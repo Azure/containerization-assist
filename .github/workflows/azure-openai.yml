@@ -1,0 +1,60 @@
+name: Azure OpenAI Test
+
+on: [workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Checkout Draft
+        uses: actions/checkout@v3
+        with:
+          repository: davidgamero/draft
+          ref: tomcat-template
+          path: draft
+
+      - name: Create k8s Kind Cluster
+        id: kind
+        uses: helm/kind-action@v1
+        with:
+          registry: true
+          registry_name: my-registry
+          registry_port: 5001
+          registry_enable_delete: true
+
+      - name: Build Draft
+        run: |
+          cd draft
+          go build -o ../.github/workflows/bin/draft
+          chmod +x ../.github/workflows/bin/draft
+          cd ..
+          rm -rf draft
+      - name: Generate with Draft
+        run: |
+          .github/workflows/bin/draft create -vv --interactive=false --skip-file-detection --variable IMAGENAME=${{ steps.kind.outputs.LOCAL_REGISTRY }}/tomcat-hello-world-workflow 
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+            
+      - name: Run Azure OpenAI scripts
+        run: |
+          cd ./.github/workflows/scripts
+          go run container_copilot.go iterate-dockerfile-build
+          go run container_copilot.go iterate-kubernetes-deploy
+        env:
+          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          REGISTRY: ${{ steps.kind.outputs.LOCAL_REGISTRY }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7 #you must explicitly allow GitHub Actions to create pull requests under repository settings Actions > General > Workflow permissions.
+        with: 
+          branch: container-copilot/update
+          delete-branch: true
