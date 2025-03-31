@@ -1,4 +1,4 @@
-
+package main
 //Gets draft binary. Would be nice to have the binary in the repo. Might exceed github file limitations.
 
 //Wrap draft dockerfile creation
