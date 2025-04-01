@@ -5,6 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"io/ioutil"
+	"log"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step
@@ -12,26 +17,24 @@ var DefaultManifestPath = filepath.Join(os.Getenv("GITHUB_WORKSPACE"), "manifest
 
 // FindKubernetesManifests locates all .yml/yaml files in the specified directory path
 // If no path is provided, DefaultManifestPath will be used
-func FindKubernetesManifests(path string) ([]string, error) {
-	// Use default path if none provided
+// FindAndCheckK8sDeployments locates all .yml/.yaml files in the given path and checks if they are Kubernetes Deployments.
+func FindAndCheckK8sDeployments(path string) ([]string, []string, error) {
 	if path == "" {
 		path = DefaultManifestPath
 		fmt.Printf("Using default manifest path: %s\n", path)
 	}
 
 	var manifestPaths []string
+	var deploymentFiles []string
 
-	// Verify the path exists and is a directory
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, fmt.Errorf("error accessing directory %s: %v", path, err)
+		return nil, nil, fmt.Errorf("error accessing directory %s: %v", path, err)
 	}
-
 	if !fileInfo.IsDir() {
-		return nil, fmt.Errorf("%s is not a directory", path)
+		return nil, nil, fmt.Errorf("%s is not a directory", path)
 	}
 
-	// Find all YAML files in the directory
 	fmt.Printf("Looking for Kubernetes manifest files in directory: %s\n", path)
 
 	err = filepath.WalkDir(path, func(filePath string, d os.DirEntry, err error) error {
@@ -40,27 +43,60 @@ func FindKubernetesManifests(path string) ([]string, error) {
 		}
 		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
 			manifestPaths = append(manifestPaths, filePath)
+			if isK8sDeployment(filePath) {
+				deploymentFiles = append(deploymentFiles, filePath)
+			}
 		}
 		return nil
 	})
+
 	if err != nil {
-		return nil, fmt.Errorf("error walking manifest directory: %v", err)
+		return nil, nil, fmt.Errorf("error walking manifest directory: %v", err)
 	}
 
-	return manifestPaths, nil
+	return manifestPaths, deploymentFiles, nil
+}
+
+// isK8sDeployment checks if a given YAML file is a Kubernetes Deployment (supports multiple documents per file).
+func isK8sDeployment(filePath string) bool {
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		log.Printf("Error reading file: %v", err)
+		return false
+	}
+
+	var documents []map[string]interface{}
+	if err := yaml.Unmarshal(data, &documents); err != nil {
+		log.Printf("Error parsing YAML: %v", err)
+		return false
+	}
+
+	for _, doc := range documents {
+		if doc != nil {
+			u := &unstructured.Unstructured{Object: doc}
+			if u.GetKind() == "Deployment" && u.GetAPIVersion() != "" && doc["spec"] != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Grabs all manifests in a "manifests" directory in the repo's root directory
-func GetDefaultManifests() ([]string, error) {
-	return FindKubernetesManifests("")
+func GetDefaultManifests() ([]string, []string, error) {
+	return FindAndCheckK8sDeployments("")
 }
 
 // InitializeManifests populates the K8sManifests field in PipelineState with manifests found in the specified path
 // If path is empty, the default manifest path will be used
 func InitializeManifests(state *PipelineState, path string) error {
-	manifestPaths, err := FindKubernetesManifests(path)
+	manifestPaths, deploymentFiles, err := FindAndCheckK8sDeployments(path)
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
+	}
+
+	if len(deploymentFiles) == 0 {
+		fmt.Println("No Kubernetes deployment files found")
 	}
 
 	if len(manifestPaths) == 0 {

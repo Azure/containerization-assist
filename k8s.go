@@ -9,13 +9,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"io/ioutil"
-	"log"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 )
 
 // checkPodStatus verifies if pods from the deployment are running correctly
@@ -185,12 +181,12 @@ func deployAndVerifySingleManifest(manifestPath string) (bool, string) {
 
 	// Only check pod status for deployment.yaml files
 	baseFilename := filepath.Base(manifestPath)
-	if !IsK8sDeployment(manifestPath) {
+	if !isK8sDeployment(manifestPath) {
 		fmt.Printf("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
 		return true, outputStr
 	}
 	// Check if the manifest is a deployment
-	if IsK8sDeployment(manifestPath) {
+	if isK8sDeployment(manifestPath) {
 		fmt.Printf("Checking pod health for deployment...\n")
 
 		// Extract namespace and app labels from the manifest
@@ -211,51 +207,6 @@ func deployAndVerifySingleManifest(manifestPath string) (bool, string) {
 
 	return true, outputStr
 }
-
-// IsK8sDeployment checks if a given YAML file is a Kubernetes Deployment Version 1
-func IsK8sDeployment(filePath string) bool {
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		log.Printf("Error reading file: %v", err)
-		return false
-	}
-
-	var obj map[string]interface{}
-	if err := yaml.Unmarshal(data, &obj); err != nil {
-		log.Printf("Error parsing YAML: %v", err)
-		return false
-	}
-
-	u := &unstructured.Unstructured{Object: obj}
-	return u.GetKind() == "Deployment"
-}
-
-// IsK8sDeployment checks if a given YAML file is a Kubernetes Deployment Version 2
-func IsK8sDeploymentUsingInstance(filePath string) bool {
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		log.Printf("Error reading file: %v", err)
-		return false
-	}
-
-	var documents []map[string]interface{}
-	if err := yaml.Unmarshal(data, &documents); err != nil {
-		log.Printf("Error parsing YAML: %v", err)
-		return false
-	}
-
-	for _, doc := range documents {
-		if doc != nil {
-			u := &unstructured.Unstructured{Object: doc}
-			if u.GetKind() == "Deployment" && u.GetAPIVersion() != "" && doc["spec"] != nil {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
 
 // iterateMultipleManifestsDeploy attempts to iteratively fix and deploy multiple Kubernetes manifests
 // Once a manifest is succesfully deployed, it is removed from the list of pending manifests
