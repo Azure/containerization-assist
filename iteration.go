@@ -22,7 +22,7 @@ type K8sManifest struct {
 type PipelineState struct {
 	Dockerfile     string
 	K8sManifests   map[string]*K8sManifest
-	BuildSuccess   bool
+	Success        bool
 	IterationCount int
 	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
 }
@@ -38,10 +38,13 @@ type Pipeline struct {
 }
 
 // Execute runs all steps in the pipeline
-func (p *Pipeline) Execute() (*PipelineState, error) {
-	state := &PipelineState{
-		Metadata:     make(map[string]interface{}),
-		K8sManifests: make(map[string]*K8sManifest),
+func (p *Pipeline) Execute(initialState *PipelineState) (*PipelineState, error) {
+	state := initialState
+	if state == nil {
+		state = &PipelineState{
+			Metadata:     make(map[string]interface{}),
+			K8sManifests: make(map[string]*K8sManifest),
+		}
 	}
 
 	for state.IterationCount < p.MaxIterations {
@@ -82,6 +85,10 @@ func (s *PipelineState) AllManifestsDeployed() bool {
 // FILLER FUNCTIONS BELOW - These don't actually do anything
 
 func DraftDockerfile(state *PipelineState) error {
+	//Call function in draft.go to generate a Dockerfile
+
+	//Should store dockerfile in state
+
 	fmt.Println("  Generated draft Dockerfile")
 	return nil
 }
@@ -99,7 +106,7 @@ func ValidateDockerfile(state *PipelineState) error {
 
 // BuildDockerfile attempts to build the Docker image
 func BuildDockerfile(state *PipelineState) error {
-	state.BuildSuccess = true
+	state.Success = true
 	fmt.Println("  Built Docker image")
 	return nil
 }
@@ -107,27 +114,71 @@ func BuildDockerfile(state *PipelineState) error {
 // FILLER FUCNTIONS END
 
 func ExampleUsage() {
-	examplePipeline := &Pipeline{
+	// Initialize state before pipeline execution
+	initialState := &PipelineState{
+		Metadata:     make(map[string]interface{}),
+		K8sManifests: make(map[string]*K8sManifest),
+	}
+
+	//Call function in draft.go to generate a Dockerfile
+
+	initialState.Dockerfile = "" // Add the generated Dockerfile here // Currently assumes just one dockerfile
+
+	err := InitializeDefaultPathManifests(initialState) // Initialize K8sManifests with default path
+	if err != nil {
+		fmt.Printf("Failed to initialize manifests: %v\n", err)
+		return
+	}
+
+	//At this point we have a dockerfile and a set of manifests in the state
+	// We can now proceed to the iteration pipelines
+
+	// Dockerfile Pipeline
+	dockerfilePipeline := &Pipeline{
 		Steps: []Step{
-			InitializeDefaultPathManifests,
-			DraftDockerfile,
 			EnhanceWithLLM,
-			ValidateDockerfile,
 			BuildDockerfile,
 		},
 		ShouldIterate: func(state *PipelineState) bool {
-			return !state.BuildSuccess // Iterate until build succeeds
+			return !state.Success // Iterate until build succeeds
 		},
 		MaxIterations: 3,
 	}
 
-	// Execute the pipeline
-	result, err := examplePipeline.Execute()
+	// K8s Manifest Pipeline - uses the state from the Dockerfile pipeline
+	manifestPipeline := &Pipeline{
+		Steps: []Step{
+			//DeployK8sManifests, only try to deploy the manifests that were not previously succesfully deployed
+			//ValidateK8sManifests,
+			//EnhanceWithLLM,
+		},
+		ShouldIterate: func(state *PipelineState) bool {
+			return !state.AllManifestsDeployed() // Iterate until all manifests are deployed //REQUIRES CHANGE sucessful deployment does not neccesarily mean container running
+		},
+		MaxIterations: 3,
+	}
+
+	fmt.Println("EXECUTING DOCKERFILE PIPELINE")
+	dockerResult, err := dockerfilePipeline.Execute(initialState)
 	if err != nil {
-		fmt.Printf("Pipeline failed: %v\n", err)
+		fmt.Printf("Dockerfile pipeline failed: %v\n", err)
+		return
+	}
+	fmt.Printf("Final Dockerfile after %d iterations:\n%s\n\n",
+		dockerResult.IterationCount+1, dockerResult.Dockerfile)
+
+	// Reset the iteration count before starting the manifest pipeline
+	dockerResult.IterationCount = 0
+
+	// The state from the dockerfile pipeline (dockerResult) is passed to the manifest pipeline,
+	// so all changes made during the dockerfile pipeline will be available to the manifest pipeline
+	fmt.Println("EXECUTING K8S MANIFEST PIPELINE")
+	manifestResult, err := manifestPipeline.Execute(dockerResult)
+	if err != nil {
+		fmt.Printf("K8s manifest pipeline failed: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Final Dockerfile after %d iterations:\n%s\n",
-		result.IterationCount+1, result.Dockerfile)
+	fmt.Printf("Processed %d Kubernetes manifests after %d iterations\n",
+		len(manifestResult.K8sManifests), manifestResult.IterationCount+1)
 }
