@@ -30,7 +30,8 @@ func readFileTree(root string) (string, error) {
 	if _, err := os.Stat(gitignorePath); err == nil {
 		gitignoreContent, err := os.ReadFile(gitignorePath)
 		if err == nil {
-			ignorePatterns = append(ignorePatterns, string(gitignoreContent))
+			gitignoreLines := strings.Split(string(gitignoreContent), "\n")
+			ignorePatterns = append(ignorePatterns, gitignoreLines...)
 		}
 	}
 
