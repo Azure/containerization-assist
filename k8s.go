@@ -181,7 +181,12 @@ func deployAndVerifySingleManifest(manifestPath string) (bool, string) {
 
 	// Only check pod status for deployment.yaml files
 	baseFilename := filepath.Base(manifestPath)
-	if baseFilename == "deployment.yaml" {
+	if !isK8sDeployment(manifestPath) {
+		fmt.Printf("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
+		return true, outputStr
+	}
+	// Check if the manifest is a deployment
+	if isK8sDeployment(manifestPath) {
 		fmt.Printf("Checking pod health for deployment...\n")
 
 		// Extract namespace and app labels from the manifest
