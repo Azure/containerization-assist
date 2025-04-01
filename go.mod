@@ -7,6 +7,8 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai v0.7.2
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
+	k8s.io/apimachinery v0.32.3
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
