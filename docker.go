@@ -149,6 +149,15 @@ Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.`
 	return nil, fmt.Errorf("no response from AI model")
 }
 
+// checkDockerRunning verifies if the Docker daemon is running.
+func checkDockerRunning() error {
+	cmd := exec.Command("docker", "info")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Docker daemon is not running. Please start Docker and try again. Error details: %s", string(output))
+	}
+	return nil
+}
+
 func checkDockerInstalled() error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return fmt.Errorf("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH")
