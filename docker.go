@@ -15,14 +15,10 @@ import (
 )
 
 // buildDockerfile attempts to build the Docker image and returns any error output
-func buildDockerfile(dockerfilePath string,registryName string) (bool, string) {
+func buildDockerfile(dockerfilePath string,registryPrefix string) (bool, string) {
 	// Get the directory containing the Dockerfile to use as build context
 	dockerfileDir := filepath.Dir(dockerfilePath)
 
-	registryPrefix := ""
-	if registryName != ""{
-     registryPrefix = registryName + "/"
-	}
 	fmt.Println("building dockerfile at dir ",dockerfileDir)
 	// Run Docker build with explicit context path
 	// Use the absolute path for the dockerfile and specify the context directory
@@ -153,6 +149,10 @@ func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, docker
 
 		// Try to build
 		registry := ""
+		registryPrefix := ""
+		if registry != ""{
+			registryPrefix = registry + "/"
+		}
 		success, buildOutput := buildDockerfile(dockerfilePath,registry)
 		if success {
 			fmt.Println("🎉 Docker build succeeded!")
@@ -162,7 +162,7 @@ func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, docker
 			if registry == ""{
 				return fmt.Errorf("no registry provided, unable to push")
 			}
-			cmd := exec.Command("docker", "push", registry+"/tomcat-hello-world-workflow:latest")
+			cmd := exec.Command("docker", "push", registryPrefix+"tomcat-hello-world-workflow:latest")
 			output, err := cmd.CombinedOutput()
 			outputStr := string(output)
 			fmt.Println("Output: ", outputStr)
