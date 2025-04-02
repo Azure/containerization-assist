@@ -69,7 +69,13 @@ func main() {
 				fmt.Sscanf(os.Args[4], "%d", &maxIterations)
 			}
 
-			repoStructure, err := getFileTree()
+			// Get current working dir for file structure path
+			cwd, err := os.Getwd()
+			if err != nil {
+				fmt.Println("Error getting current directory:", err)
+				return
+			}
+			repoStructure, err := readFileTree(cwd)
 			if err != nil {
 				fmt.Printf("failed to get file tree: %s",err.Error())
 				os.Exit(1)
