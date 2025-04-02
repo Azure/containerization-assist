@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/draft/pkg/handlers"
 	"github.com/Azure/draft/pkg/templatewriter/writers"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 )
