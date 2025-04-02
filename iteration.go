@@ -9,23 +9,23 @@ import (
 	"fmt"
 )
 
-// K8sManifest represents a single Kubernetes manifest and its deployment status
-type K8sManifest struct {
-	Name             string
-	Content          string
-	isDeployed       bool
-	isDeploymentType bool
-	//Possibly Summary of changes
-}
+// // K8sManifest represents a single Kubernetes manifest and its deployment status
+// type K8sManifest struct {
+// 	Name             string
+// 	Content          string
+// 	isDeployed       bool
+// 	isDeploymentType bool
+// 	//Possibly Summary of changes
+// }
 
-// PipelineState holds state across steps and iterations
-type PipelineState struct {
-	Dockerfile     string
-	K8sManifests   map[string]*K8sManifest
-	Success        bool
-	IterationCount int
-	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
-}
+// // PipelineState holds state across steps and iterations
+// type PipelineState struct {
+// 	Dockerfile     string
+// 	K8sManifests   map[string]*K8sManifest
+// 	Success        bool
+// 	IterationCount int
+// 	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
+// }
 
 // Step is a function type that processes the pipeline state
 type Step func(state *PipelineState) error

@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
-	"io/ioutil"
-	"log"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -131,4 +131,17 @@ func InitializeManifests(state *PipelineState, path string) error {
 
 func InitializeDefaultPathManifests(state *PipelineState) error {
 	return InitializeManifests(state, "")
+}
+
+// FormatManifestErrors returns a string containing all manifest errors with their names
+func FormatManifestErrors(state *PipelineState) string {
+	var errorBuilder strings.Builder
+
+	for name, manifest := range state.K8sManifests {
+		if manifest.errorLog != "" {
+			errorBuilder.WriteString(fmt.Sprintf("\nManifest %q:\n%s\n", name, manifest.errorLog))
+		}
+	}
+
+	return errorBuilder.String()
 }
