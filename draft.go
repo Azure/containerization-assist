@@ -14,6 +14,18 @@ import (
 
 const (
 	manifestDeploymentTemplateName = "deployment-manifests"
+	dockerTemplatePrompt           = `
+You are selecting a Dockerfile template for a project.
+
+Available Dockerfile templates:
+%s
+
+Project repository structure:
+%s
+
+Based on the files in this project, select the most appropriate Dockerfile template name from the list.
+Return only the exact template name from the list without any other text, explanation or formatting.
+`
 )
 
 func generateArtifactsWithDraft(templateName, outputDir string, variables map[string]string) error {
@@ -70,18 +82,7 @@ func getDockerfileTemplateName(client *azopenai.Client, deploymentID, projectDir
 		return "", fmt.Errorf("failed to get file tree: %w", err)
 	}
 
-	promptText := fmt.Sprintf(`
-You are selecting a Dockerfile template for a project.
-
-Available Dockerfile templates:
-%s
-
-Project repository structure:
-%s
-
-Based on the files in this project, select the most appropriate Dockerfile template name from the list.
-Return only the exact template name from the list without any other text, explanation or formatting.
-`, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
+	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
 
 	resp, err := client.GetChatCompletions(
 		context.Background(),
