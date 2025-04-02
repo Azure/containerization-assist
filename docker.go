@@ -15,15 +15,18 @@ import (
 )
 
 // buildDockerfile attempts to build the Docker image and returns any error output
-func buildDockerfile(dockerfilePath string) (bool, string) {
+func buildDockerfile(dockerfilePath string,registryName string) (bool, string) {
 	// Get the directory containing the Dockerfile to use as build context
 	dockerfileDir := filepath.Dir(dockerfilePath)
 
-	registryName := os.Getenv("REGISTRY")
-
+	registryPrefix := ""
+	if registryName != ""{
+     registryPrefix = registryName + "/"
+	}
+	fmt.Println("building dockerfile at dir ",dockerfileDir)
 	// Run Docker build with explicit context path
 	// Use the absolute path for the dockerfile and specify the context directory
-	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryName+"/tomcat-hello-world-workflow:latest", dockerfileDir)
+	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryPrefix+"tomcat-hello-world-workflow:latest", dockerfileDir)
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)
 
@@ -149,14 +152,17 @@ func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, docker
 		fmt.Printf("\n=== Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Try to build
-		success, buildOutput := buildDockerfile(dockerfilePath)
+		registry := ""
+		success, buildOutput := buildDockerfile(dockerfilePath,registry)
 		if success {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", currentDockerfile)
 
 			//Temp code for pushing to kind registry
-			registryName := os.Getenv("REGISTRY")
-			cmd := exec.Command("docker", "push", registryName+"/tomcat-hello-world-workflow:latest")
+			if registry == ""{
+				return fmt.Errorf("no registry provided, unable to push")
+			}
+			cmd := exec.Command("docker", "push", registry+"/tomcat-hello-world-workflow:latest")
 			output, err := cmd.CombinedOutput()
 			outputStr := string(output)
 			fmt.Println("Output: ", outputStr)
@@ -243,3 +249,6 @@ func findKubernetesManifests(path string) ([]string, error) {
 	return manifestPaths, nil
 }
 
+func dockerDaemonIsRunning()bool{
+	return true
+}

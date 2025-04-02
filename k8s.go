@@ -210,7 +210,7 @@ func deployAndVerifySingleManifest(manifestPath string) (bool, string) {
 
 // iterateMultipleManifestsDeploy attempts to iteratively fix and deploy multiple Kubernetes manifests
 // Once a manifest is succesfully deployed, it is removed from the list of pending manifests
-func iterateMultipleManifestsDeploy(client *azopenai.Client, deploymentID string, manifestDir string, fileStructurePath string, maxIterations int) error {
+func iterateMultipleManifestsDeploy(client *azopenai.Client, deploymentID string, manifestDir string, repoStructure string, maxIterations int) error {
 	fmt.Printf("Starting Kubernetes manifest deployment iteration process for: %s\n", manifestDir)
 
 	// Check if kubectl is installed before starting the iteration process
@@ -231,12 +231,6 @@ func iterateMultipleManifestsDeploy(client *azopenai.Client, deploymentID string
 	fmt.Printf("Found %d manifest file(s) to deploy\n", len(manifestPaths))
 	for i, path := range manifestPaths {
 		fmt.Printf("%d. %s\n", i+1, path)
-	}
-
-	// Get repository structure
-	repoStructure, err := os.ReadFile(fileStructurePath)
-	if err != nil {
-		return fmt.Errorf("error reading repository structure: %v", err)
 	}
 
 	// Load all manifest contents

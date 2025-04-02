@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -32,6 +33,33 @@ type FileAnalysisResult struct {
 }
 
 
+func generate(client *azopenai.Client,deploymentID string, dir string) error{
+	fmt.Println("Generating dockerfile")
+	maxIterations := 5
+	dockerfilePath := filepath.Join(dir,"./Dockerfile")
+
+	// Get current working dir for file structure path
+	fmt.Println("reading repo file tree at ",dir)
+	repoStructure, err := readFileTree(dir)
+	if err != nil {
+		return fmt.Errorf("failed to get file tree: %s",err.Error())
+	}
+
+	if !dockerDaemonIsRunning(){
+		return fmt.Errorf("docker daemon not detected")
+	}
+
+	if err := iterateDockerfileBuild(client, deploymentID, dockerfilePath, repoStructure, maxIterations); err != nil {
+		return fmt.Errorf("Error in dockerfile iteration process: %v\n", err)
+	}
+
+	manifestPath := filepath.Join(dir,"manifests") // Default directory containing manifests
+
+	if err := iterateMultipleManifestsDeploy(client, deploymentID, manifestPath, repoStructure, maxIterations); err != nil {
+		return fmt.Errorf("Error in Kubernetes deployment process: %v", err)
+	}
+	return nil
+}
 
 func main() {
 	// Get environment variables
@@ -55,62 +83,13 @@ func main() {
 	// Check command line arguments
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "iterate-dockerfile-build":
-			maxIterations := 5
-			dockerfilePath := "./Dockerfile"
-
-			// Allow custom dockerfile path
-			if len(os.Args) > 2 {
-				dockerfilePath = os.Args[2]
+		case "generate":
+			repoDir := "."
+			if len( os.Args) > 2{
+				fmt.Printf("targeting repo at %s",repoDir)
+				repoDir = os.Args[2]
 			}
-
-			// Allow custom max iterations
-			if len(os.Args) > 4 {
-				fmt.Sscanf(os.Args[4], "%d", &maxIterations)
-			}
-
-			// Get current working dir for file structure path
-			cwd, err := os.Getwd()
-			if err != nil {
-				fmt.Println("Error getting current directory:", err)
-				return
-			}
-			repoStructure, err := readFileTree(cwd)
-			if err != nil {
-				fmt.Printf("failed to get file tree: %s",err.Error())
-				os.Exit(1)
-			}
-
-			if err := iterateDockerfileBuild(client, deploymentID, dockerfilePath, repoStructure, maxIterations); err != nil {
-				fmt.Printf("Error in dockerfile iteration process: %v\n", err)
-				os.Exit(1)
-			}
-
-		case "iterate-kubernetes-deploy":
-			maxIterations := 5
-			manifestPath := "../../../manifests" // Default directory containing manifests
-			fileStructurePath := "repo_structure_json.txt"
-
-			// Allow custom manifest path (can be a directory or file)
-			if len(os.Args) > 2 {
-				manifestPath = os.Args[2]
-			}
-
-			// Allow file structure path
-			if len(os.Args) > 3 {
-				fileStructurePath = os.Args[3]
-			}
-
-			// Allow custom max iterations
-			if len(os.Args) > 4 {
-				fmt.Sscanf(os.Args[4], "%d", &maxIterations)
-			}
-
-			if err := iterateMultipleManifestsDeploy(client, deploymentID, manifestPath, fileStructurePath, maxIterations); err != nil {
-				fmt.Printf("Error in Kubernetes deployment process: %v", err)
-				os.Exit(1)
-			}
-
+			generate(client,deploymentID,repoDir)
 		default:
 			// Default behavior - test Azure OpenAI
 			resp, err := client.GetChatCompletions(
@@ -124,7 +103,7 @@ func main() {
 					},
 				},
 				nil,
-			)
+				)
 			if err != nil {
 				fmt.Printf("Error getting chat completions: %v\n", err)
 				os.Exit(1)
@@ -140,7 +119,6 @@ func main() {
 
 	// If no arguments provided, print usage
 	fmt.Println("Usage:")
-	fmt.Println("  go run container_copilot.go                          - Test Azure OpenAI connection")
-	fmt.Println("  go run container_copilot.go iterate-dockerfile-build [dockerfile-path] [file-structure-path] [max-iterations] - Iteratively build and fix a Dockerfile")
-	fmt.Println("  go run container_copilot.go iterate-kubernetes-deploy [manifest-path-or-dir] [file-structure-path] [max-iterations] - Iteratively deploy and fix Kubernetes manifest(s)")
+	fmt.Println("  container_copilot                          - Test Azure OpenAI connection")
+	fmt.Println("  container_copilot generate [path-to-repository-root] [max-iterations] - Iteratively generate starter container artifacts with AI")
 }
