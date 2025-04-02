@@ -1,4 +1,4 @@
-name: Azure OpenAI Test
+name: Temporary Container Copilot Test
 
 on: [workflow_dispatch]
 
@@ -33,7 +33,7 @@ jobs:
           rm -rf draft
       - name: Generate with Draft
         run: |
-          .github/workflows/bin/draft create -vv --interactive=false --skip-file-detection --variable IMAGENAME=${{ steps.kind.outputs.LOCAL_REGISTRY }}/tomcat-hello-world-workflow 
+          .github/workflows/bin/draft create -vv --interactive=false --skip-file-detection --variable IMAGENAME=${{ steps.kind.outputs.LOCAL_REGISTRY }}/container-copilot
       
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -45,9 +45,7 @@ jobs:
             
       - name: Run Azure OpenAI scripts
         run: |
-          cd ./.github/workflows/scripts
-          go run container_copilot.go iterate-dockerfile-build
-          go run container_copilot.go iterate-kubernetes-deploy
+          go run container_copilot.go generate
         env:
           AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
