@@ -68,8 +68,7 @@ func getDockerfileTemplateName(client *azopenai.Client, deploymentID, projectDir
 
 	repoStructure, err := readFileTree(projectDir)
 	if err != nil {
-		fmt.Printf("failed to get file tree: %s", err.Error())
-		os.Exit(1)
+		return "", fmt.Errorf("failed to get file tree: %w", err)
 	}
 
 	promptText := fmt.Sprintf(`
