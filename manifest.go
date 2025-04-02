@@ -119,6 +119,7 @@ func InitializeManifests(state *PipelineState, path string) error {
 		state.K8sManifests[name] = &K8sManifest{
 			Name:             name,
 			Content:          contentStr,
+			Path:             path,
 			isDeployed:       false,
 			isDeploymentType: isDeployment,
 		}
@@ -144,4 +145,17 @@ func FormatManifestErrors(state *PipelineState) string {
 	}
 
 	return errorBuilder.String()
+}
+
+// GetPendingManifests returns a map of manifest names that still need to be deployed
+func GetPendingManifests(state *PipelineState) map[string]bool {
+	pendingManifests := make(map[string]bool)
+
+	for name, manifest := range state.K8sManifests {
+		if !manifest.isDeployed {
+			pendingManifests[name] = true
+		}
+	}
+
+	return pendingManifests
 }

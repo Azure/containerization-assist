@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // ManifestDeployResult stores the result of a single manifest deployment
@@ -33,6 +35,7 @@ type FileAnalysisResult struct {
 type K8sManifest struct {
 	Name             string
 	Content          string
+	Path             string
 	isDeployed       bool
 	isDeploymentType bool
 	errorLog         string
@@ -55,6 +58,36 @@ type PipelineState struct {
 	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
 }
 
+// updateSuccessfulFiles writes the successful Dockerfile and manifests from the pipeline state to disk
+func updateSuccessfulFiles(state *PipelineState) {
+	if state.Success {
+		// Write final Dockerfile
+		if state.Dockerfile.Path != "" && state.Dockerfile.Content != "" {
+			fmt.Printf("Writing final Dockerfile to %s\n", state.Dockerfile.Path)
+			if err := os.WriteFile(state.Dockerfile.Path, []byte(state.Dockerfile.Content), 0644); err != nil {
+				fmt.Printf("Error writing Dockerfile: %v\n", err)
+			}
+		}
+
+		// Write final manifests
+		fmt.Println("Writing final Kubernetes manifest files...")
+		for name, manifest := range state.K8sManifests {
+			if manifest.isDeployed && manifest.Path != "" {
+				fmt.Printf("Writing updated manifest: %s\n", name)
+				if err := os.WriteFile(manifest.Path, []byte(manifest.Content), 0644); err != nil {
+					fmt.Printf("Error writing manifest %s: %v\n", name, err)
+				}
+			}
+		}
+
+		fmt.Println("\n🎉 Container deployment pipeline completed successfully!")
+		fmt.Println("Dockerfile and manifest files have been updated with the working versions.")
+	} else {
+		fmt.Println("\n❌ Container deployment pipeline did not complete successfully after maximum iterations.")
+		fmt.Println("No files were updated. Please review the logs for more information.")
+	}
+}
+
 func main() {
 	// Get environment variables
 	apiKey := os.Getenv("AZURE_OPENAI_KEY")
@@ -74,53 +107,85 @@ func main() {
 		os.Exit(1)
 	}
 
-	maxIterations := 5
-	dockerfilePath := "./Dockerfile"
-	manifestPath := "../../../manifests" // Default directory containing manifests
-	fileStructurePath := "repo_structure_json.txt"
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "generate":
 
-	// Get current working dir for file structure path
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Println("Error getting current directory:", err)
-		return
+			maxIterations := 5
+			dockerfilePath := "./Dockerfile"
+
+			// Get current working dir for file structure path
+			cwd, err := os.Getwd()
+			if err != nil {
+				fmt.Println("Error getting current directory:", err)
+				return
+			}
+			repoStructure, err := readFileTree(cwd)
+			if err != nil {
+				fmt.Printf("failed to get file tree: %s", err.Error())
+				os.Exit(1)
+			}
+
+			state := &PipelineState{
+				RepoFileTree:   repoStructure,
+				K8sManifests:   make(map[string]*K8sManifest),
+				Success:        false,
+				IterationCount: 0,
+				Metadata:       make(map[string]interface{}),
+			}
+
+			err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
+			if err != nil {
+				fmt.Printf("Failed to initialize manifests: %v\n", err)
+				return
+			}
+
+			err = initializeDockerFileState(state, dockerfilePath)
+			if err != nil {
+				fmt.Printf("Failed to initialize Dockerfile state: %v\n", err)
+				return
+			}
+
+			// loop through untill max iterations or success
+			for state.IterationCount < maxIterations && !state.Success {
+
+				if err := iterateDockerfileBuild(client, deploymentID, state); err != nil {
+					fmt.Printf("Error in dockerfile iteration process: %v\n", err)
+					continue
+				}
+
+				if err := iterateMultipleManifestsDeploy(client, deploymentID, maxIterations, state); err != nil {
+					fmt.Printf("Error in Kubernetes deployment process: %v", err)
+					os.Exit(1)
+				}
+			}
+
+			// Update the dockerfile and manifests with the final successful versions
+			updateSuccessfulFiles(state)
+
+		default:
+			// Default behavior - test Azure OpenAI
+			resp, err := client.GetChatCompletions(
+				context.Background(),
+				azopenai.ChatCompletionsOptions{
+					DeploymentName: to.Ptr(deploymentID),
+					Messages: []azopenai.ChatRequestMessageClassification{
+						&azopenai.ChatRequestUserMessage{
+							Content: azopenai.NewChatRequestUserMessageContent("Hello Azure OpenAI! Tell me this is working in one short sentence."),
+						},
+					},
+				},
+				nil,
+			)
+			if err != nil {
+				fmt.Printf("Error getting chat completions: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Println("Azure OpenAI Test:")
+			if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
+				fmt.Printf("Response: %s\n", *resp.Choices[0].Message.Content)
+			}
+		}
 	}
-	repoStructure, err := readFileTree(cwd)
-	if err != nil {
-		fmt.Printf("failed to get file tree: %s", err.Error())
-		os.Exit(1)
-	}
-
-	initialState := &PipelineState{
-		RepoFileTree:   repoStructure,
-		K8sManifests:   make(map[string]*K8sManifest),
-		Success:        false,
-		IterationCount: 0,
-		Metadata:       make(map[string]interface{}),
-	}
-
-	err = InitializeDefaultPathManifests(initialState) // Initialize K8sManifests with default path
-	if err != nil {
-		fmt.Printf("Failed to initialize manifests: %v\n", err)
-		return
-	}
-
-	err = initializeDockerFileState(initialState, dockerfilePath)
-	if err != nil {
-		fmt.Printf("Failed to initialize Dockerfile state: %v\n", err)
-		return
-	}
-
-	if err := iterateDockerfileBuildWithPrevErrors(client, deploymentID, initalState); err != nil {
-		fmt.Printf("Error in dockerfile iteration process: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := iterateMultipleManifestsDeploy(client, deploymentID, manifestPath, fileStructurePath, maxIterations); err != nil {
-		fmt.Printf("Error in Kubernetes deployment process: %v", err)
-		os.Exit(1)
-	}
-
-	//Update the dockerfile and manifests with the final successful versions stored in the pipeline state
-
 }

@@ -1,12 +1,12 @@
 package main
 
 import (
+	"container-copilot/utils"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -47,7 +47,7 @@ func checkPodStatus(namespace string, labelSelector string, timeout time.Duratio
 	return false, "Timeout waiting for pods to become ready"
 }
 
-func analyzeKubernetesManifest(client *azopenai.Client, deploymentID string, input FileAnalysisInput) (*FileAnalysisResult, error) {
+func analyzeKubernetesManifest(client *azopenai.Client, deploymentID string, input FileAnalysisInput, state *PipelineState) (*FileAnalysisResult, error) {
 	// Create prompt for analyzing the Kubernetes manifest
 	promptText := fmt.Sprintf(`Analyze the following Kubernetes manifest file for errors and suggest fixes:
 Manifest:
@@ -66,12 +66,14 @@ No error messages were provided. Please check for potential issues in the Kubern
 `
 	}
 
-	// Add repository file information if provided
-	if input.RepoFileTree != "" {
+	// Add Dockerfile content for reference if available
+	if state != nil && state.Dockerfile.Content != "" {
 		promptText += fmt.Sprintf(`
-Repository files structure:
+Reference Dockerfile for this application:
 %s
-`, input.RepoFileTree)
+
+Consider the Dockerfile when analyzing the Kubernetes manifest, especially for image compatibility, ports, and environment variables.
+`, state.Dockerfile.Content)
 	}
 
 	promptText += `
@@ -101,24 +103,9 @@ Output the fixed manifest between <<<MANIFEST>>> tags.`
 	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
 		content := *resp.Choices[0].Message.Content
 
-		// Extract the fixed manifest from between the tags
-		re := regexp.MustCompile(`<<<MANIFEST>>>([\s\S]*?)<<<MANIFEST>>>`)
-		matches := re.FindStringSubmatch(content)
-
-		fixedContent := ""
-		if len(matches) > 1 {
-			// Found the manifest between tags
-			fixedContent = strings.TrimSpace(matches[1])
-		} else {
-			// If tags aren't found, try to extract the content intelligently
-			apiVersionRe := regexp.MustCompile(`(?m)^apiVersion:[\s\S]*?$`)
-			if apiVersionMatches := apiVersionRe.FindString(content); apiVersionMatches != "" {
-				// Simple heuristic: Start from apiVersion
-				fixedContent = apiVersionMatches
-			} else {
-				// Fallback: use the entire content
-				fixedContent = content
-			}
+		fixedContent, err := utils.GrabContentBetweenTags(content, "MANIFEST")
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract fixed manifest: %v", err)
 		}
 
 		return &FileAnalysisResult{
@@ -137,36 +124,8 @@ func checkKubectlInstalled() error {
 	return nil
 }
 
-// deployKubernetesManifests attempts to deploy multiple Kubernetes manifests and track results for each
-func deployKubernetesManifests(manifestPaths []string) (bool, []ManifestDeployResult) {
-	results := make([]ManifestDeployResult, len(manifestPaths))
-	overallSuccess := true
-
-	// Deploy each manifest individually to track errors per manifest
-	for i, path := range manifestPaths {
-		fmt.Printf("Deploying manifest: %s\n", path)
-		success, outputStr := deployAndVerifySingleManifest(path)
-
-		// Record the result
-		results[i] = ManifestDeployResult{
-			Path:    path,
-			Success: success,
-			Output:  outputStr,
-		}
-
-		if !success {
-			overallSuccess = false
-			fmt.Printf("Deployment failed for %s\n", path)
-		} else {
-			fmt.Printf("Successfully deployed %s\n", path)
-		}
-	}
-
-	return overallSuccess, results
-}
-
 // deployAndVerifySingleManifest applies a single manifest and verifies pod health
-func deployAndVerifySingleManifest(manifestPath string) (bool, string) {
+func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool, string) {
 	// Apply the manifest
 	cmd := exec.Command("kubectl", "apply", "-f", manifestPath)
 	output, err := cmd.CombinedOutput()
@@ -181,163 +140,134 @@ func deployAndVerifySingleManifest(manifestPath string) (bool, string) {
 
 	// Only check pod status for deployment.yaml files
 	baseFilename := filepath.Base(manifestPath)
-	if !isK8sDeployment(manifestPath) {
+	if !isDeployment {
 		fmt.Printf("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
 		return true, outputStr
 	}
-	// Check if the manifest is a deployment
-	if isK8sDeployment(manifestPath) {
-		fmt.Printf("Checking pod health for deployment...\n")
 
-		// Extract namespace and app labels from the manifest
-		// This is simplified - would need to actually take this from the manifest
-		namespace := "default"        // Default namespace
-		labelSelector := "app=my-app" // Default label selector
+	fmt.Printf("Checking pod health for deployment...\n")
 
-		// Wait for pods to become healthy
-		podSuccess, podOutput := checkPodStatus(namespace, labelSelector, time.Minute)
-		if !podSuccess {
-			fmt.Printf("Pods are not healthy: %s\n", podOutput)
-			return false, outputStr + "\n" + podOutput
-		}
-		fmt.Println("Pod health check passed")
-	} else {
-		fmt.Printf("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
+	// Extract namespace and app labels from the manifest
+	// This is simplified - would need to actually take this from the manifest
+	namespace := "default"        // Default namespace
+	labelSelector := "app=my-app" // Default label selector
+
+	// Wait for pods to become healthy
+	podSuccess, podOutput := checkPodStatus(namespace, labelSelector, time.Minute)
+	if !podSuccess {
+		fmt.Printf("Pods are not healthy: %s\n", podOutput)
+		return false, outputStr + "\n" + podOutput
 	}
+	fmt.Println("Pod health check passed")
 
 	return true, outputStr
 }
 
-// iterateMultipleManifestsDeploy attempts to iteratively fix and deploy multiple Kubernetes manifests
-// Once a manifest is succesfully deployed, it is removed from the list of pending manifests
-func iterateMultipleManifestsDeploy(client *azopenai.Client, deploymentID string, manifestDir string, fileStructurePath string, maxIterations int) error {
-	fmt.Printf("Starting Kubernetes manifest deployment iteration process for: %s\n", manifestDir)
+// deployStateManifests deploys manifests from pipeline state
+func deployStateManifests(state *PipelineState) error {
+	// Create a temporary directory for manifest files
+	tmpDir, err := os.MkdirTemp("", "k8s-deploy-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 
-	// Check if kubectl is installed before starting the iteration process
+	pendingManifests := GetPendingManifests(state)
+	if len(pendingManifests) == 0 {
+		fmt.Println("No pending manifests to deploy")
+		return nil
+	}
+
+	fmt.Printf("Attempting to deploy %d manifests\n", len(pendingManifests))
+
+	var failedManifests []string
+
+	// Deploy each pending manifest using existing verification
+	for name := range pendingManifests {
+		manifest := state.K8sManifests[name]
+
+		// Write manifest to temporary file
+		tmpFile := filepath.Join(tmpDir, name)
+		if err := os.WriteFile(tmpFile, []byte(manifest.Content), 0644); err != nil {
+			return fmt.Errorf("failed to write manifest %s: %v", name, err)
+		}
+
+		// Use existing deployment verification
+		success, output := deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
+
+		if !success {
+			manifest.errorLog = output
+			manifest.isDeployed = false
+			fmt.Printf("Failed to deploy manifest %s: %s\n", name, output)
+			failedManifests = append(failedManifests, name)
+			continue
+		}
+
+		fmt.Printf("Successfully deployed manifest: %s\n", name)
+		manifest.isDeployed = true
+		manifest.errorLog = ""
+	}
+
+	// Return error if any manifests failed to deploy
+	if len(failedManifests) > 0 {
+		return fmt.Errorf("failed to deploy manifests: %v", failedManifests)
+	}
+
+	return nil
+}
+
+// Update iterateMultipleManifestsDeploy to use the new deployment function
+func iterateMultipleManifestsDeploy(client *azopenai.Client, deploymentID string, maxIterations int, state *PipelineState) error {
+	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
+
 	if err := checkKubectlInstalled(); err != nil {
 		return err
 	}
 
-	// Find all Kubernetes manifest files
-	manifestPaths, err := findKubernetesManifests(manifestDir)
-	if err != nil {
-		return err
-	}
-
-	if len(manifestPaths) == 0 {
-		return fmt.Errorf("no manifest files found at %s", manifestDir)
-	}
-
-	fmt.Printf("Found %d manifest file(s) to deploy\n", len(manifestPaths))
-	for i, path := range manifestPaths {
-		fmt.Printf("%d. %s\n", i+1, path)
-	}
-
-	// Get repository structure
-	repoStructure, err := os.ReadFile(fileStructurePath)
-	if err != nil {
-		return fmt.Errorf("error reading repository structure: %v", err)
-	}
-
-	// Load all manifest contents
-	manifests := make(map[string]string)
-	for _, path := range manifestPaths {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("error reading manifest %s: %v", path, err)
-		}
-		manifests[path] = string(content)
-	}
-
-	// Track which manifests still need to be deployed
-	pendingManifests := make(map[string]bool)
-	for _, path := range manifestPaths {
-		pendingManifests[path] = true
+	if len(state.K8sManifests) == 0 {
+		return fmt.Errorf("no manifest files found in state")
 	}
 
 	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Iteration %d of %d ===\n", i+1, maxIterations)
 
-		// Get the list of manifests that are still pending
-		var currentManifests []string
-		for path := range pendingManifests {
-			currentManifests = append(currentManifests, path)
-		}
-
-		// If no manifests are pending, we're done
-		if len(currentManifests) == 0 {
+		// Try to deploy pending manifests
+		err := deployStateManifests(state)
+		if err == nil {
+			state.Success = true
 			fmt.Println("🎉 All Kubernetes manifests deployed successfully!")
 			return nil
 		}
 
-		// Try to deploy only pending manifests
-		fmt.Printf("Attempting to deploy %d manifest(s)...\n", len(currentManifests))
-		_, deployResults := deployKubernetesManifests(currentManifests)
+		fmt.Printf("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
 
-		// Create a map to quickly look up results by path
-		resultsByPath := make(map[string]ManifestDeployResult)
-		for _, result := range deployResults {
-			resultsByPath[result.Path] = result
-			// Remove successfully deployed manifests from pending list
-			if result.Success {
-				fmt.Printf("✅ Successfully deployed: %s\n", result.Path)
-				delete(pendingManifests, result.Path)
-			}
-		}
+		// Fix each manifest that still has issues
+		pendingManifests := GetPendingManifests(state)
+		for name := range pendingManifests {
+			manifest := state.K8sManifests[name]
+			fmt.Printf("\nAnalyzing and fixing: %s\n", name)
 
-		// If no pending manifests remain, we're done
-		if len(pendingManifests) == 0 {
-			fmt.Println("🎉 All Kubernetes manifests deployed successfully!")
-			return nil
-		}
-
-		fmt.Printf("🔄 %d manifests still need fixing. Using AI to fix issues...\n", len(pendingManifests))
-
-		// Fix each manifest file that still has issues
-		for path := range pendingManifests {
-			content := manifests[path]
-			fmt.Printf("\nAnalyzing and fixing: %s\n", path)
-
-			// Use the specific error output for this manifest
-			specificErrors := resultsByPath[path].Output
-
-			// Include information about other manifest files that may be related
-			var contextInfo strings.Builder
-			contextInfo.WriteString("Other manifests in the same deployment:\n")
-			for otherPath := range manifests {
-				if otherPath != path {
-					contextInfo.WriteString(fmt.Sprintf("- %s\n", filepath.Base(otherPath)))
-				}
-			}
-
-			// Prepare input for AI analysis with specific error information
 			input := FileAnalysisInput{
-				Content:       content,
-				ErrorMessages: specificErrors,
-				RepoFileTree:  string(repoStructure),
-				FilePath:      path,
+				Content:       manifest.Content,
+				ErrorMessages: manifest.errorLog,
+				FilePath:      manifest.Path,
+				//Repo tree is currently not provided to the prompt
 			}
 
-			// Get AI to fix the manifest
-			fixResult, err := analyzeKubernetesManifest(client, deploymentID, input)
+			// Pass the entire state instead of just the Dockerfile
+			result, err := analyzeKubernetesManifest(client, deploymentID, input, state)
 			if err != nil {
-				return fmt.Errorf("error in AI analysis for %s: %v", path, err)
+				return fmt.Errorf("error in AI analysis for %s: %v", name, err)
 			}
 
-			// Update the manifest content in our map
-			manifests[path] = fixResult.FixedContent
-			fmt.Println("AI suggested fixes for", path)
-			fmt.Println(fixResult.Analysis)
-
-			// Write the fixed manifest
-			if err := os.WriteFile(path, []byte(fixResult.FixedContent), 0644); err != nil {
-				return fmt.Errorf("error writing fixed Kubernetes manifest %s: %v", path, err)
-			}
+			manifest.Content = result.FixedContent
+			fmt.Printf("AI suggested fixes for %s\n", name)
+			fmt.Println(result.Analysis)
 		}
 
-		fmt.Printf("Updated Kubernetes manifests with errors. Attempting deployment again...\n")
-		time.Sleep(1 * time.Second) // Small delay for readability
+		fmt.Println("Updated manifests with fixes. Attempting deployment again...")
+		time.Sleep(1 * time.Second)
 	}
 
-	return fmt.Errorf("failed to fix Kubernetes manifests after %d iterations; %d manifests still have issues", maxIterations, len(pendingManifests))
+	return fmt.Errorf("failed to fix Kubernetes manifests after %d iterations", maxIterations)
 }
