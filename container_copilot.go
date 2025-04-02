@@ -31,7 +31,62 @@ type FileAnalysisResult struct {
 	Analysis     string `json:"analysis"`
 }
 
+// K8sManifest represents a single Kubernetes manifest and its deployment status
+type K8sManifest struct {
+	Name             string
+	Content          string
+	Path             string
+	isDeployed       bool
+	isDeploymentType bool
+	errorLog         string
+	//Possibly Summary of changes
+}
 
+type Dockerfile struct {
+	Content     string
+	Path        string
+	BuildErrors string
+}
+
+// PipelineState holds state across steps and iterations
+type PipelineState struct {
+	RepoFileTree   string
+	Dockerfile     Dockerfile
+	K8sManifests   map[string]*K8sManifest
+	Success        bool
+	IterationCount int
+	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
+}
+
+// updateSuccessfulFiles writes the successful Dockerfile and manifests from the pipeline state to disk
+func updateSuccessfulFiles(state *PipelineState) {
+	if state.Success {
+		// Write final Dockerfile
+		if state.Dockerfile.Path != "" && state.Dockerfile.Content != "" {
+			fmt.Printf("Writing final Dockerfile to %s\n", state.Dockerfile.Path)
+			if err := os.WriteFile(state.Dockerfile.Path, []byte(state.Dockerfile.Content), 0644); err != nil {
+				fmt.Printf("Error writing Dockerfile: %v\n", err)
+			}
+		}
+
+		// Write final manifests
+		fmt.Println("Writing final Kubernetes manifest files...")
+		for name, manifest := range state.K8sManifests {
+			if manifest.isDeployed && manifest.Path != "" {
+				fmt.Printf("Writing updated manifest: %s\n", name)
+				if err := os.WriteFile(manifest.Path, []byte(manifest.Content), 0644); err != nil {
+					fmt.Printf("Error writing manifest %s: %v\n", name, err)
+				}
+			}
+		}
+
+		fmt.Println("\n🎉 Container deployment pipeline completed successfully!")
+		fmt.Println("Dockerfile and manifest files have been updated with the working versions.")
+	} else {
+		fmt.Println("\n❌ Container deployment pipeline did not complete successfully after maximum iterations.")
+		fmt.Println("No files were updated. Please review the logs for more information.")
+	}
+}
 
 func main() {
 	// Get environment variables
@@ -52,22 +107,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Check command line arguments
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "iterate-dockerfile-build":
+		case "generate":
+
 			maxIterations := 5
 			dockerfilePath := "./Dockerfile"
-
-			// Allow custom dockerfile path
-			if len(os.Args) > 2 {
-				dockerfilePath = os.Args[2]
-			}
-
-			// Allow custom max iterations
-			if len(os.Args) > 4 {
-				fmt.Sscanf(os.Args[4], "%d", &maxIterations)
-			}
 
 			// Get current working dir for file structure path
 			cwd, err := os.Getwd()
@@ -77,39 +122,46 @@ func main() {
 			}
 			repoStructure, err := readFileTree(cwd)
 			if err != nil {
-				fmt.Printf("failed to get file tree: %s",err.Error())
+				fmt.Printf("failed to get file tree: %s", err.Error())
 				os.Exit(1)
 			}
 
-			if err := iterateDockerfileBuild(client, deploymentID, dockerfilePath, repoStructure, maxIterations); err != nil {
-				fmt.Printf("Error in dockerfile iteration process: %v\n", err)
-				os.Exit(1)
+			state := &PipelineState{
+				RepoFileTree:   repoStructure,
+				K8sManifests:   make(map[string]*K8sManifest),
+				Success:        false,
+				IterationCount: 0,
+				Metadata:       make(map[string]interface{}),
 			}
 
-		case "iterate-kubernetes-deploy":
-			maxIterations := 5
-			manifestPath := "../../../manifests" // Default directory containing manifests
-			fileStructurePath := "repo_structure_json.txt"
-
-			// Allow custom manifest path (can be a directory or file)
-			if len(os.Args) > 2 {
-				manifestPath = os.Args[2]
+			err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
+			if err != nil {
+				fmt.Printf("Failed to initialize manifests: %v\n", err)
+				return
 			}
 
-			// Allow file structure path
-			if len(os.Args) > 3 {
-				fileStructurePath = os.Args[3]
+			err = initializeDockerFileState(state, dockerfilePath)
+			if err != nil {
+				fmt.Printf("Failed to initialize Dockerfile state: %v\n", err)
+				return
 			}
 
-			// Allow custom max iterations
-			if len(os.Args) > 4 {
-				fmt.Sscanf(os.Args[4], "%d", &maxIterations)
+			// loop through untill max iterations or success
+			for state.IterationCount < maxIterations && !state.Success {
+
+				if err := iterateDockerfileBuild(client, deploymentID, state); err != nil {
+					fmt.Printf("Error in dockerfile iteration process: %v\n", err)
+					continue
+				}
+
+				if err := iterateMultipleManifestsDeploy(client, deploymentID, maxIterations, state); err != nil {
+					fmt.Printf("Error in Kubernetes deployment process: %v", err)
+					os.Exit(1)
+				}
 			}
 
-			if err := iterateMultipleManifestsDeploy(client, deploymentID, manifestPath, fileStructurePath, maxIterations); err != nil {
-				fmt.Printf("Error in Kubernetes deployment process: %v", err)
-				os.Exit(1)
-			}
+			// Update the dockerfile and manifests with the final successful versions
+			updateSuccessfulFiles(state)
 
 		default:
 			// Default behavior - test Azure OpenAI
@@ -135,12 +187,5 @@ func main() {
 				fmt.Printf("Response: %s\n", *resp.Choices[0].Message.Content)
 			}
 		}
-		return
 	}
-
-	// If no arguments provided, print usage
-	fmt.Println("Usage:")
-	fmt.Println("  go run container_copilot.go                          - Test Azure OpenAI connection")
-	fmt.Println("  go run container_copilot.go iterate-dockerfile-build [dockerfile-path] [file-structure-path] [max-iterations] - Iteratively build and fix a Dockerfile")
-	fmt.Println("  go run container_copilot.go iterate-kubernetes-deploy [manifest-path-or-dir] [file-structure-path] [max-iterations] - Iteratively deploy and fix Kubernetes manifest(s)")
 }

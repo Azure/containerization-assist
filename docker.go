@@ -1,13 +1,12 @@
 package main
 
 import (
+	"container-copilot/utils"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
@@ -35,19 +34,66 @@ func buildDockerfile(dockerfilePath string) (bool, string) {
 	return true, outputStr
 }
 
-func analyzeDockerfile(client *azopenai.Client, deploymentID string, input FileAnalysisInput) (*FileAnalysisResult, error) {
+// buildDockerfileContent builds a Docker image from a string containing Dockerfile contents
+func buildDockerfileContent(dockerfileContent string) (string, error) {
+	// Create temporary directory
+	tmpDir, err := os.MkdirTemp("", "docker-build-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir) // Clean up
+
+	// Create temporary Dockerfile
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
+		return "", fmt.Errorf("failed to write Dockerfile: %v", err)
+	}
+
+	// Get registry name from environment
+	registryName := os.Getenv("REGISTRY")
+	if registryName == "" {
+		return "", fmt.Errorf("REGISTRY environment variable not set")
+	}
+
+	// Build the image using the temporary Dockerfile
+	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryName+"/container-copilot:latest", tmpDir)
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+
+	if err != nil {
+		return outputStr, fmt.Errorf("docker build failed: %v", err)
+	}
+
+	return outputStr, nil
+}
+
+func analyzeDockerfile(client *azopenai.Client, deploymentID string, state *PipelineState) (*FileAnalysisResult, error) {
+	dockerfile := state.Dockerfile
+
 	// Create prompt for analyzing the Dockerfile
 	promptText := fmt.Sprintf(`Analyze the following Dockerfile for errors and suggest fixes:
 Dockerfile:
 %s
-`, input.Content)
+`, dockerfile.Content)
+
+	// Check for manifest deployment errors and add them to the context
+	manifestErrors := FormatManifestErrors(state)
+	if manifestErrors != "" {
+		promptText += fmt.Sprintf(`
+IMPORTANT CONTEXT: Kubernetes manifest deployments failed with the following errors.
+These deployment failures may indicate issues with the Docker image produced by this Dockerfile:
+%s
+
+Please consider these deployment errors when fixing the Dockerfile.
+`, manifestErrors)
+	}
 
 	// Add error information if provided and not empty
-	if input.ErrorMessages != "" {
+	if dockerfile.BuildErrors != "" {
 		promptText += fmt.Sprintf(`
 Errors encountered when running this Dockerfile:
 %s
-`, input.ErrorMessages)
+`, dockerfile.BuildErrors)
 	} else {
 		promptText += `
 No error messages were provided. Please check for potential issues in the Dockerfile.
@@ -55,11 +101,11 @@ No error messages were provided. Please check for potential issues in the Docker
 	}
 
 	// Add repository file information if provided
-	if input.RepoFileTree != "" {
+	if state.RepoFileTree != "" {
 		promptText += fmt.Sprintf(`
 Repository files structure:
 %s
-`, input.RepoFileTree)
+`, state.RepoFileTree)
 	}
 
 	promptText += `
@@ -89,25 +135,9 @@ Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.`
 	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
 		content := *resp.Choices[0].Message.Content
 
-		// Extract the fixed Dockerfile from between the tags
-		re := regexp.MustCompile(`<<<DOCKERFILE>>>([\s\S]*?)<<<DOCKERFILE>>>`)
-		matches := re.FindStringSubmatch(content)
-
-		fixedContent := ""
-		if len(matches) > 1 {
-			// Found the dockerfile between tags
-			fixedContent = strings.TrimSpace(matches[1])
-		} else {
-			// If tags aren't found, try to extract the content intelligently
-			// Look for multi-line dockerfile content after FROM
-			fromRe := regexp.MustCompile(`(?m)^FROM[\s\S]*?$`)
-			if fromMatches := fromRe.FindString(content); fromMatches != "" {
-				// Simple heuristic: Consider everything from the first FROM as the dockerfile
-				fixedContent = fromMatches
-			} else {
-				// Fallback: use the entire content
-				fixedContent = content
-			}
+		fixedContent, err := utils.GrabContentBetweenTags(content, "DOCKERFILE")
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract fixed Dockerfile: %v", err)
 		}
 
 		return &FileAnalysisResult{
@@ -119,7 +149,6 @@ Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.`
 	return nil, fmt.Errorf("no response from AI model")
 }
 
-
 func checkDockerInstalled() error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return fmt.Errorf("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH")
@@ -127,32 +156,24 @@ func checkDockerInstalled() error {
 	return nil
 }
 
-
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, dockerfilePath string, repoStructure string, maxIterations int) error {
-	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", dockerfilePath)
+func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, state *PipelineState) error { //Will name better, didn't want to change the original function name yet
+	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
-	if err := checkDockerInstalled(); err != nil {
+	if err := checkDockerInstalled(); err != nil { // Need to move this to the start of the pipeline
 		return err
 	}
 
-	// Read the original Dockerfile
-	dockerfileContent, err := os.ReadFile(dockerfilePath)
-	if err != nil {
-		return fmt.Errorf("error reading Dockerfile: %v", err)
-	}
-
-	currentDockerfile := string(dockerfileContent)
-
+	maxIterations := 5
 	for i := range maxIterations {
 		fmt.Printf("\n=== Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Try to build
-		success, buildOutput := buildDockerfile(dockerfilePath)
-		if success {
+		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content)
+		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
-			fmt.Println("Successful Dockerfile: \n", currentDockerfile)
+			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
 
 			//Temp code for pushing to kind registry
 			registryName := os.Getenv("REGISTRY")
@@ -171,29 +192,18 @@ func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, docker
 
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
-		// Prepare input for AI analysis
-		input := FileAnalysisInput{
-			Content:       currentDockerfile,
-			ErrorMessages: buildOutput,
-			RepoFileTree:  string(repoStructure),
-			FilePath:      dockerfilePath,
-		}
+		state.Dockerfile.BuildErrors = buildOutput
 
 		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
-		result, err := analyzeDockerfile(client, deploymentID, input)
+		result, err := analyzeDockerfile(client, deploymentID, state)
 		if err != nil {
 			return fmt.Errorf("error in AI analysis: %v", err)
 		}
 
 		// Update the Dockerfile
-		currentDockerfile = result.FixedContent
+		state.Dockerfile.Content = result.FixedContent
 		fmt.Println("AI suggested fixes:")
 		fmt.Println(result.Analysis)
-
-		// Write the fixed Dockerfile
-		if err := os.WriteFile(dockerfilePath, []byte(currentDockerfile), 0644); err != nil {
-			return fmt.Errorf("error writing fixed Dockerfile: %v", err)
-		}
 
 		fmt.Printf("Updated Dockerfile written. Attempting build again...\n")
 		time.Sleep(1 * time.Second) // Small delay for readability
@@ -202,44 +212,23 @@ func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, docker
 	return fmt.Errorf("failed to fix Dockerfile after %d iterations", maxIterations)
 }
 
-// findKubernetesManifests finds all kubernetes manifest files (YAML/YML) at the given path
-// Path can be either a directory or a single file
-func findKubernetesManifests(path string) ([]string, error) {
-	var manifestPaths []string
+func initializeDockerFileState(pipelineState *PipelineState, dockerFilePath string) error {
+	// Check if Dockerfile exists
+	if _, err := os.Stat(dockerFilePath); err != nil {
+		return fmt.Errorf("error checking Dockerfile at path %s: %v", dockerFilePath, err)
+	}
 
-	// Check if the input is a directory or a file
-	fileInfo, err := os.Stat(path)
+	// Read the Dockerfile content
+	content, err := os.ReadFile(dockerFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("error accessing path %s: %v", path, err)
+		return fmt.Errorf("error reading Dockerfile at path %s: %v", dockerFilePath, err)
 	}
 
-	if fileInfo.IsDir() {
-		// It's a directory - find all YAML files
-		fmt.Printf("Looking for Kubernetes manifest files in directory: %s\n", path)
+	// Update pipeline state with Dockerfile information
+	pipelineState.Dockerfile.Content = string(content)
+	pipelineState.Dockerfile.Path = dockerFilePath
+	pipelineState.Dockerfile.BuildErrors = ""
 
-		err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() && (strings.HasSuffix(info.Name(), ".yaml") || strings.HasSuffix(info.Name(), ".yml")) {
-				manifestPaths = append(manifestPaths, filePath)
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("error walking manifest directory: %v", err)
-		}
-	} else {
-		// It's a single file
-		fmt.Printf("Using single manifest file: %s\n", path)
-
-		if strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
-			manifestPaths = append(manifestPaths, path)
-		} else {
-			return nil, fmt.Errorf("file %s is not a YAML/YML file", path)
-		}
-	}
-
-	return manifestPaths, nil
+	fmt.Printf("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
+	return nil
 }
-

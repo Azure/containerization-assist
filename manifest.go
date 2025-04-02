@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
-	"io/ioutil"
-	"log"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -119,6 +119,7 @@ func InitializeManifests(state *PipelineState, path string) error {
 		state.K8sManifests[name] = &K8sManifest{
 			Name:             name,
 			Content:          contentStr,
+			Path:             path,
 			isDeployed:       false,
 			isDeploymentType: isDeployment,
 		}
@@ -131,4 +132,30 @@ func InitializeManifests(state *PipelineState, path string) error {
 
 func InitializeDefaultPathManifests(state *PipelineState) error {
 	return InitializeManifests(state, "")
+}
+
+// FormatManifestErrors returns a string containing all manifest errors with their names
+func FormatManifestErrors(state *PipelineState) string {
+	var errorBuilder strings.Builder
+
+	for name, manifest := range state.K8sManifests {
+		if manifest.errorLog != "" {
+			errorBuilder.WriteString(fmt.Sprintf("\nManifest %q:\n%s\n", name, manifest.errorLog))
+		}
+	}
+
+	return errorBuilder.String()
+}
+
+// GetPendingManifests returns a map of manifest names that still need to be deployed
+func GetPendingManifests(state *PipelineState) map[string]bool {
+	pendingManifests := make(map[string]bool)
+
+	for name, manifest := range state.K8sManifests {
+		if !manifest.isDeployed {
+			pendingManifests[name] = true
+		}
+	}
+
+	return pendingManifests
 }
