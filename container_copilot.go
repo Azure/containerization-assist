@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // ManifestDeployResult stores the result of a single manifest deployment
@@ -85,7 +86,7 @@ func updateSuccessfulFiles(state *PipelineState) {
 
 func (c *AzOpenAIClient) generate(outputDir string) error {
 	maxIterations := 5
-		dockerfilePath := "./Dockerfile"
+		dockerfilePath := filepath.Join(outputDir, "Dockerfile")
 
 		repoStructure, err := readFileTree(outputDir)
 		if err != nil {
