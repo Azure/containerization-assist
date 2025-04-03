@@ -76,9 +76,7 @@ func initClient() (*AzOpenAIClient, error) {
 	apiKey := os.Getenv(AZURE_OPENAI_KEY)
 	endpoint := os.Getenv(AZURE_OPENAI_ENDPOINT)
 	deploymentID := os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID)
-	fmt.Printf("Using Azure OpenAI API Key: %s\n", apiKey)
-	fmt.Printf("Using Azure OpenAI Endpoint: %s\n", endpoint)
-	fmt.Printf("Using Azure OpenAI Deployment ID: %s\n", deploymentID)
+	
 	var missingVars []string
 	if apiKey == "" {
 		missingVars = append(missingVars, AZURE_OPENAI_KEY)
