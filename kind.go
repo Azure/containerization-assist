@@ -50,12 +50,42 @@ func setupLocalRegistry() error {
 		cmd = exec.Command("powershell", "-Command", `
 		if (-Not (docker network inspect kind -ErrorAction SilentlyContinue)) { docker network create kind }
 		if (-Not (docker ps -q -f name=kind-registry)) { docker run -d --restart=always -p 5001:5001 --name kind-registry registry:2 }
+		if (-Not (docker network inspect kind | Select-String kind-registry)) { docker network connect kind kind-registry }
+		kubectl apply -f - <<EOF
+		apiVersion: v1
+		kind: ConfigMap
+		metadata:
+		  name: local-registry-hosting
+		  namespace: kube-public
+		data:
+		  localRegistryHosting.v1: |
+		    host: "localhost:5001"
+		    help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
+		EOF
 		`)
 	} else {
 		cmd = exec.Command("sh", "-c", `
 		docker network inspect kind >/dev/null 2>&1 || docker network create kind
 		docker ps | grep "kind-registry" || \
 		docker run -d --restart=always -p 5001:5001 --name kind-registry registry:2
+
+		# Connect the registry to the cluster network if not already connected
+		if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' kind-registry)" = "null" ]; then
+		  docker network connect "kind" "kind-registry"
+		fi
+
+		# Document the local registry
+		cat <<EOF | kubectl apply -f -
+		apiVersion: v1
+		kind: ConfigMap
+		metadata:
+		  name: local-registry-hosting
+		  namespace: kube-public
+		data:
+		  localRegistryHosting.v1: |
+		    host: "localhost:5001"
+		    help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
+		EOF
 		`)
 	}
 
