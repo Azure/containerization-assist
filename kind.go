@@ -19,6 +19,10 @@ func validateKindInstalled() error {
 				return fmt.Errorf("failed to install kind: %s, error: %w", string(output), err)
 			}
 		case "darwin":
+			// Check if brew is installed
+			if _, err := exec.LookPath("brew"); err != nil {
+				return fmt.Errorf("Homebrew is not installed. Please install Homebrew first: https://brew.sh/")
+			}
 			installCmd := exec.Command("brew", "install", "kind")
 			if output, err := installCmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("failed to install kind on macOS: %s, error: %w", string(output), err)
