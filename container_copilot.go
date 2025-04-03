@@ -103,12 +103,12 @@ func (c *AzOpenAIClient) generate(outputDir string) error {
 
 		err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
 		if err != nil {
-			return fmt.Errorf("Failed to initialize manifests: %w", err)
+			return fmt.Errorf("failed to initialize manifests: %w", err)
 		}
 
 		err = initializeDockerFileState(state, dockerfilePath)
 		if err != nil {
-			return fmt.Errorf("Failed to initialize Dockerfile state: %w", err)
+			return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
 		}
 
 		// loop through until max iterations or success
@@ -119,8 +119,7 @@ func (c *AzOpenAIClient) generate(outputDir string) error {
 			}
 
 			if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
-				fmt.Printf("Error in Kubernetes deployment process: %v", err)
-				os.Exit(1)
+				return fmt.Errorf("error in kubernetes deployment process: %w", err)
 			}
 		}
 
@@ -132,8 +131,7 @@ func (c *AzOpenAIClient) generate(outputDir string) error {
 func (c *AzOpenAIClient) testOpenAIConn() error {
 	testResponse, err := c.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
 		if err != nil {
-			fmt.Printf("Error getting chat completions: %v\n", err)
-			return err
+			return fmt.Errorf("failed to get chat completion: %w", err)
 		}
 
 		fmt.Println("Azure OpenAI Test:")

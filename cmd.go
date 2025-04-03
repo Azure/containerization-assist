@@ -25,7 +25,7 @@ func Execute() {
 				// set default dir to current working dir for file structure path
 				cwd, err := os.Getwd()
 				if err != nil {
-					fmt.Println("Error getting current directory:", err)
+					fmt.Printf("Error getting current directory: %v\n", err)
 					return
 				}
 				args = append(args, cwd)
@@ -50,11 +50,11 @@ func Execute() {
 		Run: func(cmd *cobra.Command, args []string) {
 			c, err := initClient()
 			if err != nil {
-				fmt.Println("Error initializing Azure OpenAI client:", err)
+				fmt.Printf("Error initializing Azure OpenAI client: %v\n", err)
 				return
 			}
 			if err := c.testOpenAIConn(); err != nil {
-				fmt.Print("Error testing Azure OpenAI connection: %v\n", err)
+				fmt.Printf("Error testing Azure OpenAI connection: %v\n", err)
 				return
 			}
 		},
@@ -78,7 +78,7 @@ func initClient() (*AzOpenAIClient, error) {
 
 	client, err := NewAzOpenAIClient(endpoint, apiKey, deploymentID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Azure OpenAI client: %v", err)
+		return nil, fmt.Errorf("failed to create Azure OpenAI client: %w", err)
 	}
 
 	return client, nil
