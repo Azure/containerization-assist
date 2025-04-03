@@ -22,8 +22,7 @@ export AZURE_OPENAI_KEY=xxxxxxx
 export AZURE_OPENAI_ENDPOINT=xxxxxx
 ```
 
-From the OverView Blade, open "Explore Azure AI Foundry Portal"
-
+From the Overview Blade, open "Explore Azure AI Foundry Portal"
 In Azure AI Foundry, select the "Shared Resources">"Deployments" Blade on the left
 
 Deploy a new model named "container-copilot" (o3-mini is recommended))
