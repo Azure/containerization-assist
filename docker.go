@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+	"net/http"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -154,6 +155,19 @@ func checkDockerRunning() error {
 	cmd := exec.Command("docker", "info")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("Docker daemon is not running. Please start Docker and try again. Error details: %s", string(output))
+	}
+	return nil
+}
+
+// validateRegistryReachable checks if the local Docker registry is reachable.
+func validateRegistryReachable(registryURL string) error {
+	resp, err := http.Get(fmt.Sprintf("http://%s/v2/", registryURL))
+	if err != nil {
+		return fmt.Errorf("failed to reach local registry at %s: %w", registryURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
+		return fmt.Errorf("unexpected response from registry: %d", resp.StatusCode)
 	}
 	return nil
 }
