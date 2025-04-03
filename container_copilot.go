@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // ManifestDeployResult stores the result of a single manifest deployment
@@ -83,88 +84,58 @@ func updateSuccessfulFiles(state *PipelineState) {
 	}
 }
 
-func main() {
-	// Get environment variables
-	apiKey := os.Getenv("AZURE_OPENAI_KEY")
-	endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
-	deploymentID := "o3-mini-2"
+func (c *AzOpenAIClient) generate(outputDir string) error {
+	maxIterations := 5
+		dockerfilePath := filepath.Join(outputDir, "Dockerfile")
 
-	if apiKey == "" || endpoint == "" {
-		fmt.Println("Error: AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables must be set")
-		os.Exit(1)
-	}
-
-	client, err := NewAzOpenAIClient(endpoint, apiKey, deploymentID)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "generate":
-
-			maxIterations := 5
-			dockerfilePath := "./Dockerfile"
-
-			// Get current working dir for file structure path
-			cwd, err := os.Getwd()
-			if err != nil {
-				fmt.Println("Error getting current directory:", err)
-				return
-			}
-			repoStructure, err := readFileTree(cwd)
-			if err != nil {
-				fmt.Printf("failed to get file tree: %s", err.Error())
-				os.Exit(1)
-			}
-
-			state := &PipelineState{
-				RepoFileTree:   repoStructure,
-				K8sManifests:   make(map[string]*K8sManifest),
-				Success:        false,
-				IterationCount: 0,
-				Metadata:       make(map[string]interface{}),
-			}
-
-			err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
-			if err != nil {
-				fmt.Printf("Failed to initialize manifests: %v\n", err)
-				return
-			}
-
-			err = initializeDockerFileState(state, dockerfilePath)
-			if err != nil {
-				fmt.Printf("Failed to initialize Dockerfile state: %v\n", err)
-				return
-			}
-
-			// loop through until max iterations or success
-			for state.IterationCount < maxIterations && !state.Success {
-				if err := iterateDockerfileBuild(client, state); err != nil {
-					fmt.Printf("Error in dockerfile iteration process: %v\n", err)
-					continue
-				}
-
-				if err := iterateMultipleManifestsDeploy(client, maxIterations, state); err != nil {
-					fmt.Printf("Error in Kubernetes deployment process: %v", err)
-					os.Exit(1)
-				}
-			}
-
-			// Update the dockerfile and manifests with the final successful versions
-			updateSuccessfulFiles(state)
-
-		default:
-			// Default behavior - test Azure OpenAI
-			testResponse, err := client.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
-			if err != nil {
-				fmt.Printf("Error getting chat completions: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println("Azure OpenAI Test:")
-			fmt.Printf("Response: %s\n", testResponse)
+		repoStructure, err := readFileTree(outputDir)
+		if err != nil {
+			return fmt.Errorf("failed to get file tree: %w", err)
 		}
-	}
+
+		state := &PipelineState{
+			RepoFileTree:   repoStructure,
+			K8sManifests:   make(map[string]*K8sManifest),
+			Success:        false,
+			IterationCount: 0,
+			Metadata:       make(map[string]interface{}),
+		}
+
+		err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
+		if err != nil {
+			return fmt.Errorf("failed to initialize manifests: %w", err)
+		}
+
+		err = initializeDockerFileState(state, dockerfilePath)
+		if err != nil {
+			return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
+		}
+
+		// loop through until max iterations or success
+		for state.IterationCount < maxIterations && !state.Success {
+			if err := iterateDockerfileBuild(c, state); err != nil {
+				fmt.Printf("Error in dockerfile iteration process: %v\n", err)
+				continue
+			}
+
+			if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
+				return fmt.Errorf("error in kubernetes deployment process: %w", err)
+			}
+		}
+
+		// Update the dockerfile and manifests with the final successful versions
+		updateSuccessfulFiles(state)
+		return nil
 }
+
+func (c *AzOpenAIClient) testOpenAIConn() error {
+	testResponse, err := c.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
+		if err != nil {
+			return fmt.Errorf("failed to get chat completion: %w", err)
+		}
+
+		fmt.Println("Azure OpenAI Test:")
+		fmt.Printf("Response: %s\n", testResponse)
+	return nil
+}
+
