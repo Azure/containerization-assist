@@ -3,14 +3,11 @@ package main
 import (
 	"container-copilot/utils"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
-	"net/http"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // buildDockerfile attempts to build the Docker image and returns any error output
