@@ -5,13 +5,23 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"bufio"
+	"os"
 )
 
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
 func validateKindInstalled() error {
 	cmd := exec.Command("kind", "version")
 	if err := cmd.Run(); err != nil {
-		fmt.Println("kind is not installed, attempting to install...")
+		fmt.Println("kind is not installed.")
+		fmt.Print("Would you like to install kind? (y/n): ")
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		response := strings.ToLower(scanner.Text())
+		if response != "y" {
+			return fmt.Errorf("kind installation aborted")
+		}
+		fmt.Println("Attempting to install kind now for you...")
 		switch runtime.GOOS {
 		case "linux":
 			installCmd := exec.Command("sh", "-c", "curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/")
