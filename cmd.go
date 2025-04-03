@@ -7,15 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type containerCopilotConfig struct {
-	apiKey 	  string
-	endpoint  string
-	deploymentID string
-	outputDir 	 string
-	client   *AzOpenAIClient
-
-}
-
 func Execute() {
     var rootCmd = &cobra.Command{
         Use:   "container-copilot",
