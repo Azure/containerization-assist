@@ -1,13 +1,8 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // ManifestDeployResult stores the result of a single manifest deployment
@@ -99,11 +94,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create a client with KeyCredential
-	keyCredential := azcore.NewKeyCredential(apiKey)
-	client, err := azopenai.NewClientWithKeyCredential(endpoint, keyCredential, nil)
+	client, err := NewAzOpenAIClient(endpoint, apiKey, deploymentID)
 	if err != nil {
-		fmt.Printf("Error creating Azure OpenAI client: %v\n", err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
@@ -146,15 +139,14 @@ func main() {
 				return
 			}
 
-			// loop through untill max iterations or success
+			// loop through until max iterations or success
 			for state.IterationCount < maxIterations && !state.Success {
-
-				if err := iterateDockerfileBuild(client, deploymentID, state); err != nil {
+				if err := iterateDockerfileBuild(client, state); err != nil {
 					fmt.Printf("Error in dockerfile iteration process: %v\n", err)
 					continue
 				}
 
-				if err := iterateMultipleManifestsDeploy(client, deploymentID, maxIterations, state); err != nil {
+				if err := iterateMultipleManifestsDeploy(client, maxIterations, state); err != nil {
 					fmt.Printf("Error in Kubernetes deployment process: %v", err)
 					os.Exit(1)
 				}
@@ -165,27 +157,14 @@ func main() {
 
 		default:
 			// Default behavior - test Azure OpenAI
-			resp, err := client.GetChatCompletions(
-				context.Background(),
-				azopenai.ChatCompletionsOptions{
-					DeploymentName: to.Ptr(deploymentID),
-					Messages: []azopenai.ChatRequestMessageClassification{
-						&azopenai.ChatRequestUserMessage{
-							Content: azopenai.NewChatRequestUserMessageContent("Hello Azure OpenAI! Tell me this is working in one short sentence."),
-						},
-					},
-				},
-				nil,
-			)
+			testResponse, err := client.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
 			if err != nil {
 				fmt.Printf("Error getting chat completions: %v\n", err)
 				os.Exit(1)
 			}
 
 			fmt.Println("Azure OpenAI Test:")
-			if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
-				fmt.Printf("Response: %s\n", *resp.Choices[0].Message.Content)
-			}
+			fmt.Printf("Response: %s\n", testResponse)
 		}
 	}
 }

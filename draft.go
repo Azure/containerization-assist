@@ -1,15 +1,13 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/Azure/draft/pkg/handlers"
-	"github.com/Azure/draft/pkg/templatewriter/writers"
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/Azure/draft/pkg/handlers"
+	"github.com/Azure/draft/pkg/templatewriter/writers"
 )
 
 const (
@@ -74,7 +72,7 @@ func getDockerfileTemplateNamesFromDraft() []string {
 }
 
 // Use LLM to select the dockerfile template name from the list of available templates in draft
-func getDockerfileTemplateName(client *azopenai.Client, deploymentID, projectDir string) (string, error) {
+func getDockerfileTemplateName(client *AzOpenAIClient, projectDir string) (string, error) {
 	dockerfileTemplateNames := getDockerfileTemplateNamesFromDraft()
 
 	repoStructure, err := readFileTree(projectDir)
@@ -84,31 +82,15 @@ func getDockerfileTemplateName(client *azopenai.Client, deploymentID, projectDir
 
 	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
 
-	resp, err := client.GetChatCompletions(
-		context.Background(),
-		azopenai.ChatCompletionsOptions{
-			DeploymentName: to.Ptr(deploymentID),
-			Messages: []azopenai.ChatRequestMessageClassification{
-				&azopenai.ChatRequestUserMessage{
-					Content: azopenai.NewChatRequestUserMessageContent(promptText),
-				},
-			},
-		},
-		nil,
-	)
+	content, err := client.GetChatCompletion(promptText)
 	if err != nil {
 		return "", err
 	}
 
-	var templateName string
-
-	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
-		content := *resp.Choices[0].Message.Content
-		// Extract the template name from the response
-		templateName = strings.TrimSpace(content)
-		if !slices.Contains(dockerfileTemplateNames, templateName) {
-			return "", fmt.Errorf("invalid template name: %s", templateName)
-		}
+	templateName := strings.TrimSpace(content)
+	if !slices.Contains(dockerfileTemplateNames, templateName) {
+		return "", fmt.Errorf("invalid template name: %s", templateName)
 	}
+
 	return templateName, nil
 }

@@ -2,15 +2,11 @@ package main
 
 import (
 	"container-copilot/utils"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // buildDockerfile attempts to build the Docker image and returns any error output
@@ -67,7 +63,7 @@ func buildDockerfileContent(dockerfileContent string) (string, error) {
 	return outputStr, nil
 }
 
-func analyzeDockerfile(client *azopenai.Client, deploymentID string, state *PipelineState) (*FileAnalysisResult, error) {
+func analyzeDockerfile(client *AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
 	dockerfile := state.Dockerfile
 
 	// Create prompt for analyzing the Dockerfile
@@ -116,37 +112,20 @@ Please:
 
 Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.`
 
-	resp, err := client.GetChatCompletions(
-		context.Background(),
-		azopenai.ChatCompletionsOptions{
-			DeploymentName: to.Ptr(deploymentID),
-			Messages: []azopenai.ChatRequestMessageClassification{
-				&azopenai.ChatRequestUserMessage{
-					Content: azopenai.NewChatRequestUserMessageContent(promptText),
-				},
-			},
-		},
-		nil,
-	)
+	content, err := client.GetChatCompletion(promptText)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
-		content := *resp.Choices[0].Message.Content
-
-		fixedContent, err := utils.GrabContentBetweenTags(content, "DOCKERFILE")
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract fixed Dockerfile: %v", err)
-		}
-
-		return &FileAnalysisResult{
-			FixedContent: fixedContent,
-			Analysis:     content,
-		}, nil
+	fixedContent, err := utils.GrabContentBetweenTags(content, "DOCKERFILE")
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract fixed Dockerfile: %v", err)
 	}
 
-	return nil, fmt.Errorf("no response from AI model")
+	return &FileAnalysisResult{
+		FixedContent: fixedContent,
+		Analysis:     content,
+	}, nil
 }
 
 // checkDockerRunning verifies if the Docker daemon is running.
@@ -166,7 +145,7 @@ func checkDockerInstalled() error {
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, state *PipelineState) error { //Will name better, didn't want to change the original function name yet
+func iterateDockerfileBuild(client *AzOpenAIClient, state *PipelineState) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -204,7 +183,7 @@ func iterateDockerfileBuild(client *azopenai.Client, deploymentID string, state 
 		state.Dockerfile.BuildErrors = buildOutput
 
 		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
-		result, err := analyzeDockerfile(client, deploymentID, state)
+		result, err := analyzeDockerfile(client, state)
 		if err != nil {
 			return fmt.Errorf("error in AI analysis: %v", err)
 		}
