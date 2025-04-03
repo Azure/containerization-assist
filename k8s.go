@@ -2,16 +2,12 @@ package main
 
 import (
 	"container-copilot/utils"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 )
 
 // checkPodStatus verifies if pods from the deployment are running correctly
@@ -47,7 +43,7 @@ func checkPodStatus(namespace string, labelSelector string, timeout time.Duratio
 	return false, "Timeout waiting for pods to become ready"
 }
 
-func analyzeKubernetesManifest(client *azopenai.Client, deploymentID string, input FileAnalysisInput, state *PipelineState) (*FileAnalysisResult, error) {
+func analyzeKubernetesManifest(client *AzOpenAIClient, input FileAnalysisInput, state *PipelineState) (*FileAnalysisResult, error) {
 	// Create prompt for analyzing the Kubernetes manifest
 	promptText := fmt.Sprintf(`Analyze the following Kubernetes manifest file for errors and suggest fixes:
 Manifest:
@@ -84,37 +80,20 @@ Please:
 
 Output the fixed manifest between <<<MANIFEST>>> tags.`
 
-	resp, err := client.GetChatCompletions(
-		context.Background(),
-		azopenai.ChatCompletionsOptions{
-			DeploymentName: to.Ptr(deploymentID),
-			Messages: []azopenai.ChatRequestMessageClassification{
-				&azopenai.ChatRequestUserMessage{
-					Content: azopenai.NewChatRequestUserMessageContent(promptText),
-				},
-			},
-		},
-		nil,
-	)
+	content, err := client.GetChatCompletion(promptText)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
-		content := *resp.Choices[0].Message.Content
-
-		fixedContent, err := utils.GrabContentBetweenTags(content, "MANIFEST")
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract fixed manifest: %v", err)
-		}
-
-		return &FileAnalysisResult{
-			FixedContent: fixedContent,
-			Analysis:     content,
-		}, nil
+	fixedContent, err := utils.GrabContentBetweenTags(content, "MANIFEST")
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract fixed manifest: %v", err)
 	}
 
-	return nil, fmt.Errorf("no response from AI model")
+	return &FileAnalysisResult{
+		FixedContent: fixedContent,
+		Analysis:     content,
+	}, nil
 }
 
 func checkKubectlInstalled() error {
@@ -217,7 +196,7 @@ func deployStateManifests(state *PipelineState) error {
 }
 
 // Update iterateMultipleManifestsDeploy to use the new deployment function
-func iterateMultipleManifestsDeploy(client *azopenai.Client, deploymentID string, maxIterations int, state *PipelineState) error {
+func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, state *PipelineState) error {
 	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := checkKubectlInstalled(); err != nil {
@@ -255,7 +234,7 @@ func iterateMultipleManifestsDeploy(client *azopenai.Client, deploymentID string
 			}
 
 			// Pass the entire state instead of just the Dockerfile
-			result, err := analyzeKubernetesManifest(client, deploymentID, input, state)
+			result, err := analyzeKubernetesManifest(client, input, state)
 			if err != nil {
 				return fmt.Errorf("error in AI analysis for %s: %v", name, err)
 			}
