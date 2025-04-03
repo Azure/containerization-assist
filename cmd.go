@@ -3,8 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+)
+
+const (
+	AZURE_OPENAI_KEY			= "AZURE_OPENAI_KEY"
+	AZURE_OPENAI_ENDPOINT		= "AZURE_OPENAI_ENDPOINT"
+	AZURE_OPENAI_DEPLOYMENT_ID	= "AZURE_OPENAI_DEPLOYMENT_ID"
 )
 
 func Execute() {
@@ -20,13 +27,12 @@ func Execute() {
         Use:   "generate",
         Short: "Generate Dockerfile and Kubernetes manifests",
 		Long:  `The generate command will add Dockerfile and Kubernetes manifests to your project based on the project structure.`,
-        Run: func(cmd *cobra.Command, args []string) {
+        RunE: func(cmd *cobra.Command, args []string) error{
 			if len(args) < 1 {
 				// set default dir to current working dir for file structure path
 				cwd, err := os.Getwd()
 				if err != nil {
-					fmt.Printf("Error getting current directory: %v\n", err)
-					return
+					return fmt.Errorf("error getting current directory: %w", err)
 				}
 				args = append(args, cwd)
 			}
@@ -34,12 +40,13 @@ func Execute() {
 			dir := args[0]
 			c, err := initClient()
 			if err != nil {
-				return
+				return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 			}
 			if err := c.generate(dir); err != nil {
-				fmt.Printf("Error generating artifacts: %v\n", err)
-				return
+				return fmt.Errorf("error generating artifacts: %w", err)
 			}
+
+			return nil
         },
     }
 
@@ -47,16 +54,16 @@ func Execute() {
 		Use:  "test",
 		Short: "Test Azure OpenAI connection",
 		Long:  `The test command will test the Azure OpenAI connection based on the environment variables set and print a response.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := initClient()
 			if err != nil {
-				fmt.Printf("Error initializing Azure OpenAI client: %v\n", err)
-				return
+				return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 			}
 			if err := c.testOpenAIConn(); err != nil {
-				fmt.Printf("Error testing Azure OpenAI connection: %v\n", err)
-				return
+				return fmt.Errorf("error testing Azure OpenAI connection: %w", err)
 			}
+
+			return nil
 		},
 	}
 
@@ -66,14 +73,25 @@ func Execute() {
 }
 
 func initClient() (*AzOpenAIClient, error) {
-	// use flags for open api config?
-	apiKey := os.Getenv("AZURE_OPENAI_KEY")
-	endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
-	deploymentID := os.Getenv("AZURE_OPENAI_DEPLOYMENT_ID")
+	apiKey := os.Getenv(AZURE_OPENAI_KEY)
+	endpoint := os.Getenv(AZURE_OPENAI_ENDPOINT)
+	deploymentID := os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID)
+	fmt.Printf("Using Azure OpenAI API Key: %s\n", apiKey)
+	fmt.Printf("Using Azure OpenAI Endpoint: %s\n", endpoint)
+	fmt.Printf("Using Azure OpenAI Deployment ID: %s\n", deploymentID)
+	var missingVars []string
+	if apiKey == "" {
+		missingVars = append(missingVars, AZURE_OPENAI_KEY)
+	}
+	if endpoint == "" {
+		missingVars = append(missingVars, AZURE_OPENAI_ENDPOINT)
+	}
+	if deploymentID == "" {
+		missingVars = append(missingVars, AZURE_OPENAI_DEPLOYMENT_ID)
+	}
 
-	if apiKey == "" || endpoint == "" || deploymentID == "" {
-		fmt.Println("Error: AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT_ID environment variables must be set")
-		return nil, fmt.Errorf("missing required environment variables")
+	if len(missingVars) > 0 {
+		return nil, fmt.Errorf("missing environment variables: %s", strings.Join(missingVars, ", "))
 	}
 
 	client, err := NewAzOpenAIClient(endpoint, apiKey, deploymentID)
