@@ -89,7 +89,7 @@ func getKindCluster() (string, error) {
 		}
 	}
 
-	cmd = exec.Command("kubectl", "config", "use-context", "kind-container-copilot")
+	cmd = exec.Command("kubectl", "config", "use-context", "container-copilot")
 	if output, err = cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", string(output), err)
 	}
