@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -59,7 +58,7 @@ func FindAndCheckK8sDeployments(path string) ([]string, []string, error) {
 
 // isK8sDeployment checks if a given YAML file is a Kubernetes Deployment (supports multiple documents per file).
 func isK8sDeployment(filePath string) bool {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Printf("Error reading file: %v", err)
 		return false
