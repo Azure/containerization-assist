@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ManifestDeployResult stores the result of a single manifest deployment
@@ -78,54 +79,54 @@ func updateSuccessfulFiles(state *PipelineState) {
 
 		fmt.Println("\n🎉 Container deployment pipeline completed successfully!")
 		fmt.Println("Dockerfile and manifest files have been updated with the working versions.")
-	} else {
-		fmt.Println("\n❌ Container deployment pipeline did not complete successfully after maximum iterations.")
-		fmt.Println("No files were updated. Please review the logs for more information.")
 	}
 }
 
 func (c *AzOpenAIClient) generate(outputDir string) error {
 	maxIterations := 5
-		dockerfilePath := filepath.Join(outputDir, "Dockerfile")
+	dockerfilePath := filepath.Join(outputDir, "Dockerfile")
 
-		repoStructure, err := readFileTree(outputDir)
-		if err != nil {
-			return fmt.Errorf("failed to get file tree: %w", err)
-		}
+	repoStructure, err := readFileTree(outputDir)
+	if err != nil {
+		return fmt.Errorf("failed to get file tree: %w", err)
+	}
 
-		state := &PipelineState{
-			RepoFileTree:   repoStructure,
-			K8sManifests:   make(map[string]*K8sManifest),
-			Success:        false,
-			IterationCount: 0,
-			Metadata:       make(map[string]interface{}),
-		}
+	state := &PipelineState{
+		RepoFileTree:   repoStructure,
+		K8sManifests:   make(map[string]*K8sManifest),
+		Success:        false,
+		IterationCount: 0,
+		Metadata:       make(map[string]interface{}),
+	}
 
-		err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
-		if err != nil {
-			return fmt.Errorf("failed to initialize manifests: %w", err)
-		}
+	err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
+	if err != nil {
+		return fmt.Errorf("failed to initialize manifests: %w", err)
+	}
 
-		err = initializeDockerFileState(state, dockerfilePath)
-		if err != nil {
-			return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
-		}
+	err = initializeDockerFileState(state, dockerfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
+	}
 
-		// loop through until max iterations or success
-		for state.IterationCount < maxIterations && !state.Success {
-			if err := iterateDockerfileBuild(c, state); err != nil {
-				fmt.Printf("Error in dockerfile iteration process: %v\n", err)
-				continue
-			}
+	errors := []string{}
+	if err := iterateDockerfileBuild(c, maxIterations, state); err != nil {
+		errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
+	}
 
-			if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
-				return fmt.Errorf("error in kubernetes deployment process: %w", err)
-			}
-		}
+	if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
+		errors = append(errors, fmt.Sprintf("error in Kubernetes deplpoyment process: %v", err))
+	}
 
-		// Update the dockerfile and manifests with the final successful versions
-		updateSuccessfulFiles(state)
-		return nil
+	if len(errors) > 0 {
+		fmt.Println("\n❌ Container deployment pipeline did not complete successfully after maximum iterations.")
+		fmt.Println("No files were updated. Please review the logs for more information.")
+		return fmt.Errorf("errors encountered during iteration:\n%s", strings.Join(errors, "\n"))
+	}
+
+	// Update the dockerfile and manifests with the final successful versions
+	updateSuccessfulFiles(state)
+	return nil
 }
 
 func (c *AzOpenAIClient) testOpenAIConn() error {
@@ -134,7 +135,7 @@ func (c *AzOpenAIClient) testOpenAIConn() error {
 			return fmt.Errorf("failed to get chat completion: %w", err)
 		}
 
-		fmt.Println("Azure OpenAI Test:")
+		fmt.Println("Azure OpenAI Test")
 		fmt.Printf("Response: %s\n", testResponse)
 	return nil
 }

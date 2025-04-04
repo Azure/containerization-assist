@@ -208,7 +208,7 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 	}
 
 	for i := 0; i < maxIterations; i++ {
-		fmt.Printf("\n=== Iteration %d of %d ===\n", i+1, maxIterations)
+		fmt.Printf("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Try to deploy pending manifests
 		err := deployStateManifests(state)

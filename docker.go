@@ -159,7 +159,7 @@ func checkDockerInstalled() error {
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func iterateDockerfileBuild(client *AzOpenAIClient, state *PipelineState) error {
+func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *PipelineState) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -167,9 +167,8 @@ func iterateDockerfileBuild(client *AzOpenAIClient, state *PipelineState) error 
 		return err
 	}
 
-	maxIterations := 5
 	for i := range maxIterations {
-		fmt.Printf("\n=== Iteration %d of %d ===\n", i+1, maxIterations)
+		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Try to build
 		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content)
