@@ -167,7 +167,7 @@ func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *Pi
 		return err
 	}
 
-	for i := range maxIterations {
+	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Try to build

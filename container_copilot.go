@@ -115,7 +115,7 @@ func (c *AzOpenAIClient) generate(outputDir string) error {
 	}
 
 	if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
-		errors = append(errors, fmt.Sprintf("error in Kubernetes deplpoyment process: %v", err))
+		errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 	}
 
 	if len(errors) > 0 {
