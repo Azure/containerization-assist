@@ -49,6 +49,8 @@ type Dockerfile struct {
 type PipelineState struct {
 	RepoFileTree   string
 	Dockerfile     Dockerfile
+	RegistryURL    string
+	ImageName      string
 	K8sManifests   map[string]*K8sManifest
 	Success        bool
 	IterationCount int
@@ -82,11 +84,17 @@ func updateSuccessfulFiles(state *PipelineState) {
 	}
 }
 
-func (c *AzOpenAIClient) generate(outputDir string) error {
-	maxIterations := 5
-	dockerfilePath := filepath.Join(outputDir, "Dockerfile")
+func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
+	kindClusterName, err := getKindCluster()
+	if err != nil {
+		return fmt.Errorf("failed to get kind cluster: %w", err)
+	}
+	fmt.Printf("Using kind cluster: %s\n", kindClusterName)
 
-	repoStructure, err := readFileTree(outputDir)
+	maxIterations := 5
+	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
+
+	repoStructure, err := readFileTree(targetDir)
 	if err != nil {
 		return fmt.Errorf("failed to get file tree: %w", err)
 	}
@@ -97,9 +105,35 @@ func (c *AzOpenAIClient) generate(outputDir string) error {
 		Success:        false,
 		IterationCount: 0,
 		Metadata:       make(map[string]interface{}),
+		ImageName:  "app", // TODO: clean up app naming into state
+		RegistryURL: registry,
+	}
+	fmt.Printf("validating connection to registry %s\n",registry)
+	err = validateRegistryReachable(state.RegistryURL)
+	if err != nil {
+		return fmt.Errorf("reaching registry %s: %w\n", state.RegistryURL, err)
 	}
 
-	err = InitializeDefaultPathManifests(state) // Initialize K8sManifests with default path
+	fmt.Printf("Generating Dockerfile in %s\n", targetDir)
+	draftTemplateName, err := getDockerfileTemplateName(c, targetDir)
+	if err != nil {
+		return fmt.Errorf("getting Dockerfile template name: %w", err)
+	}
+
+	fmt.Printf("Using Dockerfile template: %s\n", draftTemplateName)
+	err = generateDockerfileWithDraft(draftTemplateName, targetDir)
+	if err != nil {
+		return fmt.Errorf("generating Dockerfile: %w", err)
+	}
+
+	fmt.Printf("Generating Kubernetes manifests in %s\n", targetDir)
+	registryAndImage := fmt.Sprintf("%s/%s", registry, "app")
+	err = generateDeploymentFilesWithDraft(targetDir, registryAndImage)
+	if err != nil {
+		return fmt.Errorf("generating deployment files: %w", err)
+	}
+
+	err = InitializeDefaultPathManifests(state,targetDir) // Initialize K8sManifests with default path
 	if err != nil {
 		return fmt.Errorf("failed to initialize manifests: %w", err)
 	}
@@ -110,9 +144,16 @@ func (c *AzOpenAIClient) generate(outputDir string) error {
 	}
 
 	errors := []string{}
-	if err := iterateDockerfileBuild(c, maxIterations, state); err != nil {
+	if err := iterateDockerfileBuild(c, maxIterations, state, targetDir); err != nil {
 		errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 	}
+
+	fmt.Printf("pushing image %s\n", registryAndImage)
+	err = pushDockerImage(registryAndImage)
+	if err != nil {
+		return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
+	}
+
 
 	if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
 		errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
@@ -131,12 +172,11 @@ func (c *AzOpenAIClient) generate(outputDir string) error {
 
 func (c *AzOpenAIClient) testOpenAIConn() error {
 	testResponse, err := c.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
-		if err != nil {
-			return fmt.Errorf("failed to get chat completion: %w", err)
-		}
+	if err != nil {
+		return fmt.Errorf("failed to get chat completion: %w", err)
+	}
 
-		fmt.Println("Azure OpenAI Test")
-		fmt.Printf("Response: %s\n", testResponse)
+	fmt.Println("Azure OpenAI Test")
+	fmt.Printf("Response: %s\n", testResponse)
 	return nil
 }
-

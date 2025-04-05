@@ -129,8 +129,8 @@ func InitializeManifests(state *PipelineState, path string) error {
 	return nil
 }
 
-func InitializeDefaultPathManifests(state *PipelineState) error {
-	return InitializeManifests(state, "")
+func InitializeDefaultPathManifests(state *PipelineState, targetPath string) error {
+	return InitializeManifests(state, targetPath)
 }
 
 // FormatManifestErrors returns a string containing all manifest errors with their names

@@ -9,49 +9,50 @@ import (
 )
 
 const (
-	AZURE_OPENAI_KEY			= "AZURE_OPENAI_KEY"
-	AZURE_OPENAI_ENDPOINT		= "AZURE_OPENAI_ENDPOINT"
-	AZURE_OPENAI_DEPLOYMENT_ID	= "AZURE_OPENAI_DEPLOYMENT_ID"
+	AZURE_OPENAI_KEY           = "AZURE_OPENAI_KEY"
+	AZURE_OPENAI_ENDPOINT      = "AZURE_OPENAI_ENDPOINT"
+	AZURE_OPENAI_DEPLOYMENT_ID = "AZURE_OPENAI_DEPLOYMENT_ID"
 )
 
-func Execute() {
-    var rootCmd = &cobra.Command{
-        Use:   "container-copilot",
-        Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
-        Run: func(cmd *cobra.Command, args []string) {
-           cmd.Help()
-        },
-    }
+var (
+	registry string
+)
 
-    var generateCmd = &cobra.Command{
-        Use:   "generate",
-        Short: "Generate Dockerfile and Kubernetes manifests",
+	var rootCmd = &cobra.Command{
+		Use:   "container-copilot",
+		Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+		},
+	}
+
+	var generateCmd = &cobra.Command{
+		Use:   "generate",
+		Short: "Generate Dockerfile and Kubernetes manifests",
 		Long:  `The generate command will add Dockerfile and Kubernetes manifests to your project based on the project structure.`,
-        RunE: func(cmd *cobra.Command, args []string) error{
-			if len(args) < 1 {
-				// set default dir to current working dir for file structure path
-				cwd, err := os.Getwd()
-				if err != nil {
-					return fmt.Errorf("error getting current directory: %w", err)
-				}
-				args = append(args, cwd)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			targetDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("error getting current directory: %w", err)
+			}
+			if len(args) > 0 {
+				targetDir = args[0]
 			}
 
-			dir := args[0]
 			c, err := initClient()
 			if err != nil {
 				return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 			}
-			if err := c.generate(dir); err != nil {
+			if err := c.generate(targetDir, registry); err != nil {
 				return fmt.Errorf("error generating artifacts: %w", err)
 			}
 
 			return nil
-        },
-    }
+		},
+	}
 
 	var testCmd = &cobra.Command{
-		Use:  "test",
+		Use:   "test",
 		Short: "Test Azure OpenAI connection",
 		Long:  `The test command will test the Azure OpenAI connection based on the environment variables set and print a response.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -67,16 +68,17 @@ func Execute() {
 		},
 	}
 
-    rootCmd.AddCommand(generateCmd)
+func Execute() {
+	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(testCmd)
-    rootCmd.Execute()
+	rootCmd.Execute()
 }
 
 func initClient() (*AzOpenAIClient, error) {
 	apiKey := os.Getenv(AZURE_OPENAI_KEY)
 	endpoint := os.Getenv(AZURE_OPENAI_ENDPOINT)
 	deploymentID := os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID)
-	
+
 	var missingVars []string
 	if apiKey == "" {
 		missingVars = append(missingVars, AZURE_OPENAI_KEY)
@@ -98,4 +100,8 @@ func initClient() (*AzOpenAIClient, error) {
 	}
 
 	return client, nil
+}
+
+func init(){
+	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
 }
