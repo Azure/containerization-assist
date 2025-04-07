@@ -2,36 +2,51 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
 
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step
 var DefaultManifestPath = filepath.Join(os.Getenv("GITHUB_WORKSPACE"), "manifests")
 
+type K8sMetadata struct {
+	Name   string            `yaml:"name"`
+	Labels map[string]string `yaml:"labels"`
+}
+type K8sObject struct {
+	ApiVersion         string      `yaml:"apiVersion"`
+	Kind               string      `yaml:"kind"`
+	Metadata           K8sMetadata `yaml:"metadata"`
+	RawContent         []byte
+	SourceManifestPath string
+}
+
+func (o K8sObject) IsDeployment() bool {
+	return o.ApiVersion == "apps/v1" && o.Kind == "Deployment"
+}
+
+const ManifestObjectDelimiter = "---"
+
 // FindKubernetesManifests locates all .yml/yaml files in the specified directory path
 // If no path is provided, DefaultManifestPath will be used
 // FindAndCheckK8sDeployments locates all .yml/.yaml files in the given path and checks if they are Kubernetes Deployments.
-func FindAndCheckK8sDeployments(path string) ([]string, []string, error) {
+func FindAndCheckK8sDeployments(path string) ([]K8sObject, error) {
 	if path == "" {
 		path = DefaultManifestPath
 		fmt.Printf("Using default manifest path: %s\n", path)
 	}
 
-	var manifestPaths []string
-	var deploymentFiles []string
+	var k8sObjects []K8sObject
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error accessing directory %s: %v", path, err)
+		return nil, fmt.Errorf("error accessing directory %s: %v", path, err)
 	}
 	if !fileInfo.IsDir() {
-		return nil, nil, fmt.Errorf("%s is not a directory", path)
+		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
 	fmt.Printf("Looking for Kubernetes manifest files in directory: %s\n", path)
@@ -41,79 +56,57 @@ func FindAndCheckK8sDeployments(path string) ([]string, []string, error) {
 			return err
 		}
 		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
-			manifestPaths = append(manifestPaths, filePath)
-			if isK8sDeployment(filePath) {
-				deploymentFiles = append(deploymentFiles, filePath)
+			fileContent, err := os.ReadFile(filePath)
+			if err != nil {
+				return fmt.Errorf("reading file %s: %w", filePath, err)
 			}
+			o, err := readK8sObjects(fileContent)
+			if err != nil {
+				return fmt.Errorf("reading k8s object: %w", err)
+			}
+			o.SourceManifestPath = filePath
+			k8sObjects = append(k8sObjects, o)
 		}
 		return nil
 	})
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("error walking manifest directory: %v", err)
+		return nil, fmt.Errorf("error walking manifest directory: %v", err)
 	}
-
-	return manifestPaths, deploymentFiles, nil
+	return k8sObjects, nil
 }
 
-// isK8sDeployment checks if a given YAML file is a Kubernetes Deployment (supports multiple documents per file).
-func isK8sDeployment(filePath string) bool {
-	data, err := os.ReadFile(filePath)
+func readK8sObjects(content []byte) (K8sObject, error) {
+	var o K8sObject
+	if strings.Contains(string(content), ManifestObjectDelimiter) {
+		return o, fmt.Errorf("multi-object manifests are not yet supported")
+	}
+	err := yaml.Unmarshal(content, &o)
 	if err != nil {
-		log.Printf("Error reading file: %v", err)
-		return false
+		return o, fmt.Errorf("unmarshaling yaml as k8s object: %w", err)
 	}
-
-	var documents []map[string]interface{}
-	if err := yaml.Unmarshal(data, &documents); err != nil {
-		log.Printf("Error parsing YAML: %v", err)
-		return false
-	}
-
-	for _, doc := range documents {
-		if doc != nil {
-			u := &unstructured.Unstructured{Object: doc}
-			if u.GetKind() == "Deployment" && u.GetAPIVersion() != "" && doc["spec"] != nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// Grabs all manifests in a "manifests" directory in the repo's root directory
-func GetDefaultManifests() ([]string, []string, error) {
-	return FindAndCheckK8sDeployments("")
+	o.RawContent = content
+	return o, nil
 }
 
 // InitializeManifests populates the K8sManifests field in PipelineState with manifests found in the specified path
 // If path is empty, the default manifest path will be used
 func InitializeManifests(state *PipelineState, path string) error {
-	manifestPaths, deploymentFiles, err := FindAndCheckK8sDeployments(path)
+	k8sObjects, err := FindAndCheckK8sDeployments(path)
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
 	}
 
-	if len(deploymentFiles) == 0 {
+	if len(k8sObjects) == 0 {
 		fmt.Println("No Kubernetes deployment files found")
 	}
 
-	if len(manifestPaths) == 0 {
-		fmt.Println("No Kubernetes manifest files found")
-		return nil
-	}
+	fmt.Printf("Found %d Kubernetes object files\n", len(k8sObjects))
 
-	fmt.Printf("Found %d Kubernetes manifest files\n", len(manifestPaths))
-
-	for _, path := range manifestPaths {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("failed to read manifest %s: %w", path, err)
-		}
-
-		name := filepath.Base(path)
-		contentStr := string(content)
-		isDeployment := strings.Contains(contentStr, "kind: Deployment")
+	for _, o := range k8sObjects {
+		contentStr := string(o.RawContent)
+		isDeployment := o.IsDeployment()
+		name := filepath.Base(o.SourceManifestPath)
 
 		state.K8sManifests[name] = &K8sManifest{
 			Name:             name,
@@ -123,7 +116,7 @@ func InitializeManifests(state *PipelineState, path string) error {
 			isDeploymentType: isDeployment,
 		}
 
-		fmt.Printf("Added manifest: %s \n", name)
+		fmt.Printf("Added manifest: %s of Kind %s\n", name, o.Kind)
 	}
 
 	return nil
