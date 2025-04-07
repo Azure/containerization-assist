@@ -36,7 +36,7 @@ export AZURE_OPENAI_ENDPOINT=xxxxxx
 - Select "Deply a Mdoel" > "Deploy base model" > "o3-mini"
 - Name the new deployment "container-copilot"
 
-Run the following commands to set yoru deployment ID in your environment:
+Run the following commands to set your deployment ID in your environment:
 ```
 export AZURE_OPENAI_DEPLOYMENT_ID=container-copilot
 ```
