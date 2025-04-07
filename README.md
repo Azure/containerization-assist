@@ -29,7 +29,7 @@ export AZURE_OPENAI_KEY=xxxxxxx
 export AZURE_OPENAI_ENDPOINT=xxxxxx
 ```
 
-3. Set Azure OpenAI Dpeloyment ID
+3. Set Azure OpenAI Deployment ID
 - From the 'Overview Blade' > 'Get Started Tab', open 'Explore Azure AI Foundry Portal'
 - Accept "You're leaving azure.com" with 'Continue' Button
 - In Azure AI Foundry, on the left select the 'Deployments' Blade under 'Shared Resources' 
