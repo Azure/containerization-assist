@@ -10,29 +10,8 @@ import (
 	"time"
 )
 
-// buildDockerfile attempts to build the Docker image and returns any error output
-func buildDockerfile(dockerfilePath string) (bool, string) {
-	// Get the directory containing the Dockerfile to use as build context
-	dockerfileDir := filepath.Dir(dockerfilePath)
-
-	registryName := os.Getenv("REGISTRY")
-
-	// Run Docker build with explicit context path
-	// Use the absolute path for the dockerfile and specify the context directory
-	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryName+"/tomcat-hello-world-workflow:latest", dockerfileDir)
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
-
-	if err != nil {
-		fmt.Println("Docker build failed with error:", err)
-		return false, outputStr
-	}
-
-	return true, outputStr
-}
-
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents
-func buildDockerfileContent(dockerfileContent string) (string, error) {
+func buildDockerfileContent(dockerfileContent string, targetDir string, registry string, imageName string) (string, error) {
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "docker-build-*")
 	if err != nil {
@@ -46,14 +25,14 @@ func buildDockerfileContent(dockerfileContent string) (string, error) {
 		return "", fmt.Errorf("failed to write Dockerfile: %v", err)
 	}
 
-	// Get registry name from environment
-	registryName := os.Getenv("REGISTRY")
-	if registryName == "" {
-		return "", fmt.Errorf("REGISTRY environment variable not set")
+	registryPrefix := ""
+	if registry != "" {
+		registryPrefix = registry + "/"
 	}
 
 	// Build the image using the temporary Dockerfile
-	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryName+"/container-copilot:latest", tmpDir)
+	fmt.Printf("building docker image with tag '%s%s:latest'\n",registryPrefix,imageName)
+	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryPrefix+imageName+":latest", targetDir)
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)
 
@@ -61,6 +40,7 @@ func buildDockerfileContent(dockerfileContent string) (string, error) {
 		return outputStr, fmt.Errorf("docker build failed: %v", err)
 	}
 
+	fmt.Printf("built docker image")
 	return outputStr, nil
 }
 
@@ -159,7 +139,7 @@ func checkDockerInstalled() error {
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *PipelineState) error {
+func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *PipelineState, targetDir string) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -171,25 +151,15 @@ func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *Pi
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Try to build
-		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content)
+		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL,state.ImageName)
 		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
 
-			//Temp code for pushing to kind registry
-			registryName := os.Getenv("REGISTRY")
-			cmd := exec.Command("docker", "push", registryName+"/tomcat-hello-world-workflow:latest")
-			output, err := cmd.CombinedOutput()
-			outputStr := string(output)
-			fmt.Println("Output: ", outputStr)
-
-			if err != nil {
-				fmt.Println("Registry push failed with error:", err)
-				return fmt.Errorf("error pushing to registry: %v", err)
-			}
-
 			return nil
 		}
+
+		fmt.Printf("Docker build failed with error: %v\n", err)
 
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
@@ -231,5 +201,20 @@ func initializeDockerFileState(pipelineState *PipelineState, dockerFilePath stri
 	pipelineState.Dockerfile.BuildErrors = ""
 
 	fmt.Printf("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
+	return nil
+}
+
+func pushDockerImage(image string) error {
+
+	cmd := exec.Command("docker", "push", image)
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+	fmt.Println("Output: ", outputStr)
+
+	if err != nil {
+		fmt.Println("Registry push failed with error:", err)
+		return fmt.Errorf("error pushing to registry: %v", err)
+	}
+
 	return nil
 }

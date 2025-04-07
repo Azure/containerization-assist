@@ -57,10 +57,12 @@ func generateDockerfileWithDraft(dockerfileTemplateName, outputDir string) error
 	return generateArtifactsWithDraft(dockerfileTemplateName, outputDir, nil)
 }
 
-func generateDeploymentFilesWithDraft(outputDir string) error {
+func generateDeploymentFilesWithDraft(outputDir string, registryAndImage string) error {
 	// APPNAME doesn't have a default value in draft template
+	fmt.Println("generating manifests with imagename ",registryAndImage)
 	customVariables := map[string]string{
-		"APPNAME": "app",
+		"IMAGENAME": registryAndImage,
+		"APPNAME": "app", // TODO: make appname based on repo dir
 	}
 	return generateArtifactsWithDraft(manifestDeploymentTemplateName, outputDir, customVariables)
 }

@@ -4,30 +4,38 @@ AI-Powered App Containerization and Kubernetes Artifact Generation
 
 ## Getting Started
 
-### Building Locally
+### Running Locally
+Prerequisites:
+- Go 1.22
+- Kubectl
+- Docker
+- Kind
+
 Clone the repo
 ```
 git clone git@github.com:Azure/container-copilot.git && cd container-copilot
-```
-
-Build container-copilot executable
-```
-go build .
-chmod +x ./container-copilot
 ```
 
 Set Azure OpenAI Keys (you'll need to create an AzureOpenAI Instance in the AzPortal, and go to Develop Tab to get keys)
 ```
 export AZURE_OPENAI_KEY=xxxxxxx
 export AZURE_OPENAI_ENDPOINT=xxxxxx
+export AZURE_OPENAI_DEPLOYMENT_ID=container-copilot
 ```
 
 From the Overview Blade, open "Explore Azure AI Foundry Portal"
 In Azure AI Foundry, select the "Shared Resources">"Deployments" Blade on the left
 
 Deploy a new model named "container-copilot" (o3-mini is recommended)
+
+Run on a local repo to test:
+
+one option to test with is https://github.com/chamilad/tomcat-hello-world (clone to a local dir first to test)
+
+run container-copilot
 ```
-./container-copilot generate ../path/to/repo
+# From root of container-copilot repo
+go run . generate <../path/to/repo>
 ```
 
 ### Using via Github Actions
