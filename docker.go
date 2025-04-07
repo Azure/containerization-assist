@@ -32,28 +32,43 @@ func buildDockerfile(dockerfilePath string) (bool, string) {
 }
 
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents
-func buildDockerfileContent(dockerfileContent string) (string, error) {
-	// Create temporary directory
-	tmpDir, err := os.MkdirTemp("", "docker-build-*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tmpDir) // Clean up
+func buildDockerfileContent(dockerfileContent string, dockerfilePath string) (string, error) {
+	// Use the directory containing the original Dockerfile as build context
+	var contextDir string
+	if dockerfilePath != "" {
+		contextDir = filepath.Dir(dockerfilePath)
+	} else {
+		return "", fmt.Errorf("dockerfilePath is empty")
 
-	// Create temporary Dockerfile
-	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
-	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write Dockerfile: %v", err)
 	}
 
-	// Get registry name from environment
+	// Create temporary Dockerfile in the context directory
+	tempDockerfileName := fmt.Sprintf("Dockerfile.temp.%d", time.Now().UnixNano())
+	tempDockerfilePath := filepath.Join(contextDir, tempDockerfileName)
+
+	// Write the Dockerfile content to the temporary file
+	if err := os.WriteFile(tempDockerfilePath, []byte(dockerfileContent), 0644); err != nil {
+		return "", fmt.Errorf("failed to write temporary Dockerfile: %v", err)
+	}
+
+	// Ensure the temporary Dockerfile gets deleted when we're done
+	defer os.Remove(tempDockerfilePath)
+
 	registryName := os.Getenv("REGISTRY")
+
+	// Create a valid image tag - if registry is empty, use a local tag
+	var imageTag string
 	if registryName == "" {
-		return "", fmt.Errorf("REGISTRY environment variable not set")
+		imageTag = "container-copilot:latest"
+		fmt.Println("REGISTRY environment variable not set, using local tag:", imageTag)
+	} else {
+		imageTag = registryName + "/container-copilot:latest"
 	}
 
-	// Build the image using the temporary Dockerfile
-	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryName+"/container-copilot:latest", tmpDir)
+	// Build the image using the temporary Dockerfile and the original Dockerfile's directory as context
+	fmt.Printf("Building Docker image using Dockerfile: %s with context: %s\n", tempDockerfilePath, contextDir)
+
+	cmd := exec.Command("docker", "build", "-f", tempDockerfilePath, "-t", imageTag, contextDir)
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)
 
@@ -170,8 +185,7 @@ func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *Pi
 	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 
-		// Try to build
-		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content)
+		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content, state.Dockerfile.Path)
 		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
