@@ -133,7 +133,7 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 		return fmt.Errorf("generating deployment files: %w", err)
 	}
 
-	err = InitializeDefaultPathManifests(state,targetDir) // Initialize K8sManifests with default path
+	err = InitializeManifests(state,targetDir) // Initialize K8sManifests with default path
 	if err != nil {
 		return fmt.Errorf("failed to initialize manifests: %w", err)
 	}
