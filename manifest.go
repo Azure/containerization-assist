@@ -32,8 +32,8 @@ const ManifestObjectDelimiter = "---"
 
 // FindKubernetesManifests locates all .yml/yaml files in the specified directory path
 // If no path is provided, DefaultManifestPath will be used
-// FindAndCheckK8sDeployments locates all .yml/.yaml files in the given path and checks if they are Kubernetes Deployments.
-func FindAndCheckK8sDeployments(path string) ([]K8sObject, error) {
+// FindK8sObjects locates all .yml/.yaml files in the given path and checks if they are Kubernetes Deployments.
+func FindK8sObjects(path string) ([]K8sObject, error) {
 	if path == "" {
 		path = DefaultManifestPath
 		fmt.Printf("Using default manifest path: %s\n", path)
@@ -92,7 +92,7 @@ func readK8sObjects(content []byte) (K8sObject, error) {
 // InitializeManifests populates the K8sManifests field in PipelineState with manifests found in the specified path
 // If path is empty, the default manifest path will be used
 func InitializeManifests(state *PipelineState, path string) error {
-	k8sObjects, err := FindAndCheckK8sDeployments(path)
+	k8sObjects, err := FindK8sObjects(path)
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
 	}
