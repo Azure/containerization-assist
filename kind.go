@@ -85,6 +85,9 @@ func setupLocalRegistry() error {
 
 // getKindCluster ensures a 'container-copilot' kind cluster exists and sets kubectl context.
 func getKindCluster() (string, error) {
+	if err := checkDockerRunning(); err != nil {
+		return "", err
+	}
 	if err := validateKindInstalled(); err != nil {
 		return "", err
 	}

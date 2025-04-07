@@ -11,31 +11,45 @@ Prerequisites:
 - Docker
 - Kind
 
-Clone the repo
+1. Clone the repo
 ```
 git clone git@github.com:Azure/container-copilot.git && cd container-copilot
 ```
 
-Set Azure OpenAI Keys (you'll need to create an AzureOpenAI Instance in the AzPortal, and go to Develop Tab to get keys)
+2. Set Azure OpenAI KEY and ENDPOINT
+
+- Create an AzureOpenAI Instance in the AzPortal
+- Go to Develop Tab
+- Copy Key and Endpoint values (Key Number doesn't matter)
+
+
+Run the following commands to set these values in your environment:
 ```
 export AZURE_OPENAI_KEY=xxxxxxx
 export AZURE_OPENAI_ENDPOINT=xxxxxx
+```
+
+3. Set Azure OpenAI Deployment ID
+- From the 'Overview Blade' > 'Get Started Tab', open 'Explore Azure AI Foundry Portal'
+- Accept "You're leaving azure.com" with 'Continue' Button
+- In Azure AI Foundry, on the left select the 'Deployments' Blade under 'Shared Resources' 
+- Select "Deply a Mdoel" > "Deploy base model" > "o3-mini"
+- Name the new deployment "container-copilot"
+
+Run the following commands to set your deployment ID in your environment:
+```
 export AZURE_OPENAI_DEPLOYMENT_ID=container-copilot
 ```
 
-From the Overview Blade, open "Explore Azure AI Foundry Portal"
-In Azure AI Foundry, select the "Shared Resources">"Deployments" Blade on the left
-
-Deploy a new model named "container-copilot" (o3-mini is recommended)
-
-Run on a local repo to test:
+4. Execute container-copilot
+Run on a local repo to test (this will be referred to as the "target repo" for containerization):
 
 one option to test with is https://github.com/chamilad/tomcat-hello-world (clone to a local dir first to test)
 
 run container-copilot
 ```
 # From root of container-copilot repo
-go run . generate <../path/to/repo>
+go run . generate <../path/to/target-repo>
 ```
 
 ### Using via Github Actions
