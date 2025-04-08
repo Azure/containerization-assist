@@ -105,10 +105,10 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 		Success:        false,
 		IterationCount: 0,
 		Metadata:       make(map[string]interface{}),
-		ImageName:  "app", // TODO: clean up app naming into state
-		RegistryURL: registry,
+		ImageName:      "app", // TODO: clean up app naming into state
+		RegistryURL:    registry,
 	}
-	fmt.Printf("validating connection to registry %s\n",registry)
+	fmt.Printf("validating connection to registry %s\n", registry)
 	err = validateRegistryReachable(state.RegistryURL)
 	if err != nil {
 		return fmt.Errorf("reaching registry %s: %w\n", state.RegistryURL, err)
@@ -133,7 +133,7 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 		return fmt.Errorf("generating deployment files: %w", err)
 	}
 
-	err = InitializeManifests(state,targetDir) // Initialize K8sManifests with default path
+	err = InitializeManifests(state, targetDir) // Initialize K8sManifests with default path
 	if err != nil {
 		return fmt.Errorf("failed to initialize manifests: %w", err)
 	}
@@ -153,7 +153,6 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 	if err != nil {
 		return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 	}
-
 
 	if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
 		errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))

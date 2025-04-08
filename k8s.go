@@ -104,7 +104,16 @@ func checkKubectlInstalled() error {
 }
 
 // deployAndVerifySingleManifest applies a single manifest and verifies pod health
-func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool, string) {
+func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool, string, error) {
+	content, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return false, "", fmt.Errorf("reading manifest file: %w", err)
+	}
+	_, err = readK8sObjects(content)
+	if err != nil {
+		return false, "", fmt.Errorf("reading k8s objects from manifest file %s: %w", manifestPath, err)
+	}
+
 	// Apply the manifest
 	cmd := exec.Command("kubectl", "apply", "-f", manifestPath)
 	output, err := cmd.CombinedOutput()
@@ -112,7 +121,7 @@ func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool
 
 	if err != nil {
 		fmt.Printf("Kubernetes deployment failed for %s with error: %v\n", manifestPath, err)
-		return false, outputStr
+		return false, outputStr, nil
 	}
 
 	fmt.Printf("Successfully applied %s\n", manifestPath)
@@ -121,7 +130,7 @@ func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool
 	baseFilename := filepath.Base(manifestPath)
 	if !isDeployment {
 		fmt.Printf("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
-		return true, outputStr
+		return true, outputStr, nil
 	}
 
 	fmt.Printf("Checking pod health for deployment...\n")
@@ -134,18 +143,18 @@ func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool
 	// Wait for pods to become healthy
 	podSuccess, podOutput := checkPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
-		fmt.Printf("Pods are not healthy: %s\n", podOutput)
-		return false, outputStr + "\n" + podOutput
+		fmt.Printf("Pods are not healthy for deployment with manifest %s\n", manifestPath)
+		return false, outputStr + "\n" + podOutput, nil
 	}
 	fmt.Println("Pod health check passed")
 
-	return true, outputStr
+	return true, outputStr, nil
 }
 
 // deployStateManifests deploys manifests from pipeline state
 func deployStateManifests(state *PipelineState) error {
 	// Create a temporary directory for manifest files
-	tmpDir, err := os.MkdirTemp("", "k8s-deploy-*")
+	tmpDir, err := os.MkdirTemp("", "container-copilot-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %v", err)
 	}
@@ -172,12 +181,15 @@ func deployStateManifests(state *PipelineState) error {
 		}
 
 		// Use existing deployment verification
-		success, output := deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
+		success, output,err := deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
+		if err != nil {
+			return fmt.Errorf("error deploying manifest %s: %v", name, err)
+		}
 
 		if !success {
 			manifest.errorLog = output
 			manifest.isDeployed = false
-			fmt.Printf("Failed to deploy manifest %s: %s\n", name, output)
+			fmt.Printf("Failed to deploy manifest %s\n", name)
 			failedManifests = append(failedManifests, name)
 			continue
 		}
@@ -231,6 +243,11 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 				ErrorMessages: manifest.errorLog,
 				FilePath:      manifest.Path,
 				//Repo tree is currently not provided to the prompt
+			}
+
+			failedImagePull := strings.Contains(manifest.errorLog, "ImagePullBackOff")
+			if failedImagePull {
+				return fmt.Errorf("ImagePullBackOff error detected in manifest %s. Skipping AI analysis.\n", name)
 			}
 
 			// Pass the entire state instead of just the Dockerfile
