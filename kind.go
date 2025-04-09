@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
-	"bufio"
-	"os"
 )
 
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
@@ -50,7 +50,7 @@ func validateKindInstalled() error {
 }
 
 // setupLocalRegistry sets up a local Docker registry for kind, supporting multiple OS types.
-func setupLocalRegistry() error {
+func setupLocalRegistryCluster() error {
 	if err := checkDockerRunning(); err != nil {
 		return err
 	}
@@ -100,7 +100,6 @@ func getKindCluster() (string, error) {
 
 	clusters := strings.Split(string(output), "\n")
 	exists := false
-	fmt.Printf("found clusters:\n%s",clusters)
 	for _, cluster := range clusters {
 		if strings.TrimSpace(cluster) == "container-copilot" {
 			exists = true
@@ -112,9 +111,8 @@ func getKindCluster() (string, error) {
 	if !exists {
 		fmt.Println("No existing kind cluster found. Creating a new one...")
 		fmt.Println("Creating kind cluster 'container-copilot'")
-		cmd = exec.Command("kind", "create", "cluster", "--name", "container-copilot")
-		if output, err = cmd.CombinedOutput(); err != nil {
-			return "", fmt.Errorf("failed to create kind cluster: %s, error: %w", string(output), err)
+		if err := setupLocalRegistryCluster(); err != nil {
+			return "", fmt.Errorf("setting up local registry cluster: %w", err)
 		}
 	}
 
@@ -122,10 +120,6 @@ func getKindCluster() (string, error) {
 	cmd = exec.Command("kubectl", "config", "use-context", "kind-container-copilot")
 	if output, err = cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", string(output), err)
-	}
-
-	if err := setupLocalRegistry(); err != nil {
-		return "", err
 	}
 
 	return "localhost:5001", nil
@@ -154,14 +148,14 @@ fi
 # https://github.com/kubernetes-sigs/kind/issues/2875
 # https://github.com/containerd/containerd/blob/main/docs/cri/config.md#registry-configuration
 # See: https://github.com/containerd/containerd/blob/main/docs/hosts.md
-# cat <<EOF | kind create cluster --config=-
-# kind: Cluster
-# apiVersion: kind.x-k8s.io/v1alpha4
-# containerdConfigPatches:
-# - |-
-# [plugins."io.containerd.grpc.v1.cri".registry]
-#  config_path = "/etc/containerd/certs.d"
-# EOF
+cat <<EOF | kind create cluster -n container-copilot --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry]
+    config_path = "/etc/containerd/certs.d"
+EOF
 
 # 3. Add the registry config to the nodes
 #
@@ -172,7 +166,7 @@ fi
 # We want a consistent name that works from both ends, so we tell containerd to
 # alias localhost:${reg_port} to the registry container when pulling images
 REGISTRY_DIR="/etc/containerd/certs.d/localhost:${reg_port}"
-for node in $(kind get nodes); do
+for node in $(kind get nodes -n container-copilot); do
   docker exec "${node}" mkdir -p "${REGISTRY_DIR}"
   cat <<EOF | docker exec -i "${node}" cp /dev/stdin "${REGISTRY_DIR}/hosts.toml"
 [host."http://${reg_name}:5000"]
