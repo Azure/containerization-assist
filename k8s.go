@@ -172,7 +172,7 @@ func deployStateManifests(state *PipelineState) error {
 
 	// Deploy each pending manifest using existing verification
 	for name := range pendingManifests {
-		manifest := state.K8sManifests[name]
+		manifest := state.K8sObjects[name]
 
 		// Write manifest to temporary file
 		tmpFile := filepath.Join(tmpDir, name)
@@ -188,14 +188,14 @@ func deployStateManifests(state *PipelineState) error {
 
 		if !success {
 			manifest.errorLog = output
-			manifest.isDeployed = false
+			manifest.isSuccessfullyDeployed = false
 			fmt.Printf("Failed to deploy manifest %s\n", name)
 			failedManifests = append(failedManifests, name)
 			continue
 		}
 
 		fmt.Printf("Successfully deployed manifest: %s\n", name)
-		manifest.isDeployed = true
+		manifest.isSuccessfullyDeployed = true
 		manifest.errorLog = ""
 	}
 
@@ -215,7 +215,7 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 		return err
 	}
 
-	if len(state.K8sManifests) == 0 {
+	if len(state.K8sObjects) == 0 {
 		return fmt.Errorf("no manifest files found in state")
 	}
 
@@ -223,21 +223,21 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 		fmt.Printf("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Fix each manifest that still has issues
-		pendingManifests := GetPendingManifests(state)
-		for name := range pendingManifests {
-			manifest := state.K8sManifests[name]
+		pendingObjects := GetPendingManifests(state)
+		for name := range pendingObjects {
+			thisObject := state.K8sObjects[name]
 			fmt.Printf("\nAnalyzing and fixing: %s\n", name)
 
 			input := FileAnalysisInput{
-				Content:       manifest.Content,
-				ErrorMessages: manifest.errorLog,
-				FilePath:      manifest.Path,
+				Content:       string(thisObject.Content),
+				ErrorMessages: thisObject.errorLog,
+				FilePath:      thisObject.ManifestPath,
 				//Repo tree is currently not provided to the prompt
 			}
 
-			failedImagePull := strings.Contains(manifest.errorLog, "ImagePullBackOff")
+			failedImagePull := strings.Contains(thisObject.errorLog, "ImagePullBackOff")
 			if failedImagePull {
-				return fmt.Errorf("ImagePullBackOff error detected in manifest %s. Skipping AI analysis.\n", name)
+				return fmt.Errorf("imagePullBackOff error detected in manifest %s. Skipping AI analysis", name)
 			}
 
 			// Pass the entire state instead of just the Dockerfile
@@ -246,7 +246,7 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 				return fmt.Errorf("error in AI analysis for %s: %v", name, err)
 			}
 
-			manifest.Content = result.FixedContent
+			thisObject.Content = []byte(result.FixedContent)
 			fmt.Printf("AI suggested fixes for %s\n", name)
 			fmt.Println(result.Analysis)
 		}
@@ -262,6 +262,14 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 
 		if i < maxIterations-1 {
 			fmt.Printf("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
+			// Log status of each manifest
+			for name, thisObject := range state.K8sObjects {
+				if thisObject.isSuccessfullyDeployed {
+					fmt.Printf("  ✅ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
+				} else {
+					fmt.Printf("  ❌ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
+				}
+			}
 		}
 
 		time.Sleep(1 * time.Second)

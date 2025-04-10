@@ -17,11 +17,14 @@ type K8sMetadata struct {
 	Labels map[string]string `yaml:"labels"`
 }
 type K8sObject struct {
-	ApiVersion         string      `yaml:"apiVersion"`
-	Kind               string      `yaml:"kind"`
-	Metadata           K8sMetadata `yaml:"metadata"`
-	RawContent         []byte
-	SourceManifestPath string
+	ApiVersion             string      `yaml:"apiVersion"`
+	Kind                   string      `yaml:"kind"`
+	Metadata               K8sMetadata `yaml:"metadata"`
+	Content                []byte
+	ManifestPath           string
+	isSuccessfullyDeployed bool
+	isDeploymentType       bool
+	errorLog               string
 }
 
 func (o K8sObject) IsDeployment() bool {
@@ -64,7 +67,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			if err != nil {
 				return fmt.Errorf("reading k8s object: %w", err)
 			}
-			o.SourceManifestPath = filePath
+			o.ManifestPath = filePath
 			k8sObjects = append(k8sObjects, o)
 		}
 		return nil
@@ -85,7 +88,7 @@ func readK8sObjects(content []byte) (K8sObject, error) {
 	if err != nil {
 		return o, fmt.Errorf("unmarshaling yaml as k8s object: %w", err)
 	}
-	o.RawContent = content
+	o.Content = content
 	return o, nil
 }
 
@@ -96,27 +99,17 @@ func InitializeManifests(state *PipelineState, path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
 	}
-
 	if len(k8sObjects) == 0 {
-		fmt.Println("No Kubernetes deployment files found")
+		return fmt.Errorf("no Kubernetes deployment files found in %s", path)
+	}
+	fmt.Printf("Found %d Kubernetes objects from %s\n", len(k8sObjects), path)
+	for _, obj := range k8sObjects {
+		fmt.Printf("  '%s' kind: %s source: %s\n", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
 	}
 
-	fmt.Printf("Found %d Kubernetes object files\n", len(k8sObjects))
-
-	for _, o := range k8sObjects {
-		contentStr := string(o.RawContent)
-		isDeployment := o.IsDeployment()
-		name := filepath.Base(o.SourceManifestPath)
-
-		state.K8sManifests[name] = &K8sManifest{
-			Name:             name,
-			Content:          contentStr,
-			Path:             path,
-			isDeployed:       false,
-			isDeploymentType: isDeployment,
-		}
-
-		fmt.Printf("Added manifest: %s of Kind %s\n", name, o.Kind)
+	state.K8sObjects = make(map[string]*K8sObject)
+	for _, obj := range k8sObjects {
+		state.K8sObjects[obj.Metadata.Name] = &obj
 	}
 
 	return nil
@@ -126,7 +119,7 @@ func InitializeManifests(state *PipelineState, path string) error {
 func FormatManifestErrors(state *PipelineState) string {
 	var errorBuilder strings.Builder
 
-	for name, manifest := range state.K8sManifests {
+	for name, manifest := range state.K8sObjects {
 		if manifest.errorLog != "" {
 			errorBuilder.WriteString(fmt.Sprintf("\nManifest %q:\n%s\n", name, manifest.errorLog))
 		}
@@ -139,8 +132,8 @@ func FormatManifestErrors(state *PipelineState) string {
 func GetPendingManifests(state *PipelineState) map[string]bool {
 	pendingManifests := make(map[string]bool)
 
-	for name, manifest := range state.K8sManifests {
-		if !manifest.isDeployed {
+	for name, manifest := range state.K8sObjects {
+		if !manifest.isSuccessfullyDeployed {
 			pendingManifests[name] = true
 		}
 	}
