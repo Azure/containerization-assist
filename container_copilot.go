@@ -144,10 +144,7 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 		return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
 	}
 
-	fmt.Println("Tree: ", state.RepoFileTree)
-
 	errors := []string{}
-
 	for i := 0; i < maxIterations && !state.Success; i++ {
 		if err := iterateDockerfileBuild(c, maxIterations, state, targetDir); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
