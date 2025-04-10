@@ -181,7 +181,7 @@ func deployStateManifests(state *PipelineState) error {
 		}
 
 		// Use existing deployment verification
-		success, output,err := deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
+		success, output, err := deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
@@ -222,16 +222,6 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
 
-		// Try to deploy pending manifests
-		err := deployStateManifests(state)
-		if err == nil {
-			state.Success = true
-			fmt.Println("🎉 All Kubernetes manifests deployed successfully!")
-			return nil
-		}
-
-		fmt.Printf("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
-
 		// Fix each manifest that still has issues
 		pendingManifests := GetPendingManifests(state)
 		for name := range pendingManifests {
@@ -260,8 +250,20 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 			fmt.Printf("AI suggested fixes for %s\n", name)
 			fmt.Println(result.Analysis)
 		}
+		fmt.Println("Updated manifests with fixes. Attempting deployment...")
 
-		fmt.Println("Updated manifests with fixes. Attempting deployment again...")
+		// Try to deploy pending manifests
+		err := deployStateManifests(state)
+		if err == nil {
+			state.Success = true
+			fmt.Printf("🎉 All Kubernetes manifests deployed successfully!")
+			return nil
+		}
+
+		if i < maxIterations-1 {
+			fmt.Printf("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
+		}
+
 		time.Sleep(1 * time.Second)
 	}
 

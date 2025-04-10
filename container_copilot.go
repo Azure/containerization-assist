@@ -94,13 +94,7 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 	maxIterations := 5
 	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
 
-	repoStructure, err := readFileTree(targetDir)
-	if err != nil {
-		return fmt.Errorf("failed to get file tree: %w", err)
-	}
-
 	state := &PipelineState{
-		RepoFileTree:   repoStructure,
 		K8sManifests:   make(map[string]*K8sManifest),
 		Success:        false,
 		IterationCount: 0,
@@ -133,6 +127,13 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 		return fmt.Errorf("generating deployment files: %w", err)
 	}
 
+	//Add RepoFileTree to state after Dockerfile and Manifests are generated
+	repoStructure, err := readFileTree(targetDir)
+	if err != nil {
+		return fmt.Errorf("failed to get file tree: %w", err)
+	}
+	state.RepoFileTree = repoStructure
+
 	err = InitializeManifests(state, targetDir) // Initialize K8sManifests with default path
 	if err != nil {
 		return fmt.Errorf("failed to initialize manifests: %w", err)
@@ -144,21 +145,25 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 	}
 
 	errors := []string{}
-	if err := iterateDockerfileBuild(c, maxIterations, state, targetDir); err != nil {
-		errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
+	for i := 0; i < maxIterations && !state.Success; i++ {
+		if err := iterateDockerfileBuild(c, maxIterations, state, targetDir); err != nil {
+			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
+			break
+		}
+
+		fmt.Printf("pushing image %s\n", registryAndImage)
+		err = pushDockerImage(registryAndImage)
+		if err != nil {
+			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
+		}
+
+		if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
+			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
+		}
+
 	}
 
-	fmt.Printf("pushing image %s\n", registryAndImage)
-	err = pushDockerImage(registryAndImage)
-	if err != nil {
-		return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
-	}
-
-	if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
-		errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
-	}
-
-	if len(errors) > 0 {
+	if !state.Success {
 		fmt.Println("\n❌ Container deployment pipeline did not complete successfully after maximum iterations.")
 		fmt.Println("No files were updated. Please review the logs for more information.")
 		return fmt.Errorf("errors encountered during iteration:\n%s", strings.Join(errors, "\n"))

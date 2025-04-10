@@ -31,7 +31,7 @@ func buildDockerfileContent(dockerfileContent string, targetDir string, registry
 	}
 
 	// Build the image using the temporary Dockerfile
-	fmt.Printf("building docker image with tag '%s%s:latest'\n",registryPrefix,imageName)
+	fmt.Printf("building docker image with tag '%s%s:latest'\n", registryPrefix, imageName)
 	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryPrefix+imageName+":latest", targetDir)
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)
@@ -150,21 +150,6 @@ func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *Pi
 	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 
-		// Try to build
-		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL,state.ImageName)
-		if err == nil {
-			fmt.Println("🎉 Docker build succeeded!")
-			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
-
-			return nil
-		}
-
-		fmt.Printf("Docker build failed with error: %v\n", err)
-
-		fmt.Println("Docker build failed. Using AI to fix issues...")
-
-		state.Dockerfile.BuildErrors = buildOutput
-
 		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
 		result, err := analyzeDockerfile(client, state)
 		if err != nil {
@@ -177,6 +162,21 @@ func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *Pi
 		fmt.Println(result.Analysis)
 
 		fmt.Printf("Updated Dockerfile written. Attempting build again...\n")
+
+		// Try to build
+		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+		if err == nil {
+			fmt.Println("🎉 Docker build succeeded!")
+			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
+
+			return nil
+		}
+
+		fmt.Printf("Docker build failed with error: %v\n", err)
+
+		fmt.Println("Docker build failed. Using AI to fix issues...")
+
+		state.Dockerfile.BuildErrors = buildOutput
 		time.Sleep(1 * time.Second) // Small delay for readability
 	}
 
