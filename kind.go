@@ -108,12 +108,16 @@ func getKindCluster() (string, error) {
 		}
 	}
 
-	if !exists {
-		fmt.Println("No existing kind cluster found. Creating a new one...")
-		fmt.Println("Creating kind cluster 'container-copilot'")
-		if err := setupLocalRegistryCluster(); err != nil {
-			return "", fmt.Errorf("setting up local registry cluster: %w", err)
+	if exists {
+		fmt.Println("Deleting existing kind cluster 'container-copilot'")
+		cmd = exec.Command("kind", "delete", "cluster", "--name", "container-copilot")
+		if output, err = cmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("failed to delete existing kind cluster: %s, error: %w", string(output), err)
 		}
+	}
+	fmt.Println("Creating kind cluster 'container-copilot'")
+	if err := setupLocalRegistryCluster(); err != nil {
+		return "", fmt.Errorf("setting up local registry cluster: %w", err)
 	}
 
 	fmt.Println("Setting kubectl context to 'kind-container-copilot'")

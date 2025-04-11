@@ -48,7 +48,11 @@ func analyzeDockerfile(client *AzOpenAIClient, state *PipelineState) (*FileAnaly
 	dockerfile := state.Dockerfile
 
 	// Create prompt for analyzing the Dockerfile
-	promptText := fmt.Sprintf(`Analyze the following Dockerfile for errors and suggest fixes:
+	promptText := fmt.Sprintf(`
+You are an expert in Dockerfile analysis and debugging.
+Your task is to analyze the provided Dockerfile for potential issues and suggest fixes.
+
+Analyze the following Dockerfile for errors and suggest fixes:
 Dockerfile:
 %s
 `, dockerfile.Content)
@@ -90,8 +94,14 @@ Please:
 1. Identify any issues in the Dockerfile
 2. Provide a fixed version of the Dockerfile
 3. Explain what changes were made and why
+4. Favor using the latest base images and best practices for Dockerfile writing
+6. If applicable, use multi-stage builds to reduce image size
+7. Make sure to account for the file structure of the repository
 
-Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.`
+Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.
+
+I will tip you if you provide a correct and working Dockerfile.
+`
 
 	content, err := client.GetChatCompletion(promptText)
 	if err != nil {

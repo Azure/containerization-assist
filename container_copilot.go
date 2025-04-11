@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +75,7 @@ func updateSuccessfulFiles(state *PipelineState) {
 	}
 }
 
-func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
+func (c *AzOpenAIClient) generate(targetDir string, registry string, enableDraftDockerfile bool) error {
 	kindClusterName, err := getKindCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
@@ -98,16 +99,25 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 		return fmt.Errorf("reaching registry %s: %w\n", state.RegistryURL, err)
 	}
 
-	fmt.Printf("Generating Dockerfile in %s\n", targetDir)
-	draftTemplateName, err := getDockerfileTemplateName(c, targetDir)
-	if err != nil {
-		return fmt.Errorf("getting Dockerfile template name: %w", err)
-	}
+	if enableDraftDockerfile {
+		fmt.Printf("Generating Dockerfile in %s\n", targetDir)
+		draftTemplateName, err := getDockerfileTemplateName(c, targetDir)
+		if err != nil {
+			return fmt.Errorf("getting Dockerfile template name: %w", err)
+		}
 
-	fmt.Printf("Using Dockerfile template: %s\n", draftTemplateName)
-	err = generateDockerfileWithDraft(draftTemplateName, targetDir)
-	if err != nil {
-		return fmt.Errorf("generating Dockerfile: %w", err)
+		fmt.Printf("Using Dockerfile template: %s\n", draftTemplateName)
+		err = generateDockerfileWithDraft(draftTemplateName, targetDir)
+		if err != nil {
+			return fmt.Errorf("generating Dockerfile: %w", err)
+		}
+	} else {
+		fmt.Printf("Writing blank starter Dockerfile in %s\n", targetDir)
+		fmt.Printf("writing empty dockerfile\n")
+		err = os.WriteFile(filepath.Join(targetDir, "Dockerfile"), []byte{}, fs.ModePerm)
+		if err != nil {
+			return fmt.Errorf("writing blank Dockerfile: %w", err)
+		}
 	}
 
 	fmt.Printf("Generating Kubernetes manifests in %s\n", targetDir)
