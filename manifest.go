@@ -67,6 +67,10 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			if err != nil {
 				return fmt.Errorf("reading k8s object: %w", err)
 			}
+			if o.Kind == "" || o.ApiVersion == "" || o.Metadata.Name == "" {
+				fmt.Printf("Skipping file %s: missing required fields\n", filePath)
+				return nil
+			}
 			o.ManifestPath = filePath
 			k8sObjects = append(k8sObjects, o)
 		}

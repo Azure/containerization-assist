@@ -15,58 +15,59 @@ const (
 )
 
 var (
-	registry string
+	registry            string
+	dockerfileGenerator string
 )
 
-	var rootCmd = &cobra.Command{
-		Use:   "container-copilot",
-		Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
-		},
-	}
+var rootCmd = &cobra.Command{
+	Use:   "container-copilot",
+	Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
+}
 
-	var generateCmd = &cobra.Command{
-		Use:   "generate",
-		Short: "Generate Dockerfile and Kubernetes manifests",
-		Long:  `The generate command will add Dockerfile and Kubernetes manifests to your project based on the project structure.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			targetDir, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("error getting current directory: %w", err)
-			}
-			if len(args) > 0 {
-				targetDir = args[0]
-			}
+var generateCmd = &cobra.Command{
+	Use:   "generate",
+	Short: "Generate Dockerfile and Kubernetes manifests",
+	Long:  `The generate command will add Dockerfile and Kubernetes manifests to your project based on the project structure.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		targetDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("error getting current directory: %w", err)
+		}
+		if len(args) > 0 {
+			targetDir = args[0]
+		}
 
-			c, err := initClient()
-			if err != nil {
-				return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
-			}
-			if err := c.generate(targetDir, registry); err != nil {
-				return fmt.Errorf("error generating artifacts: %w", err)
-			}
+		c, err := initClient()
+		if err != nil {
+			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
+		}
+		if err := c.generate(targetDir, registry, dockerfileGenerator == "draft"); err != nil {
+			return fmt.Errorf("error generating artifacts: %w", err)
+		}
 
-			return nil
-		},
-	}
+		return nil
+	},
+}
 
-	var testCmd = &cobra.Command{
-		Use:   "test",
-		Short: "Test Azure OpenAI connection",
-		Long:  `The test command will test the Azure OpenAI connection based on the environment variables set and print a response.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := initClient()
-			if err != nil {
-				return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
-			}
-			if err := c.testOpenAIConn(); err != nil {
-				return fmt.Errorf("error testing Azure OpenAI connection: %w", err)
-			}
+var testCmd = &cobra.Command{
+	Use:   "test",
+	Short: "Test Azure OpenAI connection",
+	Long:  `The test command will test the Azure OpenAI connection based on the environment variables set and print a response.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := initClient()
+		if err != nil {
+			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
+		}
+		if err := c.testOpenAIConn(); err != nil {
+			return fmt.Errorf("error testing Azure OpenAI connection: %w", err)
+		}
 
-			return nil
-		},
-	}
+		return nil
+	},
+}
 
 func Execute() {
 	rootCmd.AddCommand(generateCmd)
@@ -102,6 +103,7 @@ func initClient() (*AzOpenAIClient, error) {
 	return client, nil
 }
 
-func init(){
+func init() {
 	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
+	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")
 }
