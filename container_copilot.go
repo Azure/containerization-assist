@@ -28,17 +28,6 @@ type FileAnalysisResult struct {
 	Analysis     string `json:"analysis"`
 }
 
-// K8sManifest represents a single Kubernetes manifest and its deployment status
-type K8sManifest struct {
-	Name             string
-	Content          string
-	Path             string
-	isDeployed       bool
-	isDeploymentType bool
-	errorLog         string
-	//Possibly Summary of changes
-}
-
 type Dockerfile struct {
 	Content     string
 	Path        string
@@ -51,7 +40,7 @@ type PipelineState struct {
 	Dockerfile     Dockerfile
 	RegistryURL    string
 	ImageName      string
-	K8sManifests   map[string]*K8sManifest
+	K8sObjects     map[string]*K8sObject
 	Success        bool
 	IterationCount int
 	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
@@ -70,10 +59,11 @@ func updateSuccessfulFiles(state *PipelineState) {
 
 		// Write final manifests
 		fmt.Println("Writing final Kubernetes manifest files...")
-		for name, manifest := range state.K8sManifests {
-			if manifest.isDeployed && manifest.Path != "" {
+		for name, object := range state.K8sObjects {
+			if object.isSuccessfullyDeployed && object.ManifestPath != "" {
 				fmt.Printf("Writing updated manifest: %s\n", name)
-				if err := os.WriteFile(manifest.Path, []byte(manifest.Content), 0644); err != nil {
+				// assumes single object per file so we can write the whole content
+				if err := os.WriteFile(object.ManifestPath, []byte(object.Content), 0644); err != nil {
 					fmt.Printf("Error writing manifest %s: %v\n", name, err)
 				}
 			}
@@ -95,7 +85,7 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
 
 	state := &PipelineState{
-		K8sManifests:   make(map[string]*K8sManifest),
+		K8sObjects:     make(map[string]*K8sObject),
 		Success:        false,
 		IterationCount: 0,
 		Metadata:       make(map[string]interface{}),
