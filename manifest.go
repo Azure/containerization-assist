@@ -89,12 +89,12 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 
 func readK8sObjects(content []byte) (K8sObject, error) {
 	var o K8sObject
+	if strings.Contains(string(content), ManifestObjectDelimiter) {
+		return o, fmt.Errorf("multi-object manifests are not yet supported")
+	}
 	err := yaml.Unmarshal(content, &o)
 	if err != nil {
 		return o, fmt.Errorf("unmarshaling yaml as k8s object: %w", err)
-	}
-	if strings.Contains(string(content), ManifestObjectDelimiter) {
-		return o, fmt.Errorf("multi-object manifests are not yet supported")
 	}
 	o.Content = content
 	return o, nil
