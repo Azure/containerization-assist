@@ -21,7 +21,8 @@ Available Dockerfile templates:
 Project repository structure:
 %s
 
-Based on the files in this project, select the most appropriate Dockerfile template name from the list.
+First, analyze the project to determine how it should be built. 
+Based on project, select the most appropriate Dockerfile template name from the list.
 Return only the exact template name from the list without any other text, explanation or formatting.
 `
 )
@@ -59,10 +60,10 @@ func generateDockerfileWithDraft(dockerfileTemplateName, outputDir string) error
 
 func generateDeploymentFilesWithDraft(outputDir string, registryAndImage string) error {
 	// APPNAME doesn't have a default value in draft template
-	fmt.Println("generating manifests with imagename ",registryAndImage)
+	fmt.Println("generating manifests with imagename ", registryAndImage)
 	customVariables := map[string]string{
 		"IMAGENAME": registryAndImage,
-		"APPNAME": "app", // TODO: make appname based on repo dir
+		"APPNAME":   "app", // TODO: make appname based on repo dir
 	}
 	return generateArtifactsWithDraft(manifestDeploymentTemplateName, outputDir, customVariables)
 }

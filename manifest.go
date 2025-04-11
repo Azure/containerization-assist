@@ -65,12 +65,16 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			}
 			o, err := readK8sObjects(fileContent)
 			if err != nil {
-				return fmt.Errorf("reading k8s object: %w", err)
+				fmt.Printf("Skipping file %s: %v\n", filePath, err)
+				return nil // Skip files with errors instead of failing
 			}
+
+			// Validate that this is actually a Kubernetes manifest by checking required fields
 			if o.Kind == "" || o.ApiVersion == "" || o.Metadata.Name == "" {
-				fmt.Printf("Skipping file %s: missing required fields\n", filePath)
+				fmt.Printf("Skipping file %s: not a valid Kubernetes manifest (missing required fields)\n", filePath)
 				return nil
 			}
+
 			o.ManifestPath = filePath
 			k8sObjects = append(k8sObjects, o)
 		}
