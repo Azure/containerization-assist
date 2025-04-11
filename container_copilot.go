@@ -114,8 +114,10 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string, enableDraft
 	} else {
 		fmt.Printf("Writing blank starter Dockerfile in %s\n", targetDir)
 		fmt.Printf("writing empty dockerfile\n")
-		os.WriteFile(filepath.Join(targetDir, "Dockerfile"), []byte{}, fs.ModePerm)
-
+		err = os.WriteFile(filepath.Join(targetDir, "Dockerfile"), []byte{}, fs.ModePerm)
+		if err != nil {
+			return fmt.Errorf("writing blank Dockerfile: %w", err)
+		}
 	}
 
 	fmt.Printf("Generating Kubernetes manifests in %s\n", targetDir)
