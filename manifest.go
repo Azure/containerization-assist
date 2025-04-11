@@ -108,7 +108,8 @@ func InitializeManifests(state *PipelineState, path string) error {
 	}
 
 	state.K8sObjects = make(map[string]*K8sObject)
-	for _, obj := range k8sObjects {
+	for i := range k8sObjects {
+		obj := k8sObjects[i]
 		objKey := fmt.Sprintf("%s-%s", obj.Kind, obj.Metadata.Name)
 		state.K8sObjects[objKey] = &obj
 	}

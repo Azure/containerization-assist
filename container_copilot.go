@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,10 +106,13 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string) error {
 	}
 
 	fmt.Printf("Using Dockerfile template: %s\n", draftTemplateName)
-	err = generateDockerfileWithDraft(draftTemplateName, targetDir)
-	if err != nil {
-		return fmt.Errorf("generating Dockerfile: %w", err)
-	}
+	// write empty dockerfile to targetDir
+	fmt.Printf("writing empty dockerfile\n")
+	os.WriteFile(filepath.Join(targetDir, "Dockerfile"), []byte{}, fs.ModePerm)
+	// err = generateDockerfileWithDraft(draftTemplateName, targetDir)
+	// if err != nil {
+	// 	return fmt.Errorf("generating Dockerfile: %w", err)
+	// }
 
 	fmt.Printf("Generating Kubernetes manifests in %s\n", targetDir)
 	registryAndImage := fmt.Sprintf("%s/%s", registry, "app")
