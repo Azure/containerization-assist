@@ -146,7 +146,7 @@ jobs:
           passed_tests=""
           failed_tests=""
           
-          for i in {1.10}; do
+          for i in {1..10}; do
             if [ -f "results/test-result-$i/result.txt" ]; then
               result=$(cat "results/test-result-$i/result.txt")
               if [ "$result" == "success" ]; then
