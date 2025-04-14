@@ -62,7 +62,7 @@ jobs:
             
             # Run the test and save output
             echo "Running container-copilot generate..."
-            container-copilot generate > "logs/run-${i}.log" 2>&1
+            container-copilot generate ../coolstore > "logs/run-${i}.log" 2>&1
             
             # Check if generare returned success
             if [ $? -eq 0 ]; then
