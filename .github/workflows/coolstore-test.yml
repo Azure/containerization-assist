@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        test-number: [1, 2, 3, 4, 5]
+        test-number: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
       fail-fast: false
     
     steps:
@@ -146,7 +146,7 @@ jobs:
           passed_tests=""
           failed_tests=""
           
-          for i in {1..5}; do
+          for i in {1.10}; do
             if [ -f "results/test-result-$i/result.txt" ]; then
               result=$(cat "results/test-result-$i/result.txt")
               if [ "$result" == "success" ]; then
@@ -209,9 +209,10 @@ jobs:
       - name: Check success rate
         if: always()
         run: |
-          success_count=${{ steps.aggregate_results.outputs.success_count }}
+          success_count="${{ steps.aggregate_results.outputs.success_count }}"
           
           # Fail the workflow if success rate is below 80%
-          if [ $success_count -lt 4 ]; then
-            echo "Success rate is below 80%, marking run as failed"
+          if [ "$success_count" -lt 9 ]; then
+            echo "Success rate is below 90%, marking run as failed"
             exit 1
+          fi
