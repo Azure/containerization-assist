@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test-coolstore:
+  setup:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout container-copilot
@@ -19,7 +19,33 @@ jobs:
       - name: Build container-copilot
         run: |
           go build -o container-copilot .
-          sudo mv container-copilot /usr/local/bin/ #install onto system path
+          
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-copilot-binary
+          path: container-copilot
+          retention-days: 1
+
+  test-run:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-number: [1, 2, 3, 4, 5]
+      fail-fast: false
+    
+    steps:
+      - name: Download container-copilot binary
+        uses: actions/download-artifact@v4
+        with:
+          name: container-copilot-binary
+          path: ./
+      
+      - name: Make binary executable
+        run: |
+          chmod +x container-copilot
+          sudo mv container-copilot /usr/local/bin/
 
       - name: Checkout Konveyor Coolstore
         uses: actions/checkout@v3
@@ -34,9 +60,9 @@ jobs:
         uses: helm/kind-action@v1
         with:
           install_only: true
-
-      - name: Run Parallel Tests
-        id: container_copilot_runs
+      
+      - name: Run Test ${{ matrix.test-number }}
+        id: run_test
         env:
           AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
@@ -44,98 +70,108 @@ jobs:
         run: |
           cd coolstore
           
-          # Track our results
-          success_count=0
-          failure_count=0
-          
-          # Make sure we have a place to store logs and artifacts
+          # Make sure we have a place to store logs
           mkdir -p logs
-          mkdir -p artifacts
           
           # The success message we're looking for in the output
           SUCCESS_MESSAGE="Container deployment pipeline completed successfully!"
           
-          # Run tests in parallel using background processes
-          for i in {1..5}; do
-            # Create a function for each test
-            test_func() {
-              local i=$1
-              echo "===== Starting Test Run $i of 5 ====="
-              
-              # Create a separate directory for each test run
-              mkdir -p test-run-${i}
-              cd test-run-${i}
-              
-              # Copy the source code to this directory
-              cp -r ../* ./ 2>/dev/null || true
-              
-              # Start with a clean slate
-              rm -f Dockerfile || true
-              rm -rf manifests || true
-              mkdir -p manifests
-              
-              # Run the test and save output
-              echo "Running container-copilot generate for test $i..."
-              container-copilot generate . > "../logs/run-${i}.log" 2>&1
-              
-              # Check if the success message is in the log file
-              if grep -q "$SUCCESS_MESSAGE" "../logs/run-${i}.log"; then
-                echo "✅ Test Run $i: PASSED - Found '$SUCCESS_MESSAGE'"
-                
-                # Save the files it created
-                mkdir -p ../artifacts/run-${i}
-                [ -f Dockerfile ] && cp Dockerfile ../artifacts/run-${i}/ || echo "No Dockerfile created"
-                [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* ../artifacts/run-${i}/ || echo "No manifests created"
-                
-                # Signal success by creating empty file 
-                touch ../test-${i}-success
-              else
-                echo "❌ Test Run $i: FAILED - Did not find '$SUCCESS_MESSAGE'"
-                # Signal failure
-                touch ../test-${i}-failure
-              fi
-              
-              # Always save the logs
-              mkdir -p ../artifacts/run-${i}
-              # Log already saved to logs directory
-              
-              # Return to parent directory
-              cd ..
-            }
-            
-            # Run the test function in the background
-            test_func $i &
-          done
+          # Start with a clean slate
+          rm -f Dockerfile || true
+          rm -rf manifests || true
+          mkdir -p manifests
           
-          # Wait for all background processes to complete
-          wait
+          # Run the test and save output
+          echo "Running container-copilot generate for test ${{ matrix.test-number }}..."
+          container-copilot generate . > "logs/run-${{ matrix.test-number }}.log" 2>&1
           
+          # Check if the success message is in the log file
+          if grep -q "$SUCCESS_MESSAGE" "logs/run-${{ matrix.test-number }}.log"; then
+            echo "✅ Test Run ${{ matrix.test-number }}: PASSED - Found '$SUCCESS_MESSAGE'"
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Test Run ${{ matrix.test-number }}: FAILED - Did not find '$SUCCESS_MESSAGE'"
+            echo "result=failure" >> $GITHUB_OUTPUT
+          fi
+          
+          # Save the files it created for successful tests
+          if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
+            mkdir -p artifacts
+            [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
+            [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
+          fi
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: steps.run_test.outputs.result == 'success'
+        with:
+          name: container-copilot-artifacts-${{ matrix.test-number }}
+          path: coolstore/artifacts/
+          retention-days: 14
+
+      - name: Upload test logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-copilot-logs-${{ matrix.test-number }}
+          path: coolstore/logs/
+          retention-days: 14
+      
+      - name: Save result
+        run: echo "${{ steps.run_test.outputs.result }}" > result.txt
+      
+      - name: Upload test result
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-result-${{ matrix.test-number }}
+          path: result.txt
+  
+  aggregate-results:
+    needs: test-run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-result-*
+          path: results
+
+      - name: Aggregate Test Results
+        id: aggregate_results
+        run: |
           # Count successes and failures
-          success_count=$(ls test-*-success 2>/dev/null | wc -l)
-          failure_count=$(ls test-*-failure 2>/dev/null | wc -l)
+          success_count=0
+          failure_count=0
           
           # Build detailed results
           passed_tests=""
           failed_tests=""
           
           for i in {1..5}; do
-            if [ -f "test-${i}-success" ]; then
-              passed_tests+="- Test Run $i ✅\n"
-            elif [ -f "test-${i}-failure" ]; then
-              failed_tests+="- Test Run $i ❌\n"
-              echo "::warning::Test Run $i Failed"
+            if [ -f "results/test-result-$i/result.txt" ]; then
+              result=$(cat "results/test-result-$i/result.txt")
+              if [ "$result" == "success" ]; then
+                success_count=$((success_count + 1))
+                passed_tests+="- Test Run $i ✅\n"
+              else
+                failure_count=$((failure_count + 1))
+                failed_tests+="- Test Run $i ❌\n"
+                echo "::warning::Test Run $i Failed"
+              fi
             else
-              echo "::warning::Test Run $i Status Unknown"
+              echo "::warning::Test Run $i Result Not Found"
             fi
           done
+          
+          total_tests=$((success_count + failure_count))
+          success_rate=$((success_count * 100 / total_tests))
           
           # Show results
           echo ""
           echo "===== Test Results ====="
-          echo "Total tests: 5"
+          echo "Total tests: $total_tests"
           echo "Passed: $success_count"
           echo "Failed: $failure_count"
-          echo "Success rate: $((success_count * 100 / 5))%"
+          echo "Success rate: $success_rate%"
           
           echo -e "Passed Tests:\n$passed_tests"
           echo -e "Failed Tests:\n$failed_tests"
@@ -144,10 +180,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| Total Tests | 5 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Tests | $total_tests |" >> $GITHUB_STEP_SUMMARY
           echo "| Passed | $success_count |" >> $GITHUB_STEP_SUMMARY
           echo "| Failed | $failure_count |" >> $GITHUB_STEP_SUMMARY
-          echo "| Success Rate | $((success_count * 100 / 5))% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Success Rate | $success_rate% |" >> $GITHUB_STEP_SUMMARY
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Passed Tests" >> $GITHUB_STEP_SUMMARY
@@ -168,28 +204,12 @@ jobs:
           # Save values for other steps to use
           echo "success_count=$success_count" >> $GITHUB_OUTPUT
           echo "failure_count=$failure_count" >> $GITHUB_OUTPUT
-          echo "success_rate=$((success_count * 100 / 5))" >> $GITHUB_OUTPUT
-          
-          # Clean up signal files
-          rm -f test-*-success test-*-failure
-
-      - name: Archive artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: container-copilot-artifacts
-          path: coolstore/artifacts/
-          retention-days: 14
-
-      - name: Archive logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: container-copilot-logs
-          path: coolstore/logs/
-          retention-days: 14
+          echo "success_rate=$success_rate" >> $GITHUB_OUTPUT
           
       - name: Check success rate
+        if: always()
         run: |
-          success_count=${{ steps.container_copilot_runs.outputs.success_count }}
+          success_count=${{ steps.aggregate_results.outputs.success_count }}
           
           # Fail the workflow if success rate is below 80%
           if [ $success_count -lt 4 ]; then
