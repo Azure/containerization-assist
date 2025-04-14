@@ -106,14 +106,14 @@ jobs:
           echo "success_rate=$((success_count * 100 / 5))" >> $GITHUB_OUTPUT
 
       - name: Archive artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: container-copilot-artifacts
           path: coolstore/artifacts/
           retention-days: 14
 
       - name: Archive logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: container-copilot-logs
           path: coolstore/logs/
