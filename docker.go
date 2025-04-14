@@ -94,9 +94,10 @@ Please:
 1. Identify any issues in the Dockerfile
 2. Provide a fixed version of the Dockerfile
 3. Explain what changes were made and why
-4. Favor using the latest base images and best practices for Dockerfile writing
-6. If applicable, use multi-stage builds to reduce image size
-7. Make sure to account for the file structure of the repository
+
+Favor using the latest base images and best practices for Dockerfile writing
+If applicable, use multi-stage builds to reduce image size
+Make sure to account for the file structure of the repository
 
 Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.
 
