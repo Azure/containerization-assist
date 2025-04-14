@@ -209,10 +209,10 @@ jobs:
       - name: Check success rate
         if: always()
         run: |
-          success_count="${{ steps.aggregate_results.outputs.success_count }}"
+          success_rate="${{ steps.aggregate_results.outputs.success_rate }}"
           
-          # Fail the workflow if success rate is below 80%
-          if [ "$success_count" -lt 9 ]; then
+          # Fail the workflow if success rate is below 90%
+          if [ "$success_rate" -lt 90 ]; then
             echo "Success rate is below 90%, marking run as failed"
             exit 1
           fi
