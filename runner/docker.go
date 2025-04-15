@@ -28,7 +28,7 @@ func (d *DockerCmdRunner) Version() (string, error) {
 }
 
 func (d *DockerCmdRunner) Build(dockerfilePath, imageTag, contextPath string) (string, error) {
-	return d.runner.RunCommandStderr("docker", "build", "-f", dockerfilePath, "-t", imageTag, contextPath)
+	return d.runner.RunCommandStderr("docker", "build", "--q", "-f", dockerfilePath, "-t", imageTag, contextPath)
 }
 
 func (d *DockerCmdRunner) Push(image string) (string, error) {
