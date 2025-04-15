@@ -37,7 +37,6 @@ func (k *KindCmdRunner) DeleteCluster(name string) (string, error) {
 	return k.runner.RunCommand("kind", "delete", "cluster", "--name", name)
 }
 
-// In runner/kind.go
 func (k *KindCmdRunner) Install() (string, error) {
     switch runtime.GOOS {
     case "linux":
