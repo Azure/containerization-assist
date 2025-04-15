@@ -2,12 +2,20 @@ package main
 
 import (
 	"container-copilot/utils"
+	"context"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // checkPodStatus verifies if pods from the deployment are running correctly
@@ -278,4 +286,65 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 	}
 
 	return fmt.Errorf("failed to fix Kubernetes manifests after %d iterations", maxIterations)
+}
+
+func GetDeploymentLogs(deploymentName string, namespace string) error {
+	// Loading kubeconfig from default location
+	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
+	if err != nil {
+		return fmt.Errorf("failed to load kubeconfig: %w", err)
+	}
+
+	// Create Kubernetes client
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create k8s client: %w", err)
+	}
+
+	// Get the Deployment
+	// Note only please: We may want to handle the case where the deployment does not exist
+	// or is not found in the specified namespace
+	// This is a simplified example and may need to be adjusted based on our needs
+	deployClient := clientset.AppsV1().Deployments(namespace)
+	deployment, err := deployClient.Get(context.Background(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get deployment: %w", err)
+	}
+
+	// Get the matching pods
+	labelSelector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: deployment.Spec.Selector.MatchLabels})
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	if len(pods.Items) == 0 {
+		return fmt.Errorf("no pods found for %s", deploymentName)
+	}
+
+	// Print logs for the first pod (or loop through all if desired)
+	for _, pod := range pods.Items {
+		fmt.Printf("Logs for Pod: %s\n", pod.Name)
+		err := streamPodLogs(clientset, namespace, pod.Name)
+		if err != nil {
+			log.Printf("Error getting logs for pod %s: %v\n", pod.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// streamPodLogs prints logs to stdout
+func streamPodLogs(clientset *kubernetes.Clientset, namespace, podName string) error {
+	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{})
+	stream, err := req.Stream(context.Background())
+	if err != nil {
+		return fmt.Errorf("error opening log stream: %w", err)
+	}
+	defer stream.Close()
+
+	_, err = io.Copy(os.Stdout, stream)
+	return err
 }
