@@ -67,6 +67,8 @@ Please consider these deployment errors when fixing the Dockerfile.
 `, manifestErrors)
 	}
 
+	fmt.Println("Dockerfile build errors: ", dockerfile.BuildErrors)
+
 	// Add error information if provided and not empty
 	if dockerfile.BuildErrors != "" {
 		promptText += fmt.Sprintf(`
