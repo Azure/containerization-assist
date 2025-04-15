@@ -296,7 +296,7 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 	}
 
 	// Create Kubernetes client
-	clientset, err := kubernetes.NewForConfig(config)
+	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client: %w", err)
 	}
@@ -305,7 +305,7 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 	// Note only please: We may want to handle the case where the deployment does not exist
 	// or is not found in the specified namespace
 	// This is a simplified example and may need to be adjusted based on our needs
-	deployClient := clientset.AppsV1().Deployments(namespace)
+	deployClient := client.AppsV1().Deployments(namespace)
 	deployment, err := deployClient.Get(context.Background(), deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get deployment: %w", err)
@@ -313,7 +313,7 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 
 	// Get the matching pods
 	labelSelector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: deployment.Spec.Selector.MatchLabels})
-	pods, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+	pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -327,7 +327,7 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 	// Print logs for the first pod (or loop through all if desired)
 	for _, pod := range pods.Items {
 		fmt.Printf("Logs for Pod: %s\n", pod.Name)
-		err := streamPodLogs(clientset, namespace, pod.Name)
+		err := streamPodLogs(client, namespace, pod.Name)
 		if err != nil {
 			log.Printf("Error getting logs for pod %s: %v\n", pod.Name, err)
 		}
