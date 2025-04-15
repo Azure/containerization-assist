@@ -67,8 +67,6 @@ Please consider these deployment errors when fixing the Dockerfile.
 `, manifestErrors)
 	}
 
-	fmt.Println("Dockerfile build errors: ", dockerfile.BuildErrors)
-
 	// Add error information if provided and not empty
 	if dockerfile.BuildErrors != "" {
 		promptText += fmt.Sprintf(`
@@ -99,7 +97,7 @@ Favor using the latest base images and best practices for Dockerfile writing
 If applicable, use multi-stage builds to reduce image size
 Make sure to account for the file structure of the repository
 
-**IMPORTANT Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. IMPORTANT** 
+**IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT** 
 
 I will tip you if you provide a correct and working Dockerfile.
 `
