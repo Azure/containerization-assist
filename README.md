@@ -59,6 +59,21 @@ go run . generate <../path/to/target-repo>
 
 ## Contributing
 
+### generate command flow
+```mermaid
+flowchart TD
+    A[Start Run on Repo Root] --> B(Generate Artifacts with Draft)
+    B --> C(Load Generated Artifacts into Memory)
+    C -->|One| D(AI Fix Dockerfile)
+    D --> E{Build Dockerfile}
+    E -->|Fail| D
+    E -->|Success| F(Push to Registry)
+    F --> G{Deploy Manifests}
+    G -->|Fail| H(AI Fix Dockerfile and Manifests)
+    H --> E
+    G -->|Success| I[Write Artifacts to Disk]
+```
+
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
