@@ -180,7 +180,7 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 			return nil
 		}
 
-		fmt.Printf("Docker build failed with error: %v\n", err)
+		fmt.Printf("Docker build failed with error: %v\n", buildErrors)
 
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 

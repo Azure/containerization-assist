@@ -36,8 +36,7 @@ func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) 
 		return "", err
 	}
 
-	// Discard stdout
-	cmd.Stdout = nil
+	cmd.Stdout = io.Discard
 
 	if err := cmd.Start(); err != nil {
 		return "", err
