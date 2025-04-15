@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"container-copilot/runner"
+
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +20,13 @@ var (
 	registry            string
 	dockerfileGenerator string
 )
+
+type Clients struct {
+	AzOpenAIClient *AzOpenAIClient
+	Docker runner.DockerRunner
+	Kind runner.KindRunner
+	Kube runner.KubeRunner
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "container-copilot",
@@ -40,7 +49,7 @@ var generateCmd = &cobra.Command{
 			targetDir = args[0]
 		}
 
-		c, err := initClient()
+		c, err := initClients()
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
@@ -57,7 +66,7 @@ var testCmd = &cobra.Command{
 	Short: "Test Azure OpenAI connection",
 	Long:  `The test command will test the Azure OpenAI connection based on the environment variables set and print a response.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := initClient()
+		c, err := initClients()
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
@@ -75,7 +84,11 @@ func Execute() {
 	rootCmd.Execute()
 }
 
-func initClient() (*AzOpenAIClient, error) {
+func initClients() (*Clients, error) {
+
+	// read from .env
+
+
 	apiKey := os.Getenv(AZURE_OPENAI_KEY)
 	endpoint := os.Getenv(AZURE_OPENAI_ENDPOINT)
 	deploymentID := os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID)
@@ -95,12 +108,21 @@ func initClient() (*AzOpenAIClient, error) {
 		return nil, fmt.Errorf("missing environment variables: %s", strings.Join(missingVars, ", "))
 	}
 
-	client, err := NewAzOpenAIClient(endpoint, apiKey, deploymentID)
+	azOpenAIClient, err := NewAzOpenAIClient(endpoint, apiKey, deploymentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure OpenAI client: %w", err)
 	}
 
-	return client, nil
+	cmdRunner := &runner.DefaultCommandRunner{}
+
+	clients := &Clients{
+		AzOpenAIClient: azOpenAIClient,
+		Docker: 	   runner.NewDockerCmdRunner(cmdRunner),
+		Kind:         runner.NewKindCmdRunner(cmdRunner),
+		Kube:         runner.NewKubeCmdRunner(cmdRunner),
+	}
+
+	return clients, nil
 }
 
 func init() {

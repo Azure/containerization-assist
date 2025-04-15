@@ -11,20 +11,17 @@ import (
 )
 
 // checkPodStatus verifies if pods from the deployment are running correctly
-func checkPodStatus(namespace string, labelSelector string, timeout time.Duration) (bool, string) {
+func (c *Clients) checkPodStatus(namespace string, labelSelector string, timeout time.Duration) (bool, string) {
 	endTime := time.Now().Add(timeout)
 
 	for time.Now().Before(endTime) {
-		cmd := exec.Command("kubectl", "get", "pods", "-n", namespace, "-o", "json")
-		output, err := cmd.CombinedOutput()
-
+		outputStr, err := c.Kube.GetPods(namespace)
 		//fmt.Println("Kubectl get pods output:", string(output))
 		if err != nil {
-			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, string(output))
+			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, outputStr)
 		}
 
 		// Check for problematic pod states in the output
-		outputStr := string(output)
 		if strings.Contains(outputStr, "CrashLoopBackOff") ||
 			strings.Contains(outputStr, "Error") ||
 			strings.Contains(outputStr, "ImagePullBackOff") {
@@ -106,7 +103,7 @@ func checkKubectlInstalled() error {
 }
 
 // deployAndVerifySingleManifest applies a single manifest and verifies pod health
-func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool, string, error) {
+func (c *Clients) deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool, string, error) {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return false, "", fmt.Errorf("reading manifest file: %w", err)
@@ -117,9 +114,7 @@ func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool
 	}
 
 	// Apply the manifest
-	cmd := exec.Command("kubectl", "apply", "-f", manifestPath)
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
+	outputStr, err := c.Kube.Apply(manifestPath)
 
 	if err != nil {
 		fmt.Printf("Kubernetes deployment failed for %s with error: %v\n", manifestPath, err)
@@ -143,7 +138,7 @@ func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool
 	labelSelector := "app=my-app" // Default label selector
 
 	// Wait for pods to become healthy
-	podSuccess, podOutput := checkPodStatus(namespace, labelSelector, time.Minute)
+	podSuccess, podOutput := c.checkPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
 		fmt.Printf("Pods are not healthy for deployment with manifest %s\n", manifestPath)
 		return false, outputStr + "\n" + podOutput, nil
@@ -154,7 +149,7 @@ func deployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool
 }
 
 // deployStateManifests deploys manifests from pipeline state
-func deployStateManifests(state *PipelineState) error {
+func (c *Clients) deployStateManifests(state *PipelineState) error {
 	// Create a temporary directory for manifest files
 	tmpDir, err := os.MkdirTemp("", "container-copilot-*")
 	if err != nil {
@@ -183,7 +178,7 @@ func deployStateManifests(state *PipelineState) error {
 		}
 
 		// Use existing deployment verification
-		success, output, err := deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
+		success, output, err := c.deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
@@ -210,7 +205,7 @@ func deployStateManifests(state *PipelineState) error {
 }
 
 // Update iterateMultipleManifestsDeploy to use the new deployment function
-func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, state *PipelineState) error {
+func (c *Clients) iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, state *PipelineState) error {
 	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := checkKubectlInstalled(); err != nil {
@@ -255,7 +250,7 @@ func iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, s
 		fmt.Println("Updated manifests with fixes. Attempting deployment...")
 
 		// Try to deploy pending manifests
-		err := deployStateManifests(state)
+		err := c.deployStateManifests(state)
 		if err == nil {
 			state.Success = true
 			fmt.Printf("🎉 All Kubernetes manifests deployed successfully!")

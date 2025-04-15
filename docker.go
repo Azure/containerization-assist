@@ -11,7 +11,7 @@ import (
 )
 
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents
-func buildDockerfileContent(dockerfileContent string, targetDir string, registry string, imageName string) (string, error) {
+func (c *Clients) buildDockerfileContent(dockerfileContent string, targetDir string, registry string, imageName string) (string, error) {
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "docker-build-*")
 	if err != nil {
@@ -32,16 +32,14 @@ func buildDockerfileContent(dockerfileContent string, targetDir string, registry
 
 	// Build the image using the temporary Dockerfile
 	fmt.Printf("building docker image with tag '%s%s:latest'\n", registryPrefix, imageName)
-	cmd := exec.Command("docker", "build", "-f", dockerfilePath, "-t", registryPrefix+imageName+":latest", targetDir)
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
+	output, err := c.Docker.Build(dockerfilePath, registryPrefix+imageName+":latest", targetDir)
 
 	if err != nil {
-		return outputStr, fmt.Errorf("docker build failed: %v", err)
+		return output, fmt.Errorf("docker build failed: %v", err)
 	}
 
 	fmt.Printf("built docker image")
-	return outputStr, nil
+	return output, nil
 }
 
 func analyzeDockerfile(client *AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
@@ -120,9 +118,8 @@ I will tip you if you provide a correct and working Dockerfile.
 }
 
 // checkDockerRunning verifies if the Docker daemon is running.
-func checkDockerRunning() error {
-	cmd := exec.Command("docker", "info")
-	if output, err := cmd.CombinedOutput(); err != nil {
+func (c *Clients) checkDockerRunning() error {
+	if output, err := c.Docker.Info(); err != nil {
 		return fmt.Errorf("Docker daemon is not running. Please start Docker and try again. Error details: %s", string(output))
 	}
 	return nil
@@ -149,7 +146,7 @@ func checkDockerInstalled() error {
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *PipelineState, targetDir string) error {
+func (c *Clients) iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *PipelineState, targetDir string) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -174,7 +171,7 @@ func iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *Pi
 		fmt.Printf("Updated Dockerfile written. Attempting build again...\n")
 
 		// Try to build
-		buildOutput, err := buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+		buildOutput, err := c.buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
@@ -214,12 +211,10 @@ func initializeDockerFileState(pipelineState *PipelineState, dockerFilePath stri
 	return nil
 }
 
-func pushDockerImage(image string) error {
+func (c *Clients) pushDockerImage(image string) error {
 
-	cmd := exec.Command("docker", "push", image)
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
-	fmt.Println("Output: ", outputStr)
+	output, err := c.Docker.Push(image)
+	fmt.Println("Output: ", output)
 
 	if err != nil {
 		fmt.Println("Registry push failed with error:", err)
