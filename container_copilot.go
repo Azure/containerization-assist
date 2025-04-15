@@ -75,8 +75,9 @@ func updateSuccessfulFiles(state *PipelineState) {
 	}
 }
 
-func (c *AzOpenAIClient) generate(targetDir string, registry string, enableDraftDockerfile bool) error {
-	kindClusterName, err := getKindCluster()
+func (c *Clients) generate(targetDir string, registry string, enableDraftDockerfile bool) error {
+
+	kindClusterName, err := c.getKindCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
@@ -101,7 +102,7 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string, enableDraft
 
 	if enableDraftDockerfile {
 		fmt.Printf("Generating Dockerfile in %s\n", targetDir)
-		draftTemplateName, err := getDockerfileTemplateName(c, targetDir)
+		draftTemplateName, err := getDockerfileTemplateName(c.AzOpenAIClient, targetDir)
 		if err != nil {
 			return fmt.Errorf("getting Dockerfile template name: %w", err)
 		}
@@ -146,18 +147,18 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string, enableDraft
 
 	errors := []string{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := iterateDockerfileBuild(c, maxIterations, state, targetDir); err != nil {
+		if err := c.iterateDockerfileBuild(maxIterations, state, targetDir); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
 
 		fmt.Printf("pushing image %s\n", registryAndImage)
-		err = pushDockerImage(registryAndImage)
+		err = c.pushDockerImage(registryAndImage)
 		if err != nil {
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := iterateMultipleManifestsDeploy(c, maxIterations, state); err != nil {
+		if err := c.iterateMultipleManifestsDeploy(maxIterations, state); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
 
@@ -174,8 +175,8 @@ func (c *AzOpenAIClient) generate(targetDir string, registry string, enableDraft
 	return nil
 }
 
-func (c *AzOpenAIClient) testOpenAIConn() error {
-	testResponse, err := c.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
+func (c *Clients) testOpenAIConn() error {
+	testResponse, err := c.AzOpenAIClient.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
 	if err != nil {
 		return fmt.Errorf("failed to get chat completion: %w", err)
 	}
