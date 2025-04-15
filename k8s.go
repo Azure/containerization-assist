@@ -205,7 +205,7 @@ func (c *Clients) deployStateManifests(state *PipelineState) error {
 }
 
 // Update iterateMultipleManifestsDeploy to use the new deployment function
-func (c *Clients) iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIterations int, state *PipelineState) error {
+func (c *Clients) iterateMultipleManifestsDeploy(maxIterations int, state *PipelineState) error {
 	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := checkKubectlInstalled(); err != nil {
@@ -238,7 +238,7 @@ func (c *Clients) iterateMultipleManifestsDeploy(client *AzOpenAIClient, maxIter
 			}
 
 			// Pass the entire state instead of just the Dockerfile
-			result, err := analyzeKubernetesManifest(client, input, state)
+			result, err := analyzeKubernetesManifest(c.AzOpenAIClient, input, state)
 			if err != nil {
 				return fmt.Errorf("error in AI analysis for %s: %v", name, err)
 			}

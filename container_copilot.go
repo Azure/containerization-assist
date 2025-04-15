@@ -147,7 +147,7 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 
 	errors := []string{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := c.iterateDockerfileBuild(c.AzOpenAIClient, maxIterations, state, targetDir); err != nil {
+		if err := c.iterateDockerfileBuild(maxIterations, state, targetDir); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
@@ -158,7 +158,7 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := c.iterateMultipleManifestsDeploy(c.AzOpenAIClient, maxIterations, state); err != nil {
+		if err := c.iterateMultipleManifestsDeploy(maxIterations, state); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
 

@@ -146,7 +146,7 @@ func checkDockerInstalled() error {
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func (c *Clients) iterateDockerfileBuild(client *AzOpenAIClient, maxIterations int, state *PipelineState, targetDir string) error {
+func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir string) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -158,7 +158,7 @@ func (c *Clients) iterateDockerfileBuild(client *AzOpenAIClient, maxIterations i
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 
 		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
-		result, err := analyzeDockerfile(client, state)
+		result, err := analyzeDockerfile(c.AzOpenAIClient, state)
 		if err != nil {
 			return fmt.Errorf("error in AI analysis: %v", err)
 		}
