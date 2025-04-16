@@ -26,8 +26,13 @@ func writeIterationSnapshot(stateHistory []PipelineState, targetDir string) erro
 			"manifest_errors": FormatManifestErrors(&state),
 		}
 
-		metaJson, _ := json.MarshalIndent(meta, "", "  ")
-		_ = os.WriteFile(filepath.Join(snapDir, "metadata.json"), metaJson, 0644)
+		metaJson, err := json.MarshalIndent(meta, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshaling metadata to JSON: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(snapDir, "metadata.json"), metaJson, 0644); err != nil {
+			return fmt.Errorf("writing metadata.json: %w", err)
+		}
 
 		if state.Dockerfile.Content != "" {
 			dockerPath := filepath.Join(snapDir, "Dockerfile")
