@@ -32,14 +32,14 @@ func (c *Clients) buildDockerfileContent(dockerfileContent string, targetDir str
 
 	// Build the image using the temporary Dockerfile
 	fmt.Printf("building docker image with tag '%s%s:latest'\n", registryPrefix, imageName)
-	output, err := c.Docker.Build(dockerfilePath, registryPrefix+imageName+":latest", targetDir)
+	buildErrors, err := c.Docker.Build(dockerfilePath, registryPrefix+imageName+":latest", targetDir)
 
 	if err != nil {
-		return output, fmt.Errorf("docker build failed: %v", err)
+		return buildErrors, fmt.Errorf("docker build failed: %v", err)
 	}
 
 	fmt.Printf("built docker image")
-	return output, nil
+	return buildErrors, nil
 }
 
 func analyzeDockerfile(client *AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
@@ -97,7 +97,7 @@ Favor using the latest base images and best practices for Dockerfile writing
 If applicable, use multi-stage builds to reduce image size
 Make sure to account for the file structure of the repository
 
-Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.
+**IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT** 
 
 I will tip you if you provide a correct and working Dockerfile.
 `
@@ -172,7 +172,7 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 		fmt.Printf("Updated Dockerfile written. Attempting build again...\n")
 
 		// Try to build
-		buildOutput, err := c.buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+		buildErrors, err := c.buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
@@ -180,11 +180,11 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 			return nil
 		}
 
-		fmt.Printf("Docker build failed with error: %v\n", err)
+		fmt.Printf("Docker build failed with error: %v\n", buildErrors)
 
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
-		state.Dockerfile.BuildErrors = buildOutput
+		state.Dockerfile.BuildErrors = buildErrors
 		time.Sleep(1 * time.Second) // Small delay for readability
 	}
 
