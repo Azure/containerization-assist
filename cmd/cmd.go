@@ -6,6 +6,10 @@ import (
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/ai"
+	"github.com/Azure/container-copilot/pkg/clients"
+	"github.com/Azure/container-copilot/pkg/docker"
+	"github.com/Azure/container-copilot/pkg/k8s"
+	"github.com/Azure/container-copilot/pkg/kind"
 	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/spf13/cobra"
 )
@@ -77,7 +81,7 @@ func Execute() {
 	rootCmd.Execute()
 }
 
-func initClients() (*runner.Clients, error) {
+func initClients() (*clients.Clients, error) {
 
 	// read from .env
 
@@ -107,11 +111,11 @@ func initClients() (*runner.Clients, error) {
 
 	cmdRunner := &runner.DefaultCommandRunner{}
 
-	clients := &runner.Clients{
+	clients := &clients.Clients{
 		AzOpenAIClient: azOpenAIClient,
-		Docker:         runner.NewDockerCmdRunner(cmdRunner),
-		Kind:           runner.NewKindCmdRunner(cmdRunner),
-		Kube:           runner.NewKubeCmdRunner(cmdRunner),
+		Docker:         docker.NewDockerCmdRunner(cmdRunner),
+		Kind:           kind.NewKindCmdRunner(cmdRunner),
+		Kube:           k8s.NewKubeCmdRunner(cmdRunner),
 	}
 
 	return clients, nil

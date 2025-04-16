@@ -1,4 +1,4 @@
-package runner
+package clients
 
 import (
 	"bufio"
@@ -44,7 +44,7 @@ func (c *Clients) GetKindCluster() (string, error) {
 	if err := c.checkDockerRunning(); err != nil {
 		return "", err
 	}
-	if err := c.validateKindInstalled(); err != nil {
+	if err := c.ValidateKindInstalled(); err != nil {
 		return "", err
 	}
 
@@ -70,7 +70,7 @@ func (c *Clients) GetKindCluster() (string, error) {
 		}
 	}
 	fmt.Println("Creating kind cluster 'container-copilot'")
-	if err := c.setupLocalRegistryCluster(); err != nil {
+	if err := c.SetupLocalRegistryCluster(); err != nil {
 		return "", fmt.Errorf("setting up local registry cluster: %w", err)
 	}
 

@@ -7,11 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Azure/container-copilot/pkg/clients"
+	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/filetree"
 	"github.com/Azure/container-copilot/pkg/k8s"
+	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-func generate(targetDir string, registry string, enableDraftDockerfile bool, c *runner.Clients) error {
+func generate(targetDir string, registry string, enableDraftDockerfile bool, c *clients.Clients) error {
 
 	kindClusterName, err := c.GetKindCluster()
 	if err != nil {
@@ -22,7 +25,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 	maxIterations := 5
 	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
 
-	state := &runner.PipelineState{
+	state := &pipeline.PipelineState{
 		K8sObjects:     make(map[string]*k8s.K8sObject),
 		Success:        false,
 		IterationCount: 0,
@@ -31,20 +34,20 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 		RegistryURL:    registry,
 	}
 	fmt.Printf("validating connection to registry %s\n", registry)
-	err = runner.ValidateRegistryReachable(state.RegistryURL)
+	err = docker.ValidateRegistryReachable(state.RegistryURL)
 	if err != nil {
 		return fmt.Errorf("reaching registry %s: %w\n", state.RegistryURL, err)
 	}
 
 	if enableDraftDockerfile {
 		fmt.Printf("Generating Dockerfile in %s\n", targetDir)
-		draftTemplateName, err := getDockerfileTemplateName(c.AzOpenAIClient, targetDir)
+		draftTemplateName, err := docker.GetDockerfileTemplateName(c.AzOpenAIClient, targetDir)
 		if err != nil {
 			return fmt.Errorf("getting Dockerfile template name: %w", err)
 		}
 
 		fmt.Printf("Using Dockerfile template: %s\n", draftTemplateName)
-		err = generateDockerfileWithDraft(draftTemplateName, targetDir)
+		err = docker.GenerateDockerfileWithDraft(draftTemplateName, targetDir)
 		if err != nil {
 			return fmt.Errorf("generating Dockerfile: %w", err)
 		}
@@ -59,7 +62,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 
 	fmt.Printf("Generating Kubernetes manifests in %s\n", targetDir)
 	registryAndImage := fmt.Sprintf("%s/%s", registry, "app")
-	err = generateDeploymentFilesWithDraft(targetDir, registryAndImage)
+	err = docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage)
 	if err != nil {
 		return fmt.Errorf("generating deployment files: %w", err)
 	}
@@ -71,19 +74,19 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 	}
 	state.RepoFileTree = repoStructure
 
-	err = InitializeManifests(state, targetDir) // Initialize K8sManifests with default path
+	err = state.InitializeManifests(targetDir) // Initialize K8sManifests with default path
 	if err != nil {
 		return fmt.Errorf("failed to initialize manifests: %w", err)
 	}
 
-	err = runner.InitializeDockerFileState(state, dockerfilePath)
+	err = state.InitializeDockerFileState(dockerfilePath)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
 	}
 
 	errors := []string{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := c.IterateDockerfileBuild(maxIterations, state, targetDir); err != nil {
+		if err := pipeline.IterateDockerfileBuild(maxIterations, state, targetDir, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
@@ -94,7 +97,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := c.IterateMultipleManifestsDeploy(maxIterations, state, targetDir); err != nil {
+		if err := pipeline.IterateMultipleManifestsDeploy(maxIterations, state, targetDir, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
 	}
@@ -106,6 +109,6 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 	}
 
 	// Update the dockerfile and manifests with the final successful versions
-	updateSuccessfulFiles(state)
+	pipeline.UpdateSuccessfulFiles(state)
 	return nil
 }

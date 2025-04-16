@@ -1,8 +1,10 @@
-package runner
+package kind
 
 import (
 	"fmt"
 	"runtime"
+
+	"github.com/Azure/container-copilot/pkg/runner"
 )
 
 type KindRunner interface {
@@ -14,12 +16,12 @@ type KindRunner interface {
 }
 
 type KindCmdRunner struct {
-	runner CommandRunner
+	runner runner.CommandRunner
 }
 
 var _ KindRunner = &KindCmdRunner{}
 
-func NewKindCmdRunner(runner CommandRunner) KindRunner {
+func NewKindCmdRunner(runner runner.CommandRunner) KindRunner {
 	return &KindCmdRunner{
 		runner: runner,
 	}
@@ -38,21 +40,21 @@ func (k *KindCmdRunner) DeleteCluster(name string) (string, error) {
 }
 
 func (k *KindCmdRunner) Install() (string, error) {
-    switch runtime.GOOS {
-    case "linux":
-        return k.runner.RunCommand("sh", "-c", "curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/")
-    case "darwin":
-        return k.runner.RunCommand("brew", "install", "kind")
-    case "windows":
-        return k.runner.RunCommand("powershell", "-Command", "winget install kind")
-    default:
-        return "", fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-    }
+	switch runtime.GOOS {
+	case "linux":
+		return k.runner.RunCommand("sh", "-c", "curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/")
+	case "darwin":
+		return k.runner.RunCommand("brew", "install", "kind")
+	case "windows":
+		return k.runner.RunCommand("powershell", "-Command", "winget install kind")
+	default:
+		return "", fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
 }
 
 func (k *KindCmdRunner) SetupRegistry() (string, error) {
-    if runtime.GOOS == "windows" {
-        return k.runner.RunCommand("powershell", "-Command", `
+	if runtime.GOOS == "windows" {
+		return k.runner.RunCommand("powershell", "-Command", `
         if (-Not (docker network inspect kind -ErrorAction SilentlyContinue)) { docker network create kind }
         if (-Not (docker ps -q -f name=kind-registry)) { docker run -d --restart=always -p 5001:5001 --name kind-registry registry:2 }
         if (-Not (docker network inspect kind | Select-String kind-registry)) { docker network connect kind kind-registry }
@@ -68,9 +70,9 @@ func (k *KindCmdRunner) SetupRegistry() (string, error) {
             help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
         EOF
         `)
-    } else {
-        return k.runner.RunCommand("sh", "-c", kindSetupScript)
-    }
+	} else {
+		return k.runner.RunCommand("sh", "-c", kindSetupScript)
+	}
 }
 
 const kindSetupScript = `

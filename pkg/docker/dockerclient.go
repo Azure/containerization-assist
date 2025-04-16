@@ -1,6 +1,13 @@
-package runner
+package docker
 
-type DockerRunner interface {
+import (
+	"fmt"
+	"os/exec"
+
+	"github.com/Azure/container-copilot/pkg/runner"
+)
+
+type DockerClient interface {
 	Version() (string, error)
 	Info() (string, error)
 	Build(dockerfilePath, imageTag, contextPath string) (string, error)
@@ -8,12 +15,12 @@ type DockerRunner interface {
 }
 
 type DockerCmdRunner struct {
-	runner CommandRunner
+	runner runner.CommandRunner
 }
 
-var _ DockerRunner = &DockerCmdRunner{}
+var _ DockerClient = &DockerCmdRunner{}
 
-func NewDockerCmdRunner(runner CommandRunner) DockerRunner {
+func NewDockerCmdRunner(runner runner.CommandRunner) DockerClient {
 	return &DockerCmdRunner{
 		runner: runner,
 	}
@@ -33,4 +40,10 @@ func (d *DockerCmdRunner) Build(dockerfilePath, imageTag, contextPath string) (s
 
 func (d *DockerCmdRunner) Push(image string) (string, error) {
 	return d.runner.RunCommand("docker", "push", image)
+}
+func CheckDockerInstalled() error {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return fmt.Errorf("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH")
+	}
+	return nil
 }
