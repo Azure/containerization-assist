@@ -2,6 +2,7 @@ package runner
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os/exec"
 
@@ -33,7 +34,7 @@ func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) 
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get stderr pipe: %w", err)
 	}
 
 	cmd.Stdout = io.Discard
@@ -44,7 +45,7 @@ func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) 
 
 	stderrBytes, err := io.ReadAll(stderr)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to start command: %w", err)
 	}
 
 	cmdErr := cmd.Wait()
