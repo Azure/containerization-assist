@@ -8,45 +8,6 @@ import (
 	"strings"
 )
 
-// ManifestDeployResult stores the result of a single manifest deployment
-type ManifestDeployResult struct {
-	Path    string
-	Success bool
-	Output  string
-}
-
-// FileAnalysisInput represents the common input structure for file analysis
-type FileAnalysisInput struct {
-	Content       string `json:"content"` // Plain text content of the file
-	ErrorMessages string `json:"error_messages,omitempty"`
-	RepoFileTree  string `json:"repo_files,omitempty"` // String representation of the file tree
-	FilePath      string `json:"file_path,omitempty"`  // Path to the original file
-}
-
-// FileAnalysisResult represents the common analysis result
-type FileAnalysisResult struct {
-	FixedContent string `json:"fixed_content"`
-	Analysis     string `json:"analysis"`
-}
-
-type Dockerfile struct {
-	Content     string
-	Path        string
-	BuildErrors string
-}
-
-// PipelineState holds state across steps and iterations
-type PipelineState struct {
-	RepoFileTree   string
-	Dockerfile     Dockerfile
-	RegistryURL    string
-	ImageName      string
-	K8sObjects     map[string]*K8sObject
-	Success        bool
-	IterationCount int
-	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
-}
-
 // updateSuccessfulFiles writes the successful Dockerfile and manifests from the pipeline state to disk
 func updateSuccessfulFiles(state *PipelineState) {
 	if state.Success {
@@ -146,8 +107,9 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 	}
 
 	errors := []string{}
+	pipelineStateHistory := []PipelineState{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := c.iterateDockerfileBuild(maxIterations, state, targetDir); err != nil {
+		if err := c.iterateDockerfileBuild(maxIterations, state, targetDir, &pipelineStateHistory); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
@@ -158,10 +120,14 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := c.iterateMultipleManifestsDeploy(maxIterations, state); err != nil {
+		if err := c.iterateMultipleManifestsDeploy(maxIterations, state, &pipelineStateHistory); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
+	}
 
+	// can make this optional with a flag later
+	if err := writeIterationSnapshot(pipelineStateHistory, targetDir); err != nil {
+		return fmt.Errorf("writing iteration snapshot: %w", err)
 	}
 
 	if !state.Success {
@@ -185,3 +151,6 @@ func (c *Clients) testOpenAIConn() error {
 	fmt.Printf("Response: %s\n", testResponse)
 	return nil
 }
+
+
+

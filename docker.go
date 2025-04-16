@@ -147,7 +147,7 @@ func checkDockerInstalled() error {
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir string) error {
+func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir string, pipelineStateHistory *[]PipelineState) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -185,6 +185,7 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
 		state.Dockerfile.BuildErrors = buildOutput
+		*pipelineStateHistory = append(*pipelineStateHistory, DeepCopy(state))
 		time.Sleep(1 * time.Second) // Small delay for readability
 	}
 
