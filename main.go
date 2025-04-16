@@ -1,5 +1,9 @@
 package main
 
-func main () {
-	Execute()
+import (
+	"github.com/Azure/container-copilot/cmd"
+)
+
+func main() {
+	cmd.Execute()
 }

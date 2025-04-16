@@ -1,4 +1,4 @@
-package main
+package k8s
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-copilot/pkg/runner"
 	"sigs.k8s.io/yaml"
 )
 
@@ -87,7 +89,7 @@ func readK8sObjects(content []byte) (K8sObject, error) {
 
 // InitializeManifests populates the K8sManifests field in PipelineState with manifests found in the specified path
 // If path is empty, the default manifest path will be used
-func InitializeManifests(state *PipelineState, path string) error {
+func InitializeManifests(state *pipeline.PipelineState, path string) error {
 	k8sObjects, err := FindK8sObjects(path)
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
@@ -111,7 +113,7 @@ func InitializeManifests(state *PipelineState, path string) error {
 }
 
 // FormatManifestErrors returns a string containing all manifest errors with their names
-func FormatManifestErrors(state *PipelineState) string {
+func FormatManifestErrors(state *runner.PipelineState) string {
 	var errorBuilder strings.Builder
 
 	for name, manifest := range state.K8sObjects {
@@ -124,7 +126,7 @@ func FormatManifestErrors(state *PipelineState) string {
 }
 
 // GetPendingManifests returns a map of manifest names that still need to be deployed
-func GetPendingManifests(state *PipelineState) map[string]bool {
+func GetPendingManifests(state *runner.PipelineState) map[string]bool {
 	pendingManifests := make(map[string]bool)
 
 	for name, manifest := range state.K8sObjects {
@@ -134,4 +136,20 @@ func GetPendingManifests(state *PipelineState) map[string]bool {
 	}
 
 	return pendingManifests
+}
+
+type K8sObject struct {
+	ApiVersion             string      `yaml:"apiVersion"`
+	Kind                   string      `yaml:"kind"`
+	Metadata               K8sMetadata `yaml:"metadata"`
+	Content                []byte
+	ManifestPath           string
+	IsSuccessfullyDeployed bool
+	IsDeploymentType       bool
+	errorLog               string
+}
+
+type K8sMetadata struct {
+	Name   string            `yaml:"name"`
+	Labels map[string]string `yaml:"labels"`
 }

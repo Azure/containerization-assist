@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"container-copilot/utils"
@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/ai"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -48,7 +49,7 @@ func (c *Clients) checkPodStatus(namespace string, labelSelector string, timeout
 	return false, "Timeout waiting for pods to become ready"
 }
 
-func analyzeKubernetesManifest(client *AzOpenAIClient, input FileAnalysisInput, state *PipelineState) (*FileAnalysisResult, error) {
+func analyzeKubernetesManifest(client *ai.AzOpenAIClient, input FileAnalysisInput, state *PipelineState) (*FileAnalysisResult, error) {
 	// Create prompt for analyzing the Kubernetes manifest
 	promptText := fmt.Sprintf(`Analyze the following Kubernetes manifest file for errors and suggest fixes:
 Manifest:
@@ -186,21 +187,21 @@ func (c *Clients) deployStateManifests(state *PipelineState) error {
 		}
 
 		// Use existing deployment verification
-		success, output, err := c.deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
+		success, output, err := c.deployAndVerifySingleManifest(tmpFile, manifest.IsDeploymentType)
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
 
 		if !success {
 			manifest.errorLog = output
-			manifest.isSuccessfullyDeployed = false
+			manifest.IsSuccessfullyDeployed = false
 			fmt.Printf("Failed to deploy manifest %s\n", name)
 			failedManifests = append(failedManifests, name)
 			continue
 		}
 
 		fmt.Printf("Successfully deployed manifest: %s\n", name)
-		manifest.isSuccessfullyDeployed = true
+		manifest.IsSuccessfullyDeployed = true
 		manifest.errorLog = ""
 	}
 
@@ -270,7 +271,7 @@ func (c *Clients) iterateMultipleManifestsDeploy(maxIterations int, state *Pipel
 			fmt.Printf("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
 			// Log status of each manifest
 			for name, thisObject := range state.K8sObjects {
-				if thisObject.isSuccessfullyDeployed {
+				if thisObject.IsSuccessfullyDeployed {
 					fmt.Printf("  ✅ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
 				} else {
 					fmt.Printf("  ❌ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)

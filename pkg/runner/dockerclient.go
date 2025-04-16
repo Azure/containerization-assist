@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"container-copilot/utils"
@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/Azure/container-copilot/pkg/snapshot"
 )
 
 var ApprovedDockerImages = `
@@ -158,7 +160,7 @@ func (c *Clients) checkDockerRunning() error {
 }
 
 // validateRegistryReachable checks if the local Docker registry is reachable.
-func validateRegistryReachable(registryURL string) error {
+func ValidateRegistryReachable(registryURL string) error {
 	resp, err := http.Get(fmt.Sprintf("http://%s/v2/", registryURL))
 	if err != nil {
 		return fmt.Errorf("failed to reach local registry at %s: %w", registryURL, err)
@@ -217,7 +219,7 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
 		state.Dockerfile.BuildErrors = buildErrors
-		if err := writeIterationSnapshot(state, targetDir); err != nil {
+		if err := snapshot.WriteIterationSnapshot(state, targetDir); err != nil {
 			return fmt.Errorf("writing iteration snapshot: %w", err)
 		}
 		time.Sleep(1 * time.Second) // Small delay for readability
@@ -226,7 +228,7 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 	return fmt.Errorf("failed to fix Dockerfile after %d iterations", maxIterations)
 }
 
-func initializeDockerFileState(pipelineState *PipelineState, dockerFilePath string) error {
+func InitializeDockerFileState(pipelineState *PipelineState, dockerFilePath string) error {
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerFilePath); err != nil {
 		return fmt.Errorf("error checking Dockerfile at path %s: %v", dockerFilePath, err)

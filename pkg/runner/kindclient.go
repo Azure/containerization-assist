@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"bufio"
@@ -8,7 +8,7 @@ import (
 )
 
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
-func (c *Clients) validateKindInstalled() error {
+func (c *Clients) ValidateKindInstalled() error {
 	if _, err := c.Kind.Version(); err != nil {
 		fmt.Println("kind is not installed.")
 		fmt.Print("Would you like to install kind? (y/n): ")
@@ -27,20 +27,20 @@ func (c *Clients) validateKindInstalled() error {
 }
 
 // setupLocalRegistry sets up a local Docker registry for kind, supporting multiple OS types.
-func (c *Clients) setupLocalRegistryCluster() error {
+func (c *Clients) SetupLocalRegistryCluster() error {
 	if err := c.checkDockerRunning(); err != nil {
 		return err
 	}
 
 	if output, err := c.Kind.SetupRegistry(); err != nil {
-        return fmt.Errorf("failed to set up local registry: %s, error: %w", output, err)
-    }
+		return fmt.Errorf("failed to set up local registry: %s, error: %w", output, err)
+	}
 
 	return nil
 }
 
 // getKindCluster ensures a 'container-copilot' kind cluster exists and sets kubectl context.
-func (c *Clients) getKindCluster() (string, error) {
+func (c *Clients) GetKindCluster() (string, error) {
 	if err := c.checkDockerRunning(); err != nil {
 		return "", err
 	}
@@ -81,5 +81,3 @@ func (c *Clients) getKindCluster() (string, error) {
 
 	return "localhost:5001", nil
 }
-
-

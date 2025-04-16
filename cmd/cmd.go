@@ -1,12 +1,12 @@
-package main
+package cmd
 
 import (
 	"fmt"
 	"os"
 	"strings"
 
-	"container-copilot/runner"
-
+	"github.com/Azure/container-copilot/pkg/ai"
+	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/spf13/cobra"
 )
 
@@ -20,13 +20,6 @@ var (
 	registry            string
 	dockerfileGenerator string
 )
-
-type Clients struct {
-	AzOpenAIClient *AzOpenAIClient
-	Docker runner.DockerRunner
-	Kind runner.KindRunner
-	Kube runner.KubeRunner
-}
 
 var rootCmd = &cobra.Command{
 	Use:   "container-copilot",
@@ -53,7 +46,7 @@ var generateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
-		if err := c.generate(targetDir, registry, dockerfileGenerator == "draft"); err != nil {
+		if err := generate(targetDir, registry, dockerfileGenerator == "draft", c); err != nil {
 			return fmt.Errorf("error generating artifacts: %w", err)
 		}
 
@@ -70,7 +63,7 @@ var testCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
-		if err := c.testOpenAIConn(); err != nil {
+		if err := c.TestOpenAIConn(); err != nil {
 			return fmt.Errorf("error testing Azure OpenAI connection: %w", err)
 		}
 
@@ -84,10 +77,9 @@ func Execute() {
 	rootCmd.Execute()
 }
 
-func initClients() (*Clients, error) {
+func initClients() (*runner.Clients, error) {
 
 	// read from .env
-
 
 	apiKey := os.Getenv(AZURE_OPENAI_KEY)
 	endpoint := os.Getenv(AZURE_OPENAI_ENDPOINT)
@@ -108,18 +100,18 @@ func initClients() (*Clients, error) {
 		return nil, fmt.Errorf("missing environment variables: %s", strings.Join(missingVars, ", "))
 	}
 
-	azOpenAIClient, err := NewAzOpenAIClient(endpoint, apiKey, deploymentID)
+	azOpenAIClient, err := ai.NewAzOpenAIClient(endpoint, apiKey, deploymentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure OpenAI client: %w", err)
 	}
 
 	cmdRunner := &runner.DefaultCommandRunner{}
 
-	clients := &Clients{
+	clients := &runner.Clients{
 		AzOpenAIClient: azOpenAIClient,
-		Docker: 	   runner.NewDockerCmdRunner(cmdRunner),
-		Kind:         runner.NewKindCmdRunner(cmdRunner),
-		Kube:         runner.NewKubeCmdRunner(cmdRunner),
+		Docker:         runner.NewDockerCmdRunner(cmdRunner),
+		Kind:           runner.NewKindCmdRunner(cmdRunner),
+		Kube:           runner.NewKubeCmdRunner(cmdRunner),
 	}
 
 	return clients, nil

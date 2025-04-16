@@ -1,13 +1,15 @@
-package main
+package snapshot
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/Azure/container-copilot/pkg/runner"
 )
 
-func writeIterationSnapshot(state *PipelineState, targetDir string) error {
+func writeIterationSnapshot(state *runner.PipelineState, targetDir string) error {
 
 	snapDir := filepath.Join(targetDir, ".container-copilot-snapshots", fmt.Sprintf("iteration_%d", state.IterationCount))
 	if err := os.MkdirAll(snapDir, 0755); err != nil {
@@ -21,7 +23,7 @@ func writeIterationSnapshot(state *PipelineState, targetDir string) error {
 		"registry_url":    state.RegistryURL,
 		"image_name":      state.ImageName,
 		"docker_errors":   state.Dockerfile.BuildErrors,
-		"manifest_errors": FormatManifestErrors(state),
+		"manifest_errors": runner.FormatManifestErrors(state),
 	}
 
 	metaJson, err := json.MarshalIndent(meta, "", "  ")
