@@ -94,7 +94,7 @@ Please consider these deployment errors when fixing the Dockerfile.
 APPROVED DOCKER IMAGES: The following Docker images are approved for use:
 %s
 
-Please prioritize using these approved images in the Dockerfile, especially for Java-based applications 
+Please prioritize using these approved images in the Dockerfile, especially for Java-based applications
 where the approved Java images should be used whenever possible.
 `, ApprovedDockerImages)
 
@@ -128,7 +128,7 @@ Favor using the latest base images and best practices for Dockerfile writing
 If applicable, use multi-stage builds to reduce image size
 Make sure to account for the file structure of the repository
 
-**IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT** 
+**IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
 `
@@ -188,6 +188,7 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 
 	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
+		state.IterationCount += 1
 
 		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
 		result, err := analyzeDockerfile(c.AzOpenAIClient, state)
@@ -216,6 +217,9 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
 		state.Dockerfile.BuildErrors = buildErrors
+		if err := writeIterationSnapshot(state, targetDir); err != nil {
+			return fmt.Errorf("writing iteration snapshot: %w", err)
+		}
 		time.Sleep(1 * time.Second) // Small delay for readability
 	}
 

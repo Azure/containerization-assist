@@ -12,21 +12,6 @@ import (
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step
 var DefaultManifestPath = filepath.Join(os.Getenv("GITHUB_WORKSPACE"), "manifests")
 
-type K8sMetadata struct {
-	Name   string            `yaml:"name"`
-	Labels map[string]string `yaml:"labels"`
-}
-type K8sObject struct {
-	ApiVersion             string      `yaml:"apiVersion"`
-	Kind                   string      `yaml:"kind"`
-	Metadata               K8sMetadata `yaml:"metadata"`
-	Content                []byte
-	ManifestPath           string
-	isSuccessfullyDeployed bool
-	isDeploymentType       bool
-	errorLog               string
-}
-
 func (o K8sObject) IsDeployment() bool {
 	return o.ApiVersion == "apps/v1" && o.Kind == "Deployment"
 }
