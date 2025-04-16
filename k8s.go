@@ -145,7 +145,6 @@ func (c *Clients) deployAndVerifySingleManifest(manifestPath string, isDeploymen
 	namespace := "default"        // Default namespace
 	labelSelector := "app=my-app" // Default label selector
 
-	fmt.Println("About to check pod status")
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.checkPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
