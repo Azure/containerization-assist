@@ -24,7 +24,7 @@ func (c *Clients) checkPodStatus(namespace string, labelSelector string, timeout
 
 	for time.Now().Before(endTime) {
 		outputStr, err := c.Kube.GetPods(namespace)
-		//fmt.Println("Kubectl get pods output:", string(output))
+		//fmt.Println("Kubectl get pods output:", outputStr)
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, outputStr)
 		}
@@ -145,6 +145,7 @@ func (c *Clients) deployAndVerifySingleManifest(manifestPath string, isDeploymen
 	namespace := "default"        // Default namespace
 	labelSelector := "app=my-app" // Default label selector
 
+	fmt.Println("About to check pod status")
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.checkPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
@@ -186,7 +187,7 @@ func (c *Clients) deployStateManifests(state *PipelineState) error {
 		}
 
 		// Use existing deployment verification
-		success, output, err := c.deployAndVerifySingleManifest(tmpFile, manifest.isDeploymentType)
+		success, output, err := c.deployAndVerifySingleManifest(tmpFile, manifest.IsDeployment())
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}

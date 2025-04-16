@@ -23,7 +23,6 @@ type K8sObject struct {
 	Content                []byte
 	ManifestPath           string
 	isSuccessfullyDeployed bool
-	isDeploymentType       bool
 	errorLog               string
 }
 
