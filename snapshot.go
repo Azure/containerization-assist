@@ -55,32 +55,3 @@ func writeIterationSnapshot(state *PipelineState, targetDir string) error {
 	}
 	return nil
 }
-
-func DeepCopy(ps *PipelineState) PipelineState {
-	clone := *ps
-
-	clone.Dockerfile = Dockerfile{
-		Content:     ps.Dockerfile.Content,
-		Path:        ps.Dockerfile.Path,
-		BuildErrors: ps.Dockerfile.BuildErrors,
-	}
-
-	clone.K8sObjects = make(map[string]*K8sObject, len(ps.K8sObjects))
-	for k, v := range ps.K8sObjects {
-		if v != nil {
-			objCopy := *v
-			if v.Content != nil {
-				objCopy.Content = make([]byte, len(v.Content))
-				copy(objCopy.Content, v.Content)
-			}
-			clone.K8sObjects[k] = &objCopy
-		}
-	}
-
-	clone.Metadata = make(map[string]interface{}, len(ps.Metadata))
-	for k, v := range ps.Metadata {
-		clone.Metadata[k] = v
-	}
-
-	return clone
-}
