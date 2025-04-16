@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func writeIterationSnapshot(state *PipelineState, targetDir string) error {
+func WriteIterationSnapshot(state *PipelineState, targetDir string) error {
 
 	snapDir := filepath.Join(targetDir, ".container-copilot-snapshots", fmt.Sprintf("iteration_%d", state.IterationCount))
 	if err := os.MkdirAll(snapDir, 0755); err != nil {

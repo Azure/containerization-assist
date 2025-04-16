@@ -1,4 +1,4 @@
-package main
+package k8s
 
 import (
 	"fmt"
@@ -48,7 +48,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			if err != nil {
 				return fmt.Errorf("reading file %s: %w", filePath, err)
 			}
-			o, err := readK8sObjects(fileContent)
+			o, err := ReadK8sObjects(fileContent)
 			if err != nil {
 				fmt.Printf("Skipping file %s: %v\n", filePath, err)
 				return nil // Skip files with errors instead of failing
@@ -72,7 +72,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 	return k8sObjects, nil
 }
 
-func readK8sObjects(content []byte) (K8sObject, error) {
+func ReadK8sObjects(content []byte) (K8sObject, error) {
 	var o K8sObject
 	if strings.Contains(string(content), ManifestObjectDelimiter) {
 		return o, fmt.Errorf("multi-object manifests are not yet supported")
@@ -85,53 +85,18 @@ func readK8sObjects(content []byte) (K8sObject, error) {
 	return o, nil
 }
 
-// InitializeManifests populates the K8sManifests field in PipelineState with manifests found in the specified path
-// If path is empty, the default manifest path will be used
-func InitializeManifests(state *PipelineState, path string) error {
-	k8sObjects, err := FindK8sObjects(path)
-	if err != nil {
-		return fmt.Errorf("failed to find manifests: %w", err)
-	}
-	if len(k8sObjects) == 0 {
-		return fmt.Errorf("no Kubernetes deployment files found in %s", path)
-	}
-	fmt.Printf("Found %d Kubernetes objects from %s\n", len(k8sObjects), path)
-	for _, obj := range k8sObjects {
-		fmt.Printf("  '%s' kind: %s source: %s\n", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
-	}
-
-	state.K8sObjects = make(map[string]*K8sObject)
-	for i := range k8sObjects {
-		obj := k8sObjects[i]
-		objKey := fmt.Sprintf("%s-%s", obj.Kind, obj.Metadata.Name)
-		state.K8sObjects[objKey] = &obj
-	}
-
-	return nil
+type K8sObject struct {
+	ApiVersion             string      `yaml:"apiVersion"`
+	Kind                   string      `yaml:"kind"`
+	Metadata               K8sMetadata `yaml:"metadata"`
+	Content                []byte
+	ManifestPath           string
+	IsSuccessfullyDeployed bool
+	IsDeploymentType       bool
+	ErrorLog               string
 }
 
-// FormatManifestErrors returns a string containing all manifest errors with their names
-func FormatManifestErrors(state *PipelineState) string {
-	var errorBuilder strings.Builder
-
-	for name, manifest := range state.K8sObjects {
-		if manifest.errorLog != "" {
-			errorBuilder.WriteString(fmt.Sprintf("\nManifest %q:\n%s\n", name, manifest.errorLog))
-		}
-	}
-
-	return errorBuilder.String()
-}
-
-// GetPendingManifests returns a map of manifest names that still need to be deployed
-func GetPendingManifests(state *PipelineState) map[string]bool {
-	pendingManifests := make(map[string]bool)
-
-	for name, manifest := range state.K8sObjects {
-		if !manifest.isSuccessfullyDeployed {
-			pendingManifests[name] = true
-		}
-	}
-
-	return pendingManifests
+type K8sMetadata struct {
+	Name   string            `yaml:"name"`
+	Labels map[string]string `yaml:"labels"`
 }

@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -6,39 +6,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Azure/container-copilot/pkg/clients"
+	"github.com/Azure/container-copilot/pkg/docker"
+	"github.com/Azure/container-copilot/pkg/filetree"
+	"github.com/Azure/container-copilot/pkg/k8s"
+	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-// updateSuccessfulFiles writes the successful Dockerfile and manifests from the pipeline state to disk
-func updateSuccessfulFiles(state *PipelineState) {
-	if state.Success {
-		// Write final Dockerfile
-		if state.Dockerfile.Path != "" && state.Dockerfile.Content != "" {
-			fmt.Printf("Writing final Dockerfile to %s\n", state.Dockerfile.Path)
-			if err := os.WriteFile(state.Dockerfile.Path, []byte(state.Dockerfile.Content), 0644); err != nil {
-				fmt.Printf("Error writing Dockerfile: %v\n", err)
-			}
-		}
+func generate(targetDir string, registry string, enableDraftDockerfile bool, c *clients.Clients) error {
 
-		// Write final manifests
-		fmt.Println("Writing final Kubernetes manifest files...")
-		for name, object := range state.K8sObjects {
-			if object.isSuccessfullyDeployed && object.ManifestPath != "" {
-				fmt.Printf("Writing updated manifest: %s\n", name)
-				// assumes single object per file so we can write the whole content
-				if err := os.WriteFile(object.ManifestPath, []byte(object.Content), 0644); err != nil {
-					fmt.Printf("Error writing manifest %s: %v\n", name, err)
-				}
-			}
-		}
-
-		fmt.Println("\n🎉 Container deployment pipeline completed successfully!")
-		fmt.Println("Dockerfile and manifest files have been updated with the working versions.")
-	}
-}
-
-func (c *Clients) generate(targetDir string, registry string, enableDraftDockerfile bool) error {
-
-	kindClusterName, err := c.getKindCluster()
+	kindClusterName, err := c.GetKindCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
@@ -47,8 +25,8 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 	maxIterations := 5
 	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
 
-	state := &PipelineState{
-		K8sObjects:     make(map[string]*K8sObject),
+	state := &pipeline.PipelineState{
+		K8sObjects:     make(map[string]*k8s.K8sObject),
 		Success:        false,
 		IterationCount: 0,
 		Metadata:       make(map[string]interface{}),
@@ -56,20 +34,20 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 		RegistryURL:    registry,
 	}
 	fmt.Printf("validating connection to registry %s\n", registry)
-	err = validateRegistryReachable(state.RegistryURL)
+	err = docker.ValidateRegistryReachable(state.RegistryURL)
 	if err != nil {
 		return fmt.Errorf("reaching registry %s: %w\n", state.RegistryURL, err)
 	}
 
 	if enableDraftDockerfile {
 		fmt.Printf("Generating Dockerfile in %s\n", targetDir)
-		draftTemplateName, err := getDockerfileTemplateName(c.AzOpenAIClient, targetDir)
+		draftTemplateName, err := docker.GetDockerfileTemplateName(c.AzOpenAIClient, targetDir)
 		if err != nil {
 			return fmt.Errorf("getting Dockerfile template name: %w", err)
 		}
 
 		fmt.Printf("Using Dockerfile template: %s\n", draftTemplateName)
-		err = generateDockerfileWithDraft(draftTemplateName, targetDir)
+		err = docker.GenerateDockerfileWithDraft(draftTemplateName, targetDir)
 		if err != nil {
 			return fmt.Errorf("generating Dockerfile: %w", err)
 		}
@@ -84,42 +62,42 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 
 	fmt.Printf("Generating Kubernetes manifests in %s\n", targetDir)
 	registryAndImage := fmt.Sprintf("%s/%s", registry, "app")
-	err = generateDeploymentFilesWithDraft(targetDir, registryAndImage)
+	err = docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage)
 	if err != nil {
 		return fmt.Errorf("generating deployment files: %w", err)
 	}
 
 	//Add RepoFileTree to state after Dockerfile and Manifests are generated
-	repoStructure, err := readFileTree(targetDir)
+	repoStructure, err := filetree.ReadFileTree(targetDir)
 	if err != nil {
 		return fmt.Errorf("failed to get file tree: %w", err)
 	}
 	state.RepoFileTree = repoStructure
 
-	err = InitializeManifests(state, targetDir) // Initialize K8sManifests with default path
+	err = state.InitializeManifests(targetDir) // Initialize K8sManifests with default path
 	if err != nil {
 		return fmt.Errorf("failed to initialize manifests: %w", err)
 	}
 
-	err = initializeDockerFileState(state, dockerfilePath)
+	err = state.InitializeDockerFileState(dockerfilePath)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
 	}
 
 	errors := []string{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := c.iterateDockerfileBuild(maxIterations, state, targetDir); err != nil {
+		if err := pipeline.IterateDockerfileBuild(maxIterations, state, targetDir, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
 
 		fmt.Printf("pushing image %s\n", registryAndImage)
-		err = c.pushDockerImage(registryAndImage)
+		err = c.PushDockerImage(registryAndImage)
 		if err != nil {
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := c.iterateMultipleManifestsDeploy(maxIterations, state, targetDir); err != nil {
+		if err := pipeline.IterateMultipleManifestsDeploy(maxIterations, state, targetDir, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
 	}
@@ -131,17 +109,6 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 	}
 
 	// Update the dockerfile and manifests with the final successful versions
-	updateSuccessfulFiles(state)
-	return nil
-}
-
-func (c *Clients) testOpenAIConn() error {
-	testResponse, err := c.AzOpenAIClient.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
-	if err != nil {
-		return fmt.Errorf("failed to get chat completion: %w", err)
-	}
-
-	fmt.Println("Azure OpenAI Test")
-	fmt.Printf("Response: %s\n", testResponse)
+	pipeline.UpdateSuccessfulFiles(state)
 	return nil
 }

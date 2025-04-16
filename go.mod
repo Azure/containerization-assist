@@ -1,4 +1,4 @@
-module container-copilot
+module github.com/Azure/container-copilot
 
 go 1.23.1
 

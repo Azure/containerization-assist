@@ -1,4 +1,4 @@
-package main
+package filetree
 
 import (
 	"bytes"
@@ -21,7 +21,7 @@ var defaultIgnores = []string{
 	".DS_Store",
 }
 
-func readFileTree(root string) (string, error) {
+func ReadFileTree(root string) (string, error) {
 	// Create a map to represent the file tree structure
 	fileTree := make(map[string]interface{})
 
