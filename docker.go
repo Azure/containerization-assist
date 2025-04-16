@@ -10,6 +10,28 @@ import (
 	"time"
 )
 
+var ApprovedDockerImages = `
+approved_images:
+  - image: tomcat
+    tag: "9.0"
+  - image: jboss/wildfly
+    tag: "latest"
+  - image: jboss-eap
+    tag: "7.3"
+  - image: oracle/weblogic
+    tag: "12.2.1.4"
+  - image: ibmcom/websphere-traditional
+    tag: "9.0.5.7"
+  - image: glassfish
+    tag: "5.1"
+  - image: maven
+    tags:
+      - "3.6.3-jdk-8"
+      - "3.8.3-openjdk-17"
+      - "3.9-eclipse-temurin-8"
+      - "3.9.9-eclipse-temurin-24-alpine"
+`
+
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents
 func (c *Clients) buildDockerfileContent(dockerfileContent string, targetDir string, registry string, imageName string) (string, error) {
 	// Create temporary directory
@@ -32,14 +54,14 @@ func (c *Clients) buildDockerfileContent(dockerfileContent string, targetDir str
 
 	// Build the image using the temporary Dockerfile
 	fmt.Printf("building docker image with tag '%s%s:latest'\n", registryPrefix, imageName)
-	output, err := c.Docker.Build(dockerfilePath, registryPrefix+imageName+":latest", targetDir)
+	buildErrors, err := c.Docker.Build(dockerfilePath, registryPrefix+imageName+":latest", targetDir)
 
 	if err != nil {
-		return output, fmt.Errorf("docker build failed: %v", err)
+		return buildErrors, fmt.Errorf("docker build failed: %v", err)
 	}
 
 	fmt.Printf("built docker image")
-	return output, nil
+	return buildErrors, nil
 }
 
 func analyzeDockerfile(client *AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
@@ -66,6 +88,15 @@ These deployment failures may indicate issues with the Docker image produced by 
 Please consider these deployment errors when fixing the Dockerfile.
 `, manifestErrors)
 	}
+
+	// Add valid docker images to the context
+	promptText += fmt.Sprintf(`
+APPROVED DOCKER IMAGES: The following Docker images are approved for use:
+%s
+
+Please prioritize using these approved images in the Dockerfile, especially for Java-based applications
+where the approved Java images should be used whenever possible.
+`, ApprovedDockerImages)
 
 	// Add error information if provided and not empty
 	if dockerfile.BuildErrors != "" {
@@ -97,7 +128,7 @@ Favor using the latest base images and best practices for Dockerfile writing
 If applicable, use multi-stage builds to reduce image size
 Make sure to account for the file structure of the repository
 
-Output the fixed Dockerfile between <<<DOCKERFILE>>> tags.
+**IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
 `
@@ -173,7 +204,7 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 		fmt.Printf("Updated Dockerfile written. Attempting build again...\n")
 
 		// Try to build
-		buildOutput, err := c.buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+		buildErrors, err := c.buildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
@@ -181,11 +212,11 @@ func (c *Clients) iterateDockerfileBuild(maxIterations int, state *PipelineState
 			return nil
 		}
 
-		fmt.Printf("Docker build failed with error: %v\n", err)
+		fmt.Printf("Docker build failed with error: %v\n", buildErrors)
 
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
-		state.Dockerfile.BuildErrors = buildOutput
+		state.Dockerfile.BuildErrors = buildErrors
 		if err := writeIterationSnapshot(state, targetDir); err != nil {
 			return fmt.Errorf("writing iteration snapshot: %w", err)
 		}
