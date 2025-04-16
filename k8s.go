@@ -213,7 +213,7 @@ func (c *Clients) deployStateManifests(state *PipelineState) error {
 }
 
 // Update iterateMultipleManifestsDeploy to use the new deployment function
-func (c *Clients) iterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, pipelineStateHistory *[]PipelineState) error {
+func (c *Clients) iterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, targetDir string) error {
 	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := checkKubectlInstalled(); err != nil {
@@ -226,6 +226,7 @@ func (c *Clients) iterateMultipleManifestsDeploy(maxIterations int, state *Pipel
 
 	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
+		state.IterationCount += 1
 
 		// Fix each manifest that still has issues
 		pendingObjects := GetPendingManifests(state)
@@ -276,7 +277,10 @@ func (c *Clients) iterateMultipleManifestsDeploy(maxIterations int, state *Pipel
 				}
 			}
 		}
-		*pipelineStateHistory = append(*pipelineStateHistory, DeepCopy(state))
+		if err := writeIterationSnapshot(state, targetDir); err != nil {
+			return fmt.Errorf("writing iteration snapshot: %w", err)
+		}
+
 		time.Sleep(1 * time.Second)
 	}
 

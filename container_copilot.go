@@ -107,9 +107,8 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 	}
 
 	errors := []string{}
-	pipelineStateHistory := []PipelineState{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := c.iterateDockerfileBuild(maxIterations, state, targetDir, &pipelineStateHistory); err != nil {
+		if err := c.iterateDockerfileBuild(maxIterations, state, targetDir); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
@@ -120,14 +119,9 @@ func (c *Clients) generate(targetDir string, registry string, enableDraftDockerf
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := c.iterateMultipleManifestsDeploy(maxIterations, state, &pipelineStateHistory); err != nil {
+		if err := c.iterateMultipleManifestsDeploy(maxIterations, state, targetDir); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
-	}
-
-	// can make this optional with a flag later
-	if err := writeIterationSnapshot(pipelineStateHistory, targetDir); err != nil {
-		return fmt.Errorf("writing iteration snapshot: %w", err)
 	}
 
 	if !state.Success {
