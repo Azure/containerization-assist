@@ -151,6 +151,3 @@ func (c *Clients) testOpenAIConn() error {
 	fmt.Printf("Response: %s\n", testResponse)
 	return nil
 }
-
-
-
