@@ -43,6 +43,11 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 		if err != nil {
 			return err
 		}
+
+		if d.IsDir() && strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
+		}
+
 		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
 			fileContent, err := os.ReadFile(filePath)
 			if err != nil {

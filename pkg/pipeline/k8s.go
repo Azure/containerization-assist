@@ -152,7 +152,7 @@ func (s *PipelineState) DeployStateManifests(c *clients.Clients) error {
 }
 
 // Update iterateMultipleManifestsDeploy to use the new deployment function
-func IterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, targetDir string, c *clients.Clients) error {
+func IterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, targetDir string, generateSnapshot bool, c *clients.Clients) error {
 	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := k8s.CheckKubectlInstalled(); err != nil {
@@ -202,6 +202,11 @@ func IterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, tar
 		if err == nil {
 			state.Success = true
 			fmt.Printf("🎉 All Kubernetes manifests deployed successfully!")
+			if generateSnapshot {
+				if err := WriteIterationSnapshot(state, targetDir); err != nil {
+					return fmt.Errorf("writing iteration snapshot: %w", err)
+				}
+			}
 			return nil
 		}
 
@@ -216,8 +221,11 @@ func IterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, tar
 				}
 			}
 		}
-		if err := WriteIterationSnapshot(state, targetDir); err != nil {
-			return fmt.Errorf("writing iteration snapshot: %w", err)
+
+		if generateSnapshot {
+			if err := WriteIterationSnapshot(state, targetDir); err != nil {
+				return fmt.Errorf("writing iteration snapshot: %w", err)
+			}
 		}
 
 		time.Sleep(1 * time.Second)

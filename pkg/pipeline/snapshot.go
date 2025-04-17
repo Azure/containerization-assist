@@ -53,5 +53,7 @@ func WriteIterationSnapshot(state *PipelineState, targetDir string) error {
 			return fmt.Errorf("writing manifest snapshot: %w", err)
 		}
 	}
+
+	fmt.Printf("Snapshot for iteration %d saved to %s\n", state.IterationCount, snapDir)
 	return nil
 }
