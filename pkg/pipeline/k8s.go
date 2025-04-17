@@ -74,7 +74,8 @@ Please:
 2. Provide a fixed version of the manifest
 3. Explain what changes were made and why
 
-Do not create brand new manifests - Only fix the provided manifest. Do NOT change the name of the manifest or the name of the container image.
+Do NOT create brand new manifests - Only fix the provided manifest. 
+IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest between <<<MANIFEST>>> tags.`
 
