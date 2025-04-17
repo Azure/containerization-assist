@@ -23,7 +23,7 @@ func (k *KubeCmdRunner) Apply(manifestPath string) (string, error) {
 }
 
 func (k *KubeCmdRunner) GetPods(namespace string) (string, error) {
-	return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace)
+	return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-o", "json")
 }
 
 func (k *KubeCmdRunner) SetKubeContext(name string) (string, error) {
