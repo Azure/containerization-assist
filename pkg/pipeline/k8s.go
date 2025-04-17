@@ -124,8 +124,18 @@ func (s *PipelineState) DeployStateManifests(c *clients.Clients) error {
 		}
 
 		// Use existing deployment verification
-		success, output, err := c.DeployAndVerifySingleManifest(tmpFile, manifest.IsDeploymentType)
+		success, output, err := c.DeployAndVerifySingleManifest(tmpFile, manifest.IsDeployment())
 		if err != nil {
+			// Clean up the failed deployment
+			if manifest.IsDeployment() {
+				_, cleanupErr := c.Kube.DeleteDeployment(tmpFile)
+				if cleanupErr != nil {
+					fmt.Printf("Warning: Failed to clean up deployment: %v\n", cleanupErr)
+				} else {
+					fmt.Println("Successfully cleaned up failed deployment")
+				}
+			}
+
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
 
