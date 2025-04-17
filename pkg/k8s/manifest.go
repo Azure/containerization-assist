@@ -44,7 +44,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			return err
 		}
 
-		if d.IsDir() && strings.HasPrefix(d.Name(), ".") {
+		if d.IsDir() && strings.HasPrefix(d.Name(), ".container-copilot-snapshots") {
 			return filepath.SkipDir
 		}
 
