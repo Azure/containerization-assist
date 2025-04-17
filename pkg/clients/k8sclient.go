@@ -82,8 +82,8 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 
 	// Extract namespace and app labels from the manifest
 	// This is simplified - would need to actually take this from the manifest
-	namespace := "default"        // Default namespace
-	labelSelector := "app=my-app" // Default label selector #TODO: actually parse this from the manifest
+	namespace := "default" // Default namespace
+	labelSelector := ""    // Default label selector #TODO: actually parse this from the manifest
 
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.CheckPodStatus(namespace, labelSelector, time.Minute)
