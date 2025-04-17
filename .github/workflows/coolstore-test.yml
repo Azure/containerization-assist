@@ -50,11 +50,11 @@ jobs:
           chmod +x container-copilot
           sudo mv container-copilot /usr/local/bin/
 
-      - name: Checkout Konveyor Coolstore
+      - name: Checkout Test Repo
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: ${{ matrix.test-repo }}
-          path: coolstore
+          path: test-repo
 
       - name: Setup Docker
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -85,15 +85,15 @@ jobs:
           mkdir -p manifests
           
           # Run the test and save output
-          echo "Running container-copilot generate for test ${{ matrix.test-number }}..."
-          container-copilot generate . > "logs/run-${{ matrix.test-number }}.log" 2>&1
+          echo "Running container-copilot generate for test ${{ matrix.test-repo }}-${{ matrix.test-number }}..."
+          container-copilot generate . > "logs/run-${{ matrix.test-repo }}-${{ matrix.test-number }}.log" 2>&1
           
           # Check if the success message is in the log file
-          if grep -q "$SUCCESS_MESSAGE" "logs/run-${{ matrix.test-number }}.log"; then
-            echo "✅ Test Run ${{ matrix.test-number }}: PASSED - Found '$SUCCESS_MESSAGE'"
+          if grep -q "$SUCCESS_MESSAGE" "logs/run-${{ matrix.test-repo}}-${{ matrix.test-number }}.log"; then
+            echo "✅ Test Run ${{ matrix.test-repo }}-${{ matrix.test-number }}: PASSED - Found '$SUCCESS_MESSAGE'"
             echo "result=success" >> $GITHUB_OUTPUT
           else
-            echo "❌ Test Run ${{ matrix.test-number }}: FAILED - Did not find '$SUCCESS_MESSAGE'"
+            echo "❌ Test Run ${{ matrix.test-repo }}-${{ matrix.test-number }}: FAILED - Did not find '$SUCCESS_MESSAGE'"
             echo "result=failure" >> $GITHUB_OUTPUT
           fi
           
@@ -108,14 +108,14 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: steps.run_test.outputs.result == 'success'
         with:
-          name: container-copilot-artifacts-${{ matrix.test-number }}
+          name: container-copilot-artifacts-${{ matrix.test-repo }}-${{ matrix.test-number }}
           path: test-repo/artifacts/
           retention-days: 14
 
       - name: Upload test logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: container-copilot-logs-${{ matrix.test-number }}
+          name: container-copilot-logs-${{ matrix.test-repo }}-${{ matrix.test-number }}
           path: test-repo/logs/
           retention-days: 14
       
@@ -125,7 +125,7 @@ jobs:
       - name: Upload test result
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: test-result-${{ matrix.test-number }}
+          name: test-result-${{ matrix.test-repo }}-${{ matrix.test-number }}
           path: result.txt
   
   aggregate-results:
