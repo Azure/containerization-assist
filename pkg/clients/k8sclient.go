@@ -23,8 +23,13 @@ func (c *Clients) CheckPodStatus(namespace string, labelSelector string, timeout
 	endTime := time.Now().Add(timeout)
 
 	for time.Now().Before(endTime) {
-		outputStr, err := c.Kube.GetPods(namespace, labelSelector)
-		//fmt.Println("Kubectl get pods output:", string(output))
+		readableOutputStr, err := c.Kube.GetPods(namespace, labelSelector)
+		fmt.Println("Kubectl get pods output:\n", readableOutputStr)
+		if err != nil {
+			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, readableOutputStr)
+		}
+
+		outputStr, err := c.Kube.GetPodsJSON(namespace, labelSelector)
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, outputStr)
 		}
@@ -80,8 +85,8 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 
 	// Extract namespace and app labels from the manifest
 	// This is simplified - would need to actually take this from the manifest
-	namespace := "default"        // Default namespace
-	labelSelector := "app=my-app" // Default label selector #TODO: actually parse this from the manifest
+	namespace := "default" // Default namespace
+	labelSelector := ""    // Default label selector #TODO: actually parse this from the manifest
 
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.CheckPodStatus(namespace, labelSelector, time.Minute)

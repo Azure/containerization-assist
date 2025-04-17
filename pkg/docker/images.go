@@ -4,6 +4,7 @@ var ApprovedDockerImages = `
 approved_images:
   - image: tomcat
     tag: "9.0"
+    notes: "Tomcat should not contain the sample webapp content"
   - image: jboss/wildfly
     tag: "latest"
   - image: jboss-eap
