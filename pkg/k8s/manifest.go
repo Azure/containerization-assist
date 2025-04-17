@@ -44,6 +44,11 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			return err
 		}
 		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
+			inHiddenDir := strings.Contains(filePath, string(os.PathSeparator)+".")
+			if inHiddenDir {
+				fmt.Printf("Skipping hidden file %s\n", filePath)
+				return nil
+			}
 			fileContent, err := os.ReadFile(filePath)
 			if err != nil {
 				return fmt.Errorf("reading file %s: %w", filePath, err)
