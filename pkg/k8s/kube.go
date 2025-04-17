@@ -10,6 +10,7 @@ import (
 type KubeRunner interface {
 	Apply(manifestPath string) (string, error)
 	GetPods(namespace string, labelSelector string) (string, error)
+	GetPodsJSON(namespace string, labelSelector string) (string, error)
 	SetKubeContext(name string) (string, error)
 	DeleteDeployment(manifestPath string) (string, error)
 }
@@ -31,6 +32,13 @@ func (k *KubeCmdRunner) Apply(manifestPath string) (string, error) {
 }
 
 func (k *KubeCmdRunner) GetPods(namespace string, labelSelector string) (string, error) {
+	if labelSelector != "" {
+		return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-l", labelSelector)
+	}
+	return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace)
+}
+
+func (k *KubeCmdRunner) GetPodsJSON(namespace string, labelSelector string) (string, error) {
 	if labelSelector != "" {
 		return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-l", labelSelector, "-o", "json")
 	}
