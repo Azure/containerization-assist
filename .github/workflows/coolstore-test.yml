@@ -106,18 +106,21 @@ jobs:
             [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
           fi
 
+          #Output the run name for the next step
+          echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
+
       - name: Upload test artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: steps.run_test.outputs.result == 'success'
         with:
-          name: container-copilot-artifacts-${{ matrix.test-repo }}-${{ matrix.test-number }}
+          name: container-copilot-artifacts-${{ steps.run_test.outputs.run_name }}
           path: test-repo/artifacts/
           retention-days: 14
 
       - name: Upload test logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: container-copilot-logs-${{ matrix.test-repo }}-${{ matrix.test-number }}
+          name: container-copilot-logs-${{ steps.run_test.outputs.run_name }}
           path: test-repo/logs/
           retention-days: 14
       
@@ -127,7 +130,7 @@ jobs:
       - name: Upload test result
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: test-result-${{ matrix.test-repo }}-${{ matrix.test-number }}
+          name: test-result-${{ steps.run_test.outputs.run_name }}
           path: result.txt
   
   aggregate-results:
