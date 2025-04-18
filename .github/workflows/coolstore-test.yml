@@ -85,7 +85,7 @@ jobs:
           mkdir -p manifests
           
           # Run the test and save output
-          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|_|g')
+          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/||g')
           RUN_NAME="$REPO_NAME_WITHOUT_SLASH-${{ matrix.test-number }}"
           echo "Running container-copilot generate for test $RUN_NAME ..."
           container-copilot generate . > "logs/run-${RUN_NAME}.log" 2>&1
@@ -146,70 +146,54 @@ jobs:
       - name: Aggregate Test Results
         id: aggregate_results
         run: |
-          # Count successes and failures
-          success_count=0
-          failure_count=0
-          
-          # Build detailed results
-          passed_tests=""
-          failed_tests=""
-          
-          for i in {1..10}; do
-            if [ -f "results/test-result-$i/result.txt" ]; then
-              result=$(cat "results/test-result-$i/result.txt")
-              if [ "$result" == "success" ]; then
-                success_count=$((success_count + 1))
-                passed_tests+="- Test Run $i ✅\n"
-              else
-                failure_count=$((failure_count + 1))
-                failed_tests+="- Test Run $i ❌\n"
-                echo "::warning::Test Run $i Failed"
-              fi
-            else
-              echo "::warning::Test Run $i Result Not Found"
-            fi
-          done
-          
-          total_tests=$((success_count + failure_count))
-          success_rate=$((success_count * 100 / total_tests))
-          
-          # Show results
-          echo ""
-          echo "===== Test Results ====="
-          echo "Total tests: $total_tests"
-          echo "Passed: $success_count"
-          echo "Failed: $failure_count"
-          echo "Success rate: $success_rate%"
-          
-          echo -e "Passed Tests:\n$passed_tests"
-          echo -e "Failed Tests:\n$failed_tests"
-          
+
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| Total Tests | $total_tests |" >> $GITHUB_STEP_SUMMARY
-          echo "| Passed | $success_count |" >> $GITHUB_STEP_SUMMARY
-          echo "| Failed | $failure_count |" >> $GITHUB_STEP_SUMMARY
-          echo "| Success Rate | $success_rate% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Repo | Success Rate | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+
+          # List repos without numbers
+          export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+')"  
+          echo "Repos: $REPOS"
           
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Passed Tests" >> $GITHUB_STEP_SUMMARY
-          if [ -n "$passed_tests" ]; then
-            echo -e "$passed_tests" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "None" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Failed Tests" >> $GITHUB_STEP_SUMMARY
-          if [ -n "$failed_tests" ]; then
-            echo -e "$failed_tests" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "None" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          # Save values for other steps to use
-          echo "success_count=$success_count" >> $GITHUB_OUTPUT
-          echo "failure_count=$failure_count" >> $GITHUB_OUTPUT
-          echo "success_rate=$success_rate" >> $GITHUB_OUTPUT
+          # Loop through repos
+          for repo in $REPOS; do
+            echo "Processing results for $repo"
+
+            # Count successes and failures
+            success_count=0
+            failure_count=0
+            
+            # Build detailed results
+            passed_tests=""
+            failed_tests=""
+
+            # Loop through test runs
+            for i in {1..10}; do
+              if [ -f "results/test-result-$repo/result.txt" ]; then
+                result=$(cat "results/test-result-$repo-$i/result.txt")
+                if [ "$result" == "success" ]; then
+                  success_count=$((success_count + 1))
+                  passed_tests+="- Test Run $i ✅\n"
+                else
+                  failure_count=$((failure_count + 1))
+                  failed_tests+="- Test Run $i ❌\n"
+                  echo "::warning::Test Run $i Failed"
+                fi
+              else
+                echo "::warning::Test Run $repo-$i Result Not Found"
+              fi
+            done
+
+            total_tests=$((success_count + failure_count))
+            success_rate=$((success_count * 100 / total_tests))  
+
+            # Show results
+            echo ""
+            echo "===== $repo Test Results ====="
+            echo "Total tests: $total_tests"
+            echo "Passed: $success_count"
+            echo "Failed: $failure_count"
+            echo "Success rate: $success_rate%"
+            echo ""
+          done
