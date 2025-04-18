@@ -170,7 +170,7 @@ jobs:
 
             # Loop through test runs
             for i in {1..10}; do
-              if [ -f "results/test-result-$repo/result.txt" ]; then
+              if [ -f "results/test-result-$repo-$i/result.txt" ]; then
                 result=$(cat "results/test-result-$repo-$i/result.txt")
                 if [ "$result" == "success" ]; then
                   success_count=$((success_count + 1))
