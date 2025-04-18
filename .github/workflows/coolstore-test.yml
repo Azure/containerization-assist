@@ -86,7 +86,7 @@ jobs:
           mkdir -p manifests
           
           # Run the test and save output
-          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/||g')
+          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/||g' | sed 's|-||g')
           RUN_NAME="$REPO_NAME_WITHOUT_SLASH-${{ matrix.test-number }}"
           echo "Running container-copilot generate for test $RUN_NAME ..."
           container-copilot generate . > "logs/run-${RUN_NAME}.log" 2>&1
@@ -188,7 +188,12 @@ jobs:
             done
 
             total_tests=$((success_count + failure_count))
-            success_rate=$((success_count * 100 / total_tests))  
+            # set success rate to 0 if no tests passed
+            if [ $total_tests -eq 0 ]; then
+              success_rate=0
+            else
+              success_rate=$((success_count * 100 / total_tests))
+            fi
 
             # Show results
             echo ""
