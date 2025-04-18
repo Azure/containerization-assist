@@ -137,6 +137,7 @@ jobs:
   aggregate-results:
     needs: test-run
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Download all results
         uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
