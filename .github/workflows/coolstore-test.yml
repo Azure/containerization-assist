@@ -155,7 +155,7 @@ jobs:
           echo "| --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
 
           # List repos without numbers
-          export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+')"  
+          export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
           echo "Repos: $REPOS"
           
           # Loop through repos
@@ -202,5 +202,6 @@ jobs:
             echo "Passed: $success_count"
             echo "Failed: $failure_count"
             echo "Success rate: $success_rate%"
+            echo "| $repo | $success_rate% | $success_count | $failure_count |" >> $GITHUB_STEP_SUMMARY
             echo ""
           done
