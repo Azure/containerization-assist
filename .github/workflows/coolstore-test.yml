@@ -153,7 +153,7 @@ jobs:
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Repo | Success Rate | Passed | Failed | Timed Out |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
 
           # List repos without numbers
           export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
@@ -189,23 +189,18 @@ jobs:
               fi
             done
 
-            total_tests=$((success_count + failure_count))
-            # set success rate to 0 if no tests passed
-            if [ $total_tests -eq 0 ]; then
-              success_rate=0
-            else
-              success_rate=$((success_count * 100 / tests_per_repo))
-            fi
-            timedout_tests=$((tests_per_repo - total_tests))
+            success_rate=$((success_count * 100 / tests_per_repo))
+            completed_tests=$((success_count + failure_count))
+            timedout_test_count=$((tests_per_repo - completed_tests))
 
             # Show results
             echo ""
             echo "===== $repo Test Results ====="
-            echo "Total tests: $total_tests"
+            echo "Total tests: $tests_per_repo"
             echo "Passed: $success_count"
             echo "Failed: $failure_count"
-            echo "Timed out: $timedout_tests" # Display timed out tests
+            echo "Timed out: $timedout_test_count"
             echo "Success rate: $success_rate%"
-            echo "| $repo | $success_rate% | $success_count | $failure_count | $timedout_tests |" >> $GITHUB_STEP_SUMMARY
+            echo "| $repo | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
             echo ""
           done
