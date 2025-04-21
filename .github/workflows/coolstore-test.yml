@@ -148,10 +148,11 @@ jobs:
       - name: Aggregate Test Results
         id: aggregate_results
         run: |
+          tests_per_repo=10
 
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Repo | Success Rate | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Repo | Success Rate | Passed | Failed | Timed Out |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
 
           # List repos without numbers
@@ -168,10 +169,11 @@ jobs:
             
             # Build detailed results
             passed_tests=""
-            failed_tests=""
+            failed_tests="" # includes failed and timed out tests
+            timedout_tests=""
 
             # Loop through test runs
-            for i in {1..10}; do
+            for i in {1..$tests_per_repo}; do
               if [ -f "results/test-result-$repo-$i/result.txt" ]; then
                 result=$(cat "results/test-result-$repo-$i/result.txt")
                 if [ "$result" == "success" ]; then
@@ -192,8 +194,9 @@ jobs:
             if [ $total_tests -eq 0 ]; then
               success_rate=0
             else
-              success_rate=$((success_count * 100 / total_tests))
+              success_rate=$((success_count * 100 / tests_per_repo))
             fi
+            timedout_tests=$((tests_per_repo - total_tests))
 
             # Show results
             echo ""
@@ -201,7 +204,8 @@ jobs:
             echo "Total tests: $total_tests"
             echo "Passed: $success_count"
             echo "Failed: $failure_count"
+            echo "Timed out: $timedout_tests" # Display timed out tests
             echo "Success rate: $success_rate%"
-            echo "| $repo | $success_rate% | $success_count | $failure_count |" >> $GITHUB_STEP_SUMMARY
+            echo "| $repo | $success_rate% | $success_count | $failure_count | $timedout_tests |" >> $GITHUB_STEP_SUMMARY
             echo ""
           done
