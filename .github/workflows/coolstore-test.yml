@@ -36,6 +36,10 @@ jobs:
         test-repo:
           - konveyor-ecosystem/coolstore
           - chamilad/tomcat-hello-world
+          - agoncal/agoncal-application-petstore-ee7
+          - colinbut/monolith-enterprise-application
+          - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
+          - jamesfalkner/jboss-daytrader
       fail-fast: false
     
     steps:
