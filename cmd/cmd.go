@@ -23,6 +23,7 @@ const (
 var (
 	registry            string
 	dockerfileGenerator string
+	generateSnapshot      bool
 )
 
 var rootCmd = &cobra.Command{
@@ -50,7 +51,7 @@ var generateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
-		if err := generate(targetDir, registry, dockerfileGenerator == "draft", c); err != nil {
+		if err := generate(targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c); err != nil {
 			return fmt.Errorf("error generating artifacts: %w", err)
 		}
 
@@ -124,4 +125,5 @@ func initClients() (*clients.Clients, error) {
 func init() {
 	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
 	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")
+	generateCmd.PersistentFlags().BoolVarP(&generateSnapshot, "snapshot", "s", false, "Generate a snapshot of the Dockerfile and Kubernetes manifests generated in each iteration")
 }

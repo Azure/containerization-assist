@@ -118,7 +118,7 @@ I will tip you if you provide a correct and working Dockerfile.
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir string, c *clients.Clients) error {
+func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir string, generateSnapshot bool, c *clients.Clients) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -148,7 +148,11 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
-
+			if generateSnapshot {
+				if err := WriteIterationSnapshot(state, targetDir); err != nil {
+					return fmt.Errorf("writing iteration snapshot: %w", err)
+				}
+			}
 			return nil
 		}
 
@@ -157,9 +161,13 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
 		state.Dockerfile.BuildErrors = buildErrors
-		if err := WriteIterationSnapshot(state, targetDir); err != nil {
-			return fmt.Errorf("writing iteration snapshot: %w", err)
+
+		if generateSnapshot {
+			if err := WriteIterationSnapshot(state, targetDir); err != nil {
+				return fmt.Errorf("writing iteration snapshot: %w", err)
+			}
 		}
+
 		time.Sleep(1 * time.Second) // Small delay for readability
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-func generate(targetDir string, registry string, enableDraftDockerfile bool, c *clients.Clients) error {
+func generate(targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
 
 	kindClusterName, err := c.GetKindCluster()
 	if err != nil {
@@ -86,7 +86,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 
 	errors := []string{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := pipeline.IterateDockerfileBuild(maxIterations, state, targetDir, c); err != nil {
+		if err := pipeline.IterateDockerfileBuild(maxIterations, state, targetDir, generateSnapshot, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
@@ -97,7 +97,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, c *
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := pipeline.IterateMultipleManifestsDeploy(maxIterations, state, targetDir, c); err != nil {
+		if err := pipeline.IterateMultipleManifestsDeploy(maxIterations, state, targetDir, generateSnapshot, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
 	}
