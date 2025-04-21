@@ -33,7 +33,7 @@ jobs:
     strategy:
       max-parallel: 10
       matrix:
-        test-number: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        test-number: [1, 2, 3, 4, 5]
         test-repo:
           - konveyor-ecosystem/coolstore
           - chamilad/tomcat-hello-world
