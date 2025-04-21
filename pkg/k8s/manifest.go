@@ -9,6 +9,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const SNAPSHOT_DIR = ".container-copilot-snapshots"
+
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step
 var DefaultManifestPath = filepath.Join(os.Getenv("GITHUB_WORKSPACE"), "manifests")
 
@@ -44,7 +46,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			return err
 		}
 
-		if d.IsDir() && d.Name() == ".container-copilot-snapshots" {
+		if d.IsDir() && d.Name() == SNAPSHOT_DIR {
 			return filepath.SkipDir
 		}
 
