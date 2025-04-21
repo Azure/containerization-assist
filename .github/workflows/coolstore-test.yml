@@ -31,6 +31,7 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 10
       matrix:
         test-number: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         test-repo:
@@ -152,7 +153,7 @@ jobs:
       - name: Aggregate Test Results
         id: aggregate_results
         run: |
-          tests_per_repo=10
+          tests_per_repo=5
 
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
