@@ -173,7 +173,7 @@ jobs:
             timedout_tests=""
 
             # Loop through test runs
-            for i in {1..$tests_per_repo}; do
+            for ((i=1; i<=$tests_per_repo; i++)); do
               if [ -f "results/test-result-$repo-$i/result.txt" ]; then
                 result=$(cat "results/test-result-$repo-$i/result.txt")
                 if [ "$result" == "success" ]; then
