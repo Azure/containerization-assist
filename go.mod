@@ -1,8 +1,6 @@
 module github.com/Azure/container-copilot
 
-go 1.23.1
-
-toolchain go1.24.1
+go 1.24.1
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai v0.7.2
@@ -15,15 +13,10 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
-	github.com/flopp/go-findfont v0.1.0 // indirect
-	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
-	github.com/goccy/go-graphviz v0.2.9 // indirect
-	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
@@ -34,8 +27,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/tetratelabs/wazero v1.8.1 // indirect
-	golang.org/x/image v0.21.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/time v0.7.0 // indirect

@@ -14,26 +14,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       
       - name: Build
         run: |
           go build .
-  tomcat:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.23'
-      - name: Checkout Tomcat 
-        uses: actions/checkout@v3
-        with:
-          repository: ReinierCC/tomcat-hello-world
-          ref: master
-          path: tomcat-hello-world
-      - name: run
-        run: |
-          go run . generate  tomcat-hello-world

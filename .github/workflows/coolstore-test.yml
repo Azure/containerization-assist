@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       
       - name: Build container-copilot
         run: |
@@ -37,10 +37,22 @@ jobs:
         test-repo:
           - konveyor-ecosystem/coolstore
           - chamilad/tomcat-hello-world
+          - eNKay2408/Note-Taking
+          - SaiUpadhyayula/SpringAngularEcommerce
+          - kparent/jboss-helloworld
+          - shekhargulati/todoapp-forge
+          - Zaaim-Halim/java-EE-E-Commerce-Web-App
+          - Mariemfakhreldein/e-commerce-app
+          - dhruvinrsoni/online-pizza-ordering-system
+          - spring-petclinic/spring-petclinic-microservices
+          - jamesfalkner/jboss-daytrader
+          - oracle-samples/weblogic-examples
+          - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
+          - N-Usha/java-on-aks-piggymetrics
+          - Azure-Samples/open-liberty-on-aks
+          - Azure/wildfly-container-quickstart
           - agoncal/agoncal-application-petstore-ee7
           - colinbut/monolith-enterprise-application
-          - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
-          - jamesfalkner/jboss-daytrader
       fail-fast: false
     
     steps:
