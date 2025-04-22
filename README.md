@@ -52,6 +52,13 @@ run container-copilot
 go run . generate <../path/to/target-repo>
 ```
 
+### Using script
+
+Update the `env.example` file in the `hack` directory as needed, and copy it to `.env`:
+chmod +x hack/run-container-copilot.sh
+./hack/run-container-copilot.sh
+```
+
 ### Using via Github Actions
 ```
 > not implemented yet :)
