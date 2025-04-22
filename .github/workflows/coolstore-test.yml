@@ -211,6 +211,15 @@ jobs:
             completed_tests=$((success_count + failure_count))
             timedout_test_count=$((tests_per_repo - completed_tests))
 
+            success_emote=""
+            if [ $success_rate -ge 80 ]; then
+              success_emote="✅"
+            elif [ $success_rate -ge 50 ]; then
+              success_emote="⚠️"
+            else
+              success_emote="❌"
+            fi
+
             # Show results
             echo ""
             echo "===== $repo Test Results ====="
@@ -219,6 +228,6 @@ jobs:
             echo "Failed: $failure_count"
             echo "Timed out: $timedout_test_count"
             echo "Success rate: $success_rate%"
-            echo "| $repo | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
+            echo "| $repo | $success_emote $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
             echo ""
           done
