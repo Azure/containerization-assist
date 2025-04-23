@@ -105,6 +105,9 @@ jobs:
           # Run the test and save output
           REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/||g' | sed 's|-||g')
           RUN_NAME="$REPO_NAME_WITHOUT_SLASH-${{ matrix.test-number }}"
+          #Output the run name for the next step
+          echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
+
           echo "Running container-copilot generate for test $RUN_NAME ..."
           container-copilot generate . > "logs/run-${RUN_NAME}.log" 2>&1
           # Save the files it created for successful tests
@@ -113,9 +116,6 @@ jobs:
             [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
             [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
           fi
-
-          #Output the run name for the next step
-          echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
           
           # Check if the success message is in the log file
           if grep -q "$SUCCESS_MESSAGE" "logs/run-${RUN_NAME}.log"; then
