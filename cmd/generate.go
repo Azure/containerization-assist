@@ -48,6 +48,9 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 
 		fmt.Printf("Using Dockerfile template: %s\n", templateName)
 		err = docker.WriteDockerfileFromTemplate(templateName, targetDir)
+		if err != nil {
+			return fmt.Errorf("writing Dockerfile from template: %w", err)
+		}
 	} else {
 		fmt.Printf("Writing blank starter Dockerfile in %s\n", targetDir)
 		fmt.Printf("writing empty dockerfile\n")
