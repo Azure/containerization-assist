@@ -248,6 +248,7 @@ jobs:
           done
           average_success_rate=$((average_success_rate / ${#success_rates[@]}))
           echo "Average success rate: $average_success_rate%"
+          echo "Overall success rate: $average_success_rate%" >> $GITHUB_STEP_SUMMARY
           if [ $average_success_rate -ge 80 ]; then
             echo "Overall success: ✅"
           elif [ $average_success_rate -ge 50 ]; then
