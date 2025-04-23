@@ -108,6 +108,9 @@ jobs:
           #Output the run name for the next step
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
+          # set output to timeout, will be updated on completion
+          echo "result=timeout" >> $GITHUB_OUTPUT
+
           echo "Running container-copilot generate for test $RUN_NAME ..."
           container-copilot generate . > "logs/run-${RUN_NAME}.log" 2>&1
           # Save the files it created for successful tests
@@ -190,7 +193,7 @@ jobs:
             # Build detailed results
             passed_tests=""
             failed_tests="" # includes failed and timed out tests
-            timedout_tests=""
+            timedout_test_count=0
 
             # Loop through test runs
             for ((i=1; i<=$tests_per_repo; i++)); do
@@ -203,6 +206,9 @@ jobs:
                   failure_count=$((failure_count + 1))
                   failed_tests+="- Test Run $i ❌\n"
                   echo "::warning::Test Run $i Failed"
+                  if [ "$result" == "timeout" ]; then
+                    timedout_test_count=$((timedout_test_count + 1))
+                  fi
                 fi
               else
                 echo "::warning::Test Run $repo-$i Result Not Found"
@@ -211,7 +217,6 @@ jobs:
 
             success_rate=$((success_count * 100 / tests_per_repo))
             completed_tests=$((success_count + failure_count))
-            timedout_test_count=$((tests_per_repo - completed_tests))
 
             success_emote=""
             if [ $success_rate -ge 80 ]; then
