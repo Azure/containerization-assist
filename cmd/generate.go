@@ -41,16 +41,13 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 
 	if enableDraftDockerfile {
 		fmt.Printf("Generating Dockerfile in %s\n", targetDir)
-		draftTemplateName, err := docker.GetDockerfileTemplateName(c.AzOpenAIClient, targetDir)
+		templateName, err := docker.GetDockerfileTemplateName(c.AzOpenAIClient, targetDir)
 		if err != nil {
 			return fmt.Errorf("getting Dockerfile template name: %w", err)
 		}
 
-		fmt.Printf("Using Dockerfile template: %s\n", draftTemplateName)
-		err = docker.GenerateDockerfileWithDraft(draftTemplateName, targetDir)
-		if err != nil {
-			return fmt.Errorf("generating Dockerfile: %w", err)
-		}
+		fmt.Printf("Using Dockerfile template: %s\n", templateName)
+		err = docker.WriteDockerfileFromTemplate(templateName, targetDir)
 	} else {
 		fmt.Printf("Writing blank starter Dockerfile in %s\n", targetDir)
 		fmt.Printf("writing empty dockerfile\n")
