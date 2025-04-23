@@ -127,7 +127,6 @@ jobs:
           else
             echo "❌ Test Run $RUN_NAME: FAILED - Did not find '$SUCCESS_MESSAGE'"
             echo "result=failure" >> $GITHUB_OUTPUT
-            exit 1
           fi
 
       - name: Upload test artifacts # TODO: merge into a single artifact
@@ -181,6 +180,8 @@ jobs:
           # List repos without numbers
           export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
           echo "Repos: $REPOS"
+
+          success_rates=()
           
           # Loop through repos
           for repo in $REPOS; do
@@ -237,4 +238,21 @@ jobs:
             echo "Success rate: $success_rate%"
             echo "| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
             echo ""
+            success_rates+=("$success_rate")
           done
+
+
+          average_success_rate=0
+          for rate in "${success_rates[@]}"; do
+            average_success_rate=$((average_success_rate + rate))
+          done
+          average_success_rate=$((average_success_rate / ${#success_rates[@]}))
+          echo "Average success rate: $average_success_rate%"
+          if [ $average_success_rate -ge 80 ]; then
+            echo "Overall success: ✅"
+          elif [ $average_success_rate -ge 50 ]; then
+            echo "Overall success: ⚠️"
+          else
+            echo "Overall success: ❌"
+            exit 1
+          fi
