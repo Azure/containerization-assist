@@ -9,19 +9,6 @@ import (
 
 const (
 	manifestDeploymentTemplateName = "deployment-manifests"
-	dockerTemplatePrompt           = `
-You are selecting a Dockerfile template for a project.
-
-Available Dockerfile templates:
-%s
-
-Project repository structure:
-%s
-
-First, analyze the project to determine how it should be built.
-Based on project, select the most appropriate Dockerfile template name from the list.
-Return only the exact template name from the list without any other text, explanation or formatting.
-`
 )
 
 func generateArtifactsWithDraft(templateName, outputDir string, variables map[string]string) error {

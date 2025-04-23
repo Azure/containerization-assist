@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/filetree"
+	"github.com/Azure/container-copilot/templates"
 )
 
 type Dockerfile struct {
@@ -17,9 +20,25 @@ type Dockerfile struct {
 	BuildErrors string
 }
 
+const (
+	dockerTemplatePrompt = `
+You are selecting a Dockerfile template for a project.
+
+Available Dockerfile templates:
+%s
+
+Project repository structure:
+%s
+
+First, analyze the project to determine how it should be built.
+Based on project, select the most appropriate Dockerfile template name from the list.
+Return only the exact template name from the list without any other text, explanation or formatting.
+`
+)
+
 // Use LLM to select the dockerfile template name from the list of available templates
 func GetDockerfileTemplateName(client *ai.AzOpenAIClient, projectDir string) (string, error) {
-	dockerfileTemplateNames, err := listSubdirNames(filepath.Join("templates", "dockerfiles"))
+	dockerfileTemplateNames, err := listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
 		return "", fmt.Errorf("failed to list dockerfile template names: %w", err)
 	}
@@ -44,47 +63,36 @@ func GetDockerfileTemplateName(client *ai.AzOpenAIClient, projectDir string) (st
 	return templateName, nil
 }
 
-func listSubdirNames(path string) ([]string, error) {
-	var dirs []string
-
-	entries, err := os.ReadDir(path)
+func listEmbeddedSubdirNames(path string) ([]string, error) {
+	entries, err := templates.Templates.ReadDir(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading embedded dir %q: %w", path, err)
 	}
-
+	var dirs []string
 	for _, entry := range entries {
 		if entry.IsDir() {
 			dirs = append(dirs, entry.Name())
 		}
 	}
-
 	return dirs, nil
 }
 
 func WriteDockerfileFromTemplate(templateName, targetDir string) error {
-	templateDir := filepath.Join("templates", "dockerfiles", templateName)
-
+	basePath := filepath.Join("dockerfiles", templateName)
 	filesToCopy := []string{"Dockerfile", ".dockerignore"}
-
 	for _, filename := range filesToCopy {
-		src := filepath.Join(templateDir, filename)
-		info, err := os.Stat(src)
+		embeddedPath := filepath.Join(basePath, filename)
+		data, err := templates.Templates.ReadFile(embeddedPath)
 		if err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return fmt.Errorf("error getting stat of file %q: %w", src, err)
+			return fmt.Errorf("reading embedded file %q: %w", embeddedPath, err)
 		}
-
-		data, err := os.ReadFile(src)
-		if err != nil {
-			return fmt.Errorf("error reading file %q: %w", src, err)
-		}
-		dest := filepath.Join(targetDir, filename)
-		if err := os.WriteFile(dest, data, info.Mode().Perm()); err != nil {
-			return fmt.Errorf("error writing file %q: %w", dest, err)
+		destPath := filepath.Join(targetDir, filename)
+		if err := os.WriteFile(destPath, data, 0644); err != nil {
+			return fmt.Errorf("writing file %q: %w", destPath, err)
 		}
 	}
-
 	return nil
 }
