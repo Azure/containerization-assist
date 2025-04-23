@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       
       - name: Build container-copilot
         run: |
@@ -31,16 +31,28 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 10
+      max-parallel: 20
       matrix:
-        test-number: [1, 2, 3, 4, 5]
         test-repo:
-          - konveyor-ecosystem/coolstore
-          - chamilad/tomcat-hello-world
-          - agoncal/agoncal-application-petstore-ee7
-          - colinbut/monolith-enterprise-application
           - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
+          - Azure-Samples/open-liberty-on-aks
+          - Azure/wildfly-container-quickstart
+          - Mariemfakhreldein/e-commerce-app
+          - N-Usha/java-on-aks-piggymetrics
+          - SaiUpadhyayula/SpringAngularEcommerce
+          - Zaaim-Halim/java-EE-E-Commerce-Web-App
+          - agoncal/agoncal-application-petstore-ee7
+          - chamilad/tomcat-hello-world
+          - colinbut/monolith-enterprise-application
+          - dhruvinrsoni/online-pizza-ordering-system
+          - eNKay2408/Note-Taking
           - jamesfalkner/jboss-daytrader
+          - konveyor-ecosystem/coolstore
+          - kparent/jboss-helloworld
+          - oracle-samples/weblogic-examples
+          - shekhargulati/todoapp-forge
+          - spring-petclinic/spring-petclinic-microservices
+        test-number: [1, 2, 3, 4, 5]
       fail-fast: false
     
     steps:
@@ -93,8 +105,20 @@ jobs:
           # Run the test and save output
           REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/||g' | sed 's|-||g')
           RUN_NAME="$REPO_NAME_WITHOUT_SLASH-${{ matrix.test-number }}"
+          #Output the run name for the next step
+          echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
+
+          # set output to timeout, will be updated on completion
+          echo "result=timeout" >> $GITHUB_OUTPUT
+
           echo "Running container-copilot generate for test $RUN_NAME ..."
           container-copilot generate . > "logs/run-${RUN_NAME}.log" 2>&1
+          # Save the files it created for successful tests
+          if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
+            mkdir -p artifacts
+            [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
+            [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
+          fi
           
           # Check if the success message is in the log file
           if grep -q "$SUCCESS_MESSAGE" "logs/run-${RUN_NAME}.log"; then
@@ -103,19 +127,10 @@ jobs:
           else
             echo "❌ Test Run $RUN_NAME: FAILED - Did not find '$SUCCESS_MESSAGE'"
             echo "result=failure" >> $GITHUB_OUTPUT
-          fi
-          
-          # Save the files it created for successful tests
-          if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
-            mkdir -p artifacts
-            [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
-            [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
+            exit 1
           fi
 
-          #Output the run name for the next step
-          echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
-
-      - name: Upload test artifacts
+      - name: Upload test artifacts # TODO: merge into a single artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: steps.run_test.outputs.result == 'success'
         with:
@@ -125,15 +140,18 @@ jobs:
 
       - name: Upload test logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
         with:
           name: container-copilot-logs-${{ steps.run_test.outputs.run_name }}
           path: test-repo/logs/
           retention-days: 14
       
       - name: Save result
+        if: always()
         run: echo "${{ steps.run_test.outputs.result }}" > result.txt
       
       - name: Upload test result
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-result-${{ steps.run_test.outputs.run_name }}
@@ -157,8 +175,8 @@ jobs:
 
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Repo | Success Rate | Passed | Failed | Timed Out |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Repo | Status | Success Rate | Passed | Failed | Timed Out |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
 
           # List repos without numbers
           export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
@@ -175,7 +193,7 @@ jobs:
             # Build detailed results
             passed_tests=""
             failed_tests="" # includes failed and timed out tests
-            timedout_tests=""
+            timedout_test_count=0
 
             # Loop through test runs
             for ((i=1; i<=$tests_per_repo; i++)); do
@@ -188,6 +206,9 @@ jobs:
                   failure_count=$((failure_count + 1))
                   failed_tests+="- Test Run $i ❌\n"
                   echo "::warning::Test Run $i Failed"
+                  if [ "$result" == "timeout" ]; then
+                    timedout_test_count=$((timedout_test_count + 1))
+                  fi
                 fi
               else
                 echo "::warning::Test Run $repo-$i Result Not Found"
@@ -196,7 +217,15 @@ jobs:
 
             success_rate=$((success_count * 100 / tests_per_repo))
             completed_tests=$((success_count + failure_count))
-            timedout_test_count=$((tests_per_repo - completed_tests))
+
+            success_emote=""
+            if [ $success_rate -ge 80 ]; then
+              success_emote="✅"
+            elif [ $success_rate -ge 50 ]; then
+              success_emote="⚠️"
+            else
+              success_emote="❌"
+            fi
 
             # Show results
             echo ""
@@ -206,6 +235,6 @@ jobs:
             echo "Failed: $failure_count"
             echo "Timed out: $timedout_test_count"
             echo "Success rate: $success_rate%"
-            echo "| $repo | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
+            echo "| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
             echo ""
           done
