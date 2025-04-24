@@ -2,31 +2,13 @@ package docker
 
 import (
 	"fmt"
-	"maps"
-	"slices"
-	"strings"
 
-	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/filetree"
 	"github.com/Azure/draft/pkg/handlers"
 	"github.com/Azure/draft/pkg/templatewriter/writers"
 )
 
 const (
 	manifestDeploymentTemplateName = "deployment-manifests"
-	dockerTemplatePrompt           = `
-You are selecting a Dockerfile template for a project.
-
-Available Dockerfile templates:
-%s
-
-Project repository structure:
-%s
-
-First, analyze the project to determine how it should be built. 
-Based on project, select the most appropriate Dockerfile template name from the list.
-Return only the exact template name from the list without any other text, explanation or formatting.
-`
 )
 
 func generateArtifactsWithDraft(templateName, outputDir string, variables map[string]string) error {
@@ -68,34 +50,4 @@ func GenerateDeploymentFilesWithDraft(outputDir string, registryAndImage string)
 		"APPNAME":   "app", // TODO: make appname based on repo dir
 	}
 	return generateArtifactsWithDraft(manifestDeploymentTemplateName, outputDir, customVariables)
-}
-
-// Can be used to feed the template names to LLM to choose
-func GetDockerfileTemplateNamesFromDraft() []string {
-	dockerfileTemplateMap := handlers.GetTemplatesByType(handlers.TemplateTypeDockerfile)
-	return slices.Collect(maps.Keys(dockerfileTemplateMap))
-}
-
-// Use LLM to select the dockerfile template name from the list of available templates in draft
-func GetDockerfileTemplateName(client *ai.AzOpenAIClient, projectDir string) (string, error) {
-	dockerfileTemplateNames := GetDockerfileTemplateNamesFromDraft()
-
-	repoStructure, err := filetree.ReadFileTree(projectDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to get file tree: %w", err)
-	}
-
-	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
-
-	content, err := client.GetChatCompletion(promptText)
-	if err != nil {
-		return "", err
-	}
-
-	templateName := strings.TrimSpace(content)
-	if !slices.Contains(dockerfileTemplateNames, templateName) {
-		return "", fmt.Errorf("invalid template name: %s", templateName)
-	}
-
-	return templateName, nil
 }

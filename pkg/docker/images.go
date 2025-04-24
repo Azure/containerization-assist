@@ -5,8 +5,13 @@ approved_images:
   - image: tomcat
     tag: "9.0"
     notes: "Tomcat should not contain the sample webapp content"
-  - image: jboss/wildfly
-    tag: "latest"
+  - image: quay.io/wildfly/wildfly
+    tags:
+      - "latest"
+      - "latest-jdk21"
+      - "36.0.0.Final-jdk21"
+      - "latest-jdk17"
+      - "36.0.0.Final-jdk17"
   - image: jboss-eap
     tag: "7.3"
   - image: oracle/weblogic
