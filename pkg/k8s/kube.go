@@ -13,6 +13,7 @@ type KubeRunner interface {
 	GetPodsJSON(namespace string, labelSelector string) (string, error)
 	SetKubeContext(name string) (string, error)
 	DeleteDeployment(manifestPath string) (string, error)
+	DescribePods(namespace string, labelSelector string) (string, error)
 }
 
 type KubeCmdRunner struct {
@@ -58,4 +59,13 @@ func CheckKubectlInstalled() error {
 		return fmt.Errorf("kubectl executable not found in PATH. Please install kubectl or ensure it's available in your PATH")
 	}
 	return nil
+}
+
+func (k *KubeCmdRunner) DescribePods(namespace string, labelSelector string) (string, error) {
+	cmd := exec.Command("kubectl", "describe", "pods", "-n", namespace, "-l", labelSelector)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("error describing pods: %v\nOutput: %s", err, output)
+	}
+	return string(output), nil
 }
