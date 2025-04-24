@@ -182,8 +182,8 @@ jobs:
           github_summary_table=""
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Repo | Status | Success Rate | Passed | Failed | Timed Out |" >> github_summary_table
-          echo "| --- | --- | --- | --- | --- | --- |" >> github_summary_table
+          github_summary_table+="| Repo | Status | Success Rate | Passed | Failed | Timed Out |\n"
+          github_summary_table+="| --- | --- | --- | --- | --- | --- |\n"
 
           # List repos without numbers
           export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
@@ -244,7 +244,7 @@ jobs:
             echo "Failed: $failure_count"
             echo "Timed out: $timedout_test_count"
             echo "Success rate: $success_rate%"
-            echo "| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> github_summary_table
+            github_summary_table+="| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |\n"
             echo ""
             success_rates+=("$success_rate")
           done
