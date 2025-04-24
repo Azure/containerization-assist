@@ -179,10 +179,11 @@ jobs:
         run: |
           tests_per_repo=5
 
+          github_summary_table=""
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Repo | Status | Success Rate | Passed | Failed | Timed Out |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- | --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Repo | Status | Success Rate | Passed | Failed | Timed Out |" >> github_summary_table
+          echo "| --- | --- | --- | --- | --- | --- |" >> github_summary_table
 
           # List repos without numbers
           export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
@@ -243,11 +244,10 @@ jobs:
             echo "Failed: $failure_count"
             echo "Timed out: $timedout_test_count"
             echo "Success rate: $success_rate%"
-            echo "| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
+            echo "| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> github_summary_table
             echo ""
             success_rates+=("$success_rate")
           done
-
 
           average_success_rate=0
           for rate in "${success_rates[@]}"; do
@@ -257,15 +257,23 @@ jobs:
           pass_threshold=40
           green_threshold=80
           pass_rate_message=""
-          if [ $average_success_rate -ge 80 ]; then
+          if [ $average_success_rate -ge green_threshold ]; then
             pass_rate_message="✅ Average success rate: $average_success_rate% >= $green_threshold%"
           elif [ $average_success_rate -ge $pass_threshold ]; then
             pass_rate_message="⚠️ Average success rate: $average_success_rate% >= $pass_threshold%"
           else
             pass_rate_message="❌ Average success rate: $average_success_rate% < $pass_threshold%"
-            exit 1 # fail the job
           fi
           echo "$pass_rate_message"
           echo "" >> $GITHUB_STEP_SUMMARY # add a blank line to separate the summary from the table
           echo "$pass_rate_message" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Output the summary table
+          echo "$github_summary_table" >> $GITHUB_STEP_SUMMARY
+
+          #last check to fail the job if the average success rate is below the threshold
+          if [ $average_success_rate -lt $pass_threshold ]; then
+            echo "Average success rate: $average_success_rate% < $pass_threshold%"
+            exit 1
+          fi
