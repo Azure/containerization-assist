@@ -92,24 +92,29 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	podSuccess, podOutput := c.CheckPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
 		fmt.Printf("Pods are not healthy for deployment with manifest %s\n", manifestPath)
-		return false, outputStr + "\n" + podOutput, nil
+		deploymentName := "app" // TODO: actually parse this from the manifest
+		logs, err := c.GetDeploymentLogs(deploymentName, namespace)
+		if err != nil {
+			log.Printf("Failed to get deployment logs: %v", err)
+		}
+		return false, fmt.Sprintf("Pod output:\n%s\nPod Logs\n%s\n", podOutput, logs), nil
 	}
 	fmt.Println("Pod health check passed")
 
 	return true, outputStr, nil
 }
 
-func GetDeploymentLogs(deploymentName string, namespace string) error {
+func (c *Clients) GetDeploymentLogs(deploymentName string, namespace string) (string, error) {
 	// Loading kubeconfig from default location
 	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	if err != nil {
-		return fmt.Errorf("failed to load kubeconfig: %w", err)
+		return "", fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 
 	// Create Kubernetes client
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("failed to create k8s client: %w", err)
+		return "", fmt.Errorf("failed to create k8s client: %w", err)
 	}
 
 	// Get the Deployment
@@ -119,7 +124,7 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 	deployClient := client.AppsV1().Deployments(namespace)
 	deployment, err := deployClient.Get(context.Background(), deploymentName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get deployment: %w", err)
+		return "", fmt.Errorf("failed to get deployment: %w", err)
 	}
 
 	// Get the matching pods
@@ -128,34 +133,42 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to list pods: %w", err)
+		return "", fmt.Errorf("failed to list pods: %w", err)
 	}
 
 	if len(pods.Items) == 0 {
-		return fmt.Errorf("no pods found for %s", deploymentName)
+		return "", fmt.Errorf("no pods found for %s", deploymentName)
 	}
 
-	// Print logs for the first pod (or loop through all if desired)
+	var allLogs strings.Builder
 	for _, pod := range pods.Items {
-		fmt.Printf("Logs for Pod: %s\n", pod.Name)
-		err := streamPodLogs(client, namespace, pod.Name)
+		logs, err := getPodLogs(client, namespace, pod.Name)
 		if err != nil {
-			log.Printf("Error getting logs for pod %s: %v\n", pod.Name, err)
+			logs, err = c.Kube.DescribePods(namespace, pod.Name)
+			if err != nil {
+				fmt.Printf("failed to describe pod %s: %v", pod.Name, err)
+				continue
+			}
 		}
+		allLogs.WriteString(fmt.Sprintf("\n--- Logs for Pod: %s ---\n%s\n", pod.Name, logs))
 	}
 
-	return nil
+	return allLogs.String(), nil
 }
 
-// streamPodLogs prints logs to stdout
-func streamPodLogs(clientset *kubernetes.Clientset, namespace, podName string) error {
+func getPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (string, error) {
 	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{})
 	stream, err := req.Stream(context.Background())
 	if err != nil {
-		return fmt.Errorf("error opening log stream: %w", err)
+		return "", fmt.Errorf("error opening log stream: %w", err)
 	}
 	defer stream.Close()
 
-	_, err = io.Copy(os.Stdout, stream)
-	return err
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, stream)
+	if err != nil {
+		return "", fmt.Errorf("error copying pod logs to buffer: %w", err)
+	}
+
+	return buf.String(), nil
 }
