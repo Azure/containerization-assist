@@ -263,7 +263,9 @@ jobs:
             pass_rate_message="⚠️ Average success rate: $average_success_rate% >= $pass_threshold%"
           else
             pass_rate_message="❌ Average success rate: $average_success_rate% < $pass_threshold%"
+            exit 1 # fail the job
           fi
           echo "$pass_rate_message"
+          echo "" >> $GITHUB_STEP_SUMMARY # add a blank line to separate the summary from the table
           echo "$pass_rate_message" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
