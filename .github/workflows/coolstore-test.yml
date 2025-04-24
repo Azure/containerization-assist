@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   pull_request:
 
+# ensure that only one workflow is running at a time per branch/pr by canceling in-progress runs
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   setup:
     runs-on: ubuntu-latest
