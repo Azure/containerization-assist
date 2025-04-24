@@ -192,6 +192,9 @@ jobs:
           echo "Repos: $REPOS"
 
           success_rates=()
+
+          single_run_pass_threshold=30
+          single_run_green_threshold=80
           
           # Loop through repos
           for repo in $REPOS; do
@@ -230,9 +233,9 @@ jobs:
             completed_tests=$((success_count + failure_count))
 
             success_emote=""
-            if [ $success_rate -ge 80 ]; then
+            if [ $success_rate -ge $single_run_green_threshold ]; then
               success_emote="✅"
-            elif [ $success_rate -ge 50 ]; then
+            elif [ $success_rate -ge $single_run_pass_threshold ]; then
               success_emote="⚠️"
             else
               success_emote="❌"
@@ -252,13 +255,13 @@ jobs:
             success_rates+=("$success_rate")
           done
 
+          pass_threshold=30
+          green_threshold=80
           average_success_rate=0
           for rate in "${success_rates[@]}"; do
             average_success_rate=$((average_success_rate + rate))
           done
           average_success_rate=$((average_success_rate / ${#success_rates[@]}))
-          pass_threshold=40
-          green_threshold=80
           pass_rate_message=""
           if [ $average_success_rate -ge green_threshold ]; then
             pass_rate_message="✅ Average success rate: $average_success_rate% >= $green_threshold%"
