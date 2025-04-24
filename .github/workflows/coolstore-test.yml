@@ -39,7 +39,6 @@ jobs:
       max-parallel: 50
       matrix:
         test-repo:
-          - aws-samples/aws-codedeploy-sample-tomcat
           - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
           - Azure-Samples/open-liberty-on-aks
           - Azure/wildfly-container-quickstart
@@ -48,6 +47,7 @@ jobs:
           - SaiUpadhyayula/SpringAngularEcommerce
           - Zaaim-Halim/java-EE-E-Commerce-Web-App
           - agoncal/agoncal-application-petstore-ee7
+          - aws-samples/aws-codedeploy-sample-tomcat
           - chamilad/tomcat-hello-world
           - colinbut/monolith-enterprise-application
           - dhruvinrsoni/online-pizza-ordering-system
@@ -211,8 +211,8 @@ jobs:
 
             # Loop through test runs
             for ((i=1; i<=$tests_per_repo; i++)); do
-              if [ -f "results/test-result-$repo-$i/result.txt" ]; then
-                result=$(cat "results/test-result-$repo-$i/result.txt")
+              if [ -f "results/test-result-$repo#$i/result.txt" ]; then
+                result=$(cat "results/test-result-$repo#$i/result.txt")
                 if [ "$result" == "success" ]; then
                   success_count=$((success_count + 1))
                   passed_tests+="- Test Run $i ✅\n"
@@ -226,7 +226,7 @@ jobs:
                   fi
                 fi
               else
-                echo "::warning::Test Run $repo-$i Result Not Found"
+                echo "::warning::Test Run $repo#$i Result Not Found"
               fi
             done
 
