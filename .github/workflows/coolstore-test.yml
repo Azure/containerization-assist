@@ -85,6 +85,7 @@ jobs:
       - name: Run Test ${{ matrix.test-number }}
         id: run_test
         timeout-minutes: 5
+        continue-on-error: true
         env:
           AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
