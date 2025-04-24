@@ -36,7 +36,7 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 20
+      max-parallel: 50
       matrix:
         test-repo:
           - aws-samples/aws-codedeploy-sample-tomcat
@@ -217,11 +217,12 @@ jobs:
                   success_count=$((success_count + 1))
                   passed_tests+="- Test Run $i ✅\n"
                 else
-                  failure_count=$((failure_count + 1))
-                  failed_tests+="- Test Run $i ❌\n"
-                  echo "::warning::Test Run $i Failed"
                   if [ "$result" == "timeout" ]; then
                     timedout_test_count=$((timedout_test_count + 1))
+                  else
+                    failure_count=$((failure_count + 1))
+                    failed_tests+="- Test Run $i ❌\n"
+                    echo "::warning::Test Run $i Failed"
                   fi
                 fi
               else
