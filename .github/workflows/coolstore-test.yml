@@ -34,6 +34,7 @@ jobs:
       max-parallel: 20
       matrix:
         test-repo:
+          - aws-samples/aws-codedeploy-sample-tomcat
           - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
           - Azure-Samples/open-liberty-on-aks
           - Azure/wildfly-container-quickstart
