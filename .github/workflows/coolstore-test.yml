@@ -110,8 +110,8 @@ jobs:
           mkdir -p manifests
           
           # Run the test and save output
-          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/||g' | sed 's|-||g')
-          RUN_NAME="$REPO_NAME_WITHOUT_SLASH-${{ matrix.test-number }}"
+          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|.|g' )
+          RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ matrix.test-number }}"
           #Output the run name for the next step
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
@@ -188,7 +188,7 @@ jobs:
           "
 
           # List repos without numbers
-          export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
+          export REPOS="$(ls results | grep -oP 'test-result-\K[^#]+' | uniq)"  
           echo "Repos: $REPOS"
 
           success_rates=()
@@ -250,7 +250,11 @@ jobs:
             echo "Failed: $failure_count"
             echo "Timed out: $timedout_test_count"
             echo "Success rate: $success_rate%"
-            github_summary_table+="| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |
+
+            # Convert the repo name back to GitHub URL format (replace dots with slashes)
+            repo_url=$(echo "$repo" | sed 's/\./\//g')
+            repo_markdown_link="[$repo_url](https://github.com/$repo_url)"
+            github_summary_table+="| $repo_markdown_link | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |
             "
             echo ""
             success_rates+=("$success_rate")
