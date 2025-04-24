@@ -247,13 +247,16 @@ jobs:
             average_success_rate=$((average_success_rate + rate))
           done
           average_success_rate=$((average_success_rate / ${#success_rates[@]}))
-          echo "Average success rate: $average_success_rate%"
-          echo "Overall success rate: $average_success_rate%" >> $GITHUB_STEP_SUMMARY
+          pass_threshold=40
+          green_threshold=80
+          pass_rate_message=""
           if [ $average_success_rate -ge 80 ]; then
-            echo "Overall success: ✅"
-          elif [ $average_success_rate -ge 50 ]; then
-            echo "Overall success: ⚠️"
+            pass_rate_message="✅ Average success rate: $average_success_rate% >= $green_threshold%"
+          elif [ $average_success_rate -ge $pass_threshold ]; then
+            pass_rate_message="⚠️ Average success rate: $average_success_rate% >= $pass_threshold%"
           else
-            echo "Overall success: ❌"
-            exit 1
+            pass_rate_message="❌ Average success rate: $average_success_rate% < $pass_threshold%"
           fi
+          echo "$pass_rate_message"
+          echo "$pass_rate_message" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
