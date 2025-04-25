@@ -34,7 +34,7 @@ func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
 
 func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
 	// Load the Dockerfile template
-	templatePath := filepath.Join(os.Getenv("GITHUB_WORKSPACE"), "prompt_templates", "dockerfile_template.xml") // TODO: make this configurable
+	templatePath := filepath.Join("prompt_templates", "dockerfile_template.xml") // TODO: make this configurable
 
 	// Verify the template file exists
 	if _, err := os.Stat(templatePath); err != nil {
