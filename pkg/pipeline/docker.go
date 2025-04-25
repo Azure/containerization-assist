@@ -3,12 +3,12 @@ package pipeline
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
-	"github.com/Azure/container-copilot/utils"
 )
 
 func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
@@ -33,87 +33,58 @@ func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
 }
 
 func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
-	dockerfile := state.Dockerfile
+	// Load the Dockerfile template
+	templatePath := filepath.Join("pkg", "ai", "templates", "dockerfile_template.xml") // TODO: make this configurable
 
-	// Create prompt for analyzing the Dockerfile
-	promptText := fmt.Sprintf(`
-You are an expert in Dockerfile analysis and debugging.
-Your task is to analyze the provided Dockerfile for potential issues and suggest fixes.
-
-Analyze the following Dockerfile for errors and suggest fixes:
-Dockerfile:
-%s
-`, dockerfile.Content)
-
-	// Check for manifest deployment errors and add them to the context
-	manifestErrors := FormatManifestErrors(state)
-	if manifestErrors != "" {
-		promptText += fmt.Sprintf(`
-IMPORTANT CONTEXT: Kubernetes manifest deployments failed with the following errors.
-These deployment failures may indicate issues with the Docker image produced by this Dockerfile:
-%s
-
-Please consider these deployment errors when fixing the Dockerfile.
-`, manifestErrors)
+	// Verify the template file exists
+	if _, err := os.Stat(templatePath); err != nil {
+		return nil, fmt.Errorf("error checking Dockerfile template at path %s: %v", templatePath, err)
 	}
 
-	// Add valid docker images to the context
-	promptText += fmt.Sprintf(`
-APPROVED DOCKER IMAGES: The following Docker images are approved for use:
-%s
-
-Please prioritize using these approved images in the Dockerfile, especially for Java-based applications
-where the approved Java images should be used whenever possible.
-`, docker.ApprovedDockerImages)
-
-	// Add error information if provided and not empty
-	if dockerfile.BuildErrors != "" {
-		promptText += fmt.Sprintf(`
-Errors encountered when running this Dockerfile:
-%s
-`, dockerfile.BuildErrors)
-	} else {
-		promptText += `
-No error messages were provided. Please check for potential issues in the Dockerfile.
-`
-	}
-
-	// Add repository file information if provided
-	if state.RepoFileTree != "" {
-		promptText += fmt.Sprintf(`
-Repository files structure:
-%s
-`, state.RepoFileTree)
-	}
-
-	promptText += `
-Please:
-1. Identify any issues in the Dockerfile
-2. Provide a fixed version of the Dockerfile
-3. Explain what changes were made and why
-
-Favor using the latest base images and best practices for Dockerfile writing
-If applicable, use multi-stage builds to reduce image size
-Make sure to account for the file structure of the repository
-
-**IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT**
-
-I will tip you if you provide a correct and working Dockerfile.
-`
-
-	content, err := client.GetChatCompletion(promptText)
+	prompt, err := ai.LoadDockerfilePromptTemplate(templatePath)
 	if err != nil {
-		return nil, err
+		fmt.Printf("Error loading Dockerfile prompt template: %v\n", err)
 	}
 
-	fixedContent, err := utils.GrabContentBetweenTags(content, "DOCKERFILE")
+	prompt.FillDockerfilePrompt(
+		state.Dockerfile.Content,
+		FormatManifestErrors(state),
+		docker.ApprovedDockerImages,
+		state.Dockerfile.BuildErrors,
+		state.RepoFileTree,
+	)
+
+	// Save the prompt to file for debugging
+	ai.EncodeXMLToFile(prompt, "dockerfile_prompt_test.xml") //TODO: ADD this to as a debug option, possibly add to SNAPSHOTS
+
+	// Get the prompt text
+	promptText, err := ai.EncodeXMLToString(prompt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract fixed Dockerfile: %v", err)
+		return nil, fmt.Errorf("error generating prompt: %w", err)
+	}
+
+	//ai.PrintXMLContent(promptText)
+
+	// Get AI completion
+	responseText, err := client.GetChatCompletion(promptText)
+	if err != nil {
+		return nil, fmt.Errorf("error getting AI completion: %w", err)
+	}
+
+	// Print human-readable response for debugging
+	//fmt.Println("AI response received:")
+	//ai.PrintXMLContent(responseText)
+
+	// Extract and validate the response sections
+	// Explaination response is not used in the current implementation // Used to make model think more deeply about changes
+	fixedContent, analysis, _, err := ai.ExtractResponseSections(responseText)
+	if err != nil {
+		return nil, fmt.Errorf("error extracting response sections: %w", err)
 	}
 
 	return &FileAnalysisResult{
 		FixedContent: fixedContent,
-		Analysis:     content,
+		Analysis:     analysis,
 	}, nil
 }
 
