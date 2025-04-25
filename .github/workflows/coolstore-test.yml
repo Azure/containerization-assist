@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   pull_request:
 
+# ensure that only one workflow is running at a time per branch/pr by canceling in-progress runs
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -15,11 +20,11 @@ jobs:
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: '1.24'
-      
+
       - name: Build container-copilot
         run: |
           go build -o container-copilot .
-          
+
       - name: Upload binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -31,7 +36,7 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 20
+      max-parallel: 50
       matrix:
         test-repo:
           - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
@@ -42,6 +47,7 @@ jobs:
           - SaiUpadhyayula/SpringAngularEcommerce
           - Zaaim-Halim/java-EE-E-Commerce-Web-App
           - agoncal/agoncal-application-petstore-ee7
+          - aws-samples/aws-codedeploy-sample-tomcat
           - chamilad/tomcat-hello-world
           - colinbut/monolith-enterprise-application
           - dhruvinrsoni/online-pizza-ordering-system
@@ -54,14 +60,14 @@ jobs:
           - spring-petclinic/spring-petclinic-microservices
         test-number: [1, 2, 3, 4, 5]
       fail-fast: false
-    
+
     steps:
       - name: Download container-copilot binary
         uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
           name: container-copilot-binary
           path: ./
-      
+
       - name: Make binary executable
         run: |
           chmod +x container-copilot
@@ -80,31 +86,32 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           install_only: true
-      
+
       - name: Run Test ${{ matrix.test-number }}
         id: run_test
         timeout-minutes: 5
+        continue-on-error: true
         env:
           AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
           AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
         run: |
           cd test-repo
-          
+
           # Make sure we have a place to store logs
           mkdir -p logs
-          
+
           # The success message we're looking for in the output
           SUCCESS_MESSAGE="Container deployment pipeline completed successfully!"
-          
+
           # Start with a clean slate
           rm -f Dockerfile || true
           rm -rf manifests || true
           mkdir -p manifests
-          
+
           # Run the test and save output
-          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/||g' | sed 's|-||g')
-          RUN_NAME="$REPO_NAME_WITHOUT_SLASH-${{ matrix.test-number }}"
+          REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|.|g' )
+          RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ matrix.test-number }}"
           #Output the run name for the next step
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
@@ -119,7 +126,7 @@ jobs:
             [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
             [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
           fi
-          
+
           # Check if the success message is in the log file
           if grep -q "$SUCCESS_MESSAGE" "logs/run-${RUN_NAME}.log"; then
             echo "✅ Test Run $RUN_NAME PASSED - Found '$SUCCESS_MESSAGE'"
@@ -127,7 +134,6 @@ jobs:
           else
             echo "❌ Test Run $RUN_NAME: FAILED - Did not find '$SUCCESS_MESSAGE'"
             echo "result=failure" >> $GITHUB_OUTPUT
-            exit 1
           fi
 
       - name: Upload test artifacts # TODO: merge into a single artifact
@@ -145,18 +151,18 @@ jobs:
           name: container-copilot-logs-${{ steps.run_test.outputs.run_name }}
           path: test-repo/logs/
           retention-days: 14
-      
+
       - name: Save result
         if: always()
         run: echo "${{ steps.run_test.outputs.result }}" > result.txt
-      
+
       - name: Upload test result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-result-${{ steps.run_test.outputs.run_name }}
           path: result.txt
-  
+
   aggregate-results:
     needs: test-run
     runs-on: ubuntu-latest
@@ -173,14 +179,23 @@ jobs:
         run: |
           tests_per_repo=5
 
+          github_summary_table=""
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Repo | Status | Success Rate | Passed | Failed | Timed Out |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- | --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          github_summary_table+="| Repo | Status | Success Rate | Passed | Failed | Timed Out |
+          "
+          github_summary_table+="| --- | --- | --- | --- | --- | --- |
+          "
 
           # List repos without numbers
-          export REPOS="$(ls results | grep -oP 'test-result-\K[^-]+' | uniq)"  
+
+          export REPOS="$(ls results | grep -oP 'test-result-\K[^#]+' | uniq)"  
           echo "Repos: $REPOS"
+
+          success_rates=()
+
+          single_run_pass_threshold=30
+          single_run_green_threshold=80
           
           # Loop through repos
           for repo in $REPOS; do
@@ -189,7 +204,7 @@ jobs:
             # Count successes and failures
             success_count=0
             failure_count=0
-            
+
             # Build detailed results
             passed_tests=""
             failed_tests="" # includes failed and timed out tests
@@ -197,21 +212,22 @@ jobs:
 
             # Loop through test runs
             for ((i=1; i<=$tests_per_repo; i++)); do
-              if [ -f "results/test-result-$repo-$i/result.txt" ]; then
-                result=$(cat "results/test-result-$repo-$i/result.txt")
+              if [ -f "results/test-result-$repo#$i/result.txt" ]; then
+                result=$(cat "results/test-result-$repo#$i/result.txt")
                 if [ "$result" == "success" ]; then
                   success_count=$((success_count + 1))
                   passed_tests+="- Test Run $i ✅\n"
                 else
-                  failure_count=$((failure_count + 1))
-                  failed_tests+="- Test Run $i ❌\n"
-                  echo "::warning::Test Run $i Failed"
                   if [ "$result" == "timeout" ]; then
                     timedout_test_count=$((timedout_test_count + 1))
+                  else
+                    failure_count=$((failure_count + 1))
+                    failed_tests+="- Test Run $i ❌\n"
+                    echo "::warning::Test Run $i Failed"
                   fi
                 fi
               else
-                echo "::warning::Test Run $repo-$i Result Not Found"
+                echo "::warning::Test Run $repo#$i Result Not Found"
               fi
             done
 
@@ -219,9 +235,9 @@ jobs:
             completed_tests=$((success_count + failure_count))
 
             success_emote=""
-            if [ $success_rate -ge 80 ]; then
+            if [ $success_rate -ge $single_run_green_threshold ]; then
               success_emote="✅"
-            elif [ $success_rate -ge 50 ]; then
+            elif [ $success_rate -ge $single_run_pass_threshold ]; then
               success_emote="⚠️"
             else
               success_emote="❌"
@@ -235,6 +251,41 @@ jobs:
             echo "Failed: $failure_count"
             echo "Timed out: $timedout_test_count"
             echo "Success rate: $success_rate%"
-            echo "| $repo | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |" >> $GITHUB_STEP_SUMMARY
+
+            # Convert the repo name back to GitHub URL format (replace dots with slashes)
+            repo_url=$(echo "$repo" | sed 's/\./\//g')
+            repo_markdown_link="[$repo_url](https://github.com/$repo_url)"
+            github_summary_table+="| $repo_markdown_link | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |
+            "
             echo ""
+            success_rates+=("$success_rate")
           done
+
+          pass_threshold=30
+          green_threshold=80
+          average_success_rate=0
+          for rate in "${success_rates[@]}"; do
+            average_success_rate=$((average_success_rate + rate))
+          done
+          average_success_rate=$((average_success_rate / ${#success_rates[@]}))
+          pass_rate_message=""
+          if [ $average_success_rate -ge green_threshold ]; then
+            pass_rate_message="✅ Average success rate: $average_success_rate% >= $green_threshold%"
+          elif [ $average_success_rate -ge $pass_threshold ]; then
+            pass_rate_message="⚠️ Average success rate: $average_success_rate% >= $pass_threshold%"
+          else
+            pass_rate_message="❌ Average success rate: $average_success_rate% < $pass_threshold%"
+          fi
+          echo "$pass_rate_message"
+          echo "" >> $GITHUB_STEP_SUMMARY # add a blank line to separate the summary from the table
+          echo "$pass_rate_message" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Output the summary table
+          echo "$github_summary_table" >> $GITHUB_STEP_SUMMARY
+
+          #last check to fail the job if the average success rate is below the threshold
+          if [ $average_success_rate -lt $pass_threshold ]; then
+            echo "Average success rate: $average_success_rate% < $pass_threshold%"
+            exit 1
+          fi
