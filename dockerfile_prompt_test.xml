@@ -1,0 +1,3371 @@
+<Prompt>
+  <role>
+        You are a PHD level expert in Dockerfile analysis and debugging.
+        Your task is to DEEPLY THINK and analyze the provided Dockerfile for potential issues while using the available context about the app.
+    </role>
+  <context>
+    <repo_structure>
+      <description>Structure of the repository files</description>
+      <content>{
+  ".container-copilot-snapshots": {
+    "iteration_1": {
+      "Dockerfile",
+      "manifests": {
+        "ConfigMap-app-config.yaml",
+        "Deployment-app.yaml",
+        "Service-app.yaml"
+      },
+      "metadata.json"
+    },
+    "iteration_2": {
+      "Dockerfile",
+      "manifests": {
+        "ConfigMap-app-config.yaml",
+        "Deployment-app.yaml",
+        "Service-app.yaml"
+      },
+      "metadata.json"
+    },
+    "iteration_3": {
+      "Dockerfile",
+      "manifests": {
+        "ConfigMap-app-config.yaml",
+        "Deployment-app.yaml",
+        "Service-app.yaml"
+      },
+      "metadata.json"
+    },
+    "iteration_4": {
+      "Dockerfile",
+      "manifests": {
+        "ConfigMap-app-config.yaml",
+        "Deployment-app.yaml",
+        "Service-app.yaml"
+      },
+      "metadata.json"
+    },
+    "iteration_5": {
+      "Dockerfile",
+      "manifests": {
+        "ConfigMap-app-config.yaml",
+        "Deployment-app.yaml",
+        "Service-app.yaml"
+      },
+      "metadata.json"
+    },
+    "iteration_6": {
+      "Dockerfile",
+      "manifests": {
+        "ConfigMap-app-config.yaml",
+        "Deployment-app.yaml",
+        "Service-app.yaml"
+      },
+      "metadata.json"
+    },
+    "iteration_8": {
+      "Dockerfile",
+      "manifests": {
+        "ConfigMap-app-config.yaml",
+        "Deployment-app.yaml",
+        "Service-app.yaml"
+      },
+      "metadata.json"
+    }
+  },
+  ".dockerignore",
+  ".git": {
+  },
+  ".github": {
+  },
+  ".gitignore",
+  ".project",
+  "Dockerfile",
+  "assets": {
+    "coolstore.png"
+  },
+  "manifests": {
+    "configmap.yaml",
+    "deployment.yaml",
+    "service.yaml"
+  },
+  "pom.xml",
+  "realm-export.json",
+  "src": {
+    "main": {
+      "java": {
+        "com": {
+          "redhat": {
+            "coolstore": {
+              "model": {
+                "CatalogItemEntity.java",
+                "InventoryEntity.java",
+                "Order.java",
+                "OrderItem.java",
+                "Product.java",
+                "Promotion.java",
+                "ShoppingCart.java",
+                "ShoppingCartItem.java"
+              },
+              "persistence": {
+                "Resources.java"
+              },
+              "rest": {
+                "CartEndpoint.java",
+                "OrderEndpoint.java",
+                "ProductEndpoint.java",
+                "RestApplication.java"
+              },
+              "service": {
+                "CatalogService.java",
+                "InventoryNotificationMDB.java",
+                "OrderService.java",
+                "OrderServiceMDB.java",
+                "ProductService.java",
+                "PromoService.java",
+                "ShippingService.java",
+                "ShippingServiceRemote.java",
+                "ShoppingCartOrderProcessor.java",
+                "ShoppingCartService.java"
+              },
+              "utils": {
+                "DataBaseMigrationStartup.java",
+                "Producers.java",
+                "StartupListener.java",
+                "Transformers.java"
+              }
+            }
+          }
+        },
+        "weblogic": {
+          "application": {
+            "ApplicationLifecycleEvent.java",
+            "ApplicationLifecycleListener.java"
+          },
+          "i18n": {
+            "logging": {
+              "NonCatalogLogger.java"
+            }
+          }
+        }
+      },
+      "resources": {
+        "META-INF": {
+          "persistence.xml"
+        },
+        "db": {
+          "migration": {
+            "V1_1__CreateSchema.sql",
+            "V1_2__AddInitialData.sql"
+          }
+        }
+      },
+      "webapp": {
+        "WEB-INF": {
+          "beans.xml",
+          "web.xml"
+        },
+        "app": {
+          "app.js",
+          "controllers": {
+            "controllers.js"
+          },
+          "css": {
+            "coolstore.css"
+          },
+          "directives": {
+            "header.js"
+          },
+          "imgs": {
+            "16 oz. Vortex Tumbler.jpg",
+            "Forge Laptop Sticker.jpg",
+            "Knit socks.jpg",
+            "Lytro Camera.jpg",
+            "Nanobloc Universal Webcam Cover.jpg",
+            "Oculus Rift.jpg",
+            "Ogio Caliber Polo.jpg",
+            "Patagonia Refugio pack 28L.jpg",
+            "Pebble Smart Watch.jpg",
+            "Pronounced Kubernetes.jpg",
+            "Quarkus H2Go water bottle.jpg",
+            "Quarkus T-shirt.jpg",
+            "Quarkus twill cap.jpg",
+            "Red Fedora.jpg",
+            "Red Hat Impact T-shirt.jpg",
+            "Solid Performance Polo.jpg",
+            "Women RHEL 8 t-shirt.jpg",
+            "logo copy.png",
+            "logo.png"
+          },
+          "routes": {
+            "routes.js"
+          },
+          "services": {
+            "cart.js",
+            "catalog.js"
+          }
+        },
+        "bower_components": {
+          "angular": {
+            ".bower.json",
+            "LICENSE.md",
+            "README.md",
+            "angular-csp.css",
+            "angular.js",
+            "angular.min.js",
+            "angular.min.js.gzip",
+            "angular.min.js.map",
+            "bower.json",
+            "index.js",
+            "package.json"
+          },
+          "angular-animate": {
+            ".bower.json",
+            "LICENSE.md",
+            "README.md",
+            "angular-animate.js",
+            "angular-animate.min.js",
+            "angular-animate.min.js.map",
+            "bower.json",
+            "index.js",
+            "package.json"
+          },
+          "angular-bootstrap": {
+            ".bower.json",
+            ".gitignore",
+            ".npmignore",
+            "README.md",
+            "bower.json",
+            "index.js",
+            "package.json",
+            "ui-bootstrap-csp.css",
+            "ui-bootstrap-tpls.js",
+            "ui-bootstrap-tpls.min.js",
+            "ui-bootstrap.js",
+            "ui-bootstrap.min.js"
+          },
+          "angular-patternfly": {
+            ".bower.json",
+            ".gitattributes",
+            ".htmlhintrc",
+            ".npmignore",
+            ".openshift": {
+              "cron": {
+                "README.cron",
+                "weekly": {
+                  "README",
+                  "chronograph",
+                  "jobs.allow",
+                  "jobs.deny"
+                }
+              },
+              "markers": {
+                "hot_deploy"
+              }
+            },
+            ".travis.yml",
+            "LICENSE.txt",
+            "bower.json",
+            "deploy_key.enc",
+            "dist": {
+              "angular-patternfly.js",
+              "angular-patternfly.min.js",
+              "docs": {
+                "css": {
+                  "angular-patternfly.css",
+                  "animations.css",
+                  "bootstrap.min.css",
+                  "doc_widgets.css",
+                  "docs.css",
+                  "examples.css",
+                  "font-awesome.css",
+                  "ng-docs.css",
+                  "patternfly-additions.css",
+                  "patternfly.css",
+                  "prettify.css"
+                },
+                "font": {
+                  "FontAwesome.otf",
+                  "fontawesome-webfont.eot",
+                  "fontawesome-webfont.svg",
+                  "fontawesome-webfont.ttf",
+                  "fontawesome-webfont.woff"
+                },
+                "fonts": {
+                  "FontAwesome.otf",
+                  "OpenSans-Bold-webfont.eot",
+                  "OpenSans-Bold-webfont.svg",
+                  "OpenSans-Bold-webfont.ttf",
+                  "OpenSans-Bold-webfont.woff",
+                  "OpenSans-BoldItalic-webfont.eot",
+                  "OpenSans-BoldItalic-webfont.svg",
+                  "OpenSans-BoldItalic-webfont.ttf",
+                  "OpenSans-BoldItalic-webfont.woff",
+                  "OpenSans-ExtraBold-webfont.eot",
+                  "OpenSans-ExtraBold-webfont.svg",
+                  "OpenSans-ExtraBold-webfont.ttf",
+                  "OpenSans-ExtraBold-webfont.woff",
+                  "OpenSans-ExtraBoldItalic-webfont.eot",
+                  "OpenSans-ExtraBoldItalic-webfont.svg",
+                  "OpenSans-ExtraBoldItalic-webfont.ttf",
+                  "OpenSans-ExtraBoldItalic-webfont.woff",
+                  "OpenSans-Italic-webfont.eot",
+                  "OpenSans-Italic-webfont.svg",
+                  "OpenSans-Italic-webfont.ttf",
+                  "OpenSans-Italic-webfont.woff",
+                  "OpenSans-Light-webfont.eot",
+                  "OpenSans-Light-webfont.svg",
+                  "OpenSans-Light-webfont.ttf",
+                  "OpenSans-Light-webfont.woff",
+                  "OpenSans-LightItalic-webfont.eot",
+                  "OpenSans-LightItalic-webfont.svg",
+                  "OpenSans-LightItalic-webfont.ttf",
+                  "OpenSans-LightItalic-webfont.woff",
+                  "OpenSans-Regular-webfont.eot",
+                  "OpenSans-Regular-webfont.svg",
+                  "OpenSans-Regular-webfont.ttf",
+                  "OpenSans-Regular-webfont.woff",
+                  "OpenSans-Semibold-webfont.eot",
+                  "OpenSans-Semibold-webfont.svg",
+                  "OpenSans-Semibold-webfont.ttf",
+                  "OpenSans-Semibold-webfont.woff",
+                  "OpenSans-SemiboldItalic-webfont.eot",
+                  "OpenSans-SemiboldItalic-webfont.svg",
+                  "OpenSans-SemiboldItalic-webfont.ttf",
+                  "OpenSans-SemiboldItalic-webfont.woff",
+                  "PatternFlyIcons-webfont.eot",
+                  "PatternFlyIcons-webfont.svg",
+                  "PatternFlyIcons-webfont.ttf",
+                  "PatternFlyIcons-webfont.woff",
+                  "fontawesome-webfont.eot",
+                  "fontawesome-webfont.svg",
+                  "fontawesome-webfont.ttf",
+                  "fontawesome-webfont.woff",
+                  "fontawesome-webfont.woff2",
+                  "glyphicons-halflings-regular.eot",
+                  "glyphicons-halflings-regular.svg",
+                  "glyphicons-halflings-regular.ttf",
+                  "glyphicons-halflings-regular.woff",
+                  "glyphicons-halflings-regular.woff2"
+                },
+                "grunt-scripts": {
+                  "angular-animate.js",
+                  "angular-bootstrap-prettify.js",
+                  "angular-patternfly.js",
+                  "angular-sanitize.js",
+                  "angular-ui-router.min.js",
+                  "angular.js",
+                  "bootstrap-combobox.js",
+                  "bootstrap-datepicker.js",
+                  "bootstrap-datetimepicker.js",
+                  "bootstrap-select.js",
+                  "bootstrap-treeview.js",
+                  "bootstrap.js",
+                  "c3.js",
+                  "d3.js",
+                  "jquery.js",
+                  "lodash.min.js",
+                  "moment.js",
+                  "patternfly.js",
+                  "ui-bootstrap-tpls.js"
+                },
+                "img": {
+                  "OpenShift-Logo-NoText.svg",
+                  "OpenShift-Logo-Text.svg",
+                  "OpenShift-logo.svg",
+                  "RH_Atomic-Logo-NoText.svg",
+                  "RH_Atomic-Logo-Text.svg",
+                  "RH_atomic.svg",
+                  "apple-touch-icon-precomposed-114.png",
+                  "apple-touch-icon-precomposed-144.png",
+                  "apple-touch-icon-precomposed-152.png",
+                  "apple-touch-icon-precomposed-180.png",
+                  "apple-touch-icon-precomposed-57.png",
+                  "apple-touch-icon-precomposed-72.png",
+                  "apple-touch-icon-precomposed-76.png",
+                  "bg-login.jpg",
+                  "bg-modal-about-pf.png",
+                  "bg-navbar-pf-alt.svg",
+                  "brand-alt.svg",
+                  "brand.svg",
+                  "favicon.ico",
+                  "kubernetes-Logo.svg",
+                  "kubernetes.svg",
+                  "logo-alt.svg",
+                  "logo.svg",
+                  "patternfly-orb.svg",
+                  "spinner-inverse-lg.gif",
+                  "spinner-inverse-sm.gif",
+                  "spinner-inverse-xs.gif",
+                  "spinner-inverse.gif",
+                  "spinner-lg.gif",
+                  "spinner-sm.gif",
+                  "spinner-xs.gif",
+                  "spinner.gif"
+                },
+                "index.html",
+                "js": {
+                  "angular-bootstrap-prettify.js",
+                  "angular-bootstrap.js",
+                  "angular.min.js",
+                  "docs-setup.js",
+                  "docs.js",
+                  "google-code-prettify.js",
+                  "marked.js"
+                },
+                "partials": {
+                  "api": {
+                    "patternfly.autofocus.pfFocused.html",
+                    "patternfly.card.directive.pfAggregateStatusCard.html",
+                    "patternfly.card.directive.pfCard - Timeframe Filters.html",
+                    "patternfly.card.directive.pfCard - Trends.html",
+                    "patternfly.card.directive.pfCard - Utilization.html",
+                    "patternfly.charts.directive.pfC3Chart.html",
+                    "patternfly.charts.directive.pfDonutPctChart.html",
+                    "patternfly.charts.directive.pfHeatMap.html",
+                    "patternfly.charts.directive.pfLineChart.html",
+                    "patternfly.charts.directive.pfSparklineChart.html",
+                    "patternfly.charts.directive.pfTrendsChart.html",
+                    "patternfly.charts.directive.pfUtilizationBarChart.html",
+                    "patternfly.charts.directive.pfUtilizationTrendChart.html",
+                    "patternfly.filters.directive.pfFilter.html",
+                    "patternfly.filters.directive.pfFilterFields.html",
+                    "patternfly.filters.directive.pfFilterResults.html",
+                    "patternfly.form.directive.pfDateTimepicker.html",
+                    "patternfly.form.directive.pfDatepicker.html",
+                    "patternfly.form.directive.pfFormButtons.html",
+                    "patternfly.form.directive.pfFormGroup.html",
+                    "patternfly.form.directive.pfRemainingCharsCount.html",
+                    "patternfly.modals.directive.pfAboutModal.html",
+                    "patternfly.navigation.directive.pfVerticalNavigation - Basic.html",
+                    "patternfly.navigation.directive.pfVerticalNavigation - Router.html",
+                    "patternfly.notification.Notification.html",
+                    "patternfly.notification.directive.pfInlineNotification.html",
+                    "patternfly.notification.directive.pfNotificationDrawer.html",
+                    "patternfly.notification.directive.pfNotificationList.html",
+                    "patternfly.notification.directive.pfToastNotification.html",
+                    "patternfly.notification.directive.pfToastNotificationList.html",
+                    "patternfly.select.pfSelect.html",
+                    "patternfly.sort.directive.pfSort.html",
+                    "patternfly.toolbars.directive.pfToolbar.html",
+                    "patternfly.utils.directive.pfTransclude.html",
+                    "patternfly.utils.pfFixedAccordion.html",
+                    "patternfly.validation.pfValidation.html",
+                    "patternfly.views.directive.pfCardView.html",
+                    "patternfly.views.directive.pfListView.html",
+                    "patternfly.wizard.directive.pfWizard.html",
+                    "patternfly.wizard.directive.pfWizardReviewPage.html",
+                    "patternfly.wizard.directive.pfWizardStep.html",
+                    "patternfly.wizard.directive.pfWizardSubstep.html"
+                  }
+                }
+              },
+              "styles": {
+                "angular-patternfly.css",
+                "angular-patternfly.min.css"
+              }
+            },
+            "eslint.yaml",
+            "index.js",
+            "npm-shrinkwrap.json",
+            "scripts": {
+              "publish-ghpages.sh"
+            },
+            "styles": {
+              "angular-patternfly.css"
+            },
+            "test": {
+              "autofocus": {
+                "autofocus.spec.js"
+              },
+              "card": {
+                "aggregate-status": {
+                  "aggregate-status-card.directive.spec.js"
+                },
+                "basic": {
+                  "card.spec.js"
+                }
+              },
+              "charts": {
+                "c3": {
+                  "c3.spec.js"
+                },
+                "donut": {
+                  "donut-pct.spec.js"
+                },
+                "heatmap": {
+                  "heatmap-legend.spec.js",
+                  "heatmap.spec.js"
+                },
+                "sparkline": {
+                  "sparkline-chart.spec.js"
+                },
+                "trends": {
+                  "trends-chart.spec.js"
+                },
+                "utilization-bar": {
+                  "utilization-bar.spec.js"
+                },
+                "utilization-trend": {
+                  "utilization-trend-chart.spec.js"
+                }
+              },
+              "filters": {
+                "filter.spec.js"
+              },
+              "form": {
+                "datepicker": {
+                  "datepicker.directive.spec.js"
+                },
+                "datetimepicker": {
+                  "datetimepicker.directive.spec.js"
+                },
+                "form-buttons": {
+                  "form-buttons.directive.spec.js"
+                },
+                "form-group": {
+                  "form-group.directive.spec.js"
+                },
+                "remaining-chars-count": {
+                  "remaining-chars-count.directive.spec.js"
+                }
+              },
+              "modals": {
+                "about-modal.spec.js"
+              },
+              "navigation": {
+                "vertical-navigation.spec.js"
+              },
+              "notification": {
+                "heading.html",
+                "notification-body.html",
+                "notification-drawer.spec.js",
+                "notification-footer.html",
+                "notification.spec.js",
+                "subheading.html",
+                "title.html",
+                "toast-notification-list.spec.js",
+                "toast-notification.spec.js"
+              },
+              "select": {
+                "select.spec.js"
+              },
+              "sort": {
+                "sort.spec.js"
+              },
+              "toolbars": {
+                "toolbar.spec.js"
+              },
+              "utils": {
+                "fixed-accordion.spec.js",
+                "specUtils.js",
+                "transclude-directive.spec.js",
+                "utils.spec.js"
+              },
+              "validation": {
+                "validation.spec.js"
+              },
+              "views": {
+                "cardview": {
+                  "card-view.spec.js"
+                },
+                "listview": {
+                  "list-view.spec.js"
+                }
+              },
+              "wizard": {
+                "deployment.html",
+                "detail-page.html",
+                "review-second-template.html",
+                "review-template.html",
+                "script.js",
+                "summary.html",
+                "wizard-container.html",
+                "wizard.spec.js"
+              }
+            }
+          },
+          "angular-route": {
+            ".bower.json",
+            "LICENSE.md",
+            "README.md",
+            "angular-route.js",
+            "angular-route.min.js",
+            "angular-route.min.js.map",
+            "bower.json",
+            "index.js",
+            "package.json"
+          },
+          "angular-sanitize": {
+            ".bower.json",
+            "LICENSE.md",
+            "README.md",
+            "angular-sanitize.js",
+            "angular-sanitize.min.js",
+            "angular-sanitize.min.js.map",
+            "bower.json",
+            "index.js",
+            "package.json"
+          },
+          "bootstrap": {
+            ".bower.json",
+            "CHANGELOG.md",
+            "Gemfile",
+            "Gemfile.lock",
+            "Gruntfile.js",
+            "ISSUE_TEMPLATE.md",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "dist": {
+              "css": {
+                "bootstrap-theme.css",
+                "bootstrap-theme.css.map",
+                "bootstrap-theme.min.css",
+                "bootstrap-theme.min.css.map",
+                "bootstrap.css",
+                "bootstrap.css.map",
+                "bootstrap.min.css",
+                "bootstrap.min.css.map"
+              },
+              "fonts": {
+                "glyphicons-halflings-regular.eot",
+                "glyphicons-halflings-regular.svg",
+                "glyphicons-halflings-regular.ttf",
+                "glyphicons-halflings-regular.woff",
+                "glyphicons-halflings-regular.woff2"
+              },
+              "js": {
+                "bootstrap.js",
+                "bootstrap.min.js",
+                "npm.js"
+              }
+            },
+            "fonts": {
+              "glyphicons-halflings-regular.eot",
+              "glyphicons-halflings-regular.svg",
+              "glyphicons-halflings-regular.ttf",
+              "glyphicons-halflings-regular.woff",
+              "glyphicons-halflings-regular.woff2"
+            },
+            "grunt": {
+              ".jshintrc",
+              "bs-commonjs-generator.js",
+              "bs-glyphicons-data-generator.js",
+              "bs-lessdoc-parser.js",
+              "bs-raw-files-generator.js",
+              "change-version.js",
+              "configBridge.json",
+              "npm-shrinkwrap.json",
+              "sauce_browsers.yml"
+            },
+            "js": {
+              ".jscsrc",
+              ".jshintrc",
+              "affix.js",
+              "alert.js",
+              "button.js",
+              "carousel.js",
+              "collapse.js",
+              "dropdown.js",
+              "modal.js",
+              "popover.js",
+              "scrollspy.js",
+              "tab.js",
+              "tooltip.js",
+              "transition.js"
+            },
+            "less": {
+              ".csscomb.json",
+              ".csslintrc",
+              "alerts.less",
+              "badges.less",
+              "bootstrap.less",
+              "breadcrumbs.less",
+              "button-groups.less",
+              "buttons.less",
+              "carousel.less",
+              "close.less",
+              "code.less",
+              "component-animations.less",
+              "dropdowns.less",
+              "forms.less",
+              "glyphicons.less",
+              "grid.less",
+              "input-groups.less",
+              "jumbotron.less",
+              "labels.less",
+              "list-group.less",
+              "media.less",
+              "mixins": {
+                "alerts.less",
+                "background-variant.less",
+                "border-radius.less",
+                "buttons.less",
+                "center-block.less",
+                "clearfix.less",
+                "forms.less",
+                "gradients.less",
+                "grid-framework.less",
+                "grid.less",
+                "hide-text.less",
+                "image.less",
+                "labels.less",
+                "list-group.less",
+                "nav-divider.less",
+                "nav-vertical-align.less",
+                "opacity.less",
+                "pagination.less",
+                "panels.less",
+                "progress-bar.less",
+                "reset-filter.less",
+                "reset-text.less",
+                "resize.less",
+                "responsive-visibility.less",
+                "size.less",
+                "tab-focus.less",
+                "table-row.less",
+                "text-emphasis.less",
+                "text-overflow.less",
+                "vendor-prefixes.less"
+              },
+              "mixins.less",
+              "modals.less",
+              "navbar.less",
+              "navs.less",
+              "normalize.less",
+              "pager.less",
+              "pagination.less",
+              "panels.less",
+              "popovers.less",
+              "print.less",
+              "progress-bars.less",
+              "responsive-embed.less",
+              "responsive-utilities.less",
+              "scaffolding.less",
+              "tables.less",
+              "theme.less",
+              "thumbnails.less",
+              "tooltip.less",
+              "type.less",
+              "utilities.less",
+              "variables.less",
+              "wells.less"
+            },
+            "nuget": {
+              "MyGet.ps1",
+              "bootstrap.less.nuspec",
+              "bootstrap.nuspec"
+            },
+            "package.js",
+            "package.json"
+          },
+          "bootstrap-datepicker": {
+            ".bower.json",
+            ".editorconfig",
+            ".gitignore",
+            ".npmignore",
+            ".travis.yml",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
+            "Gruntfile.js",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "composer.json",
+            "dist": {
+              "css": {
+                "bootstrap-datepicker.css",
+                "bootstrap-datepicker.css.map",
+                "bootstrap-datepicker.min.css",
+                "bootstrap-datepicker.min.css.map",
+                "bootstrap-datepicker.standalone.css",
+                "bootstrap-datepicker.standalone.css.map",
+                "bootstrap-datepicker.standalone.min.css",
+                "bootstrap-datepicker.standalone.min.css.map",
+                "bootstrap-datepicker3.css",
+                "bootstrap-datepicker3.css.map",
+                "bootstrap-datepicker3.min.css",
+                "bootstrap-datepicker3.min.css.map",
+                "bootstrap-datepicker3.standalone.css",
+                "bootstrap-datepicker3.standalone.css.map",
+                "bootstrap-datepicker3.standalone.min.css",
+                "bootstrap-datepicker3.standalone.min.css.map"
+              },
+              "js": {
+                "bootstrap-datepicker.js",
+                "bootstrap-datepicker.min.js"
+              },
+              "locales": {
+                "bootstrap-datepicker.ar.min.js",
+                "bootstrap-datepicker.az.min.js",
+                "bootstrap-datepicker.bg.min.js",
+                "bootstrap-datepicker.bs.min.js",
+                "bootstrap-datepicker.ca.min.js",
+                "bootstrap-datepicker.cs.min.js",
+                "bootstrap-datepicker.cy.min.js",
+                "bootstrap-datepicker.da.min.js",
+                "bootstrap-datepicker.de.min.js",
+                "bootstrap-datepicker.el.min.js",
+                "bootstrap-datepicker.en-AU.min.js",
+                "bootstrap-datepicker.en-GB.min.js",
+                "bootstrap-datepicker.eo.min.js",
+                "bootstrap-datepicker.es.min.js",
+                "bootstrap-datepicker.et.min.js",
+                "bootstrap-datepicker.eu.min.js",
+                "bootstrap-datepicker.fa.min.js",
+                "bootstrap-datepicker.fi.min.js",
+                "bootstrap-datepicker.fo.min.js",
+                "bootstrap-datepicker.fr-CH.min.js",
+                "bootstrap-datepicker.fr.min.js",
+                "bootstrap-datepicker.gl.min.js",
+                "bootstrap-datepicker.he.min.js",
+                "bootstrap-datepicker.hr.min.js",
+                "bootstrap-datepicker.hu.min.js",
+                "bootstrap-datepicker.hy.min.js",
+                "bootstrap-datepicker.id.min.js",
+                "bootstrap-datepicker.is.min.js",
+                "bootstrap-datepicker.it-CH.min.js",
+                "bootstrap-datepicker.it.min.js",
+                "bootstrap-datepicker.ja.min.js",
+                "bootstrap-datepicker.ka.min.js",
+                "bootstrap-datepicker.kh.min.js",
+                "bootstrap-datepicker.kk.min.js",
+                "bootstrap-datepicker.ko.min.js",
+                "bootstrap-datepicker.kr.min.js",
+                "bootstrap-datepicker.lt.min.js",
+                "bootstrap-datepicker.lv.min.js",
+                "bootstrap-datepicker.me.min.js",
+                "bootstrap-datepicker.mk.min.js",
+                "bootstrap-datepicker.mn.min.js",
+                "bootstrap-datepicker.ms.min.js",
+                "bootstrap-datepicker.nb.min.js",
+                "bootstrap-datepicker.nl-BE.min.js",
+                "bootstrap-datepicker.nl.min.js",
+                "bootstrap-datepicker.no.min.js",
+                "bootstrap-datepicker.pl.min.js",
+                "bootstrap-datepicker.pt-BR.min.js",
+                "bootstrap-datepicker.pt.min.js",
+                "bootstrap-datepicker.ro.min.js",
+                "bootstrap-datepicker.rs-latin.min.js",
+                "bootstrap-datepicker.rs.min.js",
+                "bootstrap-datepicker.ru.min.js",
+                "bootstrap-datepicker.sk.min.js",
+                "bootstrap-datepicker.sl.min.js",
+                "bootstrap-datepicker.sq.min.js",
+                "bootstrap-datepicker.sr-latin.min.js",
+                "bootstrap-datepicker.sr.min.js",
+                "bootstrap-datepicker.sv.min.js",
+                "bootstrap-datepicker.sw.min.js",
+                "bootstrap-datepicker.th.min.js",
+                "bootstrap-datepicker.tr.min.js",
+                "bootstrap-datepicker.uk.min.js",
+                "bootstrap-datepicker.vi.min.js",
+                "bootstrap-datepicker.zh-CN.min.js",
+                "bootstrap-datepicker.zh-TW.min.js"
+              }
+            },
+            "docs": {
+              "Makefile",
+              "README.md",
+              "_screenshots": {
+                "demo_head.html",
+                "markup_component.html",
+                "markup_daterange.html",
+                "markup_inline.html",
+                "markup_input.html",
+                "option_calendarweeks.html",
+                "option_clearbtn.html",
+                "option_daysofweekdisabled.html",
+                "option_enddate.html",
+                "option_language.html",
+                "option_multidate.html",
+                "option_startdate.html",
+                "option_todaybtn.html",
+                "option_todayhighlight.html",
+                "option_weekstart.html",
+                "script": {
+                  "common.css",
+                  "common.js",
+                  "debug.js",
+                  "html-imports.min.js",
+                  "screenshot.js"
+                }
+              },
+              "_static": {
+                "screenshots": {
+                  "demo_head.png",
+                  "markup_component.png",
+                  "markup_daterange.png",
+                  "markup_inline.png",
+                  "markup_input.png",
+                  "option_calendarweeks.png",
+                  "option_clearbtn.png",
+                  "option_daysofweekdisabled.png",
+                  "option_enddate.png",
+                  "option_language.png",
+                  "option_multidate.png",
+                  "option_startdate.png",
+                  "option_todaybtn.png",
+                  "option_todayhighlight.png",
+                  "option_weekstart.png"
+                }
+              },
+              "conf.py",
+              "events.rst",
+              "i18n.rst",
+              "index.rst",
+              "keyboard.rst",
+              "make.bat",
+              "markup.rst",
+              "methods.rst",
+              "options.rst",
+              "requirements.txt"
+            },
+            "grunt": {
+              ".jshintrc"
+            },
+            "js": {
+              ".jscsrc",
+              ".jshintrc",
+              "bootstrap-datepicker.js",
+              "locales": {
+                "bootstrap-datepicker.ar.js",
+                "bootstrap-datepicker.az.js",
+                "bootstrap-datepicker.bg.js",
+                "bootstrap-datepicker.bs.js",
+                "bootstrap-datepicker.ca.js",
+                "bootstrap-datepicker.cs.js",
+                "bootstrap-datepicker.cy.js",
+                "bootstrap-datepicker.da.js",
+                "bootstrap-datepicker.de.js",
+                "bootstrap-datepicker.el.js",
+                "bootstrap-datepicker.en-AU.js",
+                "bootstrap-datepicker.en-GB.js",
+                "bootstrap-datepicker.eo.js",
+                "bootstrap-datepicker.es.js",
+                "bootstrap-datepicker.et.js",
+                "bootstrap-datepicker.eu.js",
+                "bootstrap-datepicker.fa.js",
+                "bootstrap-datepicker.fi.js",
+                "bootstrap-datepicker.fo.js",
+                "bootstrap-datepicker.fr-CH.js",
+                "bootstrap-datepicker.fr.js",
+                "bootstrap-datepicker.gl.js",
+                "bootstrap-datepicker.he.js",
+                "bootstrap-datepicker.hr.js",
+                "bootstrap-datepicker.hu.js",
+                "bootstrap-datepicker.hy.js",
+                "bootstrap-datepicker.id.js",
+                "bootstrap-datepicker.is.js",
+                "bootstrap-datepicker.it-CH.js",
+                "bootstrap-datepicker.it.js",
+                "bootstrap-datepicker.ja.js",
+                "bootstrap-datepicker.ka.js",
+                "bootstrap-datepicker.kh.js",
+                "bootstrap-datepicker.kk.js",
+                "bootstrap-datepicker.ko.js",
+                "bootstrap-datepicker.kr.js",
+                "bootstrap-datepicker.lt.js",
+                "bootstrap-datepicker.lv.js",
+                "bootstrap-datepicker.me.js",
+                "bootstrap-datepicker.mk.js",
+                "bootstrap-datepicker.mn.js",
+                "bootstrap-datepicker.ms.js",
+                "bootstrap-datepicker.nb.js",
+                "bootstrap-datepicker.nl-BE.js",
+                "bootstrap-datepicker.nl.js",
+                "bootstrap-datepicker.no.js",
+                "bootstrap-datepicker.pl.js",
+                "bootstrap-datepicker.pt-BR.js",
+                "bootstrap-datepicker.pt.js",
+                "bootstrap-datepicker.ro.js",
+                "bootstrap-datepicker.rs-latin.js",
+                "bootstrap-datepicker.rs.js",
+                "bootstrap-datepicker.ru.js",
+                "bootstrap-datepicker.sk.js",
+                "bootstrap-datepicker.sl.js",
+                "bootstrap-datepicker.sq.js",
+                "bootstrap-datepicker.sr-latin.js",
+                "bootstrap-datepicker.sr.js",
+                "bootstrap-datepicker.sv.js",
+                "bootstrap-datepicker.sw.js",
+                "bootstrap-datepicker.th.js",
+                "bootstrap-datepicker.tr.js",
+                "bootstrap-datepicker.uk.js",
+                "bootstrap-datepicker.vi.js",
+                "bootstrap-datepicker.zh-CN.js",
+                "bootstrap-datepicker.zh-TW.js"
+              }
+            },
+            "less": {
+              ".csslintrc",
+              "datepicker.less",
+              "datepicker3.less"
+            },
+            "package.json",
+            "tests": {
+              "README.md",
+              "assets": {
+                "coverage.js",
+                "jquery-1.7.1.min.js",
+                "mock.js",
+                "qunit-logging.js",
+                "qunit.css",
+                "qunit.js",
+                "utils.js"
+              },
+              "suites": {
+                "calendar-weeks.js",
+                "component.js",
+                "data-api.js",
+                "events.js",
+                "formats.js",
+                "inline.js",
+                "keyboard_navigation": {
+                  "2011.js",
+                  "2012.js",
+                  "all.js"
+                },
+                "methods.js",
+                "methods_jquery.js",
+                "mouse_navigation": {
+                  "2011.js",
+                  "2012.js",
+                  "all.js"
+                },
+                "noconflict.js",
+                "options.js",
+                "timezone.js"
+              },
+              "tests.html",
+              "timezone.html"
+            }
+          },
+          "bootstrap-select": {
+            ".bower.json",
+            "LICENSE",
+            "bower.json",
+            "dist": {
+              "css": {
+                "bootstrap-select.css",
+                "bootstrap-select.css.map",
+                "bootstrap-select.min.css"
+              },
+              "js": {
+                "bootstrap-select.js",
+                "bootstrap-select.js.map",
+                "bootstrap-select.min.js",
+                "i18n": {
+                  "defaults-ar_AR.js",
+                  "defaults-ar_AR.min.js",
+                  "defaults-bg_BG.js",
+                  "defaults-bg_BG.min.js",
+                  "defaults-cro_CRO.js",
+                  "defaults-cro_CRO.min.js",
+                  "defaults-cs_CZ.js",
+                  "defaults-cs_CZ.min.js",
+                  "defaults-da_DK.js",
+                  "defaults-da_DK.min.js",
+                  "defaults-de_DE.js",
+                  "defaults-de_DE.min.js",
+                  "defaults-en_US.js",
+                  "defaults-en_US.min.js",
+                  "defaults-es_CL.js",
+                  "defaults-es_CL.min.js",
+                  "defaults-eu.js",
+                  "defaults-eu.min.js",
+                  "defaults-fa_IR.js",
+                  "defaults-fa_IR.min.js",
+                  "defaults-fi_FI.js",
+                  "defaults-fi_FI.min.js",
+                  "defaults-fr_FR.js",
+                  "defaults-fr_FR.min.js",
+                  "defaults-hu_HU.js",
+                  "defaults-hu_HU.min.js",
+                  "defaults-id_ID.js",
+                  "defaults-id_ID.min.js",
+                  "defaults-it_IT.js",
+                  "defaults-it_IT.min.js",
+                  "defaults-ko_KR.js",
+                  "defaults-ko_KR.min.js",
+                  "defaults-lt_LT.js",
+                  "defaults-lt_LT.min.js",
+                  "defaults-nb_NO.js",
+                  "defaults-nb_NO.min.js",
+                  "defaults-nl_NL.js",
+                  "defaults-nl_NL.min.js",
+                  "defaults-pl_PL.js",
+                  "defaults-pl_PL.min.js",
+                  "defaults-pt_BR.js",
+                  "defaults-pt_BR.min.js",
+                  "defaults-pt_PT.js",
+                  "defaults-pt_PT.min.js",
+                  "defaults-ro_RO.js",
+                  "defaults-ro_RO.min.js",
+                  "defaults-ru_RU.js",
+                  "defaults-ru_RU.min.js",
+                  "defaults-sk_SK.js",
+                  "defaults-sk_SK.min.js",
+                  "defaults-sl_SI.js",
+                  "defaults-sl_SI.min.js",
+                  "defaults-sv_SE.js",
+                  "defaults-sv_SE.min.js",
+                  "defaults-tr_TR.js",
+                  "defaults-tr_TR.min.js",
+                  "defaults-ua_UA.js",
+                  "defaults-ua_UA.min.js",
+                  "defaults-zh_CN.js",
+                  "defaults-zh_CN.min.js",
+                  "defaults-zh_TW.js",
+                  "defaults-zh_TW.min.js"
+                }
+              }
+            },
+            "docs": {
+              "custom_theme": {
+                "base.html",
+                "css": {
+                  "base.css"
+                },
+                "img": {
+                  "logos": {
+                    "membermeister.png",
+                    "snapappointments.png",
+                    "thermofisher.png"
+                  }
+                },
+                "js": {
+                  "base.js"
+                },
+                "nav.html",
+                "toc.html"
+              },
+              "docs": {
+                "css": {
+                  "custom.css"
+                },
+                "dist": {
+                  "css": {
+                    "bootstrap-select.css",
+                    "bootstrap-select.css.map",
+                    "bootstrap-select.min.css"
+                  },
+                  "js": {
+                    "bootstrap-select.js",
+                    "bootstrap-select.js.map",
+                    "bootstrap-select.min.js",
+                    "i18n": {
+                      "defaults-ar_AR.js",
+                      "defaults-ar_AR.min.js",
+                      "defaults-bg_BG.js",
+                      "defaults-bg_BG.min.js",
+                      "defaults-cro_CRO.js",
+                      "defaults-cro_CRO.min.js",
+                      "defaults-cs_CZ.js",
+                      "defaults-cs_CZ.min.js",
+                      "defaults-da_DK.js",
+                      "defaults-da_DK.min.js",
+                      "defaults-de_DE.js",
+                      "defaults-de_DE.min.js",
+                      "defaults-en_US.js",
+                      "defaults-en_US.min.js",
+                      "defaults-es_CL.js",
+                      "defaults-es_CL.min.js",
+                      "defaults-eu.js",
+                      "defaults-eu.min.js",
+                      "defaults-fa_IR.js",
+                      "defaults-fa_IR.min.js",
+                      "defaults-fi_FI.js",
+                      "defaults-fi_FI.min.js",
+                      "defaults-fr_FR.js",
+                      "defaults-fr_FR.min.js",
+                      "defaults-hu_HU.js",
+                      "defaults-hu_HU.min.js",
+                      "defaults-id_ID.js",
+                      "defaults-id_ID.min.js",
+                      "defaults-it_IT.js",
+                      "defaults-it_IT.min.js",
+                      "defaults-ko_KR.js",
+                      "defaults-ko_KR.min.js",
+                      "defaults-lt_LT.js",
+                      "defaults-lt_LT.min.js",
+                      "defaults-nb_NO.js",
+                      "defaults-nb_NO.min.js",
+                      "defaults-nl_NL.js",
+                      "defaults-nl_NL.min.js",
+                      "defaults-pl_PL.js",
+                      "defaults-pl_PL.min.js",
+                      "defaults-pt_BR.js",
+                      "defaults-pt_BR.min.js",
+                      "defaults-pt_PT.js",
+                      "defaults-pt_PT.min.js",
+                      "defaults-ro_RO.js",
+                      "defaults-ro_RO.min.js",
+                      "defaults-ru_RU.js",
+                      "defaults-ru_RU.min.js",
+                      "defaults-sk_SK.js",
+                      "defaults-sk_SK.min.js",
+                      "defaults-sl_SI.js",
+                      "defaults-sl_SI.min.js",
+                      "defaults-sv_SE.js",
+                      "defaults-sv_SE.min.js",
+                      "defaults-tr_TR.js",
+                      "defaults-tr_TR.min.js",
+                      "defaults-ua_UA.js",
+                      "defaults-ua_UA.min.js",
+                      "defaults-zh_CN.js",
+                      "defaults-zh_CN.min.js",
+                      "defaults-zh_TW.js",
+                      "defaults-zh_TW.min.js"
+                    }
+                  }
+                },
+                "examples.md",
+                "index.md",
+                "methods.md",
+                "options.md"
+              },
+              "mkdocs.yml"
+            },
+            "js": {
+              ".jshintrc",
+              "bootstrap-select.js",
+              "i18n": {
+                "defaults-ar_AR.js",
+                "defaults-bg_BG.js",
+                "defaults-cro_CRO.js",
+                "defaults-cs_CZ.js",
+                "defaults-da_DK.js",
+                "defaults-de_DE.js",
+                "defaults-en_US.js",
+                "defaults-es_CL.js",
+                "defaults-eu.js",
+                "defaults-fa_IR.js",
+                "defaults-fi_FI.js",
+                "defaults-fr_FR.js",
+                "defaults-hu_HU.js",
+                "defaults-id_ID.js",
+                "defaults-it_IT.js",
+                "defaults-ko_KR.js",
+                "defaults-lt_LT.js",
+                "defaults-nb_NO.js",
+                "defaults-nl_NL.js",
+                "defaults-pl_PL.js",
+                "defaults-pt_BR.js",
+                "defaults-pt_PT.js",
+                "defaults-ro_RO.js",
+                "defaults-ru_RU.js",
+                "defaults-sk_SK.js",
+                "defaults-sl_SI.js",
+                "defaults-sv_SE.js",
+                "defaults-tr_TR.js",
+                "defaults-ua_UA.js",
+                "defaults-zh_CN.js",
+                "defaults-zh_TW.js"
+              }
+            },
+            "less": {
+              "bootstrap-select.less",
+              "variables.less"
+            },
+            "sass": {
+              "bootstrap-select.scss",
+              "variables.scss"
+            }
+          },
+          "bootstrap-switch": {
+            ".babelrc",
+            ".bower.json",
+            ".gitignore",
+            "CHANGELOG.md",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "dist": {
+              "css": {
+                "bootstrap2": {
+                  "bootstrap-switch.css",
+                  "bootstrap-switch.min.css"
+                },
+                "bootstrap3": {
+                  "bootstrap-switch.css",
+                  "bootstrap-switch.min.css"
+                }
+              },
+              "js": {
+                "bootstrap-switch.js",
+                "bootstrap-switch.min.js"
+              }
+            },
+            "karma.conf.js",
+            "src": {
+              "js": {
+                "bootstrap-switch.js",
+                "bootstrap-switch.test.js"
+              },
+              "less": {
+                "bootstrap2": {
+                  "bootstrap-switch.less",
+                  "build.less",
+                  "mixins.less",
+                  "variables.less"
+                },
+                "bootstrap3": {
+                  "bootstrap-switch.less",
+                  "build.less",
+                  "mixins": {
+                    "alerts.less",
+                    "background-variant.less",
+                    "border-radius.less",
+                    "buttons.less",
+                    "center-block.less",
+                    "clearfix.less",
+                    "forms.less",
+                    "gradients.less",
+                    "grid-framework.less",
+                    "grid.less",
+                    "hide-text.less",
+                    "image.less",
+                    "labels.less",
+                    "list-group.less",
+                    "nav-divider.less",
+                    "nav-vertical-align.less",
+                    "opacity.less",
+                    "pagination.less",
+                    "panels.less",
+                    "progress-bar.less",
+                    "reset-filter.less",
+                    "reset-text.less",
+                    "resize.less",
+                    "responsive-visibility.less",
+                    "size.less",
+                    "tab-focus.less",
+                    "table-row.less",
+                    "text-emphasis.less",
+                    "text-overflow.less",
+                    "vendor-prefixes.less"
+                  },
+                  "mixins.less",
+                  "variables.less"
+                }
+              }
+            },
+            "yarn.lock"
+          },
+          "bootstrap-touchspin": {
+            ".bower.json",
+            "CONTRIBUTING.md",
+            "Gruntfile.js",
+            "LICENSE.md",
+            "README.md",
+            "bootstrap-touchspin.jquery.json",
+            "bower.json",
+            "demo": {
+              "demo.css",
+              "favicon.ico",
+              "index.html"
+            },
+            "dist": {
+              "jquery.bootstrap-touchspin.css",
+              "jquery.bootstrap-touchspin.js",
+              "jquery.bootstrap-touchspin.min.css",
+              "jquery.bootstrap-touchspin.min.js"
+            },
+            "package.json",
+            "src": {
+              "jquery.bootstrap-touchspin.css",
+              "jquery.bootstrap-touchspin.js"
+            }
+          },
+          "c3": {
+            ".bower.json",
+            "CONTRIBUTING.md",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "c3.css",
+            "c3.js",
+            "c3.min.css",
+            "c3.min.js",
+            "extensions": {
+              "chart-bubble": {
+                "bubble.js",
+                "index.html"
+              },
+              "exporter": {
+                "config.json",
+                "phantom-exporter.js",
+                "test.png"
+              },
+              "js": {
+                "c3ext.js"
+              }
+            },
+            "karma.conf.js"
+          },
+          "d3": {
+            ".bower.json",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "d3.js",
+            "d3.min.js"
+          },
+          "datatables": {
+            ".bower.json",
+            "Contributing.md",
+            "ISSUE_TEMPLATE.md",
+            "Readme.md",
+            "bower.json",
+            "license.txt",
+            "media": {
+              "css": {
+                "dataTables.bootstrap.css",
+                "dataTables.bootstrap.min.css",
+                "dataTables.bootstrap4.css",
+                "dataTables.bootstrap4.min.css",
+                "dataTables.foundation.css",
+                "dataTables.foundation.min.css",
+                "dataTables.jqueryui.css",
+                "dataTables.jqueryui.min.css",
+                "dataTables.material.css",
+                "dataTables.material.min.css",
+                "dataTables.semanticui.css",
+                "dataTables.semanticui.min.css",
+                "dataTables.uikit.css",
+                "dataTables.uikit.min.css",
+                "jquery.dataTables.css",
+                "jquery.dataTables.min.css",
+                "jquery.dataTables_themeroller.css"
+              },
+              "images": {
+                "Sorting icons.psd",
+                "favicon.ico",
+                "sort_asc.png",
+                "sort_asc_disabled.png",
+                "sort_both.png",
+                "sort_desc.png",
+                "sort_desc_disabled.png"
+              },
+              "js": {
+                "dataTables.bootstrap.js",
+                "dataTables.bootstrap.min.js",
+                "dataTables.bootstrap4.js",
+                "dataTables.bootstrap4.min.js",
+                "dataTables.foundation.js",
+                "dataTables.foundation.min.js",
+                "dataTables.jqueryui.js",
+                "dataTables.jqueryui.min.js",
+                "dataTables.material.js",
+                "dataTables.material.min.js",
+                "dataTables.semanticui.js",
+                "dataTables.semanticui.min.js",
+                "dataTables.uikit.js",
+                "dataTables.uikit.min.js",
+                "jquery.dataTables.js",
+                "jquery.dataTables.min.js",
+                "jquery.js"
+              }
+            }
+          },
+          "datatables-colreorder": {
+            ".bower.json",
+            "Issue_template.txt",
+            "License.txt",
+            "Readme.md",
+            "bower.json",
+            "css": {
+              "colReorder.bootstrap.scss",
+              "colReorder.bootstrap4.scss",
+              "colReorder.dataTables.scss",
+              "colReorder.foundation.scss",
+              "colReorder.jqueryui.scss",
+              "colReorder.semanticui.scss"
+            },
+            "docs": {
+              "api": {
+                "colReorder.order().xml",
+                "colReorder.reset().xml",
+                "colReorder.transpose().xml"
+              },
+              "event": {
+                "column-reorder.xml"
+              },
+              "option": {
+                "colReorder.fixedColumnsLeft.xml",
+                "colReorder.fixedColumnsRight.xml",
+                "colReorder.order.xml",
+                "colReorder.realtime.xml",
+                "colReorder.xml"
+              }
+            },
+            "examples": {
+              "index.xml",
+              "initialisation": {
+                "col_filter.xml",
+                "index.xml",
+                "new_init.xml",
+                "predefined.xml",
+                "realtime.xml",
+                "reset.xml",
+                "scrolling.xml",
+                "simple.xml"
+              },
+              "integration": {
+                "colvis.xml",
+                "fixedcolumns.xml",
+                "fixedheader.xml",
+                "index.xml",
+                "responsive.xml",
+                "server_side.xml",
+                "state_save.xml"
+              },
+              "styling": {
+                "alt_insert.xml",
+                "bootstrap.xml",
+                "bootstrap4.xml",
+                "foundation.xml",
+                "index.xml",
+                "jqueryui.xml",
+                "semanticui.xml"
+              }
+            },
+            "js": {
+              "dataTables.colReorder.js"
+            },
+            "make.sh"
+          },
+          "datatables-colvis": {
+            ".bower.json",
+            "License.txt",
+            "README.md",
+            "bower.json",
+            "css": {
+              "dataTables.colVis.css",
+              "dataTables.colvis.jqueryui.css"
+            },
+            "examples": {
+              "button_order.xml",
+              "exclude_columns.xml",
+              "group_columns.xml",
+              "index.xml",
+              "jqueryui.xml",
+              "mouseover.xml",
+              "new_init.xml",
+              "restore.xml",
+              "simple.xml",
+              "text.xml",
+              "title_callback.xml",
+              "two_tables.xml",
+              "two_tables_identical.xml"
+            },
+            "js": {
+              "dataTables.colVis.js"
+            },
+            "make.sh"
+          },
+          "doc-ready": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "doc-ready.js"
+          },
+          "eonasdan-bootstrap-datetimepicker": {
+            ".bower.json",
+            "CONTRIBUTING.md",
+            "Gruntfile.js",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "component.json",
+            "composer.json",
+            "docs": {
+              "ChangeLog.md",
+              "ContributorsGuide.md",
+              "Events.md",
+              "Extras.md",
+              "FAQ.md",
+              "Functions.md",
+              "Installing.md",
+              "Options.md",
+              "Version 4 Changelog.md",
+              "Version 4 Contributors guide.md",
+              "index.md",
+              "theme": {
+                "android-chrome-144x144.png",
+                "android-chrome-192x192.png",
+                "android-chrome-36x36.png",
+                "android-chrome-48x48.png",
+                "android-chrome-72x72.png",
+                "android-chrome-96x96.png",
+                "apple-touch-icon-114x114.png",
+                "apple-touch-icon-120x120.png",
+                "apple-touch-icon-144x144.png",
+                "apple-touch-icon-152x152.png",
+                "apple-touch-icon-180x180.png",
+                "apple-touch-icon-57x57.png",
+                "apple-touch-icon-60x60.png",
+                "apple-touch-icon-72x72.png",
+                "apple-touch-icon-76x76.png",
+                "apple-touch-icon-precomposed.png",
+                "apple-touch-icon.png",
+                "base.html",
+                "browserconfig.xml",
+                "content.html",
+                "css": {
+                  "base.css",
+                  "prettify-1.0.css"
+                },
+                "favicon-16x16.png",
+                "favicon-32x32.png",
+                "favicon-96x96.png",
+                "favicon.ico",
+                "js": {
+                  "base.js",
+                  "prettify-1.0.min.js"
+                },
+                "manifest.json",
+                "mstile-144x144.png",
+                "mstile-150x150.png",
+                "mstile-310x150.png",
+                "mstile-310x310.png",
+                "mstile-70x70.png",
+                "nav.html",
+                "toc.html"
+              }
+            },
+            "mkdocs.yml",
+            "package.json",
+            "src": {
+              "js": {
+                "bootstrap-datetimepicker.js"
+              },
+              "less": {
+                "_bootstrap-datetimepicker.less",
+                "bootstrap-datetimepicker-build.less"
+              },
+              "nuget": {
+                "Bootstrap.v3.Datetimepicker.CSS.nuspec",
+                "Bootstrap.v3.Datetimepicker.nuspec",
+                "NuGet.exe",
+                "install.ps1"
+              },
+              "sass": {
+                "_bootstrap-datetimepicker.scss",
+                "bootstrap-datetimepicker-build.scss"
+              }
+            },
+            "tasks": {
+              "bump_version.js"
+            }
+          },
+          "ev-emitter": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "ev-emitter.js",
+            "package.json"
+          },
+          "eventEmitter": {
+            ".bower.json",
+            "EventEmitter.js",
+            "EventEmitter.min.js",
+            "README.md",
+            "UNLICENSE",
+            "bower.json",
+            "component.json"
+          },
+          "eventie": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "eventie.js",
+            "package.json"
+          },
+          "fizzy-ui-utils": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "utils.js"
+          },
+          "font-awesome": {
+            ".bower.json",
+            ".gitignore",
+            ".npmignore",
+            "HELP-US-OUT.txt",
+            "bower.json",
+            "css": {
+              "font-awesome.css",
+              "font-awesome.css.map",
+              "font-awesome.min.css"
+            },
+            "fonts": {
+              "FontAwesome.otf",
+              "fontawesome-webfont.eot",
+              "fontawesome-webfont.svg",
+              "fontawesome-webfont.ttf",
+              "fontawesome-webfont.woff",
+              "fontawesome-webfont.woff2"
+            },
+            "less": {
+              "animated.less",
+              "bordered-pulled.less",
+              "core.less",
+              "fixed-width.less",
+              "font-awesome.less",
+              "icons.less",
+              "larger.less",
+              "list.less",
+              "mixins.less",
+              "path.less",
+              "rotated-flipped.less",
+              "screen-reader.less",
+              "stacked.less",
+              "variables.less"
+            },
+            "scss": {
+              "_animated.scss",
+              "_bordered-pulled.scss",
+              "_core.scss",
+              "_fixed-width.scss",
+              "_icons.scss",
+              "_larger.scss",
+              "_list.scss",
+              "_mixins.scss",
+              "_path.scss",
+              "_rotated-flipped.scss",
+              "_screen-reader.scss",
+              "_stacked.scss",
+              "_variables.scss",
+              "font-awesome.scss"
+            }
+          },
+          "get-size": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "get-size.js",
+            "index.html"
+          },
+          "get-style-property": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "component.json",
+            "get-style-property.js",
+            "package.json"
+          },
+          "google-code-prettify": {
+            ".bower.json",
+            ".npmignore",
+            "CHANGES.html",
+            "COPYING",
+            "README-zh-Hans.html",
+            "README.html",
+            "README.md",
+            "bin": {
+            },
+            "bower.json",
+            "examples": {
+              "quine.html"
+            },
+            "package.json",
+            "src": {
+              "lang-apollo.js",
+              "lang-basic.js",
+              "lang-clj.js",
+              "lang-css.js",
+              "lang-dart.js",
+              "lang-erlang.js",
+              "lang-go.js",
+              "lang-hs.js",
+              "lang-lisp.js",
+              "lang-llvm.js",
+              "lang-lua.js",
+              "lang-matlab.js",
+              "lang-ml.js",
+              "lang-mumps.js",
+              "lang-n.js",
+              "lang-pascal.js",
+              "lang-proto.js",
+              "lang-r.js",
+              "lang-rd.js",
+              "lang-scala.js",
+              "lang-sql.js",
+              "lang-tcl.js",
+              "lang-tex.js",
+              "lang-vb.js",
+              "lang-vhdl.js",
+              "lang-wiki.js",
+              "lang-xq.js",
+              "lang-yaml.js",
+              "prettify.css",
+              "prettify.js",
+              "run_prettify.js"
+            },
+            "styles": {
+              "demo.html",
+              "desert.css",
+              "doxy.css",
+              "index.html",
+              "sons-of-obsidian.css",
+              "sunburst.css"
+            }
+          },
+          "imagesloaded": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "gulpfile.js",
+            "imagesloaded.js",
+            "imagesloaded.pkgd.js",
+            "imagesloaded.pkgd.min.js"
+          },
+          "isotope": {
+            ".bower.json",
+            "README.mdown",
+            "bower.json",
+            "dist": {
+              "isotope.pkgd.js",
+              "isotope.pkgd.min.js"
+            },
+            "js": {
+              "isotope.js",
+              "item.js",
+              "layout-mode.js",
+              "layout-modes": {
+                "fit-rows.js",
+                "masonry.js",
+                "vertical.js"
+              }
+            }
+          },
+          "jquery": {
+            ".bower.json",
+            "AUTHORS.txt",
+            "LICENSE.txt",
+            "README.md",
+            "bower.json",
+            "dist": {
+              "core.js",
+              "jquery.js",
+              "jquery.min.js",
+              "jquery.min.map",
+              "jquery.slim.js",
+              "jquery.slim.min.js",
+              "jquery.slim.min.map"
+            },
+            "external": {
+              "sizzle": {
+                "LICENSE.txt",
+                "dist": {
+                  "sizzle.js",
+                  "sizzle.min.js",
+                  "sizzle.min.map"
+                }
+              }
+            },
+            "src": {
+              ".eslintrc.json",
+              "ajax": {
+                "jsonp.js",
+                "load.js",
+                "parseXML.js",
+                "script.js",
+                "var": {
+                  "location.js",
+                  "nonce.js",
+                  "rquery.js"
+                },
+                "xhr.js"
+              },
+              "ajax.js",
+              "attributes": {
+                "attr.js",
+                "classes.js",
+                "prop.js",
+                "support.js",
+                "val.js"
+              },
+              "attributes.js",
+              "callbacks.js",
+              "core": {
+                "DOMEval.js",
+                "access.js",
+                "init.js",
+                "parseHTML.js",
+                "ready-no-deferred.js",
+                "ready.js",
+                "readyException.js",
+                "stripAndCollapse.js",
+                "support.js",
+                "var": {
+                  "rsingleTag.js"
+                }
+              },
+              "core.js",
+              "css": {
+                "addGetHookIf.js",
+                "adjustCSS.js",
+                "curCSS.js",
+                "hiddenVisibleSelectors.js",
+                "showHide.js",
+                "support.js",
+                "var": {
+                  "cssExpand.js",
+                  "getStyles.js",
+                  "isHiddenWithinTree.js",
+                  "rmargin.js",
+                  "rnumnonpx.js",
+                  "swap.js"
+                }
+              },
+              "css.js",
+              "data": {
+                "Data.js",
+                "var": {
+                  "acceptData.js",
+                  "dataPriv.js",
+                  "dataUser.js"
+                }
+              },
+              "data.js",
+              "deferred": {
+                "exceptionHook.js"
+              },
+              "deferred.js",
+              "deprecated.js",
+              "dimensions.js",
+              "effects": {
+                "Tween.js",
+                "animatedSelector.js"
+              },
+              "effects.js",
+              "event": {
+                "ajax.js",
+                "alias.js",
+                "focusin.js",
+                "support.js",
+                "trigger.js"
+              },
+              "event.js",
+              "exports": {
+                "amd.js",
+                "global.js"
+              },
+              "jquery.js",
+              "manipulation": {
+                "_evalUrl.js",
+                "buildFragment.js",
+                "getAll.js",
+                "setGlobalEval.js",
+                "support.js",
+                "var": {
+                  "rcheckableType.js",
+                  "rscriptType.js",
+                  "rtagName.js"
+                },
+                "wrapMap.js"
+              },
+              "manipulation.js",
+              "offset.js",
+              "queue": {
+                "delay.js"
+              },
+              "queue.js",
+              "selector-native.js",
+              "selector-sizzle.js",
+              "selector.js",
+              "serialize.js",
+              "traversing": {
+                "findFilter.js",
+                "var": {
+                  "dir.js",
+                  "rneedsContext.js",
+                  "siblings.js"
+                }
+              },
+              "traversing.js",
+              "var": {
+                "ObjectFunctionString.js",
+                "arr.js",
+                "class2type.js",
+                "concat.js",
+                "document.js",
+                "documentElement.js",
+                "fnToString.js",
+                "getProto.js",
+                "hasOwn.js",
+                "indexOf.js",
+                "pnum.js",
+                "push.js",
+                "rcssNum.js",
+                "rnothtmlwhite.js",
+                "slice.js",
+                "support.js",
+                "toString.js"
+              },
+              "wrap.js"
+            }
+          },
+          "keycloak": {
+            ".bower.json",
+            "License.html",
+            "README.md",
+            "bower.json",
+            "dist": {
+              "keycloak.js",
+              "keycloak.min copy.js",
+              "keycloak.min.js"
+            },
+            "package.json"
+          },
+          "lodash": {
+            ".bower.json",
+            "LICENSE",
+            "bower.json",
+            "lodash.js",
+            "lodash.min.js"
+          },
+          "masonry": {
+            ".bower.json",
+            "README.mdown",
+            "bower.json",
+            "changelog.md",
+            "dist": {
+              "masonry.pkgd.js",
+              "masonry.pkgd.min.js"
+            },
+            "masonry.js",
+            "sandbox": {
+              "add-items.html",
+              "basic.html",
+              "bottom-up.html",
+              "browserify": {
+                "index.html",
+                "main.js"
+              },
+              "element-sizing.html",
+              "fit-width.html",
+              "fluid.html",
+              "jquery.html",
+              "require-js": {
+                "index.html",
+                "main.js"
+              },
+              "right-to-left.html",
+              "sandbox.css",
+              "stamps.html"
+            }
+          },
+          "matchHeight": {
+            ".bower.json",
+            "CHANGELOG.md",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "dist": {
+              "jquery.matchHeight-min.js",
+              "jquery.matchHeight.js"
+            },
+            "gulpfile.js",
+            "jquery.matchHeight.js",
+            "matchHeight.jquery.json",
+            "package.json"
+          },
+          "matches-selector": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "matches-selector.js"
+          },
+          "moment": {
+            ".bower.json",
+            "CHANGELOG.md",
+            "LICENSE",
+            "README.md",
+            "bower.json",
+            "locale": {
+              "af.js",
+              "ar-ma.js",
+              "ar-sa.js",
+              "ar-tn.js",
+              "ar.js",
+              "az.js",
+              "be.js",
+              "bg.js",
+              "bn.js",
+              "bo.js",
+              "br.js",
+              "bs.js",
+              "ca.js",
+              "cs.js",
+              "cv.js",
+              "cy.js",
+              "da.js",
+              "de-at.js",
+              "de.js",
+              "dv.js",
+              "el.js",
+              "en-au.js",
+              "en-ca.js",
+              "en-gb.js",
+              "en-ie.js",
+              "en-nz.js",
+              "eo.js",
+              "es-do.js",
+              "es.js",
+              "et.js",
+              "eu.js",
+              "fa.js",
+              "fi.js",
+              "fo.js",
+              "fr-ca.js",
+              "fr-ch.js",
+              "fr.js",
+              "fy.js",
+              "gd.js",
+              "gl.js",
+              "he.js",
+              "hi.js",
+              "hr.js",
+              "hu.js",
+              "hy-am.js",
+              "id.js",
+              "is.js",
+              "it.js",
+              "ja.js",
+              "jv.js",
+              "ka.js",
+              "kk.js",
+              "km.js",
+              "ko.js",
+              "ky.js",
+              "lb.js",
+              "lo.js",
+              "lt.js",
+              "lv.js",
+              "me.js",
+              "mk.js",
+              "ml.js",
+              "mr.js",
+              "ms-my.js",
+              "ms.js",
+              "my.js",
+              "nb.js",
+              "ne.js",
+              "nl.js",
+              "nn.js",
+              "pa-in.js",
+              "pl.js",
+              "pt-br.js",
+              "pt.js",
+              "ro.js",
+              "ru.js",
+              "se.js",
+              "si.js",
+              "sk.js",
+              "sl.js",
+              "sq.js",
+              "sr-cyrl.js",
+              "sr.js",
+              "ss.js",
+              "sv.js",
+              "sw.js",
+              "ta.js",
+              "te.js",
+              "th.js",
+              "tl-ph.js",
+              "tlh.js",
+              "tr.js",
+              "tzl.js",
+              "tzm-latn.js",
+              "tzm.js",
+              "uk.js",
+              "uz.js",
+              "vi.js",
+              "x-pseudo.js",
+              "zh-cn.js",
+              "zh-tw.js"
+            },
+            "min": {
+              "locales.js",
+              "locales.min.js",
+              "moment-with-locales.js",
+              "moment-with-locales.min.js",
+              "moment.min.js",
+              "tests.js"
+            },
+            "moment.d.ts",
+            "moment.js",
+            "src": {
+              "lib": {
+                "create": {
+                  "check-overflow.js",
+                  "date-from-array.js",
+                  "from-anything.js",
+                  "from-array.js",
+                  "from-object.js",
+                  "from-string-and-array.js",
+                  "from-string-and-format.js",
+                  "from-string.js",
+                  "local.js",
+                  "parsing-flags.js",
+                  "utc.js",
+                  "valid.js"
+                },
+                "duration": {
+                  "abs.js",
+                  "add-subtract.js",
+                  "as.js",
+                  "bubble.js",
+                  "constructor.js",
+                  "create.js",
+                  "duration.js",
+                  "get.js",
+                  "humanize.js",
+                  "iso-string.js",
+                  "prototype.js"
+                },
+                "format": {
+                  "format.js"
+                },
+                "locale": {
+                  "base-config.js",
+                  "calendar.js",
+                  "constructor.js",
+                  "en.js",
+                  "formats.js",
+                  "invalid.js",
+                  "lists.js",
+                  "locale.js",
+                  "locales.js",
+                  "ordinal.js",
+                  "pre-post-format.js",
+                  "prototype.js",
+                  "relative.js",
+                  "set.js"
+                },
+                "moment": {
+                  "add-subtract.js",
+                  "calendar.js",
+                  "clone.js",
+                  "compare.js",
+                  "constructor.js",
+                  "creation-data.js",
+                  "diff.js",
+                  "format.js",
+                  "from.js",
+                  "get-set.js",
+                  "locale.js",
+                  "min-max.js",
+                  "moment.js",
+                  "now.js",
+                  "prototype.js",
+                  "start-end-of.js",
+                  "to-type.js",
+                  "to.js",
+                  "valid.js"
+                },
+                "parse": {
+                  "regex.js",
+                  "token.js"
+                },
+                "units": {
+                  "aliases.js",
+                  "constants.js",
+                  "day-of-month.js",
+                  "day-of-week.js",
+                  "day-of-year.js",
+                  "hour.js",
+                  "millisecond.js",
+                  "minute.js",
+                  "month.js",
+                  "offset.js",
+                  "priorities.js",
+                  "quarter.js",
+                  "second.js",
+                  "timestamp.js",
+                  "timezone.js",
+                  "units.js",
+                  "week-calendar-utils.js",
+                  "week-year.js",
+                  "week.js",
+                  "year.js"
+                },
+                "utils": {
+                  "abs-ceil.js",
+                  "abs-floor.js",
+                  "abs-round.js",
+                  "compare-arrays.js",
+                  "defaults.js",
+                  "deprecate.js",
+                  "extend.js",
+                  "has-own-prop.js",
+                  "hooks.js",
+                  "index-of.js",
+                  "is-array.js",
+                  "is-date.js",
+                  "is-function.js",
+                  "is-object-empty.js",
+                  "is-object.js",
+                  "is-undefined.js",
+                  "keys.js",
+                  "map.js",
+                  "some.js",
+                  "to-int.js",
+                  "zero-fill.js"
+                }
+              },
+              "locale": {
+                "af.js",
+                "ar-ma.js",
+                "ar-sa.js",
+                "ar-tn.js",
+                "ar.js",
+                "az.js",
+                "be.js",
+                "bg.js",
+                "bn.js",
+                "bo.js",
+                "br.js",
+                "bs.js",
+                "ca.js",
+                "cs.js",
+                "cv.js",
+                "cy.js",
+                "da.js",
+                "de-at.js",
+                "de.js",
+                "dv.js",
+                "el.js",
+                "en-au.js",
+                "en-ca.js",
+                "en-gb.js",
+                "en-ie.js",
+                "en-nz.js",
+                "eo.js",
+                "es-do.js",
+                "es.js",
+                "et.js",
+                "eu.js",
+                "fa.js",
+                "fi.js",
+                "fo.js",
+                "fr-ca.js",
+                "fr-ch.js",
+                "fr.js",
+                "fy.js",
+                "gd.js",
+                "gl.js",
+                "he.js",
+                "hi.js",
+                "hr.js",
+                "hu.js",
+                "hy-am.js",
+                "id.js",
+                "is.js",
+                "it.js",
+                "ja.js",
+                "jv.js",
+                "ka.js",
+                "kk.js",
+                "km.js",
+                "ko.js",
+                "ky.js",
+                "lb.js",
+                "lo.js",
+                "lt.js",
+                "lv.js",
+                "me.js",
+                "mk.js",
+                "ml.js",
+                "mr.js",
+                "ms-my.js",
+                "ms.js",
+                "my.js",
+                "nb.js",
+                "ne.js",
+                "nl.js",
+                "nn.js",
+                "pa-in.js",
+                "pl.js",
+                "pt-br.js",
+                "pt.js",
+                "ro.js",
+                "ru.js",
+                "se.js",
+                "si.js",
+                "sk.js",
+                "sl.js",
+                "sq.js",
+                "sr-cyrl.js",
+                "sr.js",
+                "ss.js",
+                "sv.js",
+                "sw.js",
+                "ta.js",
+                "te.js",
+                "th.js",
+                "tl-ph.js",
+                "tlh.js",
+                "tr.js",
+                "tzl.js",
+                "tzm-latn.js",
+                "tzm.js",
+                "uk.js",
+                "uz.js",
+                "vi.js",
+                "x-pseudo.js",
+                "zh-cn.js",
+                "zh-tw.js"
+              },
+              "moment.js"
+            },
+            "templates": {
+              "amd-named.js",
+              "amd.js",
+              "default.js",
+              "globals.js",
+              "locale-header.js",
+              "test-header.js"
+            }
+          },
+          "outlayer": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "item.js",
+            "outlayer.js"
+          },
+          "patternfly": {
+            ".bower.json",
+            "CODE_OF_CONDUCT.md",
+            "Gemfile",
+            "Gemfile.lock",
+            "Gruntfile.js",
+            "LICENSE.txt",
+            "OPEN_SOURCE_LICENCES.txt",
+            "PFICONS.md",
+            "QUICKSTART.md",
+            "README.md",
+            "bower.json",
+            "dist": {
+              "css": {
+                "patternfly-additions.css",
+                "patternfly-additions.css.map",
+                "patternfly-additions.min.css",
+                "patternfly-additions.min.css.map",
+                "patternfly.css",
+                "patternfly.css.map",
+                "patternfly.min.css",
+                "patternfly.min.css.map"
+              },
+              "fonts": {
+                "FontAwesome.otf",
+                "OpenSans-Bold-webfont.eot",
+                "OpenSans-Bold-webfont.svg",
+                "OpenSans-Bold-webfont.ttf",
+                "OpenSans-Bold-webfont.woff",
+                "OpenSans-BoldItalic-webfont.eot",
+                "OpenSans-BoldItalic-webfont.svg",
+                "OpenSans-BoldItalic-webfont.ttf",
+                "OpenSans-BoldItalic-webfont.woff",
+                "OpenSans-ExtraBold-webfont.eot",
+                "OpenSans-ExtraBold-webfont.svg",
+                "OpenSans-ExtraBold-webfont.ttf",
+                "OpenSans-ExtraBold-webfont.woff",
+                "OpenSans-ExtraBoldItalic-webfont.eot",
+                "OpenSans-ExtraBoldItalic-webfont.svg",
+                "OpenSans-ExtraBoldItalic-webfont.ttf",
+                "OpenSans-ExtraBoldItalic-webfont.woff",
+                "OpenSans-Italic-webfont.eot",
+                "OpenSans-Italic-webfont.svg",
+                "OpenSans-Italic-webfont.ttf",
+                "OpenSans-Italic-webfont.woff",
+                "OpenSans-Light-webfont.eot",
+                "OpenSans-Light-webfont.svg",
+                "OpenSans-Light-webfont.ttf",
+                "OpenSans-Light-webfont.woff",
+                "OpenSans-LightItalic-webfont.eot",
+                "OpenSans-LightItalic-webfont.svg",
+                "OpenSans-LightItalic-webfont.ttf",
+                "OpenSans-LightItalic-webfont.woff",
+                "OpenSans-Regular-webfont.eot",
+                "OpenSans-Regular-webfont.svg",
+                "OpenSans-Regular-webfont.ttf",
+                "OpenSans-Regular-webfont.woff",
+                "OpenSans-Semibold-webfont.eot",
+                "OpenSans-Semibold-webfont.svg",
+                "OpenSans-Semibold-webfont.ttf",
+                "OpenSans-Semibold-webfont.woff",
+                "OpenSans-SemiboldItalic-webfont.eot",
+                "OpenSans-SemiboldItalic-webfont.svg",
+                "OpenSans-SemiboldItalic-webfont.ttf",
+                "OpenSans-SemiboldItalic-webfont.woff",
+                "PatternFlyIcons-webfont.eot",
+                "PatternFlyIcons-webfont.svg",
+                "PatternFlyIcons-webfont.ttf",
+                "PatternFlyIcons-webfont.woff",
+                "fontawesome-webfont.eot",
+                "fontawesome-webfont.svg",
+                "fontawesome-webfont.ttf",
+                "fontawesome-webfont.woff",
+                "fontawesome-webfont.woff2",
+                "glyphicons-halflings-regular.eot",
+                "glyphicons-halflings-regular.svg",
+                "glyphicons-halflings-regular.ttf",
+                "glyphicons-halflings-regular.woff",
+                "glyphicons-halflings-regular.woff2"
+              },
+              "img": {
+                "OpenShift-Logo-NoText.svg",
+                "OpenShift-Logo-Text.svg",
+                "OpenShift-logo.svg",
+                "RH_Atomic-Logo-NoText.svg",
+                "RH_Atomic-Logo-Text.svg",
+                "RH_atomic.svg",
+                "apple-touch-icon-precomposed-114.png",
+                "apple-touch-icon-precomposed-144.png",
+                "apple-touch-icon-precomposed-152.png",
+                "apple-touch-icon-precomposed-180.png",
+                "apple-touch-icon-precomposed-57.png",
+                "apple-touch-icon-precomposed-72.png",
+                "apple-touch-icon-precomposed-76.png",
+                "bg-login.jpg",
+                "bg-modal-about-pf.png",
+                "bg-navbar-pf-alt.svg",
+                "brand-alt.svg",
+                "brand.svg",
+                "favicon.ico",
+                "kubernetes-Logo.svg",
+                "kubernetes.svg",
+                "logo-alt.svg",
+                "logo.svg",
+                "spinner-inverse-lg.gif",
+                "spinner-inverse-sm.gif",
+                "spinner-inverse-xs.gif",
+                "spinner-inverse.gif",
+                "spinner-lg.gif",
+                "spinner-sm.gif",
+                "spinner-xs.gif",
+                "spinner.gif"
+              },
+              "js": {
+                "patternfly-functions.js",
+                "patternfly-functions.min.js",
+                "patternfly-settings.js",
+                "patternfly-settings.min.js",
+                "patternfly.dataTables.pfEmpty.js",
+                "patternfly.dataTables.pfEmpty.min.js",
+                "patternfly.dataTables.pfFilter.js",
+                "patternfly.dataTables.pfFilter.min.js",
+                "patternfly.dataTables.pfResize.js",
+                "patternfly.dataTables.pfResize.min.js",
+                "patternfly.dataTables.pfSelect.js",
+                "patternfly.dataTables.pfSelect.min.js",
+                "patternfly.js",
+                "patternfly.min.js"
+              },
+              "less": {
+                "about-modal.less",
+                "alerts.less",
+                "badges.less",
+                "blank-slate.less",
+                "bootstrap-combobox.less",
+                "bootstrap-datepicker.less",
+                "bootstrap-select.less",
+                "bootstrap-switch.less",
+                "bootstrap-touchspin.less",
+                "bootstrap-treeview.less",
+                "breadcrumbs.less",
+                "buttons.less",
+                "card-view.less",
+                "cards.less",
+                "charts.less",
+                "close.less",
+                "color-variables.less",
+                "datatables.less",
+                "dependencies": {
+                  "bootstrap": {
+                    "alerts.less",
+                    "badges.less",
+                    "bootstrap.less",
+                    "breadcrumbs.less",
+                    "button-groups.less",
+                    "buttons.less",
+                    "carousel.less",
+                    "close.less",
+                    "code.less",
+                    "component-animations.less",
+                    "dropdowns.less",
+                    "forms.less",
+                    "glyphicons.less",
+                    "grid.less",
+                    "input-groups.less",
+                    "jumbotron.less",
+                    "labels.less",
+                    "list-group.less",
+                    "media.less",
+                    "mixins": {
+                      "alerts.less",
+                      "background-variant.less",
+                      "border-radius.less",
+                      "buttons.less",
+                      "center-block.less",
+                      "clearfix.less",
+                      "forms.less",
+                      "gradients.less",
+                      "grid-framework.less",
+                      "grid.less",
+                      "hide-text.less",
+                      "image.less",
+                      "labels.less",
+                      "list-group.less",
+                      "nav-divider.less",
+                      "nav-vertical-align.less",
+                      "opacity.less",
+                      "pagination.less",
+                      "panels.less",
+                      "progress-bar.less",
+                      "reset-filter.less",
+                      "reset-text.less",
+                      "resize.less",
+                      "responsive-visibility.less",
+                      "size.less",
+                      "tab-focus.less",
+                      "table-row.less",
+                      "text-emphasis.less",
+                      "text-overflow.less",
+                      "vendor-prefixes.less"
+                    },
+                    "mixins.less",
+                    "modals.less",
+                    "navbar.less",
+                    "navs.less",
+                    "normalize.less",
+                    "pager.less",
+                    "pagination.less",
+                    "panels.less",
+                    "popovers.less",
+                    "print.less",
+                    "progress-bars.less",
+                    "responsive-embed.less",
+                    "responsive-utilities.less",
+                    "scaffolding.less",
+                    "tables.less",
+                    "theme.less",
+                    "thumbnails.less",
+                    "tooltip.less",
+                    "type.less",
+                    "utilities.less",
+                    "variables.less",
+                    "wells.less"
+                  },
+                  "bootstrap-combobox": {
+                    "combobox.less"
+                  },
+                  "bootstrap-datepicker": {
+                    "datepicker.less",
+                    "datepicker3.less"
+                  },
+                  "bootstrap-select": {
+                    "bootstrap-select.less",
+                    "variables.less"
+                  },
+                  "bootstrap-touchspin": {
+                    "jquery.bootstrap-touchspin.css"
+                  },
+                  "c3": {
+                    "c3.css"
+                  },
+                  "font-awesome": {
+                    "animated.less",
+                    "bordered-pulled.less",
+                    "core.less",
+                    "fixed-width.less",
+                    "font-awesome.less",
+                    "icons.less",
+                    "larger.less",
+                    "list.less",
+                    "mixins.less",
+                    "path.less",
+                    "rotated-flipped.less",
+                    "screen-reader.less",
+                    "stacked.less",
+                    "variables.less"
+                  }
+                },
+                "dropdowns.less",
+                "fonts.less",
+                "footer.less",
+                "forms.less",
+                "icons.less",
+                "infotip.less",
+                "labels.less",
+                "layouts.less",
+                "links.less",
+                "list-group.less",
+                "list-view.less",
+                "login.less",
+                "mixins.less",
+                "modals.less",
+                "nav-vertical-alt.less",
+                "navbar-alt.less",
+                "navbar-vertical.less",
+                "navbar.less",
+                "notifications-drawer.less",
+                "pager.less",
+                "pagination.less",
+                "panels.less",
+                "patternfly-additions.less",
+                "patternfly.less",
+                "popovers.less",
+                "progress-bars.less",
+                "search.less",
+                "sidebar.less",
+                "spinner.less",
+                "syntax-highlighting.less",
+                "table-view.less",
+                "tables.less",
+                "tabs.less",
+                "time-picker.less",
+                "toast.less",
+                "toolbar.less",
+                "tooltip.less",
+                "type.less",
+                "variables.less",
+                "vertical-nav.less",
+                "wizard.less"
+              },
+              "tests": {
+                "about-modal.html",
+                "accordions.html",
+                "alerts.html",
+                "area-charts.html",
+                "badges.html",
+                "bar-charts.html",
+                "basic.html",
+                "blank-slate.html",
+                "bootstrap-combobox.html",
+                "bootstrap-datepicker.html",
+                "bootstrap-select.html",
+                "bootstrap-switch.html",
+                "bootstrap-switch.js",
+                "bootstrap-touchspin.html",
+                "bootstrap-treeview-2.html",
+                "bootstrap-treeview.html",
+                "breadcrumbs.html",
+                "buttons.html",
+                "card-view-card-variations.html",
+                "card-view-multi-select.html",
+                "card-view-single-select.html",
+                "cards.html",
+                "code.html",
+                "dashboard.html",
+                "donut-charts.html",
+                "dropdowns.html",
+                "form.html",
+                "forms.html",
+                "horizontal-navigation.html",
+                "icons.html",
+                "img": {
+                  "dashboard-3.png"
+                },
+                "index.html",
+                "infotip.html",
+                "labels.html",
+                "line-charts.html",
+                "list-group.html",
+                "list-view-compound-expansion.html",
+                "list-view-rows.html",
+                "list-view-simple-expansion.html",
+                "list-view.html",
+                "login.html",
+                "modals.html",
+                "navbar.html",
+                "notification-drawer-horizontal-nav.html",
+                "notification-drawer-vertical-nav.html",
+                "pagination.html",
+                "panels.html",
+                "pie-charts.html",
+                "popovers.html",
+                "progress-bars.html",
+                "search.html",
+                "spinner.html",
+                "tab.html",
+                "table-view-columns.html",
+                "table-view-navbar.html",
+                "table-view.html",
+                "tables.html",
+                "tabs.html",
+                "tests.css",
+                "time-picker.html",
+                "toast.html",
+                "toolbar.html",
+                "tooltip.html",
+                "typography-2.css",
+                "typography-2.html",
+                "typography.html",
+                "utilization-bar-charts.html",
+                "vertical-navigation-primary-only.html",
+                "vertical-navigation-with-badges.html",
+                "vertical-navigation-with-secondary.html",
+                "vertical-navigation-with-tertiary-no-icons.html",
+                "vertical-navigation-with-tertiary-pins.html",
+                "wizard.html"
+              }
+            },
+            "eslint.yaml",
+            "karma.conf.js",
+            "npm-shrinkwrap.json",
+            "package.json",
+            "src": {
+              "fonts": {
+                "OpenSans-Bold-webfont.eot",
+                "OpenSans-Bold-webfont.svg",
+                "OpenSans-Bold-webfont.ttf",
+                "OpenSans-Bold-webfont.woff",
+                "OpenSans-BoldItalic-webfont.eot",
+                "OpenSans-BoldItalic-webfont.svg",
+                "OpenSans-BoldItalic-webfont.ttf",
+                "OpenSans-BoldItalic-webfont.woff",
+                "OpenSans-ExtraBold-webfont.eot",
+                "OpenSans-ExtraBold-webfont.svg",
+                "OpenSans-ExtraBold-webfont.ttf",
+                "OpenSans-ExtraBold-webfont.woff",
+                "OpenSans-ExtraBoldItalic-webfont.eot",
+                "OpenSans-ExtraBoldItalic-webfont.svg",
+                "OpenSans-ExtraBoldItalic-webfont.ttf",
+                "OpenSans-ExtraBoldItalic-webfont.woff",
+                "OpenSans-Italic-webfont.eot",
+                "OpenSans-Italic-webfont.svg",
+                "OpenSans-Italic-webfont.ttf",
+                "OpenSans-Italic-webfont.woff",
+                "OpenSans-Light-webfont.eot",
+                "OpenSans-Light-webfont.svg",
+                "OpenSans-Light-webfont.ttf",
+                "OpenSans-Light-webfont.woff",
+                "OpenSans-LightItalic-webfont.eot",
+                "OpenSans-LightItalic-webfont.svg",
+                "OpenSans-LightItalic-webfont.ttf",
+                "OpenSans-LightItalic-webfont.woff",
+                "OpenSans-Regular-webfont.eot",
+                "OpenSans-Regular-webfont.svg",
+                "OpenSans-Regular-webfont.ttf",
+                "OpenSans-Regular-webfont.woff",
+                "OpenSans-Semibold-webfont.eot",
+                "OpenSans-Semibold-webfont.svg",
+                "OpenSans-Semibold-webfont.ttf",
+                "OpenSans-Semibold-webfont.woff",
+                "OpenSans-SemiboldItalic-webfont.eot",
+                "OpenSans-SemiboldItalic-webfont.svg",
+                "OpenSans-SemiboldItalic-webfont.ttf",
+                "OpenSans-SemiboldItalic-webfont.woff",
+                "PatternFlyIcons-webfont.eot",
+                "PatternFlyIcons-webfont.svg",
+                "PatternFlyIcons-webfont.ttf",
+                "PatternFlyIcons-webfont.woff"
+              },
+              "img": {
+                "OpenShift-Logo-NoText.svg",
+                "OpenShift-Logo-Text.svg",
+                "OpenShift-logo.svg",
+                "RH_Atomic-Logo-NoText.svg",
+                "RH_Atomic-Logo-Text.svg",
+                "RH_atomic.svg",
+                "apple-touch-icon-precomposed-114.png",
+                "apple-touch-icon-precomposed-144.png",
+                "apple-touch-icon-precomposed-152.png",
+                "apple-touch-icon-precomposed-180.png",
+                "apple-touch-icon-precomposed-57.png",
+                "apple-touch-icon-precomposed-72.png",
+                "apple-touch-icon-precomposed-76.png",
+                "bg-login.jpg",
+                "bg-modal-about-pf.png",
+                "bg-navbar-pf-alt.svg",
+                "brand-alt.svg",
+                "brand.svg",
+                "favicon.ico",
+                "kubernetes-Logo.svg",
+                "kubernetes.svg",
+                "logo-alt.svg",
+                "logo.svg",
+                "spinner-inverse-lg.gif",
+                "spinner-inverse-sm.gif",
+                "spinner-inverse-xs.gif",
+                "spinner-inverse.gif",
+                "spinner-lg.gif",
+                "spinner-sm.gif",
+                "spinner-xs.gif",
+                "spinner.gif"
+              },
+              "js": {
+                "patternfly-functions.js",
+                "patternfly-settings.js",
+                "patternfly.dataTables.pfEmpty.js",
+                "patternfly.dataTables.pfFilter.js",
+                "patternfly.dataTables.pfResize.js",
+                "patternfly.dataTables.pfSelect.js"
+              },
+              "less": {
+                "about-modal.less",
+                "alerts.less",
+                "badges.less",
+                "blank-slate.less",
+                "bootstrap-combobox.less",
+                "bootstrap-datepicker.less",
+                "bootstrap-select.less",
+                "bootstrap-switch.less",
+                "bootstrap-touchspin.less",
+                "bootstrap-treeview.less",
+                "breadcrumbs.less",
+                "buttons.less",
+                "card-view.less",
+                "cards.less",
+                "charts.less",
+                "close.less",
+                "color-variables.less",
+                "datatables.less",
+                "dropdowns.less",
+                "fonts.less",
+                "footer.less",
+                "forms.less",
+                "icons.less",
+                "infotip.less",
+                "labels.less",
+                "layouts.less",
+                "links.less",
+                "list-group.less",
+                "list-view.less",
+                "login.less",
+                "mixins.less",
+                "modals.less",
+                "nav-vertical-alt.less",
+                "navbar-alt.less",
+                "navbar-vertical.less",
+                "navbar.less",
+                "notifications-drawer.less",
+                "pager.less",
+                "pagination.less",
+                "panels.less",
+                "patternfly-additions.less",
+                "patternfly.less",
+                "popovers.less",
+                "progress-bars.less",
+                "search.less",
+                "sidebar.less",
+                "spinner.less",
+                "syntax-highlighting.less",
+                "table-view.less",
+                "tables.less",
+                "tabs.less",
+                "time-picker.less",
+                "toast.less",
+                "toolbar.less",
+                "tooltip.less",
+                "type.less",
+                "variables.less",
+                "vertical-nav.less",
+                "wizard.less"
+              }
+            },
+            "tests": {
+              "pages": {
+                "_config.yml",
+                "_includes": {
+                  "head.html",
+                  "widgets": {
+                    "cards": {
+                      "aggregate-status-adipiscing-mini.html",
+                      "aggregate-status-adipiscing.html",
+                      "aggregate-status-amet-mini.html",
+                      "aggregate-status-amet.html",
+                      "aggregate-status-ipsum-mini.html",
+                      "aggregate-status-ipsum.html",
+                      "dashboard-timeframe-footer.html",
+                      "dashboard-timeframe-header.html",
+                      "object-status.html",
+                      "status-inline-actions-xs.html",
+                      "summary-inline-actions-xs.html",
+                      "utilization-bar-side-labels.html",
+                      "utilization-bar-top-labels.html",
+                      "utilization-trend-multiple-metrics.html",
+                      "utilization-trend-single-metric.html"
+                    },
+                    "charts": {
+                      "area-multiple.html",
+                      "area-single.html",
+                      "bar-horizontal-group.html",
+                      "bar-horizontal-stack.html",
+                      "bar-horizontal.html",
+                      "bar-vertical-group.html",
+                      "bar-vertical-stack.html",
+                      "bar-vertical.html",
+                      "donut-mini.html",
+                      "donut-utilization.html",
+                      "donut-whole-relationship.html",
+                      "line-multiple.html",
+                      "line-single.html",
+                      "pie-mini.html",
+                      "pie-whole-relationship.html",
+                      "sparkline.html",
+                      "spline-multiple.html",
+                      "spline-single.html",
+                      "utilization-bar.html"
+                    },
+                    "communication": {
+                      "about-modal.html",
+                      "alert-danger-dismissable.html",
+                      "alert-danger.html",
+                      "alert-info-dismissable.html",
+                      "alert-success-button.html",
+                      "alert-success-dismissable.html",
+                      "alert-warning-dismissable.html",
+                      "alert-warning.html",
+                      "blank-slate.html",
+                      "toast-danger.html",
+                      "toast-in-context.html",
+                      "toast-info.html",
+                      "toast-max-width.html",
+                      "toast-success.html",
+                      "toast-warning.html",
+                      "wizard.html"
+                    },
+                    "form.html",
+                    "forms": {
+                      "bootstrap-datepicker-inline.html",
+                      "bootstrap-datepicker-text-input.html",
+                      "bootstrap-datepicker.html",
+                      "expand-collapse-section.html",
+                      "field-level-help.html",
+                      "input-validation-form.html",
+                      "input-validation-modal.html",
+                      "time-picker.html"
+                    },
+                    "framework": {
+                      "login.html"
+                    },
+                    "kebab.html",
+                    "layouts": {
+                      "card-view-multi-select.html",
+                      "card-view-single-select.html",
+                      "cards-alt.html",
+                      "cards.html",
+                      "nav-horizontal-notification-drawer.html",
+                      "nav-vertical-notification-drawer.html",
+                      "navbar-primary.html",
+                      "navbar-vertical.html",
+                      "toolbar.html"
+                    },
+                    "list-view": {
+                      "list-view-default.html",
+                      "list-view-page-compound-expansion.html",
+                      "list-view-page-simple-expansion.html",
+                      "list-view-page.html",
+                      "list-view-standard-rows-compound-expansion.html",
+                      "list-view-standard-rows-simple-expansion.html",
+                      "list-view-standard-rows.html",
+                      "list-view-variation-1.html",
+                      "list-view-variation-2.html",
+                      "list-view-variation-3.html",
+                      "list-view-variation-4.html",
+                      "list-view-variation-5.html",
+                      "list-view-variation-6.html"
+                    },
+                    "navigation": {
+                      "horizontal-multi-level.html",
+                      "horizontal-persistent-secondary-tertiary.html",
+                      "horizontal-primary-nav-bar-page.html",
+                      "horizontal-primary-nav-bar.html",
+                      "secondary-nav-amet.html",
+                      "secondary-nav-ipsum.html",
+                      "tertiary-amet-corrumpit.html",
+                      "tertiary-amet-detracto.html",
+                      "tertiary-amet-mediocrem.html",
+                      "tertiary-ipsum-copiosae.html",
+                      "tertiary-ipsum-intellegam.html",
+                      "tertiary-ipsum-patrioque.html",
+                      "vertical-navigation.html"
+                    },
+                    "notification-drawer-notifications.html",
+                    "notification-drawer.html",
+                    "notifications-drawer-notifications.html",
+                    "table-view": {
+                      "js": {
+                        "config.js",
+                        "data.js",
+                        "empty.js",
+                        "find.js"
+                      },
+                      "table-view-navbar.html",
+                      "table-view.html",
+                      "tmpl": {
+                        "begin.js.html",
+                        "end.js.html",
+                        "pagination.html",
+                        "table-all.html",
+                        "table.html",
+                        "toolbar-all.html",
+                        "toolbar.html"
+                      }
+                    }
+                  }
+                },
+                "_layouts": {
+                  "cards.html",
+                  "default.html",
+                  "layout-alt-fixed-inner-scroll.html",
+                  "layout-alt-fixed-with-footer-inner-scroll.html",
+                  "layout-alt-fixed-with-footer.html",
+                  "layout-alt-fixed.html",
+                  "layout-fixed.html",
+                  "layout-static.html",
+                  "layout.html",
+                  "login.html",
+                  "page.html"
+                },
+                "_plugins": {
+                  "strip.rb",
+                  "weighted_pages.rb"
+                },
+                "about-modal.html",
+                "accordions.html",
+                "alerts.html",
+                "area-charts.html",
+                "badges.html",
+                "bar-charts.html",
+                "basic.html",
+                "blank-slate.html",
+                "bootstrap-combobox.html",
+                "bootstrap-datepicker.html",
+                "bootstrap-select.html",
+                "bootstrap-switch.html",
+                "bootstrap-switch.js",
+                "bootstrap-touchspin.html",
+                "bootstrap-treeview-2.html",
+                "bootstrap-treeview.html",
+                "breadcrumbs.html",
+                "buttons.html",
+                "card-view-card-variations.html",
+                "card-view-multi-select.html",
+                "card-view-single-select.html",
+                "cards.html",
+                "code.html",
+                "dashboard.html",
+                "donut-charts.html",
+                "dropdowns.html",
+                "form.html",
+                "forms.html",
+                "horizontal-navigation.html",
+                "icons.html",
+                "img": {
+                  "dashboard-3.png"
+                },
+                "index.html",
+                "infotip.html",
+                "labels.html",
+                "line-charts.html",
+                "list-group.html",
+                "list-view-compound-expansion.html",
+                "list-view-rows.html",
+                "list-view-simple-expansion.html",
+                "list-view.html",
+                "login.html",
+                "modals.html",
+                "navbar.html",
+                "notification-drawer-horizontal-nav.html",
+                "notification-drawer-vertical-nav.html",
+                "pagination.html",
+                "panels.html",
+                "pie-charts.html",
+                "popovers.html",
+                "progress-bars.html",
+                "search.html",
+                "spinner.html",
+                "tab.html",
+                "table-view-columns.html",
+                "table-view-navbar.html",
+                "table-view.html",
+                "tables.html",
+                "tabs.html",
+                "tests.css",
+                "time-picker.html",
+                "toast.html",
+                "toolbar.html",
+                "tooltip.html",
+                "typography-2.css",
+                "typography-2.html",
+                "typography.html",
+                "utilization-bar-charts.html",
+                "vertical-navigation-primary-only.html",
+                "vertical-navigation-with-badges.html",
+                "vertical-navigation-with-secondary.html",
+                "vertical-navigation-with-tertiary-no-icons.html",
+                "vertical-navigation-with-tertiary-pins.html",
+                "wizard.html"
+              }
+            }
+          },
+          "patternfly-bootstrap-combobox": {
+            ".bower.json",
+            "README.md",
+            "bower.json",
+            "css": {
+              "bootstrap-combobox.css"
+            },
+            "js": {
+              "bootstrap-combobox.js"
+            },
+            "less": {
+              "combobox.less"
+            }
+          },
+          "patternfly-bootstrap-treeview": {
+            ".bower.json",
+            "CHANGELOG.md",
+            "Gruntfile.js",
+            "LICENSE",
+            "README.md",
+            "app.js",
+            "bower.json",
+            "dist": {
+              "bootstrap-treeview.min.css",
+              "bootstrap-treeview.min.js"
+            },
+            "package.json",
+            "public": {
+              "css": {
+                "bootstrap-treeview.css"
+              },
+              "data.json",
+              "example-dom.html",
+              "index.html",
+              "js": {
+                "bootstrap-treeview.js"
+              }
+            },
+            "screenshot": {
+              "default.PNG"
+            },
+            "src": {
+              "css": {
+                "bootstrap-treeview.css"
+              },
+              "js": {
+                "bootstrap-treeview.js"
+              }
+            }
+          }
+        },
+        "coolstore.json",
+        "health.jsp",
+        "index.jsp",
+        "keycloak.json",
+        "partials": {
+          "cart.html",
+          "header.html",
+          "home.html"
+        }
+      }
+    }
+  }
+}</content>
+    </repo_structure>
+    <approved_container_images>
+      <description>
+                List of approved Docker images that should be used
+
+                Please prioritize using these approved images in the Dockerfile,
+                especially for Java-based applications where the approved Java images should be used
+                whenever possible.
+
+                APPROVED DOCKER IMAGES: The Docker images inside  are approved for use
+            </description>
+      <content>
+approved_images:
+  - image: tomcat
+    tag: "9.0"
+    notes: "Tomcat should not contain the sample webapp content"
+  - image: jboss/wildfly
+    tag: "latest"
+  - image: jboss-eap
+    tag: "7.3"
+  - image: oracle/weblogic
+    tag: "12.2.1.4"
+  - image: ibmcom/websphere-traditional
+    tag: "9.0.5.7"
+  - image: glassfish
+    tag: "5.1"
+  - image: maven
+    tags:
+      - "3.6.3-jdk-8"
+      - "3.8.3-openjdk-17"
+      - "3.9-eclipse-temurin-8"
+      - "3.9.9-eclipse-temurin-24-alpine"
+</content>
+    </approved_container_images>
+    <manifest_errors>
+      <description>
+                These were errors encountered during the deployment of the Dockerfile.
+                Please consider these deployment errors when fixing the Dockerfile.
+            </description>
+    </manifest_errors>
+    <build_errors>
+      <description>Errors encountered during Dockerfile build</description>
+      <content>Dockerfile:5
+--------------------
+   3 |         FROM tomcat:9.0-alpine
+   4 |     
+   5 | >>>     COPY sample.war /usr/local/tomcat/webapps/
+   6 |     
+   7 |         EXPOSE 8080
+--------------------
+ERROR: failed to solve: failed to compute cache key: failed to calculate checksum of ref 2d6222a1-3429-4a7c-b864-7801554b35e2::3plh6gagw0eienjvs7l4szo6u: "/sample.war": not found
+</content>
+    </build_errors>
+    <dockerfile>
+      <description>Dockerfile content to be analyzed</description>
+      <content>
+    
+    FROM tomcat:9.0-alpine
+
+    COPY sample.war /usr/local/tomcat/webapps/
+
+    EXPOSE 8080
+
+    CMD ["catalina.sh", "run"]
+    
+  </content>
+    </dockerfile>
+  </context>
+  <instructions>
+    
+      Please:
+      1. Carefully analyze the provided Dockerfile.
+      2. Show your full reasoning in a dedicated <analysis> section — think step-by-step.
+      3. In the <explanation> section, explain what changes you are going to make and why.
+      4. Then provide the corrected Dockerfile in the <fixed_content> section.
+      
+      Use latest base images and Dockerfile best practices.
+      Consider multi-stage builds if applicable.
+      Respect the repository's file structure and any deployment errors.
+      
+      Your response must strictly follow the XML structure below.
+      If the format does not match exactly, the output will be rejected.
+      
+      <response>
+        <analysis>[step-by-step analysis here]</analysis>
+        <explanation>[explanation of changes here]</explanation>
+        <fixed_content>[corrected Dockerfile here]</fixed_content>
+      </response>
+      
+      Use these exact tag names: <analysis>, <explanation>, and <fixed_content>.
+      Return no extra text before or after the XML.
+        
+      </instructions>
+  <note>
+        I will tip you if you provide a correct and working Dockerfile with clear reasoning and
+        explanations.
+    </note>
+</Prompt>
