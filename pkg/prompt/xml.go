@@ -4,9 +4,35 @@ import (
 	"encoding/xml"
 	"fmt"
 	"html"
+	"io"
 	"os"
 	"strings"
 )
+
+// DecodeXML decodes XML data into the provided struct
+func DecodeXML(data string, target interface{}) error {
+	// Create a decoder that's more tolerant to XML issues
+	decoder := xml.NewDecoder(strings.NewReader(data))
+	decoder.Strict = false
+	decoder.AutoClose = xml.HTMLAutoClose
+	decoder.Entity = xml.HTMLEntity
+
+	if err := decoder.Decode(target); err != nil && err != io.EOF {
+		return fmt.Errorf("failed to decode XML: %w", err)
+	}
+
+	return nil
+}
+
+// DecodeXMLFromFile decodes XML from a file into the provided struct
+func DecodeXMLFromFile(filePath string, target interface{}) error {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read XML file: %w", err)
+	}
+
+	return DecodeXML(string(content), target)
+}
 
 // Takes XML struct and outputs it to a file
 func EncodeXMLToFile(data interface{}, filePath string) error {

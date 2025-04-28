@@ -7,27 +7,25 @@ import (
 
 // Prompt represents the root XML element in prompt templates
 type Prompt struct {
-	Role         string      `xml:"role"`
+	Role         RawString   `xml:"role"`
 	Context      interface{} `xml:"context"`
-	Instructions string      `xml:"instructions"`
-	Note         string      `xml:"note"`
+	Instructions RawString   `xml:"instructions"`
+	Note         RawString   `xml:"note"`
 }
 
 // Element represents a section with description and content
 // If the content is empty, it will be omitted from the LLM Prompt
 type Element struct {
-	Description xml.CharData `xml:"description"`
-	Content     xml.CharData `xml:"content,omitempty"`
+	Description RawString `xml:"description"`
+	Content     RawString `xml:"content,omitempty"`
 }
 
-// GetContent returns the content as a clean string without CDATA tags
 func (e *Element) GetContent() string {
 	return string(e.Content)
 }
 
-// SetContent sets the content, ensuring it will be wrapped in CDATA tags when marshaled
 func (e *Element) SetContent(content string) {
-	e.Content = xml.CharData(content)
+	e.Content = RawString(content)
 }
 
 // DockerfileContext represents the context section within the Dockerfile prompt
@@ -40,10 +38,10 @@ type DockerfileContext struct {
 }
 
 type LLMResponse struct {
-	XMLName      xml.Name     `xml:"response"`
-	Analysis     xml.CharData `xml:"analysis"`
-	Explanation  xml.CharData `xml:"explanation"`
-	FixedContent xml.CharData `xml:"fixed_content"`
+	XMLName      xml.Name  `xml:"response"`
+	Analysis     RawString `xml:"analysis"`
+	Explanation  RawString `xml:"explanation"`
+	FixedContent RawString `xml:"fixed_content"`
 }
 
 // LoadDockerfilePromptTemplateFromBytes loads the Dockerfile prompt template from a byte slice
@@ -57,22 +55,6 @@ func LoadDockerfilePromptTemplateFromBytes(data []byte) (*Prompt, error) {
 	return prompt, nil
 }
 
-// // LoadManifestPromptTemplate loads the Manifest prompt template from the given path
-// func LoadManifestPromptTemplate(templatePath string) (*Prompt, error) {
-// 	prompt := &Prompt{
-// 		Context: &ManifestContext{},
-// 	}
-
-// 	err := DecodeXMLFromFile(templatePath, prompt)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return prompt, nil
-// }
-
-// Fill populates the Dockerfile prompt with the specified content
-// Requires specifc function because the context can differ
 func (p *Prompt) FillDockerfilePrompt(dockerfileContent, manifestErrors, approvedImages, buildErrors, repoStructure string) {
 	ctx, ok := p.Context.(*DockerfileContext)
 	if !ok {
@@ -85,31 +67,6 @@ func (p *Prompt) FillDockerfilePrompt(dockerfileContent, manifestErrors, approve
 	ctx.BuildErrors.SetContent(buildErrors)
 	ctx.RepoStructure.SetContent(repoStructure)
 }
-
-// // FillManifestPrompt populates the manifest template with the specified content
-// func FillManifestPrompt(template *Prompt, manifestContent string,
-// 	deploymentErrors string, approvedServices string, repoStructure string) {
-
-// 	ctx, ok := template.Context.(*ManifestContext)
-// 	if !ok {
-// 		return // Context is not a ManifestContext
-// 	}
-
-// 	// Fill in the content sections
-// 	ctx.Manifest.Content = manifestContent
-
-// 	if deploymentErrors != "" {
-// 		ctx.DeploymentErrors.Content = deploymentErrors
-// 	}
-
-// 	if approvedServices != "" {
-// 		ctx.ApprovedServices.Content = approvedServices
-// 	}
-
-// 	if repoStructure != "" {
-// 		ctx.RepoStructure.Content = repoStructure
-// 	}
-// }
 
 func ExtractResponseSections(responseText string) (string, string, string, error) {
 	// Parse the response using XML unmarshalling
@@ -142,19 +99,19 @@ func unmarshalLLMResponse(responseText string) (*LLMResponse, error) {
 	if responseText == "" {
 		return nil, fmt.Errorf("response is empty")
 	}
-	fmt.Println("Response text:", responseText)
 
 	var response LLMResponse
 
-	err := xml.Unmarshal([]byte(responseText), &response)
+	// Use our custom decoder that's more tolerant of XML issues
+	err := DecodeXML(responseText, &response)
+
+	// If that fails, try wrapping in a response tag
 	if err != nil {
-		fmt.Println("Error unmarshalling response:", err)
-	}
-
-	if err != nil {
-
-		return nil, fmt.Errorf("failed to unmarshal LLM response: %w", err)
-
+		wrappedResponse := "<response>" + responseText + "</response>"
+		err = DecodeXML(wrappedResponse, &response)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal LLM response: %w", err)
+		}
 	}
 
 	return &response, nil

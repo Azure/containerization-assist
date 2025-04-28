@@ -64,7 +64,7 @@
       </response>
       
       Use these exact tag names: <analysis>, <explanation>, and <fixed_content>.
-      Wrap responses in CDATA sections to avoid XML parsing issues.
+      Don't add CDATA tags or any other tags.
       Return no extra text before or after the XML.
         ]]>
       </instructions>
