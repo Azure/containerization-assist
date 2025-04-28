@@ -46,20 +46,6 @@ type LLMResponse struct {
 	FixedContent xml.CharData `xml:"fixed_content"`
 }
 
-// LoadDockerfilePromptTemplate loads the Dockerfile prompt template from the given path
-func LoadDockerfilePromptTemplate(templatePath string) (*Prompt, error) {
-	prompt := &Prompt{
-		Context: &DockerfileContext{},
-	}
-
-	err := DecodeXMLFromFile(templatePath, prompt)
-	if err != nil {
-		return nil, err
-	}
-
-	return prompt, nil
-}
-
 // LoadDockerfilePromptTemplateFromBytes loads the Dockerfile prompt template from a byte slice
 func LoadDockerfilePromptTemplateFromBytes(data []byte) (*Prompt, error) {
 	prompt := &Prompt{
@@ -159,16 +145,16 @@ func unmarshalLLMResponse(responseText string) (*LLMResponse, error) {
 	fmt.Println("Response text:", responseText)
 
 	var response LLMResponse
-	err := DecodeXML(responseText, &response)
 
-	// If that fails, try wrapping in a response tag
-	// Most likely failure point
+	err := xml.Unmarshal([]byte(responseText), &response)
 	if err != nil {
-		wrappedResponse := "<response>" + responseText + "</response>"
-		err = DecodeXML(wrappedResponse, &response)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal LLM response: %w", err)
-		}
+		fmt.Println("Error unmarshalling response:", err)
+	}
+
+	if err != nil {
+
+		return nil, fmt.Errorf("failed to unmarshal LLM response: %w", err)
+
 	}
 
 	return &response, nil

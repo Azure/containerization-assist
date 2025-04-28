@@ -77,6 +77,9 @@ func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState, promptCl
 		return nil, fmt.Errorf("error extracting response sections: %w", err)
 	}
 
+	fmt.Println("fixedContent:", fixedContent)
+	fmt.Println("analysis:", analysis)
+
 	return &FileAnalysisResult{
 		FixedContent: fixedContent,
 		Analysis:     analysis,
