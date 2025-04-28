@@ -156,6 +156,7 @@ func unmarshalLLMResponse(responseText string) (*LLMResponse, error) {
 	if responseText == "" {
 		return nil, fmt.Errorf("response is empty")
 	}
+	fmt.Println("Response text:", responseText)
 
 	var response LLMResponse
 	err := DecodeXML(responseText, &response)
