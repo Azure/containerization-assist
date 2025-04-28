@@ -52,13 +52,48 @@ run container-copilot
 go run . generate <../path/to/target-repo>
 ```
 
-### Using script
+### Automated Setup
 
+The `setup` command will provision Azure OpenAI resources and run the container-copilot tool in a single step:
+
+```bash
+# From root of container-copilot repo
+go run . setup --resource-group=mygroup --location=eastus \
+  --openai-resource=myopenai --deployment=mydeploy \
+  --target-repo=../path/to/target-repo
 ```
-Update the `env.example` file in the `hack` directory as needed, and copy it to `.env`:
-chmod +x hack/run-container-copilot.sh
-./hack/run-container-copilot.sh
+
+You can also provide these values via environment variables or a `.env` file. Copy the `hack/env.example` to `.env` in the project root and fill in the required values:
+
+```bash
+# Container‑Copilot settings:
+CCP_RESOURCE_GROUP=mygroup
+CCP_LOCATION=eastus
+CCP_OPENAI_RESOURCE_NAME=myopenai
+CCP_DEPLOYMENT_NAME=mydeploy
+CCP_TARGET_REPO=../path/to/target-repo
+
+# Optional (defaults shown):
+CCP_MODEL_ID=o3-mini
+CCP_MODEL_VERSION=2025-01-31
 ```
+
+Then run the setup command without arguments:
+
+```bash
+go run . setup
+```
+
+The setup command will:
+1. Check if Azure OpenAI environment variables are already set
+   - If they are, it will skip the setup process unless `--force-setup` is specified
+2. Load existing values from a `.env` file if it exists
+3. Provision all required Azure OpenAI resources
+4. Create/update the model deployment
+5. Save all environment variables to the `.env` file in your project root
+6. Run the container-copilot generator on your target repository
+
+Once you've run the setup command, subsequent runs will detect your existing configuration and skip the provisioning step, making it faster to iterate on your containerization.
 
 ### Using via Github Actions
 ```
