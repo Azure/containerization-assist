@@ -33,13 +33,11 @@ func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
 }
 
 func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState, promptClient *clients.PromptClient) (*FileAnalysisResult, error) {
-	// Get the template content from the client's cache
+
 	templateContent, err := promptClient.GetTemplate("dockerfile_template.xml")
 	if err != nil {
 		return nil, fmt.Errorf("error loading Dockerfile prompt template: %w", err)
 	}
-
-	//fmt.Printf("Loaded Dockerfile prompt template: %s\n", templateContent)
 
 	// Load the prompt template using the prompt package function
 	promptTemplate, err := prompt.LoadDockerfilePromptTemplateFromBytes([]byte(templateContent))
@@ -60,7 +58,7 @@ func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState, promptCl
 	//prompt.EncodeXMLToFile(promptTemplate, "dockerfile_prompt_test.xml") //TODO: ADD this to as a debug option, possibly add to SNAPSHOTS
 
 	// Get the prompt text
-	promptText, err := prompt.EncodeXMLToString(promptTemplate)
+	promptText, err := prompt.EncodeXMLStructToString(promptTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("error generating prompt: %w", err)
 	}

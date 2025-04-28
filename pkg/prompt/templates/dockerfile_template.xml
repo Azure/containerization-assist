@@ -17,7 +17,7 @@
                 especially for Java-based applications where the approved Java images should be used
                 whenever possible.
 
-                APPROVED DOCKER IMAGES: The Docker images inside <content></content> are approved for use
+                APPROVED DOCKER IMAGES: The Docker images inside <content> are approved for use
             </description>
             <content></content>
         </approved_container_images>

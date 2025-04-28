@@ -20,10 +20,12 @@ type Element struct {
 	Content     RawString `xml:"content,omitempty"`
 }
 
+// GetContent returns the content as a string
 func (e *Element) GetContent() string {
 	return string(e.Content)
 }
 
+// SetContent sets the content as a RawString
 func (e *Element) SetContent(content string) {
 	e.Content = RawString(content)
 }
@@ -37,6 +39,7 @@ type DockerfileContext struct {
 	Dockerfile     Element `xml:"dockerfile"`
 }
 
+// LLMResponse represents the structure expected from the LLM
 type LLMResponse struct {
 	XMLName      xml.Name  `xml:"response"`
 	Analysis     RawString `xml:"analysis"`
@@ -44,17 +47,35 @@ type LLMResponse struct {
 	FixedContent RawString `xml:"fixed_content"`
 }
 
+// LoadDockerfilePromptTemplate loads the Dockerfile prompt template from a file
+func LoadDockerfilePromptTemplate(templatePath string) (*Prompt, error) {
+	prompt := &Prompt{
+		Context: &DockerfileContext{},
+	}
+
+	err := DecodeXMLFromFile(templatePath, prompt)
+	if err != nil {
+		return nil, err
+	}
+
+	return prompt, nil
+}
+
 // LoadDockerfilePromptTemplateFromBytes loads the Dockerfile prompt template from a byte slice
 func LoadDockerfilePromptTemplateFromBytes(data []byte) (*Prompt, error) {
 	prompt := &Prompt{
 		Context: &DockerfileContext{},
 	}
-	if err := xml.Unmarshal(data, prompt); err != nil {
+
+	// Use our custom decoder that properly handles RawString
+	if err := DecodeXML(string(data), prompt); err != nil {
 		return nil, err
 	}
+
 	return prompt, nil
 }
 
+// FillDockerfilePrompt populates the Dockerfile prompt with the specified content
 func (p *Prompt) FillDockerfilePrompt(dockerfileContent, manifestErrors, approvedImages, buildErrors, repoStructure string) {
 	ctx, ok := p.Context.(*DockerfileContext)
 	if !ok {
@@ -68,8 +89,9 @@ func (p *Prompt) FillDockerfilePrompt(dockerfileContent, manifestErrors, approve
 	ctx.RepoStructure.SetContent(repoStructure)
 }
 
+// ExtractResponseSections extracts the analysis, explanation, and fixed content from a response
 func ExtractResponseSections(responseText string) (string, string, string, error) {
-	// Parse the response using XML unmarshalling
+	// Parse the response using XML unmarshalling with flexible custom decoder
 	response, err := unmarshalLLMResponse(responseText)
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to extract response sections: %w", err)
@@ -119,7 +141,7 @@ func unmarshalLLMResponse(responseText string) (*LLMResponse, error) {
 
 // PrintStruct prints a struct in a human-readable format
 func PrintStruct(data interface{}) {
-	xmlStr, err := EncodeXMLToString(data)
+	xmlStr, err := EncodeXMLStructToString(data)
 	if err != nil {
 		fmt.Printf("Error encoding struct to XML: %v\n", err)
 		return

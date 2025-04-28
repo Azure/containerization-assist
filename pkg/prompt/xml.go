@@ -3,7 +3,6 @@ package prompt
 import (
 	"encoding/xml"
 	"fmt"
-	"html"
 	"io"
 	"os"
 	"strings"
@@ -11,7 +10,7 @@ import (
 
 // DecodeXML decodes XML data into the provided struct
 func DecodeXML(data string, target interface{}) error {
-	// Create a decoder that's more tolerant to XML issues
+	// Create a decoder that's more tolerant of XML issues
 	decoder := xml.NewDecoder(strings.NewReader(data))
 	decoder.Strict = false
 	decoder.AutoClose = xml.HTMLAutoClose
@@ -34,54 +33,47 @@ func DecodeXMLFromFile(filePath string, target interface{}) error {
 	return DecodeXML(string(content), target)
 }
 
-// Takes XML struct and outputs it to a file
-func EncodeXMLToFile(data interface{}, filePath string) error {
-	// Encode to string first to avoid escaping issues
-	xmlStr, err := EncodeXMLToString(data)
-	if err != nil {
-		return fmt.Errorf("failed to encode XML to string: %w", err)
+// EncodeXML encodes the provided struct into XML and writes it to the given writer
+func EncodeXML(data interface{}, w io.Writer) error {
+	encoder := xml.NewEncoder(w)
+	encoder.Indent("", "  ")
+
+	if err := encoder.Encode(data); err != nil {
+		return fmt.Errorf("failed to encode XML: %w", err)
 	}
 
-	humanReadable := UnescapeXML(xmlStr)
+	if err := encoder.Flush(); err != nil {
+		return fmt.Errorf("failed to flush encoder: %w", err)
+	}
 
+	return nil
+}
+
+// EncodeXMLToString encodes the provided struct to an XML string
+func EncodeXMLStructToString(data interface{}) (string, error) {
+	var sb strings.Builder
+	if err := EncodeXML(data, &sb); err != nil {
+		return "", err
+	}
+	return sb.String(), nil
+}
+
+// EncodeXMLToFile encodes the provided struct to XML and writes it to a file
+func EncodeXMLToFile(data interface{}, filePath string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to create XML file: %w", err)
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(humanReadable)
-	if err != nil {
+	if err := EncodeXML(data, file); err != nil {
 		return fmt.Errorf("failed to write XML to file: %w", err)
 	}
 
 	return nil
 }
 
-// EncodeXMLToString encodes the provided struct into an XML string without unwanted HTML entities.
-func EncodeXMLToString(data interface{}) (string, error) {
-	var sb strings.Builder
-	encoder := xml.NewEncoder(&sb)
-	encoder.Indent("", "  ")
-
-	if err := encoder.Encode(data); err != nil {
-		return "", fmt.Errorf("failed to encode XML to string: %w", err)
-	}
-
-	if err := encoder.Flush(); err != nil {
-		return "", fmt.Errorf("failed to flush encoder: %w", err)
-	}
-
-	// Return raw string with XML header
-	return sb.String(), nil
-}
-
-// HumanReadableXML converts XML with HTML entities to a human-readable format
-func UnescapeXML(s string) string {
-	return html.UnescapeString(s)
-}
-
-// PrintXMLContent prints the XML content in a human-readable format
+// PrintXMLContent prints XML content to the console
 func PrintXMLContent(content string) {
-	fmt.Println(UnescapeXML(content))
+	fmt.Println(content)
 }
