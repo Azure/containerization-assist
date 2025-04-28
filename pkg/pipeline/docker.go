@@ -57,7 +57,7 @@ func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState, promptCl
 	)
 
 	// Save the prompt to file for debugging
-	prompt.EncodeXMLToFile(promptTemplate, "dockerfile_prompt_test.xml") //TODO: ADD this to as a debug option, possibly add to SNAPSHOTS
+	//prompt.EncodeXMLToFile(promptTemplate, "dockerfile_prompt_test.xml") //TODO: ADD this to as a debug option, possibly add to SNAPSHOTS
 
 	// Get the prompt text
 	promptText, err := prompt.EncodeXMLToString(promptTemplate)

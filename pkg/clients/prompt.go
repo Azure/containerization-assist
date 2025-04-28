@@ -14,13 +14,22 @@ type PromptClient struct {
 }
 
 // NewPromptClient creates a new PromptClient with the given templates directory
+// If templatesDir is empty, it will use the embedded templates
 func NewPromptClient(templatesDir string) (*PromptClient, error) {
-	absPath, err := filepath.Abs(templatesDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path for templates directory: %w", err)
+	var manager prompt.Manager
+
+	if templatesDir == "" {
+		// Use embedded templates
+		manager = prompt.NewEmbedManager(prompt.TemplatesFS, "templates")
+	} else {
+		// Use templates from filesystem
+		absPath, err := filepath.Abs(templatesDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get absolute path for templates directory: %w", err)
+		}
+		manager = prompt.NewFileSystemManager(absPath)
 	}
 
-	manager := prompt.NewFileSystemManager(absPath)
 	return &PromptClient{
 		manager:       manager,
 		templateCache: make(map[string]string),
@@ -35,7 +44,7 @@ func (c *PromptClient) GetTemplate(name string) (string, error) {
 		return template, nil
 	}
 
-	// Not in cache, load from file system
+	// Not in cache, load from manager
 	template, err := c.manager.GetTemplate(name)
 	if err != nil {
 		return "", err
