@@ -168,7 +168,7 @@ jobs:
           github_summary_table=""
           echo "## Container-Copilot Integration Test Results" > $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          github_summary_table+="| Repo | Status | `Success Rate | Passed | Failed | Timed Out |
+          github_summary_table+="| Repo | Status | Success Rate | Passed | Failed | Timed Out |
           "
           github_summary_table+="| --- | --- | --- | --- | --- | --- |
           "
