@@ -3,12 +3,12 @@ package pipeline
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
+	"github.com/Azure/container-copilot/pkg/prompt"
 )
 
 func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
@@ -32,21 +32,23 @@ func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
 	return nil
 }
 
-func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
-	// Load the Dockerfile template
-	templatePath := filepath.Join("prompt_templates", "dockerfile_template.xml") // TODO: make this configurable
-
-	// Verify the template file exists
-	if _, err := os.Stat(templatePath); err != nil {
-		return nil, fmt.Errorf("error checking Dockerfile template at path %s: %v", templatePath, err)
-	}
-
-	prompt, err := ai.LoadDockerfilePromptTemplate(templatePath)
+func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState, promptClient *clients.PromptClient) (*FileAnalysisResult, error) {
+	// Get the template content from the client's cache
+	templateContent, err := promptClient.GetTemplate("dockerfile_template.xml")
 	if err != nil {
-		fmt.Printf("Error loading Dockerfile prompt template: %v\n", err)
+		return nil, fmt.Errorf("error loading Dockerfile prompt template: %w", err)
 	}
 
-	prompt.FillDockerfilePrompt(
+	//fmt.Printf("Loaded Dockerfile prompt template: %s\n", templateContent)
+
+	// Load the prompt template using the prompt package function
+	promptTemplate, err := prompt.LoadDockerfilePromptTemplateFromBytes([]byte(templateContent))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing Dockerfile prompt template: %w", err)
+	}
+
+	// Fill the prompt with content
+	promptTemplate.FillDockerfilePrompt(
 		state.Dockerfile.Content,
 		FormatManifestErrors(state),
 		docker.ApprovedDockerImages,
@@ -55,15 +57,13 @@ func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState) (*FileAn
 	)
 
 	// Save the prompt to file for debugging
-	ai.EncodeXMLToFile(prompt, "dockerfile_prompt_test.xml") //TODO: ADD this to as a debug option, possibly add to SNAPSHOTS
+	prompt.EncodeXMLToFile(promptTemplate, "dockerfile_prompt_test.xml") //TODO: ADD this to as a debug option, possibly add to SNAPSHOTS
 
 	// Get the prompt text
-	promptText, err := ai.EncodeXMLToString(prompt)
+	promptText, err := prompt.EncodeXMLToString(promptTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("error generating prompt: %w", err)
 	}
-
-	//ai.PrintXMLContent(promptText)
 
 	// Get AI completion
 	responseText, err := client.GetChatCompletion(promptText)
@@ -71,13 +71,8 @@ func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState) (*FileAn
 		return nil, fmt.Errorf("error getting AI completion: %w", err)
 	}
 
-	// Print human-readable response for debugging
-	//fmt.Println("AI response received:")
-	//ai.PrintXMLContent(responseText)
-
-	// Extract and validate the response sections
-	// Explaination response is not used in the current implementation // Used to make model think more deeply about changes
-	fixedContent, analysis, _, err := ai.ExtractResponseSections(responseText)
+	// Extract and validate the response sections using prompt package directly
+	fixedContent, analysis, _, err := prompt.ExtractResponseSections(responseText)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting response sections: %w", err)
 	}
@@ -101,8 +96,8 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 		state.IterationCount += 1
 
-		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
-		result, err := AnalyzeDockerfile(c.AzOpenAIClient, state)
+		// Get AI to fix the Dockerfile - call analyzeDockerfile with prompt client
+		result, err := AnalyzeDockerfile(c.AzOpenAIClient, state, c.Prompt)
 		if err != nil {
 			return fmt.Errorf("error in AI analysis: %v", err)
 		}

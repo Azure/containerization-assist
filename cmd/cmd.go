@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/ai"
@@ -111,11 +112,24 @@ func initClients() (*clients.Clients, error) {
 
 	cmdRunner := &runner.DefaultCommandRunner{}
 
+	// Initialize the PromptClient with the prompt_templates directory
+	templatesDir := filepath.Join("pkg", "prompt_templates")
+	promptClient, err := clients.NewPromptClient(templatesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create prompt client: %w", err)
+	}
+
+	// Preload all templates into memory to avoid disk reads during execution
+	if err := promptClient.PreloadTemplates(); err != nil {
+		return nil, fmt.Errorf("failed to preload templates: %w", err)
+	}
+
 	clients := &clients.Clients{
 		AzOpenAIClient: azOpenAIClient,
 		Docker:         docker.NewDockerCmdRunner(cmdRunner),
 		Kind:           kind.NewKindCmdRunner(cmdRunner),
 		Kube:           k8s.NewKubeCmdRunner(cmdRunner),
+		Prompt:         promptClient,
 	}
 
 	return clients, nil

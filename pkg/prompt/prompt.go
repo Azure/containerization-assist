@@ -1,4 +1,4 @@
-package ai
+package prompt
 
 import (
 	"encoding/xml"
@@ -57,6 +57,17 @@ func LoadDockerfilePromptTemplate(templatePath string) (*Prompt, error) {
 		return nil, err
 	}
 
+	return prompt, nil
+}
+
+// LoadDockerfilePromptTemplateFromBytes loads the Dockerfile prompt template from a byte slice
+func LoadDockerfilePromptTemplateFromBytes(data []byte) (*Prompt, error) {
+	prompt := &Prompt{
+		Context: &DockerfileContext{},
+	}
+	if err := xml.Unmarshal(data, prompt); err != nil {
+		return nil, err
+	}
 	return prompt, nil
 }
 

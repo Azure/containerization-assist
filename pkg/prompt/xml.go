@@ -1,4 +1,4 @@
-package ai
+package prompt
 
 import (
 	"encoding/xml"

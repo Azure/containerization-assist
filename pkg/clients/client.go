@@ -12,4 +12,5 @@ type Clients struct {
 	Docker         docker.DockerClient
 	Kind           kind.KindRunner
 	Kube           k8s.KubeRunner
+	Prompt         *PromptClient
 }
