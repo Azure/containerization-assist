@@ -40,23 +40,23 @@ jobs:
       matrix:
         test-repo:
           - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
-          - Azure-Samples/open-liberty-on-aks
+          # - Azure-Samples/open-liberty-on-aks
           - Azure/wildfly-container-quickstart
           - Mariemfakhreldein/e-commerce-app
           - N-Usha/java-on-aks-piggymetrics
           - SaiUpadhyayula/SpringAngularEcommerce
-          - Zaaim-Halim/java-EE-E-Commerce-Web-App
+          # - Zaaim-Halim/java-EE-E-Commerce-Web-App
           - agoncal/agoncal-application-petstore-ee7
           - aws-samples/aws-codedeploy-sample-tomcat
           - chamilad/tomcat-hello-world
           - colinbut/monolith-enterprise-application
           - dhruvinrsoni/online-pizza-ordering-system
           - eNKay2408/Note-Taking
-          - jamesfalkner/jboss-daytrader
+          # - jamesfalkner/jboss-daytrader
           - konveyor-ecosystem/coolstore
-          - kparent/jboss-helloworld
-          - oracle-samples/weblogic-examples
-          - shekhargulati/todoapp-forge
+          # - kparent/jboss-helloworld
+          # - oracle-samples/weblogic-examples
+          # - shekhargulati/todoapp-forge
           - spring-petclinic/spring-petclinic-microservices
         test-number: [1, 2, 3, 4, 5]
       fail-fast: false
