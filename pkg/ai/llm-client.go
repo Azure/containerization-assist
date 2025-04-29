@@ -40,7 +40,7 @@ func (c *AzOpenAIClient) GetChatCompletion(promptText string) (string, error) {
 				},
 			},
 			Seed:            to.Ptr(int64(42)),
-			ReasoningEffort: to.Ptr(azopenai.ReasoningEffortValueMedium),
+			ReasoningEffort: to.Ptr(azopenai.ReasoningEffortValueLow),
 		},
 		nil,
 	)
