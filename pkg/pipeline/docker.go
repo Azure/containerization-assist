@@ -102,6 +102,8 @@ Make sure to account for the file structure of the repository
 I will tip you if you provide a correct and working Dockerfile.
 `
 
+	fmt.Println(client.PrintDockerfileChatHistory())
+
 	// Use the chat history for Dockerfile generation
 	response, err := client.GetDockerfileChatCompletion(promptText)
 	if err != nil {

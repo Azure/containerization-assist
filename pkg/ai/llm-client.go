@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -13,6 +14,7 @@ type AzOpenAIClient struct {
 	client                *azopenai.Client
 	deploymentID          string
 	dockerfileChatHistory []azopenai.ChatRequestMessageClassification
+	manifestChatHistory   []azopenai.ChatRequestMessageClassification
 }
 
 // NewAzOpenAIClient creates and returns a new AzOpenAIClient using the provided credentials
@@ -27,6 +29,7 @@ func NewAzOpenAIClient(endpoint, apiKey, deploymentID string) (*AzOpenAIClient, 
 		client:                client,
 		deploymentID:          deploymentID,
 		dockerfileChatHistory: make([]azopenai.ChatRequestMessageClassification, 0),
+		manifestChatHistory:   make([]azopenai.ChatRequestMessageClassification, 0),
 	}, nil
 }
 
@@ -83,4 +86,89 @@ func (c *AzOpenAIClient) GetDockerfileChatHistory() []azopenai.ChatRequestMessag
 // GetDockerfileChatCompletion sends a prompt related to Dockerfile generation with history context
 func (c *AzOpenAIClient) GetDockerfileChatCompletion(promptText string) (string, error) {
 	return c.GetChatCompletionWithMemory(promptText, c.dockerfileChatHistory)
+}
+
+// PrintDockerfileChatHistory formats and prints the Dockerfile chat history
+func (c *AzOpenAIClient) PrintDockerfileChatHistory() string {
+	if len(c.dockerfileChatHistory) == 0 {
+		return "No chat history available."
+	}
+
+	var result strings.Builder
+	result.WriteString("\n=== Dockerfile Chat History ===\n\n")
+
+	for i, message := range c.dockerfileChatHistory {
+		result.WriteString(fmt.Sprintf("--- Message %d ---\n", i+1))
+
+		switch msg := message.(type) {
+		case *azopenai.ChatRequestUserMessage:
+			result.WriteString("Role: User\n")
+			contentStr := fmt.Sprintf("%v", msg.Content)
+			result.WriteString(fmt.Sprintf("Content: %s\n", contentStr))
+		case *azopenai.ChatRequestAssistantMessage:
+			result.WriteString("Role: Assistant\n")
+			if content := msg.Content; content != nil {
+				result.WriteString(fmt.Sprintf("Content: %s\n", *content))
+			}
+		case *azopenai.ChatRequestSystemMessage:
+			result.WriteString("Role: System\n")
+			result.WriteString(fmt.Sprintf("Content: %s\n", msg.Content))
+		default:
+			result.WriteString(fmt.Sprintf("Role: Unknown (Type: %T)\n", msg))
+		}
+
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+// AddToManifestChatHistory adds a message to the manifest chat history
+func (c *AzOpenAIClient) AddToManifestChatHistory(message azopenai.ChatRequestMessageClassification) {
+	c.manifestChatHistory = append(c.manifestChatHistory, message)
+}
+
+// GetManifestChatHistory returns the current manifest chat history
+func (c *AzOpenAIClient) GetManifestChatHistory() []azopenai.ChatRequestMessageClassification {
+	return c.manifestChatHistory
+}
+
+// GetManifestChatCompletion sends a prompt related to Kubernetes manifest generation with history context
+func (c *AzOpenAIClient) GetManifestChatCompletion(promptText string) (string, error) {
+	return c.GetChatCompletionWithMemory(promptText, c.manifestChatHistory)
+}
+
+// PrintManifestChatHistory formats and prints the Kubernetes manifest chat history
+func (c *AzOpenAIClient) PrintManifestChatHistory() string {
+	if len(c.manifestChatHistory) == 0 {
+		return "No manifest chat history available."
+	}
+
+	var result strings.Builder
+	result.WriteString("\n=== Kubernetes Manifest Chat History ===\n\n")
+
+	for i, message := range c.manifestChatHistory {
+		result.WriteString(fmt.Sprintf("--- Message %d ---\n", i+1))
+
+		switch msg := message.(type) {
+		case *azopenai.ChatRequestUserMessage:
+			result.WriteString("Role: User\n")
+			contentStr := fmt.Sprintf("%v", msg.Content)
+			result.WriteString(fmt.Sprintf("Content: %s\n", contentStr))
+		case *azopenai.ChatRequestAssistantMessage:
+			result.WriteString("Role: Assistant\n")
+			if content := msg.Content; content != nil {
+				result.WriteString(fmt.Sprintf("Content: %s\n", *content))
+			}
+		case *azopenai.ChatRequestSystemMessage:
+			result.WriteString("Role: System\n")
+			result.WriteString(fmt.Sprintf("Content: %s\n", msg.Content))
+		default:
+			result.WriteString(fmt.Sprintf("Role: Unknown (Type: %T)\n", msg))
+		}
+
+		result.WriteString("\n")
+	}
+
+	return result.String()
 }

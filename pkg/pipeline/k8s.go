@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/k8s"
@@ -78,7 +79,11 @@ IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest between <<<MANIFEST>>> tags.`
 
-	content, err := client.GetChatCompletion(promptText)
+	var content string
+	var err error
+
+	// Use chat history for manifest generation
+	content, err = client.GetManifestChatCompletion(promptText)
 	if err != nil {
 		return nil, err
 	}
@@ -88,10 +93,34 @@ Output the fixed manifest between <<<MANIFEST>>> tags.`
 		return nil, fmt.Errorf("failed to extract fixed manifest: %v", err)
 	}
 
-	return &FileAnalysisResult{
+	// Create result
+	result := &FileAnalysisResult{
 		FixedContent: fixedContent,
 		Analysis:     content,
-	}, nil
+	}
+
+	// Add user message (with error messages) to chat history
+	if input.ErrorMessages != "" {
+		manifestName := "unknown"
+		if input.FilePath != "" {
+			manifestName = filepath.Base(input.FilePath)
+		}
+		client.AddToManifestChatHistory(&azopenai.ChatRequestUserMessage{
+			Content: azopenai.NewChatRequestUserMessageContent(fmt.Sprintf("Manifest %s error: %s", manifestName, input.ErrorMessages)),
+		})
+	} else {
+		client.AddToManifestChatHistory(&azopenai.ChatRequestUserMessage{
+			Content: azopenai.NewChatRequestUserMessageContent("Please help improve this Kubernetes manifest"),
+		})
+	}
+
+	// Add assistant response to chat history
+	assistantContent := result.Analysis
+	client.AddToManifestChatHistory(&azopenai.ChatRequestAssistantMessage{
+		Content: azopenai.NewChatRequestAssistantMessageContent(assistantContent),
+	})
+
+	return result, nil
 }
 
 // deployStateManifests deploys manifests from pipeline state
