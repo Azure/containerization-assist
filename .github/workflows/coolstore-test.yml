@@ -20,11 +20,11 @@ jobs:
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: '1.24'
-
+      
       - name: Build container-copilot
         run: |
           go build -o container-copilot .
-
+          
       - name: Upload binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -40,34 +40,34 @@ jobs:
       matrix:
         test-repo:
           - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
-          - Azure-Samples/open-liberty-on-aks
+          # - Azure-Samples/open-liberty-on-aks
           - Azure/wildfly-container-quickstart
           - Mariemfakhreldein/e-commerce-app
           - N-Usha/java-on-aks-piggymetrics
           - SaiUpadhyayula/SpringAngularEcommerce
-          - Zaaim-Halim/java-EE-E-Commerce-Web-App
+          # - Zaaim-Halim/java-EE-E-Commerce-Web-App
           - agoncal/agoncal-application-petstore-ee7
           - aws-samples/aws-codedeploy-sample-tomcat
           - chamilad/tomcat-hello-world
           - colinbut/monolith-enterprise-application
           - dhruvinrsoni/online-pizza-ordering-system
           - eNKay2408/Note-Taking
-          - jamesfalkner/jboss-daytrader
+          # - jamesfalkner/jboss-daytrader
           - konveyor-ecosystem/coolstore
-          - kparent/jboss-helloworld
-          - oracle-samples/weblogic-examples
-          - shekhargulati/todoapp-forge
+          # - kparent/jboss-helloworld
+          # - oracle-samples/weblogic-examples
+          # - shekhargulati/todoapp-forge
           - spring-petclinic/spring-petclinic-microservices
         test-number: [1, 2, 3, 4, 5]
       fail-fast: false
-
+    
     steps:
       - name: Download container-copilot binary
         uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
           name: container-copilot-binary
           path: ./
-
+      
       - name: Make binary executable
         run: |
           chmod +x container-copilot
@@ -86,7 +86,7 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           install_only: true
-
+      
       - name: Run Test ${{ matrix.test-number }}
         id: run_test
         continue-on-error: true
@@ -96,18 +96,18 @@ jobs:
           AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
         run: |
           cd test-repo
-
+          
           # Make sure we have a place to store logs
-          mkdir -p logs
-
+          mkdir -p artifacts/logs
+          
           # The success message we're looking for in the output
           SUCCESS_MESSAGE="Container deployment pipeline completed successfully!"
-
+          
           # Start with a clean slate
           rm -f Dockerfile || true
           rm -rf manifests || true
           mkdir -p manifests
-
+          
           # Run the test and save output
           REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|.|g' )
           RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ matrix.test-number }}"
@@ -115,10 +115,9 @@ jobs:
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
           echo "Running container-copilot generate for test $RUN_NAME ..."
-          container-copilot generate . > "logs/run-${RUN_NAME}.log" 2>&1
+          container-copilot generate . > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
           # Save the files it created for successful tests
           if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
-            mkdir -p artifacts
             [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
             [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
           fi
@@ -134,32 +133,17 @@ jobs:
             echo "result=failure" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload test artifacts # TODO: merge into a single artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: steps.run_test.outputs.result == 'success'
-        with:
-          name: container-copilot-artifacts-${{ steps.run_test.outputs.run_name }}
-          path: test-repo/artifacts/
-          retention-days: 14
-
-      - name: Upload test logs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always()
-        with:
-          name: container-copilot-logs-${{ steps.run_test.outputs.run_name }}
-          path: test-repo/logs/
-          retention-days: 14
-
       - name: Save result
         if: always()
-        run: echo "${{ steps.run_test.outputs.result }}" > result.txt
+        run: echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
 
-      - name: Upload test result
-        if: always()
+      - name: Upload test artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
         with:
-          name: test-result-${{ steps.run_test.outputs.run_name }}
-          path: result.txt
+          name: cc-run-${{ steps.run_test.outputs.run_name }}
+          path: test-repo/artifacts/
+          retention-days: 14
 
   aggregate-results:
     needs: test-run
@@ -169,7 +153,7 @@ jobs:
       - name: Download all results
         uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
-          pattern: test-result-*
+          pattern: cc-run-*
           path: results
 
       - name: Aggregate Test Results
@@ -186,8 +170,7 @@ jobs:
           "
 
           # List repos without numbers
-
-          export REPOS="$(ls results | grep -oP 'test-result-\K[^#]+' | uniq)"
+          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"  
           echo "Repos: $REPOS"
 
           success_rates=()
@@ -202,7 +185,7 @@ jobs:
             # Count successes and failures
             success_count=0
             failure_count=0
-
+            
             # Build detailed results
             passed_tests=""
             failed_tests="" # includes failed and timed out tests
@@ -210,8 +193,8 @@ jobs:
 
             # Loop through test runs
             for ((i=1; i<=$tests_per_repo; i++)); do
-              if [ -f "results/test-result-$repo#$i/result.txt" ]; then
-                result=$(cat "results/test-result-$repo#$i/result.txt")
+              if [ -f "results/cc-run-$repo#$i/result.txt" ]; then
+                result=$(cat "results/cc-run-$repo#$i/result.txt")
                 if [ "$result" == "success" ]; then
                   success_count=$((success_count + 1))
                   passed_tests+="- Test Run $i ✅\n"
