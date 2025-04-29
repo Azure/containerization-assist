@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,7 +40,7 @@ func GetPendingManifests(state *PipelineState) map[string]bool {
 	return pendingManifests
 }
 
-func analyzeKubernetesManifest(client *ai.AzOpenAIClient, input FileAnalysisInput, state *PipelineState) (*FileAnalysisResult, error) {
+func analyzeKubernetesManifest(ctx context.Context, client *ai.AzOpenAIClient, input FileAnalysisInput, state *PipelineState) (*FileAnalysisResult, error) {
 	// Create prompt for analyzing the Kubernetes manifest
 	promptText := fmt.Sprintf(`Analyze the following Kubernetes manifest file for errors and suggest fixes:
 Manifest:
@@ -74,12 +75,12 @@ Please:
 2. Provide a fixed version of the manifest
 3. Explain what changes were made and why
 
-Do NOT create brand new manifests - Only fix the provided manifest. 
+Do NOT create brand new manifests - Only fix the provided manifest.
 IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest between <<<MANIFEST>>> tags.`
 
-	content, err := client.GetChatCompletion(promptText)
+	content, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +153,7 @@ func (s *PipelineState) DeployStateManifests(c *clients.Clients) error {
 }
 
 // Update iterateMultipleManifestsDeploy to use the new deployment function
-func IterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, targetDir string, generateSnapshot bool, c *clients.Clients) error {
+func IterateMultipleManifestsDeploy(ctx context.Context, maxIterations int, state *PipelineState, targetDir string, generateSnapshot bool, c *clients.Clients) error {
 	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := k8s.CheckKubectlInstalled(); err != nil {
@@ -164,12 +165,20 @@ func IterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, tar
 	}
 
 	for i := 0; i < maxIterations; i++ {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("operation ended: %w", err)
+		}
+
 		fmt.Printf("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
 		state.IterationCount += 1
 
 		// Fix each manifest that still has issues
 		pendingObjects := GetPendingManifests(state)
 		for name := range pendingObjects {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("operation ended: %w", err)
+			}
+
 			thisObject := state.K8sObjects[name]
 			fmt.Printf("\nAnalyzing and fixing: %s\n", name)
 
@@ -186,7 +195,7 @@ func IterateMultipleManifestsDeploy(maxIterations int, state *PipelineState, tar
 			}
 
 			// Pass the entire state instead of just the Dockerfile
-			result, err := analyzeKubernetesManifest(c.AzOpenAIClient, input, state)
+			result, err := analyzeKubernetesManifest(ctx, c.AzOpenAIClient, input, state)
 			if err != nil {
 				return fmt.Errorf("error in AI analysis for %s: %v", name, err)
 			}

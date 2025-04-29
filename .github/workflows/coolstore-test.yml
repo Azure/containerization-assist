@@ -5,7 +5,7 @@ on:
   pull_request:
 
 # ensure that only one workflow is running at a time per branch/pr by canceling in-progress runs
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -89,7 +89,6 @@ jobs:
 
       - name: Run Test ${{ matrix.test-number }}
         id: run_test
-        timeout-minutes: 5
         continue-on-error: true
         env:
           AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
@@ -189,14 +188,14 @@ jobs:
 
           # List repos without numbers
 
-          export REPOS="$(ls results | grep -oP 'test-result-\K[^#]+' | uniq)"  
+          export REPOS="$(ls results | grep -oP 'test-result-\K[^#]+' | uniq)"
           echo "Repos: $REPOS"
 
           success_rates=()
 
           single_run_pass_threshold=30
           single_run_green_threshold=80
-          
+
           # Loop through repos
           for repo in $REPOS; do
             echo "Processing results for $repo"

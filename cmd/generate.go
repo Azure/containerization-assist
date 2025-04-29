@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -14,7 +15,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-func generate(targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
+func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
 
 	kindClusterName, err := c.GetKindCluster()
 	if err != nil {
@@ -41,7 +42,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 
 	if enableDraftDockerfile {
 		fmt.Printf("Generating Dockerfile in %s\n", targetDir)
-		templateName, err := docker.GetDockerfileTemplateName(c.AzOpenAIClient, targetDir)
+		templateName, err := docker.GetDockerfileTemplateName(ctx, c.AzOpenAIClient, targetDir)
 		if err != nil {
 			return fmt.Errorf("getting Dockerfile template name: %w", err)
 		}
@@ -86,7 +87,11 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 
 	errors := []string{}
 	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := pipeline.IterateDockerfileBuild(maxIterations, state, targetDir, generateSnapshot, c); err != nil {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("operation ended: %w", err)
+		}
+
+		if err := pipeline.IterateDockerfileBuild(ctx, maxIterations, state, targetDir, generateSnapshot, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
 		}
@@ -97,7 +102,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
 		}
 
-		if err := pipeline.IterateMultipleManifestsDeploy(maxIterations, state, targetDir, generateSnapshot, c); err != nil {
+		if err := pipeline.IterateMultipleManifestsDeploy(ctx, maxIterations, state, targetDir, generateSnapshot, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
 		}
 	}

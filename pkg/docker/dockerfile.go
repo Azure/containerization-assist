@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -37,7 +38,7 @@ Return only the exact template name from the list without any other text, explan
 )
 
 // Use LLM to select the dockerfile template name from the list of available templates
-func GetDockerfileTemplateName(client *ai.AzOpenAIClient, projectDir string) (string, error) {
+func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, projectDir string) (string, error) {
 	dockerfileTemplateNames, err := listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
 		return "", fmt.Errorf("failed to list dockerfile template names: %w", err)
@@ -50,7 +51,7 @@ func GetDockerfileTemplateName(client *ai.AzOpenAIClient, projectDir string) (st
 
 	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
 
-	content, err := client.GetChatCompletion(promptText)
+	content, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return "", err
 	}
