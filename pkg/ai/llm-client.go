@@ -39,8 +39,8 @@ func (c *AzOpenAIClient) GetChatCompletion(promptText string) (string, error) {
 					Content: azopenai.NewChatRequestUserMessageContent(promptText),
 				},
 			},
-			Seed: to.Ptr(int64(42)),
-			TopP: to.Ptr(float32(0.00000001)),
+			Seed:            to.Ptr(int64(42)),
+			ReasoningEffort: to.Ptr(azopenai.ReasoningEffortValueHigh),
 		},
 		nil,
 	)
