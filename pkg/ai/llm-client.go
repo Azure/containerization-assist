@@ -39,6 +39,8 @@ func (c *AzOpenAIClient) GetChatCompletion(promptText string) (string, error) {
 					Content: azopenai.NewChatRequestUserMessageContent(promptText),
 				},
 			},
+			Seed:        to.Ptr(int64(42)),
+			Temperature: to.Ptr(float32(0)),
 		},
 		nil,
 	)
