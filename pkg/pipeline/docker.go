@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
@@ -101,20 +102,39 @@ Make sure to account for the file structure of the repository
 I will tip you if you provide a correct and working Dockerfile.
 `
 
-	content, err := client.GetChatCompletion(promptText)
+	// Use the chat history for Dockerfile generation
+	response, err := client.GetDockerfileChatCompletion(promptText)
 	if err != nil {
 		return nil, err
 	}
 
-	fixedContent, err := utils.GrabContentBetweenTags(content, "DOCKERFILE")
+	fixedContent, analysisContent, err := utils.SplitContentAtTags(response, "DOCKERFILE")
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract fixed Dockerfile: %v", err)
 	}
 
-	return &FileAnalysisResult{
+	// Save this interaction to chat history
+	result := &FileAnalysisResult{
 		FixedContent: fixedContent,
-		Analysis:     content,
-	}, nil
+		Analysis:     response,
+	}
+
+	// Add user message (with build errors) to chat history
+	if dockerfile.BuildErrors != "" {
+		client.AddToDockerfileChatHistory(&azopenai.ChatRequestUserMessage{
+			Content: azopenai.NewChatRequestUserMessageContent(fmt.Sprintf("Build error: %s", dockerfile.BuildErrors)),
+		})
+	} else {
+		client.AddToDockerfileChatHistory(&azopenai.ChatRequestUserMessage{
+			Content: azopenai.NewChatRequestUserMessageContent(fmt.Sprintf("Please help improve this Dockerfile: %s", dockerfile.Content)),
+		})
+	}
+
+	client.AddToDockerfileChatHistory(&azopenai.ChatRequestAssistantMessage{
+		Content: azopenai.NewChatRequestAssistantMessageContent(analysisContent),
+	})
+
+	return result, nil
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
