@@ -114,9 +114,6 @@ jobs:
           #Output the run name for the next step
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
-          # set output to timeout, will be updated on completion
-          echo "result=timeout" >> $GITHUB_OUTPUT
-
           echo "Running container-copilot generate for test $RUN_NAME ..."
           container-copilot generate . > "logs/run-${RUN_NAME}.log" 2>&1
           # Save the files it created for successful tests
@@ -126,8 +123,10 @@ jobs:
             [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
           fi
 
-          # Check if the success message is in the log file
-          if grep -q "$SUCCESS_MESSAGE" "logs/run-${RUN_NAME}.log"; then
+          if grep -q "context deadline exceeded" logs/run-${RUN_NAME}.log; then
+            echo "❌ Test Run $RUN_NAME: Operation timed out - context deadline exceeded"
+            echo "result=timeout" >> $GITHUB_OUTPUT
+          elif grep -q "$SUCCESS_MESSAGE" "logs/run-${RUN_NAME}.log"; then
             echo "✅ Test Run $RUN_NAME PASSED - Found '$SUCCESS_MESSAGE'"
             echo "result=success" >> $GITHUB_OUTPUT
           else
