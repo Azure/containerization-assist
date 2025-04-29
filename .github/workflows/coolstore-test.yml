@@ -125,7 +125,7 @@ jobs:
           if grep -q "context deadline exceeded" logs/run-${RUN_NAME}.log; then
             echo "❌ Test Run $RUN_NAME: Operation timed out - context deadline exceeded"
             echo "result=timeout" >> $GITHUB_OUTPUT
-          elif grep -q "$SUCCESS_MESSAGE" "logs/run-${RUN_NAME}.log"; then
+          elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/run-${RUN_NAME}.log"; then
             echo "✅ Test Run $RUN_NAME PASSED - Found '$SUCCESS_MESSAGE'"
             echo "result=success" >> $GITHUB_OUTPUT
           else
