@@ -121,21 +121,6 @@ I will tip you if you provide a correct and working Dockerfile.
 		Analysis:     response,
 	}
 
-	// Add user message (with build errors) to chat history
-	if dockerfile.BuildErrors != "" {
-		client.AddToDockerfileChatHistory(&azopenai.ChatRequestUserMessage{
-			Content: azopenai.NewChatRequestUserMessageContent(fmt.Sprintf("Build error: %s", dockerfile.BuildErrors)),
-		})
-	} else {
-		client.AddToDockerfileChatHistory(&azopenai.ChatRequestUserMessage{
-			Content: azopenai.NewChatRequestUserMessageContent(fmt.Sprintf("Please help improve this Dockerfile: %s", dockerfile.Content)),
-		})
-	}
-
-	client.AddToDockerfileChatHistory(&azopenai.ChatRequestAssistantMessage{
-		Content: azopenai.NewChatRequestAssistantMessageContent(analysisContent),
-	})
-
 	return result, nil
 }
 
@@ -151,6 +136,8 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 	for i := 0; i < maxIterations; i++ {
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 		state.IterationCount += 1
+
+		prevDockerFileContent := state.Dockerfile.Content
 
 		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
 		result, err := AnalyzeDockerfile(c.AzOpenAIClient, state)
@@ -177,6 +164,14 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 			}
 			return nil
 		}
+
+		c.AzOpenAIClient.AddToDockerfileChatHistory(&azopenai.ChatRequestUserMessage{
+			Content: azopenai.NewChatRequestUserMessageContent(fmt.Sprintf("Previous Dockerfile that was unable to be fixed: %s", prevDockerFileContent)),
+		})
+
+		c.AzOpenAIClient.AddToDockerfileChatHistory(&azopenai.ChatRequestAssistantMessage{
+			Content: azopenai.NewChatRequestAssistantMessageContent(fmt.Sprintf(("Previous try at modifying the Dockerfile that resulted in build failure: %s"), result.Analysis)),
+		})
 
 		fmt.Printf("Docker build failed with error: %v\n", buildErrors)
 
