@@ -22,7 +22,8 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 	}
 	fmt.Printf("Using kind cluster: %s\n", kindClusterName)
 
-	maxIterations := 2
+	maxIterations := 5
+	maxFullLoopIterations := 2
 	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
 
 	state := &pipeline.PipelineState{
@@ -85,7 +86,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 	}
 
 	errors := []string{}
-	for i := 0; i < maxIterations && !state.Success; i++ {
+	for i := 0; i < maxFullLoopIterations && !state.Success; i++ {
 		if err := pipeline.IterateDockerfileBuild(maxIterations, state, targetDir, generateSnapshot, c); err != nil {
 			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
 			break
