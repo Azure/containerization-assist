@@ -22,7 +22,7 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 	}
 	fmt.Printf("Using kind cluster: %s\n", kindClusterName)
 
-	maxIterations := 5
+	maxIterations := 2
 	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
 
 	state := &pipeline.PipelineState{

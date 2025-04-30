@@ -24,6 +24,20 @@ Now, here are the most recent errors and what was attempted to resolve them:
 Your task is to update the running summary. Do not attempt to resolve or fix the errors further—only summarize what happened and what was attempted that didn’t work.
 The summary should be concise and clear, and should serve as a vital tool for the next iteration of debugging.
 `
+
+	summaryFixSuccess = `
+You're helping analyze a successful Dockerfile build after several failed attempts.
+
+Here is a summary of the previous build errors and the changes that were attempted:
+%s
+
+Here is the final output from the Dockerfile that successfully built:
+%s
+
+Based on this, explain concisely what specific change or set of changes ultimately made the Dockerfile build succeed.
+
+Be precise and avoid speculation — only describe what clearly resolved the previous errors.
+`
 )
 
 func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
