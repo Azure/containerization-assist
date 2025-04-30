@@ -11,6 +11,21 @@ import (
 	"github.com/Azure/container-copilot/utils"
 )
 
+const (
+	summarizeDockerfileRunningErrorsPrompt = `
+You are assisting in debugging a Dockerfile generation process.
+
+Below is a running summary of the errors encountered so far and the unsuccessful attempts to fix them:
+%s
+
+Now, here are the most recent errors and what was attempted to resolve them:
+%s
+
+Your task is to update the running summary. Do not attempt to resolve or fix the errors further—only summarize what happened and what was attempted that didn’t work.
+The summary should be concise and clear, and should serve as a vital tool for the next iteration of debugging.
+`
+)
+
 func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerFilePath); err != nil {
@@ -84,6 +99,13 @@ No error messages were provided. Please check for potential issues in the Docker
 Repository files structure:
 %s
 `, state.RepoFileTree)
+	}
+
+	if state.Dockerfile.PreviousAttemptsSummary != "" {
+		promptText += fmt.Sprintf(`
+Previous attempts to fix the Dockerfile:
+%s
+`, state.Dockerfile.PreviousAttemptsSummary)
 	}
 
 	promptText += `
@@ -161,6 +183,15 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 		fmt.Println("Docker build failed. Using AI to fix issues...")
 
 		state.Dockerfile.BuildErrors = buildErrors
+
+		summary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(summarizeDockerfileRunningErrorsPrompt, state.Dockerfile.PreviousAttemptsSummary, result.Analysis)
+		if err != nil {
+			fmt.Printf("Warning: Failed to generate summary: %v\n", err)
+		} else {
+			state.Dockerfile.PreviousAttemptsSummary = summary
+		}
+
+		fmt.Println("Updated summary of previous attempts: \n", state.Dockerfile.PreviousAttemptsSummary)
 
 		if generateSnapshot {
 			if err := WriteIterationSnapshot(state, targetDir); err != nil {
