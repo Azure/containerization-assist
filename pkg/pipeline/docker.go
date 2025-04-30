@@ -12,17 +12,22 @@ import (
 )
 
 const (
-	summarizeDockerfileRunningErrorsPrompt = `
-You are assisting in debugging a Dockerfile generation process.
+	summaryFailureAnalysis = `
+You're helping analyze repeated build failures while trying to generate a working Dockerfile.
 
-Below is a running summary of the errors encountered so far and the unsuccessful attempts to fix them:
+Here is a summary of previous errors and attempted fixes:
 %s
 
-Now, here are the most recent errors and what was attempted to resolve them:
+Here is the most recent build error:
 %s
 
-Your task is to update the running summary. Do not attempt to resolve or fix the errors further—only summarize what happened and what was attempted that didn’t work.
-The summary should be concise and clear, and should serve as a vital tool for the next iteration of debugging.
+Your job is to answer the following:
+1. What is the root cause of this failure?
+2. Was the previous fix based on an incorrect assumption?
+3. Should a different build strategy be attempted?
+4. Summarize all this concisely and clearly. Do not fix the Dockerfile — just analyze what went wrong and how the logic should change.
+
+Be precise, and do not assume the file system has changed unless explicitly told so.
 `
 
 	summaryFixSuccess = `
