@@ -14,6 +14,16 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
+const (
+	repoStructurePrompt = `
+	Analyze the repo structure and provide the top 10 relevant files useful for dockerfile creation.
+	Also include a useful summary of the repo structure.
+
+	Repo structure:
+	%s
+	`
+)
+
 func generate(targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
 
 	kindClusterName, err := c.GetKindCluster()
@@ -73,6 +83,12 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 	if err != nil {
 		return fmt.Errorf("failed to get file tree: %w", err)
 	}
+
+	//Call chat completion to analyze the repo structure and provide the top 10 relevant files useful for dockerfile creation
+	repoStructureSummary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(repoStructurePrompt, repoStructure)
+	fmt.Printf("Repo structure summary: %s\n", repoStructureSummary)
+
+	repoStructure = repoStructureSummary + "\n" + repoStructure
 	state.RepoFileTree = repoStructure
 
 	err = state.InitializeManifests(targetDir) // Initialize K8sManifests with default path

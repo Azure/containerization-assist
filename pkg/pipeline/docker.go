@@ -25,7 +25,7 @@ Your job is to answer the following:
 1. What is the root cause of this failure?
 2. Was the previous fix based on an incorrect assumption?
 3. Should a different build strategy be attempted?
-4. Summarize all this concisely and clearly. Do not fix the Dockerfile — just analyze what went wrong and how the logic should change.
+4. Summarize all this concisely and clearly. Maintain previous changes tried. Do not fix the Dockerfile — just analyze what went wrong and how the logic should change.
 
 Be precise, and do not assume the file system has changed unless explicitly told so.
 `
@@ -133,7 +133,7 @@ Please:
 2. Provide a fixed version of the Dockerfile
 3. Explain what changes were made and why
 
-Favor using the latest base images and best practices for Dockerfile writing
+Favor using the latest base images and best practices for Dockerfile writing when appropriate.
 If applicable, use multi-stage builds to reduce image size
 Make sure to account for the file structure of the repository
 
