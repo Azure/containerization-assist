@@ -5,7 +5,7 @@ on:
   pull_request:
 
 # ensure that only one workflow is running at a time per branch/pr by canceling in-progress runs
-concurrency:
+concurrency: 
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -20,11 +20,11 @@ jobs:
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: '1.24'
-
+      
       - name: Build container-copilot
         run: |
           go build -o container-copilot .
-
+          
       - name: Upload binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -60,14 +60,14 @@ jobs:
           - spring-petclinic/spring-petclinic-microservices
         test-number: [1, 2, 3, 4, 5]
       fail-fast: false
-
+    
     steps:
       - name: Download container-copilot binary
         uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
           name: container-copilot-binary
           path: ./
-
+      
       - name: Make binary executable
         run: |
           chmod +x container-copilot
@@ -86,7 +86,7 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           install_only: true
-
+      
       - name: Run Test ${{ matrix.test-number }}
         id: run_test
         timeout-minutes: 5
@@ -97,18 +97,18 @@ jobs:
           AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
         run: |
           cd test-repo
-
+          
           # Make sure we have a place to store logs
           mkdir -p artifacts/logs
-
+          
           # The success message we're looking for in the output
           SUCCESS_MESSAGE="Container deployment pipeline completed successfully!"
-
+          
           # Start with a clean slate
           rm -f Dockerfile || true
           rm -rf manifests || true
           mkdir -p manifests
-
+          
           # Run the test and save output
           REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|.|g' )
           RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ matrix.test-number }}"
@@ -125,11 +125,9 @@ jobs:
             [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
             [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
           fi
-
-          if grep -q "context deadline exceeded" logs/run-${RUN_NAME}.log; then
-            echo "❌ Test Run $RUN_NAME: Operation timed out - context deadline exceeded"
-            echo "result=timeout" >> $GITHUB_OUTPUT
-          elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/run-${RUN_NAME}.log"; then
+          
+          # Check if the success message is in the log file
+          if grep -q "$SUCCESS_MESSAGE" "artifacts/logs/run-${RUN_NAME}.log"; then
             echo "✅ Test Run $RUN_NAME PASSED - Found '$SUCCESS_MESSAGE'"
             echo "result=success" >> $GITHUB_OUTPUT
           else
@@ -174,14 +172,14 @@ jobs:
           "
 
           # List repos without numbers
-          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"
+          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"  
           echo "Repos: $REPOS"
 
           success_rates=()
 
           single_run_pass_threshold=30
           single_run_green_threshold=80
-
+          
           # Loop through repos
           for repo in $REPOS; do
             echo "Processing results for $repo"
@@ -189,7 +187,7 @@ jobs:
             # Count successes and failures
             success_count=0
             failure_count=0
-
+            
             # Build detailed results
             passed_tests=""
             failed_tests="" # includes failed and timed out tests
