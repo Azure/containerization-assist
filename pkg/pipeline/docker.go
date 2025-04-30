@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	summaryFailureAnalysis = `
+	summarizeDockerfileRunningErrorsPrompt = `
 You're helping analyze repeated build failures while trying to generate a working Dockerfile.
 
 Here is a summary of previous errors and attempted fixes:
