@@ -88,16 +88,16 @@ func (c *AzOpenAIClient) GetDockerfileChatCompletion(promptText string) (string,
 	return c.GetChatCompletionWithMemory(promptText, c.dockerfileChatHistory)
 }
 
-// PrintDockerfileChatHistory formats and prints the Dockerfile chat history
-func (c *AzOpenAIClient) PrintDockerfileChatHistory() string {
-	if len(c.dockerfileChatHistory) == 0 {
-		return "No chat history available."
+// printChatHistory formats any chat history with a heading
+func printChatHistory(history []azopenai.ChatRequestMessageClassification, heading string) string {
+	if len(history) == 0 {
+		return fmt.Sprintf("No %s available.", strings.ToLower(heading))
 	}
 
 	var result strings.Builder
-	result.WriteString("\n=== Dockerfile Chat History ===\n\n")
+	result.WriteString(fmt.Sprintf("\n=== %s ===\n\n", heading))
 
-	for i, message := range c.dockerfileChatHistory {
+	for i, message := range history {
 		result.WriteString(fmt.Sprintf("--- Message %d ---\n", i+1))
 
 		switch msg := message.(type) {
@@ -121,6 +121,11 @@ func (c *AzOpenAIClient) PrintDockerfileChatHistory() string {
 	}
 
 	return result.String()
+}
+
+// PrintDockerfileChatHistory formats and prints the Dockerfile chat history
+func (c *AzOpenAIClient) PrintDockerfileChatHistory() string {
+	return printChatHistory(c.dockerfileChatHistory, "Dockerfile Chat History")
 }
 
 // AddToManifestChatHistory adds a message to the manifest chat history
@@ -140,35 +145,5 @@ func (c *AzOpenAIClient) GetManifestChatCompletion(promptText string) (string, e
 
 // PrintManifestChatHistory formats and prints the Kubernetes manifest chat history
 func (c *AzOpenAIClient) PrintManifestChatHistory() string {
-	if len(c.manifestChatHistory) == 0 {
-		return "No manifest chat history available."
-	}
-
-	var result strings.Builder
-	result.WriteString("\n=== Kubernetes Manifest Chat History ===\n\n")
-
-	for i, message := range c.manifestChatHistory {
-		result.WriteString(fmt.Sprintf("--- Message %d ---\n", i+1))
-
-		switch msg := message.(type) {
-		case *azopenai.ChatRequestUserMessage:
-			result.WriteString("Role: User\n")
-			contentStr := fmt.Sprintf("%v", msg.Content)
-			result.WriteString(fmt.Sprintf("Content: %s\n", contentStr))
-		case *azopenai.ChatRequestAssistantMessage:
-			result.WriteString("Role: Assistant\n")
-			if content := msg.Content; content != nil {
-				result.WriteString(fmt.Sprintf("Content: %s\n", *content))
-			}
-		case *azopenai.ChatRequestSystemMessage:
-			result.WriteString("Role: System\n")
-			result.WriteString(fmt.Sprintf("Content: %s\n", msg.Content))
-		default:
-			result.WriteString(fmt.Sprintf("Role: Unknown (Type: %T)\n", msg))
-		}
-
-		result.WriteString("\n")
-	}
-
-	return result.String()
+	return printChatHistory(c.manifestChatHistory, "Kubernetes Manifest Chat History")
 }
