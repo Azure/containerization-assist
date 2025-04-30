@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"path/filepath"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
