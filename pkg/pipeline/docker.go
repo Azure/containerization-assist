@@ -118,7 +118,7 @@ I will tip you if you provide a correct and working Dockerfile.
 	// Save this interaction to chat history
 	result := &FileAnalysisResult{
 		FixedContent: fixedContent,
-		Analysis:     response,
+		Analysis:     analysisContent,
 	}
 
 	return result, nil
