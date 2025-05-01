@@ -91,7 +91,14 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.CheckPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
-		fmt.Printf("Pods are not healthy for deployment with manifest %s\n", manifestPath)
+		fmt.Printf("Pods are not healthy for deployment with manifest %s, cleaning up failed deployment\n", manifestPath)
+		// Clean up the failed deployment
+		deleteOutput, err := c.Kube.DeleteDeployment(manifestPath)
+		if err != nil {
+			fmt.Printf("Warning: Failed to clean up deployment: %v\n", err)
+		} else {
+			fmt.Printf("Successfully deleted failed deployment: %s\n", deleteOutput)
+		}
 		return false, outputStr + "\n" + podOutput, nil
 	}
 	fmt.Println("Pod health check passed")

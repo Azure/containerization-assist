@@ -13,6 +13,7 @@ Flags (override .env / env):
   -m <MODEL_ID>              Model ID (default: o3-mini)
   -v <MODEL_VERSION>         Model version (default: 2025-01-31)
   -t <TARGET_REPO>           Path to the repo to containerize
+  --setup-only               Set up resources only, don't run the generator
   -h                         Show this help message
 EOF
   exit 1
@@ -34,10 +35,18 @@ fi
 
 # 3) parse flags
 FLAG_RG="" FLAG_LOC="" FLAG_RES="" FLAG_DEP="" FLAG_MOD="" FLAG_VER="" FLAG_TR=""
+SETUP_ONLY=false
 DEFAULT_MODEL="o3-mini"
 DEFAULT_MODEL_VERSION="2025-01-31"
 
-while getopts "g:l:a:d:m:v:t:h" opt; do
+# Handle the --setup-only flag separately
+for arg in "$@"; do
+  if [[ "$arg" == "--setup-only" ]]; then
+    SETUP_ONLY=true
+  fi
+done
+
+while getopts "g:l:a:d:m:v:t:h-:" opt; do
   case "$opt" in
     g) FLAG_RG="$OPTARG" ;;
     l) FLAG_LOC="$OPTARG" ;;
@@ -47,6 +56,10 @@ while getopts "g:l:a:d:m:v:t:h" opt; do
     v) FLAG_VER="$OPTARG" ;;
     t) FLAG_TR="$OPTARG" ;;
     h) usage ;;
+    -) case "${OPTARG}" in
+         setup-only) SETUP_ONLY=true ;;
+         *) usage ;;
+       esac ;;
     *) usage ;;
   esac
 done
@@ -81,6 +94,7 @@ echo "→ Configuration:
   MODEL_ID:              $MODEL_ID
   MODEL_VERSION:         $MODEL_VERSION
   TARGET_REPO:           $TARGET_REPO
+  SETUP_ONLY:            $SETUP_ONLY
 "
 
 # 6) check prerequisites
@@ -162,6 +176,12 @@ echo -e "\n→ Exporting AZURE_* variables…"
 export AZURE_OPENAI_KEY
 export AZURE_OPENAI_ENDPOINT
 export AZURE_OPENAI_DEPLOYMENT_ID="$DEPLOY"
+
+# If setup-only is true, don't run the generator
+if [ "$SETUP_ONLY" = true ]; then
+  echo -e "\n✓ Setup complete. Azure OpenAI resources are ready."
+  exit 0
+fi
 
 # 13) run the generator
 echo -e "\n→ Running container‑copilot on '$TARGET_REPO'…"

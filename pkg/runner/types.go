@@ -6,4 +6,3 @@ type ManifestDeployResult struct {
 	Success bool
 	Output  string
 }
-

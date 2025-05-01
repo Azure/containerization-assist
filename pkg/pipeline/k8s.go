@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -98,13 +97,6 @@ Output the fixed manifest between <<<MANIFEST>>> tags.`
 
 // deployStateManifests deploys manifests from pipeline state
 func (s *PipelineState) DeployStateManifests(c *clients.Clients) error {
-	// Create a temporary directory for manifest files
-	tmpDir, err := os.MkdirTemp("", "container-copilot-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
 	pendingManifests := GetPendingManifests(s)
 	if len(pendingManifests) == 0 {
 		fmt.Println("No pending manifests to deploy")
@@ -119,14 +111,12 @@ func (s *PipelineState) DeployStateManifests(c *clients.Clients) error {
 	for name := range pendingManifests {
 		manifest := s.K8sObjects[name]
 
-		// Write manifest to temporary file
-		tmpFile := filepath.Join(tmpDir, name)
-		if err := os.WriteFile(tmpFile, []byte(manifest.Content), 0644); err != nil {
+		// Overwrite the original manifest file in place
+		manifestPath := manifest.ManifestPath
+		if err := os.WriteFile(manifestPath, manifest.Content, 0644); err != nil {
 			return fmt.Errorf("failed to write manifest %s: %v", name, err)
 		}
-
-		// Use existing deployment verification
-		success, output, err := c.DeployAndVerifySingleManifest(tmpFile, manifest.IsDeployment())
+		success, output, err := c.DeployAndVerifySingleManifest(manifestPath, manifest.IsDeployment())
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
