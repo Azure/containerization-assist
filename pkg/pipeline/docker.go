@@ -137,9 +137,12 @@ Please:
 2. Provide a fixed version of the Dockerfile
 3. Explain what changes were made and why
 
-Favor using the latest base images and best practices for Dockerfile writing when appropriate.
-If applicable, use multi-stage builds to reduce image size
-Make sure to account for the file structure of the repository
+Favor using the latest stable base images and best practices for Dockerfile writing when appropriate.
+If applicable, use multi-stage builds to reduce image size.
+Ensure that all COPY and RUN instructions are consistent with the actual file structure of the repository — do not assume specific folders or filenames without confirming they exist.
+
+Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
+If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.
 
 **IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT**
 
