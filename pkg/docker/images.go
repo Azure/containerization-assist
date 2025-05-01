@@ -29,6 +29,7 @@ approved_images:
     notes: >
       When using Maven in Dockerfiles:
       - Do not assume a single-module layout. Set WORKDIR to the directory containing the relevant pom.xml.
+      - In multi-module projects, the root pom.xml may not produce a runnable artifact. Identify and target the correct submodule for packaging.
       - If using mvnw, COPY both the mvnw script and .mvn/ directory, and make the script executable.
       - Avoid using 'mvn dependency:go-offline' unless all required files (e.g., parent pom.xmls, .mvn) are present in the build context.
       - Prefer a full 'mvn clean package' with correct COPY structure over partial builds or dependency prefetching.
