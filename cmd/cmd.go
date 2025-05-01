@@ -27,24 +27,10 @@ var (
 	dockerfileGenerator string
 	generateSnapshot    bool
 	timeout             time.Duration
-	ctx                 context.Context
-	cancel              context.CancelFunc
 )
 
 var rootCmd = &cobra.Command{
 	Use: "container-copilot",
-	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-		ctx, cancel = context.WithTimeout(cmd.Context(), timeout)
-		cmd.SetContext(ctx)
-
-		return nil
-	},
-	PersistentPostRunE: func(cmd *cobra.Command, _ []string) error {
-		if cancel != nil {
-			cancel()
-		}
-		return nil
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -55,7 +41,8 @@ var generateCmd = &cobra.Command{
 	Short: "Generate Dockerfile and Kubernetes manifests",
 	Long:  `The generate command will add Dockerfile and Kubernetes manifests to your project based on the project structure.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
+		ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
+		defer cancel()
 		targetDir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("error getting current directory: %w", err)
@@ -97,7 +84,7 @@ var testCmd = &cobra.Command{
 func Execute() {
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(testCmd)
-	rootCmd.Execute()
+	rootCmd.ExecuteContext(context.Background())
 }
 
 func initClients() (*clients.Clients, error) {
