@@ -122,7 +122,7 @@ jobs:
             [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
           fi
 
-          if grep -q "context deadline exceeded" logs/run-${RUN_NAME}.log; then
+          if grep -q "context deadline exceeded" "artifacts/logs/run-${RUN_NAME}.log"; then
             echo "❌ Test Run $RUN_NAME: Operation timed out - context deadline exceeded"
             echo "result=timeout" >> $GITHUB_OUTPUT
           elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/run-${RUN_NAME}.log"; then
