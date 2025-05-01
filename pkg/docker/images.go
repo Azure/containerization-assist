@@ -28,9 +28,10 @@ approved_images:
       - "3.9.9-eclipse-temurin-24-alpine"
     notes: >
       When using Maven in Dockerfiles:
-      - Do not assume a single-module layout. Ensure the WORKDIR matches the directory containing the relevant pom.xml.
-      - If using mvnw, be sure to COPY both the mvnw script and the .mvn/ directory, and make the script executable.
-      - Avoid calling 'mvn dependency:go-offline' unless all required files (e.g., parent pom.xmls, .mvn directory) are present in the build context.
-      - Prefer a full 'mvn clean package' with proper COPY instructions over partial builds that assume internal structure.
-      - Avoid wildcard-based CMDs that rely on artifact names like '*-SNAPSHOT.jar'. Instead, rename the output to a known file (e.g., app.jar) during the build stage.
+      - Do not assume a single-module layout. Set WORKDIR to the directory containing the relevant pom.xml.
+      - If using mvnw, COPY both the mvnw script and .mvn/ directory, and make the script executable.
+      - Avoid using 'mvn dependency:go-offline' unless all required files (e.g., parent pom.xmls, .mvn) are present in the build context.
+      - Prefer a full 'mvn clean package' with correct COPY structure over partial builds or dependency prefetching.
+      - In the build stage, do not rely on -DfinalName to rename outputs; use a wildcard (e.g., target/*.war) to locate the artifact and rename it to a known name (e.g., app.jar).
+      - In the CMD, avoid using wildcards at runtime; reference the renamed file directly to prevent startup failures.
 `
