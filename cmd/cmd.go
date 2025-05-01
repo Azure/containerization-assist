@@ -29,7 +29,7 @@ var (
 	registry            string
 	dockerfileGenerator string
 	generateSnapshot    bool
-	timeout			 time.Duration
+	timeout             time.Duration
 
 	// Setup command variables
 	resourceGroup      string
@@ -42,7 +42,8 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "container-copilot",
+	Use:   "container-copilot",
+	Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
