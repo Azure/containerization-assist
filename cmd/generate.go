@@ -16,34 +16,12 @@ import (
 
 const (
 	repoStructurePrompt = `
-You are analyzing a code repository with the goal of generating or refining Dockerfiles.
+	Analyze the repo structure and provide the top 10 relevant files useful for dockerfile creation.
+	Also include a useful summary of the repo structure.
 
-Your task is to provide two things:
-
-1. A **structured summary** of the repository that includes:
-   - A 1-sentence description of the overall architecture (e.g., single-service web app, multi-module Maven project, Spring microservices architecture, etc.).
-   - A breakdown of the **project layout**, including:
-     • Primary source folders (e.g., src/main/java, src/main/webapp)
-     • Configuration files (e.g., pom.xml, web.xml, hibernate.cfg.xml)
-     • Support for containerization (e.g., Dockerfile, docker-compose.yml, .dockerignore, manifests/)
-     • Development and CI tooling (e.g., .devcontainer, GitHub workflows, shell scripts)
-   - Highlight how these files relate to **build, packaging, and deployment**.
-
-2. A **ranked list of the top 10 files or directories** that are most relevant for creating or modifying Dockerfiles.
-   - For each item, include:
-     • The path (or name) of the file or folder
-     • A short sentence on why it matters when building a container image
-
-Your goal is to provide context so that someone writing a Dockerfile understands which files influence:
-   - how the app is built (e.g., Maven, Gradle, npm),
-   - how the app runs (e.g., Java JAR/WAR, Node server, Python entrypoint),
-   - and how it fits into a containerized system (e.g., Dockerfile layout, orchestration, CI).
-
-Do not guess or hallucinate structure—base your output strictly on what is present in the following repo tree:
-
-Repo structure:
-%s
-`
+	Repo structure:
+	%s
+	`
 )
 
 func generate(targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {

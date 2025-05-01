@@ -32,6 +32,7 @@ approved_images:
       - In multi-module projects, the root pom.xml may not produce a runnable artifact. Identify and target the correct submodule for packaging.
       - If using mvnw, COPY both the mvnw script and .mvn/ directory, and make the script executable.
       - Avoid using 'mvn dependency:go-offline' unless all required files (e.g., parent pom.xmls, .mvn) are present in the build context.
+      - Do not assume that copying only pom.xml and src/ is sufficient. Many Maven projects require additional files (e.g., .mvn/, config files, wrapper scripts) to build successfully.
       - Prefer a full 'mvn clean package' with correct COPY structure over partial builds or dependency prefetching.
       - In the build stage, do not rely on -DfinalName to rename outputs; use a wildcard (e.g., target/*.war) to locate the artifact and rename it to a known name (e.g., app.jar).
       - In the CMD, avoid using wildcards at runtime; reference the renamed file directly to prevent startup failures.
