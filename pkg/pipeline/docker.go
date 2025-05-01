@@ -144,6 +144,8 @@ Ensure that all COPY and RUN instructions are consistent with the actual file st
 Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
 If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.
 
+DO NOT make any assumptions.
+
 **IMPORTANT: Output the fixed Dockerfile between <<<DOCKERFILE>>> tags. :IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
