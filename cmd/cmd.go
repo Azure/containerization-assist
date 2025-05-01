@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
 	"github.com/Azure/container-copilot/pkg/runner"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
@@ -46,17 +46,97 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// loadEnvFile attempts to load the .env file from the project root
+func loadEnvFile() {
+	_, file, _, ok := runtime.Caller(0)
+	if ok {
+		projectRoot := filepath.Dir(filepath.Dir(file))
+		envFile := filepath.Join(projectRoot, ".env")
+
+		// Check if .env file exists and load it
+		if _, err := os.Stat(envFile); err == nil {
+			if err := godotenv.Load(envFile); err != nil {
+				fmt.Printf("Warning: Error loading .env file: %v\n", err)
+			}
+		}
+	}
+}
+
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate Dockerfile and Kubernetes manifests",
 	Long:  `The generate command will add Dockerfile and Kubernetes manifests to your project based on the project structure.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		targetDir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("error getting current directory: %w", err)
-		}
+		// Try to load .env file first to get environment variables
+		loadEnvFile()
+
+		// Determine target directory from multiple sources in order of priority:
+		// 1. Command line argument
+		// 2. --target-repo flag
+		// 3. CCP_TARGET_REPO environment variable (which would include values from .env)
+		// 4. Interactive prompt
+
+		var targetDir string
+
+		// Check command line argument first
 		if len(args) > 0 {
 			targetDir = args[0]
+			// Set it in the environment so auto-setup can find it later
+			os.Setenv("CCP_TARGET_REPO", targetDir)
+		} else {
+			// Check flag
+			targetFlag, _ := cmd.Flags().GetString("target-repo")
+			if targetFlag != "" {
+				targetDir = targetFlag
+				// Set it in the environment so auto-setup can find it later
+				os.Setenv("CCP_TARGET_REPO", targetDir)
+			} else {
+				// Check environment variable (includes .env file)
+				targetDir = os.Getenv("CCP_TARGET_REPO")
+
+				// If still no target, prompt the user
+				if targetDir == "" {
+					// No target directory provided - inform the user and accept input
+					fmt.Println("No target repository specified. The target repository is the directory containing the application you want to containerize.")
+					fmt.Println("Example: container-copilot generate ./my-app")
+
+					// Ask if they want to provide a target directory now
+					fmt.Print("Would you like to specify a target repository now? (y/n): ")
+					var response string
+					fmt.Scanln(&response)
+
+					if strings.ToLower(response) == "y" || strings.ToLower(response) == "yes" {
+						fmt.Print("Enter path to the repository to containerize: ")
+						fmt.Scanln(&targetDir)
+
+						if targetDir == "" {
+							return fmt.Errorf("target repository is required")
+						}
+						// Set it in the environment so auto-setup can find it later
+						os.Setenv("CCP_TARGET_REPO", targetDir)
+					} else {
+						return fmt.Errorf("target repository is required")
+					}
+				} else {
+					fmt.Printf("Using target repository from environment: %s\n", targetDir)
+				}
+			}
+		}
+
+		// Check if Azure OpenAI environment variables are set
+		if os.Getenv(AZURE_OPENAI_KEY) == "" ||
+			os.Getenv(AZURE_OPENAI_ENDPOINT) == "" ||
+			os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID) == "" {
+			fmt.Println("Azure OpenAI configuration not found. Starting automatic setup process...")
+		}
+
+		// Convert targetDir to absolute path for consistent behavior
+		if targetDir != "" {
+			normalizedPath, err := NormalizeTargetRepoPath(targetDir)
+			if err != nil {
+				return err
+			}
+			targetDir = normalizedPath
 		}
 
 		c, err := initClients()
@@ -76,6 +156,9 @@ var testCmd = &cobra.Command{
 	Short: "Test Azure OpenAI connection",
 	Long:  `The test command will test the Azure OpenAI connection based on the environment variables set and print a response.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Load environment variables from .env file
+		loadEnvFile()
+
 		c, err := initClients()
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
@@ -93,215 +176,62 @@ var setupCmd = &cobra.Command{
 	Short: "Set up Azure OpenAI resources and run container-copilot",
 	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-copilot to generate artifacts.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Load any existing environment variables from .env file
+		loadEnvFile()
+
 		_, file, _, ok := runtime.Caller(0)
 		if !ok {
 			return fmt.Errorf("failed to determine source file location")
 		}
 
-		// The script should be at <repo root>/hack/run-container-copilot.sh
-		projectRoot := filepath.Dir(filepath.Dir(file)) // cmd.go -> cmd -> project root
-		scriptPath := filepath.Join(projectRoot, "hack", "run-container-copilot.sh")
+		// Get the project root directory
+		projectRoot := filepath.Dir(filepath.Dir(file))
 
-		// Verify script exists
-		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-			return fmt.Errorf("script not found at %s: %w", scriptPath, err)
-		}
-
-		// Check for existing .env file and load its content
-		envFile := filepath.Join(projectRoot, ".env")
-		existingEnvVars := make(map[string]string)
-
-		// Load existing .env file if it exists
-		if _, err := os.Stat(envFile); err == nil {
-			content, err := os.ReadFile(envFile)
-			if err == nil {
-				lines := strings.Split(string(content), "\n")
-				for _, line := range lines {
-					line = strings.TrimSpace(line)
-					if line == "" || strings.HasPrefix(line, "#") {
-						continue
-					}
-					parts := strings.SplitN(line, "=", 2)
-					if len(parts) == 2 {
-						existingEnvVars[parts[0]] = parts[1]
-					}
-				}
-			}
-		}
-
-		// Set environment variables from command line args
-		if resourceGroup != "" {
-			os.Setenv("CCP_RESOURCE_GROUP", resourceGroup)
-			existingEnvVars["CCP_RESOURCE_GROUP"] = resourceGroup
-		}
-		if location != "" {
-			os.Setenv("CCP_LOCATION", location)
-			existingEnvVars["CCP_LOCATION"] = location
-		}
-		if openaiResourceName != "" {
-			os.Setenv("CCP_OPENAI_RESOURCE_NAME", openaiResourceName)
-			existingEnvVars["CCP_OPENAI_RESOURCE_NAME"] = openaiResourceName
-		}
-		if deploymentName != "" {
-			os.Setenv("CCP_DEPLOYMENT_NAME", deploymentName)
-			existingEnvVars["CCP_DEPLOYMENT_NAME"] = deploymentName
-		}
-		if modelID != "" {
-			os.Setenv("CCP_MODEL_ID", modelID)
-			existingEnvVars["CCP_MODEL_ID"] = modelID
-		}
-		if modelVersion != "" {
-			os.Setenv("CCP_MODEL_VERSION", modelVersion)
-			existingEnvVars["CCP_MODEL_VERSION"] = modelVersion
-		}
-		if targetRepo != "" {
-			os.Setenv("CCP_TARGET_REPO", targetRepo)
-			existingEnvVars["CCP_TARGET_REPO"] = targetRepo
-		}
-
-		// Build the command to run the setup part of the script
-		setupCmd := exec.Command("bash", scriptPath, "--setup-only")
-		setupCmd.Stdout = os.Stdout
-		setupCmd.Stderr = os.Stderr
-
-		// Run the command
-		fmt.Println("Setting up Azure OpenAI resources...")
-		if err := setupCmd.Run(); err != nil {
-			return fmt.Errorf("error running setup script: %w", err)
-		}
-
-
-		fmt.Println("Retrieving Azure OpenAI configuration...")
-
-		// Get the resource name and resource group from the environment or flags
-		resName := openaiResourceName
-		if resName == "" {
-			resName = existingEnvVars["CCP_OPENAI_RESOURCE_NAME"]
-		}
-		resGroup := resourceGroup
-		if resGroup == "" {
-			resGroup = existingEnvVars["CCP_RESOURCE_GROUP"]
-		}
-		deployName := deploymentName
-		if deployName == "" {
-			deployName = existingEnvVars["CCP_DEPLOYMENT_NAME"]
-		}
-
-		// Verify we have the necessary values
-		if resName == "" || resGroup == "" || deployName == "" {
-			return fmt.Errorf("missing required values for Azure resources. Check CCP_OPENAI_RESOURCE_NAME, CCP_RESOURCE_GROUP, and CCP_DEPLOYMENT_NAME in .env file or provide them via flags")
-		}
-
-		// Get the API key using Azure CLI
-		keyCmd := exec.Command("az", "cognitiveservices", "account", "keys", "list",
-			"--name", resName,
-			"--resource-group", resGroup,
-			"--query", "key1", "-o", "tsv")
-		keyOutput, err := keyCmd.Output()
+		// Load configuration from environment, flags, etc.
+		config, err := LoadSetupConfig(cmd, args, projectRoot)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve API key: %w", err)
+			return fmt.Errorf("error loading configuration: %w", err)
 		}
-		newApiKey := strings.TrimSpace(string(keyOutput))
 
-		// Get the endpoint using Azure CLI
-		endpointCmd := exec.Command("az", "cognitiveservices", "account", "show",
-			"--name", resName,
-			"--resource-group", resGroup,
-			"--query", "properties.endpoint", "-o", "tsv")
-		endpointOutput, err := endpointCmd.Output()
+		// Validate configuration
+		if err := config.ValidateConfig(); err != nil {
+			return err
+		}
+
+		// Print configuration
+		config.PrintConfig()
+
+		// Run the setup process
+		apiKey, endpoint, deploymentID, err := RunSetup(config)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve endpoint: %w", err)
-		}
-		newEndpoint := strings.TrimSpace(string(endpointOutput))
-
-		// Set the deployment ID
-		newDeploymentID := deployName
-
-		// Update environment variables
-		os.Setenv(AZURE_OPENAI_KEY, newApiKey)
-		os.Setenv(AZURE_OPENAI_ENDPOINT, newEndpoint)
-		os.Setenv(AZURE_OPENAI_DEPLOYMENT_ID, newDeploymentID)
-
-		// Update the environment variables map
-		existingEnvVars[AZURE_OPENAI_KEY] = newApiKey
-		existingEnvVars[AZURE_OPENAI_ENDPOINT] = newEndpoint
-		existingEnvVars[AZURE_OPENAI_DEPLOYMENT_ID] = newDeploymentID
-
-		// Write updated environment variables to .env file
-		var envContent strings.Builder
-		envContent.WriteString("# Container-Copilot environment variables\n")
-		envContent.WriteString("# This file was generated/updated by container-copilot setup\n\n")
-
-		// Write Azure variables first
-		if val, ok := existingEnvVars[AZURE_OPENAI_KEY]; ok {
-			envContent.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_KEY, val))
-		}
-		if val, ok := existingEnvVars[AZURE_OPENAI_ENDPOINT]; ok {
-			envContent.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_ENDPOINT, val))
-		}
-		if val, ok := existingEnvVars[AZURE_OPENAI_DEPLOYMENT_ID]; ok {
-			envContent.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_DEPLOYMENT_ID, val))
+			return err
 		}
 
-		envContent.WriteString("\n# Container-Copilot setup variables\n")
+		// Set environment variables for this process
+		os.Setenv(AZURE_OPENAI_KEY, apiKey)
+		os.Setenv(AZURE_OPENAI_ENDPOINT, endpoint)
+		os.Setenv(AZURE_OPENAI_DEPLOYMENT_ID, deploymentID)
 
-		// Write all CCP_ variables
-		for key, val := range existingEnvVars {
-			if strings.HasPrefix(key, "CCP_") {
-				envContent.WriteString(fmt.Sprintf("%s=%s\n", key, val))
-			}
-		}
-
-		// Write any other variables that were already in the file
-		for key, val := range existingEnvVars {
-			if !strings.HasPrefix(key, "CCP_") &&
-				key != AZURE_OPENAI_KEY &&
-				key != AZURE_OPENAI_ENDPOINT &&
-				key != AZURE_OPENAI_DEPLOYMENT_ID {
-				envContent.WriteString(fmt.Sprintf("%s=%s\n", key, val))
-			}
-		}
-
-		// Write the file
-		if err := os.WriteFile(envFile, []byte(envContent.String()), 0644); err != nil {
+		// Update .env file
+		if err := UpdateEnvFile(projectRoot, config, apiKey, endpoint, deploymentID); err != nil {
 			fmt.Printf("Warning: Failed to update .env file: %v\n", err)
 		} else {
-			fmt.Printf("Updated .env file at %s\n", envFile)
-
-			// Debug output of important values
-			fmt.Printf("Azure OpenAI Key: %s\n", maskSecret(existingEnvVars[AZURE_OPENAI_KEY]))
-			fmt.Printf("Azure OpenAI Endpoint: %s\n", existingEnvVars[AZURE_OPENAI_ENDPOINT])
-			fmt.Printf("Azure OpenAI Deployment ID: %s\n", existingEnvVars[AZURE_OPENAI_DEPLOYMENT_ID])
-			fmt.Printf("Target Repo: %s\n", existingEnvVars["CCP_TARGET_REPO"])
+			fmt.Printf("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
+			fmt.Printf("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
+			fmt.Printf("Azure OpenAI Endpoint: %s\n", endpoint)
+			fmt.Printf("Azure OpenAI Deployment ID: %s\n", deploymentID)
+			fmt.Printf("Target Repo: %s\n", config.TargetRepo)
 		}
 
-		// Now that the resources are set up, continue with the generate flow
-		// Get the target directory from the target repo variable
-		targetDir := targetRepo
-		if targetDir == "" {
-			targetDir = existingEnvVars["CCP_TARGET_REPO"] // Check the loaded .env vars
-		}
-		if targetDir == "" {
-			targetDir = os.Getenv("CCP_TARGET_REPO") // Check env as last resort
-		}
-		if targetDir == "" && len(args) > 0 {
-			targetDir = args[0]
-		}
+		// Setup completed successfully
+		fmt.Println("\n✅ Setup completed successfully!")
 
-		if targetDir == "" {
-			return fmt.Errorf("no target repository specified, please provide it with --target-repo or CCP_TARGET_REPO")
-		}
-
-		// Initialize clients (this will use the AZURE_* environment variables set by the script)
-		c, err := initClients()
-		if err != nil {
-			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
-		}
-
-		// Generate the artifacts
-		fmt.Printf("Generating artifacts for %s...\n", targetDir)
-		if err := generate(targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c); err != nil {
-			return fmt.Errorf("error generating artifacts: %w", err)
+		// Display next steps instead of running generate automatically
+		if config.TargetRepo != "" {
+			fmt.Printf("\nTo generate artifacts, run:\n  container-copilot generate %s\n", config.TargetRepo)
+		} else {
+			fmt.Println("\nTo generate artifacts, run:")
+			fmt.Println("  container-copilot generate <path/to/target-repo>")
 		}
 
 		return nil
@@ -316,9 +246,10 @@ func Execute() {
 }
 
 func initClients() (*clients.Clients, error) {
+	// Try to load values from .env file first
+	loadEnvFile()
 
-	// read from .env
-
+	// Now check environment variables (which now include any from .env file)
 	apiKey := os.Getenv(AZURE_OPENAI_KEY)
 	endpoint := os.Getenv(AZURE_OPENAI_ENDPOINT)
 	deploymentID := os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID)
@@ -335,7 +266,19 @@ func initClients() (*clients.Clients, error) {
 	}
 
 	if len(missingVars) > 0 {
-		return nil, fmt.Errorf("missing environment variables: %s", strings.Join(missingVars, ", "))
+		// Instead of returning an error, try to run setup automatically
+		fmt.Printf("Missing environment variables: %s\n", strings.Join(missingVars, ", "))
+		fmt.Println("Attempting to set up Azure OpenAI resources automatically...")
+
+		// Run setup process
+		if err := runAutoSetup(); err != nil {
+			return nil, fmt.Errorf("automatic setup failed: %w\nPlease run 'container-copilot setup' manually or provide the environment variables", err)
+		}
+
+		// After setup, reload environment variables
+		apiKey = os.Getenv(AZURE_OPENAI_KEY)
+		endpoint = os.Getenv(AZURE_OPENAI_ENDPOINT)
+		deploymentID = os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID)
 	}
 
 	azOpenAIClient, err := ai.NewAzOpenAIClient(endpoint, apiKey, deploymentID)
@@ -355,10 +298,93 @@ func initClients() (*clients.Clients, error) {
 	return clients, nil
 }
 
+// runAutoSetup runs the setup process automatically with minimal user input
+func runAutoSetup() error {
+	// Load any existing environment variables from .env file
+	loadEnvFile()
+
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("failed to determine source file location")
+	}
+
+	// Get the project root directory
+	projectRoot := filepath.Dir(filepath.Dir(file))
+
+	// Create a temporary command to load config
+	tempCmd := &cobra.Command{}
+	tempCmd.Flags().String("target-repo", "", "")
+
+	// Check if target repo is already available in environment
+	envTargetRepo := os.Getenv("CCP_TARGET_REPO")
+	if envTargetRepo != "" {
+		tempCmd.Flags().Set("target-repo", envTargetRepo)
+		fmt.Printf("Using target repository from environment: %s\n", envTargetRepo)
+	}
+
+	// Empty args list
+	var args []string
+
+	// Load configuration with defaults
+	config, err := LoadSetupConfig(tempCmd, args, projectRoot)
+	if err != nil {
+		return fmt.Errorf("error loading configuration: %w", err)
+	}
+
+	// If target repo still not set, prompt the user
+	if config.TargetRepo == "" {
+		fmt.Println("A target repository path is required for containerization.")
+		fmt.Print("Enter path to the repository to containerize: ")
+		var targetRepo string
+		fmt.Scanln(&targetRepo)
+
+		if targetRepo == "" {
+			return fmt.Errorf("target repository is required")
+		}
+
+		// Use the normalized path utility
+		normalizedPath, err := NormalizeTargetRepoPath(targetRepo)
+		if err != nil {
+			return err
+		}
+		config.TargetRepo = normalizedPath
+	}
+
+	fmt.Println("Using auto-generated resource names for Azure OpenAI setup...")
+
+	// Print configuration
+	config.PrintConfig()
+
+	// Run the setup process
+	apiKey, endpoint, deploymentID, err := RunSetup(config)
+	if err != nil {
+		return err
+	}
+
+	// Set environment variables for this process
+	os.Setenv(AZURE_OPENAI_KEY, apiKey)
+	os.Setenv(AZURE_OPENAI_ENDPOINT, endpoint)
+	os.Setenv(AZURE_OPENAI_DEPLOYMENT_ID, deploymentID)
+
+	// Update .env file
+	if err := UpdateEnvFile(projectRoot, config, apiKey, endpoint, deploymentID); err != nil {
+		fmt.Printf("Warning: Failed to update .env file: %v\n", err)
+	} else {
+		fmt.Printf("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
+		fmt.Printf("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
+		fmt.Printf("Azure OpenAI Endpoint: %s\n", endpoint)
+		fmt.Printf("Azure OpenAI Deployment ID: %s\n", deploymentID)
+		fmt.Printf("Target Repo: %s\n", config.TargetRepo)
+	}
+
+	return nil
+}
+
 func init() {
 	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
 	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")
 	generateCmd.PersistentFlags().BoolVarP(&generateSnapshot, "snapshot", "s", false, "Generate a snapshot of the Dockerfile and Kubernetes manifests generated in each iteration")
+	generateCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 
 	// Setup command flags
 	setupCmd.PersistentFlags().StringVarP(&resourceGroup, "resource-group", "g", "", "Azure resource group")
@@ -369,15 +395,4 @@ func init() {
 	setupCmd.PersistentFlags().StringVarP(&modelVersion, "model-version", "v", "2025-01-31", "Model version")
 	setupCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 	setupCmd.PersistentFlags().Bool("force-setup", false, "Force setup even if environment variables are already set")
-}
-
-// Add a helper function to mask secrets for debug output
-func maskSecret(s string) string {
-	if s == "" {
-		return "<empty>"
-	}
-	if len(s) <= 8 {
-		return "****"
-	}
-	return s[:4] + "****" + s[len(s)-4:]
 }
