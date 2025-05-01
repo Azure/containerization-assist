@@ -141,6 +141,8 @@ Favor using the latest stable base images and best practices for Dockerfile writ
 If applicable, use multi-stage builds to reduce image size.
 Ensure that all COPY and RUN instructions are consistent with the actual file structure of the repository — do not assume specific folders or filenames without confirming they exist.
 
+Before running any build command, COPY all required build files and directories (e.g., build scripts, source code, configuration folders).
+- If the project uses wrapper scripts (e.g., mvnw, gradlew), make sure to COPY those along with their associated directories (e.g., .mvn/, .gradle/), and make them executable.
 Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
 If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.
 
