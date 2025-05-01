@@ -8,45 +8,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
+	"github.com/Azure/container-copilot/pkg/prompts"
 	"github.com/Azure/container-copilot/utils"
-)
-
-const (
-	summarizeDockerfileRunningErrorsPrompt = `
-You're helping analyze repeated build failures while trying to generate a working Dockerfile.
-
-Here is a summary of previous errors and attempted fixes:
-%s
-
-Here is the most recent build error:
-%s
-
-Your task is to maintain a concise and clear summary of what has been attempted so far.
-
-Summarize:
-- What caused the most recent failure
-- What changes were made in the last attempt
-- Why those changes didn’t work
-
-You are not fixing the Dockerfile directly. However, if there is a clear pattern of incorrect assumptions or a flawed strategy, you may briefly point it out to guide the next iteration.
-
-Keep the tone neutral and factual, but feel free to raise a flag if something needs to change.
-
-`
-
-	summaryFixSuccess = `
-You're helping analyze a successful Dockerfile build after several failed attempts.
-
-Here is a summary of the previous build errors and the changes that were attempted:
-%s
-
-Here is the final output from the Dockerfile that successfully built:
-%s
-
-Based on this, explain concisely what specific change or set of changes ultimately made the Dockerfile build succeed.
-
-Be precise and avoid speculation — only describe what clearly resolved the previous errors.
-`
 )
 
 func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
@@ -124,6 +87,7 @@ Repository files structure:
 `, state.RepoFileTree)
 	}
 
+	// Running LLM Summary of previous attempts
 	if state.Dockerfile.PreviousAttemptsSummary != "" {
 		promptText += fmt.Sprintf(`
 Previous attempts to fix the Dockerfile:
@@ -210,14 +174,13 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 
 		state.Dockerfile.BuildErrors = buildErrors
 
-		summary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(summarizeDockerfileRunningErrorsPrompt, state.Dockerfile.PreviousAttemptsSummary, result.Analysis)
+		summary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(prompts.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis)
 		if err != nil {
-			fmt.Printf("Warning: Failed to generate summary: %v\n", err)
+			fmt.Println("Warning: Failed to generate summary: %v\n", err)
 		} else {
 			state.Dockerfile.PreviousAttemptsSummary = summary
+			fmt.Println("\n Updated Summary of Previous Attempts: \n", state.Dockerfile.PreviousAttemptsSummary)
 		}
-
-		fmt.Println("Updated summary of previous attempts: \n", state.Dockerfile.PreviousAttemptsSummary)
 
 		if generateSnapshot {
 			if err := WriteIterationSnapshot(state, targetDir); err != nil {

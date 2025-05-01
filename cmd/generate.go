@@ -86,8 +86,9 @@ func generate(targetDir string, registry string, enableDraftDockerfile bool, gen
 
 	//Call chat completion to analyze the repo structure and provide the top 10 relevant files useful for dockerfile creation
 	repoStructureSummary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(repoStructurePrompt, repoStructure)
-	fmt.Printf("Repo structure summary: %s\n", repoStructureSummary)
+	fmt.Printf("\n Repo Structure Summary: %s\n\n", repoStructureSummary)
 
+	//Add the summary to the top of the repo structure
 	repoStructure = repoStructureSummary + "\n" + repoStructure
 	state.RepoFileTree = repoStructure
 
