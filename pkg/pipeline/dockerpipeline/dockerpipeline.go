@@ -31,7 +31,7 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
-			templateName, err := docker.GetDockerfileTemplateName(p.AIClient, targetDir)
+			templateName, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir)
 			if err != nil {
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
@@ -228,7 +228,7 @@ Make sure to account for the file structure of the repository
 I will tip you if you provide a correct and working Dockerfile.
 `
 
-	content, err := client.GetChatCompletion(promptText)
+	content, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}

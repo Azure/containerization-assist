@@ -14,7 +14,7 @@ import (
 func TestManifestPipeline_Initialize(t *testing.T) {
 	// Create a test pipeline
 	p := &ManifestPipeline{
-		AIClient: nil, 
+		AIClient: nil,
 	}
 
 	// Create a test state

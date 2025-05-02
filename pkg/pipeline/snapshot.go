@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"reflect"
+	"strings"
 )
 
 // WriteIterationSnapshot creates a snapshot of the current pipeline iteration.

@@ -68,7 +68,7 @@ IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest between <<<MANIFEST>>> tags.`
 
-	content, err := client.GetChatCompletion(promptText)
+	content, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
