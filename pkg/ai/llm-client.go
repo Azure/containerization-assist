@@ -29,9 +29,9 @@ func NewAzOpenAIClient(endpoint, apiKey, deploymentID string) (*AzOpenAIClient, 
 }
 
 // GetChatCompletion sends a prompt to the LLM and returns the completion text.
-func (c *AzOpenAIClient) GetChatCompletion(promptText string) (string, error) {
+func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText string) (string, error) {
 	resp, err := c.client.GetChatCompletions(
-		context.Background(),
+		ctx,
 		azopenai.ChatCompletionsOptions{
 			DeploymentName: to.Ptr(c.deploymentID),
 			Messages: []azopenai.ChatRequestMessageClassification{

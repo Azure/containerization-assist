@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -32,7 +33,7 @@ func (s *PipelineState) InitializeDockerFileState(dockerFilePath string) error {
 	return nil
 }
 
-func AnalyzeDockerfile(client *ai.AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
+func analyzeDockerfile(ctx context.Context, client *ai.AzOpenAIClient, state *PipelineState) (*FileAnalysisResult, error) {
 	dockerfile := state.Dockerfile
 
 	// Create prompt for analyzing the Dockerfile
@@ -101,7 +102,7 @@ Make sure to account for the file structure of the repository
 I will tip you if you provide a correct and working Dockerfile.
 `
 
-	content, err := client.GetChatCompletion(promptText)
+	content, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +119,7 @@ I will tip you if you provide a correct and working Dockerfile.
 }
 
 // iterateDockerfileBuild attempts to iteratively fix and build the Dockerfile
-func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir string, generateSnapshot bool, c *clients.Clients) error {
+func IterateDockerfileBuild(ctx context.Context, maxIterations int, state *PipelineState, targetDir string, generateSnapshot bool, c *clients.Clients) error {
 	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
@@ -127,11 +128,15 @@ func IterateDockerfileBuild(maxIterations int, state *PipelineState, targetDir s
 	}
 
 	for i := 0; i < maxIterations; i++ {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("operation ended: %w", err)
+		}
+
 		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 		state.IterationCount += 1
 
 		// Get AI to fix the Dockerfile - call analyzeDockerfile directly
-		result, err := AnalyzeDockerfile(c.AzOpenAIClient, state)
+		result, err := analyzeDockerfile(ctx, c.AzOpenAIClient, state)
 		if err != nil {
 			return fmt.Errorf("error in AI analysis: %v", err)
 		}
