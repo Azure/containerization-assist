@@ -81,7 +81,7 @@ func (c *Clients) GetKindCluster(ctx context.Context) (string, error) {
 
 	logger.Info("Setting kubectl context to 'kind-container-copilot'")
 	if output, err = c.Kube.SetKubeContext(ctx, "kind-container-copilot"); err != nil {
-		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", string(output), err)
+		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", output, err)
 	}
 
 	return "localhost:5001", nil
