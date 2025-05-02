@@ -261,7 +261,7 @@ func (p *DockerPipeline) Initialize(ctx context.Context, state *pipeline.Pipelin
 	return InitializeDockerFileState(state, path)
 }
 
-// Deploy handles deploying the Docker image to a registry
+// Deploy pushes the Docker image to the specified registry using the provided clients.
 func (p *DockerPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
