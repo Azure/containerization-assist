@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
@@ -8,11 +9,11 @@ import (
 )
 
 type KubeRunner interface {
-	Apply(manifestPath string) (string, error)
-	GetPods(namespace string, labelSelector string) (string, error)
-	GetPodsJSON(namespace string, labelSelector string) (string, error)
-	SetKubeContext(name string) (string, error)
-	DeleteDeployment(manifestPath string) (string, error)
+	Apply(ctx context.Context, manifestPath string) (string, error)
+	GetPods(ctx context.Context, namespace string, labelSelector string) (string, error)
+	GetPodsJSON(ctx context.Context, namespace string, labelSelector string) (string, error)
+	SetKubeContext(ctx context.Context, name string) (string, error)
+	DeleteDeployment(ctx context.Context, manifestPath string) (string, error)
 }
 
 type KubeCmdRunner struct {
@@ -27,29 +28,29 @@ func NewKubeCmdRunner(runner runner.CommandRunner) KubeRunner {
 	}
 }
 
-func (k *KubeCmdRunner) Apply(manifestPath string) (string, error) {
+func (k *KubeCmdRunner) Apply(ctx context.Context, manifestPath string) (string, error) {
 	return k.runner.RunCommand("kubectl", "apply", "-f", manifestPath)
 }
 
-func (k *KubeCmdRunner) GetPods(namespace string, labelSelector string) (string, error) {
+func (k *KubeCmdRunner) GetPods(ctx context.Context, namespace string, labelSelector string) (string, error) {
 	if labelSelector != "" {
 		return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-l", labelSelector)
 	}
 	return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace)
 }
 
-func (k *KubeCmdRunner) GetPodsJSON(namespace string, labelSelector string) (string, error) {
+func (k *KubeCmdRunner) GetPodsJSON(ctx context.Context, namespace string, labelSelector string) (string, error) {
 	if labelSelector != "" {
 		return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-l", labelSelector, "-o", "json")
 	}
 	return k.runner.RunCommand("kubectl", "get", "pods", "-n", namespace, "-o", "json")
 }
 
-func (k *KubeCmdRunner) SetKubeContext(name string) (string, error) {
+func (k *KubeCmdRunner) SetKubeContext(ctx context.Context, name string) (string, error) {
 	return k.runner.RunCommand("kubectl", "config", "use-context", name)
 }
 
-func (k *KubeCmdRunner) DeleteDeployment(manifestPath string) (string, error) {
+func (k *KubeCmdRunner) DeleteDeployment(ctx context.Context, manifestPath string) (string, error) {
 	return k.runner.RunCommand("kubectl", "delete", "-f", manifestPath, "--ignore-not-found=true")
 }
 

@@ -2,14 +2,15 @@ package clients
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 )
 
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
-func (c *Clients) ValidateKindInstalled() error {
-	if _, err := c.Kind.Version(); err != nil {
+func (c *Clients) ValidateKindInstalled(ctx context.Context) error {
+	if _, err := c.Kind.Version(ctx); err != nil {
 		fmt.Println("kind is not installed.")
 		fmt.Print("Would you like to install kind? (y/n): ")
 		scanner := bufio.NewScanner(os.Stdin)
@@ -19,7 +20,7 @@ func (c *Clients) ValidateKindInstalled() error {
 			return fmt.Errorf("kind installation aborted")
 		}
 		fmt.Println("Attempting to install kind now for you...")
-		if output, err := c.Kind.Install(); err != nil {
+		if output, err := c.Kind.Install(ctx); err != nil {
 			return fmt.Errorf("failed to install kind: %s, error: %w", output, err)
 		}
 	}
@@ -27,12 +28,12 @@ func (c *Clients) ValidateKindInstalled() error {
 }
 
 // setupLocalRegistry sets up a local Docker registry for kind, supporting multiple OS types.
-func (c *Clients) SetupLocalRegistryCluster() error {
-	if err := c.checkDockerRunning(); err != nil {
+func (c *Clients) SetupLocalRegistryCluster(ctx context.Context) error {
+	if err := c.checkDockerRunning(ctx); err != nil {
 		return err
 	}
 
-	if output, err := c.Kind.SetupRegistry(); err != nil {
+	if output, err := c.Kind.SetupRegistry(ctx); err != nil {
 		return fmt.Errorf("failed to set up local registry: %s, error: %w", output, err)
 	}
 
@@ -40,15 +41,15 @@ func (c *Clients) SetupLocalRegistryCluster() error {
 }
 
 // getKindCluster ensures a 'container-copilot' kind cluster exists and sets kubectl context.
-func (c *Clients) GetKindCluster() (string, error) {
-	if err := c.checkDockerRunning(); err != nil {
+func (c *Clients) GetKindCluster(ctx context.Context) (string, error) {
+	if err := c.checkDockerRunning(ctx); err != nil {
 		return "", err
 	}
-	if err := c.ValidateKindInstalled(); err != nil {
+	if err := c.ValidateKindInstalled(ctx); err != nil {
 		return "", err
 	}
 
-	output, err := c.Kind.GetClusters()
+	output, err := c.Kind.GetClusters(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get kind clusters: %s, error: %w", output, err)
 	}
@@ -65,17 +66,17 @@ func (c *Clients) GetKindCluster() (string, error) {
 
 	if exists {
 		fmt.Println("Deleting existing kind cluster 'container-copilot'")
-		if output, err = c.Kind.DeleteCluster("container-copilot"); err != nil {
+		if output, err = c.Kind.DeleteCluster(ctx, "container-copilot"); err != nil {
 			return "", fmt.Errorf("failed to delete existing kind cluster: %s, error: %w", output, err)
 		}
 	}
 	fmt.Println("Creating kind cluster 'container-copilot'")
-	if err := c.SetupLocalRegistryCluster(); err != nil {
+	if err := c.SetupLocalRegistryCluster(ctx); err != nil {
 		return "", fmt.Errorf("setting up local registry cluster: %w", err)
 	}
 
 	fmt.Println("Setting kubectl context to 'kind-container-copilot'")
-	if output, err = c.Kube.SetKubeContext("kind-container-copilot"); err != nil {
+	if output, err = c.Kube.SetKubeContext(ctx, "kind-container-copilot"); err != nil {
 		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", string(output), err)
 	}
 

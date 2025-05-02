@@ -17,7 +17,7 @@ import (
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
 	// Check for kind cluster before starting
-	kindClusterName, err := c.GetKindCluster()
+	kindClusterName, err := c.GetKindCluster(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
@@ -25,7 +25,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 
 	// Validate registry connection
 	fmt.Printf("Validating connection to registry %s\n", registry)
-	err = docker.ValidateRegistryReachable(registry)
+	err = docker.ValidateRegistryReachable(ctx, registry)
 	if err != nil {
 		return fmt.Errorf("reaching registry %s: %w\n", registry, err)
 	}

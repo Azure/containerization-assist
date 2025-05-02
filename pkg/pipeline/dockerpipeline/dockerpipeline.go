@@ -124,7 +124,7 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 		fmt.Printf("Updated Dockerfile written. Attempting build again...\n")
 
 		// Try to build
-		buildErrors, err := c.BuildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+		buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 		if err == nil {
 			fmt.Println("🎉 Docker build succeeded!")
 			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
@@ -261,7 +261,7 @@ func (p *DockerPipeline) Initialize(ctx context.Context, state *pipeline.Pipelin
 	return InitializeDockerFileState(state, path)
 }
 
-// Deploy handles pushing the Docker image to the registry
+// Deploy handles deploying the Docker image to a registry
 func (p *DockerPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
@@ -279,7 +279,7 @@ func (p *DockerPipeline) Deploy(ctx context.Context, state *pipeline.PipelineSta
 	fmt.Printf("Pushing Docker image %s to registry\n", registryAndImage)
 
 	// Push the Docker image
-	if err := c.PushDockerImage(registryAndImage); err != nil {
+	if err := c.PushDockerImage(ctx, registryAndImage); err != nil {
 		return fmt.Errorf("pushing image %s: %w", registryAndImage, err)
 	}
 

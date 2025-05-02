@@ -86,7 +86,7 @@ Output the fixed manifest between <<<MANIFEST>>> tags.`
 }
 
 // DeployStateManifests deploys manifests from pipeline state
-func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) error {
+func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c *clients.Clients) error {
 	pendingManifests := GetPendingManifests(state)
 	if len(pendingManifests) == 0 {
 		fmt.Println("No pending manifests to deploy")
@@ -106,7 +106,7 @@ func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) err
 		if err := os.WriteFile(manifestPath, manifest.Content, 0644); err != nil {
 			return fmt.Errorf("failed to write manifest %s: %v", name, err)
 		}
-		success, output, err := c.DeployAndVerifySingleManifest(manifestPath, manifest.IsDeployment())
+		success, output, err := c.DeployAndVerifySingleManifest(ctx, manifestPath, manifest.IsDeployment())
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
 		}
@@ -267,7 +267,7 @@ func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineStat
 		fmt.Println("Updated manifests with fixes. Attempting deployment...")
 
 		// Try to deploy pending manifests
-		err := DeployStateManifests(state, c)
+		err := DeployStateManifests(ctx, state, c)
 		if err == nil {
 			// All manifests deployed successfully, but don't set global success state
 			// as that's handled by the central pipeline orchestrator
@@ -362,5 +362,5 @@ func (p *ManifestPipeline) Deploy(ctx context.Context, state *pipeline.PipelineS
 	}
 
 	fmt.Printf("Deploying Kubernetes manifests...\n")
-	return DeployStateManifests(state, c)
+	return DeployStateManifests(ctx, state, c)
 }

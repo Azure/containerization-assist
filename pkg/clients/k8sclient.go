@@ -19,17 +19,17 @@ import (
 )
 
 // CheckPodStatus verifies if pods from the deployment are running correctly
-func (c *Clients) CheckPodStatus(namespace string, labelSelector string, timeout time.Duration) (bool, string) {
+func (c *Clients) CheckPodStatus(ctx context.Context, namespace string, labelSelector string, timeout time.Duration) (bool, string) {
 	endTime := time.Now().Add(timeout)
 
 	for time.Now().Before(endTime) {
-		readableOutputStr, err := c.Kube.GetPods(namespace, labelSelector)
+		readableOutputStr, err := c.Kube.GetPods(ctx, namespace, labelSelector)
 		fmt.Println("Kubectl get pods output:\n", readableOutputStr)
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, readableOutputStr)
 		}
 
-		outputStr, err := c.Kube.GetPodsJSON(namespace, labelSelector)
+		outputStr, err := c.Kube.GetPodsJSON(ctx, namespace, labelSelector)
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, outputStr)
 		}
@@ -54,7 +54,7 @@ func (c *Clients) CheckPodStatus(namespace string, labelSelector string, timeout
 }
 
 // deployAndVerifySingleManifest applies a single manifest and verifies pod health
-func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeployment bool) (bool, string, error) {
+func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPath string, isDeployment bool) (bool, string, error) {
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return false, "", fmt.Errorf("reading manifest file: %w", err)
@@ -65,7 +65,7 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	}
 
 	// Apply the manifest
-	outputStr, err := c.Kube.Apply(manifestPath)
+	outputStr, err := c.Kube.Apply(ctx, manifestPath)
 
 	if err != nil {
 		fmt.Printf("Kubernetes deployment failed for %s with error: %v\n", manifestPath, err)
@@ -89,11 +89,11 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	labelSelector := ""    // Default label selector #TODO: actually parse this from the manifest
 
 	// Wait for pods to become healthy
-	podSuccess, podOutput := c.CheckPodStatus(namespace, labelSelector, time.Minute)
+	podSuccess, podOutput := c.CheckPodStatus(ctx, namespace, labelSelector, time.Minute)
 	if !podSuccess {
 		fmt.Printf("Pods are not healthy for deployment with manifest %s, cleaning up failed deployment\n", manifestPath)
 		// Clean up the failed deployment
-		deleteOutput, err := c.Kube.DeleteDeployment(manifestPath)
+		deleteOutput, err := c.Kube.DeleteDeployment(ctx, manifestPath)
 		if err != nil {
 			fmt.Printf("Warning: Failed to clean up deployment: %v\n", err)
 		} else {
@@ -106,7 +106,7 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	return true, outputStr, nil
 }
 
-func GetDeploymentLogs(deploymentName string, namespace string) error {
+func GetDeploymentLogs(ctx context.Context, deploymentName string, namespace string) error {
 	// Loading kubeconfig from default location
 	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	if err != nil {
@@ -124,14 +124,14 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 	// or is not found in the specified namespace
 	// This is a simplified example and may need to be adjusted based on our needs
 	deployClient := client.AppsV1().Deployments(namespace)
-	deployment, err := deployClient.Get(context.Background(), deploymentName, metav1.GetOptions{})
+	deployment, err := deployClient.Get(ctx, deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get deployment: %w", err)
 	}
 
 	// Get the matching pods
 	labelSelector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: deployment.Spec.Selector.MatchLabels})
-	pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
