@@ -13,6 +13,7 @@
 .env.copy
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
+TODO.md
 
 # Mono auto generated files
 mono_crash.*

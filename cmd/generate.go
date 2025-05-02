@@ -3,29 +3,34 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/filetree"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/dockerpipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
-
+	// Check for kind cluster before starting
 	kindClusterName, err := c.GetKindCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
 	fmt.Printf("Using kind cluster: %s\n", kindClusterName)
 
-	maxIterations := 5
-	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
+	// Validate registry connection
+	fmt.Printf("Validating connection to registry %s\n", registry)
+	err = docker.ValidateRegistryReachable(registry)
+	if err != nil {
+		return fmt.Errorf("reaching registry %s: %w\n", registry, err)
+	}
 
+	// Initialize pipeline state
 	state := &pipeline.PipelineState{
 		K8sObjects:     make(map[string]*k8s.K8sObject),
 		Success:        false,
@@ -34,86 +39,51 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		ImageName:      "app", // TODO: clean up app naming into state
 		RegistryURL:    registry,
 	}
-	fmt.Printf("validating connection to registry %s\n", registry)
-	err = docker.ValidateRegistryReachable(state.RegistryURL)
-	if err != nil {
-		return fmt.Errorf("reaching registry %s: %w\n", state.RegistryURL, err)
-	}
 
-	if enableDraftDockerfile {
-		fmt.Printf("Generating Dockerfile in %s\n", targetDir)
-		templateName, err := docker.GetDockerfileTemplateName(ctx, c.AzOpenAIClient, targetDir)
-		if err != nil {
-			return fmt.Errorf("getting Dockerfile template name: %w", err)
-		}
-
-		fmt.Printf("Using Dockerfile template: %s\n", templateName)
-		err = docker.WriteDockerfileFromTemplate(templateName, targetDir)
-		if err != nil {
-			return fmt.Errorf("writing Dockerfile from template: %w", err)
-		}
-	} else {
-		fmt.Printf("Writing blank starter Dockerfile in %s\n", targetDir)
-		fmt.Printf("writing empty dockerfile\n")
-		err = os.WriteFile(filepath.Join(targetDir, "Dockerfile"), []byte{}, fs.ModePerm)
-		if err != nil {
-			return fmt.Errorf("writing blank Dockerfile: %w", err)
-		}
-	}
-
-	fmt.Printf("Generating Kubernetes manifests in %s\n", targetDir)
-	registryAndImage := fmt.Sprintf("%s/%s", registry, "app")
-	err = docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage)
-	if err != nil {
-		return fmt.Errorf("generating deployment files: %w", err)
-	}
-
-	//Add RepoFileTree to state after Dockerfile and Manifests are generated
+	// Get file tree structure for context
 	repoStructure, err := filetree.ReadFileTree(targetDir)
 	if err != nil {
 		return fmt.Errorf("failed to get file tree: %w", err)
 	}
 	state.RepoFileTree = repoStructure
 
-	err = state.InitializeManifests(targetDir) // Initialize K8sManifests with default path
-	if err != nil {
-		return fmt.Errorf("failed to initialize manifests: %w", err)
+	registryAndImage := fmt.Sprintf("%s/%s", registry, state.ImageName)
+	if err := docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage); err != nil {
+		return fmt.Errorf("generating deployment files: %w", err)
 	}
 
-	err = state.InitializeDockerFileState(dockerfilePath)
-	if err != nil {
-		return fmt.Errorf("failed to initialize Dockerfile state: %w", err)
+	// Create pipeline instances
+	dockerPipeline := &dockerpipeline.DockerPipeline{
+		AIClient:         c.AzOpenAIClient,
+		UseDraftTemplate: enableDraftDockerfile,
+		Parser:           &pipeline.DefaultParser{},
+	}
+	manifestPipeline := &manifestpipeline.ManifestPipeline{
+		AIClient: c.AzOpenAIClient,
+		Parser:   &pipeline.DefaultParser{},
 	}
 
-	errors := []string{}
-	for i := 0; i < maxIterations && !state.Success; i++ {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("operation ended: %w", err)
-		}
-
-		if err := pipeline.IterateDockerfileBuild(ctx, maxIterations, state, targetDir, generateSnapshot, c); err != nil {
-			errors = append(errors, fmt.Sprintf("error in Dockerfile iteration process: %v", err))
-			break
-		}
-
-		fmt.Printf("pushing image %s\n", registryAndImage)
-		err = c.PushDockerImage(registryAndImage)
-		if err != nil {
-			return fmt.Errorf("pushing image %s: %w\n", registryAndImage, err)
-		}
-
-		if err := pipeline.IterateMultipleManifestsDeploy(ctx, maxIterations, state, targetDir, generateSnapshot, c); err != nil {
-			errors = append(errors, fmt.Sprintf("error in Kubernetes deployment process: %v", err))
-		}
+	// Store all pipelines in a map by type for better access
+	pipelinesByType := map[string]pipeline.Pipeline{
+		"docker":   dockerPipeline,
+		"manifest": manifestPipeline,
 	}
 
-	if !state.Success {
-		fmt.Println("\n❌ Container deployment pipeline did not complete successfully after maximum iterations.")
-		fmt.Println("No files were updated. Please review the logs for more information.")
-		return fmt.Errorf("errors encountered during iteration:\n%s", strings.Join(errors, "\n"))
+	// Create path map for each pipeline
+	pathMap := map[string]string{
+		"docker":   filepath.Join(targetDir, "Dockerfile"),
+		"manifest": targetDir,
 	}
 
-	// Update the dockerfile and manifests with the final successful versions
-	pipeline.UpdateSuccessfulFiles(state)
-	return nil
+	// Common pipeline options
+	options := pipeline.RunnerOptions{
+		MaxIterations:    5, // Default max iterations
+		GenerateSnapshot: generateSnapshot,
+		TargetDirectory:  targetDir,
+	}
+
+	execOrder := []string{"docker", "manifest"}
+
+	runner := pipeline.NewRunner(pipelinesByType, execOrder, os.Stdout)
+	return runner.Run(ctx, state, pathMap, options, c)
 }
