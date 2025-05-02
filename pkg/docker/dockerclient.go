@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
@@ -8,10 +9,10 @@ import (
 )
 
 type DockerClient interface {
-	Version() (string, error)
-	Info() (string, error)
-	Build(dockerfilePath, imageTag, contextPath string) (string, error)
-	Push(imageTag string) (string, error)
+	Version(ctx context.Context) (string, error)
+	Info(ctx context.Context) (string, error)
+	Build(ctx context.Context, dockerfilePath, imageTag, contextPath string) (string, error)
+	Push(ctx context.Context, imageTag string) (string, error)
 }
 
 type DockerCmdRunner struct {
@@ -26,21 +27,22 @@ func NewDockerCmdRunner(runner runner.CommandRunner) DockerClient {
 	}
 }
 
-func (d *DockerCmdRunner) Info() (string, error) {
+func (d *DockerCmdRunner) Info(ctx context.Context) (string, error) {
 	return d.runner.RunCommand("docker", "info")
 }
 
-func (d *DockerCmdRunner) Version() (string, error) {
+func (d *DockerCmdRunner) Version(ctx context.Context) (string, error) {
 	return d.runner.RunCommand("docker", "version")
 }
 
-func (d *DockerCmdRunner) Build(dockerfilePath, imageTag, contextPath string) (string, error) {
+func (d *DockerCmdRunner) Build(ctx context.Context, dockerfilePath, imageTag, contextPath string) (string, error) {
 	return d.runner.RunCommandStderr("docker", "build", "-q", "-f", dockerfilePath, "-t", imageTag, contextPath)
 }
 
-func (d *DockerCmdRunner) Push(image string) (string, error) {
+func (d *DockerCmdRunner) Push(ctx context.Context, image string) (string, error) {
 	return d.runner.RunCommand("docker", "push", image)
 }
+
 func CheckDockerInstalled() error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return fmt.Errorf("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH")
