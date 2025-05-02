@@ -77,7 +77,7 @@ Please:
 Do NOT create brand new manifests - Only fix the provided manifest. 
 IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
-Output the fixed manifest between <<<MANIFEST>>> tags.`
+**IMPORTANT: Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. Make sure the tags are used as mentioned only for wrapping the manifest content and no where else in your response.:IMPORTANT**`
 
 	content, err := client.GetChatCompletion(promptText)
 	if err != nil {

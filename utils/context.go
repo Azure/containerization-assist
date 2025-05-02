@@ -10,8 +10,8 @@ import (
 // For example, LLM should produce a response that would include a new file inbetween two tags
 // for easy regex grabbing
 func GrabContentBetweenTags(content string, tag string) (string, error) {
-	// Create pattern for <<<TAG>>>content<<<TAG>>> format
-	pattern := fmt.Sprintf(`<<<%s>>>([\s\S]*?)<<<%s>>>`, tag, tag)
+	// Create pattern for <TAG>content<TAG> format
+	pattern := fmt.Sprintf(`<%s>([\s\S]*?)</%s>`, tag, tag)
 	re := regexp.MustCompile(pattern)
 	matches := re.FindStringSubmatch(content)
 
