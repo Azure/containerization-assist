@@ -74,10 +74,10 @@ Please:
 2. Provide a fixed version of the manifest
 3. Explain what changes were made and why
 
-Do NOT create brand new manifests - Only fix the provided manifest. 
+Do NOT create brand new manifests - Only fix the provided manifest.
 IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
-**IMPORTANT: Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. Make sure the tags are used as mentioned only for wrapping the manifest content and no where else in your response.:IMPORTANT**`
+**IMPORTANT: Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. Make sure the tags are used as mentioned only for wrapping the manifest content and nowhere else in your response.:IMPORTANT**`
 
 	content, err := client.GetChatCompletion(promptText)
 	if err != nil {

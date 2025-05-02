@@ -96,7 +96,7 @@ Favor using the latest base images and best practices for Dockerfile writing
 If applicable, use multi-stage builds to reduce image size
 Make sure to account for the file structure of the repository
 
-**IMPORTANT: Output the fixed Dockerfile between <DOCKERFILE> and </DOCKERFILE> tags. Make sure the tags are used as mentioned only for wrapping the dockerfile content and no where else in your response.:IMPORTANT**
+**IMPORTANT: Output the fixed Dockerfile between <DOCKERFILE> and </DOCKERFILE> tags. Make sure the tags are used as mentioned only for wrapping the dockerfile content and nowhere else in your response.:IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
 `
