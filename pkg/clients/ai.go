@@ -1,9 +1,12 @@
 package clients
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
-func (c *Clients) TestOpenAIConn() error {
-	testResponse, err := c.AzOpenAIClient.GetChatCompletion("Hello Azure OpenAI! Tell me this is working in one short sentence.")
+func (c *Clients) TestOpenAIConn(ctx context.Context) error {
+	testResponse, err := c.AzOpenAIClient.GetChatCompletion(ctx, "Hello Azure OpenAI! Tell me this is working in one short sentence.")
 	if err != nil {
 		return fmt.Errorf("failed to get chat completion: %w", err)
 	}

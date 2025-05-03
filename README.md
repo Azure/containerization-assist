@@ -10,13 +10,32 @@ Prerequisites:
 - Kubectl
 - Docker
 - Kind
+- Azure CLI (for automatic setup)
 
 1. Clone the repo
 ```
 git clone git@github.com:Azure/container-copilot.git && cd container-copilot
 ```
 
-2. Set Azure OpenAI KEY and ENDPOINT
+2. Run container-copilot directly
+
+The simplest way to get started is to just run the generate command with your target repository:
+
+```bash
+# From root of container-copilot repo
+go run . generate <path/to/target-repo>
+```
+
+If you don't have Azure OpenAI resources configured, the tool will automatically:
+- Set up Azure OpenAI resources
+- Create resource group, OpenAI service, and deployment
+- Save configuration to a .env file for future use
+
+After the automatic setup is complete, it will continue with the containerization process.
+
+Alternatively, you can manually set up your Azure OpenAI environment:
+
+1. Set Azure OpenAI KEY and ENDPOINT
 
 - Create an AzureOpenAI Instance in the AzPortal
 - Go to Develop Tab
@@ -29,7 +48,7 @@ export AZURE_OPENAI_KEY=xxxxxxx
 export AZURE_OPENAI_ENDPOINT=xxxxxx
 ```
 
-3. Set Azure OpenAI Deployment ID
+5. Set Azure OpenAI Deployment ID
 - From the 'Overview Blade' > 'Get Started Tab', open 'Explore Azure AI Foundry Portal'
 - Accept "You're leaving azure.com" with 'Continue' Button
 - In Azure AI Foundry, on the left select the 'Deployments' Blade under 'Shared Resources' 
@@ -41,23 +60,81 @@ Run the following commands to set your deployment ID in your environment:
 export AZURE_OPENAI_DEPLOYMENT_ID=container-copilot
 ```
 
-4. Execute container-copilot
-Run on a local repo to test (this will be referred to as the "target repo" for containerization):
+### Setup Command
 
-one option to test with is https://github.com/chamilad/tomcat-hello-world (clone to a local dir first to test)
+You can explicitly provision Azure OpenAI resources using the `setup` command:
 
-run container-copilot
-```
+```bash
 # From root of container-copilot repo
-go run . generate <../path/to/target-repo>
+go run . setup --target-repo=<path/to/target-repo>
 ```
 
-### Using script
+The setup command will:
+1. Check if Azure OpenAI environment variables are already set
+   - If they are, it will skip the setup process unless `--force-setup` is specified
+2. Load existing values from a `.env` file if it exists
+3. Provision all required Azure OpenAI resources
+4. Create/update the model deployment
+5. Save all environment variables to the `.env` file in your project root
 
+Once setup is complete, you'll need to run the generate command to containerize your application:
+
+```bash
+# From root of container-copilot repo
+go run . generate <path/to/target-repo>
 ```
-Update the `env.example` file in the `hack` directory as needed, and copy it to `.env`:
-chmod +x hack/run-container-copilot.sh
-./hack/run-container-copilot.sh
+
+The setup command accepts additional options to customize your Azure resources:
+
+```bash
+go run . setup --resource-group=mygroup --location=eastus \
+  --openai-resource=myopenai --deployment=mydeploy \
+  --target-repo=<path/to/target-repo>
+```
+
+You can also provide these values via environment variables or a `.env` file. Copy the `env.example` to `.env` in the project root and fill in the required values:
+
+```bash
+# Container‑Copilot settings:
+CCP_RESOURCE_GROUP=mygroup
+CCP_LOCATION=eastus
+CCP_OPENAI_RESOURCE_NAME=myopenai
+CCP_DEPLOYMENT_NAME=mydeploy
+CCP_TARGET_REPO=<path/to/target-repo>
+
+# Optional (defaults shown):
+CCP_MODEL_ID=o3-mini
+CCP_MODEL_VERSION=2025-01-31
+```
+
+### Path Handling
+
+Container Copilot supports both absolute and relative paths for the target repository. When you provide a relative path, it will be automatically converted to an absolute path to ensure artifacts are generated in the correct location regardless of where you run the command from.
+
+For example, both of these commands are valid:
+```bash
+go run . generate ../my-app
+go run . generate /home/user/projects/my-app
+```
+
+### Additional Options
+
+**Force Setup**: If you want to recreate your Azure OpenAI resources even when environment variables are already configured, you can use the `--force-setup` flag:
+
+```bash
+go run . setup --force-setup --target-repo=<path/to/target-repo>
+```
+
+**Registry**: You can specify a custom container registry with the `--registry` flag:
+
+```bash
+go run . generate --registry=myregistry.azurecr.io <path/to/target-repo>
+```
+
+**Dockerfile Generator**: By default, container-copilot uses the "draft" Dockerfile generator. You can disable this with:
+
+```bash
+go run . generate --dockerfile-generator=none <path/to/target-repo>
 ```
 
 ### Using via Github Actions
