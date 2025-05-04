@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
@@ -58,7 +59,7 @@ func (c *Clients) GetKindCluster() (string, error) {
 	for _, cluster := range clusters {
 		if strings.TrimSpace(cluster) == "container-copilot" {
 			exists = true
-			fmt.Println("found existing 'container-copilot' cluster")
+			logger.Infof("found existing 'container-copilot' cluster")
 			break
 		}
 	}
@@ -69,7 +70,7 @@ func (c *Clients) GetKindCluster() (string, error) {
 			return "", fmt.Errorf("failed to delete existing kind cluster: %s, error: %w", output, err)
 		}
 	}
-	fmt.Println("Creating kind cluster 'container-copilot'")
+	logger.Info("Creating kind cluster 'container-copilot'")
 	if err := c.SetupLocalRegistryCluster(); err != nil {
 		return "", fmt.Errorf("setting up local registry cluster: %w", err)
 	}
