@@ -65,7 +65,7 @@ func (c *Clients) GetKindCluster() (string, error) {
 	}
 
 	if exists {
-		fmt.Println("Deleting existing kind cluster 'container-copilot'")
+		logger.Warn("Deleting existing kind cluster 'container-copilot'")
 		if output, err = c.Kind.DeleteCluster("container-copilot"); err != nil {
 			return "", fmt.Errorf("failed to delete existing kind cluster: %s, error: %w", output, err)
 		}
@@ -75,7 +75,7 @@ func (c *Clients) GetKindCluster() (string, error) {
 		return "", fmt.Errorf("setting up local registry cluster: %w", err)
 	}
 
-	fmt.Println("Setting kubectl context to 'kind-container-copilot'")
+	logger.Info("Setting kubectl context to 'kind-container-copilot'")
 	if output, err = c.Kube.SetKubeContext("kind-container-copilot"); err != nil {
 		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", string(output), err)
 	}

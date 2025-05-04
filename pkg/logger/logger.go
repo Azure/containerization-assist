@@ -30,6 +30,10 @@ func Warn(msg string) {
 	logger.Warn().Msg(msg)
 }
 
+func Warnf(format string, args ...interface{}) {
+	logger.Warn().Msgf(format, args...)
+}
+
 func Error(msg string) {
 	logger.Error().Msg(msg)
 }
