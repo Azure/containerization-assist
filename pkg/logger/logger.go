@@ -38,6 +38,14 @@ func Error(msg string) {
 	logger.Error().Msg(msg)
 }
 
+func Errorf(format string, args ...interface{}) {
+	logger.Error().Msgf(format, args...)
+}
+
 func Debug(msg string) {
 	logger.Debug().Msg(msg)
+}
+
+func Debugf(format string, args ...interface{}) {
+	logger.Debug().Msgf(format, args...)
 }
