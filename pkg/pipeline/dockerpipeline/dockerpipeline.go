@@ -37,21 +37,21 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
 
-			fmt.Printf("Using Dockerfile template: %s\n", templateName)
+			logger.Infof("Using Dockerfile template: %s\n", templateName)
 
 			// Generate the Dockerfile from template
 			if err := docker.WriteDockerfileFromTemplate(templateName, targetDir); err != nil {
 				return fmt.Errorf("writing Dockerfile from template: %w", err)
 			}
 		} else {
-			fmt.Printf("Creating empty Dockerfile\n")
+			logger.Info("Creating empty Dockerfile\n")
 			// Create an empty file
 			if err := os.WriteFile(dockerfilePath, []byte{}, 0644); err != nil {
 				return fmt.Errorf("writing empty Dockerfile: %w", err)
 			}
 		}
 	} else {
-		fmt.Printf("Found existing Dockerfile at %s\n", dockerfilePath)
+		logger.Infof("Found existing Dockerfile at %s\n", dockerfilePath)
 	}
 
 	// Read the content and update state
@@ -75,7 +75,7 @@ func (p *DockerPipeline) GetErrors(state *pipeline.PipelineState) string {
 func (p *DockerPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
 	// Only write if there's content and no build errors, regardless of global state.Success
 	if state.Dockerfile.Path != "" && state.Dockerfile.Content != "" && state.Dockerfile.BuildErrors == "" {
-		fmt.Printf("Writing final Dockerfile to %s\n", state.Dockerfile.Path)
+		logger.Infof("Writing final Dockerfile to %s\n", state.Dockerfile.Path)
 		if err := os.WriteFile(state.Dockerfile.Path, []byte(state.Dockerfile.Content), 0644); err != nil {
 			return fmt.Errorf("writing Dockerfile: %w", err)
 		}
@@ -100,7 +100,7 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 	targetDir := options.TargetDirectory
 	generateSnapshot := options.GenerateSnapshot
 
-	fmt.Printf("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
+	logger.Infof("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
 	if err := docker.CheckDockerInstalled(); err != nil {
@@ -108,7 +108,7 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 	}
 
 	for i := 0; i < maxIterations; i++ {
-		fmt.Printf("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
+		logger.Infof("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
 		state.IterationCount += 1
 
 		// Get AI to fix the Dockerfile
@@ -119,16 +119,16 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 
 		// Update the Dockerfile
 		state.Dockerfile.Content = result.FixedContent
-		fmt.Println("AI suggested fixes:")
-		fmt.Println(result.Analysis)
+		logger.Info("AI suggested fixes:")
+		logger.Debug(result.Analysis)
 
-		fmt.Printf("Updated Dockerfile written. Attempting build again...\n")
+		logger.Info("Updated Dockerfile written. Attempting build again...\n")
 
 		// Try to build
 		buildErrors, err := c.BuildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 		if err == nil {
-			fmt.Println("🎉 Docker build succeeded!")
-			fmt.Println("Successful Dockerfile: \n", state.Dockerfile.Content)
+			logger.Info("🎉 Docker build succeeded!")
+			logger.Infof("Successful Dockerfile: \n", state.Dockerfile.Content)
 
 			// Clear any previous build errors to indicate success
 			state.Dockerfile.BuildErrors = ""
@@ -141,9 +141,9 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 			return nil
 		}
 
-		fmt.Printf("Docker build failed with error: %v\n", buildErrors)
+		logger.Errorf("Docker build failed with error: %v\n", buildErrors)
 
-		fmt.Println("Docker build failed. Using AI to fix issues...")
+		logger.Error("Docker build failed. Using AI to fix issues...")
 
 		state.Dockerfile.BuildErrors = buildErrors
 
@@ -254,7 +254,7 @@ func (p *DockerPipeline) Initialize(ctx context.Context, state *pipeline.Pipelin
 		state.Dockerfile.Content = ""
 		state.Dockerfile.Path = path
 		state.Dockerfile.BuildErrors = ""
-		fmt.Printf("Initialized empty Dockerfile state (file will be created later)\n")
+		logger.Info("Initialized empty Dockerfile state (file will be created later)\n")
 		return nil
 	}
 
@@ -277,13 +277,13 @@ func (p *DockerPipeline) Deploy(ctx context.Context, state *pipeline.PipelineSta
 
 	// Build the image name with registry
 	registryAndImage := fmt.Sprintf("%s/%s", state.RegistryURL, state.ImageName)
-	fmt.Printf("Pushing Docker image %s to registry\n", registryAndImage)
+	logger.Infof("Pushing Docker image %s to registry\n", registryAndImage)
 
 	// Push the Docker image
 	if err := c.PushDockerImage(registryAndImage); err != nil {
 		return fmt.Errorf("pushing image %s: %w", registryAndImage, err)
 	}
 
-	fmt.Printf("Successfully pushed Docker image %s to registry\n", registryAndImage)
+	logger.Infof("Successfully pushed Docker image %s to registry\n", registryAndImage)
 	return nil
 }
