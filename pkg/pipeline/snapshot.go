@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // WriteIterationSnapshot creates a snapshot of the current pipeline iteration.
@@ -83,6 +85,6 @@ func WriteIterationSnapshot(state *PipelineState, targetDir string, pipelines ..
 		}
 	}
 
-	fmt.Printf("Snapshot for iteration %d saved to %s\n", state.IterationCount, snapDir)
+	logger.Infof("Snapshot for iteration %d saved to %s\n", state.IterationCount, snapDir)
 	return nil
 }

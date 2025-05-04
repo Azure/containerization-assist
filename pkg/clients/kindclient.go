@@ -11,7 +11,7 @@ import (
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.
 func (c *Clients) ValidateKindInstalled() error {
 	if _, err := c.Kind.Version(); err != nil {
-		fmt.Println("kind is not installed.")
+		logger.Info("kind is not installed.")
 		fmt.Print("Would you like to install kind? (y/n): ")
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
@@ -19,7 +19,7 @@ func (c *Clients) ValidateKindInstalled() error {
 		if response != "y" {
 			return fmt.Errorf("kind installation aborted")
 		}
-		fmt.Println("Attempting to install kind now for you...")
+		logger.Info("Attempting to install kind now for you...")
 		if output, err := c.Kind.Install(); err != nil {
 			return fmt.Errorf("failed to install kind: %s, error: %w", output, err)
 		}

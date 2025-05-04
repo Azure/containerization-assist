@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Azure/container-copilot/pkg/k8s"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // CheckPodStatus verifies if pods from the deployment are running correctly
@@ -24,7 +25,7 @@ func (c *Clients) CheckPodStatus(namespace string, labelSelector string, timeout
 
 	for time.Now().Before(endTime) {
 		readableOutputStr, err := c.Kube.GetPods(namespace, labelSelector)
-		fmt.Println("Kubectl get pods output:\n", readableOutputStr)
+		logger.Infof("Kubectl get pods output:\n", readableOutputStr)
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, readableOutputStr)
 		}
@@ -68,20 +69,20 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	outputStr, err := c.Kube.Apply(manifestPath)
 
 	if err != nil {
-		fmt.Printf("Kubernetes deployment failed for %s with error: %v\n", manifestPath, err)
+		logger.Errorf("Kubernetes deployment failed for %s with error: %v\n", manifestPath, err)
 		return false, outputStr, nil
 	}
 
-	fmt.Printf("Successfully applied %s\n", manifestPath)
+	logger.Infof("Successfully applied %s\n", manifestPath)
 
 	// Only check pod status for deployment.yaml files
 	baseFilename := filepath.Base(manifestPath)
 	if !isDeployment {
-		fmt.Printf("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
+		logger.Infof("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
 		return true, outputStr, nil
 	}
 
-	fmt.Printf("Checking pod health for deployment...\n")
+	logger.Infof("Checking pod health for deployment...\n")
 
 	// Extract namespace and app labels from the manifest
 	// This is simplified - would need to actually take this from the manifest
@@ -91,17 +92,17 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.CheckPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
-		fmt.Printf("Pods are not healthy for deployment with manifest %s, cleaning up failed deployment\n", manifestPath)
+		logger.Infof("Pods are not healthy for deployment with manifest %s, cleaning up failed deployment\n", manifestPath)
 		// Clean up the failed deployment
 		deleteOutput, err := c.Kube.DeleteDeployment(manifestPath)
 		if err != nil {
-			fmt.Printf("Warning: Failed to clean up deployment: %v\n", err)
+			logger.Errorf("Warning: Failed to clean up deployment: %v\n", err)
 		} else {
-			fmt.Printf("Successfully deleted failed deployment: %s\n", deleteOutput)
+			logger.Infof("Successfully deleted failed deployment: %s\n", deleteOutput)
 		}
 		return false, outputStr + "\n" + podOutput, nil
 	}
-	fmt.Println("Pod health check passed")
+	logger.Info("Pod health check passed")
 
 	return true, outputStr, nil
 }
@@ -144,7 +145,7 @@ func GetDeploymentLogs(deploymentName string, namespace string) error {
 
 	// Print logs for the first pod (or loop through all if desired)
 	for _, pod := range pods.Items {
-		fmt.Printf("Logs for Pod: %s\n", pod.Name)
+		logger.Infof("Logs for Pod: %s\n", pod.Name)
 		err := streamPodLogs(client, namespace, pod.Name)
 		if err != nil {
 			log.Printf("Error getting logs for pod %s: %v\n", pod.Name, err)

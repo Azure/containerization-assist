@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents
@@ -27,14 +28,14 @@ func (c *Clients) BuildDockerfileContent(dockerfileContent string, targetDir str
 	}
 
 	// Build the image using the temporary Dockerfile
-	fmt.Printf("building docker image with tag '%s%s:latest'\n", registryPrefix, imageName)
+	logger.Infof("building docker image with tag '%s%s:latest'\n", registryPrefix, imageName)
 	buildErrors, err := c.Docker.Build(dockerfilePath, registryPrefix+imageName+":latest", targetDir)
 
 	if err != nil {
 		return buildErrors, fmt.Errorf("docker build failed: %v", err)
 	}
 
-	fmt.Printf("built docker image")
+	logger.Info("built docker image")
 	return buildErrors, nil
 }
 
@@ -49,10 +50,10 @@ func (c *Clients) checkDockerRunning() error {
 func (c *Clients) PushDockerImage(image string) error {
 
 	output, err := c.Docker.Push(image)
-	fmt.Println("Output: ", output)
+	logger.Infof("Output: ", output)
 
 	if err != nil {
-		fmt.Println("Registry push failed with error:", err)
+		logger.Errorf("Registry push failed with error:", err)
 		return fmt.Errorf("error pushing to registry: %v", err)
 	}
 

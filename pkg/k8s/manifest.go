@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"sigs.k8s.io/yaml"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 const SNAPSHOT_DIR = ".container-copilot-snapshots"
@@ -26,7 +27,7 @@ const ManifestObjectDelimiter = "---"
 func FindK8sObjects(path string) ([]K8sObject, error) {
 	if path == "" {
 		path = DefaultManifestPath
-		fmt.Printf("Using default manifest path: %s\n", path)
+		logger.Infof("Using default manifest path: %s\n", path)
 	}
 
 	var k8sObjects []K8sObject
@@ -39,7 +40,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
-	fmt.Printf("Looking for Kubernetes manifest files in directory: %s\n", path)
+	logger.Infof("Looking for Kubernetes manifest files in directory: %s\n", path)
 
 	err = filepath.WalkDir(path, func(filePath string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -57,13 +58,13 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 			}
 			o, err := ReadK8sObjects(fileContent)
 			if err != nil {
-				fmt.Printf("Skipping file %s: %v\n", filePath, err)
+				logger.Infof("Skipping file %s: %v\n", filePath, err)
 				return nil // Skip files with errors instead of failing
 			}
 
 			// Validate that this is actually a Kubernetes manifest by checking required fields
 			if o.Kind == "" || o.ApiVersion == "" || o.Metadata.Name == "" {
-				fmt.Printf("Skipping file %s: not a valid Kubernetes manifest (missing required fields)\n", filePath)
+				logger.Infof("Skipping file %s: not a valid Kubernetes manifest (missing required fields)\n", filePath)
 				return nil
 			}
 

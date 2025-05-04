@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // DockerPipeline implements the pipeline.Pipeline interface for Dockerfiles
@@ -27,7 +28,7 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 
 	// Check if Dockerfile already exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		fmt.Printf("No Dockerfile found, generating one...\n")
+		logger.Info("No Dockerfile found, generating one...\n")
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
