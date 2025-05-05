@@ -21,9 +21,15 @@ func (p *DefaultParser) ExtractContent(content string, tag string) (string, erro
 	pattern := fmt.Sprintf("(?s).*<%s>([\\s\\S]*?)</%s>", regexp.QuoteMeta(tag), regexp.QuoteMeta(tag))
 	re := regexp.MustCompile(pattern)
 	matches := re.FindStringSubmatch(content)
+
 	if len(matches) < 2 {
 		return "", fmt.Errorf("content between tags <%s> not found", tag)
 	}
 
-	return strings.TrimSpace(matches[1]), nil
+	innerContent := strings.TrimSpace(matches[1])
+	if innerContent == "" {
+		return "", fmt.Errorf("content between tags <%s> is empty", tag)
+	}
+
+	return innerContent, nil
 }

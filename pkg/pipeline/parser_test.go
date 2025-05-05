@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestGrabContentBetweenTags(t *testing.T) {
+func TestExtractContent(t *testing.T) {
 	tests := []struct {
 		name        string
 		content     string
@@ -38,7 +38,7 @@ func TestGrabContentBetweenTags(t *testing.T) {
 			content:     "<empty></empty>",
 			tag:         "empty",
 			expected:    "",
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name:        "Missing tags",
@@ -79,7 +79,8 @@ func TestGrabContentBetweenTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := GrabContentBetweenTags(tt.content, tt.tag)
+			parser := &DefaultParser{}
+			result, err := parser.ExtractContent(tt.content, tt.tag)
 
 			if tt.expectError && err == nil {
 				t.Errorf("expected an error but got nil")
