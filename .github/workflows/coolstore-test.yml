@@ -20,11 +20,11 @@ jobs:
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: '1.24'
-      
+
       - name: Build container-copilot
         run: |
           go build -o container-copilot .
-          
+
       - name: Upload binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -60,14 +60,14 @@ jobs:
           - spring-petclinic/spring-petclinic-microservices
         test-number: [1, 2, 3, 4, 5]
       fail-fast: false
-    
+
     steps:
       - name: Download container-copilot binary
         uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
           name: container-copilot-binary
           path: ./
-      
+
       - name: Make binary executable
         run: |
           chmod +x container-copilot
@@ -86,7 +86,7 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           install_only: true
-      
+
       - name: Run Test ${{ matrix.test-number }}
         id: run_test
         continue-on-error: true
@@ -96,18 +96,18 @@ jobs:
           AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
         run: |
           cd test-repo
-          
+
           # Make sure we have a place to store logs
           mkdir -p artifacts/logs
-          
+
           # The success message we're looking for in the output
-          SUCCESS_MESSAGE="Container deployment pipeline completed successfully!"
-          
+          SUCCESS_MESSAGE="All pipelines completed successfully!"
+
           # Start with a clean slate
           rm -f Dockerfile || true
           rm -rf manifests || true
           mkdir -p manifests
-          
+
           # Run the test and save output
           REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|.|g' )
           RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ matrix.test-number }}"
@@ -170,7 +170,7 @@ jobs:
           "
 
           # List repos without numbers
-          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"  
+          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"
           echo "Repos: $REPOS"
 
           success_rates=()
@@ -185,7 +185,7 @@ jobs:
             # Count successes and failures
             success_count=0
             failure_count=0
-            
+
             # Build detailed results
             passed_tests=""
             failed_tests="" # includes failed and timed out tests

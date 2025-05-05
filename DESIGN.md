@@ -24,7 +24,7 @@ Container Copilot is an AI-powered CLI tool that automates the containerization 
 
 ### 🖥 CLI Entry Point
 
-- Main command:  
+- Main command:
   ```bash
   container-copilot generate <target-dir>
   ```
@@ -127,7 +127,7 @@ Example tags:
   ```
 - Log outputs are parsed for:
   ```text
-  "Container deployment pipeline completed successfully!"
+  "All pipelines completed successfully!"
   ```
 
 Artifacts:
