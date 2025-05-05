@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/dockerpipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
@@ -21,10 +22,10 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
-	fmt.Printf("Using kind cluster: %s\n", kindClusterName)
+	logger.Infof("Using kind cluster: %s\n", kindClusterName)
 
 	// Validate registry connection
-	fmt.Printf("Validating connection to registry %s\n", registry)
+	logger.Infof("Validating connection to registry %s\n", registry)
 	err = docker.ValidateRegistryReachable(registry)
 	if err != nil {
 		return fmt.Errorf("reaching registry %s: %w\n", registry, err)

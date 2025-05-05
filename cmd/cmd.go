@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 const (
@@ -59,7 +60,7 @@ func loadEnvFile() {
 		// Check if .env file exists and load it
 		if _, err := os.Stat(envFile); err == nil {
 			if err := godotenv.Load(envFile); err != nil {
-				fmt.Printf("Warning: Error loading .env file: %v\n", err)
+				logger.Warnf("Warning: Error loading .env file: %v\n", err)
 			}
 		}
 	}
@@ -102,11 +103,11 @@ var generateCmd = &cobra.Command{
 				// If still no target, prompt the user
 				if targetDir == "" {
 					// No target directory provided - inform the user and accept input
-					fmt.Println("No target repository specified. The target repository is the directory containing the application you want to containerize.")
-					fmt.Println("Example: container-copilot generate ./my-app")
+					logger.Warn("No target repository specified. The target repository is the directory containing the application you want to containerize.")
+					logger.Info("Example: container-copilot generate ./my-app")
 
 					// Ask if they want to provide a target directory now
-					fmt.Print("Would you like to specify a target repository now? (y/n): ")
+					logger.Info("Would you like to specify a target repository now? (y/n): ")
 					var response string
 					fmt.Scanln(&response)
 
@@ -123,7 +124,7 @@ var generateCmd = &cobra.Command{
 						return fmt.Errorf("target repository is required")
 					}
 				} else {
-					fmt.Printf("Using target repository from environment: %s\n", targetDir)
+					logger.Infof("Using target repository from environment: %s\n", targetDir)
 				}
 			}
 		}
@@ -132,7 +133,7 @@ var generateCmd = &cobra.Command{
 		if os.Getenv(AZURE_OPENAI_KEY) == "" ||
 			os.Getenv(AZURE_OPENAI_ENDPOINT) == "" ||
 			os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID) == "" {
-			fmt.Println("Azure OpenAI configuration not found. Starting automatic setup process...")
+			logger.Error("Azure OpenAI configuration not found. Starting automatic setup process...")
 		}
 
 		// Convert targetDir to absolute path for consistent behavior
@@ -220,24 +221,24 @@ var setupCmd = &cobra.Command{
 
 		// Update .env file
 		if err := UpdateEnvFile(projectRoot, config, apiKey, endpoint, deploymentID); err != nil {
-			fmt.Printf("Warning: Failed to update .env file: %v\n", err)
+			logger.Warnf("Warning: Failed to update .env file: %v\n", err)
 		} else {
-			fmt.Printf("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
-			fmt.Printf("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
-			fmt.Printf("Azure OpenAI Endpoint: %s\n", endpoint)
-			fmt.Printf("Azure OpenAI Deployment ID: %s\n", deploymentID)
-			fmt.Printf("Target Repo: %s\n", config.TargetRepo)
+			logger.Infof("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
+			logger.Infof("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
+			logger.Infof("Azure OpenAI Endpoint: %s\n", endpoint)
+			logger.Infof("Azure OpenAI Deployment ID: %s\n", deploymentID)
+			logger.Infof("Target Repo: %s\n", config.TargetRepo)
 		}
 
 		// Setup completed successfully
-		fmt.Println("\n✅ Setup completed successfully!")
+		logger.Info("\n✅ Setup completed successfully!")
 
 		// Display next steps instead of running generate automatically
 		if config.TargetRepo != "" {
-			fmt.Printf("\nTo generate artifacts, run:\n  container-copilot generate %s\n", config.TargetRepo)
+			logger.Infof("\nTo generate artifacts, run:\n  container-copilot generate %s\n", config.TargetRepo)
 		} else {
-			fmt.Println("\nTo generate artifacts, run:")
-			fmt.Println("  container-copilot generate <path/to/target-repo>")
+			logger.Info("\nTo generate artifacts, run:")
+			logger.Info("  container-copilot generate <path/to/target-repo>")
 		}
 
 		return nil
@@ -273,8 +274,8 @@ func initClients() (*clients.Clients, error) {
 
 	if len(missingVars) > 0 {
 		// Instead of returning an error, try to run setup automatically
-		fmt.Printf("Missing environment variables: %s\n", strings.Join(missingVars, ", "))
-		fmt.Println("Attempting to set up Azure OpenAI resources automatically...")
+		logger.Infof("Missing environment variables: %s\n", strings.Join(missingVars, ", "))
+		logger.Info("Attempting to set up Azure OpenAI resources automatically...")
 
 		// Run setup process
 		if err := runAutoSetup(); err != nil {
@@ -325,7 +326,7 @@ func runAutoSetup() error {
 	envTargetRepo := os.Getenv("CCP_TARGET_REPO")
 	if envTargetRepo != "" {
 		tempCmd.Flags().Set("target-repo", envTargetRepo)
-		fmt.Printf("Using target repository from environment: %s\n", envTargetRepo)
+		logger.Infof("Using target repository from environment: %s\n", envTargetRepo)
 	}
 
 	// Empty args list
@@ -339,7 +340,7 @@ func runAutoSetup() error {
 
 	// If target repo still not set, prompt the user
 	if config.TargetRepo == "" {
-		fmt.Println("A target repository path is required for containerization.")
+		logger.Info("A target repository path is required for containerization.")
 		fmt.Print("Enter path to the repository to containerize: ")
 		var targetRepo string
 		fmt.Scanln(&targetRepo)
@@ -356,7 +357,7 @@ func runAutoSetup() error {
 		config.TargetRepo = normalizedPath
 	}
 
-	fmt.Println("Using auto-generated resource names for Azure OpenAI setup...")
+	logger.Info("Using auto-generated resource names for Azure OpenAI setup...")
 
 	// Print configuration
 	config.PrintConfig()
@@ -374,13 +375,13 @@ func runAutoSetup() error {
 
 	// Update .env file
 	if err := UpdateEnvFile(projectRoot, config, apiKey, endpoint, deploymentID); err != nil {
-		fmt.Printf("Warning: Failed to update .env file: %v\n", err)
+		logger.Warnf("Warning: Failed to update .env file: %v\n", err)
 	} else {
-		fmt.Printf("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
-		fmt.Printf("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
-		fmt.Printf("Azure OpenAI Endpoint: %s\n", endpoint)
-		fmt.Printf("Azure OpenAI Deployment ID: %s\n", deploymentID)
-		fmt.Printf("Target Repo: %s\n", config.TargetRepo)
+		logger.Infof("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
+		logger.Infof("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
+		logger.Infof("Azure OpenAI Endpoint: %s\n", endpoint)
+		logger.Infof("Azure OpenAI Deployment ID: %s\n", deploymentID)
+		logger.Infof("Target Repo: %s\n", config.TargetRepo)
 	}
 
 	return nil

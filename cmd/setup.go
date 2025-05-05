@@ -11,6 +11,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // SetupConfig contains all the configuration needed for the setup process
@@ -167,35 +168,35 @@ func (c *SetupConfig) ValidateConfig() error {
 
 // PrintConfig prints the configuration values
 func (c *SetupConfig) PrintConfig() {
-	fmt.Printf("→ Configuration:\n")
-	fmt.Printf("  RESOURCE_GROUP:        %s\n", c.ResourceGroup)
-	fmt.Printf("  LOCATION:              %s\n", c.Location)
-	fmt.Printf("  OPENAI_RES_NAME:       %s\n", c.OpenAIResourceName)
-	fmt.Printf("  DEPLOYMENT_NAME:       %s\n", c.DeploymentName)
-	fmt.Printf("  MODEL_ID:              %s\n", c.ModelID)
-	fmt.Printf("  MODEL_VERSION:         %s\n", c.ModelVersion)
-	fmt.Printf("  TARGET_REPO:           %s\n", c.TargetRepo)
+	logger.Info("→ Configuration:\n")
+	logger.Infof("  RESOURCE_GROUP:        %s\n", c.ResourceGroup)
+	logger.Infof("  LOCATION:              %s\n", c.Location)
+	logger.Infof("  OPENAI_RES_NAME:       %s\n", c.OpenAIResourceName)
+	logger.Infof("  DEPLOYMENT_NAME:       %s\n", c.DeploymentName)
+	logger.Infof("  MODEL_ID:              %s\n", c.ModelID)
+	logger.Infof("  MODEL_VERSION:         %s\n", c.ModelVersion)
+	logger.Infof("  TARGET_REPO:           %s\n", c.TargetRepo)
 }
 
 // RunSetup performs the full setup process and returns Azure OpenAI credentials
 func RunSetup(config *SetupConfig) (string, string, string, error) {
 	// Check prerequisites
-	fmt.Println("\n→ Verifying prerequisites…")
+	logger.Info("\n→ Verifying prerequisites…")
 	prereqs := []string{"az", "go", "kubectl", "docker", "kind"}
 	for _, prereq := range prereqs {
 		if _, err := exec.LookPath(prereq); err != nil {
 			return "", "", "", fmt.Errorf("prerequisite %s not found", prereq)
 		}
-		fmt.Printf("✓ %s\n", prereq)
+		logger.Infof("✓ %s\n", prereq)
 	}
 
 	// Ensure resource group exists
-	fmt.Printf("\n→ Checking resource group '%s'…\n", config.ResourceGroup)
+	logger.Infof("\n→ Checking resource group '%s'…\n", config.ResourceGroup)
 	rgCheckCmd := exec.Command("az", "group", "show", "--name", config.ResourceGroup)
 	rgCheckCmd.Stderr = nil
 	rgCheckCmd.Stdout = nil
 	if err := rgCheckCmd.Run(); err != nil {
-		fmt.Printf("  not found → creating in '%s'…\n", config.Location)
+		logger.Warnf("  not found → creating in '%s'…\n", config.Location)
 		rgCreateCmd := exec.Command("az", "group", "create",
 			"--name", config.ResourceGroup,
 			"--location", config.Location,
@@ -205,20 +206,20 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		if err := rgCreateCmd.Run(); err != nil {
 			return "", "", "", fmt.Errorf("failed to create resource group: %w", err)
 		}
-		fmt.Println("  ✓ Created")
+		logger.Info("  ✓ Created")
 	} else {
-		fmt.Println("  ✓ Exists")
+		logger.Info("  ✓ Exists")
 	}
 
 	// Ensure OpenAI Cognitive Services account exists
-	fmt.Printf("\n→ Ensuring Cognitive Services account '%s' (kind=OpenAI)…\n", config.OpenAIResourceName)
+	logger.Infof("\n→ Ensuring Cognitive Services account '%s' (kind=OpenAI)…\n", config.OpenAIResourceName)
 	csCheckCmd := exec.Command("az", "cognitiveservices", "account", "show",
 		"--name", config.OpenAIResourceName,
 		"--resource-group", config.ResourceGroup)
 	csCheckCmd.Stderr = nil
 	csCheckCmd.Stdout = nil
 	if err := csCheckCmd.Run(); err != nil {
-		fmt.Println("  not found → creating…")
+		logger.Warn("  not found → creating…")
 		csCreateCmd := exec.Command("az", "cognitiveservices", "account", "create",
 			"--name", config.OpenAIResourceName,
 			"--resource-group", config.ResourceGroup,
@@ -232,13 +233,13 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		if err := csCreateCmd.Run(); err != nil {
 			return "", "", "", fmt.Errorf("failed to create Cognitive Services account: %w", err)
 		}
-		fmt.Println("  ✓ Created account")
+		logger.Info("  ✓ Created account")
 	} else {
-		fmt.Println("  ✓ Account exists")
+		logger.Info("  ✓ Account exists")
 	}
 
 	// Fetch API key
-	fmt.Println("\n→ Retrieving API key and endpoint…")
+	logger.Info("\n→ Retrieving API key and endpoint…")
 	keyCmd := exec.Command("az", "cognitiveservices", "account", "keys", "list",
 		"--name", config.OpenAIResourceName,
 		"--resource-group", config.ResourceGroup,
@@ -248,7 +249,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		return "", "", "", fmt.Errorf("failed to retrieve API key: %w", err)
 	}
 	apiKey := strings.TrimSpace(string(keyOutput))
-	fmt.Println("  ✓ Key retrieved")
+	logger.Info("  ✓ Key retrieved")
 
 	// Fetch endpoint
 	endpointCmd := exec.Command("az", "cognitiveservices", "account", "show",
@@ -260,10 +261,10 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		return "", "", "", fmt.Errorf("failed to retrieve endpoint: %w", err)
 	}
 	endpoint := strings.TrimSpace(string(endpointOutput))
-	fmt.Println("  ✓ Endpoint retrieved")
+	logger.Info("  ✓ Endpoint retrieved")
 
 	// List available models
-	fmt.Printf("\n→ Available models on '%s':\n", config.OpenAIResourceName)
+	logger.Infof("\n→ Available models on '%s':\n", config.OpenAIResourceName)
 	modelsCmd := exec.Command("az", "cognitiveservices", "account", "list-models",
 		"--resource-group", config.ResourceGroup,
 		"--name", config.OpenAIResourceName,
@@ -275,7 +276,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	}
 
 	// Create/update deployment
-	fmt.Printf("\n→ Creating/updating deployment '%s'…\n", config.DeploymentName)
+	logger.Infof("\n→ Creating/updating deployment '%s'…\n", config.DeploymentName)
 	deployCmd := exec.Command("az", "cognitiveservices", "account", "deployment", "create",
 		"--name", config.OpenAIResourceName,
 		"--resource-group", config.ResourceGroup,
@@ -292,12 +293,12 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	if err := deployCmd.Run(); err != nil {
 		return "", "", "", fmt.Errorf("failed to create/update deployment: %w", err)
 	}
-	fmt.Printf("  ✓ Deployment '%s' ready\n", config.DeploymentName)
+	logger.Infof("  ✓ Deployment '%s' ready\n", config.DeploymentName)
 
 	// Setting deployment ID
 	deploymentID := config.DeploymentName
 
-	fmt.Println("\n→ Exporting AZURE_* variables…")
+	logger.Infof("\n→ Exporting AZURE_* variables…")
 
 	return apiKey, endpoint, deploymentID, nil
 }

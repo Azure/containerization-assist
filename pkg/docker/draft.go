@@ -5,6 +5,7 @@ import (
 
 	"github.com/Azure/draft/pkg/handlers"
 	"github.com/Azure/draft/pkg/templatewriter/writers"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 const (
@@ -44,7 +45,7 @@ func GenerateDockerfileWithDraft(dockerfileTemplateName, outputDir string) error
 
 func GenerateDeploymentFilesWithDraft(outputDir string, registryAndImage string) error {
 	// APPNAME doesn't have a default value in draft template
-	fmt.Println("generating manifests with imagename ", registryAndImage)
+	logger.Infof("generating manifests with imagename ", registryAndImage)
 	customVariables := map[string]string{
 		"IMAGENAME": registryAndImage,
 		"APPNAME":   "app", // TODO: make appname based on repo dir

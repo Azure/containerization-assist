@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // InitializeDockerFileState populates the Dockerfile field in PipelineState with initial values
@@ -21,6 +22,6 @@ func InitializeDockerFileState(state *pipeline.PipelineState, dockerFilePath str
 	state.Dockerfile.Path = dockerFilePath
 	state.Dockerfile.BuildErrors = ""
 
-	fmt.Printf("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
+	logger.Infof("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
 	return nil
 }

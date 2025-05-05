@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 func (c *Clients) TestOpenAIConn(ctx context.Context) error {
@@ -11,7 +12,7 @@ func (c *Clients) TestOpenAIConn(ctx context.Context) error {
 		return fmt.Errorf("failed to get chat completion: %w", err)
 	}
 
-	fmt.Println("Azure OpenAI Test")
-	fmt.Printf("Response: %s\n", testResponse)
+	logger.Info("Azure OpenAI Test")
+	logger.Infof("Response: %s\n", testResponse)
 	return nil
 }

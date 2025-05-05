@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // GetPendingManifests returns a map of manifest names that still need to be deployed
@@ -89,11 +90,11 @@ Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These
 func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) error {
 	pendingManifests := GetPendingManifests(state)
 	if len(pendingManifests) == 0 {
-		fmt.Println("No pending manifests to deploy")
+		logger.Info("No pending manifests to deploy")
 		return nil
 	}
 
-	fmt.Printf("Attempting to deploy %d manifests\n", len(pendingManifests))
+	logger.Infof("Attempting to deploy %d manifests\n", len(pendingManifests))
 
 	var failedManifests []string
 
@@ -114,12 +115,12 @@ func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) err
 		if !success {
 			manifest.ErrorLog = output
 			manifest.IsSuccessfullyDeployed = false
-			fmt.Printf("Failed to deploy manifest %s\n", name)
+			logger.Errorf("Failed to deploy manifest %s\n", name)
 			failedManifests = append(failedManifests, name)
 			continue
 		}
 
-		fmt.Printf("Successfully deployed manifest: %s\n", name)
+		logger.Infof("Successfully deployed manifest: %s\n", name)
 		manifest.IsSuccessfullyDeployed = true
 		manifest.ErrorLog = ""
 	}
@@ -152,7 +153,7 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 
 	// If no manifests exist, generate them using Draft
 	if len(k8sObjects) == 0 {
-		fmt.Printf("No existing Kubernetes manifests found, generating manifests...\n")
+		logger.Info("No existing Kubernetes manifests found, generating manifests...\n")
 
 		// Generate the manifests using Draft
 		registryAndImage := fmt.Sprintf("%s/%s", state.RegistryURL, state.ImageName)
@@ -170,9 +171,9 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 			return fmt.Errorf("no Kubernetes manifests were generated")
 		}
 
-		fmt.Printf("Successfully generated %d Kubernetes manifests\n", len(k8sObjects))
+		logger.Infof("Successfully generated %d Kubernetes manifests\n", len(k8sObjects))
 	} else {
-		fmt.Printf("Found %d existing Kubernetes manifests in %s\n", len(k8sObjects), targetDir)
+		logger.Infof("Found %d existing Kubernetes manifests in %s\n", len(k8sObjects), targetDir)
 	}
 
 	// Initialize manifests in the state
@@ -191,9 +192,9 @@ func (p *ManifestPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) e
 	// Write any successfully deployed manifests regardless of global state.Success
 	for name, object := range state.K8sObjects {
 		if object.IsSuccessfullyDeployed && object.ManifestPath != "" && len(object.Content) > 0 {
-			fmt.Printf("Writing updated manifest: %s\n", name)
+			logger.Infof("Writing updated manifest: %s\n", name)
 			if err := os.WriteFile(object.ManifestPath, object.Content, 0644); err != nil {
-				fmt.Printf("Error writing manifest %s: %v\n", name, err)
+				logger.Errorf("Error writing manifest %s: %v\n", name, err)
 				continue
 			}
 			anyWritten = true
@@ -222,7 +223,7 @@ func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineStat
 	targetDir := options.TargetDirectory
 	generateSnapshot := options.GenerateSnapshot
 
-	fmt.Printf("Starting Kubernetes manifest deployment iteration process\n")
+	logger.Info("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := k8s.CheckKubectlInstalled(); err != nil {
 		return err
@@ -233,14 +234,14 @@ func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineStat
 	}
 
 	for i := 0; i < maxIterations; i++ {
-		fmt.Printf("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
+		logger.Infof("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
 		state.IterationCount += 1
 
 		// Fix each manifest that still has issues
 		pendingObjects := GetPendingManifests(state)
 		for name := range pendingObjects {
 			thisObject := state.K8sObjects[name]
-			fmt.Printf("\nAnalyzing and fixing: %s\n", name)
+			logger.Infof("\nAnalyzing and fixing: %s\n", name)
 
 			input := pipeline.FileAnalysisInput{
 				Content:       string(thisObject.Content),
@@ -261,17 +262,17 @@ func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineStat
 			}
 
 			thisObject.Content = []byte(result.FixedContent)
-			fmt.Printf("AI suggested fixes for %s\n", name)
-			fmt.Println(result.Analysis)
+			logger.Infof("AI suggested fixes for %s\n", name)
+			logger.Debug(result.Analysis)
 		}
-		fmt.Println("Updated manifests with fixes. Attempting deployment...")
+		logger.Info("Updated manifests with fixes. Attempting deployment...")
 
 		// Try to deploy pending manifests
 		err := DeployStateManifests(state, c)
 		if err == nil {
 			// All manifests deployed successfully, but don't set global success state
 			// as that's handled by the central pipeline orchestrator
-			fmt.Printf("🎉 All Kubernetes manifests deployed successfully!\n")
+			logger.Info("🎉 All Kubernetes manifests deployed successfully!\n")
 
 			if generateSnapshot {
 				if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
@@ -282,13 +283,13 @@ func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineStat
 		}
 
 		if i < maxIterations-1 {
-			fmt.Printf("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
+			logger.Info("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
 			// Log status of each manifest
 			for name, thisObject := range state.K8sObjects {
 				if thisObject.IsSuccessfullyDeployed {
-					fmt.Printf("  ✅ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
+					logger.Infof("  ✅ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
 				} else {
-					fmt.Printf("  ❌ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
+					logger.Errorf("  ❌ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
 				}
 			}
 		}
@@ -320,9 +321,9 @@ func InitializeManifests(state *pipeline.PipelineState, path string) error {
 		return nil
 	}
 
-	fmt.Printf("Found %d Kubernetes objects from %s\n", len(k8sObjects), path)
+	logger.Infof("Found %d Kubernetes objects from %s\n", len(k8sObjects), path)
 	for _, obj := range k8sObjects {
-		fmt.Printf("  '%s' kind: %s source: %s\n", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
+		logger.Infof("  '%s' kind: %s source: %s\n", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
 	}
 
 	for i := range k8sObjects {
@@ -361,6 +362,6 @@ func (p *ManifestPipeline) Deploy(ctx context.Context, state *pipeline.PipelineS
 		return fmt.Errorf("invalid clients type")
 	}
 
-	fmt.Printf("Deploying Kubernetes manifests...\n")
+	logger.Info("Deploying Kubernetes manifests...\n")
 	return DeployStateManifests(state, c)
 }
