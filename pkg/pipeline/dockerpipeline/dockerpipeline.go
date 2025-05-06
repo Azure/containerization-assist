@@ -117,6 +117,15 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 			return fmt.Errorf("error in AI analysis: %v", err)
 		}
 
+		// Update the previous attempts summary
+		runningSummary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis)
+		if err != nil {
+			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
+		} else {
+			state.Dockerfile.PreviousAttemptsSummary = runningSummary
+			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n", state.Dockerfile.PreviousAttemptsSummary)
+		}
+
 		// Update the Dockerfile
 		state.Dockerfile.Content = result.FixedContent
 		logger.Info("AI suggested fixes:")
@@ -206,6 +215,14 @@ No error messages were provided. Please check for potential issues in the Docker
 `
 	}
 
+	// Running LLM Summary of previous attempts
+	if state.Dockerfile.PreviousAttemptsSummary != "" {
+		promptText += fmt.Sprintf(`
+	Previous attempts to fix the Dockerfile:
+	%s
+	`, state.Dockerfile.PreviousAttemptsSummary)
+	}
+
 	// Add repository file information if provided
 	if state.RepoFileTree != "" {
 		promptText += fmt.Sprintf(`
@@ -256,6 +273,7 @@ func (p *DockerPipeline) Initialize(ctx context.Context, state *pipeline.Pipelin
 		state.Dockerfile.Content = ""
 		state.Dockerfile.Path = path
 		state.Dockerfile.BuildErrors = ""
+		state.Dockerfile.PreviousAttemptsSummary = ""
 		logger.Info("Initialized empty Dockerfile state (file will be created later)\n")
 		return nil
 	}
