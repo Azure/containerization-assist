@@ -117,15 +117,6 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 			return fmt.Errorf("error in AI analysis: %v", err)
 		}
 
-		// Update the previous attempts summary
-		runningSummary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis)
-		if err != nil {
-			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
-		} else {
-			state.Dockerfile.PreviousAttemptsSummary = runningSummary
-			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n", state.Dockerfile.PreviousAttemptsSummary)
-		}
-
 		// Update the Dockerfile
 		state.Dockerfile.Content = result.FixedContent
 		logger.Info("AI suggested fixes:")
@@ -155,6 +146,15 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 		logger.Error("Docker build failed. Using AI to fix issues...")
 
 		state.Dockerfile.BuildErrors = buildErrors
+
+		// Update the previous attempts summary
+		runningSummary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
+		if err != nil {
+			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
+		} else {
+			state.Dockerfile.PreviousAttemptsSummary = runningSummary
+			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n", state.Dockerfile.PreviousAttemptsSummary)
+		}
 
 		if generateSnapshot {
 			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
