@@ -43,7 +43,11 @@ func ValidateLLM(llmConfig LLMConfig) error {
 		"stop":        []string{"\n"},
 	}
 
-	payloadBytes, _ := json.Marshal(testPayload)
+	payloadBytes, err := json.Marshal(testPayload)
+	if err != nil {
+		logger.Errorf("failed to marshal test payload: %v", err)
+		return fmt.Errorf("failed to marshal test payload: %v", err)
+	}
 	// Doc here: https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#rest-api-versioning
 	// POST https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/openai/deployments/%s/chat/completions?api-version=2024-06-01", llmConfig.Endpoint, llmConfig.DeploymentID), bytes.NewBuffer(payloadBytes))
