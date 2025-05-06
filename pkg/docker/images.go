@@ -26,7 +26,7 @@ approved_images:
       - "3.8.3-openjdk-17"
       - "3.9-eclipse-temurin-8"
       - "3.9.9-eclipse-temurin-24-alpine"
-          notes: >
+    notes: >
       When using Maven in Dockerfiles:
       - Do not assume a single-module layout. Set WORKDIR to the directory containing the relevant pom.xml.
       - In multi-module projects, the root pom.xml may be a parent that does not produce a runnable artifact. Identify the correct submodule (with its own pom.xml and src/) that builds a JAR or WAR.
