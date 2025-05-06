@@ -53,3 +53,9 @@ func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText strin
 
 	return "", fmt.Errorf("no completion received from LLM")
 }
+
+// Does a GetChatCompletion but fills the promptText in %s
+func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, promptText string, args ...interface{}) (string, error) {
+	promptText = fmt.Sprintf(promptText, args...)
+	return c.GetChatCompletion(ctx, promptText)
+}

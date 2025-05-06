@@ -10,9 +10,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
+	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
-	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // DockerPipeline implements the pipeline.Pipeline interface for Dockerfiles
@@ -220,9 +220,11 @@ Please:
 2. Provide a fixed version of the Dockerfile
 3. Explain what changes were made and why
 
-Favor using the latest base images and best practices for Dockerfile writing
-If applicable, use multi-stage builds to reduce image size
-Make sure to account for the file structure of the repository
+Favor using the latest stable base images and best practices for Dockerfile writing when appropriate.
+If applicable, use multi-stage builds to reduce image size.
+Ensure that all COPY and RUN instructions are consistent with the actual file structure of the repository — do not assume specific folders or filenames without confirming they exist.
+Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
+If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.
 
 **IMPORTANT: Output the fixed Dockerfile content between <DOCKERFILE> and </DOCKERFILE> tags. These tags must not appear anywhere else in your response except for wrapping the corrected dokerfile content. :IMPORTANT**
 

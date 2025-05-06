@@ -16,9 +16,10 @@ import (
 )
 
 type Dockerfile struct {
-	Content     string
-	Path        string
-	BuildErrors string
+	Content     			string
+	Path        			string
+	BuildErrors 			string
+	PreviousAttemptsSummary string
 }
 
 const (
