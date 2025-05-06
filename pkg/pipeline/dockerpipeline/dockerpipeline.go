@@ -153,7 +153,7 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
 		} else {
 			state.Dockerfile.PreviousAttemptsSummary = runningSummary
-			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n", state.Dockerfile.PreviousAttemptsSummary)
+			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
 		}
 
 		if generateSnapshot {
