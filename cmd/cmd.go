@@ -14,10 +14,11 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
+	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/runner"
+	llmvalidator "github.com/Azure/container-copilot/pkg/utils"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
-	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 const (
@@ -136,6 +137,19 @@ var generateCmd = &cobra.Command{
 			logger.Error("Azure OpenAI configuration not found. Starting automatic setup process...")
 		}
 
+		// Lets check if the Key, Endpoint and deployment are actually valid
+		// Validate the LLM configuration
+		llmConfig := llmvalidator.LLMConfig{
+			Endpoint:     os.Getenv(AZURE_OPENAI_ENDPOINT), // "https://xxx.openai.azure.com",
+			APIKey:       os.Getenv(AZURE_OPENAI_KEY),
+			DeploymentID: os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID),
+		}
+
+		if err := llmvalidator.ValidateLLM(llmConfig); err != nil {
+			logger.Errorf("LLM config is invalid: %v\n", err)
+		} else {
+			logger.Infof("LLM config validated successfully.")
+		}
 		// Convert targetDir to absolute path for consistent behavior
 		if targetDir != "" {
 			normalizedPath, err := NormalizeTargetRepoPath(targetDir)
