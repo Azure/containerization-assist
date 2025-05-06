@@ -14,10 +14,10 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
+	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
-	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 const (
@@ -392,7 +392,7 @@ func init() {
 	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")
 	generateCmd.PersistentFlags().BoolVarP(&generateSnapshot, "snapshot", "s", false, "Generate a snapshot of the Dockerfile and Kubernetes manifests generated in each iteration")
 	generateCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
-	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 5*time.Minute, "Timeout duration for generating artifacts")
+	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 10*time.Minute, "Timeout duration for generating artifacts")
 
 	// Setup command flags
 	setupCmd.PersistentFlags().StringVarP(&resourceGroup, "resource-group", "g", "", "Azure resource group")
