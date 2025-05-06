@@ -218,7 +218,7 @@ No error messages were provided. Please check for potential issues in the Docker
 	// Running LLM Summary of previous attempts
 	if state.Dockerfile.PreviousAttemptsSummary != "" {
 		promptText += fmt.Sprintf(`
-	Previous attempts to fix the Dockerfile:
+	Summary of your previous attempts to fix the Dockerfile that were NOT successful:
 	%s
 	`, state.Dockerfile.PreviousAttemptsSummary)
 	}
