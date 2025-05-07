@@ -11,8 +11,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
 // GetPendingManifests returns a map of manifest names that still need to be deployed
@@ -69,10 +69,18 @@ IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	content, err := client.GetChatCompletion(ctx, promptText)
+	// Call LLM and capture token usage
+	resp, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
+
+	// Accumulate token usage in pipeline state
+	state.TokenUsage.PromptTokens += resp.TokenUsage.PromptTokens
+	state.TokenUsage.CompletionTokens += resp.TokenUsage.CompletionTokens
+	state.TokenUsage.TotalTokens += resp.TokenUsage.TotalTokens
+
+	content := resp.Content
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "MANIFEST")

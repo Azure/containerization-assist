@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 )
@@ -14,6 +15,7 @@ type PipelineState struct {
 	K8sObjects     map[string]*k8s.K8sObject
 	Success        bool
 	IterationCount int
+	TokenUsage     ai.TokenUsage
 	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
 }
 

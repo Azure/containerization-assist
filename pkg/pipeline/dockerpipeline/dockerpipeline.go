@@ -32,10 +32,17 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
-			templateName, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir)
+			resp, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir)
 			if err != nil {
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
+
+			// Accumulate token usage from template selection
+			state.TokenUsage.PromptTokens += resp.TokenUsage.PromptTokens
+			state.TokenUsage.CompletionTokens += resp.TokenUsage.CompletionTokens
+			state.TokenUsage.TotalTokens += resp.TokenUsage.TotalTokens
+
+			templateName := resp.Content
 
 			logger.Infof("Using Dockerfile template: %s\n", templateName)
 
@@ -152,7 +159,7 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 		if err != nil {
 			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
 		} else {
-			state.Dockerfile.PreviousAttemptsSummary = runningSummary
+			state.Dockerfile.PreviousAttemptsSummary = runningSummary.Content
 			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
 		}
 
@@ -248,10 +255,17 @@ If using shell logic in CMD or RUN, it should fail clearly if expected files are
 I will tip you if you provide a correct and working Dockerfile.
 `
 
-	content, err := client.GetChatCompletion(ctx, promptText)
+	resp, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
+
+	// Accumulate token usage in pipeline state
+	state.TokenUsage.PromptTokens += resp.TokenUsage.PromptTokens
+	state.TokenUsage.CompletionTokens += resp.TokenUsage.CompletionTokens
+	state.TokenUsage.TotalTokens += resp.TokenUsage.TotalTokens
+
+	content := resp.Content
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "DOCKERFILE")
