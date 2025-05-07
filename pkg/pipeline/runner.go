@@ -10,6 +10,10 @@ import (
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
+const (
+	dockerPipeline string = "docker"
+)
+
 // NewRunner constructs a Runner. You must pass a non-empty order;
 // / it will drive init→generate→iterate→finalize in exactly this sequence.
 func NewRunner(pipelineMap map[string]Pipeline, order []string, out io.Writer) *Runner {
@@ -92,7 +96,7 @@ func (r *Runner) iterate(
 		allErrs = append(allErrs, iterErrs...)
 		if len(iterErrs) != 0 {
 			// Return early on docker pipeline error
-			if _, hasDocker := r.pipelines["docker"]; hasDocker && !success["docker"] {
+			if _, hasDocker := r.pipelines[dockerPipeline]; hasDocker && !success[dockerPipeline] {
 				logger.Warnf("Docker pipeline failed; stopping iteration")
 				break
 			}
@@ -129,7 +133,7 @@ func (r *Runner) runIteration(
 			msg := fmt.Sprintf("%s run error: %v", key, err)
 			fmt.Fprintf(r.out, "❌ %s failed: %v\n", key, err)
 			// Fail fast on docker pipeline error
-			if key == "docker" {
+			if key == dockerPipeline {
 				return []string{msg}
 			}
 			errs = append(errs, msg)
