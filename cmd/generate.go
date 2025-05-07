@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/dockerpipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysispipeline"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
@@ -53,7 +54,10 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		return fmt.Errorf("generating deployment files: %w", err)
 	}
 
-	// Create pipeline instances
+	repoAnalysisPipeline := &repoanalysispipeline.RepoAnalysisPipeline{
+		AIClient: c.AzOpenAIClient,
+		Parser:   &pipeline.DefaultParser{},
+	}
 	dockerPipeline := &dockerpipeline.DockerPipeline{
 		AIClient:         c.AzOpenAIClient,
 		UseDraftTemplate: enableDraftDockerfile,
@@ -64,16 +68,17 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		Parser:   &pipeline.DefaultParser{},
 	}
 
-	// Store all pipelines in a map by type for better access
 	pipelinesByType := map[string]pipeline.Pipeline{
-		"docker":   dockerPipeline,
-		"manifest": manifestPipeline,
+		"repoanalysis": repoAnalysisPipeline,
+		"docker":       dockerPipeline,
+		"manifest":     manifestPipeline,
 	}
 
 	// Create path map for each pipeline
 	pathMap := map[string]string{
-		"docker":   filepath.Join(targetDir, "Dockerfile"),
-		"manifest": targetDir,
+		"repoanalysis": targetDir,
+		"docker":       filepath.Join(targetDir, "Dockerfile"),
+		"manifest":     targetDir,
 	}
 
 	// Common pipeline options
@@ -84,7 +89,8 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		TargetDirectory:           targetDir,
 	}
 
-	execOrder := []string{"docker", "manifest"}
+	// Update execution order to include repo analysis as the first step
+	execOrder := []string{"repoanalysis", "docker", "manifest"}
 
 	runner := pipeline.NewRunner(pipelinesByType, execOrder, os.Stdout)
 	return runner.Run(ctx, state, pathMap, options, c)

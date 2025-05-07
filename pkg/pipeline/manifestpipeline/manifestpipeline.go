@@ -11,8 +11,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
 // GetPendingManifests returns a map of manifest names that still need to be deployed
@@ -56,6 +56,16 @@ Reference Dockerfile for this application:
 
 Consider the Dockerfile when analyzing the Kubernetes manifest, especially for image compatibility, ports, and environment variables.
 `, state.Dockerfile.Content)
+	}
+
+	// Add repository analysis results if available
+	if repoAnalysis, ok := state.Metadata["RepoAnalysisResult"].(string); ok && repoAnalysis != "" {
+		promptText += fmt.Sprintf(`
+IMPORTANT CONTEXT: The repository has been analyzed and the following information was gathered:
+%s
+
+Please use this repository analysis information to ensure Databases are accounted for in the manifest.
+`, repoAnalysis)
 	}
 
 	promptText += `
