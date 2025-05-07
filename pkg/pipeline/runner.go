@@ -85,7 +85,7 @@ func (r *Runner) iterate(
 	success := make(map[string]bool)
 
 	for i := 1; i <= completeLoopIterations; i++ {
-		fmt.Fprintf(r.out, "\n=== Iteration %d/%d ===\n", i, completeLoopIter)
+		fmt.Fprintf(r.out, "\n=== Iteration %d/%d ===\n", i, completeLoopIterations)
 
 		// Iterate through each pipeline for maxIterations
 		iterErrs := r.runIteration(ctx, state, clients, success, opts)
