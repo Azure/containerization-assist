@@ -10,10 +10,10 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/filetree"
 	"github.com/Azure/container-copilot/pkg/k8s"
+	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/dockerpipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
-	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
@@ -78,9 +78,10 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 
 	// Common pipeline options
 	options := pipeline.RunnerOptions{
-		MaxIterations:    5, // Default max iterations
-		GenerateSnapshot: generateSnapshot,
-		TargetDirectory:  targetDir,
+		CompleteLoopIterations: 2, // Default complete loop iterations
+		MaxIterations:          5, // Default max iterations
+		GenerateSnapshot:       generateSnapshot,
+		TargetDirectory:        targetDir,
 	}
 
 	execOrder := []string{"docker", "manifest"}

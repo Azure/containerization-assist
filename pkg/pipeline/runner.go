@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // NewRunner constructs a Runner. You must pass a non-empty order;
@@ -35,7 +37,7 @@ func (r *Runner) Run(
 	if err := r.generate(ctx, state, opts.TargetDirectory); err != nil {
 		return err
 	}
-	errs := r.iterate(ctx, state, opts.MaxIterations, clients, opts)
+	errs := r.iterate(ctx, state, opts.CompleteLoopIterations, clients, opts)
 	if err := r.updateFiles(state); err != nil {
 		fmt.Fprintf(r.out, "⚠️ Warning: %v\n", err)
 	}
@@ -75,19 +77,27 @@ func (r *Runner) generate(ctx context.Context, state *PipelineState, targetDir s
 func (r *Runner) iterate(
 	ctx context.Context,
 	state *PipelineState,
-	maxIter int,
+	completeLoopIterations int,
 	clients interface{},
 	opts RunnerOptions,
 ) []string {
 	var allErrs []string
 	success := make(map[string]bool)
 
-	for i := 1; i <= maxIter; i++ {
-		fmt.Fprintf(r.out, "\n=== Iteration %d/%d ===\n", i, maxIter)
-		state.IterationCount = i
+	for i := 1; i <= completeLoopIterations; i++ {
+		fmt.Fprintf(r.out, "\n=== Iteration %d/%d ===\n", i, completeLoopIter)
 
-		iterErrs := r.runOnce(ctx, state, clients, success, opts)
+		// Iterate through each pipeline for maxIterations
+		iterErrs := r.runIteration(ctx, state, clients, success, opts)
 		allErrs = append(allErrs, iterErrs...)
+		if len(iterErrs) != 0 {
+			// Return early on docker pipeline error
+			if _, hasDocker := r.pipelines["docker"]; hasDocker && !success["docker"] {
+				logger.Warnf("Docker pipeline failed; stopping iteration")
+				break
+			}
+		}
+
 		if len(iterErrs) == 0 {
 			fmt.Fprintln(r.out, "🎉 All pipelines completed successfully!")
 			state.Success = true
@@ -99,7 +109,7 @@ func (r *Runner) iterate(
 	return allErrs
 }
 
-func (r *Runner) runOnce(
+func (r *Runner) runIteration(
 	ctx context.Context,
 	state *PipelineState,
 	clients interface{},
@@ -117,8 +127,12 @@ func (r *Runner) runOnce(
 		p := r.pipelines[key]
 		if err := p.Run(ctx, state, clients, opts); err != nil {
 			msg := fmt.Sprintf("%s run error: %v", key, err)
-			errs = append(errs, msg)
 			fmt.Fprintf(r.out, "❌ %s failed: %v\n", key, err)
+			// Fail fast on docker pipeline error
+			if key == "docker" {
+				return []string{msg}
+			}
+			errs = append(errs, msg)
 			continue
 		}
 

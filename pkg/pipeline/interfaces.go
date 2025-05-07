@@ -28,9 +28,10 @@ type Pipeline interface {
 
 // RunnerOptions defines configuration options for a pipeline run
 type RunnerOptions struct {
-	MaxIterations    int
-	GenerateSnapshot bool
-	TargetDirectory  string
+	CompleteLoopIterations int
+	MaxIterations          int
+	GenerateSnapshot       bool
+	TargetDirectory        string
 }
 
 // Runner coordinates and executes a set of pipelines.
