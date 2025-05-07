@@ -10,9 +10,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/docker"
+	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
-	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // DockerPipeline implements the pipeline.Pipeline interface for Dockerfiles
@@ -147,6 +147,15 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 
 		state.Dockerfile.BuildErrors = buildErrors
 
+		// Update the previous attempts summary
+		runningSummary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
+		if err != nil {
+			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
+		} else {
+			state.Dockerfile.PreviousAttemptsSummary = runningSummary
+			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
+		}
+
 		if generateSnapshot {
 			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
 				return fmt.Errorf("writing iteration snapshot: %w", err)
@@ -206,6 +215,14 @@ No error messages were provided. Please check for potential issues in the Docker
 `
 	}
 
+	// Running LLM Summary of previous attempts
+	if state.Dockerfile.PreviousAttemptsSummary != "" {
+		promptText += fmt.Sprintf(`
+	Summary of your previous attempts to fix the Dockerfile that were NOT successful:
+	%s
+	`, state.Dockerfile.PreviousAttemptsSummary)
+	}
+
 	// Add repository file information if provided
 	if state.RepoFileTree != "" {
 		promptText += fmt.Sprintf(`
@@ -220,9 +237,11 @@ Please:
 2. Provide a fixed version of the Dockerfile
 3. Explain what changes were made and why
 
-Favor using the latest base images and best practices for Dockerfile writing
-If applicable, use multi-stage builds to reduce image size
-Make sure to account for the file structure of the repository
+Favor using the latest stable base images and best practices for Dockerfile writing when appropriate.
+If applicable, use multi-stage builds to reduce image size.
+Ensure that all COPY and RUN instructions are consistent with the actual file structure of the repository — do not assume specific folders or filenames without confirming they exist.
+Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
+If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.
 
 **IMPORTANT: Output the fixed Dockerfile content between <DOCKERFILE> and </DOCKERFILE> tags. These tags must not appear anywhere else in your response except for wrapping the corrected dokerfile content. :IMPORTANT**
 
@@ -254,6 +273,7 @@ func (p *DockerPipeline) Initialize(ctx context.Context, state *pipeline.Pipelin
 		state.Dockerfile.Content = ""
 		state.Dockerfile.Path = path
 		state.Dockerfile.BuildErrors = ""
+		state.Dockerfile.PreviousAttemptsSummary = ""
 		logger.Info("Initialized empty Dockerfile state (file will be created later)\n")
 		return nil
 	}

@@ -78,10 +78,10 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 
 	// Common pipeline options
 	options := pipeline.RunnerOptions{
-		CompleteLoopIterations: 2, // Default complete loop iterations
-		MaxIterations:          5, // Default max iterations
-		GenerateSnapshot:       generateSnapshot,
-		TargetDirectory:        targetDir,
+		MaxIterations:             5, // Default max iterations
+		CompleteLoopMaxIterations: 2, // Default max iterations for the entire loop
+		GenerateSnapshot:          generateSnapshot,
+		TargetDirectory:           targetDir,
 	}
 
 	execOrder := []string{"docker", "manifest"}

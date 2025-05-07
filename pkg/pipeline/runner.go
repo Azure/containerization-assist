@@ -37,7 +37,7 @@ func (r *Runner) Run(
 	if err := r.generate(ctx, state, opts.TargetDirectory); err != nil {
 		return err
 	}
-	errs := r.iterate(ctx, state, opts.CompleteLoopIterations, clients, opts)
+	errs := r.iterate(ctx, state, opts.CompleteLoopMaxIterations, clients, opts)
 	if err := r.updateFiles(state); err != nil {
 		fmt.Fprintf(r.out, "⚠️ Warning: %v\n", err)
 	}

@@ -26,4 +26,14 @@ approved_images:
       - "3.8.3-openjdk-17"
       - "3.9-eclipse-temurin-8"
       - "3.9.9-eclipse-temurin-24-alpine"
+    notes: >
+      When using Maven in Dockerfiles:
+      - Do not assume a single-module layout. Set WORKDIR to the directory containing the relevant pom.xml.
+      - In multi-module projects, the root pom.xml may be a parent that does not produce a runnable artifact. Identify the correct submodule (with its own pom.xml and src/) that builds a JAR or WAR.
+      - Always COPY all required build files: at minimum pom.xml and src/, and if present, .mvn/, mvnw, configuration files, or other submodules. Avoid assuming pom.xml + src/ alone is sufficient.
+      - If using mvnw, COPY both the mvnw script and .mvn/ directory, and make the script executable.
+      - Avoid 'mvn dependency:go-offline' unless all transitive and parent files are in the context.
+      - Prefer full 'mvn clean package' builds. Avoid partial goals unless structure is known.
+      - In the build stage, use a wildcard (e.g., target/*.war) to locate the output and rename it to a known name (e.g., app.jar). Do not rely on -DfinalName.
+      - In the CMD, avoid runtime wildcards or find-based commands. Reference the renamed artifact directly to ensure startup reliability.
 `
