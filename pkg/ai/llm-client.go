@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 type AzOpenAIClient struct {
@@ -90,7 +91,8 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 
 	// 4) loop, handling any tool calls, up to N turns
 	var final string
-	for turn := 0; turn < 15; turn++ {
+	for turn := range 15 {
+		logger.Debugf("    tool calls turn %d", turn)
 		resp, err := c.client.GetChatCompletions(ctx, opts, nil)
 		if err != nil {
 			return "", err
@@ -99,6 +101,7 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 
 		// Did the model invoke any tools?
 		if tcalls := msg.ToolCalls; tcalls != nil && len(tcalls) > 0 {
+			logger.Debugf("    invoked %d tools", len(tcalls))
 			// a) echo the assistant's message with tool calls into our history
 			var content *azopenai.ChatRequestAssistantMessageContent
 			if msg.Content != nil {

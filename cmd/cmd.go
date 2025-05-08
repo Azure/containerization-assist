@@ -137,19 +137,6 @@ var generateCmd = &cobra.Command{
 			logger.Error("Azure OpenAI configuration not found. Starting automatic setup process...")
 		}
 
-		// Lets check if the Key, Endpoint and deployment are actually valid
-		// Validate the LLM configuration
-		llmConfig := llmvalidator.LLMConfig{
-			Endpoint:     os.Getenv(AZURE_OPENAI_ENDPOINT), // "https://xxx.openai.azure.com",
-			APIKey:       os.Getenv(AZURE_OPENAI_KEY),
-			DeploymentID: os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID),
-		}
-
-		if err := llmvalidator.ValidateLLM(llmConfig); err != nil {
-			logger.Errorf("LLM config is invalid: %v\n", err)
-		} else {
-			logger.Infof("LLM config validated successfully.")
-		}
 		// Convert targetDir to absolute path for consistent behavior
 		if targetDir != "" {
 			normalizedPath, err := NormalizeTargetRepoPath(targetDir)
@@ -162,6 +149,20 @@ var generateCmd = &cobra.Command{
 		c, err := initClients()
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
+		}
+
+		// Lets check if the Key, Endpoint and deployment are actually valid
+		// Validate the LLM configuration
+		llmConfig := llmvalidator.LLMConfig{
+			Endpoint:     os.Getenv(AZURE_OPENAI_ENDPOINT), // "https://xxx.openai.azure.com",
+			APIKey:       os.Getenv(AZURE_OPENAI_KEY),
+			DeploymentID: os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID),
+		}
+
+		if err := llmvalidator.ValidateLLM(llmConfig); err != nil {
+			logger.Errorf("LLM config is invalid: %v\n", err)
+		} else {
+			logger.Infof("LLM config validated successfully.")
 		}
 		if err := generate(ctx, targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c); err != nil {
 			return fmt.Errorf("error generating artifacts: %w", err)
@@ -417,4 +418,6 @@ func init() {
 	setupCmd.PersistentFlags().StringVarP(&modelVersion, "model-version", "v", "2025-01-31", "Model version")
 	setupCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 	setupCmd.PersistentFlags().Bool("force-setup", false, "Force setup even if environment variables are already set")
+
+	rootC
 }

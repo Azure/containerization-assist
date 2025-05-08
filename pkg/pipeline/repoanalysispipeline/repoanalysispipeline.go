@@ -19,7 +19,7 @@ type LoggingFileReader struct {
 
 // ReadFile logs the file read operation and forwards to the base reader
 func (r *LoggingFileReader) ReadFile(path string) (string, error) {
-	callLog := fmt.Sprintf("📄 LLM reading file: %s", path)
+	callLog := fmt.Sprintf("  📄 LLM reading file: %s", path)
 	// Print directly to stdout for immediate visibility
 	fmt.Println(callLog)
 	r.Calls = append(r.Calls, callLog)
@@ -28,7 +28,7 @@ func (r *LoggingFileReader) ReadFile(path string) (string, error) {
 
 // FileExists logs the file check operation and forwards to the base reader
 func (r *LoggingFileReader) FileExists(path string) bool {
-	callLog := fmt.Sprintf("🔍 LLM checking if file exists: %s", path)
+	callLog := fmt.Sprintf("  🔍 LLM checking if file exists: %s", path)
 	// Print directly to stdout for immediate visibility
 	fmt.Println(callLog)
 	r.Calls = append(r.Calls, callLog)
@@ -37,7 +37,7 @@ func (r *LoggingFileReader) FileExists(path string) bool {
 
 // ListDirectory logs the directory list operation and forwards to the base reader
 func (r *LoggingFileReader) ListDirectory(path string) ([]string, error) {
-	callLog := fmt.Sprintf("📂 LLM listing directory: %s", path)
+	callLog := fmt.Sprintf("  📂 LLM listing directory: %s", path)
 	// Print directly to stdout for immediate visibility
 	fmt.Println(callLog)
 	r.Calls = append(r.Calls, callLog)

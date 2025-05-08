@@ -34,7 +34,7 @@ func ValidateLLM(llmConfig LLMConfig) error {
 	}
 
 	// Attempt to send a minimal test request to the endpoint
-	testPayload := map[string]interface{}{
+	testPayload := map[string]any{
 		"messages": []map[string]string{
 			{"role": "user", "content": "Hi"},
 		},
