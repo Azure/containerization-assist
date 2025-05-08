@@ -19,6 +19,7 @@ import (
 	llmvalidator "github.com/Azure/container-copilot/pkg/utils"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -53,6 +54,7 @@ var rootCmd = &cobra.Command{
 		cmd.Help()
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 		if verbose {
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		}
@@ -133,7 +135,7 @@ var generateCmd = &cobra.Command{
 						return fmt.Errorf("target repository is required")
 					}
 				} else {
-					logger.Infof("Using target repository from environment: %s\n", targetDir)
+					logger.Infof("Using target repository from environment: %s", targetDir)
 				}
 			}
 		}
@@ -154,7 +156,7 @@ var generateCmd = &cobra.Command{
 		}
 
 		if err := llmvalidator.ValidateLLM(llmConfig); err != nil {
-			logger.Errorf("LLM config is invalid: %v\n", err)
+			logger.Errorf("LLM config is invalid: %v", err)
 		} else {
 			logger.Infof("LLM config validated successfully.")
 		}
@@ -243,13 +245,13 @@ var setupCmd = &cobra.Command{
 
 		// Update .env file
 		if err := UpdateEnvFile(projectRoot, config, apiKey, endpoint, deploymentID); err != nil {
-			logger.Warnf("Warning: Failed to update .env file: %v\n", err)
+			logger.Warnf("Warning: Failed to update .env file: %v", err)
 		} else {
-			logger.Infof("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
-			logger.Infof("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
-			logger.Infof("Azure OpenAI Endpoint: %s\n", endpoint)
-			logger.Infof("Azure OpenAI Deployment ID: %s\n", deploymentID)
-			logger.Infof("Target Repo: %s\n", config.TargetRepo)
+			logger.Infof("Updated .env file at %s", filepath.Join(projectRoot, ".env"))
+			logger.Infof("Azure OpenAI Key: %s", maskSecretValue(apiKey))
+			logger.Infof("Azure OpenAI Endpoint: %s", endpoint)
+			logger.Infof("Azure OpenAI Deployment ID: %s", deploymentID)
+			logger.Infof("Target Repo: %s", config.TargetRepo)
 		}
 
 		// Setup completed successfully
@@ -257,7 +259,7 @@ var setupCmd = &cobra.Command{
 
 		// Display next steps instead of running generate automatically
 		if config.TargetRepo != "" {
-			logger.Infof("\nTo generate artifacts, run:\n  container-copilot generate %s\n", config.TargetRepo)
+			logger.Infof("\nTo generate artifacts, run: container-copilot generate %s", config.TargetRepo)
 		} else {
 			logger.Info("\nTo generate artifacts, run:")
 			logger.Info("  container-copilot generate <path/to/target-repo>")
@@ -296,7 +298,7 @@ func initClients() (*clients.Clients, error) {
 
 	if len(missingVars) > 0 {
 		// Instead of returning an error, try to run setup automatically
-		logger.Infof("Missing environment variables: %s\n", strings.Join(missingVars, ", "))
+		logger.Infof("Missing environment variables: %s", strings.Join(missingVars, ", "))
 		logger.Info("Attempting to set up Azure OpenAI resources automatically...")
 
 		// Run setup process
@@ -397,13 +399,13 @@ func runAutoSetup() error {
 
 	// Update .env file
 	if err := UpdateEnvFile(projectRoot, config, apiKey, endpoint, deploymentID); err != nil {
-		logger.Warnf("Warning: Failed to update .env file: %v\n", err)
+		logger.Warnf("Warning: Failed to update .env file: %v", err)
 	} else {
-		logger.Infof("Updated .env file at %s\n", filepath.Join(projectRoot, ".env"))
-		logger.Infof("Azure OpenAI Key: %s\n", maskSecretValue(apiKey))
-		logger.Infof("Azure OpenAI Endpoint: %s\n", endpoint)
-		logger.Infof("Azure OpenAI Deployment ID: %s\n", deploymentID)
-		logger.Infof("Target Repo: %s\n", config.TargetRepo)
+		logger.Infof("Updated .env file at %s", filepath.Join(projectRoot, ".env"))
+		logger.Infof("Azure OpenAI Key: %s", maskSecretValue(apiKey))
+		logger.Infof("Azure OpenAI Endpoint: %s", endpoint)
+		logger.Infof("Azure OpenAI Deployment ID: %s", deploymentID)
+		logger.Infof("Target Repo: %s", config.TargetRepo)
 	}
 
 	return nil
