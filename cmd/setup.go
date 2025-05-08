@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
-	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // SetupConfig contains all the configuration needed for the setup process
@@ -385,4 +385,16 @@ func maskSecretValue(s string) string {
 		return "<empty>"
 	}
 	return "****"
+}
+
+func init() {
+	// Setup command flags
+	setupCmd.PersistentFlags().StringVarP(&resourceGroup, "resource-group", "g", "", "Azure resource group")
+	setupCmd.PersistentFlags().StringVarP(&location, "location", "l", "", "Azure region for the resource group")
+	setupCmd.PersistentFlags().StringVarP(&openaiResourceName, "openai-resource", "a", "", "Azure OpenAI Cognitive Services resource name")
+	setupCmd.PersistentFlags().StringVarP(&deploymentName, "deployment", "d", "", "Deployment name")
+	setupCmd.PersistentFlags().StringVarP(&modelID, "model-id", "m", "o3-mini", "Model ID")
+	setupCmd.PersistentFlags().StringVarP(&modelVersion, "model-version", "", "2025-01-31", "Model version")
+	setupCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
+	setupCmd.PersistentFlags().Bool("force-setup", false, "Force setup even if environment variables are already set")
 }

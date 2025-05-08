@@ -18,6 +18,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/runner"
 	llmvalidator "github.com/Azure/container-copilot/pkg/utils"
 	"github.com/joho/godotenv"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +42,8 @@ var (
 	modelID            string
 	modelVersion       string
 	targetRepo         string
+
+	verbose bool
 )
 
 var rootCmd = &cobra.Command{
@@ -48,6 +51,11 @@ var rootCmd = &cobra.Command{
 	Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
+	},
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if verbose {
+			zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		}
 	},
 }
 
@@ -402,19 +410,5 @@ func runAutoSetup() error {
 }
 
 func init() {
-	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
-	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")
-	generateCmd.PersistentFlags().BoolVarP(&generateSnapshot, "snapshot", "s", false, "Generate a snapshot of the Dockerfile and Kubernetes manifests generated in each iteration")
-	generateCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
-	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 10*time.Minute, "Timeout duration for generating artifacts")
-
-	// Setup command flags
-	setupCmd.PersistentFlags().StringVarP(&resourceGroup, "resource-group", "g", "", "Azure resource group")
-	setupCmd.PersistentFlags().StringVarP(&location, "location", "l", "", "Azure region for the resource group")
-	setupCmd.PersistentFlags().StringVarP(&openaiResourceName, "openai-resource", "a", "", "Azure OpenAI Cognitive Services resource name")
-	setupCmd.PersistentFlags().StringVarP(&deploymentName, "deployment", "d", "", "Deployment name")
-	setupCmd.PersistentFlags().StringVarP(&modelID, "model-id", "m", "o3-mini", "Model ID")
-	setupCmd.PersistentFlags().StringVarP(&modelVersion, "model-version", "v", "2025-01-31", "Model version")
-	setupCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
-	setupCmd.PersistentFlags().Bool("force-setup", false, "Force setup even if environment variables are already set")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
 }
