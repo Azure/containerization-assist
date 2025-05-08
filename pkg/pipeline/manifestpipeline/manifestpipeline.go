@@ -69,7 +69,6 @@ IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	// Call LLM and capture token usage
 	resp, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
