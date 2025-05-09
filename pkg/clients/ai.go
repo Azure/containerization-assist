@@ -14,11 +14,7 @@ func (c *Clients) TestOpenAIConn(ctx context.Context) error {
 	}
 
 	logger.Info("Azure OpenAI Test")
-<<<<<<< HEAD
-	logger.Infof("Response: %s", testResponse)
-=======
 	logger.Infof("Response: %s", content)
 	logger.Infof("Total tokens used: %d, Prompt tokens: %d, Completion tokens: %d", tokenUsage.TotalTokens, tokenUsage.PromptTokens, tokenUsage.CompletionTokens)
->>>>>>> main
 	return nil
 }
