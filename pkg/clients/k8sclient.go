@@ -24,7 +24,7 @@ func (c *Clients) CheckPodStatus(namespace string, labelSelector string, timeout
 
 	for time.Now().Before(endTime) {
 		readableOutputStr, err := c.Kube.GetPods(namespace, labelSelector)
-		logger.Infof("Kubectl get pods output:", readableOutputStr)
+		logger.Infof("Kubectl get pods output: \n%s", readableOutputStr)
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, readableOutputStr)
 		}
