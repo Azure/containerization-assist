@@ -42,8 +42,7 @@ var (
 	modelID            string
 	modelVersion       string
 	targetRepo         string
-
-	verbose bool
+	verbose            bool
 )
 
 var rootCmd = &cobra.Command{
