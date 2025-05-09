@@ -69,10 +69,15 @@ IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	content, err := client.GetChatCompletion(ctx, promptText)
+	content, tokenUsage, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
+
+	// Accumulate token usage in pipeline state
+	state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
+	state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
+	state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "MANIFEST")

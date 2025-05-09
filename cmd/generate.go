@@ -88,7 +88,13 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	execOrder := []string{"docker", "manifest"}
 
 	runner := pipeline.NewRunner(pipelinesByType, execOrder, os.Stdout)
-	return runner.Run(ctx, state, pathMap, options, c)
+	err = runner.Run(ctx, state, pathMap, options, c)
+	if err != nil {
+		return err
+	}
+
+	logger.Infof("Total Token usage: Prompt: %d, Completion: %d,  Total: %d\n", state.TokenUsage.PromptTokens, state.TokenUsage.CompletionTokens, state.TokenUsage.TotalTokens)
+	return nil
 }
 
 func init() {
