@@ -15,11 +15,6 @@ type AzOpenAIClient struct {
 	deploymentID string
 }
 
-type ChatCompletionsResponse struct {
-	Content    string
-	TokenUsage TokenUsage
-}
-
 // TokenUsage holds the token usage information across all pipelines
 type TokenUsage struct {
 	CompletionTokens int
