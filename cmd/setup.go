@@ -169,13 +169,13 @@ func (c *SetupConfig) ValidateConfig() error {
 // PrintConfig prints the configuration values
 func (c *SetupConfig) PrintConfig() {
 	logger.Info("→ Configuration:\n")
-	logger.Infof("  RESOURCE_GROUP:        %s\n", c.ResourceGroup)
-	logger.Infof("  LOCATION:              %s\n", c.Location)
-	logger.Infof("  OPENAI_RES_NAME:       %s\n", c.OpenAIResourceName)
-	logger.Infof("  DEPLOYMENT_NAME:       %s\n", c.DeploymentName)
-	logger.Infof("  MODEL_ID:              %s\n", c.ModelID)
-	logger.Infof("  MODEL_VERSION:         %s\n", c.ModelVersion)
-	logger.Infof("  TARGET_REPO:           %s\n", c.TargetRepo)
+	logger.Infof("  RESOURCE_GROUP:        %s", c.ResourceGroup)
+	logger.Infof("  LOCATION:              %s", c.Location)
+	logger.Infof("  OPENAI_RES_NAME:       %s", c.OpenAIResourceName)
+	logger.Infof("  DEPLOYMENT_NAME:       %s", c.DeploymentName)
+	logger.Infof("  MODEL_ID:              %s", c.ModelID)
+	logger.Infof("  MODEL_VERSION:         %s", c.ModelVersion)
+	logger.Infof("  TARGET_REPO:           %s", c.TargetRepo)
 }
 
 // RunSetup performs the full setup process and returns Azure OpenAI credentials
@@ -264,7 +264,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	logger.Info("  ✓ Endpoint retrieved")
 
 	// List available models
-	logger.Infof("\n→ Available models on '%s':\n", config.OpenAIResourceName)
+	logger.Infof("\n→ Available models on '%s':", config.OpenAIResourceName)
 	modelsCmd := exec.Command("az", "cognitiveservices", "account", "list-models",
 		"--resource-group", config.ResourceGroup,
 		"--name", config.OpenAIResourceName,
@@ -276,7 +276,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	}
 
 	// Create/update deployment
-	logger.Infof("\n→ Creating/updating deployment '%s'…\n", config.DeploymentName)
+	logger.Infof("\n→ Creating/updating deployment '%s'…", config.DeploymentName)
 	deployCmd := exec.Command("az", "cognitiveservices", "account", "deployment", "create",
 		"--name", config.OpenAIResourceName,
 		"--resource-group", config.ResourceGroup,
@@ -293,7 +293,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	if err := deployCmd.Run(); err != nil {
 		return "", "", "", fmt.Errorf("failed to create/update deployment: %w", err)
 	}
-	logger.Infof("  ✓ Deployment '%s' ready\n", config.DeploymentName)
+	logger.Infof("  ✓ Deployment '%s' ready", config.DeploymentName)
 
 	// Setting deployment ID
 	deploymentID := config.DeploymentName

@@ -24,7 +24,7 @@ func (c *Clients) CheckPodStatus(namespace string, labelSelector string, timeout
 
 	for time.Now().Before(endTime) {
 		readableOutputStr, err := c.Kube.GetPods(namespace, labelSelector)
-		logger.Infof("Kubectl get pods output:\n", readableOutputStr)
+		logger.Infof("Kubectl get pods output:", readableOutputStr)
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, readableOutputStr)
 		}
@@ -68,20 +68,20 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	outputStr, err := c.Kube.Apply(manifestPath)
 
 	if err != nil {
-		logger.Errorf("Kubernetes deployment failed for %s with error: %v\n", manifestPath, err)
+		logger.Errorf("Kubernetes deployment failed for %s with error: %v", manifestPath, err)
 		return false, outputStr, nil
 	}
 
-	logger.Infof("Successfully applied %s\n", manifestPath)
+	logger.Infof("Successfully applied %s", manifestPath)
 
 	// Only check pod status for deployment.yaml files
 	baseFilename := filepath.Base(manifestPath)
 	if !isDeployment {
-		logger.Infof("Skipping pod health check for non-deployment manifest: %s\n", baseFilename)
+		logger.Infof("Skipping pod health check for non-deployment manifest: %s", baseFilename)
 		return true, outputStr, nil
 	}
 
-	logger.Infof("Checking pod health for deployment...\n")
+	logger.Infof("Checking pod health for deployment...")
 
 	// Extract namespace and app labels from the manifest
 	// This is simplified - would need to actually take this from the manifest

@@ -1,12 +1,15 @@
 package k8s
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-copilot/templates"
 	"sigs.k8s.io/yaml"
 )
 
@@ -106,4 +109,32 @@ type K8sObject struct {
 type K8sMetadata struct {
 	Name   string            `yaml:"name"`
 	Labels map[string]string `yaml:"labels"`
+}
+
+type ManifestsName string
+
+const (
+	ManifestsBasic ManifestsName = "manifest-basic" // Basic manifests for a deployment, service, and configmap
+)
+
+const MANIFEST_TEMPLATE_DIR = "manifests"
+
+func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string) error {
+	basePath := filepath.Join(MANIFEST_TEMPLATE_DIR, string(templateName))
+	filesToCopy := []string{"deployment.yaml", "service.yaml", "configmap.yaml"}
+	for _, filename := range filesToCopy {
+		embeddedPath := filepath.Join(basePath, filename)
+		data, err := templates.Templates.ReadFile(embeddedPath)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return fmt.Errorf("reading embedded file %q: %w", embeddedPath, err)
+		}
+		destPath := filepath.Join(targetDir, filename)
+		if err := os.WriteFile(destPath, data, 0644); err != nil {
+			return fmt.Errorf("writing file %q: %w", destPath, err)
+		}
+	}
+	return nil
 }

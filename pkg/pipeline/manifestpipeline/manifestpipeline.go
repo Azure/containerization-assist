@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
-	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
@@ -155,10 +154,11 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 	if len(k8sObjects) == 0 {
 		logger.Info("No existing Kubernetes manifests found, generating manifests...")
 
-		// Generate the manifests using Draft
+		// Generate the manifests using Draft templates
 		registryAndImage := fmt.Sprintf("%s/%s", state.RegistryURL, state.ImageName)
-		if err := docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage); err != nil {
-			return fmt.Errorf("generating deployment files with Draft: %w", err)
+		logger.Debugf("Generating manifests with image name %s", registryAndImage)
+		if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, targetDir); err != nil {
+			return fmt.Errorf("writing manifests from template: %w", err)
 		}
 
 		// Re-scan for the newly generated manifests

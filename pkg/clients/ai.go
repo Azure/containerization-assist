@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
@@ -13,6 +14,6 @@ func (c *Clients) TestOpenAIConn(ctx context.Context) error {
 	}
 
 	logger.Info("Azure OpenAI Test")
-	logger.Infof("Response: %s\n", testResponse)
+	logger.Infof("Response: %s", testResponse)
 	return nil
 }

@@ -14,6 +14,9 @@ type PipelineState struct {
 	K8sObjects     map[string]*k8s.K8sObject
 	Success        bool
 	IterationCount int
+	StageCount int
+	RetryCount int
+	StageHistory []{name string, retries int}
 	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
 }
 
