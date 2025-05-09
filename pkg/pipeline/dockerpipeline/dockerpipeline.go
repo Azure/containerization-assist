@@ -28,7 +28,7 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 
 	// Check if Dockerfile already exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		logger.Info("No Dockerfile found, generating one...\n")
+		logger.Info("No Dockerfile found, generating one...")
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
@@ -37,21 +37,21 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
 
-			logger.Infof("Using Dockerfile template: %s\n", templateName)
+			logger.Infof("Using Dockerfile template: %s", templateName)
 
 			// Generate the Dockerfile from template
 			if err := docker.WriteDockerfileFromTemplate(templateName, targetDir); err != nil {
 				return fmt.Errorf("writing Dockerfile from template: %w", err)
 			}
 		} else {
-			logger.Info("Creating empty Dockerfile\n")
+			logger.Info("Creating empty Dockerfile")
 			// Create an empty file
 			if err := os.WriteFile(dockerfilePath, []byte{}, 0644); err != nil {
 				return fmt.Errorf("writing empty Dockerfile: %w", err)
 			}
 		}
 	} else {
-		logger.Infof("Found existing Dockerfile at %s\n", dockerfilePath)
+		logger.Infof("Found existing Dockerfile at %s", dockerfilePath)
 	}
 
 	// Read the content and update state

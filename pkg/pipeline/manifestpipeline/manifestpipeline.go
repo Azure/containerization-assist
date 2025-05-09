@@ -241,7 +241,7 @@ func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineStat
 		pendingObjects := GetPendingManifests(state)
 		for name := range pendingObjects {
 			thisObject := state.K8sObjects[name]
-			logger.Infof("\nAnalyzing and fixing: %s\n", name)
+			logger.Infof("Analyzing and fixing: %s", name)
 
 			input := pipeline.FileAnalysisInput{
 				Content:       string(thisObject.Content),
@@ -321,9 +321,9 @@ func InitializeManifests(state *pipeline.PipelineState, path string) error {
 		return nil
 	}
 
-	logger.Infof("Found %d Kubernetes objects from %s\n", len(k8sObjects), path)
+	logger.Infof("Found %d Kubernetes objects from %s", len(k8sObjects), path)
 	for _, obj := range k8sObjects {
-		logger.Infof("  '%s' kind: %s source: %s\n", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
+		logger.Infof("  '%s' kind: %s source: %s", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
 	}
 
 	for i := range k8sObjects {

@@ -70,7 +70,7 @@ func (r *Runner) initialize(ctx context.Context, state *PipelineState, pathMap m
 
 func (r *Runner) generate(ctx context.Context, state *PipelineState, targetDir string) error {
 	for _, key := range r.order {
-		fmt.Fprintf(r.out, "🔧 Generating artifacts for %s...\n", key)
+		logger.Infof("🔧 Generating artifacts for %s...", key)
 		// ensure the pipeline exists
 		p, exists := r.stages[key]
 		if !exists {
