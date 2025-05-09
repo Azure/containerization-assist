@@ -19,7 +19,6 @@ import (
 	llmvalidator "github.com/Azure/container-copilot/pkg/utils"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +53,7 @@ var rootCmd = &cobra.Command{
 		cmd.Help()
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		if verbose {
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		}

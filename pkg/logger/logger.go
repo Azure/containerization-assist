@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"os"
 	"time"
 
@@ -10,12 +11,26 @@ import (
 var logger zerolog.Logger
 
 func init() {
-	output := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-	}
-	logger = zerolog.New(output).With().Timestamp().Logger()
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	writer := zerolog.MultiLevelWriter(
+		SpecificLevelWriter{
+			Writer: zerolog.ConsoleWriter{
+				Out:        os.Stdout,
+				TimeFormat: time.RFC3339,
+			},
+			Levels: []zerolog.Level{
+				zerolog.DebugLevel, zerolog.InfoLevel, zerolog.WarnLevel,
+			},
+		},
+		SpecificLevelWriter{
+			Writer: zerolog.ConsoleWriter{
+				Out: os.Stderr,
+			},
+			Levels: []zerolog.Level{
+				zerolog.ErrorLevel, zerolog.FatalLevel, zerolog.PanicLevel,
+			},
+		},
+	)
+	logger = zerolog.New(writer).With().Timestamp().Logger()
 }
 
 func Info(msg string) {
@@ -48,4 +63,19 @@ func Debug(msg string) {
 
 func Debugf(format string, args ...interface{}) {
 	logger.Debug().Msgf(format, args...)
+}
+
+// multilevel writer from https://stackoverflow.com/questions/76858037/how-to-use-zerolog-to-filter-info-logs-to-stdout-and-error-logs-to-stderr
+type SpecificLevelWriter struct {
+	io.Writer
+	Levels []zerolog.Level
+}
+
+func (w SpecificLevelWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
+	for _, l := range w.Levels {
+		if l == level {
+			return w.Write(p)
+		}
+	}
+	return len(p), nil
 }
