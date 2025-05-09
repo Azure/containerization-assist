@@ -8,12 +8,17 @@ import (
 )
 
 func (c *Clients) TestOpenAIConn(ctx context.Context) error {
-	testResponse, err := c.AzOpenAIClient.GetChatCompletion(ctx, "Hello Azure OpenAI! Tell me this is working in one short sentence.")
+	content, tokenUsage, err := c.AzOpenAIClient.GetChatCompletion(ctx, "Hello Azure OpenAI! Tell me this is working in one short sentence.")
 	if err != nil {
 		return fmt.Errorf("failed to get chat completion: %w", err)
 	}
 
 	logger.Info("Azure OpenAI Test")
+<<<<<<< HEAD
 	logger.Infof("Response: %s", testResponse)
+=======
+	logger.Infof("Response: %s", content)
+	logger.Infof("Total tokens used: %d, Prompt tokens: %d, Completion tokens: %d", tokenUsage.TotalTokens, tokenUsage.PromptTokens, tokenUsage.CompletionTokens)
+>>>>>>> main
 	return nil
 }
