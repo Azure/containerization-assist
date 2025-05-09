@@ -37,16 +37,12 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
 
-<<<<<<< HEAD
-			logger.Infof("Using Dockerfile template: %s", templateName)
-=======
 			// Accumulate token usage from template selection
 			state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
 			state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
 			state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 			logger.Infof("Using Dockerfile template: %s\n", templateName)
->>>>>>> main
 
 			// Generate the Dockerfile from template
 			if err := docker.WriteDockerfileFromTemplate(templateName, targetDir); err != nil {
