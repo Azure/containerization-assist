@@ -32,17 +32,15 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
-			resp, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir)
+			templateName, tokenUsage, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir)
 			if err != nil {
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
 
 			// Accumulate token usage from template selection
-			state.TokenUsage.PromptTokens += resp.TokenUsage.PromptTokens
-			state.TokenUsage.CompletionTokens += resp.TokenUsage.CompletionTokens
-			state.TokenUsage.TotalTokens += resp.TokenUsage.TotalTokens
-
-			templateName := resp.Content
+			state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
+			state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
+			state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 			logger.Infof("Using Dockerfile template: %s\n", templateName)
 
@@ -155,13 +153,18 @@ func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState,
 		state.Dockerfile.BuildErrors = buildErrors
 
 		// Update the previous attempts summary
-		runningSummary, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
+		runningSummary, tokenUsage, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
 		if err != nil {
 			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
 		} else {
-			state.Dockerfile.PreviousAttemptsSummary = runningSummary.Content
+			state.Dockerfile.PreviousAttemptsSummary = runningSummary
 			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
 		}
+
+		// Accumulate token usage
+		state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
+		state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
+		state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 		if generateSnapshot {
 			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
@@ -255,17 +258,15 @@ If using shell logic in CMD or RUN, it should fail clearly if expected files are
 I will tip you if you provide a correct and working Dockerfile.
 `
 
-	resp, err := client.GetChatCompletion(ctx, promptText)
+	content, tokenUsage, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
 
 	// Accumulate token usage in pipeline state
-	state.TokenUsage.PromptTokens += resp.TokenUsage.PromptTokens
-	state.TokenUsage.CompletionTokens += resp.TokenUsage.CompletionTokens
-	state.TokenUsage.TotalTokens += resp.TokenUsage.TotalTokens
-
-	content := resp.Content
+	state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
+	state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
+	state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "DOCKERFILE")

@@ -42,7 +42,7 @@ func NewAzOpenAIClient(endpoint, apiKey, deploymentID string) (*AzOpenAIClient, 
 }
 
 // GetChatCompletion sends a prompt to the LLM and returns the completion text.
-func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText string) (*ChatCompletionsResponse, error) {
+func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText string) (string, TokenUsage, error) {
 	// Approximate the number of tokens in the input text.
 	// This assumes an average token is approximately 4 characters long.
 	approxTokens := len(promptText) / 4
@@ -61,25 +61,24 @@ func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText strin
 	)
 
 	if err != nil {
-		return &ChatCompletionsResponse{}, err
+		return "", TokenUsage{}, err
+	}
+
+	tokenUsage := TokenUsage{
+		CompletionTokens: int(*resp.Usage.CompletionTokens),
+		PromptTokens:     int(*resp.Usage.PromptTokens),
+		TotalTokens:      int(*resp.Usage.TotalTokens),			
 	}
 
 	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
-		return &ChatCompletionsResponse{
-			Content: *resp.Choices[0].Message.Content,
-			TokenUsage: TokenUsage{
-				CompletionTokens: int(*resp.Usage.CompletionTokens),
-				PromptTokens:     int(*resp.Usage.PromptTokens),
-				TotalTokens:      int(*resp.Usage.TotalTokens),
-			},
-		}, nil
+		return *resp.Choices[0].Message.Content, tokenUsage, nil	
 	}
 
-	return &ChatCompletionsResponse{}, fmt.Errorf("no completion received from LLM")
+	return "", tokenUsage, fmt.Errorf("no completion received from LLM")
 }
 
 // Does a GetChatCompletion but fills the promptText in %s
-func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, promptText string, args ...interface{}) (*ChatCompletionsResponse, error) {
+func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, promptText string, args ...interface{}) (string, TokenUsage, error) {
 	promptText = fmt.Sprintf(promptText, args...)
 	return c.GetChatCompletion(ctx, promptText)
 }
