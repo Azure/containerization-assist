@@ -31,6 +31,8 @@ func NewAzOpenAIClient(endpoint, apiKey, deploymentID string) (*AzOpenAIClient, 
 
 // GetChatCompletion sends a prompt to the LLM and returns the completion text.
 func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText string) (string, error) {
+	// Approximate the number of tokens in the input text.
+	// This assumes an average token is approximately 4 characters long.
 	approxTokens := len(promptText) / 4
 	logger.Debugf("Calling GetChatCompletion with approxTokens: %d", approxTokens)
 	resp, err := c.client.GetChatCompletions(
