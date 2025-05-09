@@ -55,30 +55,30 @@ Keep the tone neutral and factual, but feel free to raise a flag if something ne
 )
 
 // Use LLM to select the dockerfile template name from the list of available templates
-func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, projectDir string) (*ai.ChatCompletetionsResponse, error) {
+func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, projectDir string) (*ai.ChatCompletionsResponse, error) {
 	dockerfileTemplateNames, err := listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
-		return &ai.ChatCompletetionsResponse{}, fmt.Errorf("failed to list dockerfile template names: %w", err)
+		return &ai.ChatCompletionsResponse{}, fmt.Errorf("failed to list dockerfile template names: %w", err)
 	}
 
 	repoStructure, err := filetree.ReadFileTree(projectDir)
 	if err != nil {
-		return &ai.ChatCompletetionsResponse{}, fmt.Errorf("failed to get file tree: %w", err)
+		return &ai.ChatCompletionsResponse{}, fmt.Errorf("failed to get file tree: %w", err)
 	}
 
 	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
 
 	chatResponse, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
-		return &ai.ChatCompletetionsResponse{}, err
+		return &ai.ChatCompletionsResponse{}, err
 	}
 
 	templateName := strings.TrimSpace(chatResponse.Content)
 	if !slices.Contains(dockerfileTemplateNames, templateName) {
-		return &ai.ChatCompletetionsResponse{}, fmt.Errorf("invalid template name: %s", templateName)
+		return &ai.ChatCompletionsResponse{}, fmt.Errorf("invalid template name: %s", templateName)
 	}
 
-	return &ai.ChatCompletetionsResponse{
+	return &ai.ChatCompletionsResponse{
 		Content:    templateName,
 		TokenUsage: chatResponse.TokenUsage,
 	}, nil
