@@ -72,7 +72,7 @@ func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, p
 		return "", tokenUsage, fmt.Errorf("invalid template name: %s", templateName)
 	}
 
-	return content, tokenUsage, nil
+	return templateName, tokenUsage, nil
 }
 
 func listEmbeddedSubdirNames(path string) ([]string, error) {
