@@ -33,6 +33,7 @@ var (
 	dockerfileGenerator string
 	generateSnapshot    bool
 	timeout             time.Duration
+	maxDepth            int
 
 	// Setup command variables
 	resourceGroup      string

@@ -32,7 +32,7 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
-			templateName, tokenUsage, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir)
+			templateName, tokenUsage, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir, state.RepoFileTree)
 			if err != nil {
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}

@@ -15,13 +15,29 @@ var defaultIgnores = []string{
 	"vendor/",
 	"go.mod",
 	"go.sum",
+	"target/",
+	"build/",
+	"out/",
+	"dist/",
 	"bin/",
 	"obj/",
 	".git/",
 	".DS_Store",
+	".idea/",
+	".vscode/",
+	"*.class",
+	"*.png",
+	"*.jpg",
+	"*.jpeg",
+	"*.gif",
+	"*.mp4",
+	"*.ico",
+	"*.svg",
+	"*.log",
+	"*.exe",
 }
 
-func ReadFileTree(root string) (string, error) {
+func ReadFileTree(root string, maxDepth int) (string, error) {
 	// Create a map to represent the file tree structure
 	fileTree := make(map[string]interface{})
 
@@ -40,28 +56,39 @@ func ReadFileTree(root string) (string, error) {
 
 	gitIgnoreMatcher = ignore.CompileIgnoreLines(ignorePatterns...)
 
-	// Walk the directory tree
+	// Walk the directory tree with depth limit
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
 		relPath, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-
-		// Skip root directory
-		if relPath == "." {
+		if err != nil || relPath == "." {
 			return nil
 		}
 
-		// Check if the path is ignored
-		if gitIgnoreMatcher != nil && gitIgnoreMatcher.MatchesPath(relPath) {
+		// count separators to determine depth
+		depth := strings.Count(relPath, string(filepath.Separator))
+		if maxDepth >= 0 && depth > maxDepth {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
+		}
+
+		// Check if the path is ignored
+		if gitIgnoreMatcher != nil {
+			// Append slash for directories so patterns ending in '/' match
+			pathToMatch := relPath
+			if info.IsDir() {
+				pathToMatch = relPath + string(filepath.Separator)
+			}
+			if gitIgnoreMatcher.MatchesPath(pathToMatch) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 		}
 
 		// Split the path into components
