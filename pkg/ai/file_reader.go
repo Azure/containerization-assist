@@ -1,24 +1,24 @@
 package ai
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
 
-// FileReader interface defines methods for reading files
-type FileReader interface {
-	ReadFile(path string) (string, error)
-	FileExists(path string) bool
-	ListDirectory(path string) ([]string, error)
-}
+var (
+	// LoggingCallback is called when a file operation is logged (if not nil)
+	LoggingCallback func(message string)
+)
 
-// DefaultFileReader provides a standard implementation of FileReader
-type DefaultFileReader struct {
-	BaseDir string
-}
+// ReadFile reads a file from the specified base directory with optional logging
+func ReadFile(baseDir, path string) (string, error) {
+	if LoggingCallback != nil {
+		message := fmt.Sprintf("📄 LLM reading file: %s", path)
+		LoggingCallback(message)
+	}
 
-func (r *DefaultFileReader) ReadFile(path string) (string, error) {
-	fullPath := filepath.Join(r.BaseDir, path)
+	fullPath := filepath.Join(baseDir, path)
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		return "", err
@@ -26,14 +26,26 @@ func (r *DefaultFileReader) ReadFile(path string) (string, error) {
 	return string(data), nil
 }
 
-func (r *DefaultFileReader) FileExists(path string) bool {
-	fullPath := filepath.Join(r.BaseDir, path)
+// FileExists checks if a file exists in the specified base directory with optional logging
+func FileExists(baseDir, path string) bool {
+	if LoggingCallback != nil {
+		message := fmt.Sprintf("🔍 LLM checking if file exists: %s", path)
+		LoggingCallback(message)
+	}
+
+	fullPath := filepath.Join(baseDir, path)
 	_, err := os.Stat(fullPath)
 	return err == nil
 }
 
-func (r *DefaultFileReader) ListDirectory(path string) ([]string, error) {
-	fullPath := filepath.Join(r.BaseDir, path)
+// ListDirectory lists files in a directory with optional logging
+func ListDirectory(baseDir, path string) ([]string, error) {
+	if LoggingCallback != nil {
+		message := fmt.Sprintf("📂 LLM listing directory: %s", path)
+		LoggingCallback(message)
+	}
+
+	fullPath := filepath.Join(baseDir, path)
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		return nil, err

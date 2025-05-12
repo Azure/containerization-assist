@@ -418,6 +418,4 @@ func init() {
 	setupCmd.PersistentFlags().StringVarP(&modelVersion, "model-version", "v", "2025-01-31", "Model version")
 	setupCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 	setupCmd.PersistentFlags().Bool("force-setup", false, "Force setup even if environment variables are already set")
-
-	rootC
 }

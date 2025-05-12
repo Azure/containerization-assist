@@ -3,46 +3,11 @@ package repoanalysispipeline
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
-
-// LoggingFileReader wraps a FileReader to log and display operations
-type LoggingFileReader struct {
-	BaseReader ai.FileReader
-	Calls      []string
-}
-
-// ReadFile logs the file read operation and forwards to the base reader
-func (r *LoggingFileReader) ReadFile(path string) (string, error) {
-	callLog := fmt.Sprintf("  📄 LLM reading file: %s", path)
-	// Print directly to stdout for immediate visibility
-	fmt.Println(callLog)
-	r.Calls = append(r.Calls, callLog)
-	return r.BaseReader.ReadFile(path)
-}
-
-// FileExists logs the file check operation and forwards to the base reader
-func (r *LoggingFileReader) FileExists(path string) bool {
-	callLog := fmt.Sprintf("  🔍 LLM checking if file exists: %s", path)
-	// Print directly to stdout for immediate visibility
-	fmt.Println(callLog)
-	r.Calls = append(r.Calls, callLog)
-	return r.BaseReader.FileExists(path)
-}
-
-// ListDirectory logs the directory list operation and forwards to the base reader
-func (r *LoggingFileReader) ListDirectory(path string) ([]string, error) {
-	callLog := fmt.Sprintf("  📂 LLM listing directory: %s", path)
-	// Print directly to stdout for immediate visibility
-	fmt.Println(callLog)
-	r.Calls = append(r.Calls, callLog)
-	return r.BaseReader.ListDirectory(path)
-}
 
 // RepoAnalysisPipeline implements the pipeline.Pipeline interface for repository analysis
 type RepoAnalysisPipeline struct {
@@ -71,7 +36,6 @@ func (p *RepoAnalysisPipeline) GetErrors(state *pipeline.PipelineState) string {
 	return ""
 }
 
-// WriteSuccessfulFiles writes the successful repo analysis to the state
 func (p *RepoAnalysisPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
 	// Nothing to write for repo analysis
 	return nil
@@ -96,28 +60,27 @@ func (p *RepoAnalysisPipeline) Deploy(ctx context.Context, state *pipeline.Pipel
 
 // Run executes the repository analysis pipeline
 func (p *RepoAnalysisPipeline) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
-	// Type assertion for clients - validate the type but we don't need to use the variable
-	_, ok := clientsObj.(*clients.Clients)
-	if !ok {
-		return fmt.Errorf("invalid clients type")
-	}
 
 	targetDir := options.TargetDirectory
 	logger.Infof("Starting repository analysis for: %s\n", targetDir)
-	fmt.Printf("\n🔍 Analyzing repository at: %s\n", targetDir)
-	fmt.Println("\n⚙️ LLM File Operations (real-time):")
+	logger.Infof("\n🔍 Analyzing repository at: %s\n", targetDir)
+	logger.Info("\n⚙️ LLM File Operations (real-time):")
 
-	// Create a new logging file reader that wraps the default file reader
-	baseReader := &ai.DefaultFileReader{BaseDir: targetDir}
-	loggingReader := &LoggingFileReader{
-		BaseReader: baseReader,
-		Calls:      []string{},
+	// Create a slice to store operation logs and implement real-time logging
+	var operationLogs []string
+
+	// Set up callback for file operations
+	ai.LoggingCallback = func(message string) {
+		logger.Info(message)
+		operationLogs = append(operationLogs, message)
 	}
 
-	p.AIClient.FileReader = loggingReader
-
-	// Analyze the repository content for containerization requirements using file tools
+	// Analyze the repository content
 	repoAnalysis, err := AnalyzeRepositoryWithFileAccess(ctx, p.AIClient, state, targetDir)
+
+	// Clear callback
+	ai.LoggingCallback = nil
+
 	if err != nil {
 		state.Metadata["RepoAnalysisError"] = fmt.Sprintf("repository analysis failed: %v", err)
 		return fmt.Errorf("repository analysis failed: %v", err)
@@ -127,69 +90,25 @@ func (p *RepoAnalysisPipeline) Run(ctx context.Context, state *pipeline.Pipeline
 	state.Metadata["RepoAnalysisResult"] = repoAnalysis
 
 	// Print out the LLM function call summary
-	fmt.Println("\n📊 LLM Analysis Summary:")
-	fmt.Printf("- Total file operations: %d\n", len(loggingReader.Calls))
+	logger.Info("\n📊 LLM Analysis Summary:")
+	logger.Infof("- Total file operations: %d\n", len(operationLogs))
 
 	// Format the file operation logs for better readability
-	fileOperations := FormatFileOperationLogs(loggingReader.Calls)
+	fileOperations := FormatFileOperationLogs(operationLogs)
 
 	// Store the function calls in the metadata
 	state.Metadata["RepoAnalysisCalls"] = fileOperations
 
 	// Print file operation summary
-	fmt.Println("\n🔎 Summary of Files Accessed During Analysis:")
-	fmt.Println(fileOperations)
+	logger.Info("\n🔎 Summary of Files Accessed During Analysis:")
+	logger.Info(fileOperations)
 
-	fmt.Println("\n📋 Repository Analysis Results:")
-	fmt.Println(repoAnalysis)
+	logger.Info("\n📋 Repository Analysis Results:")
+	logger.Info(repoAnalysis)
 
 	logger.Info("✅ Repository analysis completed successfully")
 
 	return nil
-}
-
-// FormatFileOperationLogs formats the file operations list for better readability
-func FormatFileOperationLogs(calls []string) string {
-	if len(calls) == 0 {
-		return "No file operations detected."
-	}
-
-	// Group by operation type
-	fileReads := []string{}
-	dirLists := []string{}
-	fileChecks := []string{}
-
-	for _, call := range calls {
-		if strings.Contains(call, "reading file") {
-			path := strings.TrimPrefix(call, "📄 LLM reading file: ")
-			fileReads = append(fileReads, path)
-		} else if strings.Contains(call, "listing directory") {
-			path := strings.TrimPrefix(call, "📂 LLM listing directory: ")
-			dirLists = append(dirLists, path)
-		} else if strings.Contains(call, "checking if file exists") {
-			path := strings.TrimPrefix(call, "🔍 LLM checking if file exists: ")
-			fileChecks = append(fileChecks, path)
-		}
-	}
-
-	var result strings.Builder
-
-	result.WriteString(fmt.Sprintf("📄 Files Read (%d):\n", len(fileReads)))
-	for _, file := range fileReads {
-		result.WriteString(fmt.Sprintf("  - %s\n", file))
-	}
-
-	result.WriteString(fmt.Sprintf("\n📂 Directories Listed (%d):\n", len(dirLists)))
-	for _, dir := range dirLists {
-		result.WriteString(fmt.Sprintf("  - %s\n", dir))
-	}
-
-	result.WriteString(fmt.Sprintf("\n🔍 Files Checked (%d):\n", len(fileChecks)))
-	for _, check := range fileChecks {
-		result.WriteString(fmt.Sprintf("  - %s\n", check))
-	}
-
-	return result.String()
 }
 
 // AnalyzeRepositoryWithFileAccess uses AI with file access tools to analyze the repository for containerization requirements

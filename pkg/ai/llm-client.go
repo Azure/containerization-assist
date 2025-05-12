@@ -15,7 +15,6 @@ import (
 type AzOpenAIClient struct {
 	client       *azopenai.Client
 	deploymentID string
-	FileReader   FileReader // File reader for accessing repository files
 }
 
 func NewAzOpenAIClient(endpoint, apiKey, deploymentID string) (*AzOpenAIClient, error) {
@@ -27,12 +26,7 @@ func NewAzOpenAIClient(endpoint, apiKey, deploymentID string) (*AzOpenAIClient, 
 	return &AzOpenAIClient{
 		client:       client,
 		deploymentID: deploymentID,
-		FileReader:   nil,
 	}, nil
-}
-
-func (c *AzOpenAIClient) SetFileReader(baseDir string) {
-	c.FileReader = &DefaultFileReader{BaseDir: baseDir}
 }
 
 func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText string) (string, error) {
@@ -62,20 +56,16 @@ func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, prompt
 }
 
 // GetChatCompletionWithFileTools sends a prompt with file‐system tools (read_file, list_directory, file_exists)
-// under the 2023‑12‑01‑preview API (tools + tool_choice), and returns the final assistant reply.
+// LLM is given a certaim number of turns to respond, the final assistant message is returned when the final llm reply does not contain any tool calls.
+// LLM maintains the conversation history, including the tool calls and their responses.
 func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 	ctx context.Context,
 	prompt, baseDir string,
 ) (string, error) {
-	// 1) ensure we can read files
-	if c.FileReader == nil {
-		c.SetFileReader(baseDir)
-	}
-
-	// 2) get our file system tools
+	// 1) get our file system tools
 	tools := GetFileSystemTools()
 
-	// 3) prime the messages with the user's prompt
+	// 2) prime the messages with the user's prompt
 	messages := []azopenai.ChatRequestMessageClassification{
 		&azopenai.ChatRequestUserMessage{
 			Content: azopenai.NewChatRequestUserMessageContent(prompt),
@@ -89,109 +79,99 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		ToolChoice:     azopenai.ChatCompletionsToolChoiceAuto,
 	}
 
-	// 4) loop, handling any tool calls, up to N turns
-	var final string
+	// 3) loop, handling any tool calls, up to N turns
 	for turn := range 15 {
 		logger.Debugf("    tool calls turn %d", turn)
 		resp, err := c.client.GetChatCompletions(ctx, opts, nil)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("Chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
 		}
 		msg := resp.Choices[0].Message
+		tcalls := msg.ToolCalls
 
 		// Did the model invoke any tools?
-		if tcalls := msg.ToolCalls; tcalls != nil && len(tcalls) > 0 {
-			logger.Debugf("    invoked %d tools", len(tcalls))
-			// a) echo the assistant's message with tool calls into our history
-			var content *azopenai.ChatRequestAssistantMessageContent
+		if len(tcalls) == 0 {
+			// No tool calls - return the final response
 			if msg.Content != nil {
-				content = azopenai.NewChatRequestAssistantMessageContent(*msg.Content)
+				return *msg.Content, nil
 			}
+			return "", fmt.Errorf("empty response from LLM")
+		}
 
-			assistantMsg := &azopenai.ChatRequestAssistantMessage{
-				Content: content,
-			}
+		// Tools were invoked
+		logger.Debugf("    invoked %d tools", len(tcalls))
 
-			// Build tool calls for the assistant message
-			var toolCalls []azopenai.ChatCompletionsFunctionToolCall
-			for _, tc := range tcalls {
-				// Handle function specific tool calls
-				if funcTC, ok := tc.(*azopenai.ChatCompletionsFunctionToolCall); ok && funcTC.Function != nil {
-					toolCall := azopenai.ChatCompletionsFunctionToolCall{
-						ID:   funcTC.ID,
-						Type: funcTC.Type,
-						Function: &azopenai.FunctionCall{
-							Name:      funcTC.Function.Name,
-							Arguments: funcTC.Function.Arguments,
-						},
-					}
-					toolCalls = append(toolCalls, toolCall)
+		// a) echo the assistant's message with tool calls into our history
+		var content *azopenai.ChatRequestAssistantMessageContent
+		if msg.Content != nil {
+			content = azopenai.NewChatRequestAssistantMessageContent(*msg.Content)
+		}
+
+		assistantMsg := &azopenai.ChatRequestAssistantMessage{
+			Content: content,
+		}
+
+		// Add tool calls directly to the assistant message to maintain conversation history
+		assistantMsg.ToolCalls = msg.ToolCalls
+		messages = append(messages, assistantMsg)
+
+		// b) execute each tool and append its response
+		for _, tc := range msg.ToolCalls {
+			// Only process function tool calls
+			if funcTC, ok := tc.(*azopenai.ChatCompletionsFunctionToolCall); ok && funcTC.Function != nil {
+
+				var params struct {
+					FilePath string `json:"filePath"`
+					DirPath  string `json:"dirPath"`
 				}
-			}
 
-			// Add tool calls to assistant message
-			var toolCallsClassification []azopenai.ChatCompletionsToolCallClassification
-			for i := range toolCalls {
-				toolCallsClassification = append(toolCallsClassification, &toolCalls[i])
-			}
-			assistantMsg.ToolCalls = toolCallsClassification
-			messages = append(messages, assistantMsg)
+				if err := json.Unmarshal([]byte(*funcTC.Function.Arguments), &params); err != nil {
+					out := fmt.Sprintf("ERROR: Failed to parse tool arguments: %v", err)
 
-			// b) execute each tool and append its response
-			for _, tc := range tcalls {
-				// Only process function tool calls
-				if funcTC, ok := tc.(*azopenai.ChatCompletionsFunctionToolCall); ok && funcTC.Function != nil {
-					var params struct {
-						FilePath string `json:"filePath"`
-						DirPath  string `json:"dirPath"`
-					}
-					_ = json.Unmarshal([]byte(*funcTC.Function.Arguments), &params)
-
-					var out string
-					switch *funcTC.Function.Name {
-					case "read_file":
-						data, err := c.FileReader.ReadFile(params.FilePath)
-						if err != nil {
-							out = fmt.Sprintf("ERROR: %v", err)
-						} else {
-							out = data
-						}
-					case "list_directory":
-						list, err := c.FileReader.ListDirectory(params.DirPath)
-						if err != nil {
-							out = fmt.Sprintf("ERROR: %v", err)
-						} else {
-							out = strings.Join(list, "\n")
-						}
-					case "file_exists":
-						exists := c.FileReader.FileExists(params.FilePath)
-						out = fmt.Sprintf("%v", exists)
-					}
-
-					// Create a tool message with the response
+					//If error occurs, create a tool message with the error so that the LLM can see it
 					content := azopenai.NewChatRequestToolMessageContent(out)
 					toolMsg := &azopenai.ChatRequestToolMessage{
 						Content:    content,
 						ToolCallID: funcTC.ID,
 					}
 					messages = append(messages, toolMsg)
+					continue
 				}
+
+				var out string
+				switch *funcTC.Function.Name {
+				case "read_file":
+					data, err := ReadFile(baseDir, params.FilePath)
+					if err != nil {
+						out = fmt.Sprintf("ERROR: %v", err)
+					} else {
+						out = data
+					}
+				case "list_directory":
+					list, err := ListDirectory(baseDir, params.DirPath)
+					if err != nil {
+						out = fmt.Sprintf("ERROR: %v", err)
+					} else {
+						out = strings.Join(list, "\n")
+					}
+				case "file_exists":
+					exists := FileExists(baseDir, params.FilePath)
+					out = fmt.Sprintf("%v", exists)
+				}
+
+				// Create a tool message with the response
+				content := azopenai.NewChatRequestToolMessageContent(out)
+				toolMsg := &azopenai.ChatRequestToolMessage{
+					Content:    content,
+					ToolCallID: funcTC.ID,
+				}
+				messages = append(messages, toolMsg)
 			}
-
-			// c) update opts and let the model produce its final reply
-			opts.Messages = messages
-			continue
 		}
 
-		// no tool calls ⇒ final assistant content
-		if msg.Content != nil {
-			final = *msg.Content
-			break
-		}
+		// c) update opts and let the model produce its final reply
+		opts.Messages = messages
 	}
 
-	if final == "" {
-		return "", fmt.Errorf("no final response after handling tool calls")
-	}
-	return final, nil
+	return "", fmt.Errorf("maximum turns reached without final response")
 }
