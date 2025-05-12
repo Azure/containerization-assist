@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,6 +91,10 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.CheckPodStatus(namespace, labelSelector, time.Minute)
 	if !podSuccess {
+		podLogs, err := GetDeploymentLogs(labelSelector, namespace)
+		if err != nil {
+			logger.Errorf("Error retrieving deployment logs: %v\n", err)
+		}
 		logger.Infof("Pods are not healthy for deployment with manifest %s, cleaning up failed deployment\n", manifestPath)
 		// Clean up the failed deployment
 		deleteOutput, err := c.Kube.DeleteDeployment(manifestPath)
@@ -100,70 +103,65 @@ func (c *Clients) DeployAndVerifySingleManifest(manifestPath string, isDeploymen
 		} else {
 			logger.Infof("Successfully deleted failed deployment: %s\n", deleteOutput)
 		}
-		return false, outputStr + "\n" + podOutput, nil
+		return false, outputStr + "\n" + podOutput + "\n" + podLogs, nil
 	}
 	logger.Info("Pod health check passed")
 
 	return true, outputStr, nil
 }
 
-func GetDeploymentLogs(deploymentName string, namespace string) error {
+// GetDeploymentLogs retrieves logs for pods matching the label selector in the specified namespace
+func GetDeploymentLogs(labelSelector string, namespace string) (string, error) {
 	// Loading kubeconfig from default location
 	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	if err != nil {
-		return fmt.Errorf("failed to load kubeconfig: %w", err)
+		return "", fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 
 	// Create Kubernetes client
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("failed to create k8s client: %w", err)
+		return "", fmt.Errorf("failed to create k8s client: %w", err)
 	}
 
-	// Get the Deployment
-	// Note only please: We may want to handle the case where the deployment does not exist
-	// or is not found in the specified namespace
-	// This is a simplified example and may need to be adjusted based on our needs
-	deployClient := client.AppsV1().Deployments(namespace)
-	deployment, err := deployClient.Get(context.Background(), deploymentName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get deployment: %w", err)
-	}
-
-	// Get the matching pods
-	labelSelector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: deployment.Spec.Selector.MatchLabels})
+	// List pods matching the provided selector
 	pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to list pods: %w", err)
+		return "", fmt.Errorf("failed to list pods: %w", err)
 	}
 
 	if len(pods.Items) == 0 {
-		return fmt.Errorf("no pods found for %s", deploymentName)
+		return "", fmt.Errorf("no pods found for selector %q in namespace %q", labelSelector, namespace)
 	}
 
-	// Print logs for the first pod (or loop through all if desired)
+	var logBuilder strings.Builder
+	// Retrieve logs for each pod
 	for _, pod := range pods.Items {
-		logger.Infof("Logs for Pod: %s\n", pod.Name)
-		err := streamPodLogs(client, namespace, pod.Name)
+		logBuilder.WriteString(fmt.Sprintf("Logs for Pod: %s\n", pod.Name))
+		podLogs, err := readPodLogs(client, namespace, pod.Name)
 		if err != nil {
-			log.Printf("Error getting logs for pod %s: %v\n", pod.Name, err)
+			return "", fmt.Errorf("error retrieving logs for pod %s: %w", pod.Name, err)
 		}
+		logBuilder.WriteString(podLogs)
 	}
 
-	return nil
+	return logBuilder.String(), nil
 }
 
-// streamPodLogs prints logs to stdout
-func streamPodLogs(clientset *kubernetes.Clientset, namespace, podName string) error {
+// readPodLogs retrieves logs for a given pod and returns them as a string
+func readPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (string, error) {
 	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{})
 	stream, err := req.Stream(context.Background())
 	if err != nil {
-		return fmt.Errorf("error opening log stream: %w", err)
+		return "", fmt.Errorf("error opening log stream for pod %s: %w", podName, err)
 	}
 	defer stream.Close()
 
-	_, err = io.Copy(os.Stdout, stream)
-	return err
+	data, err := io.ReadAll(stream)
+	if err != nil {
+		return "", fmt.Errorf("error reading log stream for pod %s: %w", podName, err)
+	}
+	return string(data), nil
 }

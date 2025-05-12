@@ -27,7 +27,7 @@ const ManifestObjectDelimiter = "---"
 func FindK8sObjects(path string) ([]K8sObject, error) {
 	if path == "" {
 		path = DefaultManifestPath
-		logger.Infof("Using default manifest path: %s\n", path)
+		logger.Infof("Using default manifest path: %s", path)
 	}
 
 	var k8sObjects []K8sObject
@@ -40,7 +40,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
-	logger.Infof("Looking for Kubernetes manifest files in directory: %s\n", path)
+	logger.Infof("Looking for Kubernetes manifest files in directory: %s", path)
 
 	err = filepath.WalkDir(path, func(filePath string, d os.DirEntry, err error) error {
 		if err != nil {

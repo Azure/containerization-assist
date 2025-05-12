@@ -79,10 +79,15 @@ IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	content, err := client.GetChatCompletion(ctx, promptText)
+	content, tokenUsage, err := client.GetChatCompletion(ctx, promptText)
 	if err != nil {
 		return nil, err
 	}
+
+	// Accumulate token usage in pipeline state
+	state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
+	state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
+	state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "MANIFEST")
@@ -104,7 +109,7 @@ func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) err
 		return nil
 	}
 
-	logger.Infof("Attempting to deploy %d manifests\n", len(pendingManifests))
+	logger.Infof("Attempting to deploy %d manifests", len(pendingManifests))
 
 	var failedManifests []string
 
@@ -125,12 +130,12 @@ func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) err
 		if !success {
 			manifest.ErrorLog = output
 			manifest.IsSuccessfullyDeployed = false
-			logger.Errorf("Failed to deploy manifest %s\n", name)
+			logger.Errorf("Failed to deploy manifest %s", name)
 			failedManifests = append(failedManifests, name)
 			continue
 		}
 
-		logger.Infof("Successfully deployed manifest: %s\n", name)
+		logger.Infof("Successfully deployed manifest: %s", name)
 		manifest.IsSuccessfullyDeployed = true
 		manifest.ErrorLog = ""
 	}
@@ -163,7 +168,7 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 
 	// If no manifests exist, generate them using Draft
 	if len(k8sObjects) == 0 {
-		logger.Info("No existing Kubernetes manifests found, generating manifests...\n")
+		logger.Info("No existing Kubernetes manifests found, generating manifests...")
 
 		// Generate the manifests using Draft
 		registryAndImage := fmt.Sprintf("%s/%s", state.RegistryURL, state.ImageName)
@@ -181,9 +186,9 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 			return fmt.Errorf("no Kubernetes manifests were generated")
 		}
 
-		logger.Infof("Successfully generated %d Kubernetes manifests\n", len(k8sObjects))
+		logger.Infof("Successfully generated %d Kubernetes manifests", len(k8sObjects))
 	} else {
-		logger.Infof("Found %d existing Kubernetes manifests in %s\n", len(k8sObjects), targetDir)
+		logger.Infof("Found %d existing Kubernetes manifests in %s", len(k8sObjects), targetDir)
 	}
 
 	// Initialize manifests in the state
@@ -202,9 +207,9 @@ func (p *ManifestPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) e
 	// Write any successfully deployed manifests regardless of global state.Success
 	for name, object := range state.K8sObjects {
 		if object.IsSuccessfullyDeployed && object.ManifestPath != "" && len(object.Content) > 0 {
-			logger.Infof("Writing updated manifest: %s\n", name)
+			logger.Infof("Writing updated manifest: %s", name)
 			if err := os.WriteFile(object.ManifestPath, object.Content, 0644); err != nil {
-				logger.Errorf("Error writing manifest %s: %v\n", name, err)
+				logger.Errorf("Error writing manifest %s: %v", name, err)
 				continue
 			}
 			anyWritten = true
