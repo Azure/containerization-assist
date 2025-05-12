@@ -15,6 +15,7 @@ import (
 type AzOpenAIClient struct {
 	client       *azopenai.Client
 	deploymentID string
+	tokenUsage   TokenUsage
 }
 
 // TokenUsage holds the token usage information across all pipelines
@@ -22,6 +23,23 @@ type TokenUsage struct {
 	CompletionTokens int
 	PromptTokens     int
 	TotalTokens      int
+}
+
+// IncrementTokenUsage increments the client's token usage with the usage from a new API call
+func (c *AzOpenAIClient) IncrementTokenUsage(usage TokenUsage) {
+	c.tokenUsage.CompletionTokens += usage.CompletionTokens
+	c.tokenUsage.PromptTokens += usage.PromptTokens
+	c.tokenUsage.TotalTokens += usage.TotalTokens
+}
+
+// GetTokenUsage returns the current token usage statistics
+func (c *AzOpenAIClient) GetTokenUsage() TokenUsage {
+	return c.tokenUsage
+}
+
+// ResetTokenUsage resets the client's token usage statistics to zero
+func (c *AzOpenAIClient) ResetTokenUsage() {
+	c.tokenUsage = TokenUsage{}
 }
 
 // NewAzOpenAIClient creates and returns a new AzOpenAIClient using the provided credentials
@@ -63,26 +81,27 @@ func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText strin
 	tokenUsage := TokenUsage{
 		CompletionTokens: int(*resp.Usage.CompletionTokens),
 		PromptTokens:     int(*resp.Usage.PromptTokens),
-		TotalTokens:      int(*resp.Usage.TotalTokens),			
+		TotalTokens:      int(*resp.Usage.TotalTokens),
 	}
+
+	// Increment the client's token usage statistics
+	c.IncrementTokenUsage(tokenUsage)
+
 	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
-		return *resp.Choices[0].Message.Content, tokenUsage, nil	
+		return *resp.Choices[0].Message.Content, tokenUsage, nil
 	}
 
 	return "", tokenUsage, fmt.Errorf("no completion received from LLM")
 }
 
-func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, promptText string, args ...interface{}) (string, error) {
-	return c.GetChatCompletion(ctx, fmt.Sprintf(promptText, args...))
-}
-
 // GetChatCompletionWithFileTools sends a prompt with file‐system tools (read_file, list_directory, file_exists)
 // LLM is given a certaim number of turns to respond, the final assistant message is returned when the final llm reply does not contain any tool calls.
 // LLM maintains the conversation history, including the tool calls and their responses.
+// Returns the generated response, token usage statistics, and any error that occurred.
 func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 	ctx context.Context,
 	prompt, baseDir string,
-) (string, error) {
+) (string, TokenUsage, error) {
 	// 1) get our file system tools
 	tools := GetFileSystemTools()
 
@@ -105,7 +124,16 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		logger.Debugf("    tool calls turn %d", turn)
 		resp, err := c.client.GetChatCompletions(ctx, opts, nil)
 		if err != nil {
-			return "", fmt.Errorf("Chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
+			return "", c.tokenUsage, fmt.Errorf("Chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
+		}
+
+		// Increment token usage from this API call
+		if resp.Usage != nil {
+			c.IncrementTokenUsage(TokenUsage{
+				CompletionTokens: int(*resp.Usage.CompletionTokens),
+				PromptTokens:     int(*resp.Usage.PromptTokens),
+				TotalTokens:      int(*resp.Usage.TotalTokens),
+			})
 		}
 		msg := resp.Choices[0].Message
 		tcalls := msg.ToolCalls
@@ -114,9 +142,9 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		if len(tcalls) == 0 {
 			// No tool calls - return the final response
 			if msg.Content != nil {
-				return *msg.Content, nil
+				return *msg.Content, c.tokenUsage, nil
 			}
-			return "", fmt.Errorf("empty response from LLM")
+			return "", c.tokenUsage, fmt.Errorf("empty response from LLM")
 		}
 
 		// Tools were invoked
@@ -194,10 +222,10 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		opts.Messages = messages
 	}
 
-	return "", fmt.Errorf("maximum turns reached without final response")
+	return "", c.tokenUsage, fmt.Errorf("maximum turns reached without final response")
 }
 
-// Does a GetChatCompletion but fills the promptText in %s
+// Does a GetChatCompletion but fills the promptText in %s and returns token usage
 func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, promptText string, args ...interface{}) (string, TokenUsage, error) {
 	promptText = fmt.Sprintf(promptText, args...)
 	return c.GetChatCompletion(ctx, promptText)
