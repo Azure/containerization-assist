@@ -69,7 +69,7 @@ func ReadFileTree(root string, maxDepth int) (string, error) {
 
 		// count separators to determine depth
 		depth := strings.Count(relPath, string(filepath.Separator))
-		if depth > maxDepth {
+		if maxDepth >= 0 && depth > maxDepth {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -77,11 +77,18 @@ func ReadFileTree(root string, maxDepth int) (string, error) {
 		}
 
 		// Check if the path is ignored
-		if gitIgnoreMatcher != nil && gitIgnoreMatcher.MatchesPath(relPath) {
+		if gitIgnoreMatcher != nil {
+			// Append slash for directories so patterns ending in '/' match
+			pathToMatch := relPath
 			if info.IsDir() {
-				return filepath.SkipDir
+				pathToMatch = relPath + string(filepath.Separator)
 			}
-			return nil
+			if gitIgnoreMatcher.MatchesPath(pathToMatch) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 		}
 
 		// Split the path into components
