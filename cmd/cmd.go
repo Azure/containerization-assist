@@ -33,6 +33,7 @@ var (
 	dockerfileGenerator string
 	generateSnapshot    bool
 	timeout             time.Duration
+	maxDepth            int
 
 	// Setup command variables
 	resourceGroup      string
@@ -142,22 +143,9 @@ var generateCmd = &cobra.Command{
 		if os.Getenv(AZURE_OPENAI_KEY) == "" ||
 			os.Getenv(AZURE_OPENAI_ENDPOINT) == "" ||
 			os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID) == "" {
-			logger.Error("Azure OpenAI configuration not found. Starting automatic setup process...")
+			logger.Warn("Azure OpenAI configuration not found. Starting automatic setup process...")
 		}
 
-		// Lets check if the Key, Endpoint and deployment are actually valid
-		// Validate the LLM configuration
-		llmConfig := llmvalidator.LLMConfig{
-			Endpoint:     os.Getenv(AZURE_OPENAI_ENDPOINT), // "https://xxx.openai.azure.com",
-			APIKey:       os.Getenv(AZURE_OPENAI_KEY),
-			DeploymentID: os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID),
-		}
-
-		if err := llmvalidator.ValidateLLM(llmConfig); err != nil {
-			logger.Errorf("LLM config is invalid: %v", err)
-		} else {
-			logger.Infof("LLM config validated successfully.")
-		}
 		// Convert targetDir to absolute path for consistent behavior
 		if targetDir != "" {
 			normalizedPath, err := NormalizeTargetRepoPath(targetDir)
@@ -167,7 +155,7 @@ var generateCmd = &cobra.Command{
 			targetDir = normalizedPath
 		}
 
-		c, err := initClients()
+		c, err := initClients(ctx)
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
@@ -188,7 +176,7 @@ var testCmd = &cobra.Command{
 		// Load environment variables from .env file
 		loadEnvFile()
 
-		c, err := initClients()
+		c, err := initClients(ctx)
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
@@ -274,7 +262,7 @@ func Execute() {
 	rootCmd.ExecuteContext(context.Background())
 }
 
-func initClients() (*clients.Clients, error) {
+func initClients(ctx context.Context) (*clients.Clients, error) {
 	// Try to load values from .env file first
 	loadEnvFile()
 
@@ -313,6 +301,18 @@ func initClients() (*clients.Clients, error) {
 	azOpenAIClient, err := ai.NewAzOpenAIClient(endpoint, apiKey, deploymentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure OpenAI client: %w", err)
+	}
+
+	// After ensuring env vars are present, validate the LLM configuration
+	llmConfig := llmvalidator.LLMConfig{
+		Endpoint:       endpoint,
+		APIKey:         apiKey,
+		DeploymentID:   deploymentID,
+		AzOpenAIClient: azOpenAIClient,
+	}
+	
+	if err := llmvalidator.ValidateLLM(ctx, llmConfig); err != nil {
+		return nil, fmt.Errorf("LLM configuration validation failed: %w", err)
 	}
 
 	cmdRunner := &runner.DefaultCommandRunner{}
