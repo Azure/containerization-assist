@@ -1,24 +1,23 @@
 package llmvalidator
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
-	"time"
 
+	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 type LLMConfig struct {
-	Endpoint     string
-	APIKey       string
-	DeploymentID string
+	Endpoint       string
+	APIKey         string
+	DeploymentID   string
+	AzOpenAIClient *ai.AzOpenAIClient
 }
 
-func ValidateLLM(llmConfig LLMConfig) error {
+func ValidateLLM(ctx context.Context, llmConfig LLMConfig) error {
 
 	_, err := url.ParseRequestURI(llmConfig.Endpoint)
 	if err != nil {
@@ -33,45 +32,21 @@ func ValidateLLM(llmConfig LLMConfig) error {
 		return errors.New("deployment ID is missing")
 	}
 
-	// Attempt to send a minimal test request to the endpoint
-	testPayload := map[string]interface{}{
-		"messages": []map[string]string{
-			{"role": "user", "content": "Hi"},
-		},
-		"max_tokens":  5,
-		"temperature": 0,
-		"stop":        []string{"\n"},
-	}
+	promptText := "This is a test prompt to validate the connection. Please respond with a simple confirmation message."
 
-	payloadBytes, err := json.Marshal(testPayload)
+	content, tokenUsage, err := llmConfig.AzOpenAIClient.GetChatCompletion(ctx, promptText)
 	if err != nil {
-		logger.Errorf("failed to marshal test payload: %v", err)
-		return fmt.Errorf("failed to marshal test payload: %v", err)
-	}
-	// Doc here: https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#rest-api-versioning
-	// POST https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2024-06-01
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/openai/deployments/%s/chat/completions?api-version=2024-06-01", llmConfig.Endpoint, llmConfig.DeploymentID), bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		logger.Errorf("failed to create test request: %v", err)
-		return fmt.Errorf("failed to create test request: %v", err)
+		logger.Errorf("failed to get chat completion: %v", err)
+		return fmt.Errorf("LLM validation failed: failed to get chat completion using AzOpenAIClient: %v", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("api-key", llmConfig.APIKey)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-
-	if err != nil {
-		logger.Errorf("failed to contact LLM endpoint: %v", err)
-		return fmt.Errorf("failed to contact LLM endpoint: %v", err)
+	if content == "" {
+		logger.Errorf("LLM validation failed: empty response content")
+		return errors.New("LLM validation failed: empty response content")
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		logger.Errorf("LLM validation failed: received status %d", resp.StatusCode)
-		return fmt.Errorf("LLM validation failed: received status %d", resp.StatusCode)
-	}
+	logger.Infof("LLM validation successful: %s", content)
+	logger.Debugf("Token usage: Total tokens: %d, Prompt tokens: %d, Completion tokens: %d", tokenUsage.TotalTokens, tokenUsage.PromptTokens, tokenUsage.CompletionTokens)
 
 	return nil
 }
