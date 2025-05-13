@@ -160,19 +160,6 @@ var generateCmd = &cobra.Command{
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
 
-		// Lets check if the Key, Endpoint and deployment are actually valid
-		// Validate the LLM configuration
-		llmConfig := llmvalidator.LLMConfig{
-			Endpoint:     os.Getenv(AZURE_OPENAI_ENDPOINT), // "https://xxx.openai.azure.com",
-			APIKey:       os.Getenv(AZURE_OPENAI_KEY),
-			DeploymentID: os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID),
-		}
-
-		if err := llmvalidator.ValidateLLM(llmConfig); err != nil {
-			logger.Errorf("LLM config is invalid: %v\n", err)
-		} else {
-			logger.Infof("LLM config validated successfully.")
-		}
 		if err := generate(ctx, targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c); err != nil {
 			return fmt.Errorf("error generating artifacts: %w", err)
 		}
@@ -322,9 +309,9 @@ func initClients(ctx context.Context) (*clients.Clients, error) {
 		Endpoint:       endpoint,
 		APIKey:         apiKey,
 		DeploymentID:   deploymentID,
-		AzOpenAIClient: azOpenAIClient,
+		AzOpenAIClient: azOpenAIClient, // This client is correctly set here for validation
 	}
-	
+
 	if err := llmvalidator.ValidateLLM(ctx, llmConfig); err != nil {
 		return nil, fmt.Errorf("LLM configuration validation failed: %w", err)
 	}

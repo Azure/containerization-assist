@@ -39,6 +39,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		K8sObjects:     make(map[string]*k8s.K8sObject),
 		Success:        false,
 		IterationCount: 0,
+		Metadata:       make(map[string]interface{}),
 		ImageName:      "app", // TODO: clean up app naming into state
 		RegistryURL:    registry,
 	}
@@ -51,7 +52,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	state.RepoFileTree = repoStructure
 	logger.Debugf("File tree structure:\n%s", repoStructure)
 
-	repoAnalysisPipeline := &repoanalysispipeline.RepoAnalysisPipeline{
+	repoAnalysisStage := &repoanalysispipeline.RepoAnalysisPipeline{
 		AIClient: c.AzOpenAIClient,
 		Parser:   &pipeline.DefaultParser{},
 	}
@@ -66,10 +67,10 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		Parser:   &pipeline.DefaultParser{},
 	}
 
-	pipelinesByType := map[string]pipeline.Pipeline{
-		"repoanalysis": repoAnalysisPipeline,
-		"docker":       dockerPipeline,
-		"manifest":     manifestPipeline,
+	pipelinesByType := map[string]pipeline.PipelineStage{
+		"repoanalysis": repoAnalysisStage,
+		"docker":       dockerStage,
+		"manifest":     manifestStage,
 	}
 
 	// Create path map for each pipeline
