@@ -13,7 +13,7 @@ import (
 // TestDockerPipeline_Initialize tests the Initialize method
 func TestDockerPipeline_Initialize(t *testing.T) {
 	// Create a test pipeline
-	p := &DockerPipeline{
+	p := &DockerStage{
 		AIClient:         nil,
 		UseDraftTemplate: false,
 	}
@@ -58,7 +58,7 @@ func TestDockerPipeline_Initialize(t *testing.T) {
 // TestDockerPipeline_GetErrors tests the GetErrors method
 func TestDockerPipeline_GetErrors(t *testing.T) {
 	// Create a test pipeline
-	p := &DockerPipeline{}
+	p := &DockerStage{}
 
 	// Create a test state with errors
 	state := &pipeline.PipelineState{
@@ -82,7 +82,7 @@ func TestDockerPipeline_Generate(t *testing.T) {
 // TestDockerPipeline_WriteSuccessfulFiles tests the WriteSuccessfulFiles method
 func TestDockerPipeline_WriteSuccessfulFiles(t *testing.T) {
 	// Create a test pipeline
-	p := &DockerPipeline{}
+	p := &DockerStage{}
 
 	// Create a temp dir and file for testing
 	tmpDir := t.TempDir()

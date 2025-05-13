@@ -50,20 +50,20 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	state.RepoFileTree = repoStructure
 
 	// Create pipeline instances
-	dockerPipeline := &dockerpipeline.DockerPipeline{
+	dockerStage := &dockerpipeline.DockerStage{
 		AIClient:         c.AzOpenAIClient,
 		UseDraftTemplate: enableDraftDockerfile,
 		Parser:           &pipeline.DefaultParser{},
 	}
-	manifestPipeline := &manifestpipeline.ManifestPipeline{
+	manifestStage := &manifestpipeline.ManifestStage{
 		AIClient: c.AzOpenAIClient,
 		Parser:   &pipeline.DefaultParser{},
 	}
 
 	// Store all pipelines in a map by type for better access
 	pipelinesByType := map[string]pipeline.PipelineStage{
-		"docker":   dockerPipeline,
-		"manifest": manifestPipeline,
+		"docker":   dockerStage,
+		"manifest": manifestStage,
 	}
 
 	// Create path map for each pipeline

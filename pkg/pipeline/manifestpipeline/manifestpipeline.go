@@ -137,14 +137,14 @@ func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) err
 	return nil
 }
 
-// ManifestPipeline implements the pipeline.Pipeline interface for Kubernetes manifests
-type ManifestPipeline struct {
+// ManifestStage implements the pipeline.Pipeline interface for Kubernetes manifests
+type ManifestStage struct {
 	AIClient *ai.AzOpenAIClient
 	Parser   pipeline.Parser
 }
 
 // Generate creates Kubernetes manifests if needed
-func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
+func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
 	if state.RegistryURL == "" || state.ImageName == "" {
 		return fmt.Errorf("registry URL or image name not provided in state")
 	}
@@ -186,12 +186,12 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 }
 
 // GetErrors returns a formatted string of all manifest errors
-func (p *ManifestPipeline) GetErrors(state *pipeline.PipelineState) string {
+func (p *ManifestStage) GetErrors(state *pipeline.PipelineState) string {
 	return FormatManifestErrors(state)
 }
 
 // WriteSuccessfulFiles writes successful manifests to disk
-func (p *ManifestPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
+func (p *ManifestStage) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
 	anyWritten := false
 
 	// Write any successfully deployed manifests regardless of global state.Success
@@ -213,7 +213,7 @@ func (p *ManifestPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) e
 }
 
 // Run executes the manifest deployment pipeline
-func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
+func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
@@ -354,13 +354,13 @@ func FormatManifestErrors(state *pipeline.PipelineState) string {
 }
 
 // Initialize prepares the pipeline state with initial manifest-related values
-func (p *ManifestPipeline) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
+func (p *ManifestStage) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
 	// For manifest pipeline, path should be the directory containing manifests
 	return InitializeManifests(state, path)
 }
 
 // Deploy handles deploying Kubernetes manifests
-func (p *ManifestPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
+func (p *ManifestStage) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
