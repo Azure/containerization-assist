@@ -13,7 +13,7 @@ import (
 // TestManifestPipeline_Initialize tests the Initialize method
 func TestManifestPipeline_Initialize(t *testing.T) {
 	// Create a test pipeline
-	p := &ManifestPipeline{
+	p := &ManifestStage{
 		AIClient: nil,
 	}
 
@@ -40,7 +40,7 @@ func TestManifestPipeline_Initialize(t *testing.T) {
 // TestManifestPipeline_GetErrors tests the GetErrors method
 func TestManifestPipeline_GetErrors(t *testing.T) {
 	// Create a test pipeline
-	p := &ManifestPipeline{}
+	p := &ManifestStage{}
 
 	// Create a test state with errors
 	state := &pipeline.PipelineState{
@@ -66,7 +66,7 @@ func TestManifestPipeline_Generate(t *testing.T) {
 // TestManifestPipeline_WriteSuccessfulFiles tests the WriteSuccessfulFiles method
 func TestManifestPipeline_WriteSuccessfulFiles(t *testing.T) {
 	// Create a test pipeline
-	p := &ManifestPipeline{}
+	p := &ManifestStage{}
 
 	// Create a temp dir for testing
 	tmpDir := t.TempDir()

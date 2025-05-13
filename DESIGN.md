@@ -96,7 +96,6 @@ Example tags:
 | File | Responsibility |
 |------|----------------|
 | `cmd/generate.go` | Entry point and orchestration |
-| `pkg/docker/draft.go` | Templating with Draft |
 | `pkg/pipeline/docker.go` | Dockerfile repair loop |
 | `pkg/pipeline/k8s.go` | Manifest repair loop |
 | `pkg/filetree/filetree.go` | Builds tree for LLM input |

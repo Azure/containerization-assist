@@ -18,18 +18,19 @@ import (
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
+	logger.Debugf("Generating artifacts in directory: %s", targetDir)
 	// Check for kind cluster before starting
 	kindClusterName, err := c.GetKindCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
-	logger.Infof("Using kind cluster: %s\n", kindClusterName)
+	logger.Infof("Using kind cluster: %s", kindClusterName)
 
 	// Validate registry connection
-	logger.Infof("Validating connection to registry %s\n", registry)
+	logger.Infof("Validating connection to registry %s", registry)
 	err = docker.ValidateRegistryReachable(registry)
 	if err != nil {
-		return fmt.Errorf("reaching registry %s: %w\n", registry, err)
+		return fmt.Errorf("reaching registry %s: %w", registry, err)
 	}
 
 	// Initialize pipeline state
@@ -37,7 +38,6 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		K8sObjects:     make(map[string]*k8s.K8sObject),
 		Success:        false,
 		IterationCount: 0,
-		Metadata:       make(map[string]interface{}),
 		ImageName:      "app", // TODO: clean up app naming into state
 		RegistryURL:    registry,
 	}
@@ -50,26 +50,21 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	state.RepoFileTree = repoStructure
 	logger.Debugf("File tree structure:\n%s", repoStructure)
 
-	registryAndImage := fmt.Sprintf("%s/%s", registry, state.ImageName)
-	if err := docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage); err != nil {
-		return fmt.Errorf("generating deployment files: %w", err)
-	}
-
 	// Create pipeline instances
-	dockerPipeline := &dockerpipeline.DockerPipeline{
+	dockerStage := &dockerpipeline.DockerStage{
 		AIClient:         c.AzOpenAIClient,
 		UseDraftTemplate: enableDraftDockerfile,
 		Parser:           &pipeline.DefaultParser{},
 	}
-	manifestPipeline := &manifestpipeline.ManifestPipeline{
+	manifestStage := &manifestpipeline.ManifestStage{
 		AIClient: c.AzOpenAIClient,
 		Parser:   &pipeline.DefaultParser{},
 	}
 
 	// Store all pipelines in a map by type for better access
-	pipelinesByType := map[string]pipeline.Pipeline{
-		"docker":   dockerPipeline,
-		"manifest": manifestPipeline,
+	pipelinesByType := map[string]pipeline.PipelineStage{
+		"docker":   dockerStage,
+		"manifest": manifestStage,
 	}
 
 	// Create path map for each pipeline

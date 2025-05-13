@@ -16,14 +16,14 @@ const (
 
 // NewRunner constructs a Runner. You must pass a non-empty order;
 // / it will drive init→generate→iterate→finalize in exactly this sequence.
-func NewRunner(pipelineMap map[string]Pipeline, order []string, out io.Writer) *Runner {
+func NewRunner(pipelineMap map[string]PipelineStage, order []string, out io.Writer) *Runner {
 	if len(order) == 0 {
 		panic("pipeline order must be non-empty")
 	}
 	return &Runner{
-		pipelines: pipelineMap,
-		order:     order,
-		out:       out,
+		stages: pipelineMap,
+		order:  order,
+		out:    out,
 	}
 }
 
@@ -53,7 +53,7 @@ func (r *Runner) Run(
 
 func (r *Runner) initialize(ctx context.Context, state *PipelineState, pathMap map[string]string) error {
 	for _, key := range r.order {
-		p, exists := r.pipelines[key]
+		p, exists := r.stages[key]
 		if !exists {
 			continue
 		}
@@ -70,8 +70,13 @@ func (r *Runner) initialize(ctx context.Context, state *PipelineState, pathMap m
 
 func (r *Runner) generate(ctx context.Context, state *PipelineState, targetDir string) error {
 	for _, key := range r.order {
-		fmt.Fprintf(r.out, "🔧 Generating artifacts for %s...\n", key)
-		if err := r.pipelines[key].Generate(ctx, state, targetDir); err != nil {
+		logger.Infof("🔧 Generating artifacts for %s...", key)
+		// ensure the pipeline exists
+		p, exists := r.stages[key]
+		if !exists {
+			return fmt.Errorf("missing pipeline %q", key)
+		}
+		if err := p.Generate(ctx, state, targetDir); err != nil {
 			return fmt.Errorf("generate %s: %w", key, err)
 		}
 	}
@@ -96,7 +101,7 @@ func (r *Runner) iterate(
 		allErrs = append(allErrs, iterErrs...)
 		if len(iterErrs) != 0 {
 			// Return early on docker pipeline error
-			if _, hasDocker := r.pipelines[dockerPipeline]; hasDocker && !success[dockerPipeline] {
+			if _, hasDocker := r.stages[dockerPipeline]; hasDocker && !success[dockerPipeline] {
 				logger.Warnf("Docker pipeline failed; stopping iteration")
 				break
 			}
@@ -128,7 +133,7 @@ func (r *Runner) runIteration(
 			continue
 		}
 
-		p := r.pipelines[key]
+		p := r.stages[key]
 		if err := p.Run(ctx, state, clients, opts); err != nil {
 			msg := fmt.Sprintf("%s run error: %v", key, err)
 			fmt.Fprintf(r.out, "❌ %s failed: %v\n", key, err)
@@ -165,7 +170,7 @@ func (r *Runner) runIteration(
 
 func (r *Runner) updateFiles(state *PipelineState) error {
 	var errs []string
-	for _, p := range r.pipelines {
+	for _, p := range r.stages {
 		if err := p.WriteSuccessfulFiles(state); err != nil {
 			errs = append(errs, fmt.Sprintf("%T: %v", p, err))
 		}

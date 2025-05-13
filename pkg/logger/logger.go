@@ -3,7 +3,6 @@ package logger
 import (
 	"io"
 	"os"
-	"time"
 
 	"github.com/rs/zerolog"
 )
@@ -14,8 +13,7 @@ func init() {
 	writer := zerolog.MultiLevelWriter(
 		SpecificLevelWriter{
 			Writer: zerolog.ConsoleWriter{
-				Out:        os.Stdout,
-				TimeFormat: time.RFC3339,
+				Out: os.Stdout,
 			},
 			Levels: []zerolog.Level{
 				zerolog.DebugLevel, zerolog.InfoLevel, zerolog.WarnLevel,

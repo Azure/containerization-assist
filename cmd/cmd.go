@@ -70,7 +70,7 @@ func loadEnvFile() {
 		// Check if .env file exists and load it
 		if _, err := os.Stat(envFile); err == nil {
 			if err := godotenv.Load(envFile); err != nil {
-				logger.Warnf("Warning: Error loading .env file: %v\n", err)
+				logger.Warnf("Warning: Error loading .env file: %v", err)
 			}
 		}
 	}
@@ -348,7 +348,7 @@ func runAutoSetup() error {
 	envTargetRepo := os.Getenv("CCP_TARGET_REPO")
 	if envTargetRepo != "" {
 		tempCmd.Flags().Set("target-repo", envTargetRepo)
-		logger.Infof("Using target repository from environment: %s\n", envTargetRepo)
+		logger.Infof("Using target repository from environment: %s", envTargetRepo)
 	}
 
 	// Empty args list

@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
-	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
@@ -138,14 +137,14 @@ func DeployStateManifests(state *pipeline.PipelineState, c *clients.Clients) err
 	return nil
 }
 
-// ManifestPipeline implements the pipeline.Pipeline interface for Kubernetes manifests
-type ManifestPipeline struct {
+// ManifestStage implements the pipeline.Pipeline interface for Kubernetes manifests
+type ManifestStage struct {
 	AIClient *ai.AzOpenAIClient
 	Parser   pipeline.Parser
 }
 
 // Generate creates Kubernetes manifests if needed
-func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
+func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
 	if state.RegistryURL == "" || state.ImageName == "" {
 		return fmt.Errorf("registry URL or image name not provided in state")
 	}
@@ -160,10 +159,11 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 	if len(k8sObjects) == 0 {
 		logger.Info("No existing Kubernetes manifests found, generating manifests...")
 
-		// Generate the manifests using Draft
+		// Generate the manifests using Draft templates
 		registryAndImage := fmt.Sprintf("%s/%s", state.RegistryURL, state.ImageName)
-		if err := docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage); err != nil {
-			return fmt.Errorf("generating deployment files with Draft: %w", err)
+		logger.Debugf("Generating manifests with image name %s", registryAndImage)
+		if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, targetDir); err != nil {
+			return fmt.Errorf("writing manifests from template: %w", err)
 		}
 
 		// Re-scan for the newly generated manifests
@@ -186,12 +186,12 @@ func (p *ManifestPipeline) Generate(ctx context.Context, state *pipeline.Pipelin
 }
 
 // GetErrors returns a formatted string of all manifest errors
-func (p *ManifestPipeline) GetErrors(state *pipeline.PipelineState) string {
+func (p *ManifestStage) GetErrors(state *pipeline.PipelineState) string {
 	return FormatManifestErrors(state)
 }
 
 // WriteSuccessfulFiles writes successful manifests to disk
-func (p *ManifestPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
+func (p *ManifestStage) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
 	anyWritten := false
 
 	// Write any successfully deployed manifests regardless of global state.Success
@@ -213,7 +213,7 @@ func (p *ManifestPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) e
 }
 
 // Run executes the manifest deployment pipeline
-func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
+func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
@@ -246,7 +246,7 @@ func (p *ManifestPipeline) Run(ctx context.Context, state *pipeline.PipelineStat
 		pendingObjects := GetPendingManifests(state)
 		for name := range pendingObjects {
 			thisObject := state.K8sObjects[name]
-			logger.Infof("\nAnalyzing and fixing: %s\n", name)
+			logger.Infof("Analyzing and fixing: %s", name)
 
 			input := pipeline.FileAnalysisInput{
 				Content:       string(thisObject.Content),
@@ -326,9 +326,9 @@ func InitializeManifests(state *pipeline.PipelineState, path string) error {
 		return nil
 	}
 
-	logger.Infof("Found %d Kubernetes objects from %s\n", len(k8sObjects), path)
+	logger.Infof("Found %d Kubernetes objects from %s", len(k8sObjects), path)
 	for _, obj := range k8sObjects {
-		logger.Infof("  '%s' kind: %s source: %s\n", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
+		logger.Infof("  '%s' kind: %s source: %s", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
 	}
 
 	for i := range k8sObjects {
@@ -354,13 +354,13 @@ func FormatManifestErrors(state *pipeline.PipelineState) string {
 }
 
 // Initialize prepares the pipeline state with initial manifest-related values
-func (p *ManifestPipeline) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
+func (p *ManifestStage) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
 	// For manifest pipeline, path should be the directory containing manifests
 	return InitializeManifests(state, path)
 }
 
 // Deploy handles deploying Kubernetes manifests
-func (p *ManifestPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
+func (p *ManifestStage) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {

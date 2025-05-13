@@ -15,20 +15,20 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
 )
 
-// DockerPipeline implements the pipeline.Pipeline interface for Dockerfiles
-type DockerPipeline struct {
+// DockerStage implements the pipeline.Pipeline interface for Dockerfiles
+type DockerStage struct {
 	AIClient         *ai.AzOpenAIClient
 	UseDraftTemplate bool
 	Parser           pipeline.Parser
 }
 
 // Generate creates a Dockerfile based on inputs
-func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
+func (p *DockerStage) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
 	dockerfilePath := filepath.Join(targetDir, "Dockerfile")
 
 	// Check if Dockerfile already exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		logger.Info("No Dockerfile found, generating one...\n")
+		logger.Info("No Dockerfile found, generating one...")
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
@@ -49,14 +49,14 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 				return fmt.Errorf("writing Dockerfile from template: %w", err)
 			}
 		} else {
-			logger.Info("Creating empty Dockerfile\n")
+			logger.Info("Creating empty Dockerfile")
 			// Create an empty file
 			if err := os.WriteFile(dockerfilePath, []byte{}, 0644); err != nil {
 				return fmt.Errorf("writing empty Dockerfile: %w", err)
 			}
 		}
 	} else {
-		logger.Infof("Found existing Dockerfile at %s\n", dockerfilePath)
+		logger.Infof("Found existing Dockerfile at %s", dockerfilePath)
 	}
 
 	// Read the content and update state
@@ -72,12 +72,12 @@ func (p *DockerPipeline) Generate(ctx context.Context, state *pipeline.PipelineS
 }
 
 // GetErrors returns Docker-related errors from the state
-func (p *DockerPipeline) GetErrors(state *pipeline.PipelineState) string {
+func (p *DockerStage) GetErrors(state *pipeline.PipelineState) string {
 	return state.Dockerfile.BuildErrors
 }
 
 // WriteSuccessfulFiles writes the successful Dockerfile to disk
-func (p *DockerPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
+func (p *DockerStage) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
 	// Only write if there's content and no build errors, regardless of global state.Success
 	if state.Dockerfile.Path != "" && state.Dockerfile.Content != "" && state.Dockerfile.BuildErrors == "" {
 		logger.Infof("Writing final Dockerfile to %s\n", state.Dockerfile.Path)
@@ -90,7 +90,7 @@ func (p *DockerPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) err
 }
 
 // Run executes the Dockerfile generation and build pipeline
-func (p *DockerPipeline) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
+func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
@@ -281,7 +281,7 @@ I will tip you if you provide a correct and working Dockerfile.
 }
 
 // Initialize prepares the pipeline state with initial Docker-related values
-func (p *DockerPipeline) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
+func (p *DockerStage) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
 	// Initialize a blank Dockerfile state if the file doesn't exist
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// If file doesn't exist, just initialize with empty content
@@ -298,7 +298,7 @@ func (p *DockerPipeline) Initialize(ctx context.Context, state *pipeline.Pipelin
 }
 
 // Deploy handles pushing the Docker image to the registry
-func (p *DockerPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
+func (p *DockerStage) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Type assertion for clients
 	c, ok := clientsObj.(*clients.Clients)
 	if !ok {
