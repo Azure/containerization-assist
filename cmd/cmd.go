@@ -146,8 +146,6 @@ var generateCmd = &cobra.Command{
 			logger.Warn("Azure OpenAI configuration not found. Starting automatic setup process...")
 		}
 
-		// Direct LLM config validation removed; now handled in initClients
-
 		// Convert targetDir to absolute path for consistent behavior
 		if targetDir != "" {
 			normalizedPath, err := NormalizeTargetRepoPath(targetDir)
