@@ -33,6 +33,7 @@ var (
 	dockerfileGenerator string
 	generateSnapshot    bool
 	timeout             time.Duration
+	maxDepth            int
 
 	// Setup command variables
 	resourceGroup      string
@@ -69,7 +70,7 @@ func loadEnvFile() {
 		// Check if .env file exists and load it
 		if _, err := os.Stat(envFile); err == nil {
 			if err := godotenv.Load(envFile); err != nil {
-				logger.Warnf("Warning: Error loading .env file: %v\n", err)
+				logger.Warnf("Warning: Error loading .env file: %v", err)
 			}
 		}
 	}
@@ -142,7 +143,7 @@ var generateCmd = &cobra.Command{
 		if os.Getenv(AZURE_OPENAI_KEY) == "" ||
 			os.Getenv(AZURE_OPENAI_ENDPOINT) == "" ||
 			os.Getenv(AZURE_OPENAI_DEPLOYMENT_ID) == "" {
-			logger.Error("Azure OpenAI configuration not found. Starting automatic setup process...")
+			logger.Warn("Azure OpenAI configuration not found. Starting automatic setup process...")
 		}
 
 		// Convert targetDir to absolute path for consistent behavior
@@ -154,7 +155,7 @@ var generateCmd = &cobra.Command{
 			targetDir = normalizedPath
 		}
 
-		c, err := initClients()
+		c, err := initClients(ctx)
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
@@ -189,7 +190,7 @@ var testCmd = &cobra.Command{
 		// Load environment variables from .env file
 		loadEnvFile()
 
-		c, err := initClients()
+		c, err := initClients(ctx)
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
@@ -275,7 +276,7 @@ func Execute() {
 	rootCmd.ExecuteContext(context.Background())
 }
 
-func initClients() (*clients.Clients, error) {
+func initClients(ctx context.Context) (*clients.Clients, error) {
 	// Try to load values from .env file first
 	loadEnvFile()
 
@@ -316,6 +317,18 @@ func initClients() (*clients.Clients, error) {
 		return nil, fmt.Errorf("failed to create Azure OpenAI client: %w", err)
 	}
 
+	// After ensuring env vars are present, validate the LLM configuration
+	llmConfig := llmvalidator.LLMConfig{
+		Endpoint:       endpoint,
+		APIKey:         apiKey,
+		DeploymentID:   deploymentID,
+		AzOpenAIClient: azOpenAIClient,
+	}
+	
+	if err := llmvalidator.ValidateLLM(ctx, llmConfig); err != nil {
+		return nil, fmt.Errorf("LLM configuration validation failed: %w", err)
+	}
+
 	cmdRunner := &runner.DefaultCommandRunner{}
 
 	clients := &clients.Clients{
@@ -349,7 +362,7 @@ func runAutoSetup() error {
 	envTargetRepo := os.Getenv("CCP_TARGET_REPO")
 	if envTargetRepo != "" {
 		tempCmd.Flags().Set("target-repo", envTargetRepo)
-		logger.Infof("Using target repository from environment: %s\n", envTargetRepo)
+		logger.Infof("Using target repository from environment: %s", envTargetRepo)
 	}
 
 	// Empty args list

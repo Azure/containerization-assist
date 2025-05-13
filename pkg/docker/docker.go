@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/filetree"
 	"github.com/Azure/container-copilot/templates"
 )
 
@@ -55,15 +54,10 @@ Keep the tone neutral and factual, but feel free to raise a flag if something ne
 )
 
 // Use LLM to select the dockerfile template name from the list of available templates
-func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, projectDir string) (string, ai.TokenUsage, error) {
+func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, projectDir string, repoStructure string) (string, ai.TokenUsage, error) {
 	dockerfileTemplateNames, err := listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
 		return "", ai.TokenUsage{}, fmt.Errorf("failed to list dockerfile template names: %w", err)
-	}
-
-	repoStructure, err := filetree.ReadFileTree(projectDir)
-	if err != nil {
-		return "", ai.TokenUsage{}, fmt.Errorf("failed to get file tree: %w", err)
 	}
 
 	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
@@ -78,7 +72,7 @@ func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, p
 		return "", tokenUsage, fmt.Errorf("invalid template name: %s", templateName)
 	}
 
-	return content, tokenUsage, nil
+	return templateName, tokenUsage, nil
 }
 
 func listEmbeddedSubdirNames(path string) ([]string, error) {

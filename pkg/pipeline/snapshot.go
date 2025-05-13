@@ -14,7 +14,7 @@ import (
 // WriteIterationSnapshot creates a snapshot of the current pipeline iteration.
 // The function accepts a variadic parameter `pipelines`, which is a list of Pipeline objects.
 // Each pipeline can contribute its errors to the snapshot, which are included in the metadata.
-func WriteIterationSnapshot(state *PipelineState, targetDir string, pipelines ...Pipeline) error {
+func WriteIterationSnapshot(state *PipelineState, targetDir string, pipelines ...PipelineStage) error {
 	snapDir := filepath.Join(targetDir, ".container-copilot-snapshots", fmt.Sprintf("iteration_%d", state.IterationCount))
 	if err := os.MkdirAll(snapDir, 0755); err != nil {
 		return fmt.Errorf("creating container-copilot-snapshot directory: %w", err)

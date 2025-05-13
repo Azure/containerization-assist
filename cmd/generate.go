@@ -19,18 +19,19 @@ import (
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
+	logger.Debugf("Generating artifacts in directory: %s", targetDir)
 	// Check for kind cluster before starting
 	kindClusterName, err := c.GetKindCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get kind cluster: %w", err)
 	}
-	logger.Infof("Using kind cluster: %s\n", kindClusterName)
+	logger.Infof("Using kind cluster: %s", kindClusterName)
 
 	// Validate registry connection
-	logger.Infof("Validating connection to registry %s\n", registry)
+	logger.Infof("Validating connection to registry %s", registry)
 	err = docker.ValidateRegistryReachable(registry)
 	if err != nil {
-		return fmt.Errorf("reaching registry %s: %w\n", registry, err)
+		return fmt.Errorf("reaching registry %s: %w", registry, err)
 	}
 
 	// Initialize pipeline state
@@ -38,33 +39,29 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		K8sObjects:     make(map[string]*k8s.K8sObject),
 		Success:        false,
 		IterationCount: 0,
-		Metadata:       make(map[string]interface{}),
 		ImageName:      "app", // TODO: clean up app naming into state
 		RegistryURL:    registry,
 	}
 
 	// Get file tree structure for context
-	repoStructure, err := filetree.ReadFileTree(targetDir)
+	repoStructure, err := filetree.ReadFileTree(targetDir, maxDepth)
 	if err != nil {
 		return fmt.Errorf("failed to get file tree: %w", err)
 	}
 	state.RepoFileTree = repoStructure
-
-	registryAndImage := fmt.Sprintf("%s/%s", registry, state.ImageName)
-	if err := docker.GenerateDeploymentFilesWithDraft(targetDir, registryAndImage); err != nil {
-		return fmt.Errorf("generating deployment files: %w", err)
-	}
+	logger.Debugf("File tree structure:\n%s", repoStructure)
 
 	repoAnalysisPipeline := &repoanalysispipeline.RepoAnalysisPipeline{
 		AIClient: c.AzOpenAIClient,
 		Parser:   &pipeline.DefaultParser{},
 	}
-	dockerPipeline := &dockerpipeline.DockerPipeline{
+	// Create pipeline instances
+	dockerStage := &dockerpipeline.DockerStage{
 		AIClient:         c.AzOpenAIClient,
 		UseDraftTemplate: enableDraftDockerfile,
 		Parser:           &pipeline.DefaultParser{},
 	}
-	manifestPipeline := &manifestpipeline.ManifestPipeline{
+	manifestStage := &manifestpipeline.ManifestStage{
 		AIClient: c.AzOpenAIClient,
 		Parser:   &pipeline.DefaultParser{},
 	}
@@ -109,4 +106,5 @@ func init() {
 	generateCmd.PersistentFlags().BoolVarP(&generateSnapshot, "snapshot", "s", false, "Generate a snapshot of the Dockerfile and Kubernetes manifests generated in each iteration")
 	generateCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 10*time.Minute, "Timeout duration for generating artifacts")
+	generateCmd.PersistentFlags().IntVarP(&maxDepth, "max-depth", "d", 3, "Maximum depth for file tree scan of target repository. Set to -1 for entire repo.")
 }

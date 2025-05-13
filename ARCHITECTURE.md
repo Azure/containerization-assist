@@ -22,7 +22,7 @@ This document provides an overview of the key modules and their responsibilities
 
 ### Docker Support
 
-- **`pkg/docker/`**: Dockerfile templating (`GetDockerfileTemplateName`, `WriteDockerfileFromTemplate`), Draft integration, build loop
+- **`pkg/docker/`**: Dockerfile templating (`GetDockerfileTemplateName`, `WriteDockerfileFromTemplate`), Draft template integration, build loop
 
 ### File Management
 
@@ -30,7 +30,7 @@ This document provides an overview of the key modules and their responsibilities
 
 ### Kubernetes Integration
 
-- **`pkg/k8s/`**: Kubernetes manifest discovery & lightweight parsing (`FindK8sObjects`, `ReadK8sObjects`)
+- **`pkg/k8s/`**: Kubernetes manifest discovery & lightweight parsing (`FindK8sObjects`, `ReadK8sObjects`), Draft manifest template integration
 
 ### Pipeline Orchestration
 
@@ -61,7 +61,7 @@ This document provides an overview of the key modules and their responsibilities
 
 1. Ensure Kind cluster via `Clients.Kind`
 2. Generate or write initial Dockerfile (`pkg/docker`)
-3. Generate raw manifests via Draft (`pkg/docker`)
+3. Generate raw k8s manifests (`pkg/k8s`)
 4. Build `PipelineState`, load file tree
 
 ### Dockerfile Iteration Process
