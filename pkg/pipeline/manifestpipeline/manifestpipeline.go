@@ -57,6 +57,16 @@ Consider the Dockerfile when analyzing the Kubernetes manifest, especially for i
 `, state.Dockerfile.Content)
 	}
 
+	// Add repository analysis results if available
+	if repoAnalysis, ok := state.Metadata[pipeline.RepoAnalysisResultKey].(string); ok && repoAnalysis != "" {
+		promptText += fmt.Sprintf(`
+IMPORTANT CONTEXT: The repository has been analyzed and the following information was gathered:
+%s
+
+Please use this repository analysis information to ensure Databases are accounted for in the manifest.
+`, repoAnalysis)
+	}
+
 	promptText += `
 Please:
 1. Identify any issues in the Kubernetes manifest

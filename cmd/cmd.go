@@ -159,6 +159,7 @@ var generateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
+
 		if err := generate(ctx, targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c); err != nil {
 			return fmt.Errorf("error generating artifacts: %w", err)
 		}
@@ -308,9 +309,9 @@ func initClients(ctx context.Context) (*clients.Clients, error) {
 		Endpoint:       endpoint,
 		APIKey:         apiKey,
 		DeploymentID:   deploymentID,
-		AzOpenAIClient: azOpenAIClient,
+		AzOpenAIClient: azOpenAIClient, // This client is correctly set here for validation
 	}
-	
+
 	if err := llmvalidator.ValidateLLM(ctx, llmConfig); err != nil {
 		return nil, fmt.Errorf("LLM configuration validation failed: %w", err)
 	}

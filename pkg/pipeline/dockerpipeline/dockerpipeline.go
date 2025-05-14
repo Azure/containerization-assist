@@ -153,18 +153,13 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 		state.Dockerfile.BuildErrors = buildErrors
 
 		// Update the previous attempts summary
-		runningSummary, tokenUsage, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
+		runningSummary, _, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
 		if err != nil {
 			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
 		} else {
 			state.Dockerfile.PreviousAttemptsSummary = runningSummary
 			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
 		}
-
-		// Accumulate token usage
-		state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
-		state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
-		state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 		if generateSnapshot {
 			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
@@ -178,9 +173,12 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	return fmt.Errorf("failed to fix Dockerfile after %d iterations", maxIterations)
 }
 
-// AnalyzeDockerfile uses AI to analyze and fix Dockerfile content
+// AnalyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities
 func AnalyzeDockerfile(ctx context.Context, client *ai.AzOpenAIClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
 	dockerfile := state.Dockerfile
+
+	// Get the base directory from the Dockerfile path
+	baseDir := filepath.Dir(dockerfile.Path)
 
 	// Create prompt for analyzing the Dockerfile
 	promptText := fmt.Sprintf(`
@@ -191,6 +189,16 @@ Analyze the following Dockerfile for errors and suggest fixes:
 Dockerfile:
 %s
 `, dockerfile.Content)
+
+	// Add repository analysis results if available
+	if repoAnalysis, ok := state.Metadata[pipeline.RepoAnalysisResultKey].(string); ok && repoAnalysis != "" {
+		promptText += fmt.Sprintf(`
+IMPORTANT CONTEXT: The repository has been analyzed and the following information was gathered:
+%s
+
+Please use this repository analysis information to improve the Dockerfile.
+`, repoAnalysis)
+	}
 
 	// Check for manifest deployment errors and add them to the context
 	manifestErrors := manifestpipeline.FormatManifestErrors(state)
@@ -228,9 +236,9 @@ No error messages were provided. Please check for potential issues in the Docker
 	// Running LLM Summary of previous attempts
 	if state.Dockerfile.PreviousAttemptsSummary != "" {
 		promptText += fmt.Sprintf(`
-	Summary of your previous attempts to fix the Dockerfile that were NOT successful:
-	%s
-	`, state.Dockerfile.PreviousAttemptsSummary)
+Summary of your previous attempts to fix the Dockerfile that were NOT successful:
+%s
+`, state.Dockerfile.PreviousAttemptsSummary)
 	}
 
 	// Add repository file information if provided
@@ -242,31 +250,37 @@ Repository files structure:
 	}
 
 	promptText += `
+IMPORTANT: You have access to the following file-related tools:
+1. read_file - Read the contents of a file (path should be relative to the repository root)
+2. list_directory - List files in a directory (path should be relative to the repository root)
+3. file_exists - Check if a file exists (path should be relative to the repository root)
+
+You can use these tools to examine key project files to better understand the application structure and dependencies.
+
 Please:
 1. Identify any issues in the Dockerfile
-2. Provide a fixed version of the Dockerfile
-3. Explain what changes were made and why
+2. Use the file tools if you need to look at critical files (package.json, requirements.txt, pom.xml, build.gradle, etc.)
+3. Provide a fixed version of the Dockerfile
+4. Explain what changes were made and why
 
 Favor using the latest stable base images and best practices for Dockerfile writing when appropriate.
+Make sure database connections are accounted for in the Dockerfile. They must be passed in, don't request for me to ensure they are there.
 If applicable, use multi-stage builds to reduce image size.
 Ensure that all COPY and RUN instructions are consistent with the actual file structure of the repository — do not assume specific folders or filenames without confirming they exist.
 Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
 If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.
 
-**IMPORTANT: Output the fixed Dockerfile content between <DOCKERFILE> and </DOCKERFILE> tags. These tags must not appear anywhere else in your response except for wrapping the corrected dokerfile content. :IMPORTANT**
+**IMPORTANT: Output the fixed Dockerfile content between <DOCKERFILE> and </DOCKERFILE> tags. These tags must not appear anywhere else in your response except for wrapping the corrected dockerfile content. :IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
 `
 
-	content, tokenUsage, err := client.GetChatCompletion(ctx, promptText)
+	//content, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
+	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
+
 	if err != nil {
 		return nil, err
 	}
-
-	// Accumulate token usage in pipeline state
-	state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
-	state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
-	state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "DOCKERFILE")
