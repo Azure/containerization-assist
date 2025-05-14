@@ -45,13 +45,13 @@ func (p *RepoAnalysisPipeline) WriteSuccessfulFiles(state *pipeline.PipelineStat
 func (p *RepoAnalysisPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Print the repository analysis for visibility during deployment
 	if analysis, ok := state.Metadata["RepoAnalysisResult"].(string); ok && analysis != "" {
-		fmt.Println("\n📋 Repository Analysis Results:")
-		fmt.Println(analysis)
+		logger.Infof("\n📋 Repository Analysis Results:")
+		logger.Infof(analysis)
 
 		// Also print the file operation summary if available
 		if calls, ok := state.Metadata["RepoAnalysisCalls"].(string); ok && calls != "" {
-			fmt.Println("\n🔎 Files Accessed During Analysis:")
-			fmt.Println(calls)
+			logger.Infof("\n🔎 Files Accessed During Analysis:")
+			logger.Infof(calls)
 		}
 	}
 

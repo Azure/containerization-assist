@@ -26,10 +26,10 @@ type TokenUsage struct {
 }
 
 // IncrementTokenUsage increments the client's token usage with the usage from a new API call
-func (c *AzOpenAIClient) IncrementTokenUsage(usage TokenUsage) {
-	c.tokenUsage.CompletionTokens += usage.CompletionTokens
-	c.tokenUsage.PromptTokens += usage.PromptTokens
-	c.tokenUsage.TotalTokens += usage.TotalTokens
+func (c *AzOpenAIClient) IncrementTokenUsage(usage *azopenai.CompletionsUsage) {
+	c.tokenUsage.CompletionTokens += int(*usage.CompletionTokens)
+	c.tokenUsage.PromptTokens += int(*usage.PromptTokens)
+	c.tokenUsage.TotalTokens += int(*usage.TotalTokens)
 }
 
 // GetTokenUsage returns the current token usage statistics
@@ -85,7 +85,7 @@ func (c *AzOpenAIClient) GetChatCompletion(ctx context.Context, promptText strin
 	}
 
 	// Increment the client's token usage statistics
-	c.IncrementTokenUsage(tokenUsage)
+	c.IncrementTokenUsage(resp.Usage)
 
 	if len(resp.Choices) > 0 && resp.Choices[0].Message.Content != nil {
 		return *resp.Choices[0].Message.Content, tokenUsage, nil
@@ -119,21 +119,23 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		ToolChoice:     azopenai.ChatCompletionsToolChoiceAuto,
 	}
 
+	// Track the token usage for this specific function call
+	thisCallUsage := TokenUsage{}
+
 	// 3) loop, handling any tool calls, up to N turns
 	for turn := range 15 {
 		logger.Debugf("    tool calls turn %d", turn)
 		resp, err := c.client.GetChatCompletions(ctx, opts, nil)
 		if err != nil {
-			return "", c.tokenUsage, fmt.Errorf("Chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
+			return "", thisCallUsage, fmt.Errorf("Chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
 		}
 
 		// Increment token usage from this API call
 		if resp.Usage != nil {
-			c.IncrementTokenUsage(TokenUsage{
-				CompletionTokens: int(*resp.Usage.CompletionTokens),
-				PromptTokens:     int(*resp.Usage.PromptTokens),
-				TotalTokens:      int(*resp.Usage.TotalTokens),
-			})
+			c.IncrementTokenUsage(resp.Usage) //Increments the global token usage
+			thisCallUsage.CompletionTokens += int(*resp.Usage.CompletionTokens)
+			thisCallUsage.PromptTokens += int(*resp.Usage.PromptTokens)
+			thisCallUsage.TotalTokens += int(*resp.Usage.TotalTokens)
 		}
 		msg := resp.Choices[0].Message
 		tcalls := msg.ToolCalls
@@ -142,9 +144,9 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		if len(tcalls) == 0 {
 			// No tool calls - return the final response
 			if msg.Content != nil {
-				return *msg.Content, c.tokenUsage, nil
+				return *msg.Content, thisCallUsage, nil
 			}
-			return "", c.tokenUsage, fmt.Errorf("empty response from LLM")
+			return "", thisCallUsage, fmt.Errorf("empty response from LLM")
 		}
 
 		// Tools were invoked
@@ -222,7 +224,7 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		opts.Messages = messages
 	}
 
-	return "", c.tokenUsage, fmt.Errorf("maximum turns reached without final response")
+	return "", thisCallUsage, fmt.Errorf("maximum turns reached without final response")
 }
 
 // Does a GetChatCompletion but fills the promptText in %s and returns token usage
