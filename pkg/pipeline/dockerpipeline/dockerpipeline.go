@@ -191,7 +191,7 @@ Dockerfile:
 `, dockerfile.Content)
 
 	// Add repository analysis results if available
-	if repoAnalysis, ok := state.Metadata["RepoAnalysisResult"].(string); ok && repoAnalysis != "" {
+	if repoAnalysis, ok := state.Metadata[pipeline.RepoAnalysisResultKey].(string); ok && repoAnalysis != "" {
 		promptText += fmt.Sprintf(`
 IMPORTANT CONTEXT: The repository has been analyzed and the following information was gathered:
 %s

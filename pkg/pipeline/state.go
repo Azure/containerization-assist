@@ -16,7 +16,7 @@ type PipelineState struct {
 	Success        bool
 	IterationCount int
 	TokenUsage     ai.TokenUsage
-	Metadata       map[string]interface{} //Flexible storage //Could store summary of changes that will get displayed to the user at the end
+	Metadata       map[MetadataKey]any //Flexible storage
 }
 
 // FileAnalysisInput represents the common input structure for file analysis
@@ -32,3 +32,12 @@ type FileAnalysisResult struct {
 	FixedContent string `json:"fixed_content"`
 	Analysis     string `json:"analysis"`
 }
+
+type MetadataKey string
+
+// Known metadata keys used across pipeline stages
+const (
+	RepoAnalysisResultKey MetadataKey = "RepoAnalysisResult"
+	RepoAnalysisCallsKey  MetadataKey = "RepoAnalysisCalls"
+	RepoAnalysisErrorKey  MetadataKey = "RepoAnalysisError"
+)

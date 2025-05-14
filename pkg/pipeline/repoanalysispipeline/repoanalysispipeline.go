@@ -30,7 +30,7 @@ func (p *RepoAnalysisPipeline) Generate(ctx context.Context, state *pipeline.Pip
 // GetErrors returns repo analysis-related errors from the state
 func (p *RepoAnalysisPipeline) GetErrors(state *pipeline.PipelineState) string {
 	// Check if there's any analysis error stored in metadata
-	if err, ok := state.Metadata["RepoAnalysisError"].(string); ok && err != "" {
+	if err, ok := state.Metadata[pipeline.RepoAnalysisErrorKey].(string); ok && err != "" {
 		return err
 	}
 	return ""
@@ -44,12 +44,12 @@ func (p *RepoAnalysisPipeline) WriteSuccessfulFiles(state *pipeline.PipelineStat
 // Deploy handles any deployment steps needed after repo analysis
 func (p *RepoAnalysisPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Print the repository analysis for visibility during deployment
-	if analysis, ok := state.Metadata["RepoAnalysisResult"].(string); ok && analysis != "" {
+	if analysis, ok := state.Metadata[pipeline.RepoAnalysisResultKey].(string); ok && analysis != "" {
 		logger.Infof("\n📋 Repository Analysis Results:")
 		logger.Infof(analysis)
 
 		// Also print the file operation summary if available
-		if calls, ok := state.Metadata["RepoAnalysisCalls"].(string); ok && calls != "" {
+		if calls, ok := state.Metadata[pipeline.RepoAnalysisCallsKey].(string); ok && calls != "" {
 			logger.Infof("\n🔎 Files Accessed During Analysis:")
 			logger.Infof(calls)
 		}
@@ -82,12 +82,12 @@ func (p *RepoAnalysisPipeline) Run(ctx context.Context, state *pipeline.Pipeline
 	ai.LoggingCallback = nil
 
 	if err != nil {
-		state.Metadata["RepoAnalysisError"] = fmt.Sprintf("repository analysis failed: %v", err)
+		state.Metadata[pipeline.RepoAnalysisErrorKey] = fmt.Sprintf("repository analysis failed: %v", err)
 		return fmt.Errorf("repository analysis failed: %v", err)
 	}
 
 	// Store the analysis results in the pipeline state metadata
-	state.Metadata["RepoAnalysisResult"] = repoAnalysis
+	state.Metadata[pipeline.RepoAnalysisResultKey] = repoAnalysis
 
 	// Print out the LLM function call summary
 	logger.Info("\n📊 LLM Analysis Summary:")
@@ -97,7 +97,7 @@ func (p *RepoAnalysisPipeline) Run(ctx context.Context, state *pipeline.Pipeline
 	fileOperations := FormatFileOperationLogs(operationLogs)
 
 	// Store the function calls in the metadata
-	state.Metadata["RepoAnalysisCalls"] = fileOperations
+	state.Metadata[pipeline.RepoAnalysisCallsKey] = fileOperations
 
 	// Print file operation summary
 	logger.Info("\n🔎 Summary of Files Accessed During Analysis:")

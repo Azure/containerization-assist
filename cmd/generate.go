@@ -39,7 +39,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		K8sObjects:     make(map[string]*k8s.K8sObject),
 		Success:        false,
 		IterationCount: 0,
-		Metadata:       make(map[string]interface{}),
+		Metadata:       make(map[pipeline.MetadataKey]any),
 		ImageName:      "app", // TODO: clean up app naming into state
 		RegistryURL:    registry,
 	}

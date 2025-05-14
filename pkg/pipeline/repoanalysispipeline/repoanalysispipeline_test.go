@@ -77,7 +77,7 @@ func TestRepoAnalysisPipeline_GetErrors(t *testing.T) {
 
 	// Test with no errors
 	state := &pipeline.PipelineState{
-		Metadata: make(map[string]interface{}),
+		Metadata: make(map[pipeline.MetadataKey]any),
 	}
 	errors := p.GetErrors(state)
 	if errors != "" {
@@ -85,7 +85,7 @@ func TestRepoAnalysisPipeline_GetErrors(t *testing.T) {
 	}
 
 	// Test with errors
-	state.Metadata["RepoAnalysisError"] = "test analysis error"
+	state.Metadata[pipeline.RepoAnalysisErrorKey] = "test analysis error"
 	errors = p.GetErrors(state)
 	if errors != "test analysis error" {
 		t.Errorf("GetErrors should return the error message, expected: 'test analysis error', got: %s", errors)
@@ -114,9 +114,9 @@ func TestRepoAnalysisPipeline_Deploy(t *testing.T) {
 
 	// Create a test state with analysis results
 	state := &pipeline.PipelineState{
-		Metadata: map[string]interface{}{
-			"RepoAnalysisResult": "Analysis result",
-			"RepoAnalysisCalls":  "File operations",
+		Metadata: map[pipeline.MetadataKey]any{
+			pipeline.RepoAnalysisResultKey: "Analysis result",
+			pipeline.RepoAnalysisCallsKey:  "File operations",
 		},
 	}
 
