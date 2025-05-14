@@ -52,7 +52,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	state.RepoFileTree = repoStructure
 	logger.Debugf("File tree structure:\n%s", repoStructure)
 
-	repoAnalysisStage := &repoanalysispipeline.RepoAnalysisPipeline{
+	repoAnalysisStage := &repoanalysispipeline.RepoAnalysisStage{
 		AIClient: c.AzOpenAIClient,
 		Parser:   &pipeline.DefaultParser{},
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
@@ -50,11 +51,11 @@ func (c *Clients) checkDockerRunning() error {
 func (c *Clients) PushDockerImage(image string) error {
 
 	output, err := c.Docker.Push(image)
-	logger.Infof("Output: ", output)
+	logger.Infof("Output: %s", output)
 
 	if err != nil {
-		logger.Errorf("Registry push failed with error:", err)
-		return fmt.Errorf("error pushing to registry: %v", err)
+		logger.Errorf("Registry push failed with error: %s", err.Error())
+		return fmt.Errorf("error pushing to registry: %s", err.Error())
 	}
 
 	return nil

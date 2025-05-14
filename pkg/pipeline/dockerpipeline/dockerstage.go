@@ -15,11 +15,31 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
 )
 
-// DockerStage implements the pipeline.Pipeline interface for Dockerfiles
+// DockerStage implements the pipeline.PipelineStage interface for Dockerfiles
+var _ pipeline.PipelineStage = &DockerStage{}
+
 type DockerStage struct {
 	AIClient         *ai.AzOpenAIClient
 	UseDraftTemplate bool
 	Parser           pipeline.Parser
+}
+
+// InitializeDockerFileState populates the Dockerfile field in PipelineState with initial values
+// This function assumes the Dockerfile already exists at the given path
+func InitializeDockerFileState(state *pipeline.PipelineState, dockerFilePath string) error {
+	// Read the Dockerfile content
+	content, err := os.ReadFile(dockerFilePath)
+	if err != nil {
+		return fmt.Errorf("error reading Dockerfile at path %s: %v", dockerFilePath, err)
+	}
+
+	// Update pipeline state with Dockerfile information
+	state.Dockerfile.Content = string(content)
+	state.Dockerfile.Path = dockerFilePath
+	state.Dockerfile.BuildErrors = ""
+
+	logger.Infof("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
+	return nil
 }
 
 // Generate creates a Dockerfile based on inputs
@@ -133,7 +153,7 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 		buildErrors, err := c.BuildDockerfileContent(state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 		if err == nil {
 			logger.Info("🎉 Docker build succeeded!")
-			logger.Infof("Successful Dockerfile: \n", state.Dockerfile.Content)
+			logger.Infof("Successful Dockerfile: \n%s", state.Dockerfile.Content)
 
 			// Clear any previous build errors to indicate success
 			state.Dockerfile.BuildErrors = ""
