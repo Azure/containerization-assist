@@ -1,4 +1,4 @@
-package dockerpipeline
+package dockerstage
 
 import (
 	"context"
@@ -12,14 +12,34 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
 )
 
-// DockerStage implements the pipeline.Pipeline interface for Dockerfiles
+// DockerStage implements the pipeline.PipelineStage interface for Dockerfiles
+var _ pipeline.PipelineStage = &DockerStage{}
+
 type DockerStage struct {
 	AIClient         *ai.AzOpenAIClient
 	UseDraftTemplate bool
 	Parser           pipeline.Parser
+}
+
+// InitializeDockerFileState populates the Dockerfile field in PipelineState with initial values
+// This function assumes the Dockerfile already exists at the given path
+func InitializeDockerFileState(state *pipeline.PipelineState, dockerFilePath string) error {
+	// Read the Dockerfile content
+	content, err := os.ReadFile(dockerFilePath)
+	if err != nil {
+		return fmt.Errorf("error reading Dockerfile at path %s: %v", dockerFilePath, err)
+	}
+
+	// Update pipeline state with Dockerfile information
+	state.Dockerfile.Content = string(content)
+	state.Dockerfile.Path = dockerFilePath
+	state.Dockerfile.BuildErrors = ""
+
+	logger.Infof("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
+	return nil
 }
 
 // Generate creates a Dockerfile based on inputs
@@ -133,7 +153,7 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 		buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 		if err == nil {
 			logger.Info("🎉 Docker build succeeded!")
-			logger.Infof("Successful Dockerfile: \n", state.Dockerfile.Content)
+			logger.Infof("Successful Dockerfile: \n%s", state.Dockerfile.Content)
 
 			// Clear any previous build errors to indicate success
 			state.Dockerfile.BuildErrors = ""
@@ -201,7 +221,7 @@ Please use this repository analysis information to improve the Dockerfile.
 	}
 
 	// Check for manifest deployment errors and add them to the context
-	manifestErrors := manifestpipeline.FormatManifestErrors(state)
+	manifestErrors := manifeststage.FormatManifestErrors(state)
 	if manifestErrors != "" {
 		promptText += fmt.Sprintf(`
 IMPORTANT CONTEXT: Kubernetes manifest deployments failed with the following errors.

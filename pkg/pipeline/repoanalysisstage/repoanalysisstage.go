@@ -1,4 +1,4 @@
-package repoanalysispipeline
+package repoanalysisstage
 
 import (
 	"context"
@@ -9,26 +9,28 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-// RepoAnalysisPipeline implements the pipeline.Pipeline interface for repository analysis
-type RepoAnalysisPipeline struct {
+// RepoAnalysisStage implements the pipeline.PipelineStage interface for repository analysis
+var _ pipeline.PipelineStage = &RepoAnalysisStage{}
+
+type RepoAnalysisStage struct {
 	AIClient *ai.AzOpenAIClient
 	Parser   pipeline.Parser
 }
 
 // Initialize prepares the pipeline state with initial repo analysis-related values
-func (p *RepoAnalysisPipeline) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
+func (p *RepoAnalysisStage) Initialize(ctx context.Context, state *pipeline.PipelineState, path string) error {
 	// No specific initialization needed for repo analysis
 	return nil
 }
 
 // Generate creates the repository analysis if needed
-func (p *RepoAnalysisPipeline) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
+func (p *RepoAnalysisStage) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
 	// Nothing to generate for repo analysis
 	return nil
 }
 
 // GetErrors returns repo analysis-related errors from the state
-func (p *RepoAnalysisPipeline) GetErrors(state *pipeline.PipelineState) string {
+func (p *RepoAnalysisStage) GetErrors(state *pipeline.PipelineState) string {
 	// Check if there's any analysis error stored in metadata
 	if err, ok := state.Metadata[pipeline.RepoAnalysisErrorKey].(string); ok && err != "" {
 		return err
@@ -36,22 +38,22 @@ func (p *RepoAnalysisPipeline) GetErrors(state *pipeline.PipelineState) string {
 	return ""
 }
 
-func (p *RepoAnalysisPipeline) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
+func (p *RepoAnalysisStage) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
 	// Nothing to write for repo analysis
 	return nil
 }
 
 // Deploy handles any deployment steps needed after repo analysis
-func (p *RepoAnalysisPipeline) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
+func (p *RepoAnalysisStage) Deploy(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}) error {
 	// Print the repository analysis for visibility during deployment
 	if analysis, ok := state.Metadata[pipeline.RepoAnalysisResultKey].(string); ok && analysis != "" {
 		logger.Infof("\n📋 Repository Analysis Results:")
-		logger.Infof(analysis)
+		logger.Info(analysis)
 
 		// Also print the file operation summary if available
 		if calls, ok := state.Metadata[pipeline.RepoAnalysisCallsKey].(string); ok && calls != "" {
 			logger.Infof("\n🔎 Files Accessed During Analysis:")
-			logger.Infof(calls)
+			logger.Info(calls)
 		}
 	}
 
@@ -59,7 +61,7 @@ func (p *RepoAnalysisPipeline) Deploy(ctx context.Context, state *pipeline.Pipel
 }
 
 // Run executes the repository analysis pipeline
-func (p *RepoAnalysisPipeline) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
+func (p *RepoAnalysisStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 
 	targetDir := options.TargetDirectory
 	logger.Infof("Starting repository analysis for: %s\n", targetDir)

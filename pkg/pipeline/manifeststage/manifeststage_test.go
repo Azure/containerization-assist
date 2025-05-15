@@ -1,4 +1,4 @@
-package manifestpipeline
+package manifeststage
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-// TestManifestPipeline_Initialize tests the Initialize method
-func TestManifestPipeline_Initialize(t *testing.T) {
+// TestManifestStage_Initialize tests the Initialize method
+func TestManifestStage_Initialize(t *testing.T) {
 	// Create a test pipeline
 	p := &ManifestStage{
 		AIClient: nil,
@@ -37,8 +37,8 @@ func TestManifestPipeline_Initialize(t *testing.T) {
 	}
 }
 
-// TestManifestPipeline_GetErrors tests the GetErrors method
-func TestManifestPipeline_GetErrors(t *testing.T) {
+// TestManifestStage_GetErrors tests the GetErrors method
+func TestManifestStage_GetErrors(t *testing.T) {
 	// Create a test pipeline
 	p := &ManifestStage{}
 
@@ -58,13 +58,13 @@ func TestManifestPipeline_GetErrors(t *testing.T) {
 	}
 }
 
-// TestManifestPipeline_Generate tests basic functionality of Generate
-func TestManifestPipeline_Generate(t *testing.T) {
+// TestManifestStage_Generate tests basic functionality of Generate
+func TestManifestStage_Generate(t *testing.T) {
 	t.Skip("Skipping test that would require docker package and Draft integration")
 }
 
-// TestManifestPipeline_WriteSuccessfulFiles tests the WriteSuccessfulFiles method
-func TestManifestPipeline_WriteSuccessfulFiles(t *testing.T) {
+// TestManifestStage_WriteSuccessfulFiles tests the WriteSuccessfulFiles method
+func TestManifestStage_WriteSuccessfulFiles(t *testing.T) {
 	// Create a test pipeline
 	p := &ManifestStage{}
 
@@ -114,13 +114,13 @@ func TestManifestPipeline_WriteSuccessfulFiles(t *testing.T) {
 	}
 }
 
-// TestManifestPipeline_Run is a basic test for the Run method
-func TestManifestPipeline_Run(t *testing.T) {
+// TestManifestStage_Run is a basic test for the Run method
+func TestManifestStage_Run(t *testing.T) {
 	t.Skip("Skipping test that would require services")
 }
 
-// TestManifestPipeline_Deploy is a basic test for the Deploy method
-func TestManifestPipeline_Deploy(t *testing.T) {
+// TestManifestStage_Deploy is a basic test for the Deploy method
+func TestManifestStage_Deploy(t *testing.T) {
 	t.Skip("Skipping test that would require services")
 }
 
