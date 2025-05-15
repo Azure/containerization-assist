@@ -181,6 +181,7 @@ var testCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
+
 		if err := c.TestOpenAIConn(ctx); err != nil {
 			return fmt.Errorf("error testing Azure OpenAI connection: %w", err)
 		}

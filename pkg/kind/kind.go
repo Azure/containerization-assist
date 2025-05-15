@@ -1,6 +1,7 @@
 package kind
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 
@@ -8,11 +9,11 @@ import (
 )
 
 type KindRunner interface {
-	Version() (string, error)
-	GetClusters() (string, error)
-	DeleteCluster(name string) (string, error)
-	Install() (string, error)
-	SetupRegistry() (string, error)
+	Version(ctx context.Context) (string, error)
+	GetClusters(ctx context.Context) (string, error)
+	DeleteCluster(ctx context.Context, name string) (string, error)
+	Install(ctx context.Context) (string, error)
+	SetupRegistry(ctx context.Context) (string, error)
 }
 
 type KindCmdRunner struct {
@@ -27,19 +28,19 @@ func NewKindCmdRunner(runner runner.CommandRunner) KindRunner {
 	}
 }
 
-func (k *KindCmdRunner) Version() (string, error) {
+func (k *KindCmdRunner) Version(ctx context.Context) (string, error) {
 	return k.runner.RunCommand("kind", "version")
 }
 
-func (k *KindCmdRunner) GetClusters() (string, error) {
+func (k *KindCmdRunner) GetClusters(ctx context.Context) (string, error) {
 	return k.runner.RunCommand("kind", "get", "clusters")
 }
 
-func (k *KindCmdRunner) DeleteCluster(name string) (string, error) {
+func (k *KindCmdRunner) DeleteCluster(ctx context.Context, name string) (string, error) {
 	return k.runner.RunCommand("kind", "delete", "cluster", "--name", name)
 }
 
-func (k *KindCmdRunner) Install() (string, error) {
+func (k *KindCmdRunner) Install(ctx context.Context) (string, error) {
 	switch runtime.GOOS {
 	case "linux":
 		return k.runner.RunCommand("sh", "-c", "curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/")
@@ -52,7 +53,7 @@ func (k *KindCmdRunner) Install() (string, error) {
 	}
 }
 
-func (k *KindCmdRunner) SetupRegistry() (string, error) {
+func (k *KindCmdRunner) SetupRegistry(ctx context.Context) (string, error) {
 	if runtime.GOOS == "windows" {
 		return k.runner.RunCommand("powershell", "-Command", `
         if (-Not (docker network inspect kind -ErrorAction SilentlyContinue)) { docker network create kind }
