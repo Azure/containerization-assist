@@ -1,4 +1,4 @@
-package dockerpipeline
+package dockerstage
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
 )
 
 // DockerStage implements the pipeline.PipelineStage interface for Dockerfiles
@@ -221,7 +221,7 @@ Please use this repository analysis information to improve the Dockerfile.
 	}
 
 	// Check for manifest deployment errors and add them to the context
-	manifestErrors := manifestpipeline.FormatManifestErrors(state)
+	manifestErrors := manifeststage.FormatManifestErrors(state)
 	if manifestErrors != "" {
 		promptText += fmt.Sprintf(`
 IMPORTANT CONTEXT: Kubernetes manifest deployments failed with the following errors.

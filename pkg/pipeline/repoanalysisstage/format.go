@@ -1,4 +1,4 @@
-package repoanalysispipeline
+package repoanalysisstage
 
 import (
 	"fmt"

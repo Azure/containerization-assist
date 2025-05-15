@@ -1,4 +1,4 @@
-package manifestpipeline
+package manifeststage
 
 import (
 	"context"

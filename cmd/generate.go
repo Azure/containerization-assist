@@ -13,9 +13,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/dockerpipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysispipeline"
+	dockerpipeline "github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
+	manifestpipeline "github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
+	repoanalysispipeline "github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
