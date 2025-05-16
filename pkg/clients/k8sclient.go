@@ -76,7 +76,7 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 		return false, outputStr, nil
 	}
 
-	logger.Infof("  ✅ Successfully applied manifest %s", manifestPath)
+	logger.Infof("  ☑️ Successfully applied manifest %s", manifestPath)
 
 	// Only check pod status for deployment.yaml files
 	baseFilename := filepath.Base(manifestPath)

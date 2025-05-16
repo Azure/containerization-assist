@@ -104,9 +104,9 @@ func (r *Runner) Run(
 		}
 		stage := currentStageConfig.Stage
 		if state.RetryCount == 0 {
-			fmt.Fprintf(r.out, "=== Running stage %s ===", currentStageConfig.Id)
+			fmt.Fprintf(r.out, "=== Running stage %s (iteration %d) ===", currentStageConfig.Id, state.IterationCount)
 		} else {
-			fmt.Fprintf(r.out, "  === Retrying stage %s (%d/%d) ===", currentStageConfig.Id, state.RetryCount, currentStageConfig.MaxRetries)
+			fmt.Fprintf(r.out, "  === Retrying stage %s %d/%d  (iteration %d) ===", currentStageConfig.Id, state.RetryCount, currentStageConfig.MaxRetries, state.IterationCount)
 		}
 
 		err := stage.Run(ctx, state, clients, opts)
