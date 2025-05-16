@@ -13,9 +13,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/dockerpipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/manifestpipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysispipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
+	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
+	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
@@ -64,7 +64,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		{
 			Id:   "analysis",
 			Path: targetDir,
-			Stage: &repoanalysispipeline.RepoAnalysisStage{
+			Stage: &repoanalysisstage.RepoAnalysisStage{
 				AIClient: c.AzOpenAIClient,
 				Parser:   &pipeline.DefaultParser{},
 			},
@@ -73,7 +73,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 			Id:         "docker",
 			MaxRetries: 5,
 			Path:       filepath.Join(targetDir, "Dockerfile"),
-			Stage: &dockerpipeline.DockerStage{
+			Stage: &dockerstage.DockerStage{
 				AIClient:         c.AzOpenAIClient,
 				UseDraftTemplate: enableDraftDockerfile,
 				Parser:           &pipeline.DefaultParser{},
@@ -84,7 +84,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 			MaxRetries: 5,
 			OnFailGoto: "docker",
 			Path:       targetDir,
-			Stage: &manifestpipeline.ManifestStage{
+			Stage: &manifeststage.ManifestStage{
 				AIClient: c.AzOpenAIClient,
 				Parser:   &pipeline.DefaultParser{},
 			},

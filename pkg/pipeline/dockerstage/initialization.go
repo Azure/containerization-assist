@@ -1,11 +1,11 @@
-package dockerpipeline
+package dockerstage
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
 // InitializeDockerFileState populates the Dockerfile field in PipelineState with initial values

@@ -1,4 +1,4 @@
-package repoanalysispipeline
+package repoanalysisstage
 
 import (
 	"context"
@@ -39,7 +39,7 @@ func TestFormatFileOperationLogs(t *testing.T) {
 // TestRepoAnalysisPipeline_Initialize tests the Initialize method
 func TestRepoAnalysisPipeline_Initialize(t *testing.T) {
 	// Create a test pipeline
-	p := &RepoAnalysisPipeline{
+	p := &RepoAnalysisStage{
 		AIClient: nil,
 	}
 
@@ -56,7 +56,7 @@ func TestRepoAnalysisPipeline_Initialize(t *testing.T) {
 // TestRepoAnalysisPipeline_Generate tests the Generate method
 func TestRepoAnalysisPipeline_Generate(t *testing.T) {
 	// Create a test pipeline
-	p := &RepoAnalysisPipeline{
+	p := &RepoAnalysisStage{
 		AIClient: nil,
 	}
 
@@ -73,7 +73,7 @@ func TestRepoAnalysisPipeline_Generate(t *testing.T) {
 // TestRepoAnalysisPipeline_GetErrors tests the GetErrors method
 func TestRepoAnalysisPipeline_GetErrors(t *testing.T) {
 	// Create a test pipeline
-	p := &RepoAnalysisPipeline{}
+	p := &RepoAnalysisStage{}
 
 	// Test with no errors
 	state := &pipeline.PipelineState{
@@ -95,7 +95,7 @@ func TestRepoAnalysisPipeline_GetErrors(t *testing.T) {
 // TestRepoAnalysisPipeline_WriteSuccessfulFiles tests the WriteSuccessfulFiles method
 func TestRepoAnalysisPipeline_WriteSuccessfulFiles(t *testing.T) {
 	// Create a test pipeline
-	p := &RepoAnalysisPipeline{}
+	p := &RepoAnalysisStage{}
 
 	// Create a test state
 	state := &pipeline.PipelineState{}
@@ -110,7 +110,7 @@ func TestRepoAnalysisPipeline_WriteSuccessfulFiles(t *testing.T) {
 // TestRepoAnalysisPipeline_Deploy tests the Deploy method
 func TestRepoAnalysisPipeline_Deploy(t *testing.T) {
 	// Create a test pipeline
-	p := &RepoAnalysisPipeline{}
+	p := &RepoAnalysisStage{}
 
 	// Create a test state with analysis results
 	state := &pipeline.PipelineState{
