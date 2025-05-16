@@ -29,7 +29,7 @@ func (d *DefaultCommandRunner) RunCommand(args ...string) (string, error) {
 
 // RunCommandStderr runs a command and returns only the stderr output
 func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) {
-	logger.Debugf("Running command (stderr only): %s", args)
+	logger.Debugf("Running command (stderr only): %v", args)
 	cmd := exec.Command(args[0], args[1:]...)
 
 	stderr, err := cmd.StderrPipe()
