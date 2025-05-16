@@ -34,9 +34,19 @@ type RunnerOptions struct {
 	TargetDirectory           string
 }
 
+// StageConfig defines the common runner configuration for each stage
+type StageConfig struct {
+	Id            string // Unique arbitrary identifier for the stage
+	Stage         PipelineStage
+	MaxRetries    int
+	OnFailGoto    string // StageId to go to on failure - if empty, go back to first stage
+	OnSuccessGoto string // StageId to go to on success - if empty, go to next stage
+	Path          string
+}
+
 // Runner coordinates and executes a set of stages.
 type Runner struct {
-	stages map[string]PipelineStage
-	order  []string
-	out    io.Writer
+	stageConfigs []*StageConfig
+	id2Stage     map[string]*StageConfig
+	out          io.Writer
 }

@@ -8,13 +8,14 @@ import (
 
 // PipelineState holds state across steps and iterations
 type PipelineState struct {
+	IterationCount int
+	RetryCount     int
 	RepoFileTree   string
 	Dockerfile     docker.Dockerfile
 	RegistryURL    string
 	ImageName      string
 	K8sObjects     map[string]*k8s.K8sObject
 	Success        bool
-	IterationCount int
 	TokenUsage     ai.TokenUsage
 	Metadata       map[MetadataKey]any //Flexible storage
 }

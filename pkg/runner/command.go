@@ -6,7 +6,7 @@ import (
 	"io"
 	"os/exec"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/Azure/container-copilot/pkg/logger"
 )
 
 // CommandRunner is an interface for executing commands and getting the output/error
@@ -20,16 +20,16 @@ type DefaultCommandRunner struct{}
 var _ CommandRunner = &DefaultCommandRunner{}
 
 func (d *DefaultCommandRunner) RunCommand(args ...string) (string, error) {
-	log.Debug("Running command: ", args)
+	logger.Debugf("Running command: %s", args)
 	cmd := exec.Command(args[0], args[1:]...)
 	out, err := cmd.CombinedOutput()
-	log.Debug("Command output: ", string(out))
+	logger.Debugf("Command output: %s", string(out))
 	return string(out), err
 }
 
 // RunCommandStderr runs a command and returns only the stderr output
 func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) {
-	log.Debug("Running command (stderr only): ", args)
+	logger.Debugf("Running command (stderr only): %s", args)
 	cmd := exec.Command(args[0], args[1:]...)
 
 	stderr, err := cmd.StderrPipe()
@@ -51,7 +51,7 @@ func (d *DefaultCommandRunner) RunCommandStderr(args ...string) (string, error) 
 	cmdErr := cmd.Wait()
 
 	stderrOutput := string(stderrBytes)
-	log.Debug("Command stderr output: ", stderrOutput)
+	logger.Debugf("Command stderr output: %s", stderrOutput)
 
 	return stderrOutput, cmdErr
 }

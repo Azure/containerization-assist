@@ -52,34 +52,6 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	state.RepoFileTree = repoStructure
 	logger.Debugf("File tree structure:\n%s", repoStructure)
 
-	repoAnalysisStage := &repoanalysispipeline.RepoAnalysisPipeline{
-		AIClient: c.AzOpenAIClient,
-		Parser:   &pipeline.DefaultParser{},
-	}
-	// Create pipeline instances
-	dockerStage := &dockerpipeline.DockerStage{
-		AIClient:         c.AzOpenAIClient,
-		UseDraftTemplate: enableDraftDockerfile,
-		Parser:           &pipeline.DefaultParser{},
-	}
-	manifestStage := &manifestpipeline.ManifestStage{
-		AIClient: c.AzOpenAIClient,
-		Parser:   &pipeline.DefaultParser{},
-	}
-
-	pipelinesByType := map[string]pipeline.PipelineStage{
-		"repoanalysis": repoAnalysisStage,
-		"docker":       dockerStage,
-		"manifest":     manifestStage,
-	}
-
-	// Create path map for each pipeline
-	pathMap := map[string]string{
-		"repoanalysis": targetDir,
-		"docker":       filepath.Join(targetDir, "Dockerfile"),
-		"manifest":     targetDir,
-	}
-
 	// Common pipeline options
 	options := pipeline.RunnerOptions{
 		MaxIterations:             5, // Default max iterations
@@ -88,11 +60,37 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		TargetDirectory:           targetDir,
 	}
 
-	// Update execution order to include repo analysis as the first step
-	execOrder := []string{"repoanalysis", "docker", "manifest"}
-
-	runner := pipeline.NewRunner(pipelinesByType, execOrder, os.Stdout)
-	err = runner.Run(ctx, state, pathMap, options, c)
+	runner := pipeline.NewRunner([]*pipeline.StageConfig{
+		{
+			Id:   "analysis",
+			Path: targetDir,
+			Stage: &repoanalysispipeline.RepoAnalysisStage{
+				AIClient: c.AzOpenAIClient,
+				Parser:   &pipeline.DefaultParser{},
+			},
+		},
+		{
+			Id:         "docker",
+			MaxRetries: 5,
+			Path:       filepath.Join(targetDir, "Dockerfile"),
+			Stage: &dockerpipeline.DockerStage{
+				AIClient:         c.AzOpenAIClient,
+				UseDraftTemplate: enableDraftDockerfile,
+				Parser:           &pipeline.DefaultParser{},
+			},
+		},
+		{
+			Id:         "manifest",
+			MaxRetries: 5,
+			OnFailGoto: "docker",
+			Path:       targetDir,
+			Stage: &manifestpipeline.ManifestStage{
+				AIClient: c.AzOpenAIClient,
+				Parser:   &pipeline.DefaultParser{},
+			},
+		},
+	}, os.Stdout)
+	err = runner.Run(ctx, state, options, c)
 	if err != nil {
 		return err
 	}

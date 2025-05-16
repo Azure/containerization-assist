@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Azure/container-copilot/pkg/ai"
 	"github.com/Azure/container-copilot/pkg/clients"
@@ -121,6 +120,7 @@ func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c 
 		if err := os.WriteFile(manifestPath, manifest.Content, 0644); err != nil {
 			return fmt.Errorf("failed to write manifest %s: %v", name, err)
 		}
+		logger.Debugf("Deploying manifest: %s", manifestPath)
 		success, output, err := c.DeployAndVerifySingleManifest(ctx, manifestPath, manifest.IsDeployment())
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
@@ -230,15 +230,8 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 		return fmt.Errorf("invalid clients type")
 	}
 
-	maxIterations := options.MaxIterations
-	if maxIterations <= 0 {
-		maxIterations = 5 // Default
-	}
-
 	targetDir := options.TargetDirectory
 	generateSnapshot := options.GenerateSnapshot
-
-	logger.Info("Starting Kubernetes manifest deployment iteration process\n")
 
 	if err := k8s.CheckKubectlInstalled(); err != nil {
 		return err
@@ -248,77 +241,68 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 		return fmt.Errorf("no manifest files found in state")
 	}
 
-	for i := 0; i < maxIterations; i++ {
-		logger.Infof("\n=== Manifests Iteration %d of %d ===\n", i+1, maxIterations)
-		state.IterationCount += 1
+	// Fix each manifest that still has issues
+	pendingObjects := GetPendingManifests(state)
+	for name := range pendingObjects {
+		thisObject := state.K8sObjects[name]
+		logger.Infof("Analyzing and fixing: %s", name)
 
-		// Fix each manifest that still has issues
-		pendingObjects := GetPendingManifests(state)
-		for name := range pendingObjects {
-			thisObject := state.K8sObjects[name]
-			logger.Infof("Analyzing and fixing: %s", name)
-
-			input := pipeline.FileAnalysisInput{
-				Content:       string(thisObject.Content),
-				ErrorMessages: thisObject.ErrorLog,
-				FilePath:      thisObject.ManifestPath,
-				//Repo tree is currently not provided to the prompt
-			}
-
-			failedImagePull := strings.Contains(thisObject.ErrorLog, "ImagePullBackOff")
-			if failedImagePull {
-				return fmt.Errorf("imagePullBackOff error detected in manifest %s. Skipping AI analysis", name)
-			}
-
-			// Pass the entire state instead of just the Dockerfile
-			result, err := analyzeKubernetesManifest(ctx, p.AIClient, input, state)
-			if err != nil {
-				return fmt.Errorf("error in AI analysis for %s: %v", name, err)
-			}
-
-			thisObject.Content = []byte(result.FixedContent)
-			logger.Infof("AI suggested fixes for %s\n", name)
-			logger.Debug(result.Analysis)
-		}
-		logger.Info("Updated manifests with fixes. Attempting deployment...")
-
-		// Try to deploy pending manifests
-		err := DeployStateManifests(ctx, state, c)
-		if err == nil {
-			// All manifests deployed successfully, but don't set global success state
-			// as that's handled by the central pipeline orchestrator
-			logger.Info("🎉 All Kubernetes manifests deployed successfully!\n")
-
-			if generateSnapshot {
-				if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
-					return fmt.Errorf("writing iteration snapshot: %w", err)
-				}
-			}
-			return nil
+		input := pipeline.FileAnalysisInput{
+			Content:       string(thisObject.Content),
+			ErrorMessages: thisObject.ErrorLog,
+			FilePath:      thisObject.ManifestPath,
+			//Repo tree is currently not provided to the prompt
 		}
 
-		if i < maxIterations-1 {
-			logger.Info("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
-			// Log status of each manifest
-			for name, thisObject := range state.K8sObjects {
-				if thisObject.IsSuccessfullyDeployed {
-					logger.Infof("  ✅ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
-				} else {
-					logger.Errorf("  ❌ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
-				}
-			}
+		failedImagePull := strings.Contains(thisObject.ErrorLog, "ImagePullBackOff")
+		if failedImagePull {
+			return fmt.Errorf("imagePullBackOff error detected in manifest %s. Skipping AI analysis", name)
 		}
+
+		// Pass the entire state instead of just the Dockerfile
+		result, err := analyzeKubernetesManifest(ctx, p.AIClient, input, state)
+		if err != nil {
+			return fmt.Errorf("error in AI analysis for %s: %v", name, err)
+		}
+
+		thisObject.Content = []byte(result.FixedContent)
+		logger.Infof("AI suggested fixes for %s\n", name)
+		logger.Debug(result.Analysis)
+	}
+	logger.Info("Updated manifests with fixes. Attempting deployment...")
+
+	// Try to deploy pending manifests
+	err := DeployStateManifests(ctx, state, c)
+	if err == nil {
+		// All manifests deployed successfully, but don't set global success state
+		// as that's handled by the central pipeline orchestrator
+		logger.Info("🎉 All Kubernetes manifests deployed successfully!\n")
 
 		if generateSnapshot {
 			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
 				return fmt.Errorf("writing iteration snapshot: %w", err)
 			}
 		}
-
-		time.Sleep(1 * time.Second)
+		return nil
 	}
 
-	return fmt.Errorf("failed to fix Kubernetes manifests after %d iterations", maxIterations)
+	logger.Info("🔄 Some manifests failed to deploy. Using AI to fix issues...\n")
+	// Log status of each manifest
+	for name, thisObject := range state.K8sObjects {
+		if thisObject.IsSuccessfullyDeployed {
+			logger.Infof("  ✅ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
+		} else {
+			logger.Errorf("  ❌ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
+		}
+	}
+
+	if generateSnapshot {
+		if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
+			return fmt.Errorf("writing iteration snapshot: %w", err)
+		}
+	}
+
+	return fmt.Errorf("failed to fix Kubernetes manifests")
 }
 
 // InitializeManifests populates the K8sObjects field in PipelineState with manifests found in the specified path

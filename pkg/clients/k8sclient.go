@@ -18,13 +18,15 @@ import (
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
+const APP_LABEL = "app.kubernetes.io/name"
+
 // CheckPodStatus verifies if pods from the deployment are running correctly
 func (c *Clients) CheckPodStatus(ctx context.Context, namespace string, labelSelector string, timeout time.Duration) (bool, string) {
 	endTime := time.Now().Add(timeout)
 
 	for time.Now().Before(endTime) {
 		readableOutputStr, err := c.Kube.GetPods(ctx, namespace, labelSelector)
-		logger.Infof("Kubectl get pods output: \n%s", readableOutputStr)
+		logger.Debugf("Kubectl get pods output: \n%s", readableOutputStr)
 
 		if err != nil {
 			return false, fmt.Sprintf("Error checking pod status: %v\nOutput: %s", err, readableOutputStr)
@@ -56,11 +58,12 @@ func (c *Clients) CheckPodStatus(ctx context.Context, namespace string, labelSel
 
 // deployAndVerifySingleManifest applies a single manifest and verifies pod health
 func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPath string, isDeployment bool) (bool, string, error) {
+	logger.Infof("%s", manifestPath)
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return false, "", fmt.Errorf("reading manifest file: %w", err)
 	}
-	_, err = k8s.ReadK8sObjects(content)
+	o, err := k8s.ReadK8sObjects(content)
 	if err != nil {
 		return false, "", fmt.Errorf("reading k8s objects from manifest file %s: %w", manifestPath, err)
 	}
@@ -69,44 +72,51 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 	outputStr, err := c.Kube.Apply(ctx, manifestPath)
 
 	if err != nil {
-		logger.Errorf("Kubernetes deployment failed for %s with error: %v", manifestPath, err)
+		logger.Errorf(" ❌ failed to apply manifest %s with error: %v", manifestPath, err)
 		return false, outputStr, nil
 	}
 
-	logger.Infof("Successfully applied %s", manifestPath)
+	logger.Infof("  ✅ Successfully applied manifest %s", manifestPath)
 
 	// Only check pod status for deployment.yaml files
 	baseFilename := filepath.Base(manifestPath)
 	if !isDeployment {
-		logger.Infof("Skipping pod health check for non-deployment manifest: %s", baseFilename)
+		logger.Infof("  Skipping pod health check for non-deployment manifest: %s", baseFilename)
 		return true, outputStr, nil
 	}
 
-	logger.Infof("Checking pod health for deployment...")
+	logger.Debugf("  Checking pod health for deployment manifest: %s", baseFilename)
 
 	// Extract namespace and app labels from the manifest
 	// This is simplified - would need to actually take this from the manifest
 	namespace := "default" // Default namespace
-	labelSelector := ""    // Default label selector #TODO: actually parse this from the manifest
+	k8sAppName := o.Metadata.Labels[APP_LABEL]
+	if k8sAppName == "" {
+		logger.Errorf("  No app label found in manifest %s", manifestPath)
+		return false, "", fmt.Errorf("no app label found in manifest %s", manifestPath)
+	}
+	labelSelector := fmt.Sprintf("%s=%s", APP_LABEL, k8sAppName)
 
 	// Wait for pods to become healthy
 	podSuccess, podOutput := c.CheckPodStatus(ctx, namespace, labelSelector, time.Minute)
 	if !podSuccess {
+		logger.Debugf("  Retrieving logs for pods with label selector %s in namespace %s", labelSelector, namespace)
 		podLogs, err := GetDeploymentLogs(ctx, labelSelector, namespace)
 		if err != nil {
 			logger.Errorf("Error retrieving deployment logs: %v\n", err)
+			return false, outputStr + "\n" + podOutput, nil
 		}
 		logger.Infof("Pods are not healthy for deployment with manifest %s, cleaning up failed deployment\n", manifestPath)
 		// Clean up the failed deployment
 		deleteOutput, err := c.Kube.DeleteDeployment(ctx, manifestPath)
 		if err != nil {
-			logger.Errorf("Warning: Failed to clean up deployment: %v\n", err)
+			logger.Errorf("  ⚠️ Warning: Failed to clean up deployment: %v\n", err)
 		} else {
-			logger.Infof("Successfully deleted failed deployment: %s\n", deleteOutput)
+			logger.Infof("  Successfully deleted failed deployment: %s\n", deleteOutput)
 		}
 		return false, outputStr + "\n" + podOutput + "\n" + podLogs, nil
 	}
-	logger.Info("Pod health check passed")
+	logger.Info("  Pod health check passed")
 
 	return true, outputStr, nil
 }
