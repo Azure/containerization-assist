@@ -13,6 +13,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
+// ManifestStage implements the pipeline.PipelineStage interface for Kubernetes manifests
+var _ pipeline.PipelineStage = &ManifestStage{}
+
 // GetPendingManifests returns a map of manifest names that still need to be deployed
 func GetPendingManifests(state *pipeline.PipelineState) map[string]bool {
 	pendingManifests := make(map[string]bool)

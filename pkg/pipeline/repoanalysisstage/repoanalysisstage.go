@@ -9,7 +9,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-// RepoAnalysisStage implements the pipeline.Pipeline interface for repository analysis
+// RepoAnalysisStage implements the pipeline.PipelineStage interface for repository analysis
+var _ pipeline.PipelineStage = &RepoAnalysisStage{}
+
 type RepoAnalysisStage struct {
 	AIClient *ai.AzOpenAIClient
 	Parser   pipeline.Parser
@@ -46,12 +48,12 @@ func (p *RepoAnalysisStage) Deploy(ctx context.Context, state *pipeline.Pipeline
 	// Print the repository analysis for visibility during deployment
 	if analysis, ok := state.Metadata[pipeline.RepoAnalysisResultKey].(string); ok && analysis != "" {
 		logger.Infof("\n📋 Repository Analysis Results:")
-		logger.Infof(analysis)
+		logger.Info(analysis)
 
 		// Also print the file operation summary if available
 		if calls, ok := state.Metadata[pipeline.RepoAnalysisCallsKey].(string); ok && calls != "" {
 			logger.Infof("\n🔎 Files Accessed During Analysis:")
-			logger.Infof(calls)
+			logger.Info(calls)
 		}
 	}
 

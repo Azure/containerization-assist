@@ -15,11 +15,31 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
 )
 
-// DockerStage implements the pipeline.Pipeline interface for Dockerfiles
+// DockerStage implements the pipeline.PipelineStage interface for Dockerfiles
+var _ pipeline.PipelineStage = &DockerStage{}
+
 type DockerStage struct {
 	AIClient         *ai.AzOpenAIClient
 	UseDraftTemplate bool
 	Parser           pipeline.Parser
+}
+
+// InitializeDockerFileState populates the Dockerfile field in PipelineState with initial values
+// This function assumes the Dockerfile already exists at the given path
+func InitializeDockerFileState(state *pipeline.PipelineState, dockerFilePath string) error {
+	// Read the Dockerfile content
+	content, err := os.ReadFile(dockerFilePath)
+	if err != nil {
+		return fmt.Errorf("error reading Dockerfile at path %s: %v", dockerFilePath, err)
+	}
+
+	// Update pipeline state with Dockerfile information
+	state.Dockerfile.Content = string(content)
+	state.Dockerfile.Path = dockerFilePath
+	state.Dockerfile.BuildErrors = ""
+
+	logger.Infof("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
+	return nil
 }
 
 // Generate creates a Dockerfile based on inputs
@@ -126,8 +146,37 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 		logger.Info("🎉 Docker build succeeded!")
 		logger.Infof("Successful Dockerfile: \n%s", state.Dockerfile.Content)
 
-		// Clear any previous build errors to indicate success
-		state.Dockerfile.BuildErrors = ""
+		// Try to build
+		buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+		if err == nil {
+			logger.Info("🎉 Docker build succeeded!")
+			logger.Infof("Successful Dockerfile: \n%s", state.Dockerfile.Content)
+
+			// Clear any previous build errors to indicate success
+			state.Dockerfile.BuildErrors = ""
+
+			if generateSnapshot {
+				if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
+					return fmt.Errorf("writing iteration snapshot: %w", err)
+				}
+			}
+			return nil
+		}
+
+		logger.Errorf("Docker build failed with error: %v\n", buildErrors)
+
+		logger.Error("Docker build failed. Using AI to fix issues...")
+
+		state.Dockerfile.BuildErrors = buildErrors
+
+		// Update the previous attempts summary
+		runningSummary, _, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
+		if err != nil {
+			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
+		} else {
+			state.Dockerfile.PreviousAttemptsSummary = runningSummary
+			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
+		}
 
 		if generateSnapshot {
 			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {

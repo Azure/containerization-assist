@@ -51,11 +51,11 @@ func (c *Clients) checkDockerRunning(ctx context.Context) error {
 
 func (c *Clients) PushDockerImage(ctx context.Context, image string) error {
 	output, err := c.Docker.Push(ctx, image)
-	logger.Infof("Output: ", output)
+	logger.Infof("Output: %s", output)
 
 	if err != nil {
-		logger.Errorf("Registry push failed with error:", err)
-		return fmt.Errorf("error pushing to registry: %v", err)
+		logger.Errorf("Registry push failed with error: %s", err.Error())
+		return fmt.Errorf("error pushing to registry: %s", err.Error())
 	}
 
 	return nil

@@ -10,8 +10,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
-// TestDockerPipeline_Initialize tests the Initialize method
-func TestDockerPipeline_Initialize(t *testing.T) {
+// TestDockerStage_Initialize tests the Initialize method
+func TestDockerStage_Initialize(t *testing.T) {
 	// Create a test pipeline
 	p := &DockerStage{
 		AIClient:         nil,
@@ -55,8 +55,8 @@ func TestDockerPipeline_Initialize(t *testing.T) {
 	}
 }
 
-// TestDockerPipeline_GetErrors tests the GetErrors method
-func TestDockerPipeline_GetErrors(t *testing.T) {
+// TestDockerStage_GetErrors tests the GetErrors method
+func TestDockerStage_GetErrors(t *testing.T) {
 	// Create a test pipeline
 	p := &DockerStage{}
 
@@ -74,13 +74,13 @@ func TestDockerPipeline_GetErrors(t *testing.T) {
 	}
 }
 
-// TestDockerPipeline_Generate tests basic functionality of Generate
-func TestDockerPipeline_Generate(t *testing.T) {
+// TestDockerStage_Generate tests basic functionality of Generate
+func TestDockerStage_Generate(t *testing.T) {
 	t.Skip("Skipping test that would require docker package mocking")
 }
 
-// TestDockerPipeline_WriteSuccessfulFiles tests the WriteSuccessfulFiles method
-func TestDockerPipeline_WriteSuccessfulFiles(t *testing.T) {
+// TestDockerStage_WriteSuccessfulFiles tests the WriteSuccessfulFiles method
+func TestDockerStage_WriteSuccessfulFiles(t *testing.T) {
 	// Create a test pipeline
 	p := &DockerStage{}
 
@@ -126,13 +126,13 @@ func TestDockerPipeline_WriteSuccessfulFiles(t *testing.T) {
 	}
 }
 
-// TestDockerPipeline_Run is a basic test for the Run method
-func TestDockerPipeline_Run(t *testing.T) {
+// TestDockerStage_Run is a basic test for the Run method
+func TestDockerStage_Run(t *testing.T) {
 	t.Skip("Skipping test that would require services")
 }
 
-// TestDockerPipeline_Deploy is a basic test for the Deploy method
-func TestDockerPipeline_Deploy(t *testing.T) {
+// TestDockerStage_Deploy is a basic test for the Deploy method
+func TestDockerStage_Deploy(t *testing.T) {
 	t.Skip("Skipping test that would require services")
 }
 
