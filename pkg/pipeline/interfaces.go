@@ -34,14 +34,27 @@ type RunnerOptions struct {
 	TargetDirectory           string
 }
 
-// StageConfig defines the common runner configuration for each stage
+// StageConfig defines the configuration for a single stage in the pipeline runner.
 type StageConfig struct {
-	Id            string // Unique arbitrary identifier for the stage
-	Stage         PipelineStage
-	MaxRetries    int
-	OnFailGoto    string // StageId to go to on failure - if empty, go back to first stage
-	OnSuccessGoto string // StageId to go to on success - if empty, go to next stage
-	Path          string
+	// Id is a unique arbitrary identifier for the stage.
+	Id string
+
+	// Stage represents the pipeline stage to be executed.
+	Stage PipelineStage
+
+	// MaxRetries specifies the maximum number of retries allowed for the stage.
+	MaxRetries int
+
+	// OnFailGoto specifies the ID of the stage to go to on failure.
+	// If empty, the runner will go back to the first stage.
+	OnFailGoto string
+
+	// OnSuccessGoto specifies the ID of the stage to go to on success.
+	// If empty, the runner will proceed to the next stage.
+	OnSuccessGoto string
+
+	// Path specifies the file system path associated with the stage.
+	Path string
 }
 
 // Runner coordinates and executes a set of stages.
