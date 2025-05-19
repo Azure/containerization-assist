@@ -13,9 +13,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
-	dockerpipeline "github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
-	manifestpipeline "github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
-	repoanalysispipeline "github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
+	"github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
+	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
+	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
@@ -52,34 +52,6 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	state.RepoFileTree = repoStructure
 	logger.Debugf("File tree structure:\n%s", repoStructure)
 
-	repoAnalysisStage := &repoanalysispipeline.RepoAnalysisStage{
-		AIClient: c.AzOpenAIClient,
-		Parser:   &pipeline.DefaultParser{},
-	}
-	// Create pipeline instances
-	dockerStage := &dockerpipeline.DockerStage{
-		AIClient:         c.AzOpenAIClient,
-		UseDraftTemplate: enableDraftDockerfile,
-		Parser:           &pipeline.DefaultParser{},
-	}
-	manifestStage := &manifestpipeline.ManifestStage{
-		AIClient: c.AzOpenAIClient,
-		Parser:   &pipeline.DefaultParser{},
-	}
-
-	pipelinesByType := map[string]pipeline.PipelineStage{
-		"repoanalysis": repoAnalysisStage,
-		"docker":       dockerStage,
-		"manifest":     manifestStage,
-	}
-
-	// Create path map for each pipeline
-	pathMap := map[string]string{
-		"repoanalysis": targetDir,
-		"docker":       filepath.Join(targetDir, "Dockerfile"),
-		"manifest":     targetDir,
-	}
-
 	// Common pipeline options
 	options := pipeline.RunnerOptions{
 		MaxIterations:             5, // Default max iterations
@@ -88,11 +60,37 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		TargetDirectory:           targetDir,
 	}
 
-	// Update execution order to include repo analysis as the first step
-	execOrder := []string{"repoanalysis", "docker", "manifest"}
-
-	runner := pipeline.NewRunner(pipelinesByType, execOrder, os.Stdout)
-	err = runner.Run(ctx, state, pathMap, options, c)
+	runner := pipeline.NewRunner([]*pipeline.StageConfig{
+		{
+			Id:   "analysis",
+			Path: targetDir,
+			Stage: &repoanalysisstage.RepoAnalysisStage{
+				AIClient: c.AzOpenAIClient,
+				Parser:   &pipeline.DefaultParser{},
+			},
+		},
+		{
+			Id:         "docker",
+			MaxRetries: 5,
+			Path:       filepath.Join(targetDir, "Dockerfile"),
+			Stage: &dockerstage.DockerStage{
+				AIClient:         c.AzOpenAIClient,
+				UseDraftTemplate: enableDraftDockerfile,
+				Parser:           &pipeline.DefaultParser{},
+			},
+		},
+		{
+			Id:         "manifest",
+			MaxRetries: 5,
+			OnFailGoto: "docker",
+			Path:       targetDir,
+			Stage: &manifeststage.ManifestStage{
+				AIClient: c.AzOpenAIClient,
+				Parser:   &pipeline.DefaultParser{},
+			},
+		},
+	}, os.Stdout)
+	err = runner.Run(ctx, state, options, c)
 	if err != nil {
 		return err
 	}

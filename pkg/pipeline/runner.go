@@ -15,15 +15,52 @@ const (
 )
 
 // NewRunner constructs a Runner. You must pass a non-empty order;
-// / it will drive init→generate→iterate→finalize in exactly this sequence.
-func NewRunner(pipelineMap map[string]PipelineStage, order []string, out io.Writer) *Runner {
-	if len(order) == 0 {
+// All stages' Init are called in order first
+// then all stages' Generate are called in order, and finally
+// stages' Run methods are executed in order, respecting the flow
+// as defined in the StageConfigs (MaxRetries and OnFailGoto).
+func NewRunner(stageConfigs []*StageConfig, out io.Writer) *Runner {
+	if len(stageConfigs) == 0 {
 		panic("pipeline order must be non-empty")
 	}
+	// Ensure no nil stages
+	// Populate the id2Stage map
+	// Fill in missing OnSuccessGotos
+	id2Stage := make(map[string]*StageConfig)
+	var prevStageConfig *StageConfig
+	for i, sc := range stageConfigs {
+		if sc == nil {
+			panic(fmt.Sprintf("pipeline StageConfig %d must not be nil", i))
+		}
+		if sc.Stage == nil {
+			panic(fmt.Sprintf("pipeline StageConfig.Stage %d must not be nil", i))
+		}
+		if _, exists := id2Stage[string(sc.Id)]; exists {
+			panic(fmt.Sprintf("duplicate stage ID %s", sc.Id))
+		}
+		id2Stage[sc.Id] = sc
+		// Backfill OnSuccessGoto if not set, with default to next stage
+		if prevStageConfig != nil && prevStageConfig.OnSuccessGoto == "" {
+			prevStageConfig.OnSuccessGoto = sc.Id //
+		}
+		// Backfill OnFailGoto if not set, with default to first stage
+		if sc.OnFailGoto == "" {
+			sc.OnFailGoto = stageConfigs[0].Id // Default to first stage
+		}
+		prevStageConfig = sc
+	}
+	// Second pass to ensure failure stages are valid now that id2Stage is populated
+	for _, stage := range stageConfigs {
+		if stage.OnFailGoto != "" {
+			if _, exists := id2Stage[stage.OnFailGoto]; !exists {
+				panic(fmt.Sprintf("invalid OnFailGoto id %s for stage %s", stage.OnFailGoto, stage.Id))
+			}
+		}
+	}
 	return &Runner{
-		stages: pipelineMap,
-		order:  order,
-		out:    out,
+		stageConfigs: stageConfigs,
+		out:          out,
+		id2Stage:     id2Stage,
 	}
 }
 
@@ -31,147 +68,87 @@ func NewRunner(pipelineMap map[string]PipelineStage, order []string, out io.Writ
 func (r *Runner) Run(
 	ctx context.Context,
 	state *PipelineState,
-	pathMap map[string]string,
 	opts RunnerOptions,
 	clients interface{},
 ) error {
-	if err := r.initialize(ctx, state, pathMap); err != nil {
-		return err
+	// Initialize the pipeline stages in order
+	for _, sc := range r.stageConfigs {
+		if err := sc.Stage.Initialize(ctx, state, sc.Path); err != nil {
+			return fmt.Errorf("initializing stage %s: %w", sc.Id, err)
+		}
 	}
-	if err := r.generate(ctx, state, opts.TargetDirectory); err != nil {
-		return err
+	// Generate artifacts for each stage in order
+	for _, sc := range r.stageConfigs {
+		logger.Infof("🔧 Generating artifacts for %s...", sc.Id)
+		// ensure the pipeline exists
+		if err := sc.Stage.Generate(ctx, state, opts.TargetDirectory); err != nil {
+			return fmt.Errorf("generate %s: %w", sc.Id, err)
+		}
 	}
-	errs := r.iterate(ctx, state, opts.CompleteLoopMaxIterations, clients, opts)
-	if err := r.updateFiles(state); err != nil {
-		fmt.Fprintf(r.out, "⚠️ Warning: %v\n", err)
-	}
-	if len(errs) > 0 {
-		return errors.New("pipeline errors:\n" + strings.Join(errs, "\n"))
-	}
-	return nil
-}
 
-func (r *Runner) initialize(ctx context.Context, state *PipelineState, pathMap map[string]string) error {
-	for _, key := range r.order {
-		p, exists := r.stages[key]
-		if !exists {
+	// Advance Stages until all are successful or max iterations reached
+	if r.stageConfigs == nil {
+		return errors.New("no stages to run")
+	}
+	if r.stageConfigs[0].Stage == nil {
+		return errors.New("first stage is nil")
+	}
+	if r.stageConfigs[0].Id == "" {
+		return errors.New("first stage ID is empty")
+	}
+	currentStageConfig := r.stageConfigs[0]
+	for {
+		state.IterationCount++
+		if ctx.Err() != nil {
+			return fmt.Errorf("abort iterating with context err: %w", ctx.Err())
+		}
+		stage := currentStageConfig.Stage
+		if state.RetryCount == 0 {
+			fmt.Fprintf(r.out, "=== Running stage %s (iteration %d) ===", currentStageConfig.Id, state.IterationCount)
+		} else {
+			fmt.Fprintf(r.out, "  === Retrying stage %s %d/%d  (iteration %d) ===", currentStageConfig.Id, state.RetryCount, currentStageConfig.MaxRetries, state.IterationCount)
+		}
+
+		err := stage.Run(ctx, state, clients, opts)
+		if err != nil {
+			state.RetryCount++
+			if state.RetryCount > currentStageConfig.MaxRetries {
+				// If max retries reached, move to failed stage
+				currentStageConfig = r.id2Stage[currentStageConfig.OnFailGoto]
+				fmt.Fprintf(r.out, "❌ Stage %s failed max times %d: %v\n", currentStageConfig.Id, state.RetryCount, err)
+				continue
+			}
+			fmt.Fprintf(r.out, "  ❌ Stage %s failed: %v\n", currentStageConfig.Id, err)
 			continue
 		}
-		path, ok := pathMap[key]
-		if !ok {
-			return fmt.Errorf("missing path for pipeline %q", key)
+		fmt.Fprintf(r.out, "  ✅ Stage %s succeeded, deploying...\n", currentStageConfig.Id)
+		err = stage.Deploy(ctx, state, clients)
+		if err != nil {
+			fmt.Fprintf(r.out, "⚠️ Deploy failed for stage %s: %v\n", currentStageConfig.Id, err)
 		}
-		if err := p.Initialize(ctx, state, path); err != nil {
-			return fmt.Errorf("initialize %s: %w", key, err)
-		}
-	}
-	return nil
-}
-
-func (r *Runner) generate(ctx context.Context, state *PipelineState, targetDir string) error {
-	for _, key := range r.order {
-		logger.Infof("🔧 Generating artifacts for %s...", key)
-		// ensure the pipeline exists
-		p, exists := r.stages[key]
-		if !exists {
-			return fmt.Errorf("missing pipeline %q", key)
-		}
-		if err := p.Generate(ctx, state, targetDir); err != nil {
-			return fmt.Errorf("generate %s: %w", key, err)
-		}
-	}
-	return nil
-}
-
-func (r *Runner) iterate(
-	ctx context.Context,
-	state *PipelineState,
-	completeLoopIterations int,
-	clients interface{},
-	opts RunnerOptions,
-) []string {
-	var allErrs []string
-	success := make(map[string]bool)
-
-	for i := 1; i <= completeLoopIterations; i++ {
-		fmt.Fprintf(r.out, "\n=== Iteration %d/%d ===\n", i, completeLoopIterations)
-
-		// Iterate through each pipeline for maxIterations
-		iterErrs := r.runIteration(ctx, state, clients, success, opts)
-		allErrs = append(allErrs, iterErrs...)
-		if len(iterErrs) != 0 {
-			// Return early on docker pipeline error
-			if _, hasDocker := r.stages[dockerPipeline]; hasDocker && !success[dockerPipeline] {
-				logger.Warnf("Docker pipeline failed; stopping iteration")
-				break
-			}
-		}
-
-		if len(iterErrs) == 0 {
-			fmt.Fprintln(r.out, "🎉 All pipelines completed successfully!")
+		// If the stage succeeded, reset retry count
+		state.RetryCount = 0
+		nextStageId := currentStageConfig.OnSuccessGoto
+		if nextStageId == "" {
+			// If no next stage, we are done
+			fmt.Fprintln(r.out, "🎉 All stages completed successfully!")
 			state.Success = true
 			break
 		}
-		fmt.Fprintln(r.out, "❌ Iteration completed with errors; retrying...")
+		// Move to next stage
+		currentStageConfig = r.id2Stage[nextStageId]
 	}
 
-	return allErrs
-}
-
-func (r *Runner) runIteration(
-	ctx context.Context,
-	state *PipelineState,
-	clients interface{},
-	success map[string]bool,
-	opts RunnerOptions,
-) []string {
-	var errs []string
-
-	for _, key := range r.order {
-		if success[key] {
-			fmt.Fprintf(r.out, "⏭ Skipping %s (already succeeded)\n", key)
-			continue
-		}
-
-		p := r.stages[key]
-		if err := p.Run(ctx, state, clients, opts); err != nil {
-			msg := fmt.Sprintf("%s run error: %v", key, err)
-			fmt.Fprintf(r.out, "❌ %s failed: %v\n", key, err)
-			// Fail fast on docker pipeline error
-			if key == dockerPipeline {
-				return []string{msg}
-			}
-			errs = append(errs, msg)
-			continue
-		}
-
-		if report := p.GetErrors(state); report != "" {
-			msg := fmt.Sprintf("%s reported errors:\n%s", key, report)
-			errs = append(errs, msg)
-			fmt.Fprintf(r.out, "❌ %s errors:\n%s\n", key, report)
-			continue
-		}
-
-		success[key] = true
-		fmt.Fprintf(r.out, "✅ %s succeeded\n", key)
-
-		fmt.Fprintf(r.out, "🚀 Deploying %s...\n", key)
-		if err := p.Deploy(ctx, state, clients); err != nil {
-			msg := fmt.Sprintf("%s deploy error: %v", key, err)
-			errs = append(errs, msg)
-			fmt.Fprintf(r.out, "❌ %s deployment failed: %v\n", key, err)
-		} else {
-			fmt.Fprintf(r.out, "✅ %s deployed\n", key)
-		}
+	if err := r.updateFiles(state); err != nil {
+		fmt.Fprintf(r.out, "⚠️ Warning: %v\n", err)
 	}
-
-	return errs
+	return nil
 }
 
 func (r *Runner) updateFiles(state *PipelineState) error {
 	var errs []string
-	for _, p := range r.stages {
-		if err := p.WriteSuccessfulFiles(state); err != nil {
+	for _, p := range r.stageConfigs {
+		if err := p.Stage.WriteSuccessfulFiles(state); err != nil {
 			errs = append(errs, fmt.Sprintf("%T: %v", p, err))
 		}
 	}

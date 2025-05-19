@@ -117,37 +117,34 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 		return fmt.Errorf("invalid clients type")
 	}
 
-	maxIterations := options.MaxIterations
-	if maxIterations <= 0 {
-		maxIterations = 5 // Default
-	}
-
 	targetDir := options.TargetDirectory
 	generateSnapshot := options.GenerateSnapshot
 
-	logger.Infof("Starting Dockerfile build iteration process for: %s\n", state.Dockerfile.Path)
+	logger.Infof("Starting Dockerfile build process for: %s\n", state.Dockerfile.Path)
 
 	// Check if Docker is installed before starting the iteration process
 	if err := docker.CheckDockerInstalled(); err != nil {
 		return err
 	}
 
-	for i := 0; i < maxIterations; i++ {
-		logger.Infof("\n=== Dockerfile Iteration %d of %d ===\n", i+1, maxIterations)
-		state.IterationCount += 1
+	// Get AI to fix the Dockerfile
+	result, err := AnalyzeDockerfile(ctx, p.AIClient, state)
+	if err != nil {
+		return fmt.Errorf("error in AI analysis: %v", err)
+	}
 
-		// Get AI to fix the Dockerfile
-		result, err := AnalyzeDockerfile(ctx, p.AIClient, state)
-		if err != nil {
-			return fmt.Errorf("error in AI analysis: %v", err)
-		}
+	// Update the Dockerfile
+	state.Dockerfile.Content = result.FixedContent
+	logger.Info("AI suggested fixes:")
+	logger.Debug(result.Analysis)
 
-		// Update the Dockerfile
-		state.Dockerfile.Content = result.FixedContent
-		logger.Info("AI suggested fixes:")
-		logger.Debug(result.Analysis)
+	logger.Info("Updated Dockerfile written. Attempting build again...\n")
 
-		logger.Info("Updated Dockerfile written. Attempting build again...\n")
+	// Try to build
+	buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
+	if err == nil {
+		logger.Info("🎉 Docker build succeeded!")
+		logger.Infof("Successful Dockerfile: \n%s", state.Dockerfile.Content)
 
 		// Try to build
 		buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
@@ -186,11 +183,33 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 				return fmt.Errorf("writing iteration snapshot: %w", err)
 			}
 		}
-
-		time.Sleep(1 * time.Second) // Small delay for readability
+		return nil
 	}
 
-	return fmt.Errorf("failed to fix Dockerfile after %d iterations", maxIterations)
+	logger.Errorf("Docker build failed with error: %v\n", buildErrors)
+
+	logger.Error("Docker build failed. Using AI to fix issues...")
+
+	state.Dockerfile.BuildErrors = buildErrors
+
+	// Update the previous attempts summary
+	runningSummary, _, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
+	if err != nil {
+		logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
+	} else {
+		state.Dockerfile.PreviousAttemptsSummary = runningSummary
+		logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
+	}
+
+	if generateSnapshot {
+		if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
+			return fmt.Errorf("writing iteration snapshot: %w", err)
+		}
+	}
+
+	time.Sleep(1 * time.Second) // Small delay for readability
+
+	return fmt.Errorf("failed to fix Dockerfile")
 }
 
 // AnalyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities

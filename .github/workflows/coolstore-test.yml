@@ -101,7 +101,7 @@ jobs:
           mkdir -p artifacts/logs
 
           # The success message we're looking for in the output
-          SUCCESS_MESSAGE="All pipelines completed successfully!"
+          SUCCESS_MESSAGE="All stages completed successfully!"
 
           # Start with a clean slate
           rm -f Dockerfile || true
