@@ -110,6 +110,12 @@ func (r *Runner) Run(
 		}
 
 		err := stage.Run(ctx, state, clients, opts)
+		if opts.GenerateSnapshot {
+			if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
+				return fmt.Errorf("writing iteration snapshot: %w", err)
+			}
+		}
+
 		if err != nil {
 			state.RetryCount++
 			if state.RetryCount > currentStageConfig.MaxRetries {
