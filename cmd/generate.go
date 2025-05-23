@@ -93,11 +93,11 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	}, os.Stdout)
 	err = runner.Run(ctx, state, options, c)
 	if generateSnapshot {
-		stageHistoryJSON, err := json.Marshal(state.StageHistory)
+		stageHistoryJSON, err := json.MarshalIndent(state.StageHistory, "", "  ")
 		if err != nil {
 			logger.Warnf("Error marshalling stage history: %v", err)
 		}
-		reportFile := filepath.Join(targetDir, "run_report.json")
+		reportFile := filepath.Join(targetDir, pipeline.ReportDirectory, "run_report.json")
 		logger.Debugf("Writing stage history to %s", reportFile)
 		if err := os.WriteFile(reportFile, stageHistoryJSON, 0644); err != nil {
 			logger.Errorf("Error writing stage history to file: %v", err)

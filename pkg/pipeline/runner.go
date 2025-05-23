@@ -64,7 +64,10 @@ func NewRunner(stageConfigs []*StageConfig, out io.Writer) *Runner {
 	}
 }
 
-// Run drives the full pipeline workflow: init → generate → iterate → finalize.
+// Run drives the full pipeline workflow
+// 1. init all stages
+// 2. generate all stages
+// 3. run stages in order, respecting OnSuccessGoto and OnFailGoto
 func (r *Runner) Run(
 	ctx context.Context,
 	state *PipelineState,
@@ -111,6 +114,15 @@ func (r *Runner) Run(
 
 		err := stage.Run(ctx, state, clients, opts)
 		if opts.GenerateSnapshot {
+			outcome := StageOutcomeSuccess
+			if err != nil {
+				outcome = StageOutcomeFailure
+			}
+			state.StageHistory = append(state.StageHistory, StageVisit{
+				StageID:    currentStageConfig.Id,
+				RetryCount: state.RetryCount,
+				Outcome:    outcome,
+			})
 			if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
 				return fmt.Errorf("writing iteration snapshot: %w", err)
 			}
