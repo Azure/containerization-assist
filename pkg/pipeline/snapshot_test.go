@@ -19,6 +19,7 @@ func TestSnapshotHistory(t *testing.T) {
 	}, w)
 	err := r.Run(context.Background(), state, RunnerOptions{
 		GenerateSnapshot: true,
+		TargetDirectory:  t.TempDir(),
 	}, nil)
 	if err != nil {
 		t.Errorf("failed to run pipeline: %v", err)
