@@ -114,24 +114,35 @@ type K8sMetadata struct {
 type ManifestsName string
 
 const (
-	ManifestsBasic ManifestsName = "manifest-basic" // Basic manifests for a deployment, service, and configmap
+	ManifestsBasic ManifestsName = "manifest-basic" // Basic manifests for a deployment, service, configmap and secret
 )
 
 const MANIFEST_TEMPLATE_DIR = "manifests"
+const MANIFEST_TARGET_DIR = "manifests"
 
 func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string) error {
 	basePath := filepath.Join(MANIFEST_TEMPLATE_DIR, string(templateName))
-	filesToCopy := []string{"deployment.yaml", "service.yaml", "configmap.yaml"}
+	filesToCopy := []string{"deployment.yaml", "service.yaml", "configmap.yaml", "secret.yaml"}
+
+	manifestsDir := filepath.Join(targetDir, MANIFEST_TARGET_DIR)
+	if err := os.MkdirAll(manifestsDir, 0755); err != nil {
+		return fmt.Errorf("creating manifests directory %q: %w", manifestsDir, err)
+	}
+
 	for _, filename := range filesToCopy {
 		embeddedPath := filepath.Join(basePath, filename)
 		data, err := templates.Templates.ReadFile(embeddedPath)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
+				logger.Debugf("Template file %s does not exist, skipping", embeddedPath)
 				continue
 			}
 			return fmt.Errorf("reading embedded file %q: %w", embeddedPath, err)
 		}
-		destPath := filepath.Join(targetDir, filename)
+
+		destPath := filepath.Join(manifestsDir, filename)
+		logger.Debugf("Writing manifest file: %s", destPath)
+
 		if err := os.WriteFile(destPath, data, 0644); err != nil {
 			return fmt.Errorf("writing file %q: %w", destPath, err)
 		}
