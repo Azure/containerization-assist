@@ -134,6 +134,7 @@ func (r *Runner) Run(
 				// If max retries reached, move to failed stage
 				currentStageConfig = r.id2Stage[currentStageConfig.OnFailGoto]
 				fmt.Fprintf(r.out, "❌ Stage %s failed max times %d: %v\n", currentStageConfig.Id, state.RetryCount, err)
+				state.RetryCount = 0 // Reset retry count for next stage
 				continue
 			}
 			fmt.Fprintf(r.out, "  ❌ Stage %s failed: %v\n", currentStageConfig.Id, err)
