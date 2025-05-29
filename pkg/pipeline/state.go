@@ -18,6 +18,20 @@ type PipelineState struct {
 	Success        bool
 	TokenUsage     ai.TokenUsage
 	Metadata       map[MetadataKey]any //Flexible storage
+	StageHistory   []StageVisit
+}
+
+type StageOutcome string
+
+const (
+	StageOutcomeSuccess StageOutcome = "success"
+	StageOutcomeFailure StageOutcome = "failure"
+)
+
+type StageVisit struct {
+	StageID    string
+	RetryCount int
+	Outcome    StageOutcome
 }
 
 // FileAnalysisInput represents the common input structure for file analysis

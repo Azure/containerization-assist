@@ -83,6 +83,10 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 		defer cancel()
+
+		if generateSnapshot {
+			logger.Debugf("Running with snapshot generation and run report enabled")
+		}
 		// Try to load .env file first to get environment variables
 		loadEnvFile()
 

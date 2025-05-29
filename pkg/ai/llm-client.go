@@ -127,7 +127,7 @@ func (c *AzOpenAIClient) GetChatCompletionWithFileTools(
 		logger.Debugf("    tool calls turn %d", turn)
 		resp, err := c.client.GetChatCompletions(ctx, opts, nil)
 		if err != nil {
-			return "", thisCallUsage, fmt.Errorf("Chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
+			return "", thisCallUsage, fmt.Errorf("chat completion failed on turn %d: %w, in GetChatCompletionWithFileTools", turn+1, err)
 		}
 
 		// Increment token usage from this API call

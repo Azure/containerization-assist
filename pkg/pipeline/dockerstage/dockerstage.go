@@ -118,7 +118,6 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	}
 
 	targetDir := options.TargetDirectory
-	generateSnapshot := options.GenerateSnapshot
 
 	logger.Infof("Starting Dockerfile build process for: %s\n", state.Dockerfile.Path)
 
@@ -155,11 +154,6 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 			// Clear any previous build errors to indicate success
 			state.Dockerfile.BuildErrors = ""
 
-			if generateSnapshot {
-				if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
-					return fmt.Errorf("writing iteration snapshot: %w", err)
-				}
-			}
 			return nil
 		}
 
@@ -178,11 +172,6 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
 		}
 
-		if generateSnapshot {
-			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
-				return fmt.Errorf("writing iteration snapshot: %w", err)
-			}
-		}
 		return nil
 	}
 
@@ -199,12 +188,6 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	} else {
 		state.Dockerfile.PreviousAttemptsSummary = runningSummary
 		logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
-	}
-
-	if generateSnapshot {
-		if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
-			return fmt.Errorf("writing iteration snapshot: %w", err)
-		}
 	}
 
 	time.Sleep(1 * time.Second) // Small delay for readability
