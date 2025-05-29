@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/ai"
@@ -123,7 +124,7 @@ func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c 
 		if err := os.WriteFile(manifestPath, manifest.Content, 0644); err != nil {
 			return fmt.Errorf("failed to write manifest %s: %v", name, err)
 		}
-		logger.Debugf("Deploying manifest: %s", manifestPath)
+		logger.Infof("  %s", name)
 		success, output, err := c.DeployAndVerifySingleManifest(ctx, manifestPath, manifest.IsDeployment())
 		if err != nil {
 			return fmt.Errorf("error deploying manifest %s: %v", name, err)
@@ -158,12 +159,13 @@ type ManifestStage struct {
 
 // Generate creates Kubernetes manifests if needed
 func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
+	manifestPath := filepath.Join(targetDir, k8s.DefaultManifestPath)
 	if state.RegistryURL == "" || state.ImageName == "" {
 		return fmt.Errorf("registry URL or image name not provided in state")
 	}
 
 	// Check if manifests already exist
-	k8sObjects, err := k8s.FindK8sObjects(targetDir)
+	k8sObjects, err := k8s.FindK8sObjects(manifestPath)
 	if err != nil {
 		return fmt.Errorf("failed to find manifests: %w", err)
 	}
@@ -195,7 +197,7 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 	}
 
 	// Initialize manifests in the state
-	return InitializeManifests(state, targetDir)
+	return InitializeManifests(state, manifestPath)
 }
 
 // GetErrors returns a formatted string of all manifest errors
@@ -266,7 +268,7 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 		}
 
 		thisObject.Content = []byte(result.FixedContent)
-		logger.Infof("AI suggested fixes for %s\n", name)
+		logger.Debugf("AI suggested fixes for %s", name)
 		logger.Debug(result.Analysis)
 	}
 	logger.Info("Updated manifests with fixes. Attempting deployment...")
@@ -310,7 +312,7 @@ func InitializeManifests(state *pipeline.PipelineState, path string) error {
 
 	logger.Infof("Found %d Kubernetes objects from %s", len(k8sObjects), path)
 	for _, obj := range k8sObjects {
-		logger.Infof("  '%s' kind: %s source: %s", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
+		logger.Debugf("  '%s' kind: %s source: %s", obj.Metadata.Name, obj.Kind, obj.ManifestPath)
 	}
 
 	for i := range k8sObjects {

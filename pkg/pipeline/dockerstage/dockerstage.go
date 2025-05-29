@@ -38,7 +38,7 @@ func InitializeDockerFileState(state *pipeline.PipelineState, dockerFilePath str
 	state.Dockerfile.Path = dockerFilePath
 	state.Dockerfile.BuildErrors = ""
 
-	logger.Infof("Successfully initialized Dockerfile state from: %s\n", dockerFilePath)
+	logger.Infof("Successfully initialized Dockerfile state from: %s", dockerFilePath)
 	return nil
 }
 
@@ -134,44 +134,16 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 
 	// Update the Dockerfile
 	state.Dockerfile.Content = result.FixedContent
-	logger.Info("AI suggested fixes:")
+	logger.Debug("AI suggested fixes:")
 	logger.Debug(result.Analysis)
 
-	logger.Info("Updated Dockerfile written. Attempting build again...\n")
+	logger.Info("Updated Dockerfile written. Attempting build again...")
 
 	// Try to build
 	buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
 	if err == nil {
 		logger.Info("🎉 Docker build succeeded!")
-		logger.Infof("Successful Dockerfile: \n%s", state.Dockerfile.Content)
-
-		// Try to build
-		buildErrors, err := c.BuildDockerfileContent(ctx, state.Dockerfile.Content, targetDir, state.RegistryURL, state.ImageName)
-		if err == nil {
-			logger.Info("🎉 Docker build succeeded!")
-			logger.Infof("Successful Dockerfile: \n%s", state.Dockerfile.Content)
-
-			// Clear any previous build errors to indicate success
-			state.Dockerfile.BuildErrors = ""
-
-			return nil
-		}
-
-		logger.Errorf("Docker build failed with error: %v\n", buildErrors)
-
-		logger.Error("Docker build failed. Using AI to fix issues...")
-
-		state.Dockerfile.BuildErrors = buildErrors
-
-		// Update the previous attempts summary
-		runningSummary, _, err := c.AzOpenAIClient.GetChatCompletionWithFormat(ctx, docker.DockerfileRunningErrors, state.Dockerfile.PreviousAttemptsSummary, result.Analysis+"\n Current Build Errors"+buildErrors)
-		if err != nil {
-			logger.Errorf("Warning: Failed to generate dockerfile error summary: %v\n", err)
-		} else {
-			state.Dockerfile.PreviousAttemptsSummary = runningSummary
-			logger.Infof("\n Updated Summary of Previous Dockerfile Attempts: \n%s", state.Dockerfile.PreviousAttemptsSummary)
-		}
-
+		logger.Debugf("Successful Dockerfile: \n%s", state.Dockerfile.Content)
 		return nil
 	}
 

@@ -43,7 +43,7 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
-	logger.Infof("Looking for Kubernetes manifest files in directory: %s", path)
+	logger.Infof("Finding Kubernetes manifest files in directory: %s", path)
 
 	err = filepath.WalkDir(path, func(filePath string, d os.DirEntry, err error) error {
 		if err != nil {

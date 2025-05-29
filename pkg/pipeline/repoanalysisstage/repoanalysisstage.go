@@ -64,16 +64,16 @@ func (p *RepoAnalysisStage) Deploy(ctx context.Context, state *pipeline.Pipeline
 func (p *RepoAnalysisStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 
 	targetDir := options.TargetDirectory
-	logger.Infof("Starting repository analysis for: %s\n", targetDir)
-	logger.Infof("\n🔍 Analyzing repository at: %s\n", targetDir)
-	logger.Info("\n⚙️ LLM File Operations (real-time):")
+	logger.Infof("Starting repository analysis for: %s", targetDir)
+	logger.Infof("🔍 Analyzing repository at: %s\n", targetDir)
+	logger.Info("⚙️ LLM File Operations (real-time):")
 
 	// Create a slice to store operation logs and implement real-time logging
 	var operationLogs []string
 
 	// Set up callback for file operations
 	ai.LoggingCallback = func(message string) {
-		logger.Info(message)
+		logger.Info("  " + message)
 		operationLogs = append(operationLogs, message)
 	}
 
@@ -92,7 +92,7 @@ func (p *RepoAnalysisStage) Run(ctx context.Context, state *pipeline.PipelineSta
 	state.Metadata[pipeline.RepoAnalysisResultKey] = repoAnalysis
 
 	// Print out the LLM function call summary
-	logger.Info("\n📊 LLM Analysis Summary:")
+	logger.Info("📊 LLM Analysis Summary:")
 	logger.Infof("- Total file operations: %d\n", len(operationLogs))
 
 	// Format the file operation logs for better readability
@@ -102,10 +102,10 @@ func (p *RepoAnalysisStage) Run(ctx context.Context, state *pipeline.PipelineSta
 	state.Metadata[pipeline.RepoAnalysisCallsKey] = fileOperations
 
 	// Print file operation summary
-	logger.Info("\n🔎 Summary of Files Accessed During Analysis:")
+	logger.Info("🔎 Summary of Files Accessed During Analysis:")
 	logger.Info(fileOperations)
 
-	logger.Info("\n📋 Repository Analysis Results:")
+	logger.Info("📋 Repository Analysis Results:")
 	logger.Info(repoAnalysis)
 
 	logger.Info("✅ Repository analysis completed successfully")
