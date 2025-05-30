@@ -144,6 +144,8 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	if err == nil {
 		logger.Info("🎉 Docker build succeeded!")
 		logger.Debugf("Successful Dockerfile: \n%s", state.Dockerfile.Content)
+		// Clear any previous build errors to indicate success
+		state.Dockerfile.BuildErrors = ""
 		return nil
 	}
 
