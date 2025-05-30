@@ -159,7 +159,7 @@ type ManifestStage struct {
 
 // Generate creates Kubernetes manifests if needed
 func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineState, targetDir string) error {
-	manifestPath := filepath.Join(targetDir, k8s.MANIFEST_DIR_NAME)
+	manifestPath := filepath.Join(targetDir)
 	if state.RegistryURL == "" || state.ImageName == "" {
 		return fmt.Errorf("registry URL or image name not provided in state")
 	}
@@ -197,7 +197,7 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 	}
 
 	// Initialize manifests in the state
-	return InitializeManifests(state, manifestPath)
+	return InitializeManifests(state, targetDir)
 }
 
 // GetErrors returns a formatted string of all manifest errors
