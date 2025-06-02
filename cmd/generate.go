@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -91,8 +92,20 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		},
 	}, os.Stdout)
 	err = runner.Run(ctx, state, options, c)
+	if generateSnapshot {
+		stageHistoryJSON, err := json.MarshalIndent(state.StageHistory, "", "  ")
+		if err != nil {
+			logger.Warnf("Error marshalling stage history: %v", err)
+		}
+		reportFile := filepath.Join(targetDir, pipeline.ReportDirectory, "run_report.json")
+		logger.Debugf("Writing stage history to %s", reportFile)
+		if err := os.WriteFile(reportFile, stageHistoryJSON, 0644); err != nil {
+			logger.Errorf("Error writing stage history to file: %v", err)
+		}
+	}
+
 	if err != nil {
-		return err
+		return fmt.Errorf("running pipeline: %w", err)
 	}
 
 	logger.Infof("Total Token usage: Prompt: %d, Completion: %d,  Total: %d\n", state.TokenUsage.PromptTokens, state.TokenUsage.CompletionTokens, state.TokenUsage.TotalTokens)

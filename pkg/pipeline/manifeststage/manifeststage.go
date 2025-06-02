@@ -233,9 +233,6 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 		return fmt.Errorf("invalid clients type")
 	}
 
-	targetDir := options.TargetDirectory
-	generateSnapshot := options.GenerateSnapshot
-
 	if err := k8s.CheckKubectlInstalled(); err != nil {
 		return err
 	}
@@ -280,12 +277,6 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 		// All manifests deployed successfully, but don't set global success state
 		// as that's handled by the central pipeline orchestrator
 		logger.Info("🎉 All Kubernetes manifests deployed successfully!\n")
-
-		if generateSnapshot {
-			if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
-				return fmt.Errorf("writing iteration snapshot: %w", err)
-			}
-		}
 		return nil
 	}
 
@@ -296,12 +287,6 @@ func (p *ManifestStage) Run(ctx context.Context, state *pipeline.PipelineState, 
 			logger.Infof("  ✅ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
 		} else {
 			logger.Errorf("  ❌ %s kind:%s source:%s\n", name, thisObject.Kind, thisObject.ManifestPath)
-		}
-	}
-
-	if generateSnapshot {
-		if err := pipeline.WriteIterationSnapshot(state, targetDir, p); err != nil {
-			return fmt.Errorf("writing iteration snapshot: %w", err)
 		}
 	}
 
