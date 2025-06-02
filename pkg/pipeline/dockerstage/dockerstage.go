@@ -289,6 +289,15 @@ Repository files structure:
 	}
 
 	promptText += `
+IMPORTANT: If the repository contains a pom.xml file (i.e., it is a Maven-based Java project), you MUST ensure the following lines are present in the Dockerfile:
+1. COPY mvnw .
+2. COPY .mvn/ .mvn/
+3. RUN chmod +x mvnw
+
+These steps are required for the Maven wrapper to work correctly in the container. Do not omit them if pom.xml is present in the repository.
+`
+
+	promptText += `
 IMPORTANT: You have access to the following file-related tools:
 1. read_file - Read the contents of a file (path should be relative to the repository root)
 2. list_directory - List files in a directory (path should be relative to the repository root)
