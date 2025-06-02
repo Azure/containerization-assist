@@ -159,6 +159,15 @@ var generateCmd = &cobra.Command{
 			targetDir = normalizedPath
 		}
 
+		// Validate that the directory exists
+        info, err := os.Stat(targetDir)
+        if os.IsNotExist(err) {
+            return fmt.Errorf("targetDir %q does not exist", targetDir)
+        }
+        if !info.IsDir() {
+            return fmt.Errorf("targetDir %q is not a directory", targetDir)
+        }
+
 		c, err := initClients(ctx)
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
