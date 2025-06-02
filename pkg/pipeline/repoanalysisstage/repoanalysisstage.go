@@ -65,7 +65,7 @@ func (p *RepoAnalysisStage) Run(ctx context.Context, state *pipeline.PipelineSta
 
 	targetDir := options.TargetDirectory
 	logger.Infof("Starting repository analysis for: %s", targetDir)
-	logger.Infof("🔍 Analyzing repository at: %s\n", targetDir)
+	logger.Infof("🔍 Analyzing repository at: %s", targetDir)
 	logger.Info("⚙️ LLM File Operations (real-time):")
 
 	// Create a slice to store operation logs and implement real-time logging
