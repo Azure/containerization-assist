@@ -480,8 +480,6 @@ func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) 
 	optimalRPM := 100    // Preferred RPM for early return
 	minRequiredRPM := 10 // Minimum RPM needed for deployment
 
-	// Check all provided regions for capacity
-	// Get subscription ID outside the loop
 	subCmd := exec.Command("az", "account", "show", "--query", "id", "-o", "tsv")
 	subOutput, err := subCmd.Output()
 	if err != nil {
@@ -489,6 +487,7 @@ func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) 
 	}
 	subscriptionID := strings.TrimSpace(string(subOutput))
 
+	// Check all provided regions for capacity
 	for i, region := range preferredRegions {
 		logger.Infof("  Checking region %d/%d: %s...", i+1, len(preferredRegions), region)
 		// Get quota information for the region using REST API
