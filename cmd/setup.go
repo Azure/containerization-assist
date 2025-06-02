@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -339,7 +338,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		"--model-version", config.ModelVersion,
 		"--model-format", "OpenAI",
 		"--sku-name", "GlobalStandard",
-		"--sku-capacity", strconv.Itoa(capacity),
+		"--sku-capacity", fmt.Sprintf("%d", capacity),
 		"--only-show-errors",
 		"--output", "none")
 	deployCmd.Stdout = os.Stdout
