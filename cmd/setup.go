@@ -204,7 +204,6 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	capacity := 10 // Use default capacity
 	if err != nil {
 		logger.Warnf("Failed to check RPM capacity: %v", err)
-		logger.Warnf("Proceeding with configured region: %s", config.Location)
 		return "", "", "", fmt.Errorf("failed to determine optimal region: %w", err)
 	} else if optimalRegion != config.Location {
 		logger.Infof("→ Using region '%s' instead of '%s' for better capacity", optimalRegion, config.Location)
