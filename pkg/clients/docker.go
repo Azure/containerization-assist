@@ -30,7 +30,7 @@ func (c *Clients) BuildDockerfileContent(ctx context.Context, dockerfileContent 
 	}
 
 	// Build the image using the temporary Dockerfile
-	logger.Infof("building docker image with tag '%s%s:latest'\n", registryPrefix, imageName)
+	logger.Infof("building docker image with tag '%s%s:latest'", registryPrefix, imageName)
 	buildErrors, err := c.Docker.Build(ctx, dockerfilePath, registryPrefix+imageName+":latest", targetDir)
 
 	if err != nil {

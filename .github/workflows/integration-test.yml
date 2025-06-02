@@ -1,4 +1,4 @@
-name: Coolstore Integration Test
+name: Integration Test
 
 on:
   workflow_dispatch:
@@ -156,7 +156,7 @@ jobs:
           pattern: cc-run-*
           path: results
 
-      - name: Aggregate Test Results
+      - name: Integreation Test Results Summary
         id: aggregate_results
         run: |
           tests_per_repo=5

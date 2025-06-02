@@ -13,10 +13,11 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const SNAPSHOT_DIR = ".container-copilot-snapshots"
+const SNAPSHOT_DIR_NAME = ".container-copilot-snapshots"
+const MANIFEST_DIR_NAME = "manifests"
 
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step
-var DefaultManifestPath = filepath.Join(os.Getenv("GITHUB_WORKSPACE"), "manifests")
+var DefaultManifestAbsolutePath = filepath.Join(os.Getenv("GITHUB_WORKSPACE"), MANIFEST_DIR_NAME)
 
 func (o K8sObject) IsDeployment() bool {
 	return o.ApiVersion == "apps/v1" && o.Kind == "Deployment"
@@ -29,7 +30,7 @@ const ManifestObjectDelimiter = "---"
 // FindK8sObjects locates all .yml/.yaml files in the given path and checks if they are Kubernetes Deployments.
 func FindK8sObjects(path string) ([]K8sObject, error) {
 	if path == "" {
-		path = DefaultManifestPath
+		path = DefaultManifestAbsolutePath
 		logger.Infof("Using default manifest path: %s", path)
 	}
 
@@ -43,14 +44,14 @@ func FindK8sObjects(path string) ([]K8sObject, error) {
 		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
-	logger.Infof("Looking for Kubernetes manifest files in directory: %s", path)
+	logger.Infof("Finding Kubernetes manifest files in directory: %s", path)
 
 	err = filepath.WalkDir(path, func(filePath string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if d.IsDir() && d.Name() == SNAPSHOT_DIR {
+		if d.IsDir() && d.Name() == SNAPSHOT_DIR_NAME {
 			return filepath.SkipDir
 		}
 

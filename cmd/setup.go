@@ -93,9 +93,9 @@ func NormalizeTargetRepoPath(path string) (string, error) {
 // LoadSetupConfig loads configuration from environment, flags, and defaults
 func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*SetupConfig, error) {
 	// Generate default resource names
-	defaultResourceGroup := GenerateDefaultResourceName("ccp-rg-")
-	defaultResourceName := GenerateDefaultResourceName("ccp-ai-")
-	defaultDeploymentName := GenerateDefaultResourceName("ccp-dep-")
+	defaultResourceGroup := GenerateDefaultResourceName("container-copilot-rg-")
+	defaultResourceName := GenerateDefaultResourceName("container-copilot-ai-")
+	defaultDeploymentName := GenerateDefaultResourceName("container-copilot-dep-")
 	defaultLocation := DetermineDefaultLocation()
 
 	// Get force-setup flag first
