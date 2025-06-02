@@ -481,18 +481,16 @@ func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) 
 	minRequiredRPM := 10 // Minimum RPM needed for deployment
 
 	// Check all provided regions for capacity
+	// Get subscription ID outside the loop
+	subCmd := exec.Command("az", "account", "show", "--query", "id", "-o", "tsv")
+	subOutput, err := subCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get subscription ID: %v", err)
+	}
+	subscriptionID := strings.TrimSpace(string(subOutput))
+
 	for i, region := range preferredRegions {
 		logger.Infof("  Checking region %d/%d: %s...", i+1, len(preferredRegions), region)
-
-		// Get subscription ID
-		subCmd := exec.Command("az", "account", "show", "--query", "id", "-o", "tsv")
-		subOutput, err := subCmd.Output()
-		if err != nil {
-			logger.Warnf("    Failed to get subscription ID: %v", err)
-			continue
-		}
-		subscriptionID := strings.TrimSpace(string(subOutput))
-
 		// Get quota information for the region using REST API
 		quotaURL := fmt.Sprintf("https://management.azure.com/subscriptions/%s/providers/Microsoft.CognitiveServices/locations/%s/usages?api-version=2023-05-01", subscriptionID, region)
 		quotaCmd := exec.Command("az", "rest", "--method", "GET", "--url", quotaURL)
