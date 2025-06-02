@@ -91,9 +91,9 @@ func NormalizeTargetRepoPath(path string) (string, error) {
 // LoadSetupConfig loads configuration from environment, flags, and defaults
 func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*SetupConfig, error) {
 	// Generate default resource names
-	defaultResourceGroup := GenerateDefaultResourceName("ccp-rg-")
-	defaultResourceName := GenerateDefaultResourceName("ccp-ai-")
-	defaultDeploymentName := GenerateDefaultResourceName("ccp-dep-")
+	defaultResourceGroup := GenerateDefaultResourceName("container-copilot-rg-")
+	defaultResourceName := GenerateDefaultResourceName("container-copilot-ai-")
+	defaultDeploymentName := GenerateDefaultResourceName("container-copilot-dep-")
 	defaultLocation := DetermineDefaultLocation()
 
 	// Load the .env file
@@ -285,7 +285,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		"--model-version", config.ModelVersion,
 		"--model-format", "OpenAI",
 		"--sku-name", "GlobalStandard",
-		"--sku-capacity", "1",
+		"--sku-capacity", "10",
 		"--only-show-errors",
 		"--output", "none")
 	deployCmd.Stdout = os.Stdout

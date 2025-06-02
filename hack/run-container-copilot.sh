@@ -165,7 +165,7 @@ az cognitiveservices account deployment create \
   --model-version   "$MODEL_VERSION" \
   --model-format    OpenAI \
   --sku-name        GlobalStandard \
-  --sku-capacity    1 \
+  --sku-capacity    10 \
   --only-show-errors \
   --output none
 
