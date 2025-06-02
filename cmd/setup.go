@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +28,7 @@ type SetupConfig struct {
 	Registry            string
 	DockerfileGenerator string
 	GenerateSnapshot    bool
+	ForceSetup          bool
 }
 
 // GenerateDefaultResourceName generates a default name for Azure resources
@@ -96,15 +99,20 @@ func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*Se
 	defaultDeploymentName := GenerateDefaultResourceName("ccp-dep-")
 	defaultLocation := DetermineDefaultLocation()
 
-	// Load the .env file
+	// Get force-setup flag first
+	forceSetup, _ := cmd.Flags().GetBool("force-setup")
+
+	// Load the .env file only if force-setup is NOT enabled
 	envVars := make(map[string]string)
 	envFile := filepath.Join(projectRoot, ".env")
 
-	if _, err := os.Stat(envFile); err == nil {
-		envFromFile, err := godotenv.Read(envFile)
-		if err == nil {
-			for k, v := range envFromFile {
-				envVars[k] = v
+	if !forceSetup {
+		if _, err := os.Stat(envFile); err == nil {
+			envFromFile, err := godotenv.Read(envFile)
+			if err == nil {
+				for k, v := range envFromFile {
+					envVars[k] = v
+				}
 			}
 		}
 	}
@@ -120,6 +128,7 @@ func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*Se
 	registry, _ := cmd.Flags().GetString("registry")
 	dockerfileGenerator, _ := cmd.Flags().GetString("dockerfile-generator")
 	generateSnapshot, _ := cmd.Flags().GetBool("snapshot")
+	// forceSetup already retrieved above
 
 	// Create config, prioritizing flag values, then .env, then env vars, then defaults
 	config := &SetupConfig{
@@ -132,6 +141,7 @@ func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*Se
 		Registry:            getFirstNonEmpty(registry, envVars["CCP_REGISTRY"], os.Getenv("CCP_REGISTRY"), "localhost:5001"),
 		DockerfileGenerator: getFirstNonEmpty(dockerfileGenerator, "", "", "draft"),
 		GenerateSnapshot:    generateSnapshot,
+		ForceSetup:          forceSetup,
 	}
 
 	// Handle target repo from args or env
@@ -188,6 +198,18 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 			return "", "", "", fmt.Errorf("prerequisite %s not found", prereq)
 		}
 		logger.Infof("✓ %s\n", prereq)
+	}
+
+	// Check RPM capacity across regions and determine optimal deployment settings
+	optimalRegion, err := CheckRPMCapacityInRegions(config.ModelID, config.ModelVersion, config.Location)
+	capacity := 10 // Use default capacity
+	if err != nil {
+		logger.Warnf("Failed to check RPM capacity: %v", err)
+		logger.Warnf("Proceeding with configured region: %s", config.Location)
+		return "", "", "", fmt.Errorf("failed to determine optimal region: %w", err)
+	} else if optimalRegion != config.Location {
+		logger.Infof("→ Using region '%s' instead of '%s' for better capacity", optimalRegion, config.Location)
+		config.Location = optimalRegion
 	}
 
 	// Ensure resource group exists
@@ -275,8 +297,40 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		return "", "", "", fmt.Errorf("failed to list models: %w", err)
 	}
 
-	// Create/update deployment
-	logger.Infof("\n→ Creating/updating deployment '%s'…", config.DeploymentName)
+	// Create/update deployment with optimal capacity
+	logger.Infof("\n→ Creating/updating deployment '%s' with capacity %d…", config.DeploymentName, capacity)
+
+	// Check if deployment already exists
+	deployCheckCmd := exec.Command("az", "cognitiveservices", "account", "deployment", "show",
+		"--name", config.OpenAIResourceName,
+		"--resource-group", config.ResourceGroup,
+		"--deployment-name", config.DeploymentName)
+	deployCheckCmd.Stderr = nil
+	deployCheckCmd.Stdout = nil
+	deploymentExists := deployCheckCmd.Run() == nil
+
+	if deploymentExists {
+		if config.ForceSetup {
+			logger.Infof("  Deployment '%s' exists. Force setup enabled - deleting existing deployment first...", config.DeploymentName)
+			deleteCmd := exec.Command("az", "cognitiveservices", "account", "deployment", "delete",
+				"--name", config.OpenAIResourceName,
+				"--resource-group", config.ResourceGroup,
+				"--deployment-name", config.DeploymentName,
+				"--yes")
+			deleteCmd.Stdout = os.Stdout
+			deleteCmd.Stderr = os.Stderr
+			if err := deleteCmd.Run(); err != nil {
+				logger.Warnf("Warning: Failed to delete existing deployment: %v", err)
+				logger.Info("  Attempting to proceed with update...")
+			} else {
+				logger.Info("  ✓ Existing deployment deleted")
+			}
+		} else {
+			logger.Infof("  Deployment '%s' already exists. Use --force-setup to overwrite.", config.DeploymentName)
+			logger.Info("  Attempting to update existing deployment...")
+		}
+	}
+
 	deployCmd := exec.Command("az", "cognitiveservices", "account", "deployment", "create",
 		"--name", config.OpenAIResourceName,
 		"--resource-group", config.ResourceGroup,
@@ -285,7 +339,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 		"--model-version", config.ModelVersion,
 		"--model-format", "OpenAI",
 		"--sku-name", "GlobalStandard",
-		"--sku-capacity", "1",
+		"--sku-capacity", strconv.Itoa(capacity),
 		"--only-show-errors",
 		"--output", "none")
 	deployCmd.Stdout = os.Stdout
@@ -293,7 +347,7 @@ func RunSetup(config *SetupConfig) (string, string, string, error) {
 	if err := deployCmd.Run(); err != nil {
 		return "", "", "", fmt.Errorf("failed to create/update deployment: %w", err)
 	}
-	logger.Infof("  ✓ Deployment '%s' ready", config.DeploymentName)
+	logger.Infof("  ✓ Deployment '%s' ready with capacity %d", config.DeploymentName, capacity)
 
 	// Setting deployment ID
 	deploymentID := config.DeploymentName
@@ -385,6 +439,169 @@ func maskSecretValue(s string) string {
 		return "<empty>"
 	}
 	return "****"
+}
+
+// ModelQuota represents the quota information for a model in a region
+type ModelQuota struct {
+	CurrentValue int `json:"currentValue"`
+	Limit        int `json:"limit"`
+	Name         struct {
+		LocalizedValue string `json:"localizedValue"`
+		Value          string `json:"value"`
+	} `json:"name"`
+	Unit string `json:"unit"`
+}
+
+// QuotaResponse represents the response from the Azure quota API
+type QuotaResponse struct {
+	Value []ModelQuota `json:"value"`
+}
+
+// RegionRPMInfo represents capacity information for a region
+type RegionRPMInfo struct {
+	Region            string
+	AvailableRPM      int
+	AvailableAccounts int
+}
+
+// CheckRPMCapacityInRegions checks RPM capacity for the specified model across multiple regions
+// Returns the best region with sufficient capacity
+func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) (string, error) {
+	logger.Info("\n→ Checking RPM capacity across regions...")
+
+	// Define preferred regions to check, starting with user's preferred location
+	preferredRegions := []string{
+		preferredLocation, // Start with the configured location
+		"westus", "westus2", "eastus2", "centralus",
+		"westeurope", "northeurope", "uksouth", "francecentral",
+		"southeastasia", "japaneast", "australiaeast", "canadacentral",
+	}
+
+	var regionInfo []RegionRPMInfo
+	optimalRPM := 100    // Preferred RPM for early return
+	minRequiredRPM := 10 // Minimum RPM needed for deployment
+
+	// Check all provided regions for capacity
+	for i, region := range preferredRegions {
+		logger.Infof("  Checking region %d/%d: %s...", i+1, len(preferredRegions), region)
+
+		// Get subscription ID
+		subCmd := exec.Command("az", "account", "show", "--query", "id", "-o", "tsv")
+		subOutput, err := subCmd.Output()
+		if err != nil {
+			logger.Warnf("    Failed to get subscription ID: %v", err)
+			continue
+		}
+		subscriptionID := strings.TrimSpace(string(subOutput))
+
+		// Get quota information for the region using REST API
+		quotaURL := fmt.Sprintf("https://management.azure.com/subscriptions/%s/providers/Microsoft.CognitiveServices/locations/%s/usages?api-version=2023-05-01", subscriptionID, region)
+		quotaCmd := exec.Command("az", "rest", "--method", "GET", "--url", quotaURL)
+
+		output, err := quotaCmd.Output()
+		if err != nil {
+			logger.Warnf("    Failed to check capacity in %s: %v", region, err)
+			continue
+		}
+
+		var quotaResponse QuotaResponse
+		if err := json.Unmarshal(output, &quotaResponse); err != nil {
+			logger.Warnf("    Failed to parse quota response for %s: %v", region, err)
+			continue
+		}
+
+		// Look for both Cognitive Services account quota and deployment quota
+		var availableRPM int
+		var availableAccounts int
+		foundDeploymentQuota := false
+		foundAccountQuota := false
+
+		// Check for OpenAI account quota (this is what matters for creating OpenAI accounts)
+		for _, quota := range quotaResponse.Value {
+			if quota.Name.Value == "OpenAI.S0.AccountCount" {
+				availableAccounts = quota.Limit - quota.CurrentValue
+				logger.Infof("    Available OpenAI accounts: %d (limit: %d, current: %d)",
+					availableAccounts, quota.Limit, quota.CurrentValue)
+				foundAccountQuota = true
+				break
+			}
+		}
+
+		// Check for GlobalStandard deployment quota for the specific model
+		globalStandardQuotaName := fmt.Sprintf("OpenAI.GlobalStandard.%s", modelID)
+		for _, quota := range quotaResponse.Value {
+			if quota.Name.Value == globalStandardQuotaName {
+				availableRPM = quota.Limit - quota.CurrentValue
+				logger.Infof("    Available GlobalStandard capacity: %d (limit: %d, current: %d) for %s",
+					availableRPM, quota.Limit, quota.CurrentValue, quota.Name.Value)
+				foundDeploymentQuota = true
+				break
+			}
+		}
+
+		// Debug: Log all available quotas for this region if no match found
+		if !foundAccountQuota || !foundDeploymentQuota {
+			logger.Debugf("    Available quotas in %s:", region)
+			for _, quota := range quotaResponse.Value {
+				if (strings.Contains(quota.Name.Value, "OpenAI") || strings.Contains(quota.Name.Value, "AccountCount")) && quota.Limit > 0 {
+					logger.Debugf("      - %s: %d available (limit: %d, current: %d)",
+						quota.Name.Value, quota.Limit-quota.CurrentValue, quota.Limit, quota.CurrentValue)
+				}
+			}
+		}
+
+		// Region is only suitable if it has both account quota AND deployment quota available
+		if foundAccountQuota && foundDeploymentQuota && availableAccounts > 0 && availableRPM > 0 {
+			regionInfo = append(regionInfo, RegionRPMInfo{
+				Region:            region,
+				AvailableRPM:      availableRPM,
+				AvailableAccounts: availableAccounts,
+			})
+
+			// If we found a region with optimal capacity, return immediately
+			if availableRPM >= optimalRPM {
+				logger.Infof("  ✓ Found optimal capacity in %s (available accounts: %d, available RPM: %d)",
+					region, availableAccounts, availableRPM)
+				return region, nil
+			}
+		} else {
+			if !foundAccountQuota {
+				logger.Infof("    No OpenAI account quota found in %s", region)
+			}
+			if !foundDeploymentQuota {
+				logger.Infof("    No deployment quota found for %s in %s", modelID, region)
+			}
+			if foundAccountQuota && availableAccounts == 0 {
+				logger.Infof("    No available OpenAI account quota in %s", region)
+			}
+			if foundDeploymentQuota && availableRPM == 0 {
+				logger.Infof("    No available deployment capacity in %s", region)
+			}
+		}
+	}
+
+	// If no region has sufficient capacity, fail
+	if len(regionInfo) == 0 {
+		return "", fmt.Errorf("no regions found with available capacity for model %s", modelID)
+	}
+
+	// Sort regions by available RPM and pick the best one
+	bestRegion := regionInfo[0]
+	for _, info := range regionInfo[1:] {
+		if info.AvailableRPM > bestRegion.AvailableRPM {
+			bestRegion = info
+		}
+	}
+
+	// Fail if the best region doesn't meet minimum requirements
+	if bestRegion.AvailableRPM < minRequiredRPM {
+		return "", fmt.Errorf("best available region '%s' has insufficient capacity (%d RPM) - minimum required is %d RPM for model %s",
+			bestRegion.Region, bestRegion.AvailableRPM, minRequiredRPM, modelID)
+	}
+
+	logger.Infof("  ✓ Best available region: %s (available accounts: %d, available RPM: %d)",
+		bestRegion.Region, bestRegion.AvailableAccounts, bestRegion.AvailableRPM)
+	return bestRegion.Region, nil
 }
 
 func init() {
