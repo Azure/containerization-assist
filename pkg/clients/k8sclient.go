@@ -98,10 +98,10 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 	labelSelector := fmt.Sprintf("%s=%s", APP_LABEL, k8sAppName)
 
 	// Wait for pods to become healthy
-	podSuccess, podOutput := c.CheckPodStatus(ctx, namespace, k8sAppName, time.Minute)
+	podSuccess, podOutput := c.CheckPodStatus(ctx, namespace, labelSelector, time.Minute)
 	if !podSuccess {
 		logger.Debugf("    Retrieving logs for pods with label selector %s in namespace %s", labelSelector, namespace)
-		podLogs, err := GetDeploymentLogs(ctx, labelSelector, namespace)
+		podLogs, err := GetDeploymentLogs(ctx, k8sAppName , namespace)
 		if err != nil {
 			logger.Errorf("Error retrieving deployment logs: %v\n", err)
 			return false, outputStr + "\n" + podOutput, nil
@@ -140,7 +140,7 @@ func GetDeploymentLogs(ctx context.Context, deploymentName string, namespace str
 	// or is not found in the specified namespace
 	// This is a simplified example and may need to be adjusted based on our needs
 	deployClient := client.AppsV1().Deployments(namespace)
-	// changed deploymentName to k8sAppName 
+	// changed deploymentName to k8sAppName
 	deployment, err := deployClient.Get(ctx, deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to get deployment: %w", err)
