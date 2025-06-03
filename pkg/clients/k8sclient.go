@@ -141,7 +141,7 @@ func GetDeploymentLogs(ctx context.Context, deploymentName string, namespace str
 	// This is a simplified example and may need to be adjusted based on our needs
 	deployClient := client.AppsV1().Deployments(namespace)
 	// changed deploymentName to "app" not sure WHY yet
-	deployment, err := deployClient.Get(ctx, labelSelector, metav1.GetOptions{})
+	deployment, err := deployClient.Get(ctx, deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to get deployment: %w", err)
 	}
