@@ -102,9 +102,9 @@ func TestDockerStage_WriteSuccessfulFiles(t *testing.T) {
 		t.Errorf("WriteSuccessfulFiles should succeed with unsuccessful state, got error: %v", err)
 	}
 
-	// File should not exist
-	if _, err := os.Stat(dockerfilePath); !os.IsNotExist(err) {
-		t.Errorf("WriteSuccessfulFiles should not create file with unsuccessful state")
+	// File should exist
+	if _, err := os.Stat(dockerfilePath); err != nil {
+		t.Errorf("WriteSuccessfulFiles should create file with unsuccessful state")
 	}
 
 	// Test with successful state

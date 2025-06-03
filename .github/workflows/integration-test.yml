@@ -242,7 +242,7 @@ jobs:
             success_rates+=("$success_rate")
           done
 
-          pass_threshold=30
+          pass_threshold=50
           green_threshold=80
           average_success_rate=0
           for rate in "${success_rates[@]}"; do
