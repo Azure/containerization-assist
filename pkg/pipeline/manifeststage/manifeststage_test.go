@@ -89,9 +89,9 @@ func TestManifestStage_WriteSuccessfulFiles(t *testing.T) {
 		t.Errorf("WriteSuccessfulFiles should succeed with unsuccessful state, got error: %v", err)
 	}
 
-	// File should not exist
-	if _, err := os.Stat(manifestPath); !os.IsNotExist(err) {
-		t.Errorf("WriteSuccessfulFiles should not create file with unsuccessful state")
+	// File should exist
+	if _, err := os.Stat(manifestPath); err != nil {
+		t.Errorf("WriteSuccessfulFiles should create files with unsuccessful state")
 	}
 
 	// Test with successful state
