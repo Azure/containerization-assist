@@ -29,6 +29,7 @@ spec:
             limits:
               cpu: "1"
               memory: "1Gi"
+          # Environment variables from ConfigMap and Secret. There is no need for env fields
           envFrom:
             - configMapRef:
                 name: app-config

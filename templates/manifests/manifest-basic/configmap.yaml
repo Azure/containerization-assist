@@ -1,3 +1,4 @@
+# This ConfigMap is used to store non-sensitive configuration data for the application.
 apiVersion: v1
 kind: ConfigMap
 metadata:
