@@ -98,9 +98,6 @@ func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*Se
 	defaultDeploymentName := GenerateDefaultResourceName("container-copilot-dep-")
 	defaultLocation := DetermineDefaultLocation()
 
-	// Get force-setup flag first
-	forceSetup, _ := cmd.Flags().GetBool("force-setup")
-
 	// Load the .env file only if force-setup is NOT enabled
 	envVars := make(map[string]string)
 	envFile := filepath.Join(projectRoot, ".env")
@@ -127,7 +124,6 @@ func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*Se
 	registry, _ := cmd.Flags().GetString("registry")
 	dockerfileGenerator, _ := cmd.Flags().GetString("dockerfile-generator")
 	generateSnapshot, _ := cmd.Flags().GetBool("snapshot")
-	// forceSetup already retrieved above
 
 	// Create config, prioritizing flag values, then .env, then env vars, then defaults
 	config := &SetupConfig{
@@ -608,5 +604,5 @@ func init() {
 	setupCmd.PersistentFlags().StringVarP(&modelID, "model-id", "m", "o3-mini", "Model ID")
 	setupCmd.PersistentFlags().StringVarP(&modelVersion, "model-version", "", "2025-01-31", "Model version")
 	setupCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
-	setupCmd.PersistentFlags().Bool("force-setup", false, "Force setup even if environment variables are already set")
+	setupCmd.PersistentFlags().BoolVar(&forceSetup, "force-setup", false, "Force setup even if environment variables are already set")
 }

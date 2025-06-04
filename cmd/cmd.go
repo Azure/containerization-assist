@@ -44,6 +44,7 @@ var (
 	modelVersion       string
 	targetRepo         string
 	verbose            bool
+	forceSetup         bool
 )
 
 var rootCmd = &cobra.Command{
