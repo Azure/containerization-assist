@@ -140,7 +140,6 @@ func GetDeploymentLogs(ctx context.Context, deploymentName string, namespace str
 	// or is not found in the specified namespace
 	// This is a simplified example and may need to be adjusted based on our needs
 	deployClient := client.AppsV1().Deployments(namespace)
-	// changed deploymentName to k8sAppName
 	deployment, err := deployClient.Get(ctx, deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to get deployment: %w", err)
