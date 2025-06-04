@@ -14,6 +14,7 @@ type KubeRunner interface {
 	GetPodsJSON(ctx context.Context, namespace string, labelSelector string) (string, error)
 	SetKubeContext(ctx context.Context, name string) (string, error)
 	DeleteDeployment(ctx context.Context, manifestPath string) (string, error)
+	DescribePod(ctx context.Context, namespace string, podName string) (string, error)
 }
 
 type KubeCmdRunner struct {
@@ -52,6 +53,10 @@ func (k *KubeCmdRunner) SetKubeContext(ctx context.Context, name string) (string
 
 func (k *KubeCmdRunner) DeleteDeployment(ctx context.Context, manifestPath string) (string, error) {
 	return k.runner.RunCommand("kubectl", "delete", "-f", manifestPath, "--ignore-not-found=true")
+}
+
+func (k *KubeCmdRunner) DescribePod(ctx context.Context, namespace string, podName string) (string, error) {
+	return k.runner.RunCommand("kubectl", "describe", "pod", podName, "-n", namespace)
 }
 
 func CheckKubectlInstalled() error {

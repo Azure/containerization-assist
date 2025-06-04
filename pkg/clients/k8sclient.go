@@ -101,7 +101,7 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 	podSuccess, podOutput := c.CheckPodStatus(ctx, namespace, labelSelector, time.Minute)
 	if !podSuccess {
 		logger.Debugf("    Retrieving logs for pods with label selector %s in namespace %s", labelSelector, namespace)
-		podLogs, err := GetDeploymentLogs(ctx, labelSelector, namespace)
+		podLogs, err := c.GetDeploymentLogs(ctx, labelSelector, namespace)
 		if err != nil {
 			logger.Errorf("Error retrieving deployment logs: %v\n", err)
 			return false, outputStr + "\n" + podOutput, nil
@@ -114,15 +114,21 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 		} else {
 			logger.Infof("    Successfully deleted failed deployment: %s\n", deleteOutput)
 		}
-		return false, outputStr + "\n" + podOutput + "\n" + podLogs, nil
+
+		// Build error response with both pod health and diagnostic info
+		diagnosticOutput := fmt.Sprintf("\n=== DEPLOYMENT HEALTH CHECK RESULTS ===\n%s\n\n=== POD DIAGNOSTIC INFORMATION ===\n%s",
+			podOutput, podLogs)
+
+		return false, outputStr + "\n" + diagnosticOutput, nil
 	}
 	logger.Info("    Pod health check passed")
 
 	return true, outputStr, nil
 }
 
-// GetDeploymentLogs retrieves logs for pods matching the label selector in the specified namespace
-func GetDeploymentLogs(ctx context.Context, deploymentName string, namespace string) (string, error) {
+// GetDeploymentLogs retrieves both container logs and detailed pod descriptions
+// for all pods matching the label selector in the specified namespace
+func (c *Clients) GetDeploymentLogs(ctx context.Context, labelSelector string, namespace string) (string, error) {
 	// Loading kubeconfig from default location
 	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	if err != nil {
@@ -139,35 +145,54 @@ func GetDeploymentLogs(ctx context.Context, deploymentName string, namespace str
 	// Note only please: We may want to handle the case where the deployment does not exist
 	// or is not found in the specified namespace
 	// This is a simplified example and may need to be adjusted based on our needs
-	deployClient := client.AppsV1().Deployments(namespace)
-	deployment, err := deployClient.Get(ctx, deploymentName, metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to get deployment: %w", err)
-	}
-
-	// Get the matching pods
-	labelSelector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: deployment.Spec.Selector.MatchLabels})
+	logger.Debugf("Getting pod logs using label selector: %s in namespace: %s", labelSelector, namespace)
 	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to list pods: %w", err)
+		return "", fmt.Errorf("failed to list pods with selector %q: %w", labelSelector, err)
 	}
 
 	if len(pods.Items) == 0 {
+		logger.Debugf("No pods found for selector %q in namespace %q", labelSelector, namespace)
 		return "", fmt.Errorf("no pods found for selector %q in namespace %q", labelSelector, namespace)
 	}
 
+	logger.Debugf("Found %d pod(s) matching selector %q", len(pods.Items), labelSelector)
+
 	var logBuilder strings.Builder
+
 	// Retrieve logs for each pod
 	for _, pod := range pods.Items {
-		logBuilder.WriteString(fmt.Sprintf("Logs for Pod: %s\n", pod.Name))
-		podLogs, err := readPodLogs(client, namespace, pod.Name)
-		if err != nil {
-			return "", fmt.Errorf("error retrieving logs for pod %s: %w", pod.Name, err)
+		podName := pod.Name
+		logBuilder.WriteString(fmt.Sprintf("\n=== POD: %s ===\n", podName))
+
+		// Get pod description first
+		logger.Debugf("Fetching detailed pod description for %s", podName)
+		logBuilder.WriteString(fmt.Sprintf("\n--- POD DETAILS ---\n"))
+
+		podDetails, describeErr := c.Kube.DescribePod(ctx, namespace, podName)
+		if describeErr != nil {
+			logger.Errorf("Failed to describe pod %s: %v", podName, describeErr)
+			logBuilder.WriteString(fmt.Sprintf("Error retrieving pod details: %v\n", describeErr))
+		} else {
+			logBuilder.WriteString(podDetails + "\n")
 		}
-		logBuilder.WriteString(podLogs)
+
+		// Try to get container logs
+		logBuilder.WriteString(fmt.Sprintf("\n--- CONTAINER LOGS ---\n"))
+		podLogs, err := readPodLogs(client, namespace, podName)
+		if err != nil {
+			logger.Debugf("Unable to read logs for pod %s: %v", podName, err)
+			logBuilder.WriteString(fmt.Sprintf("Container logs not available: %v\n", err))
+		} else {
+			// If we got logs successfully
+			if podLogs == "" {
+				logBuilder.WriteString("Container logs are empty. The container may have just started.\n")
+			} else {
+				logBuilder.WriteString(podLogs + "\n")
+			}
+		}
 	}
 
 	return logBuilder.String(), nil
