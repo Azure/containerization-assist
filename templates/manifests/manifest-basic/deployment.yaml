@@ -28,7 +28,7 @@ spec:
               memory: "0.5Gi"
             limits:
               cpu: "1"
-              memory: "1Gi"         
+              memory: "1Gi"
           envFrom:
             - configMapRef:
                 name: app-config
@@ -90,4 +90,4 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app.kubernetes.io/name: app 
+              app.kubernetes.io/name: app
