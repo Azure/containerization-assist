@@ -44,6 +44,7 @@ var (
 	modelVersion       string
 	targetRepo         string
 	verbose            bool
+	forceSetup         bool
 )
 
 var rootCmd = &cobra.Command{
@@ -199,9 +200,6 @@ var setupCmd = &cobra.Command{
 	Short: "Set up Azure OpenAI resources and run container-copilot",
 	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-copilot to generate artifacts.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load any existing environment variables from .env file
-		loadEnvFile()
-
 		_, file, _, ok := runtime.Caller(0)
 		if !ok {
 			return fmt.Errorf("failed to determine source file location")
@@ -209,6 +207,26 @@ var setupCmd = &cobra.Command{
 
 		// Get the project root directory
 		projectRoot := filepath.Dir(filepath.Dir(file))
+
+		// Check force-setup flag first, before loading .env file
+		forceSetup, _ := cmd.Flags().GetBool("force-setup")
+
+		if forceSetup {
+			logger.Info("Force setup enabled - deleting existing .env file and proceeding with fresh setup...")
+			// Delete existing .env file if it exists
+			envFile := filepath.Join(projectRoot, ".env")
+			if _, err := os.Stat(envFile); err == nil {
+				if err := os.Remove(envFile); err != nil {
+					logger.Warnf("Warning: Failed to delete existing .env file: %v", err)
+				} else {
+					logger.Info("  ✓ Deleted existing .env file")
+				}
+			}
+			// Do NOT load .env file when force-setup is enabled
+		} else {
+			// Load any existing environment variables from .env file only if not force-setup
+			loadEnvFile()
+		}
 
 		// Load configuration from environment, flags, etc.
 		config, err := LoadSetupConfig(cmd, args, projectRoot)
