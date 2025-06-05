@@ -159,7 +159,7 @@ var generateCmd = &cobra.Command{
 			}
 			targetDir = normalizedPath
 		}
-		
+
 		// Validate that the directory exists
 		info, err := os.Stat(targetDir)
 		if err != nil {
@@ -169,8 +169,8 @@ var generateCmd = &cobra.Command{
 			return fmt.Errorf("error checking targetDir %q: %w", targetDir, err)
 		}
 		if !info.IsDir() {
-            return fmt.Errorf("targetDir %q is not a directory", targetDir)
-        }
+			return fmt.Errorf("targetDir %q is not a directory", targetDir)
+		}
 
 		c, err := initClients(ctx)
 		if err != nil {
