@@ -1,4 +1,4 @@
-# Container Copilot
+# Container Kit
 
 AI-Powered App Containerization and Kubernetes Artifact Generation
 
@@ -17,7 +17,7 @@ Prerequisites:
 git clone git@github.com:Azure/container-copilot.git && cd container-copilot
 ```
 
-2. Run container-copilot directly
+2. Run container-kit directly
 
 The simplest way to get started is to just run the generate command with your target repository:
 
@@ -53,11 +53,11 @@ export AZURE_OPENAI_ENDPOINT=xxxxxx
 - Accept "You're leaving azure.com" with 'Continue' Button
 - In Azure AI Foundry, on the left select the 'Deployments' Blade under 'Shared Resources' 
 - Select "Deply a Mdoel" > "Deploy base model" > "o3-mini"
-- Name the new deployment "container-copilot"
+- Name the new deployment "container-kit"
 
 Run the following commands to set your deployment ID in your environment:
 ```
-export AZURE_OPENAI_DEPLOYMENT_ID=container-copilot
+export AZURE_OPENAI_DEPLOYMENT_ID=container-kit
 ```
 
 ### Setup Command
@@ -65,7 +65,7 @@ export AZURE_OPENAI_DEPLOYMENT_ID=container-copilot
 You can explicitly provision Azure OpenAI resources using the `setup` command:
 
 ```bash
-# From root of container-copilot repo
+# From root of container-kit repo
 go run . setup --target-repo=<path/to/target-repo>
 ```
 
@@ -80,7 +80,7 @@ The setup command will:
 Once setup is complete, you'll need to run the generate command to containerize your application:
 
 ```bash
-# From root of container-copilot repo
+# From root of container-kit repo
 go run . generate <path/to/target-repo>
 ```
 
@@ -109,7 +109,7 @@ CCP_MODEL_VERSION=2025-01-31
 
 ### Path Handling
 
-Container Copilot supports both absolute and relative paths for the target repository. When you provide a relative path, it will be automatically converted to an absolute path to ensure artifacts are generated in the correct location regardless of where you run the command from.
+Container Kit supports both absolute and relative paths for the target repository. When you provide a relative path, it will be automatically converted to an absolute path to ensure artifacts are generated in the correct location regardless of where you run the command from.
 
 For example, both of these commands are valid:
 ```bash
@@ -131,7 +131,7 @@ go run . setup --force-setup --target-repo=<path/to/target-repo>
 go run . generate --registry=myregistry.azurecr.io <path/to/target-repo>
 ```
 
-**Dockerfile Generator**: By default, container-copilot uses the "draft" Dockerfile generator. You can disable this with:
+**Dockerfile Generator**: By default, container-kit uses the "draft" Dockerfile generator. You can disable this with:
 
 ```bash
 go run . generate --dockerfile-generator=none <path/to/target-repo>

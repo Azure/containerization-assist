@@ -47,7 +47,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "container-copilot",
+	Use:   "container-kit",
 	Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -118,7 +118,7 @@ var generateCmd = &cobra.Command{
 				if targetDir == "" {
 					// No target directory provided - inform the user and accept input
 					logger.Warn("No target repository specified. The target repository is the directory containing the application you want to containerize.")
-					logger.Info("Example: container-copilot generate ./my-app")
+					logger.Info("Example: container-kit generate ./my-app")
 
 					// Ask if they want to provide a target directory now
 					logger.Info("Would you like to specify a target repository now? (y/n): ")
@@ -196,8 +196,8 @@ var testCmd = &cobra.Command{
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Set up Azure OpenAI resources and run container-copilot",
-	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-copilot to generate artifacts.`,
+	Short: "Set up Azure OpenAI resources and run container-kit",
+	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-kit to generate artifacts.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Load any existing environment variables from .env file
 		loadEnvFile()
@@ -251,10 +251,10 @@ var setupCmd = &cobra.Command{
 
 		// Display next steps instead of running generate automatically
 		if config.TargetRepo != "" {
-			logger.Infof("\nTo generate artifacts, run: container-copilot generate %s", config.TargetRepo)
+			logger.Infof("\nTo generate artifacts, run: container-kit generate %s", config.TargetRepo)
 		} else {
 			logger.Info("\nTo generate artifacts, run:")
-			logger.Info("  container-copilot generate <path/to/target-repo>")
+			logger.Info("  container-kit generate <path/to/target-repo>")
 		}
 
 		return nil
@@ -295,7 +295,7 @@ func initClients(ctx context.Context) (*clients.Clients, error) {
 
 		// Run setup process
 		if err := runAutoSetup(); err != nil {
-			return nil, fmt.Errorf("automatic setup failed: %w\nPlease run 'container-copilot setup' manually or provide the environment variables", err)
+			return nil, fmt.Errorf("automatic setup failed: %w\nPlease run 'container-kit setup' manually or provide the environment variables", err)
 		}
 
 		// After setup, reload environment variables

@@ -91,9 +91,9 @@ func NormalizeTargetRepoPath(path string) (string, error) {
 // LoadSetupConfig loads configuration from environment, flags, and defaults
 func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*SetupConfig, error) {
 	// Generate default resource names
-	defaultResourceGroup := GenerateDefaultResourceName("container-copilot-rg-")
-	defaultResourceName := GenerateDefaultResourceName("container-copilot-ai-")
-	defaultDeploymentName := GenerateDefaultResourceName("container-copilot-dep-")
+	defaultResourceGroup := GenerateDefaultResourceName("container-kit-rg-")
+	defaultResourceName := GenerateDefaultResourceName("container-kit-ai-")
+	defaultDeploymentName := GenerateDefaultResourceName("container-kit-dep-")
 	defaultLocation := DetermineDefaultLocation()
 
 	// Load the .env file
@@ -312,7 +312,7 @@ func UpdateEnvFile(projectRoot string, config *SetupConfig, apiKey, endpoint, de
 		AZURE_OPENAI_ENDPOINT:      endpoint,
 		AZURE_OPENAI_DEPLOYMENT_ID: deploymentID,
 
-		// Container Copilot variables
+		// Container Kit variables
 		"CCP_RESOURCE_GROUP":       config.ResourceGroup,
 		"CCP_LOCATION":             config.Location,
 		"CCP_OPENAI_RESOURCE_NAME": config.OpenAIResourceName,
@@ -338,15 +338,15 @@ func UpdateEnvFile(projectRoot string, config *SetupConfig, apiKey, endpoint, de
 
 	// Write .env file content
 	var content strings.Builder
-	content.WriteString("# Container-Copilot environment variables\n")
-	content.WriteString("# This file was generated/updated by container-copilot setup\n\n")
+	content.WriteString("# Container-Kit environment variables\n")
+	content.WriteString("# This file was generated/updated by container-kit setup\n\n")
 
 	// Azure OpenAI variables first
 	content.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_KEY, envVars[AZURE_OPENAI_KEY]))
 	content.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_ENDPOINT, envVars[AZURE_OPENAI_ENDPOINT]))
 	content.WriteString(fmt.Sprintf("%s=%s\n", AZURE_OPENAI_DEPLOYMENT_ID, envVars[AZURE_OPENAI_DEPLOYMENT_ID]))
 
-	content.WriteString("\n# Container-Copilot setup variables\n")
+	content.WriteString("\n# Container-Kit setup variables\n")
 
 	// All CCP_ variables
 	for k, v := range envVars {
