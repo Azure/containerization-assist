@@ -125,6 +125,14 @@ go run . generate /home/user/projects/my-app
 go run . setup --force-setup --target-repo=<path/to/target-repo>
 ```
 
+Use this when you want to:
+- Start completely fresh after a failed setup
+- Change your Azure OpenAI model or deployment configuration  
+- Clear out old environment variables and regenerate everything
+- Troubleshoot issues with existing Azure deployments
+
+**Warning**: This will delete your existing `.env` file and recreate Azure OpenAI deployments. The underlying Azure resources (resource groups, Cognitive Services accounts) are preserved.
+
 **Registry**: You can specify a custom container registry with the `--registry` flag:
 
 ```bash
