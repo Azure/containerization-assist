@@ -96,15 +96,15 @@ You can also provide these values via environment variables or a `.env` file. Co
 
 ```bash
 # Container‑Copilot settings:
-CCP_RESOURCE_GROUP=mygroup
-CCP_LOCATION=eastus
-CCP_OPENAI_RESOURCE_NAME=myopenai
-CCP_DEPLOYMENT_NAME=mydeploy
-CCP_TARGET_REPO=<path/to/target-repo>
+AZURE_OPENAI_RESOURCE_GROUP=mygroup
+AZURE_OPENAI_LOCATION=eastus
+AZURE_OPENAI_RESOURCE_NAME=myopenai
+AZURE_OPENAI_DEPLOYMENT_NAME=mydeploy
+TARGET_REPO=<path/to/target-repo>
 
 # Optional (defaults shown):
-CCP_MODEL_ID=o3-mini
-CCP_MODEL_VERSION=2025-01-31
+AZURE_OPENAI_MODEL_ID=o3-mini
+AZURE_OPENAI_MODEL_VERSION=2025-01-31
 ```
 
 ### Path Handling

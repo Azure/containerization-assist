@@ -71,7 +71,7 @@ func DetermineDefaultLocation() string {
 }
 
 // NormalizeTargetRepoPath takes a target repository path and converts it to an absolute path.
-// It also updates the CCP_TARGET_REPO environment variable with the normalized path.
+// It also updates the TARGET_REPO environment variable with the normalized path.
 // Returns the normalized path and any error that occurred.
 func NormalizeTargetRepoPath(path string) (string, error) {
 	if path == "" {
@@ -85,7 +85,7 @@ func NormalizeTargetRepoPath(path string) (string, error) {
 	}
 
 	// Update environment variable
-	os.Setenv("CCP_TARGET_REPO", absPath)
+	os.Setenv("TARGET_REPO", absPath)
 
 	return absPath, nil
 }
@@ -127,20 +127,20 @@ func LoadSetupConfig(cmd *cobra.Command, args []string, projectRoot string) (*Se
 
 	// Create config, prioritizing flag values, then .env, then env vars, then defaults
 	config := &SetupConfig{
-		ResourceGroup:       getFirstNonEmpty(resourceGroup, envVars["CCP_RESOURCE_GROUP"], os.Getenv("CCP_RESOURCE_GROUP"), defaultResourceGroup),
-		Location:            getFirstNonEmpty(location, envVars["CCP_LOCATION"], os.Getenv("CCP_LOCATION"), defaultLocation),
-		OpenAIResourceName:  getFirstNonEmpty(openaiResourceName, envVars["CCP_OPENAI_RESOURCE_NAME"], os.Getenv("CCP_OPENAI_RESOURCE_NAME"), defaultResourceName),
-		DeploymentName:      getFirstNonEmpty(deploymentName, envVars["CCP_DEPLOYMENT_NAME"], os.Getenv("CCP_DEPLOYMENT_NAME"), defaultDeploymentName),
-		ModelID:             getFirstNonEmpty(modelID, envVars["CCP_MODEL_ID"], os.Getenv("CCP_MODEL_ID"), "o3-mini"),
-		ModelVersion:        getFirstNonEmpty(modelVersion, envVars["CCP_MODEL_VERSION"], os.Getenv("CCP_MODEL_VERSION"), "2025-01-31"),
-		Registry:            getFirstNonEmpty(registry, envVars["CCP_REGISTRY"], os.Getenv("CCP_REGISTRY"), "localhost:5001"),
+		ResourceGroup:       getFirstNonEmpty(resourceGroup, envVars["AZURE_OPENAI_RESOURCE_GROUP"], os.Getenv("AZURE_OPENAI_RESOURCE_GROUP"), defaultResourceGroup),
+		Location:            getFirstNonEmpty(location, envVars["AZURE_OPENAI_LOCATION"], os.Getenv("AZURE_OPENAI_LOCATION"), defaultLocation),
+		OpenAIResourceName:  getFirstNonEmpty(openaiResourceName, envVars["AZURE_OPENAI_RESOURCE_NAME"], os.Getenv("AZURE_OPENAI_RESOURCE_NAME"), defaultResourceName),
+		DeploymentName:      getFirstNonEmpty(deploymentName, envVars["AZURE_OPENAI_DEPLOYMENT_NAME"], os.Getenv("AZURE_OPENAI_DEPLOYMENT_NAME"), defaultDeploymentName),
+		ModelID:             getFirstNonEmpty(modelID, envVars["AZURE_OPENAI_MODEL_ID"], os.Getenv("AZURE_OPENAI_MODEL_ID"), "o3-mini"),
+		ModelVersion:        getFirstNonEmpty(modelVersion, envVars["AZURE_OPENAI_MODEL_VERSION"], os.Getenv("AZURE_OPENAI_MODEL_VERSION"), "2025-01-31"),
+		Registry:            getFirstNonEmpty(registry, envVars["CONTAINER_REGISTRY"], os.Getenv("CONTAINER_REGISTRY"), "localhost:5001"),
 		DockerfileGenerator: getFirstNonEmpty(dockerfileGenerator, "", "", "draft"),
 		GenerateSnapshot:    generateSnapshot,
 		ForceSetup:          forceSetup,
 	}
 
 	// Handle target repo from args or env
-	targetRepoPath := getFirstNonEmpty(targetRepo, envVars["CCP_TARGET_REPO"], os.Getenv("CCP_TARGET_REPO"), "")
+	targetRepoPath := getFirstNonEmpty(targetRepo, envVars["TARGET_REPO"], os.Getenv("TARGET_REPO"), "")
 	if targetRepoPath == "" && len(args) > 0 {
 		targetRepoPath = args[0]
 	}
@@ -361,13 +361,13 @@ func UpdateEnvFile(projectRoot string, config *SetupConfig, apiKey, endpoint, de
 		AZURE_OPENAI_DEPLOYMENT_ID: deploymentID,
 
 		// Container Kit variables
-		"CCP_RESOURCE_GROUP":       config.ResourceGroup,
-		"CCP_LOCATION":             config.Location,
-		"CCP_OPENAI_RESOURCE_NAME": config.OpenAIResourceName,
-		"CCP_DEPLOYMENT_NAME":      config.DeploymentName,
-		"CCP_MODEL_ID":             config.ModelID,
-		"CCP_MODEL_VERSION":        config.ModelVersion,
-		"CCP_TARGET_REPO":          config.TargetRepo,
+		"AZURE_OPENAI_RESOURCE_GROUP":  config.ResourceGroup,
+		"AZURE_OPENAI_LOCATION":        config.Location,
+		"AZURE_OPENAI_RESOURCE_NAME":   config.OpenAIResourceName,
+		"AZURE_OPENAI_DEPLOYMENT_NAME": config.DeploymentName,
+		"AZURE_OPENAI_MODEL_ID":        config.ModelID,
+		"AZURE_OPENAI_MODEL_VERSION":   config.ModelVersion,
+		"TARGET_REPO":                  config.TargetRepo,
 	}
 
 	// Read existing env file to preserve other variables
@@ -396,9 +396,9 @@ func UpdateEnvFile(projectRoot string, config *SetupConfig, apiKey, endpoint, de
 
 	content.WriteString("\n# Container-Kit setup variables\n")
 
-	// All CCP_ variables
+	// All AZURE_OPENAI_ variables
 	for k, v := range envVars {
-		if strings.HasPrefix(k, "CCP_") {
+		if strings.HasPrefix(k, "AZURE_OPENAI_") {
 			content.WriteString(fmt.Sprintf("%s=%s\n", k, v))
 		}
 	}
@@ -407,7 +407,7 @@ func UpdateEnvFile(projectRoot string, config *SetupConfig, apiKey, endpoint, de
 
 	// All other variables
 	for k, v := range envVars {
-		if !strings.HasPrefix(k, "CCP_") &&
+		if !strings.HasPrefix(k, "AZURE_OPENAI_") &&
 			k != AZURE_OPENAI_KEY &&
 			k != AZURE_OPENAI_ENDPOINT &&
 			k != AZURE_OPENAI_DEPLOYMENT_ID {

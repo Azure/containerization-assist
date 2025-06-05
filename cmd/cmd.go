@@ -94,7 +94,7 @@ var generateCmd = &cobra.Command{
 		// Determine target directory from multiple sources in order of priority:
 		// 1. Command line argument
 		// 2. --target-repo flag
-		// 3. CCP_TARGET_REPO environment variable (which would include values from .env)
+		// 3. TARGET_REPO environment variable (which would include values from .env)
 		// 4. Interactive prompt
 
 		var targetDir string
@@ -103,17 +103,17 @@ var generateCmd = &cobra.Command{
 		if len(args) > 0 {
 			targetDir = args[0]
 			// Set it in the environment so auto-setup can find it later
-			os.Setenv("CCP_TARGET_REPO", targetDir)
+			os.Setenv("TARGET_REPO", targetDir)
 		} else {
 			// Check flag
 			targetFlag, _ := cmd.Flags().GetString("target-repo")
 			if targetFlag != "" {
 				targetDir = targetFlag
 				// Set it in the environment so auto-setup can find it later
-				os.Setenv("CCP_TARGET_REPO", targetDir)
+				os.Setenv("TARGET_REPO", targetDir)
 			} else {
 				// Check environment variable (includes .env file)
-				targetDir = os.Getenv("CCP_TARGET_REPO")
+				targetDir = os.Getenv("TARGET_REPO")
 
 				// If still no target, prompt the user
 				if targetDir == "" {
@@ -134,7 +134,7 @@ var generateCmd = &cobra.Command{
 							return fmt.Errorf("target repository is required")
 						}
 						// Set it in the environment so auto-setup can find it later
-						os.Setenv("CCP_TARGET_REPO", targetDir)
+						os.Setenv("TARGET_REPO", targetDir)
 					} else {
 						return fmt.Errorf("target repository is required")
 					}
@@ -369,7 +369,7 @@ func runAutoSetup() error {
 	tempCmd.Flags().String("target-repo", "", "")
 
 	// Check if target repo is already available in environment
-	envTargetRepo := os.Getenv("CCP_TARGET_REPO")
+	envTargetRepo := os.Getenv("TARGET_REPO")
 	if envTargetRepo != "" {
 		tempCmd.Flags().Set("target-repo", envTargetRepo)
 		logger.Infof("Using target repository from environment: %s", envTargetRepo)
