@@ -259,7 +259,7 @@ Please:
 3. Provide a fixed version of the Dockerfile
 4. Explain what changes were made and why
 
-Favor using the latest stable base images and best practices for Dockerfile writing when appropriate.
+Favor using the latest stable base images and best practices for Dockerfile writing when appropriate. In cases where the latest images continue to fail,revert to the last known working image version.
 Make sure database connections are accounted for in the Dockerfile. They must be passed in, don't request for me to ensure they are there.
 If applicable, use multi-stage builds to reduce image size.
 Ensure that all COPY and RUN instructions are consistent with the actual file structure of the repository — do not assume specific folders or filenames without confirming they exist.

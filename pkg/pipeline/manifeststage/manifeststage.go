@@ -77,6 +77,8 @@ Please:
 3. Explain what changes were made and why
 
 Do NOT create brand new manifests - Only fix the provided manifest.
+Ensure the health paths actually exist before using httpGet otherwise use tcpSocket probe action.
+For a Spring Boot application, make sure the Actuator dependency is included in the pom.xml before using /actuator/health as the HTTP GET path in the startup probe.
 IMPORTANT: Do NOT change the name of the app or the name of the container image.
 
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`

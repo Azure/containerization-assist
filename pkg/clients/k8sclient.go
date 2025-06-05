@@ -101,7 +101,7 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 	podSuccess, podOutput := c.CheckPodStatus(ctx, namespace, labelSelector, time.Minute)
 	if !podSuccess {
 		logger.Debugf("    Retrieving logs for pods with label selector %s in namespace %s", labelSelector, namespace)
-		podLogs, err := GetDeploymentLogs(ctx, labelSelector, namespace)
+		podLogs, err := GetDeploymentLogs(ctx, k8sAppName, namespace)
 		if err != nil {
 			logger.Errorf("Error retrieving deployment logs: %v\n", err)
 			return false, outputStr + "\n" + podOutput, nil
