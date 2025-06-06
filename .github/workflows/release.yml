@@ -23,6 +23,7 @@ jobs:
         with:
           fetch-depth: 0
       - run: git tag ${{ github.event.inputs.tag }}
+      - run: git push origin ${{ github.event.inputs.tag }}
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
