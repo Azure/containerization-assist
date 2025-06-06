@@ -137,7 +137,7 @@ jobs:
         if: always()
         run: |
           # Copy snapshot files to run artifacts
-          cp -r test-repo/.container-copilot/ test-repo/artifacts/snapshot/
+          cp -r test-repo/.container-copilot/* test-repo/artifacts/snapshot/
           echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
 
       - name: Upload test artifacts
