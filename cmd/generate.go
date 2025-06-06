@@ -93,13 +93,14 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	}, os.Stdout)
 	err = runner.Run(ctx, state, options, c)
 	if generateSnapshot {
-		stageHistoryJSON, err := json.MarshalIndent(state.StageHistory, "", "  ")
+		report := NewReport(ctx, state, targetDir)
+		reportJSON, err := json.MarshalIndent(report, "", "  ")
 		if err != nil {
 			logger.Warnf("Error marshalling stage history: %v", err)
 		}
 		reportFile := filepath.Join(targetDir, pipeline.ReportDirectory, "run_report.json")
 		logger.Debugf("Writing stage history to %s", reportFile)
-		if err := os.WriteFile(reportFile, stageHistoryJSON, 0644); err != nil {
+		if err := os.WriteFile(reportFile, reportJSON, 0644); err != nil {
 			logger.Errorf("Error writing stage history to file: %v", err)
 		}
 	}
@@ -110,6 +111,36 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 
 	logger.Infof("Total Token usage: Prompt: %d, Completion: %d,  Total: %d\n", state.TokenUsage.PromptTokens, state.TokenUsage.CompletionTokens, state.TokenUsage.TotalTokens)
 	return nil
+}
+
+func NewReport(ctx context.Context, state *pipeline.PipelineState, targetDir string) *RunReport {
+	outcome := RunOutcomeSuccess
+	// if deadline exceeded or canceled, set outcome to timeout
+	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
+		outcome = RunOutcomeTimeout
+	}
+	if !state.Success {
+		outcome = RunOutcomeFailure
+	}
+	return &RunReport{
+		IterationCount: state.IterationCount,
+		Outcome:        outcome,
+		StageHistory:   state.StageHistory,
+	}
+}
+
+type RunOutcome string
+
+const (
+	RunOutcomeSuccess RunOutcome = "success"
+	RunOutcomeFailure RunOutcome = "failure"
+	RunOutcomeTimeout RunOutcome = "timeout"
+)
+
+type RunReport struct {
+	IterationCount int                   `json:"iteration_count"`
+	Outcome        RunOutcome            `json:"outcome"`
+	StageHistory   []pipeline.StageVisit `json:"stage_history"`
 }
 
 func init() {
