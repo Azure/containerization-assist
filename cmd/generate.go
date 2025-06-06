@@ -19,7 +19,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
 )
 
-func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
+func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients, extraContext string) error {
 	logger.Debugf("Generating artifacts in directory: %s", targetDir)
 	// Check for kind cluster before starting
 	kindClusterName, err := c.GetKindCluster(ctx)
@@ -43,6 +43,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		Metadata:       make(map[pipeline.MetadataKey]any),
 		ImageName:      "app", // TODO: clean up app naming into state
 		RegistryURL:    registry,
+		ExtraContext:   extraContext,
 	}
 
 	// Get file tree structure for context
@@ -150,4 +151,5 @@ func init() {
 	generateCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 10*time.Minute, "Timeout duration for generating artifacts")
 	generateCmd.PersistentFlags().IntVarP(&maxDepth, "max-depth", "d", 3, "Maximum depth for file tree scan of target repository. Set to -1 for entire repo.")
+	generateCmd.PersistentFlags().StringVarP(&extraContext, "context", "c", "", "Extra context to pass to the AI model, e.g., 'This is a SpringBoot app'")
 }
