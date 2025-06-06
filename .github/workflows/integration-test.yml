@@ -135,7 +135,7 @@ jobs:
 
       - name: Save result
         if: always()
-        run: 
+        run: |
           # Copy snapshot files to run artifacts
           cp -r test-repo/.container-copilot test-repo/artifacts || echo "No .container-copilot directory found"
           echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
