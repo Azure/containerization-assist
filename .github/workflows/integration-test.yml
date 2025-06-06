@@ -115,7 +115,7 @@ jobs:
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
           echo "Running container-copilot generate for test $RUN_NAME ..."
-          container-copilot generate . > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
+          container-copilot generate . --snapshot > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
           # Save the files it created for successful tests
           if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
             [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
@@ -135,7 +135,10 @@ jobs:
 
       - name: Save result
         if: always()
-        run: echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
+        run: 
+          # Copy snapshot files to run artifacts
+          cp -r test-repo/.container-copilot test-repo/artifacts || echo "No .container-copilot directory found"
+          echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
