@@ -76,8 +76,12 @@ Please:
 2. Provide a fixed version of the manifest
 3. Explain what changes were made and why
 
-Do NOT create brand new manifests - Only fix the provided manifest.
-IMPORTANT: Do NOT change the name of the app or the name of the container image.
+- Do NOT create brand new manifests - Only fix the provided manifest.
+- Ensure the health paths actually exist before using httpGet otherwise use tcpSocket probe action. 
+- Prefer using secrets for sensitive information like database passwords and configmap for non-sensitive data. Do NOT use hardcoded values in the manifest.
+- The default configmap name is 'app-config' and the default secret name is 'secret-ref'. Do NOT change these names while referring to them in the manifests.
+- Use 'host.docker.internal' for database host in the manifests.
+IMPORTANT: Do NOT change the name of the app or the name of the container image. 
 
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
