@@ -1,6 +1,8 @@
 #!/bin/bash
 
+# Enable strict error handling
 set -e
+set -o pipefail
 
 echo "📦 Starting container-copilot demo with PostgreSQL and artifact generation"
 echo "----------------------------------------------------------------------------"
@@ -104,13 +106,21 @@ docker run --name ${POSTGRES_CONTAINER_NAME} \
 
 # Wait for PostgreSQL to initialize
 echo "⏳ Waiting for PostgreSQL to initialize..."
-sleep 5
-max_attempts=10
+sleep 3
+max_attempts=15
 attempt=1
 
-while ! docker exec ${POSTGRES_CONTAINER_NAME} pg_isready -U postgres > /dev/null 2>&1; do
+# More reliable check that includes connection with the specified user
+wait_for_postgres() {
+  docker exec ${POSTGRES_CONTAINER_NAME} pg_isready -U ${POSTGRES_USER} > /dev/null 2>&1 || 
+  docker exec ${POSTGRES_CONTAINER_NAME} pg_isready -U postgres > /dev/null 2>&1
+}
+
+while ! wait_for_postgres; do
   if [ $attempt -eq $max_attempts ]; then
     echo "❌ PostgreSQL failed to start after ${max_attempts} attempts"
+    echo "   Logs from PostgreSQL container:"
+    docker logs ${POSTGRES_CONTAINER_NAME}
     exit 1
   fi
   echo "  Still waiting... (${attempt}/${max_attempts})"
@@ -126,15 +136,22 @@ echo "  - Database: ${POSTGRES_DB}"
 echo "✅ Target repository: $TARGET_REPO"
 echo ""
 
+# Add trap to clean up resources even if the script exits unexpectedly
+cleanup() {
+  echo -e "\n🧹 Cleaning up resources..."
+  docker stop ${POSTGRES_CONTAINER_NAME} > /dev/null 2>&1 || true
+  docker rm ${POSTGRES_CONTAINER_NAME} > /dev/null 2>&1 || true
+  echo "✅ Cleanup complete"
+}
+trap cleanup EXIT
+
 # Run container-copilot on the target repository
 echo -e "\n→ Running container‑copilot on '${TARGET_REPO}'..."
 echo "----------------------------------------------------------------"
 (
   cd "$PROJECT_ROOT"
-  go run . generate "$TARGET_REPO"
+  go run . generate "$TARGET_REPO" --context "Use 'host.docker.internal' for postgresql host in the manifests."
 )
 
 echo "----------------------------------------------------------------"
 echo "✅ Demo complete. Generated artifacts for $TARGET_REPO"
-echo "To clean up PostgreSQL container, run:"
-echo "docker stop ${POSTGRES_CONTAINER_NAME} && docker rm ${POSTGRES_CONTAINER_NAME}"

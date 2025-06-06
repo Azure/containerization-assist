@@ -34,6 +34,7 @@ var (
 	generateSnapshot    bool
 	timeout             time.Duration
 	maxDepth            int
+	extraContext        string
 
 	// Setup command variables
 	resourceGroup      string
@@ -165,7 +166,7 @@ var generateCmd = &cobra.Command{
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
 
-		if err := generate(ctx, targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c); err != nil {
+		if err := generate(ctx, targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c, extraContext); err != nil {
 			return fmt.Errorf("error generating artifacts: %w", err)
 		}
 

@@ -77,12 +77,16 @@ Please:
 3. Explain what changes were made and why
 
 - Do NOT create brand new manifests - Only fix the provided manifest.
-- Ensure the health paths actually exist before using httpGet otherwise use tcpSocket probe action. 
+- Verify that the health check paths exist before using httpGet probe; if they dont't use a tcpSocket probe instead. 
 - Prefer using secrets for sensitive information like database passwords and configmap for non-sensitive data. Do NOT use hardcoded values in the manifest.
 - The default configmap name is 'app-config' and the default secret name is 'secret-ref'. Do NOT change these names while referring to them in the manifests.
-- Use 'host.docker.internal' for database host in the manifests.
-IMPORTANT: Do NOT change the name of the app or the name of the container image. 
+IMPORTANT: Do NOT change the name of the app or the name of the container image.`
 
+promptText += fmt.Sprintf(`
+ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is relevant for generating working Kubernetes manifests):
+%s`, state.ExtraContext)
+
+promptText += `
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
 	content, tokenUsage, err := client.GetChatCompletion(ctx, promptText)

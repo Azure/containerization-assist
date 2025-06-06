@@ -127,7 +127,7 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	}
 
 	// Get AI to fix the Dockerfile
-	result, err := AnalyzeDockerfile(ctx, p.AIClient, state)
+	result, err := analyzeDockerfile(ctx, p.AIClient, state)
 	if err != nil {
 		return fmt.Errorf("error in AI analysis: %v", err)
 	}
@@ -169,8 +169,8 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 	return fmt.Errorf("failed to fix Dockerfile")
 }
 
-// AnalyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities
-func AnalyzeDockerfile(ctx context.Context, client *ai.AzOpenAIClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
+// analyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities
+func analyzeDockerfile(ctx context.Context, client *ai.AzOpenAIClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
 	dockerfile := state.Dockerfile
 
 	// Get the base directory from the Dockerfile path
@@ -264,8 +264,13 @@ Make sure database connections are accounted for in the Dockerfile. They must be
 If applicable, use multi-stage builds to reduce image size.
 Ensure that all COPY and RUN instructions are consistent with the actual file structure of the repository — do not assume specific folders or filenames without confirming they exist.
 Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
-If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.
+If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.`
 
+promptText += fmt.Sprintf(`
+ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is relevant for generating a working Dockerfile):
+%s`, state.ExtraContext)
+
+promptText += `
 **IMPORTANT: Output the fixed Dockerfile content between <DOCKERFILE> and </DOCKERFILE> tags. These tags must not appear anywhere else in your response except for wrapping the corrected dockerfile content. :IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
