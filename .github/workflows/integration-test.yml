@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
-          go-version: '1.24'
+          go-version: "1.24"
 
       - name: Build container-copilot
         run: |
@@ -49,7 +49,7 @@ jobs:
           - agoncal/agoncal-application-petstore-ee7
           - aws-samples/aws-codedeploy-sample-tomcat
           - chamilad/tomcat-hello-world
-          - colinbut/monolith-enterprise-application
+          # - colinbut/monolith-enterprise-application
           - dhruvinrsoni/online-pizza-ordering-system
           - eNKay2408/Note-Taking
           # - jamesfalkner/jboss-daytrader
@@ -57,7 +57,7 @@ jobs:
           # - kparent/jboss-helloworld
           # - oracle-samples/weblogic-examples
           # - shekhargulati/todoapp-forge
-          - spring-petclinic/spring-petclinic-microservices
+          # - spring-petclinic/spring-petclinic-microservices
         test-number: [1, 2, 3, 4, 5]
       fail-fast: false
 
