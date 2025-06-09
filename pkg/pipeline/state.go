@@ -56,4 +56,8 @@ const (
 	RepoAnalysisResultKey MetadataKey = "RepoAnalysisResult"
 	RepoAnalysisCallsKey  MetadataKey = "RepoAnalysisCalls"
 	RepoAnalysisErrorKey  MetadataKey = "RepoAnalysisError"
+	// ACA migration keys
+	UserACAConfigPathKey  MetadataKey = "UserACAConfigPath"  // string path to aca.json provided by user/analysis
+	RepoHasACAKey         MetadataKey = "RepoHasACA"         // bool set by analysis stage
+	ACAAnalysisSummaryKey MetadataKey = "ACAAnalysisSummary" // string summary passed to LLM
 )

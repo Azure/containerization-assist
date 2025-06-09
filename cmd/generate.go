@@ -14,10 +14,13 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/acatransformstage"
 	"github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
 	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
 )
+
+var acaConfigPath string
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients, extraContext string) error {
 	logger.Debugf("Generating artifacts in directory: %s", targetDir)
@@ -54,6 +57,12 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	state.RepoFileTree = repoStructure
 	logger.Debugf("File tree structure:\n%s", repoStructure)
 
+	// Store aca-config path if provided
+	if acaConfigPath != "" {
+		state.Metadata[pipeline.UserACAConfigPathKey] = acaConfigPath
+		logger.Infof("✨ ACA migration enabled – using %s", acaConfigPath)
+	}
+
 	// Common pipeline options
 	options := pipeline.RunnerOptions{
 		MaxIterations:             5, // Default max iterations
@@ -62,36 +71,58 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		TargetDirectory:           targetDir,
 	}
 
-	runner := pipeline.NewRunner([]*pipeline.StageConfig{
-		{
-			Id:   "analysis",
-			Path: targetDir,
-			Stage: &repoanalysisstage.RepoAnalysisStage{
-				AIClient: c.AzOpenAIClient,
-				Parser:   &pipeline.DefaultParser{},
-			},
+	// Build stage list dynamically
+	var stages []*pipeline.StageConfig
+
+	// analysis stage always first
+	stages = append(stages, &pipeline.StageConfig{
+		Id:   "analysis",
+		Path: targetDir,
+		Stage: &repoanalysisstage.RepoAnalysisStage{
+			AIClient: c.AzOpenAIClient,
+			Parser:   &pipeline.DefaultParser{},
 		},
-		{
+	})
+
+	if acaConfigPath != "" {
+		// Insert ACA transform stage and skip Dockerfile generation
+		stages = append(stages, &pipeline.StageConfig{
+			Id:    "acatransform",
+			Path:  acaConfigPath,
+			Stage: &acatransformstage.ACATransformStage{},
+		})
+	} else {
+		// Docker stage only when not migrating
+		stages = append(stages, &pipeline.StageConfig{
 			Id:         "docker",
-			MaxRetries: 5,
 			Path:       filepath.Join(targetDir, "Dockerfile"),
+			MaxRetries: 5,
 			Stage: &dockerstage.DockerStage{
 				AIClient:         c.AzOpenAIClient,
 				UseDraftTemplate: enableDraftDockerfile,
 				Parser:           &pipeline.DefaultParser{},
 			},
+		})
+	}
+
+	// manifest stage always present
+	stages = append(stages, &pipeline.StageConfig{
+		Id:         "manifest",
+		Path:       targetDir,
+		MaxRetries: 5,
+		Stage: &manifeststage.ManifestStage{
+			AIClient: c.AzOpenAIClient,
+			Parser:   &pipeline.DefaultParser{},
 		},
-		{
-			Id:         "manifest",
-			MaxRetries: 5,
-			OnFailGoto: "docker",
-			Path:       targetDir,
-			Stage: &manifeststage.ManifestStage{
-				AIClient: c.AzOpenAIClient,
-				Parser:   &pipeline.DefaultParser{},
-			},
-		},
-	}, os.Stdout)
+	})
+
+	// when docker stage present, set OnFailGoto
+	if acaConfigPath == "" {
+		// link manifest fail to docker
+		stages[len(stages)-1].OnFailGoto = "docker"
+	}
+
+	runner := pipeline.NewRunner(stages, os.Stdout)
 	err = runner.Run(ctx, state, options, c)
 	if generateSnapshot {
 		report := NewReport(ctx, state, targetDir)
@@ -152,4 +183,5 @@ func init() {
 	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 10*time.Minute, "Timeout duration for generating artifacts")
 	generateCmd.PersistentFlags().IntVarP(&maxDepth, "max-depth", "d", 3, "Maximum depth for file tree scan of target repository. Set to -1 for entire repo.")
 	generateCmd.PersistentFlags().StringVarP(&extraContext, "context", "c", "", "Extra context to pass to the AI model, e.g., 'This is a SpringBoot app'")
+	generateCmd.PersistentFlags().StringVarP(&acaConfigPath, "aca-config", "", "", "Path to the ACA configuration file")
 }
