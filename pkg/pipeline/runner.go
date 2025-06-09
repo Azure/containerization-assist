@@ -43,10 +43,6 @@ func NewRunner(stageConfigs []*StageConfig, out io.Writer) *Runner {
 		if prevStageConfig != nil && prevStageConfig.OnSuccessGoto == "" {
 			prevStageConfig.OnSuccessGoto = sc.Id //
 		}
-		// Backfill OnFailGoto if not set, with default to first stage
-		if sc.OnFailGoto == "" {
-			sc.OnFailGoto = stageConfigs[0].Id // Default to first stage
-		}
 		prevStageConfig = sc
 	}
 	// Second pass to ensure failure stages are valid now that id2Stage is populated
@@ -132,6 +128,9 @@ func (r *Runner) Run(
 			state.RetryCount++
 			if state.RetryCount > currentStageConfig.MaxRetries {
 				// If max retries reached, move to failed stage
+				if currentStageConfig.OnFailGoto == "" {
+					break
+				}
 				currentStageConfig = r.id2Stage[currentStageConfig.OnFailGoto]
 				fmt.Fprintf(r.out, "❌ Stage %s failed max times %d: %v\n", currentStageConfig.Id, state.RetryCount, err)
 				state.RetryCount = 0 // Reset retry count for next stage
