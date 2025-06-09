@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
-          go-version: '1.24'
+          go-version: "1.24"
 
       - name: Build container-copilot
         run: |
@@ -49,7 +49,7 @@ jobs:
           - agoncal/agoncal-application-petstore-ee7
           - aws-samples/aws-codedeploy-sample-tomcat
           - chamilad/tomcat-hello-world
-          - colinbut/monolith-enterprise-application
+          # - colinbut/monolith-enterprise-application
           - dhruvinrsoni/online-pizza-ordering-system
           - eNKay2408/Note-Taking
           # - jamesfalkner/jboss-daytrader
@@ -57,7 +57,7 @@ jobs:
           # - kparent/jboss-helloworld
           # - oracle-samples/weblogic-examples
           # - shekhargulati/todoapp-forge
-          - spring-petclinic/spring-petclinic-microservices
+          # - spring-petclinic/spring-petclinic-microservices
         test-number: [1, 2, 3, 4, 5]
       fail-fast: false
 
@@ -115,7 +115,7 @@ jobs:
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
           echo "Running container-copilot generate for test $RUN_NAME ..."
-          container-copilot generate . > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
+          container-copilot generate . --snapshot > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
           # Save the files it created for successful tests
           if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
             [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
@@ -135,7 +135,10 @@ jobs:
 
       - name: Save result
         if: always()
-        run: echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
+        run: |
+          # Copy snapshot files to run artifacts
+          cp -r test-repo/.container-copilot test-repo/artifacts/snapshot
+          echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

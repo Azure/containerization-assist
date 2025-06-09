@@ -19,7 +19,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
 )
 
-func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients) error {
+func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, c *clients.Clients, extraContext string) error {
 	logger.Debugf("Generating artifacts in directory: %s", targetDir)
 	// Check for kind cluster before starting
 	kindClusterName, err := c.GetKindCluster(ctx)
@@ -43,6 +43,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		Metadata:       make(map[pipeline.MetadataKey]any),
 		ImageName:      "app", // TODO: clean up app naming into state
 		RegistryURL:    registry,
+		ExtraContext:   extraContext,
 	}
 
 	// Get file tree structure for context
@@ -93,13 +94,14 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	}, os.Stdout)
 	err = runner.Run(ctx, state, options, c)
 	if generateSnapshot {
-		stageHistoryJSON, err := json.MarshalIndent(state.StageHistory, "", "  ")
+		report := NewReport(ctx, state, targetDir)
+		reportJSON, err := json.MarshalIndent(report, "", "  ")
 		if err != nil {
 			logger.Warnf("Error marshalling stage history: %v", err)
 		}
 		reportFile := filepath.Join(targetDir, pipeline.ReportDirectory, "run_report.json")
 		logger.Debugf("Writing stage history to %s", reportFile)
-		if err := os.WriteFile(reportFile, stageHistoryJSON, 0644); err != nil {
+		if err := os.WriteFile(reportFile, reportJSON, 0644); err != nil {
 			logger.Errorf("Error writing stage history to file: %v", err)
 		}
 	}
@@ -112,6 +114,36 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	return nil
 }
 
+func NewReport(ctx context.Context, state *pipeline.PipelineState, targetDir string) *RunReport {
+	outcome := RunOutcomeSuccess
+	// if deadline exceeded or canceled, set outcome to timeout
+	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
+		outcome = RunOutcomeTimeout
+	}
+	if !state.Success {
+		outcome = RunOutcomeFailure
+	}
+	return &RunReport{
+		IterationCount: state.IterationCount,
+		Outcome:        outcome,
+		StageHistory:   state.StageHistory,
+	}
+}
+
+type RunOutcome string
+
+const (
+	RunOutcomeSuccess RunOutcome = "success"
+	RunOutcomeFailure RunOutcome = "failure"
+	RunOutcomeTimeout RunOutcome = "timeout"
+)
+
+type RunReport struct {
+	IterationCount int                   `json:"iteration_count"`
+	Outcome        RunOutcome            `json:"outcome"`
+	StageHistory   []pipeline.StageVisit `json:"stage_history"`
+}
+
 func init() {
 	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
 	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")
@@ -119,4 +151,5 @@ func init() {
 	generateCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 10*time.Minute, "Timeout duration for generating artifacts")
 	generateCmd.PersistentFlags().IntVarP(&maxDepth, "max-depth", "d", 3, "Maximum depth for file tree scan of target repository. Set to -1 for entire repo.")
+	generateCmd.PersistentFlags().StringVarP(&extraContext, "context", "c", "", "Extra context to pass to the AI model, e.g., 'This is a SpringBoot app'")
 }
