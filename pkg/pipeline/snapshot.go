@@ -12,7 +12,7 @@ import (
 )
 
 // ReportDirectory is the directory where the iteration snapshots will be stored along with a report of the run
-const ReportDirectory = ".container-copilot"
+const ReportDirectory = ".container-kit"
 
 // WriteIterationSnapshot creates a snapshot of the current pipeline iteration.
 // The function accepts a variadic parameter `stages`, which is a list of PipelineStage objects.
@@ -20,7 +20,7 @@ const ReportDirectory = ".container-copilot"
 func WriteIterationSnapshot(state *PipelineState, targetDir string, stages ...PipelineStage) error {
 	snapDir := filepath.Join(targetDir, ReportDirectory, fmt.Sprintf("iteration_%d", state.IterationCount))
 	if err := os.MkdirAll(snapDir, 0755); err != nil {
-		return fmt.Errorf("creating container-copilot-snapshot directory: %w", err)
+		return fmt.Errorf("creating container-kit-snapshot directory: %w", err)
 	}
 
 	// Collect errors from all stages
