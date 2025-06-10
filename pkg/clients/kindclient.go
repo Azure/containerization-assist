@@ -44,7 +44,7 @@ func (c *Clients) SetupLocalRegistryCluster(ctx context.Context) error {
 	return nil
 }
 
-// getKindCluster ensures a 'container-copilot' kind cluster exists and sets kubectl context.
+// getKindCluster ensures a 'container-kit' kind cluster exists and sets kubectl context.
 func (c *Clients) GetKindCluster(ctx context.Context) (string, error) {
 	if err := c.checkDockerRunning(ctx); err != nil {
 		return "", err
@@ -61,26 +61,26 @@ func (c *Clients) GetKindCluster(ctx context.Context) (string, error) {
 	clusters := strings.Split(string(output), "\n")
 	exists := false
 	for _, cluster := range clusters {
-		if strings.TrimSpace(cluster) == "container-copilot" {
+		if strings.TrimSpace(cluster) == "container-kit" {
 			exists = true
-			logger.Infof("found existing 'container-copilot' cluster")
+			logger.Infof("found existing 'container-kit' cluster")
 			break
 		}
 	}
 
 	if exists {
-		logger.Warn("Deleting existing kind cluster 'container-copilot'")
-		if output, err = c.Kind.DeleteCluster(ctx, "container-copilot"); err != nil {
+		logger.Warn("Deleting existing kind cluster 'container-kit'")
+		if output, err = c.Kind.DeleteCluster(ctx, "container-kit"); err != nil {
 			return "", fmt.Errorf("failed to delete existing kind cluster: %s, error: %w", output, err)
 		}
 	}
-	logger.Info("Creating kind cluster 'container-copilot'")
+	logger.Info("Creating kind cluster 'container-kit'")
 	if err := c.SetupLocalRegistryCluster(ctx); err != nil {
 		return "", fmt.Errorf("setting up local registry cluster: %w", err)
 	}
 
-	logger.Info("Setting kubectl context to 'kind-container-copilot'")
-	if output, err = c.Kube.SetKubeContext(ctx, "kind-container-copilot"); err != nil {
+	logger.Info("Setting kubectl context to 'kind-container-kit'")
+	if output, err = c.Kube.SetKubeContext(ctx, "kind-container-kit"); err != nil {
 		return "", fmt.Errorf("failed to set kubectl context: %s, error: %w", output, err)
 	}
 

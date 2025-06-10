@@ -46,7 +46,7 @@ type StageConfig struct {
 	MaxRetries int
 
 	// OnFailGoto specifies the ID of the stage to go to on failure.
-	// If empty, the runner will go back to the first stage.
+	// If empty, the runner will exit after exceeding MaxRetries.
 	OnFailGoto string
 
 	// OnSuccessGoto specifies the ID of the stage to go to on success.

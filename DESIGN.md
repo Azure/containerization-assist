@@ -1,8 +1,8 @@
-# 📦 Container Copilot: Design Document
+# 📦 Container Kit: Design Document
 
 ## 🧭 Overview
 
-Container Copilot is an AI-powered CLI tool that automates the containerization of applications and the generation of Kubernetes artifacts. It leverages Azure OpenAI (LLM) to iteratively resolve issues in Dockerfiles and Kubernetes manifests until the application can be deployed successfully to a local Kind cluster.
+Container Kit is an AI-powered CLI tool that automates the containerization of applications and the generation of Kubernetes artifacts. It leverages Azure OpenAI (LLM) to iteratively resolve issues in Dockerfiles and Kubernetes manifests until the application can be deployed successfully to a local Kind cluster.
 
 ---
 
@@ -26,7 +26,7 @@ Container Copilot is an AI-powered CLI tool that automates the containerization 
 
 - Main command:
   ```bash
-  container-copilot generate <target-dir>
+  container-kit generate <target-dir>
   ```
 
 - Initializes pipeline, bootstraps templates, and executes iteration logic.
@@ -113,7 +113,7 @@ Example tags:
   ```
 
 - Local Docker registry at `localhost:5001`
-- Kind cluster named `container-copilot`
+- Kind cluster named `container-kit`
 
 ---
 
@@ -122,7 +122,7 @@ Example tags:
 - GitHub Actions matrix runs 10 parallel test jobs.
 - Each test invokes:
   ```bash
-  container-copilot generate .
+  container-kit generate .
   ```
 - Log outputs are parsed for:
   ```text

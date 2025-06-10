@@ -34,6 +34,7 @@ var (
 	generateSnapshot    bool
 	timeout             time.Duration
 	maxDepth            int
+	extraContext        string
 
 	// Setup command variables
 	resourceGroup      string
@@ -48,7 +49,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "container-copilot",
+	Use:   "container-kit",
 	Short: "An AI-Powered CLI tool to containerize your app and generate Kubernetes artifacts",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -94,7 +95,7 @@ var generateCmd = &cobra.Command{
 		// Determine target directory from multiple sources in order of priority:
 		// 1. Command line argument
 		// 2. --target-repo flag
-		// 3. CCP_TARGET_REPO environment variable (which would include values from .env)
+		// 3. TARGET_REPO environment variable (which would include values from .env)
 		// 4. Interactive prompt
 
 		var targetDir string
@@ -103,23 +104,23 @@ var generateCmd = &cobra.Command{
 		if len(args) > 0 {
 			targetDir = args[0]
 			// Set it in the environment so auto-setup can find it later
-			os.Setenv("CCP_TARGET_REPO", targetDir)
+			os.Setenv("TARGET_REPO", targetDir)
 		} else {
 			// Check flag
 			targetFlag, _ := cmd.Flags().GetString("target-repo")
 			if targetFlag != "" {
 				targetDir = targetFlag
 				// Set it in the environment so auto-setup can find it later
-				os.Setenv("CCP_TARGET_REPO", targetDir)
+				os.Setenv("TARGET_REPO", targetDir)
 			} else {
 				// Check environment variable (includes .env file)
-				targetDir = os.Getenv("CCP_TARGET_REPO")
+				targetDir = os.Getenv("TARGET_REPO")
 
 				// If still no target, prompt the user
 				if targetDir == "" {
 					// No target directory provided - inform the user and accept input
 					logger.Warn("No target repository specified. The target repository is the directory containing the application you want to containerize.")
-					logger.Info("Example: container-copilot generate ./my-app")
+					logger.Info("Example: container-kit generate ./my-app")
 
 					// Ask if they want to provide a target directory now
 					logger.Info("Would you like to specify a target repository now? (y/n): ")
@@ -134,7 +135,7 @@ var generateCmd = &cobra.Command{
 							return fmt.Errorf("target repository is required")
 						}
 						// Set it in the environment so auto-setup can find it later
-						os.Setenv("CCP_TARGET_REPO", targetDir)
+						os.Setenv("TARGET_REPO", targetDir)
 					} else {
 						return fmt.Errorf("target repository is required")
 					}
@@ -160,12 +161,24 @@ var generateCmd = &cobra.Command{
 			targetDir = normalizedPath
 		}
 
+		// Validate that the directory exists
+		info, err := os.Stat(targetDir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("targetDir %q does not exist", targetDir)
+			}
+			return fmt.Errorf("error checking targetDir %q: %w", targetDir, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("targetDir %q is not a directory", targetDir)
+		}
+
 		c, err := initClients(ctx)
 		if err != nil {
 			return fmt.Errorf("error initializing Azure OpenAI client: %w", err)
 		}
 
-		if err := generate(ctx, targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c); err != nil {
+		if err := generate(ctx, targetDir, registry, dockerfileGenerator == "draft", generateSnapshot, c, extraContext); err != nil {
 			return fmt.Errorf("error generating artifacts: %w", err)
 		}
 
@@ -197,8 +210,8 @@ var testCmd = &cobra.Command{
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Set up Azure OpenAI resources and run container-copilot",
-	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-copilot to generate artifacts.`,
+	Short: "Set up Azure OpenAI resources and run container-kit",
+	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-kit to generate artifacts.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_, file, _, ok := runtime.Caller(0)
 		if !ok {
@@ -269,10 +282,10 @@ var setupCmd = &cobra.Command{
 
 		// Display next steps instead of running generate automatically
 		if config.TargetRepo != "" {
-			logger.Infof("\nTo generate artifacts, run: container-copilot generate %s", config.TargetRepo)
+			logger.Infof("\nTo generate artifacts, run: container-kit generate %s", config.TargetRepo)
 		} else {
 			logger.Info("\nTo generate artifacts, run:")
-			logger.Info("  container-copilot generate <path/to/target-repo>")
+			logger.Info("  container-kit generate <path/to/target-repo>")
 		}
 
 		return nil
@@ -313,7 +326,7 @@ func initClients(ctx context.Context) (*clients.Clients, error) {
 
 		// Run setup process
 		if err := runAutoSetup(); err != nil {
-			return nil, fmt.Errorf("automatic setup failed: %w\nPlease run 'container-copilot setup' manually or provide the environment variables", err)
+			return nil, fmt.Errorf("automatic setup failed: %w\nPlease run 'container-kit setup' manually or provide the environment variables", err)
 		}
 
 		// After setup, reload environment variables
@@ -369,7 +382,7 @@ func runAutoSetup() error {
 	tempCmd.Flags().String("target-repo", "", "")
 
 	// Check if target repo is already available in environment
-	envTargetRepo := os.Getenv("CCP_TARGET_REPO")
+	envTargetRepo := os.Getenv("TARGET_REPO")
 	if envTargetRepo != "" {
 		tempCmd.Flags().Set("target-repo", envTargetRepo)
 		logger.Infof("Using target repository from environment: %s", envTargetRepo)
