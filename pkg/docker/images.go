@@ -35,7 +35,7 @@ approved_images:
       - If using mvnw, COPY both the mvnw script and .mvn/ directory, and make the script executable.
       - Avoid 'mvn dependency:go-offline' unless all transitive and parent files are in the context.
       -if maven builds throw errors, try using maven with the D-skipTests flag to skip tests.
-      - if mavin builds continue to fail when using a specific base version of the image (e.g if 3.9 fails try 3.6.3), try using a different base image version.
+      - if maven builds continue to fail when using a specific base version of the image (e.g if 3.9 fails try 3.6.3), try using a different base image version.
       - Prefer full 'mvn clean package' builds. Avoid partial goals unless structure is known.
       - In the build stage, use a wildcard (e.g., target/*.war) to locate the output and rename it to a known name (e.g., app.jar). Do not rely on -DfinalName.
       - In the CMD, avoid runtime wildcards or find-based commands. Reference the renamed artifact directly to ensure startup reliability.
