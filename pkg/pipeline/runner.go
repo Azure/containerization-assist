@@ -109,7 +109,7 @@ func (r *Runner) Run(
 		}
 
 		err := stage.Run(ctx, state, clients, opts)
-		if opts.GenerateSnapshot {
+		if opts.GenerateSnapshot || opts.GenerateReport {
 			outcome := StageOutcomeSuccess
 			if err != nil {
 				outcome = StageOutcomeFailure
@@ -119,8 +119,10 @@ func (r *Runner) Run(
 				RetryCount: state.RetryCount,
 				Outcome:    outcome,
 			})
-			if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
-				return fmt.Errorf("writing iteration snapshot: %w", err)
+			if opts.GenerateSnapshot {
+				if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
+					return fmt.Errorf("writing iteration snapshot: %w", err)
+				}
 			}
 		}
 
