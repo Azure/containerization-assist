@@ -55,7 +55,6 @@ func formatMarkdownReport(ctx context.Context, state *PipelineState) string {
 		outcome = RunOutcomeFailure
 	}
 
-	// md.WriteString(fmt.Sprintf("# Run Report\n\n"))
 	md.WriteString(fmt.Sprintf("**Outcome:** %s\n\n", outcome))
 	md.WriteString(fmt.Sprintf("**Total Iterations:** %d\n\n", state.IterationCount))
 	md.WriteString(fmt.Sprintf("## Stage History\n\n"))
