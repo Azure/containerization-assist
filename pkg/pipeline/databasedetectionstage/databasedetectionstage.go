@@ -3,8 +3,6 @@ package databasedetectionstage
 import (
 	"context"
 	"os"
-	"time"
-	"fmt"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-copilot/pkg/utils"
 )
 
 // DatabaseType defines a custom type for database types.
@@ -139,14 +138,14 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 		CosmosDB:   regexp.MustCompile(`(?i)(cosmosdb)[\s-]?(\d+\.\d+(\.\d+)?)|<cosmosdb\.version>(\d+\.\d+(\.\d+)?)</cosmosdb\.version>|cosmosdb\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
 	}
 
-	// Scan the repository for database-related terms and versions
-	spinner := []rune{'|', '/', '-', '\\'}
+	// Initialize progress tracker
+	progressTracker := utils.NewProgressTracker()
+
 	var totalFiles int
 	totalFiles, _ = calculateTotalFiles(targetDir)
 	var processedFiles int
 	var detectedDatabases []DatabaseDetectionResult
 
-	
 	err := filepath.Walk(targetDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -166,8 +165,7 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 					version := "unknown"
 					if versionPattern, ok := versionPatterns[dbType]; ok {
 						matches := versionPattern.FindStringSubmatch(string(data))
-						// Check all possible groups for a version match
-						if len(matches) > 2 { 				
+						if len(matches) > 2 {
 							for _, group := range matches[2:] {
 								if group != "" {
 									version = group
@@ -183,15 +181,9 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 					})
 				}
 			}
+
 			processedFiles++
-            progress := float64(processedFiles) / float64(totalFiles) * 100
-            spinnerChar := spinner[processedFiles%len(spinner)]
-			if progress == 100 {
-				fmt.Printf("\r        Progress: [%-30s] %c 100.00%%\n", strings.Repeat("=", 30), spinnerChar)
-			} else {
-            	fmt.Printf("\r        Progress: [%-30s] %c %.2f%%", strings.Repeat("=", int(progress/3.33)), spinnerChar, progress)
-				time.Sleep(25 * time.Millisecond)
-			}
+			progressTracker.UpdateProgress(processedFiles, totalFiles)
 		}
 		return nil
 	})
