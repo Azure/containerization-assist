@@ -1,6 +1,6 @@
-# Container Copilot Modules
+# Container Kit Modules
 
-This document provides an overview of the key modules and their responsibilities within the Container Copilot project.
+This document provides an overview of the key modules and their responsibilities within the Container Kit project.
 
 ## Command Line Interface
 
@@ -37,7 +37,7 @@ This document provides an overview of the key modules and their responsibilities
 - **`pkg/pipeline/`**: Core orchestration:
   - Dockerfile iteration (analysis ↔ build ↔ fix)
   - Kubernetes manifest iteration (analysis ↔ apply ↔ fix)
-  - Snapshot management in `.container-copilot-snapshots`
+  - Snapshot management in `.container-kit-snapshots`
 
 ### Execution
 
@@ -46,7 +46,7 @@ This document provides an overview of the key modules and their responsibilities
 ## Resources
 
 - **`templates/`**: Embedded Dockerfile templates for multiple languages
-- **`hack/`**: Shell scripts (`env.example`, `run-container-copilot.sh`)
+- **`hack/`**: Shell scripts (`env.example`, `run-container-kit.sh`)
 - **`utils/`**: Helper functions (`GrabContentBetweenTags`) to extract LLM responses
 
 ## Component Interactions
