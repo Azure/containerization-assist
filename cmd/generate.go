@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/logger"
 	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-copilot/pkg/pipeline/databasedetectionstage"
 	"github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
 	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
 	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
@@ -70,6 +71,11 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 				AIClient: c.AzOpenAIClient,
 				Parser:   &pipeline.DefaultParser{},
 			},
+		},
+		{
+			Id:    "database-detection",
+			Path:  targetDir,
+			Stage: &databasedetectionstage.DatabaseDetectionStage{},
 		},
 		{
 			Id:         "docker",
