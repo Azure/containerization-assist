@@ -266,22 +266,33 @@ Ensure that all COPY and RUN instructions are consistent with the actual file st
 Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
 If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.`
 
-promptText += fmt.Sprintf(`
+	promptText += fmt.Sprintf(`
 ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is relevant for generating a working Dockerfile):
 %s`, state.ExtraContext)
 
-promptText += `
+	promptText += `
 **IMPORTANT: Output the fixed Dockerfile content between <DOCKERFILE> and </DOCKERFILE> tags. These tags must not appear anywhere else in your response except for wrapping the corrected dockerfile content. :IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
 `
 
 	//content, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
-	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
-
+	content, tokenUsage, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
 	if err != nil {
 		return nil, err
 	}
+
+	// Append the completion to the state
+	state.LLMCompletions = append(state.LLMCompletions, pipeline.LLMCompletion{
+		StageID:   "DockerStage",
+		Iteration: state.IterationCount,
+		Response:  content,
+		TokenUsage: pipeline.TokenUsage{
+			CompletionTokens: tokenUsage.CompletionTokens,
+			PromptTokens:     tokenUsage.PromptTokens,
+			TotalTokens:      tokenUsage.TotalTokens,
+		},
+	})
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "DOCKERFILE")

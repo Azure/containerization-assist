@@ -82,17 +82,29 @@ Please:
 - The default configmap name is 'app-config' and the default secret name is 'secret-ref'. Do NOT change these names while referring to them in the manifests.
 IMPORTANT: Do NOT change the name of the app or the name of the container image.`
 
-promptText += fmt.Sprintf(`
+	promptText += fmt.Sprintf(`
 ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is relevant for generating working Kubernetes manifests):
 %s`, state.ExtraContext)
 
-promptText += `
+	promptText += `
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	content, tokenUsage, err := client.GetChatCompletion(ctx, promptText)
+	content, tokenUsage, err := client.GetChatCompletionWithFileTools(ctx, promptText, k8s.MANIFEST_TARGET_DIR)
 	if err != nil {
 		return nil, err
 	}
+
+	// Append the completion to the state
+	state.LLMCompletions = append(state.LLMCompletions, pipeline.LLMCompletion{
+		StageID:   "ManifestStage",
+		Iteration: state.IterationCount,
+		Response:  content,
+		TokenUsage: pipeline.TokenUsage{
+			CompletionTokens: tokenUsage.CompletionTokens,
+			PromptTokens:     tokenUsage.PromptTokens,
+			TotalTokens:      tokenUsage.TotalTokens,
+		},
+	})
 
 	// Accumulate token usage in pipeline state
 	state.TokenUsage.PromptTokens += tokenUsage.PromptTokens

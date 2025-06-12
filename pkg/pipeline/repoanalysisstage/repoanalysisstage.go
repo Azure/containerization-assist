@@ -201,10 +201,21 @@ This information will be used to create an accurate Dockerfile and Kubernetes ma
 `, state.RepoFileTree)
 
 	// Get LLM analysis using the file access tools
-	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, targetDir)
+	content, tokenUsage, err := client.GetChatCompletionWithFileTools(ctx, promptText, targetDir)
 	if err != nil {
-		return "", err
+		return " ", err
 	}
 
+	// Append the completion to the state
+	state.LLMCompletions = append(state.LLMCompletions, pipeline.LLMCompletion{
+		StageID:   "RepoAnalysisStage",
+		Iteration: state.IterationCount,
+		Response:  content,
+		TokenUsage: pipeline.TokenUsage{
+			CompletionTokens: tokenUsage.CompletionTokens,
+			PromptTokens:     tokenUsage.PromptTokens,
+			TotalTokens:      tokenUsage.TotalTokens,
+		},
+	})
 	return content, nil
 }
