@@ -176,6 +176,7 @@ func (c *Clients) GetDeploymentLogs(ctx context.Context, labelSelector string, n
 			logger.Errorf("Failed to describe pod %s: %v", podName, describeErr)
 			logBuilder.WriteString(fmt.Sprintf("Error retrieving pod details: %v\n", describeErr))
 		} else {
+			logger.Debugf("Detailed pod description for %s:\n%s", podName, podDetails)
 			logBuilder.WriteString(podDetails + "\n")
 		}
 
@@ -190,6 +191,7 @@ func (c *Clients) GetDeploymentLogs(ctx context.Context, labelSelector string, n
 			if podLogs == "" {
 				logBuilder.WriteString("Container logs are empty. The container may have just started.\n")
 			} else {
+				logger.Debugf("Retrieved logs for pod %s:\n%s", podName, podLogs)
 				logBuilder.WriteString(podLogs + "\n")
 			}
 		}
