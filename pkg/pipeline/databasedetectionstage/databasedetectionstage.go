@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/logger"
@@ -216,6 +217,11 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 	for _, db := range detectedDatabases {
 		result = append(result, *db)
 	}
+
+	// Sort the result by database type for consistent ordering
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Type < result[j].Type
+	})
 
 	return result, nil
 }
