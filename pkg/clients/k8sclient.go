@@ -101,7 +101,7 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 	podSuccess, podOutput := c.CheckPodStatus(ctx, namespace, labelSelector, time.Minute)
 	if !podSuccess {
 		logger.Debugf("    Retrieving logs for pods with label selector %s in namespace %s", labelSelector, namespace)
-		podLogs, err := GetDeploymentLogs(ctx, k8sAppName , namespace)
+		podLogs, err := GetDeploymentLogs(ctx, k8sAppName, namespace)
 		if err != nil {
 			logger.Errorf("Error retrieving deployment logs: %v\n", err)
 			return false, outputStr + "\n" + podOutput, nil
@@ -120,7 +120,6 @@ func (c *Clients) DeployAndVerifySingleManifest(ctx context.Context, manifestPat
 
 	return true, outputStr, nil
 }
-
 // GetDeploymentLogs retrieves logs for pods matching the label selector in the specified namespace
 func GetDeploymentLogs(ctx context.Context, deploymentName string, namespace string) (string, error) {
 	// Loading kubeconfig from default location
