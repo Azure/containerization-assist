@@ -45,6 +45,7 @@ var KnownDatabaseTypes = []DatabaseType{
 type DatabaseDetectionResult struct {
 	Type    string `json:"type"`
 	Version string `json:"version"`
+	Source  string `json:"source"`
 }
 
 // Ensure DatabaseDetectionStage implements pipeline.PipelineStage interface.
@@ -85,10 +86,6 @@ func (d *DatabaseDetectionStage) WriteSuccessfulFiles(state *pipeline.PipelineSt
 // Run ties together the stage's initialization and generation.
 func (d *DatabaseDetectionStage) Run(ctx context.Context, state *pipeline.PipelineState, clientsObj interface{}, options pipeline.RunnerOptions) error {
 	targetDir := options.TargetDirectory
-	// Use state.TargetDir as the path for both initialization and generation.
-	if err := d.Initialize(ctx, state, targetDir); err != nil {
-		return err
-	}
 
 	// Call the helper to detect the database.
 	detectedDatabases, err := d.detectDatabases(targetDir)
@@ -114,6 +111,9 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 	logger.Infof("Detecting databases in repository: %s", targetDir)
 
 	// Define key terms and version patterns for database detection
+
+	// databasePatterns maps each supported database type to a corresponding regular expression
+	// The regex patterns are case-insensitive and designed to match common database names or aliases.
 	databasePatterns := map[DatabaseType]*regexp.Regexp{
 		MySQL:      regexp.MustCompile(`(?i)\bmysql\b|(?i)\bmariadb\b`),
 		PostgreSQL: regexp.MustCompile(`(?i)\bpostgres\b|(?i)\bpostgresql\b`),
@@ -127,6 +127,15 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 	}
 
 	versionPatterns := map[DatabaseType]*regexp.Regexp{
+		// versionPatterns maps each supported database type to a corresponding regular expression
+		// used to extract version numbers from text sources (e.g., config files, logs).
+		//
+		// The regex patterns are case-insensitive and designed to match various common formats:
+		//   - Plain text format: "mysql 8.0.23", "postgresql-12.3"
+		//   - XML/markup format: "<mysql.version>8.0.23</mysql.version>"
+		//   - Key-value format: "mysql.version 8.0.23"
+		//
+		// Each pattern captures version numbers in the form of "X.Y" or "X.Y.Z".
 		MySQL:      regexp.MustCompile(`(?i)(mysql|mariadb)[\s-]?(\d+\.\d+(\.\d+)?)|<mysql\.version>(\d+\.\d+(\.\d+)?)</mysql\.version>|mysql\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
 		PostgreSQL: regexp.MustCompile(`(?i)(postgres|postgresql)[\s-]?(\d+\.\d+(\.\d+)?)|<postgresql\.version>(\d+\.\d+(\.\d+)?)</postgresql\.version>|postgresql\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
 		MongoDB:    regexp.MustCompile(`(?i)(mongodb)[\s-]?(\d+\.\d+(\.\d+)?)|<mongodb\.version>(\d+\.\d+(\.\d+)?)</mongodb\.version>|mongodb\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
@@ -141,10 +150,9 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 	// Initialize progress tracker
 	progressTracker := utils.NewProgressTracker()
 
-	var totalFiles int
-	totalFiles, _ = calculateTotalFiles(targetDir)
+	totalFiles, _ := calculateTotalFiles(targetDir)
 	var processedFiles int
-	var detectedDatabases []DatabaseDetectionResult
+	detectedDatabases := make(map[DatabaseType]*DatabaseDetectionResult) // Use a map to avoid duplicates
 
 	err := filepath.Walk(targetDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -160,25 +168,36 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 			}
 
 			// Search for database patterns and version patterns in the file content
-			for dbType, pattern := range databasePatterns {
-				if pattern.Match(data) {
-					version := "unknown"
-					if versionPattern, ok := versionPatterns[dbType]; ok {
-						matches := versionPattern.FindStringSubmatch(string(data))
-						if len(matches) > 2 {
-							for _, group := range matches[2:] {
-								if group != "" {
-									version = group
-									break
-								}
-							}
+			// Scan file content for known database types and their versions.
+			for dbType, dbPattern := range databasePatterns {
+				if !dbPattern.Match(data) {
+					continue
+				}
+
+				version := "unknown"
+				if versionPattern, ok := versionPatterns[dbType]; ok {
+					version = extractVersion(string(data), versionPattern)
+				}
+
+				logger.Debugf("Detected database type %s (version %s) in file %s", dbType, version, path)
+
+				// Update or add the database detection result in the map
+				if existing, exists := detectedDatabases[dbType]; exists {
+					// Only overwrite if the existing version is "unknown"
+					if existing.Version == "unknown" {
+						detectedDatabases[dbType] = &DatabaseDetectionResult{
+							Type:    string(dbType),
+							Version: version,
+							Source:  path,
 						}
 					}
-					logger.Debugf("Detected database type %s (version %s) in file %s", dbType, version, path)
-					detectedDatabases = append(detectedDatabases, DatabaseDetectionResult{
+				} else {
+					// Add new entry if it doesn't exist
+					detectedDatabases[dbType] = &DatabaseDetectionResult{
 						Type:    string(dbType),
 						Version: version,
-					})
+						Source:  path,
+					}
 				}
 			}
 
@@ -193,41 +212,10 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 		return nil, err
 	}
 
-	// Remove duplicates from detected databases
-	detectedDatabases = removeDuplicateDatabases(detectedDatabases)
-
-	return detectedDatabases, nil
-}
-
-// removeDuplicateDatabases removes duplicate entries from the detected databases list.
-func removeDuplicateDatabases(databases []DatabaseDetectionResult) []DatabaseDetectionResult {
-	unique := make(map[string]DatabaseDetectionResult)
-	unknownVersions := make(map[string]bool)
-
-	// Iterate through the detected databases
-	for _, db := range databases {
-		if db.Version == "unknown" {
-			unknownVersions[db.Type] = true
-		} else {
-			unique[db.Type] = db
-		}
-	}
-
+	// Convert the map to a slice for the final result
 	var result []DatabaseDetectionResult
-
-	// Add databases with actual versions to the result
-	for _, db := range unique {
-		result = append(result, db)
-	}
-
-	// Add databases with "unknown" versions only if no actual version exists
-	for dbType := range unknownVersions {
-		if _, exists := unique[dbType]; !exists {
-			result = append(result, DatabaseDetectionResult{
-				Type:    dbType,
-				Version: "unknown",
-			})
-		}
+	for _, db := range detectedDatabases {
+		result = append(result, *db)
 	}
 
 	// Sort the result by database type for consistent ordering
@@ -235,7 +223,21 @@ func removeDuplicateDatabases(databases []DatabaseDetectionResult) []DatabaseDet
 		return result[i].Type < result[j].Type
 	})
 
-	return result
+	return result, nil
+}
+
+// extractVersion extracts the version number from the given data string using the provided regular expression.
+// It returns the extracted version number as a string, or "unknown" if no valid version number is found.
+func extractVersion(data string, versionPattern *regexp.Regexp) string {
+	matches := versionPattern.FindStringSubmatch(data)
+	if len(matches) > 2 {
+		for _, group := range matches[2:] {
+			if group != "" {
+				return group
+			}
+		}
+	}
+	return "unknown"
 }
 
 func calculateTotalFiles(targetDir string) (int, error) {
