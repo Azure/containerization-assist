@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const SNAPSHOT_DIR_NAME = ".container-copilot-snapshots"
+const SNAPSHOT_DIR_NAME = ".container-kit-snapshots"
 const MANIFEST_DIR_NAME = "manifests"
 
 // Path where manifests are expected to be found - uses GITHUB_WORKSPACE - requires checkout action step

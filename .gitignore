@@ -403,4 +403,4 @@ FodyWeavers.xsd
 *.sln.iml
 
 **/.DS_store
-container-copilot
+container-kit
