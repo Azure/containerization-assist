@@ -169,9 +169,9 @@ func (c *Clients) GetDeploymentLogs(ctx context.Context, labelSelector string, n
 
 		// Get pod description first
 		logger.Debugf("Fetching detailed pod description for %s", podName)
-		logBuilder.WriteString(fmt.Sprintf("\n--- POD DETAILS ---\n"))
+		logBuilder.WriteString("\n--- POD DETAILS ---\n")
 
-		podDetails, describeErr := c.Kube.DescribePod(ctx, namespace, podName)
+		podDetails, describeErr := describePodStatus(client, namespace, podName)
 		if describeErr != nil {
 			logger.Errorf("Failed to describe pod %s: %v", podName, describeErr)
 			logBuilder.WriteString(fmt.Sprintf("Error retrieving pod details: %v\n", describeErr))
@@ -180,7 +180,7 @@ func (c *Clients) GetDeploymentLogs(ctx context.Context, labelSelector string, n
 		}
 
 		// Try to get container logs
-		logBuilder.WriteString(fmt.Sprintf("\n--- CONTAINER LOGS ---\n"))
+		logBuilder.WriteString("\n--- CONTAINER LOGS ---\n")
 		podLogs, err := readPodLogs(client, namespace, podName)
 		if err != nil {
 			logger.Debugf("Unable to read logs for pod %s: %v", podName, err)
@@ -212,4 +212,58 @@ func readPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (st
 		return "", fmt.Errorf("error reading log stream for pod %s: %w", podName, err)
 	}
 	return string(data), nil
+}
+
+func describePodStatus(clientset *kubernetes.Clientset, namespace, podName string) (string, error) {
+	ctx := context.Background()
+	var sb strings.Builder
+
+	// Fetch pod
+	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get pod: %v", err)
+	}
+
+	sb.WriteString(fmt.Sprintf("Pod: %s\nNamespace: %s\nStatus: %s\n", pod.Name, pod.Namespace, pod.Status.Phase))
+	sb.WriteString("--------------------------------------------------\n")
+
+	// Container status errors
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Waiting != nil {
+			sb.WriteString(fmt.Sprintf("Container: %s\n  Waiting: %s - %s\n", cs.Name, cs.State.Waiting.Reason, cs.State.Waiting.Message))
+		}
+		if cs.State.Terminated != nil {
+			sb.WriteString(fmt.Sprintf("Container: %s\n  Terminated: %s - %s (Exit Code: %d)\n",
+				cs.Name,
+				cs.State.Terminated.Reason,
+				cs.State.Terminated.Message,
+				cs.State.Terminated.ExitCode))
+		}
+	}
+
+	// Events
+	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s", podName, namespace)
+	eventList, err := clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fieldSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list events: %v", err)
+	}
+
+	if len(eventList.Items) > 0 {
+		sb.WriteString("\nEvents:\n")
+		for _, e := range eventList.Items {
+			sb.WriteString(fmt.Sprintf(
+				"  %s\t%s\t%s\t%s\n",
+				e.FirstTimestamp.Format("2006-01-02 15:04:05"),
+				e.Type,
+				e.Reason,
+				e.Message,
+			))
+		}
+	} else {
+		sb.WriteString("\nNo events found for pod.\n")
+	}
+
+	return sb.String(), nil
 }
