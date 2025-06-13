@@ -40,10 +40,11 @@ func TestDatabaseDetectionStage_Run(t *testing.T) {
 	// Create a test file with database-related content
 	testFilePath := filepath.Join(tmpDir, "testfile.txt")
 	testContent := `
-        mysql 8.0.16
-        <postgresql.version>15.3</postgresql.version>
+        mariadb 8.0.16
+        <postgres.version>15.3</postgres.version>
         redistribution
         redis.version 7.0.11
+		Cassandra version 14.5.6
     `
 	if err := os.WriteFile(testFilePath, []byte(testContent), 0644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
@@ -62,6 +63,7 @@ func TestDatabaseDetectionStage_Run(t *testing.T) {
 	}
 
 	expected := []DatabaseDetectionResult{
+		{Type: "Cassandra", Version: "14.5.6"},
 		{Type: "MySQL", Version: "8.0.16"},
 		{Type: "PostgreSQL", Version: "15.3"},
 		{Type: "Redis", Version: "7.0.11"},

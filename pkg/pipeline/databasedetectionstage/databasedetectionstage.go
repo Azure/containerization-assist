@@ -13,41 +13,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/utils"
 )
 
-// DatabaseType defines a custom type for database types.
-type DatabaseType string
-
-// Enum-like constants for known database types.
-const (
-	MySQL      DatabaseType = "MySQL"
-	PostgreSQL DatabaseType = "PostgreSQL"
-	MongoDB    DatabaseType = "MongoDB"
-	Redis      DatabaseType = "Redis"
-	Cassandra  DatabaseType = "Cassandra"
-	DynamoDB   DatabaseType = "DynamoDB"
-	SQLite     DatabaseType = "SQLite"
-	SQLServer  DatabaseType = "SQLServer"
-	CosmosDB   DatabaseType = "CosmosDB"
-)
-
-// KnownDatabaseTypes is a list of all valid database types.
-var KnownDatabaseTypes = []DatabaseType{
-	MySQL,
-	PostgreSQL,
-	MongoDB,
-	Redis,
-	Cassandra,
-	DynamoDB,
-	SQLite,
-	SQLServer,
-	CosmosDB,
-}
-
-type DatabaseDetectionResult struct {
-	Type    string `json:"type"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
-}
-
 // Ensure DatabaseDetectionStage implements pipeline.PipelineStage interface.
 var _ pipeline.PipelineStage = &DatabaseDetectionStage{}
 
@@ -110,43 +75,6 @@ func (d *DatabaseDetectionStage) Deploy(ctx context.Context, state *pipeline.Pip
 func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDetectionResult, error) {
 	logger.Infof("Detecting databases in repository: %s", targetDir)
 
-	// Define key terms and version patterns for database detection
-
-	// databasePatterns maps each supported database type to a corresponding regular expression
-	// The regex patterns are case-insensitive and designed to match common database names or aliases.
-	databasePatterns := map[DatabaseType]*regexp.Regexp{
-		MySQL:      regexp.MustCompile(`(?i)\bmysql\b|(?i)\bmariadb\b`),
-		PostgreSQL: regexp.MustCompile(`(?i)\bpostgres\b|(?i)\bpostgresql\b`),
-		MongoDB:    regexp.MustCompile(`(?i)\bmongodb\b`),
-		Redis:      regexp.MustCompile(`(?i)\bredis\b`),
-		Cassandra:  regexp.MustCompile(`(?i)\bcassandra\b`),
-		DynamoDB:   regexp.MustCompile(`(?i)\bdynamodb\b`),
-		SQLite:     regexp.MustCompile(`(?i)\bsqlite\b`),
-		SQLServer:  regexp.MustCompile(`(?i)\bsqlserver\b|(?i)\bmssql\b`),
-		CosmosDB:   regexp.MustCompile(`(?i)\bcosmosdb\b`),
-	}
-
-	versionPatterns := map[DatabaseType]*regexp.Regexp{
-		// versionPatterns maps each supported database type to a corresponding regular expression
-		// used to extract version numbers from text sources (e.g., config files, logs).
-		//
-		// The regex patterns are case-insensitive and designed to match various common formats:
-		//   - Plain text format: "mysql 8.0.23", "postgresql-12.3"
-		//   - XML/markup format: "<mysql.version>8.0.23</mysql.version>"
-		//   - Key-value format: "mysql.version 8.0.23"
-		//
-		// Each pattern captures version numbers in the form of "X.Y" or "X.Y.Z".
-		MySQL:      regexp.MustCompile(`(?i)(mysql|mariadb)[\s-]?(\d+\.\d+(\.\d+)?)|<mysql\.version>(\d+\.\d+(\.\d+)?)</mysql\.version>|mysql\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		PostgreSQL: regexp.MustCompile(`(?i)(postgres|postgresql)[\s-]?(\d+\.\d+(\.\d+)?)|<postgresql\.version>(\d+\.\d+(\.\d+)?)</postgresql\.version>|postgresql\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		MongoDB:    regexp.MustCompile(`(?i)(mongodb)[\s-]?(\d+\.\d+(\.\d+)?)|<mongodb\.version>(\d+\.\d+(\.\d+)?)</mongodb\.version>|mongodb\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		Redis:      regexp.MustCompile(`(?i)(redis)[\s-]?(\d+\.\d+(\.\d+)?)|<redis\.version>(\d+\.\d+(\.\d+)?)</redis\.version>|redis\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		Cassandra:  regexp.MustCompile(`(?i)(cassandra)[\s-]?(\d+\.\d+(\.\d+)?)|<cassandra\.version>(\d+\.\d+(\.\d+)?)</cassandra\.version>|cassandra\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		DynamoDB:   regexp.MustCompile(`(?i)(dynamodb)[\s-]?(\d+\.\d+(\.\d+)?)|<dynamodb\.version>(\d+\.\d+(\.\d+)?)</dynamodb\.version>|dynamodb\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		SQLite:     regexp.MustCompile(`(?i)(sqlite)[\s-]?(\d+\.\d+(\.\d+)?)|<sqlite\.version>(\d+\.\d+(\.\d+)?)</sqlite\.version>|sqlite\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		SQLServer:  regexp.MustCompile(`(?i)(sqlserver|mssql)[\s-]?(\d+\.\d+(\.\d+)?)|<sqlserver\.version>(\d+\.\d+(\.\d+)?)</sqlserver\.version>|sqlserver\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-		CosmosDB:   regexp.MustCompile(`(?i)(cosmosdb)[\s-]?(\d+\.\d+(\.\d+)?)|<cosmosdb\.version>(\d+\.\d+(\.\d+)?)</cosmosdb\.version>|cosmosdb\.version[\s-]?(\d+\.\d+(\.\d+)?)`),
-	}
-
 	// Initialize progress tracker
 	progressTracker := utils.NewProgressTracker()
 
@@ -168,31 +96,21 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 			}
 
 			// Search for database patterns and version patterns in the file content
-			// Scan file content for known database types and their versions.
-			for dbType, dbPattern := range databasePatterns {
+			for dbType, dbPattern := range DatabasePatterns {
 				if !dbPattern.Match(data) {
 					continue
 				}
 
 				version := "unknown"
-				if versionPattern, ok := versionPatterns[dbType]; ok {
+				if versionPattern, ok := VersionPatterns[dbType]; ok {
 					version = extractVersion(string(data), versionPattern)
 				}
 
 				logger.Debugf("Detected database type %s (version %s) in file %s", dbType, version, path)
 
 				// Update or add the database detection result in the map
-				if existing, exists := detectedDatabases[dbType]; exists {
+				if existing, exists := detectedDatabases[dbType]; exists && existing.Version == "unknown" || !exists{
 					// Only overwrite if the existing version is "unknown"
-					if existing.Version == "unknown" {
-						detectedDatabases[dbType] = &DatabaseDetectionResult{
-							Type:    string(dbType),
-							Version: version,
-							Source:  path,
-						}
-					}
-				} else {
-					// Add new entry if it doesn't exist
 					detectedDatabases[dbType] = &DatabaseDetectionResult{
 						Type:    string(dbType),
 						Version: version,
@@ -230,9 +148,13 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 // It returns the extracted version number as a string, or "unknown" if no valid version number is found.
 func extractVersion(data string, versionPattern *regexp.Regexp) string {
 	matches := versionPattern.FindStringSubmatch(data)
+
+	// Regex to validate version format (e.g., "X.Y" or "X.Y.Z")
+	versionFormat := regexp.MustCompile(`^\d+\.\d+(\.\d+)?$`)
+
 	if len(matches) > 2 {
 		for _, group := range matches[2:] {
-			if group != "" {
+			if versionFormat.MatchString(group) { // Check if the group matches the version format
 				return group
 			}
 		}
