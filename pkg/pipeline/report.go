@@ -88,11 +88,13 @@ func WriteReport(ctx context.Context, state *PipelineState, targetDir string) er
 	reportJSON, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		logger.Warnf("Error marshalling stage history: %v", err)
+		return fmt.Errorf("marshalling stage history: %w", err)
 	}
 	reportFile := filepath.Join(reportDirectoryPath, "run_report.json")
 	logger.Debugf("Writing stage history to %s", reportFile)
 	if err := os.WriteFile(reportFile, reportJSON, 0644); err != nil {
 		logger.Errorf("Error writing stage history to file: %v", err)
+		return fmt.Errorf("writing stage history to file: %w", err)
 	}
 
 	// Generate and write the markdown report using context and pipeline state
