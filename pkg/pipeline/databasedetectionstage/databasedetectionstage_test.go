@@ -26,57 +26,78 @@ func TestDatabaseDetectionStage_Initialize(t *testing.T) {
 
 // TestDatabaseDetectionStage_Run tests the Run method
 func TestDatabaseDetectionStage_Run(t *testing.T) {
-	// Create a test pipeline
-	stage := &DatabaseDetectionStage{}
-
-	// Create a test state
-	state := &pipeline.PipelineState{
-		Metadata: make(map[pipeline.MetadataKey]any),
+	type testCase struct {
+		name     string                    // Test case name
+		content  string                    // Input file content
+		expected []DatabaseDetectionResult // Expected detected databases
 	}
 
-	// Create a temp directory for testing
-	tmpDir := t.TempDir()
-
-	// Create a test file with database-related content
-	testFilePath := filepath.Join(tmpDir, "testfile.txt")
-	testContent := `
-        mariadb 8.0.16
-        <postgres.version>15.3</postgres.version>
-        redistribution
-        redis.version 7.0.11
-		Cassandra version 14.5.6
-    `
-	if err := os.WriteFile(testFilePath, []byte(testContent), 0644); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
+	tests := []testCase{
+		{
+			name: "Valid database content",
+			content: `
+                mysql 8.0.16
+                <postgres.version>15.3</postgres.version>
+                redis.version 7.0.11
+				redistribution
+                Cassandra version 14.5.6
+            `,
+			expected: []DatabaseDetectionResult{
+				{Type: "Cassandra", Version: "14.5.6"},
+				{Type: "MySQL", Version: "8.0.16"},
+				{Type: "PostgreSQL", Version: "15.3"},
+				{Type: "Redis", Version: "7.0.11"},
+			},
+		},
+		{
+			name: "Non-database content",
+			content: `
+                Some random text
+				Redistribution
+                Not a database
+                Just some words
+            `,
+			expected: []DatabaseDetectionResult{},
+		},
 	}
 
-	// Run the detection stage
-	err := stage.Run(context.Background(), state, nil, pipeline.RunnerOptions{TargetDirectory: tmpDir})
-	if err != nil {
-		t.Errorf("Run should not return an error, got: %v", err)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create a temporary file with the test content
+			tmpDir := t.TempDir()
+			testFilePath := filepath.Join(tmpDir, "testfile.txt")
+			if err := os.WriteFile(testFilePath, []byte(test.content), 0644); err != nil {
+				t.Fatalf("Failed to write test file: %v", err)
+			}
 
-	// Validate detected databases
-	detectedDatabases, ok := state.Metadata["detectedDatabases"].([]DatabaseDetectionResult)
-	if !ok {
-		t.Fatalf("Run did not populate detected databases in metadata")
-	}
+			// Create a test pipeline
+			stage := &DatabaseDetectionStage{}
+			state := &pipeline.PipelineState{
+				Metadata: make(map[pipeline.MetadataKey]any),
+			}
 
-	expected := []DatabaseDetectionResult{
-		{Type: "Cassandra", Version: "14.5.6"},
-		{Type: "MySQL", Version: "8.0.16"},
-		{Type: "PostgreSQL", Version: "15.3"},
-		{Type: "Redis", Version: "7.0.11"},
-	}
+			// Run the detection stage
+			err := stage.Run(context.Background(), state, nil, pipeline.RunnerOptions{TargetDirectory: tmpDir})
+			if err != nil {
+				t.Errorf("Run should not return an error, got: %v", err)
+			}
 
-	if len(detectedDatabases) != len(expected) {
-		t.Errorf("Expected %d detected databases, got %d", len(expected), len(detectedDatabases))
-	}
+			// Validate detected databases
+			detectedDatabases, ok := state.Metadata["detectedDatabases"].([]DatabaseDetectionResult)
+			if !ok {
+				t.Fatalf("Run did not populate detected databases in metadata")
+			}
 
-	for i, db := range detectedDatabases {
-		if db.Type != expected[i].Type || db.Version != expected[i].Version {
-			t.Errorf("Detected database mismatch. Expected: %v, Got: %v", expected[i], db)
-		}
+			if len(detectedDatabases) != len(test.expected) {
+				t.Errorf("Expected %d detected databases, got %d", len(test.expected), len(detectedDatabases))
+			}
+
+			for i, db := range detectedDatabases {
+				if db.Type != test.expected[i].Type || db.Version != test.expected[i].Version {
+					t.Errorf("Detected database mismatch. Expected: %v, Got: %v", test.expected[i], db)
+				}
+			}
+		})
 	}
 }
 

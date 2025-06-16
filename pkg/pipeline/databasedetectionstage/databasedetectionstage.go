@@ -88,40 +88,42 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 		}
 
 		// Only scan files (skip directories)
-		if !info.IsDir() {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				logger.Warnf("Failed to read file %s: %v", path, err)
-				return nil
-			}
-
-			// Search for database patterns and version patterns in the file content
-			for dbType, dbPattern := range DatabasePatterns {
-				if !dbPattern.Match(data) {
-					continue
-				}
-
-				version := "unknown"
-				if versionPattern, ok := VersionPatterns[dbType]; ok {
-					version = extractVersion(string(data), versionPattern)
-				}
-
-				logger.Debugf("Detected database type %s (version %s) in file %s", dbType, version, path)
-
-				// Update or add the database detection result in the map
-				if existing, exists := detectedDatabases[dbType]; exists && existing.Version == "unknown" || !exists{
-					// Only overwrite if the existing version is "unknown"
-					detectedDatabases[dbType] = &DatabaseDetectionResult{
-						Type:    string(dbType),
-						Version: version,
-						Source:  path,
-					}
-				}
-			}
-
-			processedFiles++
-			progressTracker.UpdateProgress(processedFiles, totalFiles)
+		if info.IsDir() {
+			return nil
 		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			logger.Warnf("Failed to read file %s: %v", path, err)
+			return nil
+		}
+
+		// Search for database patterns and version patterns in the file content
+		for dbType, dbPattern := range DatabasePatterns {
+			if !dbPattern.Match(data) {
+				continue
+			}
+
+			version := "unknown"
+			if versionPattern, ok := VersionPatterns[dbType]; ok {
+				version = extractVersion(string(data), versionPattern)
+			}
+
+			logger.Debugf("Detected database type %s (version %s) in file %s", dbType, version, path)
+
+			// Update or add the database detection result in the map
+			if existing, exists := detectedDatabases[dbType]; exists && existing.Version == "unknown" || !exists{
+				// Only overwrite if the existing version is "unknown"
+				detectedDatabases[dbType] = &DatabaseDetectionResult{
+					Type:    string(dbType),
+					Version: version,
+					Source:  path,
+				}
+			}
+		}
+
+		processedFiles++
+		progressTracker.UpdateProgress(processedFiles, totalFiles)
 		return nil
 	})
 
