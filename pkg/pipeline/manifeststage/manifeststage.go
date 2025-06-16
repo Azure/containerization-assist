@@ -79,6 +79,7 @@ Please:
 - Do NOT create brand new manifests - Only fix the provided manifest.
 - Verify that the health check paths exist before using httpGet probe; if they dont't use a tcpSocket probe instead. 
 - Prefer using secrets for sensitive information like database passwords and configmap for non-sensitive data. Do NOT use hardcoded values in the manifest.
+- For a Spring Boot application, make sure the Actuator dependency is included in the pom.xml before using /actuator/health as the HTTP GET path in the startup probe.
 - The default configmap name is 'app-config' and the default secret name is 'secret-ref'. Do NOT change these names while referring to them in the manifests.
 IMPORTANT: Do NOT change the name of the app or the name of the container image.`
 
