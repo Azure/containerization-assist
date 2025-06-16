@@ -107,6 +107,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 	return nil
 }
 
+// separated generateSnapshot and generateReport flags to make it more customer-friendly
 func init() {
 	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
 	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")

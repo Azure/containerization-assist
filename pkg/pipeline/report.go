@@ -84,7 +84,7 @@ func WriteReport(ctx context.Context, state *PipelineState, targetDir string) er
 		return fmt.Errorf("creating report directory: %w", err)
 	}
 
-	report := NewReport(ctx, state, targetDir)
+	report := NewReport(ctx, state)
 	reportJSON, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		logger.Warnf("Error marshalling stage history: %v", err)
