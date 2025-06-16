@@ -25,7 +25,7 @@ type RunReport struct {
 	StageHistory   []StageVisit `json:"stage_history"`
 }
 
-func NewReport(ctx context.Context, state *PipelineState, targetDir string) *RunReport {
+func NewReport(ctx context.Context, state *PipelineState) *RunReport {
 	outcome := RunOutcomeSuccess
 	// if deadline exceeded or canceled, set outcome to timeout
 	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
