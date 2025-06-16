@@ -17,6 +17,12 @@ type AzOpenAIClient struct {
 	deploymentID string
 	tokenUsage   TokenUsage
 }
+type LLMCompletion struct {
+	StageID    string     `json:"stage_id"`
+	Iteration  int        `json:"iteration"`
+	Response   string     `json:"response"`
+	TokenUsage TokenUsage `json:"token_usage"`
+}
 
 // TokenUsage holds the token usage information across all pipelines
 type TokenUsage struct {

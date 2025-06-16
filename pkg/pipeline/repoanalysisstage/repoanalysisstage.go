@@ -207,11 +207,11 @@ This information will be used to create an accurate Dockerfile and Kubernetes ma
 	}
 
 	// Append the completion to the state
-	state.LLMCompletions = append(state.LLMCompletions, pipeline.LLMCompletion{
+	state.LLMCompletions = append(state.LLMCompletions, ai.LLMCompletion{
 		StageID:   "RepoAnalysisStage",
 		Iteration: state.IterationCount,
 		Response:  content,
-		TokenUsage: pipeline.TokenUsage{
+		TokenUsage: ai.TokenUsage{
 			CompletionTokens: tokenUsage.CompletionTokens,
 			PromptTokens:     tokenUsage.PromptTokens,
 			TotalTokens:      tokenUsage.TotalTokens,

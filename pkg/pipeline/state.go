@@ -19,8 +19,8 @@ type PipelineState struct {
 	TokenUsage     ai.TokenUsage
 	Metadata       map[MetadataKey]any //Flexible storage
 	StageHistory   []StageVisit
-	ExtraContext   string          // Additional context for AI models passed from the CLI
-	LLMCompletions []LLMCompletion `json:"llm_completions,omitempty"`
+	ExtraContext   string             // Additional context for AI models passed from the CLI
+	LLMCompletions []ai.LLMCompletion `json:"llm_completions,omitempty"`
 }
 
 type StageOutcome string
@@ -34,18 +34,6 @@ type StageVisit struct {
 	StageID    string
 	RetryCount int
 	Outcome    StageOutcome
-}
-type TokenUsage struct {
-	CompletionTokens int `json:"completion_tokens"`
-	PromptTokens     int `json:"prompt_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-type LLMCompletion struct {
-	StageID    string     `json:"stage_id"`
-	Iteration  int        `json:"iteration"`
-	Response   string     `json:"response"`
-	TokenUsage TokenUsage `json:"token_usage"`
 }
 
 // FileAnalysisInput represents the common input structure for file analysis

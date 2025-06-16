@@ -283,11 +283,11 @@ I will tip you if you provide a correct and working Dockerfile.
 	}
 
 	// Append the completion to the state
-	state.LLMCompletions = append(state.LLMCompletions, pipeline.LLMCompletion{
+	state.LLMCompletions = append(state.LLMCompletions, ai.LLMCompletion{
 		StageID:   "DockerStage",
 		Iteration: state.IterationCount,
 		Response:  content,
-		TokenUsage: pipeline.TokenUsage{
+		TokenUsage: ai.TokenUsage{
 			CompletionTokens: tokenUsage.CompletionTokens,
 			PromptTokens:     tokenUsage.PromptTokens,
 			TotalTokens:      tokenUsage.TotalTokens,
