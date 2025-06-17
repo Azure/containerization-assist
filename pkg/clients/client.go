@@ -8,7 +8,7 @@ import (
 )
 
 type Clients struct {
-	AzOpenAIClient *ai.AzOpenAIClient
+	AzOpenAIClient ai.LLMClient
 	Docker         docker.DockerClient
 	Kind           kind.KindRunner
 	Kube           k8s.KubeRunner

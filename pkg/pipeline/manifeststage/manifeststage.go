@@ -31,7 +31,7 @@ func GetPendingManifests(state *pipeline.PipelineState) map[string]bool {
 }
 
 // analyzeKubernetesManifest uses AI to analyze and fix Kubernetes manifest content
-func analyzeKubernetesManifest(ctx context.Context, client *ai.AzOpenAIClient, input pipeline.FileAnalysisInput, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
+func analyzeKubernetesManifest(ctx context.Context, client ai.LLMClient, input pipeline.FileAnalysisInput, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
 	// Create prompt for analyzing the Kubernetes manifest
 	promptText := fmt.Sprintf(`Analyze the following Kubernetes manifest file for errors and suggest fixes:
 Manifest:
@@ -90,27 +90,10 @@ ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is rele
 	promptText += `
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	content, tokenUsage, err := client.GetChatCompletionWithFileTools(ctx, promptText, k8s.MANIFEST_TARGET_DIR)
+	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, k8s.MANIFEST_TARGET_DIR)
 	if err != nil {
 		return nil, err
 	}
-
-	// Append the completion to the state
-	state.LLMCompletions = append(state.LLMCompletions, ai.LLMCompletion{
-		StageID:   "ManifestStage",
-		Iteration: state.IterationCount,
-		Response:  content,
-		TokenUsage: ai.TokenUsage{
-			CompletionTokens: tokenUsage.CompletionTokens,
-			PromptTokens:     tokenUsage.PromptTokens,
-			TotalTokens:      tokenUsage.TotalTokens,
-		},
-	})
-
-	// Accumulate token usage in pipeline state
-	state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
-	state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
-	state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "MANIFEST")
@@ -174,7 +157,7 @@ func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c 
 
 // ManifestStage implements the pipeline.Pipeline interface for Kubernetes manifests
 type ManifestStage struct {
-	AIClient *ai.AzOpenAIClient
+	AIClient ai.LLMClient
 	Parser   pipeline.Parser
 }
 
@@ -224,6 +207,9 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 // GetErrors returns a formatted string of all manifest errors
 func (p *ManifestStage) GetErrors(state *pipeline.PipelineState) string {
 	return FormatManifestErrors(state)
+}
+func (p *ManifestStage) SetAIClient(client ai.LLMClient) {
+	p.AIClient = client
 }
 
 // WriteSuccessfulFiles writes successful manifests to disk

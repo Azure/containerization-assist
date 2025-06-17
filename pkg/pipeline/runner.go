@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
@@ -68,7 +69,7 @@ func (r *Runner) Run(
 	ctx context.Context,
 	state *PipelineState,
 	opts RunnerOptions,
-	clients interface{},
+	clientsIface interface{},
 ) error {
 	// Initialize the pipeline stages in order
 	for _, sc := range r.stageConfigs {
@@ -107,8 +108,29 @@ func (r *Runner) Run(
 		} else {
 			logger.Infof("  === Retrying stage %s %d/%d  (iteration %d) ===", currentStageConfig.Id, state.RetryCount, currentStageConfig.MaxRetries, state.IterationCount)
 		}
+		var runErr error
+		// If snapshot generation is enabled and an OpenAI client exists,
+		// wrap the client's calls with tracking for token usage and completions.
+		// Inject the tracked client into the stage if it supports AIClientInjectable.
+		// Run the stage with the tracked client, then restore the original client.
 
-		err := stage.Run(ctx, state, clients, opts)
+		if c, ok := clientsIface.(*clients.Clients); ok && c.AzOpenAIClient != nil {
+			tracked := WrapForTracking(c.AzOpenAIClient, state, string(currentStageConfig.Id), opts)
+
+			original := c.AzOpenAIClient
+			c.AzOpenAIClient = tracked
+
+			if injectable, ok := stage.(AIClientInjectable); ok {
+				injectable.SetAIClient(tracked)
+			}
+
+			runErr = stage.Run(ctx, state, clientsIface, opts)
+
+			c.AzOpenAIClient = original
+		} else {
+			runErr = stage.Run(ctx, state, clientsIface, opts)
+		}
+		err := runErr
 		if opts.GenerateSnapshot {
 			outcome := StageOutcomeSuccess
 			if err != nil {
@@ -140,7 +162,7 @@ func (r *Runner) Run(
 			continue
 		}
 		fmt.Fprintf(r.out, "  ✅ Stage %s succeeded, deploying...\n", currentStageConfig.Id)
-		err = stage.Deploy(ctx, state, clients)
+		err = stage.Deploy(ctx, state, clientsIface)
 		if err != nil {
 			fmt.Fprintf(r.out, "⚠️ Deploy failed for stage %s: %v\n", currentStageConfig.Id, err)
 		}

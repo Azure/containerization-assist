@@ -13,7 +13,7 @@ import (
 var _ pipeline.PipelineStage = &RepoAnalysisStage{}
 
 type RepoAnalysisStage struct {
-	AIClient *ai.AzOpenAIClient
+	AIClient ai.LLMClient
 	Parser   pipeline.Parser
 }
 
@@ -36,6 +36,9 @@ func (p *RepoAnalysisStage) GetErrors(state *pipeline.PipelineState) string {
 		return err
 	}
 	return ""
+}
+func (p *RepoAnalysisStage) SetAIClient(client ai.LLMClient) {
+	p.AIClient = client
 }
 
 func (p *RepoAnalysisStage) WriteSuccessfulFiles(state *pipeline.PipelineState) error {
@@ -114,7 +117,7 @@ func (p *RepoAnalysisStage) Run(ctx context.Context, state *pipeline.PipelineSta
 }
 
 // AnalyzeRepositoryWithFileAccess uses AI with file access tools to analyze the repository for containerization requirements
-func AnalyzeRepositoryWithFileAccess(ctx context.Context, client *ai.AzOpenAIClient, state *pipeline.PipelineState, targetDir string) (string, error) {
+func AnalyzeRepositoryWithFileAccess(ctx context.Context, client ai.LLMClient, state *pipeline.PipelineState, targetDir string) (string, error) {
 	// Create prompt for LLM to analyze repository with file access tools
 	promptText := fmt.Sprintf(`
 You are an expert in containerizing applications. Your task is to analyze this repository and identify all the information needed to properly containerize it.
@@ -201,21 +204,9 @@ This information will be used to create an accurate Dockerfile and Kubernetes ma
 `, state.RepoFileTree)
 
 	// Get LLM analysis using the file access tools
-	content, tokenUsage, err := client.GetChatCompletionWithFileTools(ctx, promptText, targetDir)
+	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, targetDir)
 	if err != nil {
 		return " ", err
 	}
-
-	// Append the completion to the state
-	state.LLMCompletions = append(state.LLMCompletions, ai.LLMCompletion{
-		StageID:   "RepoAnalysisStage",
-		Iteration: state.IterationCount,
-		Response:  content,
-		TokenUsage: ai.TokenUsage{
-			CompletionTokens: tokenUsage.CompletionTokens,
-			PromptTokens:     tokenUsage.PromptTokens,
-			TotalTokens:      tokenUsage.TotalTokens,
-		},
-	})
 	return content, nil
 }

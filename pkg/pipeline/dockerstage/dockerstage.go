@@ -19,7 +19,7 @@ import (
 var _ pipeline.PipelineStage = &DockerStage{}
 
 type DockerStage struct {
-	AIClient         *ai.AzOpenAIClient
+	AIClient         ai.LLMClient
 	UseDraftTemplate bool
 	Parser           pipeline.Parser
 }
@@ -52,15 +52,10 @@ func (p *DockerStage) Generate(ctx context.Context, state *pipeline.PipelineStat
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
-			templateName, tokenUsage, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir, state.RepoFileTree)
+			templateName, _, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir, state.RepoFileTree)
 			if err != nil {
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
-
-			// Accumulate token usage from template selection
-			state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
-			state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
-			state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 			logger.Infof("Using Dockerfile template: %s\n", templateName)
 
@@ -94,6 +89,9 @@ func (p *DockerStage) Generate(ctx context.Context, state *pipeline.PipelineStat
 // GetErrors returns Docker-related errors from the state
 func (p *DockerStage) GetErrors(state *pipeline.PipelineState) string {
 	return state.Dockerfile.BuildErrors
+}
+func (p *DockerStage) SetAIClient(client ai.LLMClient) {
+	p.AIClient = client
 }
 
 // WriteSuccessfulFiles writes the successful Dockerfile to disk
@@ -170,7 +168,7 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 }
 
 // analyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities
-func analyzeDockerfile(ctx context.Context, client *ai.AzOpenAIClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
+func analyzeDockerfile(ctx context.Context, client ai.LLMClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
 	dockerfile := state.Dockerfile
 
 	// Get the base directory from the Dockerfile path
@@ -277,22 +275,10 @@ I will tip you if you provide a correct and working Dockerfile.
 `
 
 	//content, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
-	content, tokenUsage, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
+	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
 	if err != nil {
 		return nil, err
 	}
-
-	// Append the completion to the state
-	state.LLMCompletions = append(state.LLMCompletions, ai.LLMCompletion{
-		StageID:   "DockerStage",
-		Iteration: state.IterationCount,
-		Response:  content,
-		TokenUsage: ai.TokenUsage{
-			CompletionTokens: tokenUsage.CompletionTokens,
-			PromptTokens:     tokenUsage.PromptTokens,
-			TotalTokens:      tokenUsage.TotalTokens,
-		},
-	})
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "DOCKERFILE")

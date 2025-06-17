@@ -54,7 +54,7 @@ Keep the tone neutral and factual, but feel free to raise a flag if something ne
 )
 
 // Use LLM to select the dockerfile template name from the list of available templates
-func GetDockerfileTemplateName(ctx context.Context, client *ai.AzOpenAIClient, projectDir string, repoStructure string) (string, ai.TokenUsage, error) {
+func GetDockerfileTemplateName(ctx context.Context, client ai.LLMClient, projectDir string, repoStructure string) (string, ai.TokenUsage, error) {
 	dockerfileTemplateNames, err := listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
 		return "", ai.TokenUsage{}, fmt.Errorf("failed to list dockerfile template names: %w", err)
