@@ -44,24 +44,31 @@ func TestWriteReport(t *testing.T) {
 		t.Errorf("JSON report file does not exist at path: %s", jsonFile)
 	}
 
-	jsonData, err := os.ReadFile(jsonFile)
+	mdFile := filepath.Join(tmpDir, ReportDirectory, "report.md")
+	if _, err := os.Stat(mdFile); os.IsNotExist(err) {
+		t.Errorf("Markdown report file does not exist at path: %s", mdFile)
+	}
+
+	validateReportFiles(t, jsonFile, mdFile, state)
+}
+
+func validateReportFiles(t *testing.T, jsonFile, mdFile string, state *PipelineState) {
+	data, err := os.ReadFile(jsonFile)
 	if err != nil {
-		t.Errorf("Error reading JSON report file: %v", err)
+		t.Fatalf("Failed to read JSON report at %s: %v", jsonFile, err)
 	}
 
 	var report RunReport
-	if err := json.Unmarshal(jsonData, &report); err != nil {
-		t.Errorf("Error unmarshalling JSON report: %v", err)
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatalf("Failed to unmarshal JSON report: %v", err)
 	}
 
 	if report.IterationCount != state.IterationCount {
 		t.Errorf("Expected iteration count %d, got %d", state.IterationCount, report.IterationCount)
 	}
-
 	if report.Outcome != RunOutcomeSuccess {
-		t.Errorf("Expected outcome %s, got %s", RunOutcomeSuccess, report.Outcome)
+		t.Errorf("Expected outcome %q, got %q", RunOutcomeSuccess, report.Outcome)
 	}
-
 	if len(report.StageHistory) != len(state.StageHistory) {
 		t.Errorf("Expected stage history length %d, got %d", len(state.StageHistory), len(report.StageHistory))
 	} else {
@@ -78,45 +85,32 @@ func TestWriteReport(t *testing.T) {
 		}
 	}
 
-	mdFile := filepath.Join(tmpDir, ReportDirectory, "report.md")
-	if _, err := os.Stat(mdFile); os.IsNotExist(err) {
-		t.Errorf("Markdown report file does not exist at path: %s", mdFile)
-	}
-
 	mdData, err := os.ReadFile(mdFile)
 	if err != nil {
-		t.Errorf("Error reading Markdown report file: %v", err)
+		t.Fatalf("Failed to read Markdown report at %s: %v", mdFile, err)
 	}
 	mdContent := string(mdData)
-	if !strings.Contains(mdContent, fmt.Sprintf("**Total Iterations:** %d", state.IterationCount)) {
-		t.Errorf("Markdown report missing iteration info; got content: %s", mdContent)
+
+	assertContains := func(substr, desc string) {
+		if !strings.Contains(mdContent, substr) {
+			t.Errorf("Missing %s in Markdown: expected to contain %q", desc, substr)
+		}
 	}
 
-	if !strings.Contains(mdContent, fmt.Sprintf("**Outcome:** %s", RunOutcomeSuccess)) {
-		t.Errorf("Markdown report missing or incorrect outcome info. Expected to contain '**Outcome:** %s'. Got content: %s", RunOutcomeSuccess, mdContent)
-	}
+	assertContains(fmt.Sprintf("**Total Iterations:** %d", state.IterationCount), "iteration count")
+	assertContains(fmt.Sprintf("**Outcome:** %s", RunOutcomeSuccess), "outcome")
+	assertContains("## Stage History", "Stage History section")
 
-	if !strings.Contains(mdContent, "## Stage History") {
-		t.Errorf("Markdown report missing '## Stage History' section. Got content: %s", mdContent)
-	}
 	if len(state.StageHistory) > 0 {
-		expectedStageMd := fmt.Sprintf("| %s | %d | %s |", state.StageHistory[0].StageID, state.StageHistory[0].RetryCount, state.StageHistory[0].Outcome)
-		if !strings.Contains(mdContent, expectedStageMd) {
-			t.Errorf("Markdown report missing or incorrect stage history entry. Expected to contain '%s'. Got content: %s", expectedStageMd, mdContent)
-		}
+		stage := state.StageHistory[0]
+		stageRow := fmt.Sprintf("| %s | %d | %s |", stage.StageID, stage.RetryCount, stage.Outcome)
+		assertContains(stageRow, "stage history table row")
 	}
+
 	if state.Success {
-		if !strings.Contains(mdContent, "## Token Usage") {
-			t.Errorf("Markdown report missing '## Token Usage' section for a successful run. Got content: %s", mdContent)
-		}
-		if !strings.Contains(mdContent, fmt.Sprintf("Prompt Tokens: %d", state.TokenUsage.PromptTokens)) {
-			t.Errorf("Markdown report missing or incorrect prompt tokens. Got content: %s", mdContent)
-		}
-		if !strings.Contains(mdContent, fmt.Sprintf("Completion Tokens: %d", state.TokenUsage.CompletionTokens)) {
-			t.Errorf("Markdown report missing or incorrect completion tokens. Got content: %s", mdContent)
-		}
-		if !strings.Contains(mdContent, fmt.Sprintf("Total Tokens: %d", state.TokenUsage.TotalTokens)) {
-			t.Errorf("Markdown report missing or incorrect total tokens. Got content: %s", mdContent)
-		}
+		assertContains("## Token Usage", "Token Usage section")
+		assertContains(fmt.Sprintf("Prompt Tokens: %d", state.TokenUsage.PromptTokens), "prompt tokens")
+		assertContains(fmt.Sprintf("Completion Tokens: %d", state.TokenUsage.CompletionTokens), "completion tokens")
+		assertContains(fmt.Sprintf("Total Tokens: %d", state.TokenUsage.TotalTokens), "total tokens")
 	}
 }

@@ -103,6 +103,7 @@ func WriteReport(ctx context.Context, state *PipelineState, targetDir string) er
 	logger.Debugf("Writing markdown report to %s", reportMarkdownFile)
 	if err := os.WriteFile(reportMarkdownFile, []byte(markdownReportContent), 0644); err != nil {
 		logger.Errorf("Error writing markdown report to file: %v", err)
+		return fmt.Errorf("writing markdown report to file: %w", err)
 	}
 
 	return nil
