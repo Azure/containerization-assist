@@ -47,12 +47,12 @@ func NewReport(ctx context.Context, state *PipelineState) *RunReport {
 func formatMarkdownReport(ctx context.Context, state *PipelineState) string {
 	var md strings.Builder
 
-	outcome := RunOutcomeSuccess
+	outcome := RunOutcomeFailure
 	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
 		outcome = RunOutcomeTimeout
 	}
-	if !state.Success {
-		outcome = RunOutcomeFailure
+	if state.Success {
+		outcome = RunOutcomeSuccess
 	}
 
 	md.WriteString(fmt.Sprintf("**Outcome:** %s\n\n", outcome))
