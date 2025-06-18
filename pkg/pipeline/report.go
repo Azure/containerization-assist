@@ -19,6 +19,10 @@ const (
 	RunOutcomeTimeout RunOutcome = "timeout"
 )
 
+const RunReportFileName = "run_report.json"
+
+const ReportMarkdownFileName = "report.md"
+
 type RunReport struct {
 	IterationCount int          `json:"iteration_count"`
 	Outcome        RunOutcome   `json:"outcome"`
@@ -89,7 +93,7 @@ func WriteReport(ctx context.Context, state *PipelineState, targetDir string) er
 		logger.Warnf("Error marshalling stage history: %v", err)
 		return fmt.Errorf("marshalling stage history: %w", err)
 	}
-	reportFile := filepath.Join(reportDirectoryPath, "run_report.json")
+	reportFile := filepath.Join(reportDirectoryPath, RunReportFileName)
 	logger.Debugf("Writing stage history to %s", reportFile)
 	if err := os.WriteFile(reportFile, reportJSON, 0644); err != nil {
 		logger.Errorf("Error writing stage history to file: %v", err)
@@ -98,7 +102,7 @@ func WriteReport(ctx context.Context, state *PipelineState, targetDir string) er
 
 	// Generate and write the markdown report using context and pipeline state
 	markdownReportContent := formatMarkdownReport(ctx, state)
-	reportMarkdownFile := filepath.Join(reportDirectoryPath, "report.md")
+	reportMarkdownFile := filepath.Join(reportDirectoryPath, ReportMarkdownFileName)
 	logger.Debugf("Writing markdown report to %s", reportMarkdownFile)
 	if err := os.WriteFile(reportMarkdownFile, []byte(markdownReportContent), 0644); err != nil {
 		logger.Errorf("Error writing markdown report to file: %v", err)

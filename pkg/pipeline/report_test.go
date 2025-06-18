@@ -39,12 +39,12 @@ func TestWriteReport(t *testing.T) {
 		t.Fatalf("WriteReport returned error: %v", err)
 	}
 
-	jsonFile := filepath.Join(tmpDir, ReportDirectory, "run_report.json")
+	jsonFile := filepath.Join(tmpDir, ReportDirectory, RunReportFileName)
 	if _, err := os.Stat(jsonFile); os.IsNotExist(err) {
 		t.Errorf("JSON report file does not exist at path: %s", jsonFile)
 	}
 
-	mdFile := filepath.Join(tmpDir, ReportDirectory, "report.md")
+	mdFile := filepath.Join(tmpDir, ReportDirectory, ReportMarkdownFileName)
 	if _, err := os.Stat(mdFile); os.IsNotExist(err) {
 		t.Errorf("Markdown report file does not exist at path: %s", mdFile)
 	}
