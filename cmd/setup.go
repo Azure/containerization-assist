@@ -487,7 +487,7 @@ func CheckRPMCapacityInRegions(modelID, modelVersion, preferredLocation string) 
 		logger.Infof("  Checking region %d/%d: %s...", i+1, len(preferredRegions), region)
 		// Get quota information for the region using REST API
 		quotaURL := fmt.Sprintf("https://management.azure.com/subscriptions/%s/providers/Microsoft.CognitiveServices/locations/%s/usages?api-version=2023-05-01", subscriptionID, region)
-		quotaCmd := exec.Command("az", "rest", "--method", "GET", "--url", quotaURL)
+		quotaCmd := exec.Command("az", "rest", "--method", "GET", "--url", quotaURL, "--output", "json")
 
 		output, err := quotaCmd.Output()
 		if err != nil {
