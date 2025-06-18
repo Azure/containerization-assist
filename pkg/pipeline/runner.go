@@ -69,7 +69,7 @@ func (r *Runner) Run(
 	ctx context.Context,
 	state *PipelineState,
 	opts RunnerOptions,
-	clientsIface interface{},
+	clients *clients.Clients,
 ) error {
 	// Initialize the pipeline stages in order
 	for _, sc := range r.stageConfigs {
@@ -114,21 +114,21 @@ func (r *Runner) Run(
 		// Inject the tracked client into the stage if it supports AIClientInjectable.
 		// Run the stage with the tracked client, then restore the original client.
 
-		if c, ok := clientsIface.(*clients.Clients); ok && c.AzOpenAIClient != nil {
-			tracked := WrapForTracking(c.AzOpenAIClient, state, string(currentStageConfig.Id), opts)
+		if clients.AzOpenAIClient != nil {
+			tracked := WrapForTracking(clients.AzOpenAIClient, state, string(currentStageConfig.Id), opts)
 
-			original := c.AzOpenAIClient
-			c.AzOpenAIClient = tracked
+			original := clients.AzOpenAIClient
+			clients.AzOpenAIClient = tracked
 
 			if injectable, ok := stage.(AIClientInjectable); ok {
 				injectable.SetAIClient(tracked)
 			}
 
-			runErr = stage.Run(ctx, state, clientsIface, opts)
+			runErr = stage.Run(ctx, state, clients, opts)
 
-			c.AzOpenAIClient = original
+			clients.AzOpenAIClient = original
 		} else {
-			runErr = stage.Run(ctx, state, clientsIface, opts)
+			runErr = stage.Run(ctx, state, clients, opts)
 		}
 		err := runErr
 		if opts.GenerateSnapshot {
@@ -162,7 +162,7 @@ func (r *Runner) Run(
 			continue
 		}
 		fmt.Fprintf(r.out, "  ✅ Stage %s succeeded, deploying...\n", currentStageConfig.Id)
-		err = stage.Deploy(ctx, state, clientsIface)
+		err = stage.Deploy(ctx, state, clients)
 		if err != nil {
 			fmt.Fprintf(r.out, "⚠️ Deploy failed for stage %s: %v\n", currentStageConfig.Id, err)
 		}
