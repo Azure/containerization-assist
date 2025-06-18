@@ -68,12 +68,11 @@ func formatMarkdownReport(ctx context.Context, state *PipelineState) string {
 			md.WriteString(fmt.Sprintf("| %s | %d | %s |\n", visit.StageID, visit.RetryCount, visit.Outcome))
 		}
 	}
-	if state.Success {
-		md.WriteString(fmt.Sprintf("\n## Token Usage\n\n"))
-		md.WriteString(fmt.Sprintf("Prompt Tokens: %d\n", state.TokenUsage.PromptTokens))
-		md.WriteString(fmt.Sprintf("Completion Tokens: %d\n", state.TokenUsage.CompletionTokens))
-		md.WriteString(fmt.Sprintf("Total Tokens: %d\n", state.TokenUsage.TotalTokens))
-	}
+	md.WriteString("\n## Token Usage\n\n")
+	md.WriteString(fmt.Sprintf("Prompt Tokens: %d\n", state.TokenUsage.PromptTokens))
+	md.WriteString(fmt.Sprintf("Completion Tokens: %d\n", state.TokenUsage.CompletionTokens))
+	md.WriteString(fmt.Sprintf("Total Tokens: %d\n", state.TokenUsage.TotalTokens))
+
 	return md.String()
 }
 

@@ -107,10 +107,8 @@ func validateReportFiles(t *testing.T, jsonFile, mdFile string, state *PipelineS
 		assertContains(stageRow, "stage history table row")
 	}
 
-	if state.Success {
-		assertContains("## Token Usage", "Token Usage section")
-		assertContains(fmt.Sprintf("Prompt Tokens: %d", state.TokenUsage.PromptTokens), "prompt tokens")
-		assertContains(fmt.Sprintf("Completion Tokens: %d", state.TokenUsage.CompletionTokens), "completion tokens")
-		assertContains(fmt.Sprintf("Total Tokens: %d", state.TokenUsage.TotalTokens), "total tokens")
-	}
+	assertContains("## Token Usage", "Token Usage section")
+	assertContains(fmt.Sprintf("Prompt Tokens: %d", state.TokenUsage.PromptTokens), "prompt tokens")
+	assertContains(fmt.Sprintf("Completion Tokens: %d", state.TokenUsage.CompletionTokens), "completion tokens")
+	assertContains(fmt.Sprintf("Total Tokens: %d", state.TokenUsage.TotalTokens), "total tokens")
 }
