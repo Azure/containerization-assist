@@ -114,7 +114,7 @@ func (r *Runner) Run(
 		// Inject the tracked client into the stage if it supports AIClientInjectable.
 		// Run the stage with the tracked client, then restore the original client.
 
-		if clients.AzOpenAIClient != nil {
+		if clients != nil && clients.AzOpenAIClient != nil {
 			tracked := WrapForTracking(clients.AzOpenAIClient, state, string(currentStageConfig.Id), opts)
 
 			original := clients.AzOpenAIClient
