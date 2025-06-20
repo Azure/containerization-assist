@@ -30,13 +30,13 @@ type RunReport struct {
 }
 
 func NewReport(ctx context.Context, state *PipelineState) *RunReport {
-	outcome := RunOutcomeSuccess
+	outcome := RunOutcomeFailure
 	// if deadline exceeded or canceled, set outcome to timeout
 	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
 		outcome = RunOutcomeTimeout
 	}
-	if !state.Success {
-		outcome = RunOutcomeFailure
+	if state.Success {
+		outcome = RunOutcomeSuccess
 	}
 	return &RunReport{
 		IterationCount: state.IterationCount,
