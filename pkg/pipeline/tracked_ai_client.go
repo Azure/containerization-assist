@@ -25,34 +25,34 @@ func WrapForTracking(base ai.LLMClient, state *PipelineState, stageID string, op
 
 func (t *trackedAIClient) GetChatCompletion(ctx context.Context, prompt string) (string, ai.TokenUsage, error) {
 	resp, usage, err := t.base.GetChatCompletion(ctx, prompt)
-	t.trackCompletion(resp, usage, err, prompt)
+	if err == nil {
+		t.trackCompletion(resp, usage, prompt)
+	}
 	return resp, usage, err
 }
 
 func (t *trackedAIClient) GetChatCompletionWithFileTools(ctx context.Context, prompt, baseDir string) (string, ai.TokenUsage, error) {
 	resp, usage, err := t.base.GetChatCompletionWithFileTools(ctx, prompt, baseDir)
-	t.trackCompletion(resp, usage, err, prompt)
+	if err == nil {
+		t.trackCompletion(resp, usage, prompt)
+	}
 	return resp, usage, err
 }
 
 func (t *trackedAIClient) GetChatCompletionWithFormat(ctx context.Context, prompt string, args ...interface{}) (string, ai.TokenUsage, error) {
 	formattedPrompt := fmt.Sprintf(prompt, args...)
 	resp, usage, err := t.base.GetChatCompletionWithFormat(ctx, prompt, args...)
-	t.trackCompletion(resp, usage, err, formattedPrompt)
+	if err == nil {
+		t.trackCompletion(resp, usage, formattedPrompt)
+	}
 	return resp, usage, err
 }
 
-func (t *trackedAIClient) trackCompletion(resp string, usage ai.TokenUsage, err error, prompt string) {
-	if err != nil {
-		return
-	}
-
-	// Accumulate token usage
+func (t *trackedAIClient) trackCompletion(resp string, usage ai.TokenUsage, prompt string) {
 	t.state.TokenUsage.PromptTokens += usage.PromptTokens
 	t.state.TokenUsage.CompletionTokens += usage.CompletionTokens
 	t.state.TokenUsage.TotalTokens += usage.TotalTokens
 
-	// Snapshot LLM completion if enabled
 	if t.opts.GenerateSnapshot {
 		t.state.LLMCompletions = append(t.state.LLMCompletions, ai.LLMCompletion{
 			StageID:    t.stageID,
