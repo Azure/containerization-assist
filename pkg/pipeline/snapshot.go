@@ -61,15 +61,15 @@ func WriteIterationSnapshot(state *PipelineState, targetDir string, stages ...Pi
 		meta["llm_completions"] = state.LLMCompletions
 
 		completionsJson, err := json.MarshalIndent(state.LLMCompletions, "", "  ")
-		if err == nil {
-			if writeErr := os.WriteFile(filepath.Join(snapDir, "llm_completions.json"), completionsJson, 0644); writeErr != nil {
-				logger.Errorf("Failed to write llm_completions.json: %v", writeErr)
-			}
-		} else {
-			logger.Errorf("Failed to marshal LLM completions: %v", err)
+		if err != nil {
+			return fmt.Errorf("marshaling LLM completions: %w", err)
+		}
+
+		writeErr := os.WriteFile(filepath.Join(snapDir, "llm_completions.json"), completionsJson, 0644)
+		if writeErr != nil {
+			return fmt.Errorf("writing llm_completions.json: %w", writeErr)
 		}
 	}
-
 	metaJson, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling metadata to JSON: %w", err)
