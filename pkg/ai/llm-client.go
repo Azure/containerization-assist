@@ -22,6 +22,7 @@ type LLMCompletion struct {
 	Iteration  int        `json:"iteration"`
 	Response   string     `json:"response"`
 	TokenUsage TokenUsage `json:"token_usage"`
+	Prompt     string     `json:"prompt"`
 }
 
 // TokenUsage holds the token usage information across all pipelines

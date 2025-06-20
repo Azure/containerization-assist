@@ -108,28 +108,21 @@ func (r *Runner) Run(
 		} else {
 			logger.Infof("  === Retrying stage %s %d/%d  (iteration %d) ===", currentStageConfig.Id, state.RetryCount, currentStageConfig.MaxRetries, state.IterationCount)
 		}
-		var runErr error
 		// If snapshot generation is enabled and an OpenAI client exists,
 		// wrap the client's calls with tracking for token usage and completions.
 		// Inject the tracked client into the stage if it supports AIClientInjectable.
 		// Run the stage with the tracked client, then restore the original client.
 
-		if clients != nil && clients.AzOpenAIClient != nil {
-			tracked := WrapForTracking(clients.AzOpenAIClient, state, string(currentStageConfig.Id), opts)
-
-			original := clients.AzOpenAIClient
-			clients.AzOpenAIClient = tracked
-
-			if injectable, ok := stage.(AIClientInjectable); ok {
-				injectable.SetAIClient(tracked)
-			}
-
-			runErr = stage.Run(ctx, state, clients, opts)
-
-			clients.AzOpenAIClient = original
-		} else {
-			runErr = stage.Run(ctx, state, clients, opts)
+		if opts.GenerateSnapshot && clients != nil && clients.AzOpenAIClient != nil {
+			clients.AzOpenAIClient = WrapForTracking(clients.AzOpenAIClient, state, "", opts)
 		}
+
+		// Run the stage as usual
+		if injectable, ok := stage.(AIClientInjectable); ok {
+			injectable.SetAIClient(clients.AzOpenAIClient)
+		}
+
+		runErr := stage.Run(ctx, state, clients, opts)
 		err := runErr
 		if opts.GenerateSnapshot {
 			outcome := StageOutcomeSuccess
