@@ -19,7 +19,8 @@ type PipelineState struct {
 	TokenUsage     ai.TokenUsage
 	Metadata       map[MetadataKey]any //Flexible storage
 	StageHistory   []StageVisit
-	ExtraContext   string // Additional context for AI models passed from the CLI
+	ExtraContext   string             // Additional context for AI models passed from the CLI
+	LLMCompletions []ai.LLMCompletion `json:"llm_completions,omitempty"`
 }
 
 type StageOutcome string
