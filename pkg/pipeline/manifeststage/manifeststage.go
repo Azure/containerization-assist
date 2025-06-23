@@ -31,7 +31,7 @@ func GetPendingManifests(state *pipeline.PipelineState) map[string]bool {
 }
 
 // analyzeKubernetesManifest uses AI to analyze and fix Kubernetes manifest content
-func analyzeKubernetesManifest(ctx context.Context, client *ai.AzOpenAIClient, input pipeline.FileAnalysisInput, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
+func analyzeKubernetesManifest(ctx context.Context, client ai.LLMClient, input pipeline.FileAnalysisInput, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
 	// Create prompt for analyzing the Kubernetes manifest
 	promptText := fmt.Sprintf(`Analyze the following Kubernetes manifest file for errors and suggest fixes:
 Manifest:
@@ -77,27 +77,23 @@ Please:
 3. Explain what changes were made and why
 
 - Do NOT create brand new manifests - Only fix the provided manifest.
-- Verify that the health check paths exist before using httpGet probe; if they dont't use a tcpSocket probe instead. 
+- Verify that the health check paths exist before using httpGet probe; if they don't, use a tcpSocket probe instead. 
 - Prefer using secrets for sensitive information like database passwords and configmap for non-sensitive data. Do NOT use hardcoded values in the manifest.
+- For a Spring Boot application, make sure the Actuator dependency is included in the pom.xml before using /actuator/health as the HTTP GET path in the startup probe.
 - The default configmap name is 'app-config' and the default secret name is 'secret-ref'. Do NOT change these names while referring to them in the manifests.
 IMPORTANT: Do NOT change the name of the app or the name of the container image.`
 
-promptText += fmt.Sprintf(`
+	promptText += fmt.Sprintf(`
 ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is relevant for generating working Kubernetes manifests):
 %s`, state.ExtraContext)
 
-promptText += `
+	promptText += `
 Output the fixed manifest content between <MANIFEST> and </MANIFEST> tags. These tags must not appear anywhere else in your response except for wrapping the corrected manifest content.`
 
-	content, tokenUsage, err := client.GetChatCompletion(ctx, promptText)
+	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, k8s.MANIFEST_TARGET_DIR)
 	if err != nil {
 		return nil, err
 	}
-
-	// Accumulate token usage in pipeline state
-	state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
-	state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
-	state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 	parser := &pipeline.DefaultParser{}
 	fixedContent, err := parser.ExtractContent(content, "MANIFEST")
@@ -161,7 +157,7 @@ func DeployStateManifests(ctx context.Context, state *pipeline.PipelineState, c 
 
 // ManifestStage implements the pipeline.Pipeline interface for Kubernetes manifests
 type ManifestStage struct {
-	AIClient *ai.AzOpenAIClient
+	AIClient ai.LLMClient
 	Parser   pipeline.Parser
 }
 
@@ -211,6 +207,9 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 // GetErrors returns a formatted string of all manifest errors
 func (p *ManifestStage) GetErrors(state *pipeline.PipelineState) string {
 	return FormatManifestErrors(state)
+}
+func (p *ManifestStage) SetAIClient(client ai.LLMClient) {
+	p.AIClient = client
 }
 
 // WriteSuccessfulFiles writes successful manifests to disk

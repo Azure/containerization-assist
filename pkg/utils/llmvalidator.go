@@ -1,4 +1,4 @@
-package llmvalidator
+package utils
 
 import (
 	"context"
