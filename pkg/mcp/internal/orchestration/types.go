@@ -1,0 +1,46 @@
+package orchestration
+
+import "context"
+
+// SessionManager interface for MCP session management
+type SessionManager interface {
+	GetSession(sessionID string) (interface{}, error)
+	UpdateSession(session interface{}) error
+}
+
+// ToolRegistry interface for registering and retrieving tools
+type ToolRegistry interface {
+	RegisterTool(name string, tool interface{}) error
+	GetTool(name string) (interface{}, error)
+	ListTools() []string
+	ValidateTool(name string) error
+}
+
+// ToolOrchestrator interface for orchestrating tool execution
+type ToolOrchestrator interface {
+	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
+	ValidateToolArgs(toolName string, args interface{}) error
+	GetToolMetadata(toolName string) (*ToolMetadata, error)
+}
+
+// ToolMetadata contains metadata about a tool
+type ToolMetadata struct {
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description"`
+	Version      string                 `json:"version"`
+	Category     string                 `json:"category"`
+	Dependencies []string               `json:"dependencies"`
+	Capabilities []string               `json:"capabilities"`
+	Requirements []string               `json:"requirements"`
+	Parameters   map[string]interface{} `json:"parameters"`
+	OutputSchema map[string]interface{} `json:"output_schema"`
+	Examples     []ToolExample          `json:"examples"`
+}
+
+// ToolExample represents an example of tool usage
+type ToolExample struct {
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Input       interface{} `json:"input"`
+	Output      interface{} `json:"output"`
+}

@@ -1,188 +1,207 @@
 # Container Kit
 
-AI-Powered App Containerization and Kubernetes Artifact Generation
+AI-Powered Application Containerization and Kubernetes Deployment
 
-## Getting Started
+Container Kit automates the creation of Docker images and Kubernetes manifests using AI-guided workflows and atomic operations. It provides two modes of operation optimized for different use cases.
 
-### Running Locally
-Prerequisites:
-- Go 1.22
-- Kubectl
+## 🚀 Quick Start
+
+### MCP Server (Recommended)
+
+The MCP server provides both atomic tools and conversational workflows for containerization.
+
+**Prerequisites:**
+- Go 1.21+
 - Docker
-- Kind
-- Azure CLI (for automatic setup)
+- kubectl (optional, for Kubernetes features)
 
-1. Clone the repo
-```
-git clone git@github.com:Azure/container-copilot.git && cd container-copilot
-```
-
-2. Run container-kit directly
-
-The simplest way to get started is to just run the generate command with your target repository:
-
+**Setup:**
 ```bash
-# From root of container-copilot repo
-go run . generate <path/to/target-repo>
+git clone https://github.com/Azure/container-copilot.git
+cd container-copilot
+
+# Build the MCP server
+make mcp
+
+# Test the server
+./container-kit-mcp --version
 ```
 
-If you don't have Azure OpenAI resources configured, the tool will automatically:
-- Set up Azure OpenAI resources
-- Create resource group, OpenAI service, and deployment
-- Save configuration to a .env file for future use
+**Use with Claude Desktop:**
+Add to your Claude Desktop config and ask Claude: *"Help me containerize my application"*
 
-After the automatic setup is complete, it will continue with the containerization process.
+> **📖 Complete Setup Guide**: See [MCP_DOCUMENTATION.md](MCP_DOCUMENTATION.md) for detailed setup instructions, troubleshooting, and advanced configuration.
 
-Alternatively, you can manually set up your Azure OpenAI environment:
+### CLI Tool (Legacy)
 
-1. Set Azure OpenAI KEY and ENDPOINT
+**Prerequisites:**
+- Go 1.21+
+- kubectl, Docker, Kind
+- Azure OpenAI (for AI features)
 
-- Create an AzureOpenAI Instance in the AzPortal
-- Go to Develop Tab
-- Copy Key and Endpoint values (Key Number doesn't matter)
-
-
-Run the following commands to set these values in your environment:
-```
+**Setup:**
+```bash
+# Set Azure OpenAI credentials
 export AZURE_OPENAI_KEY=xxxxxxx
 export AZURE_OPENAI_ENDPOINT=xxxxxx
-```
-
-5. Set Azure OpenAI Deployment ID
-- From the 'Overview Blade' > 'Get Started Tab', open 'Explore Azure AI Foundry Portal'
-- Accept "You're leaving azure.com" with 'Continue' Button
-- In Azure AI Foundry, on the left select the 'Deployments' Blade under 'Shared Resources' 
-- Select "Deply a Mdoel" > "Deploy base model" > "o3-mini"
-- Name the new deployment "container-kit"
-
-Run the following commands to set your deployment ID in your environment:
-```
 export AZURE_OPENAI_DEPLOYMENT_ID=container-kit
-```
 
-### Setup Command
-
-You can explicitly provision Azure OpenAI resources using the `setup` command:
-
-```bash
-# From root of container-kit repo
-go run . setup --target-repo=<path/to/target-repo>
-```
-
-The setup command will:
-1. Check if Azure OpenAI environment variables are already set
-   - If they are, it will skip the setup process unless `--force-setup` is specified
-2. Load existing values from a `.env` file if it exists
-3. Provision all required Azure OpenAI resources
-4. Create/update the model deployment
-5. Save all environment variables to the `.env` file in your project root
-
-Once setup is complete, you'll need to run the generate command to containerize your application:
-
-```bash
-# From root of container-kit repo
+# Run containerization
 go run . generate <path/to/target-repo>
 ```
 
-The setup command accepts additional options to customize your Azure resources:
+## 🛠️ Development Setup
+
+### Option 1: Development Container (Recommended)
+
+Get started in seconds with a fully configured development environment:
+
+**Prerequisites:**
+- [Docker](https://docs.docker.com/get-docker/)
+- [VS Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+
+**Setup:**
+1. Clone this repository
+2. Open in VS Code: `code .`
+3. Click "Reopen in Container" when prompted
+4. Wait for automatic setup (3-5 minutes first time)
+5. Start coding! All tools are pre-installed and configured.
+
+See [`.devcontainer/README.md`](.devcontainer/README.md) for full details.
+
+### Option 2: Local Development
+
+**Prerequisites:**
+- Go 1.21+
+- golangci-lint
+- Docker, kubectl, kind (for full functionality)
+
+**Setup:**
+```bash
+# Install golangci-lint
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+# Build and test
+make mcp           # Build MCP server
+make test          # Run tests
+make lint          # Run linting
+make help          # See all available targets
+```
+
+## 📖 Documentation
+
+### Core Documentation
+- **[MCP Server Documentation](./MCP_DOCUMENTATION.md)** - Complete setup, tools, and usage guide
+- **[Architecture Overview](./ARCHITECTURE.md)** - Technical design and system architecture  
+- **[AI Integration Pattern](./docs/AI_INTEGRATION_PATTERN.md)** - AI integration guidelines and fixing capabilities
+
+### Development
+- **[Contributing Guide](./CONTRIBUTING.md)** - Development workflow and standards
+- **[Development Container](./.devcontainer/README.md)** - Instant development setup
+- **[Development Guide](./CLAUDE.md)** - Claude Code development guidance
+- **[Linting Strategy](./docs/LINTING.md)** - Code quality and error budget approach
+
+### Operations
+- **[Security Policy](./SECURITY.md)** - Security guidelines and vulnerability reporting
+- **[Support Guide](./SUPPORT.md)** - Getting help and troubleshooting
+
+## 🏗️ Architecture
+
+Container Kit provides two operation modes with different architectural approaches:
+
+- **MCP Server** (Primary): Atomic tools + conversational workflows with session persistence
+- **CLI Tool** (Legacy): Pipeline-based iterative refinement with AI integration
+
+> **📖 Complete Architecture Guide**: See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical design and system components.
+
+## 🛠️ Available Tools
+
+### MCP Atomic Tools
+- `analyze_repository_atomic` - Analyze code for containerization
+- `generate_dockerfile` - Generate optimized Dockerfiles
+- `build_image_atomic` - Build Docker images with fixing capabilities
+- `push_image_atomic` - Push to registries
+- `pull_image_atomic` - Pull images from registries
+- `tag_image_atomic` - Tag Docker images
+- `generate_manifests_atomic` - Create Kubernetes manifests
+- `deploy_kubernetes_atomic` - Deploy to Kubernetes with fixing
+- `check_health_atomic` - Verify deployment health
+- `scan_image_security_atomic` - Security vulnerability scanning
+- `scan_secrets_atomic` - Secret detection and remediation
+- `validate_dockerfile_atomic` - Dockerfile validation and optimization
+
+### Conversation Mode
+- `chat` - Guided conversational workflow through complete containerization process
+
+### Management Tools
+- `list_sessions` - List active MCP sessions
+- `delete_session` - Clean up sessions and workspaces
+- `get_server_health` - Server status and capabilities
+- `get_logs` - Export server logs with filtering
+- `get_telemetry_metrics` - Export Prometheus metrics
+
+## 🧪 Testing
 
 ```bash
-go run . setup --resource-group=mygroup --location=eastus \
-  --openai-resource=myopenai --deployment=mydeploy \
-  --target-repo=<path/to/target-repo>
+# Run automated tests
+./test/integration/run_tests.sh
+
+# Manual testing with Claude Desktop
+# See test/integration/mcp/claude_desktop_test.md
+
+# Run specific test suites
+make test                    # All tests
+go test ./pkg/mcp/...       # MCP-specific tests
+go test -tags integration   # Integration tests only
 ```
 
-You can also provide these values via environment variables or a `.env` file. Copy the `env.example` to `.env` in the project root and fill in the required values:
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Development setup (devcontainer recommended)
+- Code style and standards
+- Testing requirements
+- Pull request process
+
+## 📊 Quality & Linting
+
+We use an error budget approach for code quality:
 
 ```bash
-# Container‑Copilot settings:
-AZURE_OPENAI_RESOURCE_GROUP=mygroup
-AZURE_OPENAI_LOCATION=eastus
-AZURE_OPENAI_RESOURCE_NAME=myopenai
-AZURE_OPENAI_DEPLOYMENT_NAME=mydeploy
-TARGET_REPO=<path/to/target-repo>
-
-# Optional (defaults shown):
-AZURE_OPENAI_MODEL_ID=o3-mini
-AZURE_OPENAI_MODEL_VERSION=2025-01-31
+make lint              # Strict linting (fails on any issue)
+make lint-threshold    # Linting with error budget
+make lint-report       # Generate detailed reports
 ```
 
-### Path Handling
+See [docs/LINTING.md](docs/LINTING.md) for our quality strategy.
 
-Container Kit supports both absolute and relative paths for the target repository. When you provide a relative path, it will be automatically converted to an absolute path to ensure artifacts are generated in the correct location regardless of where you run the command from.
+## 🚢 Deployment Models
 
-For example, both of these commands are valid:
-```bash
-go run . generate ../my-app
-go run . generate /home/user/projects/my-app
-```
+### MCP Server Deployment
+- **Development**: Local stdio transport with Claude Desktop
+- **Production**: HTTP transport with load balancing
+- **Cloud**: Container deployment with persistent volumes
+- **Instant Setup**: VS Code devcontainer with all tools pre-configured
 
-### Additional Options
+### CLI Deployment
+- **Local**: Direct execution with local Docker/Kind
+- **CI/CD**: Pipeline integration for automated containerization
 
-**Force Setup**: If you want to recreate your Azure OpenAI resources even when environment variables are already configured, you can use the `--force-setup` flag:
+## 📝 License
 
-```bash
-go run . setup --force-setup --target-repo=<path/to/target-repo>
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-Use this when you want to:
-- Start completely fresh after a failed setup
-- Change your Azure OpenAI model or deployment configuration  
-- Clear out old environment variables and regenerate everything
-- Troubleshoot issues with existing Azure deployments
+## 🔒 Security
 
-**Warning**: This will delete your existing `.env` file and recreate Azure OpenAI deployments. The underlying Azure resources (resource groups, Cognitive Services accounts) are preserved.
+See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities.
 
-**Registry**: You can specify a custom container registry with the `--registry` flag:
+## 📞 Support
 
-```bash
-go run . generate --registry=myregistry.azurecr.io <path/to/target-repo>
-```
+- **Issues**: Use GitHub Issues for bug reports and feature requests
+- **Discussions**: Use GitHub Discussions for questions and help
+- **Documentation**: Check the documentation links above
 
-**Dockerfile Generator**: By default, container-kit uses the "draft" Dockerfile generator. You can disable this with:
+## 🏷️ Version
 
-```bash
-go run . generate --dockerfile-generator=none <path/to/target-repo>
-```
-
-### Using via Github Actions
-```
-> not implemented yet :)
-```
-
-## Contributing
-
-### generate command flow
-```mermaid
-flowchart TD
-    A[Start Run on Repo Root] --> B(Generate Artifacts with Draft)
-    B --> C(Load Generated Artifacts into Memory)
-    C -->|One| D(AI Fix Dockerfile)
-    D --> E{Build Dockerfile}
-    E -->|Fail| D
-    E -->|Success| F(Push to Registry)
-    F --> G{Deploy Manifests}
-    G -->|Fail| H(AI Fix Dockerfile and Manifests)
-    H --> E
-    G -->|Success| I[Write Artifacts to Disk]
-```
-
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
-trademarks or logos is subject to and must follow 
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+See [releases](https://github.com/Azure/container-copilot/releases) for version history and changelog.

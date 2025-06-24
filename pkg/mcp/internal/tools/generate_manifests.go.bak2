@@ -1,0 +1,1192 @@
+package tools
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/Azure/container-copilot/pkg/core/kubernetes"
+	"github.com/Azure/container-copilot/pkg/k8s"
+	customizerk8s "github.com/Azure/container-copilot/pkg/mcp/internal/customizer/kubernetes"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/ops"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-copilot/templates"
+	"github.com/rs/zerolog"
+	"gopkg.in/yaml.v3"
+)
+
+// GenerateManifestsArgs represents the arguments for the generate_manifests tool
+type GenerateManifestsArgs struct {
+	types.BaseToolArgs
+	ImageRef       types.ImageReference `json:"image_ref" description:"Container image reference"`
+	Namespace      string               `json:"namespace,omitempty" description:"Kubernetes namespace"`
+	ServiceType    string               `json:"service_type,omitempty" description:"Service type (ClusterIP, NodePort, LoadBalancer)"`
+	Replicas       int                  `json:"replicas,omitempty" description:"Number of replicas"`
+	Resources      ResourceRequests     `json:"resources,omitempty" description:"Resource requirements"`
+	Environment    map[string]string    `json:"environment,omitempty" description:"Environment variables"`
+	Secrets        []SecretRef          `json:"secrets,omitempty" description:"Secret references"`
+	IncludeIngress bool                 `json:"include_ingress,omitempty" description:"Generate Ingress resource"`
+	HelmTemplate   bool                 `json:"helm_template,omitempty" description:"Generate as Helm template"`
+	ConfigMapData  map[string]string    `json:"configmap_data,omitempty" description:"ConfigMap data key-value pairs"`
+	ConfigMapFiles map[string]string    `json:"configmap_files,omitempty" description:"ConfigMap file paths to mount"`
+	BinaryData     map[string][]byte    `json:"binary_data,omitempty" description:"ConfigMap binary data"`
+	IngressHosts   []IngressHost        `json:"ingress_hosts,omitempty" description:"Ingress host configuration"`
+	IngressTLS     []IngressTLS         `json:"ingress_tls,omitempty" description:"Ingress TLS configuration"`
+	IngressClass   string               `json:"ingress_class,omitempty" description:"Ingress class name"`
+	ServicePorts   []ServicePort        `json:"service_ports,omitempty" description:"Service port configuration"`
+	LoadBalancerIP string               `json:"load_balancer_ip,omitempty" description:"LoadBalancer IP for service"`
+	SessionAffinity string              `json:"session_affinity,omitempty" description:"Session affinity (None, ClientIP)"`
+	WorkflowLabels map[string]string    `json:"workflow_labels,omitempty" description:"Additional labels from workflow session"`
+	RegistrySecrets []RegistrySecret    `json:"registry_secrets,omitempty" description:"Registry credentials for pull secrets"`
+	GeneratePullSecret bool             `json:"generate_pull_secret,omitempty" description:"Generate image pull secret"`
+	ValidateManifests bool              `json:"validate_manifests,omitempty" description:"Validate generated manifests against K8s schemas"`
+	ValidationOptions ValidationOptions `json:"validation_options,omitempty" description:"Options for manifest validation"`
+}
+
+// SecretRef represents a reference to a Kubernetes secret
+type SecretRef struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
+	Env  string `json:"env"`
+}
+
+// ResourceRequests represents Kubernetes resource requirements
+type ResourceRequests struct {
+	CPURequest    string `json:"cpu_request,omitempty"`
+	MemoryRequest string `json:"memory_request,omitempty"`
+	CPULimit      string `json:"cpu_limit,omitempty"`
+	MemoryLimit   string `json:"memory_limit,omitempty"`
+}
+
+// IngressHost represents an ingress host configuration
+type IngressHost struct {
+	Host  string        `json:"host"`
+	Paths []IngressPath `json:"paths"`
+}
+
+// IngressPath represents a path in an ingress rule
+type IngressPath struct {
+	Path        string `json:"path"`
+	PathType    string `json:"path_type,omitempty"`
+	ServiceName string `json:"service_name,omitempty"`
+	ServicePort int    `json:"service_port,omitempty"`
+}
+
+// IngressTLS represents TLS configuration for ingress
+type IngressTLS struct {
+	Hosts      []string `json:"hosts"`
+	SecretName string   `json:"secret_name"`
+}
+
+// ServicePort represents a port in a service
+type ServicePort struct {
+	Name       string `json:"name,omitempty"`
+	Protocol   string `json:"protocol,omitempty"`
+	Port       int    `json:"port"`
+	TargetPort int    `json:"target_port,omitempty"`
+	NodePort   int    `json:"node_port,omitempty"`
+}
+
+// ValidationOptions holds options for manifest validation
+type ValidationOptions struct {
+	K8sVersion          string   `json:"k8s_version,omitempty" description:"Target Kubernetes version"`
+	SkipDryRun          bool     `json:"skip_dry_run,omitempty" description:"Skip dry-run validation"`
+	SkipSchemaValidation bool    `json:"skip_schema_validation,omitempty" description:"Skip schema validation"`
+	AllowedKinds        []string `json:"allowed_kinds,omitempty" description:"List of allowed resource kinds"`
+	RequiredLabels      []string `json:"required_labels,omitempty" description:"List of required labels"`
+	ForbiddenFields     []string `json:"forbidden_fields,omitempty" description:"List of forbidden fields"`
+	StrictValidation    bool     `json:"strict_validation,omitempty" description:"Enable strict validation mode"`
+}
+
+// RegistrySecret represents registry authentication credentials
+type RegistrySecret struct {
+	Registry string `json:"registry"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email,omitempty"`
+}
+
+// ValidationSummary represents the summary of validation results
+type ValidationSummary struct {
+	Enabled      bool                       `json:"enabled"`
+	OverallValid bool                       `json:"overall_valid"`
+	TotalFiles   int                        `json:"total_files"`
+	ValidFiles   int                        `json:"valid_files"`
+	ErrorCount   int                        `json:"error_count"`
+	WarningCount int                        `json:"warning_count"`
+	Duration     time.Duration              `json:"duration"`
+	K8sVersion   string                     `json:"k8s_version,omitempty"`
+	Results      map[string]FileValidation  `json:"results"`
+}
+
+// FileValidation represents validation results for a single file
+type FileValidation struct {
+	Valid        bool               `json:"valid"`
+	Kind         string             `json:"kind"`
+	APIVersion   string             `json:"api_version,omitempty"`
+	Name         string             `json:"name,omitempty"`
+	Namespace    string             `json:"namespace,omitempty"`
+	ErrorCount   int                `json:"error_count"`
+	WarningCount int                `json:"warning_count"`
+	Duration     time.Duration      `json:"duration"`
+	Errors       []ValidationIssue  `json:"errors,omitempty"`
+	Warnings     []ValidationIssue  `json:"warnings,omitempty"`
+	Suggestions  []string           `json:"suggestions,omitempty"`
+}
+
+// ValidationIssue represents a validation error or warning
+type ValidationIssue struct {
+	Field    string `json:"field"`
+	Message  string `json:"message"`
+	Code     string `json:"code,omitempty"`
+	Severity string `json:"severity"`
+	Path     string `json:"path,omitempty"`
+}
+// GenerateManifestsResult represents the result of manifest generation
+type GenerateManifestsResult struct {
+	types.BaseToolResponse
+	Manifests        []ManifestInfo      `json:"manifests"`
+	ManifestPath     string              `json:"manifest_path"`
+	ImageRef         types.ImageReference `json:"image_ref"`
+	Namespace        string              `json:"namespace"`
+	ServiceType      string              `json:"service_type"`
+	Replicas         int                 `json:"replicas"`
+	Resources        ResourceRequests    `json:"resources"`
+	Duration         time.Duration       `json:"duration"`
+	ValidationResult *ValidationSummary  `json:"validation_result,omitempty"`
+	Error            *types.ToolError    `json:"error,omitempty"`
+}
+
+// ManifestInfo represents information about a generated manifest
+type ManifestInfo struct {
+	Name    string `json:"name"`
+	Kind    string `json:"kind"`
+	Path    string `json:"path"`
+	Content string `json:"content,omitempty"`
+}
+
+// GenerateManifestsTool handles Kubernetes manifest generation
+type GenerateManifestsTool struct {
+	logger        zerolog.Logger
+	workspaceBase string
+	validator     *ops.ManifestValidator
+}
+
+// NewGenerateManifestsTool creates a new generate manifests tool
+func NewGenerateManifestsTool(logger zerolog.Logger, workspaceBase string) *GenerateManifestsTool {
+	return &GenerateManifestsTool{
+		logger:        logger,
+		workspaceBase: workspaceBase,
+		validator:     nil, // Will be initialized on first use
+	}
+}
+
+// NewGenerateManifestsToolWithValidator creates a new generate manifests tool with a custom validator
+func NewGenerateManifestsToolWithValidator(logger zerolog.Logger, workspaceBase string, validator *ops.ManifestValidator) *GenerateManifestsTool {
+	return &GenerateManifestsTool{
+		logger:        logger,
+		workspaceBase: workspaceBase,
+		validator:     validator,
+	}
+}
+
+// Execute generates Kubernetes manifests based on the provided arguments
+func (t *GenerateManifestsTool) Execute(ctx context.Context, args GenerateManifestsArgs) (*GenerateManifestsResult, error) {
+	startTime := time.Now()
+
+	// Create base response with versioning
+	response := &GenerateManifestsResult{
+		BaseToolResponse: types.NewBaseResponse("generate_manifests", args.SessionID, args.DryRun),
+		ImageRef:         args.ImageRef,
+		Namespace:        args.Namespace,
+		ServiceType:      args.ServiceType,
+		Replicas:         args.Replicas,
+		Resources:        args.Resources,
+		Manifests:        []ManifestInfo{},
+	}
+
+	// Apply defaults
+	if args.Namespace == "" {
+		args.Namespace = "default"
+		response.Namespace = "default"
+	}
+	if args.ServiceType == "" {
+		args.ServiceType = types.ServiceTypeLoadBalancer
+		response.ServiceType = types.ServiceTypeLoadBalancer
+	}
+	if args.Replicas == 0 {
+		args.Replicas = 1
+		response.Replicas = 1
+	}
+
+	// Validate image reference
+	if args.ImageRef.String() == "" {
+		return nil, types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required", types.ErrTypeValidation)
+	}
+
+	t.logger.Info().
+		Str("session_id", args.SessionID).
+		Str("image_ref", args.ImageRef.String()).
+		Str("namespace", args.Namespace).
+		Bool("dry_run", args.DryRun).
+		Msg("Generating Kubernetes manifests")
+
+	// Determine workspace directory
+	workspaceDir := filepath.Join(t.workspaceBase, args.SessionID)
+	if args.SessionID == "" {
+		workspaceDir = filepath.Join(t.workspaceBase, "default")
+	}
+
+	// Set manifest path
+	manifestPath := filepath.Join(workspaceDir, "manifests")
+	response.ManifestPath = manifestPath
+
+	// For dry-run, just return what would be generated
+	if args.DryRun {
+		response.Manifests = []ManifestInfo{
+			{Name: "app", Kind: "Deployment", Path: filepath.Join(manifestPath, "deployment.yaml")},
+			{Name: "app", Kind: "Service", Path: filepath.Join(manifestPath, "service.yaml")},
+			{Name: "app-config", Kind: "ConfigMap", Path: filepath.Join(manifestPath, "configmap.yaml")},
+			{Name: "secret-ref", Kind: "Secret", Path: filepath.Join(manifestPath, "secret.yaml")},
+		}
+		if args.IncludeIngress {
+			response.Manifests = append(response.Manifests, ManifestInfo{
+				Name: "app", Kind: "Ingress", Path: filepath.Join(manifestPath, "ingress.yaml"),
+			})
+		}
+		response.Duration = time.Since(startTime)
+		return response, nil
+	}
+
+	// Generate manifests from templates
+	if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, workspaceDir); err != nil {
+		return nil, types.NewRichError("MANIFEST_TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write manifests from template: %v", err), types.ErrTypeBuild)
+	}
+
+	// Copy ingress template if requested
+	if args.IncludeIngress {
+		if err := t.writeIngressTemplate(workspaceDir); err != nil {
+			return nil, types.NewRichError("INGRESS_TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write ingress template: %v", err), types.ErrTypeBuild)
+		}
+	}
+
+	// Use customizer module for deployment
+	deploymentCustomizer := customizerk8s.NewDeploymentCustomizer(t.logger)
+	
+	// Update deployment manifest with the correct image and settings
+	deploymentPath := filepath.Join(manifestPath, "deployment.yaml")
+	deploymentOptions := kubernetes.DeploymentOptions{
+		ImageRef:  args.ImageRef.String(),
+		Namespace: args.Namespace,
+		Replicas:  args.Replicas,
+		EnvVars:   args.Environment,
+		Labels:    args.WorkflowLabels,
+	}
+
+	if err := deploymentCustomizer.CustomizeDeployment(deploymentPath, deploymentOptions); err != nil {
+		return nil, types.NewRichError("DEPLOYMENT_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize deployment manifest: %v", err), types.ErrTypeBuild)
+	}
+
+	// Update service manifest using customizer
+	serviceCustomizer := customizerk8s.NewServiceCustomizer(t.logger)
+	servicePath := filepath.Join(manifestPath, "service.yaml")
+	serviceOpts := customizerk8s.ServiceCustomizationOptions{
+		ServiceType:     args.ServiceType,
+		ServicePorts:    t.convertServicePorts(args.ServicePorts),
+		LoadBalancerIP:  args.LoadBalancerIP,
+		SessionAffinity: args.SessionAffinity,
+		Namespace:       args.Namespace,
+		Labels:          args.WorkflowLabels,
+	}
+	if err := serviceCustomizer.CustomizeService(servicePath, serviceOpts); err != nil {
+		return nil, fmt.Errorf("failed to customize service manifest: %w", err)
+	}
+
+	// Generate and customize ConfigMap if environment variables or data exists
+	if len(args.Environment) > 0 || len(args.ConfigMapData) > 0 || len(args.ConfigMapFiles) > 0 {
+		configMapPath := filepath.Join(manifestPath, "configmap.yaml")
+		
+		// Combine environment variables and configmap data
+		allData := make(map[string]string)
+		for k, v := range args.Environment {
+			allData[k] = v
+		}
+		for k, v := range args.ConfigMapData {
+			allData[k] = v
+		}
+		
+		// Handle file data
+		for fileName, filePath := range args.ConfigMapFiles {
+			if fileData, err := os.ReadFile(filePath); err == nil {
+				allData[fileName] = string(fileData)
+			} else {
+				t.logger.Warn().Str("file", filePath).Err(err).Msg("Failed to read ConfigMap file")
+			}
+		}
+		
+		// Use customizer module for ConfigMap
+		configMapCustomizer := customizerk8s.NewConfigMapCustomizer(t.logger)
+		
+		configMapOptions := kubernetes.ConfigMapOptions{
+			Namespace: args.Namespace,
+			Data:      allData,
+			Labels:    args.WorkflowLabels,
+		}
+
+		if err := configMapCustomizer.CustomizeConfigMap(configMapPath, configMapOptions); err != nil {
+			return nil, types.NewRichError("CONFIGMAP_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize configmap manifest: %v", err), types.ErrTypeBuild)
+		}
+		
+		// Handle binary data if present
+		if len(args.BinaryData) > 0 {
+			if err := t.addBinaryDataToConfigMap(configMapPath, args.BinaryData); err != nil {
+				return nil, fmt.Errorf("failed to add binary data to configmap: %w", err)
+			}
+		}
+	} else {
+		// Even if no ConfigMap data, customize the template ConfigMap with workflow labels if it exists
+		configMapPath := filepath.Join(manifestPath, "configmap.yaml")
+		if _, err := os.Stat(configMapPath); err == nil && len(args.WorkflowLabels) > 0 {
+			configMapCustomizer := customizerk8s.NewConfigMapCustomizer(t.logger)
+			configMapOptions := kubernetes.ConfigMapOptions{
+				Namespace: args.Namespace,
+				Labels:    args.WorkflowLabels,
+			}
+			if err := configMapCustomizer.CustomizeConfigMap(configMapPath, configMapOptions); err != nil {
+				return nil, fmt.Errorf("failed to customize configmap manifest with workflow labels: %w", err)
+			}
+		}
+	}
+
+	// Customize secret manifest with workflow labels if it exists
+	secretPath := filepath.Join(manifestPath, "secret.yaml")
+	if _, err := os.Stat(secretPath); err == nil {
+		if err := t.customizeSecretManifest(secretPath, args); err != nil {
+			return nil, fmt.Errorf("failed to customize secret manifest: %w", err)
+		}
+	}
+
+	// Generate and customize Ingress if requested
+	if args.IncludeIngress {
+		ingressPath := filepath.Join(manifestPath, "ingress.yaml")
+		
+		// Use customizer module for Ingress
+		ingressCustomizer := customizerk8s.NewIngressCustomizer(t.logger)
+		ingressOpts := customizerk8s.IngressCustomizationOptions{
+			IngressHosts: t.convertIngressHosts(args.IngressHosts),
+			IngressTLS:   t.convertIngressTLS(args.IngressTLS),
+			IngressClass: args.IngressClass,
+			Namespace:    args.Namespace,
+			Labels:       args.WorkflowLabels,
+		}
+		if err := ingressCustomizer.CustomizeIngress(ingressPath, ingressOpts); err != nil {
+			return nil, fmt.Errorf("failed to customize ingress manifest: %w", err)
+		}
+	} else {
+		// Even if no ConfigMap data, customize the template ConfigMap with workflow labels if it exists
+		configMapPath := filepath.Join(manifestPath, "configmap.yaml")
+		if _, err := os.Stat(configMapPath); err == nil && len(args.WorkflowLabels) > 0 {
+			configMapCustomizer := customizerk8s.NewConfigMapCustomizer(t.logger)
+			configMapOptions := kubernetes.ConfigMapOptions{
+				Namespace: args.Namespace,
+				Labels:    args.WorkflowLabels,
+			}
+			if err := configMapCustomizer.CustomizeConfigMap(configMapPath, configMapOptions); err != nil {
+				return nil, fmt.Errorf("failed to customize configmap manifest with workflow labels: %w", err)
+			}
+		}
+	}
+
+	// Customize secret manifest with workflow labels if it exists
+	secretPath = filepath.Join(manifestPath, "secret.yaml")
+	if _, err := os.Stat(secretPath); err == nil {
+		secretCustomizer := customizerk8s.NewSecretCustomizer(t.logger)
+		secretOpts := customizerk8s.SecretCustomizationOptions{
+			Namespace: args.Namespace,
+			Labels:    args.WorkflowLabels,
+		}
+		if err := secretCustomizer.CustomizeSecret(secretPath, secretOpts); err != nil {
+			return nil, fmt.Errorf("failed to customize secret manifest: %w", err)
+		}
+	}
+
+	// Generate pull secret if registry credentials are provided
+	if args.GeneratePullSecret && len(args.RegistrySecrets) > 0 {
+		registrySecretPath := filepath.Join(manifestPath, "registry-secret.yaml")
+		if err := t.generateRegistrySecret(registrySecretPath, args); err != nil {
+			return nil, fmt.Errorf("failed to generate registry secret: %w", err)
+		}
+
+		// Update deployment to use the pull secret
+		deploymentPath := filepath.Join(manifestPath, "deployment.yaml")
+		if err := t.addPullSecretToDeployment(deploymentPath, "registry-secret"); err != nil {
+			return nil, fmt.Errorf("failed to add pull secret to deployment: %w", err)
+		}
+	}
+
+	// Find and read all generated manifests
+	k8sObjects, err := k8s.FindK8sObjects(manifestPath)
+	if err != nil {
+		return nil, types.NewRichError("MANIFEST_DISCOVERY_FAILED", fmt.Sprintf("failed to find generated manifests: %v", err), types.ErrTypeSystem)
+	}
+
+	// Convert K8sObjects to ManifestInfo
+	for _, obj := range k8sObjects {
+		manifestInfo := ManifestInfo{
+			Name: obj.Metadata.Name,
+			Kind: obj.Kind,
+			Path: obj.ManifestPath,
+			// Optionally include content for small manifests
+			Content: string(obj.Content),
+		}
+		response.Manifests = append(response.Manifests, manifestInfo)
+	}
+
+	// Perform manifest validation if requested
+	if args.ValidateManifests {
+		validationSummary, err := t.validateGeneratedManifests(ctx, manifestPath, args.ValidationOptions)
+		if err != nil {
+			t.logger.Warn().Err(err).Msg("Manifest validation failed")
+			// Continue execution but include validation error
+			validationSummary = &ValidationSummary{
+				Enabled:      true,
+				OverallValid: false,
+				ErrorCount:   1,
+				Results: map[string]FileValidation{
+					"validation_error": {
+						Valid:      false,
+						ErrorCount: 1,
+						Errors: []ValidationIssue{
+							{
+								Field:    "validation",
+								Message:  fmt.Sprintf("Validation failed: %v", err),
+								Code:     "VALIDATION_SYSTEM_ERROR",
+								Severity: "error",
+							},
+						},
+					},
+				},
+			}
+		}
+		response.ValidationResult = validationSummary
+
+		t.logger.Info().
+			Bool("validation_enabled", validationSummary.Enabled).
+			Bool("overall_valid", validationSummary.OverallValid).
+			Int("valid_files", validationSummary.ValidFiles).
+			Int("total_files", validationSummary.TotalFiles).
+			Int("error_count", validationSummary.ErrorCount).
+			Int("warning_count", validationSummary.WarningCount).
+			Dur("validation_duration", validationSummary.Duration).
+			Msg("Manifest validation completed")
+	}
+
+	response.Duration = time.Since(startTime)
+
+	t.logger.Info().
+		Str("session_id", args.SessionID).
+		Int("manifest_count", len(response.Manifests)).
+		Dur("duration", response.Duration).
+		Msg("Manifest generation completed")
+
+	return response, nil
+}
+
+// writeIngressTemplate writes the ingress template to the workspace
+func (t *GenerateManifestsTool) writeIngressTemplate(workspaceDir string) error {
+	// Import the templates package to access embedded files
+	data, err := templates.Templates.ReadFile("manifests/manifest-basic/ingress.yaml")
+	if err != nil {
+		return types.NewRichError("INGRESS_TEMPLATE_READ_FAILED", fmt.Sprintf("reading embedded ingress template: %v", err), types.ErrTypeSystem)
+	}
+
+	manifestPath := filepath.Join(workspaceDir, "manifests")
+	destPath := filepath.Join(manifestPath, "ingress.yaml")
+
+	if err := os.WriteFile(destPath, data, 0644); err != nil {
+		return types.NewRichError("INGRESS_TEMPLATE_WRITE_FAILED", fmt.Sprintf("writing ingress template: %v", err), types.ErrTypeSystem)
+	}
+
+	return nil
+}
+
+// addBinaryDataToConfigMap adds binary data to an existing ConfigMap manifest
+func (t *GenerateManifestsTool) addBinaryDataToConfigMap(configMapPath string, binaryData map[string][]byte) error {
+	content, err := os.ReadFile(configMapPath)
+	if err != nil {
+		return fmt.Errorf("reading configmap manifest: %w", err)
+	}
+
+	var configMap map[string]interface{}
+	if err := yaml.Unmarshal(content, &configMap); err != nil {
+		return fmt.Errorf("parsing configmap YAML: %w", err)
+	}
+
+	// Add binaryData section
+	if len(binaryData) > 0 {
+		binaryDataMap := make(map[string]interface{})
+		for key, data := range binaryData {
+			// Kubernetes expects base64 encoded binary data
+			binaryDataMap[key] = base64.StdEncoding.EncodeToString(data)
+		}
+		configMap["binaryData"] = binaryDataMap
+	}
+
+	// Write back the updated manifest
+	updatedContent, err := yaml.Marshal(configMap)
+	if err != nil {
+		return fmt.Errorf("marshaling updated configmap YAML: %w", err)
+	}
+
+	if err := os.WriteFile(configMapPath, updatedContent, 0644); err != nil {
+		return fmt.Errorf("writing updated configmap manifest: %w", err)
+	}
+
+	return nil
+}
+
+// customizeAdvancedIngress customizes an ingress manifest with advanced features
+func (t *GenerateManifestsTool) customizeAdvancedIngress(ingressPath string, args GenerateManifestsArgs) error {
+	content, err := os.ReadFile(ingressPath)
+	if err != nil {
+		return fmt.Errorf("reading ingress manifest: %w", err)
+	}
+
+	var ingress map[string]interface{}
+	if err := yaml.Unmarshal(content, &ingress); err != nil {
+		return fmt.Errorf("parsing ingress YAML: %w", err)
+	}
+
+	// Update namespace
+	if args.Namespace != "" {
+		if err := t.updateNestedValue(ingress, args.Namespace, "metadata", "namespace"); err != nil {
+			return fmt.Errorf("updating namespace: %w", err)
+		}
+	}
+
+	// Update labels with workflow labels
+	if len(args.WorkflowLabels) > 0 {
+		if err := t.updateLabelsInManifest(ingress, args.WorkflowLabels); err != nil {
+			return fmt.Errorf("updating workflow labels: %w", err)
+		}
+	}
+
+	// Update ingress class
+	if args.IngressClass != "" {
+		if err := t.updateNestedValue(ingress, args.IngressClass, "spec", "ingressClassName"); err != nil {
+			return fmt.Errorf("updating ingress class: %w", err)
+		}
+	}
+
+	// Update rules if custom hosts are provided
+	if len(args.IngressHosts) > 0 {
+		if err := t.updateIngressRules(ingress, args.IngressHosts); err != nil {
+			return fmt.Errorf("updating ingress rules: %w", err)
+		}
+	}
+
+	// Add TLS configuration if provided
+	if len(args.IngressTLS) > 0 {
+		if err := t.updateIngressTLS(ingress, args.IngressTLS); err != nil {
+			return fmt.Errorf("updating ingress TLS: %w", err)
+		}
+	}
+
+	// Write back the updated manifest
+	updatedContent, err := yaml.Marshal(ingress)
+	if err != nil {
+		return fmt.Errorf("marshaling updated ingress YAML: %w", err)
+	}
+
+	if err := os.WriteFile(ingressPath, updatedContent, 0644); err != nil {
+		return fmt.Errorf("writing updated ingress manifest: %w", err)
+	}
+
+	t.logger.Debug().
+		Str("ingress_path", ingressPath).
+		Int("host_count", len(args.IngressHosts)).
+		Int("tls_count", len(args.IngressTLS)).
+		Msg("Successfully customized ingress manifest")
+
+	return nil
+}
+
+// customizeAdvancedService customizes a service manifest with advanced features
+func (t *GenerateManifestsTool) customizeAdvancedService(servicePath string, args GenerateManifestsArgs) error {
+	content, err := os.ReadFile(servicePath)
+	if err != nil {
+		return fmt.Errorf("reading service manifest: %w", err)
+	}
+
+	var service map[string]interface{}
+	if err := yaml.Unmarshal(content, &service); err != nil {
+		return fmt.Errorf("parsing service YAML: %w", err)
+	}
+
+	// Update namespace
+	if args.Namespace != "" {
+		if err := t.updateNestedValue(service, args.Namespace, "metadata", "namespace"); err != nil {
+			return fmt.Errorf("updating namespace: %w", err)
+		}
+	}
+
+	// Update labels with workflow labels
+	if len(args.WorkflowLabels) > 0 {
+		if err := t.updateLabelsInManifest(service, args.WorkflowLabels); err != nil {
+			return fmt.Errorf("updating workflow labels: %w", err)
+		}
+	}
+
+	// Update service type
+	if args.ServiceType != "" {
+		if err := t.updateNestedValue(service, args.ServiceType, "spec", "type"); err != nil {
+			return fmt.Errorf("updating service type: %w", err)
+		}
+	}
+
+	// Update LoadBalancer IP if specified
+	if args.LoadBalancerIP != "" {
+		if err := t.updateNestedValue(service, args.LoadBalancerIP, "spec", "loadBalancerIP"); err != nil {
+			return fmt.Errorf("updating loadBalancerIP: %w", err)
+		}
+	}
+
+	// Update session affinity
+	if args.SessionAffinity != "" {
+		if err := t.updateNestedValue(service, args.SessionAffinity, "spec", "sessionAffinity"); err != nil {
+			return fmt.Errorf("updating sessionAffinity: %w", err)
+		}
+	}
+
+	// Update ports if custom ports are provided
+	if len(args.ServicePorts) > 0 {
+		if err := t.updateServicePorts(service, args.ServicePorts); err != nil {
+			return fmt.Errorf("updating service ports: %w", err)
+		}
+	}
+
+	// Write back the updated manifest
+	updatedContent, err := yaml.Marshal(service)
+	if err != nil {
+		return fmt.Errorf("marshaling updated service YAML: %w", err)
+	}
+
+	if err := os.WriteFile(servicePath, updatedContent, 0644); err != nil {
+		return fmt.Errorf("writing updated service manifest: %w", err)
+	}
+
+	t.logger.Debug().
+		Str("service_path", servicePath).
+		Str("service_type", args.ServiceType).
+		Int("port_count", len(args.ServicePorts)).
+		Msg("Successfully customized service manifest")
+
+	return nil
+}
+
+// updateServicePorts updates the ports section of a service
+func (t *GenerateManifestsTool) updateServicePorts(service map[string]interface{}, servicePorts []ServicePort) error {
+	var ports []interface{}
+
+	for _, servicePort := range servicePorts {
+		protocol := servicePort.Protocol
+		if protocol == "" {
+			protocol = "TCP"
+		}
+
+		targetPort := servicePort.TargetPort
+		if targetPort == 0 {
+			targetPort = servicePort.Port
+		}
+
+		portObj := map[string]interface{}{
+			"protocol":   protocol,
+			"port":       servicePort.Port,
+			"targetPort": targetPort,
+		}
+
+		if servicePort.Name != "" {
+			portObj["name"] = servicePort.Name
+		}
+
+		// Add nodePort for NodePort and LoadBalancer services
+		if servicePort.NodePort > 0 {
+			portObj["nodePort"] = servicePort.NodePort
+		}
+
+		ports = append(ports, portObj)
+	}
+
+	return t.updateNestedValue(service, ports, "spec", "ports")
+}
+
+// updateIngressRules updates the rules section of an ingress
+func (t *GenerateManifestsTool) updateIngressRules(ingress map[string]interface{}, hosts []IngressHost) error {
+	var rules []interface{}
+
+	for _, host := range hosts {
+		rule := map[string]interface{}{
+			"host": host.Host,
+			"http": map[string]interface{}{
+				"paths": []interface{}{},
+			},
+		}
+
+		var paths []interface{}
+		for _, path := range host.Paths {
+			pathType := path.PathType
+			if pathType == "" {
+				pathType = "Prefix"
+			}
+
+			serviceName := path.ServiceName
+			if serviceName == "" {
+				serviceName = "app" // Default service name
+			}
+
+			servicePort := path.ServicePort
+			if servicePort == 0 {
+				servicePort = 80 // Default port
+			}
+
+			pathObj := map[string]interface{}{
+				"path":     path.Path,
+				"pathType": pathType,
+				"backend": map[string]interface{}{
+					"service": map[string]interface{}{
+						"name": serviceName,
+						"port": map[string]interface{}{
+							"number": servicePort,
+						},
+					},
+				},
+			}
+			paths = append(paths, pathObj)
+		}
+
+		rule["http"].(map[string]interface{})["paths"] = paths
+		rules = append(rules, rule)
+	}
+
+	return t.updateNestedValue(ingress, rules, "spec", "rules")
+}
+
+// updateIngressTLS updates the TLS section of an ingress
+func (t *GenerateManifestsTool) updateIngressTLS(ingress map[string]interface{}, tlsConfigs []IngressTLS) error {
+	var tls []interface{}
+
+	for _, tlsConfig := range tlsConfigs {
+		tlsObj := map[string]interface{}{
+			"hosts":      tlsConfig.Hosts,
+			"secretName": tlsConfig.SecretName,
+		}
+		tls = append(tls, tlsObj)
+	}
+
+	return t.updateNestedValue(ingress, tls, "spec", "tls")
+}
+
+// updateNestedValue is a helper method to update nested values in YAML structures
+func (t *GenerateManifestsTool) updateNestedValue(obj interface{}, value interface{}, path ...interface{}) error {
+	if len(path) == 0 {
+		return fmt.Errorf("empty path provided")
+	}
+
+	current := obj
+	for i, key := range path[:len(path)-1] {
+		switch curr := current.(type) {
+		case map[string]interface{}:
+			keyStr, ok := key.(string)
+			if !ok {
+				return fmt.Errorf("non-string key at path index %d", i)
+			}
+			if next, exists := curr[keyStr]; exists {
+				current = next
+			} else {
+				// Create missing intermediate maps
+				newMap := make(map[string]interface{})
+				curr[keyStr] = newMap
+				current = newMap
+			}
+		case []interface{}:
+			keyInt, ok := key.(int)
+			if !ok {
+				return fmt.Errorf("non-integer key for array at path index %d", i)
+			}
+			if keyInt < len(curr) {
+				current = curr[keyInt]
+			} else {
+				return fmt.Errorf("array index %d out of bounds at path index %d", keyInt, i)
+			}
+		default:
+			return fmt.Errorf("cannot navigate through non-map/non-array at path index %d", i)
+		}
+	}
+
+	// Set the final value
+	finalKey := path[len(path)-1]
+	switch curr := current.(type) {
+	case map[string]interface{}:
+		keyStr, ok := finalKey.(string)
+		if !ok {
+			return fmt.Errorf("non-string final key")
+		}
+		curr[keyStr] = value
+	case []interface{}:
+		keyInt, ok := finalKey.(int)
+		if !ok {
+			return fmt.Errorf("non-integer final key for array")
+		}
+		if keyInt < len(curr) {
+			curr[keyInt] = value
+		} else {
+			return fmt.Errorf("array index %d out of bounds for final key", keyInt)
+		}
+	default:
+		return fmt.Errorf("cannot set value on non-map/non-array")
+	}
+
+	return nil
+}
+
+// customizeSecretManifest customizes a secret manifest with workflow labels and namespace
+func (t *GenerateManifestsTool) customizeSecretManifest(secretPath string, args GenerateManifestsArgs) error {
+	content, err := os.ReadFile(secretPath)
+	if err != nil {
+		return fmt.Errorf("reading secret manifest: %w", err)
+	}
+
+	var secret map[string]interface{}
+	if err := yaml.Unmarshal(content, &secret); err != nil {
+		return fmt.Errorf("parsing secret YAML: %w", err)
+	}
+
+	// Update namespace
+	if args.Namespace != "" {
+		if err := t.updateNestedValue(secret, args.Namespace, "metadata", "namespace"); err != nil {
+			return fmt.Errorf("updating namespace: %w", err)
+		}
+	}
+
+	// Update labels with workflow labels
+	if len(args.WorkflowLabels) > 0 {
+		if err := t.updateLabelsInManifest(secret, args.WorkflowLabels); err != nil {
+			return fmt.Errorf("updating workflow labels: %w", err)
+		}
+	}
+
+	// Write the updated secret back to file
+	updatedContent, err := yaml.Marshal(secret)
+	if err != nil {
+		return fmt.Errorf("marshaling updated secret YAML: %w", err)
+	}
+
+	if err := os.WriteFile(secretPath, updatedContent, 0644); err != nil {
+		return fmt.Errorf("writing updated secret manifest: %w", err)
+	}
+
+	t.logger.Debug().
+		Str("secret_path", secretPath).
+		Msg("Successfully customized secret manifest")
+
+	return nil
+}
+
+// updateLabelsInManifest updates labels in any Kubernetes manifest
+func (t *GenerateManifestsTool) updateLabelsInManifest(manifest map[string]interface{}, labels map[string]string) error {
+	if len(labels) == 0 {
+		return nil
+	}
+
+	// Get existing metadata
+	metadata, exists := manifest["metadata"]
+	if !exists {
+		metadata = make(map[string]interface{})
+		manifest["metadata"] = metadata
+	}
+
+	metadataMap, ok := metadata.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("metadata is not a map")
+	}
+
+	// Get existing labels
+	existingLabels, exists := metadataMap["labels"]
+	if !exists {
+		existingLabels = make(map[string]interface{})
+		metadataMap["labels"] = existingLabels
+	}
+
+	labelsMap, ok := existingLabels.(map[string]interface{})
+	if !ok {
+		labelsMap = make(map[string]interface{})
+		metadataMap["labels"] = labelsMap
+	}
+
+	// Add new labels (existing labels take precedence)
+	for key, value := range labels {
+		if _, exists := labelsMap[key]; !exists {
+			labelsMap[key] = value
+		}
+	}
+
+	return nil
+}
+
+// generateRegistrySecret generates a Kubernetes secret for registry authentication
+func (t *GenerateManifestsTool) generateRegistrySecret(secretPath string, args GenerateManifestsArgs) error {
+	// Create the pull secret structure
+	pullSecret := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Secret",
+		"metadata": map[string]interface{}{
+			"name":      "registry-secret",
+			"namespace": args.Namespace,
+			"labels": map[string]interface{}{
+				"app.kubernetes.io/managed-by": "container-copilot",
+			},
+		},
+		"type": "kubernetes.io/dockerconfigjson",
+		"data": map[string]interface{}{},
+	}
+
+	// Add workflow labels if present
+	if len(args.WorkflowLabels) > 0 {
+		labels := pullSecret["metadata"].(map[string]interface{})["labels"].(map[string]interface{})
+		for k, v := range args.WorkflowLabels {
+			if _, exists := labels[k]; !exists {
+				labels[k] = v
+			}
+		}
+	}
+
+	// Build the docker config JSON
+	dockerConfig := map[string]interface{}{
+		"auths": map[string]interface{}{},
+	}
+
+	auths := dockerConfig["auths"].(map[string]interface{})
+	for _, regSecret := range args.RegistrySecrets {
+		// Create base64 encoded auth string
+		authString := base64.StdEncoding.EncodeToString([]byte(regSecret.Username + ":" + regSecret.Password))
+		
+		registryAuth := map[string]interface{}{
+			"username": regSecret.Username,
+			"password": regSecret.Password,
+			"auth":     authString,
+		}
+
+		if regSecret.Email != "" {
+			registryAuth["email"] = regSecret.Email
+		}
+
+		auths[regSecret.Registry] = registryAuth
+	}
+
+	// Encode the entire docker config as base64
+	dockerConfigJSON, err := json.Marshal(dockerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal docker config: %w", err)
+	}
+
+	pullSecret["data"].(map[string]interface{})[".dockerconfigjson"] = base64.StdEncoding.EncodeToString(dockerConfigJSON)
+
+	// Write the secret to file
+	secretContent, err := yaml.Marshal(pullSecret)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pull secret YAML: %w", err)
+	}
+
+	if err := os.WriteFile(secretPath, secretContent, 0644); err != nil {
+		return fmt.Errorf("failed to write pull secret file: %w", err)
+	}
+
+	t.logger.Debug().
+		Str("secret_path", secretPath).
+		Int("registry_count", len(args.RegistrySecrets)).
+		Msg("Successfully generated registry pull secret")
+
+	return nil
+}
+
+// addPullSecretToDeployment adds imagePullSecrets to a deployment
+func (t *GenerateManifestsTool) addPullSecretToDeployment(deploymentPath, secretName string) error {
+	content, err := os.ReadFile(deploymentPath)
+	if err != nil {
+		return fmt.Errorf("reading deployment manifest: %w", err)
+	}
+
+	var deployment map[string]interface{}
+	if err := yaml.Unmarshal(content, &deployment); err != nil {
+		return fmt.Errorf("parsing deployment YAML: %w", err)
+	}
+
+	// Navigate to spec.template.spec.imagePullSecrets
+	pullSecrets := []interface{}{
+		map[string]interface{}{
+			"name": secretName,
+		},
+	}
+
+	if err := t.updateNestedValue(deployment, pullSecrets, "spec", "template", "spec", "imagePullSecrets"); err != nil {
+		return fmt.Errorf("updating imagePullSecrets: %w", err)
+	}
+
+	// Write back the updated deployment
+	updatedContent, err := yaml.Marshal(deployment)
+	if err != nil {
+		return fmt.Errorf("marshaling updated deployment YAML: %w", err)
+	}
+
+	if err := os.WriteFile(deploymentPath, updatedContent, 0644); err != nil {
+		return fmt.Errorf("writing updated deployment manifest: %w", err)
+	}
+
+	t.logger.Debug().
+		Str("deployment_path", deploymentPath).
+		Str("secret_name", secretName).
+		Msg("Successfully added pull secret to deployment")
+
+	return nil
+}
+
+// validateGeneratedManifests validates all generated manifests
+func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, manifestPath string, options ValidationOptions) (*ValidationSummary, error) {
+	start := time.Now()
+
+	// Convert ValidationOptions to ManifestValidationOptions
+	validationOptions := ops.ManifestValidationOptions{
+		K8sVersion:          options.K8sVersion,
+		SkipDryRun:          options.SkipDryRun,
+		SkipSchemaValidation: options.SkipSchemaValidation,
+		AllowedKinds:        options.AllowedKinds,
+		RequiredLabels:      options.RequiredLabels,
+		ForbiddenFields:     options.ForbiddenFields,
+		StrictValidation:    options.StrictValidation,
+	}
+
+	// Create kubectl validator (without requiring actual kubectl for now)
+	var validator *ops.ManifestValidator
+	if !options.SkipDryRun {
+		kubectlValidator := ops.NewKubectlValidator(t.logger, ops.KubectlValidationOptions{
+			Timeout: 30 * time.Second,
+		})
+		validator = ops.NewManifestValidator(t.logger, kubectlValidator)
+	} else {
+		validator = ops.NewManifestValidator(t.logger, nil)
+	}
+
+	// Validate the manifest directory
+	batchResult, err := validator.ValidateManifestDirectory(ctx, manifestPath, validationOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate manifest directory: %w", err)
+	}
+
+	// Convert BatchValidationResult to ValidationSummary
+	summary := &ValidationSummary{
+		Enabled:      true,
+		OverallValid: batchResult.OverallValid,
+		TotalFiles:   batchResult.TotalManifests,
+		ValidFiles:   batchResult.ValidManifests,
+		ErrorCount:   batchResult.ErrorCount,
+		WarningCount: batchResult.WarningCount,
+		Duration:     time.Since(start),
+		K8sVersion:   "unknown", // We don't have kubectl available
+		Results:      make(map[string]FileValidation),
+	}
+
+	// Convert individual validation results
+	for fileName, result := range batchResult.Results {
+		fileValidation := FileValidation{
+			Valid:        result.Valid,
+			Kind:         result.Kind,
+			APIVersion:   result.APIVersion,
+			Name:         result.Name,
+			Namespace:    result.Namespace,
+			ErrorCount:   len(result.Errors),
+			WarningCount: len(result.Warnings),
+			Duration:     result.Duration,
+			Suggestions:  result.Suggestions,
+		}
+
+		// Convert errors
+		for _, err := range result.Errors {
+			fileValidation.Errors = append(fileValidation.Errors, ValidationIssue{
+				Field:    err.Field,
+				Message:  err.Message,
+				Code:     err.Code,
+				Severity: string(err.Severity),
+				Path:     err.Path,
+			})
+		}
+
+		// Convert warnings
+		for _, warning := range result.Warnings {
+			fileValidation.Warnings = append(fileValidation.Warnings, ValidationIssue{
+				Field:    warning.Field,
+				Message:  warning.Message,
+				Code:     warning.Code,
+				Severity: "warning",
+				Path:     warning.Path,
+			})
+		}
+
+		summary.Results[fileName] = fileValidation
+	}
+
+	return summary, nil
+}
+
+// Converter methods for customizer types
+
+// convertServicePorts converts ServicePort slice to customizer format
+func (t *GenerateManifestsTool) convertServicePorts(ports []ServicePort) []customizerk8s.ServicePort {
+	result := make([]customizerk8s.ServicePort, len(ports))
+	for i, p := range ports {
+		result[i] = customizerk8s.ServicePort{
+			Name:       p.Name,
+			Port:       p.Port,
+			TargetPort: p.TargetPort,
+			NodePort:   p.NodePort,
+			Protocol:   p.Protocol,
+		}
+	}
+	return result
+}
+
+// convertIngressHosts converts IngressHost slice to customizer format
+func (t *GenerateManifestsTool) convertIngressHosts(hosts []IngressHost) []customizerk8s.IngressHost {
+	result := make([]customizerk8s.IngressHost, len(hosts))
+	for i, h := range hosts {
+		paths := make([]customizerk8s.IngressPath, len(h.Paths))
+		for j, p := range h.Paths {
+			paths[j] = customizerk8s.IngressPath{
+				Path:        p.Path,
+				PathType:    p.PathType,
+				ServiceName: p.ServiceName,
+				ServicePort: p.ServicePort,
+			}
+		}
+		result[i] = customizerk8s.IngressHost{
+			Host:  h.Host,
+			Paths: paths,
+		}
+	}
+	return result
+}
+
+// convertIngressTLS converts IngressTLS slice to customizer format
+func (t *GenerateManifestsTool) convertIngressTLS(tls []IngressTLS) []customizerk8s.IngressTLS {
+	result := make([]customizerk8s.IngressTLS, len(tls))
+	for i, t := range tls {
+		result[i] = customizerk8s.IngressTLS{
+			Hosts:      t.Hosts,
+			SecretName: t.SecretName,
+		}
+	}
+	return result
+}

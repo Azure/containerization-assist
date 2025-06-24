@@ -1,0 +1,139 @@
+name: Export Tool Schemas
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'pkg/mcp/tools/**'
+      - 'cmd/mcp-server/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'pkg/mcp/tools/**'
+      - 'cmd/mcp-server/**'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  export-schemas:
+    name: Export Tool Schemas
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+            
+      - name: Build MCP server
+        run: |
+          go mod download
+          go build -o container-kit-mcp ./cmd/mcp-server
+          
+      - name: Export tool schemas
+        run: |
+          ./container-kit-mcp --export-schemas --schema-output=docs/tools.schema.json
+          
+      - name: Check for schema changes
+        id: schema-changes
+        run: |
+          if git diff --quiet docs/tools.schema.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes to tool schemas"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Tool schemas have been updated"
+            git diff docs/tools.schema.json
+          fi
+          
+      - name: Commit updated schemas (main branch only)
+        if: steps.schema-changes.outputs.changed == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/tools.schema.json
+          git commit -m "Update tool schemas
+
+          🤖 Generated with GitHub Actions
+          
+          Auto-updated tool schemas based on latest MCP tool definitions."
+          git push
+          
+      - name: Comment on PR with schema changes
+        if: steps.schema-changes.outputs.changed == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const schema = JSON.parse(fs.readFileSync('docs/tools.schema.json', 'utf8'));
+            
+            // Format tools by category
+            let toolsList = '';
+            if (schema.tools?.by_category) {
+              for (const [category, tools] of Object.entries(schema.tools.by_category)) {
+                toolsList += `\n#### ${category} Tools\n`;
+                for (const tool of tools) {
+                  toolsList += `- **${tool.name}**: ${tool.description}\n`;
+                }
+              }
+            }
+            
+            const comment = `## 🔧 Tool Schema Update
+            
+            This PR includes changes to MCP tool definitions. The tool schema has been automatically updated:
+            
+            - **Schema version**: ${schema.schema_version}
+            - **Generated**: ${schema.generated_at}
+            - **Total tools**: ${schema.tools?.total_count || 0}
+            - **Description**: ${schema.description}
+            
+            ### Available Tools (${schema.tools?.total_count || 0} total):
+            ${toolsList || 'No tools found'}
+            
+            ### Capabilities:
+            ${schema.capabilities?.ai_features?.map(feature => `- 🤖 ${feature}`).join('\n') || ''}
+            
+            ### Security Features:
+            ${schema.capabilities?.security?.map(feature => `- 🔒 ${feature}`).join('\n') || ''}
+            
+            ### Resources:
+            ${schema.resources?.available_resources?.map(resource => `- 📊 ${resource}`).join('\n') || ''}
+            
+            The updated schema is available at \`docs/tools.schema.json\` and can be used by IDE plugins and LLMs for tool discovery.
+            
+            **Note**: ${schema.tools?.note || 'Tools are automatically registered with GoMCP'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            
+      - name: Upload schema as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-schemas
+          path: docs/tools.schema.json
+          retention-days: 30
