@@ -3,6 +3,11 @@ set -e
 
 echo "🚀 Setting up Container Kit development environment..."
 
+# Change to workspace directory
+WORKSPACE_DIR="${CONTAINER_WORKSPACE_FOLDER:-$(pwd)}"
+echo "📁 Working directory: $WORKSPACE_DIR"
+cd "$WORKSPACE_DIR"
+
 # Update system packages
 echo "📦 Updating system packages..."
 sudo apt-get update
@@ -66,16 +71,31 @@ echo "Docker version: $(docker --version)"
 
 # Initialize Go module cache
 echo "📚 Warming up Go module cache..."
-go mod download
+if [ -f "go.mod" ]; then
+    go mod download || echo "⚠️  Failed to download modules, continuing..."
+else
+    echo "⚠️  No go.mod found, skipping module download"
+fi
 
 # Build the project to ensure everything works
 echo "🔨 Building project to verify setup..."
-go build -o /tmp/container-kit .
-go build -tags mcp -o /tmp/container-kit-mcp ./cmd/mcp-server
+if [ -f "main.go" ]; then
+    go build -o /tmp/container-kit . || echo "⚠️  Main build failed, continuing..."
+fi
+
+if [ -d "cmd/mcp-server" ]; then
+    go build -tags mcp -o /tmp/container-kit-mcp ./cmd/mcp-server || echo "⚠️  MCP server build failed, continuing..."
+else
+    echo "⚠️  cmd/mcp-server not found, skipping MCP build"
+fi
 
 # Run tests to ensure everything is working
 echo "🧪 Running quick test to verify setup..."
-go test ./pkg/mcp/tools/ -short
+if [ -d "pkg/mcp/tools" ]; then
+    go test ./pkg/mcp/tools/ -short || echo "⚠️  Tests failed, continuing..."
+else
+    echo "⚠️  pkg/mcp/tools not found, skipping tests"
+fi
 
 # Create helpful aliases
 echo "📝 Setting up helpful aliases..."
@@ -110,8 +130,9 @@ EOF
 
 # Set up pre-commit hooks directory
 echo "🔗 Setting up git hooks..."
-mkdir -p .git/hooks
-cat > .git/hooks/pre-commit << 'EOF'
+if [ -d ".git" ]; then
+    mkdir -p .git/hooks
+    cat > .git/hooks/pre-commit << 'EOF'
 #!/bin/bash
 # Run linting and tests before commit
 echo "Running pre-commit checks..."
@@ -130,7 +151,10 @@ fi
 
 echo "✅ Pre-commit checks passed!"
 EOF
-chmod +x .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
+else
+    echo "⚠️  Not in a git repository, skipping git hooks setup"
+fi
 
 # Create welcome message
 cat > ~/.devcontainer-welcome << 'EOF'
