@@ -46,7 +46,7 @@ This development container provides a fully configured environment for Container
 ## 🛠️ What's Included
 
 ### Core Development Tools
-- **Go 1.24+** - Latest Go compiler and tools
+- **Go 1.24** - Latest Go compiler and tools
 - **Node.js LTS** - JavaScript runtime for web tools
 - **npm** - Node package manager
 - **golangci-lint** - Comprehensive Go linting
@@ -122,7 +122,14 @@ kdd <deployment>      # kubectl describe deployment
 
 ## 🐛 Troubleshooting
 
-### Container won't start
+### Container won't start / "no such file or directory" error
+- The devcontainer now automatically detects the workspace folder
+- If you see "chdir to cwd failed", try:
+  1. Command Palette → "Dev Containers: Rebuild Container"
+  2. Delete the container and volume, then restart
+  3. Ensure you're opening the repository root folder in VS Code
+
+### Container won't start (other issues)
 - Ensure Docker is running
 - Try rebuilding: Command Palette → "Dev Containers: Rebuild Container"
 - Check Docker has enough resources allocated
