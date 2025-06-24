@@ -19,7 +19,7 @@ import (
 var _ pipeline.PipelineStage = &DockerStage{}
 
 type DockerStage struct {
-	AIClient         *ai.AzOpenAIClient
+	AIClient         ai.LLMClient
 	UseDraftTemplate bool
 	Parser           pipeline.Parser
 }
@@ -52,15 +52,10 @@ func (p *DockerStage) Generate(ctx context.Context, state *pipeline.PipelineStat
 
 		if p.UseDraftTemplate {
 			// Use the existing function from the docker package
-			templateName, tokenUsage, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir, state.RepoFileTree)
+			templateName, _, err := docker.GetDockerfileTemplateName(ctx, p.AIClient, targetDir, state.RepoFileTree)
 			if err != nil {
 				return fmt.Errorf("getting Dockerfile template name: %w", err)
 			}
-
-			// Accumulate token usage from template selection
-			state.TokenUsage.PromptTokens += tokenUsage.PromptTokens
-			state.TokenUsage.CompletionTokens += tokenUsage.CompletionTokens
-			state.TokenUsage.TotalTokens += tokenUsage.TotalTokens
 
 			logger.Infof("Using Dockerfile template: %s\n", templateName)
 
@@ -94,6 +89,9 @@ func (p *DockerStage) Generate(ctx context.Context, state *pipeline.PipelineStat
 // GetErrors returns Docker-related errors from the state
 func (p *DockerStage) GetErrors(state *pipeline.PipelineState) string {
 	return state.Dockerfile.BuildErrors
+}
+func (p *DockerStage) SetAIClient(client ai.LLMClient) {
+	p.AIClient = client
 }
 
 // WriteSuccessfulFiles writes the successful Dockerfile to disk
@@ -170,7 +168,7 @@ func (p *DockerStage) Run(ctx context.Context, state *pipeline.PipelineState, cl
 }
 
 // analyzeDockerfile uses AI to analyze and fix Dockerfile content with file reading capabilities
-func analyzeDockerfile(ctx context.Context, client *ai.AzOpenAIClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
+func analyzeDockerfile(ctx context.Context, client ai.LLMClient, state *pipeline.PipelineState) (*pipeline.FileAnalysisResult, error) {
 	dockerfile := state.Dockerfile
 
 	// Get the base directory from the Dockerfile path
@@ -266,11 +264,11 @@ Ensure that all COPY and RUN instructions are consistent with the actual file st
 Avoid relying on runtime wildcard patterns (e.g., find or *.jar in CMD) unless the build stage guarantees those files exist at the expected paths.
 If using shell logic in CMD or RUN, it should fail clearly if expected files are missing — avoid silent errors or infinite loops.`
 
-promptText += fmt.Sprintf(`
+	promptText += fmt.Sprintf(`
 ADDITIONAL CONTEXT (You might not need to use this, so only use it if it is relevant for generating a working Dockerfile):
 %s`, state.ExtraContext)
 
-promptText += `
+	promptText += `
 **IMPORTANT: Output the fixed Dockerfile content between <DOCKERFILE> and </DOCKERFILE> tags. These tags must not appear anywhere else in your response except for wrapping the corrected dockerfile content. :IMPORTANT**
 
 I will tip you if you provide a correct and working Dockerfile.
@@ -278,7 +276,6 @@ I will tip you if you provide a correct and working Dockerfile.
 
 	//content, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
 	content, _, err := client.GetChatCompletionWithFileTools(ctx, promptText, baseDir)
-
 	if err != nil {
 		return nil, err
 	}

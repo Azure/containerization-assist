@@ -17,12 +17,25 @@ type AzOpenAIClient struct {
 	deploymentID string
 	tokenUsage   TokenUsage
 }
+type LLMCompletion struct {
+	StageID    string     `json:"stage_id"`
+	Iteration  int        `json:"iteration"`
+	Response   string     `json:"response"`
+	TokenUsage TokenUsage `json:"token_usage"`
+	Prompt     string     `json:"prompt"`
+}
 
 // TokenUsage holds the token usage information across all pipelines
 type TokenUsage struct {
 	CompletionTokens int
 	PromptTokens     int
 	TotalTokens      int
+}
+type LLMClient interface {
+	GetChatCompletion(ctx context.Context, prompt string) (string, TokenUsage, error)
+	GetChatCompletionWithFileTools(ctx context.Context, prompt, baseDir string) (string, TokenUsage, error)
+	GetChatCompletionWithFormat(ctx context.Context, prompt string, args ...interface{}) (string, TokenUsage, error)
+	GetTokenUsage() TokenUsage
 }
 
 // IncrementTokenUsage increments the client's token usage with the usage from a new API call

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
@@ -68,7 +69,7 @@ func (r *Runner) Run(
 	ctx context.Context,
 	state *PipelineState,
 	opts RunnerOptions,
-	clients interface{},
+	clients *clients.Clients,
 ) error {
 	// Initialize the pipeline stages in order
 	for _, sc := range r.stageConfigs {
@@ -107,9 +108,20 @@ func (r *Runner) Run(
 		} else {
 			logger.Infof("  === Retrying stage %s %d/%d  (iteration %d) ===", currentStageConfig.Id, state.RetryCount, currentStageConfig.MaxRetries, state.IterationCount)
 		}
+		// If snapshot generation is enabled and an OpenAI client exists,
+		// wrap the client with tracking to capture token usage and completions.
+		if clients != nil && clients.AzOpenAIClient != nil {
+			clients.AzOpenAIClient = WrapForTracking(clients.AzOpenAIClient, state, "", opts)
+		}
 
+		// If the stage supports AI client injection, inject the client.
+		if injectable, ok := stage.(AIClientInjectable); ok {
+			injectable.SetAIClient(clients.AzOpenAIClient)
+		}
+
+		// Run the stage with the current state, clients, and options.
 		err := stage.Run(ctx, state, clients, opts)
-		if opts.GenerateSnapshot {
+		if opts.GenerateSnapshot || opts.GenerateReport {
 			outcome := StageOutcomeSuccess
 			if err != nil {
 				outcome = StageOutcomeFailure
@@ -119,8 +131,10 @@ func (r *Runner) Run(
 				RetryCount: state.RetryCount,
 				Outcome:    outcome,
 			})
-			if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
-				return fmt.Errorf("writing iteration snapshot: %w", err)
+			if opts.GenerateSnapshot {
+				if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
+					return fmt.Errorf("writing iteration snapshot: %w", err)
+				}
 			}
 		}
 
