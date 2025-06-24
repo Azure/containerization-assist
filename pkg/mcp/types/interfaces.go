@@ -45,6 +45,27 @@ type ToolExample struct {
 	Output      map[string]interface{} `json:"output"`
 }
 
+// ToolArgs is a marker interface for tool-specific argument types
+type ToolArgs interface {
+	// Validate checks if the arguments are valid
+	Validate() error
+}
+
+// ToolResult is a marker interface for tool-specific result types
+type ToolResult interface {
+	// IsSuccess indicates if the tool execution was successful
+	IsSuccess() bool
+
+	// GetError returns any error that occurred during execution
+	GetError() error
+}
+
+// ArgConverter converts generic arguments to tool-specific types
+type ArgConverter func(args map[string]interface{}) (ToolArgs, error)
+
+// ResultConverter converts tool-specific results to generic types
+type ResultConverter func(result ToolResult) (map[string]interface{}, error)
+
 // =============================================================================
 // SESSION INTERFACE
 // =============================================================================
@@ -297,6 +318,48 @@ type ToolRegistry interface {
 	// GetMetadata returns metadata for all registered tools
 	GetMetadata() map[string]ToolMetadata
 }
+
+// =============================================================================
+// AI CONTEXT INTERFACES
+// =============================================================================
+
+// AIContext provides essential AI context capabilities for tool responses
+type AIContext interface {
+	// Assessment capabilities
+	GetAssessment() *UnifiedAssessment
+
+	// Recommendation capabilities
+	GenerateRecommendations() []Recommendation
+
+	// Context enrichment
+	GetToolContext() *ToolContext
+
+	// Essential metadata
+	GetMetadata() map[string]interface{}
+}
+
+// ScoreCalculator provides unified scoring algorithms
+type ScoreCalculator interface {
+	CalculateScore(data interface{}) int
+	DetermineRiskLevel(score int, factors map[string]interface{}) string
+	CalculateConfidence(evidence []string) int
+}
+
+// TradeoffAnalyzer provides unified trade-off analysis
+type TradeoffAnalyzer interface {
+	AnalyzeTradeoffs(options []string, context map[string]interface{}) []TradeoffAnalysis
+	CompareAlternatives(alternatives []AlternativeStrategy) *ComparisonMatrix
+	RecommendBestOption(analysis []TradeoffAnalysis) *DecisionRecommendation
+}
+
+// AI Context supporting types (placeholders - to be defined based on usage)
+type UnifiedAssessment struct{}
+type Recommendation struct{}
+type ToolContext struct{}
+type TradeoffAnalysis struct{}
+type AlternativeStrategy struct{}
+type ComparisonMatrix struct{}
+type DecisionRecommendation struct{}
 
 // =============================================================================
 // ERROR CODES

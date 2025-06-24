@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -166,7 +167,7 @@ func (t *HTTPTransport) handleOptions(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serve starts the HTTP server and handles requests
-func (t *HTTPTransport) Serve(ctx context.Context, handler RequestHandler) error {
+func (t *HTTPTransport) Serve(ctx context.Context, handler mcptypes.RequestHandler) error {
 	t.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", t.port),
 		Handler:      t.router,

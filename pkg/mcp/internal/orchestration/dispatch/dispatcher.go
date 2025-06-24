@@ -3,27 +3,29 @@ package dispatch
 import (
 	"fmt"
 	"sync"
+
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // ToolDispatcher handles type-safe tool dispatch without reflection
 type ToolDispatcher struct {
-	tools      map[string]ToolFactory
-	converters map[string]ArgConverter
-	metadata   map[string]ToolMetadata
+	tools      map[string]mcptypes.ToolFactory
+	converters map[string]mcptypes.ArgConverter
+	metadata   map[string]mcptypes.ToolMetadata
 	mu         sync.RWMutex
 }
 
 // NewToolDispatcher creates a new tool dispatcher
 func NewToolDispatcher() *ToolDispatcher {
 	return &ToolDispatcher{
-		tools:      make(map[string]ToolFactory),
-		converters: make(map[string]ArgConverter),
-		metadata:   make(map[string]ToolMetadata),
+		tools:      make(map[string]mcptypes.ToolFactory),
+		converters: make(map[string]mcptypes.ArgConverter),
+		metadata:   make(map[string]mcptypes.ToolMetadata),
 	}
 }
 
 // RegisterTool registers a tool with its factory and argument converter
-func (d *ToolDispatcher) RegisterTool(name string, factory ToolFactory, converter ArgConverter) error {
+func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory, converter mcptypes.ArgConverter) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -43,7 +45,7 @@ func (d *ToolDispatcher) RegisterTool(name string, factory ToolFactory, converte
 }
 
 // GetToolFactory returns the factory for a specific tool
-func (d *ToolDispatcher) GetToolFactory(name string) (ToolFactory, bool) {
+func (d *ToolDispatcher) GetToolFactory(name string) (mcptypes.ToolFactory, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -52,7 +54,7 @@ func (d *ToolDispatcher) GetToolFactory(name string) (ToolFactory, bool) {
 }
 
 // ConvertArgs converts generic arguments to tool-specific types
-func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (ToolArgs, error) {
+func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcptypes.ToolArgs, error) {
 	d.mu.RLock()
 	converter, exists := d.converters[toolName]
 	d.mu.RUnlock()
@@ -82,7 +84,7 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (ToolArg
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (d *ToolDispatcher) GetToolMetadata(name string) (ToolMetadata, bool) {
+func (d *ToolDispatcher) GetToolMetadata(name string) (mcptypes.ToolMetadata, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 

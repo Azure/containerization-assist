@@ -18,6 +18,7 @@ type OptimizationStrategy string
 
 const (
 	OptimizationSize         OptimizationStrategy = "size"
+	OptimizationSpeed        OptimizationStrategy = "speed"
 	OptimizationSecurity     OptimizationStrategy = "security"
 	OptimizationPerformance  OptimizationStrategy = "performance"
 	OptimizationBalanced     OptimizationStrategy = "balanced"
@@ -32,4 +33,8 @@ type TemplateContext struct {
 	Dependencies     []string
 	OptStrategy      OptimizationStrategy
 	CustomValues     map[string]interface{}
+	HasTests         bool
+	HasDatabase      bool
+	IsWebApp         bool
+	HasStaticFiles   bool
 }

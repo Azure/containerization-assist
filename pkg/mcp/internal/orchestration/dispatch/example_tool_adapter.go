@@ -3,6 +3,8 @@ package dispatch
 import (
 	"context"
 	"fmt"
+
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // Example: How to adapt an existing tool to the new type-safe system
@@ -16,7 +18,7 @@ type AnalyzeRepositoryArgs struct {
 	ExtraParams map[string]string `json:"extra_params,omitempty"`
 }
 
-// Validate implements ToolArgs interface
+// Validate implements mcptypes.ToolArgs interface
 func (a *AnalyzeRepositoryArgs) Validate() error {
 	if a.SessionID == "" {
 		return fmt.Errorf("session_id is required")
@@ -38,12 +40,12 @@ type AnalyzeRepositoryResult struct {
 	Recommendations map[string]interface{} `json:"recommendations"`
 }
 
-// IsSuccess implements ToolResult interface
+// IsSuccess implements mcptypes.ToolResult interface
 func (r *AnalyzeRepositoryResult) IsSuccess() bool {
 	return r.Success
 }
 
-// GetError implements ToolResult interface
+// GetError implements mcptypes.ToolResult interface
 func (r *AnalyzeRepositoryResult) GetError() error {
 	return r.Error
 }
@@ -83,9 +85,19 @@ func (t *AnalyzeRepositoryToolAdapter) Execute(ctx context.Context, args interfa
 	return result, nil
 }
 
+// Validate implements Tool interface
+func (t *AnalyzeRepositoryToolAdapter) Validate(ctx context.Context, args interface{}) error {
+	// Type assert to our specific args type
+	toolArgs, ok := args.(*AnalyzeRepositoryArgs)
+	if !ok {
+		return fmt.Errorf("invalid argument type: expected *AnalyzeRepositoryArgs")
+	}
+	return toolArgs.Validate()
+}
+
 // GetMetadata implements Tool interface
-func (t *AnalyzeRepositoryToolAdapter) GetMetadata() ToolMetadata {
-	return ToolMetadata{
+func (t *AnalyzeRepositoryToolAdapter) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
 		Name:         "analyze_repository_atomic",
 		Description:  "Analyzes repository structure and dependencies",
 		Version:      "1.0.0",
@@ -99,7 +111,7 @@ func (t *AnalyzeRepositoryToolAdapter) GetMetadata() ToolMetadata {
 			"branch":     "string (optional)",
 			"depth":      "int (optional)",
 		},
-		Examples: []ToolExample{
+		Examples: []mcptypes.ToolExample{
 			{
 				Name:        "Basic Repository Analysis",
 				Description: "Analyze a GitHub repository",
@@ -118,7 +130,7 @@ func (t *AnalyzeRepositoryToolAdapter) GetMetadata() ToolMetadata {
 }
 
 // ConvertAnalyzeRepositoryArgs is the generated argument converter
-func ConvertAnalyzeRepositoryArgs(args map[string]interface{}) (ToolArgs, error) {
+func ConvertAnalyzeRepositoryArgs(args map[string]interface{}) (mcptypes.ToolArgs, error) {
 	result := &AnalyzeRepositoryArgs{}
 
 	// Extract session_id
@@ -175,7 +187,7 @@ func ConvertAnalyzeRepositoryArgs(args map[string]interface{}) (ToolArgs, error)
 func RegisterAnalyzeRepositoryTool(dispatcher *ToolDispatcher) error {
 	return dispatcher.RegisterTool(
 		"analyze_repository_atomic",
-		func() Tool { return &AnalyzeRepositoryToolAdapter{} },
+		func() mcptypes.Tool { return &AnalyzeRepositoryToolAdapter{} },
 		ConvertAnalyzeRepositoryArgs,
 	)
 }
