@@ -144,6 +144,47 @@ lint-baseline:
 lint-ratchet:
 	@./scripts/lint-ratchet.sh ./pkg/mcp/...
 
+# Team D: Infrastructure & Quality targets
+.PHONY: validate-structure
+validate-structure:
+	@echo "Running package boundary validation..."
+	@go run tools/check-boundaries/main.go
+
+.PHONY: validate-interfaces
+validate-interfaces:
+	@echo "Running interface validation..."
+	@go run tools/validate-interfaces/main.go
+
+.PHONY: check-hygiene
+check-hygiene:
+	@echo "Running dependency hygiene check..."
+	@go run tools/check-hygiene/main.go
+
+.PHONY: enforce-quality
+enforce-quality:
+	@echo "Running build-time quality enforcement..."
+	@go run tools/build-enforcement/main.go
+
+.PHONY: migrate-all
+migrate-all:
+	@echo "Executing complete migration..."
+	@go run tools/migrate/main.go --execute
+
+.PHONY: update-imports
+update-imports:
+	@echo "Updating import paths..."
+	@go run tools/update-imports/main.go --all
+
+.PHONY: bench-performance
+bench-performance:
+	@echo "Running performance comparison..."
+	@go run tools/measure-performance/main.go --compare --baseline=performance_baseline.json
+
+.PHONY: baseline-performance
+baseline-performance:
+	@echo "Establishing performance baseline..."
+	@go run tools/measure-performance/main.go
+
 .PHONY: help
 help:
 	@echo "Container Kit Makefile"
@@ -167,6 +208,16 @@ help:
 	@echo "Dependency management:"
 	@echo "  deps-update       Update Go dependencies (go get -u && go mod tidy)"
 	@echo "  deps-commit       Commit dependency updates with changelog template"
+	@echo ""
+	@echo "Migration & Quality targets (Team D):"
+	@echo "  validate-structure    Check package boundary rules"
+	@echo "  validate-interfaces   Check interface conformance"
+	@echo "  check-hygiene        Check dependency hygiene"
+	@echo "  enforce-quality      Run all build-time quality checks"
+	@echo "  migrate-all          Execute complete package migration"
+	@echo "  update-imports       Update import paths after migration"
+	@echo "  bench-performance    Compare performance to baseline"
+	@echo "  baseline-performance Establish new performance baseline"
 	@echo ""
 	@echo "Other targets:"
 	@echo "  clean             Remove built binaries"
