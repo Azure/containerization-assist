@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/localrivet/gomcp/server"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -1214,34 +1215,52 @@ func (t *AtomicScanImageSecurityTool) calculateSecurityScore(summary Vulnerabili
 	return score
 }
 
-// SimpleTool interface implementation
+// Tool interface implementation (unified interface)
 
-// GetName returns the tool name
-func (t *AtomicScanImageSecurityTool) GetName() string {
-	return "atomic_scan_image_security"
-}
-
-// GetDescription returns the tool description
-func (t *AtomicScanImageSecurityTool) GetDescription() string {
-	return "Performs comprehensive security vulnerability scanning on Docker images using industry-standard scanners"
-}
-
-// GetVersion returns the tool version
-func (t *AtomicScanImageSecurityTool) GetVersion() string {
-	return constants.AtomicToolVersion
-}
-
-// GetCapabilities returns the tool capabilities
-func (t *AtomicScanImageSecurityTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      false,
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicScanImageSecurityTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_scan_image_security",
+		Description: "Performs comprehensive security vulnerability scanning on Docker images using industry-standard scanners",
+		Version:     constants.AtomicToolVersion,
+		Category:    "security",
+		Dependencies: []string{"docker", "security_scanner"},
+		Capabilities: []string{
+			"supports_streaming",
+			"vulnerability_scanning",
+		},
+		Requirements: []string{"docker_daemon", "image_available"},
+		Parameters: map[string]string{
+			"image_name":           "required - Docker image name/tag to scan",
+			"severity_threshold":   "optional - Minimum severity to report",
+			"vuln_types":           "optional - Types of vulnerabilities to scan",
+			"include_fixable":      "optional - Include only fixable vulnerabilities",
+			"max_results":          "optional - Maximum number of results",
+			"include_remediations": "optional - Include remediation recommendations",
+			"generate_report":      "optional - Generate detailed security report",
+			"fail_on_critical":     "optional - Fail if critical vulnerabilities found",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "basic_scan",
+				Description: "Scan a Docker image for security vulnerabilities",
+				Input: map[string]interface{}{
+					"session_id":         "session-123",
+					"image_name":         "nginx:latest",
+					"severity_threshold": "HIGH",
+				},
+				Output: map[string]interface{}{
+					"success":             true,
+					"total_vulnerabilities": 5,
+					"critical_count":       0,
+					"high_count":           2,
+				},
+			},
+		},
 	}
 }
 
-// Validate validates the tool arguments
+// Validate validates the tool arguments (unified interface)
 func (t *AtomicScanImageSecurityTool) Validate(ctx context.Context, args interface{}) error {
 	scanArgs, ok := args.(AtomicScanImageSecurityArgs)
 	if !ok {
@@ -1278,7 +1297,7 @@ func (t *AtomicScanImageSecurityTool) Validate(ctx context.Context, args interfa
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
+// Execute implements unified Tool interface
 func (t *AtomicScanImageSecurityTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	scanArgs, ok := args.(AtomicScanImageSecurityArgs)
 	if !ok {
@@ -1290,6 +1309,33 @@ func (t *AtomicScanImageSecurityTool) Execute(ctx context.Context, args interfac
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, scanArgs)
+}
+
+// Legacy interface methods for backward compatibility
+
+// GetName returns the tool name (legacy SimpleTool compatibility)
+func (t *AtomicScanImageSecurityTool) GetName() string {
+	return t.GetMetadata().Name
+}
+
+// GetDescription returns the tool description (legacy SimpleTool compatibility)
+func (t *AtomicScanImageSecurityTool) GetDescription() string {
+	return t.GetMetadata().Description
+}
+
+// GetVersion returns the tool version (legacy SimpleTool compatibility)
+func (t *AtomicScanImageSecurityTool) GetVersion() string {
+	return t.GetMetadata().Version
+}
+
+// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+func (t *AtomicScanImageSecurityTool) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
+		SupportsDryRun:    true,
+		SupportsStreaming: true,
+		IsLongRunning:     true,
+		RequiresAuth:      false,
+	}
 }
 
 // ExecuteTyped provides the original typed execute method

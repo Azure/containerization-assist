@@ -13,6 +13,7 @@ import (
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -800,34 +801,47 @@ func (t *AtomicPushImageTool) validateImageReference(imageRef string) error {
 	return nil
 }
 
-// SimpleTool interface implementation
+// Tool interface implementation (unified interface)
 
-// GetName returns the tool name
-func (t *AtomicPushImageTool) GetName() string {
-	return "atomic_push_image"
-}
-
-// GetDescription returns the tool description
-func (t *AtomicPushImageTool) GetDescription() string {
-	return "Pushes Docker images to container registries with authentication support, retry logic, and progress tracking"
-}
-
-// GetVersion returns the tool version
-func (t *AtomicPushImageTool) GetVersion() string {
-	return "1.0.0"
-}
-
-// GetCapabilities returns the tool capabilities
-func (t *AtomicPushImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      true,
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicPushImageTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_push_image",
+		Description: "Pushes Docker images to container registries with authentication support, retry logic, and progress tracking",
+		Version:     "1.0.0",
+		Category:    "docker",
+		Dependencies: []string{"docker"},
+		Capabilities: []string{
+			"supports_dry_run",
+			"supports_streaming",
+		},
+		Requirements: []string{"docker_daemon", "registry_access"},
+		Parameters: map[string]string{
+			"image_ref":    "required - Full image reference to push",
+			"registry_url": "optional - Override registry URL",
+			"timeout":      "optional - Push timeout in seconds",
+			"retry_count":  "optional - Number of retry attempts",
+			"force":        "optional - Force push even if image exists",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "basic_push",
+				Description: "Push a Docker image to registry",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+					"image_ref":  "myregistry.azurecr.io/myapp:v1.0.0",
+				},
+				Output: map[string]interface{}{
+					"success":        true,
+					"image_ref":      "myregistry.azurecr.io/myapp:v1.0.0",
+					"push_duration":  "45s",
+				},
+			},
+		},
 	}
 }
 
-// Validate validates the tool arguments
+// Validate validates the tool arguments (unified interface)
 func (t *AtomicPushImageTool) Validate(ctx context.Context, args interface{}) error {
 	pushArgs, ok := args.(AtomicPushImageArgs)
 	if !ok {
@@ -859,7 +873,7 @@ func (t *AtomicPushImageTool) Validate(ctx context.Context, args interface{}) er
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
+// Execute implements unified Tool interface
 func (t *AtomicPushImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	pushArgs, ok := args.(AtomicPushImageArgs)
 	if !ok {
@@ -871,6 +885,33 @@ func (t *AtomicPushImageTool) Execute(ctx context.Context, args interface{}) (in
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, pushArgs)
+}
+
+// Legacy interface methods for backward compatibility
+
+// GetName returns the tool name (legacy SimpleTool compatibility)
+func (t *AtomicPushImageTool) GetName() string {
+	return t.GetMetadata().Name
+}
+
+// GetDescription returns the tool description (legacy SimpleTool compatibility)
+func (t *AtomicPushImageTool) GetDescription() string {
+	return t.GetMetadata().Description
+}
+
+// GetVersion returns the tool version (legacy SimpleTool compatibility)
+func (t *AtomicPushImageTool) GetVersion() string {
+	return t.GetMetadata().Version
+}
+
+// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+func (t *AtomicPushImageTool) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
+		SupportsDryRun:    true,
+		SupportsStreaming: true,
+		IsLongRunning:     true,
+		RequiresAuth:      true,
+	}
 }
 
 // ExecuteTyped provides the original typed execute method

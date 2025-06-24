@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/repository"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -658,34 +659,50 @@ func (t *AtomicAnalyzeRepositoryTool) validateLocalPath(path string) error {
 
 // AI Context methods are now provided by embedded BaseAIContextResult
 
-// SimpleTool interface implementation
+// Tool interface implementation (unified interface)
 
-// GetName returns the tool name
-func (t *AtomicAnalyzeRepositoryTool) GetName() string {
-	return "atomic_analyze_repository"
-}
-
-// GetDescription returns the tool description
-func (t *AtomicAnalyzeRepositoryTool) GetDescription() string {
-	return "Analyzes repository structure, detects programming language, framework, and generates containerization recommendations"
-}
-
-// GetVersion returns the tool version
-func (t *AtomicAnalyzeRepositoryTool) GetVersion() string {
-	return "1.0.0"
-}
-
-// GetCapabilities returns the tool capabilities
-func (t *AtomicAnalyzeRepositoryTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      false,
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicAnalyzeRepositoryTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_analyze_repository",
+		Description: "Analyzes repository structure, detects programming language, framework, and generates containerization recommendations",
+		Version:     "1.0.0",
+		Category:    "analysis",
+		Dependencies: []string{"git"},
+		Capabilities: []string{
+			"supports_streaming",
+			"repository_analysis",
+		},
+		Requirements: []string{"git_access"},
+		Parameters: map[string]string{
+			"repo_url":      "required - Repository URL or local path",
+			"branch":        "optional - Git branch to analyze",
+			"context":       "optional - Additional context about the application",
+			"language_hint": "optional - Programming language hint",
+			"shallow":       "optional - Perform shallow clone",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "analyze_repo",
+				Description: "Analyze a Git repository structure",
+				Input: map[string]interface{}{
+					"session_id":    "session-123",
+					"repo_url":      "https://github.com/user/myapp.git",
+					"branch":        "main",
+					"language_hint": "nodejs",
+				},
+				Output: map[string]interface{}{
+					"success":           true,
+					"detected_language": "javascript",
+					"framework":         "express",
+					"build_tool":        "npm",
+				},
+			},
+		},
 	}
 }
 
-// Validate validates the tool arguments
+// Validate validates the tool arguments (unified interface)
 func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interface{}) error {
 	analyzeArgs, ok := args.(AtomicAnalyzeRepositoryArgs)
 	if !ok {
@@ -710,7 +727,7 @@ func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interfa
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
+// Execute implements unified Tool interface
 func (t *AtomicAnalyzeRepositoryTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	analyzeArgs, ok := args.(AtomicAnalyzeRepositoryArgs)
 	if !ok {
@@ -722,6 +739,33 @@ func (t *AtomicAnalyzeRepositoryTool) Execute(ctx context.Context, args interfac
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, analyzeArgs)
+}
+
+// Legacy interface methods for backward compatibility
+
+// GetName returns the tool name (legacy SimpleTool compatibility)
+func (t *AtomicAnalyzeRepositoryTool) GetName() string {
+	return t.GetMetadata().Name
+}
+
+// GetDescription returns the tool description (legacy SimpleTool compatibility)
+func (t *AtomicAnalyzeRepositoryTool) GetDescription() string {
+	return t.GetMetadata().Description
+}
+
+// GetVersion returns the tool version (legacy SimpleTool compatibility)
+func (t *AtomicAnalyzeRepositoryTool) GetVersion() string {
+	return t.GetMetadata().Version
+}
+
+// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+func (t *AtomicAnalyzeRepositoryTool) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
+		SupportsDryRun:    true,
+		SupportsStreaming: true,
+		IsLongRunning:     true,
+		RequiresAuth:      false,
+	}
 }
 
 // ExecuteTyped provides the original typed execute method

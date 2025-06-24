@@ -13,29 +13,13 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
-// Temporary types for unified interface (will be removed after interface migration)
-type ToolMetadata struct {
-	Name         string            `json:"name"`
-	Description  string            `json:"description"`
-	Version      string            `json:"version"`
-	Category     string            `json:"category"`
-	Dependencies []string          `json:"dependencies"`
-	Capabilities []string          `json:"capabilities"`
-	Requirements []string          `json:"requirements"`
-	Parameters   map[string]string `json:"parameters"`
-	Examples     []ToolExample     `json:"examples"`
-}
-
-type ToolExample struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Input       map[string]interface{} `json:"input"`
-	Output      map[string]interface{} `json:"output"`
-}
+// Import the unified interface types
+// These will be available from "github.com/Azure/container-copilot/pkg/mcp" after interface migration
 
 // AtomicBuildImageArgs defines arguments for atomic Docker image building
 type AtomicBuildImageArgs struct {
@@ -179,8 +163,8 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 // Tool interface implementation (unified MCP interface)
 
 // GetMetadata returns comprehensive tool metadata
-func (t *AtomicBuildImageTool) GetMetadata() ToolMetadata {
-	return ToolMetadata{
+func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
 		Name:        "atomic_build_image",
 		Description: "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
 		Version:     constants.AtomicToolVersion,
@@ -203,7 +187,7 @@ func (t *AtomicBuildImageTool) GetMetadata() ToolMetadata {
 			"push_after_build": "optional - Push image after build",
 			"registry_url":     "optional - Registry URL for pushing",
 		},
-		Examples: []ToolExample{
+		Examples: []mcptypes.ToolExample{
 			{
 				Name:        "basic_build",
 				Description: "Build a basic Docker image",
