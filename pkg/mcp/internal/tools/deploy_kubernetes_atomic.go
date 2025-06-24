@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -948,34 +949,64 @@ func (t *AtomicDeployKubernetesTool) handleHealthCheckError(ctx context.Context,
 	return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("health check failed: %v", err), "health_check_error")
 }
 
-// SimpleTool interface implementation
+// Tool interface implementation (unified MCP interface)
 
-// GetName returns the tool name
-func (t *AtomicDeployKubernetesTool) GetName() string {
-	return "atomic_deploy_kubernetes"
-}
-
-// GetDescription returns the tool description
-func (t *AtomicDeployKubernetesTool) GetDescription() string {
-	return "Deploys containerized applications to Kubernetes with manifest generation, health checks, and rollback support"
-}
-
-// GetVersion returns the tool version
-func (t *AtomicDeployKubernetesTool) GetVersion() string {
-	return "1.0.0"
-}
-
-// GetCapabilities returns the tool capabilities
-func (t *AtomicDeployKubernetesTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      false,
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicDeployKubernetesTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_deploy_kubernetes",
+		Description: "Deploys containerized applications to Kubernetes with manifest generation, health checks, and rollback support",
+		Version:     "1.0.0",
+		Category:    "kubernetes",
+		Dependencies: []string{"kubectl", "kubernetes-cluster"},
+		Capabilities: []string{
+			"supports_dry_run",
+			"supports_streaming",
+			"long_running",
+			"manifest_generation",
+		},
+		Requirements: []string{"kubernetes_access", "image_registry_access"},
+		Parameters: map[string]string{
+			"image_ref":       "required - Container image reference",
+			"app_name":        "optional - Application name",
+			"namespace":       "optional - Kubernetes namespace (default: default)",
+			"replicas":        "optional - Number of replicas (default: 1)",
+			"port":            "optional - Application port (default: 80)",
+			"service_type":    "optional - Service type (ClusterIP, NodePort, LoadBalancer)",
+			"include_ingress": "optional - Generate Ingress resource",
+			"environment":     "optional - Environment variables",
+			"cpu_request":     "optional - CPU request",
+			"memory_request":  "optional - Memory request",
+			"cpu_limit":       "optional - CPU limit",
+			"memory_limit":    "optional - Memory limit",
+			"generate_only":   "optional - Only generate manifests",
+			"wait_for_ready":  "optional - Wait for pods to be ready",
+			"wait_timeout":    "optional - Wait timeout in seconds",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "basic_deployment",
+				Description: "Deploy a basic application to Kubernetes",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+					"image_ref":  "myregistry.azurecr.io/myapp:v1.0.0",
+					"app_name":   "myapp",
+					"namespace":  "production",
+					"replicas":   3,
+					"port":       8080,
+				},
+				Output: map[string]interface{}{
+					"success":          true,
+					"manifest_paths":   []string{"/workspace/manifests/deployment.yaml"},
+					"deployment_ready": true,
+					"pod_count":        3,
+				},
+			},
+		},
 	}
 }
 
-// Validate validates the tool arguments
+// Validate validates the tool arguments (unified interface)
 func (t *AtomicDeployKubernetesTool) Validate(ctx context.Context, args interface{}) error {
 	deployArgs, ok := args.(AtomicDeployKubernetesArgs)
 	if !ok {
@@ -1000,7 +1031,7 @@ func (t *AtomicDeployKubernetesTool) Validate(ctx context.Context, args interfac
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
+// Execute implements unified Tool interface
 func (t *AtomicDeployKubernetesTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	deployArgs, ok := args.(AtomicDeployKubernetesArgs)
 	if !ok {
@@ -1012,6 +1043,33 @@ func (t *AtomicDeployKubernetesTool) Execute(ctx context.Context, args interface
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, deployArgs)
+}
+
+// Legacy interface methods for backward compatibility
+
+// GetName returns the tool name (legacy SimpleTool compatibility)
+func (t *AtomicDeployKubernetesTool) GetName() string {
+	return t.GetMetadata().Name
+}
+
+// GetDescription returns the tool description (legacy SimpleTool compatibility)
+func (t *AtomicDeployKubernetesTool) GetDescription() string {
+	return t.GetMetadata().Description
+}
+
+// GetVersion returns the tool version (legacy SimpleTool compatibility)
+func (t *AtomicDeployKubernetesTool) GetVersion() string {
+	return t.GetMetadata().Version
+}
+
+// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+func (t *AtomicDeployKubernetesTool) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
+		SupportsDryRun:    true,
+		SupportsStreaming: true,
+		IsLongRunning:     true,
+		RequiresAuth:      false,
+	}
 }
 
 // ExecuteTyped provides the original typed execute method

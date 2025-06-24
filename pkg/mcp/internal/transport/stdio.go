@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -43,7 +44,7 @@ func NewStdioTransportWithLogger(logger zerolog.Logger) *StdioTransport {
 }
 
 // Serve starts the stdio transport and blocks until context cancellation
-func (s *StdioTransport) Serve(ctx context.Context, handler RequestHandler) error {
+func (s *StdioTransport) Serve(ctx context.Context, handler mcptypes.RequestHandler) error {
 	s.logger.Info().Msg("Starting stdio transport")
 
 	// Prefer using GomcpManager if available, fallback to server

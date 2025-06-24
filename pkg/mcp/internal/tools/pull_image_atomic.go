@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/localrivet/gomcp/server"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -544,34 +545,45 @@ func (r *AtomicPullImageResult) GetAlternativeStrategies() []ai_context.Alternat
 	return alternatives
 }
 
-// SimpleTool interface implementation
+// Tool interface implementation (unified interface)
 
-// GetName returns the tool name
-func (t *AtomicPullImageTool) GetName() string {
-	return "atomic_pull_image"
-}
-
-// GetDescription returns the tool description
-func (t *AtomicPullImageTool) GetDescription() string {
-	return "Pulls Docker images from container registries with authentication support and detailed progress tracking"
-}
-
-// GetVersion returns the tool version
-func (t *AtomicPullImageTool) GetVersion() string {
-	return "1.0.0"
-}
-
-// GetCapabilities returns the tool capabilities
-func (t *AtomicPullImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      false,
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicPullImageTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_pull_image",
+		Description: "Pulls Docker images from container registries with authentication support and detailed progress tracking",
+		Version:     "1.0.0",
+		Category:    "docker",
+		Dependencies: []string{"docker"},
+		Capabilities: []string{
+			"supports_streaming",
+		},
+		Requirements: []string{"docker_daemon"},
+		Parameters: map[string]string{
+			"image_ref":    "required - Full image reference to pull",
+			"timeout":      "optional - Pull timeout in seconds",
+			"retry_count":  "optional - Number of retry attempts",
+			"force":        "optional - Force pull even if image exists",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "basic_pull",
+				Description: "Pull a Docker image from registry",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+					"image_ref":  "nginx:latest",
+				},
+				Output: map[string]interface{}{
+					"success":       true,
+					"image_ref":     "nginx:latest",
+					"pull_duration": "30s",
+				},
+			},
+		},
 	}
 }
 
-// Validate validates the tool arguments
+// Validate validates the tool arguments (unified interface)
 func (t *AtomicPullImageTool) Validate(ctx context.Context, args interface{}) error {
 	pullArgs, ok := args.(AtomicPullImageArgs)
 	if !ok {
@@ -596,7 +608,7 @@ func (t *AtomicPullImageTool) Validate(ctx context.Context, args interface{}) er
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
+// Execute implements unified Tool interface
 func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	pullArgs, ok := args.(AtomicPullImageArgs)
 	if !ok {
@@ -608,6 +620,33 @@ func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (in
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, pullArgs)
+}
+
+// Legacy interface methods for backward compatibility
+
+// GetName returns the tool name (legacy SimpleTool compatibility)
+func (t *AtomicPullImageTool) GetName() string {
+	return t.GetMetadata().Name
+}
+
+// GetDescription returns the tool description (legacy SimpleTool compatibility)
+func (t *AtomicPullImageTool) GetDescription() string {
+	return t.GetMetadata().Description
+}
+
+// GetVersion returns the tool version (legacy SimpleTool compatibility)
+func (t *AtomicPullImageTool) GetVersion() string {
+	return t.GetMetadata().Version
+}
+
+// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+func (t *AtomicPullImageTool) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
+		SupportsDryRun:    true,
+		SupportsStreaming: true,
+		IsLongRunning:     true,
+		RequiresAuth:      false,
+	}
 }
 
 // ExecuteTyped provides the original typed execute method

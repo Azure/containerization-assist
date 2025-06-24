@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/localrivet/gomcp/server"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -437,32 +438,6 @@ func (t *AtomicTagImageTool) extractRegistryURL(imageRef string) string {
 	return "docker.io" // Default registry
 }
 
-// SimpleTool interface implementation
-
-// GetName returns the tool name
-func (t *AtomicTagImageTool) GetName() string {
-	return "atomic_tag_image"
-}
-
-// GetDescription returns the tool description
-func (t *AtomicTagImageTool) GetDescription() string {
-	return "Tags Docker images with new names for versioning, environment promotion, or registry organization"
-}
-
-// GetVersion returns the tool version
-func (t *AtomicTagImageTool) GetVersion() string {
-	return constants.AtomicToolVersion
-}
-
-// GetCapabilities returns the tool capabilities
-func (t *AtomicTagImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     false,
-		RequiresAuth:      false,
-	}
-}
 
 // Validate validates the tool arguments
 func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) error {
@@ -520,6 +495,71 @@ func (t *AtomicTagImageTool) Execute(ctx context.Context, args interface{}) (int
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, tagArgs)
+}
+
+// Tool interface implementation (unified interface)
+
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicTagImageTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_tag_image",
+		Description: "Tags Docker images with new names for versioning, environment promotion, or registry organization",
+		Version:     constants.AtomicToolVersion,
+		Category:    "docker",
+		Dependencies: []string{"docker"},
+		Capabilities: []string{
+			"supports_dry_run",
+		},
+		Requirements: []string{"docker_daemon"},
+		Parameters: map[string]string{
+			"source_image": "required - Source image to tag",
+			"target_image": "required - Target image name and tag",
+			"force":        "optional - Force tag even if target exists",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "basic_tag",
+				Description: "Tag a Docker image with new name",
+				Input: map[string]interface{}{
+					"session_id":    "session-123",
+					"source_image":  "myapp:latest",
+					"target_image":  "myregistry.azurecr.io/myapp:v1.0.0",
+				},
+				Output: map[string]interface{}{
+					"success":      true,
+					"source_image": "myapp:latest",
+					"target_image": "myregistry.azurecr.io/myapp:v1.0.0",
+				},
+			},
+		},
+	}
+}
+
+// Legacy interface methods for backward compatibility
+
+// GetName returns the tool name (legacy SimpleTool compatibility)
+func (t *AtomicTagImageTool) GetName() string {
+	return t.GetMetadata().Name
+}
+
+// GetDescription returns the tool description (legacy SimpleTool compatibility)
+func (t *AtomicTagImageTool) GetDescription() string {
+	return t.GetMetadata().Description
+}
+
+// GetVersion returns the tool version (legacy SimpleTool compatibility)
+func (t *AtomicTagImageTool) GetVersion() string {
+	return t.GetMetadata().Version
+}
+
+// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+func (t *AtomicTagImageTool) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
+		SupportsDryRun:    true,
+		SupportsStreaming: true,
+		IsLongRunning:     false,
+		RequiresAuth:      false,
+	}
 }
 
 // ExecuteTyped provides the original typed execute method

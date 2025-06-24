@@ -13,9 +13,13 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
+
+// Import the unified interface types
+// These will be available from "github.com/Azure/container-copilot/pkg/mcp" after interface migration
 
 // AtomicBuildImageArgs defines arguments for atomic Docker image building
 type AtomicBuildImageArgs struct {
@@ -156,34 +160,53 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 	return result, nil
 }
 
-// SimpleTool interface implementation
+// Tool interface implementation (unified MCP interface)
 
-// GetName returns the tool name
-func (t *AtomicBuildImageTool) GetName() string {
-	return "atomic_build_image"
-}
-
-// GetDescription returns the tool description
-func (t *AtomicBuildImageTool) GetDescription() string {
-	return "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning"
-}
-
-// GetVersion returns the tool version
-func (t *AtomicBuildImageTool) GetVersion() string {
-	return constants.AtomicToolVersion
-}
-
-// GetCapabilities returns the tool capabilities
-func (t *AtomicBuildImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      false,
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_build_image",
+		Description: "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
+		Version:     constants.AtomicToolVersion,
+		Category:    "docker",
+		Dependencies: []string{"docker"},
+		Capabilities: []string{
+			"supports_dry_run",
+			"supports_streaming", 
+			"long_running",
+		},
+		Requirements: []string{"docker_daemon", "build_context"},
+		Parameters: map[string]string{
+			"image_name":       "required - Docker image name",
+			"image_tag":        "optional - Image tag (default: latest)",
+			"dockerfile_path":  "optional - Path to Dockerfile",
+			"build_context":    "optional - Build context directory",
+			"platform":         "optional - Target platform (default: linux/amd64)",
+			"no_cache":         "optional - Build without cache",
+			"build_args":       "optional - Docker build arguments",
+			"push_after_build": "optional - Push image after build",
+			"registry_url":     "optional - Registry URL for pushing",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "basic_build",
+				Description: "Build a basic Docker image",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+					"image_name": "my-app",
+					"image_tag":  "v1.0.0",
+				},
+				Output: map[string]interface{}{
+					"success":        true,
+					"full_image_ref": "my-app:v1.0.0",
+					"build_duration": "30s",
+				},
+			},
+		},
 	}
 }
 
-// Validate validates the tool arguments
+// Validate validates the tool arguments (unified interface)
 func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) error {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
@@ -208,7 +231,7 @@ func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) e
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
+// Execute implements unified Tool interface
 func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
@@ -220,6 +243,33 @@ func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (i
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, buildArgs)
+}
+
+// Legacy interface methods for backward compatibility
+
+// GetName returns the tool name (legacy SimpleTool compatibility)
+func (t *AtomicBuildImageTool) GetName() string {
+	return t.GetMetadata().Name
+}
+
+// GetDescription returns the tool description (legacy SimpleTool compatibility)
+func (t *AtomicBuildImageTool) GetDescription() string {
+	return t.GetMetadata().Description
+}
+
+// GetVersion returns the tool version (legacy SimpleTool compatibility)
+func (t *AtomicBuildImageTool) GetVersion() string {
+	return t.GetMetadata().Version
+}
+
+// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+func (t *AtomicBuildImageTool) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
+		SupportsDryRun:    true,
+		SupportsStreaming: true,
+		IsLongRunning:     true,
+		RequiresAuth:      false,
+	}
 }
 
 // ExecuteTyped provides the original typed execute method

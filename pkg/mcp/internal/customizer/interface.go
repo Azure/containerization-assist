@@ -17,19 +17,24 @@ type Customizer interface {
 type OptimizationStrategy string
 
 const (
-	OptimizationSize     OptimizationStrategy = "size"
-	OptimizationSpeed    OptimizationStrategy = "speed"
-	OptimizationSecurity OptimizationStrategy = "security"
-	OptimizationDefault  OptimizationStrategy = "default"
+	OptimizationSize         OptimizationStrategy = "size"
+	OptimizationSpeed        OptimizationStrategy = "speed"
+	OptimizationSecurity     OptimizationStrategy = "security"
+	OptimizationPerformance  OptimizationStrategy = "performance"
+	OptimizationBalanced     OptimizationStrategy = "balanced"
 )
 
-// TemplateContext provides common context for template selection
+// TemplateContext provides context for template customization
 type TemplateContext struct {
-	Language       string
-	Framework      string
-	HasTests       bool
-	HasDatabase    bool
-	IsWebApp       bool
-	HasStaticFiles bool
-	Dependencies   []analysis.Dependency
+	AnalysisResult   *analysis.AnalysisResult
+	Language         string
+	Framework        string
+	Port             int
+	Dependencies     []string
+	OptStrategy      OptimizationStrategy
+	CustomValues     map[string]interface{}
+	HasTests         bool
+	HasDatabase      bool
+	IsWebApp         bool
+	HasStaticFiles   bool
 }
