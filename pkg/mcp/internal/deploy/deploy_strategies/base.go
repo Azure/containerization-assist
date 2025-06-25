@@ -5,9 +5,16 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
+
+// ProgressReporter provides progress reporting (local interface to avoid import cycles)
+type ProgressReporter interface {
+	ReportStage(stageProgress float64, message string)
+	NextStage(message string)
+	SetStage(stageIndex int, message string)
+	ReportOverall(progress float64, message string)
+}
 
 // K8sDeployerAdapter provides an interface for Kubernetes deployment operations
 type K8sDeployerAdapter interface {
@@ -77,7 +84,7 @@ type DeploymentConfig struct {
 
 	// Dependencies
 	K8sDeployer      K8sDeployerAdapter
-	ProgressReporter mcptypes.ProgressReporter
+	ProgressReporter ProgressReporter
 	Logger           zerolog.Logger
 }
 

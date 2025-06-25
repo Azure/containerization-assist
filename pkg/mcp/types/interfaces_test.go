@@ -32,24 +32,7 @@ func (m *MockAIAnalyzer) GetTokenUsage() TokenUsage {
 
 func (m *MockAIAnalyzer) ResetTokenUsage() {}
 
-// MockProgressReporter implements ProgressReporter interface
-type MockProgressReporter struct{}
-
-func (m *MockProgressReporter) ReportStage(stageProgress float64, message string) {}
-
-func (m *MockProgressReporter) NextStage(message string) {}
-
-func (m *MockProgressReporter) SetStage(stageIndex int, message string) {}
-
-func (m *MockProgressReporter) ReportOverall(progress float64, message string) {}
-
-func (m *MockProgressReporter) GetCurrentStage() (int, ProgressStage) {
-	return 0, ProgressStage{
-		Name:        "test",
-		Weight:      0.5,
-		Description: "test stage",
-	}
-}
+// MockProgressReporter removed - interface moved to main package to avoid import cycle
 
 // Note: SessionManager testing removed due to complex dependencies
 
@@ -65,12 +48,7 @@ func TestInterfaceConformance(t *testing.T) {
 
 	// HealthChecker test removed - interface moved to main package to avoid import cycle
 
-	// Test ProgressReporter interface
-	var progressReporter ProgressReporter = &MockProgressReporter{}
-	idx, stage := progressReporter.GetCurrentStage()
-	if idx != 0 || stage.Name != "test" {
-		t.Error("ProgressReporter interface not properly implemented")
-	}
+	// ProgressReporter test removed - interface moved to main package to avoid import cycle
 
 	// Note: SessionManager test removed due to complex dependencies
 

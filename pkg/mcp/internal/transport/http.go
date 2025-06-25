@@ -19,6 +19,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// RequestHandler processes MCP requests (local interface to avoid import cycles)
+type RequestHandler interface {
+	HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error)
+}
+
 // HTTPTransport implements the Transport interface for HTTP/REST communication
 type HTTPTransport struct {
 	server         *http.Server
@@ -34,7 +39,7 @@ type HTTPTransport struct {
 	rateLimiter    map[string]*rateLimiter
 	logBodies      bool
 	maxBodyLogSize int64
-	handler        mcptypes.RequestHandler
+	handler        RequestHandler
 }
 
 // HTTPTransportConfig holds configuration for HTTP transport
@@ -212,7 +217,7 @@ func (t *HTTPTransport) Close() error {
 }
 
 // SetHandler sets the request handler for this transport
-func (t *HTTPTransport) SetHandler(handler mcptypes.RequestHandler) {
+func (t *HTTPTransport) SetHandler(handler RequestHandler) {
 	t.handler = handler
 }
 

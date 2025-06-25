@@ -6,10 +6,17 @@ import (
 	"os"
 	"time"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
+
+// Transport interface for transport types (local interface to avoid import cycles)
+type Transport interface {
+	Serve(ctx context.Context) error
+	Stop() error
+	Name() string
+	SetHandler(handler RequestHandler)
+}
 
 // StdioTransport implements Transport for stdio communication
 type StdioTransport struct {
@@ -17,7 +24,7 @@ type StdioTransport struct {
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
 	logger       zerolog.Logger
-	handler      mcptypes.RequestHandler
+	handler      RequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
@@ -91,7 +98,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 }
 
 // SetHandler sets the request handler for this transport
-func (s *StdioTransport) SetHandler(handler mcptypes.RequestHandler) {
+func (s *StdioTransport) SetHandler(handler RequestHandler) {
 	s.handler = handler
 }
 
@@ -238,6 +245,6 @@ func (s *StdioTransport) CreateRecoveryResponse(originalError error, recoverySte
 }
 
 // LogTransportInfo logs transport startup information
-func LogTransportInfo(transport mcptypes.Transport) {
+func LogTransportInfo(transport Transport) {
 	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on stdio transport\n")
 }
