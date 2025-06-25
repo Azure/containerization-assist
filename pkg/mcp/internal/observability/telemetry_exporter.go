@@ -374,15 +374,15 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
             const trendClass = metric.trend?.trend || 'stable';
             const trendSymbol = trendClass === 'up' ? '↑' : trendClass === 'down' ? '↓' : '→';
             const trendText = metric.trend ? 
-                \`<div class="trend \${trendClass}">\${trendSymbol} \${Math.abs(metric.trend.change).toFixed(1)}%</div>\` : '';
+                ` + "`" + `<div class="trend ${trendClass}">${trendSymbol} ${Math.abs(metric.trend.change).toFixed(1)}%</div>` + "`" + ` : '';
             
-            return \`
+            return ` + "`" + `
                 <div class="metric-card">
-                    <div class="metric-label">\${metric.label}</div>
-                    <div class="metric-value">\${metric.value}</div>
-                    \${trendText}
+                    <div class="metric-label">${metric.label}</div>
+                    <div class="metric-value">${metric.value}</div>
+                    ${trendText}
                 </div>
-            \`;
+            ` + "`" + `;
         }
         
         function generateAlertsHTML(alerts) {
@@ -390,18 +390,18 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
                 return '';
             }
             
-            return \`
+            return ` + "`" + `
                 <div class="alerts">
                     <h2>Active Alerts</h2>
-                    \${alerts.map(alert => \`
-                        <div class="alert \${alert.severity}">
-                            <strong>\${alert.name}</strong>: \${alert.message}
+                    ${alerts.map(alert => ` + "`" + `
+                        <div class="alert ${alert.severity}">
+                            <strong>${alert.name}</strong>: ${alert.message}
                             <br>
-                            <small>Since: \${new Date(alert.start_time).toLocaleString()}</small>
+                            <small>Since: ${new Date(alert.start_time).toLocaleString()}</small>
                         </div>
-                    \`).join('')}
+                    ` + "`" + `).join('')}
                 </div>
-            \`;
+            ` + "`" + `;
         }
         
         function generateSLOHTML(sloStatus) {
@@ -410,31 +410,31 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
                 return '';
             }
             
-            return \`
+            return ` + "`" + `
                 <div class="alerts">
                     <h2>SLO Status</h2>
                     <div class="slo-grid">
-                        \${slos.map(([name, slo]) => {
+                        ${slos.map(([name, slo]) => {
                             const fillClass = slo.compliant ? '' : 
                                 slo.error_budget_left < 20 ? 'critical' : 'warning';
-                            return \`
+                            return ` + "`" + `
                                 <div class="slo-item">
-                                    <strong>\${slo.name}</strong>
+                                    <strong>${slo.name}</strong>
                                     <div class="slo-bar">
-                                        <div class="slo-fill \${fillClass}" 
-                                             style="width: \${slo.current}%"></div>
+                                        <div class="slo-fill ${fillClass}" 
+                                             style="width: ${slo.current}%"></div>
                                     </div>
                                     <small>
-                                        Current: \${slo.current.toFixed(2)}% | 
-                                        Target: \${slo.target}% | 
-                                        Budget: \${slo.error_budget_left.toFixed(1)}%
+                                        Current: ${slo.current.toFixed(2)}% | 
+                                        Target: ${slo.target}% | 
+                                        Budget: ${slo.error_budget_left.toFixed(1)}%
                                     </small>
                                 </div>
-                            \`;
+                            ` + "`" + `;
                         }).join('')}
                     </div>
                 </div>
-            \`;
+            ` + "`" + `;
         }
         
         // Update every 10 seconds

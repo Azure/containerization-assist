@@ -3,6 +3,7 @@ package observability
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -293,7 +294,7 @@ func (tm *TracingManager) CreateChildContext(parent *TraceContext) context.Conte
 	}
 
 	// Parse span ID as parent
-	parentSpanID, err := trace.SpanIDFromHex(parent.SpanID)
+	_, err := trace.SpanIDFromHex(parent.SpanID)
 	if err != nil {
 		return context.Background()
 	}
@@ -450,5 +451,3 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-// Import required for HTTP middleware
-import "net/http"

@@ -1,4 +1,4 @@
-package ops_test
+package observability_test
 
 import (
 	"context"

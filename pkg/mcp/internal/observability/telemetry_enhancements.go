@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -577,5 +578,3 @@ func getGaugeVecValue(gv prometheus.GaugeVec, labels ...string) float64 {
 	return getGaugeValue(g)
 }
 
-// Import for metric DTOs
-import io_prometheus_client "github.com/prometheus/client_model/go"

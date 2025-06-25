@@ -3,6 +3,7 @@ package observability
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
