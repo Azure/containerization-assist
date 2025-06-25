@@ -339,8 +339,10 @@ func (m *mockFailingTransport) Name() string {
 	return "mock-failing-transport"
 }
 
-func (m *mockFailingTransport) SetHandler(handler mcptypes.RequestHandler) {
-	m.handler = handler
+func (m *mockFailingTransport) SetHandler(handler interface{}) {
+	if h, ok := handler.(mcptypes.RequestHandler); ok {
+		m.handler = h
+	}
 }
 
 // TestServerConfigValidation tests configuration validation

@@ -130,6 +130,9 @@ type MCPError struct {
 // SPECIALIZED TOOL TYPES (non-duplicated from main interfaces)
 // =============================================================================
 
+// ToolFactory creates new instances of tools
+type ToolFactory func() Tool
+
 // ArgConverter converts generic arguments to tool-specific types
 // NOTE: ToolArgs interface is defined in pkg/mcp/interfaces.go
 type ArgConverter func(args map[string]interface{}) (interface{}, error)
@@ -279,10 +282,7 @@ type VulnerabilityCount struct {
 // =============================================================================
 
 // NOTE: ToolRegistry interface is now defined in pkg/mcp/interfaces.go
-
-// ToolFactory creates new instances of tools
-// NOTE: Tool interface is defined in pkg/mcp/interfaces.go
-type ToolFactory func() interface{}
+// NOTE: ToolFactory is already defined above in SPECIALIZED TOOL TYPES section
 
 // =============================================================================
 // AI CONTEXT INTERFACES

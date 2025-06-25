@@ -99,7 +99,7 @@ func TestToolDispatcher(t *testing.T) {
 	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
 		return &testToolWrapper{impl: &testToolImpl{name: "test_tool"}}
 	})
-	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
+	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (interface{}, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
 	})
@@ -187,7 +187,7 @@ func TestDispatcherConcurrency(t *testing.T) {
 	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
 		return &testToolWrapper{impl: &testToolImpl{name: "concurrent_test_tool"}}
 	})
-	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
+	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (interface{}, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
 	})
