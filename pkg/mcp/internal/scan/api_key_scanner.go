@@ -17,16 +17,6 @@ type APIKeyScanner struct {
 	logger   zerolog.Logger
 }
 
-// Severity represents the severity of a finding
-type Severity string
-
-const (
-	SeverityLow      Severity = "low"
-	SeverityMedium   Severity = "medium"
-	SeverityHigh     Severity = "high"
-	SeverityCritical Severity = "critical"
-)
-
 // APIKeyPattern represents a pattern for detecting specific API keys
 type APIKeyPattern struct {
 	Name        string
@@ -56,23 +46,23 @@ func (a *APIKeyScanner) GetName() string {
 // GetScanTypes returns the types of secrets this scanner can detect
 func (a *APIKeyScanner) GetScanTypes() []string {
 	return []string{
-		string(scan.SecretTypeAPIKey),
-		string(scan.SecretTypeToken),
+		string(SecretTypeAPIKey),
+		string(SecretTypeToken),
 	}
 }
 
 // IsApplicable determines if this scanner should run
-func (a *APIKeyScanner) IsApplicable(content string, contentType scan.ContentType) bool {
+func (a *APIKeyScanner) IsApplicable(content string, contentType ContentType) bool {
 	// API key scanner is applicable to most content types
 	return true
 }
 
 // Scan performs API key scanning
-func (a *APIKeyScanner) Scan(ctx context.Context, config scan.ScanConfig) (*scan.ScanResult, error) {
+func (a *APIKeyScanner) Scan(ctx context.Context, config ScanConfig) (*ScanResult, error) {
 	startTime := time.Now()
-	result := &scan.ScanResult{
+	result := &ScanResult{
 		Scanner:  a.GetName(),
-		Secrets:  make([]scan.Secret, 0),
+		Secrets:  make([]Secret, 0),
 		Metadata: make(map[string]interface{}),
 		Errors:   make([]error, 0),
 	}
@@ -98,8 +88,8 @@ func (a *APIKeyScanner) Scan(ctx context.Context, config scan.ScanConfig) (*scan
 }
 
 // scanLineForAPIKeys scans a line for API keys
-func (a *APIKeyScanner) scanLineForAPIKeys(line string, lineNum int, config scan.ScanConfig) ([]scan.Secret, error) {
-	var secrets []scan.Secret
+func (a *APIKeyScanner) scanLineForAPIKeys(line string, lineNum int, config ScanConfig) ([]Secret, error) {
+	var secrets []Secret
 
 	for patternName, pattern := range a.patterns {
 		matches := pattern.Pattern.FindAllStringSubmatch(line, -1)
@@ -122,17 +112,17 @@ func (a *APIKeyScanner) createAPIKeySecret(
 	pattern *APIKeyPattern,
 	value, line string,
 	lineNum int,
-	config scan.ScanConfig,
-) scan.Secret {
+	config ScanConfig,
+) Secret {
 
 	// Calculate confidence based on pattern and value characteristics
 	confidence := a.calculateAPIKeyConfidence(pattern, value, line)
 
-	secret := scan.Secret{
-		Type:        scan.SecretTypeAPIKey,
+	secret := Secret{
+		Type:        SecretTypeAPIKey,
 		Value:       value,
-		MaskedValue: scan.MaskSecret(value),
-		Location: &scan.Location{
+		MaskedValue: MaskSecret(value),
+		Location: &Location{
 			File:   config.FilePath,
 			Line:   lineNum,
 			Column: strings.Index(line, value) + 1,
@@ -141,14 +131,14 @@ func (a *APIKeyScanner) createAPIKeySecret(
 		Severity:   a.getAPIKeySeverity(pattern, confidence),
 		Context:    strings.TrimSpace(line),
 		Pattern:    pattern.Name,
-		Entropy:    scan.CalculateEntropy(value),
+		Entropy:    CalculateEntropy(value),
 		Metadata: map[string]interface{}{
 			"detection_method":   "api_key_pattern",
 			"api_service":        pattern.Name,
 			"pattern_confidence": pattern.Confidence,
 			"value_length":       len(value),
 		},
-		Evidence: []scan.Evidence{
+		Evidence: []Evidence{
 			{
 				Type:        "api_key_pattern",
 				Description: fmt.Sprintf("Matched %s API key pattern", pattern.Name),
@@ -258,23 +248,23 @@ func (a *APIKeyScanner) getPatternConfidence(patternName string) float64 {
 }
 
 // getPatternSeverity returns severity for different pattern types
-func (a *APIKeyScanner) getPatternSeverity(patternName string) scan.Severity {
-	severityMap := map[string]scan.Severity{
-		"AWS_Secret_Key":      scan.SeverityCritical,
-		"Stripe_Secret":       scan.SeverityCritical,
-		"GitHub_Classic":      scan.SeverityHigh,
-		"GitHub_Fine_Grained": scan.SeverityHigh,
-		"Google_API":          scan.SeverityHigh,
-		"Slack_Token":         scan.SeverityHigh,
-		"Discord_Bot":         scan.SeverityMedium,
-		"JWT":                 scan.SeverityMedium,
-		"Bearer_Token":        scan.SeverityMedium,
+func (a *APIKeyScanner) getPatternSeverity(patternName string) Severity {
+	severityMap := map[string]Severity{
+		"AWS_Secret_Key":      SeverityCritical,
+		"Stripe_Secret":       SeverityCritical,
+		"GitHub_Classic":      SeverityHigh,
+		"GitHub_Fine_Grained": SeverityHigh,
+		"Google_API":          SeverityHigh,
+		"Slack_Token":         SeverityHigh,
+		"Discord_Bot":         SeverityMedium,
+		"JWT":                 SeverityMedium,
+		"Bearer_Token":        SeverityMedium,
 	}
 
 	if severity, exists := severityMap[patternName]; exists {
 		return severity
 	}
-	return scan.SeverityMedium // Default severity
+	return SeverityMedium // Default severity
 }
 
 // isValidAPIKey performs additional validation on detected API keys
@@ -349,20 +339,20 @@ func (a *APIKeyScanner) calculateAPIKeyConfidence(pattern *APIKeyPattern, value,
 }
 
 // getAPIKeySeverity determines severity for an API key
-func (a *APIKeyScanner) getAPIKeySeverity(pattern *APIKeyPattern, confidence float64) scan.Severity {
+func (a *APIKeyScanner) getAPIKeySeverity(pattern *APIKeyPattern, confidence float64) Severity {
 	baseSeverity := pattern.Severity
 
 	// Reduce severity for low confidence
 	if confidence < 0.5 {
 		switch baseSeverity {
-		case scan.SeverityCritical:
-			return scan.SeverityHigh
-		case scan.SeverityHigh:
-			return scan.SeverityMedium
-		case scan.SeverityMedium:
-			return scan.SeverityLow
+		case SeverityCritical:
+			return SeverityHigh
+		case SeverityHigh:
+			return SeverityMedium
+		case SeverityMedium:
+			return SeverityLow
 		default:
-			return scan.SeverityInfo
+			return SeverityInfo
 		}
 	}
 
@@ -370,7 +360,7 @@ func (a *APIKeyScanner) getAPIKeySeverity(pattern *APIKeyPattern, confidence flo
 }
 
 // calculateConfidence calculates overall confidence for the scan result
-func (a *APIKeyScanner) calculateConfidence(result *scan.ScanResult) float64 {
+func (a *APIKeyScanner) calculateConfidence(result *ScanResult) float64 {
 	if len(result.Secrets) == 0 {
 		return 0.0
 	}

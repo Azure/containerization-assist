@@ -21,9 +21,9 @@ type CertificateScanner struct {
 type CertificatePattern struct {
 	Name        string
 	Pattern     *regexp.Regexp
-	SecretType  scan.SecretType
+	SecretType  SecretType
 	Confidence  float64
-	Severity    scan.Severity
+	Severity    Severity
 	Description string
 }
 
@@ -47,13 +47,13 @@ func (c *CertificateScanner) GetName() string {
 // GetScanTypes returns the types of secrets this scanner can detect
 func (c *CertificateScanner) GetScanTypes() []string {
 	return []string{
-		string(scan.SecretTypePrivateKey),
-		string(scan.SecretTypeCertificate),
+		string(SecretTypePrivateKey),
+		string(SecretTypeCertificate),
 	}
 }
 
 // IsApplicable determines if this scanner should run
-func (c *CertificateScanner) IsApplicable(content string, contentType scan.ContentType) bool {
+func (c *CertificateScanner) IsApplicable(content string, contentType ContentType) bool {
 	// Look for certificate/key indicators
 	indicators := []string{
 		"-----BEGIN",
@@ -76,11 +76,11 @@ func (c *CertificateScanner) IsApplicable(content string, contentType scan.Conte
 }
 
 // Scan performs certificate and private key scanning
-func (c *CertificateScanner) Scan(ctx context.Context, config scan.ScanConfig) (*scan.ScanResult, error) {
+func (c *CertificateScanner) Scan(ctx context.Context, config ScanConfig) (*ScanResult, error) {
 	startTime := time.Now()
-	result := &scan.ScanResult{
+	result := &ScanResult{
 		Scanner:  c.GetName(),
-		Secrets:  make([]scan.Secret, 0),
+		Secrets:  make([]Secret, 0),
 		Metadata: make(map[string]interface{}),
 		Errors:   make([]error, 0),
 	}
@@ -114,44 +114,44 @@ func (c *CertificateScanner) Scan(ctx context.Context, config scan.ScanConfig) (
 }
 
 // scanForCertificateBlocks scans for multi-line certificate blocks
-func (c *CertificateScanner) scanForCertificateBlocks(config scan.ScanConfig) ([]scan.Secret, error) {
-	var secrets []scan.Secret
+func (c *CertificateScanner) scanForCertificateBlocks(config ScanConfig) ([]Secret, error) {
+	var secrets []Secret
 
 	// Patterns for multi-line certificate blocks
 	blockPatterns := map[string]struct {
 		pattern    *regexp.Regexp
-		secretType scan.SecretType
-		severity   scan.Severity
+		secretType SecretType
+		severity   Severity
 	}{
 		"RSA_Private_Key": {
 			pattern:    regexp.MustCompile(`(?s)-----BEGIN RSA PRIVATE KEY-----(.*?)-----END RSA PRIVATE KEY-----`),
-			secretType: scan.SecretTypePrivateKey,
-			severity:   scan.SeverityCritical,
+			secretType: SecretTypePrivateKey,
+			severity:   SeverityCritical,
 		},
 		"EC_Private_Key": {
 			pattern:    regexp.MustCompile(`(?s)-----BEGIN EC PRIVATE KEY-----(.*?)-----END EC PRIVATE KEY-----`),
-			secretType: scan.SecretTypePrivateKey,
-			severity:   scan.SeverityCritical,
+			secretType: SecretTypePrivateKey,
+			severity:   SeverityCritical,
 		},
 		"Private_Key": {
 			pattern:    regexp.MustCompile(`(?s)-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----`),
-			secretType: scan.SecretTypePrivateKey,
-			severity:   scan.SeverityCritical,
+			secretType: SecretTypePrivateKey,
+			severity:   SeverityCritical,
 		},
 		"OpenSSH_Private_Key": {
 			pattern:    regexp.MustCompile(`(?s)-----BEGIN OPENSSH PRIVATE KEY-----(.*?)-----END OPENSSH PRIVATE KEY-----`),
-			secretType: scan.SecretTypePrivateKey,
-			severity:   scan.SeverityCritical,
+			secretType: SecretTypePrivateKey,
+			severity:   SeverityCritical,
 		},
 		"Certificate": {
 			pattern:    regexp.MustCompile(`(?s)-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----`),
-			secretType: scan.SecretTypeCertificate,
-			severity:   scan.SeverityHigh,
+			secretType: SecretTypeCertificate,
+			severity:   SeverityHigh,
 		},
 		"Public_Key": {
 			pattern:    regexp.MustCompile(`(?s)-----BEGIN PUBLIC KEY-----(.*?)-----END PUBLIC KEY-----`),
-			secretType: scan.SecretTypeCertificate,
-			severity:   scan.SeverityMedium,
+			secretType: SecretTypeCertificate,
+			severity:   SeverityMedium,
 		},
 	}
 
@@ -181,8 +181,8 @@ func (c *CertificateScanner) scanForCertificateBlocks(config scan.ScanConfig) ([
 }
 
 // scanLineForCertificates scans a single line for certificate content
-func (c *CertificateScanner) scanLineForCertificates(line string, lineNum int, config scan.ScanConfig) ([]scan.Secret, error) {
-	var secrets []scan.Secret
+func (c *CertificateScanner) scanLineForCertificates(line string, lineNum int, config ScanConfig) ([]Secret, error) {
+	var secrets []Secret
 
 	for _, pattern := range c.patterns {
 		matches := pattern.Pattern.FindAllStringSubmatch(line, -1)
@@ -203,10 +203,10 @@ func (c *CertificateScanner) scanLineForCertificates(line string, lineNum int, c
 // createCertificateSecret creates a secret from certificate block detection
 func (c *CertificateScanner) createCertificateSecret(
 	patternName, fullBlock, content string,
-	secretType scan.SecretType,
-	severity scan.Severity,
-	config scan.ScanConfig,
-) scan.Secret {
+	secretType SecretType,
+	severity Severity,
+	config ScanConfig,
+) Secret {
 
 	// Calculate line number for the beginning of the block
 	lines := strings.Split(config.Content, "\n")
@@ -220,11 +220,11 @@ func (c *CertificateScanner) createCertificateSecret(
 
 	confidence := c.calculateCertificateConfidence(secretType, content, fullBlock)
 
-	secret := scan.Secret{
+	secret := Secret{
 		Type:        secretType,
 		Value:       fullBlock,
 		MaskedValue: c.maskCertificate(fullBlock),
-		Location: &scan.Location{
+		Location: &Location{
 			File:   config.FilePath,
 			Line:   lineNum,
 			Column: 1,
@@ -233,7 +233,7 @@ func (c *CertificateScanner) createCertificateSecret(
 		Severity:   severity,
 		Context:    c.extractCertificateContext(fullBlock),
 		Pattern:    patternName,
-		Entropy:    scan.CalculateEntropy(content),
+		Entropy:    CalculateEntropy(content),
 		Metadata: map[string]interface{}{
 			"detection_method": "certificate_block",
 			"certificate_type": patternName,
@@ -241,7 +241,7 @@ func (c *CertificateScanner) createCertificateSecret(
 			"content_size":     len(content),
 			"is_multiline":     true,
 		},
-		Evidence: []scan.Evidence{
+		Evidence: []Evidence{
 			{
 				Type:        "certificate_block",
 				Description: fmt.Sprintf("PEM-encoded %s detected", patternName),
@@ -260,16 +260,16 @@ func (c *CertificateScanner) createLineSecret(
 	pattern *CertificatePattern,
 	value, line string,
 	lineNum int,
-	config scan.ScanConfig,
-) scan.Secret {
+	config ScanConfig,
+) Secret {
 
 	confidence := c.calculateCertificateConfidence(pattern.SecretType, value, line)
 
-	secret := scan.Secret{
+	secret := Secret{
 		Type:        pattern.SecretType,
 		Value:       value,
 		MaskedValue: c.maskCertificate(value),
-		Location: &scan.Location{
+		Location: &Location{
 			File:   config.FilePath,
 			Line:   lineNum,
 			Column: strings.Index(line, value) + 1,
@@ -278,14 +278,14 @@ func (c *CertificateScanner) createLineSecret(
 		Severity:   pattern.Severity,
 		Context:    strings.TrimSpace(line),
 		Pattern:    pattern.Name,
-		Entropy:    scan.CalculateEntropy(value),
+		Entropy:    CalculateEntropy(value),
 		Metadata: map[string]interface{}{
 			"detection_method": "certificate_line",
 			"certificate_type": pattern.Name,
 			"value_length":     len(value),
 			"is_multiline":     false,
 		},
-		Evidence: []scan.Evidence{
+		Evidence: []Evidence{
 			{
 				Type:        "certificate_line",
 				Description: fmt.Sprintf("%s detected in line", pattern.Description),
@@ -303,30 +303,30 @@ func (c *CertificateScanner) createLineSecret(
 func (c *CertificateScanner) initializePatterns() {
 	patterns := map[string]struct {
 		pattern     string
-		secretType  scan.SecretType
+		secretType  SecretType
 		confidence  float64
-		severity    scan.Severity
+		severity    Severity
 		description string
 	}{
 		"Inline_Private_Key": {
 			pattern:     `(?i)(?:private[_-]?key|privatekey)[\"'\s]*[:=][\"'\s]*([A-Za-z0-9+/=]{100,})`,
-			secretType:  scan.SecretTypePrivateKey,
+			secretType:  SecretTypePrivateKey,
 			confidence:  0.80,
-			severity:    scan.SeverityCritical,
+			severity:    SeverityCritical,
 			description: "Inline private key",
 		},
 		"Base64_Certificate": {
 			pattern:     `(?i)(?:certificate|cert)[\"'\s]*[:=][\"'\s]*([A-Za-z0-9+/=]{100,})`,
-			secretType:  scan.SecretTypeCertificate,
+			secretType:  SecretTypeCertificate,
 			confidence:  0.70,
-			severity:    scan.SeverityHigh,
+			severity:    SeverityHigh,
 			description: "Base64-encoded certificate",
 		},
 		"PEM_Marker": {
 			pattern:     `(-----BEGIN [A-Z ]+-----[A-Za-z0-9+/=\s]+-----END [A-Z ]+-----)`,
-			secretType:  scan.SecretTypeCertificate,
+			secretType:  SecretTypeCertificate,
 			confidence:  0.95,
-			severity:    scan.SeverityHigh,
+			severity:    SeverityHigh,
 			description: "PEM-formatted certificate or key",
 		},
 	}
@@ -423,7 +423,7 @@ func (c *CertificateScanner) extractCertificateContext(fullBlock string) string 
 }
 
 // calculateCertificateConfidence calculates confidence for certificate detection
-func (c *CertificateScanner) calculateCertificateConfidence(secretType scan.SecretType, content, context string) float64 {
+func (c *CertificateScanner) calculateCertificateConfidence(secretType SecretType, content, context string) float64 {
 	confidence := 0.8 // Base confidence
 
 	// Higher confidence for well-formed PEM blocks
@@ -437,7 +437,7 @@ func (c *CertificateScanner) calculateCertificateConfidence(secretType scan.Secr
 	}
 
 	// Private keys are more critical
-	if secretType == scan.SecretTypePrivateKey {
+	if secretType == SecretTypePrivateKey {
 		confidence += 0.05
 	}
 
@@ -461,7 +461,7 @@ func (c *CertificateScanner) calculateCertificateConfidence(secretType scan.Secr
 }
 
 // calculateConfidence calculates overall confidence for the scan result
-func (c *CertificateScanner) calculateConfidence(result *scan.ScanResult) float64 {
+func (c *CertificateScanner) calculateConfidence(result *ScanResult) float64 {
 	if len(result.Secrets) == 0 {
 		return 0.0
 	}

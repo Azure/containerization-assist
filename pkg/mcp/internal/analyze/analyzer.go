@@ -3,13 +3,11 @@ package analyze
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -75,40 +73,17 @@ func (c *CallerAnalyzer) Analyze(ctx context.Context, prompt string) (string, er
 		fullPrompt = c.systemPreamble + "\n\n" + prompt
 	}
 
-	args := map[string]any{
-		"session_id": uuid.NewString(),
-		"message":    fullPrompt,
-		"stream":     false,
-	}
-
-	ch, err := c.transport.InvokeTool(ctx, c.toolName, args, false)
+	response, err := c.transport.SendPrompt(fullPrompt)
 	if err != nil {
-		c.logger.Error().Err(err).Msg("Failed to invoke tool on hosting LLM")
+		c.logger.Error().Err(err).Msg("Failed to send prompt to hosting LLM")
 		return "", fmt.Errorf("failed to analyze via hosting LLM: %w", err)
 	}
 
-	var reply json.RawMessage
-	select {
-	case reply = <-ch:
-		if reply == nil {
-			return "", fmt.Errorf("received nil response from hosting LLM")
-		}
-	case <-ctx.Done():
-		return "", ctx.Err()
+	if response == "" {
+		return "", fmt.Errorf("received empty response from hosting LLM")
 	}
 
-	var out contract.ToolInvocationResponse
-	if err := json.Unmarshal(reply, &out); err != nil {
-		c.logger.Error().Err(err).Msg("Failed to unmarshal LLM response")
-		return "", fmt.Errorf("failed to decode LLM response: %w", err)
-	}
-
-	if out.Error != "" {
-		c.logger.Error().Str("llm_error", out.Error).Msg("LLM returned error")
-		return "", fmt.Errorf("LLM error: %s", out.Error)
-	}
-
-	result := strings.TrimSpace(out.Content)
+	result := strings.TrimSpace(response)
 	c.logger.Debug().
 		Str("response_hash", fmt.Sprintf("%x", sha256.Sum256([]byte(result)))[:8]).
 		Int("response_len", len(result)).

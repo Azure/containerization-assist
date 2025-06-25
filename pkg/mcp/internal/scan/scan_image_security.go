@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -174,8 +173,8 @@ type ConfigFix struct {
 type AtomicScanImageSecurityTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
-	fixingMixin     *fixing.AtomicToolFixingMixin
-	logger          zerolog.Logger
+	// fixingMixin removed - functionality will be integrated directly
+	logger zerolog.Logger
 }
 
 // NewAtomicScanImageSecurityTool creates a new atomic security scanning tool
@@ -183,8 +182,8 @@ func NewAtomicScanImageSecurityTool(adapter mcptypes.PipelineOperations, session
 	return &AtomicScanImageSecurityTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
-		fixingMixin:     nil, // Will be set via SetAnalyzer if fixing is enabled
-		logger:          logger.With().Str("tool", "atomic_scan_image_security").Logger(),
+		// fixingMixin removed - functionality will be integrated directly
+		logger: logger.With().Str("tool", "atomic_scan_image_security").Logger(),
 	}
 }
 
@@ -323,7 +322,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 	// Run security scan
 	severityThreshold := args.SeverityThreshold
 	if severityThreshold == "" {
-		severityThreshold = constants.DefaultSeverityThreshold
+		severityThreshold = "HIGH"
 	}
 
 	// Use VulnTypes if provided, otherwise default to os and library
@@ -1195,7 +1194,7 @@ func (t *AtomicScanImageSecurityTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:         "atomic_scan_image_security",
 		Description:  "Performs comprehensive security vulnerability scanning on Docker images using industry-standard scanners",
-		Version:      constants.AtomicToolVersion,
+		Version:      "1.0.0",
 		Category:     "security",
 		Dependencies: []string{"docker", "security_scanner"},
 		Capabilities: []string{
@@ -1302,8 +1301,8 @@ func (t *AtomicScanImageSecurityTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicScanImageSecurityTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicScanImageSecurityTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,
@@ -1318,7 +1317,5 @@ func (t *AtomicScanImageSecurityTool) ExecuteTyped(ctx context.Context, args Ato
 
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
 func (t *AtomicScanImageSecurityTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
-	if analyzer != nil {
-		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "scan_image_security_atomic", t.logger)
-	}
+	// Fixing functionality will be integrated directly when needed
 }

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

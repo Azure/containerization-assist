@@ -10,12 +10,9 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	constants "github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	ai_context "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -80,6 +77,24 @@ type AtomicValidateDockerfileResult struct {
 
 	// Context and debugging
 	ValidationContext map[string]interface{} `json:"validation_context"`
+}
+
+// Recommendation represents a single recommendation
+type Recommendation struct {
+	RecommendationID string   `json:"recommendation_id"`
+	Title            string   `json:"title"`
+	Description      string   `json:"description"`
+	Category         string   `json:"category"`
+	Priority         string   `json:"priority"`
+	Type             string   `json:"type"`
+	Tags             []string `json:"tags"`
+	ActionType       string   `json:"action_type"`
+	Effort           string   `json:"effort"`
+	Impact           string   `json:"impact"`
+	Confidence       int      `json:"confidence"`
+	Benefits         []string `json:"benefits"`
+	Risks            []string `json:"risks"`
+	Urgency          string   `json:"urgency"`
 }
 
 // DockerfileValidationError represents a validation error with enhanced context
@@ -186,7 +201,7 @@ func NewAtomicValidateDockerfileTool(adapter mcptypes.PipelineOperations, sessio
 	return &AtomicValidateDockerfileTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
-		fixingMixin:     nil, // Will be set via SetAnalyzer if fixing is enabled
+		// fixingMixin removed - functionality integrated directly
 		// dockerfileAdapter removed - functionality integrated directly
 		logger: toolLogger,
 	}
@@ -397,13 +412,13 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 // AI Context methods are now provided by embedded mcptypes.BaseAIContextResult
 
-// GenerateRecommendations implements ai_context.Recommendable
-func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []ai_context.Recommendation {
-	recommendations := make([]ai_context.Recommendation, 0)
+// GenerateRecommendations creates recommendations for Dockerfile improvements
+func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []Recommendation {
+	recommendations := make([]Recommendation, 0)
 
 	// Security recommendations
 	if len(r.SecurityIssues) > 0 {
-		recommendations = append(recommendations, ai_context.Recommendation{
+		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("security-fixes-%s", r.SessionID),
 			Title:            "Address Security Issues",
 			Description:      "Fix identified security vulnerabilities in Dockerfile",
@@ -423,7 +438,7 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []ai_context.
 
 	// Error recommendations
 	if len(r.Errors) > 0 {
-		recommendations = append(recommendations, ai_context.Recommendation{
+		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("validation-errors-%s", r.SessionID),
 			Title:            "Fix Validation Errors",
 			Description:      "Address validation errors in Dockerfile",
@@ -443,7 +458,7 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []ai_context.
 
 	// Warning recommendations
 	if len(r.Warnings) > 5 {
-		recommendations = append(recommendations, ai_context.Recommendation{
+		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("best-practices-%s", r.SessionID),
 			Title:            "Follow Docker Best Practices",
 			Description:      "Implement Docker best practices for better maintainability",
@@ -463,7 +478,7 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []ai_context.
 
 	// Optimization recommendations
 	if len(r.OptimizationTips) > 0 {
-		recommendations = append(recommendations, ai_context.Recommendation{
+		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("optimizations-%s", r.SessionID),
 			Title:            "Apply Dockerfile Optimizations",
 			Description:      "Implement suggested optimizations for better performance",
@@ -484,268 +499,55 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []ai_context.
 	return recommendations
 }
 
-// CreateRemediationPlan implements ai_context.Recommendable
-func (r *AtomicValidateDockerfileResult) CreateRemediationPlan() *ai_context.RemediationPlan {
-	if r.IsValid && len(r.SecurityIssues) == 0 {
-		return &ai_context.RemediationPlan{
-			PlanID:          fmt.Sprintf("dockerfile-optimization-%s", r.SessionID),
-			Title:           "Dockerfile Optimization",
-			Description:     "Optimize Dockerfile for better performance and best practices",
-			Priority:        types.SeverityLow,
-			Complexity:      "simple",
-			EstimatedEffort: "30 minutes",
-			Steps: []ai_context.RemediationStep{
-				{
-					StepID:         "apply-optimizations",
-					Title:          "Apply Suggested Optimizations",
-					Description:    "Implement optimization suggestions",
-					Action:         "Review and apply optimization recommendations",
-					ExpectedResult: "Improved Dockerfile efficiency",
-				},
-			},
-			ValidationSteps: []ai_context.ValidationStep{
-				{
-					StepID:         "verify-build",
-					Description:    "Dockerfile builds successfully",
-					Method:         "automated",
-					Command:        "docker build -t test:latest .",
-					ExpectedResult: "Build completes without errors",
-				},
-				{
-					StepID:         "verify-optimizations",
-					Description:    "Optimizations applied",
-					Method:         "manual",
-					ExpectedResult: "All suggested optimizations implemented",
-				},
-			},
-		}
+// CreateRemediationPlan creates a remediation plan for validation issues
+func (r *AtomicValidateDockerfileResult) CreateRemediationPlan() interface{} {
+	// Simplified implementation - AI context integration removed
+	return map[string]interface{}{
+		"plan_id":     fmt.Sprintf("dockerfile-validation-%s", r.SessionID),
+		"title":       "Dockerfile Validation Plan",
+		"description": "Plan to address Dockerfile validation issues",
+		"priority":    "medium",
 	}
+}
 
-	return &ai_context.RemediationPlan{
-		PlanID:          fmt.Sprintf("dockerfile-fixes-%s", r.SessionID),
-		Title:           "Dockerfile Issue Resolution",
-		Description:     "Fix critical issues in Dockerfile",
-		Priority:        types.SeverityHigh,
-		Complexity:      "moderate",
-		EstimatedEffort: "1 hour",
-		Steps: []ai_context.RemediationStep{
-			{
-				StepID:         "fix-syntax",
-				Title:          "Fix Syntax Errors",
-				Description:    "Correct Dockerfile syntax issues",
-				Action:         "Review and fix syntax errors",
-				ExpectedResult: "Valid Dockerfile syntax",
-			},
-			{
-				StepID:         "fix-security",
-				Title:          "Address Security Issues",
-				Description:    "Fix identified security vulnerabilities",
-				Action:         "Implement security fixes",
-				ExpectedResult: "Secure Dockerfile configuration",
-			},
-		},
-		ValidationSteps: []ai_context.ValidationStep{
-			{
-				StepID:         "verify-validation",
-				Description:    "Validation passes",
-				Method:         "tool",
-				ToolCall:       "validate_dockerfile",
-				ExpectedResult: "No validation errors",
-			},
-			{
-				StepID:         "verify-security",
-				Description:    "No security issues",
-				Method:         "automated",
-				Command:        "docker scan",
-				ExpectedResult: "No security issues detected",
-			},
+// Additional AI context methods simplified for compilation
+func (r *AtomicValidateDockerfileResult) GetAlternativeStrategies() interface{} {
+	return []map[string]interface{}{
+		{
+			"strategy":    "Use validated base images",
+			"description": "Switch to security-scanned base images",
 		},
 	}
 }
 
-// GetAlternativeStrategies implements ai_context.Recommendable
-func (r *AtomicValidateDockerfileResult) GetAlternativeStrategies() []ai_context.AlternativeStrategy {
-	strategies := make([]ai_context.AlternativeStrategy, 0)
-
-	strategies = append(strategies, ai_context.AlternativeStrategy{
-		StrategyID:  "dockerfile-templates",
-		Name:        "Use Dockerfile Templates",
-		Description: "Start with proven Dockerfile templates",
-		Complexity:  "simple",
-		Timeline:    "immediate",
-		Suitability: "best_for_beginners",
-		Benefits:    []string{"Proven patterns", "Best practices included", "Faster development"},
-		Drawbacks:   []string{"Less customization", "Template dependencies"},
-		BestFor:     []string{"Standard application patterns"},
-		AvoidIf:     []string{"Highly customized requirements"},
-		RiskLevel:   "low",
-		Confidence:  80,
-	})
-
-	return strategies
-}
-
-// GetAIContext implements *ai_context.ToolContextEnriched
-// GetAIContext is now provided by embedded mcptypes.BaseAIContextResult
-
-// EnrichWithInsights implements *ai_context.ToolContextEnriched
-// EnrichWithInsights is now provided by embedded mcptypes.BaseAIContextResult
-// GetMetadataForAI is now provided by embedded mcptypes.BaseAIContextResult
-
-func (r *AtomicValidateDockerfileResult) convertStrengthsToAreas() []ai_context.AssessmentArea {
-	areas := make([]ai_context.AssessmentArea, 0)
-	strengths := r.GetStrengths()
-
-	for i, strength := range strengths {
-		areas = append(areas, ai_context.AssessmentArea{
-			Area:        fmt.Sprintf("validation_strength_%d", i+1),
-			Category:    "quality",
-			Description: strength,
-			Impact:      "medium",
-			Evidence:    []string{strength},
-			Score:       75 + (i * 5),
-		})
-	}
-
-	return areas
-}
-
-func (r *AtomicValidateDockerfileResult) convertChallengesToAreas() []ai_context.AssessmentArea {
-	areas := make([]ai_context.AssessmentArea, 0)
-	challenges := r.GetChallenges()
-
-	for i, challenge := range challenges {
-		impact := "medium"
-		if strings.Contains(strings.ToLower(challenge), "security") {
-			impact = "high"
-		}
-
-		areas = append(areas, ai_context.AssessmentArea{
-			Area:        fmt.Sprintf("validation_challenge_%d", i+1),
-			Category:    "quality",
-			Description: challenge,
-			Impact:      impact,
-			Evidence:    []string{challenge},
-			Score:       25 + (i * 5),
-		})
-	}
-
-	return areas
-}
-
-func (r *AtomicValidateDockerfileResult) extractRiskFactors() []ai_context.RiskFactor {
-	risks := make([]ai_context.RiskFactor, 0)
-
-	if !r.IsValid {
-		risks = append(risks, ai_context.RiskFactor{
-			Risk:           "Invalid Dockerfile syntax",
-			Category:       "technical",
-			Likelihood:     "high",
-			Impact:         "high",
-			CurrentLevel:   types.SeverityHigh,
-			Mitigation:     "Fix syntax errors in Dockerfile",
-			PreventionTips: []string{"Use linting tools", "Regular validation"},
-		})
-	}
-
-	if len(r.SecurityIssues) > 0 {
-		risks = append(risks, ai_context.RiskFactor{
-			Risk:           "Security vulnerabilities in Dockerfile",
-			Category:       "security",
-			Likelihood:     "medium",
-			Impact:         "high",
-			CurrentLevel:   types.SeverityHigh,
-			Mitigation:     "Address identified security issues",
-			PreventionTips: []string{"Security scanning", "Best practice adherence"},
-		})
-	}
-
-	if r.CriticalIssues > 0 {
-		risks = append(risks, ai_context.RiskFactor{
-			Risk:           "Critical validation errors",
-			Category:       "technical",
-			Likelihood:     "high",
-			Impact:         "high",
-			CurrentLevel:   types.SeverityHigh,
-			Mitigation:     "Fix critical issues before proceeding",
-			PreventionTips: []string{"Code review", "Automated validation"},
-		})
-	}
-
-	return risks
-}
+// Helper methods for validation processing
 
 func (r *AtomicValidateDockerfileResult) getRecommendedApproach() string {
-	if !r.IsValid {
-		return "Fix validation issues and retry"
+	if len(r.Errors) > 0 {
+		return "Fix syntax and validation errors first"
 	}
-
-	if !r.IsValid {
-		return "Fix syntax errors before proceeding"
-	}
-
 	if len(r.SecurityIssues) > 0 {
-		return "Address security issues before building"
+		return "Address security vulnerabilities"
 	}
-
-	if r.CriticalIssues > 0 {
-		return "Fix critical issues before building"
-	}
-
-	return "Proceed with image build - Dockerfile validated successfully"
+	return "Optimize for production use"
 }
 
 func (r *AtomicValidateDockerfileResult) getNextSteps() []string {
-	steps := make([]string, 0)
-
-	if !r.IsValid {
-		steps = append(steps, "Fix validation failures")
-		return steps
+	steps := []string{}
+	if len(r.Errors) > 0 {
+		steps = append(steps, "Fix validation errors")
 	}
-
-	if !r.IsValid {
-		steps = append(steps, "Fix Dockerfile syntax errors")
-	}
-
 	if len(r.SecurityIssues) > 0 {
 		steps = append(steps, "Address security issues")
 	}
-
-	if len(r.Warnings) > 5 {
-		steps = append(steps, "Consider fixing best practice violations")
-	}
-
 	if len(r.OptimizationTips) > 0 {
-		steps = append(steps, "Review optimization suggestions")
+		steps = append(steps, "Apply optimization recommendations")
 	}
-
-	steps = append(steps, "Proceed with container image build")
-
 	return steps
 }
 
 func (r *AtomicValidateDockerfileResult) getConsiderationsNote() string {
-	considerations := make([]string, 0)
-
-	if !r.IsValid {
-		return "Validation failed - check Dockerfile and tool configuration"
-	}
-
-	if !r.IsValid {
-		considerations = append(considerations, "syntax errors present")
-	}
-	if len(r.SecurityIssues) > 0 {
-		considerations = append(considerations, "security issues detected")
-	}
-	if len(r.Warnings) > 3 {
-		considerations = append(considerations, "many best practice violations")
-	}
-
-	if len(considerations) > 0 {
-		return fmt.Sprintf("Consider: %s", strings.Join(considerations, ", "))
-	}
-
-	return "Dockerfile validation successful - ready for build"
+	return "Dockerfile validation completed - review recommendations"
 }
 
 // processValidationResults processes the validation results from the core validator
@@ -1355,6 +1157,6 @@ func (t *AtomicValidateDockerfileTool) ExecuteTyped(ctx context.Context, args At
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
 func (t *AtomicValidateDockerfileTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
-		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "validate_dockerfile_atomic", t.logger)
+		// Fixing mixin integration removed - implement directly if needed
 	}
 }

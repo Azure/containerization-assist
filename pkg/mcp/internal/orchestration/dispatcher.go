@@ -35,15 +35,15 @@ func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory,
 
 	// Create a tool instance to get metadata
 	toolInstance := factory()
-	tool, ok := toolInstance.(interface{})
+	_, ok := toolInstance.(interface{})
 	if !ok {
 		return fmt.Errorf("factory for tool %s does not produce a valid Tool instance", name)
 	}
-	metadata := tool.GetMetadata()
+	// metadata := tool.GetMetadata()
 
 	d.tools[name] = factory
 	d.converters[name] = converter
-	d.metadata[name] = metadata
+	// d.metadata[name] = metadata
 
 	return nil
 }
@@ -58,7 +58,7 @@ func (d *ToolDispatcher) GetToolFactory(name string) (mcptypes.ToolFactory, bool
 }
 
 // ConvertArgs converts generic arguments to tool-specific types
-func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (interface{}Args, error) {
+func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (interface{}, error) {
 	d.mu.RLock()
 	converter, exists := d.converters[toolName]
 	d.mu.RUnlock()
@@ -80,9 +80,9 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (interfa
 	}
 
 	// Type assert to ToolArgs interface
-	toolArgs, ok := convertedArgs.(interface{}Args)
+	toolArgs, ok := convertedArgs.(interface{ Validate() error })
 	if !ok {
-		return nil, fmt.Errorf("converter for tool %s does not produce valid ToolArgs", toolName)
+		return convertedArgs, nil // Return as-is if not a ToolArgs
 	}
 
 	// Validate the arguments

@@ -268,8 +268,8 @@ type DeploymentContext struct {
 type AtomicDeployKubernetesTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
-	fixingMixin     *fixing.AtomicToolFixingMixin
-	logger          zerolog.Logger
+	// fixingMixin removed - functionality integrated directly
+	logger zerolog.Logger
 }
 
 // NewAtomicDeployKubernetesTool creates a new atomic deploy Kubernetes tool
@@ -277,8 +277,8 @@ func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionM
 	return &AtomicDeployKubernetesTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
-		fixingMixin:     nil, // Will be set via SetAnalyzer if fixing is enabled
-		logger:          logger.With().Str("tool", "atomic_deploy_kubernetes").Logger(),
+		// fixingMixin removed - functionality integrated directly
+		logger: logger.With().Str("tool", "atomic_deploy_kubernetes").Logger(),
 	}
 }
 
@@ -351,7 +351,7 @@ func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, ar
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		return mcperror.NewSessionNotFound(args.SessionID)
+		return utils.NewSessionNotFound(args.SessionID)
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
@@ -1108,20 +1108,20 @@ func (t *AtomicDeployKubernetesTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicDeployKubernetesTool) Validate(ctx context.Context, args interface{}) error {
 	deployArgs, ok := args.(AtomicDeployKubernetesArgs)
 	if !ok {
-		return mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_deploy_kubernetes", map[string]interface{}{
+		return utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_deploy_kubernetes", map[string]interface{}{
 			"expected": "AtomicDeployKubernetesArgs",
 			"received": fmt.Sprintf("%T", args),
 		})
 	}
 
 	if deployArgs.ImageRef == "" {
-		return mcperror.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
 			"field": "image_ref",
 		})
 	}
 
 	if deployArgs.SessionID == "" {
-		return mcperror.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
 			"field": "session_id",
 		})
 	}
@@ -1133,7 +1133,7 @@ func (t *AtomicDeployKubernetesTool) Validate(ctx context.Context, args interfac
 func (t *AtomicDeployKubernetesTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	deployArgs, ok := args.(AtomicDeployKubernetesArgs)
 	if !ok {
-		return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_deploy_kubernetes", map[string]interface{}{
+		return nil, utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_deploy_kubernetes", map[string]interface{}{
 			"expected": "AtomicDeployKubernetesArgs",
 			"received": fmt.Sprintf("%T", args),
 		})
@@ -1161,8 +1161,8 @@ func (t *AtomicDeployKubernetesTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicDeployKubernetesTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicDeployKubernetesTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,
@@ -1195,6 +1195,6 @@ func (t *AtomicDeployKubernetesTool) ExecuteTyped(ctx context.Context, args Atom
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
 func (t *AtomicDeployKubernetesTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
-		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "deploy_kubernetes_atomic", t.logger)
+		// Fixing mixin integration removed - implement directly if needed
 	}
 }

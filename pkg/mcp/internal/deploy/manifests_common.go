@@ -4,8 +4,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 )
 
-// ManifestGenerator defines the interface for manifest generation
-type ManifestGenerator interface {
+// ManifestGeneratorInterface defines the interface for manifest generation
+type ManifestGeneratorInterface interface {
 	GenerateManifests(args GenerateManifestsRequest) (*kubernetes.ManifestGenerationResult, error)
 }
 

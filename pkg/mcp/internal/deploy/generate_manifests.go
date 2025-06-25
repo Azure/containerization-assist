@@ -53,43 +53,43 @@ type GenerateManifestsArgs struct {
 	NetworkPolicySpec    *NetworkPolicySpec `json:"network_policy_spec,omitempty" description:"NetworkPolicy specification"`
 }
 
-// SecretRef represents a reference to a Kubernetes secret
-type SecretRef struct {
+// ManifestSecretRef represents a reference to a Kubernetes secret
+type ManifestSecretRef struct {
 	Name string `json:"name"`
 	Key  string `json:"key"`
 	Env  string `json:"env"`
 }
 
-// ResourceRequests represents Kubernetes resource requirements
-type ResourceRequests struct {
+// ManifestResourceRequests represents Kubernetes resource requirements
+type ManifestResourceRequests struct {
 	CPURequest    string `json:"cpu_request,omitempty"`
 	MemoryRequest string `json:"memory_request,omitempty"`
 	CPULimit      string `json:"cpu_limit,omitempty"`
 	MemoryLimit   string `json:"memory_limit,omitempty"`
 }
 
-// IngressHost represents an ingress host configuration
-type IngressHost struct {
-	Host  string        `json:"host"`
-	Paths []IngressPath `json:"paths"`
+// ManifestIngressHost represents an ingress host configuration
+type ManifestIngressHost struct {
+	Host  string                `json:"host"`
+	Paths []ManifestIngressPath `json:"paths"`
 }
 
-// IngressPath represents a path in an ingress rule
-type IngressPath struct {
+// ManifestIngressPath represents a path in an ingress rule
+type ManifestIngressPath struct {
 	Path        string `json:"path"`
 	PathType    string `json:"path_type,omitempty"`
 	ServiceName string `json:"service_name,omitempty"`
 	ServicePort int    `json:"service_port,omitempty"`
 }
 
-// IngressTLS represents TLS configuration for ingress
-type IngressTLS struct {
+// ManifestIngressTLS represents TLS configuration for ingress
+type ManifestIngressTLS struct {
 	Hosts      []string `json:"hosts"`
 	SecretName string   `json:"secret_name"`
 }
 
-// ServicePort represents a port in a service
-type ServicePort struct {
+// ManifestServicePort represents a port in a service
+type ManifestServicePort struct {
 	Name       string `json:"name,omitempty"`
 	Protocol   string `json:"protocol,omitempty"`
 	Port       int    `json:"port"`
@@ -116,36 +116,36 @@ type RegistrySecret struct {
 	Email    string `json:"email,omitempty"`
 }
 
-// ValidationSummary represents the summary of validation results
-type ValidationSummary struct {
-	Enabled      bool                      `json:"enabled"`
-	OverallValid bool                      `json:"overall_valid"`
-	TotalFiles   int                       `json:"total_files"`
-	ValidFiles   int                       `json:"valid_files"`
+// ManifestValidationSummary represents the summary of validation results
+type ManifestValidationSummary struct {
+	Enabled      bool                              `json:"enabled"`
+	OverallValid bool                              `json:"overall_valid"`
+	TotalFiles   int                               `json:"total_files"`
+	ValidFiles   int                               `json:"valid_files"`
+	ErrorCount   int                               `json:"error_count"`
+	WarningCount int                               `json:"warning_count"`
+	Duration     time.Duration                     `json:"duration"`
+	K8sVersion   string                            `json:"k8s_version,omitempty"`
+	Results      map[string]ManifestFileValidation `json:"results"`
+}
+
+// ManifestFileValidation represents validation results for a single file
+type ManifestFileValidation struct {
+	Valid        bool                      `json:"valid"`
+	Kind         string                    `json:"kind"`
+	APIVersion   string                    `json:"api_version,omitempty"`
+	Name         string                    `json:"name,omitempty"`
+	Namespace    string                    `json:"namespace,omitempty"`
 	ErrorCount   int                       `json:"error_count"`
 	WarningCount int                       `json:"warning_count"`
 	Duration     time.Duration             `json:"duration"`
-	K8sVersion   string                    `json:"k8s_version,omitempty"`
-	Results      map[string]FileValidation `json:"results"`
-}
-
-// FileValidation represents validation results for a single file
-type FileValidation struct {
-	Valid        bool              `json:"valid"`
-	Kind         string            `json:"kind"`
-	APIVersion   string            `json:"api_version,omitempty"`
-	Name         string            `json:"name,omitempty"`
-	Namespace    string            `json:"namespace,omitempty"`
-	ErrorCount   int               `json:"error_count"`
-	WarningCount int               `json:"warning_count"`
-	Duration     time.Duration     `json:"duration"`
-	Errors       []ValidationIssue `json:"errors,omitempty"`
-	Warnings     []ValidationIssue `json:"warnings,omitempty"`
-	Suggestions  []string          `json:"suggestions,omitempty"`
+	Errors       []ManifestValidationIssue `json:"errors,omitempty"`
+	Warnings     []ManifestValidationIssue `json:"warnings,omitempty"`
+	Suggestions  []string                  `json:"suggestions,omitempty"`
 }
 
 // ValidationIssue represents a validation error or warning
-type ValidationIssue struct {
+type ManifestValidationIssue struct {
 	Field    string `json:"field"`
 	Message  string `json:"message"`
 	Code     string `json:"code,omitempty"`
@@ -196,17 +196,17 @@ type IPBlock struct {
 // GenerateManifestsResult represents the result of manifest generation
 type GenerateManifestsResult struct {
 	types.BaseToolResponse
-	Success          bool                 `json:"success"`
-	Manifests        []ManifestInfo       `json:"manifests"`
-	ManifestPath     string               `json:"manifest_path"`
-	ImageRef         types.ImageReference `json:"image_ref"`
-	Namespace        string               `json:"namespace"`
-	ServiceType      string               `json:"service_type"`
-	Replicas         int                  `json:"replicas"`
-	Resources        ResourceRequests     `json:"resources"`
-	Duration         time.Duration        `json:"duration"`
-	ValidationResult *ValidationSummary   `json:"validation_result,omitempty"`
-	Error            *types.ToolError     `json:"error,omitempty"`
+	Success          bool                       `json:"success"`
+	Manifests        []ManifestInfo             `json:"manifests"`
+	ManifestPath     string                     `json:"manifest_path"`
+	ImageRef         types.ImageReference       `json:"image_ref"`
+	Namespace        string                     `json:"namespace"`
+	ServiceType      string                     `json:"service_type"`
+	Replicas         int                        `json:"replicas"`
+	Resources        ResourceRequests           `json:"resources"`
+	Duration         time.Duration              `json:"duration"`
+	ValidationResult *ManifestValidationSummary `json:"validation_result,omitempty"`
+	Error            *types.ToolError           `json:"error,omitempty"`
 }
 
 // ManifestInfo represents information about a generated manifest
@@ -296,10 +296,9 @@ func convertToGenerateManifestsArgs(args map[string]interface{}) (GenerateManife
 	// Resources
 	if resources, ok := args["resources"].(map[string]interface{}); ok {
 		result.Resources = ResourceRequests{
-			CPURequest:    getStringValue(resources, "cpu_request"),
-			MemoryRequest: getStringValue(resources, "memory_request"),
-			CPULimit:      getStringValue(resources, "cpu_limit"),
-			MemoryLimit:   getStringValue(resources, "memory_limit"),
+			CPU:     getStringValue(resources, "cpu_request"),
+			Memory:  getStringValue(resources, "memory_request"),
+			Storage: getStringValue(resources, "storage"),
 		}
 	}
 
@@ -350,7 +349,6 @@ func convertToGenerateManifestsArgs(args map[string]interface{}) (GenerateManife
 				secret := SecretRef{
 					Name: getStringValue(secretMap, "name"),
 					Key:  getStringValue(secretMap, "key"),
-					Env:  getStringValue(secretMap, "env"),
 				}
 				result.Secrets = append(result.Secrets, secret)
 			}
@@ -510,10 +508,9 @@ func convertGenerateManifestsResultToMap(result *GenerateManifestsResult) map[st
 	// Resources
 	if result.Resources != (ResourceRequests{}) {
 		output["resources"] = map[string]interface{}{
-			"cpu_request":    result.Resources.CPURequest,
-			"memory_request": result.Resources.MemoryRequest,
-			"cpu_limit":      result.Resources.CPULimit,
-			"memory_limit":   result.Resources.MemoryLimit,
+			"cpu":     result.Resources.CPU,
+			"memory":  result.Resources.Memory,
+			"storage": result.Resources.Storage,
 		}
 	}
 
@@ -647,18 +644,18 @@ func (t *GenerateManifestsTool) Execute(ctx context.Context, args interface{}) (
 		// Convert from map to struct using JSON marshaling
 		jsonData, err = json.Marshal(a)
 		if err != nil {
-			return nil, mcperror.NewWithData("invalid_arguments", "Failed to marshal map to JSON", map[string]interface{}{
+			return nil, utils.NewWithData("invalid_arguments", "Failed to marshal map to JSON", map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
 		if err = json.Unmarshal(jsonData, &manifestArgs); err != nil {
-			return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument structure for generate_manifests", map[string]interface{}{
+			return nil, utils.NewWithData("invalid_arguments", "Invalid argument structure for generate_manifests", map[string]interface{}{
 				"expected": "GenerateManifestsArgs or compatible map",
 				"error":    err.Error(),
 			})
 		}
 	default:
-		return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for generate_manifests", map[string]interface{}{
+		return nil, utils.NewWithData("invalid_arguments", "Invalid argument type for generate_manifests", map[string]interface{}{
 			"expected": "GenerateManifestsArgs or map[string]interface{}",
 			"received": fmt.Sprintf("%T", args),
 		})
@@ -956,15 +953,15 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		if err != nil {
 			t.logger.Warn().Err(err).Msg("Manifest validation failed")
 			// Continue execution but include validation error
-			validationSummary = &ValidationSummary{
+			validationSummary = &ManifestValidationSummary{
 				Enabled:      true,
 				OverallValid: false,
 				ErrorCount:   1,
-				Results: map[string]FileValidation{
+				Results: map[string]ManifestFileValidation{
 					"validation_error": {
 						Valid:      false,
 						ErrorCount: 1,
-						Errors: []ValidationIssue{
+						Errors: []ManifestValidationIssue{
 							{
 								Field:    "validation",
 								Message:  fmt.Sprintf("Validation failed: %v", err),
@@ -1206,8 +1203,8 @@ func (t *GenerateManifestsTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities
-func (t *GenerateManifestsTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *GenerateManifestsTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: false,
 		IsLongRunning:     false,
@@ -1224,12 +1221,12 @@ func (t *GenerateManifestsTool) Validate(ctx context.Context, args interface{}) 
 			var err error
 			manifestArgs, err = convertToGenerateManifestsArgs(mapArgs)
 			if err != nil {
-				return mcperror.NewWithData("conversion_error", fmt.Sprintf("Failed to convert arguments: %v", err), map[string]interface{}{
+				return utils.NewWithData("conversion_error", fmt.Sprintf("Failed to convert arguments: %v", err), map[string]interface{}{
 					"error": err.Error(),
 				})
 			}
 		} else {
-			return mcperror.NewWithData("invalid_arguments", "Invalid argument type for generate_manifests", map[string]interface{}{
+			return utils.NewWithData("invalid_arguments", "Invalid argument type for generate_manifests", map[string]interface{}{
 				"expected": "GenerateManifestsArgs or map[string]interface{}",
 				"received": fmt.Sprintf("%T", args),
 			})
@@ -1237,13 +1234,13 @@ func (t *GenerateManifestsTool) Validate(ctx context.Context, args interface{}) 
 	}
 
 	if manifestArgs.ImageRef.Repository == "" {
-		return mcperror.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
 			"field": "image_ref",
 		})
 	}
 
 	if manifestArgs.SessionID == "" {
-		return mcperror.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
 			"field": "session_id",
 		})
 	}
@@ -1252,7 +1249,7 @@ func (t *GenerateManifestsTool) Validate(ctx context.Context, args interface{}) 
 }
 
 // validateGeneratedManifests validates all generated manifests
-func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, manifestPath string, options ValidationOptions) (*ValidationSummary, error) {
+func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, manifestPath string, options ValidationOptions) (*ManifestValidationSummary, error) {
 	start := time.Now()
 
 	// Convert ValidationOptions to ManifestValidationOptions
@@ -1283,8 +1280,8 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 		return nil, fmt.Errorf("failed to validate manifest directory: %w", err)
 	}
 
-	// Convert BatchValidationResult to ValidationSummary
-	summary := &ValidationSummary{
+	// Convert BatchValidationResult to ManifestValidationSummary
+	summary := &ManifestValidationSummary{
 		Enabled:      true,
 		OverallValid: batchResult.OverallValid,
 		TotalFiles:   batchResult.TotalManifests,
@@ -1293,12 +1290,12 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 		WarningCount: batchResult.WarningCount,
 		Duration:     time.Since(start),
 		K8sVersion:   "unknown", // We don't have kubectl available
-		Results:      make(map[string]FileValidation),
+		Results:      make(map[string]ManifestFileValidation),
 	}
 
 	// Convert individual validation results
 	for fileName, result := range batchResult.Results {
-		fileValidation := FileValidation{
+		fileValidation := ManifestFileValidation{
 			Valid:        result.Valid,
 			Kind:         result.Kind,
 			APIVersion:   result.APIVersion,
@@ -1312,7 +1309,7 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 
 		// Convert errors
 		for _, err := range result.Errors {
-			fileValidation.Errors = append(fileValidation.Errors, ValidationIssue{
+			fileValidation.Errors = append(fileValidation.Errors, ManifestValidationIssue{
 				Field:    err.Field,
 				Message:  err.Message,
 				Code:     err.Code,
@@ -1323,7 +1320,7 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 
 		// Convert warnings
 		for _, warning := range result.Warnings {
-			fileValidation.Warnings = append(fileValidation.Warnings, ValidationIssue{
+			fileValidation.Warnings = append(fileValidation.Warnings, ManifestValidationIssue{
 				Field:    warning.Field,
 				Message:  warning.Message,
 				Code:     warning.Code,

@@ -1121,8 +1121,8 @@ func (t *AtomicScanSecretsTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities
-func (t *AtomicScanSecretsTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicScanSecretsTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,

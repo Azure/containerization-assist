@@ -65,7 +65,6 @@ func (t *AtomicGenerateManifestsTool) createSecretsPlan(args AtomicGenerateManif
 		plan.SecretReferences[secret.Name] = SecretRef{
 			Name: secretName,
 			Key:  strings.ToLower(secret.Name),
-			Env:  secret.Name,
 		}
 		secretGroups[secretName] = append(secretGroups[secretName], secret.Name)
 	}

@@ -830,8 +830,8 @@ func (t *AtomicCheckHealthTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities
-func (t *AtomicCheckHealthTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicCheckHealthTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,

@@ -39,7 +39,7 @@ func getContainerizationPipeline() *WorkflowSpec {
 					Conditions: []StageCondition{
 						{Key: "repo_url", Operator: "required"},
 					},
-					Timeout: durationPtr(10 * time.Minute),
+					Timeout: 10 * time.Minute,
 				},
 				{
 					Name:      "dockerfile-generation",
@@ -55,14 +55,14 @@ func getContainerizationPipeline() *WorkflowSpec {
 					Tools:     []string{"validate_dockerfile_atomic", "scan_secrets_atomic"},
 					DependsOn: []string{"dockerfile-generation"},
 					Parallel:  true,
-					Timeout:   durationPtr(5 * time.Minute),
+					Timeout:   5 * time.Minute,
 				},
 				{
 					Name:      "build",
 					Tools:     []string{"build_image_atomic"},
 					DependsOn: []string{"validation"},
 					Parallel:  false,
-					RetryPolicy: &RetryPolicy{
+					RetryPolicy: &RetryPolicyExecution{
 						MaxAttempts:  3,
 						BackoffMode:  "exponential",
 						InitialDelay: 30 * time.Second,
@@ -90,26 +90,26 @@ func getContainerizationPipeline() *WorkflowSpec {
 					Tools:     []string{"deploy_kubernetes_atomic"},
 					DependsOn: []string{"deployment-prep"},
 					Parallel:  false,
-					Timeout:   durationPtr(15 * time.Minute),
+					Timeout:   15 * time.Minute,
 				},
 				{
 					Name:      "validation",
 					Tools:     []string{"check_health_atomic"},
 					DependsOn: []string{"deployment"},
 					Parallel:  false,
-					Timeout:   durationPtr(5 * time.Minute),
+					Timeout:   5 * time.Minute,
 				},
 			},
-			Variables: map[string]string{
+			Variables: map[string]interface{}{
 				"registry":              "myregistry.azurecr.io",
 				"namespace":             "default",
 				"security_scan_enabled": "true",
 			},
-			ErrorPolicy: ErrorPolicy{
+			ErrorPolicy: &ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 3,
 			},
-			Timeout: durationPtr(60 * time.Minute),
+			Timeout: 60 * time.Minute,
 		},
 	}
 }
@@ -156,7 +156,7 @@ func getSecurityFocusedPipeline() *WorkflowSpec {
 					Tools:     []string{"scan_image_security_atomic"},
 					DependsOn: []string{"build"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"scan_mode":        "comprehensive",
 						"fail_on_critical": "true",
 					},
@@ -175,13 +175,13 @@ func getSecurityFocusedPipeline() *WorkflowSpec {
 					Tools:     []string{"generate_manifests_atomic", "deploy_kubernetes_atomic"},
 					DependsOn: []string{"tag-and-push"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"gitops_ready":    "true",
 						"secret_handling": "auto",
 					},
 				},
 			},
-			ErrorPolicy: ErrorPolicy{
+			ErrorPolicy: &ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 1,
 			},
@@ -210,14 +210,14 @@ func getDevelopmentWorkflow() *WorkflowSpec {
 					Tools:     []string{"analyze_repository_atomic"},
 					DependsOn: []string{},
 					Parallel:  false,
-					Timeout:   durationPtr(2 * time.Minute),
+					Timeout:   2 * time.Minute,
 				},
 				{
 					Name:      "build-and-test",
 					Tools:     []string{"build_image_atomic"},
 					DependsOn: []string{"quick-analysis"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"quick_build":       "true",
 						"skip_optimization": "true",
 					},
@@ -227,17 +227,17 @@ func getDevelopmentWorkflow() *WorkflowSpec {
 					Tools:     []string{"generate_manifests_atomic", "deploy_kubernetes_atomic"},
 					DependsOn: []string{"build-and-test"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"namespace": "development",
 						"replicas":  "1",
 					},
 				},
 			},
-			ErrorPolicy: ErrorPolicy{
+			ErrorPolicy: &ErrorPolicy{
 				Mode:        "continue",
 				MaxFailures: 5,
 			},
-			Timeout: durationPtr(15 * time.Minute),
+			Timeout: 15 * time.Minute,
 		},
 	}
 }
@@ -272,7 +272,7 @@ func getProductionDeployment() *WorkflowSpec {
 					Tools:     []string{"scan_image_security_atomic"},
 					DependsOn: []string{"pull-image"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"scan_mode":    "production",
 						"fail_on_high": "true",
 					},
@@ -285,7 +285,7 @@ func getProductionDeployment() *WorkflowSpec {
 					Tools:     []string{"tag_image_atomic"},
 					DependsOn: []string{"production-security-scan"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"tag_suffix":    "prod",
 						"add_timestamp": "true",
 					},
@@ -301,7 +301,7 @@ func getProductionDeployment() *WorkflowSpec {
 					Tools:     []string{"generate_manifests_atomic"},
 					DependsOn: []string{"production-push"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"namespace":       "production",
 						"replicas":        "3",
 						"resource_limits": "true",
@@ -313,8 +313,8 @@ func getProductionDeployment() *WorkflowSpec {
 					Tools:     []string{"deploy_kubernetes_atomic"},
 					DependsOn: []string{"production-manifests"},
 					Parallel:  false,
-					Timeout:   durationPtr(30 * time.Minute),
-					Variables: map[string]string{
+					Timeout:   30 * time.Minute,
+					Variables: map[string]interface{}{
 						"deployment_strategy": "rolling",
 						"max_unavailable":     "25%",
 					},
@@ -324,8 +324,8 @@ func getProductionDeployment() *WorkflowSpec {
 					Tools:     []string{"check_health_atomic"},
 					DependsOn: []string{"production-deployment"},
 					Parallel:  false,
-					Timeout:   durationPtr(10 * time.Minute),
-					RetryPolicy: &RetryPolicy{
+					Timeout:   10 * time.Minute,
+					RetryPolicy: &RetryPolicyExecution{
 						MaxAttempts:  5,
 						BackoffMode:  "linear",
 						InitialDelay: 30 * time.Second,
@@ -333,11 +333,11 @@ func getProductionDeployment() *WorkflowSpec {
 					},
 				},
 			},
-			ErrorPolicy: ErrorPolicy{
+			ErrorPolicy: &ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 1,
 			},
-			Timeout: durationPtr(90 * time.Minute),
+			Timeout: 90 * time.Minute,
 		},
 	}
 }
@@ -378,7 +378,7 @@ func getCICDPipeline() *WorkflowSpec {
 					Tools:     []string{"build_image_atomic"},
 					DependsOn: []string{"dockerfile-validation"},
 					Parallel:  false,
-					RetryPolicy: &RetryPolicy{
+					RetryPolicy: &RetryPolicyExecution{
 						MaxAttempts:  2,
 						BackoffMode:  "fixed",
 						InitialDelay: 1 * time.Minute,
@@ -389,7 +389,7 @@ func getCICDPipeline() *WorkflowSpec {
 					Tools:     []string{"scan_image_security_atomic"},
 					DependsOn: []string{"build-stage"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"qa_mode": "thorough",
 					},
 				},
@@ -398,7 +398,7 @@ func getCICDPipeline() *WorkflowSpec {
 					Tools:     []string{"tag_image_atomic", "push_image_atomic", "generate_manifests_atomic"},
 					DependsOn: []string{"quality-assurance"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"environment": "staging",
 						"tag_suffix":  "staging",
 					},
@@ -408,7 +408,7 @@ func getCICDPipeline() *WorkflowSpec {
 					Tools:     []string{"deploy_kubernetes_atomic"},
 					DependsOn: []string{"staging-deployment"},
 					Parallel:  false,
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"namespace": "staging",
 					},
 				},
@@ -417,7 +417,7 @@ func getCICDPipeline() *WorkflowSpec {
 					Tools:     []string{"check_health_atomic"},
 					DependsOn: []string{"staging-deploy"},
 					Parallel:  false,
-					Timeout:   durationPtr(15 * time.Minute),
+					Timeout:   15 * time.Minute,
 				},
 				{
 					Name:      "production-promotion",
@@ -427,18 +427,18 @@ func getCICDPipeline() *WorkflowSpec {
 					Conditions: []StageCondition{
 						{Key: "approve_production", Operator: "equals", Value: true},
 					},
-					Variables: map[string]string{
+					Variables: map[string]interface{}{
 						"tag_suffix": "production",
 						"promote":    "true",
 					},
 				},
 			},
-			Variables: map[string]string{
+			Variables: map[string]interface{}{
 				"registry":             "registry.company.com",
 				"approve_production":   "false",
 				"notification_webhook": "${NOTIFICATION_URL}",
 			},
-			ErrorPolicy: ErrorPolicy{
+			ErrorPolicy: &ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 2,
 				Routing: []ErrorRouting{
@@ -455,7 +455,7 @@ func getCICDPipeline() *WorkflowSpec {
 					},
 				},
 			},
-			Timeout: durationPtr(120 * time.Minute),
+			Timeout: 120 * time.Minute,
 		},
 	}
 }
@@ -485,7 +485,7 @@ func ListAvailableWorkflows() []WorkflowInfo {
 			Version:     spec.Metadata.Version,
 			Labels:      spec.Metadata.Labels,
 			StageCount:  len(spec.Spec.Stages),
-			HasTimeout:  spec.Spec.Timeout != nil,
+			HasTimeout:  spec.Spec.Timeout > 0,
 		})
 	}
 

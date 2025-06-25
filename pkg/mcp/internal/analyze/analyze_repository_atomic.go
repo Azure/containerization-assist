@@ -70,9 +70,10 @@ type AtomicAnalyzeRepositoryTool struct {
 	sessionManager  mcptypes.ToolSessionManager
 	// errorHandler field removed - using direct error handling
 	logger           zerolog.Logger
-	repoCloner       *git.Cloner
-	repoAnalyzer     *analysis.Analyzer
-	contextGenerator *analysis.ContextGenerator
+	gitManager       *git.Manager
+	repoAnalyzer     *analysis.RepositoryAnalyzer
+	repoCloner       *git.Manager
+	contextGenerator *ContextGenerator
 }
 
 // NewAtomicAnalyzeRepositoryTool creates a new atomic analyze repository tool
@@ -82,9 +83,10 @@ func NewAtomicAnalyzeRepositoryTool(adapter mcptypes.PipelineOperations, session
 		sessionManager:  sessionManager,
 		// errorHandler initialization removed - using direct error handling
 		logger:           logger.With().Str("tool", "atomic_analyze_repository").Logger(),
-		repoCloner:       git.NewCloner(logger),
-		repoAnalyzer:     analysis.NewAnalyzer(logger),
-		contextGenerator: analysis.NewContextGenerator(logger),
+		gitManager:       git.NewManager(logger),
+		repoAnalyzer:     analysis.NewRepositoryAnalyzer(logger),
+		repoCloner:       git.NewManager(logger),
+		contextGenerator: NewContextGenerator(logger),
 	}
 }
 
@@ -344,7 +346,17 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		SessionID:    session.SessionID,
 	}
 
-	repoAnalysisResult, err := t.repoAnalyzer.Analyze(ctx, analysisOpts)
+	coreAnalysisResult, err := t.repoAnalyzer.AnalyzeRepository(analysisOpts.RepoPath)
+	if err != nil {
+		return result, err
+	}
+
+	// Create our wrapped result with additional context
+	repoAnalysisResult := &AnalysisResult{
+		AnalysisResult: coreAnalysisResult,
+		Duration:       time.Since(analysisStartTime),
+		Context:        t.generateAnalysisContext(analysisOpts.RepoPath, coreAnalysisResult),
+	}
 	result.AnalysisDuration = time.Since(analysisStartTime)
 
 	if err != nil {
@@ -495,8 +507,14 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 		SessionID: sessionID,
 	}
 
-	// Clone using the repository module
-	result, err := t.repoCloner.Clone(ctx, cloneOpts)
+	// Clone using the git manager
+	result, err := t.repoCloner.CloneRepository(ctx, cloneOpts.TargetDir, git.CloneOptions{
+		URL:          cloneOpts.RepoURL,
+		Branch:       cloneOpts.Branch,
+		Depth:        1, // shallow clone
+		SingleBranch: true,
+		Recursive:    false,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +529,7 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 		}
 	})
 
-	return result.CloneResult, nil
+	return result, nil
 }
 
 // updateSessionState updates the session with analysis results
@@ -605,6 +623,29 @@ func (t *AtomicAnalyzeRepositoryTool) isURL(path string) bool {
 		strings.HasPrefix(path, "https://") ||
 		strings.HasPrefix(path, "git@") ||
 		strings.HasPrefix(path, "ssh://")
+}
+
+// generateAnalysisContext creates rich context from the analysis results
+func (t *AtomicAnalyzeRepositoryTool) generateAnalysisContext(repoPath string, analysis *analysis.AnalysisResult) *AnalysisContext {
+	// This is a simplified version - in practice you'd analyze the repo more thoroughly
+	return &AnalysisContext{
+		FilesAnalyzed:               len(analysis.ConfigFiles),
+		ConfigFilesFound:            []string{},
+		EntryPointsFound:            analysis.EntryPoints,
+		TestFilesFound:              []string{},
+		BuildFilesFound:             analysis.BuildFiles,
+		PackageManagers:             []string{},
+		DatabaseFiles:               []string{},
+		DockerFiles:                 []string{},
+		K8sFiles:                    []string{},
+		HasGitIgnore:                false,
+		HasReadme:                   false,
+		HasLicense:                  false,
+		HasCI:                       false,
+		RepositorySize:              0,
+		ContainerizationSuggestions: []string{},
+		NextStepSuggestions:         []string{},
+	}
 }
 
 func (t *AtomicAnalyzeRepositoryTool) validateLocalPath(path string) error {

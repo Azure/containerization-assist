@@ -47,7 +47,7 @@ func (sm *BoltWorkflowSessionManager) CreateSession(workflowSpec *WorkflowSpec) 
 		StageResults:     make(map[string]interface{}),
 		SharedContext:    make(map[string]interface{}),
 		Checkpoints:      []WorkflowCheckpoint{},
-		ResourceBindings: make(map[string]string),
+		ResourceBindings: make(map[string]interface{}),
 		StartTime:        time.Now(),
 		LastActivity:     time.Now(),
 		CreatedAt:        time.Now(),

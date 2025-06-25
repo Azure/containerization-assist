@@ -37,14 +37,7 @@ func NewWorkflowOrchestrator(
 	stageExecutor := NewDefaultStageExecutor(logger, toolRegistry, toolOrchestrator)
 
 	// Create workflow engine
-	engine := NewEngine(
-		logger,
-		stageExecutor,
-		sessionManager,
-		dependencyResolver,
-		errorRouter,
-		checkpointManager,
-	)
+	engine := NewEngine()
 
 	return &WorkflowOrchestrator{
 		engine:             engine,
@@ -263,7 +256,7 @@ func ExampleIntegrationWithMCP(db *bbolt.DB, logger zerolog.Logger) {
 	result, err := workflowOrchestrator.ExecuteWorkflow(
 		ctx,
 		"containerization-pipeline",
-		WithVariables(map[string]string{
+		WithVariables(map[string]interface{}{
 			"repo_url": "https://github.com/example/app",
 			"registry": "myregistry.azurecr.io",
 		}),

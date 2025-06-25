@@ -798,20 +798,27 @@ func (cm *BoltCheckpointManager) reconstructSession(checkpoint *WorkflowCheckpoi
 	}
 
 	session := &WorkflowSession{
-		ID:               getStringValue("session_id", ""),
-		WorkflowID:       getStringValue("workflow_id", ""),
-		WorkflowName:     getStringValue("workflow_name", ""),
-		Status:           WorkflowStatus(getStringValue("status", string(WorkflowStatusPending))),
-		CurrentStage:     getStringValue("current_stage", ""),
-		CompletedStages:  getStringSlice("completed_stages"),
-		FailedStages:     getStringSlice("failed_stages"),
-		SkippedStages:    getStringSlice("skipped_stages"),
-		StageResults:     checkpoint.StageResults,
-		ResourceBindings: getStringMap("resource_bindings"),
-		StartTime:        getTime("start_time", time.Now()),
-		LastActivity:     getTime("last_activity", time.Now()),
-		CreatedAt:        getTime("start_time", time.Now()), // Use start_time as created_at
-		UpdatedAt:        checkpoint.Timestamp,
+		ID:              getStringValue("session_id", ""),
+		WorkflowID:      getStringValue("workflow_id", ""),
+		WorkflowName:    getStringValue("workflow_name", ""),
+		Status:          WorkflowStatus(getStringValue("status", string(WorkflowStatusPending))),
+		CurrentStage:    getStringValue("current_stage", ""),
+		CompletedStages: getStringSlice("completed_stages"),
+		FailedStages:    getStringSlice("failed_stages"),
+		SkippedStages:   getStringSlice("skipped_stages"),
+		StageResults:    checkpoint.StageResults,
+		ResourceBindings: func() map[string]interface{} {
+			strMap := getStringMap("resource_bindings")
+			interfaceMap := make(map[string]interface{})
+			for k, v := range strMap {
+				interfaceMap[k] = v
+			}
+			return interfaceMap
+		}(),
+		StartTime:    getTime("start_time", time.Now()),
+		LastActivity: getTime("last_activity", time.Now()),
+		CreatedAt:    getTime("start_time", time.Now()), // Use start_time as created_at
+		UpdatedAt:    checkpoint.Timestamp,
 	}
 
 	// Restore shared context

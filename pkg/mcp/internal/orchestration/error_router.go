@@ -340,7 +340,9 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 		// Calculate retry delay
 		retryCount := 0
 		if session.ErrorContext != nil {
-			retryCount = session.ErrorContext.RetryCount
+			if count, ok := session.ErrorContext["retry_count"].(int); ok {
+				retryCount = count
+			}
 		}
 
 		retryAfter := er.retryManager.CalculateRetryDelay(retryPolicy, retryCount)

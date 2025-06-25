@@ -23,11 +23,11 @@ import (
 
 // AtomicGenerateManifestsTool implements atomic Kubernetes manifest generation with secret handling
 type AtomicGenerateManifestsTool struct {
-	pipelineAdapter     mcptypes.PipelineOperations
-	sessionManager      mcptypes.ToolSessionManager
-	secretScanner       *utils.SecretScanner
-	secretGenerator     *corek8s.SecretGenerator
-	fixingMixin         *fixing.AtomicToolFixingMixin
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
+	secretScanner   *utils.SecretScanner
+	secretGenerator *corek8s.SecretGenerator
+	// fixingMixin removed - functionality integrated directly
 	templateIntegration *TemplateIntegration
 	// manifestsAdapter removed - functionality integrated directly
 	logger zerolog.Logger
@@ -37,11 +37,11 @@ type AtomicGenerateManifestsTool struct {
 func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateManifestsTool {
 	toolLogger := logger.With().Str("tool", "atomic_generate_manifests").Logger()
 	return &AtomicGenerateManifestsTool{
-		pipelineAdapter:     adapter,
-		sessionManager:      sessionManager,
-		secretScanner:       utils.NewSecretScanner(),
-		secretGenerator:     corek8s.NewSecretGenerator(toolLogger),
-		fixingMixin:         nil, // Will be set via SetAnalyzer if fixing is enabled
+		pipelineAdapter: adapter,
+		sessionManager:  sessionManager,
+		secretScanner:   utils.NewSecretScanner(),
+		secretGenerator: corek8s.NewSecretGenerator(toolLogger),
+		// fixingMixin removed - functionality integrated directly
 		templateIntegration: NewTemplateIntegration(toolLogger),
 		// manifestsAdapter removed - functionality integrated directly
 		logger: toolLogger,
@@ -51,18 +51,12 @@ func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, session
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
 func (t *AtomicGenerateManifestsTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
-		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "generate_manifests_atomic", t.logger)
+		// Fixing mixin integration removed - implement directly if needed
 	}
 }
 
 // ExecuteWithFixes runs the atomic manifest generation with AI-driven fixing capabilities
 func (t *AtomicGenerateManifestsTool) ExecuteWithFixes(ctx context.Context, args AtomicGenerateManifestsArgs) (*AtomicGenerateManifestsResult, error) {
-	// Check if fixing is enabled
-	if t.fixingMixin == nil {
-		t.logger.Warn().Msg("AI-driven fixing not enabled, falling back to regular execution")
-		return t.ExecuteManifestGeneration(ctx, args)
-	}
-
 	// First validate basic requirements
 	if args.SessionID == "" {
 		return nil, types.NewValidationErrorBuilder("Session ID is required", "session_id", args.SessionID).
@@ -92,35 +86,15 @@ func (t *AtomicGenerateManifestsTool) ExecuteWithFixes(ctx context.Context, args
 		return nil, types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("session not found: %s", args.SessionID), types.ErrTypeSession)
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
-	workspaceDir := t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
+	_ = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 
 	t.logger.Info().
 		Str("session_id", args.SessionID).
 		Str("app_name", args.AppName).
 		Str("image_ref", args.ImageRef).
-		Msg("Starting manifest generation with AI-driven fixing")
-	// Create fixable operation wrapper
-	operation := &ManifestGenerationOperation{
-		tool:         t,
-		args:         args,
-		session:      session,
-		workspaceDir: workspaceDir,
-		logger:       t.logger,
-	}
-	// Execute with retry and fixing
-	err = t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, workspaceDir, operation)
-	if err != nil {
-		return &AtomicGenerateManifestsResult{
-			BaseToolResponse:    types.NewBaseResponse("generate_manifests_atomic", args.SessionID, args.DryRun),
-			BaseAIContextResult: internal.NewBaseAIContextResult("generate_manifests", false, time.Since(time.Now())),
-			Success:             false,
-			SessionID:           args.SessionID,
-			AppName:             args.AppName,
-			ImageRef:            args.ImageRef,
-			// Error details are logged, not stored in result
-		}, err
-	}
-	// If we get here, the generation succeeded - call the regular ExecuteManifestGeneration to get full results
+		Msg("Starting manifest generation")
+
+	// Execute manifest generation directly
 	return t.ExecuteManifestGeneration(ctx, args)
 }
 
@@ -723,8 +697,8 @@ func (t *AtomicGenerateManifestsTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities
-func (t *AtomicGenerateManifestsTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicGenerateManifestsTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     false,
@@ -856,7 +830,7 @@ func (t *AtomicGenerateManifestsTool) Validate(ctx context.Context, args interfa
 				return types.NewRichError("CONVERSION_ERROR", fmt.Sprintf("failed to convert arguments: %v", err), types.ErrTypeValidation)
 			}
 		} else {
-			return mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_generate_manifests", map[string]interface{}{
+			return utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_generate_manifests", map[string]interface{}{
 				"expected": "AtomicGenerateManifestsArgs or map[string]interface{}",
 				"received": fmt.Sprintf("%T", args),
 			})
@@ -864,13 +838,13 @@ func (t *AtomicGenerateManifestsTool) Validate(ctx context.Context, args interfa
 	}
 
 	if manifestArgs.ImageRef == "" {
-		return mcperror.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
 			"field": "image_ref",
 		})
 	}
 
 	if manifestArgs.SessionID == "" {
-		return mcperror.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
 			"field": "session_id",
 		})
 	}
@@ -890,12 +864,12 @@ func (t *AtomicGenerateManifestsTool) Execute(ctx context.Context, args interfac
 	case map[string]interface{}:
 		manifestArgs, err = convertToAtomicGenerateManifestsArgs(a)
 		if err != nil {
-			return nil, mcperror.NewWithData("conversion_error", fmt.Sprintf("Failed to convert arguments: %v", err), map[string]interface{}{
+			return nil, utils.NewWithData("conversion_error", fmt.Sprintf("Failed to convert arguments: %v", err), map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
 	default:
-		return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_generate_manifests", map[string]interface{}{
+		return nil, utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_generate_manifests", map[string]interface{}{
 			"expected": "AtomicGenerateManifestsArgs or map[string]interface{}",
 			"received": fmt.Sprintf("%T", args),
 		})

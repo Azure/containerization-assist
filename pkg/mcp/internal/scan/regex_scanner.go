@@ -13,7 +13,7 @@ import (
 // RegexBasedScanner implements secret detection using regular expressions
 type RegexBasedScanner struct {
 	name     string
-	patterns map[scan.SecretType]*regexp.Regexp
+	patterns map[SecretType]*regexp.Regexp
 	logger   zerolog.Logger
 }
 
@@ -21,7 +21,7 @@ type RegexBasedScanner struct {
 func NewRegexBasedScanner(logger zerolog.Logger) *RegexBasedScanner {
 	scanner := &RegexBasedScanner{
 		name:     "regex_scanner",
-		patterns: make(map[scan.SecretType]*regexp.Regexp),
+		patterns: make(map[SecretType]*regexp.Regexp),
 		logger:   logger.With().Str("scanner", "regex").Logger(),
 	}
 
@@ -37,21 +37,21 @@ func (r *RegexBasedScanner) GetName() string {
 // GetScanTypes returns the types of secrets this scanner can detect
 func (r *RegexBasedScanner) GetScanTypes() []string {
 	return []string{
-		string(scan.SecretTypeAPIKey),
-		string(scan.SecretTypePassword),
-		string(scan.SecretTypeToken),
-		string(scan.SecretTypeCredential),
-		string(scan.SecretTypeSecret),
-		string(scan.SecretTypeEnvironmentVar),
+		string(SecretTypeAPIKey),
+		string(SecretTypePassword),
+		string(SecretTypeToken),
+		string(SecretTypeCredential),
+		string(SecretTypeSecret),
+		string(SecretTypeEnvironmentVar),
 	}
 }
 
 // IsApplicable determines if this scanner should run
-func (r *RegexBasedScanner) IsApplicable(content string, contentType scan.ContentType) bool {
+func (r *RegexBasedScanner) IsApplicable(content string, contentType ContentType) bool {
 	// Regex scanner is applicable to most content types
 	switch contentType {
-	case scan.ContentTypeSourceCode, scan.ContentTypeConfig,
-		scan.ContentTypeEnvironment, scan.ContentTypeGeneric:
+	case ContentTypeSourceCode, ContentTypeConfig,
+		ContentTypeEnvironment, ContentTypeGeneric:
 		return true
 	default:
 		return false
@@ -59,11 +59,11 @@ func (r *RegexBasedScanner) IsApplicable(content string, contentType scan.Conten
 }
 
 // Scan performs regex-based secret scanning
-func (r *RegexBasedScanner) Scan(ctx context.Context, config scan.ScanConfig) (*scan.ScanResult, error) {
+func (r *RegexBasedScanner) Scan(ctx context.Context, config ScanConfig) (*ScanResult, error) {
 	startTime := time.Now()
-	result := &scan.ScanResult{
+	result := &ScanResult{
 		Scanner:  r.GetName(),
-		Secrets:  make([]scan.Secret, 0),
+		Secrets:  make([]Secret, 0),
 		Metadata: make(map[string]interface{}),
 		Errors:   make([]error, 0),
 	}
@@ -90,8 +90,8 @@ func (r *RegexBasedScanner) Scan(ctx context.Context, config scan.ScanConfig) (*
 }
 
 // scanLine scans a single line for secrets
-func (r *RegexBasedScanner) scanLine(line string, lineNum int, config scan.ScanConfig) ([]scan.Secret, error) {
-	var secrets []scan.Secret
+func (r *RegexBasedScanner) scanLine(line string, lineNum int, config ScanConfig) ([]Secret, error) {
+	var secrets []Secret
 
 	for secretType, pattern := range r.patterns {
 		matches := pattern.FindAllStringSubmatch(line, -1)
@@ -117,26 +117,26 @@ func (r *RegexBasedScanner) scanLine(line string, lineNum int, config scan.ScanC
 
 // createSecret creates a secret from detection results
 func (r *RegexBasedScanner) createSecret(
-	secretType scan.SecretType,
+	secretType SecretType,
 	value, line string,
 	lineNum int,
-	config scan.ScanConfig,
-) scan.Secret {
+	config ScanConfig,
+) Secret {
 
 	// Calculate confidence based on various factors
 	confidence := r.calculateSecretConfidence(secretType, value, line)
 
 	// Determine severity
-	severity := scan.GetSecretSeverity(secretType, confidence)
+	severity := GetSecretSeverity(secretType, confidence)
 
 	// Calculate entropy
-	entropy := scan.CalculateEntropy(value)
+	entropy := CalculateEntropy(value)
 
-	secret := scan.Secret{
+	secret := Secret{
 		Type:        secretType,
 		Value:       value,
-		MaskedValue: scan.MaskSecret(value),
-		Location: &scan.Location{
+		MaskedValue: MaskSecret(value),
+		Location: &Location{
 			File:   config.FilePath,
 			Line:   lineNum,
 			Column: strings.Index(line, value) + 1,
@@ -151,7 +151,7 @@ func (r *RegexBasedScanner) createSecret(
 			"line_length":      len(line),
 			"value_length":     len(value),
 		},
-		Evidence: []scan.Evidence{
+		Evidence: []Evidence{
 			{
 				Type:        "regex_match",
 				Description: fmt.Sprintf("Matched %s pattern", secretType),
@@ -166,29 +166,29 @@ func (r *RegexBasedScanner) createSecret(
 }
 
 // detectHighEntropy detects high-entropy strings that might be secrets
-func (r *RegexBasedScanner) detectHighEntropy(line string, lineNum int, config scan.ScanConfig) []scan.Secret {
-	var secrets []scan.Secret
+func (r *RegexBasedScanner) detectHighEntropy(line string, lineNum int, config ScanConfig) []Secret {
+	var secrets []Secret
 
 	// Split line into potential secret tokens
 	tokens := r.extractTokens(line)
 
 	for _, token := range tokens {
 		if len(token) >= 16 && len(token) <= 100 { // Reasonable secret length
-			entropy := scan.CalculateEntropy(token)
+			entropy := CalculateEntropy(token)
 			if entropy > 4.5 { // High entropy threshold
 				confidence := r.calculateEntropyConfidence(entropy, token)
 				if confidence > 0.6 {
-					secret := scan.Secret{
-						Type:        scan.SecretTypeHighEntropy,
+					secret := Secret{
+						Type:        SecretTypeHighEntropy,
 						Value:       token,
-						MaskedValue: scan.MaskSecret(token),
-						Location: &scan.Location{
+						MaskedValue: MaskSecret(token),
+						Location: &Location{
 							File:   config.FilePath,
 							Line:   lineNum,
 							Column: strings.Index(line, token) + 1,
 						},
 						Confidence: confidence,
-						Severity:   scan.GetSecretSeverity(scan.SecretTypeHighEntropy, confidence),
+						Severity:   GetSecretSeverity(SecretTypeHighEntropy, confidence),
 						Context:    strings.TrimSpace(line),
 						Pattern:    "high_entropy",
 						Entropy:    entropy,
@@ -197,7 +197,7 @@ func (r *RegexBasedScanner) detectHighEntropy(line string, lineNum int, config s
 							"entropy_score":    entropy,
 							"token_length":     len(token),
 						},
-						Evidence: []scan.Evidence{
+						Evidence: []Evidence{
 							{
 								Type:        "entropy_analysis",
 								Description: fmt.Sprintf("High entropy string (%.2f)", entropy),
@@ -243,24 +243,24 @@ func (r *RegexBasedScanner) extractTokens(line string) []string {
 
 // initializePatterns initializes regex patterns for different secret types
 func (r *RegexBasedScanner) initializePatterns() {
-	patterns := map[scan.SecretType]string{
+	patterns := map[SecretType]string{
 		// API Keys
-		scan.SecretTypeAPIKey: `(?i)(?:api[_-]?key|apikey)[\"'\s]*[:=][\"'\s]*([a-zA-Z0-9_\-]{16,64})`,
+		SecretTypeAPIKey: `(?i)(?:api[_-]?key|apikey)[\"'\s]*[:=][\"'\s]*([a-zA-Z0-9_\-]{16,64})`,
 
 		// Generic tokens
-		scan.SecretTypeToken: `(?i)(?:token|access[_-]?token)[\"'\s]*[:=][\"'\s]*([a-zA-Z0-9_\-\.]{20,128})`,
+		SecretTypeToken: `(?i)(?:token|access[_-]?token)[\"'\s]*[:=][\"'\s]*([a-zA-Z0-9_\-\.]{20,128})`,
 
 		// Passwords
-		scan.SecretTypePassword: `(?i)(?:password|passwd|pwd)[\"'\s]*[:=][\"'\s]*([^\s\"']{8,64})`,
+		SecretTypePassword: `(?i)(?:password|passwd|pwd)[\"'\s]*[:=][\"'\s]*([^\s\"']{8,64})`,
 
 		// Generic secrets
-		scan.SecretTypeSecret: `(?i)(?:secret|client[_-]?secret)[\"'\s]*[:=][\"'\s]*([a-zA-Z0-9_\-]{16,128})`,
+		SecretTypeSecret: `(?i)(?:secret|client[_-]?secret)[\"'\s]*[:=][\"'\s]*([a-zA-Z0-9_\-]{16,128})`,
 
 		// Environment variables with secret-like names
-		scan.SecretTypeEnvironmentVar: `(?i)(?:SECRET|KEY|TOKEN|PASSWORD)_[A-Z0-9_]*[\"'\s]*[:=][\"'\s]*([^\s\"']{8,128})`,
+		SecretTypeEnvironmentVar: `(?i)(?:SECRET|KEY|TOKEN|PASSWORD)_[A-Z0-9_]*[\"'\s]*[:=][\"'\s]*([^\s\"']{8,128})`,
 
 		// Generic credentials
-		scan.SecretTypeCredential: `(?i)(?:credential|cred)[\"'\s]*[:=][\"'\s]*([^\s\"']{8,64})`,
+		SecretTypeCredential: `(?i)(?:credential|cred)[\"'\s]*[:=][\"'\s]*([^\s\"']{8,64})`,
 	}
 
 	for secretType, patternStr := range patterns {
@@ -276,7 +276,7 @@ func (r *RegexBasedScanner) initializePatterns() {
 }
 
 // calculateSecretConfidence calculates confidence for a detected secret
-func (r *RegexBasedScanner) calculateSecretConfidence(secretType scan.SecretType, value, context string) float64 {
+func (r *RegexBasedScanner) calculateSecretConfidence(secretType SecretType, value, context string) float64 {
 	confidence := 0.5 // Base confidence
 
 	// Adjust based on value characteristics
@@ -357,7 +357,7 @@ func (r *RegexBasedScanner) calculateEntropyConfidence(entropy float64, value st
 }
 
 // calculateConfidence calculates overall confidence for the scan result
-func (r *RegexBasedScanner) calculateConfidence(result *scan.ScanResult) float64 {
+func (r *RegexBasedScanner) calculateConfidence(result *ScanResult) float64 {
 	if len(result.Secrets) == 0 {
 		return 0.0
 	}
@@ -371,7 +371,7 @@ func (r *RegexBasedScanner) calculateConfidence(result *scan.ScanResult) float64
 }
 
 // getPatternString returns the pattern string for a secret type
-func (r *RegexBasedScanner) getPatternString(secretType scan.SecretType) string {
+func (r *RegexBasedScanner) getPatternString(secretType SecretType) string {
 	if pattern, exists := r.patterns[secretType]; exists {
 		return pattern.String()
 	}
