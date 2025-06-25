@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 
@@ -130,12 +129,6 @@ func (r *ConversationResponse) GetAutoAdvanceMessage() string {
 	return baseMsg
 }
 
-// Tool is an alias for tools.Tool with an additional Execute method requirement
-// This ensures compatibility between conversation and tools packages
-type Tool = interface {
-	tools.Tool
-	Execute(params map[string]interface{}) (interface{}, error)
-}
 
 // Note: ErrorHandler is now in the errors package for centralized error management
 

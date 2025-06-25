@@ -216,3 +216,4 @@ type ToolRegistry interface {
 	// GetMetadata returns metadata for a specific tool
 	GetMetadata(name string) (ToolMetadata, bool)
 }
+
