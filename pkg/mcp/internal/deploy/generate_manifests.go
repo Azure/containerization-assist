@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/templates"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
@@ -1505,4 +1506,107 @@ func (t *GenerateManifestsTool) convertNetworkPolicyPeers(peers []NetworkPolicyP
 		}
 	}
 	return result
+}
+
+// GetMetadata returns metadata for the generate_manifests tool
+func (t *GenerateManifestsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:         "generate_manifests",
+		Description:  "Generates Kubernetes manifests for containerized applications with comprehensive configuration options",
+		Version:      "1.0.0",
+		Category:     "kubernetes",
+		Dependencies: []string{},
+		Capabilities: []string{
+			"kubernetes_manifest_generation",
+			"helm_template_support",
+			"ingress_configuration",
+			"network_policy_support",
+			"secret_management",
+			"configmap_generation",
+			"resource_specification",
+			"service_configuration",
+		},
+		Requirements: []string{
+			"kubernetes_access",
+			"workspace_access",
+		},
+		Parameters: map[string]string{
+			"session_id":             "Required session identifier",
+			"image_ref":              "Container image reference (name:tag or registry/name:tag)",
+			"namespace":              "Kubernetes namespace (default: default)",
+			"service_type":           "Service type: ClusterIP, NodePort, LoadBalancer (default: LoadBalancer)",
+			"replicas":               "Number of pod replicas (default: 1)",
+			"resources":              "Resource requirements (CPU/memory requests and limits)",
+			"environment":            "Environment variables as key-value pairs",
+			"secrets":                "Secret references for environment variables",
+			"include_ingress":        "Generate Ingress resource (default: false)",
+			"helm_template":          "Generate as Helm template (default: false)",
+			"configmap_data":         "ConfigMap data as key-value pairs",
+			"configmap_files":        "ConfigMap file paths to mount",
+			"binary_data":            "ConfigMap binary data",
+			"ingress_hosts":          "Ingress host configuration",
+			"ingress_tls":            "Ingress TLS configuration",
+			"ingress_class":          "Ingress class name",
+			"service_ports":          "Service port configuration",
+			"load_balancer_ip":       "LoadBalancer IP for service",
+			"session_affinity":       "Session affinity (None, ClientIP)",
+			"workflow_labels":        "Additional labels from workflow session",
+			"registry_secrets":       "Registry credentials for pull secrets",
+			"generate_pull_secret":   "Generate image pull secret (default: false)",
+			"validate_manifests":     "Validate generated manifests (default: false)",
+			"validation_options":     "Options for manifest validation",
+			"include_network_policy": "Generate NetworkPolicy resource (default: false)",
+			"network_policy_spec":    "NetworkPolicy specification",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic Deployment",
+				Description: "Generate basic deployment and service manifests",
+				Input: map[string]interface{}{
+					"session_id": "example-session",
+					"image_ref": map[string]interface{}{
+						"name": "myapp",
+						"tag":  "latest",
+					},
+					"namespace":    "default",
+					"service_type": "LoadBalancer",
+					"replicas":     2,
+				},
+				Output: map[string]interface{}{
+					"success":   true,
+					"manifests": "Generated deployment.yaml and service.yaml",
+					"namespace": "default",
+				},
+			},
+			{
+				Name:        "Full Configuration",
+				Description: "Generate manifests with ingress, secrets, and configmaps",
+				Input: map[string]interface{}{
+					"session_id": "example-session",
+					"image_ref": map[string]interface{}{
+						"name": "myapp",
+						"tag":  "v1.0.0",
+					},
+					"namespace":       "production",
+					"service_type":    "ClusterIP",
+					"replicas":        3,
+					"include_ingress": true,
+					"environment": map[string]string{
+						"NODE_ENV": "production",
+					},
+					"resources": map[string]string{
+						"cpu_request":    "100m",
+						"memory_request": "128Mi",
+						"cpu_limit":      "500m",
+						"memory_limit":   "512Mi",
+					},
+				},
+				Output: map[string]interface{}{
+					"success":   true,
+					"manifests": "Generated deployment.yaml, service.yaml, ingress.yaml",
+					"namespace": "production",
+				},
+			},
+		},
+	}
 }

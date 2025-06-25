@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -86,12 +87,68 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 	}, nil
 }
 
-// GetToolName returns the tool name
-func (t *AnalyzeRepositoryRedirectTool) GetToolName() string {
-	return "analyze_repository"
+// Validate validates the input arguments
+func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args interface{}) error {
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return types.NewRichError("INVALID_ARGUMENTS", "invalid argument type: expected map[string]interface{}", "validation_error")
+	}
+
+	// Check required fields
+	if sessionID, _ := argsMap["session_id"].(string); sessionID == "" {
+		// Session ID is optional, will be generated if missing
+	}
+
+	// Check for repo_path or path
+	if repoPath, ok := argsMap["repo_path"].(string); !ok || repoPath == "" {
+		if path, ok := argsMap["path"].(string); !ok || path == "" {
+			return types.NewRichError("INVALID_ARGUMENTS", "repo_path or path is required", "validation_error")
+		}
+	}
+
+	return nil
 }
 
-// GetToolDescription returns the tool description
-func (t *AnalyzeRepositoryRedirectTool) GetToolDescription() string {
-	return "Analyzes a repository to determine language, framework, dependencies, and containerization requirements"
+// GetMetadata returns the tool metadata
+func (t *AnalyzeRepositoryRedirectTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:         "analyze_repository",
+		Description:  "Analyzes a repository to determine language, framework, dependencies, and containerization requirements",
+		Version:      "1.0.0",
+		Category:     "analysis",
+		Dependencies: []string{"analyze_repository_atomic"},
+		Capabilities: []string{
+			"language_detection",
+			"framework_analysis",
+			"dependency_scanning",
+			"structure_analysis",
+			"containerization_assessment",
+		},
+		Requirements: []string{
+			"repository_access",
+			"workspace_access",
+		},
+		Parameters: map[string]string{
+			"session_id": "Session identifier (optional, will be generated if not provided)",
+			"repo_path":  "Path to the repository to analyze",
+			"path":       "Alternative field name for repo_path",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Analyze Local Repository",
+				Description: "Analyze a local repository for containerization",
+				Input: map[string]interface{}{
+					"session_id": "analysis-session",
+					"repo_path":  "/path/to/repository",
+				},
+				Output: map[string]interface{}{
+					"success":    true,
+					"language":   "javascript",
+					"framework":  "express",
+					"port":       3000,
+					"dockerfile": "Generated Dockerfile ready",
+				},
+			},
+		},
+	}
 }
