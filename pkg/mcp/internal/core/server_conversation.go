@@ -9,9 +9,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
@@ -130,7 +129,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 
 	// Create clients for pipeline adapter
 	cmdRunner := &runner.DefaultCommandRunner{}
-	mcpClients := adapter.NewMCPClients(
+	mcpClients := core.NewMCPClients(
 		docker.NewDockerCmdRunner(cmdRunner),
 		kind.NewKindCmdRunner(cmdRunner),
 		k8s.NewKubeCmdRunner(cmdRunner),
@@ -138,8 +137,8 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 
 	// In conversation mode, use CallerAnalyzer instead of StubAnalyzer
 	// This requires the transport to be able to forward prompts to the LLM
-	if transport, ok := s.transport.(contract.LLMTransport); ok {
-		callerAnalyzer := analyzer.NewCallerAnalyzer(transport, analyzer.CallerAnalyzerOpts{
+	if transport, ok := s.transport.(types.LLMTransport); ok {
+		callerAnalyzer := analyze.NewCallerAnalyzer(transport, analyze.CallerAnalyzerOpts{
 			ToolName:       "chat",
 			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
 			PerCallTimeout: 60 * time.Second,

@@ -1,4 +1,4 @@
-package credential_providers
+package registry
 
 import (
 	"context"

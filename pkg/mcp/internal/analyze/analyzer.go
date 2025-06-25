@@ -1,4 +1,4 @@
-package analyzer
+package analyze
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"

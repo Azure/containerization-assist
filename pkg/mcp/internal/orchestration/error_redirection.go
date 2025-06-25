@@ -1,4 +1,4 @@
-package errors
+package orchestration
 
 import (
 	"fmt"

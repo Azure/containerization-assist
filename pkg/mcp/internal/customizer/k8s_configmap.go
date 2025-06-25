@@ -1,4 +1,4 @@
-package kubernetes
+package customizer
 
 import (
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"

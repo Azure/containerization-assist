@@ -11,9 +11,9 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	customizerk8s "github.com/Azure/container-copilot/pkg/mcp/internal/customizer/kubernetes"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	customizerk8s "github.com/Azure/container-copilot/pkg/mcp/internal/customizer"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"

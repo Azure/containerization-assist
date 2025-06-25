@@ -1,4 +1,4 @@
-package contract
+package types
 
 // ToolCapabilities defines the operational capabilities of a tool
 // This is part of the contract between MCP server and hosting LLM

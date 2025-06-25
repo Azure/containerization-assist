@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
 	orchestrationtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/testutil"
 	profilingtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil"
 	"github.com/rs/zerolog"
@@ -19,7 +19,7 @@ type IntegrationTestSuite struct {
 	logger              zerolog.Logger
 	sessionManager      *TestSessionManager
 	mockPipelineAdapter *MockPipelineAdapter
-	mockClients         *adapter.MCPClients
+	mockClients         *mcptypes.MCPClients
 	orchestratorCapture *orchestrationtestutil.ExecutionCapture
 	profilingTestSuite  *profilingtestutil.ProfiledTestSuite
 	testStartTime       time.Time
@@ -58,7 +58,7 @@ func (its *IntegrationTestSuite) GetPipelineAdapter() *MockPipelineAdapter {
 }
 
 // GetClients returns the test client sets
-func (its *IntegrationTestSuite) GetClients() *adapter.MCPClients {
+func (its *IntegrationTestSuite) GetClients() *mcptypes.MCPClients {
 	return its.mockClients
 }
 
@@ -490,9 +490,9 @@ func (mpa *MockPipelineAdapter) Clear() {
 }
 
 // NewTestClientSets creates pre-configured client mocks for testing
-func NewTestClientSets() *adapter.MCPClients {
+func NewTestClientSets() *mcptypes.MCPClients {
 	// Create mock clients with test implementations
-	return &adapter.MCPClients{
+	return &mcptypes.MCPClients{
 		Docker:   nil,                        // Mock docker client can be injected as needed
 		Kind:     nil,                        // Mock kind runner can be injected as needed
 		Kube:     nil,                        // Mock kube runner can be injected as needed

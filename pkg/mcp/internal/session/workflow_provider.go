@@ -1,4 +1,4 @@
-package label_providers
+package session
 
 import (
 	"fmt"

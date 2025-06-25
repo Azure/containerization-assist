@@ -1,4 +1,4 @@
-package mcperror
+package utils
 
 import (
 	"errors"

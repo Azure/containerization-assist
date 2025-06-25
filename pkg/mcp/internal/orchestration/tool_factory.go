@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )

@@ -1,4 +1,4 @@
-package ai_context
+package utils
 
 import (
 	"encoding/json"

@@ -1,4 +1,4 @@
-package validate
+package build
 
 import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"

@@ -1,4 +1,4 @@
-package profiling
+package observability
 
 import (
 	"context"

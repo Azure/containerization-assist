@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 
@@ -86,7 +85,7 @@ func (r *ConversationResponse) CanAutoAdvance() bool {
 }
 
 // ShouldAutoAdvance determines if auto-advance should be triggered based on user preferences
-func (r *ConversationResponse) ShouldAutoAdvance(userPrefs contract.UserPreferences) bool {
+func (r *ConversationResponse) ShouldAutoAdvance(userPrefs types.UserPreferences) bool {
 	if !r.CanAutoAdvance() {
 		return false
 	}

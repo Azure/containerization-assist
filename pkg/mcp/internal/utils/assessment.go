@@ -1,4 +1,4 @@
-package ai_context
+package utils
 
 // UnifiedAssessment provides a standardized assessment structure for all tools
 type UnifiedAssessment struct {

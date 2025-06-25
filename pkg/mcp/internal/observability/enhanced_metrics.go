@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/config"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"

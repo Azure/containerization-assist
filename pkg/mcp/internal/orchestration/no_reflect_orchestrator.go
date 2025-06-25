@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )

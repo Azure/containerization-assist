@@ -7,7 +7,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/jsonrpc"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
 	"github.com/rs/zerolog"

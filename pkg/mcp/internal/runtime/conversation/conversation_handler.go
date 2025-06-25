@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
@@ -133,8 +133,8 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 		return response, nil
 	}
 
-	// Get user preferences to check auto-advance settings
-	var userPrefs contract.UserPreferences = contract.UserPreferences{
+	// Get user preferences to check auto-advance settings  
+	var userPrefs types.UserPreferences = types.UserPreferences{
 		SkipConfirmations: false,
 	}
 

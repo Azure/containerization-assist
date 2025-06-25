@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 

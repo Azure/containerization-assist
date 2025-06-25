@@ -1,4 +1,4 @@
-package adapter
+package core
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
