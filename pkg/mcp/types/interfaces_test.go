@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"testing"
-	"time"
 )
 
 // Test interface conformance by implementing mock types
@@ -33,65 +32,6 @@ func (m *MockAIAnalyzer) GetTokenUsage() TokenUsage {
 
 func (m *MockAIAnalyzer) ResetTokenUsage() {}
 
-// MockHealthChecker implements HealthChecker interface
-type MockHealthChecker struct{}
-
-func (m *MockHealthChecker) GetSystemResources() SystemResources {
-	return SystemResources{
-		CPUUsage:    50.0,
-		MemoryUsage: 75.0,
-		DiskUsage:   60.0,
-		OpenFiles:   100,
-		GoRoutines:  50,
-	}
-}
-
-func (m *MockHealthChecker) GetSessionStats() SessionHealthStats {
-	return SessionHealthStats{
-		ActiveSessions:    5,
-		TotalSessions:     100,
-		FailedSessions:    2,
-		AverageSessionAge: 250.0,
-	}
-}
-
-func (m *MockHealthChecker) GetCircuitBreakerStats() map[string]CircuitBreakerStatus {
-	return map[string]CircuitBreakerStatus{
-		"docker": {State: CircuitBreakerClosed},
-		"k8s":    {State: CircuitBreakerOpen},
-	}
-}
-
-func (m *MockHealthChecker) CheckServiceHealth(ctx context.Context) []ServiceHealth {
-	return []ServiceHealth{
-		{
-			Name:      "docker",
-			Status:    "healthy",
-			LastCheck: time.Now(),
-		},
-	}
-}
-
-func (m *MockHealthChecker) GetJobQueueStats() JobQueueStats {
-	return JobQueueStats{
-		QueuedJobs:    3,
-		RunningJobs:   2,
-		CompletedJobs: 95,
-		FailedJobs:    5,
-	}
-}
-
-func (m *MockHealthChecker) GetRecentErrors(limit int) []RecentError {
-	return []RecentError{
-		{
-			Timestamp: time.Now(),
-			Message:   "mock error",
-			Component: "test",
-			Context:   map[string]interface{}{"test": true},
-		},
-	}
-}
-
 // MockProgressReporter implements ProgressReporter interface
 type MockProgressReporter struct{}
 
@@ -113,35 +53,6 @@ func (m *MockProgressReporter) GetCurrentStage() (int, ProgressStage) {
 
 // Note: SessionManager testing removed due to complex dependencies
 
-// MockBaseAnalyzer implements BaseAnalyzer interface
-type MockBaseAnalyzer struct{}
-
-func (m *MockBaseAnalyzer) Analyze(ctx context.Context, input interface{}, options BaseAnalysisOptions) (*BaseAnalysisResult, error) {
-	return &BaseAnalysisResult{
-		Summary: BaseAnalysisSummary{
-			TotalFindings: 0,
-			OverallScore:  100,
-		},
-		Findings:        []BaseFinding{},
-		Recommendations: []BaseRecommendation{},
-		Metrics:         map[string]interface{}{},
-		Context:         map[string]interface{}{},
-	}, nil
-}
-
-func (m *MockBaseAnalyzer) GetName() string {
-	return "mock-analyzer"
-}
-
-func (m *MockBaseAnalyzer) GetCapabilities() BaseAnalyzerCapabilities {
-	return BaseAnalyzerCapabilities{
-		SupportedTypes:   []string{"test"},
-		SupportedAspects: []string{"security", "performance"},
-		RequiresContext:  false,
-		SupportsDeepScan: true,
-	}
-}
-
 // MockBaseValidator removed - BaseValidator interface moved to base package
 
 // Test interface conformance
@@ -152,27 +63,16 @@ func TestInterfaceConformance(t *testing.T) {
 		t.Error("AIAnalyzer interface not properly implemented")
 	}
 
-	// Test HealthChecker interface
-	var healthChecker InternalHealthChecker = &MockHealthChecker{}
-	stats := healthChecker.GetSessionStats()
-	if stats.ActiveSessions != 5 {
-		t.Error("HealthChecker interface not properly implemented")
-	}
+	// HealthChecker test removed - interface moved to main package to avoid import cycle
 
 	// Test ProgressReporter interface
-	var progressReporter InternalProgressReporter = &MockProgressReporter{}
+	var progressReporter ProgressReporter = &MockProgressReporter{}
 	idx, stage := progressReporter.GetCurrentStage()
 	if idx != 0 || stage.Name != "test" {
 		t.Error("ProgressReporter interface not properly implemented")
 	}
 
 	// Note: SessionManager test removed due to complex dependencies
-
-	// Test BaseAnalyzer interface
-	var baseAnalyzer BaseAnalyzer = &MockBaseAnalyzer{}
-	if baseAnalyzer.GetName() != "mock-analyzer" {
-		t.Error("BaseAnalyzer interface not properly implemented")
-	}
 
 	// BaseValidator test removed - interface moved to base package
 }

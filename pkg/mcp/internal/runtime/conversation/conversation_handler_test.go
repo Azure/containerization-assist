@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
@@ -122,7 +122,7 @@ func TestHandleConversation(t *testing.T) {
 		// Setup
 		handler := createTestHandler(t, logger)
 
-		args := runtime.ChatToolArgs{
+		args := conversation.ChatToolArgs{
 			Message:   "Hello, test message",
 			SessionID: "test-session-123",
 		}
@@ -141,7 +141,7 @@ func TestHandleConversation(t *testing.T) {
 		// Setup
 		handler := createTestHandler(t, logger)
 
-		args := runtime.ChatToolArgs{
+		args := conversation.ChatToolArgs{
 			Message:   "", // Empty message
 			SessionID: "test-session-123",
 		}
@@ -162,7 +162,7 @@ func TestHandleConversation(t *testing.T) {
 		handler := createTestHandler(t, logger)
 
 		// Use a normal message
-		args := runtime.ChatToolArgs{
+		args := conversation.ChatToolArgs{
 			Message:   "hello",
 			SessionID: "test-session-123",
 		}
@@ -283,7 +283,7 @@ func TestSessionManagement(t *testing.T) {
 		// Setup
 		handler := createTestHandler(t, logger)
 
-		args := runtime.ChatToolArgs{
+		args := conversation.ChatToolArgs{
 			Message:   "Create new session",
 			SessionID: "", // No session ID provided
 		}
@@ -306,7 +306,7 @@ func TestSessionManagement(t *testing.T) {
 		_, err := sessionMgr.GetOrCreateSession("existing-session")
 		require.NoError(t, err)
 
-		args := runtime.ChatToolArgs{
+		args := conversation.ChatToolArgs{
 			Message:   "Use existing session",
 			SessionID: "existing-session",
 		}
@@ -335,7 +335,7 @@ func TestPreferenceIntegration(t *testing.T) {
 		_, err := sessionMgr.GetOrCreateSession("pref-test")
 		require.NoError(t, err)
 
-		args := runtime.ChatToolArgs{
+		args := conversation.ChatToolArgs{
 			Message:   "Test with preferences",
 			SessionID: "pref-test",
 		}
@@ -492,7 +492,7 @@ func BenchmarkHandleConversation(b *testing.B) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 	handler := createTestHandler(&testing.T{}, logger)
 
-	args := runtime.ChatToolArgs{
+	args := conversation.ChatToolArgs{
 		Message:   "Benchmark test message",
 		SessionID: "bench-session",
 	}

@@ -225,7 +225,7 @@ func (t *AtomicScanImageSecurityTool) executeWithoutProgress(ctx context.Context
 }
 
 // performSecurityScan performs the actual security scan
-func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, args AtomicScanImageSecurityArgs, reporter mcptypes.InternalProgressReporter) (*AtomicScanImageSecurityResult, error) {
+func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, args AtomicScanImageSecurityArgs, reporter mcptypes.ProgressReporter) (*AtomicScanImageSecurityResult, error) {
 	startTime := time.Now()
 
 	// Get session
@@ -1151,8 +1151,8 @@ func (t *AtomicScanImageSecurityTool) updateSessionState(session *sessiontypes.S
 
 	// Save session
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			*state = *session
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			*sess = *session
 		}
 	})
 }

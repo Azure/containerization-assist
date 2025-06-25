@@ -16,6 +16,10 @@ const (
 )
 
 func TestServerGracefulShutdown(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	// Create a test server config
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
@@ -39,6 +43,10 @@ func TestServerGracefulShutdown(t *testing.T) {
 }
 
 func TestServerShutdownWithActiveJobs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	// Create a test server config
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
@@ -87,6 +95,10 @@ func TestServerShutdownWithActiveJobs(t *testing.T) {
 }
 
 func TestServerShutdownComponents(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	// Create a test server config
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()

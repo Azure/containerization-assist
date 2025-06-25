@@ -17,7 +17,7 @@ type StdioTransport struct {
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
 	logger       zerolog.Logger
-	handler      mcptypes.InternalRequestHandler
+	handler      mcptypes.RequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
@@ -91,13 +91,32 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 }
 
 // SetHandler sets the request handler for this transport
-func (s *StdioTransport) SetHandler(handler mcptypes.InternalRequestHandler) {
+func (s *StdioTransport) SetHandler(handler mcptypes.RequestHandler) {
 	s.handler = handler
 }
 
+// Start starts the stdio transport - alias for Serve
+func (s *StdioTransport) Start(ctx context.Context) error {
+	return s.Serve(ctx)
+}
+
 // Stop gracefully shuts down the stdio transport (alias for Close for interface compatibility)
-func (s *StdioTransport) Stop() error {
+func (s *StdioTransport) Stop(ctx context.Context) error {
 	return s.Close()
+}
+
+// SendMessage sends a message via stdio (delegated to gomcp server)
+func (s *StdioTransport) SendMessage(message interface{}) error {
+	// For stdio transport, message sending is handled by the gomcp server
+	// This is typically not called directly
+	return fmt.Errorf("SendMessage should be handled by gomcp server for stdio transport")
+}
+
+// ReceiveMessage receives a message via stdio (delegated to gomcp server)
+func (s *StdioTransport) ReceiveMessage() (interface{}, error) {
+	// For stdio transport, message receiving is handled by the gomcp server
+	// This is typically not called directly
+	return nil, fmt.Errorf("ReceiveMessage should be handled by gomcp server for stdio transport")
 }
 
 // Close shuts down the transport
@@ -219,7 +238,6 @@ func (s *StdioTransport) CreateRecoveryResponse(originalError error, recoverySte
 }
 
 // LogTransportInfo logs transport startup information
-func LogTransportInfo(transport mcptypes.InternalTransport) {
-	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on %s transport: %s\n",
-		transport.Name(), transport.Name())
+func LogTransportInfo(transport mcptypes.Transport) {
+	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on stdio transport\n")
 }

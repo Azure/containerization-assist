@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// RuntimeValidator defines the base interface for all runtime validators
-type RuntimeValidator interface {
+// BaseValidator defines the base interface for all validators
+type BaseValidator interface {
 	// Validate performs validation and returns a result
 	Validate(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error)
 
@@ -95,26 +95,26 @@ type ValidationMetadata struct {
 }
 
 // BaseValidator provides common functionality for validators
-type BaseValidator struct {
+type BaseValidatorImpl struct {
 	Name    string
 	Version string
 }
 
 // NewBaseValidator creates a new base validator
-func NewBaseValidator(name, version string) *BaseValidator {
-	return &BaseValidator{
+func NewBaseValidator(name, version string) *BaseValidatorImpl {
+	return &BaseValidatorImpl{
 		Name:    name,
 		Version: version,
 	}
 }
 
 // GetName returns the validator name
-func (v *BaseValidator) GetName() string {
+func (v *BaseValidatorImpl) GetName() string {
 	return v.Name
 }
 
 // CreateResult creates a new validation result with metadata
-func (v *BaseValidator) CreateResult() *ValidationResult {
+func (v *BaseValidatorImpl) CreateResult() *ValidationResult {
 	return &ValidationResult{
 		IsValid:  true,
 		Score:    100,
@@ -270,11 +270,11 @@ func (c *ValidationContext) Duration() time.Duration {
 
 // ValidatorChain allows chaining multiple validators
 type ValidatorChain struct {
-	validators []RuntimeValidator
+	validators []BaseValidator
 }
 
 // NewValidatorChain creates a new validator chain
-func NewValidatorChain(validators ...RuntimeValidator) *ValidatorChain {
+func NewValidatorChain(validators ...BaseValidator) *ValidatorChain {
 	return &ValidatorChain{
 		validators: validators,
 	}

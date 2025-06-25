@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
+	runtimeconv "github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
@@ -60,14 +60,14 @@ func TestConversationFlow(t *testing.T) {
 
 	// Type assert to the concrete conversation handler type
 	adapter, ok := adapterInterface.(interface {
-		HandleConversation(ctx context.Context, args runtime.ChatToolArgs) (*runtime.ChatToolResult, error)
+		HandleConversation(ctx context.Context, args conversation.ChatToolArgs) (*conversation.ChatToolResult, error)
 	})
 	require.True(t, ok, "adapter should implement HandleConversation method")
 
 	ctx := context.Background()
 
 	t.Run("InitialGreeting", func(t *testing.T) {
-		chatArgs := runtime.ChatToolArgs{
+		chatArgs := conversation.ChatToolArgs{
 			Message: "Hello, I want to containerize my application",
 		}
 
@@ -87,7 +87,7 @@ func TestConversationFlow(t *testing.T) {
 
 	t.Run("ConversationContinuation", func(t *testing.T) {
 		// First message to establish session
-		chatArgs1 := runtime.ChatToolArgs{
+		chatArgs1 := conversation.ChatToolArgs{
 			Message: "I want to containerize my Go application",
 		}
 
@@ -99,7 +99,7 @@ func TestConversationFlow(t *testing.T) {
 		require.NotEmpty(t, sessionID)
 
 		// Continue the conversation with session ID
-		chatArgs2 := runtime.ChatToolArgs{
+		chatArgs2 := conversation.ChatToolArgs{
 			Message:   "Yes, continue with the pre-flight checks",
 			SessionID: sessionID,
 		}
@@ -114,7 +114,7 @@ func TestConversationFlow(t *testing.T) {
 
 	t.Run("ErrorHandling", func(t *testing.T) {
 		// Test with empty message parameter
-		chatArgs := runtime.ChatToolArgs{
+		chatArgs := conversation.ChatToolArgs{
 			Message:   "", // Empty message should cause error
 			SessionID: "test-session",
 		}
@@ -155,13 +155,13 @@ func TestConversationState(t *testing.T) {
 		require.True(t, ok, "session should be of correct type")
 
 		// Create conversation state
-		state := &conversation.ConversationState{
+		state := &runtimeconv.ConversationState{
 			SessionState: session,
 			CurrentStage: types.StageInit,
-			History:      []conversation.ConversationTurn{},
+			History:      []runtimeconv.ConversationTurn{},
 			Preferences:  types.UserPreferences{},
 			Context:      make(map[string]interface{}),
-			Artifacts:    make(map[string]conversation.Artifact),
+			Artifacts:    make(map[string]runtimeconv.Artifact),
 		}
 
 		assert.Equal(t, types.StageInit, state.CurrentStage)
@@ -178,21 +178,21 @@ func TestConversationState(t *testing.T) {
 		session, ok := sessionInterface.(*sessiontypes.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
-		state := &conversation.ConversationState{
+		state := &runtimeconv.ConversationState{
 			SessionState: session,
 			CurrentStage: types.StageInit,
-			History:      []conversation.ConversationTurn{},
+			History:      []runtimeconv.ConversationTurn{},
 		}
 
 		// Add conversation turns
-		turn1 := conversation.ConversationTurn{
+		turn1 := runtimeconv.ConversationTurn{
 			UserInput: "Hello",
 			Assistant: "Hi! I'll help you containerize your application.",
 			Stage:     types.StageInit,
 			Timestamp: time.Now(),
 		}
 
-		turn2 := conversation.ConversationTurn{
+		turn2 := runtimeconv.ConversationTurn{
 			UserInput: "Analyze my Go application",
 			Assistant: "I'll analyze your Go application. Please provide the repository URL.",
 			Stage:     types.StageAnalysis,
@@ -209,6 +209,10 @@ func TestConversationState(t *testing.T) {
 
 // TestConversationStages tests individual conversation stages
 func TestConversationStages(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	tmpDir, err := os.MkdirTemp("", "conversation-stages-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
@@ -239,7 +243,7 @@ func TestConversationStages(t *testing.T) {
 	mockOrchestrator := &MockConversationOrchestrator{}
 
 	// Create prompt manager
-	promptManager := conversation.NewPromptManager(conversation.PromptManagerConfig{
+	promptManager := runtimeconv.NewPromptManager(runtimeconv.PromptManagerConfig{
 		SessionManager:   sessionManager,
 		ToolOrchestrator: mockOrchestrator,
 		PreferenceStore:  preferenceStore,
@@ -283,7 +287,7 @@ func TestConversationStages(t *testing.T) {
 // TestConversationOptions tests conversation response options
 func TestConversationOptions(t *testing.T) {
 	t.Run("OptionCreation", func(t *testing.T) {
-		option := conversation.Option{
+		option := runtimeconv.Option{
 			ID:          "continue",
 			Label:       "Continue with analysis",
 			Description: "Proceed to analyze the repository",
@@ -296,11 +300,11 @@ func TestConversationOptions(t *testing.T) {
 	})
 
 	t.Run("ConversationResponseWithOptions", func(t *testing.T) {
-		response := &conversation.ConversationResponse{
+		response := &runtimeconv.ConversationResponse{
 			Message: "What would you like to do next?",
 			Stage:   types.StageAnalysis,
-			Status:  conversation.ResponseStatusSuccess,
-			Options: []conversation.Option{
+			Status:  runtimeconv.ResponseStatusSuccess,
+			Options: []runtimeconv.Option{
 				{
 					ID:          "analyze",
 					Label:       "Analyze repository",
@@ -384,7 +388,7 @@ func (m *MockConversationOrchestrator) ValidateToolArgs(toolName string, args in
 	return nil
 }
 
-func (m *MockConversationOrchestrator) GetToolMetadata(toolName string) (interface{}, error) {
+func (m *MockConversationOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
 	return &mcptypes.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",

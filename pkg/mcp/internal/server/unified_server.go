@@ -520,7 +520,7 @@ func (adapter *ConversationOrchestratorAdapter) ValidateToolArgs(toolName string
 	return adapter.toolOrchestrator.ValidateToolArgs(toolName, args)
 }
 
-func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (interface{}, error) {
+func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
 	return adapter.toolOrchestrator.GetToolMetadata(toolName)
 }
 
@@ -529,7 +529,7 @@ type RegistryAdapter struct {
 	registry *orchestration.MCPToolRegistry
 }
 
-func (adapter *RegistryAdapter) Register(name string, factory mcptypes.ToolFactory) error {
+func (adapter *RegistryAdapter) Register(name string, factory func() mcptypes.Tool) error {
 	// Create tool instance from factory and register it
 	tool := factory()
 	return adapter.registry.RegisterTool(name, tool)
@@ -543,10 +543,24 @@ func (adapter *RegistryAdapter) Get(name string) (mcptypes.ToolFactory, error) {
 	}
 
 	// Return a factory that creates the same tool instance
-	factory := func() interface{} {
-		return tool.(mcptypes.InternalTool)
+	factory := func() mcptypes.Tool {
+		return tool.(mcptypes.Tool)
 	}
 	return factory, nil
+}
+
+func (adapter *RegistryAdapter) Create(name string) (mcptypes.Tool, error) {
+	// Get the tool from the registry
+	tool, err := adapter.registry.GetTool(name)
+	if err != nil {
+		return nil, err
+	}
+	return tool.(mcptypes.Tool), nil
+}
+
+func (adapter *RegistryAdapter) Exists(name string) bool {
+	_, err := adapter.registry.GetTool(name)
+	return err == nil
 }
 
 func (adapter *RegistryAdapter) List() []string {

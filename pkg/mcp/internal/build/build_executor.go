@@ -147,7 +147,7 @@ func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, arg
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.InternalProgressReporter) error {
+func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	e.logger.Info().Msg("Loading session")
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
@@ -532,8 +532,8 @@ func (e *BuildExecutorService) updateSessionState(session *sessiontypes.SessionS
 	session.UpdateLastAccessed()
 
 	return e.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			*state = *session
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			*sess = *session
 		}
 	})
 }

@@ -27,7 +27,7 @@ func (t *testToolImpl) GetMetadata() interface{} {
 	}
 }
 
-// testToolWrapper wraps testToolImpl to implement mcptypes.InternalTool
+// testToolWrapper wraps testToolImpl to implement mcptypes.Tool
 type testToolWrapper struct {
 	impl *testToolImpl
 }
@@ -49,7 +49,7 @@ func (w *testToolWrapper) Validate(ctx context.Context, args interface{}) error 
 	return nil
 }
 
-// testToolArgs implements mcptypes.InternalToolArgs
+// testToolArgs implements mcptypes.ToolArgs
 type testToolArgs struct {
 	data map[string]interface{}
 }
@@ -65,7 +65,7 @@ func (a *testToolArgs) GetSessionID() string {
 	return "test-session"
 }
 
-// testToolResult implements mcptypes.InternalToolResult
+// testToolResult implements mcptypes.ToolResult
 type testToolResult struct {
 	success bool
 	result  interface{}
@@ -96,13 +96,13 @@ func TestToolDispatcher(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Create a simple test tool directly without adapter
-	factory := func() interface{} {
+	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
 		return &testToolWrapper{impl: &testToolImpl{name: "test_tool"}}
-	}
-	converter := func(args map[string]interface{}) (interface{}, error) {
+	})
+	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
-	}
+	})
 	err := dispatcher.RegisterTool("test_tool", factory, converter)
 	if err != nil {
 		t.Fatalf("Failed to register tool: %v", err)
@@ -139,7 +139,7 @@ func TestToolDispatcher(t *testing.T) {
 	t.Run("ToolExecution", func(t *testing.T) {
 		factory, _ := dispatcher.GetToolFactory("test_tool")
 		toolInstance := factory()
-		tool, ok := toolInstance.(mcptypes.InternalTool)
+		tool, ok := toolInstance.(mcptypes.Tool)
 		if !ok {
 			t.Fatalf("Tool factory did not return a valid Tool instance")
 		}
@@ -184,13 +184,13 @@ func TestDispatcherConcurrency(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Register test tool
-	factory := func() interface{} {
+	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
 		return &testToolWrapper{impl: &testToolImpl{name: "concurrent_test_tool"}}
-	}
-	converter := func(args map[string]interface{}) (interface{}, error) {
+	})
+	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
-	}
+	})
 	dispatcher.RegisterTool("concurrent_test_tool", factory, converter)
 
 	// Test concurrent access
@@ -206,7 +206,7 @@ func TestDispatcherConcurrency(t *testing.T) {
 			factory, _ := dispatcher.GetToolFactory("concurrent_test_tool")
 			if factory != nil {
 				toolInstance := factory()
-				if tool, ok := toolInstance.(mcptypes.InternalTool); ok {
+				if tool, ok := toolInstance.(mcptypes.Tool); ok {
 					// Execute tool
 					_, _ = tool.Execute(context.Background(), nil)
 				}

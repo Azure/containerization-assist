@@ -164,7 +164,7 @@ func (t *AtomicGenerateManifestsTool) executeWithoutProgress(ctx context.Context
 }
 
 // performManifestGeneration performs the actual manifest generation
-func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter mcptypes.InternalProgressReporter) (*AtomicGenerateManifestsResult, error) {
+func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter mcptypes.ProgressReporter) (*AtomicGenerateManifestsResult, error) {
 	startTime := time.Now()
 
 	// Get session
@@ -523,8 +523,8 @@ func (t *AtomicGenerateManifestsTool) updateSessionState(session *sessiontypes.S
 	session.UpdateLastAccessed()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			*state = *session
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			*sess = *session
 		}
 	})
 }

@@ -163,9 +163,9 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 
 	// Update session
 	err = pm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			// Copy conversation state back
-			*state = *convState.SessionState
+		if sess, ok := s.(*mcptypes.SessionState); ok {
+			sess.CurrentStage = string(response.Stage)
+			sess.Status = string(response.Status)
 		}
 	})
 	if err != nil {

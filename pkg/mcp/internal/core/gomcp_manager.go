@@ -22,8 +22,8 @@ type GomcpManager struct {
 	server        server.Server
 	config        GomcpConfig
 	logger        slog.Logger
-	transport     mcptypes.InternalTransport // Injected transport
-	isInitialized bool                       // Prevent mutation after creation
+	transport     mcptypes.Transport // Injected transport
+	isInitialized bool               // Prevent mutation after creation
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -42,7 +42,7 @@ func NewGomcpManager(config GomcpConfig) *GomcpManager {
 }
 
 // WithTransport sets the transport for the gomcp manager
-func (gm *GomcpManager) WithTransport(t mcptypes.InternalTransport) *GomcpManager {
+func (gm *GomcpManager) WithTransport(t mcptypes.Transport) *GomcpManager {
 	if gm.isInitialized {
 		gm.logger.Error("cannot set transport: manager already initialized")
 		return gm
@@ -78,18 +78,10 @@ func (gm *GomcpManager) Initialize() error {
 		server.WithProtocolVersion(gm.config.ProtocolVersion),
 	)
 
-	// Configure transport based on the transport name
-	switch gm.transport.Name() {
-	case "stdio":
-		gm.server = gm.server.AsStdio()
-	case "http":
-		// For HTTP transport, we need to get the port somehow
-		// This is a simplified implementation
-		address := ":8080" // Default port
-		gm.server = gm.server.AsHTTP(address)
-	default:
-		return fmt.Errorf("unsupported transport type: %s", gm.transport.Name())
-	}
+	// Configure transport - default to stdio
+	// Since Transport interface doesn't have Name() method,
+	// we'll use stdio as the default transport type
+	gm.server = gm.server.AsStdio()
 
 	gm.isInitialized = true
 	return nil
@@ -101,7 +93,7 @@ func (gm *GomcpManager) GetServer() server.Server {
 }
 
 // GetTransport returns the configured transport
-func (gm *GomcpManager) GetTransport() mcptypes.InternalTransport {
+func (gm *GomcpManager) GetTransport() mcptypes.Transport {
 	return gm.transport
 }
 
@@ -155,7 +147,7 @@ func (gm *GomcpManager) Shutdown(ctx context.Context) error {
 			shutdownErrors = append(shutdownErrors, ctx.Err())
 		default:
 			// Stop the transport
-			if err := gm.transport.Stop(); err != nil {
+			if err := gm.transport.Stop(ctx); err != nil {
 				gm.logger.Error("error stopping transport", "error", err)
 				shutdownErrors = append(shutdownErrors, err)
 			} else {

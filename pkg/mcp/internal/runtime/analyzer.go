@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// RuntimeAnalyzer defines the base interface for all runtime analyzers
-type RuntimeAnalyzer interface {
+// BaseAnalyzer defines the base interface for all analyzers
+type BaseAnalyzer interface {
 	// Analyze performs analysis and returns results
 	Analyze(ctx context.Context, input interface{}, options AnalysisOptions) (*AnalysisResult, error)
 
@@ -138,16 +138,16 @@ type AnalyzerCapabilities struct {
 	SupportsDeepScan bool
 }
 
-// BaseAnalyzer provides common functionality for analyzers
-type BaseAnalyzer struct {
+// BaseAnalyzerImpl provides common functionality for analyzers
+type BaseAnalyzerImpl struct {
 	Name         string
 	Version      string
 	Capabilities AnalyzerCapabilities
 }
 
 // NewBaseAnalyzer creates a new base analyzer
-func NewBaseAnalyzer(name, version string, capabilities AnalyzerCapabilities) *BaseAnalyzer {
-	return &BaseAnalyzer{
+func NewBaseAnalyzer(name, version string, capabilities AnalyzerCapabilities) *BaseAnalyzerImpl {
+	return &BaseAnalyzerImpl{
 		Name:         name,
 		Version:      version,
 		Capabilities: capabilities,
@@ -155,17 +155,17 @@ func NewBaseAnalyzer(name, version string, capabilities AnalyzerCapabilities) *B
 }
 
 // GetName returns the analyzer name
-func (a *BaseAnalyzer) GetName() string {
+func (a *BaseAnalyzerImpl) GetName() string {
 	return a.Name
 }
 
 // GetCapabilities returns the analyzer capabilities
-func (a *BaseAnalyzer) GetCapabilities() AnalyzerCapabilities {
+func (a *BaseAnalyzerImpl) GetCapabilities() AnalyzerCapabilities {
 	return a.Capabilities
 }
 
 // CreateResult creates a new analysis result with metadata
-func (a *BaseAnalyzer) CreateResult() *AnalysisResult {
+func (a *BaseAnalyzerImpl) CreateResult() *AnalysisResult {
 	return &AnalysisResult{
 		Summary: AnalysisSummary{
 			Strengths:  make([]string, 0),
@@ -314,11 +314,11 @@ func (c *AnalysisContext) Duration() time.Duration {
 
 // AnalyzerChain allows chaining multiple analyzers
 type AnalyzerChain struct {
-	analyzers []RuntimeAnalyzer
+	analyzers []BaseAnalyzer
 }
 
 // NewAnalyzerChain creates a new analyzer chain
-func NewAnalyzerChain(analyzers ...RuntimeAnalyzer) *AnalyzerChain {
+func NewAnalyzerChain(analyzers ...BaseAnalyzer) *AnalyzerChain {
 	return &AnalyzerChain{
 		analyzers: analyzers,
 	}

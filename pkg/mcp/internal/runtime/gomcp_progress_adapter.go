@@ -30,7 +30,7 @@ func NewGoMCPProgressAdapter(serverCtx *server.Context, stages []mcptypes.Progre
 	}
 }
 
-// ReportStage implements mcptypes.InternalProgressReporter
+// ReportStage implements mcptypes.ProgressReporter
 func (a *GoMCPProgressAdapter) ReportStage(stageProgress float64, message string) {
 	if a.token == "" {
 		return
@@ -48,7 +48,7 @@ func (a *GoMCPProgressAdapter) ReportStage(stageProgress float64, message string
 	a.serverCtx.SendProgress(overallProgress, nil, message)
 }
 
-// NextStage implements mcptypes.InternalProgressReporter
+// NextStage implements mcptypes.ProgressReporter
 func (a *GoMCPProgressAdapter) NextStage(message string) {
 	if a.current < len(a.stages)-1 {
 		a.current++
@@ -56,7 +56,7 @@ func (a *GoMCPProgressAdapter) NextStage(message string) {
 	a.ReportStage(0.0, message)
 }
 
-// SetStage implements mcptypes.InternalProgressReporter
+// SetStage implements mcptypes.ProgressReporter
 func (a *GoMCPProgressAdapter) SetStage(stageIndex int, message string) {
 	if stageIndex >= 0 && stageIndex < len(a.stages) {
 		a.current = stageIndex
@@ -64,14 +64,14 @@ func (a *GoMCPProgressAdapter) SetStage(stageIndex int, message string) {
 	a.ReportStage(0.0, message)
 }
 
-// ReportOverall implements mcptypes.InternalProgressReporter
+// ReportOverall implements mcptypes.ProgressReporter
 func (a *GoMCPProgressAdapter) ReportOverall(progress float64, message string) {
 	if a.token != "" {
 		a.serverCtx.SendProgress(progress, nil, message)
 	}
 }
 
-// GetCurrentStage implements mcptypes.InternalProgressReporter
+// GetCurrentStage implements mcptypes.ProgressReporter
 func (a *GoMCPProgressAdapter) GetCurrentStage() (int, mcptypes.ProgressStage) {
 	if a.current >= 0 && a.current < len(a.stages) {
 		return a.current, a.stages[a.current]
@@ -91,7 +91,7 @@ func (a *GoMCPProgressAdapter) Complete(message string) {
 func ExecuteToolWithGoMCPProgress[TArgs any, TResult any](
 	serverCtx *server.Context,
 	stages []mcptypes.ProgressStage,
-	executeFn func(ctx context.Context, args TArgs, reporter mcptypes.InternalProgressReporter) (TResult, error),
+	executeFn func(ctx context.Context, args TArgs, reporter mcptypes.ProgressReporter) (TResult, error),
 	fallbackFn func(ctx context.Context, args TArgs) (TResult, error),
 	args TArgs,
 ) (TResult, error) {

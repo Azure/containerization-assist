@@ -89,7 +89,7 @@ func (e *BuildExecutorImpl) Execute(ctx context.Context, buildCtx BuildContext, 
 }
 
 // ExecuteWithProgress runs a build with progress reporting
-func (e *BuildExecutorImpl) ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter BuildProgressReporter) (*ExecutionResult, error) {
+func (e *BuildExecutorImpl) ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter ExtendedBuildReporter) (*ExecutionResult, error) {
 	buildID := uuid.New().String()
 
 	// Create cancellable context
@@ -221,7 +221,7 @@ func (e *BuildExecutorImpl) runBuild(ctx context.Context, buildCtx BuildContext,
 	return buildResult, nil
 }
 
-func (e *BuildExecutorImpl) executeWithProgressInternal(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, activeBuild *activeBuild, reporter BuildProgressReporter) (*ExecutionResult, error) {
+func (e *BuildExecutorImpl) executeWithProgressInternal(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, activeBuild *activeBuild, reporter ExtendedBuildReporter) (*ExecutionResult, error) {
 	result := &ExecutionResult{
 		Performance: &PerformanceMetrics{},
 	}

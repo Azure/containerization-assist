@@ -5,39 +5,39 @@ import (
 	"time"
 )
 
-// This file contains non-duplicate interface types that are not in pkg/mcp/interfaces.go
-// All core interfaces are defined in pkg/mcp/interfaces.go as the single source of truth
+// Unified MCP Interface Types
+// This package contains only the interface types to avoid circular imports
 
 // =============================================================================
-// SPECIALIZED TOOL TYPES (non-duplicated from main interfaces)
+// CORE INTERFACES (temporarily restored to avoid import cycles)
 // =============================================================================
 
-// ArgConverter converts generic arguments to tool-specific types
-// Note: Returns interface{} to avoid import cycle with ToolArgs from main package
-type ArgConverter func(args map[string]interface{}) (interface{}, error)
+// TODO: Import cycles resolved - interface definitions moved to pkg/mcp/interfaces.go
 
-// ResultConverter converts tool-specific results to generic types
-type ResultConverter func(result interface{}) (map[string]interface{}, error)
+// NOTE: ToolArgs and ToolResult interfaces are now defined in pkg/mcp/interfaces.go
 
-// Internal lightweight interfaces (different names to avoid duplication with main interfaces)
-// InternalTool provides the core tool interface for internal use
-type InternalTool interface {
+// Type aliases to avoid breaking existing code during migration
+// These will eventually be removed once all references are updated
+
+// NOTE: These interfaces are temporarily restored to avoid import cycles
+
+type ToolArgs interface {
+	GetSessionID() string
+	Validate() error
+}
+
+type ToolResult interface {
+	GetSuccess() bool
+}
+
+// Tool represents the unified interface for all MCP tools
+type Tool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
 	GetMetadata() ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
 }
 
-// InternalToolArgs is a marker interface for tool-specific argument types
-type InternalToolArgs interface {
-	GetSessionID() string
-	Validate() error
-}
-
-// ToolFactory creates new instances of tools
-// Note: Returns interface{} to avoid import cycle with Tool from main package
-type ToolFactory func() interface{}
-
-// ToolMetadata contains comprehensive information about a tool (lightweight version)
+// ToolMetadata contains comprehensive information about a tool
 type ToolMetadata struct {
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
@@ -50,7 +50,7 @@ type ToolMetadata struct {
 	Examples     []ToolExample     `json:"examples"`
 }
 
-// ToolExample represents an example usage of a tool (lightweight version)
+// ToolExample represents an example usage of a tool
 type ToolExample struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -58,51 +58,79 @@ type ToolExample struct {
 	Output      map[string]interface{} `json:"output"`
 }
 
-// ToolOrchestrator interface for tool orchestration (unique to this file)
-// Note: Uses interface{} types to avoid import cycle with main package types
+// ProgressReporter provides stage-aware progress reporting
+type ProgressReporter interface {
+	ReportStage(stageProgress float64, message string)
+	NextStage(message string)
+	SetStage(stageIndex int, message string)
+	ReportOverall(progress float64, message string)
+	GetCurrentStage() (int, ProgressStage)
+}
+
+// ProgressStage represents a stage in a multi-step operation
+type ProgressStage struct {
+	Name        string  // Human-readable stage name
+	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
+	Description string  // Optional detailed description
+}
+
+// NOTE: Session interface is now defined in pkg/mcp/interfaces.go
+
+// NOTE: Transport and RequestHandler interfaces are now defined in pkg/mcp/interfaces.go
+
+// NOTE: Orchestrator and ToolRegistry interfaces are now defined in pkg/mcp/interfaces.go
+
+// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
+
+// NOTE: HealthChecker interface is now defined in pkg/mcp/interfaces.go
+
+// NOTE: These interfaces are now defined in pkg/mcp/interfaces.go
+// Keeping type aliases for compatibility during migration
+
+// Type aliases for interfaces that moved to pkg/mcp/interfaces.go
+type RequestHandler = interface {
+	HandleRequest(ctx context.Context, request interface{}) (interface{}, error)
+}
+
+type Transport = interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	SendMessage(message interface{}) error
+	ReceiveMessage() (interface{}, error)
+	SetHandler(handler RequestHandler)
+}
+
+type ToolRegistry = interface {
+	Register(name string, factory func() Tool) error
+	Create(name string) (Tool, error)
+	List() []string
+	Exists(name string) bool
+}
+
+// ToolRegistry interface is now defined in pkg/mcp/interfaces.go
+
+// ToolOrchestrator interface is for internal use only
 type ToolOrchestrator interface {
 	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
 	ValidateToolArgs(toolName string, args interface{}) error
-	GetToolMetadata(toolName string) (interface{}, error)
+	GetToolMetadata(toolName string) (*ToolMetadata, error)
 }
 
-// Internal lightweight interfaces for transport and registry
-// InternalToolRegistry manages tool registration and discovery
-type InternalToolRegistry interface {
-	Register(name string, factory ToolFactory) error
-	Get(name string) (ToolFactory, error)
-	List() []string
-	GetMetadata() map[string]ToolMetadata
-}
+// Transport interface is now defined in pkg/mcp/interfaces.go
 
-// InternalTransport represents the unified interface for MCP transport mechanisms
-type InternalTransport interface {
-	Serve(ctx context.Context) error
-	Stop() error
-	Name() string
-	SetHandler(handler InternalRequestHandler)
-}
-
-// InternalRequestHandler processes MCP requests
-type InternalRequestHandler interface {
-	HandleRequest(ctx context.Context, req interface{}) (interface{}, error)
-}
-
-// MCPRequest represents an incoming MCP request (lightweight version)
+// RequestHandler interface is now defined in pkg/mcp/interfaces.go
 type MCPRequest struct {
 	ID     string      `json:"id"`
 	Method string      `json:"method"`
 	Params interface{} `json:"params"`
 }
 
-// MCPResponse represents an MCP response (lightweight version)
 type MCPResponse struct {
 	ID     string      `json:"id"`
 	Result interface{} `json:"result,omitempty"`
 	Error  *MCPError   `json:"error,omitempty"`
 }
 
-// MCPError represents an MCP error response (lightweight version)
 type MCPError struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
@@ -110,10 +138,22 @@ type MCPError struct {
 }
 
 // =============================================================================
-// SESSION TYPES (more comprehensive versions)
+// SPECIALIZED TOOL TYPES (non-duplicated from main interfaces)
 // =============================================================================
 
-// SessionState holds the unified session state (more comprehensive than interfaces.go version)
+// ArgConverter converts generic arguments to tool-specific types
+type ArgConverter func(args map[string]interface{}) (ToolArgs, error)
+
+// ResultConverter converts tool-specific results to generic types
+type ResultConverter func(result ToolResult) (map[string]interface{}, error)
+
+// =============================================================================
+// SESSION TYPES (interface defined in main interfaces file)
+// =============================================================================
+
+// NOTE: Session interface is now defined in pkg/mcp/interfaces.go
+
+// SessionState holds the unified session state
 type SessionState struct {
 	// Core fields
 	ID        string
@@ -165,10 +205,29 @@ type SessionMetadata struct {
 }
 
 // =============================================================================
-// SUPPORTING TYPES (more comprehensive versions)
+// TRANSPORT TYPES (interface defined in main interfaces file)
 // =============================================================================
 
-// RepositoryInfo contains information about analyzed repositories (more detailed than interfaces.go)
+// NOTE: Transport interface is now defined above with RequestHandler
+// NOTE: MCP types are also defined above with Transport
+
+// =============================================================================
+// ORCHESTRATOR TYPES (interface defined in main interfaces file)
+// =============================================================================
+
+// NOTE: Orchestrator interface is now defined in pkg/mcp/interfaces.go
+
+// =============================================================================
+// SESSION MANAGER TYPES (interface defined in main interfaces file)
+// =============================================================================
+
+// NOTE: SessionManager interface is now defined in pkg/mcp/interfaces.go
+
+// =============================================================================
+// SUPPORTING TYPES
+// =============================================================================
+
+// RepositoryInfo contains information about analyzed repositories
 type RepositoryInfo struct {
 	// Core analysis
 	Language     string   `json:"language"`
@@ -204,7 +263,7 @@ type FileStructure struct {
 	PackageManagers []string `json:"package_managers"`
 }
 
-// SecurityScanResult contains information about security scans (more detailed)
+// SecurityScanResult contains information about security scans
 type SecurityScanResult struct {
 	Success         bool               `json:"success"`
 	ScannedAt       time.Time          `json:"scanned_at"`
@@ -223,6 +282,15 @@ type VulnerabilityCount struct {
 	Unknown  int `json:"unknown"`
 	Total    int `json:"total"`
 }
+
+// =============================================================================
+// FACTORY AND REGISTRY TYPES (interface defined in main interfaces file)
+// =============================================================================
+
+// NOTE: ToolRegistry interface is now defined in pkg/mcp/interfaces.go
+
+// ToolFactory creates new instances of tools
+type ToolFactory func() Tool
 
 // =============================================================================
 // AI CONTEXT INTERFACES
@@ -474,7 +542,19 @@ type ToolSessionManager interface {
 	FindSessionByRepo(ctx context.Context, repoURL string) (interface{}, error)
 }
 
+// UpdateSessionHelper is a helper function for updating sessions with type safety
+// Usage: UpdateSessionHelper(sessionManager, sessionID, func(s *SessionState) { s.Field = value })
+func UpdateSessionHelper[T any](manager ToolSessionManager, sessionID string, updater func(*T)) error {
+	return manager.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*T); ok {
+			updater(session)
+		}
+	})
+}
+
 // Pipeline operation result types
+// Note: DockerBuildResult has been replaced by the unified BuildResult type above
+
 type DockerState struct {
 	Images     []string `json:"images"`
 	Containers []string `json:"containers"`
@@ -502,6 +582,9 @@ type KubernetesDeploymentResult struct {
 	Services    []string   `json:"services"`
 	Error       *RichError `json:"error,omitempty"`
 }
+
+// HealthCheckResult moved to unified types section above
+// PodStatus is used by the legacy HealthCheckResult type
 
 // =============================================================================
 // ERROR CODES
@@ -555,8 +638,12 @@ type TokenUsage struct {
 }
 
 // =============================================================================
-// HEALTH CHECKING TYPES (lightweight versions to avoid import cycles)
+// HEALTH AND MONITORING TYPES (interface defined in main interfaces file)
 // =============================================================================
+
+// HealthChecker interface is now defined in pkg/mcp/interfaces.go
+
+// NOTE: HealthChecker interface is now defined above
 
 // SystemResources represents system resource information
 type SystemResources struct {
@@ -578,13 +665,6 @@ type SessionHealthStats struct {
 	SessionErrors     int     `json:"session_errors_last_hour"`
 }
 
-// Circuit breaker states
-const (
-	CircuitBreakerClosed   = "closed"
-	CircuitBreakerOpen     = "open"
-	CircuitBreakerHalfOpen = "half-open"
-)
-
 // CircuitBreakerStatus represents the status of a circuit breaker
 type CircuitBreakerStatus struct {
 	State         string    `json:"state"` // open, closed, half-open
@@ -594,6 +674,13 @@ type CircuitBreakerStatus struct {
 	TotalRequests int64     `json:"total_requests"`
 	SuccessCount  int64     `json:"success_count"`
 }
+
+// Circuit breaker states
+const (
+	CircuitBreakerClosed   = "closed"
+	CircuitBreakerOpen     = "open"
+	CircuitBreakerHalfOpen = "half-open"
+)
 
 // ServiceHealth represents the health of an external service
 type ServiceHealth struct {
@@ -623,46 +710,23 @@ type RecentError struct {
 	Context   map[string]interface{} `json:"context,omitempty"`
 }
 
-// InternalHealthChecker defines the interface for health checking operations
-type InternalHealthChecker interface {
-	GetSystemResources() SystemResources
-	GetSessionStats() SessionHealthStats
-	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
-	CheckServiceHealth(ctx context.Context) []ServiceHealth
-	GetJobQueueStats() JobQueueStats
-	GetRecentErrors(limit int) []RecentError
-}
-
 // =============================================================================
-// PROGRESS TRACKING TYPES
+// PROGRESS TRACKING TYPES (interface defined in main interfaces file)
 // =============================================================================
 
-// ProgressStage represents a stage in a multi-step operation (lightweight version to avoid import cycles)
-type ProgressStage struct {
-	Name        string  // Human-readable stage name
-	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
-	Description string  // Optional detailed description
-}
-
-// InternalProgressReporter provides stage-aware progress reporting
-type InternalProgressReporter interface {
-	ReportStage(stageProgress float64, message string)
-	NextStage(message string)
-	SetStage(stageIndex int, message string)
-	ReportOverall(progress float64, message string)
-	GetCurrentStage() (int, ProgressStage)
-}
-
+// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
 // ProgressTracker provides centralized progress reporting for tools
 type ProgressTracker interface {
 	// RunWithProgress executes an operation with standardized progress reporting
 	RunWithProgress(
 		ctx context.Context,
 		operation string,
-		stages []interface{}, // Using interface{} to avoid import cycle
-		fn func(ctx context.Context, reporter interface{}) error,
+		stages []ProgressStage,
+		fn func(ctx context.Context, reporter ProgressReporter) error,
 	) error
 }
+
+// NOTE: ProgressStage is defined above with ProgressReporter
 
 // SessionData represents session information for management tools
 type SessionData struct {
@@ -690,17 +754,9 @@ type SessionManagerStats struct {
 // BASE TOOL INTERFACES (migrated from tools/base)
 // =============================================================================
 
-// BaseAnalyzer defines the interface for all analyzers
-type BaseAnalyzer interface {
-	// Analyze performs analysis and returns results
-	Analyze(ctx context.Context, input interface{}, options BaseAnalysisOptions) (*BaseAnalysisResult, error)
-
-	// GetName returns the analyzer name
-	GetName() string
-
-	// GetCapabilities returns what this analyzer can do
-	GetCapabilities() BaseAnalyzerCapabilities
-}
+// NOTE: BaseAnalyzer and BaseValidator interfaces are defined in their respective packages:
+// - BaseAnalyzer: pkg/mcp/internal/tools/base/analyzer.go
+// - BaseValidator: pkg/mcp/internal/tools/base/validator.go
 
 // BaseAnalysisOptions provides common options for analysis
 type BaseAnalysisOptions struct {

@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
@@ -67,7 +67,7 @@ func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHand
 }
 
 // HandleConversation handles a conversation turn
-func (ch *ConversationHandler) HandleConversation(ctx context.Context, args runtime.ChatToolArgs) (*runtime.ChatToolResult, error) {
+func (ch *ConversationHandler) HandleConversation(ctx context.Context, args conversation.ChatToolArgs) (*conversation.ChatToolResult, error) {
 	if args.Message == "" {
 		return nil, fmt.Errorf("message parameter is required")
 	}
@@ -75,7 +75,7 @@ func (ch *ConversationHandler) HandleConversation(ctx context.Context, args runt
 	// Process the conversation
 	response, err := ch.promptManager.ProcessPrompt(ctx, args.SessionID, args.Message)
 	if err != nil {
-		return &runtime.ChatToolResult{
+		return &conversation.ChatToolResult{
 			Success: false,
 			Message: fmt.Sprintf("Failed to process prompt: %v", err),
 		}, nil
@@ -90,7 +90,7 @@ func (ch *ConversationHandler) HandleConversation(ctx context.Context, args runt
 	}
 
 	// Convert response to ChatToolResult format
-	result := &runtime.ChatToolResult{
+	result := &conversation.ChatToolResult{
 		Success:   true,
 		SessionID: finalResponse.SessionID, // Use session ID from response
 		Message:   finalResponse.Message,

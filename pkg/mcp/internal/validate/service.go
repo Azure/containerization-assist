@@ -18,21 +18,21 @@ import (
 // ValidationService provides centralized validation functionality
 type ValidationService struct {
 	logger     zerolog.Logger
-	validators map[string]runtime.RuntimeValidator
 	schemas    map[string]interface{}
+	validators map[string]interface{}
 }
 
 // NewValidationService creates a new validation service
 func NewValidationService(logger zerolog.Logger) *ValidationService {
 	return &ValidationService{
 		logger:     logger.With().Str("service", "validation").Logger(),
-		validators: make(map[string]runtime.RuntimeValidator),
 		schemas:    make(map[string]interface{}),
+		validators: make(map[string]interface{}),
 	}
 }
 
 // RegisterValidator registers a validator with the service
-func (s *ValidationService) RegisterValidator(name string, validator runtime.RuntimeValidator) {
+func (s *ValidationService) RegisterValidator(name string, validator interface{}) {
 	s.validators[name] = validator
 	s.logger.Debug().Str("validator", name).Msg("Validator registered")
 }
@@ -301,9 +301,15 @@ func (s *ValidationService) BatchValidate(ctx context.Context, items []Validatio
 	}
 
 	for _, item := range items {
-		validator, exists := s.validators[item.ValidatorName]
+		validatorInterface, exists := s.validators[item.ValidatorName]
 		if !exists {
 			s.logger.Warn().Str("validator", item.ValidatorName).Msg("Validator not found")
+			continue
+		}
+
+		validator, ok := validatorInterface.(runtime.BaseValidator)
+		if !ok {
+			s.logger.Warn().Str("validator", item.ValidatorName).Msg("Invalid validator type")
 			continue
 		}
 

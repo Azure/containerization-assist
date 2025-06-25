@@ -77,7 +77,7 @@ type DeploymentConfig struct {
 
 	// Dependencies
 	K8sDeployer      K8sDeployerAdapter
-	ProgressReporter mcptypes.InternalProgressReporter
+	ProgressReporter mcptypes.ProgressReporter
 	Logger           zerolog.Logger
 }
 

@@ -63,7 +63,7 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 	}
 
 	return o.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		state, ok := s.(*sessiontypes.SessionState)
+		sess, ok := s.(*sessiontypes.SessionState)
 		if !ok {
 			return
 		}
@@ -72,7 +72,7 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 		case *mcptypes.BuildResult:
 			if r.Success {
 				// Update image reference
-				state.ImageRef = types.ImageReference{
+				sess.ImageRef = types.ImageReference{
 					Registry:   "",
 					Repository: r.ImageRef,
 					Tag:        "latest",
@@ -82,7 +82,7 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 			o.logger.Warn().Str("type", fmt.Sprintf("%T", result)).Msg("Unknown result type for session update")
 		}
 
-		state.LastAccessed = time.Now()
+		sess.LastAccessed = time.Now()
 	})
 }
 

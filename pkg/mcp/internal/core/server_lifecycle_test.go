@@ -17,6 +17,10 @@ import (
 
 // TestServerCreation tests various server creation scenarios
 func TestServerCreation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	tests := []struct {
 		name      string
 		setupFunc func(config *ServerConfig)
@@ -120,6 +124,10 @@ func TestServerStartupSequence(t *testing.T) {
 
 // TestServerComponentInitializationFailure tests failure scenarios during component initialization
 func TestServerComponentInitializationFailure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	t.Run("workspace manager failure propagates", func(t *testing.T) {
 		config := DefaultServerConfig()
 		// This will fail due to permission issues
@@ -145,6 +153,10 @@ func TestServerComponentInitializationFailure(t *testing.T) {
 
 // TestServerGracefulDegradation tests server behavior when dependencies fail
 func TestServerGracefulDegradation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = ""
@@ -176,6 +188,10 @@ func TestServerGracefulDegradation(t *testing.T) {
 
 // TestServerStopIdempotency tests that Stop() can be called multiple times safely
 func TestServerStopIdempotency(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = ""
@@ -199,6 +215,10 @@ func TestServerStopIdempotency(t *testing.T) {
 
 // TestServerTransportError tests server behavior when transport fails
 func TestServerTransportError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = ""
@@ -228,6 +248,10 @@ func TestServerContextCancellation(t *testing.T) {
 
 // TestServerCleanupOnFailure tests that resources are cleaned up on startup failure
 func TestServerCleanupOnFailure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = filepath.Join(t.TempDir(), "sessions.db")
@@ -260,6 +284,10 @@ func TestServerCleanupOnFailure(t *testing.T) {
 
 // TestServerMetrics tests server metrics and health endpoints
 func TestServerMetrics(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = ""
@@ -280,7 +308,7 @@ func TestServerMetrics(t *testing.T) {
 type mockFailingTransport struct {
 	failOnServe bool
 	serveErr    error
-	handler     mcptypes.InternalRequestHandler
+	handler     mcptypes.RequestHandler
 }
 
 func (m *mockFailingTransport) Serve(ctx context.Context) error {
@@ -291,15 +319,27 @@ func (m *mockFailingTransport) Serve(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockFailingTransport) Stop() error {
+func (m *mockFailingTransport) Start(ctx context.Context) error {
+	return m.Serve(ctx)
+}
+
+func (m *mockFailingTransport) Stop(ctx context.Context) error {
 	return nil
+}
+
+func (m *mockFailingTransport) SendMessage(message interface{}) error {
+	return nil
+}
+
+func (m *mockFailingTransport) ReceiveMessage() (interface{}, error) {
+	return nil, nil
 }
 
 func (m *mockFailingTransport) Name() string {
 	return "mock-failing-transport"
 }
 
-func (m *mockFailingTransport) SetHandler(handler mcptypes.InternalRequestHandler) {
+func (m *mockFailingTransport) SetHandler(handler mcptypes.RequestHandler) {
 	m.handler = handler
 }
 
@@ -355,6 +395,10 @@ func TestServerConfigValidation(t *testing.T) {
 
 // TestServerResourceLimits tests resource limit enforcement
 func TestServerResourceLimits(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	config := DefaultServerConfig()
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = ""
