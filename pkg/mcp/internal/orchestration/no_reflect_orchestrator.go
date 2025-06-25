@@ -4,12 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
+
+// Local type definitions to avoid import cycles
+
+// AtomicAnalyzeRepositoryArgs defines arguments for atomic repository analysis
+// This is a local copy to avoid importing the analyze package which creates cycles
+type AtomicAnalyzeRepositoryArgs struct {
+	types.BaseToolArgs
+	RepoURL      string `json:"repo_url" description:"Repository URL (GitHub, GitLab, etc.) or local path"`
+	Branch       string `json:"branch,omitempty" description:"Git branch to analyze (default: main)"`
+	Context      string `json:"context,omitempty" description:"Additional context about the application"`
+	LanguageHint string `json:"language_hint,omitempty" description:"Primary programming language hint"`
+	Shallow      bool   `json:"shallow,omitempty" description:"Perform shallow clone for faster analysis"`
+}
 
 // NoReflectToolOrchestrator provides type-safe tool execution without reflection
 type NoReflectToolOrchestrator struct {
@@ -44,32 +55,23 @@ func (o *NoReflectToolOrchestrator) SetPipelineOperations(operations interface{}
 	o.pipelineOperations = operations
 
 	// Try to assert to the correct type
-	if pipelineOps, ok := operations.(mcptypes.PipelineOperations); ok {
-		// Extract concrete session manager from the wrapper
-		if concreteSessionManager := o.extractConcreteSessionManager(); concreteSessionManager != nil {
-			o.toolFactory = NewToolFactory(pipelineOps, concreteSessionManager, o.analyzer, o.logger)
-			o.logger.Debug().Msg("Tool factory successfully initialized with concrete session manager")
-		} else {
-			o.logger.Warn().Msg("Tool factory initialization requires concrete session manager - factory not created")
-		}
+	if _, ok := operations.(mcptypes.PipelineOperations); ok {
+		// Skip tool factory creation due to import cycle prevention
+		// The extractConcreteSessionManager returns nil to avoid import cycles
+		o.logger.Warn().Msg("Tool factory creation disabled to prevent import cycles - use SetToolFactory directly")
 	} else {
 		o.logger.Error().Msg("Failed to assert pipeline operations to correct type")
 	}
 }
 
 // extractConcreteSessionManager attempts to extract the concrete session manager
-func (o *NoReflectToolOrchestrator) extractConcreteSessionManager() *session.SessionManager {
-	// Try to extract from sessionManagerAdapterImpl if it exists
-	if adapter, ok := o.sessionManager.(interface {
-		GetConcreteSessionManager() *session.SessionManager
-	}); ok {
-		return adapter.GetConcreteSessionManager()
-	}
-
-	// Since the interfaces have different signatures, we cannot directly type assert
-	// The orchestration.SessionManager interface is designed to work with interface{}
-	// while the concrete session.SessionManager works with typed SessionState
-	o.logger.Debug().Msg("Cannot extract concrete session manager due to interface signature mismatch")
+// NOTE: This function is disabled to avoid import cycles. The tool factory
+// creation is skipped when concrete session manager cannot be extracted.
+func (o *NoReflectToolOrchestrator) extractConcreteSessionManager() interface{} {
+	// Import cycle prevention: cannot import session.SessionManager directly
+	// The orchestration.SessionManager interface works with interface{} types
+	// while ToolFactory requires concrete session.SessionManager types
+	o.logger.Debug().Msg("Concrete session manager extraction disabled to prevent import cycles")
 	return nil
 }
 
@@ -81,15 +83,8 @@ func (o *NoReflectToolOrchestrator) SetToolFactory(factory *ToolFactory) {
 // SetAnalyzer sets the AI analyzer for tool fixing capabilities
 func (o *NoReflectToolOrchestrator) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	o.analyzer = analyzer
-	// If tool factory already exists, recreate it with the analyzer
-	if o.toolFactory != nil && o.pipelineOperations != nil {
-		if pipelineOps, ok := o.pipelineOperations.(mcptypes.PipelineOperations); ok {
-			if concreteSessionManager := o.extractConcreteSessionManager(); concreteSessionManager != nil {
-				o.toolFactory = NewToolFactory(pipelineOps, concreteSessionManager, o.analyzer, o.logger)
-				o.logger.Debug().Msg("Tool factory recreated with analyzer")
-			}
-		}
-	}
+	// Tool factory recreation disabled due to import cycle prevention
+	o.logger.Debug().Msg("Tool factory recreation disabled - analyzer set for future factory creation")
 }
 
 // ExecuteTool executes a tool using type-safe dispatch without reflection
@@ -200,44 +195,28 @@ func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context
 		return nil, types.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
 	}
 
-	// Create tool instance
+	// Convert args to typed struct
+	sessionID, _ := getString(argsMap, "session_id")
+	repoURL, _ := getString(argsMap, "repo_url")
+	branch, _ := getString(argsMap, "branch")
+	context, _ := getString(argsMap, "context")
+	languageHint, _ := getString(argsMap, "language_hint")
+	shallow, _ := getBool(argsMap, "shallow")
+
+	args := &AtomicAnalyzeRepositoryArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: sessionID,
+		},
+		RepoURL:      repoURL,
+		Branch:       branch,
+		Context:      context,
+		LanguageHint: languageHint,
+		Shallow:      shallow,
+	}
+
+	// Create and execute the tool
 	tool := o.toolFactory.CreateAnalyzeRepositoryTool()
-
-	// Build typed arguments
-	args := analyze.AtomicAnalyzeRepositoryArgs{}
-
-	// Extract required fields
-	if sessionID, ok := getString(argsMap, "session_id"); ok {
-		args.SessionID = sessionID
-	} else {
-		return nil, types.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
-	}
-
-	if repoURL, ok := getString(argsMap, "repo_url"); ok {
-		args.RepoURL = repoURL
-	} else {
-		return nil, types.NewRichError("REPO_URL_REQUIRED", "repo_url is required", "validation_error")
-	}
-
-	// Extract optional fields
-	if branch, ok := getString(argsMap, "branch"); ok {
-		args.Branch = branch
-	}
-
-	if context, ok := getString(argsMap, "context"); ok {
-		args.Context = context
-	}
-
-	if languageHint, ok := getString(argsMap, "language_hint"); ok {
-		args.LanguageHint = languageHint
-	}
-
-	if shallow, ok := getBool(argsMap, "shallow"); ok {
-		args.Shallow = shallow
-	}
-
-	// Execute the tool
-	return tool.ExecuteRepositoryAnalysis(ctx, args)
+	return tool.Execute(ctx, args)
 }
 
 // Tool execution implementations are in no_reflect_orchestrator_impl.go
