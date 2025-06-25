@@ -90,24 +90,26 @@ type RecentError struct {
 }
 
 // HealthChecker interface for checking service health
-type HealthChecker interface {
-	GetSystemResources() SystemResources
-	GetSessionStats() SessionHealthStats
-	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
-	CheckServiceHealth(ctx context.Context) []ServiceHealth
-	GetJobQueueStats() JobQueueStats
-	GetRecentErrors(limit int) []RecentError
+// LocalHealthChecker defines the interface for health checking operations
+// This extends the core health checking functionality
+type LocalHealthChecker interface {
+	GetSystemResources() mcptypes.SystemResources
+	GetSessionStats() mcptypes.SessionHealthStats
+	GetCircuitBreakerStats() map[string]mcptypes.CircuitBreakerStatus
+	CheckServiceHealth(ctx context.Context) []mcptypes.ServiceHealth
+	GetJobQueueStats() mcptypes.JobQueueStats
+	GetRecentErrors(limit int) []mcptypes.RecentError
 	GetUptime() time.Duration
 }
 
 // GetServerHealthTool implements the get_server_health MCP tool
 type GetServerHealthTool struct {
 	logger        zerolog.Logger
-	healthChecker HealthChecker
+	healthChecker LocalHealthChecker
 }
 
 // NewGetServerHealthTool creates a new server health tool
-func NewGetServerHealthTool(logger zerolog.Logger, healthChecker HealthChecker) *GetServerHealthTool {
+func NewGetServerHealthTool(logger zerolog.Logger, healthChecker LocalHealthChecker) *GetServerHealthTool {
 	return &GetServerHealthTool{
 		logger:        logger,
 		healthChecker: healthChecker,

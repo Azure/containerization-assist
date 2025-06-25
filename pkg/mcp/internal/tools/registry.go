@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/alecthomas/jsonschema"
 	"github.com/rs/zerolog"
 )
@@ -17,18 +18,18 @@ import (
 // Contracts
 ///////////////////////////////////////////////////////////////////////////////
 
-type Tool interface {
-	GetName() string
-	GetDescription() string
-	GetVersion() string
-	GetCapabilities() contract.ToolCapabilities
+// NOTE: Tool interface is now defined in pkg/mcp/interfaces.go
+// Using mcp.Tool for the unified interface
+
+// UnifiedTool represents the unified interface for all MCP tools
+type UnifiedTool interface {
+	Execute(ctx context.Context, args interface{}) (interface{}, error)
+	GetMetadata() mcptypes.ToolMetadata
+	Validate(ctx context.Context, args interface{}) error
 }
 
-// ToolCapabilities is now defined in interfaces.go
-
 type ExecutableTool[TArgs, TResult any] interface {
-	Tool
-	Execute(ctx context.Context, args TArgs) (*TResult, error)
+	UnifiedTool
 	PreValidate(ctx context.Context, args TArgs) error
 }
 
@@ -37,7 +38,7 @@ type ExecutableTool[TArgs, TResult any] interface {
 ///////////////////////////////////////////////////////////////////////////////
 
 type ToolRegistration struct {
-	Tool         Tool
+	Tool         UnifiedTool
 	InputSchema  map[string]any
 	OutputSchema map[string]any
 	Handler      func(ctx context.Context, args json.RawMessage) (interface{}, error)

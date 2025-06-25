@@ -2,6 +2,8 @@ package build
 
 import (
 	"time"
+
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // BuildStrategy defines the interface for different build strategies
@@ -171,8 +173,14 @@ type BuildStatus struct {
 }
 
 // ProgressReporter defines the interface for progress reporting
-type ProgressReporter interface {
-	ReportProgress(progress float64, stage string, message string)
+// BuildProgressReporter defines the interface for build progress reporting
+// This extends the core progress reporting functionality
+type BuildProgressReporter interface {
+	ReportStage(stageProgress float64, message string)
+	NextStage(message string)
+	SetStage(stageIndex int, message string)
+	ReportOverall(progress float64, message string)
+	GetCurrentStage() (int, mcptypes.ProgressStage)
 	ReportError(err error)
 	ReportWarning(message string)
 	ReportInfo(message string)

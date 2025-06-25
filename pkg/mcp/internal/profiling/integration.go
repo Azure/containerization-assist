@@ -7,21 +7,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
 // ProfiledOrchestrator wraps an orchestrator with profiling capabilities
 type ProfiledOrchestrator struct {
-	orchestrator ToolOrchestrator
+	orchestrator mcp.Orchestrator
 	profiler     *ToolProfiler
 	logger       zerolog.Logger
 }
 
-// ToolOrchestrator interface for the orchestrator being profiled
-type ToolOrchestrator interface {
-	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
-	ValidateToolArgs(toolName string, args interface{}) error
-}
+// NOTE: Using unified mcp.Orchestrator interface instead of local ToolOrchestrator
 
 // ProfiledExecutionResult wraps the execution result with profiling data
 type ProfiledExecutionResult struct {

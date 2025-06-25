@@ -1,6 +1,8 @@
 package orchestration
 
-import "context"
+import (
+	"context"
+)
 
 // SessionManager interface for MCP session management
 type SessionManager interface {
@@ -8,20 +10,8 @@ type SessionManager interface {
 	UpdateSession(session interface{}) error
 }
 
-// ToolRegistry interface for registering and retrieving tools
-type ToolRegistry interface {
-	RegisterTool(name string, tool interface{}) error
-	GetTool(name string) (interface{}, error)
-	ListTools() []string
-	ValidateTool(name string) error
-}
-
-// ToolOrchestrator interface for orchestrating tool execution
-type ToolOrchestrator interface {
-	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
-	ValidateToolArgs(toolName string, args interface{}) error
-	GetToolMetadata(toolName string) (*ToolMetadata, error)
-}
+// NOTE: ToolRegistry and Orchestrator interfaces are now defined in pkg/mcp/interfaces.go
+// Use mcp.ToolRegistry and mcp.Orchestrator for the unified interfaces
 
 // ToolMetadata contains metadata about a tool
 type ToolMetadata struct {

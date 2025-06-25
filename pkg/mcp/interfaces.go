@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -13,15 +14,9 @@ import (
 // =============================================================================
 
 // Tool represents the unified interface for all MCP tools
-// ALL tools (atomic, chat, session, server, etc.) MUST implement this interface
 type Tool interface {
-	// Execute runs the tool with the provided arguments
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
-
-	// GetMetadata returns comprehensive metadata about the tool
 	GetMetadata() ToolMetadata
-
-	// Validate checks if the provided arguments are valid for this tool
 	Validate(ctx context.Context, args interface{}) error
 }
 
@@ -132,20 +127,60 @@ type Transport interface {
 
 	// Stop gracefully stops the transport
 	Stop() error
+
+	// Name returns the transport name
+	Name() string
+
+	// SetHandler sets the request handler
+	SetHandler(handler RequestHandler)
+}
+
+// RequestHandler processes MCP requests
+type RequestHandler interface {
+	HandleRequest(ctx context.Context, req *MCPRequest) (*MCPResponse, error)
+}
+
+// MCPRequest represents an incoming MCP request
+type MCPRequest struct {
+	ID     string      `json:"id"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
+}
+
+// MCPResponse represents an MCP response
+type MCPResponse struct {
+	ID     string      `json:"id"`
+	Result interface{} `json:"result,omitempty"`
+	Error  *MCPError   `json:"error,omitempty"`
+}
+
+// MCPError represents an MCP error response
+type MCPError struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
 }
 
 // =============================================================================
 // ORCHESTRATOR INTERFACE
 // =============================================================================
 
-// Orchestrator represents the unified interface for tool orchestration
+// Orchestrator defines the unified interface for tool orchestration
 type Orchestrator interface {
-	// ExecuteTool executes a tool by name with the provided arguments
 	ExecuteTool(ctx context.Context, name string, args interface{}) (interface{}, error)
-
-	// RegisterTool registers a tool with the orchestrator
 	RegisterTool(name string, tool Tool) error
 }
+
+// ToolRegistry manages tool registration and discovery
+type ToolRegistry interface {
+	Register(name string, factory ToolFactory) error
+	Get(name string) (ToolFactory, error)
+	List() []string
+	GetMetadata() map[string]ToolMetadata
+}
+
+// ToolFactory creates new instances of tools
+type ToolFactory func() Tool
 
 // =============================================================================
 // TOOL ARGUMENT AND RESULT INTERFACES
@@ -155,6 +190,8 @@ type Orchestrator interface {
 type ToolArgs interface {
 	// GetSessionID returns the session ID for this tool execution
 	GetSessionID() string
+	// Validate validates the arguments
+	Validate() error
 }
 
 // ToolResult is a marker interface for tool-specific result types
@@ -171,6 +208,14 @@ type BaseToolArgs struct {
 // GetSessionID implements ToolArgs interface
 func (b BaseToolArgs) GetSessionID() string {
 	return b.SessionID
+}
+
+// Validate implements ToolArgs interface
+func (b BaseToolArgs) Validate() error {
+	if b.SessionID == "" {
+		return fmt.Errorf("session_id is required")
+	}
+	return nil
 }
 
 // BaseToolResponse provides common fields for all tool responses
@@ -199,20 +244,93 @@ type RichError interface {
 }
 
 // =============================================================================
-// REGISTRY INTERFACE
+// PROGRESS REPORTING INTERFACE
 // =============================================================================
 
-// ToolRegistry manages tool registration and discovery
-type ToolRegistry interface {
-	// Register adds a tool to the registry
-	Register(name string, tool Tool) error
+// ProgressReporter provides stage-aware progress reporting
+type ProgressReporter interface {
+	ReportStage(stageProgress float64, message string)
+	NextStage(message string)
+	SetStage(stageIndex int, message string)
+	ReportOverall(progress float64, message string)
+	GetCurrentStage() (int, ProgressStage)
+}
 
-	// Get retrieves a tool by name
-	Get(name string) (Tool, bool)
+// ProgressStage represents a stage in a multi-step operation
+type ProgressStage struct {
+	Name        string  // Human-readable stage name
+	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
+	Description string  // Optional detailed description
+}
 
-	// List returns all registered tool names
-	List() []string
+// =============================================================================
+// HEALTH CHECKING INTERFACE
+// =============================================================================
 
-	// GetMetadata returns metadata for a specific tool
-	GetMetadata(name string) (ToolMetadata, bool)
+// HealthChecker defines the interface for health checking operations
+type HealthChecker interface {
+	GetSystemResources() SystemResources
+	GetSessionStats() SessionHealthStats
+	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
+	CheckServiceHealth(ctx context.Context) []ServiceHealth
+	GetJobQueueStats() JobQueueStats
+	GetRecentErrors(limit int) []RecentError
+}
+
+// SystemResources represents system resource information
+type SystemResources struct {
+	CPUUsage    float64   `json:"cpu_usage_percent"`
+	MemoryUsage float64   `json:"memory_usage_percent"`
+	DiskUsage   float64   `json:"disk_usage_percent"`
+	OpenFiles   int       `json:"open_files"`
+	GoRoutines  int       `json:"goroutines"`
+	HeapSize    int64     `json:"heap_size_bytes"`
+	LastUpdated time.Time `json:"last_updated"`
+}
+
+// SessionHealthStats represents session-related health statistics
+type SessionHealthStats struct {
+	ActiveSessions    int     `json:"active_sessions"`
+	TotalSessions     int     `json:"total_sessions"`
+	FailedSessions    int     `json:"failed_sessions"`
+	AverageSessionAge float64 `json:"average_session_age_minutes"`
+	SessionErrors     int     `json:"session_errors_last_hour"`
+}
+
+// CircuitBreakerStatus represents the status of a circuit breaker
+type CircuitBreakerStatus struct {
+	State         string    `json:"state"` // open, closed, half-open
+	FailureCount  int       `json:"failure_count"`
+	LastFailure   time.Time `json:"last_failure"`
+	NextRetry     time.Time `json:"next_retry"`
+	TotalRequests int64     `json:"total_requests"`
+	SuccessCount  int64     `json:"success_count"`
+}
+
+// ServiceHealth represents the health of an external service
+type ServiceHealth struct {
+	Name         string                 `json:"name"`
+	Status       string                 `json:"status"` // healthy, degraded, unhealthy
+	LastCheck    time.Time              `json:"last_check"`
+	ResponseTime time.Duration          `json:"response_time"`
+	ErrorMessage string                 `json:"error_message,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// JobQueueStats represents job queue statistics
+type JobQueueStats struct {
+	QueuedJobs      int     `json:"queued_jobs"`
+	RunningJobs     int     `json:"running_jobs"`
+	CompletedJobs   int64   `json:"completed_jobs"`
+	FailedJobs      int64   `json:"failed_jobs"`
+	AverageWaitTime float64 `json:"average_wait_time_seconds"`
+}
+
+// RecentError represents a recent error for debugging
+type RecentError struct {
+	Timestamp time.Time              `json:"timestamp"`
+	Message   string                 `json:"message"`
+	Component string                 `json:"component"`
+	Severity  string                 `json:"severity"`
+	Context   map[string]interface{} `json:"context,omitempty"`
 }
