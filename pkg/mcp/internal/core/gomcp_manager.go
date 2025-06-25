@@ -23,7 +23,7 @@ type GomcpManager struct {
 	config        GomcpConfig
 	logger        slog.Logger
 	transport     mcptypes.Transport // Injected transport
-	isInitialized bool                       // Prevent mutation after creation
+	isInitialized bool               // Prevent mutation after creation
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern

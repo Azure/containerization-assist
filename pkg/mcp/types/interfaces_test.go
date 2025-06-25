@@ -32,7 +32,6 @@ func (m *MockAIAnalyzer) GetTokenUsage() TokenUsage {
 
 func (m *MockAIAnalyzer) ResetTokenUsage() {}
 
-
 // MockProgressReporter implements ProgressReporter interface
 type MockProgressReporter struct{}
 
@@ -54,7 +53,6 @@ func (m *MockProgressReporter) GetCurrentStage() (int, ProgressStage) {
 
 // Note: SessionManager testing removed due to complex dependencies
 
-
 // MockBaseValidator removed - BaseValidator interface moved to base package
 
 // Test interface conformance
@@ -75,7 +73,6 @@ func TestInterfaceConformance(t *testing.T) {
 	}
 
 	// Note: SessionManager test removed due to complex dependencies
-
 
 	// BaseValidator test removed - interface moved to base package
 }

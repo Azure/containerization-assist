@@ -96,13 +96,13 @@ func TestToolDispatcher(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Create a simple test tool directly without adapter
-	factory := func() interface{} {
+	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
 		return &testToolWrapper{impl: &testToolImpl{name: "test_tool"}}
-	}
-	converter := func(args map[string]interface{}) (interface{}, error) {
+	})
+	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
-	}
+	})
 	err := dispatcher.RegisterTool("test_tool", factory, converter)
 	if err != nil {
 		t.Fatalf("Failed to register tool: %v", err)
@@ -184,13 +184,13 @@ func TestDispatcherConcurrency(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Register test tool
-	factory := func() interface{} {
+	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
 		return &testToolWrapper{impl: &testToolImpl{name: "concurrent_test_tool"}}
-	}
-	converter := func(args map[string]interface{}) (interface{}, error) {
+	})
+	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
-	}
+	})
 	dispatcher.RegisterTool("concurrent_test_tool", factory, converter)
 
 	// Test concurrent access

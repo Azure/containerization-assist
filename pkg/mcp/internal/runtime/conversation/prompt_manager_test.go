@@ -121,7 +121,7 @@ func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{
 	return nil
 }
 
-func (m *MockToolOrchestrator) GetToolMetadata(toolName string) (interface{}, error) {
+func (m *MockToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
 	return &mcptypes.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",
