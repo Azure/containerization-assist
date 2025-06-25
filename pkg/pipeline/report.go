@@ -24,24 +24,31 @@ const RunReportFileName = "run_report.json"
 const ReportMarkdownFileName = "report.md"
 
 type RunReport struct {
-	IterationCount int          `json:"iteration_count"`
-	Outcome        RunOutcome   `json:"outcome"`
-	StageHistory   []StageVisit `json:"stage_history"`
+	IterationCount    int                       `json:"iteration_count"`
+	Outcome           RunOutcome                `json:"outcome"`
+	StageHistory      []StageVisit              `json:"stage_history"`
+	DetectedDatabases []DatabaseDetectionResult `json:"detected_databases"`
 }
 
 func NewReport(ctx context.Context, state *PipelineState) *RunReport {
 	outcome := RunOutcomeFailure
-	// if deadline exceeded or canceled, set outcome to timeout
 	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
 		outcome = RunOutcomeTimeout
 	}
 	if state.Success {
 		outcome = RunOutcomeSuccess
 	}
+
+	var detectedDatabases []DatabaseDetectionResult
+	if dbs, ok := state.Metadata["detectedDatabases"].([]DatabaseDetectionResult); ok {
+		detectedDatabases = dbs
+	}
+
 	return &RunReport{
-		IterationCount: state.IterationCount,
-		Outcome:        outcome,
-		StageHistory:   state.StageHistory,
+		IterationCount:    state.IterationCount,
+		Outcome:           outcome,
+		StageHistory:      state.StageHistory,
+		DetectedDatabases: detectedDatabases,
 	}
 }
 
@@ -61,7 +68,7 @@ func formatMarkdownReport(ctx context.Context, state *PipelineState) string {
 
 	md.WriteString(fmt.Sprintf("**Outcome:** %s\n\n", outcome))
 	md.WriteString(fmt.Sprintf("**Total Iterations:** %d\n\n", state.IterationCount))
-	md.WriteString(fmt.Sprintf("## Stage History\n\n"))
+	md.WriteString("## Stage History\n\n")
 
 	if len(state.StageHistory) == 0 {
 		md.WriteString("No stage history recorded.\n")
@@ -72,6 +79,18 @@ func formatMarkdownReport(ctx context.Context, state *PipelineState) string {
 			md.WriteString(fmt.Sprintf("| %s | %d | %s |\n", visit.StageID, visit.RetryCount, visit.Outcome))
 		}
 	}
+
+	md.WriteString("\n## Detected Databases\n\n")
+	if state.Metadata["detectedDatabases"] == nil && len(state.DetectedDatabases) > 0 {
+		md.WriteString("| Database Type | Version | Source |\n")
+		md.WriteString("|---------------|---------|--------|\n")
+		for _, db := range state.DetectedDatabases {
+			md.WriteString(fmt.Sprintf("| %s | %s | %s |\n", db.Type, db.Version, db.Source))
+		}
+	} else {
+		md.WriteString("No databases detected.\n")
+	}
+
 	md.WriteString("\n## Token Usage\n\n")
 	md.WriteString(fmt.Sprintf("Prompt Tokens: %d\n", state.TokenUsage.PromptTokens))
 	md.WriteString(fmt.Sprintf("Completion Tokens: %d\n", state.TokenUsage.CompletionTokens))

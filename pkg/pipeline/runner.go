@@ -11,10 +11,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/logger"
 )
 
-const (
-	dockerPipeline string = "docker"
-)
-
 // NewRunner constructs a Runner. You must pass a non-empty order;
 // All stages' Init are called in order first
 // then all stages' Generate are called in order, and finally
