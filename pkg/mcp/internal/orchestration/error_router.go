@@ -5,30 +5,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/errors"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
 // DefaultErrorRouter implements ErrorRouter for workflow error handling and recovery
 type DefaultErrorRouter struct {
 	logger             zerolog.Logger
-	classifier         *errors.ErrorClassifier
-	router             *errors.ErrorRouter
-	recoveryManager    *errors.RecoveryManager
-	retryManager       *errors.RetryManager
-	redirectionManager *errors.RedirectionManager
+	classifier         *ErrorClassifier
+	router             *ErrorRouter
+	recoveryManager    *RecoveryManager
+	retryManager       *RetryManager
+	redirectionManager *RedirectionManager
 }
 
 // NewDefaultErrorRouter creates a new error router with default rules
 func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
 	router := &DefaultErrorRouter{
 		logger:             logger.With().Str("component", "error_router").Logger(),
-		classifier:         errors.NewErrorClassifier(logger),
-		router:             errors.NewErrorRouter(logger),
-		recoveryManager:    errors.NewRecoveryManager(logger),
-		retryManager:       errors.NewRetryManager(logger),
-		redirectionManager: errors.NewRedirectionManager(logger),
+		classifier:         NewErrorClassifier(logger),
+		router:             NewErrorRouter(logger),
+		recoveryManager:    NewRecoveryManager(logger),
+		retryManager:       NewRetryManager(logger),
+		redirectionManager: NewRedirectionManager(logger),
 	}
 
 	// Initialize with default routing rules
@@ -37,23 +35,14 @@ func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
 	return router
 }
 
-// Type aliases for backward compatibility
-type ErrorRoutingRule = errors.ErrorRoutingRule
-type RoutingCondition = errors.RoutingCondition
-type RecoveryStrategy = errors.RecoveryStrategy
-type RecoveryStep = errors.RecoveryStep
-type RedirectionPlan = errors.RedirectionPlan
-type RedirectionErrorContext = errors.RedirectionErrorContext
-type ErrorRoutingParameters = errors.ErrorRoutingParameters
-type RecoveryStepParameters = errors.RecoveryStepParameters
-type RecoveryStrategyParameters = errors.RecoveryStrategyParameters
+// Type aliases removed - types are now directly available in the orchestration package
 
 // RouteError routes an error and determines the appropriate action
 func (er *DefaultErrorRouter) RouteError(
 	ctx context.Context,
-	workflowError *workflow.WorkflowError,
-	session *workflow.WorkflowSession,
-) (*workflow.ErrorAction, error) {
+	workflowError *WorkflowError,
+	session *WorkflowSession,
+) (*ErrorAction, error) {
 	er.logger.Info().
 		Str("error_id", workflowError.ID).
 		Str("stage_name", workflowError.StageName).
@@ -67,7 +56,7 @@ func (er *DefaultErrorRouter) RouteError(
 		er.logger.Debug().
 			Str("stage_name", workflowError.StageName).
 			Msg("No rules matched error conditions, using default fail action")
-		return &workflow.ErrorAction{
+		return &ErrorAction{
 			Action:  "fail",
 			Message: "No routing rules matched error conditions",
 		}, nil
@@ -84,13 +73,13 @@ func (er *DefaultErrorRouter) RouteError(
 }
 
 // IsFatalError determines if an error should be considered fatal and cause immediate workflow failure
-func (er *DefaultErrorRouter) IsFatalError(workflowError *workflow.WorkflowError) bool {
+func (er *DefaultErrorRouter) IsFatalError(workflowError *WorkflowError) bool {
 	return er.classifier.IsFatalError(workflowError)
 }
 
 // CanRecover determines if an error can be recovered from
-func (er *DefaultErrorRouter) CanRecover(workflowError *workflow.WorkflowError) bool {
-	recoveryStrategies := make(map[string]errors.RecoveryStrategy)
+func (er *DefaultErrorRouter) CanRecover(workflowError *WorkflowError) bool {
+	recoveryStrategies := make(map[string]RecoveryStrategy)
 	// Get all recovery strategies from recovery manager
 	for _, id := range []string{"network_recovery", "resource_recovery"} {
 		if strategy, exists := er.recoveryManager.GetRecoveryStrategy(id); exists {
@@ -101,12 +90,12 @@ func (er *DefaultErrorRouter) CanRecover(workflowError *workflow.WorkflowError) 
 }
 
 // GetRecoveryOptions returns available recovery options for an error
-func (er *DefaultErrorRouter) GetRecoveryOptions(workflowError *workflow.WorkflowError) []workflow.RecoveryOption {
-	// Convert from errors.RecoveryOption to workflow.RecoveryOption
+func (er *DefaultErrorRouter) GetRecoveryOptions(workflowError *WorkflowError) []RecoveryOption {
+	// Convert from errors.RecoveryOption to RecoveryOption
 	options := er.recoveryManager.GetRecoveryOptions(workflowError, er.classifier)
-	result := make([]workflow.RecoveryOption, len(options))
+	result := make([]RecoveryOption, len(options))
 	for i, opt := range options {
-		result[i] = workflow.RecoveryOption{
+		result[i] = RecoveryOption{
 			Name:        opt.Name,
 			Description: opt.Description,
 			Action:      opt.Action,
@@ -129,9 +118,9 @@ func (er *DefaultErrorRouter) AddRecoveryStrategy(strategy RecoveryStrategy) {
 }
 
 // SetRetryPolicy sets a retry policy for a specific stage
-func (er *DefaultErrorRouter) SetRetryPolicy(stageName string, policy *workflow.RetryPolicy) {
-	// Convert from workflow.RetryPolicy to errors.RetryPolicy
-	errorsPolicy := &errors.RetryPolicy{
+func (er *DefaultErrorRouter) SetRetryPolicy(stageName string, policy *RetryPolicy) {
+	// Convert from RetryPolicy to RetryPolicy
+	errorsPolicy := &RetryPolicy{
 		MaxAttempts:  policy.MaxAttempts,
 		BackoffMode:  policy.BackoffMode,
 		InitialDelay: policy.InitialDelay,
@@ -144,15 +133,15 @@ func (er *DefaultErrorRouter) SetRetryPolicy(stageName string, policy *workflow.
 // Internal implementation methods
 
 // ValidateRedirectTarget validates that a redirect target is valid and available
-func (er *DefaultErrorRouter) ValidateRedirectTarget(redirectTo string, workflowError *workflow.WorkflowError) error {
+func (er *DefaultErrorRouter) ValidateRedirectTarget(redirectTo string, workflowError *WorkflowError) error {
 	return er.redirectionManager.ValidateRedirectTarget(redirectTo, workflowError)
 }
 
 // CreateRedirectionPlan creates a detailed plan for error redirection
 func (er *DefaultErrorRouter) CreateRedirectionPlan(
 	redirectTo string,
-	workflowError *workflow.WorkflowError,
-	session *workflow.WorkflowSession,
+	workflowError *WorkflowError,
+	session *WorkflowSession,
 ) (*RedirectionPlan, error) {
 	return er.redirectionManager.CreateRedirectionPlan(redirectTo, workflowError, session)
 }
@@ -207,7 +196,7 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 			{Field: "error_type", Operator: "contains", Value: "network"},
 		},
 		Action: "retry",
-		RetryPolicy: &errors.RetryPolicy{
+		RetryPolicy: &RetryPolicy{
 			MaxAttempts:  3,
 			BackoffMode:  "exponential",
 			InitialDelay: 5 * time.Second,
@@ -227,7 +216,7 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 			{Field: "error_type", Operator: "contains", Value: "timeout"},
 		},
 		Action: "retry",
-		RetryPolicy: &errors.RetryPolicy{
+		RetryPolicy: &RetryPolicy{
 			MaxAttempts:  2,
 			BackoffMode:  "fixed",
 			InitialDelay: 10 * time.Second,
@@ -249,7 +238,7 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 			{Field: "error_type", Operator: "contains", Value: "resource_unavailable"},
 		},
 		Action: "retry",
-		RetryPolicy: &errors.RetryPolicy{
+		RetryPolicy: &RetryPolicy{
 			MaxAttempts:  5,
 			BackoffMode:  "linear",
 			InitialDelay: 30 * time.Second,
@@ -315,9 +304,9 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 func (er *DefaultErrorRouter) executeRoutingAction(
 	ctx context.Context,
 	rule *ErrorRoutingRule,
-	workflowError *workflow.WorkflowError,
-	session *workflow.WorkflowSession,
-) (*workflow.ErrorAction, error) {
+	workflowError *WorkflowError,
+	session *WorkflowSession,
+) (*ErrorAction, error) {
 	// Convert ErrorRoutingParameters to map[string]interface{}
 	parameters := make(map[string]interface{})
 	if rule.Parameters != nil {
@@ -334,7 +323,7 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 		}
 	}
 
-	action := &workflow.ErrorAction{
+	action := &ErrorAction{
 		Action:     rule.Action,
 		Parameters: parameters,
 		Message:    fmt.Sprintf("Applied routing rule: %s", rule.Name),

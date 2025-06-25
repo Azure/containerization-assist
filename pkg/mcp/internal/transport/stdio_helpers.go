@@ -1,4 +1,4 @@
-package stdio
+package transport
 
 import (
 	"encoding/json"

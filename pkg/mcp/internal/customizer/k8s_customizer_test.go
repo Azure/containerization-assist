@@ -58,7 +58,7 @@ spec:
 		},
 	}
 
-	err := customizer.CustomizeDeployment(deploymentPath, opts)
+	err := CustomizeDeployment(deploymentPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeDeployment failed: %v", err)
 	}
@@ -139,7 +139,7 @@ spec:
 		},
 	}
 
-	err := customizer.CustomizeService(servicePath, opts)
+	err := CustomizeService(servicePath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeService failed: %v", err)
 	}
@@ -211,7 +211,7 @@ data: {}
 		},
 	}
 
-	err := customizer.CustomizeConfigMap(configMapPath, opts)
+	err := CustomizeConfigMap(configMapPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeConfigMap failed: %v", err)
 	}
@@ -293,7 +293,7 @@ spec:
 		},
 	}
 
-	err := customizer.CustomizeIngress(ingressPath, opts)
+	err := CustomizeIngress(ingressPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeIngress failed: %v", err)
 	}
@@ -364,7 +364,7 @@ data: {}
 		},
 	}
 
-	err := customizer.CustomizeSecret(secretPath, opts)
+	err := CustomizeSecret(secretPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeSecret failed: %v", err)
 	}

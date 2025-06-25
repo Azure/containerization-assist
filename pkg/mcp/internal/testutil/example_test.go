@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	orchestrationtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/testutil"
-	profilingtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil"
 	"github.com/rs/zerolog"
 )
 
@@ -52,7 +50,7 @@ func TestExampleOrchestratorMocking(t *testing.T) {
 	_ = zerolog.New(zerolog.NewTestWriter(t)).With().Timestamp().Logger()
 
 	// Create mock orchestrator
-	mockOrchestrator := orchestrationtestutil.NewMockToolOrchestrator()
+	mockOrchestrator := NewMockToolOrchestrator()
 
 	// Configure mock behavior
 	mockOrchestrator.ExecuteFunc = func(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
@@ -66,7 +64,7 @@ func TestExampleOrchestratorMocking(t *testing.T) {
 	}
 
 	// Create assertion helper
-	assertHelper := orchestrationtestutil.NewAssertionHelper(t)
+	assertHelper := NewAssertionHelper(t)
 
 	// Execute some tools
 	ctx := context.Background()
@@ -98,7 +96,7 @@ func TestExampleProfilingUtilities(t *testing.T) {
 	logger := zerolog.New(zerolog.NewTestWriter(t)).With().Timestamp().Logger()
 
 	// Create profiled test suite
-	suite := profilingtestutil.NewProfiledTestSuite(t, logger)
+	suite := NewProfiledTestSuite(t, logger)
 
 	// Test tool execution with profiling
 	result, err := suite.ProfileExecution(
@@ -123,9 +121,9 @@ func TestExampleProfilingUtilities(t *testing.T) {
 	}
 
 	// Assert performance expectations - adjusted for actual behavior
-	suite.AssertPerformance(profilingtestutil.PerformanceExpectations{
+	suite.AssertPerformance(PerformanceExpectations{
 		MaxTotalExecutionTime: timePtr(100 * time.Millisecond),
-		ToolExpectations: map[string]profilingtestutil.ToolPerformanceExpectations{
+		ToolExpectations: map[string]ToolPerformanceExpectations{
 			"test_tool": {
 				MinExecutions:       intPtr(1),
 				MaxExecutions:       intPtr(2), // Adjusted for actual execution count
@@ -136,10 +134,10 @@ func TestExampleProfilingUtilities(t *testing.T) {
 	})
 
 	// Test performance assertions
-	perfAssert := profilingtestutil.NewPerformanceAssertion(t)
+	perfAssert := NewPerformanceAssertion(t)
 
 	// Create mock tool statistics for testing
-	mockStats := &profilingtestutil.ToolStatsExpectations{
+	mockStats := &ToolStatsExpectations{
 		MinExecutions:       1,
 		MaxExecutions:       5,
 		MinSuccessRate:      95.0,

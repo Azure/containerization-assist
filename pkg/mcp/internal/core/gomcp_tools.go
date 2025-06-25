@@ -9,7 +9,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"

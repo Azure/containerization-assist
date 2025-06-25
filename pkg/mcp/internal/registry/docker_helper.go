@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/registry"
 	"github.com/rs/zerolog"
 )
 
@@ -57,7 +56,7 @@ func NewDockerConfigProvider(logger zerolog.Logger) *DockerConfigProvider {
 }
 
 // GetCredentials retrieves credentials for a registry
-func (dcp *DockerConfigProvider) GetCredentials(registryURL string) (*registry.RegistryCredentials, error) {
+func (dcp *DockerConfigProvider) GetCredentials(registryURL string) (*RegistryCredentials, error) {
 	// Normalize registry URL for Docker config lookup
 	normalizedURL := dcp.normalizeRegistryURL(registryURL)
 
@@ -145,7 +144,7 @@ func (dcp *DockerConfigProvider) loadDockerConfig() (*DockerConfig, error) {
 	return &config, nil
 }
 
-func (dcp *DockerConfigProvider) tryCredentialHelpers(config *DockerConfig, registryURL string) *registry.RegistryCredentials {
+func (dcp *DockerConfigProvider) tryCredentialHelpers(config *DockerConfig, registryURL string) *RegistryCredentials {
 	// Check registry-specific credential helpers
 	for configRegistry, helper := range config.CredHelpers {
 		if dcp.registryMatches(registryURL, configRegistry) {
@@ -177,7 +176,7 @@ func (dcp *DockerConfigProvider) tryCredentialHelpers(config *DockerConfig, regi
 	return nil
 }
 
-func (dcp *DockerConfigProvider) tryDirectAuth(config *DockerConfig, registryURL string) *registry.RegistryCredentials {
+func (dcp *DockerConfigProvider) tryDirectAuth(config *DockerConfig, registryURL string) *RegistryCredentials {
 	for configRegistry, auth := range config.Auths {
 		if dcp.registryMatches(registryURL, configRegistry) {
 			dcp.logger.Debug().
@@ -188,7 +187,7 @@ func (dcp *DockerConfigProvider) tryDirectAuth(config *DockerConfig, registryURL
 			// Try to extract credentials from auth field
 			if auth.Auth != "" {
 				if username, password := dcp.decodeAuth(auth.Auth); username != "" {
-					return &registry.RegistryCredentials{
+					return &RegistryCredentials{
 						Username:   username,
 						Password:   password,
 						Registry:   registryURL,
@@ -199,7 +198,7 @@ func (dcp *DockerConfigProvider) tryDirectAuth(config *DockerConfig, registryURL
 
 			// Try explicit username/password
 			if auth.Username != "" && auth.Password != "" {
-				return &registry.RegistryCredentials{
+				return &RegistryCredentials{
 					Username:   auth.Username,
 					Password:   auth.Password,
 					Registry:   registryURL,
@@ -212,7 +211,7 @@ func (dcp *DockerConfigProvider) tryDirectAuth(config *DockerConfig, registryURL
 	return nil
 }
 
-func (dcp *DockerConfigProvider) tryCredentialStore(store, registryURL string) *registry.RegistryCredentials {
+func (dcp *DockerConfigProvider) tryCredentialStore(store, registryURL string) *RegistryCredentials {
 	dcp.logger.Debug().
 		Str("registry", registryURL).
 		Str("store", store).
@@ -221,7 +220,7 @@ func (dcp *DockerConfigProvider) tryCredentialStore(store, registryURL string) *
 	return dcp.executeCredentialHelper(store, registryURL)
 }
 
-func (dcp *DockerConfigProvider) executeCredentialHelper(helper, registryURL string) *registry.RegistryCredentials {
+func (dcp *DockerConfigProvider) executeCredentialHelper(helper, registryURL string) *RegistryCredentials {
 	// Construct helper command name
 	helperCmd := fmt.Sprintf("docker-credential-%s", helper)
 
@@ -269,7 +268,7 @@ func (dcp *DockerConfigProvider) executeCredentialHelper(helper, registryURL str
 		Str("username", response.Username).
 		Msg("Successfully retrieved credentials from helper")
 
-	return &registry.RegistryCredentials{
+	return &RegistryCredentials{
 		Username:   response.Username,
 		Password:   response.Secret,
 		Registry:   registryURL,

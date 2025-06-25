@@ -7,18 +7,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // ProfiledOrchestrator wraps an orchestrator with profiling capabilities
 type ProfiledOrchestrator struct {
-	orchestrator mcp.Orchestrator
+	orchestrator interface{}
 	profiler     *ToolProfiler
 	logger       zerolog.Logger
 }
 
-// NOTE: Using unified mcp.Orchestrator interface instead of local ToolOrchestrator
+// NOTE: Using unified interface{} interface instead of local ToolOrchestrator
 
 // ProfiledExecutionResult wraps the execution result with profiling data
 type ProfiledExecutionResult struct {
@@ -29,7 +29,7 @@ type ProfiledExecutionResult struct {
 }
 
 // NewProfiledOrchestrator creates a new profiled orchestrator wrapper
-func NewProfiledOrchestrator(orchestrator mcp.Orchestrator, logger zerolog.Logger) *ProfiledOrchestrator {
+func NewProfiledOrchestrator(orchestrator interface{}, logger zerolog.Logger) *ProfiledOrchestrator {
 	// Check if profiling is enabled via environment variable
 	enabled := true
 	if envVal := os.Getenv("MCP_PROFILING_ENABLED"); envVal != "" {

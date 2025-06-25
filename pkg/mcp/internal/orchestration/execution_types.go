@@ -4,22 +4,21 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 )
 
 // ExecuteToolFunc is the signature for tool execution functions
 type ExecuteToolFunc func(
 	ctx context.Context,
 	toolName string,
-	stage *workflow.WorkflowStage,
-	session *workflow.WorkflowSession,
+	stage *WorkflowStage,
+	session *WorkflowSession,
 ) (interface{}, error)
 
 // ExecutionResult represents the result of executing tools
 type ExecutionResult struct {
 	Success   bool                        `json:"success"`
 	Results   map[string]interface{}      `json:"results"`
-	Artifacts []workflow.WorkflowArtifact `json:"artifacts"`
+	Artifacts []WorkflowArtifact `json:"artifacts"`
 	Metrics   map[string]interface{}      `json:"metrics"`
 	Duration  time.Duration               `json:"duration"`
 	Error     *ExecutionError             `json:"error,omitempty"`
@@ -37,15 +36,15 @@ type ExecutionError struct {
 type Executor interface {
 	Execute(
 		ctx context.Context,
-		stage *workflow.WorkflowStage,
-		session *workflow.WorkflowSession,
+		stage *WorkflowStage,
+		session *WorkflowSession,
 		toolNames []string,
 		executeToolFunc ExecuteToolFunc,
 	) (*ExecutionResult, error)
 }
 
 // Helper function to extract artifacts from tool results
-func extractArtifacts(toolResult interface{}) []workflow.WorkflowArtifact {
+func extractArtifacts(toolResult interface{}) []WorkflowArtifact {
 	if toolResult == nil {
 		return nil
 	}
@@ -53,14 +52,14 @@ func extractArtifacts(toolResult interface{}) []workflow.WorkflowArtifact {
 	// Try to extract artifacts from the result
 	if resultMap, ok := toolResult.(map[string]interface{}); ok {
 		if artifacts, exists := resultMap["artifacts"]; exists {
-			if artifactList, ok := artifacts.([]workflow.WorkflowArtifact); ok {
+			if artifactList, ok := artifacts.([]WorkflowArtifact); ok {
 				return artifactList
 			}
 			// Try to convert []interface{} to []WorkflowArtifact
 			if artifactInterfaces, ok := artifacts.([]interface{}); ok {
-				var result []workflow.WorkflowArtifact
+				var result []WorkflowArtifact
 				for _, a := range artifactInterfaces {
-					if artifact, ok := a.(workflow.WorkflowArtifact); ok {
+					if artifact, ok := a.(WorkflowArtifact); ok {
 						result = append(result, artifact)
 					}
 				}

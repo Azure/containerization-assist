@@ -18,7 +18,7 @@ var fixMappings = map[string]string{
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation": "github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation",
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability":        "github.com/Azure/container-copilot/pkg/mcp/internal/observability",
 	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow":             "github.com/Azure/container-copilot/pkg/mcp/internal/workflow",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/validate":             "github.com/Azure/container-copilot/pkg/mcp/internal/validate",
+	"github.com/Azure/container-copilot/pkg/mcp/internal/validate":             "github.com/Azure/container-copilot/pkg/mcp/internal/build",
 }
 
 func main() {

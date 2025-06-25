@@ -20,13 +20,13 @@ func NewOptimizer(logger zerolog.Logger) *Optimizer {
 }
 
 // ApplyOptimization applies optimization strategies to a Dockerfile
-func (o *Optimizer) ApplyOptimization(content string, strategy customizer.OptimizationStrategy, context *customizer.TemplateContext) string {
+func (o *Optimizer) ApplyOptimization(content string, strategy OptimizationStrategy, context *TemplateContext) string {
 	switch strategy {
-	case customizer.OptimizationSize:
+	case OptimizationSize:
 		return o.optimizeForSize(content, context)
-	case customizer.OptimizationSpeed:
+	case OptimizationSpeed:
 		return o.optimizeForSpeed(content, context)
-	case customizer.OptimizationSecurity:
+	case OptimizationSecurity:
 		return o.optimizeForSecurity(content, context)
 	default:
 		return content
@@ -34,7 +34,7 @@ func (o *Optimizer) ApplyOptimization(content string, strategy customizer.Optimi
 }
 
 // optimizeForSize optimizes the Dockerfile for minimal image size
-func (o *Optimizer) optimizeForSize(content string, context *customizer.TemplateContext) string {
+func (o *Optimizer) optimizeForSize(content string, context *TemplateContext) string {
 	var optimizations []string
 
 	// Suggest Alpine-based images
@@ -79,7 +79,7 @@ func (o *Optimizer) optimizeForSize(content string, context *customizer.Template
 }
 
 // optimizeForSpeed optimizes the Dockerfile for faster builds
-func (o *Optimizer) optimizeForSpeed(content string, context *customizer.TemplateContext) string {
+func (o *Optimizer) optimizeForSpeed(content string, context *TemplateContext) string {
 	var optimizations []string
 
 	// Suggest build cache optimization
@@ -112,7 +112,7 @@ func (o *Optimizer) optimizeForSpeed(content string, context *customizer.Templat
 }
 
 // optimizeForSecurity optimizes the Dockerfile for security
-func (o *Optimizer) optimizeForSecurity(content string, context *customizer.TemplateContext) string {
+func (o *Optimizer) optimizeForSecurity(content string, context *TemplateContext) string {
 	var optimizations []string
 
 	// Add non-root user if not present
@@ -221,7 +221,7 @@ func (o *Optimizer) insertBeforeLastCommand(content, insertion string) string {
 }
 
 // GenerateOptimizationContext generates optimization recommendations
-func (o *Optimizer) GenerateOptimizationContext(content string, context *customizer.TemplateContext) *OptimizationContext {
+func (o *Optimizer) GenerateOptimizationContext(content string, context *TemplateContext) *OptimizationContext {
 	ctx := &OptimizationContext{
 		CurrentSize:       o.estimateImageSize(content),
 		OptimizationHints: []string{},

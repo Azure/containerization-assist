@@ -1,17 +1,15 @@
-package stdio
+package transport
 
 import (
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport/llm"
 	"github.com/rs/zerolog"
 )
 
 // TransportPair holds related stdio transports
 type TransportPair struct {
-	MainTransport *transport.StdioTransport
-	LLMTransport  *llm.StdioLLMTransport
+	MainTransport *StdioTransport
+	LLMTransport  *StdioLLMTransport
 }
 
 // NewTransportPair creates both main and LLM stdio transports with shared configuration
@@ -41,7 +39,7 @@ func NewTransportPair(config Config) (*TransportPair, error) {
 }
 
 // NewStdioTransportWithConfig creates a main stdio transport using shared configuration
-func NewStdioTransportWithConfig(config Config) (*transport.StdioTransport, error) {
+func NewStdioTransportWithConfig(config Config) (*StdioTransport, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
@@ -50,11 +48,11 @@ func NewStdioTransportWithConfig(config Config) (*transport.StdioTransport, erro
 	logger := config.CreateLogger()
 
 	// Use existing constructor but with our standardized logger
-	return transport.NewStdioTransportWithLogger(logger), nil
+	return NewStdioTransportWithLogger(logger), nil
 }
 
 // NewLLMTransportWithConfig creates an LLM stdio transport using shared configuration
-func NewLLMTransportWithConfig(config Config, baseTransport *transport.StdioTransport) (*llm.StdioLLMTransport, error) {
+func NewLLMTransportWithConfig(config Config, baseTransport *StdioTransport) (*StdioLLMTransport, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
@@ -67,27 +65,27 @@ func NewLLMTransportWithConfig(config Config, baseTransport *transport.StdioTran
 	logger := config.CreateLogger()
 
 	// Use existing constructor but with our standardized logger
-	return llm.NewStdioLLMTransport(baseTransport, logger), nil
+	return NewStdioLLMTransport(baseTransport, logger), nil
 }
 
 // NewDefaultStdioTransport creates a stdio transport with default configuration
-func NewDefaultStdioTransport(baseLogger zerolog.Logger) *transport.StdioTransport {
+func NewDefaultStdioTransport(baseLogger zerolog.Logger) *StdioTransport {
 	config := NewDefaultConfig(baseLogger)
 	stdioTransport, err := NewStdioTransportWithConfig(config)
 	if err != nil {
 		// Fallback to original constructor if config fails
-		return transport.NewStdioTransportWithLogger(baseLogger)
+		return NewStdioTransportWithLogger(baseLogger)
 	}
 	return stdioTransport
 }
 
 // NewDefaultLLMTransport creates an LLM transport with default configuration
-func NewDefaultLLMTransport(baseTransport *transport.StdioTransport, baseLogger zerolog.Logger) *llm.StdioLLMTransport {
+func NewDefaultLLMTransport(baseTransport *StdioTransport, baseLogger zerolog.Logger) *StdioLLMTransport {
 	config := NewConfigWithComponent(baseLogger, "stdio_llm_transport")
 	llmTransport, err := NewLLMTransportWithConfig(config, baseTransport)
 	if err != nil {
 		// Fallback to original constructor if config fails
-		return llm.NewStdioLLMTransport(baseTransport, baseLogger)
+		return NewStdioLLMTransport(baseTransport, baseLogger)
 	}
 	return llmTransport
 }

@@ -5,7 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -22,25 +21,25 @@ func NewDefaultDependencyResolver(logger zerolog.Logger) *DefaultDependencyResol
 }
 
 // ResolveDependencies resolves stage dependencies and returns execution groups
-func (dr *DefaultDependencyResolver) ResolveDependencies(stages []workflow.WorkflowStage) ([][]workflow.WorkflowStage, error) {
+func (dr *DefaultDependencyResolver) ResolveDependencies(stages []WorkflowStage) ([][]WorkflowStage, error) {
 	// Validate dependencies first
 	if err := dr.ValidateDependencies(stages); err != nil {
 		return nil, err
 	}
 
 	// Build stage map for easy lookup
-	stageMap := make(map[string]workflow.WorkflowStage)
+	stageMap := make(map[string]WorkflowStage)
 	for _, stage := range stages {
 		stageMap[stage.Name] = stage
 	}
 
 	// Track stages that can be executed in parallel
-	var executionGroups [][]workflow.WorkflowStage
+	var executionGroups [][]WorkflowStage
 	completed := make(map[string]bool)
 	processing := make(map[string]bool)
 
 	for len(completed) < len(stages) {
-		var currentGroup []workflow.WorkflowStage
+		var currentGroup []WorkflowStage
 
 		// Find stages that can be executed now
 		for _, stage := range stages {
@@ -103,7 +102,7 @@ func (dr *DefaultDependencyResolver) ResolveDependencies(stages []workflow.Workf
 }
 
 // ValidateDependencies validates that stage dependencies are valid
-func (dr *DefaultDependencyResolver) ValidateDependencies(stages []workflow.WorkflowStage) error {
+func (dr *DefaultDependencyResolver) ValidateDependencies(stages []WorkflowStage) error {
 	// Build stage map for validation
 	stageMap := make(map[string]bool)
 	for _, stage := range stages {
@@ -138,7 +137,7 @@ func (dr *DefaultDependencyResolver) ValidateDependencies(stages []workflow.Work
 }
 
 // GetExecutionOrder returns a simple execution order (not grouped)
-func (dr *DefaultDependencyResolver) GetExecutionOrder(stages []workflow.WorkflowStage) ([]string, error) {
+func (dr *DefaultDependencyResolver) GetExecutionOrder(stages []WorkflowStage) ([]string, error) {
 	executionGroups, err := dr.ResolveDependencies(stages)
 	if err != nil {
 		return nil, err
@@ -155,7 +154,7 @@ func (dr *DefaultDependencyResolver) GetExecutionOrder(stages []workflow.Workflo
 }
 
 // GetDependencyGraph returns a visual representation of the dependency graph
-func (dr *DefaultDependencyResolver) GetDependencyGraph(stages []workflow.WorkflowStage) (*DependencyGraph, error) {
+func (dr *DefaultDependencyResolver) GetDependencyGraph(stages []WorkflowStage) (*DependencyGraph, error) {
 	if err := dr.ValidateDependencies(stages); err != nil {
 		return nil, err
 	}
@@ -208,9 +207,9 @@ func (dr *DefaultDependencyResolver) GetDependencyGraph(stages []workflow.Workfl
 }
 
 // GetCriticalPath calculates the critical path through the workflow
-func (dr *DefaultDependencyResolver) GetCriticalPath(stages []workflow.WorkflowStage, stageDurations map[string]time.Duration) ([]string, time.Duration, error) {
+func (dr *DefaultDependencyResolver) GetCriticalPath(stages []WorkflowStage, stageDurations map[string]time.Duration) ([]string, time.Duration, error) {
 	// Build stage map
-	stageMap := make(map[string]*workflow.WorkflowStage)
+	stageMap := make(map[string]*WorkflowStage)
 	for i := range stages {
 		stageMap[stages[i].Name] = &stages[i]
 	}
@@ -394,7 +393,7 @@ func (dr *DefaultDependencyResolver) buildCriticalPath(
 
 func (dr *DefaultDependencyResolver) hasCycle(
 	stageName string,
-	stages []workflow.WorkflowStage,
+	stages []WorkflowStage,
 	visited map[string]bool,
 	recursionStack map[string]bool,
 ) bool {
@@ -402,7 +401,7 @@ func (dr *DefaultDependencyResolver) hasCycle(
 	recursionStack[stageName] = true
 
 	// Find the stage by name
-	var currentStage *workflow.WorkflowStage
+	var currentStage *WorkflowStage
 	for _, stage := range stages {
 		if stage.Name == stageName {
 			currentStage = &stage
@@ -429,7 +428,7 @@ func (dr *DefaultDependencyResolver) hasCycle(
 	return false
 }
 
-func (dr *DefaultDependencyResolver) getStageNames(stages []workflow.WorkflowStage) []string {
+func (dr *DefaultDependencyResolver) getStageNames(stages []WorkflowStage) []string {
 	names := make([]string, len(stages))
 	for i, stage := range stages {
 		names[i] = stage.Name
@@ -463,7 +462,7 @@ type GraphEdge struct {
 }
 
 // AnalyzeDependencyComplexity analyzes the complexity of the dependency graph
-func (dr *DefaultDependencyResolver) AnalyzeDependencyComplexity(stages []workflow.WorkflowStage) (*DependencyAnalysis, error) {
+func (dr *DefaultDependencyResolver) AnalyzeDependencyComplexity(stages []WorkflowStage) (*DependencyAnalysis, error) {
 	if err := dr.ValidateDependencies(stages); err != nil {
 		return nil, err
 	}
@@ -546,7 +545,7 @@ type DependencyAnalysis struct {
 }
 
 // GetOptimizationSuggestions returns suggestions for optimizing the workflow
-func (dr *DefaultDependencyResolver) GetOptimizationSuggestions(stages []workflow.WorkflowStage) ([]OptimizationSuggestion, error) {
+func (dr *DefaultDependencyResolver) GetOptimizationSuggestions(stages []WorkflowStage) ([]OptimizationSuggestion, error) {
 	analysis, err := dr.AnalyzeDependencyComplexity(stages)
 	if err != nil {
 		return nil, err

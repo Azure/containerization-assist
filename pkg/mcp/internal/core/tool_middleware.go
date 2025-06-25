@@ -1,18 +1,18 @@
-package services
+package core
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/validate"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // ToolMiddleware provides middleware functionality for atomic tools
 type ToolMiddleware struct {
-	validationService *validate.ValidationService
+	validationService *build.ValidationService
 	errorService      *ErrorService
 	telemetryService  *TelemetryService
 	logger            zerolog.Logger
@@ -21,7 +21,7 @@ type ToolMiddleware struct {
 
 // NewToolMiddleware creates a new tool middleware
 func NewToolMiddleware(
-	validationService *validate.ValidationService,
+	validationService *build.ValidationService,
 	errorService *ErrorService,
 	telemetryService *TelemetryService,
 	logger zerolog.Logger,
@@ -41,7 +41,7 @@ func (m *ToolMiddleware) Use(middleware Middleware) {
 }
 
 // ExecuteWithMiddleware executes a tool with all middleware applied
-func (m *ToolMiddleware) ExecuteWithMiddleware(ctx context.Context, tool mcp.Tool, args interface{}) (interface{}, error) {
+func (m *ToolMiddleware) ExecuteWithMiddleware(ctx context.Context, tool interface{}, args interface{}) (interface{}, error) {
 	// Create execution context
 	execCtx := &ExecutionContext{
 		Context:   ctx,
@@ -104,7 +104,7 @@ func (m *ToolMiddleware) recordExecution(execCtx *ExecutionContext, result inter
 // ExecutionContext provides context for tool execution
 type ExecutionContext struct {
 	Context   context.Context
-	Tool      mcp.Tool
+	Tool      interface{}
 	Args      interface{}
 	StartTime time.Time
 	Metadata  map[string]interface{}
@@ -120,12 +120,12 @@ type Middleware interface {
 
 // ValidationMiddleware provides automatic validation
 type ValidationMiddleware struct {
-	service *validate.ValidationService
+	service *build.ValidationService
 	logger  zerolog.Logger
 }
 
 // NewValidationMiddleware creates a new validation middleware
-func NewValidationMiddleware(service *validate.ValidationService, logger zerolog.Logger) *ValidationMiddleware {
+func NewValidationMiddleware(service *build.ValidationService, logger zerolog.Logger) *ValidationMiddleware {
 	return &ValidationMiddleware{
 		service: service,
 		logger:  logger.With().Str("middleware", "validation").Logger(),
@@ -398,7 +398,7 @@ func (m *TimeoutMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 
 // StandardMiddlewareChain creates a standard middleware chain
 func StandardMiddlewareChain(
-	validationService *validate.ValidationService,
+	validationService *build.ValidationService,
 	errorService *ErrorService,
 	telemetryService *TelemetryService,
 	logger zerolog.Logger,

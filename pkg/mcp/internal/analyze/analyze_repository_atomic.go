@@ -61,13 +61,12 @@ type AtomicAnalysisResult struct {
 	ContainerizationAssessment *ContainerizationAssessment `json:"containerization_assessment"`
 }
 
-// Type aliases for backward compatibility
-type ContainerizationAssessment = repository.ContainerizationAssessment
-
-// Type aliases for backward compatibility
-type TechnologyStackAssessment = repository.TechnologyStackAssessment
-type ContainerizationRisk = repository.ContainerizationRisk
-type DeploymentRecommendation = repository.DeploymentRecommendation
+// Type aliases for backward compatibility - using local types from types.go
+// TODO: These should eventually be moved to a proper repository package
+// type ContainerizationAssessment = repository.ContainerizationAssessment
+// type TechnologyStackAssessment = repository.TechnologyStackAssessment
+// type ContainerizationRisk = repository.ContainerizationRisk
+// type DeploymentRecommendation = repository.DeploymentRecommendation
 
 // Uses interfaces from interfaces.go to avoid import cycles
 

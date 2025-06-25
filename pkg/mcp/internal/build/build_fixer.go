@@ -469,8 +469,8 @@ func (t *AtomicBuildImageTool) identifySecurityImplications(errStr string, build
 	return implications
 }
 
-// DockerBuildOperation implements FixableOperation for Docker builds
-type DockerBuildOperation struct {
+// AtomicDockerBuildOperation implements FixableOperation for Docker builds
+type AtomicDockerBuildOperation struct {
 	tool           *AtomicBuildImageTool
 	args           AtomicBuildImageArgs
 	session        *sessiontypes.SessionState
@@ -481,7 +481,7 @@ type DockerBuildOperation struct {
 }
 
 // ExecuteOnce performs a single Docker build attempt
-func (op *DockerBuildOperation) ExecuteOnce(ctx context.Context) error {
+func (op *AtomicDockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 	op.logger.Debug().
 		Str("image_name", op.args.ImageName).
 		Str("dockerfile_path", op.dockerfilePath).
@@ -539,7 +539,7 @@ func (op *DockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 }
 
 // GetFailureAnalysis analyzes why the Docker build failed
-func (op *DockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*types.RichError, error) {
+func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*types.RichError, error) {
 	op.logger.Debug().Err(err).Msg("Analyzing Docker build failure")
 
 	// If it's already a RichError, return it
@@ -617,7 +617,7 @@ func (op *DockerBuildOperation) GetFailureAnalysis(ctx context.Context, err erro
 }
 
 // PrepareForRetry applies fixes and prepares for the next build attempt
-func (op *DockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_strategy", fixAttempt.FixStrategy.Name).
 		Msg("Preparing for retry after fix")
@@ -639,7 +639,7 @@ func (op *DockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt 
 }
 
 // applyDockerfileFix applies fixes to the Dockerfile
-func (op *DockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if fixAttempt.FixedContent == "" {
 		return types.NewRichError("INVALID_ARGUMENTS", "no fixed Dockerfile content provided", "missing_content")
 	}
@@ -664,7 +664,7 @@ func (op *DockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttem
 }
 
 // applyDependencyFix applies dependency-related fixes
-func (op *DockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().Msg("Applying dependency fix")
 
 	// Apply file changes specified in the fix strategy
@@ -693,7 +693,7 @@ func (op *DockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttem
 }
 
 // applyConfigFix applies configuration-related fixes
-func (op *DockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().Msg("Applying configuration fix")
 
 	// Apply file changes specified in the fix strategy
@@ -722,7 +722,7 @@ func (op *DockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *
 }
 
 // applyGenericFix applies generic fixes
-func (op *DockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().Msg("Applying generic fix")
 
 	// If there's fixed content, treat it as a Dockerfile fix
@@ -761,7 +761,7 @@ func (op *DockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt 
 }
 
 // applyFileChange applies a single file change from a fix strategy
-func (op *DockerBuildOperation) applyFileChange(change mcptypes.FileChange) error {
+func (op *AtomicDockerBuildOperation) applyFileChange(change mcptypes.FileChange) error {
 	// Ensure the directory exists for the target file
 	dir := filepath.Dir(change.FilePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -805,7 +805,7 @@ func (op *DockerBuildOperation) applyFileChange(change mcptypes.FileChange) erro
 }
 
 // backupFile creates a backup of a file
-func (op *DockerBuildOperation) backupFile(source, backup string) error {
+func (op *AtomicDockerBuildOperation) backupFile(source, backup string) error {
 	data, err := os.ReadFile(source)
 	if err != nil {
 		return err

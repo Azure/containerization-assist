@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -30,8 +29,8 @@ func NewParallelExecutor(logger zerolog.Logger, maxConcurrency int) *ParallelExe
 // Execute runs tools in parallel with optional concurrency limit
 func (pe *ParallelExecutor) Execute(
 	ctx context.Context,
-	stage *workflow.WorkflowStage,
-	session *workflow.WorkflowSession,
+	stage *WorkflowStage,
+	session *WorkflowSession,
 	toolNames []string,
 	executeToolFunc ExecuteToolFunc,
 ) (*ExecutionResult, error) {
@@ -43,7 +42,7 @@ func (pe *ParallelExecutor) Execute(
 
 	result := &ExecutionResult{
 		Results:   make(map[string]interface{}),
-		Artifacts: []workflow.WorkflowArtifact{},
+		Artifacts: []WorkflowArtifact{},
 		Metrics: map[string]interface{}{
 			"execution_type":  "parallel",
 			"tool_count":      len(toolNames),

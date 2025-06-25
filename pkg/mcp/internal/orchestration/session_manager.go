@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
@@ -30,24 +29,24 @@ const (
 )
 
 // CreateSession creates a new workflow session
-func (sm *BoltWorkflowSessionManager) CreateSession(workflowSpec *workflow.WorkflowSpec) (*workflow.WorkflowSession, error) {
+func (sm *BoltWorkflowSessionManager) CreateSession(workflowSpec *WorkflowSpec) (*WorkflowSession, error) {
 	sessionID := uuid.New().String()
 	workflowID := fmt.Sprintf("%s_%s_%d", workflowSpec.Metadata.Name, workflowSpec.Metadata.Version, time.Now().Unix())
 
-	session := &workflow.WorkflowSession{
+	session := &WorkflowSession{
 		ID:               sessionID,
 		WorkflowID:       workflowID,
 		WorkflowName:     workflowSpec.Metadata.Name,
 		WorkflowVersion:  workflowSpec.Metadata.Version,
 		Labels:           make(map[string]string),
-		Status:           workflow.WorkflowStatusPending,
+		Status:           WorkflowStatusPending,
 		CurrentStage:     "",
 		CompletedStages:  []string{},
 		FailedStages:     []string{},
 		SkippedStages:    []string{},
 		StageResults:     make(map[string]interface{}),
 		SharedContext:    make(map[string]interface{}),
-		Checkpoints:      []workflow.WorkflowCheckpoint{},
+		Checkpoints:      []WorkflowCheckpoint{},
 		ResourceBindings: make(map[string]string),
 		StartTime:        time.Now(),
 		LastActivity:     time.Now(),
@@ -98,8 +97,8 @@ func (sm *BoltWorkflowSessionManager) CreateSession(workflowSpec *workflow.Workf
 }
 
 // GetSession retrieves a workflow session by ID
-func (sm *BoltWorkflowSessionManager) GetSession(sessionID string) (*workflow.WorkflowSession, error) {
-	var session *workflow.WorkflowSession
+func (sm *BoltWorkflowSessionManager) GetSession(sessionID string) (*WorkflowSession, error) {
+	var session *WorkflowSession
 
 	err := sm.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(workflowSessionsBucket))
@@ -112,7 +111,7 @@ func (sm *BoltWorkflowSessionManager) GetSession(sessionID string) (*workflow.Wo
 			return fmt.Errorf("session not found: %s", sessionID)
 		}
 
-		session = &workflow.WorkflowSession{}
+		session = &WorkflowSession{}
 		return json.Unmarshal(sessionData, session)
 	})
 
@@ -124,7 +123,7 @@ func (sm *BoltWorkflowSessionManager) GetSession(sessionID string) (*workflow.Wo
 }
 
 // UpdateSession updates an existing workflow session
-func (sm *BoltWorkflowSessionManager) UpdateSession(session *workflow.WorkflowSession) error {
+func (sm *BoltWorkflowSessionManager) UpdateSession(session *WorkflowSession) error {
 	session.UpdatedAt = time.Now()
 
 	err := sm.db.Update(func(tx *bbolt.Tx) error {
@@ -177,8 +176,8 @@ func (sm *BoltWorkflowSessionManager) DeleteSession(sessionID string) error {
 }
 
 // ListSessions returns a list of workflow sessions matching the filter
-func (sm *BoltWorkflowSessionManager) ListSessions(filter workflow.SessionFilter) ([]*workflow.WorkflowSession, error) {
-	var sessions []*workflow.WorkflowSession
+func (sm *BoltWorkflowSessionManager) ListSessions(filter SessionFilter) ([]*WorkflowSession, error) {
+	var sessions []*WorkflowSession
 
 	err := sm.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(workflowSessionsBucket))
@@ -203,7 +202,7 @@ func (sm *BoltWorkflowSessionManager) ListSessions(filter workflow.SessionFilter
 				break
 			}
 
-			var session workflow.WorkflowSession
+			var session WorkflowSession
 			if err := json.Unmarshal(value, &session); err != nil {
 				sm.logger.Warn().
 					Err(err).
@@ -255,22 +254,22 @@ func (sm *BoltWorkflowSessionManager) ListSessions(filter workflow.SessionFilter
 }
 
 // GetSessionsByWorkflow returns all sessions for a specific workflow
-func (sm *BoltWorkflowSessionManager) GetSessionsByWorkflow(workflowName string) ([]*workflow.WorkflowSession, error) {
-	return sm.ListSessions(workflow.SessionFilter{
+func (sm *BoltWorkflowSessionManager) GetSessionsByWorkflow(workflowName string) ([]*WorkflowSession, error) {
+	return sm.ListSessions(SessionFilter{
 		WorkflowName: workflowName,
 	})
 }
 
 // GetActiveSession returns active sessions (running, paused)
-func (sm *BoltWorkflowSessionManager) GetActiveSessions() ([]*workflow.WorkflowSession, error) {
-	allSessions, err := sm.ListSessions(workflow.SessionFilter{})
+func (sm *BoltWorkflowSessionManager) GetActiveSessions() ([]*WorkflowSession, error) {
+	allSessions, err := sm.ListSessions(SessionFilter{})
 	if err != nil {
 		return nil, err
 	}
 
-	var activeSessions []*workflow.WorkflowSession
+	var activeSessions []*WorkflowSession
 	for _, session := range allSessions {
-		if session.Status == workflow.WorkflowStatusRunning || session.Status == workflow.WorkflowStatusPaused {
+		if session.Status == WorkflowStatusRunning || session.Status == WorkflowStatusPaused {
 			activeSessions = append(activeSessions, session)
 		}
 	}
@@ -292,13 +291,13 @@ func (sm *BoltWorkflowSessionManager) CleanupExpiredSessions(maxAge time.Duratio
 
 		cursor := bucket.Cursor()
 		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
-			var session workflow.WorkflowSession
+			var session WorkflowSession
 			if err := json.Unmarshal(value, &session); err != nil {
 				continue
 			}
 
 			// Check if session is expired (completed or failed and older than maxAge)
-			if (session.Status == workflow.WorkflowStatusCompleted || session.Status == workflow.WorkflowStatusFailed || session.Status == workflow.WorkflowStatusCancelled) &&
+			if (session.Status == WorkflowStatusCompleted || session.Status == WorkflowStatusFailed || session.Status == WorkflowStatusCancelled) &&
 				session.UpdatedAt.Before(cutoffTime) {
 				expiredSessions = append(expiredSessions, session.ID)
 			}
@@ -335,7 +334,7 @@ func (sm *BoltWorkflowSessionManager) CleanupExpiredSessions(maxAge time.Duratio
 // GetSessionMetrics returns metrics about workflow sessions
 func (sm *BoltWorkflowSessionManager) GetSessionMetrics() (*SessionMetrics, error) {
 	metrics := &SessionMetrics{
-		StatusCounts:     make(map[workflow.WorkflowStatus]int),
+		StatusCounts:     make(map[WorkflowStatus]int),
 		WorkflowCounts:   make(map[string]int),
 		AverageDurations: make(map[string]time.Duration),
 	}
@@ -350,7 +349,7 @@ func (sm *BoltWorkflowSessionManager) GetSessionMetrics() (*SessionMetrics, erro
 		workflowDurations := make(map[string][]time.Duration)
 
 		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
-			var session workflow.WorkflowSession
+			var session WorkflowSession
 			if err := json.Unmarshal(value, &session); err != nil {
 				continue
 			}
@@ -393,7 +392,7 @@ func (sm *BoltWorkflowSessionManager) GetSessionMetrics() (*SessionMetrics, erro
 // SessionMetrics contains metrics about workflow sessions
 type SessionMetrics struct {
 	TotalSessions    int                             `json:"total_sessions"`
-	StatusCounts     map[workflow.WorkflowStatus]int `json:"status_counts"`
+	StatusCounts     map[WorkflowStatus]int `json:"status_counts"`
 	WorkflowCounts   map[string]int                  `json:"workflow_counts"`
 	AverageDurations map[string]time.Duration        `json:"average_durations"`
 	LastActivity     time.Time                       `json:"last_activity"`

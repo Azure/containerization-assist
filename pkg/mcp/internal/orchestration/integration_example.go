@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	// "github.com/Azure/container-copilot/pkg/mcp/internal/workflow" // TODO: Implement workflow package
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
 )
 
 // WorkflowOrchestrator combines all workflow components into a single orchestrator
 type WorkflowOrchestrator struct {
-	engine             *workflow.Engine
+	engine             *Engine
 	sessionManager     *BoltWorkflowSessionManager
 	dependencyResolver *DefaultDependencyResolver
 	errorRouter        *DefaultErrorRouter
@@ -36,7 +37,7 @@ func NewWorkflowOrchestrator(
 	stageExecutor := NewDefaultStageExecutor(logger, toolRegistry, toolOrchestrator)
 
 	// Create workflow engine
-	engine := workflow.NewEngine(
+	engine := NewEngine(
 		logger,
 		stageExecutor,
 		sessionManager,
@@ -60,8 +61,8 @@ func NewWorkflowOrchestrator(
 func (wo *WorkflowOrchestrator) ExecuteWorkflow(
 	ctx context.Context,
 	workflowName string,
-	options ...workflow.ExecutionOption,
-) (*workflow.WorkflowResult, error) {
+	options ...ExecutionOption,
+) (*WorkflowResult, error) {
 	// Get workflow specification
 	workflowSpec, exists := GetWorkflowByName(workflowName)
 	if !exists {
@@ -96,9 +97,9 @@ func (wo *WorkflowOrchestrator) ExecuteWorkflow(
 // ExecuteCustomWorkflow executes a custom workflow specification
 func (wo *WorkflowOrchestrator) ExecuteCustomWorkflow(
 	ctx context.Context,
-	workflowSpec *workflow.WorkflowSpec,
-	options ...workflow.ExecutionOption,
-) (*workflow.WorkflowResult, error) {
+	workflowSpec *WorkflowSpec,
+	options ...ExecutionOption,
+) (*WorkflowResult, error) {
 	wo.logger.Info().
 		Str("workflow_name", workflowSpec.Metadata.Name).
 		Str("workflow_version", workflowSpec.Metadata.Version).
@@ -108,17 +109,17 @@ func (wo *WorkflowOrchestrator) ExecuteCustomWorkflow(
 }
 
 // ValidateWorkflow validates a workflow specification
-func (wo *WorkflowOrchestrator) ValidateWorkflow(workflowSpec *workflow.WorkflowSpec) error {
+func (wo *WorkflowOrchestrator) ValidateWorkflow(workflowSpec *WorkflowSpec) error {
 	return wo.engine.ValidateWorkflow(workflowSpec)
 }
 
 // GetWorkflowStatus returns the current status of a workflow session
-func (wo *WorkflowOrchestrator) GetWorkflowStatus(sessionID string) (*workflow.WorkflowSession, error) {
+func (wo *WorkflowOrchestrator) GetWorkflowStatus(sessionID string) (*WorkflowSession, error) {
 	return wo.sessionManager.GetSession(sessionID)
 }
 
 // ListActiveSessions returns all currently active workflow sessions
-func (wo *WorkflowOrchestrator) ListActiveSessions() ([]*workflow.WorkflowSession, error) {
+func (wo *WorkflowOrchestrator) ListActiveSessions() ([]*WorkflowSession, error) {
 	return wo.sessionManager.GetActiveSessions()
 }
 
@@ -128,7 +129,7 @@ func (wo *WorkflowOrchestrator) PauseWorkflow(sessionID string) error {
 }
 
 // ResumeWorkflow resumes a paused workflow
-func (wo *WorkflowOrchestrator) ResumeWorkflow(ctx context.Context, sessionID string, workflowSpec *workflow.WorkflowSpec) (*workflow.WorkflowResult, error) {
+func (wo *WorkflowOrchestrator) ResumeWorkflow(ctx context.Context, sessionID string, workflowSpec *WorkflowSpec) (*WorkflowResult, error) {
 	return wo.engine.ResumeWorkflow(ctx, sessionID, workflowSpec)
 }
 
@@ -138,17 +139,17 @@ func (wo *WorkflowOrchestrator) CancelWorkflow(sessionID string) error {
 }
 
 // GetDependencyGraph returns the dependency graph for a workflow
-func (wo *WorkflowOrchestrator) GetDependencyGraph(workflowSpec *workflow.WorkflowSpec) (*DependencyGraph, error) {
+func (wo *WorkflowOrchestrator) GetDependencyGraph(workflowSpec *WorkflowSpec) (*DependencyGraph, error) {
 	return wo.dependencyResolver.GetDependencyGraph(workflowSpec.Spec.Stages)
 }
 
 // AnalyzeWorkflowComplexity analyzes the complexity of a workflow
-func (wo *WorkflowOrchestrator) AnalyzeWorkflowComplexity(workflowSpec *workflow.WorkflowSpec) (*DependencyAnalysis, error) {
+func (wo *WorkflowOrchestrator) AnalyzeWorkflowComplexity(workflowSpec *WorkflowSpec) (*DependencyAnalysis, error) {
 	return wo.dependencyResolver.AnalyzeDependencyComplexity(workflowSpec.Spec.Stages)
 }
 
 // GetOptimizationSuggestions returns suggestions for optimizing a workflow
-func (wo *WorkflowOrchestrator) GetOptimizationSuggestions(workflowSpec *workflow.WorkflowSpec) ([]OptimizationSuggestion, error) {
+func (wo *WorkflowOrchestrator) GetOptimizationSuggestions(workflowSpec *WorkflowSpec) ([]OptimizationSuggestion, error) {
 	return wo.dependencyResolver.GetOptimizationSuggestions(workflowSpec.Spec.Stages)
 }
 
@@ -158,7 +159,7 @@ func (wo *WorkflowOrchestrator) AddCustomErrorRoute(stageName string, rule Error
 }
 
 // CreateCheckpoint creates a checkpoint for manual workflow management
-func (wo *WorkflowOrchestrator) CreateCheckpoint(sessionID, stageName, message string) (*workflow.WorkflowCheckpoint, error) {
+func (wo *WorkflowOrchestrator) CreateCheckpoint(sessionID, stageName, message string) (*WorkflowCheckpoint, error) {
 	session, err := wo.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, err
@@ -169,12 +170,12 @@ func (wo *WorkflowOrchestrator) CreateCheckpoint(sessionID, stageName, message s
 }
 
 // ListCheckpoints lists all checkpoints for a session
-func (wo *WorkflowOrchestrator) ListCheckpoints(sessionID string) ([]*workflow.WorkflowCheckpoint, error) {
+func (wo *WorkflowOrchestrator) ListCheckpoints(sessionID string) ([]*WorkflowCheckpoint, error) {
 	return wo.checkpointManager.ListCheckpoints(sessionID)
 }
 
 // RestoreFromCheckpoint restores a workflow from a checkpoint
-func (wo *WorkflowOrchestrator) RestoreFromCheckpoint(sessionID, checkpointID string) (*workflow.WorkflowSession, error) {
+func (wo *WorkflowOrchestrator) RestoreFromCheckpoint(sessionID, checkpointID string) (*WorkflowSession, error) {
 	return wo.checkpointManager.RestoreFromCheckpoint(sessionID, checkpointID)
 }
 
@@ -262,12 +263,12 @@ func ExampleIntegrationWithMCP(db *bbolt.DB, logger zerolog.Logger) {
 	result, err := workflowOrchestrator.ExecuteWorkflow(
 		ctx,
 		"containerization-pipeline",
-		workflow.WithVariables(map[string]string{
+		WithVariables(map[string]string{
 			"repo_url": "https://github.com/example/app",
 			"registry": "myregistry.azurecr.io",
 		}),
-		workflow.WithCreateCheckpoints(true),
-		workflow.WithEnableParallel(true),
+		WithCreateCheckpoints(true),
+		WithEnableParallel(true),
 	)
 
 	if err != nil {
@@ -284,18 +285,18 @@ func ExampleIntegrationWithMCP(db *bbolt.DB, logger zerolog.Logger) {
 }
 
 // ExampleCustomWorkflow shows how to create and execute a custom workflow
-func ExampleCustomWorkflow(orchestrator *WorkflowOrchestrator) (*workflow.WorkflowResult, error) {
+func ExampleCustomWorkflow(orchestrator *WorkflowOrchestrator) (*WorkflowResult, error) {
 	// Create a custom workflow for a specific use case
-	customWorkflow := &workflow.WorkflowSpec{
+	customWorkflow := &WorkflowSpec{
 		APIVersion: "orchestration/v1",
 		Kind:       "Workflow",
-		Metadata: workflow.WorkflowMetadata{
+		Metadata: WorkflowMetadata{
 			Name:        "custom-security-audit",
 			Description: "Custom security audit workflow",
 			Version:     "1.0.0",
 		},
-		Spec: workflow.WorkflowDefinition{
-			Stages: []workflow.WorkflowStage{
+		Spec: WorkflowDefinition{
+			Stages: []WorkflowStage{
 				{
 					Name:     "security-scan",
 					Tools:    []string{"scan_image_security_atomic", "scan_secrets_atomic"},

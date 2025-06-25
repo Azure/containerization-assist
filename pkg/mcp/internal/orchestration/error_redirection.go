@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -21,7 +20,7 @@ func NewRedirectionManager(logger zerolog.Logger) *RedirectionManager {
 }
 
 // ValidateRedirectTarget validates that a redirect target is valid and available
-func (rm *RedirectionManager) ValidateRedirectTarget(redirectTo string, workflowError *workflow.WorkflowError) error {
+func (rm *RedirectionManager) ValidateRedirectTarget(redirectTo string, workflowError *WorkflowError) error {
 	if redirectTo == "" {
 		return fmt.Errorf("redirect target cannot be empty")
 	}
@@ -61,8 +60,8 @@ func (rm *RedirectionManager) ValidateRedirectTarget(redirectTo string, workflow
 // CreateRedirectionPlan creates a detailed plan for error redirection
 func (rm *RedirectionManager) CreateRedirectionPlan(
 	redirectTo string,
-	workflowError *workflow.WorkflowError,
-	session *workflow.WorkflowSession,
+	workflowError *WorkflowError,
+	session *WorkflowSession,
 ) (*RedirectionPlan, error) {
 	plan := &RedirectionPlan{
 		SourceStage:         workflowError.StageName,

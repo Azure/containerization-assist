@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/registry"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/registry/credential_providers"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
@@ -116,9 +115,9 @@ func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
 	registryMgr := registry.NewMultiRegistryManager(config, logger)
 
 	// Register credential providers
-	registryMgr.RegisterProvider(credential_providers.NewDockerConfigProvider(logger))
-	registryMgr.RegisterProvider(credential_providers.NewAzureCLIProvider(logger))
-	registryMgr.RegisterProvider(credential_providers.NewAWSECRProvider(logger))
+	registryMgr.RegisterProvider(registry.NewDockerConfigProvider(logger))
+	registryMgr.RegisterProvider(registry.NewAzureCLIProvider(logger))
+	registryMgr.RegisterProvider(registry.NewAWSECRProvider(logger))
 
 	// Initialize registry validator
 	validator := registry.NewRegistryValidator(logger)

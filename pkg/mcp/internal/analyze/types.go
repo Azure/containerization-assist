@@ -64,39 +64,43 @@ type AnalysisContext struct {
 	NextStepSuggestions         []string `json:"next_step_suggestions"`
 }
 
+// TODO: These types are duplicated with repository package types
+// They should be moved to a proper repository package to avoid conflicts
+// Commenting out these duplicates to resolve the issue
+
 // ContainerizationAssessment provides AI decision-making context
-type ContainerizationAssessment struct {
-	ReadinessScore      int                        `json:"readiness_score"` // 0-100
-	StrengthAreas       []string                   `json:"strength_areas"`
-	ChallengeAreas      []string                   `json:"challenge_areas"`
-	RecommendedApproach string                     `json:"recommended_approach"`
-	TechnologyStack     TechnologyStackAssessment  `json:"technology_stack"`
-	RiskAnalysis        []ContainerizationRisk     `json:"risk_analysis"`
-	DeploymentOptions   []DeploymentRecommendation `json:"deployment_options"`
-}
+// type ContainerizationAssessment struct {
+// 	ReadinessScore      int                        `json:"readiness_score"` // 0-100
+// 	StrengthAreas       []string                   `json:"strength_areas"`
+// 	ChallengeAreas      []string                   `json:"challenge_areas"`
+// 	RecommendedApproach string                     `json:"recommended_approach"`
+// 	TechnologyStack     TechnologyStackAssessment  `json:"technology_stack"`
+// 	RiskAnalysis        []ContainerizationRisk     `json:"risk_analysis"`
+// 	DeploymentOptions   []DeploymentRecommendation `json:"deployment_options"`
+// }
 
 // TechnologyStackAssessment provides technology-specific recommendations
-type TechnologyStackAssessment struct {
-	Language               string   `json:"language"`
-	Framework              string   `json:"framework"`
-	BaseImageOptions       []string `json:"base_image_options"`
-	BuildStrategy          string   `json:"build_strategy"`
-	SecurityConsiderations []string `json:"security_considerations"`
-}
+// type TechnologyStackAssessment struct {
+// 	Language               string   `json:"language"`
+// 	Framework              string   `json:"framework"`
+// 	BaseImageOptions       []string `json:"base_image_options"`
+// 	BuildStrategy          string   `json:"build_strategy"`
+// 	SecurityConsiderations []string `json:"security_considerations"`
+// }
 
 // ContainerizationRisk identifies potential challenges
-type ContainerizationRisk struct {
-	Area       string `json:"area"`
-	Risk       string `json:"risk"`
-	Impact     string `json:"impact"` // low, medium, high
-	Mitigation string `json:"mitigation"`
-}
+// type ContainerizationRisk struct {
+// 	Area       string `json:"area"`
+// 	Risk       string `json:"risk"`
+// 	Impact     string `json:"impact"` // low, medium, high
+// 	Mitigation string `json:"mitigation"`
+// }
 
 // DeploymentRecommendation provides deployment strategy options
-type DeploymentRecommendation struct {
-	Strategy   string   `json:"strategy"`
-	Pros       []string `json:"pros"`
-	Cons       []string `json:"cons"`
-	Complexity string   `json:"complexity"` // simple, moderate, complex
-	UseCase    string   `json:"use_case"`
-}
+// type DeploymentRecommendation struct {
+// 	Strategy   string   `json:"strategy"`
+// 	Pros       []string `json:"pros"`
+// 	Cons       []string `json:"cons"`
+// 	Complexity string   `json:"complexity"` // simple, moderate, complex
+// 	UseCase    string   `json:"use_case"`
+// }

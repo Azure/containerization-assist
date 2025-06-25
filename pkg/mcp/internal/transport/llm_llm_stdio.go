@@ -1,4 +1,4 @@
-package llm
+package transport
 
 import (
 	"context"
@@ -8,22 +8,20 @@ import (
 	"sync"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/jsonrpc"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
 	"github.com/rs/zerolog"
 )
 
-// StdioLLMTransport implements contract.LLMTransport for stdio transport
+// StdioLLMTransport implements types.LLMTransport for stdio transport
 // It can invoke tools back to the hosting LLM via stdio
 type StdioLLMTransport struct {
-	stdioTransport *transport.StdioTransport
+	stdioTransport *StdioTransport
 	logger         zerolog.Logger
-	jsonrpcClient  *jsonrpc.Client
+	jsonrpcClient  *Client
 	mu             sync.Mutex
 }
 
 // NewStdioLLMTransport creates a new stdio LLM transport
-func NewStdioLLMTransport(stdioTransport *transport.StdioTransport, logger zerolog.Logger) *StdioLLMTransport {
+func NewStdioLLMTransport(stdioTransport *StdioTransport, logger zerolog.Logger) *StdioLLMTransport {
 	return &StdioLLMTransport{
 		stdioTransport: stdioTransport,
 		logger:         logger.With().Str("component", "stdio_llm_transport").Logger(),
@@ -31,7 +29,7 @@ func NewStdioLLMTransport(stdioTransport *transport.StdioTransport, logger zerol
 	}
 }
 
-// InvokeTool implements contract.LLMTransport
+// InvokeTool implements types.LLMTransport
 // For stdio, this means sending a JSON-RPC request back through the stdio channel
 func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload map[string]any, stream bool) (<-chan json.RawMessage, error) {
 	s.logger.Debug().
@@ -43,7 +41,7 @@ func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload
 	s.mu.Lock()
 	if s.jsonrpcClient == nil {
 		// Use stdin/stdout for bidirectional communication
-		s.jsonrpcClient = jsonrpc.NewClient(os.Stdin, os.Stdout)
+		s.jsonrpcClient = NewClient(os.Stdin, os.Stdout)
 	}
 	jsonrpcClient := s.jsonrpcClient
 	s.mu.Unlock()
@@ -77,7 +75,7 @@ func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload
 				Str("tool_name", name).
 				Msg("Failed to invoke tool via JSON-RPC")
 
-			response := contract.ToolInvocationResponse{
+			response := types.ToolInvocationResponse{
 				Content: "",
 				Error:   fmt.Sprintf("Failed to invoke tool '%s': %v", name, err),
 			}
@@ -110,4 +108,4 @@ func (s *StdioLLMTransport) Close() error {
 }
 
 // Ensure interface compliance
-var _ contract.LLMTransport = (*StdioLLMTransport)(nil)
+var _ types.LLMTransport = (*StdioLLMTransport)(nil)

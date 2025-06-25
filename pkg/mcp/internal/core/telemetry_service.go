@@ -1,4 +1,4 @@
-package services
+package core
 
 import (
 	"context"

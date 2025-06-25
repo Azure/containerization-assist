@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -24,8 +23,8 @@ func NewSequentialExecutor(logger zerolog.Logger) *SequentialExecutor {
 // Execute runs tools sequentially in the order specified
 func (se *SequentialExecutor) Execute(
 	ctx context.Context,
-	stage *workflow.WorkflowStage,
-	session *workflow.WorkflowSession,
+	stage *WorkflowStage,
+	session *WorkflowSession,
 	toolNames []string,
 	executeToolFunc ExecuteToolFunc,
 ) (*ExecutionResult, error) {
@@ -36,7 +35,7 @@ func (se *SequentialExecutor) Execute(
 
 	result := &ExecutionResult{
 		Results:   make(map[string]interface{}),
-		Artifacts: []workflow.WorkflowArtifact{},
+		Artifacts: []WorkflowArtifact{},
 		Metrics: map[string]interface{}{
 			"execution_type": "sequential",
 			"tool_count":     len(toolNames),

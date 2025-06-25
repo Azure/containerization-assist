@@ -3,12 +3,11 @@ package orchestration
 import (
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 )
 
 // GetExampleWorkflows returns a collection of example workflow specifications
-func GetExampleWorkflows() map[string]*workflow.WorkflowSpec {
-	return map[string]*workflow.WorkflowSpec{
+func GetExampleWorkflows() map[string]*WorkflowSpec {
+	return map[string]*WorkflowSpec{
 		"containerization-pipeline": getContainerizationPipeline(),
 		"security-focused-pipeline": getSecurityFocusedPipeline(),
 		"development-workflow":      getDevelopmentWorkflow(),
@@ -18,11 +17,11 @@ func GetExampleWorkflows() map[string]*workflow.WorkflowSpec {
 }
 
 // getContainerizationPipeline returns a standard containerization workflow
-func getContainerizationPipeline() *workflow.WorkflowSpec {
-	return &workflow.WorkflowSpec{
+func getContainerizationPipeline() *WorkflowSpec {
+	return &WorkflowSpec{
 		APIVersion: "orchestration/v1",
 		Kind:       "Workflow",
-		Metadata: workflow.WorkflowMetadata{
+		Metadata: WorkflowMetadata{
 			Name:        "containerization-pipeline",
 			Description: "Complete containerization pipeline from source code to deployed application",
 			Version:     "1.0.0",
@@ -31,14 +30,14 @@ func getContainerizationPipeline() *workflow.WorkflowSpec {
 				"category": "standard",
 			},
 		},
-		Spec: workflow.WorkflowDefinition{
-			Stages: []workflow.WorkflowStage{
+		Spec: WorkflowDefinition{
+			Stages: []WorkflowStage{
 				{
 					Name:      "analysis",
 					Tools:     []string{"analyze_repository_atomic"},
 					DependsOn: []string{},
 					Parallel:  false,
-					Conditions: []workflow.StageCondition{
+					Conditions: []StageCondition{
 						{Key: "repo_url", Operator: "required"},
 					},
 					Timeout: durationPtr(10 * time.Minute),
@@ -48,7 +47,7 @@ func getContainerizationPipeline() *workflow.WorkflowSpec {
 					Tools:     []string{"generate_dockerfile"},
 					DependsOn: []string{"analysis"},
 					Parallel:  false,
-					Conditions: []workflow.StageCondition{
+					Conditions: []StageCondition{
 						{Key: "dockerfile_exists", Operator: "not_exists"},
 					},
 				},
@@ -64,7 +63,7 @@ func getContainerizationPipeline() *workflow.WorkflowSpec {
 					Tools:     []string{"build_image_atomic"},
 					DependsOn: []string{"validation"},
 					Parallel:  false,
-					RetryPolicy: &workflow.RetryPolicy{
+					RetryPolicy: &RetryPolicy{
 						MaxAttempts:  3,
 						BackoffMode:  "exponential",
 						InitialDelay: 30 * time.Second,
@@ -77,7 +76,7 @@ func getContainerizationPipeline() *workflow.WorkflowSpec {
 					Tools:     []string{"scan_image_security_atomic"},
 					DependsOn: []string{"build"},
 					Parallel:  false,
-					Conditions: []workflow.StageCondition{
+					Conditions: []StageCondition{
 						{Key: "security_scan_enabled", Operator: "equals", Value: true},
 					},
 				},
@@ -107,7 +106,7 @@ func getContainerizationPipeline() *workflow.WorkflowSpec {
 				"namespace":             "default",
 				"security_scan_enabled": "true",
 			},
-			ErrorPolicy: workflow.ErrorPolicy{
+			ErrorPolicy: ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 3,
 			},
@@ -117,11 +116,11 @@ func getContainerizationPipeline() *workflow.WorkflowSpec {
 }
 
 // getSecurityFocusedPipeline returns a security-focused workflow
-func getSecurityFocusedPipeline() *workflow.WorkflowSpec {
-	return &workflow.WorkflowSpec{
+func getSecurityFocusedPipeline() *WorkflowSpec {
+	return &WorkflowSpec{
 		APIVersion: "orchestration/v1",
 		Kind:       "Workflow",
-		Metadata: workflow.WorkflowMetadata{
+		Metadata: WorkflowMetadata{
 			Name:        "security-focused-pipeline",
 			Description: "Enhanced security pipeline with comprehensive scanning and validation",
 			Version:     "1.0.0",
@@ -130,8 +129,8 @@ func getSecurityFocusedPipeline() *workflow.WorkflowSpec {
 				"category": "enhanced",
 			},
 		},
-		Spec: workflow.WorkflowDefinition{
-			Stages: []workflow.WorkflowStage{
+		Spec: WorkflowDefinition{
+			Stages: []WorkflowStage{
 				{
 					Name:      "analysis",
 					Tools:     []string{"analyze_repository_atomic"},
@@ -143,7 +142,7 @@ func getSecurityFocusedPipeline() *workflow.WorkflowSpec {
 					Tools:     []string{"scan_secrets_atomic", "validate_dockerfile_atomic"},
 					DependsOn: []string{"analysis"},
 					Parallel:  true,
-					OnFailure: &workflow.FailureAction{
+					OnFailure: &FailureAction{
 						Action: "fail",
 					},
 				},
@@ -162,7 +161,7 @@ func getSecurityFocusedPipeline() *workflow.WorkflowSpec {
 						"scan_mode":        "comprehensive",
 						"fail_on_critical": "true",
 					},
-					OnFailure: &workflow.FailureAction{
+					OnFailure: &FailureAction{
 						Action: "fail",
 					},
 				},
@@ -183,7 +182,7 @@ func getSecurityFocusedPipeline() *workflow.WorkflowSpec {
 					},
 				},
 			},
-			ErrorPolicy: workflow.ErrorPolicy{
+			ErrorPolicy: ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 1,
 			},
@@ -192,11 +191,11 @@ func getSecurityFocusedPipeline() *workflow.WorkflowSpec {
 }
 
 // getDevelopmentWorkflow returns a development-friendly workflow
-func getDevelopmentWorkflow() *workflow.WorkflowSpec {
-	return &workflow.WorkflowSpec{
+func getDevelopmentWorkflow() *WorkflowSpec {
+	return &WorkflowSpec{
 		APIVersion: "orchestration/v1",
 		Kind:       "Workflow",
-		Metadata: workflow.WorkflowMetadata{
+		Metadata: WorkflowMetadata{
 			Name:        "development-workflow",
 			Description: "Fast development workflow with minimal security checks",
 			Version:     "1.0.0",
@@ -205,8 +204,8 @@ func getDevelopmentWorkflow() *workflow.WorkflowSpec {
 				"environment": "dev",
 			},
 		},
-		Spec: workflow.WorkflowDefinition{
-			Stages: []workflow.WorkflowStage{
+		Spec: WorkflowDefinition{
+			Stages: []WorkflowStage{
 				{
 					Name:      "quick-analysis",
 					Tools:     []string{"analyze_repository_atomic"},
@@ -235,7 +234,7 @@ func getDevelopmentWorkflow() *workflow.WorkflowSpec {
 					},
 				},
 			},
-			ErrorPolicy: workflow.ErrorPolicy{
+			ErrorPolicy: ErrorPolicy{
 				Mode:        "continue",
 				MaxFailures: 5,
 			},
@@ -245,11 +244,11 @@ func getDevelopmentWorkflow() *workflow.WorkflowSpec {
 }
 
 // getProductionDeployment returns a production deployment workflow
-func getProductionDeployment() *workflow.WorkflowSpec {
-	return &workflow.WorkflowSpec{
+func getProductionDeployment() *WorkflowSpec {
+	return &WorkflowSpec{
 		APIVersion: "orchestration/v1",
 		Kind:       "Workflow",
-		Metadata: workflow.WorkflowMetadata{
+		Metadata: WorkflowMetadata{
 			Name:        "production-deployment",
 			Description: "Production-ready deployment with comprehensive validation",
 			Version:     "1.0.0",
@@ -258,14 +257,14 @@ func getProductionDeployment() *workflow.WorkflowSpec {
 				"environment": "production",
 			},
 		},
-		Spec: workflow.WorkflowDefinition{
-			Stages: []workflow.WorkflowStage{
+		Spec: WorkflowDefinition{
+			Stages: []WorkflowStage{
 				{
 					Name:      "pull-image",
 					Tools:     []string{"pull_image_atomic"},
 					DependsOn: []string{},
 					Parallel:  false,
-					Conditions: []workflow.StageCondition{
+					Conditions: []StageCondition{
 						{Key: "image_ref", Operator: "required"},
 					},
 				},
@@ -278,7 +277,7 @@ func getProductionDeployment() *workflow.WorkflowSpec {
 						"scan_mode":    "production",
 						"fail_on_high": "true",
 					},
-					OnFailure: &workflow.FailureAction{
+					OnFailure: &FailureAction{
 						Action: "fail",
 					},
 				},
@@ -327,7 +326,7 @@ func getProductionDeployment() *workflow.WorkflowSpec {
 					DependsOn: []string{"production-deployment"},
 					Parallel:  false,
 					Timeout:   durationPtr(10 * time.Minute),
-					RetryPolicy: &workflow.RetryPolicy{
+					RetryPolicy: &RetryPolicy{
 						MaxAttempts:  5,
 						BackoffMode:  "linear",
 						InitialDelay: 30 * time.Second,
@@ -335,7 +334,7 @@ func getProductionDeployment() *workflow.WorkflowSpec {
 					},
 				},
 			},
-			ErrorPolicy: workflow.ErrorPolicy{
+			ErrorPolicy: ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 1,
 			},
@@ -345,11 +344,11 @@ func getProductionDeployment() *workflow.WorkflowSpec {
 }
 
 // getCICDPipeline returns a comprehensive CI/CD pipeline workflow
-func getCICDPipeline() *workflow.WorkflowSpec {
-	return &workflow.WorkflowSpec{
+func getCICDPipeline() *WorkflowSpec {
+	return &WorkflowSpec{
 		APIVersion: "orchestration/v1",
 		Kind:       "Workflow",
-		Metadata: workflow.WorkflowMetadata{
+		Metadata: WorkflowMetadata{
 			Name:        "ci-cd-pipeline",
 			Description: "Complete CI/CD pipeline with testing, security, and deployment",
 			Version:     "1.0.0",
@@ -358,8 +357,8 @@ func getCICDPipeline() *workflow.WorkflowSpec {
 				"category": "complete",
 			},
 		},
-		Spec: workflow.WorkflowDefinition{
-			Stages: []workflow.WorkflowStage{
+		Spec: WorkflowDefinition{
+			Stages: []WorkflowStage{
 				{
 					Name:      "source-analysis",
 					Tools:     []string{"analyze_repository_atomic", "scan_secrets_atomic"},
@@ -371,7 +370,7 @@ func getCICDPipeline() *workflow.WorkflowSpec {
 					Tools:     []string{"validate_dockerfile_atomic"},
 					DependsOn: []string{"source-analysis"},
 					Parallel:  false,
-					Conditions: []workflow.StageCondition{
+					Conditions: []StageCondition{
 						{Key: "dockerfile_exists", Operator: "exists"},
 					},
 				},
@@ -380,7 +379,7 @@ func getCICDPipeline() *workflow.WorkflowSpec {
 					Tools:     []string{"build_image_atomic"},
 					DependsOn: []string{"dockerfile-validation"},
 					Parallel:  false,
-					RetryPolicy: &workflow.RetryPolicy{
+					RetryPolicy: &RetryPolicy{
 						MaxAttempts:  2,
 						BackoffMode:  "fixed",
 						InitialDelay: 1 * time.Minute,
@@ -426,7 +425,7 @@ func getCICDPipeline() *workflow.WorkflowSpec {
 					Tools:     []string{"tag_image_atomic", "push_image_atomic"},
 					DependsOn: []string{"staging-tests"},
 					Parallel:  false,
-					Conditions: []workflow.StageCondition{
+					Conditions: []StageCondition{
 						{Key: "approve_production", Operator: "equals", Value: true},
 					},
 					Variables: map[string]string{
@@ -440,10 +439,10 @@ func getCICDPipeline() *workflow.WorkflowSpec {
 				"approve_production":   "false",
 				"notification_webhook": "${NOTIFICATION_URL}",
 			},
-			ErrorPolicy: workflow.ErrorPolicy{
+			ErrorPolicy: ErrorPolicy{
 				Mode:        "fail_fast",
 				MaxFailures: 2,
-				Routing: []workflow.ErrorRouting{
+				Routing: []ErrorRouting{
 					{
 						FromTool:   "build_image_atomic",
 						ErrorType:  "build_error",
@@ -468,7 +467,7 @@ func durationPtr(d time.Duration) *time.Duration {
 }
 
 // GetWorkflowByName returns a workflow specification by name
-func GetWorkflowByName(name string) (*workflow.WorkflowSpec, bool) {
+func GetWorkflowByName(name string) (*WorkflowSpec, bool) {
 	workflows := GetExampleWorkflows()
 	workflow, exists := workflows[name]
 	return workflow, exists

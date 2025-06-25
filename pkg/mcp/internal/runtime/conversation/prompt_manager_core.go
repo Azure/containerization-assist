@@ -5,11 +5,7 @@ import (
 	"fmt"
 
 	obs "github.com/Azure/container-copilot/pkg/mcp/internal/observability"
-<<<<<<< HEAD
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-=======
->>>>>>> 9f88049 (tmp)
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"

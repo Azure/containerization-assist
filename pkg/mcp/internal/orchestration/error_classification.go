@@ -3,7 +3,6 @@ package orchestration
 import (
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -20,7 +19,7 @@ func NewErrorClassifier(logger zerolog.Logger) *ErrorClassifier {
 }
 
 // IsFatalError determines if an error should be considered fatal and cause immediate workflow failure
-func (ec *ErrorClassifier) IsFatalError(workflowError *workflow.WorkflowError) bool {
+func (ec *ErrorClassifier) IsFatalError(workflowError *WorkflowError) bool {
 	// Critical severity errors are always fatal
 	if workflowError.Severity == "critical" {
 		return true
@@ -88,7 +87,7 @@ func (ec *ErrorClassifier) IsFatalError(workflowError *workflow.WorkflowError) b
 }
 
 // CanRecover determines if an error can be recovered from
-func (ec *ErrorClassifier) CanRecover(workflowError *workflow.WorkflowError, recoveryStrategies map[string]RecoveryStrategy) bool {
+func (ec *ErrorClassifier) CanRecover(workflowError *WorkflowError, recoveryStrategies map[string]RecoveryStrategy) bool {
 	// Fatal errors cannot be recovered
 	if ec.IsFatalError(workflowError) {
 		ec.logger.Debug().
@@ -132,7 +131,7 @@ func (ec *ErrorClassifier) CanRecover(workflowError *workflow.WorkflowError, rec
 }
 
 // ClassifySeverity determines the severity of an error if not already set
-func (ec *ErrorClassifier) ClassifySeverity(workflowError *workflow.WorkflowError) string {
+func (ec *ErrorClassifier) ClassifySeverity(workflowError *WorkflowError) string {
 	if workflowError.Severity != "" {
 		return workflowError.Severity
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -37,7 +36,7 @@ func (er *ErrorRouter) AddRoutingRule(stageName string, rule ErrorRoutingRule) {
 }
 
 // FindMatchingRule finds the best matching routing rule for an error
-func (er *ErrorRouter) FindMatchingRule(workflowError *workflow.WorkflowError) *ErrorRoutingRule {
+func (er *ErrorRouter) FindMatchingRule(workflowError *WorkflowError) *ErrorRoutingRule {
 	rules := er.getApplicableRules(workflowError)
 	if len(rules) == 0 {
 		er.logger.Debug().
@@ -50,13 +49,13 @@ func (er *ErrorRouter) FindMatchingRule(workflowError *workflow.WorkflowError) *
 }
 
 // MatchesConditions checks if all conditions match for a routing rule
-func (er *ErrorRouter) MatchesConditions(rule ErrorRoutingRule, workflowError *workflow.WorkflowError) bool {
+func (er *ErrorRouter) MatchesConditions(rule ErrorRoutingRule, workflowError *WorkflowError) bool {
 	return er.ruleMatches(rule, workflowError)
 }
 
 // Internal methods
 
-func (er *ErrorRouter) getApplicableRules(workflowError *workflow.WorkflowError) []ErrorRoutingRule {
+func (er *ErrorRouter) getApplicableRules(workflowError *WorkflowError) []ErrorRoutingRule {
 	var applicableRules []ErrorRoutingRule
 
 	// Get stage-specific rules
@@ -81,7 +80,7 @@ func (er *ErrorRouter) getApplicableRules(workflowError *workflow.WorkflowError)
 }
 
 func (er *ErrorRouter) findBestMatchingRule(
-	workflowError *workflow.WorkflowError,
+	workflowError *WorkflowError,
 	rules []ErrorRoutingRule,
 ) *ErrorRoutingRule {
 	var matchingRules []ErrorRoutingRule
@@ -111,7 +110,7 @@ func (er *ErrorRouter) findBestMatchingRule(
 	return bestRule
 }
 
-func (er *ErrorRouter) ruleMatches(rule ErrorRoutingRule, workflowError *workflow.WorkflowError) bool {
+func (er *ErrorRouter) ruleMatches(rule ErrorRoutingRule, workflowError *WorkflowError) bool {
 	if len(rule.Conditions) == 0 {
 		return true // Rule with no conditions matches everything
 	}
@@ -126,7 +125,7 @@ func (er *ErrorRouter) ruleMatches(rule ErrorRoutingRule, workflowError *workflo
 	return true
 }
 
-func (er *ErrorRouter) conditionMatches(condition RoutingCondition, workflowError *workflow.WorkflowError) bool {
+func (er *ErrorRouter) conditionMatches(condition RoutingCondition, workflowError *WorkflowError) bool {
 	var fieldValue string
 
 	// Get field value from error

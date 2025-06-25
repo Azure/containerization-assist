@@ -15,7 +15,6 @@ import (
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
-	stdioutils "github.com/Azure/container-copilot/pkg/mcp/internal/transport/stdio"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
@@ -172,8 +171,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		fallthrough
 	default:
 		// Use factory for consistent stdio transport creation
-		stdioTransport := stdioutils.NewDefaultStdioTransport(logger)
-		mcpTransport = NewTransportAdapter(stdioTransport)
+		mcpTransport = transport.NewDefaultStdioTransport(logger)
 	}
 
 	// Create gomcp manager with builder pattern

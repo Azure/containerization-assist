@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Azure/container-copilot/pkg/mcp"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
@@ -12,7 +11,7 @@ import (
 type ToolDispatcher struct {
 	tools      map[string]mcptypes.ToolFactory
 	converters map[string]mcptypes.ArgConverter
-	metadata   map[string]mcp.ToolMetadata
+	metadata   map[string]mcptypes.ToolMetadata
 	mu         sync.RWMutex
 }
 
@@ -21,7 +20,7 @@ func NewToolDispatcher() *ToolDispatcher {
 	return &ToolDispatcher{
 		tools:      make(map[string]mcptypes.ToolFactory),
 		converters: make(map[string]mcptypes.ArgConverter),
-		metadata:   make(map[string]mcp.ToolMetadata),
+		metadata:   make(map[string]mcptypes.ToolMetadata),
 	}
 }
 
@@ -36,7 +35,7 @@ func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory,
 
 	// Create a tool instance to get metadata
 	toolInstance := factory()
-	tool, ok := toolInstance.(mcp.Tool)
+	tool, ok := toolInstance.(interface{})
 	if !ok {
 		return fmt.Errorf("factory for tool %s does not produce a valid Tool instance", name)
 	}
@@ -59,7 +58,7 @@ func (d *ToolDispatcher) GetToolFactory(name string) (mcptypes.ToolFactory, bool
 }
 
 // ConvertArgs converts generic arguments to tool-specific types
-func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcp.ToolArgs, error) {
+func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (interface{}Args, error) {
 	d.mu.RLock()
 	converter, exists := d.converters[toolName]
 	d.mu.RUnlock()
@@ -81,7 +80,7 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcp.Too
 	}
 
 	// Type assert to ToolArgs interface
-	toolArgs, ok := convertedArgs.(mcp.ToolArgs)
+	toolArgs, ok := convertedArgs.(interface{}Args)
 	if !ok {
 		return nil, fmt.Errorf("converter for tool %s does not produce valid ToolArgs", toolName)
 	}
@@ -95,7 +94,7 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcp.Too
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (d *ToolDispatcher) GetToolMetadata(name string) (mcp.ToolMetadata, bool) {
+func (d *ToolDispatcher) GetToolMetadata(name string) (mcptypes.ToolMetadata, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 

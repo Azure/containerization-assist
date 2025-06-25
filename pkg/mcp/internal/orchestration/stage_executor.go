@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/execution"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	// Execution types are in the orchestration package
+	// Workflow types would go here when implemented
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -21,9 +22,9 @@ type DefaultStageExecutor struct {
 	secretRedactor   *SecretRedactor
 
 	// Execution strategies
-	sequentialExecutor  execution.Executor
-	parallelExecutor    execution.Executor
-	conditionalExecutor map[string]execution.Executor // keyed by base executor type
+	sequentialExecutor  Executor
+	parallelExecutor    Executor
+	conditionalExecutor map[string]Executor // keyed by base executor type
 }
 
 // NewDefaultStageExecutor creates a new stage executor with modular execution strategies
@@ -33,13 +34,13 @@ func NewDefaultStageExecutor(
 	toolOrchestrator InternalToolOrchestrator,
 ) *DefaultStageExecutor {
 	// Create base executors
-	seqExec := execution.NewSequentialExecutor(logger)
-	parExec := execution.NewParallelExecutor(logger, 10)
+	seqExec := NewSequentialExecutor(logger)
+	parExec := NewParallelExecutor(logger, 10)
 
 	// Create conditional wrappers
-	condExecs := map[string]execution.Executor{
-		"sequential": execution.NewConditionalExecutor(logger, seqExec),
-		"parallel":   execution.NewConditionalExecutor(logger, parExec),
+	condExecs := map[string]Executor{
+		"sequential": NewConditionalExecutor(logger, seqExec),
+		"parallel":   NewConditionalExecutor(logger, parExec),
 	}
 
 	return &DefaultStageExecutor{
@@ -56,9 +57,9 @@ func NewDefaultStageExecutor(
 // ExecuteStage executes a workflow stage with its tools
 func (se *DefaultStageExecutor) ExecuteStage(
 	ctx context.Context,
-	stage *workflow.WorkflowStage,
-	session *workflow.WorkflowSession,
-) (*workflow.StageResult, error) {
+	stage *WorkflowStage,
+	session *WorkflowSession,
+) (*StageResult, error) {
 	se.logger.Info().
 		Str("stage_name", stage.Name).
 		Str("session_id", session.ID).
@@ -78,12 +79,12 @@ func (se *DefaultStageExecutor) ExecuteStage(
 	}
 
 	// Create tool execution function
-	executeToolFunc := func(ctx context.Context, toolName string, stage *workflow.WorkflowStage, session *workflow.WorkflowSession) (interface{}, error) {
+	executeToolFunc := func(ctx context.Context, toolName string, stage *WorkflowSpecWorkflowStage, session *WorkflowSession) (interface{}, error) {
 		return se.executeTool(ctx, toolName, stage, session)
 	}
 
 	// Select appropriate executor
-	var executor execution.Executor
+	var executor Executor
 
 	if len(stage.Conditions) > 0 {
 		// Use conditional executor
@@ -105,7 +106,7 @@ func (se *DefaultStageExecutor) ExecuteStage(
 	execResult, err := executor.Execute(stageCtx, stage, session, stage.Tools, executeToolFunc)
 
 	// Convert execution result to stage result
-	stageResult := &workflow.StageResult{
+	stageResult := &StageResult{
 		StageName: stage.Name,
 		Success:   execResult.Success,
 		Duration:  execResult.Duration,
@@ -115,7 +116,7 @@ func (se *DefaultStageExecutor) ExecuteStage(
 	}
 
 	if err != nil {
-		stageResult.Error = &workflow.WorkflowError{
+		stageResult.Error = &WorkflowError{
 			ID:        fmt.Sprintf("%s_%s_%d", session.ID, stage.Name, time.Now().Unix()),
 			StageName: stage.Name,
 			ErrorType: "stage_execution_error",
@@ -143,7 +144,7 @@ func (se *DefaultStageExecutor) ExecuteStage(
 }
 
 // ValidateStage validates a workflow stage configuration
-func (se *DefaultStageExecutor) ValidateStage(stage *workflow.WorkflowStage) error {
+func (se *DefaultStageExecutor) ValidateStage(stage *WorkflowSpecWorkflowStage) error {
 	validator := NewStageValidator(se.toolRegistry)
 	return validator.Validate(stage)
 }
@@ -152,8 +153,8 @@ func (se *DefaultStageExecutor) ValidateStage(stage *workflow.WorkflowStage) err
 func (se *DefaultStageExecutor) executeTool(
 	ctx context.Context,
 	toolName string,
-	stage *workflow.WorkflowStage,
-	session *workflow.WorkflowSession,
+	stage *WorkflowStage,
+	session *WorkflowSession,
 ) (interface{}, error) {
 	// Prepare tool arguments
 	args := se.prepareToolArgs(toolName, stage, session)
@@ -183,8 +184,8 @@ func (se *DefaultStageExecutor) executeTool(
 // prepareToolArgs prepares arguments for tool execution
 func (se *DefaultStageExecutor) prepareToolArgs(
 	toolName string,
-	stage *workflow.WorkflowStage,
-	session *workflow.WorkflowSession,
+	stage *WorkflowStage,
+	session *WorkflowSession,
 ) map[string]interface{} {
 	args := make(map[string]interface{})
 
@@ -208,11 +209,11 @@ func (se *DefaultStageExecutor) prepareToolArgs(
 }
 
 // expandVariableEnhanced expands variables with enhanced ${var} syntax support
-func (se *DefaultStageExecutor) expandVariableEnhanced(value string, session *workflow.WorkflowSession, stage *workflow.WorkflowStage) string {
-	resolver := workflow.NewVariableResolver(se.logger)
+func (se *DefaultStageExecutor) expandVariableEnhanced(value string, session *WorkflowSession, stage *WorkflowSpecWorkflowStage) string {
+	resolver := NewVariableResolver(se.logger)
 
 	// Build variable context (without workflow vars since we don't have access to workflowSpec here)
-	context := &workflow.VariableContext{
+	context := &VariableContext{
 		WorkflowVars:    make(map[string]string), // Will be empty, could be populated from session if needed
 		StageVars:       stage.Variables,
 		SessionContext:  session.SharedContext,
@@ -250,7 +251,7 @@ func (se *DefaultStageExecutor) expandVariableEnhanced(value string, session *wo
 }
 
 // expandVariable expands variables with session context (legacy method - kept for compatibility)
-func (se *DefaultStageExecutor) expandVariable(value string, session *workflow.WorkflowSession) string {
+func (se *DefaultStageExecutor) expandVariable(value string, session *WorkflowSession) string {
 	// Simple variable expansion - replace ${var} with session context values
 	expanded := value
 	for k, v := range session.SharedContext {

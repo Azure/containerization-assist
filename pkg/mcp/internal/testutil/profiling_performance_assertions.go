@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/profiling"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 )
 
 // PerformanceAssertion provides utilities for performance-specific assertions
@@ -21,7 +21,7 @@ func NewPerformanceAssertion(t *testing.T) *PerformanceAssertion {
 
 // AssertExecutionTiming verifies that an execution session has expected timing
 func (pa *PerformanceAssertion) AssertExecutionTiming(
-	session *profiling.ExecutionSession,
+	session *observability.ExecutionSession,
 	minDuration, maxDuration time.Duration,
 ) {
 	pa.t.Helper()
@@ -42,7 +42,7 @@ func (pa *PerformanceAssertion) AssertExecutionTiming(
 
 // AssertDispatchOverhead verifies that dispatch time is within reasonable bounds
 func (pa *PerformanceAssertion) AssertDispatchOverhead(
-	session *profiling.ExecutionSession,
+	session *observability.ExecutionSession,
 	maxOverhead time.Duration,
 ) {
 	pa.t.Helper()
@@ -67,7 +67,7 @@ func (pa *PerformanceAssertion) AssertDispatchOverhead(
 
 // AssertMemoryUsage verifies memory usage patterns
 func (pa *PerformanceAssertion) AssertMemoryUsage(
-	session *profiling.ExecutionSession,
+	session *observability.ExecutionSession,
 	maxMemoryDelta uint64,
 ) {
 	pa.t.Helper()
@@ -85,7 +85,7 @@ func (pa *PerformanceAssertion) AssertMemoryUsage(
 
 // AssertNoMemoryLeak verifies that memory delta is reasonable
 func (pa *PerformanceAssertion) AssertNoMemoryLeak(
-	session *profiling.ExecutionSession,
+	session *observability.ExecutionSession,
 	maxLeakBytes uint64,
 ) {
 	pa.t.Helper()
@@ -106,7 +106,7 @@ func (pa *PerformanceAssertion) AssertNoMemoryLeak(
 
 // AssertToolStats verifies tool statistics meet expectations
 func (pa *PerformanceAssertion) AssertToolStats(
-	stats *profiling.ToolStats,
+	stats *observability.ToolStats,
 	expectations ToolStatsExpectations,
 ) {
 	pa.t.Helper()
@@ -150,7 +150,7 @@ func (pa *PerformanceAssertion) AssertToolStats(
 
 // AssertPerformanceReport verifies overall performance report
 func (pa *PerformanceAssertion) AssertPerformanceReport(
-	report *profiling.PerformanceReport,
+	report *observability.PerformanceReport,
 	expectations ReportExpectations,
 ) {
 	pa.t.Helper()
@@ -185,7 +185,7 @@ func (pa *PerformanceAssertion) AssertPerformanceReport(
 
 // AssertBenchmarkResult verifies benchmark results meet expectations
 func (pa *PerformanceAssertion) AssertBenchmarkResult(
-	result *profiling.BenchmarkResult,
+	result *observability.BenchmarkResult,
 	expectations BenchmarkExpectations,
 ) {
 	pa.t.Helper()
@@ -237,7 +237,7 @@ func (pa *PerformanceAssertion) AssertBenchmarkResult(
 
 // AssertBenchmarkComparison verifies benchmark comparison results
 func (pa *PerformanceAssertion) AssertBenchmarkComparison(
-	comparison *profiling.BenchmarkComparison,
+	comparison *observability.BenchmarkComparison,
 	expectations ComparisonExpectations,
 ) {
 	pa.t.Helper()
@@ -288,7 +288,7 @@ func (pa *PerformanceAssertion) AssertBenchmarkComparison(
 
 // AssertNoPerformanceRegression verifies that performance hasn't degraded
 func (pa *PerformanceAssertion) AssertNoPerformanceRegression(
-	baseline, current *profiling.BenchmarkResult,
+	baseline, current *observability.BenchmarkResult,
 	tolerancePercent float64,
 ) {
 	pa.t.Helper()
@@ -319,7 +319,7 @@ func (pa *PerformanceAssertion) AssertNoPerformanceRegression(
 
 // AssertPerformanceImprovement verifies that performance has improved
 func (pa *PerformanceAssertion) AssertPerformanceImprovement(
-	baseline, current *profiling.BenchmarkResult,
+	baseline, current *observability.BenchmarkResult,
 	minimumImprovementPercent float64,
 ) {
 	pa.t.Helper()

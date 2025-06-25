@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
 	orchestrationtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/testutil"
 	profilingtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -496,7 +497,7 @@ func NewTestClientSets() *mcptypes.MCPClients {
 		Docker:   nil,                        // Mock docker client can be injected as needed
 		Kind:     nil,                        // Mock kind runner can be injected as needed
 		Kube:     nil,                        // Mock kube runner can be injected as needed
-		Analyzer: analyzer.NewStubAnalyzer(), // Use stub analyzer for testing
+		Analyzer: analyze.NewStubAnalyzer(), // Use stub analyzer for testing
 	}
 }
 

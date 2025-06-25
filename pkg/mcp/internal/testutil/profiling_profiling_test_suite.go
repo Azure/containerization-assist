@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/profiling"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/rs/zerolog"
 )
 
 // ProfiledTestSuite provides a test suite with built-in profiling capabilities
 type ProfiledTestSuite struct {
 	t             *testing.T
-	profiler      *profiling.ToolProfiler
+	profiler      *observability.ToolProfiler
 	mockProfiler  *MockProfiler
 	logger        zerolog.Logger
 	testStartTime time.Time
@@ -30,7 +30,7 @@ func NewProfiledTestSuite(t *testing.T, logger zerolog.Logger) *ProfiledTestSuit
 
 	return &ProfiledTestSuite{
 		t:             t,
-		profiler:      profiling.NewToolProfiler(testLogger, true),
+		profiler:      observability.NewToolProfiler(testLogger, true),
 		mockProfiler:  NewMockProfiler(),
 		logger:        testLogger,
 		testStartTime: time.Now(),
@@ -45,7 +45,7 @@ func (pts *ProfiledTestSuite) WithMockProfiler() *ProfiledTestSuite {
 }
 
 // GetProfiler returns the real profiler instance
-func (pts *ProfiledTestSuite) GetProfiler() *profiling.ToolProfiler {
+func (pts *ProfiledTestSuite) GetProfiler() *observability.ToolProfiler {
 	return pts.profiler
 }
 
@@ -69,13 +69,13 @@ func (pts *ProfiledTestSuite) ProfileExecution(
 }
 
 // StartBenchmark starts a benchmark for the test
-func (pts *ProfiledTestSuite) StartBenchmark(toolName string, config profiling.BenchmarkConfig) *profiling.BenchmarkSuite {
+func (pts *ProfiledTestSuite) StartBenchmark(toolName string, config observability.BenchmarkConfig) *observability.BenchmarkSuite {
 	if !pts.enabled {
 		// Return a mock benchmark suite
 		return NewMockBenchmarkSuite(pts.logger, pts.mockProfiler)
 	}
 
-	return profiling.NewBenchmarkSuite(pts.logger, pts.profiler)
+	return observability.NewBenchmarkSuite(pts.logger, pts.profiler)
 }
 
 // AssertPerformance performs performance assertions on the test execution
@@ -120,7 +120,7 @@ func (pts *ProfiledTestSuite) AssertPerformance(expectations PerformanceExpectat
 	}
 }
 
-func (pts *ProfiledTestSuite) assertToolPerformance(toolName string, stats *profiling.ToolStats, expectations ToolPerformanceExpectations) {
+func (pts *ProfiledTestSuite) assertToolPerformance(toolName string, stats *observability.ToolStats, expectations ToolPerformanceExpectations) {
 	pts.t.Helper()
 
 	// Assert execution count
@@ -392,8 +392,8 @@ func (e *MockProfilingError) Error() string {
 }
 
 // Mock benchmark suite for testing
-func NewMockBenchmarkSuite(logger zerolog.Logger, mockProfiler *MockProfiler) *profiling.BenchmarkSuite {
+func NewMockBenchmarkSuite(logger zerolog.Logger, mockProfiler *MockProfiler) *observability.BenchmarkSuite {
 	// For now, return the real benchmark suite
 	// In a full implementation, we'd create a mock benchmark suite
-	return profiling.NewBenchmarkSuite(logger, profiling.NewToolProfiler(logger, false))
+	return observability.NewBenchmarkSuite(logger, observability.NewToolProfiler(logger, false))
 }

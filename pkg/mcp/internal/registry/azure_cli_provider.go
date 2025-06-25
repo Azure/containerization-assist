@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/registry"
 	"github.com/rs/zerolog"
 )
 
@@ -35,7 +34,7 @@ func NewAzureCLIProvider(logger zerolog.Logger) *AzureCLIProvider {
 }
 
 // GetCredentials retrieves credentials for an Azure Container Registry
-func (acp *AzureCLIProvider) GetCredentials(registryURL string) (*registry.RegistryCredentials, error) {
+func (acp *AzureCLIProvider) GetCredentials(registryURL string) (*RegistryCredentials, error) {
 	if !acp.isAzureRegistry(registryURL) {
 		return nil, fmt.Errorf("registry %s is not an Azure Container Registry", registryURL)
 	}
@@ -66,7 +65,7 @@ func (acp *AzureCLIProvider) GetCredentials(registryURL string) (*registry.Regis
 		Str("registry_name", registryName).
 		Msg("Successfully obtained Azure CLI token")
 
-	return &registry.RegistryCredentials{
+	return &RegistryCredentials{
 		Username:   "00000000-0000-0000-0000-000000000000", // Azure uses a fixed GUID for ACR token auth
 		Password:   token.AccessToken,
 		Token:      token.AccessToken,

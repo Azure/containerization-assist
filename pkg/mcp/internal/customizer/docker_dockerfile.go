@@ -23,10 +23,10 @@ func NewDockerfileCustomizer(logger zerolog.Logger) *DockerfileCustomizer {
 type DockerfileCustomizationOptions struct {
 	BaseImage          string
 	IncludeHealthCheck bool
-	Optimization       customizer.OptimizationStrategy
+	Optimization       OptimizationStrategy
 	BuildArgs          map[string]string
 	Platform           string
-	TemplateContext    *customizer.TemplateContext
+	TemplateContext    *TemplateContext
 }
 
 // CustomizeDockerfile applies customizations to a Dockerfile

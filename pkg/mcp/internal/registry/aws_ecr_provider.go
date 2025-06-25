@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/registry"
 	"github.com/rs/zerolog"
 )
 
@@ -41,7 +40,7 @@ func NewAWSECRProvider(logger zerolog.Logger) *AWSECRProvider {
 }
 
 // GetCredentials retrieves credentials for an AWS ECR registry
-func (ecp *AWSECRProvider) GetCredentials(registryURL string) (*registry.RegistryCredentials, error) {
+func (ecp *AWSECRProvider) GetCredentials(registryURL string) (*RegistryCredentials, error) {
 	if !ecp.isECRRegistry(registryURL) {
 		return nil, fmt.Errorf("registry %s is not an AWS ECR registry", registryURL)
 	}
@@ -75,7 +74,7 @@ func (ecp *AWSECRProvider) GetCredentials(registryURL string) (*registry.Registr
 		Time("expires_at", authData.ExpiresAt).
 		Msg("Successfully obtained AWS ECR token")
 
-	return &registry.RegistryCredentials{
+	return &RegistryCredentials{
 		Username:   username,
 		Password:   password,
 		Registry:   registryURL,

@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
@@ -24,7 +23,7 @@ type UnifiedMCPServer struct {
 
 	// Workflow mode components
 	workflowOrchestrator *orchestration.WorkflowOrchestrator
-	workflowEngine       *workflow.Engine
+	workflowEngine       *orchestration.Engine
 
 	// Shared components
 	toolRegistry     *orchestration.MCPToolRegistry
@@ -397,9 +396,9 @@ func (s *UnifiedMCPServer) executeWorkflowTool(ctx context.Context, args map[str
 	if workflowName, ok := args["workflow_name"].(string); ok {
 		variables, _ := args["variables"].(map[string]string)
 
-		var options []workflow.ExecutionOption
+		var options []orchestration.ExecutionOption
 		if vars := variables; vars != nil {
-			options = append(options, workflow.WithVariables(vars))
+			options = append(options, orchestration.WithVariables(vars))
 		}
 
 		return s.workflowOrchestrator.ExecuteWorkflow(ctx, workflowName, options...)
@@ -413,7 +412,7 @@ func (s *UnifiedMCPServer) executeWorkflowTool(ctx context.Context, args map[str
 			return nil, fmt.Errorf("invalid workflow specification: %w", err)
 		}
 
-		var spec workflow.WorkflowSpec
+		var spec orchestration.WorkflowSpec
 		if err := json.Unmarshal(specBytes, &spec); err != nil {
 			return nil, fmt.Errorf("failed to parse workflow specification: %w", err)
 		}

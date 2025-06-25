@@ -11,11 +11,10 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	customizerk8s "github.com/Azure/container-copilot/pkg/mcp/internal/customizer"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/templates"
 	"github.com/rs/zerolog"

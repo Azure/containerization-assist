@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -25,8 +24,8 @@ func NewConditionalExecutor(logger zerolog.Logger, baseExecutor Executor) *Condi
 // Execute runs tools based on condition evaluation
 func (ce *ConditionalExecutor) Execute(
 	ctx context.Context,
-	stage *workflow.WorkflowStage,
-	session *workflow.WorkflowSession,
+	stage *WorkflowStage,
+	session *WorkflowSession,
 	toolNames []string,
 	executeToolFunc ExecuteToolFunc,
 ) (*ExecutionResult, error) {
@@ -44,7 +43,7 @@ func (ce *ConditionalExecutor) Execute(
 		return &ExecutionResult{
 			Success:   true,
 			Results:   map[string]interface{}{"skipped": true, "reason": "conditions not met"},
-			Artifacts: []workflow.WorkflowArtifact{},
+			Artifacts: []WorkflowArtifact{},
 			Metrics: map[string]interface{}{
 				"execution_type": "conditional",
 				"skipped":        true,
@@ -70,7 +69,7 @@ func (ce *ConditionalExecutor) Execute(
 }
 
 // evaluateConditions checks if all conditions are met
-func (ce *ConditionalExecutor) evaluateConditions(conditions []workflow.StageCondition, session *workflow.WorkflowSession) bool {
+func (ce *ConditionalExecutor) evaluateConditions(conditions []StageCondition, session *WorkflowSession) bool {
 	if len(conditions) == 0 {
 		return true
 	}
@@ -90,7 +89,7 @@ func (ce *ConditionalExecutor) evaluateConditions(conditions []workflow.StageCon
 }
 
 // evaluateCondition checks a single condition
-func (ce *ConditionalExecutor) evaluateCondition(condition *workflow.StageCondition, session *workflow.WorkflowSession) bool {
+func (ce *ConditionalExecutor) evaluateCondition(condition *StageCondition, session *WorkflowSession) bool {
 	// Get value from shared context
 	value, exists := session.SharedContext[condition.Key]
 

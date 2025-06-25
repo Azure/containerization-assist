@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	stdioutils "github.com/Azure/container-copilot/pkg/mcp/internal/transport/stdio"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,10 +72,10 @@ func (m *MockStdioClient) GetLastRequest() (map[string]interface{}, error) {
 func TestStdioLLMTransport_InvokeTool(t *testing.T) {
 	// Create stdio transport using factory for consistent configuration
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
-	stdioTransport := stdioutils.NewDefaultStdioTransport(logger)
+	stdioTransport := NewDefaultStdioTransport(logger)
 
 	// Create LLM transport using factory for consistent configuration
-	llmTransport := stdioutils.NewDefaultLLMTransport(stdioTransport, logger)
+	llmTransport := NewDefaultLLMTransport(stdioTransport, logger)
 
 	// Note: This test validates the basic functionality without actual stdio communication
 	// In a real environment, the stdio transport would be connected to an MCP client

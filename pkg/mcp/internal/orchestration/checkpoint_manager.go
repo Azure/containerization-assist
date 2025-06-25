@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
@@ -162,14 +161,14 @@ func (cm *BoltCheckpointManager) verifyChecksum(data []byte, expectedChecksum st
 
 // CreateCheckpoint creates a new checkpoint for a workflow session
 func (cm *BoltCheckpointManager) CreateCheckpoint(
-	session *workflow.WorkflowSession,
+	session *WorkflowSession,
 	stageName string,
 	message string,
-	workflowSpec *workflow.WorkflowSpec,
-) (*workflow.WorkflowCheckpoint, error) {
+	workflowSpec *WorkflowSpec,
+) (*WorkflowCheckpoint, error) {
 	checkpointID := uuid.New().String()
 
-	checkpoint := &workflow.WorkflowCheckpoint{
+	checkpoint := &WorkflowCheckpoint{
 		ID:           checkpointID,
 		StageName:    stageName,
 		Timestamp:    time.Now(),
@@ -257,11 +256,11 @@ func (cm *BoltCheckpointManager) CreateCheckpoint(
 
 // CreateIncrementalCheckpoint creates a checkpoint that only stores changes since the last checkpoint
 func (cm *BoltCheckpointManager) CreateIncrementalCheckpoint(
-	session *workflow.WorkflowSession,
+	session *WorkflowSession,
 	stageName string,
 	message string,
-	workflowSpec *workflow.WorkflowSpec,
-) (*workflow.WorkflowCheckpoint, error) {
+	workflowSpec *WorkflowSpec,
+) (*WorkflowCheckpoint, error) {
 	// Get the latest checkpoint to calculate delta
 	latestCheckpoint, err := cm.GetLatestCheckpoint(session.ID)
 	if err != nil {
@@ -275,7 +274,7 @@ func (cm *BoltCheckpointManager) CreateIncrementalCheckpoint(
 	checkpointID := uuid.New().String()
 
 	// Calculate delta - only include changes since last checkpoint
-	deltaCheckpoint := &workflow.WorkflowCheckpoint{
+	deltaCheckpoint := &WorkflowCheckpoint{
 		ID:           checkpointID,
 		StageName:    stageName,
 		Timestamp:    time.Now(),
@@ -353,15 +352,15 @@ func (cm *BoltCheckpointManager) CreateIncrementalCheckpoint(
 
 // calculateSessionStateDelta calculates the difference in session state
 func (cm *BoltCheckpointManager) calculateSessionStateDelta(
-	currentSession *workflow.WorkflowSession,
-	lastCheckpoint *workflow.WorkflowCheckpoint,
+	currentSession *WorkflowSession,
+	lastCheckpoint *WorkflowCheckpoint,
 ) map[string]interface{} {
 	delta := make(map[string]interface{})
 
 	// Compare and add only changed fields
 	lastState := lastCheckpoint.SessionState
 
-	if currentSession.Status != workflow.WorkflowStatus(lastState["status"].(string)) {
+	if currentSession.Status != WorkflowStatus(lastState["status"].(string)) {
 		delta["status"] = string(currentSession.Status)
 	}
 
@@ -433,8 +432,8 @@ func (cm *BoltCheckpointManager) deepEqual(a, b interface{}) bool {
 func (cm *BoltCheckpointManager) RestoreFromCheckpoint(
 	sessionID string,
 	checkpointID string,
-) (*workflow.WorkflowSession, error) {
-	var checkpoint *workflow.WorkflowCheckpoint
+) (*WorkflowSession, error) {
+	var checkpoint *WorkflowCheckpoint
 
 	// Retrieve checkpoint from database
 	err := cm.db.View(func(tx *bbolt.Tx) error {
@@ -467,14 +466,14 @@ func (cm *BoltCheckpointManager) RestoreFromCheckpoint(
 				// Continue with corrupted data - better than failing completely
 			}
 
-			checkpoint = &workflow.WorkflowCheckpoint{}
+			checkpoint = &WorkflowCheckpoint{}
 			return json.Unmarshal(decompressedData, checkpoint)
 		} else {
 			// Legacy format - direct unmarshal
 			cm.logger.Debug().
 				Str("checkpoint_id", checkpointID).
 				Msg("Loading checkpoint in legacy format")
-			checkpoint = &workflow.WorkflowCheckpoint{}
+			checkpoint = &WorkflowCheckpoint{}
 			return json.Unmarshal(envelopeData, checkpoint)
 		}
 	})
@@ -499,8 +498,8 @@ func (cm *BoltCheckpointManager) RestoreFromCheckpoint(
 }
 
 // ListCheckpoints returns all checkpoints for a session
-func (cm *BoltCheckpointManager) ListCheckpoints(sessionID string) ([]*workflow.WorkflowCheckpoint, error) {
-	var checkpoints []*workflow.WorkflowCheckpoint
+func (cm *BoltCheckpointManager) ListCheckpoints(sessionID string) ([]*WorkflowCheckpoint, error) {
+	var checkpoints []*WorkflowCheckpoint
 
 	err := cm.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(checkpointsBucket))
@@ -513,7 +512,7 @@ func (cm *BoltCheckpointManager) ListCheckpoints(sessionID string) ([]*workflow.
 		prefix := []byte(sessionID + "_")
 
 		for key, value := cursor.Seek(prefix); key != nil && len(key) > len(prefix) && string(key[:len(prefix)]) == string(prefix); key, value = cursor.Next() {
-			var checkpoint workflow.WorkflowCheckpoint
+			var checkpoint WorkflowCheckpoint
 			if err := json.Unmarshal(value, &checkpoint); err != nil {
 				cm.logger.Warn().
 					Err(err).
@@ -637,7 +636,7 @@ func (cm *BoltCheckpointManager) CleanupExpiredCheckpoints(maxAge time.Duration)
 
 		cursor := bucket.Cursor()
 		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
-			var checkpoint workflow.WorkflowCheckpoint
+			var checkpoint WorkflowCheckpoint
 			if err := json.Unmarshal(value, &checkpoint); err != nil {
 				continue
 			}
@@ -689,7 +688,7 @@ func (cm *BoltCheckpointManager) CleanupExpiredCheckpoints(maxAge time.Duration)
 }
 
 // GetLatestCheckpoint returns the most recent checkpoint for a session
-func (cm *BoltCheckpointManager) GetLatestCheckpoint(sessionID string) (*workflow.WorkflowCheckpoint, error) {
+func (cm *BoltCheckpointManager) GetLatestCheckpoint(sessionID string) (*WorkflowCheckpoint, error) {
 	checkpoints, err := cm.ListCheckpoints(sessionID)
 	if err != nil {
 		return nil, err
@@ -718,7 +717,7 @@ func (cm *BoltCheckpointManager) GetCheckpointMetrics() (*CheckpointMetrics, err
 
 		cursor := bucket.Cursor()
 		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
-			var checkpoint workflow.WorkflowCheckpoint
+			var checkpoint WorkflowCheckpoint
 			if err := json.Unmarshal(value, &checkpoint); err != nil {
 				continue
 			}
@@ -752,7 +751,7 @@ func (cm *BoltCheckpointManager) GetCheckpointMetrics() (*CheckpointMetrics, err
 
 // Helper methods
 
-func (cm *BoltCheckpointManager) reconstructSession(checkpoint *workflow.WorkflowCheckpoint) (*workflow.WorkflowSession, error) {
+func (cm *BoltCheckpointManager) reconstructSession(checkpoint *WorkflowCheckpoint) (*WorkflowSession, error) {
 	sessionState := checkpoint.SessionState
 
 	// Extract values with type assertions
@@ -798,11 +797,11 @@ func (cm *BoltCheckpointManager) reconstructSession(checkpoint *workflow.Workflo
 		return defaultValue
 	}
 
-	session := &workflow.WorkflowSession{
+	session := &WorkflowSession{
 		ID:               getStringValue("session_id", ""),
 		WorkflowID:       getStringValue("workflow_id", ""),
 		WorkflowName:     getStringValue("workflow_name", ""),
-		Status:           workflow.WorkflowStatus(getStringValue("status", string(workflow.WorkflowStatusPending))),
+		Status:           WorkflowStatus(getStringValue("status", string(WorkflowStatusPending))),
 		CurrentStage:     getStringValue("current_stage", ""),
 		CompletedStages:  getStringSlice("completed_stages"),
 		FailedStages:     getStringSlice("failed_stages"),
@@ -823,7 +822,7 @@ func (cm *BoltCheckpointManager) reconstructSession(checkpoint *workflow.Workflo
 	}
 
 	// Add checkpoint to session's checkpoint list
-	session.Checkpoints = []workflow.WorkflowCheckpoint{*checkpoint}
+	session.Checkpoints = []WorkflowCheckpoint{*checkpoint}
 
 	return session, nil
 }

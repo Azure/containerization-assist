@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"

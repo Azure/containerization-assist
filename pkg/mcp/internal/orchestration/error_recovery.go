@@ -3,7 +3,6 @@ package orchestration
 import (
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 
@@ -32,7 +31,7 @@ func (rm *RecoveryManager) AddRecoveryStrategy(strategy RecoveryStrategy) {
 }
 
 // GetRecoveryOptions returns available recovery options for an error
-func (rm *RecoveryManager) GetRecoveryOptions(workflowError *workflow.WorkflowError, classifier *ErrorClassifier) []RecoveryOption {
+func (rm *RecoveryManager) GetRecoveryOptions(workflowError *WorkflowError, classifier *ErrorClassifier) []RecoveryOption {
 	var options []RecoveryOption
 
 	// Find applicable recovery strategies

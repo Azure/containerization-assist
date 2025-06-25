@@ -3,7 +3,8 @@ package orchestration
 import (
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	// "github.com/Azure/container-copilot/pkg/mcp/internal/workflow" // TODO: Implement workflow package
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // StageValidator handles validation of workflow stages
@@ -19,7 +20,7 @@ func NewStageValidator(toolRegistry InternalToolRegistry) *StageValidator {
 }
 
 // Validate validates a workflow stage configuration
-func (sv *StageValidator) Validate(stage *workflow.WorkflowStage) error {
+func (sv *StageValidator) Validate(stage *WorkflowStage) error {
 	// Basic validation
 	if err := sv.validateBasicRequirements(stage); err != nil {
 		return err
@@ -54,7 +55,7 @@ func (sv *StageValidator) Validate(stage *workflow.WorkflowStage) error {
 }
 
 // validateBasicRequirements checks basic stage requirements
-func (sv *StageValidator) validateBasicRequirements(stage *workflow.WorkflowStage) error {
+func (sv *StageValidator) validateBasicRequirements(stage *WorkflowStage) error {
 	if stage.Name == "" {
 		return fmt.Errorf("stage name is required")
 	}
@@ -67,7 +68,7 @@ func (sv *StageValidator) validateBasicRequirements(stage *workflow.WorkflowStag
 }
 
 // validateTools validates that all tools exist and are available
-func (sv *StageValidator) validateTools(stage *workflow.WorkflowStage) error {
+func (sv *StageValidator) validateTools(stage *WorkflowStage) error {
 	for _, toolName := range stage.Tools {
 		if _, err := sv.toolRegistry.GetTool(toolName); err != nil {
 			return fmt.Errorf("invalid tool %s in stage %s: %w", toolName, stage.Name, err)
@@ -77,7 +78,7 @@ func (sv *StageValidator) validateTools(stage *workflow.WorkflowStage) error {
 }
 
 // validateTimeout validates timeout configuration
-func (sv *StageValidator) validateTimeout(stage *workflow.WorkflowStage) error {
+func (sv *StageValidator) validateTimeout(stage *WorkflowStage) error {
 	if stage.Timeout != nil && *stage.Timeout <= 0 {
 		return fmt.Errorf("stage timeout must be positive")
 	}
@@ -85,7 +86,7 @@ func (sv *StageValidator) validateTimeout(stage *workflow.WorkflowStage) error {
 }
 
 // validateRetryPolicy validates retry policy configuration
-func (sv *StageValidator) validateRetryPolicy(stage *workflow.WorkflowStage) error {
+func (sv *StageValidator) validateRetryPolicy(stage *WorkflowStage) error {
 	if stage.RetryPolicy == nil {
 		return nil
 	}
@@ -123,7 +124,7 @@ func (sv *StageValidator) validateRetryPolicy(stage *workflow.WorkflowStage) err
 }
 
 // validateConditions validates stage conditions
-func (sv *StageValidator) validateConditions(stage *workflow.WorkflowStage) error {
+func (sv *StageValidator) validateConditions(stage *WorkflowStage) error {
 	for i, condition := range stage.Conditions {
 		if err := sv.validateCondition(&condition, i); err != nil {
 			return fmt.Errorf("invalid condition %d for stage %s: %w", i, stage.Name, err)
@@ -133,7 +134,7 @@ func (sv *StageValidator) validateConditions(stage *workflow.WorkflowStage) erro
 }
 
 // validateCondition validates a single condition
-func (sv *StageValidator) validateCondition(condition *workflow.StageCondition, index int) error {
+func (sv *StageValidator) validateCondition(condition *StageCondition, index int) error {
 	if condition.Key == "" {
 		return fmt.Errorf("condition key is required at index %d", index)
 	}
@@ -168,7 +169,7 @@ func (sv *StageValidator) validateCondition(condition *workflow.StageCondition, 
 }
 
 // validateFailureAction validates failure action configuration
-func (sv *StageValidator) validateFailureAction(stage *workflow.WorkflowStage) error {
+func (sv *StageValidator) validateFailureAction(stage *WorkflowStage) error {
 	if stage.OnFailure == nil {
 		return nil
 	}

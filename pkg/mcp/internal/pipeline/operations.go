@@ -8,7 +8,6 @@ import (
 
 	_ "github.com/Azure/container-copilot/pkg/docker"
 	_ "github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
