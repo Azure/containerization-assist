@@ -376,11 +376,20 @@ type IterativeFixer interface {
 	// Fix attempts to fix an issue iteratively
 	Fix(ctx context.Context, issue interface{}) (*FixingResult, error)
 
+	// AttemptFix attempts to fix an issue with a specific attempt number
+	AttemptFix(ctx context.Context, issue interface{}, attempt int) (*FixingResult, error)
+
 	// SetMaxAttempts sets the maximum number of fix attempts
 	SetMaxAttempts(max int)
 
 	// GetFixHistory returns the history of fix attempts
 	GetFixHistory() []FixAttempt
+
+	// GetFailureRouting returns routing rules for different failure types
+	GetFailureRouting() map[string]string
+
+	// GetFixStrategies returns available fix strategies
+	GetFixStrategies() []string
 }
 
 // ContextSharer provides context sharing capabilities

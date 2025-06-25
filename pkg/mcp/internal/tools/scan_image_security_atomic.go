@@ -9,6 +9,7 @@ import (
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/constants"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
@@ -175,6 +176,7 @@ type ConfigFix struct {
 type AtomicScanImageSecurityTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
+	fixingMixin     *fixing.AtomicToolFixingMixin
 	logger          zerolog.Logger
 }
 
@@ -183,6 +185,7 @@ func NewAtomicScanImageSecurityTool(adapter mcptypes.PipelineOperations, session
 	return &AtomicScanImageSecurityTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
+		fixingMixin:     nil, // Will be set via SetAnalyzer if fixing is enabled
 		logger:          logger.With().Str("tool", "atomic_scan_image_security").Logger(),
 	}
 }
@@ -1307,4 +1310,11 @@ func (t *AtomicScanImageSecurityTool) GetCapabilities() contract.ToolCapabilitie
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicScanImageSecurityTool) ExecuteTyped(ctx context.Context, args AtomicScanImageSecurityArgs) (*AtomicScanImageSecurityResult, error) {
 	return t.ExecuteScan(ctx, args)
+}
+
+// SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
+func (t *AtomicScanImageSecurityTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+	if analyzer != nil {
+		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "scan_image_security_atomic", t.logger)
+	}
 }

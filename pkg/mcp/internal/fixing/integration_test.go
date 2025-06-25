@@ -99,7 +99,7 @@ func TestIterativeFixerBasicFlow(t *testing.T) {
 		BaseDir:       "/tmp/test",
 	}
 
-	result, err := fixer.AttemptFix(ctx, fixingCtx)
+	result, err := fixer.Fix(ctx, fixingCtx)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
@@ -269,6 +270,7 @@ type DeploymentContext struct {
 type AtomicDeployKubernetesTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
+	fixingMixin     *fixing.AtomicToolFixingMixin
 	logger          zerolog.Logger
 }
 
@@ -277,6 +279,7 @@ func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionM
 	return &AtomicDeployKubernetesTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
+		fixingMixin:     nil, // Will be set via SetAnalyzer if fixing is enabled
 		logger:          logger.With().Str("tool", "atomic_deploy_kubernetes").Logger(),
 	}
 }
@@ -1185,4 +1188,11 @@ func (t *AtomicDeployKubernetesTool) ExecuteTyped(ctx context.Context, args Atom
 
 	// Direct execution without progress tracking
 	return t.executeWithoutProgress(ctx, args, result, startTime)
+}
+
+// SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
+func (t *AtomicDeployKubernetesTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+	if analyzer != nil {
+		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "deploy_kubernetes_atomic", t.logger)
+	}
 }

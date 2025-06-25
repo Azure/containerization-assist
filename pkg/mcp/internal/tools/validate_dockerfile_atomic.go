@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/ai_context"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/constants"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
@@ -175,6 +176,7 @@ type SecurityAnalysis struct {
 type AtomicValidateDockerfileTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
+	fixingMixin     *fixing.AtomicToolFixingMixin
 	// dockerfileAdapter removed - functionality integrated directly
 	logger zerolog.Logger
 }
@@ -185,6 +187,7 @@ func NewAtomicValidateDockerfileTool(adapter mcptypes.PipelineOperations, sessio
 	return &AtomicValidateDockerfileTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
+		fixingMixin:     nil, // Will be set via SetAnalyzer if fixing is enabled
 		// dockerfileAdapter removed - functionality integrated directly
 		logger: toolLogger,
 	}
@@ -1237,4 +1240,11 @@ func (t *AtomicValidateDockerfileTool) Execute(ctx context.Context, args interfa
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicValidateDockerfileTool) ExecuteTyped(ctx context.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	return t.ExecuteValidation(ctx, args)
+}
+
+// SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
+func (t *AtomicValidateDockerfileTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+	if analyzer != nil {
+		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "validate_dockerfile_atomic", t.logger)
+	}
 }

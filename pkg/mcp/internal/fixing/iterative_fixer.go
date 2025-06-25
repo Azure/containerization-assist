@@ -12,20 +12,24 @@ import (
 
 // DefaultIterativeFixer implements the IterativeFixer interface using CallerAnalyzer
 type DefaultIterativeFixer struct {
-	analyzer mcptypes.AIAnalyzer
-	logger   zerolog.Logger
+	analyzer    mcptypes.AIAnalyzer
+	logger      zerolog.Logger
+	maxAttempts int
+	fixHistory  []mcptypes.FixAttempt
 }
 
 // NewDefaultIterativeFixer creates a new iterative fixer
 func NewDefaultIterativeFixer(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *DefaultIterativeFixer {
 	return &DefaultIterativeFixer{
-		analyzer: analyzer,
-		logger:   logger.With().Str("component", "iterative_fixer").Logger(),
+		analyzer:    analyzer,
+		logger:      logger.With().Str("component", "iterative_fixer").Logger(),
+		maxAttempts: 3, // default max attempts
+		fixHistory:  make([]mcptypes.FixAttempt, 0),
 	}
 }
 
-// AttemptFix tries to fix a failure using AI analysis with iterative loops
-func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, fixingCtx *FixingContext) (*mcptypes.FixingResult, error) {
+// attemptFixInternal tries to fix a failure using AI analysis with iterative loops
+func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCtx *FixingContext) (*mcptypes.FixingResult, error) {
 	startTime := time.Now()
 	result := &mcptypes.FixingResult{
 		AllAttempts:   []mcptypes.FixAttempt{},
@@ -45,7 +49,7 @@ func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, fixingCtx *Fixin
 			Msg("Starting fix attempt")
 
 		// Get fix strategies for this attempt
-		strategies, err := f.GetFixStrategies(ctx, fixingCtx)
+		strategies, err := f.getFixStrategiesForContext(ctx, fixingCtx)
 		if err != nil {
 			f.logger.Error().Err(err).Int("attempt", attempt).Msg("Failed to get fix strategies")
 			continue
@@ -99,8 +103,8 @@ func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, fixingCtx *Fixin
 	return result, result.Error
 }
 
-// GetFixStrategies analyzes an error and returns potential fix strategies
-func (f *DefaultIterativeFixer) GetFixStrategies(ctx context.Context, fixingCtx *FixingContext) ([]mcptypes.FixStrategy, error) {
+// getFixStrategiesForContext analyzes an error and returns potential fix strategies
+func (f *DefaultIterativeFixer) getFixStrategiesForContext(ctx context.Context, fixingCtx *FixingContext) ([]mcptypes.FixStrategy, error) {
 	// Build comprehensive prompt for AI analysis
 	prompt := f.buildAnalysisPrompt(fixingCtx)
 
@@ -381,4 +385,83 @@ func (f *DefaultIterativeFixer) extractFixedContent(response string) string {
 	}
 
 	return strings.TrimSpace(response[start : start+end])
+}
+
+// Fix implements the IterativeFixer interface method
+func (f *DefaultIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mcptypes.FixingResult, error) {
+	// Convert issue to FixingContext
+	fixingCtx, ok := issue.(*FixingContext)
+	if !ok {
+		// Try to create a basic FixingContext from the issue
+		return nil, fmt.Errorf("issue must be of type *FixingContext")
+	}
+	
+	// Ensure maxAttempts is set
+	if fixingCtx.MaxAttempts == 0 {
+		fixingCtx.MaxAttempts = f.maxAttempts
+	}
+	
+	// Call the internal attempt fix method
+	result, err := f.attemptFixInternal(ctx, fixingCtx)
+	
+	// Update fix history
+	if result != nil && len(result.AllAttempts) > 0 {
+		f.fixHistory = append(f.fixHistory, result.AllAttempts...)
+	}
+	
+	return result, err
+}
+
+// AttemptFix implements the IterativeFixer interface method with specific attempt number
+func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, issue interface{}, attempt int) (*mcptypes.FixingResult, error) {
+	// Convert issue to FixingContext
+	fixingCtx, ok := issue.(*FixingContext)
+	if !ok {
+		return nil, fmt.Errorf("issue must be of type *FixingContext")
+	}
+	
+	// Set the specific attempt number
+	fixingCtx.MaxAttempts = attempt
+	
+	// Call the main Fix method
+	return f.Fix(ctx, fixingCtx)
+}
+
+// SetMaxAttempts implements the IterativeFixer interface method
+func (f *DefaultIterativeFixer) SetMaxAttempts(max int) {
+	f.maxAttempts = max
+}
+
+// GetFixHistory implements the IterativeFixer interface method
+func (f *DefaultIterativeFixer) GetFixHistory() []mcptypes.FixAttempt {
+	return f.fixHistory
+}
+
+// GetFailureRouting implements the IterativeFixer interface method
+func (f *DefaultIterativeFixer) GetFailureRouting() map[string]string {
+	// Return routing rules for different failure types
+	return map[string]string{
+		"build_error":      "dockerfile",
+		"permission_error": "permission",
+		"network_error":    "network",
+		"config_error":     "config",
+		"dependency_error": "dependency",
+		"manifest_error":   "manifest",
+		"deployment_error": "deployment",
+	}
+}
+
+// GetFixStrategies implements the IterativeFixer interface method
+func (f *DefaultIterativeFixer) GetFixStrategies() []string {
+	// Return available fix strategy names
+	return []string{
+		"dockerfile_fix",
+		"dependency_fix",
+		"config_fix",
+		"permission_fix",
+		"network_fix",
+		"manifest_fix",
+		"retry_with_cleanup",
+		"fallback_defaults",
+	}
 }

@@ -3,6 +3,7 @@ package fixing
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -34,9 +35,9 @@ type AnalyzerIntegratedFixer struct {
 
 // NewAnalyzerIntegratedFixer creates a fixer that integrates with CallerAnalyzer
 func NewAnalyzerIntegratedFixer(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
-	// Create minimal working implementations for testing
-	fixer := &mockIterativeFixer{maxAttempts: 3, history: make([]mcptypes.FixAttempt, 0), analyzer: analyzer}
-	contextSharer := &mockContextSharer{context: make(map[string]interface{})}
+	// Use real DefaultIterativeFixer implementation instead of mock
+	fixer := NewDefaultIterativeFixer(analyzer, logger)
+	contextSharer := &realContextSharer{context: make(map[string]interface{})}
 
 	return &AnalyzerIntegratedFixer{
 		fixer:        fixer,
@@ -100,7 +101,6 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, sessionID
 	}
 
 	// Attempt the fix
-	// TODO: The interface doesn't have AttemptFix method, using Fix instead
 	var result *mcptypes.FixingResult
 	var fixErr error
 	if a.fixer != nil {
@@ -114,10 +114,16 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, sessionID
 	}
 	if fixErr != nil {
 		// Check if we should route this failure to another tool
-		// TODO: GetFailureRouting is not part of the interface
-		// targetTool, routingErr := a.contextShare.GetFailureRouting(ctx, sessionID, fixingCtx.ErrorDetails)
-		targetTool := ""
-		var routingErr error = fmt.Errorf("not implemented")
+		routing := a.fixer.GetFailureRouting()
+		errorType := "unknown_error"
+		if richError, ok := fixingCtx.OriginalError.(*types.RichError); ok {
+			errorType = richError.Type
+		}
+		targetTool, hasRouting := routing[errorType]
+		var routingErr error
+		if !hasRouting {
+			routingErr = fmt.Errorf("no routing for error type: %s", errorType)
+		}
 		if routingErr == nil && targetTool != toolName {
 			a.logger.Info().
 				Str("current_tool", toolName).
@@ -200,9 +206,21 @@ func (a *AnalyzerIntegratedFixer) GetFixingRecommendations(ctx context.Context, 
 		fixingCtx.ErrorDetails["message"] = err.Error()
 	}
 
-	// TODO: GetFixStrategies is not part of the interface
-	// return a.fixer.GetFixStrategies(ctx, fixingCtx)
-	return []mcptypes.FixStrategy{}, nil
+	// Get available fix strategies from the fixer
+	strategyNames := a.fixer.GetFixStrategies()
+	strategies := make([]mcptypes.FixStrategy, 0, len(strategyNames))
+	
+	// Convert strategy names to FixStrategy objects
+	for i, name := range strategyNames {
+		strategies = append(strategies, mcptypes.FixStrategy{
+			Name:        name,
+			Description: fmt.Sprintf("Apply %s strategy", name),
+			Type:        getStrategyType(name),
+			Priority:    i + 1, // Lower index = higher priority
+		})
+	}
+	
+	return strategies, nil
 }
 
 // AnalyzeErrorWithContext provides enhanced error analysis using shared context
@@ -364,17 +382,63 @@ func (m *mockIterativeFixer) GetFixHistory() []mcptypes.FixAttempt {
 	return m.history
 }
 
-// mockContextSharer provides a minimal implementation for testing
-type mockContextSharer struct {
+func (m *mockIterativeFixer) AttemptFix(ctx context.Context, issue interface{}, attempt int) (*mcptypes.FixingResult, error) {
+	// For mock, just call Fix with limited attempts
+	savedMax := m.maxAttempts
+	m.maxAttempts = attempt
+	result, err := m.Fix(ctx, issue)
+	m.maxAttempts = savedMax
+	return result, err
+}
+
+func (m *mockIterativeFixer) GetFailureRouting() map[string]string {
+	return map[string]string{
+		"build_error": "dockerfile",
+		"deploy_error": "kubernetes",
+	}
+}
+
+func (m *mockIterativeFixer) GetFixStrategies() []string {
+	return []string{"dockerfile_fix", "dependency_fix", "config_fix"}
+}
+
+// realContextSharer provides proper context sharing implementation
+type realContextSharer struct {
 	context map[string]interface{}
 }
 
-func (m *mockContextSharer) ShareContext(ctx context.Context, key string, value interface{}) error {
-	m.context[key] = value
+func (r *realContextSharer) ShareContext(ctx context.Context, key string, value interface{}) error {
+	if r.context == nil {
+		r.context = make(map[string]interface{})
+	}
+	r.context[key] = value
 	return nil
 }
 
-func (m *mockContextSharer) GetSharedContext(ctx context.Context, key string) (interface{}, bool) {
-	value, exists := m.context[key]
+func (r *realContextSharer) GetSharedContext(ctx context.Context, key string) (interface{}, bool) {
+	if r.context == nil {
+		return nil, false
+	}
+	value, exists := r.context[key]
 	return value, exists
+}
+
+// getStrategyType infers the strategy type from its name
+func getStrategyType(strategyName string) string {
+	switch {
+	case strings.Contains(strategyName, "dockerfile"):
+		return "dockerfile"
+	case strings.Contains(strategyName, "dependency"):
+		return "dependency"
+	case strings.Contains(strategyName, "config"):
+		return "config"
+	case strings.Contains(strategyName, "manifest"):
+		return "manifest"
+	case strings.Contains(strategyName, "network"):
+		return "network"
+	case strings.Contains(strategyName, "permission"):
+		return "permission"
+	default:
+		return "general"
+	}
 }
