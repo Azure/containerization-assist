@@ -621,7 +621,17 @@ type TokenUsage struct {
 // HEALTH AND MONITORING TYPES (interface defined in main interfaces file)
 // =============================================================================
 
-// NOTE: HealthChecker interface is now defined in pkg/mcp/interfaces.go
+// HealthChecker provides system health checking capabilities
+type HealthChecker interface {
+	GetSystemResources() SystemResources
+	GetSessionStats() SessionHealthStats
+	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
+	CheckServiceHealth(ctx context.Context) []ServiceHealth
+	GetJobQueueStats() JobQueueStats
+	GetRecentErrors(limit int) []RecentError
+}
+
+// NOTE: HealthChecker interface is now defined above
 
 // SystemResources represents system resource information
 type SystemResources struct {

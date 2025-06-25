@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/clients"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -132,8 +133,8 @@ func NewValidateDeploymentTool(logger zerolog.Logger, workspaceBase string, jobM
 	}
 }
 
-// Execute validates deployment to Kind cluster
-func (t *ValidateDeploymentTool) Execute(ctx context.Context, args ValidateDeploymentArgs) (*ValidateDeploymentResult, error) {
+// ExecuteTyped validates deployment to Kind cluster (typed version)
+func (t *ValidateDeploymentTool) ExecuteTyped(ctx context.Context, args ValidateDeploymentArgs) (*ValidateDeploymentResult, error) {
 	startTime := time.Now()
 
 	// Create base response with versioning
@@ -512,4 +513,143 @@ func (t *ValidateDeploymentTool) performHealthCheck(ctx context.Context, service
 	result.StatusCode = 200
 
 	return result
+}
+
+// GetMetadata returns comprehensive tool metadata
+func (t *ValidateDeploymentTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:         "validate_deployment",
+		Description:  "Validates Kubernetes deployment by checking pod status, service connectivity, and health endpoints",
+		Category:     "validation",
+		Version:      "1.0.0",
+		Dependencies: []string{"docker", "kubectl", "kind"},
+		Capabilities: []string{
+			"cluster-validation",
+			"pod-status-check",
+			"service-connectivity",
+			"health-endpoint-check",
+			"async-validation",
+		},
+		Requirements: []string{
+			"kubernetes-cluster",
+			"kubectl-access",
+		},
+		Parameters: map[string]string{
+			"cluster_name":      "Kind cluster name (default: container-kit)",
+			"namespace":         "Kubernetes namespace (default: default)",
+			"manifest_path":     "Path to manifests directory (optional)",
+			"timeout":           "Validation timeout (default: 5m)",
+			"health_check_path": "HTTP health check endpoint (optional)",
+			"create_cluster":    "Create Kind cluster if not exists (default: false)",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic validation",
+				Description: "Validate deployment in default namespace",
+				Input: map[string]interface{}{
+					"cluster_name": "my-cluster",
+					"namespace":    "default",
+				},
+				Output: map[string]interface{}{
+					"success": true,
+					"pod_status": []interface{}{
+						map[string]interface{}{
+							"name":   "app-123",
+							"status": "Running",
+							"ready":  "1/1",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Validate validates the provided arguments
+func (t *ValidateDeploymentTool) Validate(ctx context.Context, args interface{}) error {
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return types.NewRichError("INVALID_ARGS_TYPE", "args must be a map[string]interface{}", types.ErrTypeValidation)
+	}
+
+	// Validate timeout format if provided
+	if timeoutStr, exists := argsMap["timeout"]; exists {
+		if timeout, ok := timeoutStr.(string); ok && timeout != "" {
+			if _, err := time.ParseDuration(timeout); err != nil {
+				return types.NewRichError("INVALID_TIMEOUT", fmt.Sprintf("invalid timeout format: %s", timeout), types.ErrTypeValidation)
+			}
+		}
+	}
+
+	// Validate cluster name format if provided
+	if clusterName, exists := argsMap["cluster_name"]; exists {
+		if name, ok := clusterName.(string); ok && name != "" {
+			if strings.ContainsAny(name, " /\\:*?\"<>|") {
+				return types.NewRichError("INVALID_CLUSTER_NAME", "cluster name contains invalid characters", types.ErrTypeValidation)
+			}
+		}
+	}
+
+	// Validate namespace format if provided
+	if namespace, exists := argsMap["namespace"]; exists {
+		if ns, ok := namespace.(string); ok && ns != "" {
+			if strings.ContainsAny(ns, " /\\:*?\"<>|") {
+				return types.NewRichError("INVALID_NAMESPACE", "namespace contains invalid characters", types.ErrTypeValidation)
+			}
+		}
+	}
+
+	return nil
+}
+
+// Execute implements the unified Tool interface
+func (t *ValidateDeploymentTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Convert generic args to typed args
+	deploymentArgs, err := convertToValidateDeploymentArgs(args)
+	if err != nil {
+		return nil, types.NewRichError("ARG_CONVERSION_FAILED", err.Error(), types.ErrTypeValidation)
+	}
+
+	// Call the typed ExecuteTyped method
+	return t.ExecuteTyped(ctx, deploymentArgs)
+}
+
+// convertToValidateDeploymentArgs converts untyped map to typed ValidateDeploymentArgs
+func convertToValidateDeploymentArgs(args interface{}) (ValidateDeploymentArgs, error) {
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return ValidateDeploymentArgs{}, fmt.Errorf("args must be a map[string]interface{}")
+	}
+
+	result := ValidateDeploymentArgs{}
+
+	if sessionID, ok := argsMap["session_id"].(string); ok {
+		result.SessionID = sessionID
+	}
+	if dryRun, ok := argsMap["dry_run"].(bool); ok {
+		result.DryRun = dryRun
+	}
+	if clusterName, ok := argsMap["cluster_name"].(string); ok {
+		result.ClusterName = clusterName
+	}
+	if namespace, ok := argsMap["namespace"].(string); ok {
+		result.Namespace = namespace
+	}
+	if manifestPath, ok := argsMap["manifest_path"].(string); ok {
+		result.ManifestPath = manifestPath
+	}
+	if timeout, ok := argsMap["timeout"].(string); ok {
+		result.Timeout = timeout
+	}
+	if healthCheckPath, ok := argsMap["health_check_path"].(string); ok {
+		result.HealthCheckPath = healthCheckPath
+	}
+	if createCluster, ok := argsMap["create_cluster"].(bool); ok {
+		result.CreateCluster = createCluster
+	}
+	if useLocalRegistry, ok := argsMap["use_local_registry"].(bool); ok {
+		result.UseLocalRegistry = useLocalRegistry
+	}
+
+	return result, nil
 }

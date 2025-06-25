@@ -58,6 +58,13 @@ func (a *testToolArgs) Validate() error {
 	return nil
 }
 
+func (a *testToolArgs) GetSessionID() string {
+	if sessionID, ok := a.data["session_id"].(string); ok {
+		return sessionID
+	}
+	return "test-session"
+}
+
 // testToolResult implements mcptypes.ToolResult
 type testToolResult struct {
 	success bool
@@ -70,6 +77,10 @@ func (r *testToolResult) GetResult() interface{} {
 }
 
 func (r *testToolResult) IsSuccess() bool {
+	return r.success
+}
+
+func (r *testToolResult) GetSuccess() bool {
 	return r.success
 }
 

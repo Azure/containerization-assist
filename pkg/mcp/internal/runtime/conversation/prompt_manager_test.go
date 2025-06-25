@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -121,10 +121,12 @@ func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{
 	return nil
 }
 
-func (m *MockToolOrchestrator) GetToolMetadata(toolName string) (*orchestration.ToolMetadata, error) {
-	return &orchestration.ToolMetadata{
+func (m *MockToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+	return &mcptypes.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",
+		Version:     "1.0.0",
+		Category:    "test",
 	}, nil
 }
 

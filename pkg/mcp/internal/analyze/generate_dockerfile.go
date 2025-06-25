@@ -118,7 +118,7 @@ func NewGenerateDockerfileTool(sessionManager mcptypes.ToolSessionManager, logge
 }
 
 // Execute generates a Dockerfile based on repository analysis and user preferences
-func (t *GenerateDockerfileTool) Execute(ctx context.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
+func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
 	// Create base response
 	response := &GenerateDockerfileResult{
 		BaseToolResponse: types.NewBaseResponse("generate_dockerfile", args.SessionID, args.DryRun),
@@ -302,7 +302,7 @@ func (t *GenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, a
 	t.logger.Info().Msg("Initializing Dockerfile generation")
 
 	// Execute the core logic
-	result, err := t.Execute(context.Background(), args)
+	result, err := t.ExecuteTyped(context.Background(), args)
 
 	if err != nil {
 		t.logger.Info().Msg("Dockerfile generation failed")
@@ -1151,4 +1151,175 @@ func (t *GenerateDockerfileTool) generateOptimizationContext(content string, arg
 	)
 
 	return ctx
+}
+
+// Unified Interface Implementation
+// These methods implement the mcptypes.Tool interface for unified tool handling
+
+// GetMetadata returns comprehensive tool metadata
+func (t *GenerateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "generate_dockerfile_atomic",
+		Description: "Generates optimized Dockerfiles based on repository analysis with language-specific templates and best practices",
+		Version:     "1.0.0",
+		Category:    "containerization",
+		Dependencies: []string{
+			"session_manager",
+			"repository_analysis",
+		},
+		Capabilities: []string{
+			"dockerfile_generation",
+			"language_detection",
+			"template_selection",
+			"optimization_recommendations",
+			"multi_stage_builds",
+			"security_hardening",
+		},
+		Requirements: []string{
+			"valid_session_id",
+			"analyzed_repository",
+		},
+		Parameters: map[string]string{
+			"session_id":     "string - Session ID for session context",
+			"language":       "string - Programming language (optional, auto-detected if not provided)",
+			"framework":      "string - Framework name (optional, auto-detected if not provided)",
+			"optimization":   "string - Optimization focus: size, security, speed (default: balanced)",
+			"use_multistage": "bool - Use multi-stage builds for optimization (default: true)",
+			"base_image":     "string - Custom base image (optional, uses language defaults)",
+			"port":           "int - Application port (default: language-specific)",
+			"dry_run":        "bool - Generate preview without creating files",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Auto-detected Node.js Application",
+				Description: "Generate Dockerfile for a Node.js application with auto-detection",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+				},
+				Output: map[string]interface{}{
+					"success":         true,
+					"language":        "javascript",
+					"framework":       "node",
+					"dockerfile_path": "/workspace/Dockerfile",
+					"optimization":    "balanced",
+				},
+			},
+			{
+				Name:        "Python Flask with Size Optimization",
+				Description: "Generate optimized Dockerfile for Python Flask application",
+				Input: map[string]interface{}{
+					"session_id":   "session-456",
+					"language":     "python",
+					"framework":    "flask",
+					"optimization": "size",
+					"port":         5000,
+				},
+				Output: map[string]interface{}{
+					"success":      true,
+					"language":     "python",
+					"framework":    "flask",
+					"optimization": "size",
+					"multistage":   true,
+					"base_image":   "python:3.11-alpine",
+				},
+			},
+		},
+	}
+}
+
+// Validate validates the tool arguments
+func (t *GenerateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
+	dockerfileArgs, ok := args.(GenerateDockerfileArgs)
+	if !ok {
+		// Try to convert from map if it's not already typed
+		if mapArgs, ok := args.(map[string]interface{}); ok {
+			var err error
+			dockerfileArgs, err = convertToGenerateDockerfileArgs(mapArgs)
+			if err != nil {
+				return types.NewRichError("CONVERSION_ERROR", fmt.Sprintf("failed to convert arguments: %v", err), types.ErrTypeValidation)
+			}
+		} else {
+			return types.NewRichError("INVALID_ARGUMENTS", "invalid argument type for generate_dockerfile_atomic", types.ErrTypeValidation)
+		}
+	}
+
+	if dockerfileArgs.SessionID == "" {
+		return types.NewRichError("MISSING_REQUIRED_FIELD", "session_id is required", types.ErrTypeValidation)
+	}
+
+	// Validate optimization type if provided
+	if dockerfileArgs.Optimization != "" {
+		validOptimizations := []string{"size", "security", "speed", "balanced"}
+		valid := false
+		for _, opt := range validOptimizations {
+			if dockerfileArgs.Optimization == opt {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return types.NewRichError("INVALID_OPTIMIZATION", fmt.Sprintf("optimization must be one of: %v, got: %s", validOptimizations, dockerfileArgs.Optimization), types.ErrTypeValidation)
+		}
+	}
+
+	return nil
+}
+
+// Execute implements the generic Tool interface
+func (t *GenerateDockerfileTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Handle both typed and untyped arguments
+	var dockerfileArgs GenerateDockerfileArgs
+	var err error
+
+	switch a := args.(type) {
+	case GenerateDockerfileArgs:
+		dockerfileArgs = a
+	case map[string]interface{}:
+		dockerfileArgs, err = convertToGenerateDockerfileArgs(a)
+		if err != nil {
+			return nil, types.NewRichError("CONVERSION_ERROR", fmt.Sprintf("failed to convert arguments: %v", err), types.ErrTypeValidation)
+		}
+	default:
+		return nil, types.NewRichError("INVALID_ARGUMENTS", "invalid argument type for generate_dockerfile_atomic", types.ErrTypeValidation)
+	}
+
+	// Call the typed ExecuteTyped method
+	return t.ExecuteTyped(ctx, dockerfileArgs)
+}
+
+// convertToGenerateDockerfileArgs converts untyped map to typed GenerateDockerfileArgs
+func convertToGenerateDockerfileArgs(args map[string]interface{}) (GenerateDockerfileArgs, error) {
+	result := GenerateDockerfileArgs{}
+
+	if sessionID, ok := args["session_id"].(string); ok {
+		result.SessionID = sessionID
+	}
+	if dryRun, ok := args["dry_run"].(bool); ok {
+		result.DryRun = dryRun
+	}
+	if template, ok := args["template"].(string); ok {
+		result.Template = template
+	}
+	if optimization, ok := args["optimization"].(string); ok {
+		result.Optimization = optimization
+	}
+	if baseImage, ok := args["base_image"].(string); ok {
+		result.BaseImage = baseImage
+	}
+	if includeHealthCheck, ok := args["include_health_check"].(bool); ok {
+		result.IncludeHealthCheck = includeHealthCheck
+	}
+	if platform, ok := args["platform"].(string); ok {
+		result.Platform = platform
+	}
+	if buildArgs, ok := args["build_args"].(map[string]interface{}); ok {
+		result.BuildArgs = make(map[string]string)
+		for k, v := range buildArgs {
+			if strVal, ok := v.(string); ok {
+				result.BuildArgs[k] = strVal
+			}
+		}
+	}
+
+	return result, nil
 }

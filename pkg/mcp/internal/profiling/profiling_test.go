@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	mcp "github.com/Azure/container-copilot/pkg/mcp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -349,15 +350,15 @@ func TestBenchmarkSuite_ComparisonAnalysis(t *testing.T) {
 
 // Mock orchestrator for testing ProfiledOrchestrator
 type mockOrchestrator struct {
-	executeFunc    func(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
+	executeFunc    func(ctx context.Context, toolName string, args interface{}) (interface{}, error)
 	validateFunc   func(toolName string, args interface{}) error
 	executionDelay time.Duration
 	shouldFail     bool
 }
 
-func (m *mockOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
+func (m *mockOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error) {
 	if m.executeFunc != nil {
-		return m.executeFunc(ctx, toolName, args, session)
+		return m.executeFunc(ctx, toolName, args)
 	}
 
 	if m.executionDelay > 0 {
@@ -375,6 +376,11 @@ func (m *mockOrchestrator) ValidateToolArgs(toolName string, args interface{}) e
 	if m.validateFunc != nil {
 		return m.validateFunc(toolName, args)
 	}
+	return nil
+}
+
+func (m *mockOrchestrator) RegisterTool(name string, tool mcp.Tool) error {
+	// Mock implementation - just return success
 	return nil
 }
 

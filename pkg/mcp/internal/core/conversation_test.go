@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -384,9 +384,11 @@ func (m *MockConversationOrchestrator) ValidateToolArgs(toolName string, args in
 	return nil
 }
 
-func (m *MockConversationOrchestrator) GetToolMetadata(toolName string) (*orchestration.ToolMetadata, error) {
-	return &orchestration.ToolMetadata{
+func (m *MockConversationOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+	return &mcptypes.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",
+		Version:     "1.0.0",
+		Category:    "test",
 	}, nil
 }
