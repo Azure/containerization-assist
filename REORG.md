@@ -141,6 +141,8 @@ This plan consolidates the MCP reorganization strategy with feedback to create a
 **Timeline**: Weeks 2-3 (after Team A completes interfaces)  
 **Domain**: Complete tool system overhaul with auto-registration
 
+**⚠️ CRITICAL NOTE**: Team C must update ALL tools to implement the unified interface, not just atomic tools. This includes chat tools, session tools, server tools, and any other tools in the system.
+
 ### Week 2: Auto-Registration System
 **Priority Tasks:**
 1. **Delete all 24 generated adapters** (complete removal)
@@ -229,15 +231,24 @@ This plan consolidates the MCP reorganization strategy with feedback to create a
      - Conversation mode initialization
      - Integration test setup
 
-4. **Standardize all tools** with unified patterns:
+4. **Standardize ALL tools** with unified patterns:
+   **IMPORTANT**: Update EVERY tool in the codebase, not just atomic tools!
    ```go
-   // Every tool follows this exact pattern
-   type BuildImageTool struct { /* ... */ }
+   // Every tool (atomic, chat, session, etc.) MUST implement this pattern:
+   type AnyTool struct { /* ... */ }
    
-   func (t *BuildImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) { /* ... */ }
-   func (t *BuildImageTool) GetMetadata() ToolMetadata { /* ... */ }
-   func (t *BuildImageTool) Validate(ctx context.Context, args interface{}) error { /* ... */ }
+   func (t *AnyTool) Execute(ctx context.Context, args interface{}) (interface{}, error) { /* ... */ }
+   func (t *AnyTool) GetMetadata() ToolMetadata { /* ... */ }
+   func (t *AnyTool) Validate(ctx context.Context, args interface{}) error { /* ... */ }
    ```
+   
+   Tools requiring updates include:
+   - All atomic tools (`atomic_*`)
+   - Chat tool (`chat`)
+   - Session management tools (`list_sessions`, `delete_session`, etc.)
+   - Server tools (`get_server_health`, `get_telemetry_metrics`)
+   - Registry tools
+   - ANY tool that currently exists in the system
 
 **Dependencies**: Team A (unified interfaces)  
 **Blocks**: None  
