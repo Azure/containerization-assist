@@ -251,76 +251,54 @@ func (gm *GomcpManager) registerCoreTools(deps *ToolDependencies) error {
 	return nil
 }
 
-// registerAtomicTools registers containerization workflow tools via orchestrator
+// registerAtomicTools registers containerization workflow tools via auto-registration
 func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	// Create registrar for this function
 	registrar := tools.NewStandardToolRegistrar(gm.server, deps.Logger)
 
-	// Create atomic tools and register them with the orchestrator's tool registry
-	atomicTools := map[string]interface{}{
-		"analyze_repository_atomic": tools.NewAtomicAnalyzeRepositoryTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "analyze_repository_atomic").Logger(),
-		),
-		"build_image_atomic": tools.NewAtomicBuildImageTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
-		),
+	// Use auto-registration adapter for zero-code approach
+	autoRegistry := tools.NewAutoRegistrationAdapter()
+	
+	// Create adapter for orchestrator registry to unified interface
+	registryAdapter := tools.NewOrchestratorRegistryAdapter(deps.ToolRegistry)
+	
+	deps.Logger.Info().Msg("🚀 Starting auto-registration of atomic tools")
+	
+	// Register tools ready for auto-registration
+	if err := autoRegistry.RegisterAtomicTools(registryAdapter); err != nil {
+		deps.Logger.Error().Err(err).Msg("Failed to auto-register atomic tools")
+		return fmt.Errorf("auto-registration failed: %w", err)
+	}
+
+	// For tools not yet migrated to unified interface, create them manually (temporary)
+	pendingTools := map[string]interface{}{
 		"generate_dockerfile_atomic": tools.NewGenerateDockerfileTool(
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "generate_dockerfile_atomic").Logger(),
-		),
-		"deploy_kubernetes_atomic": tools.NewAtomicDeployKubernetesTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "deploy_kubernetes_atomic").Logger(),
-		),
-		"validate_dockerfile_atomic": tools.NewAtomicValidateDockerfileTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "validate_dockerfile_atomic").Logger(),
-		),
-		"pull_image_atomic": tools.NewAtomicPullImageTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "pull_image_atomic").Logger(),
-		),
-		"tag_image_atomic": tools.NewAtomicTagImageTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "tag_image_atomic").Logger(),
-		),
-		"scan_image_security_atomic": tools.NewAtomicScanImageSecurityTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "scan_image_security_atomic").Logger(),
-		),
-		"scan_secrets_atomic": tools.NewAtomicScanSecretsTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "scan_secrets_atomic").Logger(),
 		),
 		"generate_manifests_atomic": tools.NewAtomicGenerateManifestsTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "generate_manifests_atomic").Logger(),
 		),
-		"push_image_atomic": tools.NewAtomicPushImageTool(
+		"scan_secrets_atomic": tools.NewAtomicScanSecretsTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "push_image_atomic").Logger(),
+			deps.Logger.With().Str("tool", "scan_secrets_atomic").Logger(),
+		),
+		"validate_dockerfile_atomic": tools.NewAtomicValidateDockerfileTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "validate_dockerfile_atomic").Logger(),
 		),
 	}
 
-	// Register atomic tools with the orchestrator's tool registry first
-	for name, tool := range atomicTools {
+	// Register pending tools manually until they're migrated to unified interface
+	for name, tool := range pendingTools {
 		if err := deps.ToolRegistry.RegisterTool(name, tool); err != nil {
-			deps.Logger.Error().Err(err).Str("tool", name).Msg("Failed to register atomic tool with orchestrator")
-			// Continue with other tools even if one fails
+			deps.Logger.Error().Err(err).Str("tool", name).Msg("Failed to register pending atomic tool")
 		} else {
-			deps.Logger.Info().Str("tool", name).Msg("Registered atomic tool with orchestrator")
+			deps.Logger.Info().Str("tool", name).Msg("⏳ Registered pending tool (awaiting interface migration)")
 		}
 	}
 
