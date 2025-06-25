@@ -10,12 +10,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Transport interface for transport types (local interface to avoid import cycles)
-type Transport interface {
+// LocalTransport interface for transport types (local interface to avoid import cycles)
+type LocalTransport interface {
 	Serve(ctx context.Context) error
 	Stop() error
 	Name() string
-	SetHandler(handler RequestHandler)
+	SetHandler(handler LocalRequestHandler)
 }
 
 // StdioTransport implements Transport for stdio communication
@@ -24,7 +24,7 @@ type StdioTransport struct {
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
 	logger       zerolog.Logger
-	handler      RequestHandler
+	handler      LocalRequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
@@ -98,7 +98,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 }
 
 // SetHandler sets the request handler for this transport
-func (s *StdioTransport) SetHandler(handler RequestHandler) {
+func (s *StdioTransport) SetHandler(handler LocalRequestHandler) {
 	s.handler = handler
 }
 
@@ -245,6 +245,6 @@ func (s *StdioTransport) CreateRecoveryResponse(originalError error, recoverySte
 }
 
 // LogTransportInfo logs transport startup information
-func LogTransportInfo(transport Transport) {
+func LogTransportInfo(transport LocalTransport) {
 	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on stdio transport\n")
 }
