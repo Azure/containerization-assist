@@ -10,7 +10,6 @@ import (
 	"time"
 
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -216,7 +215,7 @@ func TestServerStopIdempotency(t *testing.T) {
 // TestServerTransportError tests server behavior when transport fails
 func TestServerTransportError(t *testing.T) {
 	t.Skip("Temporarily disabled - test times out after 10m due to server startup hanging")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -310,7 +309,7 @@ func TestServerMetrics(t *testing.T) {
 type mockFailingTransport struct {
 	failOnServe bool
 	serveErr    error
-	handler     mcptypes.RequestHandler
+	handler     InternalRequestHandler
 }
 
 func (m *mockFailingTransport) Serve(ctx context.Context) error {
@@ -342,7 +341,7 @@ func (m *mockFailingTransport) Name() string {
 }
 
 func (m *mockFailingTransport) SetHandler(handler interface{}) {
-	if h, ok := handler.(mcptypes.RequestHandler); ok {
+	if h, ok := handler.(InternalRequestHandler); ok {
 		m.handler = h
 	}
 }

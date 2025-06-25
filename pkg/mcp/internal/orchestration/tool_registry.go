@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// MCPToolRegistry implements ToolRegistry for MCP atomic tools
+// MCPToolRegistry implements InternalToolRegistry for MCP atomic tools
 type MCPToolRegistry struct {
 	tools    map[string]ToolInfo
 	metadata map[string]*ToolMetadata

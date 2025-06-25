@@ -37,7 +37,7 @@ func TestNewPromptManager(t *testing.T) {
 	defer sessionMgr.Stop()
 
 	// Create mock tool orchestrator
-	toolOrchestrator := &MockToolOrchestrator{}
+	toolOrchestrator := &MockInternalToolOrchestrator{}
 
 	config := PromptManagerConfig{
 		SessionManager:   sessionMgr,
@@ -80,7 +80,7 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 	defer sessionMgr.Stop()
 
 	// Create mock tool orchestrator
-	toolOrchestrator := &MockToolOrchestrator{}
+	toolOrchestrator := &MockInternalToolOrchestrator{}
 
 	config := PromptManagerConfig{
 		SessionManager:   sessionMgr,
@@ -105,10 +105,10 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 	assert.NotEmpty(t, response.Message)
 }
 
-// MockToolOrchestrator implements ToolOrchestrator interface for testing
-type MockToolOrchestrator struct{}
+// MockInternalToolOrchestrator implements InternalToolOrchestrator interface for testing
+type MockInternalToolOrchestrator struct{}
 
-func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
+func (m *MockInternalToolOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
 	return map[string]interface{}{
 		"tool":     toolName,
 		"success":  true,
@@ -117,11 +117,11 @@ func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string,
 	}, nil
 }
 
-func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
+func (m *MockInternalToolOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
 	return nil
 }
 
-func (m *MockToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+func (m *MockInternalToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
 	return &mcptypes.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",
@@ -153,7 +153,7 @@ func TestPromptManagerErrorHandling(t *testing.T) {
 	defer sessionMgr.Stop()
 
 	// Create mock tool orchestrator
-	toolOrchestrator := &MockToolOrchestrator{}
+	toolOrchestrator := &MockInternalToolOrchestrator{}
 
 	config := PromptManagerConfig{
 		SessionManager:   sessionMgr,

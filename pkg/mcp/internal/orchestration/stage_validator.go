@@ -8,11 +8,11 @@ import (
 
 // StageValidator handles validation of workflow stages
 type StageValidator struct {
-	toolRegistry ToolRegistry
+	toolRegistry InternalToolRegistry
 }
 
 // NewStageValidator creates a new stage validator
-func NewStageValidator(toolRegistry ToolRegistry) *StageValidator {
+func NewStageValidator(toolRegistry InternalToolRegistry) *StageValidator {
 	return &StageValidator{
 		toolRegistry: toolRegistry,
 	}

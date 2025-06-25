@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -22,8 +21,8 @@ type GomcpManager struct {
 	server        server.Server
 	config        GomcpConfig
 	logger        slog.Logger
-	transport     mcptypes.Transport // Injected transport
-	isInitialized bool               // Prevent mutation after creation
+	transport     InternalTransport // Injected transport
+	isInitialized bool              // Prevent mutation after creation
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -42,7 +41,7 @@ func NewGomcpManager(config GomcpConfig) *GomcpManager {
 }
 
 // WithTransport sets the transport for the gomcp manager
-func (gm *GomcpManager) WithTransport(t mcptypes.Transport) *GomcpManager {
+func (gm *GomcpManager) WithTransport(t InternalTransport) *GomcpManager {
 	if gm.isInitialized {
 		gm.logger.Error("cannot set transport: manager already initialized")
 		return gm
@@ -79,7 +78,7 @@ func (gm *GomcpManager) Initialize() error {
 	)
 
 	// Configure transport - default to stdio
-	// Since Transport interface doesn't have Name() method,
+	// Since InternalTransport interface doesn't have Name() method,
 	// we'll use stdio as the default transport type
 	gm.server = gm.server.AsStdio()
 
@@ -93,7 +92,7 @@ func (gm *GomcpManager) GetServer() server.Server {
 }
 
 // GetTransport returns the configured transport
-func (gm *GomcpManager) GetTransport() mcptypes.Transport {
+func (gm *GomcpManager) GetTransport() InternalTransport {
 	return gm.transport
 }
 

@@ -4,16 +4,16 @@ import (
 	"context"
 )
 
-// ToolRegistry interface for the orchestration package
+// InternalToolRegistry interface for the orchestration package
 // This is a local interface to avoid import cycles with pkg/mcp
-type ToolRegistry interface {
+type InternalToolRegistry interface {
 	// GetTool retrieves a tool instance by name
 	GetTool(name string) (interface{}, error)
 }
 
-// ToolOrchestrator interface for the orchestration package
+// InternalToolOrchestrator interface for the orchestration package
 // This is a local interface to avoid import cycles with pkg/mcp
-type ToolOrchestrator interface {
+type InternalToolOrchestrator interface {
 	// ExecuteTool executes a tool with the given arguments
 	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
 }

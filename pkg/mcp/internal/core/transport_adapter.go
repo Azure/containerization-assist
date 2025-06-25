@@ -18,7 +18,7 @@ type TransportAdapter struct {
 }
 
 // NewTransportAdapter creates a new transport adapter
-func NewTransportAdapter(t interface{}) mcptypes.Transport {
+func NewTransportAdapter(t interface{}) InternalTransport {
 	// Type assert to ensure it has the required methods
 	if transport, ok := t.(interface {
 		Serve(ctx context.Context) error
@@ -51,15 +51,15 @@ func (ta *TransportAdapter) SetHandler(handler interface{}) {
 	// Type assert to the expected handler type
 	if h, ok := handler.(transport.LocalRequestHandler); ok {
 		ta.internal.SetHandler(h)
-	} else if h, ok := handler.(mcptypes.RequestHandler); ok {
-		// Wrap the types.RequestHandler to LocalRequestHandler
+	} else if h, ok := handler.(InternalRequestHandler); ok {
+		// Wrap the InternalRequestHandler to LocalRequestHandler
 		ta.internal.SetHandler(&requestHandlerAdapter{handler: h})
 	}
 }
 
-// requestHandlerAdapter adapts mcptypes.RequestHandler to transport.LocalRequestHandler
+// requestHandlerAdapter adapts InternalRequestHandler to transport.LocalRequestHandler
 type requestHandlerAdapter struct {
-	handler mcptypes.RequestHandler
+	handler InternalRequestHandler
 }
 
 // HandleRequest implements transport.LocalRequestHandler

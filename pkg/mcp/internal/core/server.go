@@ -17,7 +17,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
 	stdioutils "github.com/Azure/container-copilot/pkg/mcp/internal/transport/stdio"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -64,7 +63,7 @@ type Server struct {
 	workspaceManager *utils.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
-	transport        mcptypes.Transport
+	transport        InternalTransport
 	logger           zerolog.Logger
 	startTime        time.Time
 
@@ -154,7 +153,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	})
 
 	// Initialize transport
-	var mcpTransport mcptypes.Transport
+	var mcpTransport InternalTransport
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -190,7 +189,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		})))
 
 	// Set GomcpManager on transport for proper lifecycle management
-	// Use type assertion since Transport interface doesn't have Name() method
+	// Use type assertion since InternalTransport interface doesn't have Name() method
 	if setter, ok := mcpTransport.(interface{ SetGomcpManager(interface{}) }); ok {
 		setter.SetGomcpManager(gomcpManager)
 	}
@@ -294,7 +293,7 @@ func (s *Server) IsConversationModeEnabled() bool {
 }
 
 // GetTransport returns the server's transport
-func (s *Server) GetTransport() mcptypes.Transport {
+func (s *Server) GetTransport() InternalTransport {
 	return s.transport
 }
 

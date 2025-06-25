@@ -20,7 +20,7 @@ import (
 type ConversationHandler struct {
 	promptManager    *PromptManager
 	sessionManager   *session.SessionManager
-	toolOrchestrator mcptypes.ToolOrchestrator
+	toolOrchestrator orchestration.InternalToolOrchestrator
 	preferenceStore  *utils.PreferenceStore
 	logger           zerolog.Logger
 }
@@ -40,7 +40,7 @@ type ConversationHandlerConfig struct {
 // NewConversationHandler creates a new concrete conversation handler
 func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHandler, error) {
 	// Use provided orchestrator or create adapter
-	var toolOrchestrator mcptypes.ToolOrchestrator
+	var toolOrchestrator orchestration.InternalToolOrchestrator
 	if config.ToolOrchestrator != nil {
 		// Use the provided canonical orchestrator directly
 		toolOrchestrator = config.ToolOrchestrator
