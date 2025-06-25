@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools/manifests"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -24,7 +25,7 @@ type ManifestsAdapter struct {
 }
 
 // NewManifestsAdapter creates a new adapter for the refactored manifests modules
-func NewManifestsAdapter(pipelineAdapter PipelineOperations, logger zerolog.Logger) *ManifestsAdapter {
+func NewManifestsAdapter(pipelineAdapter mcptypes.PipelineOperations, logger zerolog.Logger) *ManifestsAdapter {
 	// Create wrapper for pipeline operations
 	wrapper := &manifestsPipelineWrapper{adapter: pipelineAdapter}
 
@@ -37,13 +38,44 @@ func NewManifestsAdapter(pipelineAdapter PipelineOperations, logger zerolog.Logg
 	}
 }
 
-// manifestsPipelineWrapper wraps PipelineOperations to implement manifests.PipelineAdapter
+// manifestsPipelineWrapper wraps mcptypes.PipelineOperations to implement manifests.PipelineAdapter
 type manifestsPipelineWrapper struct {
-	adapter PipelineOperations
+	adapter mcptypes.PipelineOperations
 }
 
 func (w *manifestsPipelineWrapper) GenerateKubernetesManifests(sessionID, imageRef, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*kubernetes.ManifestGenerationResult, error) {
-	return w.adapter.GenerateKubernetesManifests(sessionID, imageRef, appName, port, cpuRequest, memoryRequest, cpuLimit, memoryLimit)
+	manifestResult, err := w.adapter.GenerateKubernetesManifests(sessionID, imageRef, appName, port, cpuRequest, memoryRequest, cpuLimit, memoryLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from mcptypes.KubernetesManifestResult to kubernetes.ManifestGenerationResult
+	if manifestResult == nil {
+		return nil, nil
+	}
+
+	result := &kubernetes.ManifestGenerationResult{
+		Success: manifestResult.Success,
+	}
+
+	if manifestResult.Error != nil {
+		result.Error = &kubernetes.ManifestError{
+			Type:    manifestResult.Error.Type,
+			Message: manifestResult.Error.Message,
+		}
+	}
+
+	// Convert manifests
+	for _, manifest := range manifestResult.Manifests {
+		result.Manifests = append(result.Manifests, kubernetes.GeneratedManifest{
+			Kind:    manifest.Kind,
+			Name:    manifest.Name,
+			Path:    manifest.Path,
+			Content: manifest.Content,
+		})
+	}
+
+	return result, nil
 }
 
 // GenerateManifestsWithModules generates manifests using the refactored modules

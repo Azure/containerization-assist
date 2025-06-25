@@ -12,7 +12,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -128,13 +130,13 @@ func standardSecretScanStages() []interfaces.ProgressStage {
 
 // AtomicScanSecretsTool implements atomic secret scanning
 type AtomicScanSecretsTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
 // NewAtomicScanSecretsTool creates a new atomic secret scanning tool
-func NewAtomicScanSecretsTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicScanSecretsTool {
+func NewAtomicScanSecretsTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicScanSecretsTool {
 	return &AtomicScanSecretsTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -187,7 +189,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 	reporter.ReportStage(0.1, "Loading session")
 
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicScanSecretsResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_scan_secrets", args.SessionID, args.DryRun),
@@ -199,6 +201,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, types.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -320,7 +323,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 // executeWithoutProgress handles the main execution without progress reporting
 func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time) (*AtomicScanSecretsResult, error) {
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicScanSecretsResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_scan_secrets", args.SessionID, args.DryRun),
@@ -332,6 +335,7 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, types.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).

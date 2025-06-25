@@ -8,19 +8,20 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // ContextEnricher provides utilities to enrich tool responses with unified AI context
 type ContextEnricher struct {
-	calculator ScoreCalculator
-	analyzer   TradeoffAnalyzer
+	calculator mcptypes.ScoreCalculator
+	analyzer   mcptypes.TradeoffAnalyzer
 }
 
 // NewContextEnricher creates a new context enricher with default implementations
 func NewContextEnricher() *ContextEnricher {
 	return &ContextEnricher{
 		calculator: &DefaultScoreCalculator{},
-		analyzer:   &DefaultTradeoffAnalyzer{},
+		analyzer:   nil, // TODO: Implement proper analyzer when mcptypes are fully defined
 	}
 }
 
@@ -38,9 +39,11 @@ func (e *ContextEnricher) EnrichToolResponse(response interface{}, toolName stri
 	}
 
 	// Extract assessment if response implements AIContext
-	if aiContext, ok := response.(AIContext); ok {
-		context.Assessment = aiContext.GetAssessment()
-		context.Recommendations = aiContext.GenerateRecommendations()
+	if _, ok := response.(mcptypes.AIContext); ok {
+		// Type conversion is needed as these are placeholder types
+		// TODO: Implement proper type conversion when mcptypes are fully defined
+		context.Assessment = e.generateAssessment(response, toolName)
+		context.Recommendations = e.generateRecommendations(response, toolName)
 	} else {
 		// Generate assessment and recommendations from response data
 		context.Assessment = e.generateAssessment(response, toolName)
@@ -233,7 +236,9 @@ func (e *ContextEnricher) extractDecisionPoints(response interface{}) []Decision
 
 // generateTradeoffs creates trade-off analysis from response data
 func (e *ContextEnricher) generateTradeoffs(response interface{}) []TradeoffAnalysis {
-	return e.analyzer.AnalyzeTradeoffs([]string{"current_approach"}, e.extractTradeoffContext(response))
+	// Use local analyzer that returns local types
+	localAnalyzer := &DefaultTradeoffAnalyzer{}
+	return localAnalyzer.AnalyzeTradeoffs([]string{"current_approach"}, e.extractTradeoffContext(response))
 }
 
 // generateInsights creates contextual insights from response data

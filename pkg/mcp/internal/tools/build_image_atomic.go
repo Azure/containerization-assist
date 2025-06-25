@@ -73,8 +73,8 @@ type AtomicBuildImageResult struct {
 
 // AtomicBuildImageTool is the main tool for atomic Docker image building
 type AtomicBuildImageTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 
 	// Module components
@@ -85,14 +85,14 @@ type AtomicBuildImageTool struct {
 }
 
 // NewAtomicBuildImageTool creates a new atomic build image tool
-func NewAtomicBuildImageTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
+func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_build_image").Logger()
-	
+
 	// Initialize all modules
 	contextAnalyzer := NewBuildContextAnalyzer(toolLogger)
 	validator := NewBuildValidator(toolLogger)
 	executor := NewBuildExecutor(adapter, sessionManager, toolLogger)
-	
+
 	return &AtomicBuildImageTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -165,14 +165,14 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
-		Name:        "atomic_build_image",
-		Description: "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
-		Version:     constants.AtomicToolVersion,
-		Category:    "docker",
+		Name:         "atomic_build_image",
+		Description:  "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
+		Version:      constants.AtomicToolVersion,
+		Category:     "docker",
 		Dependencies: []string{"docker"},
 		Capabilities: []string{
 			"supports_dry_run",
-			"supports_streaming", 
+			"supports_streaming",
 			"long_running",
 		},
 		Requirements: []string{"docker_daemon", "build_context"},

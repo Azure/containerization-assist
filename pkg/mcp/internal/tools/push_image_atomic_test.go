@@ -25,24 +25,15 @@ type testPushPipelineAdapter struct {
 	pushCallArgs   []string
 }
 
-func (t *testPushPipelineAdapter) PushDockerImage(sessionID, imageName, registryURL string) (*coredocker.RegistryPushResult, error) {
+func (t *testPushPipelineAdapter) PushDockerImage(sessionID, imageRef string) error {
 	t.pushCallCount++
-	t.pushCallArgs = []string{sessionID, imageName, registryURL}
+	t.pushCallArgs = []string{sessionID, imageRef}
 
 	if t.shouldFailPush {
-		return t.pushResult, t.pushError
+		return t.pushError
 	}
-	if t.pushResult != nil {
-		return t.pushResult, nil
-	}
-	// Default result
-	return &coredocker.RegistryPushResult{
-		Success:  true,
-		Registry: registryURL,
-		ImageRef: imageName,
-		Duration: 3 * time.Second,
-		Output:   "Push complete: sha256:abc123def456",
-	}, nil
+	// Success case - no error
+	return nil
 }
 
 // Context management methods for testing
@@ -129,7 +120,6 @@ func TestAtomicPushImageTool_Execute(t *testing.T) {
 				// Verify adapter was called correctly
 				assert.Equal(t, 1, adapter.pushCallCount)
 				assert.Equal(t, "myregistry.azurecr.io/myapp:v1.0.0", adapter.pushCallArgs[1])
-				assert.Equal(t, "myregistry.azurecr.io", adapter.pushCallArgs[2])
 			},
 		},
 		{
@@ -580,8 +570,9 @@ func TestAtomicPushImageTool_SessionStateUpdate(t *testing.T) {
 	assert.True(t, result.Success)
 
 	// Verify session state was updated
-	session, err := sessionMgr.GetSession("state-test-session")
+	sessionInterface, err := sessionMgr.GetSession("state-test-session")
 	require.NoError(t, err)
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Verify image push state is correctly tracked
 	assert.True(t, session.Dockerfile.Pushed) // Check modern field directly

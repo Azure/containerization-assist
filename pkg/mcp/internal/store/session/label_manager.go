@@ -25,9 +25,9 @@ type LabelValidator struct {
 	ReservedPrefixes []string // Reserved prefixes like "kubernetes.io/"
 
 	// Custom validation rules
-	RequiredLabels   []string                   // Labels that must be present
-	ForbiddenLabels  []string                   // Labels that are not allowed
-	LabelPatterns    map[string]*regexp.Regexp // Pattern validation for specific labels
+	RequiredLabels  []string                  // Labels that must be present
+	ForbiddenLabels []string                  // Labels that are not allowed
+	LabelPatterns   map[string]*regexp.Regexp // Pattern validation for specific labels
 }
 
 // NewLabelManager creates a new label manager
@@ -69,7 +69,7 @@ func (lm *LabelManager) AddLabels(sessionID string, labels ...string) error {
 	}
 
 	// Get session
-	session, err := lm.sessionManager.GetSession(sessionID)
+	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
@@ -111,7 +111,7 @@ func (lm *LabelManager) RemoveLabels(sessionID string, labels ...string) error {
 		Msg("Removing labels from session")
 
 	// Get session
-	session, err := lm.sessionManager.GetSession(sessionID)
+	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
@@ -164,7 +164,7 @@ func (lm *LabelManager) SetLabels(sessionID string, labels []string) error {
 	}
 
 	// Get session
-	session, err := lm.sessionManager.GetSession(sessionID)
+	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
@@ -191,7 +191,7 @@ func (lm *LabelManager) SetLabels(sessionID string, labels []string) error {
 
 // GetLabels retrieves labels for a session
 func (lm *LabelManager) GetLabels(sessionID string) ([]string, error) {
-	session, err := lm.sessionManager.GetSession(sessionID)
+	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
@@ -214,7 +214,7 @@ func (lm *LabelManager) SetK8sLabels(sessionID string, labels map[string]string)
 	}
 
 	// Get session
-	session, err := lm.sessionManager.GetSession(sessionID)
+	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
@@ -258,7 +258,7 @@ func (lm *LabelManager) RemoveK8sLabel(sessionID string, key string) error {
 		Msg("Removing K8s label from session")
 
 	// Get session
-	session, err := lm.sessionManager.GetSession(sessionID)
+	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to get session: %w", err)
 	}
@@ -286,7 +286,7 @@ func (lm *LabelManager) RemoveK8sLabel(sessionID string, key string) error {
 
 // GetK8sLabels retrieves Kubernetes labels for a session
 func (lm *LabelManager) GetK8sLabels(sessionID string) (map[string]string, error) {
-	session, err := lm.sessionManager.GetSession(sessionID)
+	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
@@ -328,7 +328,7 @@ func (v *LabelValidator) ValidateLabel(label string) error {
 		if len(parts) == 2 {
 			prefix := parts[0]
 			value := parts[1]
-			
+
 			if pattern, exists := v.LabelPatterns[prefix]; exists {
 				if !pattern.MatchString(value) {
 					return fmt.Errorf("label value %q does not match required pattern for prefix %q", value, prefix)

@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -598,9 +599,14 @@ func (w *sessionLabelManagerWrapper) GetAllLabels() []string {
 }
 
 func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (tools.SessionLabelData, error) {
-	session, err := w.sm.GetSession(sessionID)
+	sessionInterface, err := w.sm.GetSession(sessionID)
 	if err != nil {
 		return tools.SessionLabelData{}, err
+	}
+
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		return tools.SessionLabelData{}, fmt.Errorf("unexpected session type")
 	}
 
 	return tools.SessionLabelData{
@@ -610,7 +616,7 @@ func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (tools.Session
 }
 
 func (w *sessionLabelManagerWrapper) ListSessions() []tools.SessionLabelData {
-	summaries := w.sm.ListSessions()
+	summaries := w.sm.ListSessionSummaries()
 	result := make([]tools.SessionLabelData, len(summaries))
 	for i, summary := range summaries {
 		result[i] = tools.SessionLabelData{

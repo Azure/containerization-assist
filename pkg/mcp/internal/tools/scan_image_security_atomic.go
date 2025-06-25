@@ -12,8 +12,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
-	"github.com/localrivet/gomcp/server"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
@@ -173,20 +173,19 @@ type ConfigFix struct {
 
 // AtomicScanImageSecurityTool implements atomic security scanning
 type AtomicScanImageSecurityTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
 // NewAtomicScanImageSecurityTool creates a new atomic security scanning tool
-func NewAtomicScanImageSecurityTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicScanImageSecurityTool {
+func NewAtomicScanImageSecurityTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicScanImageSecurityTool {
 	return &AtomicScanImageSecurityTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
 		logger:          logger.With().Str("tool", "atomic_scan_image_security").Logger(),
 	}
 }
-
 
 // ExecuteScan runs the atomic security scanning
 func (t *AtomicScanImageSecurityTool) ExecuteScan(ctx context.Context, args AtomicScanImageSecurityArgs) (*AtomicScanImageSecurityResult, error) {
@@ -227,7 +226,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 	startTime := time.Now()
 
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicScanImageSecurityResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_scan_image_security", args.SessionID, args.DryRun),
@@ -243,6 +242,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, nil
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -1220,10 +1220,10 @@ func (t *AtomicScanImageSecurityTool) calculateSecurityScore(summary Vulnerabili
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicScanImageSecurityTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
-		Name:        "atomic_scan_image_security",
-		Description: "Performs comprehensive security vulnerability scanning on Docker images using industry-standard scanners",
-		Version:     constants.AtomicToolVersion,
-		Category:    "security",
+		Name:         "atomic_scan_image_security",
+		Description:  "Performs comprehensive security vulnerability scanning on Docker images using industry-standard scanners",
+		Version:      constants.AtomicToolVersion,
+		Category:     "security",
 		Dependencies: []string{"docker", "security_scanner"},
 		Capabilities: []string{
 			"supports_streaming",
@@ -1250,10 +1250,10 @@ func (t *AtomicScanImageSecurityTool) GetMetadata() mcptypes.ToolMetadata {
 					"severity_threshold": "HIGH",
 				},
 				Output: map[string]interface{}{
-					"success":             true,
+					"success":               true,
 					"total_vulnerabilities": 5,
-					"critical_count":       0,
-					"high_count":           2,
+					"critical_count":        0,
+					"high_count":            2,
 				},
 			},
 		},

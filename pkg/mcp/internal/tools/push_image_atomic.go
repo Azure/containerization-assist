@@ -11,9 +11,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -85,13 +85,13 @@ type PushContext struct {
 
 // AtomicPushImageTool implements atomic Docker image push using core operations
 type AtomicPushImageTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
 // NewAtomicPushImageTool creates a new atomic push image tool
-func NewAtomicPushImageTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicPushImageTool {
+func NewAtomicPushImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicPushImageTool {
 	return &AtomicPushImageTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -157,11 +157,12 @@ func (t *AtomicPushImageTool) ExecuteWithContext(serverCtx *server.Context, args
 func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args AtomicPushImageArgs, result *AtomicPushImageResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	reporter.ReportStage(0.1, "Loading session")
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Set session details
 	result.SessionID = session.SessionID
@@ -207,13 +208,14 @@ func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args Atom
 // executeWithoutProgress handles execution without progress tracking (fallback)
 func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args AtomicPushImageArgs, result *AtomicPushImageResult, startTime time.Time) (*AtomicPushImageResult, error) {
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
 		return result, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Set session details
 	result.SessionID = session.SessionID
@@ -269,28 +271,55 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *sessiont
 
 	// Push Docker image using core operations
 	pushStartTime := time.Now()
-	pushResult, err := t.pipelineAdapter.PushDockerImage(
+	// PushDockerImage only returns error, not a result
+	err := t.pipelineAdapter.PushDockerImage(
 		session.SessionID,
 		result.ImageRef,
-		result.RegistryURL,
 	)
 	result.PushDuration = time.Since(pushStartTime)
-	result.PushResult = pushResult
 
 	if err != nil {
+		result.Success = false
+
+		// Detect error type for proper error construction
+		errorType := types.ErrorCategoryUnknown
+		if strings.Contains(strings.ToLower(err.Error()), "authentication") ||
+			strings.Contains(strings.ToLower(err.Error()), "login") ||
+			strings.Contains(strings.ToLower(err.Error()), "auth") ||
+			strings.Contains(strings.ToLower(err.Error()), "denied") {
+			errorType = types.ErrorCategoryAuthError
+		} else if strings.Contains(strings.ToLower(err.Error()), "network") ||
+			strings.Contains(strings.ToLower(err.Error()), "timeout") ||
+			strings.Contains(strings.ToLower(err.Error()), "no such host") {
+			errorType = types.NetworkError
+		} else if strings.Contains(strings.ToLower(err.Error()), "rate limit") ||
+			strings.Contains(strings.ToLower(err.Error()), "toomanyrequests") {
+			errorType = types.ErrorCategoryRateLimit
+		}
+
+		result.PushResult = &coredocker.RegistryPushResult{
+			Success:  false,
+			ImageRef: result.ImageRef,
+			Registry: result.RegistryURL,
+			Error: &coredocker.RegistryError{
+				Type:     errorType,
+				Message:  err.Error(),
+				ImageRef: result.ImageRef,
+				Registry: result.RegistryURL,
+				Output:   err.Error(),
+			},
+		}
 		// Log push failure
-		t.handlePushError(ctx, err, pushResult, result)
+		t.handlePushError(ctx, err, result.PushResult, result)
 		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("push failed: %v", err), "push_error")
 	}
 
-	if pushResult != nil && !pushResult.Success {
-		// Log push result error
-		pushErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("push failed: %s", pushResult.Error.Message), "push_error")
-		t.handlePushError(ctx, pushErr, pushResult, result)
-		return pushErr
+	// Push succeeded since we didn't get an error
+	result.PushResult = &coredocker.RegistryPushResult{
+		Success:  true,
+		ImageRef: result.ImageRef,
+		Registry: result.RegistryURL,
 	}
-
-	// Push succeeded
 	result.Success = true
 	result.BaseAIContextResult.IsSuccessful = true
 	result.BaseAIContextResult.Duration = result.TotalDuration
@@ -680,9 +709,11 @@ func (t *AtomicPushImageTool) updateSessionState(session *sessiontypes.SessionSt
 
 	session.UpdateLastAccessed()
 
-	return t.sessionManager.UpdateSession(session.SessionID, func(s *sessiontypes.SessionState) {
+	// UpdateSession expects typed function for updateFunc
+	updateFunc := func(s *sessiontypes.SessionState) {
 		*s = *session
-	})
+	}
+	return t.sessionManager.UpdateSession(session.SessionID, updateFunc)
 }
 
 func (t *AtomicPushImageTool) detectRegistryType(registry string) string {
@@ -806,10 +837,10 @@ func (t *AtomicPushImageTool) validateImageReference(imageRef string) error {
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicPushImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
-		Name:        "atomic_push_image",
-		Description: "Pushes Docker images to container registries with authentication support, retry logic, and progress tracking",
-		Version:     "1.0.0",
-		Category:    "docker",
+		Name:         "atomic_push_image",
+		Description:  "Pushes Docker images to container registries with authentication support, retry logic, and progress tracking",
+		Version:      "1.0.0",
+		Category:     "docker",
 		Dependencies: []string{"docker"},
 		Capabilities: []string{
 			"supports_dry_run",
@@ -832,9 +863,9 @@ func (t *AtomicPushImageTool) GetMetadata() mcptypes.ToolMetadata {
 					"image_ref":  "myregistry.azurecr.io/myapp:v1.0.0",
 				},
 				Output: map[string]interface{}{
-					"success":        true,
-					"image_ref":      "myregistry.azurecr.io/myapp:v1.0.0",
-					"push_duration":  "45s",
+					"success":       true,
+					"image_ref":     "myregistry.azurecr.io/myapp:v1.0.0",
+					"push_duration": "45s",
 				},
 			},
 		},

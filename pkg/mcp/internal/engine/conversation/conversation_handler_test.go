@@ -462,8 +462,10 @@ func TestSessionManagerAdapter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check that the update was applied
-		retrieved, err := sessionMgr.GetSession("update-test")
+		retrievedInterface, err := sessionMgr.GetSession("update-test")
 		require.NoError(t, err)
+		retrieved, ok := retrievedInterface.(*sessiontypes.SessionState)
+		require.True(t, ok, "session should be of correct type")
 		assert.Equal(t, "test/repo", retrieved.ImageRef.Repository)
 		assert.Equal(t, "updated", retrieved.ImageRef.Tag)
 	})

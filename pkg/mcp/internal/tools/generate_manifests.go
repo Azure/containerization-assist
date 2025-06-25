@@ -47,7 +47,7 @@ type GenerateManifestsArgs struct {
 	GeneratePullSecret bool                 `json:"generate_pull_secret,omitempty" description:"Generate image pull secret"`
 	ValidateManifests  bool                 `json:"validate_manifests,omitempty" description:"Validate generated manifests against K8s schemas"`
 	ValidationOptions  ValidationOptions    `json:"validation_options,omitempty" description:"Options for manifest validation"`
-	
+
 	// NetworkPolicy configuration
 	IncludeNetworkPolicy bool               `json:"include_network_policy,omitempty" description:"Generate NetworkPolicy resource"`
 	NetworkPolicySpec    *NetworkPolicySpec `json:"network_policy_spec,omitempty" description:"NetworkPolicy specification"`
@@ -155,10 +155,10 @@ type ValidationIssue struct {
 
 // NetworkPolicySpec represents the specification of a NetworkPolicy
 type NetworkPolicySpec struct {
-	PolicyTypes []string                `json:"policy_types,omitempty" description:"Types of policies (Ingress, Egress)"`
-	PodSelector map[string]string       `json:"pod_selector,omitempty" description:"Pods to which this policy applies"`
-	Ingress     []NetworkPolicyIngress  `json:"ingress,omitempty" description:"Ingress rules"`
-	Egress      []NetworkPolicyEgress   `json:"egress,omitempty" description:"Egress rules"`
+	PolicyTypes []string               `json:"policy_types,omitempty" description:"Types of policies (Ingress, Egress)"`
+	PodSelector map[string]string      `json:"pod_selector,omitempty" description:"Pods to which this policy applies"`
+	Ingress     []NetworkPolicyIngress `json:"ingress,omitempty" description:"Ingress rules"`
+	Egress      []NetworkPolicyEgress  `json:"egress,omitempty" description:"Egress rules"`
 }
 
 // NetworkPolicyIngress represents an ingress rule in a NetworkPolicy

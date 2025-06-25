@@ -7,11 +7,10 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/analysis"
-	"github.com/Azure/container-copilot/pkg/core/docker"
 	"github.com/Azure/container-copilot/pkg/core/git"
-	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,7 +36,7 @@ func (m *MockAtomicPipelineAdapter) SavePipelineState(sessionID string, state in
 	return args.Error(0)
 }
 
-// Implement all PipelineOperations methods (stubs for testing)
+// Implement all mcptypes.PipelineOperations methods (stubs for testing)
 func (m *MockAtomicPipelineAdapter) AnalyzeRepository(sessionID, repoPath string) (*analysis.AnalysisResult, error) {
 	args := m.Called(sessionID, repoPath)
 	return args.Get(0).(*analysis.AnalysisResult), args.Error(1)
@@ -53,29 +52,35 @@ func (m *MockAtomicPipelineAdapter) GenerateDockerfile(sessionID, language, fram
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockAtomicPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*docker.BuildResult, error) {
+func (m *MockAtomicPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*mcptypes.BuildResult, error) {
 	args := m.Called(sessionID, imageName, dockerfilePath)
-	return args.Get(0).(*docker.BuildResult), args.Error(1)
+	return args.Get(0).(*mcptypes.BuildResult), args.Error(1)
 }
 
-func (m *MockAtomicPipelineAdapter) PushDockerImage(sessionID, imageName, registryURL string) (*docker.RegistryPushResult, error) {
-	args := m.Called(sessionID, imageName, registryURL)
-	return args.Get(0).(*docker.RegistryPushResult), args.Error(1)
+func (m *MockAtomicPipelineAdapter) PushDockerImage(sessionID, imageName string) error {
+	args := m.Called(sessionID, imageName)
+	return args.Error(0)
 }
 
-func (m *MockAtomicPipelineAdapter) GenerateKubernetesManifests(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*kubernetes.ManifestGenerationResult, error) {
+func (m *MockAtomicPipelineAdapter) GenerateKubernetesManifests(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*mcptypes.KubernetesManifestResult, error) {
 	args := m.Called(sessionID, imageName, appName, port, cpuRequest, memoryRequest, cpuLimit, memoryLimit)
-	return args.Get(0).(*kubernetes.ManifestGenerationResult), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*mcptypes.KubernetesManifestResult), args.Error(1)
 }
 
-func (m *MockAtomicPipelineAdapter) DeployToKubernetes(sessionID, manifestPath, namespace string) (*kubernetes.DeploymentResult, error) {
-	args := m.Called(sessionID, manifestPath, namespace)
-	return args.Get(0).(*kubernetes.DeploymentResult), args.Error(1)
+func (m *MockAtomicPipelineAdapter) DeployToKubernetes(sessionID string, manifestPaths []string) (*mcptypes.KubernetesDeploymentResult, error) {
+	args := m.Called(sessionID, manifestPaths)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*mcptypes.KubernetesDeploymentResult), args.Error(1)
 }
 
-func (m *MockAtomicPipelineAdapter) CheckApplicationHealth(sessionID, namespace, labelSelector string, timeout time.Duration) (*kubernetes.HealthCheckResult, error) {
+func (m *MockAtomicPipelineAdapter) CheckApplicationHealth(sessionID, namespace, labelSelector string, timeout time.Duration) (*mcptypes.HealthCheckResult, error) {
 	args := m.Called(sessionID, namespace, labelSelector, timeout)
-	return args.Get(0).(*kubernetes.HealthCheckResult), args.Error(1)
+	return args.Get(0).(*mcptypes.HealthCheckResult), args.Error(1)
 }
 
 func (m *MockAtomicPipelineAdapter) PreviewDeployment(sessionID, manifestPath, namespace string) (string, error) {
@@ -101,20 +106,37 @@ func (m *MockAtomicPipelineAdapter) ClearContext(sessionID string) {
 	m.Called(sessionID)
 }
 
-func (m *MockAtomicPipelineAdapter) TagDockerImage(sessionID, sourceImage, targetImage string) (*docker.TagResult, error) {
-	args := m.Called(sessionID, sourceImage, targetImage)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*docker.TagResult), args.Error(1)
+func (m *MockAtomicPipelineAdapter) AcquireResource(sessionID, resourceType string) error {
+	args := m.Called(sessionID, resourceType)
+	return args.Error(0)
 }
 
-func (m *MockAtomicPipelineAdapter) PullDockerImage(sessionID, imageRef string) (*docker.PullResult, error) {
-	args := m.Called(sessionID, imageRef)
+func (m *MockAtomicPipelineAdapter) ReleaseResource(sessionID, resourceType string) error {
+	args := m.Called(sessionID, resourceType)
+	return args.Error(0)
+}
+
+func (m *MockAtomicPipelineAdapter) ConvertToDockerState(sessionID string) (*mcptypes.DockerState, error) {
+	args := m.Called(sessionID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*docker.PullResult), args.Error(1)
+	return args.Get(0).(*mcptypes.DockerState), args.Error(1)
+}
+
+func (m *MockAtomicPipelineAdapter) TagDockerImage(sessionID, sourceImage, targetImage string) error {
+	args := m.Called(sessionID, sourceImage, targetImage)
+	return args.Error(0)
+}
+
+func (m *MockAtomicPipelineAdapter) PullDockerImage(sessionID, imageRef string) error {
+	args := m.Called(sessionID, imageRef)
+	return args.Error(0)
+}
+
+func (m *MockAtomicPipelineAdapter) UpdateSessionFromDockerResults(sessionID string, results interface{}) error {
+	args := m.Called(sessionID, results)
+	return args.Error(0)
 }
 
 // MockAtomicSessionManager for testing atomic tools
@@ -122,12 +144,14 @@ type MockAtomicSessionManager struct {
 	mock.Mock
 }
 
-func (m *MockAtomicSessionManager) GetSession(sessionID string) (*sessiontypes.SessionState, error) {
+func (m *MockAtomicSessionManager) GetSession(sessionID string) (interface{}, error) {
 	args := m.Called(sessionID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*sessiontypes.SessionState), args.Error(1)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *MockAtomicSessionManager) GetSessionInterface(sessionID string) (interface{}, error) {
+	args := m.Called(sessionID)
+	return args.Get(0), args.Error(1)
 }
 
 func (m *MockAtomicSessionManager) SaveSession(session *sessiontypes.SessionState) error {
@@ -143,25 +167,32 @@ func (m *MockAtomicSessionManager) CreateSession() (*sessiontypes.SessionState, 
 	return args.Get(0).(*sessiontypes.SessionState), args.Error(1)
 }
 
-func (m *MockAtomicSessionManager) GetOrCreateSession(sessionID string) (*sessiontypes.SessionState, error) {
+func (m *MockAtomicSessionManager) GetOrCreateSession(sessionID string) (interface{}, error) {
 	args := m.Called(sessionID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*sessiontypes.SessionState), args.Error(1)
+	return args.Get(0), args.Error(1)
 }
 
-func (m *MockAtomicSessionManager) DeleteSession(sessionID string) error {
-	args := m.Called(sessionID)
+func (m *MockAtomicSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+	args := m.Called(ctx, sessionID)
 	return args.Error(0)
 }
 
-func (m *MockAtomicSessionManager) ListSessions() ([]*sessiontypes.SessionState, error) {
-	args := m.Called()
+func (m *MockAtomicSessionManager) FindSessionByRepo(ctx context.Context, repoPath string) (interface{}, error) {
+	args := m.Called(ctx, repoPath)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *MockAtomicSessionManager) GetOrCreateSessionFromRepo(repoPath string) (interface{}, error) {
+	args := m.Called(repoPath)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *MockAtomicSessionManager) ListSessions(ctx context.Context, filters map[string]interface{}) ([]interface{}, error) {
+	args := m.Called(ctx, filters)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*sessiontypes.SessionState), args.Error(1)
+	return args.Get(0).([]interface{}), args.Error(1)
 }
 
 func (m *MockAtomicSessionManager) UpdateSession(sessionID string, updateFunc func(*sessiontypes.SessionState)) error {
@@ -194,12 +225,8 @@ func TestAtomicPullImageTool(t *testing.T) {
 		mockSessionMgr.On("UpdateSession", mock.Anything, mock.Anything).Return(nil)
 		mockAdapter.On("GetSessionWorkspace", "test-session").Return("/tmp/test-workspace")
 
-		// Mock successful pull result
-		pullResult := &docker.PullResult{
-			Success:  true,
-			ImageRef: "nginx:latest",
-		}
-		mockAdapter.On("PullDockerImage", "test-session", "nginx:latest").Return(pullResult, nil)
+		// Mock successful pull - now returns only error
+		mockAdapter.On("PullDockerImage", "test-session", "nginx:latest").Return(nil)
 
 		// Create tool
 		pullTool := NewAtomicPullImageTool(mockAdapter, mockSessionMgr, logger)
@@ -323,13 +350,8 @@ func TestAtomicTagImageTool(t *testing.T) {
 		mockSessionMgr.On("UpdateSession", mock.Anything, mock.Anything).Return(nil)
 		mockAdapter.On("GetSessionWorkspace", "test-session").Return("/tmp/test-workspace")
 
-		// Mock TagDockerImage method
-		tagResult := &docker.TagResult{
-			Success:     true,
-			SourceImage: "nginx:latest",
-			TargetImage: "my-nginx:v1.0.0",
-		}
-		mockAdapter.On("TagDockerImage", "test-session", "nginx:latest", "my-nginx:v1.0.0").Return(tagResult, nil)
+		// Mock TagDockerImage method - returns only error per interface
+		mockAdapter.On("TagDockerImage", "test-session", "nginx:latest", "my-nginx:v1.0.0").Return(nil)
 
 		// Create tool
 		tagTool := NewAtomicTagImageTool(mockAdapter, mockSessionMgr, logger)
@@ -415,12 +437,7 @@ func TestAtomicTagImageTool(t *testing.T) {
 		mockAdapter.On("GetSessionWorkspace", "test-session").Return("/tmp/test-workspace")
 
 		// Mock successful tag operation - Docker allows tagging same image with same name
-		tagResult := &docker.TagResult{
-			Success:     true,
-			SourceImage: "nginx:latest",
-			TargetImage: "nginx:latest",
-		}
-		mockAdapter.On("TagDockerImage", "test-session", "nginx:latest", "nginx:latest").Return(tagResult, nil)
+		mockAdapter.On("TagDockerImage", "test-session", "nginx:latest", "nginx:latest").Return(nil)
 
 		// Create tool
 		tagTool := NewAtomicTagImageTool(mockAdapter, mockSessionMgr, logger)

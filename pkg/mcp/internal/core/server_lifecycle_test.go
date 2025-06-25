@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -279,9 +280,10 @@ func TestServerMetrics(t *testing.T) {
 type mockFailingTransport struct {
 	failOnServe bool
 	serveErr    error
+	handler     mcptypes.RequestHandler
 }
 
-func (m *mockFailingTransport) Serve(ctx context.Context, handler transport.RequestHandler) error {
+func (m *mockFailingTransport) Serve(ctx context.Context) error {
 	if m.failOnServe {
 		return m.serveErr
 	}
@@ -289,12 +291,16 @@ func (m *mockFailingTransport) Serve(ctx context.Context, handler transport.Requ
 	return nil
 }
 
-func (m *mockFailingTransport) Close() error {
+func (m *mockFailingTransport) Stop() error {
 	return nil
 }
 
 func (m *mockFailingTransport) Name() string {
 	return "mock-failing-transport"
+}
+
+func (m *mockFailingTransport) SetHandler(handler mcptypes.RequestHandler) {
+	m.handler = handler
 }
 
 // TestServerConfigValidation tests configuration validation
@@ -358,12 +364,16 @@ func TestServerResourceLimits(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create sessions up to the limit
-	session1, err := server.sessionManager.GetOrCreateSession("")
+	session1Interface, err := server.sessionManager.GetOrCreateSession("")
 	assert.NoError(t, err)
+	session1, ok := session1Interface.(*sessiontypes.SessionState)
+	require.True(t, ok, "session1 should be of correct type")
 	assert.NotEmpty(t, session1.SessionID)
 
-	session2, err := server.sessionManager.GetOrCreateSession("")
+	session2Interface, err := server.sessionManager.GetOrCreateSession("")
 	assert.NoError(t, err)
+	session2, ok := session2Interface.(*sessiontypes.SessionState)
+	require.True(t, ok, "session2 should be of correct type")
 	assert.NotEmpty(t, session2.SessionID)
 
 	// Creating another session should respect the limit

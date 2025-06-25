@@ -29,7 +29,7 @@ func NewBuildValidator(logger zerolog.Logger) *BuildValidator {
 func (bv *BuildValidator) ValidateBuildPrerequisites(dockerfilePath string, buildContext string) error {
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		return types.NewErrorBuilder("invalid_arguments", 
+		return types.NewErrorBuilder("invalid_arguments",
 			fmt.Sprintf("Dockerfile not found at %s", dockerfilePath), "validation").
 			WithSeverity("high").
 			WithOperation("ValidateBuildPrerequisites").
@@ -39,7 +39,7 @@ func (bv *BuildValidator) ValidateBuildPrerequisites(dockerfilePath string, buil
 
 	// Check if build context exists
 	if _, err := os.Stat(buildContext); os.IsNotExist(err) {
-		return types.NewErrorBuilder("invalid_arguments", 
+		return types.NewErrorBuilder("invalid_arguments",
 			fmt.Sprintf("Build context directory not found at %s", buildContext), "validation").
 			WithSeverity("high").
 			WithOperation("ValidateBuildPrerequisites").
@@ -50,7 +50,7 @@ func (bv *BuildValidator) ValidateBuildPrerequisites(dockerfilePath string, buil
 	// Check if Docker is available
 	cmd := exec.Command("docker", "version")
 	if err := cmd.Run(); err != nil {
-		return types.NewErrorBuilder("internal_server_error", 
+		return types.NewErrorBuilder("internal_server_error",
 			"Docker is not available. Please ensure Docker is installed and running", "execution").
 			WithSeverity("critical").
 			WithOperation("ValidateBuildPrerequisites").
@@ -64,7 +64,7 @@ func (bv *BuildValidator) ValidateBuildPrerequisites(dockerfilePath string, buil
 // RunSecurityScan runs a security scan on the built image using Trivy
 func (bv *BuildValidator) RunSecurityScan(ctx context.Context, imageName string, imageTag string) (*coredocker.ScanResult, time.Duration, error) {
 	startTime := time.Now()
-	
+
 	// Check if Trivy is installed
 	cmd := exec.Command("trivy", "--version")
 	if err := cmd.Run(); err != nil {
@@ -82,7 +82,7 @@ func (bv *BuildValidator) RunSecurityScan(ctx context.Context, imageName string,
 		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
 			bv.logger.Warn().Str("stderr", string(exitErr.Stderr)).Msg("Trivy scan failed")
 		}
-		return nil, time.Since(startTime), types.NewErrorBuilder("internal_server_error", 
+		return nil, time.Since(startTime), types.NewErrorBuilder("internal_server_error",
 			"Security scan failed", "execution").
 			WithSeverity("medium").
 			WithOperation("RunSecurityScan").
@@ -134,62 +134,62 @@ func (bv *BuildValidator) RunSecurityScan(ctx context.Context, imageName string,
 // AddPushTroubleshootingTips adds troubleshooting tips for push failures
 func (bv *BuildValidator) AddPushTroubleshootingTips(err error, registryURL string) []string {
 	tips := []string{}
-	
+
 	errorMsg := err.Error()
-	
-	if strings.Contains(errorMsg, "authentication required") || 
-	   strings.Contains(errorMsg, "unauthorized") {
-		tips = append(tips, 
+
+	if strings.Contains(errorMsg, "authentication required") ||
+		strings.Contains(errorMsg, "unauthorized") {
+		tips = append(tips,
 			"Authentication failed. Run: docker login "+registryURL,
 			"Check if your credentials are correct",
 			"For private registries, ensure you have push permissions")
 	}
-	
-	if strings.Contains(errorMsg, "connection refused") || 
-	   strings.Contains(errorMsg, "no such host") {
+
+	if strings.Contains(errorMsg, "connection refused") ||
+		strings.Contains(errorMsg, "no such host") {
 		tips = append(tips,
 			"Cannot connect to registry. Check if the registry URL is correct",
 			"Verify network connectivity to "+registryURL,
 			"If using a private registry, ensure it's accessible from your network")
 	}
-	
+
 	if strings.Contains(errorMsg, "denied") {
 		tips = append(tips,
 			"Access denied. Verify you have push permissions to this repository",
 			"Check if the repository exists and you have write access",
 			"For organization repositories, ensure your account is properly configured")
 	}
-	
+
 	return tips
 }
 
 // AddTroubleshootingTips adds general troubleshooting tips based on the error
 func (bv *BuildValidator) AddTroubleshootingTips(err error) []string {
 	tips := []string{}
-	
+
 	if err == nil {
 		return tips
 	}
-	
+
 	errorMsg := err.Error()
-	
+
 	// Docker daemon issues
 	if strings.Contains(errorMsg, "Cannot connect to the Docker daemon") {
-		tips = append(tips, 
+		tips = append(tips,
 			"Ensure Docker Desktop is running",
 			"Try: sudo systemctl start docker (Linux)",
 			"Check Docker daemon logs for errors")
 	}
-	
+
 	// Dockerfile syntax errors
 	if strings.Contains(errorMsg, "failed to parse Dockerfile") ||
-	   strings.Contains(errorMsg, "unknown instruction") {
+		strings.Contains(errorMsg, "unknown instruction") {
 		tips = append(tips,
 			"Check Dockerfile syntax",
 			"Ensure all instructions are valid",
 			"Verify proper line endings (LF, not CRLF)")
 	}
-	
+
 	// Build context issues
 	if strings.Contains(errorMsg, "no such file or directory") {
 		tips = append(tips,
@@ -197,16 +197,16 @@ func (bv *BuildValidator) AddTroubleshootingTips(err error) []string {
 			"Check if build context includes all necessary files",
 			"Ensure relative paths are correct from build context")
 	}
-	
+
 	// Network issues
 	if strings.Contains(errorMsg, "temporary failure resolving") ||
-	   strings.Contains(errorMsg, "network is unreachable") {
+		strings.Contains(errorMsg, "network is unreachable") {
 		tips = append(tips,
 			"Check internet connectivity",
 			"Verify DNS settings",
 			"Try using a different DNS server (e.g., 8.8.8.8)")
 	}
-	
+
 	// Space issues
 	if strings.Contains(errorMsg, "no space left on device") {
 		tips = append(tips,
@@ -214,7 +214,7 @@ func (bv *BuildValidator) AddTroubleshootingTips(err error) []string {
 			"Run: docker system prune -a",
 			"Check available space with: df -h")
 	}
-	
+
 	return tips
 }
 
@@ -239,7 +239,7 @@ func (bv *BuildValidator) ValidateArgs(args *AtomicBuildImageArgs) error {
 			}
 		}
 		if !valid {
-			return types.NewErrorBuilder("invalid_arguments", 
+			return types.NewErrorBuilder("invalid_arguments",
 				fmt.Sprintf("invalid platform %s, must be one of: %v", args.Platform, validPlatforms), "validation").
 				WithSeverity("high").
 				WithOperation("ValidateArgs").
@@ -250,7 +250,7 @@ func (bv *BuildValidator) ValidateArgs(args *AtomicBuildImageArgs) error {
 
 	// Validate registry URL if push is requested
 	if args.PushAfterBuild && args.RegistryURL == "" {
-		return types.NewErrorBuilder("invalid_arguments", 
+		return types.NewErrorBuilder("invalid_arguments",
 			"registry_url is required when push_after_build is true", "validation").
 			WithSeverity("high").
 			WithOperation("ValidateArgs").

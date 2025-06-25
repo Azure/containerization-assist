@@ -220,13 +220,13 @@ func TestTagValidation(t *testing.T) {
 			fieldChecks []string // Required fields that should have jsonschema tags
 		}{
 			{
-				name:       "AtomicBuildImageArgs",
-				structType: AtomicBuildImageArgs{},
+				name:        "AtomicBuildImageArgs",
+				structType:  AtomicBuildImageArgs{},
 				fieldChecks: []string{"ImageName", "ImageTag", "Platform"},
 			},
 			{
-				name:       "GenerateDockerfileArgs", 
-				structType: GenerateDockerfileArgs{},
+				name:        "GenerateDockerfileArgs",
+				structType:  GenerateDockerfileArgs{},
 				fieldChecks: []string{"Template", "BaseImage", "Platform"},
 			},
 		}

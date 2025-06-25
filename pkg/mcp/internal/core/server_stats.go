@@ -3,11 +3,10 @@ package core
 import (
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter/mcp"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 )
 
 // ServerStats provides comprehensive server statistics
@@ -35,36 +34,36 @@ func (s *Server) GetStats() *ServerStats {
 }
 
 // GetWorkspaceStats returns workspace statistics
-func (s *Server) GetWorkspaceStats() adapter.WorkspaceStats {
+func (s *Server) GetWorkspaceStats() mcp.WorkspaceStats {
 	stats := s.workspaceManager.GetStats()
-	return adapter.WorkspaceStats{
+	return mcp.WorkspaceStats{
 		TotalDiskUsage: stats.TotalDiskUsage,
 		SessionCount:   stats.TotalSessions,
 	}
 }
 
 // GetSessionManagerStats returns session manager statistics
-func (s *Server) GetSessionManagerStats() adapter.SessionManagerStats {
+func (s *Server) GetSessionManagerStats() mcp.SessionManagerStats {
 	stats := s.sessionManager.GetStats()
-	return adapter.SessionManagerStats{
+	return mcp.SessionManagerStats{
 		ActiveSessions: stats.ActiveSessions,
 		TotalSessions:  stats.TotalSessions,
 	}
 }
 
 // GetCircuitBreakerStats returns circuit breaker statistics
-func (s *Server) GetCircuitBreakerStats() map[string]adapter.CircuitBreakerStats {
+func (s *Server) GetCircuitBreakerStats() map[string]mcp.CircuitBreakerStats {
 	if s.circuitBreakers == nil {
 		return nil
 	}
 
 	stats := s.circuitBreakers.GetStats()
-	result := make(map[string]adapter.CircuitBreakerStats)
+	result := make(map[string]mcp.CircuitBreakerStats)
 	for name, stat := range stats {
-		result[name] = adapter.CircuitBreakerStats{
+		result[name] = mcp.CircuitBreakerStats{
 			State:        stat.State,
 			FailureCount: stat.FailureCount,
-			SuccessCount: stat.SuccessCount,
+			SuccessCount: int64(stat.SuccessCount),
 			LastFailure:  &stat.LastFailure,
 		}
 	}
@@ -72,8 +71,8 @@ func (s *Server) GetCircuitBreakerStats() map[string]adapter.CircuitBreakerStats
 }
 
 // GetConfig returns server configuration
-func (s *Server) GetConfig() adapter.ServerConfig {
-	return adapter.ServerConfig{
+func (s *Server) GetConfig() mcp.ServerConfig {
+	return mcp.ServerConfig{
 		TotalDiskLimit: s.config.TotalDiskLimit,
 	}
 }
@@ -84,7 +83,7 @@ func (s *Server) GetStartTime() time.Time {
 }
 
 // GetConversationAdapter returns the conversation handler if conversation mode is enabled
-func (s *Server) GetConversationAdapter() tools.ConversationOperations {
+func (s *Server) GetConversationAdapter() interface{} {
 	if s.conversationComponents != nil && s.conversationComponents.Handler != nil {
 		return s.conversationComponents.Handler
 	}

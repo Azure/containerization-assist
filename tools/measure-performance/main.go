@@ -49,11 +49,11 @@ type MemoryUsage struct {
 }
 
 type BenchResult struct {
-	NsPerOp     int64   `json:"ns_per_op"`
-	AllocsPerOp int64   `json:"allocs_per_op"`
-	BytesPerOp  int64   `json:"bytes_per_op"`
-	MemPerOp    string  `json:"mem_per_op"`
-	Iterations  int     `json:"iterations"`
+	NsPerOp     int64  `json:"ns_per_op"`
+	AllocsPerOp int64  `json:"allocs_per_op"`
+	BytesPerOp  int64  `json:"bytes_per_op"`
+	MemPerOp    string `json:"mem_per_op"`
+	Iterations  int    `json:"iterations"`
 }
 
 type PerformanceComparison struct {
@@ -67,20 +67,20 @@ type PerformanceComparison struct {
 
 func main() {
 	flag.Parse()
-	
+
 	fmt.Println("MCP Performance Measurement Tool")
 	fmt.Println("================================")
-	
+
 	metrics := &PerformanceMetrics{
 		Timestamp:  time.Now(),
 		Benchmarks: make(map[string]BenchResult),
 	}
-	
+
 	// Get Git version for tracking
 	if version, err := getGitVersion(); err == nil {
 		metrics.Version = version
 	}
-	
+
 	// 1. Measure build time
 	fmt.Println("📏 Measuring build time...")
 	buildTime, err := measureBuildTime()
@@ -90,7 +90,7 @@ func main() {
 		metrics.BuildTime = buildTime
 		fmt.Printf("   Build time: %s\n", buildTime.Human)
 	}
-	
+
 	// 2. Measure test time
 	fmt.Println("📏 Measuring test time...")
 	testTime, err := measureTestTime()
@@ -100,7 +100,7 @@ func main() {
 		metrics.TestTime = testTime
 		fmt.Printf("   Test time: %s\n", testTime.Human)
 	}
-	
+
 	// 3. Measure binary size
 	fmt.Println("📏 Measuring binary size...")
 	binarySize, err := measureBinarySize()
@@ -110,7 +110,7 @@ func main() {
 		metrics.BinarySize = binarySize
 		fmt.Printf("   Binary size: %s\n", binarySize.Human)
 	}
-	
+
 	// 4. Count packages and files
 	fmt.Println("📏 Counting packages and files...")
 	packageCount, fileCount, lineCount, err := countCodeMetrics()
@@ -122,7 +122,7 @@ func main() {
 		metrics.LineCount = lineCount
 		fmt.Printf("   Packages: %d, Files: %d, Lines: %d\n", packageCount, fileCount, lineCount)
 	}
-	
+
 	// 5. Run benchmarks
 	fmt.Println("📏 Running benchmarks...")
 	benchmarks, err := runBenchmarks()
@@ -132,7 +132,7 @@ func main() {
 		metrics.Benchmarks = benchmarks
 		fmt.Printf("   Ran %d benchmarks\n", len(benchmarks))
 	}
-	
+
 	// 6. Measure compile memory usage
 	fmt.Println("📏 Measuring compile memory usage...")
 	compileMemory, err := measureCompileMemory()
@@ -142,14 +142,14 @@ func main() {
 		metrics.CompileMemory = compileMemory
 		fmt.Printf("   Compile memory: %s\n", compileMemory.Human)
 	}
-	
+
 	// Save metrics
 	if err := saveMetrics(metrics, *output); err != nil {
 		log.Fatalf("Failed to save metrics: %v", err)
 	}
-	
+
 	fmt.Printf("\n✅ Performance metrics saved to: %s\n", *output)
-	
+
 	// Compare with baseline if requested
 	if *compare && *baseline != "" {
 		fmt.Println("\n📊 Comparing with baseline...")
@@ -171,12 +171,12 @@ func getGitVersion() (string, error) {
 func measureBuildTime() (Duration, error) {
 	// Clean first
 	exec.Command("go", "clean", "-cache").Run()
-	
+
 	start := time.Now()
 	cmd := exec.Command("go", "build", "./...")
 	err := cmd.Run()
 	duration := time.Since(start)
-	
+
 	return Duration{
 		Seconds: duration.Seconds(),
 		Human:   duration.String(),
@@ -188,7 +188,7 @@ func measureTestTime() (Duration, error) {
 	cmd := exec.Command("go", "test", "./...", "-v")
 	err := cmd.Run()
 	duration := time.Since(start)
-	
+
 	return Duration{
 		Seconds: duration.Seconds(),
 		Human:   duration.String(),
@@ -199,21 +199,21 @@ func measureBinarySize() (FileSize, error) {
 	// Build the main binary
 	tempDir := os.TempDir()
 	binaryPath := filepath.Join(tempDir, "mcp-server-test")
-	
+
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/mcp-server")
 	if err := cmd.Run(); err != nil {
 		return FileSize{}, fmt.Errorf("failed to build binary: %w", err)
 	}
-	
+
 	// Get file size
 	info, err := os.Stat(binaryPath)
 	if err != nil {
 		return FileSize{}, fmt.Errorf("failed to stat binary: %w", err)
 	}
-	
+
 	// Clean up
 	os.Remove(binaryPath)
-	
+
 	size := info.Size()
 	return FileSize{
 		Bytes: size,
@@ -225,12 +225,12 @@ func countCodeMetrics() (int, int, int, error) {
 	packageCount := 0
 	fileCount := 0
 	lineCount := 0
-	
+
 	err := filepath.WalkDir(".", func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip vendor, .git, and other irrelevant directories
 		if d.IsDir() {
 			name := d.Name()
@@ -244,33 +244,33 @@ func countCodeMetrics() (int, int, int, error) {
 			}
 			return nil
 		}
-		
+
 		if strings.HasSuffix(path, ".go") {
 			fileCount++
-			
+
 			// Count lines in the file
 			lines, err := countLinesInFile(path)
 			if err == nil {
 				lineCount += lines
 			}
 		}
-		
+
 		return nil
 	})
-	
+
 	return packageCount, fileCount, lineCount, err
 }
 
 func runBenchmarks() (map[string]BenchResult, error) {
 	benchmarks := make(map[string]BenchResult)
-	
+
 	// Run benchmarks with memory stats
 	cmd := exec.Command("go", "test", "-bench=.", "-benchmem", "./...")
 	output, err := cmd.Output()
 	if err != nil {
 		return benchmarks, fmt.Errorf("failed to run benchmarks: %w", err)
 	}
-	
+
 	// Parse benchmark output
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
@@ -286,7 +286,7 @@ func runBenchmarks() (map[string]BenchResult, error) {
 			}
 		}
 	}
-	
+
 	return benchmarks, nil
 }
 
@@ -294,25 +294,25 @@ func measureCompileMemory() (MemoryUsage, error) {
 	// Use go build with memory profiling
 	tempDir := os.TempDir()
 	memProfilePath := filepath.Join(tempDir, "compile.mem")
-	
+
 	cmd := exec.Command("go", "build", "-gcflags", "-memprofile="+memProfilePath, "./...")
 	err := cmd.Run()
 	if err != nil {
 		return MemoryUsage{}, fmt.Errorf("failed to build with memory profiling: %w", err)
 	}
-	
+
 	// Try to get memory info from the profile (simplified)
 	info, err := os.Stat(memProfilePath)
 	if err != nil {
 		return MemoryUsage{}, nil // Return empty if profiling didn't work
 	}
-	
+
 	// Clean up
 	os.Remove(memProfilePath)
-	
+
 	// This is a rough approximation - in practice you'd parse the actual profile
 	size := info.Size() * 1000 // Rough multiplier for actual memory usage
-	
+
 	return MemoryUsage{
 		Bytes: size,
 		Human: formatBytes(size),
@@ -324,7 +324,7 @@ func saveMetrics(metrics *PerformanceMetrics, outputPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal metrics: %w", err)
 	}
-	
+
 	return os.WriteFile(outputPath, data, 0644)
 }
 
@@ -334,16 +334,16 @@ func compareWithBaseline(current *PerformanceMetrics, baselinePath string) error
 	if err != nil {
 		return fmt.Errorf("failed to read baseline file: %w", err)
 	}
-	
+
 	var baseline PerformanceMetrics
 	if err := json.Unmarshal(baselineData, &baseline); err != nil {
 		return fmt.Errorf("failed to parse baseline data: %w", err)
 	}
-	
+
 	// Compare metrics
 	fmt.Println("\n📊 Performance Comparison")
 	fmt.Println("========================")
-	
+
 	comparisons := []PerformanceComparison{
 		compareMetric("Build Time", baseline.BuildTime.Seconds, current.BuildTime.Seconds, true),
 		compareMetric("Test Time", baseline.TestTime.Seconds, current.TestTime.Seconds, true),
@@ -352,10 +352,10 @@ func compareWithBaseline(current *PerformanceMetrics, baselinePath string) error
 		compareMetric("File Count", float64(baseline.FileCount), float64(current.FileCount), true),
 		compareMetric("Line Count", float64(baseline.LineCount), float64(current.LineCount), true),
 	}
-	
+
 	regressions := 0
 	improvements := 0
-	
+
 	for _, comp := range comparisons {
 		symbol := "="
 		if comp.ChangeType == "improvement" {
@@ -365,14 +365,14 @@ func compareWithBaseline(current *PerformanceMetrics, baselinePath string) error
 			symbol = "↑"
 			regressions++
 		}
-		
-		fmt.Printf("%s %s: %.2f%% change %s\n", 
-			symbol, comp.Metric, comp.Change*100, 
+
+		fmt.Printf("%s %s: %.2f%% change %s\n",
+			symbol, comp.Metric, comp.Change*100,
 			formatComparison(comp.Baseline, comp.Current))
 	}
-	
+
 	fmt.Printf("\nSummary: %d improvements, %d regressions\n", improvements, regressions)
-	
+
 	if regressions > 0 {
 		fmt.Println("⚠️  Performance regressions detected!")
 	} else if improvements > 0 {
@@ -380,14 +380,14 @@ func compareWithBaseline(current *PerformanceMetrics, baselinePath string) error
 	} else {
 		fmt.Println("➡️  Performance remained stable")
 	}
-	
+
 	return nil
 }
 
 func compareMetric(name string, baseline, current float64, lowerIsBetter bool) PerformanceComparison {
 	change := (current - baseline) / baseline
 	changeType := "neutral"
-	
+
 	if change > 0.05 { // 5% threshold
 		if lowerIsBetter {
 			changeType = "regression"
@@ -401,7 +401,7 @@ func compareMetric(name string, baseline, current float64, lowerIsBetter bool) P
 			changeType = "regression"
 		}
 	}
-	
+
 	return PerformanceComparison{
 		Metric:      name,
 		Baseline:    baseline,
@@ -434,13 +434,13 @@ func hasGoFilesInDir(dir string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") {
 			return true, nil
 		}
 	}
-	
+
 	return false, nil
 }
 
@@ -449,7 +449,7 @@ func countLinesInFile(path string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	
+
 	return strings.Count(string(data), "\n"), nil
 }
 
@@ -459,14 +459,14 @@ func parseBenchmarkLine(line string) *BenchResult {
 	if len(parts) < 4 {
 		return nil
 	}
-	
+
 	result := &BenchResult{}
-	
+
 	// Parse iterations
 	if iterations, err := strconv.Atoi(parts[1]); err == nil {
 		result.Iterations = iterations
 	}
-	
+
 	// Parse ns/op
 	if len(parts) >= 4 && strings.HasSuffix(parts[3], "ns/op") {
 		nsStr := strings.TrimSuffix(parts[2], "ns/op")
@@ -474,7 +474,7 @@ func parseBenchmarkLine(line string) *BenchResult {
 			result.NsPerOp = ns
 		}
 	}
-	
+
 	// Parse memory stats if present
 	for i, part := range parts {
 		if strings.HasSuffix(part, "B/op") && i > 0 {
@@ -490,6 +490,6 @@ func parseBenchmarkLine(line string) *BenchResult {
 			}
 		}
 	}
-	
+
 	return result
 }

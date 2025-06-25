@@ -75,8 +75,8 @@ type DeploymentRecommendation = repository.DeploymentRecommendation
 
 // AtomicAnalyzeRepositoryTool implements atomic repository analysis using core operations
 type AtomicAnalyzeRepositoryTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	// errorHandler field removed - using direct error handling
 	logger           zerolog.Logger
 	repoCloner       *repository.Cloner
@@ -85,7 +85,7 @@ type AtomicAnalyzeRepositoryTool struct {
 }
 
 // NewAtomicAnalyzeRepositoryTool creates a new atomic analyze repository tool
-func NewAtomicAnalyzeRepositoryTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicAnalyzeRepositoryTool {
+func NewAtomicAnalyzeRepositoryTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicAnalyzeRepositoryTool {
 	return &AtomicAnalyzeRepositoryTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -462,8 +462,9 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*sessiontypes.SessionState, error) {
 	if sessionID != "" {
 		// Try to get existing session
-		session, err := t.sessionManager.GetSession(sessionID)
+		sessionInterface, err := t.sessionManager.GetSession(sessionID)
 		if err == nil {
+			session := sessionInterface.(*sessiontypes.SessionState)
 			// Check if session is expired
 			if time.Now().After(session.ExpiresAt) {
 				t.logger.Info().
@@ -480,10 +481,11 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 					oldSessionInfo["last_repo_url"] = session.ScanSummary.RepoURL
 				}
 				// Create new session with metadata about the old one
-				newSession, err := t.sessionManager.GetOrCreateSession("")
+				newSessionInterface, err := t.sessionManager.GetOrCreateSession("")
 				if err != nil {
 					return nil, mcperror.NewSessionNotFound("replacement_session")
 				}
+				newSession := newSessionInterface.(*sessiontypes.SessionState)
 				if newSession.Metadata == nil {
 					newSession.Metadata = make(map[string]interface{})
 				}
@@ -504,10 +506,11 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 	}
 
 	// Create new session
-	session, err := t.sessionManager.GetOrCreateSession("")
+	sessionInterface, err := t.sessionManager.GetOrCreateSession("")
 	if err != nil {
 		return nil, mcperror.NewSessionNotFound("new_session")
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	t.logger.Info().Str("session_id", session.SessionID).Msg("Created new session for repository analysis")
 	return session, nil
@@ -516,10 +519,11 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 // cloneRepository clones the repository using the repository module
 func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessionID string, args AtomicAnalyzeRepositoryArgs) (*git.CloneResult, error) {
 	// Get session to find workspace directory
-	session, err := t.sessionManager.GetSession(sessionID)
+	sessionInterface, err := t.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Prepare clone options
 	cloneOpts := repository.CloneOptions{
@@ -664,10 +668,10 @@ func (t *AtomicAnalyzeRepositoryTool) validateLocalPath(path string) error {
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicAnalyzeRepositoryTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
-		Name:        "atomic_analyze_repository",
-		Description: "Analyzes repository structure, detects programming language, framework, and generates containerization recommendations",
-		Version:     "1.0.0",
-		Category:    "analysis",
+		Name:         "atomic_analyze_repository",
+		Description:  "Analyzes repository structure, detects programming language, framework, and generates containerization recommendations",
+		Version:      "1.0.0",
+		Category:     "analysis",
 		Dependencies: []string{"git"},
 		Capabilities: []string{
 			"supports_streaming",

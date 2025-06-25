@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
@@ -153,8 +154,8 @@ func (a *GenerateDockerfileAdapter) GetVersion() string {
 	return "1.0.0"
 }
 
-func (a *GenerateDockerfileAdapter) GetCapabilities() ToolCapabilities {
-	return ToolCapabilities{
+func (a *GenerateDockerfileAdapter) GetCapabilities() contract.ToolCapabilities {
+	return contract.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: false,
 		IsLongRunning:     false,

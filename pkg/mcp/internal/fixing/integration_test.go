@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -218,11 +218,11 @@ func TestFixingConfiguration(t *testing.T) {
 	assert.False(t, defaultConfig.EnableRouting)
 }
 
-// MockOperation implements FixableOperation for testing
+// MockOperation implements mcptypes.FixableOperation for testing
 type MockOperation struct {
 	executeFunc         func(ctx context.Context) error
-	failureAnalysisFunc func(ctx context.Context, err error) (*types.RichError, error)
-	prepareRetryFunc    func(ctx context.Context, fixAttempt *fixing.FixAttempt) error
+	failureAnalysisFunc func(ctx context.Context, err error) (*mcptypes.RichError, error)
+	prepareRetryFunc    func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error
 }
 
 func (m *MockOperation) ExecuteOnce(ctx context.Context) error {
@@ -232,12 +232,12 @@ func (m *MockOperation) ExecuteOnce(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockOperation) GetFailureAnalysis(ctx context.Context, err error) (*types.RichError, error) {
+func (m *MockOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
 	if m.failureAnalysisFunc != nil {
 		return m.failureAnalysisFunc(ctx, err)
 	}
 
-	return &types.RichError{
+	return &mcptypes.RichError{
 		Code:     "TEST_ERROR",
 		Type:     "test_error",
 		Severity: "Medium",
@@ -245,20 +245,32 @@ func (m *MockOperation) GetFailureAnalysis(ctx context.Context, err error) (*typ
 	}, nil
 }
 
-func (m *MockOperation) PrepareForRetry(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (m *MockOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if m.prepareRetryFunc != nil {
 		return m.prepareRetryFunc(ctx, fixAttempt)
 	}
 	return nil
 }
 
+func (m *MockOperation) CanRetry() bool {
+	return true
+}
+
+func (m *MockOperation) Execute(ctx context.Context) error {
+	return m.ExecuteOnce(ctx)
+}
+
+func (m *MockOperation) GetLastError() error {
+	return nil
+}
+
 func TestFixAttemptSerialization(t *testing.T) {
-	fixAttempt := fixing.FixAttempt{
+	fixAttempt := mcptypes.FixAttempt{
 		AttemptNumber: 1,
 		StartTime:     time.Now(),
 		EndTime:       time.Now().Add(time.Minute),
 		Duration:      time.Minute,
-		FixStrategy: fixing.FixStrategy{
+		FixStrategy: mcptypes.FixStrategy{
 			Name:        "Test Fix",
 			Description: "A test fix strategy",
 			Priority:    1,
@@ -278,14 +290,12 @@ func TestFixAttemptSerialization(t *testing.T) {
 }
 
 func TestFixStrategyValidation(t *testing.T) {
-	strategy := fixing.FixStrategy{
-		Name:          "Fix Base Image",
-		Description:   "Update the Docker base image to a valid one",
-		Priority:      1,
-		Type:          "dockerfile",
-		Commands:      []string{"docker pull node:18-alpine"},
-		Validation:    "Verify image can be pulled",
-		EstimatedTime: "2 minutes",
+	strategy := mcptypes.FixStrategy{
+		Name:        "Fix Base Image",
+		Description: "Update the Docker base image to a valid one",
+		Priority:    1,
+		Type:        "dockerfile",
+		Commands:    []string{"docker pull node:18-alpine"},
 	}
 
 	assert.Equal(t, "Fix Base Image", strategy.Name)

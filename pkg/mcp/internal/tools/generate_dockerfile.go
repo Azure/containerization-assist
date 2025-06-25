@@ -132,9 +132,15 @@ func (t *GenerateDockerfileTool) Execute(ctx context.Context, args GenerateDocke
 		Msg("Starting Dockerfile generation")
 
 	// Get session to access repository analysis
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		return nil, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session %s: %v", args.SessionID, err), "session_error")
+	}
+
+	// Type assert to concrete session type
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		return nil, types.NewRichError("INTERNAL_ERROR", "session type assertion failed", "type_error")
 	}
 
 	// Select template based on repository analysis or user override

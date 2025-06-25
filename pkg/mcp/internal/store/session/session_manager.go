@@ -91,8 +91,8 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 	return sm, nil
 }
 
-// GetOrCreateSession retrieves an existing session or creates a new one
-func (sm *SessionManager) GetOrCreateSession(sessionID string) (*sessiontypes.SessionState, error) {
+// getOrCreateSessionConcrete retrieves an existing session or creates a new one
+func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*sessiontypes.SessionState, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -167,8 +167,8 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(*sessiont
 	return nil
 }
 
-// GetSession retrieves a session by ID
-func (sm *SessionManager) GetSession(sessionID string) (*sessiontypes.SessionState, error) {
+// GetSessionConcrete retrieves a session by ID with concrete return type
+func (sm *SessionManager) GetSessionConcrete(sessionID string) (*sessiontypes.SessionState, error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -179,8 +179,35 @@ func (sm *SessionManager) GetSession(sessionID string) (*sessiontypes.SessionSta
 	return nil, fmt.Errorf("session not found: %s", sessionID)
 }
 
-// ListSessions returns a list of all sessions
-func (sm *SessionManager) ListSessions() []sessiontypes.SessionSummary {
+// GetSessionInterface (interface compatible) for ToolSessionManager interface
+func (sm *SessionManager) GetSessionInterface(sessionID string) (interface{}, error) {
+	session, err := sm.GetSessionConcrete(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+// GetSession (interface override) for ToolSessionManager interface compatibility
+func (sm *SessionManager) GetSession(sessionID string) (interface{}, error) {
+	session, err := sm.GetSessionConcrete(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+// GetOrCreateSession (interface override) for ToolSessionManager interface compatibility
+func (sm *SessionManager) GetOrCreateSession(sessionID string) (interface{}, error) {
+	session, err := sm.getOrCreateSessionConcrete(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+// ListSessionSummaries returns a list of all session summaries
+func (sm *SessionManager) ListSessionSummaries() []sessiontypes.SessionSummary {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -193,7 +220,7 @@ func (sm *SessionManager) ListSessions() []sessiontypes.SessionSummary {
 }
 
 // DeleteSession removes a session and cleans up its workspace
-func (sm *SessionManager) DeleteSession(sessionID string) error {
+func (sm *SessionManager) DeleteSession(ctx context.Context, sessionID string) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -218,6 +245,67 @@ func (sm *SessionManager) DeleteSession(sessionID string) error {
 
 	sm.logger.Info().Str("session_id", sessionID).Msg("Deleted session")
 	return nil
+}
+
+// FindSessionByRepo finds a session by repository URL
+func (sm *SessionManager) FindSessionByRepo(ctx context.Context, repoURL string) (interface{}, error) {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	for _, session := range sm.sessions {
+		// Check if repository URL matches
+		if session.RepoURL == repoURL {
+			return session, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no session found for repository URL: %s", repoURL)
+}
+
+// ListSessions (interface compatible) returns sessions with optional filtering
+func (sm *SessionManager) ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error) {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	// Convert sessions to interface{} slice for compatibility
+	var results []interface{}
+	for _, session := range sm.sessions {
+		// Apply basic filtering if provided
+		if filter != nil {
+			// Simple filter implementation - could be expanded
+			if status, ok := filter["status"]; ok && status != "active" {
+				continue
+			}
+		}
+		results = append(results, session)
+	}
+
+	return results, nil
+}
+
+// GetOrCreateSession (interface compatible) for ToolSessionManager interface
+func (sm *SessionManager) GetOrCreateSessionFromRepo(repoURL string) (interface{}, error) {
+	// First try to find an existing session for this repo
+	if session, err := sm.FindSessionByRepo(context.Background(), repoURL); err == nil {
+		return session, nil
+	}
+
+	// If not found, create a new session with a random ID
+	sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
+	session, err := sm.getOrCreateSessionConcrete(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update the session with repo URL
+	err = sm.UpdateSession(session.SessionID, func(s *sessiontypes.SessionState) {
+		s.RepoURL = repoURL
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return session, nil
 }
 
 // GarbageCollect removes expired sessions and cleans up resources

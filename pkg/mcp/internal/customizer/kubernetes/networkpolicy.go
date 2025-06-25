@@ -52,8 +52,8 @@ type NetworkPolicyPortRule struct {
 
 // NetworkPolicyPeerRule represents a peer rule in NetworkPolicy
 type NetworkPolicyPeerRule struct {
-	PodSelector       map[string]string    `json:"podSelector,omitempty"`
-	NamespaceSelector map[string]string    `json:"namespaceSelector,omitempty"`
+	PodSelector       map[string]string     `json:"podSelector,omitempty"`
+	NamespaceSelector map[string]string     `json:"namespaceSelector,omitempty"`
 	IPBlock           *NetworkPolicyIPBlock `json:"ipBlock,omitempty"`
 }
 
@@ -133,7 +133,7 @@ func (nc *NetworkPolicyCustomizer) applyCustomizations(networkPolicy *map[string
 		ingressRules := make([]interface{}, len(options.Ingress))
 		for i, rule := range options.Ingress {
 			ingressRule := make(map[string]interface{})
-			
+
 			// Add ports
 			if len(rule.Ports) > 0 {
 				ports := make([]interface{}, len(rule.Ports))
@@ -152,7 +152,7 @@ func (nc *NetworkPolicyCustomizer) applyCustomizations(networkPolicy *map[string
 				}
 				ingressRule["ports"] = ports
 			}
-			
+
 			// Add from rules
 			if len(rule.From) > 0 {
 				fromRules := make([]interface{}, len(rule.From))
@@ -181,7 +181,7 @@ func (nc *NetworkPolicyCustomizer) applyCustomizations(networkPolicy *map[string
 				}
 				ingressRule["from"] = fromRules
 			}
-			
+
 			ingressRules[i] = ingressRule
 		}
 		spec["ingress"] = ingressRules
@@ -192,7 +192,7 @@ func (nc *NetworkPolicyCustomizer) applyCustomizations(networkPolicy *map[string
 		egressRules := make([]interface{}, len(options.Egress))
 		for i, rule := range options.Egress {
 			egressRule := make(map[string]interface{})
-			
+
 			// Add ports
 			if len(rule.Ports) > 0 {
 				ports := make([]interface{}, len(rule.Ports))
@@ -211,7 +211,7 @@ func (nc *NetworkPolicyCustomizer) applyCustomizations(networkPolicy *map[string
 				}
 				egressRule["ports"] = ports
 			}
-			
+
 			// Add to rules
 			if len(rule.To) > 0 {
 				toRules := make([]interface{}, len(rule.To))
@@ -240,7 +240,7 @@ func (nc *NetworkPolicyCustomizer) applyCustomizations(networkPolicy *map[string
 				}
 				egressRule["to"] = toRules
 			}
-			
+
 			egressRules[i] = egressRule
 		}
 		spec["egress"] = egressRules
@@ -262,17 +262,17 @@ func (nc *NetworkPolicyCustomizer) applyCustomizations(networkPolicy *map[string
 // applyLabels applies labels to the NetworkPolicy metadata
 func (nc *NetworkPolicyCustomizer) applyLabels(networkPolicy *map[string]interface{}, labels map[string]string) {
 	np := *networkPolicy
-	
+
 	if _, exists := np["metadata"]; !exists {
 		np["metadata"] = make(map[string]interface{})
 	}
 	metadata := np["metadata"].(map[string]interface{})
-	
+
 	if _, exists := metadata["labels"]; !exists {
 		metadata["labels"] = make(map[string]interface{})
 	}
 	metadataLabels := metadata["labels"].(map[string]interface{})
-	
+
 	for key, value := range labels {
 		metadataLabels[key] = value
 	}
@@ -281,17 +281,17 @@ func (nc *NetworkPolicyCustomizer) applyLabels(networkPolicy *map[string]interfa
 // applyAnnotations applies annotations to the NetworkPolicy metadata
 func (nc *NetworkPolicyCustomizer) applyAnnotations(networkPolicy *map[string]interface{}, annotations map[string]string) {
 	np := *networkPolicy
-	
+
 	if _, exists := np["metadata"]; !exists {
 		np["metadata"] = make(map[string]interface{})
 	}
 	metadata := np["metadata"].(map[string]interface{})
-	
+
 	if _, exists := metadata["annotations"]; !exists {
 		metadata["annotations"] = make(map[string]interface{})
 	}
 	metadataAnnotations := metadata["annotations"].(map[string]interface{})
-	
+
 	for key, value := range annotations {
 		metadataAnnotations[key] = value
 	}

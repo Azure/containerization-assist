@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
 	"github.com/rs/zerolog"
@@ -54,8 +55,14 @@ func TestConversationFlow(t *testing.T) {
 	err = server.EnableConversationMode(convConfig)
 	require.NoError(t, err)
 
-	adapter := server.GetConversationAdapter()
-	require.NotNil(t, adapter)
+	adapterInterface := server.GetConversationAdapter()
+	require.NotNil(t, adapterInterface)
+
+	// Type assert to the concrete conversation handler type
+	adapter, ok := adapterInterface.(interface {
+		HandleConversation(ctx context.Context, args tools.ChatToolArgs) (*tools.ChatToolResult, error)
+	})
+	require.True(t, ok, "adapter should implement HandleConversation method")
 
 	ctx := context.Background()
 
@@ -141,8 +148,11 @@ func TestConversationState(t *testing.T) {
 
 	t.Run("ConversationStateCreation", func(t *testing.T) {
 		sessionID := "conv-state-test-123"
-		session, err := sessionManager.GetOrCreateSession(sessionID)
+		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
+
+		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		require.True(t, ok, "session should be of correct type")
 
 		// Create conversation state
 		state := &conversation.ConversationState{
@@ -162,8 +172,11 @@ func TestConversationState(t *testing.T) {
 
 	t.Run("ConversationTurnHistory", func(t *testing.T) {
 		sessionID := "conv-history-test-456"
-		session, err := sessionManager.GetOrCreateSession(sessionID)
+		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
+
+		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		require.True(t, ok, "session should be of correct type")
 
 		state := &conversation.ConversationState{
 			SessionState: session,

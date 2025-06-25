@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/services/errors"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/services/telemetry"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/services/validation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools/base"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -43,7 +43,7 @@ func (m *ToolMiddleware) Use(middleware Middleware) {
 }
 
 // ExecuteWithMiddleware executes a tool with all middleware applied
-func (m *ToolMiddleware) ExecuteWithMiddleware(ctx context.Context, tool base.AtomicTool, args interface{}) (interface{}, error) {
+func (m *ToolMiddleware) ExecuteWithMiddleware(ctx context.Context, tool mcptypes.Tool, args interface{}) (interface{}, error) {
 	// Create execution context
 	execCtx := &ExecutionContext{
 		Context:   ctx,
@@ -86,7 +86,7 @@ func (m *ToolMiddleware) recordExecution(execCtx *ExecutionContext, result inter
 	duration := time.Since(execCtx.StartTime)
 
 	execution := telemetry.ToolExecution{
-		Tool:      execCtx.Tool.GetName(),
+		Tool:      execCtx.Tool.GetMetadata().Name,
 		Operation: "execute",
 		StartTime: execCtx.StartTime,
 		EndTime:   time.Now(),
@@ -106,7 +106,7 @@ func (m *ToolMiddleware) recordExecution(execCtx *ExecutionContext, result inter
 // ExecutionContext provides context for tool execution
 type ExecutionContext struct {
 	Context   context.Context
-	Tool      base.AtomicTool
+	Tool      mcptypes.Tool
 	Args      interface{}
 	StartTime time.Time
 	Metadata  map[string]interface{}
@@ -139,11 +139,11 @@ func (m *ValidationMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 	return func(ctx *ExecutionContext) (interface{}, error) {
 		// Validate arguments using the tool's validation
 		if err := ctx.Tool.Validate(ctx.Context, ctx.Args); err != nil {
-			m.logger.Error().Err(err).Str("tool", ctx.Tool.GetName()).Msg("Validation failed")
+			m.logger.Error().Err(err).Str("tool", ctx.Tool.GetMetadata().Name).Msg("Validation failed")
 			return nil, err
 		}
 
-		m.logger.Debug().Str("tool", ctx.Tool.GetName()).Msg("Validation passed")
+		m.logger.Debug().Str("tool", ctx.Tool.GetMetadata().Name).Msg("Validation passed")
 
 		// Continue to next middleware
 		return next(ctx)
@@ -166,7 +166,7 @@ func NewLoggingMiddleware(logger zerolog.Logger) *LoggingMiddleware {
 func (m *LoggingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 	return func(ctx *ExecutionContext) (interface{}, error) {
 		m.logger.Info().
-			Str("tool", ctx.Tool.GetName()).
+			Str("tool", ctx.Tool.GetMetadata().Name).
 			Msg("Tool execution started")
 
 		result, err := next(ctx)
@@ -174,12 +174,12 @@ func (m *LoggingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 		if err != nil {
 			m.logger.Error().
 				Err(err).
-				Str("tool", ctx.Tool.GetName()).
+				Str("tool", ctx.Tool.GetMetadata().Name).
 				Dur("duration", time.Since(ctx.StartTime)).
 				Msg("Tool execution failed")
 		} else {
 			m.logger.Info().
-				Str("tool", ctx.Tool.GetName()).
+				Str("tool", ctx.Tool.GetMetadata().Name).
 				Dur("duration", time.Since(ctx.StartTime)).
 				Msg("Tool execution completed successfully")
 		}
@@ -210,7 +210,7 @@ func (m *ErrorHandlingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 		if err != nil {
 			// Create error context
 			errorCtx := errors.ErrorContext{
-				Tool:      ctx.Tool.GetName(),
+				Tool:      ctx.Tool.GetMetadata().Name,
 				Operation: "execute",
 				Fields:    make(map[string]interface{}),
 			}
@@ -247,7 +247,7 @@ func NewMetricsMiddleware(service *telemetry.TelemetryService, logger zerolog.Lo
 func (m *MetricsMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 	return func(ctx *ExecutionContext) (interface{}, error) {
 		// Create performance tracker
-		tracker := m.service.CreatePerformanceTracker(ctx.Tool.GetName(), "execute")
+		tracker := m.service.CreatePerformanceTracker(ctx.Tool.GetMetadata().Name, "execute")
 		tracker.Start()
 
 		result, err := next(ctx)
@@ -263,7 +263,7 @@ func (m *MetricsMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 		}
 
 		m.logger.Debug().
-			Str("tool", ctx.Tool.GetName()).
+			Str("tool", ctx.Tool.GetMetadata().Name).
 			Dur("duration", duration).
 			Bool("success", err == nil).
 			Msg("Metrics recorded")
@@ -291,7 +291,7 @@ func (m *RecoveryMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 			if r := recover(); r != nil {
 				m.logger.Error().
 					Interface("panic", r).
-					Str("tool", ctx.Tool.GetName()).
+					Str("tool", ctx.Tool.GetMetadata().Name).
 					Msg("Panic recovered during tool execution")
 
 				err = fmt.Errorf("tool execution panicked: %v", r)
@@ -337,8 +337,9 @@ func (m *ContextMiddleware) extractMetadata(ctx *ExecutionContext) {
 	}
 
 	// Add tool metadata
-	ctx.Metadata["tool_name"] = ctx.Tool.GetName()
-	ctx.Metadata["tool_version"] = ctx.Tool.GetVersion()
+	metadata := ctx.Tool.GetMetadata()
+	ctx.Metadata["tool_name"] = metadata.Name
+	ctx.Metadata["tool_version"] = metadata.Version
 }
 
 // TimeoutMiddleware provides execution timeout
@@ -388,7 +389,7 @@ func (m *TimeoutMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 			ctx.Context = originalCtx
 
 			m.logger.Error().
-				Str("tool", ctx.Tool.GetName()).
+				Str("tool", ctx.Tool.GetMetadata().Name).
 				Dur("timeout", m.timeout).
 				Msg("Tool execution timed out")
 

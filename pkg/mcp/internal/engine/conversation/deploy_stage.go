@@ -152,26 +152,26 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	if resultData, ok := result.Result.(map[string]interface{}); ok {
 		if manifests, ok := resultData["manifests"].(map[string]interface{}); ok {
 			for name, content := range manifests {
-			contentStr, ok := content.(string)
-			if !ok {
-				continue // Skip invalid content
-			}
-			manifest := types.K8sManifest{
-				Name:    name,
-				Content: contentStr,
-				Kind:    extractKind(contentStr),
-			}
-			state.K8sManifests[name] = manifest
+				contentStr, ok := content.(string)
+				if !ok {
+					continue // Skip invalid content
+				}
+				manifest := types.K8sManifest{
+					Name:    name,
+					Content: contentStr,
+					Kind:    extractKind(contentStr),
+				}
+				state.K8sManifests[name] = manifest
 
-			// Add as artifact
-			artifact := Artifact{
-				Type:    "k8s-manifest",
-				Name:    fmt.Sprintf("%s (%s)", name, manifest.Kind),
-				Content: manifest.Content,
-				Stage:   types.StageManifests,
+				// Add as artifact
+				artifact := Artifact{
+					Type:    "k8s-manifest",
+					Name:    fmt.Sprintf("%s (%s)", name, manifest.Kind),
+					Content: manifest.Content,
+					Stage:   types.StageManifests,
+				}
+				state.AddArtifact(artifact)
 			}
-			state.AddArtifact(artifact)
-		}
 		}
 	}
 

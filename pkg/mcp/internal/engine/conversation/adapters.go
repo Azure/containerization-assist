@@ -10,6 +10,36 @@ import (
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 )
 
+// ToolResult represents the result of a tool execution in the conversation engine
+type ToolResult struct {
+	CallID        string        `json:"call_id"`
+	CorrelationID string        `json:"correlation_id"`
+	ToolName      string        `json:"tool_name"`
+	Success       bool          `json:"success"`
+	Result        interface{}   `json:"result,omitempty"`
+	Error         string        `json:"error,omitempty"`
+	ExecutionTime time.Duration `json:"execution_time"`
+	Timestamp     time.Time     `json:"timestamp"`
+}
+
+// IsSuccess implements the mcptypes.ToolResult interface
+func (tr *ToolResult) IsSuccess() bool {
+	return tr.Success
+}
+
+// GetError implements the mcptypes.ToolResult interface
+func (tr *ToolResult) GetError() error {
+	if tr.Error == "" {
+		return nil
+	}
+	return fmt.Errorf("%s", tr.Error)
+}
+
+// ToolOrchestrator defines the interface expected by the conversation engine
+type ToolOrchestrator interface {
+	ExecuteTool(ctx context.Context, toolName string, args interface{}, sessionID string) (*ToolResult, error)
+}
+
 // sessionManagerAdapter adapts the conversation session manager to orchestration.SessionManager interface
 type sessionManagerAdapter struct {
 	sessionManager *session.SessionManager

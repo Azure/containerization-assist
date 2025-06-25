@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/rs/zerolog"
 )
 
@@ -32,7 +32,7 @@ type ConversationHandlerConfig struct {
 	PreferenceStore  *preference.PreferenceStore
 	PipelineAdapter  *mcpadapter.PipelineAdapter        // Concrete type instead of generic
 	ToolOrchestrator *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
-	Transport        transport.Transport
+	Transport        interface{}                        // Accept both mcptypes.Transport and internal transport.Transport
 	Logger           zerolog.Logger
 	Telemetry        *ops.TelemetryManager
 }
@@ -140,12 +140,15 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 
 	// Check if autopilot is enabled in session context
 	if sessionID := response.SessionID; sessionID != "" {
-		session, err := ch.sessionManager.GetSession(sessionID)
-		if err == nil && session != nil && session.RepoAnalysis != nil {
-			if sessionCtx, ok := session.RepoAnalysis["_context"].(map[string]interface{}); ok {
-				if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
-					// Override user preferences when autopilot is explicitly enabled
-					userPrefs.SkipConfirmations = true
+		sessionInterface, err := ch.sessionManager.GetSession(sessionID)
+		if err == nil && sessionInterface != nil {
+			// Type assert to concrete session type
+			if session, ok := sessionInterface.(*sessiontypes.SessionState); ok && session.RepoAnalysis != nil {
+				if sessionCtx, ok := session.RepoAnalysis["_context"].(map[string]interface{}); ok {
+					if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
+						// Override user preferences when autopilot is explicitly enabled
+						userPrefs.SkipConfirmations = true
+					}
 				}
 			}
 		}

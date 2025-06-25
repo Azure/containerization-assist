@@ -18,6 +18,7 @@ import (
 	stdioutils "github.com/Azure/container-copilot/pkg/mcp/internal/transport/stdio"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -60,7 +61,7 @@ type Server struct {
 	workspaceManager *store.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
-	transport        transport.Transport
+	transport        mcptypes.Transport
 	logger           zerolog.Logger
 	startTime        time.Time
 
@@ -150,7 +151,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	})
 
 	// Initialize transport
-	var mcpTransport transport.Transport
+	var mcpTransport mcptypes.Transport
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -185,8 +186,12 @@ func NewServer(config ServerConfig) (*Server, error) {
 		})))
 
 	// Set GomcpManager on StdioTransport for proper lifecycle management
-	if stdioTransport, ok := mcpTransport.(*transport.StdioTransport); ok {
-		stdioTransport.SetGomcpManager(gomcpManager)
+	// Note: We need to import the transport package to access concrete types
+	if mcpTransport.Name() == "stdio" {
+		// For stdio transport, we need to set the gomcp manager if possible
+		if setter, ok := mcpTransport.(interface{ SetGomcpManager(interface{}) }); ok {
+			setter.SetGomcpManager(gomcpManager)
+		}
 	}
 
 	// Initialize OpenTelemetry if enabled
@@ -288,7 +293,7 @@ func (s *Server) IsConversationModeEnabled() bool {
 }
 
 // GetTransport returns the server's transport
-func (s *Server) GetTransport() transport.Transport {
+func (s *Server) GetTransport() mcptypes.Transport {
 	return s.transport
 }
 

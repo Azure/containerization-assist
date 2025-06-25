@@ -18,7 +18,7 @@ type PromptManager struct {
 	toolOrchestrator ToolOrchestrator
 	preFlightChecker *ops.PreFlightChecker
 	preferenceStore  *preference.PreferenceStore
-	retryManager     RetryManager
+	retryManager     *SimpleRetryManager
 	logger           zerolog.Logger
 }
 
@@ -52,9 +52,15 @@ func (pm *PromptManager) newResponse(state *ConversationState) *ConversationResp
 // ProcessPrompt processes a user prompt and returns a response
 func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput string) (*ConversationResponse, error) {
 	// Get or create conversation state
-	session, err := pm.sessionManager.GetOrCreateSession(sessionID)
+	sessionInterface, err := pm.sessionManager.GetOrCreateSession(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	// Type assert to concrete session type
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		return nil, fmt.Errorf("session type assertion failed")
 	}
 
 	// Create conversation state from session state

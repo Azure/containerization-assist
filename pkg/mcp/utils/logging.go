@@ -22,7 +22,7 @@ type Logger interface {
 	Debug(msg string, fields ...Field)
 	// Fatal logs a fatal message and exits the program
 	Fatal(msg string, err error, fields ...Field)
-	
+
 	// With returns a new logger with the given fields
 	With(fields ...Field) Logger
 	// WithContext returns a new logger with context fields

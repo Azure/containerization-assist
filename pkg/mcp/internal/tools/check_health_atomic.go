@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -149,14 +150,14 @@ type RestartAnalysis struct {
 
 // AtomicCheckHealthTool implements atomic application health checking using core operations
 type AtomicCheckHealthTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	// errorHandler field removed - using direct error handling
 	logger zerolog.Logger
 }
 
 // NewAtomicCheckHealthTool creates a new atomic check health tool
-func NewAtomicCheckHealthTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
+func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
 	return &AtomicCheckHealthTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -211,7 +212,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 	startTime := time.Now()
 
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		// Create result with error for session failure
 		result := &AtomicCheckHealthResult{
@@ -230,6 +231,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		// Session retrieval error is returned directly
 		return result, nil
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Build label selector
 	labelSelector := t.buildLabelSelector(args, session)
@@ -304,7 +306,50 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		30*time.Second, // Default timeout for health checks
 	)
 	result.HealthCheckDuration = time.Since(healthStartTime)
-	result.HealthResult = healthResult
+
+	// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
+	if healthResult != nil {
+		result.HealthResult = &kubernetes.HealthCheckResult{
+			Success:   healthResult.Healthy,
+			Namespace: namespace,
+			Duration:  result.HealthCheckDuration,
+		}
+		if healthResult.Error != nil {
+			result.HealthResult.Error = &kubernetes.HealthCheckError{
+				Type:    healthResult.Error.Type,
+				Message: healthResult.Error.Message,
+			}
+		}
+		// Convert pod statuses
+		for _, ps := range healthResult.PodStatuses {
+			podStatus := kubernetes.DetailedPodStatus{
+				Name:      ps.Name,
+				Namespace: namespace,
+				Status:    ps.Status,
+				Ready:     ps.Ready,
+			}
+			result.HealthResult.Pods = append(result.HealthResult.Pods, podStatus)
+		}
+		// Update summary
+		result.HealthResult.Summary = kubernetes.HealthSummary{
+			TotalPods:   len(result.HealthResult.Pods),
+			ReadyPods:   0,
+			FailedPods:  0,
+			PendingPods: 0,
+		}
+		for _, pod := range result.HealthResult.Pods {
+			if pod.Ready {
+				result.HealthResult.Summary.ReadyPods++
+			} else if pod.Status == "Failed" || pod.Phase == "Failed" {
+				result.HealthResult.Summary.FailedPods++
+			} else if pod.Status == "Pending" || pod.Phase == "Pending" {
+				result.HealthResult.Summary.PendingPods++
+			}
+		}
+		if result.HealthResult.Summary.TotalPods > 0 {
+			result.HealthResult.Summary.HealthyRatio = float64(result.HealthResult.Summary.ReadyPods) / float64(result.HealthResult.Summary.TotalPods)
+		}
+	}
 
 	if reporter != nil {
 		reporter.ReportStage(0.9, "Resource query complete")
@@ -325,9 +370,9 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
-		Bool("healthy", healthResult.Success).
-		Int("pods_ready", healthResult.Summary.ReadyPods).
-		Int("pods_total", healthResult.Summary.TotalPods).
+		Bool("healthy", result.HealthResult != nil && result.HealthResult.Success).
+		Int("pods_ready", result.HealthResult.Summary.ReadyPods).
+		Int("pods_total", result.HealthResult.Summary.TotalPods).
 		Dur("health_check_duration", result.HealthCheckDuration).
 		Msg("Application health check completed")
 
@@ -338,14 +383,14 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 	}
 
 	// Analyze the health results to populate the context
-	result.Success = healthResult.Success
+	result.Success = result.HealthResult != nil && result.HealthResult.Success
 
 	if reporter != nil {
 		reporter.ReportStage(0.5, "Health data analyzed")
 	}
 
 	// Stage 4: Wait for readiness if requested
-	if args.WaitForReady && !healthResult.Success {
+	if args.WaitForReady && (result.HealthResult == nil || !result.HealthResult.Success) {
 		if reporter != nil {
 			reporter.NextStage("Waiting for ready state")
 			reporter.ReportStage(0.1, "Starting readiness wait")
@@ -447,19 +492,21 @@ func (t *AtomicCheckHealthTool) waitForApplicationReady(ctx context.Context, ses
 		case <-timeoutCtx.Done():
 			// Timeout reached, return final status
 			result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
-			if err != nil {
+			if err != nil || result == nil {
 				return nil
 			}
-			return result
+			// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
+			return t.convertHealthCheckResult(result, namespace)
 
 		case <-ticker.C:
 			result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
-			if err != nil {
+			if err != nil || result == nil {
 				continue // Continue polling on error
 			}
 
-			if result.Success {
-				return result // Application is ready
+			if result.Healthy {
+				// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
+				return t.convertHealthCheckResult(result, namespace) // Application is ready
 			}
 		}
 	}
@@ -864,3 +911,57 @@ func (t *AtomicCheckHealthTool) ExecuteTyped(ctx context.Context, args AtomicChe
 }
 
 // AI Context methods are now provided by embedded BaseAIContextResult
+
+// convertHealthCheckResult converts from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
+func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.HealthCheckResult, namespace string) *kubernetes.HealthCheckResult {
+	if result == nil {
+		return nil
+	}
+
+	k8sResult := &kubernetes.HealthCheckResult{
+		Success:   result.Healthy,
+		Namespace: namespace,
+	}
+
+	if result.Error != nil {
+		k8sResult.Error = &kubernetes.HealthCheckError{
+			Type:    result.Error.Type,
+			Message: result.Error.Message,
+		}
+	}
+
+	// Convert pod statuses
+	for _, ps := range result.PodStatuses {
+		podStatus := kubernetes.DetailedPodStatus{
+			Name:      ps.Name,
+			Namespace: namespace,
+			Status:    ps.Status,
+			Ready:     ps.Ready,
+		}
+		k8sResult.Pods = append(k8sResult.Pods, podStatus)
+	}
+
+	// Update summary
+	k8sResult.Summary = kubernetes.HealthSummary{
+		TotalPods:   len(k8sResult.Pods),
+		ReadyPods:   0,
+		FailedPods:  0,
+		PendingPods: 0,
+	}
+
+	for _, pod := range k8sResult.Pods {
+		if pod.Ready {
+			k8sResult.Summary.ReadyPods++
+		} else if pod.Status == "Failed" || pod.Phase == "Failed" {
+			k8sResult.Summary.FailedPods++
+		} else if pod.Status == "Pending" || pod.Phase == "Pending" {
+			k8sResult.Summary.PendingPods++
+		}
+	}
+
+	if k8sResult.Summary.TotalPods > 0 {
+		k8sResult.Summary.HealthyRatio = float64(k8sResult.Summary.ReadyPods) / float64(k8sResult.Summary.TotalPods)
+	}
+
+	return k8sResult
+}

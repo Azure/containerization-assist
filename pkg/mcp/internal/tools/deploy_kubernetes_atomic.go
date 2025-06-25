@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
@@ -268,13 +267,13 @@ type DeploymentContext struct {
 
 // AtomicDeployKubernetesTool implements atomic Kubernetes deployment using core operations
 type AtomicDeployKubernetesTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
 // NewAtomicDeployKubernetesTool creates a new atomic deploy Kubernetes tool
-func NewAtomicDeployKubernetesTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
+func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
 	return &AtomicDeployKubernetesTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -348,11 +347,12 @@ func (t *AtomicDeployKubernetesTool) ExecuteWithContext(serverCtx *server.Contex
 func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	reporter.ReportStage(0.1, "Loading session")
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return mcperror.NewSessionNotFound(args.SessionID)
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Set session details
 	result.SessionID = session.SessionID
@@ -424,13 +424,14 @@ func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, ar
 // executeWithoutProgress handles execution without progress tracking (fallback)
 func (t *AtomicDeployKubernetesTool) executeWithoutProgress(ctx context.Context, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, startTime time.Time) (*AtomicDeployKubernetesResult, error) {
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
 		return result, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Set session details
 	result.SessionID = session.SessionID
@@ -500,6 +501,7 @@ type KubernetesDeployOperation struct {
 	session      *sessiontypes.SessionState
 	workspaceDir string
 	namespace    string
+	manifests    []string
 	logger       zerolog.Logger
 }
 
@@ -513,8 +515,7 @@ func (op *KubernetesDeployOperation) ExecuteOnce(ctx context.Context) error {
 	// Deploy to Kubernetes via pipeline adapter
 	deployResult, err := op.tool.pipelineAdapter.DeployToKubernetes(
 		op.session.SessionID,
-		"", // manifest path - will be generated internally
-		op.namespace,
+		op.manifests,
 	)
 
 	if err != nil {
@@ -544,7 +545,7 @@ func (op *KubernetesDeployOperation) GetFailureAnalysis(ctx context.Context, err
 }
 
 // PrepareForRetry applies fixes and prepares for the next deployment attempt
-func (op *KubernetesDeployOperation) PrepareForRetry(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *KubernetesDeployOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_strategy", fixAttempt.FixStrategy.Name).
 		Msg("Preparing for retry after fix")
@@ -566,7 +567,7 @@ func (op *KubernetesDeployOperation) PrepareForRetry(ctx context.Context, fixAtt
 }
 
 // applyManifestFix applies fixes to Kubernetes manifests
-func (op *KubernetesDeployOperation) applyManifestFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *KubernetesDeployOperation) applyManifestFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if fixAttempt.FixedContent == "" {
 		return types.NewRichError("INVALID_ARGUMENTS", "no fixed manifest content provided", "missing_content")
 	}
@@ -614,7 +615,7 @@ func (op *KubernetesDeployOperation) applyManifestFix(ctx context.Context, fixAt
 }
 
 // applyDependencyFix applies dependency-related fixes
-func (op *KubernetesDeployOperation) applyDependencyFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *KubernetesDeployOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_type", "dependency").
 		Int("file_changes", len(fixAttempt.FixStrategy.FileChanges)).
@@ -650,7 +651,7 @@ func (op *KubernetesDeployOperation) applyDependencyFix(ctx context.Context, fix
 }
 
 // applyResourceFix applies resource-related fixes
-func (op *KubernetesDeployOperation) applyResourceFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *KubernetesDeployOperation) applyResourceFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_type", "resource").
 		Int("file_changes", len(fixAttempt.FixStrategy.FileChanges)).
@@ -687,7 +688,7 @@ func (op *KubernetesDeployOperation) applyResourceFix(ctx context.Context, fixAt
 }
 
 // applyGenericFix applies generic fixes
-func (op *KubernetesDeployOperation) applyGenericFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *KubernetesDeployOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	// Generic fix application
 	if fixAttempt.FixedContent != "" {
 		return op.applyManifestFix(ctx, fixAttempt)
@@ -698,7 +699,7 @@ func (op *KubernetesDeployOperation) applyGenericFix(ctx context.Context, fixAtt
 }
 
 // applyFileChange applies a single file change operation
-func (op *KubernetesDeployOperation) applyFileChange(change fixing.FileChange) error {
+func (op *KubernetesDeployOperation) applyFileChange(change mcptypes.FileChange) error {
 	filePath := filepath.Join(op.workspaceDir, change.FilePath)
 
 	switch change.Operation {
@@ -780,16 +781,38 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 		"", // memoryLimit - not specified for deploy tool
 	)
 	result.GenerationDuration = time.Since(generationStart)
-	result.ManifestResult = manifestResult
+
+	// Convert from mcptypes.KubernetesManifestResult to kubernetes.ManifestGenerationResult
+	if manifestResult != nil {
+		result.ManifestResult = &kubernetes.ManifestGenerationResult{
+			Success:   manifestResult.Success,
+			OutputDir: result.WorkspaceDir,
+		}
+		if manifestResult.Error != nil {
+			result.ManifestResult.Error = &kubernetes.ManifestError{
+				Type:    manifestResult.Error.Type,
+				Message: manifestResult.Error.Message,
+			}
+		}
+		// Convert manifests
+		for _, manifest := range manifestResult.Manifests {
+			result.ManifestResult.Manifests = append(result.ManifestResult.Manifests, kubernetes.GeneratedManifest{
+				Kind:    manifest.Kind,
+				Name:    manifest.Name,
+				Path:    manifest.Path,
+				Content: manifest.Content,
+			})
+		}
+	}
 
 	if err != nil {
-		t.handleGenerationError(ctx, err, manifestResult, result)
+		t.handleGenerationError(ctx, err, result.ManifestResult, result)
 		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", err), "generation_error")
 	}
 
 	if manifestResult != nil && !manifestResult.Success {
 		generationErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %s", manifestResult.Error.Message), "generation_error")
-		t.handleGenerationError(ctx, generationErr, manifestResult, result)
+		t.handleGenerationError(ctx, generationErr, result.ManifestResult, result)
 		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", generationErr), "generation_error")
 	}
 
@@ -815,22 +838,56 @@ func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, sess
 	deploymentStart := time.Now()
 
 	// Deploy to Kubernetes using pipeline adapter
+	// Get manifests from result
+	manifests := []string{}
+	if result.ManifestResult != nil {
+		for _, manifest := range result.ManifestResult.Manifests {
+			manifests = append(manifests, manifest.Path)
+		}
+	}
 	deployResult, err := t.pipelineAdapter.DeployToKubernetes(
 		session.SessionID,
-		"", // manifest path - will be generated internally
-		args.Namespace,
+		manifests,
 	)
 	result.DeploymentDuration = time.Since(deploymentStart)
-	result.DeploymentResult = deployResult
+
+	// Convert from mcptypes.KubernetesDeploymentResult to kubernetes.DeploymentResult
+	if deployResult != nil {
+		result.DeploymentResult = &kubernetes.DeploymentResult{
+			Success:   deployResult.Success,
+			Namespace: deployResult.Namespace,
+		}
+		if deployResult.Error != nil {
+			result.DeploymentResult.Error = &kubernetes.DeploymentError{
+				Type:    deployResult.Error.Type,
+				Message: deployResult.Error.Message,
+			}
+		}
+		// Convert deployments and services
+		for _, d := range deployResult.Deployments {
+			result.DeploymentResult.Resources = append(result.DeploymentResult.Resources, kubernetes.DeployedResource{
+				Kind:      "Deployment",
+				Name:      d,
+				Namespace: deployResult.Namespace,
+			})
+		}
+		for _, s := range deployResult.Services {
+			result.DeploymentResult.Resources = append(result.DeploymentResult.Resources, kubernetes.DeployedResource{
+				Kind:      "Service",
+				Name:      s,
+				Namespace: deployResult.Namespace,
+			})
+		}
+	}
 
 	if err != nil {
-		t.handleDeploymentError(ctx, err, deployResult, result)
+		t.handleDeploymentError(ctx, err, result.DeploymentResult, result)
 		return err
 	}
 
 	if deployResult != nil && !deployResult.Success {
 		deploymentErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment failed: %s", deployResult.Error.Message), "deployment_error")
-		t.handleDeploymentError(ctx, deploymentErr, deployResult, result)
+		t.handleDeploymentError(ctx, deploymentErr, result.DeploymentResult, result)
 		return deploymentErr
 	}
 
@@ -866,16 +923,64 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 		timeout,
 	)
 	result.HealthCheckDuration = time.Since(healthStart)
-	result.HealthResult = healthResult
+
+	// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
+	if healthResult != nil {
+		result.HealthResult = &kubernetes.HealthCheckResult{
+			Success:   healthResult.Healthy,
+			Namespace: args.Namespace,
+			Duration:  result.HealthCheckDuration,
+		}
+		if healthResult.Error != nil {
+			result.HealthResult.Error = &kubernetes.HealthCheckError{
+				Type:    healthResult.Error.Type,
+				Message: healthResult.Error.Message,
+			}
+		}
+		// Convert pod statuses
+		for _, ps := range healthResult.PodStatuses {
+			podStatus := kubernetes.DetailedPodStatus{
+				Name:      ps.Name,
+				Namespace: args.Namespace,
+				Status:    ps.Status,
+				Ready:     ps.Ready,
+			}
+			result.HealthResult.Pods = append(result.HealthResult.Pods, podStatus)
+		}
+		// Update summary
+		result.HealthResult.Summary = kubernetes.HealthSummary{
+			TotalPods:   len(result.HealthResult.Pods),
+			ReadyPods:   0,
+			FailedPods:  0,
+			PendingPods: 0,
+		}
+		for _, pod := range result.HealthResult.Pods {
+			if pod.Ready {
+				result.HealthResult.Summary.ReadyPods++
+			} else if pod.Status == "Failed" || pod.Phase == "Failed" {
+				result.HealthResult.Summary.FailedPods++
+			} else if pod.Status == "Pending" || pod.Phase == "Pending" {
+				result.HealthResult.Summary.PendingPods++
+			}
+		}
+		if result.HealthResult.Summary.TotalPods > 0 {
+			result.HealthResult.Summary.HealthyRatio = float64(result.HealthResult.Summary.ReadyPods) / float64(result.HealthResult.Summary.TotalPods)
+		}
+	}
 
 	if err != nil {
-		t.handleHealthCheckError(ctx, err, healthResult, result)
+		t.handleHealthCheckError(ctx, err, result.HealthResult, result)
 		return err
 	}
 
-	if healthResult != nil && !healthResult.Success {
-		healthErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment health check failed: %d/%d pods ready", healthResult.Summary.ReadyPods, healthResult.Summary.TotalPods), "health_check_error")
-		t.handleHealthCheckError(ctx, healthErr, healthResult, result)
+	if healthResult != nil && !healthResult.Healthy {
+		var readyPods, totalPods int
+		if result.HealthResult != nil {
+			readyPods = result.HealthResult.Summary.ReadyPods
+			totalPods = result.HealthResult.Summary.TotalPods
+		}
+		healthErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment health check failed: %d/%d pods ready", readyPods, totalPods), "health_check_error")
+		t.handleHealthCheckError(ctx, healthErr, result.HealthResult, result)
 		return healthErr
 	}
 
@@ -954,10 +1059,10 @@ func (t *AtomicDeployKubernetesTool) handleHealthCheckError(ctx context.Context,
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicDeployKubernetesTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
-		Name:        "atomic_deploy_kubernetes",
-		Description: "Deploys containerized applications to Kubernetes with manifest generation, health checks, and rollback support",
-		Version:     "1.0.0",
-		Category:    "kubernetes",
+		Name:         "atomic_deploy_kubernetes",
+		Description:  "Deploys containerized applications to Kubernetes with manifest generation, health checks, and rollback support",
+		Version:      "1.0.0",
+		Category:     "kubernetes",
 		Dependencies: []string{"kubectl", "kubernetes-cluster"},
 		Capabilities: []string{
 			"supports_dry_run",

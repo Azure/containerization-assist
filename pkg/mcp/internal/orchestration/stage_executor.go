@@ -210,7 +210,7 @@ func (se *DefaultStageExecutor) prepareToolArgs(
 // expandVariableEnhanced expands variables with enhanced ${var} syntax support
 func (se *DefaultStageExecutor) expandVariableEnhanced(value string, session *workflow.WorkflowSession, stage *workflow.WorkflowStage) string {
 	resolver := workflow.NewVariableResolver(se.logger)
-	
+
 	// Build variable context (without workflow vars since we don't have access to workflowSpec here)
 	context := &workflow.VariableContext{
 		WorkflowVars:    make(map[string]string), // Will be empty, could be populated from session if needed
@@ -219,7 +219,7 @@ func (se *DefaultStageExecutor) expandVariableEnhanced(value string, session *wo
 		EnvironmentVars: make(map[string]string),
 		Secrets:         make(map[string]string),
 	}
-	
+
 	// Populate environment variables (with common container/k8s prefixes)
 	for _, prefix := range []string{"CONTAINER_", "K8S_", "KUBERNETES_", "DOCKER_", "CI_", "BUILD_"} {
 		for _, env := range os.Environ() {
@@ -231,21 +231,21 @@ func (se *DefaultStageExecutor) expandVariableEnhanced(value string, session *wo
 			}
 		}
 	}
-	
+
 	// Check if workflow variables are stored in session context
 	if workflowVars, exists := session.SharedContext["_workflow_variables"]; exists {
 		if varsMap, ok := workflowVars.(map[string]string); ok {
 			context.WorkflowVars = varsMap
 		}
 	}
-	
+
 	// Expand variables
 	expanded, err := resolver.ResolveVariables(value, context)
 	if err != nil {
 		se.logger.Warn().Err(err).Str("value", value).Msg("Failed to expand variables")
 		return value // Return original on error
 	}
-	
+
 	return expanded
 }
 

@@ -17,12 +17,12 @@ type SessionQuery struct {
 	K8sLabels map[string]string // Sessions with these K8s labels
 
 	// Time-based filters
-	CreatedAfter    *time.Time
-	CreatedBefore   *time.Time
-	AccessedAfter   *time.Time
-	AccessedBefore  *time.Time
-	ExpiresAfter    *time.Time
-	ExpiresBefore   *time.Time
+	CreatedAfter   *time.Time
+	CreatedBefore  *time.Time
+	AccessedAfter  *time.Time
+	AccessedBefore *time.Time
+	ExpiresAfter   *time.Time
+	ExpiresBefore  *time.Time
 
 	// State-based filters
 	LastErrorExists bool // Sessions that have a last error
@@ -40,12 +40,12 @@ type SessionQuery struct {
 
 // QueryResult contains the results of a session query
 type QueryResult struct {
-	Sessions    []*sessiontypes.SessionState
-	TotalCount  int
-	HasMore     bool
-	Query       SessionQuery
-	ExecutedAt  time.Time
-	Duration    time.Duration
+	Sessions   []*sessiontypes.SessionState
+	TotalCount int
+	HasMore    bool
+	Query      SessionQuery
+	ExecutedAt time.Time
+	Duration   time.Duration
 }
 
 // SessionQueryManager provides session querying capabilities
@@ -67,7 +67,7 @@ func NewSessionQueryManager(sessionManager *SessionManager, logger zerolog.Logge
 // QuerySessions executes a query and returns matching sessions
 func (qm *SessionQueryManager) QuerySessions(query SessionQuery) ([]*sessiontypes.SessionState, error) {
 	startTime := time.Now()
-	
+
 	qm.logger.Debug().
 		Interface("query", query).
 		Msg("Executing session query")
@@ -340,11 +340,11 @@ func (qm *SessionQueryManager) sortSessions(sessions []*sessiontypes.SessionStat
 func (qm *SessionQueryManager) getAllSessions() ([]*sessiontypes.SessionState, error) {
 	// This is a simplified implementation - in a production system,
 	// we would want to optimize this to avoid loading all sessions into memory
-	sessionSummaries := qm.sessionManager.ListSessions()
+	sessionSummaries := qm.sessionManager.ListSessionSummaries()
 
 	var sessions []*sessiontypes.SessionState
 	for _, summary := range sessionSummaries {
-		session, err := qm.sessionManager.GetSession(summary.SessionID)
+		session, err := qm.sessionManager.GetSessionConcrete(summary.SessionID)
 		if err != nil {
 			qm.logger.Warn().
 				Str("session_id", summary.SessionID).

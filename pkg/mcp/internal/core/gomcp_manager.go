@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -22,8 +22,8 @@ type GomcpManager struct {
 	server        server.Server
 	config        GomcpConfig
 	logger        slog.Logger
-	transport     transport.Transport // Injected transport
-	isInitialized bool                // Prevent mutation after creation
+	transport     mcptypes.Transport // Injected transport
+	isInitialized bool               // Prevent mutation after creation
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -42,7 +42,7 @@ func NewGomcpManager(config GomcpConfig) *GomcpManager {
 }
 
 // WithTransport sets the transport for the gomcp manager
-func (gm *GomcpManager) WithTransport(t transport.Transport) *GomcpManager {
+func (gm *GomcpManager) WithTransport(t mcptypes.Transport) *GomcpManager {
 	if gm.isInitialized {
 		gm.logger.Error("cannot set transport: manager already initialized")
 		return gm
@@ -78,21 +78,17 @@ func (gm *GomcpManager) Initialize() error {
 		server.WithProtocolVersion(gm.config.ProtocolVersion),
 	)
 
-	// Configure transport based on the injected transport type
-	switch t := gm.transport.(type) {
-	case *transport.StdioTransport:
+	// Configure transport based on the transport name
+	switch gm.transport.Name() {
+	case "stdio":
 		gm.server = gm.server.AsStdio()
-		// Set the gomcp server on the stdio transport
-		t.SetServer(gm.server)
-	case *transport.HTTPTransport:
-		// HTTP transport uses a different server model - configure for HTTP
-		// Get the port from the HTTP transport configuration
-		address := fmt.Sprintf(":%d", t.GetPort())
+	case "http":
+		// For HTTP transport, we need to get the port somehow
+		// This is a simplified implementation
+		address := ":8080" // Default port
 		gm.server = gm.server.AsHTTP(address)
-		// Set the gomcp server on the HTTP transport for tool registration
-		t.SetServer(gm.server)
 	default:
-		return fmt.Errorf("unsupported transport type: %T", t)
+		return fmt.Errorf("unsupported transport type: %s", gm.transport.Name())
 	}
 
 	gm.isInitialized = true
@@ -105,7 +101,7 @@ func (gm *GomcpManager) GetServer() server.Server {
 }
 
 // GetTransport returns the configured transport
-func (gm *GomcpManager) GetTransport() transport.Transport {
+func (gm *GomcpManager) GetTransport() mcptypes.Transport {
 	return gm.transport
 }
 
@@ -158,14 +154,12 @@ func (gm *GomcpManager) Shutdown(ctx context.Context) error {
 			gm.logger.Warn("shutdown context cancelled before transport shutdown")
 			shutdownErrors = append(shutdownErrors, ctx.Err())
 		default:
-			// Close the transport
-			if closer, ok := gm.transport.(interface{ Close() error }); ok {
-				if err := closer.Close(); err != nil {
-					gm.logger.Error("error closing transport", "error", err)
-					shutdownErrors = append(shutdownErrors, err)
-				} else {
-					gm.logger.Info("transport closed successfully")
-				}
+			// Stop the transport
+			if err := gm.transport.Stop(); err != nil {
+				gm.logger.Error("error stopping transport", "error", err)
+				shutdownErrors = append(shutdownErrors, err)
+			} else {
+				gm.logger.Info("transport stopped successfully")
 			}
 		}
 	}

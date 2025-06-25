@@ -110,13 +110,13 @@ type SessionState struct {
 
 // SessionMetadata contains session metadata
 type SessionMetadata struct {
-	CreatedAt       time.Time `json:"created_at"`
-	LastAccessedAt  time.Time `json:"last_accessed_at"`
-	ExpiresAt       time.Time `json:"expires_at"`
-	WorkspaceSize   int64     `json:"workspace_size"`
-	OperationCount  int       `json:"operation_count"`
-	CurrentStage    string    `json:"current_stage"`
-	Labels          []string  `json:"labels"`
+	CreatedAt      time.Time `json:"created_at"`
+	LastAccessedAt time.Time `json:"last_accessed_at"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	WorkspaceSize  int64     `json:"workspace_size"`
+	OperationCount int       `json:"operation_count"`
+	CurrentStage   string    `json:"current_stage"`
+	Labels         []string  `json:"labels"`
 }
 
 // =============================================================================
@@ -264,12 +264,12 @@ type FileStructure struct {
 
 // SecurityScanResult contains information about security scans
 type SecurityScanResult struct {
-	Success         bool                `json:"success"`
-	ScannedAt       time.Time           `json:"scanned_at"`
-	ImageRef        string              `json:"image_ref"`
-	Scanner         string              `json:"scanner"`
-	Vulnerabilities VulnerabilityCount  `json:"vulnerabilities"`
-	FixableCount    int                 `json:"fixable_count"`
+	Success         bool               `json:"success"`
+	ScannedAt       time.Time          `json:"scanned_at"`
+	ImageRef        string             `json:"image_ref"`
+	Scanner         string             `json:"scanner"`
+	Vulnerabilities VulnerabilityCount `json:"vulnerabilities"`
+	FixableCount    int                `json:"fixable_count"`
 }
 
 // VulnerabilityCount provides vulnerability counts by severity
@@ -391,6 +391,30 @@ type ToolRegistry interface {
 
 	// GetMetadata returns metadata for all registered tools
 	GetMetadata() map[string]ToolMetadata
+}
+
+// =============================================================================
+// SERVER INTERFACE
+// =============================================================================
+
+// WorkspaceStats represents workspace statistics
+type WorkspaceStats struct {
+	TotalDiskUsage int64 `json:"total_disk_usage"`
+	SessionCount   int   `json:"session_count"`
+}
+
+// SessionManagerStats represents session manager statistics
+type SessionManagerStats struct {
+	ActiveSessions int `json:"active_sessions"`
+	TotalSessions  int `json:"total_sessions"`
+}
+
+// CircuitBreakerStats represents circuit breaker statistics
+type CircuitBreakerStats struct {
+	State        string     `json:"state"`
+	FailureCount int        `json:"failure_count"`
+	SuccessCount int64      `json:"success_count"`
+	LastFailure  *time.Time `json:"last_failure,omitempty"`
 }
 
 // =============================================================================

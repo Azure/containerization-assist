@@ -25,47 +25,47 @@ var (
 // Import path mappings based on the new package structure
 var importMappings = map[string]string{
 	// Interface consolidation
-	"github.com/tng/workspace/prod/pkg/mcp/internal/interfaces":                   "github.com/tng/workspace/prod/pkg/mcp",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/adapter/interfaces":          "github.com/tng/workspace/prod/pkg/mcp",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/interfaces":            "github.com/tng/workspace/prod/pkg/mcp",
-	
+	"github.com/tng/workspace/prod/pkg/mcp/internal/interfaces":         "github.com/tng/workspace/prod/pkg/mcp",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/adapter/interfaces": "github.com/tng/workspace/prod/pkg/mcp",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/interfaces":   "github.com/tng/workspace/prod/pkg/mcp",
+
 	// Package restructuring - flattened structure
-	"github.com/tng/workspace/prod/pkg/mcp/internal/engine":                      "github.com/tng/workspace/prod/pkg/mcp/internal/runtime",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/engine/conversation":         "github.com/tng/workspace/prod/pkg/mcp/internal/runtime/conversation",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/atomic/build":          "github.com/tng/workspace/prod/pkg/mcp/internal/build",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/atomic/deploy":         "github.com/tng/workspace/prod/pkg/mcp/internal/deploy",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/security":              "github.com/tng/workspace/prod/pkg/mcp/internal/scan",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/analysis":              "github.com/tng/workspace/prod/pkg/mcp/internal/analyze",
-	
+	"github.com/tng/workspace/prod/pkg/mcp/internal/engine":              "github.com/tng/workspace/prod/pkg/mcp/internal/runtime",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/engine/conversation": "github.com/tng/workspace/prod/pkg/mcp/internal/runtime/conversation",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/atomic/build":  "github.com/tng/workspace/prod/pkg/mcp/internal/build",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/atomic/deploy": "github.com/tng/workspace/prod/pkg/mcp/internal/deploy",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/security":      "github.com/tng/workspace/prod/pkg/mcp/internal/scan",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/analysis":      "github.com/tng/workspace/prod/pkg/mcp/internal/analyze",
+
 	// Session consolidation
-	"github.com/tng/workspace/prod/pkg/mcp/internal/store/session":               "github.com/tng/workspace/prod/pkg/mcp/internal/session",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/types/session":               "github.com/tng/workspace/prod/pkg/mcp/internal/session",
-	
+	"github.com/tng/workspace/prod/pkg/mcp/internal/store/session": "github.com/tng/workspace/prod/pkg/mcp/internal/session",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/types/session": "github.com/tng/workspace/prod/pkg/mcp/internal/session",
+
 	// Workflow simplification
-	"github.com/tng/workspace/prod/pkg/mcp/internal/orchestration/workflow":      "github.com/tng/workspace/prod/pkg/mcp/internal/workflow",
-	
+	"github.com/tng/workspace/prod/pkg/mcp/internal/orchestration/workflow": "github.com/tng/workspace/prod/pkg/mcp/internal/workflow",
+
 	// Observability package
-	"github.com/tng/workspace/prod/pkg/logger":                                   "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/ops":                         "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
-	
+	"github.com/tng/workspace/prod/pkg/logger":           "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/ops": "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
+
 	// Validation package
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/validation":            "github.com/tng/workspace/prod/pkg/mcp/internal/validate",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/validation": "github.com/tng/workspace/prod/pkg/mcp/internal/validate",
 }
 
 func main() {
 	flag.Parse()
-	
+
 	fmt.Println("MCP Import Path Update Tool")
 	fmt.Println("===========================")
-	
+
 	if *dryRun {
 		fmt.Println("🔍 DRY RUN MODE - No changes will be applied")
 		fmt.Println()
 	}
-	
+
 	var filesToProcess []string
 	var err error
-	
+
 	if *all {
 		filesToProcess, err = findAllGoFiles()
 		if err != nil {
@@ -80,35 +80,35 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	
+
 	fmt.Printf("📄 Processing %d files...\n", len(filesToProcess))
 	fmt.Println()
-	
+
 	totalChanges := 0
 	changedFiles := 0
-	
+
 	for _, filePath := range filesToProcess {
 		changes, err := processFile(filePath)
 		if err != nil {
 			log.Printf("⚠️  Failed to process %s: %v", filePath, err)
 			continue
 		}
-		
+
 		if changes > 0 {
 			changedFiles++
 			totalChanges += changes
-			
+
 			if *verbose {
 				fmt.Printf("✅ %s: %d imports updated\n", filePath, changes)
 			}
 		}
 	}
-	
+
 	fmt.Printf("\n🎉 Summary:\n")
 	fmt.Printf("   Files processed: %d\n", len(filesToProcess))
 	fmt.Printf("   Files changed: %d\n", changedFiles)
 	fmt.Printf("   Total import updates: %d\n", totalChanges)
-	
+
 	if !*dryRun && totalChanges > 0 {
 		fmt.Println("\n📝 Next steps:")
 		fmt.Println("   1. Run 'go mod tidy' to clean up dependencies")
@@ -119,61 +119,61 @@ func main() {
 
 func findAllGoFiles() ([]string, error) {
 	var files []string
-	
+
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip vendor and .git directories
 		if d.IsDir() && (d.Name() == "vendor" || d.Name() == ".git") {
 			return filepath.SkipDir
 		}
-		
+
 		if !d.IsDir() && strings.HasSuffix(path, ".go") {
 			files = append(files, path)
 		}
-		
+
 		return nil
 	})
-	
+
 	return files, err
 }
 
 func processFile(filePath string) (int, error) {
 	fset := token.NewFileSet()
-	
+
 	// Parse the file
 	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse file: %w", err)
 	}
-	
+
 	changes := 0
 	modified := false
-	
+
 	// Process import declarations
 	for _, decl := range file.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok || genDecl.Tok != token.IMPORT {
 			continue
 		}
-		
+
 		for _, spec := range genDecl.Specs {
 			importSpec, ok := spec.(*ast.ImportSpec)
 			if !ok {
 				continue
 			}
-			
+
 			// Get the import path (without quotes)
 			importPath := strings.Trim(importSpec.Path.Value, `"`)
-			
+
 			// Check if this import needs to be updated
 			if newPath, exists := importMappings[importPath]; exists {
 				if *verbose {
 					fmt.Printf("📝 %s: %s -> %s\n", filePath, importPath, newPath)
 				}
-				
+
 				if !*dryRun {
 					importSpec.Path.Value = `"` + newPath + `"`
 					modified = true
@@ -182,7 +182,7 @@ func processFile(filePath string) (int, error) {
 			}
 		}
 	}
-	
+
 	// Also check for string-based imports in comments or other contexts
 	if changes == 0 {
 		// Read file content and check for import paths in comments or strings
@@ -190,7 +190,7 @@ func processFile(filePath string) (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("failed to read file: %w", err)
 		}
-		
+
 		stringChanges, newContent := updateStringImports(string(content), filePath)
 		if stringChanges > 0 && !*dryRun {
 			err = os.WriteFile(filePath, []byte(newContent), 0644)
@@ -200,26 +200,26 @@ func processFile(filePath string) (int, error) {
 		}
 		changes += stringChanges
 	}
-	
+
 	// Write the modified AST back to file
 	if modified && !*dryRun {
 		var buf strings.Builder
 		if err := format.Node(&buf, fset, file); err != nil {
 			return 0, fmt.Errorf("failed to format file: %w", err)
 		}
-		
+
 		if err := os.WriteFile(filePath, []byte(buf.String()), 0644); err != nil {
 			return 0, fmt.Errorf("failed to write file: %w", err)
 		}
 	}
-	
+
 	return changes, nil
 }
 
 func updateStringImports(content, filePath string) (int, string) {
 	changes := 0
 	newContent := content
-	
+
 	// Create regex patterns for each import mapping
 	for oldPath, newPath := range importMappings {
 		// Match import paths in strings, comments, and other contexts
@@ -230,16 +230,16 @@ func updateStringImports(content, filePath string) (int, string) {
 			// In comments
 			regexp.QuoteMeta(oldPath),
 		}
-		
+
 		for _, pattern := range patterns {
 			re := regexp.MustCompile(pattern)
 			matches := re.FindAllString(newContent, -1)
-			
+
 			if len(matches) > 0 {
 				if *verbose {
 					fmt.Printf("📝 %s: Found %d string references to %s\n", filePath, len(matches), oldPath)
 				}
-				
+
 				// Replace the old path with new path, preserving quotes
 				replacement := strings.ReplaceAll(pattern, regexp.QuoteMeta(oldPath), newPath)
 				newContent = re.ReplaceAllString(newContent, replacement)
@@ -247,7 +247,7 @@ func updateStringImports(content, filePath string) (int, string) {
 			}
 		}
 	}
-	
+
 	return changes, newContent
 }
 

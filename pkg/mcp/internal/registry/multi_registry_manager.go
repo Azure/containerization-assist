@@ -30,17 +30,17 @@ type MultiRegistryConfig struct {
 
 // RegistryConfig contains configuration for a single registry
 type RegistryConfig struct {
-	URL             string            `json:"url"`
-	AuthMethod      string            `json:"auth_method"` // "basic", "oauth", "helper", "keychain"
-	Username        string            `json:"username,omitempty"`
-	Password        string            `json:"password,omitempty"`
-	Token           string            `json:"token,omitempty"`
-	CredentialHelper string           `json:"credential_helper,omitempty"`
-	Insecure        bool              `json:"insecure,omitempty"`
-	Timeout         time.Duration     `json:"timeout,omitempty"`
-	Headers         map[string]string `json:"headers,omitempty"`
-	FallbackMethods []string          `json:"fallback_methods,omitempty"`
-	RateLimitAware  bool              `json:"rate_limit_aware,omitempty"`
+	URL              string            `json:"url"`
+	AuthMethod       string            `json:"auth_method"` // "basic", "oauth", "helper", "keychain"
+	Username         string            `json:"username,omitempty"`
+	Password         string            `json:"password,omitempty"`
+	Token            string            `json:"token,omitempty"`
+	CredentialHelper string            `json:"credential_helper,omitempty"`
+	Insecure         bool              `json:"insecure,omitempty"`
+	Timeout          time.Duration     `json:"timeout,omitempty"`
+	Headers          map[string]string `json:"headers,omitempty"`
+	FallbackMethods  []string          `json:"fallback_methods,omitempty"`
+	RateLimitAware   bool              `json:"rate_limit_aware,omitempty"`
 }
 
 // CredentialProvider interface for different authentication methods
@@ -54,13 +54,13 @@ type CredentialProvider interface {
 
 // RegistryCredentials contains authentication credentials
 type RegistryCredentials struct {
-	Username    string
-	Password    string
-	Token       string
-	ExpiresAt   *time.Time
-	Registry    string
-	AuthMethod  string
-	Source      string // Which provider returned these credentials
+	Username   string
+	Password   string
+	Token      string
+	ExpiresAt  *time.Time
+	Registry   string
+	AuthMethod string
+	Source     string // Which provider returned these credentials
 }
 
 // CachedCredentials wraps credentials with cache metadata
@@ -90,7 +90,7 @@ func NewMultiRegistryManager(config *MultiRegistryConfig, logger zerolog.Logger)
 // RegisterProvider adds a credential provider to the manager
 func (mrm *MultiRegistryManager) RegisterProvider(provider CredentialProvider) {
 	mrm.providers = append(mrm.providers, provider)
-	
+
 	// Sort providers by priority (higher priority first)
 	for i := len(mrm.providers) - 1; i > 0; i-- {
 		if mrm.providers[i].GetPriority() > mrm.providers[i-1].GetPriority() {
@@ -189,7 +189,7 @@ func (mrm *MultiRegistryManager) ValidateRegistryAccess(ctx context.Context, reg
 // GetRegistryConfig returns the configuration for a specific registry
 func (mrm *MultiRegistryManager) GetRegistryConfig(registry string) (*RegistryConfig, bool) {
 	normalizedRegistry := mrm.normalizeRegistry(registry)
-	
+
 	// Check for exact match
 	if config, exists := mrm.config.Registries[normalizedRegistry]; exists {
 		return &config, true
@@ -245,7 +245,7 @@ func (mrm *MultiRegistryManager) normalizeRegistry(registry string) string {
 	// Remove protocol if present
 	registry = strings.TrimPrefix(registry, "https://")
 	registry = strings.TrimPrefix(registry, "http://")
-	
+
 	// Handle docker.io special case
 	if registry == "docker.io" || registry == "index.docker.io" {
 		return "https://index.docker.io/v1/"
@@ -284,7 +284,7 @@ func (mrm *MultiRegistryManager) cacheCredentials(registry string, creds *Regist
 	defer mrm.cacheMutex.Unlock()
 
 	expiresAt := time.Now().Add(mrm.config.CacheTimeout)
-	
+
 	// Use credential expiration if it's sooner
 	if creds.ExpiresAt != nil && creds.ExpiresAt.Before(expiresAt) {
 		expiresAt = *creds.ExpiresAt
@@ -352,7 +352,7 @@ func (mrm *MultiRegistryManager) tryFallbackRegistries(ctx context.Context, regi
 				Str("registry", registry).
 				Str("fallback", fallback).
 				Msg("Trying fallback authentication method")
-			
+
 			// Try fallback - this is a simplified implementation
 			// In a real implementation, you'd try different auth methods
 		}
