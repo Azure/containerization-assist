@@ -35,11 +35,22 @@ Team A is responsible for replacing all 11 interface files with a single unified
 - Ensure consistent interface usage across entire codebase
 
 #### Task 5: Remove Old Interface Files
-- Delete all 11 legacy interface files:
-  - `dispatch/interfaces.go`
-  - `tools/interfaces.go`
-  - `base/atomic_tool.go`
-  - 8 additional interface files
+- Delete all legacy interface files:
+  - `pkg/mcp/types/interfaces.go` (move contents to unified file)
+  - `pkg/mcp/internal/orchestration/workflow/interfaces.go`
+  - `pkg/mcp/internal/orchestration/types.go`
+  - `pkg/mcp/internal/orchestration/execution/types.go`
+  - `pkg/mcp/internal/customizer/interface.go`
+  - `pkg/mcp/internal/adapter/mcp/adapters.go`
+  - `pkg/mcp/internal/engine/conversation/adapters.go`
+  - `pkg/mcp/internal/tools/base/adapter.go`
+  - `pkg/mcp/internal/tools/base/analyzer.go`
+  - `pkg/mcp/internal/tools/base/validator.go`
+  - `pkg/mcp/internal/tools/base_ai_context.go`
+  - `pkg/mcp/internal/tools/registry.go`
+  - `pkg/mcp/internal/tools/registration_helper.go`
+  - All `common.go` files with interfaces in tools subdirectories
+  - All strategy pattern interfaces (build/strategies.go, deploy_strategies/base.go)
 - Clean up unused interface definitions
 
 #### Task 6: Update Import Statements

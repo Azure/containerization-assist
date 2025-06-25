@@ -6,7 +6,7 @@ This plan consolidates the MCP reorganization strategy with feedback to create a
 
 ## Critical Issues & Solutions
 
-### 🚨 **Interface Explosion**: 11 interface files → 1 unified interface
+### 🚨 **Interface Explosion**: 15+ interface files → 1 unified interface
 ### 📁 **Excessive Nesting**: 62 directories → 15 focused packages  
 ### 🔄 **Code Duplication**: 24 generated adapters → auto-registration system
 ### 🔗 **Tight Coupling**: Circular dependencies → clean module boundaries
@@ -70,11 +70,13 @@ This plan consolidates the MCP reorganization strategy with feedback to create a
 ### Week 2: Complete Migration
 **Priority Tasks:**
 1. **Update all remaining packages** to unified interfaces
-2. **Remove all old interface files** (11 files → 0)
-   - Delete `dispatch/interfaces.go`
-   - Delete `tools/interfaces.go` 
-   - Delete `base/atomic_tool.go`
-   - Delete all 8 remaining interface files
+2. **Remove all old interface files** (15+ files → 0)
+   - Delete all interface definitions from:
+     - `types/interfaces.go` (merge into unified)
+     - `orchestration/workflow/interfaces.go`
+     - `adapter/`, `tools/base/`, `customizer/` interfaces
+     - All `common.go` files with interface definitions
+     - Strategy pattern interfaces throughout codebase
 
 3. **Update import statements** across entire codebase
 4. **Add interface conformance tests**
@@ -406,7 +408,7 @@ This plan consolidates the MCP reorganization strategy with feedback to create a
 ### Quantified Improvements
 - **📁 File Reduction**: 343 → ~80 files (-75%)
 - **🗂️ Directory Reduction**: 62 → ~15 directories (-75%)
-- **🔧 Interface Consolidation**: 11 → 1 interface file (-90%)
+- **🔧 Interface Consolidation**: 15+ → 1 interface file (-93%)
 - **⚡ Tool Files**: 11 mega-files → 16 focused files (+45% granularity)
 - **🏗️ Build Time**: -20% (measured via benchmarks, primarily from reduced compilation complexity)
 - **📦 Binary Size**: -15% (tracked in CI)
