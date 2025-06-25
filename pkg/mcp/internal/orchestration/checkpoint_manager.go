@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/workflow"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"

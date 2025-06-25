@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 

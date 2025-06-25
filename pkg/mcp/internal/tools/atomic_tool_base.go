@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"

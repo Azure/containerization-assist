@@ -24,18 +24,11 @@ var (
 
 // Import path mappings based on the new package structure
 var importMappings = map[string]string{
-	// Interface consolidation
-	"github.com/tng/workspace/prod/pkg/mcp/internal/interfaces":         "github.com/tng/workspace/prod/pkg/mcp",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/adapter/interfaces": "github.com/tng/workspace/prod/pkg/mcp",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/interfaces":   "github.com/tng/workspace/prod/pkg/mcp",
-
 	// Package restructuring - flattened structure
-	"github.com/tng/workspace/prod/pkg/mcp/internal/engine":              "github.com/tng/workspace/prod/pkg/mcp/internal/runtime",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/engine/conversation": "github.com/tng/workspace/prod/pkg/mcp/internal/runtime/conversation",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/atomic/build":  "github.com/tng/workspace/prod/pkg/mcp/internal/build",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/atomic/deploy": "github.com/tng/workspace/prod/pkg/mcp/internal/deploy",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/security":      "github.com/tng/workspace/prod/pkg/mcp/internal/scan",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/analysis":      "github.com/tng/workspace/prod/pkg/mcp/internal/analyze",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/engine":               "github.com/tng/workspace/prod/pkg/mcp/internal/runtime",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/runtime/conversation": "github.com/tng/workspace/prod/pkg/mcp/internal/runtime/conversation",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/security":       "github.com/tng/workspace/prod/pkg/mcp/internal/scan",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/analysis":       "github.com/tng/workspace/prod/pkg/mcp/internal/analyze",
 
 	// Session consolidation
 	"github.com/tng/workspace/prod/pkg/mcp/internal/store/session": "github.com/tng/workspace/prod/pkg/mcp/internal/session",
@@ -45,11 +38,11 @@ var importMappings = map[string]string{
 	"github.com/tng/workspace/prod/pkg/mcp/internal/orchestration/workflow": "github.com/tng/workspace/prod/pkg/mcp/internal/workflow",
 
 	// Observability package
-	"github.com/tng/workspace/prod/pkg/logger":           "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/ops": "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
+	"github.com/tng/workspace/prod/pkg/logger":                     "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/ops":          "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
 
 	// Validation package
-	"github.com/tng/workspace/prod/pkg/mcp/internal/tools/validation": "github.com/tng/workspace/prod/pkg/mcp/internal/validate",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/validate": "github.com/tng/workspace/prod/pkg/mcp/internal/validate",
 }
 
 func main() {

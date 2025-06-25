@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

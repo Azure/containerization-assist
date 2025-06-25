@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
 )
 
 // Implementation of all tool execution methods for NoReflectToolOrchestrator
@@ -18,7 +21,7 @@ func (o *NoReflectToolOrchestrator) executeBuildImage(ctx context.Context, argsM
 	tool := o.toolFactory.CreateBuildImageTool()
 
 	// Build typed arguments
-	args := tools.AtomicBuildImageArgs{}
+	args := build.AtomicBuildImageArgs{}
 
 	// Extract required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -79,7 +82,7 @@ func (o *NoReflectToolOrchestrator) executePushImage(ctx context.Context, argsMa
 	}
 
 	tool := o.toolFactory.CreatePushImageTool()
-	args := tools.AtomicPushImageArgs{}
+	args := build.AtomicPushImageArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -120,7 +123,7 @@ func (o *NoReflectToolOrchestrator) executePullImage(ctx context.Context, argsMa
 	}
 
 	tool := o.toolFactory.CreatePullImageTool()
-	args := tools.AtomicPullImageArgs{}
+	args := build.AtomicPullImageArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -157,7 +160,7 @@ func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap
 	}
 
 	tool := o.toolFactory.CreateTagImageTool()
-	args := tools.AtomicTagImageArgs{}
+	args := build.AtomicTagImageArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -198,7 +201,7 @@ func (o *NoReflectToolOrchestrator) executeScanImageSecurity(ctx context.Context
 	}
 
 	tool := o.toolFactory.CreateScanImageSecurityTool()
-	args := tools.AtomicScanImageSecurityArgs{}
+	args := scan.AtomicScanImageSecurityArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -257,7 +260,7 @@ func (o *NoReflectToolOrchestrator) executeScanSecrets(ctx context.Context, args
 	}
 
 	tool := o.toolFactory.CreateScanSecretsTool()
-	args := tools.AtomicScanSecretsArgs{}
+	args := scan.AtomicScanSecretsArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -318,7 +321,7 @@ func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context
 	}
 
 	tool := o.toolFactory.CreateGenerateManifestsTool()
-	args := tools.AtomicGenerateManifestsArgs{}
+	args := deploy.AtomicGenerateManifestsArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -408,7 +411,7 @@ func (o *NoReflectToolOrchestrator) executeDeployKubernetes(ctx context.Context,
 	}
 
 	tool := o.toolFactory.CreateDeployKubernetesTool()
-	args := tools.AtomicDeployKubernetesArgs{}
+	args := deploy.AtomicDeployKubernetesArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -496,7 +499,7 @@ func (o *NoReflectToolOrchestrator) executeCheckHealth(ctx context.Context, args
 	}
 
 	tool := o.toolFactory.CreateCheckHealthTool()
-	args := tools.AtomicCheckHealthArgs{}
+	args := deploy.AtomicCheckHealthArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -555,7 +558,7 @@ func (o *NoReflectToolOrchestrator) executeGenerateDockerfile(ctx context.Contex
 	}
 
 	tool := o.toolFactory.CreateGenerateDockerfileTool()
-	args := tools.GenerateDockerfileArgs{}
+	args := analyze.GenerateDockerfileArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
@@ -601,7 +604,7 @@ func (o *NoReflectToolOrchestrator) executeValidateDockerfile(ctx context.Contex
 	}
 
 	tool := o.toolFactory.CreateValidateDockerfileTool()
-	args := tools.AtomicValidateDockerfileArgs{}
+	args := analyze.AtomicValidateDockerfileArgs{}
 
 	// Required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {

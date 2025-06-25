@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/workflow"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 )
 
 // ExecuteToolFunc is the signature for tool execution functions

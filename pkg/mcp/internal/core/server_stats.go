@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 

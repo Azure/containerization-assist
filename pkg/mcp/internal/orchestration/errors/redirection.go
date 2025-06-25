@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/workflow"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 

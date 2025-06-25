@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -188,7 +188,7 @@ func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context
 	tool := o.toolFactory.CreateAnalyzeRepositoryTool()
 
 	// Build typed arguments
-	args := tools.AtomicAnalyzeRepositoryArgs{}
+	args := analyze.AtomicAnalyzeRepositoryArgs{}
 
 	// Extract required fields
 	if sessionID, ok := getString(argsMap, "session_id"); ok {

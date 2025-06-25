@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
@@ -29,13 +30,13 @@ func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerS
 	}
 
 	// Detailed health check using atomic tool
-	healthTool := tools.NewAtomicCheckHealthTool(
+	healthTool := deploy.NewAtomicCheckHealthTool(
 		deps.PipelineOperations,
 		deps.AtomicSessionMgr,
 		deps.Logger.With().Str("tool", "check_health_atomic").Logger(),
 	)
 
-	atomicArgs := tools.AtomicCheckHealthArgs{
+	atomicArgs := deploy.AtomicCheckHealthArgs{
 		BaseToolArgs: types.BaseToolArgs{
 			SessionID: sessionID,
 			DryRun:    args.DryRun,
@@ -74,7 +75,7 @@ func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerS
 	}
 
 	// Type assert to get the actual result
-	result, ok := resultInterface.(*tools.AtomicCheckHealthResult)
+	result, ok := resultInterface.(*deploy.AtomicCheckHealthResult)
 	if !ok {
 		return nil, fmt.Errorf("unexpected result type: %T", resultInterface)
 	}

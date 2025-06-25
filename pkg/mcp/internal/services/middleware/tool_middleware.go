@@ -7,14 +7,14 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/services/errors"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/services/telemetry"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/services/validation"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/validate"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // ToolMiddleware provides middleware functionality for atomic tools
 type ToolMiddleware struct {
-	validationService *validation.ValidationService
+	validationService *validate.ValidationService
 	errorService      *errors.ErrorService
 	telemetryService  *telemetry.TelemetryService
 	logger            zerolog.Logger
@@ -23,7 +23,7 @@ type ToolMiddleware struct {
 
 // NewToolMiddleware creates a new tool middleware
 func NewToolMiddleware(
-	validationService *validation.ValidationService,
+	validationService *validate.ValidationService,
 	errorService *errors.ErrorService,
 	telemetryService *telemetry.TelemetryService,
 	logger zerolog.Logger,
@@ -122,12 +122,12 @@ type Middleware interface {
 
 // ValidationMiddleware provides automatic validation
 type ValidationMiddleware struct {
-	service *validation.ValidationService
+	service *validate.ValidationService
 	logger  zerolog.Logger
 }
 
 // NewValidationMiddleware creates a new validation middleware
-func NewValidationMiddleware(service *validation.ValidationService, logger zerolog.Logger) *ValidationMiddleware {
+func NewValidationMiddleware(service *validate.ValidationService, logger zerolog.Logger) *ValidationMiddleware {
 	return &ValidationMiddleware{
 		service: service,
 		logger:  logger.With().Str("middleware", "validation").Logger(),
@@ -400,7 +400,7 @@ func (m *TimeoutMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 
 // StandardMiddlewareChain creates a standard middleware chain
 func StandardMiddlewareChain(
-	validationService *validation.ValidationService,
+	validationService *validate.ValidationService,
 	errorService *errors.ErrorService,
 	telemetryService *telemetry.TelemetryService,
 	logger zerolog.Logger,

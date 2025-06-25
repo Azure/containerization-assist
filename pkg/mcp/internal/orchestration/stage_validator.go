@@ -3,7 +3,7 @@ package orchestration
 import (
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/workflow"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 )
 
 // StageValidator handles validation of workflow stages

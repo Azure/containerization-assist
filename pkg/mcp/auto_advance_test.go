@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/engine/conversation"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 

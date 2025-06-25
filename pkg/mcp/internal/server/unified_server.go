@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/engine/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/workflow"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
 )

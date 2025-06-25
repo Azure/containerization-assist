@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 

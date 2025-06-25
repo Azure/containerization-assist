@@ -12,9 +12,13 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/localrivet/gomcp/server"
@@ -256,49 +260,70 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	// Create registrar for this function
 	registrar := tools.NewStandardToolRegistrar(gm.server, deps.Logger)
 
-	// Use auto-registration adapter for zero-code approach
-	autoRegistry := tools.NewAutoRegistrationAdapter()
-
-	// Create adapter for orchestrator registry to unified interface
-	registryAdapter := tools.NewOrchestratorRegistryAdapter(deps.ToolRegistry)
-
-	deps.Logger.Info().Msg("🚀 Starting auto-registration of atomic tools")
-
-	// Register tools ready for auto-registration
-	if err := autoRegistry.RegisterAtomicTools(registryAdapter); err != nil {
-		deps.Logger.Error().Err(err).Msg("Failed to auto-register atomic tools")
-		return fmt.Errorf("auto-registration failed: %w", err)
-	}
-
-	// For tools not yet migrated to unified interface, create them manually (temporary)
-	pendingTools := map[string]interface{}{
-		"generate_dockerfile_atomic": tools.NewGenerateDockerfileTool(
+	// Create atomic tools and register them with the orchestrator's tool registry
+	atomicTools := map[string]interface{}{
+		"analyze_repository_atomic": analyze.NewAtomicAnalyzeRepositoryTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "analyze_repository_atomic").Logger(),
+		),
+		"build_image_atomic": build.NewAtomicBuildImageTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
+		),
+		"generate_dockerfile_atomic": analyze.NewGenerateDockerfileTool(
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "generate_dockerfile_atomic").Logger(),
 		),
-		"generate_manifests_atomic": tools.NewAtomicGenerateManifestsTool(
+		"deploy_kubernetes_atomic": deploy.NewAtomicDeployKubernetesTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "generate_manifests_atomic").Logger(),
+			deps.Logger.With().Str("tool", "deploy_kubernetes_atomic").Logger(),
 		),
-		"scan_secrets_atomic": tools.NewAtomicScanSecretsTool(
-			deps.PipelineOperations,
-			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "scan_secrets_atomic").Logger(),
-		),
-		"validate_dockerfile_atomic": tools.NewAtomicValidateDockerfileTool(
+		"validate_dockerfile_atomic": analyze.NewAtomicValidateDockerfileTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "validate_dockerfile_atomic").Logger(),
 		),
+		"pull_image_atomic": build.NewAtomicPullImageTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "pull_image_atomic").Logger(),
+		),
+		"tag_image_atomic": build.NewAtomicTagImageTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "tag_image_atomic").Logger(),
+		),
+		"scan_image_security_atomic": scan.NewAtomicScanImageSecurityTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "scan_image_security_atomic").Logger(),
+		),
+		"scan_secrets_atomic": scan.NewAtomicScanSecretsTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "scan_secrets_atomic").Logger(),
+		),
+		"generate_manifests_atomic": deploy.NewAtomicGenerateManifestsTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "generate_manifests_atomic").Logger(),
+		),
+		"push_image_atomic": build.NewAtomicPushImageTool(
+			deps.PipelineOperations,
+			deps.AtomicSessionMgr,
+			deps.Logger.With().Str("tool", "push_image_atomic").Logger(),
+		),
 	}
 
-	// Register pending tools manually until they're migrated to unified interface
-	for name, tool := range pendingTools {
+	// Register tools with the orchestrator's tool registry
+	for name, tool := range atomicTools {
 		if err := deps.ToolRegistry.RegisterTool(name, tool); err != nil {
-			deps.Logger.Error().Err(err).Str("tool", name).Msg("Failed to register pending atomic tool")
+			deps.Logger.Error().Err(err).Str("tool", name).Msg("Failed to register atomic tool")
 		} else {
-			deps.Logger.Info().Str("tool", name).Msg("⏳ Registered pending tool (awaiting interface migration)")
+			deps.Logger.Info().Str("tool", name).Msg("Registered atomic tool successfully")
 		}
 	}
 
@@ -325,7 +350,7 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	// Special validation tool that delegates to orchestrator with modified args
 	tools.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
-		func(ctx *server.Context, args *tools.AtomicDeployKubernetesArgs) (*tools.AtomicDeployKubernetesResult, error) {
+		func(ctx *server.Context, args *deploy.AtomicDeployKubernetesArgs) (*deploy.AtomicDeployKubernetesResult, error) {
 			// Set dry run mode for validation
 			args.DryRun = true
 
@@ -337,7 +362,7 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 			}
 
 			// Type assert the result
-			if deployResult, ok := result.(*tools.AtomicDeployKubernetesResult); ok {
+			if deployResult, ok := result.(*deploy.AtomicDeployKubernetesResult); ok {
 				return deployResult, nil
 			}
 

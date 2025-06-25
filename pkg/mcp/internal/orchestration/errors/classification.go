@@ -3,7 +3,7 @@ package errors
 import (
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/workflow"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 )
 

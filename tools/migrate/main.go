@@ -31,8 +31,8 @@ var migrations = []PackageMigration{
 
 	// Package restructuring - flattened structure
 	{"pkg/mcp/internal/engine/", "pkg/mcp/internal/runtime/", "Rename engine to runtime"},
-	{"pkg/mcp/internal/tools/atomic/build/", "pkg/mcp/internal/build/", "Flatten build tools"},
-	{"pkg/mcp/internal/tools/atomic/deploy/", "pkg/mcp/internal/deploy/", "Flatten deploy tools"},
+	{"pkg/mcp/internal/tools/build/", "pkg/mcp/internal/build/", "Flatten build tools"},
+	{"pkg/mcp/internal/tools/deploy_strategies/", "pkg/mcp/internal/deploy/", "Flatten deploy tools"},
 	{"pkg/mcp/internal/tools/security/", "pkg/mcp/internal/scan/", "Rename security to scan"},
 	{"pkg/mcp/internal/tools/analysis/", "pkg/mcp/internal/analyze/", "Rename analysis to analyze"},
 
@@ -47,11 +47,7 @@ var migrations = []PackageMigration{
 	{"pkg/mcp/internal/orchestration/workflow/", "pkg/mcp/internal/workflow/", "Simplify workflow package"},
 
 	// Create observability package early
-	{"pkg/logger/", "pkg/mcp/internal/observability/", "Move logging to observability"},
-	{"pkg/mcp/internal/ops/", "pkg/mcp/internal/observability/", "Merge ops into observability"},
-
-	// Validation package (shared/exported)
-	{"pkg/mcp/internal/tools/validation/", "pkg/mcp/internal/validate/", "Create shared validation package"},
+	{"pkg/mcp/internal/ops/", "pkg/mcp/internal/observability/", "Create observability package"},
 }
 
 func main() {

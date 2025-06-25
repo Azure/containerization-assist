@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/ops"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )

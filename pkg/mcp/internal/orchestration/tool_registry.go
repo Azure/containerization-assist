@@ -5,7 +5,10 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
 	"github.com/rs/zerolog"
 )
 
@@ -205,24 +208,24 @@ func (r *MCPToolRegistry) GetToolCategories() []string {
 // registerAtomicTools registers all atomic tools with their adapters
 func (r *MCPToolRegistry) registerAtomicTools() {
 	// Repository analysis tools
-	r.registerTool("analyze_repository_atomic", &tools.AtomicAnalyzeRepositoryTool{})
+	r.registerTool("analyze_repository_atomic", &analyze.AtomicAnalyzeRepositoryTool{})
 
 	// Docker tools
-	r.registerTool("generate_dockerfile", &tools.GenerateDockerfileTool{})
-	r.registerTool("validate_dockerfile_atomic", &tools.AtomicValidateDockerfileTool{})
-	r.registerTool("build_image_atomic", &tools.AtomicBuildImageTool{})
-	r.registerTool("push_image_atomic", &tools.AtomicPushImageTool{})
-	r.registerTool("pull_image_atomic", &tools.AtomicPullImageTool{})
-	r.registerTool("tag_image_atomic", &tools.AtomicTagImageTool{})
+	r.registerTool("generate_dockerfile", &analyze.GenerateDockerfileTool{})
+	r.registerTool("validate_dockerfile_atomic", &analyze.AtomicValidateDockerfileTool{})
+	r.registerTool("build_image_atomic", &build.AtomicBuildImageTool{})
+	r.registerTool("push_image_atomic", &build.AtomicPushImageTool{})
+	r.registerTool("pull_image_atomic", &build.AtomicPullImageTool{})
+	r.registerTool("tag_image_atomic", &build.AtomicTagImageTool{})
 
 	// Security tools
-	r.registerTool("scan_image_security_atomic", &tools.AtomicScanImageSecurityTool{})
-	r.registerTool("scan_secrets_atomic", &tools.AtomicScanSecretsTool{})
+	r.registerTool("scan_image_security_atomic", &scan.AtomicScanImageSecurityTool{})
+	r.registerTool("scan_secrets_atomic", &scan.AtomicScanSecretsTool{})
 
 	// Kubernetes tools
-	r.registerTool("generate_manifests_atomic", &tools.AtomicGenerateManifestsTool{})
-	r.registerTool("deploy_kubernetes_atomic", &tools.AtomicDeployKubernetesTool{})
-	r.registerTool("check_health_atomic", &tools.AtomicCheckHealthTool{})
+	r.registerTool("generate_manifests_atomic", &deploy.AtomicGenerateManifestsTool{})
+	r.registerTool("deploy_kubernetes_atomic", &deploy.AtomicDeployKubernetesTool{})
+	r.registerTool("check_health_atomic", &deploy.AtomicCheckHealthTool{})
 
 	r.logger.Info().
 		Int("tool_count", len(r.tools)).

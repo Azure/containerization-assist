@@ -10,9 +10,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/engine/conversation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/ops"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
 	"github.com/Azure/container-copilot/pkg/runner"
 )

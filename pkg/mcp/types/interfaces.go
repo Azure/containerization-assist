@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 )
 
 // Unified MCP Interface Types
