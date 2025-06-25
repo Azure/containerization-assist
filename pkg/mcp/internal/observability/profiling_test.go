@@ -349,15 +349,15 @@ func TestBenchmarkSuite_ComparisonAnalysis(t *testing.T) {
 
 // Mock orchestrator for testing ProfiledOrchestrator
 type mockOrchestrator struct {
-	executeFunc    func(ctx context.Context, toolName string, args interface{}) (interface{}, error)
+	executeFunc    func(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
 	validateFunc   func(toolName string, args interface{}) error
 	executionDelay time.Duration
 	shouldFail     bool
 }
 
-func (m *mockOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error) {
+func (m *mockOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
 	if m.executeFunc != nil {
-		return m.executeFunc(ctx, toolName, args)
+		return m.executeFunc(ctx, toolName, args, session)
 	}
 
 	if m.executionDelay > 0 {
