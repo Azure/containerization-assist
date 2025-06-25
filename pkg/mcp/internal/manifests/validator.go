@@ -14,8 +14,8 @@ import (
 
 // Validator handles manifest validation
 type Validator struct {
-	logger       zerolog.Logger
-	opsValidator *ops.ManifestValidator
+	logger            zerolog.Logger
+	manifestValidator *observability.ManifestValidator
 }
 
 // NewValidator creates a new manifest validator
@@ -156,8 +156,8 @@ func (v *Validator) validateFile(ctx context.Context, filePath string) (*FileVal
 		return &validation, err
 	}
 
-	// If we have an ops validator, use it for detailed validation
-	if v.opsValidator != nil {
+	// If we have a manifest validator, use it for detailed validation
+	if v.manifestValidator != nil {
 		// This would integrate with the existing validation system
 		v.logger.Debug().Str("file", filePath).Msg("Performing detailed validation")
 	}

@@ -34,7 +34,7 @@ type ConversationHandlerConfig struct {
 	ToolOrchestrator   *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
 	Transport          interface{}                        // Accept both mcptypes.Transport and internal transport.Transport
 	Logger             zerolog.Logger
-	Telemetry          *ops.TelemetryManager
+	Telemetry          *observability.TelemetryManager
 }
 
 // NewConversationHandler creates a new concrete conversation handler

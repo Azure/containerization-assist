@@ -613,7 +613,7 @@ func convertGenerateManifestsResultToMap(result *GenerateManifestsResult) map[st
 type GenerateManifestsTool struct {
 	logger        zerolog.Logger
 	workspaceBase string
-	validator     *ops.ManifestValidator
+	validator     *observability.ManifestValidator
 }
 
 // NewGenerateManifestsTool creates a new generate manifests tool
@@ -626,7 +626,7 @@ func NewGenerateManifestsTool(logger zerolog.Logger, workspaceBase string) *Gene
 }
 
 // NewGenerateManifestsToolWithValidator creates a new generate manifests tool with a custom validator
-func NewGenerateManifestsToolWithValidator(logger zerolog.Logger, workspaceBase string, validator *ops.ManifestValidator) *GenerateManifestsTool {
+func NewGenerateManifestsToolWithValidator(logger zerolog.Logger, workspaceBase string, validator *observability.ManifestValidator) *GenerateManifestsTool {
 	return &GenerateManifestsTool{
 		logger:        logger,
 		workspaceBase: workspaceBase,
@@ -1257,7 +1257,7 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 	start := time.Now()
 
 	// Convert ValidationOptions to ManifestValidationOptions
-	validationOptions := ops.ManifestValidationOptions{
+	validationOptions := observability.ManifestValidationOptions{
 		K8sVersion:           options.K8sVersion,
 		SkipDryRun:           options.SkipDryRun,
 		SkipSchemaValidation: options.SkipSchemaValidation,
@@ -1268,14 +1268,14 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 	}
 
 	// Create kubectl validator (without requiring actual kubectl for now)
-	var validator *ops.ManifestValidator
+	var validator *observability.ManifestValidator
 	if !options.SkipDryRun {
-		kubectlValidator := ops.NewKubectlValidator(t.logger, ops.KubectlValidationOptions{
+		kubectlValidator := observability.NewKubectlValidator(t.logger, observability.KubectlValidationOptions{
 			Timeout: 30 * time.Second,
 		})
-		validator = ops.NewManifestValidator(t.logger, kubectlValidator)
+		validator = observability.NewManifestValidator(t.logger, kubectlValidator)
 	} else {
-		validator = ops.NewManifestValidator(t.logger, nil)
+		validator = observability.NewManifestValidator(t.logger, nil)
 	}
 
 	// Validate the manifest directory

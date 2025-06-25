@@ -15,7 +15,7 @@ import (
 
 func (pm *PromptManager) hasPassedPreFlightChecks(state *ConversationState) bool {
 	// Check if pre-flight checks have been run and passed
-	if result, ok := state.Context["preflight_result"].(*ops.PreFlightResult); ok {
+	if result, ok := state.Context["preflight_result"].(*observability.PreFlightResult); ok {
 		// Checks are valid for 1 hour
 		if time.Since(result.Timestamp) < 1*time.Hour {
 			return result.CanProceed
@@ -59,12 +59,12 @@ func (pm *PromptManager) shouldAutoRunPreFlightChecks(state *ConversationState, 
 	return !isFirstTime
 }
 
-func (pm *PromptManager) handleFailedPreFlightChecks(ctx context.Context, state *ConversationState, result *ops.PreFlightResult, stage types.ConversationStage) *ConversationResponse {
+func (pm *PromptManager) handleFailedPreFlightChecks(ctx context.Context, state *ConversationState, result *observability.PreFlightResult, stage types.ConversationStage) *ConversationResponse {
 	var failedChecks []string
 	var suggestions []string
 
 	for _, check := range result.Checks {
-		if check.Status == ops.CheckStatusFail {
+		if check.Status == observability.CheckStatusFail {
 			failedChecks = append(failedChecks, fmt.Sprintf("❌ %s: %s", check.Name, check.Error))
 			if check.RecoveryAction != "" {
 				suggestions = append(suggestions, fmt.Sprintf("• %s", check.RecoveryAction))
@@ -178,7 +178,7 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 
 		// Find first critical failure for recovery
 		for _, check := range result.Checks {
-			if check.Status == ops.CheckStatusFail && check.Category != "optional" {
+			if check.Status == observability.CheckStatusFail && check.Category != "optional" {
 				state.Context["last_failed_check"] = check.Name
 				response.Options = pm.getRecoveryOptions(check)
 				break
@@ -199,7 +199,7 @@ func (pm *PromptManager) rerunSingleCheck(ctx context.Context, state *Conversati
 		}
 	}
 
-	if result.Status == ops.CheckStatusPass {
+	if result.Status == observability.CheckStatusPass {
 		// Check passed, run all checks again
 		return pm.handlePreFlightChecks(ctx, state, "")
 	}
@@ -217,12 +217,12 @@ func (pm *PromptManager) rerunSingleCheck(ctx context.Context, state *Conversati
 	}
 }
 
-func (pm *PromptManager) formatPreFlightWarnings(result *ops.PreFlightResult) string {
+func (pm *PromptManager) formatPreFlightWarnings(result *observability.PreFlightResult) string {
 	var sb strings.Builder
 	sb.WriteString("⚠️ Pre-flight checks completed with warnings:\n\n")
 
 	for _, check := range result.Checks {
-		if check.Status == ops.CheckStatusWarning {
+		if check.Status == observability.CheckStatusWarning {
 			sb.WriteString(fmt.Sprintf("• %s: %s\n", check.Name, check.Message))
 		}
 	}
@@ -231,12 +231,12 @@ func (pm *PromptManager) formatPreFlightWarnings(result *ops.PreFlightResult) st
 	return sb.String()
 }
 
-func (pm *PromptManager) formatPreFlightErrors(result *ops.PreFlightResult) string {
+func (pm *PromptManager) formatPreFlightErrors(result *observability.PreFlightResult) string {
 	var sb strings.Builder
 	sb.WriteString("❌ Pre-flight checks failed. The following issues must be resolved:\n\n")
 
 	for _, check := range result.Checks {
-		if check.Status == ops.CheckStatusFail {
+		if check.Status == observability.CheckStatusFail {
 			sb.WriteString(fmt.Sprintf("• %s: %s\n", check.Name, check.Message))
 			if check.RecoveryAction != "" {
 				sb.WriteString(fmt.Sprintf("  → %s\n", check.RecoveryAction))
@@ -247,7 +247,7 @@ func (pm *PromptManager) formatPreFlightErrors(result *ops.PreFlightResult) stri
 	return sb.String()
 }
 
-func (pm *PromptManager) getRecoveryOptions(check ops.CheckResult) []Option {
+func (pm *PromptManager) getRecoveryOptions(check observability.CheckResult) []Option {
 	options := []Option{
 		{ID: "fixed", Label: "I've fixed it, try again"},
 	}
