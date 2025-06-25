@@ -1,4 +1,4 @@
-package deploy_strategies
+package deploy
 
 import (
 	"context"

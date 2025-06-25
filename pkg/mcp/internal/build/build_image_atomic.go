@@ -7,10 +7,6 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
@@ -37,7 +33,7 @@ type AtomicBuildImageArgs struct {
 // AtomicBuildImageResult defines the response from atomic Docker image building
 type AtomicBuildImageResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult      // Embedded for AI context methods
+	mcptypes.BaseAIContextResult      // Embedded for AI context methods
 	Success                      bool `json:"success"`
 
 	// Session context
@@ -80,7 +76,7 @@ type AtomicBuildImageTool struct {
 	contextAnalyzer *BuildContextAnalyzer
 	validator       *BuildValidatorImpl
 	executor        *BuildExecutorService
-	fixingMixin     *fixing.AtomicToolFixingMixin
+	// fixingMixin     *fixing.AtomicToolFixingMixin // TODO: fixing package not implemented
 }
 
 // NewAtomicBuildImageTool creates a new atomic build image tool
@@ -99,21 +95,22 @@ func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager
 		contextAnalyzer: contextAnalyzer,
 		validator:       validator,
 		executor:        executor,
-		fixingMixin:     nil, // Will be set via SetAnalyzer if fixing is enabled
+		// fixingMixin:     nil, // TODO: fixing package not implemented
 	}
 }
 
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
 func (t *AtomicBuildImageTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
-		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "atomic_build_image", t.logger)
+		// t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "atomic_build_image", t.logger) // TODO: fixing package not implemented
 	}
 }
 
 // ExecuteWithFixes runs the atomic Docker image build with AI-driven fixing capabilities
 func (t *AtomicBuildImageTool) ExecuteWithFixes(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
 	// Delegate to executor with fixing mixin
-	return t.executor.ExecuteWithFixes(ctx, args, t.fixingMixin)
+	// TODO: fixing not implemented yet
+	return t.executor.ExecuteWithFixes(ctx, args, nil)
 }
 
 // ExecuteBuild runs the atomic Docker image build (deprecated: use ExecuteWithContext)
@@ -129,7 +126,7 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 	// Create result object early for error handling
 	result := &AtomicBuildImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
 		SessionID:           args.SessionID,
 		ImageName:           args.ImageName,
 		ImageTag:            t.getImageTag(args.ImageTag),
@@ -138,12 +135,13 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 	}
 
 	// Use centralized build stages for progress tracking
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
-		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
-		{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
-		{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},
-		{Name: "Finalize", Weight: 0.05, Description: "Updating session state"},
-	})
+	// TODO: Progress adapter removed to break import cycles
+	// _ = nil // was: internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
+	//	{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
+	//	{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
+	//	{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},
+	//	{Name: "Finalize", Weight: 0.05, Description: "Updating session state"},
+	// })
 
 	// Delegate to executor with progress tracking
 	ctx := context.Background()
@@ -171,7 +169,7 @@ func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:         "atomic_build_image",
 		Description:  "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
-		Version:      constants.AtomicToolVersion,
+		Version:      "1.0.0",
 		Category:     "docker",
 		Dependencies: []string{"docker"},
 		Capabilities: []string{
@@ -267,8 +265,8 @@ func (t *AtomicBuildImageTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicBuildImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicBuildImageTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,
@@ -285,14 +283,14 @@ func (t *AtomicBuildImageTool) ExecuteTyped(ctx context.Context, args AtomicBuil
 
 func (t *AtomicBuildImageTool) getImageTag(tag string) string {
 	if tag == "" {
-		return constants.DefaultImageTag
+		return "latest"
 	}
 	return tag
 }
 
 func (t *AtomicBuildImageTool) getPlatform(platform string) string {
 	if platform == "" {
-		return constants.DefaultPlatform
+		return "linux/amd64"
 	}
 	return platform
 }

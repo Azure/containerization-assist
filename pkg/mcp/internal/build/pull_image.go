@@ -3,24 +3,21 @@ package build
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
 // standardPullStages provides common stages for pull operations
-func standardPullStages() []internal.LocalProgressStage {
-	return []internal.LocalProgressStage{
+func standardPullStages() []mcptypes.LocalProgressStage {
+	return []mcptypes.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
 		{Name: "Authenticate", Weight: 0.15, Description: "Authenticating with registry"},
 		{Name: "Pull", Weight: 0.60, Description: "Pulling Docker image layers"},
@@ -45,7 +42,7 @@ type AtomicPullImageArgs struct {
 // AtomicPullImageResult defines the response from atomic Docker image pull
 type AtomicPullImageResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult      // Embedded for AI context methods
+	mcptypes.BaseAIContextResult      // Embedded for AI context methods
 	Success                      bool `json:"success"`
 
 	// Session context
@@ -117,7 +114,7 @@ func (t *AtomicPullImageTool) ExecutePullImage(ctx context.Context, args AtomicP
 	// Create result object early for error handling
 	result := &AtomicPullImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_pull_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("pull", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("pull", false, 0), // Will be updated later
 		ImageRef:            args.ImageRef,
 		PullContext:         &PullContext{},
 	}
@@ -133,13 +130,13 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	// Create result object early for error handling
 	result := &AtomicPullImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_pull_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("pull", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("pull", false, 0), // Will be updated later
 		ImageRef:            args.ImageRef,
 		PullContext:         &PullContext{},
 	}
 
 	// Create progress adapter for GoMCP using standard pull stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Pull", Weight: 0.80, Description: "Pulling image"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	// _ = nil // TODO: Progress adapter removed to break import cycles
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -149,7 +146,7 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	result.TotalDuration = time.Since(startTime)
 
 	// Update AI context with final result
-	result.BaseAIContextResult = internal.NewBaseAIContextResult("pull", result.Success, result.TotalDuration)
+	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("pull", result.Success, result.TotalDuration)
 
 	// Complete progress tracking
 	if err != nil {
@@ -170,7 +167,7 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		return mcperror.NewSessionNotFound(args.SessionID)
+		return utils.NewSessionNotFound(args.SessionID)
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
@@ -191,7 +188,7 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 		result.Registry = t.extractRegistryURL(args.ImageRef)
 		result.Success = true
 		// Update AI context with success
-		result.BaseAIContextResult = internal.NewBaseAIContextResult("pull", true, result.TotalDuration)
+		result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("pull", true, result.TotalDuration)
 		result.PullContext.PullStatus = "dry-run"
 		result.PullContext.NextStepSuggestions = []string{
 			"This is a dry-run - no actual pull was performed",
@@ -208,7 +205,7 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 			Str("session_id", session.SessionID).
 			Str("image_ref", result.ImageRef).
 			Msg("Pull prerequisites validation failed")
-		return mcperror.NewWithData("prerequisites_validation_failed", "Pull prerequisites validation failed", map[string]interface{}{
+		return utils.NewWithData("prerequisites_validation_failed", "Pull prerequisites validation failed", map[string]interface{}{
 			"session_id": session.SessionID,
 			"image_ref":  result.ImageRef,
 		})
@@ -229,7 +226,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
-		return result, mcperror.NewSessionNotFound(args.SessionID)
+		return result, utils.NewSessionNotFound(args.SessionID)
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
@@ -248,7 +245,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 		result.Registry = t.extractRegistryURL(args.ImageRef)
 		result.Success = true
 		// Update AI context with success
-		result.BaseAIContextResult = internal.NewBaseAIContextResult("pull", true, result.TotalDuration)
+		result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("pull", true, result.TotalDuration)
 		result.PullContext.PullStatus = "dry-run"
 		result.PullContext.NextStepSuggestions = []string{
 			"This is a dry-run - no actual pull was performed",
@@ -266,7 +263,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 			Msg("Pull prerequisites validation failed")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
-		return result, mcperror.NewWithData("prerequisites_validation_failed", "Pull prerequisites validation failed", map[string]interface{}{
+		return result, utils.NewWithData("prerequisites_validation_failed", "Pull prerequisites validation failed", map[string]interface{}{
 			"session_id": session.SessionID,
 			"image_ref":  result.ImageRef,
 		})
@@ -277,7 +274,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 	result.TotalDuration = time.Since(startTime)
 
 	// Update AI context with final result
-	result.BaseAIContextResult = internal.NewBaseAIContextResult("pull", result.Success, result.TotalDuration)
+	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("pull", result.Success, result.TotalDuration)
 
 	if err != nil {
 		result.Success = false
@@ -304,7 +301,7 @@ func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiont
 	if err != nil {
 		result.Success = false
 		t.logger.Error().Err(err).Str("image_ref", args.ImageRef).Msg("Failed to pull image")
-		return mcperror.NewWithData("image_pull_failed", "Failed to pull image", map[string]interface{}{
+		return utils.NewWithData("image_pull_failed", "Failed to pull image", map[string]interface{}{
 			"image_ref":  args.ImageRef,
 			"session_id": session.SessionID,
 		})
@@ -435,97 +432,21 @@ func (t *AtomicPullImageTool) updateSessionState(session *sessiontypes.SessionSt
 }
 
 // GenerateRecommendations implements ai_context.Recommendable
-func (r *AtomicPullImageResult) GenerateRecommendations() []ai_context.Recommendation {
-	recommendations := []ai_context.Recommendation{}
-
-	if !r.Success {
-		recommendations = append(recommendations, ai_context.Recommendation{
-			Priority:    "high",
-			Category:    "troubleshooting",
-			Title:       "Resolve Image Pull Failure",
-			Description: "Investigate and fix the image pull failure",
-			Reasoning:   []string{"Application cannot run without the required container image"},
-			Impact:      "high",
-			Benefits:    []string{"Enables successful container deployment and application startup"},
-		})
-	}
-
-	// Registry optimization
-	if r.PullContext != nil && r.PullContext.CacheHitRatio < 0.5 {
-		recommendations = append(recommendations, ai_context.Recommendation{
-			Priority:    "medium",
-			Category:    "optimization",
-			Title:       "Optimize Image Caching",
-			Description: "Implement image caching strategies to improve pull performance",
-			Reasoning:   []string{"Better caching reduces pull times and bandwidth usage"},
-			Impact:      "medium",
-			Benefits:    []string{"Faster deployments and reduced network overhead"},
-		})
-	}
-
-	return recommendations
+func (r *AtomicPullImageResult) GenerateRecommendations() []mcptypes.Recommendation {
+	// TODO: Implement when Recommendation struct is fully defined
+	return []mcptypes.Recommendation{}
 }
 
 // CreateRemediationPlan implements ai_context.Recommendable
-func (r *AtomicPullImageResult) CreateRemediationPlan() *ai_context.RemediationPlan {
-	plan := &ai_context.RemediationPlan{
-		Priority: "low",
-		Steps:    []ai_context.RemediationStep{},
-	}
-
-	if !r.Success {
-		plan.Priority = "high"
-
-		// Step 1: Check image availability
-		plan.Steps = append(plan.Steps, ai_context.RemediationStep{
-			Action:      "verify",
-			Description: "Verify image exists in registry",
-			Command:     fmt.Sprintf("docker manifest inspect %s", r.ImageRef),
-		})
-
-		// Step 2: Check authentication
-		plan.Steps = append(plan.Steps, ai_context.RemediationStep{
-			Action:      "authenticate",
-			Description: "Verify registry authentication",
-			Command:     fmt.Sprintf("docker login %s", r.Registry),
-		})
-
-		// Step 3: Retry pull
-		plan.Steps = append(plan.Steps, ai_context.RemediationStep{
-			Action:      "retry",
-			Description: "Retry image pull with verbose output",
-			Command:     fmt.Sprintf("docker pull %s", r.ImageRef),
-		})
-	}
-
-	return plan
+// TODO: Implement when AI context types are fully defined in mcptypes
+func (r *AtomicPullImageResult) CreateRemediationPlan() *utils.RemediationPlan {
+	return nil
 }
 
 // GetAlternativeStrategies implements ai_context.Recommendable
-func (r *AtomicPullImageResult) GetAlternativeStrategies() []ai_context.AlternativeStrategy {
-	alternatives := []ai_context.AlternativeStrategy{}
-
-	// Registry mirrors
-	alternatives = append(alternatives, ai_context.AlternativeStrategy{
-		Name:        "Registry Mirror",
-		Description: "Use a registry mirror or pull-through cache",
-		Benefits:    []string{"Faster pulls", "Reduced bandwidth", "Better availability"},
-		Drawbacks:   []string{"Additional infrastructure", "Potential sync delays"},
-		Complexity:  "medium",
-		Timeline:    "days",
-	})
-
-	// Pre-pulling
-	alternatives = append(alternatives, ai_context.AlternativeStrategy{
-		Name:        "Image Pre-pulling",
-		Description: "Pre-pull images to all nodes using DaemonSet",
-		Benefits:    []string{"Faster pod startup", "Predictable behavior", "Reduced pull failures"},
-		Drawbacks:   []string{"Storage overhead", "Update complexity", "Network load"},
-		Complexity:  "medium",
-		Timeline:    "hours",
-	})
-
-	return alternatives
+func (r *AtomicPullImageResult) GetAlternativeStrategies() []mcptypes.AlternativeStrategy {
+	// TODO: Implement when AlternativeStrategy struct is fully defined
+	return []mcptypes.AlternativeStrategy{}
 }
 
 // Tool interface implementation (unified interface)
@@ -570,20 +491,20 @@ func (t *AtomicPullImageTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicPullImageTool) Validate(ctx context.Context, args interface{}) error {
 	pullArgs, ok := args.(AtomicPullImageArgs)
 	if !ok {
-		return mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_pull_image", map[string]interface{}{
+		return utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_pull_image", map[string]interface{}{
 			"expected": "AtomicPullImageArgs",
 			"received": fmt.Sprintf("%T", args),
 		})
 	}
 
 	if pullArgs.ImageRef == "" {
-		return mcperror.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "ImageRef is required", map[string]interface{}{
 			"field": "image_ref",
 		})
 	}
 
 	if pullArgs.SessionID == "" {
-		return mcperror.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
+		return utils.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
 			"field": "session_id",
 		})
 	}
@@ -595,7 +516,7 @@ func (t *AtomicPullImageTool) Validate(ctx context.Context, args interface{}) er
 func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	pullArgs, ok := args.(AtomicPullImageArgs)
 	if !ok {
-		return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_pull_image", map[string]interface{}{
+		return nil, utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_pull_image", map[string]interface{}{
 			"expected": "AtomicPullImageArgs",
 			"received": fmt.Sprintf("%T", args),
 		})
@@ -623,8 +544,8 @@ func (t *AtomicPullImageTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicPullImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicPullImageTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,
@@ -639,7 +560,7 @@ func (t *AtomicPullImageTool) ExecuteTyped(ctx context.Context, args AtomicPullI
 	// Create result object early for error handling
 	result := &AtomicPullImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_pull_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("pull", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("pull", false, 0), // Will be updated later
 		ImageRef:            args.ImageRef,
 		PullContext:         &PullContext{},
 	}

@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 
@@ -88,7 +87,7 @@ func (lm *LabelManager) AddLabels(sessionID string, labels ...string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
+		if state, ok := s.(*SessionState); ok {
 			state.Labels = session.Labels
 		}
 	})
@@ -136,7 +135,7 @@ func (lm *LabelManager) RemoveLabels(sessionID string, labels ...string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
+		if state, ok := s.(*SessionState); ok {
 			state.Labels = session.Labels
 		}
 	})
@@ -179,7 +178,7 @@ func (lm *LabelManager) SetLabels(sessionID string, labels []string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
+		if state, ok := s.(*SessionState); ok {
 			state.Labels = session.Labels
 		}
 	})
@@ -237,7 +236,7 @@ func (lm *LabelManager) SetK8sLabels(sessionID string, labels map[string]string)
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
+		if state, ok := s.(*SessionState); ok {
 			state.K8sLabels = session.K8sLabels
 		}
 	})
@@ -278,7 +277,7 @@ func (lm *LabelManager) RemoveK8sLabel(sessionID string, key string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
+		if state, ok := s.(*SessionState); ok {
 			state.Labels = session.Labels
 		}
 	})

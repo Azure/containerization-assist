@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 
@@ -40,7 +39,7 @@ type SessionQuery struct {
 
 // QueryResult contains the results of a session query
 type QueryResult struct {
-	Sessions   []*sessiontypes.SessionState
+	Sessions   []*SessionState
 	TotalCount int
 	HasMore    bool
 	Query      SessionQuery
@@ -65,7 +64,7 @@ func NewSessionQueryManager(sessionManager *SessionManager, logger zerolog.Logge
 }
 
 // QuerySessions executes a query and returns matching sessions
-func (qm *SessionQueryManager) QuerySessions(query SessionQuery) ([]*sessiontypes.SessionState, error) {
+func (qm *SessionQueryManager) QuerySessions(query SessionQuery) ([]*SessionState, error) {
 	startTime := time.Now()
 
 	qm.logger.Debug().
@@ -79,7 +78,7 @@ func (qm *SessionQueryManager) QuerySessions(query SessionQuery) ([]*sessiontype
 	}
 
 	// Apply filters
-	var matchingSessions []*sessiontypes.SessionState
+	var matchingSessions []*SessionState
 	for _, session := range allSessions {
 		if qm.sessionMatchesQuery(session, query) {
 			matchingSessions = append(matchingSessions, session)
@@ -152,7 +151,7 @@ func (qm *SessionQueryManager) QuerySessionIDs(query SessionQuery) ([]string, er
 }
 
 // GetSessionsByLabelPrefix returns sessions that have labels with the specified prefix
-func (qm *SessionQueryManager) GetSessionsByLabelPrefix(prefix string) ([]*sessiontypes.SessionState, error) {
+func (qm *SessionQueryManager) GetSessionsByLabelPrefix(prefix string) ([]*SessionState, error) {
 	qm.logger.Debug().
 		Str("prefix", prefix).
 		Msg("Getting sessions by label prefix")
@@ -162,7 +161,7 @@ func (qm *SessionQueryManager) GetSessionsByLabelPrefix(prefix string) ([]*sessi
 		return nil, fmt.Errorf("failed to get sessions: %w", err)
 	}
 
-	var matchingSessions []*sessiontypes.SessionState
+	var matchingSessions []*SessionState
 	for _, session := range allSessions {
 		for _, label := range session.Labels {
 			if strings.HasPrefix(label, prefix) {
@@ -176,7 +175,7 @@ func (qm *SessionQueryManager) GetSessionsByLabelPrefix(prefix string) ([]*sessi
 }
 
 // GetSessionsWithAnyLabel returns sessions that have any of the specified labels
-func (qm *SessionQueryManager) GetSessionsWithAnyLabel(labels []string) ([]*sessiontypes.SessionState, error) {
+func (qm *SessionQueryManager) GetSessionsWithAnyLabel(labels []string) ([]*SessionState, error) {
 	query := SessionQuery{
 		AnyLabels: labels,
 	}
@@ -184,7 +183,7 @@ func (qm *SessionQueryManager) GetSessionsWithAnyLabel(labels []string) ([]*sess
 }
 
 // GetSessionsWithAllLabels returns sessions that have all of the specified labels
-func (qm *SessionQueryManager) GetSessionsWithAllLabels(labels []string) ([]*sessiontypes.SessionState, error) {
+func (qm *SessionQueryManager) GetSessionsWithAllLabels(labels []string) ([]*SessionState, error) {
 	query := SessionQuery{
 		Labels: labels,
 	}
@@ -192,7 +191,7 @@ func (qm *SessionQueryManager) GetSessionsWithAllLabels(labels []string) ([]*ses
 }
 
 // sessionMatchesQuery checks if a session matches the given query criteria
-func (qm *SessionQueryManager) sessionMatchesQuery(session *sessiontypes.SessionState, query SessionQuery) bool {
+func (qm *SessionQueryManager) sessionMatchesQuery(session *SessionState, query SessionQuery) bool {
 	// Check required labels (ALL must be present)
 	if len(query.Labels) > 0 {
 		sessionLabels := make(map[string]bool)
@@ -282,7 +281,7 @@ func (qm *SessionQueryManager) sessionMatchesQuery(session *sessiontypes.Session
 }
 
 // sortSessions sorts sessions based on the specified criteria
-func (qm *SessionQueryManager) sortSessions(sessions []*sessiontypes.SessionState, sortBy, sortOrder string) {
+func (qm *SessionQueryManager) sortSessions(sessions []*SessionState, sortBy, sortOrder string) {
 	if len(sessions) <= 1 {
 		return
 	}
@@ -337,12 +336,12 @@ func (qm *SessionQueryManager) sortSessions(sessions []*sessiontypes.SessionStat
 }
 
 // getAllSessions gets all sessions from the session manager
-func (qm *SessionQueryManager) getAllSessions() ([]*sessiontypes.SessionState, error) {
+func (qm *SessionQueryManager) getAllSessions() ([]*SessionState, error) {
 	// This is a simplified implementation - in a production system,
 	// we would want to optimize this to avoid loading all sessions into memory
 	sessionSummaries := qm.sessionManager.ListSessionSummaries()
 
-	var sessions []*sessiontypes.SessionState
+	var sessions []*SessionState
 	for _, summary := range sessionSummaries {
 		session, err := qm.sessionManager.GetSessionConcrete(summary.SessionID)
 		if err != nil {

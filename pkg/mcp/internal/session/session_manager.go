@@ -10,13 +10,12 @@ import (
 	"sync"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 
 // SessionManager manages MCP sessions with persistence and quotas
 type SessionManager struct {
-	sessions     map[string]*sessiontypes.SessionState
+	sessions     map[string]*SessionState
 	mutex        sync.RWMutex
 	workspaceDir string
 	maxSessions  int
@@ -72,7 +71,7 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 	}
 
 	sm := &SessionManager{
-		sessions:          make(map[string]*sessiontypes.SessionState),
+		sessions:          make(map[string]*SessionState),
 		workspaceDir:      config.WorkspaceDir,
 		maxSessions:       config.MaxSessions,
 		sessionTTL:        config.SessionTTL,
@@ -92,7 +91,7 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 }
 
 // getOrCreateSessionConcrete retrieves an existing session or creates a new one
-func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*sessiontypes.SessionState, error) {
+func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*SessionState, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -131,7 +130,7 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*session
 		return nil, fmt.Errorf("failed to create session workspace: %w", err)
 	}
 
-	session := sessiontypes.NewSessionStateWithTTL(sessionID, workspaceDir, sm.sessionTTL)
+	session := NewSessionStateWithTTL(sessionID, workspaceDir, sm.sessionTTL)
 	session.MaxDiskUsage = sm.maxDiskPerSession
 
 	sm.sessions[sessionID] = session
@@ -168,16 +167,16 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 }
 
 // UpdateSessionTyped updates a session with a typed function (for backward compatibility)
-func (sm *SessionManager) UpdateSessionTyped(sessionID string, updater func(*sessiontypes.SessionState)) error {
+func (sm *SessionManager) UpdateSessionTyped(sessionID string, updater func(*SessionState)) error {
 	return sm.UpdateSession(sessionID, func(s interface{}) {
-		if session, ok := s.(*sessiontypes.SessionState); ok {
+		if session, ok := s.(*SessionState); ok {
 			updater(session)
 		}
 	})
 }
 
 // GetSessionConcrete retrieves a session by ID with concrete return type
-func (sm *SessionManager) GetSessionConcrete(sessionID string) (*sessiontypes.SessionState, error) {
+func (sm *SessionManager) GetSessionConcrete(sessionID string) (*SessionState, error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
@@ -216,11 +215,11 @@ func (sm *SessionManager) GetOrCreateSession(sessionID string) (interface{}, err
 }
 
 // ListSessionSummaries returns a list of all session summaries
-func (sm *SessionManager) ListSessionSummaries() []sessiontypes.SessionSummary {
+func (sm *SessionManager) ListSessionSummaries() []SessionSummary {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
-	summaries := make([]sessiontypes.SessionSummary, 0, len(sm.sessions))
+	summaries := make([]SessionSummary, 0, len(sm.sessions))
 	for _, session := range sm.sessions {
 		summaries = append(summaries, session.GetSummary())
 	}
@@ -308,7 +307,7 @@ func (sm *SessionManager) GetOrCreateSessionFromRepo(repoURL string) (interface{
 
 	// Update the session with repo URL
 	err = sm.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
+		if state, ok := s.(*SessionState); ok {
 			state.RepoURL = repoURL
 		}
 	})
@@ -440,7 +439,7 @@ func (sm *SessionManager) Stop() error {
 // AddSessionLabel adds a label to a session
 func (sm *SessionManager) AddSessionLabel(sessionID, label string) error {
 	return sm.UpdateSession(sessionID, func(s interface{}) {
-		if session, ok := s.(*sessiontypes.SessionState); ok {
+		if session, ok := s.(*SessionState); ok {
 			session.AddLabel(label)
 		}
 	})
@@ -449,7 +448,7 @@ func (sm *SessionManager) AddSessionLabel(sessionID, label string) error {
 // RemoveSessionLabel removes a label from a session
 func (sm *SessionManager) RemoveSessionLabel(sessionID, label string) error {
 	return sm.UpdateSession(sessionID, func(s interface{}) {
-		if session, ok := s.(*sessiontypes.SessionState); ok {
+		if session, ok := s.(*SessionState); ok {
 			session.RemoveLabel(label)
 		}
 	})
@@ -458,18 +457,18 @@ func (sm *SessionManager) RemoveSessionLabel(sessionID, label string) error {
 // SetSessionLabels replaces all labels for a session
 func (sm *SessionManager) SetSessionLabels(sessionID string, labels []string) error {
 	return sm.UpdateSession(sessionID, func(s interface{}) {
-		if session, ok := s.(*sessiontypes.SessionState); ok {
+		if session, ok := s.(*SessionState); ok {
 			session.SetLabels(labels)
 		}
 	})
 }
 
 // GetSessionsByLabel returns sessions that have the specified label
-func (sm *SessionManager) GetSessionsByLabel(label string) []sessiontypes.SessionSummary {
+func (sm *SessionManager) GetSessionsByLabel(label string) []SessionSummary {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
-	var results []sessiontypes.SessionSummary
+	var results []SessionSummary
 	for _, session := range sm.sessions {
 		if session.HasLabel(label) {
 			results = append(results, session.GetSummary())
@@ -498,11 +497,11 @@ func (sm *SessionManager) GetAllLabels() []string {
 }
 
 // ListSessionsFiltered returns sessions filtered by multiple criteria including labels
-func (sm *SessionManager) ListSessionsFiltered(filters SessionFilters) []sessiontypes.SessionSummary {
+func (sm *SessionManager) ListSessionsFiltered(filters SessionFilters) []SessionSummary {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
-	var results []sessiontypes.SessionSummary
+	var results []SessionSummary
 	for _, session := range sm.sessions {
 		if sm.matchesFilters(session, filters) {
 			results = append(results, session.GetSummary())
@@ -539,13 +538,14 @@ func (sm *SessionManager) GetStats() *SessionManagerStats {
 
 // SessionManagerStats provides statistics about the session manager
 type SessionManagerStats struct {
-	TotalSessions    int   `json:"total_sessions"`
-	ActiveSessions   int   `json:"active_sessions"`
-	ExpiredSessions  int   `json:"expired_sessions"`
-	SessionsWithJobs int   `json:"sessions_with_jobs"`
-	TotalDiskUsage   int64 `json:"total_disk_usage_bytes"`
-	MaxSessions      int   `json:"max_sessions"`
-	TotalDiskLimit   int64 `json:"total_disk_limit_bytes"`
+	TotalSessions    int       `json:"total_sessions"`
+	ActiveSessions   int       `json:"active_sessions"`
+	ExpiredSessions  int       `json:"expired_sessions"`
+	SessionsWithJobs int       `json:"sessions_with_jobs"`
+	TotalDiskUsage   int64     `json:"total_disk_usage_bytes"`
+	MaxSessions      int       `json:"max_sessions"`
+	TotalDiskLimit   int64     `json:"total_disk_limit_bytes"`
+	ServerStartTime  time.Time `json:"server_start_time,omitempty"`
 }
 
 // SessionFilters defines criteria for filtering sessions
@@ -561,7 +561,7 @@ type SessionFilters struct {
 // Helper methods
 
 // matchesFilters checks if a session matches the given filters
-func (sm *SessionManager) matchesFilters(session *sessiontypes.SessionState, filters SessionFilters) bool {
+func (sm *SessionManager) matchesFilters(session *SessionState, filters SessionFilters) bool {
 	// Check ALL labels requirement
 	if len(filters.Labels) > 0 {
 		for _, requiredLabel := range filters.Labels {

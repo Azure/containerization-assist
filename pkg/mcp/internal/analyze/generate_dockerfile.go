@@ -3,7 +3,6 @@ package analyze
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"os"
 	"path/filepath"
 	"strings"
@@ -296,7 +295,7 @@ func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Generate
 // ExecuteWithContext runs the Dockerfile generation with GoMCP progress tracking
 func (t *GenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
 	// Create progress adapter for GoMCP using standard generation stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Generate", Weight: 0.80, Description: "Generating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = mcptypes.NewGoMCPProgressAdapter(serverCtx, []mcptypes.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Generate", Weight: 0.80, Description: "Generating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Progress adapter removed - execute the core logic directly
 	t.logger.Info().Msg("Initializing Dockerfile generation")
@@ -883,7 +882,7 @@ func (t *GenerateDockerfileTool) getTemplateOptions(language, framework string, 
 			Description: "Tomcat-based deployment for WAR files",
 			BestFor:     []string{"Java web applications", "JSP projects", "Servlet-based apps"},
 			Limitations: []string{"Heavier base image", "Requires WAR packaging"},
-			MatchScore:  t.calculateMatchScore(types.AppServerTomcat, language, framework, configFiles),
+			MatchScore:  t.calculateMatchScore("tomcat", language, framework, configFiles),
 		},
 		// Node.js templates
 		{
@@ -965,7 +964,7 @@ func (t *GenerateDockerfileTool) calculateMatchScore(templateType, language, fra
 			if strings.Contains(file, "build.gradle") {
 				score += 40
 			}
-		case types.AppServerTomcat:
+		case "tomcat":
 			if strings.Contains(file, "web.xml") || strings.Contains(file, ".jsp") {
 				score += 30
 			}
@@ -991,7 +990,7 @@ func (t *GenerateDockerfileTool) calculateMatchScore(templateType, language, fra
 			if strings.Contains(strings.ToLower(framework), "spring") {
 				score += 20
 			}
-		case types.AppServerTomcat:
+		case "tomcat":
 			if strings.Contains(strings.ToLower(framework), "servlet") {
 				score += 20
 			}

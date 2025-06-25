@@ -7,15 +7,14 @@ import (
 	"sync"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/rs/zerolog/log"
 	bolt "go.etcd.io/bbolt"
 )
 
 // SessionStore defines the interface for session persistence
 type SessionStore interface {
-	Save(sessionID string, state *sessiontypes.SessionState) error
-	Load(sessionID string) (*sessiontypes.SessionState, error)
+	Save(sessionID string, state *SessionState) error
+	Load(sessionID string) (*SessionState, error)
 	Delete(sessionID string) error
 	List() ([]string, error)
 	Close() error
@@ -94,7 +93,7 @@ func NewBoltSessionStore(dbPath string) (*BoltSessionStore, error) {
 }
 
 // Save persists a session state to the database
-func (s *BoltSessionStore) Save(sessionID string, state *sessiontypes.SessionState) error {
+func (s *BoltSessionStore) Save(sessionID string, state *SessionState) error {
 	data, err := json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("failed to marshal session state: %w", err)
@@ -107,8 +106,8 @@ func (s *BoltSessionStore) Save(sessionID string, state *sessiontypes.SessionSta
 }
 
 // Load retrieves a session state from the database
-func (s *BoltSessionStore) Load(sessionID string) (*sessiontypes.SessionState, error) {
-	var state *sessiontypes.SessionState
+func (s *BoltSessionStore) Load(sessionID string) (*SessionState, error) {
+	var state *SessionState
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(sessionsBucket))
@@ -117,7 +116,7 @@ func (s *BoltSessionStore) Load(sessionID string) (*sessiontypes.SessionState, e
 			return fmt.Errorf("session not found: %s", sessionID)
 		}
 
-		state = &sessiontypes.SessionState{}
+		state = &SessionState{}
 		return json.Unmarshal(data, state)
 	})
 	if err != nil {
@@ -163,7 +162,7 @@ func (s *BoltSessionStore) CleanupExpired(ttl time.Duration) error {
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(sessionsBucket))
 		return bucket.ForEach(func(k, v []byte) error {
-			var state sessiontypes.SessionState
+			var state SessionState
 			if err := json.Unmarshal(v, &state); err != nil {
 				return err
 			}
@@ -199,7 +198,7 @@ func (s *BoltSessionStore) GetStats() (*SessionStoreStats, error) {
 		return bucket.ForEach(func(k, v []byte) error {
 			stats.TotalSessions++
 
-			var state sessiontypes.SessionState
+			var state SessionState
 			if err := json.Unmarshal(v, &state); err != nil {
 				return err
 			}
@@ -235,25 +234,25 @@ type SessionStoreStats struct {
 // MemorySessionStore implements SessionStore using in-memory storage (for testing)
 type MemorySessionStore struct {
 	mu       sync.RWMutex
-	sessions map[string]*sessiontypes.SessionState
+	sessions map[string]*SessionState
 }
 
 // NewMemorySessionStore creates a new in-memory session store
 func NewMemorySessionStore() *MemorySessionStore {
 	return &MemorySessionStore{
-		sessions: make(map[string]*sessiontypes.SessionState),
+		sessions: make(map[string]*SessionState),
 	}
 }
 
 // Save stores a session in memory
-func (s *MemorySessionStore) Save(sessionID string, state *sessiontypes.SessionState) error {
+func (s *MemorySessionStore) Save(sessionID string, state *SessionState) error {
 	// Deep copy to prevent external modifications
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}
 
-	var copy sessiontypes.SessionState
+	var copy SessionState
 	if err := json.Unmarshal(data, &copy); err != nil {
 		return err
 	}
@@ -265,7 +264,7 @@ func (s *MemorySessionStore) Save(sessionID string, state *sessiontypes.SessionS
 }
 
 // Load retrieves a session from memory
-func (s *MemorySessionStore) Load(sessionID string) (*sessiontypes.SessionState, error) {
+func (s *MemorySessionStore) Load(sessionID string) (*SessionState, error) {
 	s.mu.RLock()
 	state, exists := s.sessions[sessionID]
 	s.mu.RUnlock()
@@ -280,7 +279,7 @@ func (s *MemorySessionStore) Load(sessionID string) (*sessiontypes.SessionState,
 		return nil, err
 	}
 
-	var copy sessiontypes.SessionState
+	var copy SessionState
 	if err := json.Unmarshal(data, &copy); err != nil {
 		return nil, err
 	}

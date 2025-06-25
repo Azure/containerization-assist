@@ -6,7 +6,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
+	analyzer "github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -46,7 +46,7 @@ func (c *MCPClients) ValidateAnalyzerForProduction(logger zerolog.Logger, transp
 	}
 
 	// Check if using StubAnalyzer
-	if _, isStub := c.Analyzer.(*analyzer.StubAnalyzer); isStub {
+	if _, isStub := c.Analyzer.(*analyze.StubAnalyzer); isStub {
 		if transportEnabled {
 			// Fatal: StubAnalyzer in production with enabled transport will cause silent failures
 			return fmt.Errorf("CRITICAL: StubAnalyzer detected with enabled transport - this will cause silent AI failures in production. Either disable transport or configure a proper analyzer (CallerAnalyzer)")

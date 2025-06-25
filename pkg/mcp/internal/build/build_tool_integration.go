@@ -45,7 +45,7 @@ func (b *BuildImageWithFixes) ExecuteWithFixes(ctx context.Context, sessionID st
 		Msg("Starting Docker build with AI-driven fixing")
 
 	// Create the fixable operation
-	operation := &DockerBuildOperation{
+	operation := &IntegratedDockerBuildOperation{
 		SessionID:      sessionID,
 		ImageName:      imageName,
 		DockerfilePath: dockerfilePath,
@@ -57,8 +57,8 @@ func (b *BuildImageWithFixes) ExecuteWithFixes(ctx context.Context, sessionID st
 	return b.fixingMixin.ExecuteWithRetry(ctx, sessionID, buildContext, operation)
 }
 
-// DockerBuildOperation implements mcptypes.FixableOperation for Docker builds
-type DockerBuildOperation struct {
+// IntegratedDockerBuildOperation implements mcptypes.FixableOperation for Docker builds
+type IntegratedDockerBuildOperation struct {
 	SessionID      string
 	ImageName      string
 	DockerfilePath string
@@ -68,7 +68,7 @@ type DockerBuildOperation struct {
 }
 
 // ExecuteOnce performs a single Docker build attempt
-func (op *DockerBuildOperation) ExecuteOnce(ctx context.Context) error {
+func (op *IntegratedDockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 	op.logger.Debug().
 		Str("image_name", op.ImageName).
 		Str("dockerfile_path", op.DockerfilePath).
@@ -91,7 +91,7 @@ func (op *DockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 }
 
 // GetFailureAnalysis analyzes why the Docker build failed
-func (op *DockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
+func (op *IntegratedDockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
 	op.logger.Debug().Err(err).Msg("Analyzing Docker build failure")
 
 	// If it's already a RichError, return it
@@ -139,7 +139,7 @@ func (op *DockerBuildOperation) GetFailureAnalysis(ctx context.Context, err erro
 }
 
 // PrepareForRetry applies fixes and prepares for the next build attempt
-func (op *DockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_strategy", fixAttempt.FixStrategy.Name).
 		Msg("Preparing for retry after fix")
@@ -161,7 +161,7 @@ func (op *DockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt 
 }
 
 // applyDockerfileFix applies fixes to the Dockerfile
-func (op *DockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if fixAttempt.FixedContent == "" {
 		return fmt.Errorf("no fixed Dockerfile content provided")
 	}
@@ -186,7 +186,7 @@ func (op *DockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttem
 }
 
 // applyDependencyFix applies dependency-related fixes
-func (op *DockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_type", "dependency").
 		Int("file_changes", len(fixAttempt.FixStrategy.FileChanges)).
@@ -216,7 +216,7 @@ func (op *DockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttem
 }
 
 // applyConfigFix applies configuration-related fixes
-func (op *DockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_type", "config").
 		Int("file_changes", len(fixAttempt.FixStrategy.FileChanges)).
@@ -245,7 +245,7 @@ func (op *DockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *
 }
 
 // applyGenericFix applies generic fixes
-func (op *DockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	// Generic fix application
 	if fixAttempt.FixedContent != "" {
 		return op.applyDockerfileFix(ctx, fixAttempt)
@@ -256,7 +256,7 @@ func (op *DockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt 
 }
 
 // applyFileChange applies a single file change operation
-func (op *DockerBuildOperation) applyFileChange(change mcptypes.FileChange) error {
+func (op *IntegratedDockerBuildOperation) applyFileChange(change mcptypes.FileChange) error {
 	filePath := filepath.Join(op.BuildContext, change.FilePath)
 
 	switch change.Operation {
@@ -304,7 +304,7 @@ func (op *DockerBuildOperation) applyFileChange(change mcptypes.FileChange) erro
 }
 
 // backupFile creates a backup of a file
-func (op *DockerBuildOperation) backupFile(source, backup string) error {
+func (op *IntegratedDockerBuildOperation) backupFile(source, backup string) error {
 	// Clean paths to prevent directory traversal
 	cleanSource := filepath.Clean(source)
 	cleanBackup := filepath.Clean(backup)
@@ -317,7 +317,7 @@ func (op *DockerBuildOperation) backupFile(source, backup string) error {
 }
 
 // simulateBuild simulates a Docker build for demonstration
-func (op *DockerBuildOperation) simulateBuild(ctx context.Context) error {
+func (op *IntegratedDockerBuildOperation) simulateBuild(ctx context.Context) error {
 	// This is a simulation - in real implementation, this would:
 	// 1. Execute docker build command
 	// 2. Parse build output
@@ -353,7 +353,7 @@ func (op *DockerBuildOperation) simulateBuild(ctx context.Context) error {
 }
 
 // Execute runs the operation
-func (op *DockerBuildOperation) Execute(ctx context.Context) error {
+func (op *IntegratedDockerBuildOperation) Execute(ctx context.Context) error {
 	err := op.ExecuteOnce(ctx)
 	if err != nil {
 		op.lastError = err
@@ -362,12 +362,12 @@ func (op *DockerBuildOperation) Execute(ctx context.Context) error {
 }
 
 // CanRetry determines if the operation can be retried
-func (op *DockerBuildOperation) CanRetry() bool {
+func (op *IntegratedDockerBuildOperation) CanRetry() bool {
 	// Docker builds can generally be retried
 	return true
 }
 
 // GetLastError returns the last error encountered
-func (op *DockerBuildOperation) GetLastError() error {
+func (op *IntegratedDockerBuildOperation) GetLastError() error {
 	return op.lastError
 }

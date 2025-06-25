@@ -3,7 +3,6 @@ package build
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,7 +93,7 @@ func (e *BuildExecutorService) ExecuteBuild(ctx context.Context, args AtomicBuil
 	startTime := time.Now()
 	result := &AtomicBuildImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
 		SessionID:           args.SessionID,
 		ImageName:           args.ImageName,
 		ImageTag:            e.getImageTag(args.ImageTag),
@@ -111,7 +110,7 @@ func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, arg
 	// Create result object early for error handling
 	result := &AtomicBuildImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
 		SessionID:           args.SessionID,
 		ImageName:           args.ImageName,
 		ImageTag:            e.getImageTag(args.ImageTag),
@@ -120,12 +119,13 @@ func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, arg
 	}
 
 	// Use centralized build stages for progress tracking
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
-		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
-		{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
-		{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},
-		{Name: "Finalize", Weight: 0.05, Description: "Updating session state"},
-	})
+	// TODO: Move progress adapter to avoid import cycles
+	// _ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
+	//	{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
+	//	{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
+	//	{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},
+	//	{Name: "Finalize", Weight: 0.05, Description: "Updating session state"},
+	// })
 
 	// Execute with progress tracking
 	ctx := context.Background()

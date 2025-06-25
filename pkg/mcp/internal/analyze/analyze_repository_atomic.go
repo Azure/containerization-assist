@@ -3,18 +3,16 @@ package analyze
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/analysis"
 	"github.com/Azure/container-copilot/pkg/core/git"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcperror "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -33,7 +31,7 @@ type AtomicAnalyzeRepositoryArgs struct {
 // AtomicAnalysisResult defines the response from atomic repository analysis
 type AtomicAnalysisResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult      // Embed AI context methods
+	mcptypes.BaseAIContextResult      // Embed AI context methods
 	Success                      bool `json:"success"`
 
 	// Session context
@@ -108,7 +106,7 @@ func (t *AtomicAnalyzeRepositoryTool) ExecuteRepositoryAnalysis(ctx context.Cont
 // ExecuteWithContext runs the atomic repository analysis with GoMCP progress tracking
 func (t *AtomicAnalyzeRepositoryTool) ExecuteWithContext(serverCtx *server.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
 	// Create progress adapter for GoMCP using standard analysis stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Analyze", Weight: 0.80, Description: "Analyzing"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = mcptypes.NewGoMCPProgressAdapter(serverCtx, []mcptypes.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Analyze", Weight: 0.80, Description: "Analyzing"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -143,12 +141,12 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		// Create result with error for session failure
 		result := &AtomicAnalysisResult{
 			BaseToolResponse:           types.NewBaseResponse("atomic_analyze_repository", args.SessionID, args.DryRun),
-			BaseAIContextResult:        internal.NewBaseAIContextResult("analysis", false, time.Since(startTime)),
+			BaseAIContextResult:        mcptypes.NewBaseAIContextResult("analysis", false, time.Since(startTime)),
 			SessionID:                  args.SessionID,
 			RepoURL:                    args.RepoURL,
 			Branch:                     args.Branch,
 			TotalDuration:              time.Since(startTime),
-			AnalysisContext:            &repository.AnalysisContext{},
+			AnalysisContext:            &AnalysisContext{},
 			ContainerizationAssessment: &ContainerizationAssessment{},
 		}
 		result.Success = false
@@ -170,7 +168,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 	// Create base response
 	result := &AtomicAnalysisResult{
 		BaseToolResponse:           types.NewBaseResponse("atomic_analyze_repository", session.SessionID, args.DryRun),
-		BaseAIContextResult:        internal.NewBaseAIContextResult("analysis", false, 0), // Duration and success will be updated later
+		BaseAIContextResult:        mcptypes.NewBaseAIContextResult("analysis", false, 0), // Duration and success will be updated later
 		SessionID:                  session.SessionID,
 		WorkspaceDir:               t.pipelineAdapter.GetSessionWorkspace(session.SessionID),
 		RepoURL:                    args.RepoURL,
@@ -407,7 +405,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 	result.Success = true
 	result.TotalDuration = time.Since(startTime)
 
-	// Update internal.BaseAIContextResult fields
+	// Update mcptypes.BaseAIContextResult fields
 	result.BaseAIContextResult.IsSuccessful = true
 	result.BaseAIContextResult.Duration = result.TotalDuration
 
@@ -632,7 +630,7 @@ func (t *AtomicAnalyzeRepositoryTool) validateLocalPath(path string) error {
 
 // Unified AI Context Interface Implementations
 
-// AI Context methods are now provided by embedded internal.BaseAIContextResult
+// AI Context methods are now provided by embedded mcptypes.BaseAIContextResult
 
 // Tool interface implementation (unified interface)
 

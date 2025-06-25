@@ -3,7 +3,6 @@ package analyze
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,12 +10,12 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	constants "github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	ai_context "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -49,7 +48,7 @@ type AtomicValidateDockerfileArgs struct {
 // AtomicValidateDockerfileResult represents the result of atomic Dockerfile validation
 type AtomicValidateDockerfileResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult // Embedded for AI context methods
+	mcptypes.BaseAIContextResult // Embedded for AI context methods
 
 	// Validation metadata
 	SessionID      string        `json:"session_id"`
@@ -202,7 +201,7 @@ func (t *AtomicValidateDockerfileTool) ExecuteValidation(ctx context.Context, ar
 // ExecuteWithContext runs the atomic Dockerfile validation with GoMCP progress tracking
 func (t *AtomicValidateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	// Create progress adapter for GoMCP using standard validation stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Validate", Weight: 0.80, Description: "Validating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = mcptypes.NewGoMCPProgressAdapter(serverCtx, []mcptypes.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Validate", Weight: 0.80, Description: "Validating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -236,7 +235,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	if err != nil {
 		result := &AtomicValidateDockerfileResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_validate_dockerfile", args.SessionID, args.DryRun),
-			BaseAIContextResult: internal.NewBaseAIContextResult("validate", false, 0), // Will be updated later
+			BaseAIContextResult: mcptypes.NewBaseAIContextResult("validate", false, 0), // Will be updated later
 			Duration:            time.Since(startTime),
 		}
 
@@ -256,7 +255,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	// Create base result
 	result := &AtomicValidateDockerfileResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_validate_dockerfile", session.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("validate", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("validate", false, 0), // Will be updated later
 		ValidationContext:   make(map[string]interface{}),
 	}
 
@@ -375,7 +374,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 	result.Duration = time.Since(startTime)
 
-	// Update internal.BaseAIContextResult with final values
+	// Update mcptypes.BaseAIContextResult with final values
 	result.BaseAIContextResult.IsSuccessful = result.IsValid
 	result.BaseAIContextResult.Duration = result.Duration
 
@@ -396,7 +395,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 // AI Context Interface Implementations
 
-// AI Context methods are now provided by embedded internal.BaseAIContextResult
+// AI Context methods are now provided by embedded mcptypes.BaseAIContextResult
 
 // GenerateRecommendations implements ai_context.Recommendable
 func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []ai_context.Recommendation {
@@ -587,11 +586,11 @@ func (r *AtomicValidateDockerfileResult) GetAlternativeStrategies() []ai_context
 }
 
 // GetAIContext implements *ai_context.ToolContextEnriched
-// GetAIContext is now provided by embedded internal.BaseAIContextResult
+// GetAIContext is now provided by embedded mcptypes.BaseAIContextResult
 
 // EnrichWithInsights implements *ai_context.ToolContextEnriched
-// EnrichWithInsights is now provided by embedded internal.BaseAIContextResult
-// GetMetadataForAI is now provided by embedded internal.BaseAIContextResult
+// EnrichWithInsights is now provided by embedded mcptypes.BaseAIContextResult
+// GetMetadataForAI is now provided by embedded mcptypes.BaseAIContextResult
 
 func (r *AtomicValidateDockerfileResult) convertStrengthsToAreas() []ai_context.AssessmentArea {
 	areas := make([]ai_context.AssessmentArea, 0)
@@ -1175,8 +1174,8 @@ func (t *AtomicValidateDockerfileTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities
-func (t *AtomicValidateDockerfileTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicValidateDockerfileTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     false,

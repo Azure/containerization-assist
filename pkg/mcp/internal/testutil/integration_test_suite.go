@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
 	orchestrationtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/testutil"
 	profilingtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil"
 	"github.com/rs/zerolog"

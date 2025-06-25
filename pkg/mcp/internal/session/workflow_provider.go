@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 )
 
 // WorkflowLabelProvider provides automatic workflow-related labels
@@ -19,8 +18,8 @@ type WorkflowLabelProvider struct {
 
 // LabelProvider interface for automatic label generation
 type LabelProvider interface {
-	GetLabels(session *sessiontypes.SessionState) ([]string, error)
-	GetK8sLabels(session *sessiontypes.SessionState) (map[string]string, error)
+	GetLabels(session *SessionState) ([]string, error)
+	GetK8sLabels(session *SessionState) (map[string]string, error)
 	GetName() string
 	IsEnabled() bool
 }
@@ -46,7 +45,7 @@ func (w *WorkflowLabelProvider) IsEnabled() bool {
 }
 
 // GetLabels generates workflow-related session labels
-func (w *WorkflowLabelProvider) GetLabels(session *sessiontypes.SessionState) ([]string, error) {
+func (w *WorkflowLabelProvider) GetLabels(session *SessionState) ([]string, error) {
 	var labels []string
 
 	// Time-based labels
@@ -77,7 +76,7 @@ func (w *WorkflowLabelProvider) GetLabels(session *sessiontypes.SessionState) ([
 }
 
 // GetK8sLabels generates workflow-related Kubernetes labels
-func (w *WorkflowLabelProvider) GetK8sLabels(session *sessiontypes.SessionState) (map[string]string, error) {
+func (w *WorkflowLabelProvider) GetK8sLabels(session *SessionState) (map[string]string, error) {
 	k8sLabels := make(map[string]string)
 
 	// Add session ID for tracking
@@ -119,7 +118,7 @@ func (w *WorkflowLabelProvider) GetK8sLabels(session *sessiontypes.SessionState)
 }
 
 // generateTimeLabels creates time-based labels
-func (w *WorkflowLabelProvider) generateTimeLabels(session *sessiontypes.SessionState) []string {
+func (w *WorkflowLabelProvider) generateTimeLabels(session *SessionState) []string {
 	var labels []string
 
 	now := time.Now()
@@ -153,7 +152,7 @@ func (w *WorkflowLabelProvider) generateTimeLabels(session *sessiontypes.Session
 }
 
 // generateToolLabels creates tool-based labels
-func (w *WorkflowLabelProvider) generateToolLabels(session *sessiontypes.SessionState) []string {
+func (w *WorkflowLabelProvider) generateToolLabels(session *SessionState) []string {
 	var labels []string
 	var toolsUsed []string
 
@@ -188,7 +187,7 @@ func (w *WorkflowLabelProvider) generateToolLabels(session *sessiontypes.Session
 }
 
 // generateStageLabels creates workflow stage labels
-func (w *WorkflowLabelProvider) generateStageLabels(session *sessiontypes.SessionState) []string {
+func (w *WorkflowLabelProvider) generateStageLabels(session *SessionState) []string {
 	var labels []string
 
 	stage := w.determineWorkflowStage(session)
@@ -206,7 +205,7 @@ func (w *WorkflowLabelProvider) generateStageLabels(session *sessiontypes.Sessio
 }
 
 // generateProgressLabels creates progress tracking labels
-func (w *WorkflowLabelProvider) generateProgressLabels(session *sessiontypes.SessionState) []string {
+func (w *WorkflowLabelProvider) generateProgressLabels(session *SessionState) []string {
 	var labels []string
 
 	progress := w.calculateProgress(session)
@@ -220,7 +219,7 @@ func (w *WorkflowLabelProvider) generateProgressLabels(session *sessiontypes.Ses
 }
 
 // determineWorkflowStage determines the current workflow stage
-func (w *WorkflowLabelProvider) determineWorkflowStage(session *sessiontypes.SessionState) string {
+func (w *WorkflowLabelProvider) determineWorkflowStage(session *SessionState) string {
 	// Check for errors first
 	if session.LastError != nil {
 		return "failed"
@@ -259,7 +258,7 @@ func (w *WorkflowLabelProvider) determineWorkflowStage(session *sessiontypes.Ses
 }
 
 // determineSessionStatus determines the session status
-func (w *WorkflowLabelProvider) determineSessionStatus(session *sessiontypes.SessionState) string {
+func (w *WorkflowLabelProvider) determineSessionStatus(session *SessionState) string {
 	if session.LastError != nil {
 		return "error"
 	}
@@ -280,7 +279,7 @@ func (w *WorkflowLabelProvider) determineSessionStatus(session *sessiontypes.Ses
 }
 
 // calculateProgress calculates workflow progress as a percentage
-func (w *WorkflowLabelProvider) calculateProgress(session *sessiontypes.SessionState) int {
+func (w *WorkflowLabelProvider) calculateProgress(session *SessionState) int {
 	progress := 0
 
 	// Basic progress based on completed activities

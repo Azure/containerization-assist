@@ -7,8 +7,6 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -36,7 +34,7 @@ type AtomicPushImageArgs struct {
 // AtomicPushImageResult defines the response from atomic Docker image push
 type AtomicPushImageResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult      // Embed AI context methods
+	mcptypes.BaseAIContextResult      // Embed AI context methods
 	Success                      bool `json:"success"`
 
 	// Session context
@@ -106,7 +104,7 @@ func (t *AtomicPushImageTool) ExecutePush(ctx context.Context, args AtomicPushIm
 	// Create result object early for error handling
 	result := &AtomicPushImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_push_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("push", false, 0), // Duration and success will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("push", false, 0), // Duration and success will be updated later
 		SessionID:           args.SessionID,
 		ImageRef:            args.ImageRef,
 		RegistryURL:         t.extractRegistryURL(args),
@@ -124,7 +122,7 @@ func (t *AtomicPushImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	// Create result object early for error handling
 	result := &AtomicPushImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_push_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("push", false, 0), // Duration will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("push", false, 0), // Duration will be updated later
 		SessionID:           args.SessionID,
 		ImageRef:            args.ImageRef,
 		RegistryURL:         t.extractRegistryURL(args),
@@ -132,7 +130,7 @@ func (t *AtomicPushImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	}
 
 	// Create progress adapter for GoMCP using standard push stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Push", Weight: 0.80, Description: "Pushing image"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	// _ = nil // TODO: Progress adapter removed to break import cycles
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -926,8 +924,8 @@ func (t *AtomicPushImageTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicPushImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicPushImageTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,

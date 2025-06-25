@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 
@@ -41,12 +40,12 @@ func TestBoltSessionStore(t *testing.T) {
 
 		// Create test session state
 		sessionID := "test-session-123"
-		state := &sessiontypes.SessionState{
+		state := &SessionState{
 			SessionID:    sessionID,
 			WorkspaceDir: "/tmp/workspace",
 			CreatedAt:    time.Now(),
 			LastAccessed: time.Now(),
-			StageHistory: []sessiontypes.ToolExecution{
+			StageHistory: []ToolExecution{
 				{
 					Tool:      "analyze_repository",
 					StartTime: time.Now(),
@@ -111,7 +110,7 @@ func TestBoltSessionStore(t *testing.T) {
 		// Save multiple sessions
 		sessions := []string{"session-1", "session-2", "session-3"}
 		for _, sessionID := range sessions {
-			state := &sessiontypes.SessionState{
+			state := &SessionState{
 				SessionID:    sessionID,
 				WorkspaceDir: "/tmp/" + sessionID,
 				CreatedAt:    time.Now(),
@@ -154,7 +153,7 @@ func TestBoltSessionStore(t *testing.T) {
 		defer store.Close()
 
 		sessionID := "session-to-delete"
-		state := &sessiontypes.SessionState{
+		state := &SessionState{
 			SessionID:    sessionID,
 			WorkspaceDir: "/tmp/delete-test",
 			CreatedAt:    time.Now(),
@@ -237,7 +236,7 @@ func BenchmarkBoltSessionStore_Save(b *testing.B) {
 	}
 	defer store.Close()
 
-	state := &sessiontypes.SessionState{
+	state := &SessionState{
 		SessionID:    "benchmark-session",
 		WorkspaceDir: "/tmp/benchmark",
 		CreatedAt:    time.Now(),
@@ -271,7 +270,7 @@ func BenchmarkBoltSessionStore_Load(b *testing.B) {
 
 	// Pre-populate with test data
 	sessionID := "benchmark-load-session"
-	state := &sessiontypes.SessionState{
+	state := &SessionState{
 		SessionID:    sessionID,
 		WorkspaceDir: "/tmp/benchmark",
 		CreatedAt:    time.Now(),

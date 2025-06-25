@@ -3,13 +3,10 @@ package build
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -18,8 +15,8 @@ import (
 )
 
 // standardTagStages provides common stages for tag operations
-func standardTagStages() []internal.LocalProgressStage {
-	return []internal.LocalProgressStage{
+func standardTagStages() []mcptypes.LocalProgressStage {
+	return []mcptypes.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
 		{Name: "Check", Weight: 0.30, Description: "Checking source image availability"},
 		{Name: "Tag", Weight: 0.40, Description: "Tagging Docker image"},
@@ -43,7 +40,7 @@ type AtomicTagImageArgs struct {
 // AtomicTagImageResult defines the response from atomic Docker image tagging
 type AtomicTagImageResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult      // Embedded for AI context methods
+	mcptypes.BaseAIContextResult      // Embedded for AI context methods
 	Success                      bool `json:"success"`
 
 	// Session context
@@ -114,7 +111,7 @@ func (t *AtomicTagImageTool) ExecuteTag(ctx context.Context, args AtomicTagImage
 	// Create result object early for error handling
 	result := &AtomicTagImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("tag", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0), // Will be updated later
 		SessionID:           args.SessionID,
 		SourceImage:         args.SourceImage,
 		TargetImage:         args.TargetImage,
@@ -126,7 +123,7 @@ func (t *AtomicTagImageTool) ExecuteTag(ctx context.Context, args AtomicTagImage
 	result.TotalDuration = time.Since(startTime)
 
 	// Update AI context with final result
-	result.BaseAIContextResult = internal.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
+	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
 
 	if err != nil {
 		result.Success = false
@@ -142,7 +139,7 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 	// Create result object early for error handling
 	result := &AtomicTagImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("tag", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0), // Will be updated later
 		SessionID:           args.SessionID,
 		SourceImage:         args.SourceImage,
 		TargetImage:         args.TargetImage,
@@ -150,7 +147,7 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 	}
 
 	// Create progress adapter for GoMCP using standard tag stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, standardTagStages())
+	// _ = nil // TODO: Progress adapter removed to break import cycles
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -160,7 +157,7 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 	result.TotalDuration = time.Since(startTime)
 
 	// Update AI context with final result
-	result.BaseAIContextResult = internal.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
+	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
 
 	// Complete progress tracking
 	if err != nil {
@@ -490,7 +487,7 @@ func (t *AtomicTagImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:         "atomic_tag_image",
 		Description:  "Tags Docker images with new names for versioning, environment promotion, or registry organization",
-		Version:      constants.AtomicToolVersion,
+		Version:      "1.0.0",
 		Category:     "docker",
 		Dependencies: []string{"docker"},
 		Capabilities: []string{
@@ -539,8 +536,8 @@ func (t *AtomicTagImageTool) GetVersion() string {
 }
 
 // GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicTagImageTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicTagImageTool) GetCapabilities() types.ToolCapabilities {
+	return types.ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     false,

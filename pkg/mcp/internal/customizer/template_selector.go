@@ -1,10 +1,9 @@
-package template
+package customizer
 
 import (
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/core/analysis"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/customizer"
 	"github.com/rs/zerolog"
 )
 
