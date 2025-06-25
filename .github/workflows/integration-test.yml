@@ -137,8 +137,12 @@ jobs:
       - name: Save result
         if: always()
         run: |
-          # Copy snapshot files to run artifacts
-          cp -r test-repo/.container-kit test-repo/artifacts/snapshot
+          # Copy snapshot files to run artifacts if they exist
+          if [ -d "test-repo/.container-kit" ]; then
+            cp -r test-repo/.container-kit test-repo/artifacts/snapshot
+          else
+            echo "No .container-kit directory found - skipping snapshot copy"
+          fi
           echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
 
       - name: Upload test artifacts
