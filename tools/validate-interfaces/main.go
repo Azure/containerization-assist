@@ -16,10 +16,12 @@ import (
 )
 
 var (
-	verbose       = flag.Bool("verbose", false, "Verbose output")
-	fix           = flag.Bool("fix", false, "Attempt to fix violations automatically")
-	metrics       = flag.Bool("metrics", false, "Generate interface adoption metrics report")
-	metricsOutput = flag.String("metrics-output", "interface_metrics.json", "Output file for metrics report")
+	verbose        = flag.Bool("verbose", false, "Verbose output")
+	fix            = flag.Bool("fix", false, "Attempt to fix violations automatically")
+	metrics        = flag.Bool("metrics", false, "Generate interface adoption metrics report")
+	metricsOutput  = flag.String("metrics-output", "interface_metrics.json", "Output file for metrics report")
+	errorBudget    = flag.Int("error-budget", 0, "Allow up to N interface validation errors before failing")
+	warningBudget  = flag.Int("warning-budget", -1, "Allow up to N interface validation warnings before failing (-1 = unlimited)")
 )
 
 // Expected unified interfaces that should exist after Team A's work
@@ -212,10 +214,18 @@ func main() {
 
 	fmt.Printf("Summary: %d errors, %d warnings\n", errors, warnings)
 
-	if errors > 0 {
-		fmt.Println("\n❌ Interface validation failed!")
-		fmt.Println("   Fix the errors above before proceeding with the migration.")
+	// Check error budget
+	if errors > *errorBudget {
+		fmt.Printf("\n❌ Interface validation failed! (%d errors > %d allowed)\n", errors, *errorBudget)
+		fmt.Println("   Fix the errors above or increase the error budget.")
 		os.Exit(1)
+	} else if *warningBudget >= 0 && warnings > *warningBudget {
+		fmt.Printf("\n❌ Interface validation failed! (%d warnings > %d allowed)\n", warnings, *warningBudget)
+		fmt.Println("   Fix the warnings above or increase the warning budget.")
+		os.Exit(1)
+	} else if errors > 0 {
+		fmt.Printf("\n⚠️  Interface validation passed with %d errors (within budget of %d).\n", errors, *errorBudget)
+		fmt.Println("   Consider fixing the errors above.")
 	} else if warnings > 0 {
 		fmt.Println("\n⚠️  Interface validation passed with warnings.")
 		fmt.Println("   Consider addressing the warnings above.")

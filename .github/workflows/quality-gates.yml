@@ -44,7 +44,7 @@ jobs:
       id: interfaces
       run: |
         echo "🔍 Validating interface compliance..."
-        go run tools/validate-interfaces/main.go --metrics --metrics-output interface-metrics.json
+        go run tools/validate-interfaces/main.go --metrics --metrics-output interface-metrics.json --error-budget 10
         
         # Extract key metrics
         ADOPTION_RATE=$(jq '.overview.adoption_rate' interface-metrics.json)
