@@ -24,8 +24,8 @@ type AnalyzeRepositoryArgs struct {
 	Sandbox      bool   `json:"sandbox,omitempty" description:"Run analysis in sandboxed environment"`
 }
 
-// AnalysisResult defines the response from repository analysis
-type AnalysisResult struct {
+// RepositoryAnalysisResult defines the response from repository analysis
+type RepositoryAnalysisResult struct {
 	types.BaseToolResponse
 	Language         string              `json:"language"`
 	Framework        string              `json:"framework"`
@@ -72,7 +72,7 @@ func NewAnalyzeRepositoryTool(logger zerolog.Logger) *AnalyzeRepositoryTool {
 }
 
 // Execute runs the repository analysis
-func (t *AnalyzeRepositoryTool) Execute(ctx context.Context, args AnalyzeRepositoryArgs) (*AnalysisResult, error) {
+func (t *AnalyzeRepositoryTool) Execute(ctx context.Context, args AnalyzeRepositoryArgs) (*RepositoryAnalysisResult, error) {
 	startTime := time.Now()
 
 	sessionID := args.SessionID
@@ -81,7 +81,7 @@ func (t *AnalyzeRepositoryTool) Execute(ctx context.Context, args AnalyzeReposit
 	}
 
 	// Create base response
-	response := &AnalysisResult{
+	response := &RepositoryAnalysisResult{
 		BaseToolResponse: types.NewBaseResponse("analyze_repository", sessionID, args.DryRun),
 		Dependencies:     make([]string, 0),
 		EntryPoints:      make([]string, 0),
@@ -128,7 +128,7 @@ func (t *AnalyzeRepositoryTool) Execute(ctx context.Context, args AnalyzeReposit
 }
 
 // analyzeRepository performs the actual repository analysis
-func (t *AnalyzeRepositoryTool) analyzeRepository(repoPath string, result *AnalysisResult, args AnalyzeRepositoryArgs) error {
+func (t *AnalyzeRepositoryTool) analyzeRepository(repoPath string, result *RepositoryAnalysisResult, args AnalyzeRepositoryArgs) error {
 	// Generate file tree if requested
 	if !args.SkipFileTree {
 		fileTree, err := generateFileTree(repoPath)
@@ -170,7 +170,7 @@ func (t *AnalyzeRepositoryTool) analyzeRepository(repoPath string, result *Analy
 }
 
 // detectLanguageAndFramework detects the primary language and framework
-func (t *AnalyzeRepositoryTool) detectLanguageAndFramework(repoPath string, result *AnalysisResult) error {
+func (t *AnalyzeRepositoryTool) detectLanguageAndFramework(repoPath string, result *RepositoryAnalysisResult) error {
 	commonFiles := map[string]func() (string, string){
 		"package.json":     func() (string, string) { return types.LanguageJavaScript, "nodejs" },
 		"go.mod":           func() (string, string) { return "go", "go" },
@@ -198,7 +198,7 @@ func (t *AnalyzeRepositoryTool) detectLanguageAndFramework(repoPath string, resu
 }
 
 // extractDependencies extracts dependencies based on language
-func (t *AnalyzeRepositoryTool) extractDependencies(repoPath string, result *AnalysisResult) {
+func (t *AnalyzeRepositoryTool) extractDependencies(repoPath string, result *RepositoryAnalysisResult) {
 	// Simplified dependency extraction
 	switch result.Language {
 	case types.LanguageJavaScript:
@@ -211,7 +211,7 @@ func (t *AnalyzeRepositoryTool) extractDependencies(repoPath string, result *Ana
 }
 
 // identifyEntryPoints identifies common entry points
-func (t *AnalyzeRepositoryTool) identifyEntryPoints(repoPath string, result *AnalysisResult) {
+func (t *AnalyzeRepositoryTool) identifyEntryPoints(repoPath string, result *RepositoryAnalysisResult) {
 	switch result.Language {
 	case types.LanguageJavaScript:
 		if fileExists(filepath.Join(repoPath, "index.js")) {
@@ -235,7 +235,7 @@ func (t *AnalyzeRepositoryTool) identifyEntryPoints(repoPath string, result *Ana
 }
 
 // generateBuildCommands generates build commands based on language
-func (t *AnalyzeRepositoryTool) generateBuildCommands(result *AnalysisResult) {
+func (t *AnalyzeRepositoryTool) generateBuildCommands(result *RepositoryAnalysisResult) {
 	switch result.Language {
 	case types.LanguageJavaScript:
 		result.BuildCommands = []string{"npm install", "npm run build"}
@@ -258,7 +258,7 @@ func (t *AnalyzeRepositoryTool) generateBuildCommands(result *AnalysisResult) {
 }
 
 // generateSuggestions provides automated suggestions
-func (t *AnalyzeRepositoryTool) generateSuggestions(result *AnalysisResult) {
+func (t *AnalyzeRepositoryTool) generateSuggestions(result *RepositoryAnalysisResult) {
 	result.Suggestions = append(result.Suggestions,
 		fmt.Sprintf("Detected %s application", result.Language))
 

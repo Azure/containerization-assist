@@ -7,7 +7,7 @@ import (
 
 // Additional security validation methods
 
-func (v *BuildValidatorImpl) validateUserInstruction(parts []string, lineNum int, result *ValidationResult) {
+func (v *BuildValidator) validateUserInstruction(parts []string, lineNum int, result *ValidationResult) {
 	if len(parts) < 2 {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    lineNum,
@@ -28,7 +28,7 @@ func (v *BuildValidatorImpl) validateUserInstruction(parts []string, lineNum int
 	}
 }
 
-func (v *BuildValidatorImpl) validateExposeInstruction(parts []string, lineNum int, result *ValidationResult) {
+func (v *BuildValidator) validateExposeInstruction(parts []string, lineNum int, result *ValidationResult) {
 	if len(parts) < 2 {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    lineNum,
@@ -51,7 +51,7 @@ func (v *BuildValidatorImpl) validateExposeInstruction(parts []string, lineNum i
 	}
 }
 
-func (v *BuildValidatorImpl) validateEnvArgInstruction(parts []string, lineNum int, result *ValidationResult, instruction string) {
+func (v *BuildValidator) validateEnvArgInstruction(parts []string, lineNum int, result *ValidationResult, instruction string) {
 	if len(parts) < 2 {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    lineNum,
@@ -83,7 +83,7 @@ func (v *BuildValidatorImpl) validateEnvArgInstruction(parts []string, lineNum i
 	}
 }
 
-func (v *BuildValidatorImpl) validateWorkdirInstruction(parts []string, lineNum int, result *ValidationResult) {
+func (v *BuildValidator) validateWorkdirInstruction(parts []string, lineNum int, result *ValidationResult) {
 	if len(parts) < 2 {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    lineNum,
@@ -104,7 +104,7 @@ func (v *BuildValidatorImpl) validateWorkdirInstruction(parts []string, lineNum 
 	}
 }
 
-func (v *BuildValidatorImpl) validateCmdEntrypointInstruction(parts []string, lineNum int, result *ValidationResult, instruction string) {
+func (v *BuildValidator) validateCmdEntrypointInstruction(parts []string, lineNum int, result *ValidationResult, instruction string) {
 	if len(parts) < 2 {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    lineNum,
@@ -121,7 +121,7 @@ func (v *BuildValidatorImpl) validateCmdEntrypointInstruction(parts []string, li
 	}
 }
 
-func (v *BuildValidatorImpl) checkNetworkExposure(lines []string, result *SecurityValidationResult) {
+func (v *BuildValidator) checkNetworkExposure(lines []string, result *SecurityValidationResult) {
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
 
@@ -147,7 +147,7 @@ func (v *BuildValidatorImpl) checkNetworkExposure(lines []string, result *Securi
 	}
 }
 
-func (v *BuildValidatorImpl) checkPackageManagement(lines []string, result *SecurityValidationResult) {
+func (v *BuildValidator) checkPackageManagement(lines []string, result *SecurityValidationResult) {
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
 

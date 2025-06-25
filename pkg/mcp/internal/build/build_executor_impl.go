@@ -13,7 +13,7 @@ import (
 // BuildExecutorImpl implements the BuildExecutor interface
 type BuildExecutorImpl struct {
 	strategyManager *StrategyManager
-	validator       BuildValidator
+	validator       BuildValidatorInterface
 	activeBuilds    map[string]*activeBuild
 	mu              sync.RWMutex
 	logger          zerolog.Logger
@@ -30,7 +30,7 @@ type activeBuild struct {
 }
 
 // NewBuildExecutor creates a new build executor
-func NewBuildExecutor(strategyManager *StrategyManager, validator BuildValidator, logger zerolog.Logger) *BuildExecutorImpl {
+func NewBuildExecutorImpl(strategyManager *StrategyManager, validator BuildValidatorInterface, logger zerolog.Logger) *BuildExecutorImpl {
 	return &BuildExecutorImpl{
 		strategyManager: strategyManager,
 		validator:       validator,

@@ -52,7 +52,7 @@ type BuildFix struct {
 }
 
 // BuildStrategy represents different build strategies
-type BuildStrategy struct {
+type BuildStrategyRecommendation struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Benefits    []string `json:"benefits"`
@@ -313,11 +313,11 @@ func (t *AtomicBuildImageTool) generateSuggestedFixes(errStr string, buildResult
 }
 
 // generateAlternativeStrategies provides different approaches to building
-func (t *AtomicBuildImageTool) generateAlternativeStrategies(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildStrategy {
-	strategies := []BuildStrategy{}
+func (t *AtomicBuildImageTool) generateAlternativeStrategies(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildStrategyRecommendation {
+	strategies := []BuildStrategyRecommendation{}
 
 	// Base strategy alternatives
-	strategies = append(strategies, BuildStrategy{
+	strategies = append(strategies, BuildStrategyRecommendation{
 		Name:        "Multi-stage build optimization",
 		Description: "Use multi-stage builds to reduce final image size and complexity",
 		Pros:        []string{"Smaller final image", "Better caching", "Cleaner separation"},
@@ -328,7 +328,7 @@ func (t *AtomicBuildImageTool) generateAlternativeStrategies(errStr string, buil
 
 	if strings.Contains(strings.ToLower(result.BuildContext_Info.BaseImage), "ubuntu") ||
 		strings.Contains(strings.ToLower(result.BuildContext_Info.BaseImage), "debian") {
-		strategies = append(strategies, BuildStrategy{
+		strategies = append(strategies, BuildStrategyRecommendation{
 			Name:        "Alpine base image",
 			Description: "Switch to Alpine Linux for smaller, more secure base image",
 			Pros:        []string{"Much smaller size", "Better security", "Faster builds"},
@@ -340,7 +340,7 @@ func (t *AtomicBuildImageTool) generateAlternativeStrategies(errStr string, buil
 
 	// Network-specific strategies
 	if strings.Contains(errStr, "network") || strings.Contains(errStr, "timeout") {
-		strategies = append(strategies, BuildStrategy{
+		strategies = append(strategies, BuildStrategyRecommendation{
 			Name:        "Offline/cached build",
 			Description: "Pre-download dependencies and use local cache",
 			Pros:        []string{"No network dependencies", "Faster builds", "More reliable"},
@@ -352,7 +352,7 @@ func (t *AtomicBuildImageTool) generateAlternativeStrategies(errStr string, buil
 
 	// Performance-specific strategies
 	if result.BuildDuration > 5*time.Minute {
-		strategies = append(strategies, BuildStrategy{
+		strategies = append(strategies, BuildStrategyRecommendation{
 			Name:        "Build optimization",
 			Description: "Optimize layer caching and reduce rebuild time",
 			Pros:        []string{"Faster subsequent builds", "Better resource usage"},

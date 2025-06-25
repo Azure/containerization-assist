@@ -1,12 +1,10 @@
-package middleware
+package services
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/services/errors"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/services/telemetry"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/validate"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
@@ -15,8 +13,8 @@ import (
 // ToolMiddleware provides middleware functionality for atomic tools
 type ToolMiddleware struct {
 	validationService *validate.ValidationService
-	errorService      *errors.ErrorService
-	telemetryService  *telemetry.TelemetryService
+	errorService      *ErrorService
+	telemetryService  *TelemetryService
 	logger            zerolog.Logger
 	middlewares       []Middleware
 }
@@ -24,8 +22,8 @@ type ToolMiddleware struct {
 // NewToolMiddleware creates a new tool middleware
 func NewToolMiddleware(
 	validationService *validate.ValidationService,
-	errorService *errors.ErrorService,
-	telemetryService *telemetry.TelemetryService,
+	errorService *ErrorService,
+	telemetryService *TelemetryService,
 	logger zerolog.Logger,
 ) *ToolMiddleware {
 	return &ToolMiddleware{
@@ -85,7 +83,7 @@ func (m *ToolMiddleware) buildChain(execCtx *ExecutionContext) HandlerFunc {
 func (m *ToolMiddleware) recordExecution(execCtx *ExecutionContext, result interface{}, err error) {
 	duration := time.Since(execCtx.StartTime)
 
-	execution := telemetry.ToolExecution{
+	execution := ToolExecution{
 		Tool:      execCtx.Tool.GetMetadata().Name,
 		Operation: "execute",
 		StartTime: execCtx.StartTime,
@@ -190,12 +188,12 @@ func (m *LoggingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 
 // ErrorHandlingMiddleware provides automatic error handling
 type ErrorHandlingMiddleware struct {
-	service *errors.ErrorService
+	service *ErrorService
 	logger  zerolog.Logger
 }
 
 // NewErrorHandlingMiddleware creates a new error handling middleware
-func NewErrorHandlingMiddleware(service *errors.ErrorService, logger zerolog.Logger) *ErrorHandlingMiddleware {
+func NewErrorHandlingMiddleware(service *ErrorService, logger zerolog.Logger) *ErrorHandlingMiddleware {
 	return &ErrorHandlingMiddleware{
 		service: service,
 		logger:  logger.With().Str("middleware", "error_handling").Logger(),
@@ -209,7 +207,7 @@ func (m *ErrorHandlingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 
 		if err != nil {
 			// Create error context
-			errorCtx := errors.ErrorContext{
+			errorCtx := ErrorContext{
 				Tool:      ctx.Tool.GetMetadata().Name,
 				Operation: "execute",
 				Fields:    make(map[string]interface{}),
@@ -231,12 +229,12 @@ func (m *ErrorHandlingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 
 // MetricsMiddleware provides automatic metrics collection
 type MetricsMiddleware struct {
-	service *telemetry.TelemetryService
+	service *TelemetryService
 	logger  zerolog.Logger
 }
 
 // NewMetricsMiddleware creates a new metrics middleware
-func NewMetricsMiddleware(service *telemetry.TelemetryService, logger zerolog.Logger) *MetricsMiddleware {
+func NewMetricsMiddleware(service *TelemetryService, logger zerolog.Logger) *MetricsMiddleware {
 	return &MetricsMiddleware{
 		service: service,
 		logger:  logger.With().Str("middleware", "metrics").Logger(),
@@ -401,8 +399,8 @@ func (m *TimeoutMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 // StandardMiddlewareChain creates a standard middleware chain
 func StandardMiddlewareChain(
 	validationService *validate.ValidationService,
-	errorService *errors.ErrorService,
-	telemetryService *telemetry.TelemetryService,
+	errorService *ErrorService,
+	telemetryService *TelemetryService,
 	logger zerolog.Logger,
 ) *ToolMiddleware {
 	middleware := NewToolMiddleware(validationService, errorService, telemetryService, logger)

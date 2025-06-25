@@ -1,6 +1,7 @@
 package build
 
 import (
+	"context"
 	"time"
 
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -52,7 +53,7 @@ type BuildResult struct {
 }
 
 // BuildValidator defines the interface for build validation
-type BuildValidator interface {
+type BuildValidatorInterface interface {
 	// ValidateDockerfile checks if the Dockerfile is valid
 	ValidateDockerfile(dockerfilePath string) (*ValidationResult, error)
 
@@ -116,12 +117,12 @@ type ComplianceViolation struct {
 }
 
 // BuildExecutor defines the interface for build execution
-type BuildExecutor interface {
+type BuildExecutorInterface interface {
 	// Execute runs the build with the selected strategy
-	Execute(ctx BuildContext, strategy BuildStrategy) (*ExecutionResult, error)
+	Execute(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy) (*ExecutionResult, error)
 
 	// ExecuteWithProgress runs the build with progress reporting
-	ExecuteWithProgress(ctx BuildContext, strategy BuildStrategy, reporter BuildProgressReporter) (*ExecutionResult, error)
+	ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter BuildProgressReporter) (*ExecutionResult, error)
 
 	// Monitor monitors a running build
 	Monitor(buildID string) (*BuildStatus, error)
@@ -173,6 +174,13 @@ type BuildStatus struct {
 }
 
 // ProgressReporter defines the interface for progress reporting
+type ProgressReporter interface {
+	ReportProgress(progress float64, stage string, message string)
+	ReportError(err error)
+	ReportWarning(message string)
+	ReportInfo(message string)
+}
+
 // BuildProgressReporter defines the interface for build progress reporting
 // This extends the core progress reporting functionality
 type BuildProgressReporter interface {

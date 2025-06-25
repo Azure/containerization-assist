@@ -1167,11 +1167,11 @@ func (e *BuildExecutor) generateSuggestedFixes(errStr string, buildResult *cored
 }
 
 // generateAlternativeStrategies provides different approaches to building
-func (e *BuildExecutor) generateAlternativeStrategies(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildStrategy {
-	strategies := []BuildStrategy{}
+func (e *BuildExecutor) generateAlternativeStrategies(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildStrategyRecommendation {
+	strategies := []BuildStrategyRecommendation{}
 
 	// Base strategy alternatives
-	strategies = append(strategies, BuildStrategy{
+	strategies = append(strategies, BuildStrategyRecommendation{
 		Name:        "Multi-stage build optimization",
 		Description: "Use multi-stage builds to reduce final image size and complexity",
 		Pros:        []string{"Smaller final image", "Better caching", "Cleaner separation"},
@@ -1182,7 +1182,7 @@ func (e *BuildExecutor) generateAlternativeStrategies(errStr string, buildResult
 
 	if strings.Contains(strings.ToLower(result.BuildContext_Info.BaseImage), "ubuntu") ||
 		strings.Contains(strings.ToLower(result.BuildContext_Info.BaseImage), "debian") {
-		strategies = append(strategies, BuildStrategy{
+		strategies = append(strategies, BuildStrategyRecommendation{
 			Name:        "Alpine base image",
 			Description: "Switch to Alpine Linux for smaller, more secure base image",
 			Pros:        []string{"Much smaller size", "Better security", "Faster builds"},
@@ -1194,7 +1194,7 @@ func (e *BuildExecutor) generateAlternativeStrategies(errStr string, buildResult
 
 	// Network-specific strategies
 	if strings.Contains(errStr, "network") || strings.Contains(errStr, "timeout") {
-		strategies = append(strategies, BuildStrategy{
+		strategies = append(strategies, BuildStrategyRecommendation{
 			Name:        "Offline/cached build",
 			Description: "Pre-download dependencies and use local cache",
 			Pros:        []string{"No network dependencies", "Faster builds", "More reliable"},
@@ -1206,7 +1206,7 @@ func (e *BuildExecutor) generateAlternativeStrategies(errStr string, buildResult
 
 	// Performance-specific strategies
 	if result.BuildDuration > 5*time.Minute {
-		strategies = append(strategies, BuildStrategy{
+		strategies = append(strategies, BuildStrategyRecommendation{
 			Name:        "Build optimization",
 			Description: "Optimize layer caching and reduce rebuild time",
 			Pros:        []string{"Faster subsequent builds", "Better resource usage"},
