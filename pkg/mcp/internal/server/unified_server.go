@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
 )
@@ -109,8 +110,10 @@ func NewUnifiedMCPServer(
 
 	// Initialize workflow components if needed
 	if mode == ModeDual || mode == ModeWorkflow {
+		// Create registry adapter to bridge interface differences
+		registryAdapter := &RegistryAdapter{registry: toolRegistry}
 		server.workflowOrchestrator = orchestration.NewWorkflowOrchestrator(
-			db, toolRegistry, toolOrchestrator, logger)
+			db, registryAdapter, toolOrchestrator, logger)
 	}
 
 	server.logger.Info().
@@ -517,6 +520,94 @@ func (adapter *ConversationOrchestratorAdapter) ValidateToolArgs(toolName string
 	return adapter.toolOrchestrator.ValidateToolArgs(toolName, args)
 }
 
-func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*orchestration.ToolMetadata, error) {
+func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
 	return adapter.toolOrchestrator.GetToolMetadata(toolName)
+}
+
+// RegistryAdapter adapts MCPToolRegistry to the types.ToolRegistry interface
+type RegistryAdapter struct {
+	registry *orchestration.MCPToolRegistry
+}
+
+func (adapter *RegistryAdapter) Register(name string, factory mcptypes.ToolFactory) error {
+	// Create tool instance from factory and register it
+	tool := factory()
+	return adapter.registry.RegisterTool(name, tool)
+}
+
+func (adapter *RegistryAdapter) Get(name string) (mcptypes.ToolFactory, error) {
+	// Get tool instance and wrap it in a factory
+	tool, err := adapter.registry.GetTool(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return a factory that creates the same tool instance
+	factory := func() mcptypes.Tool {
+		return tool.(mcptypes.Tool)
+	}
+	return factory, nil
+}
+
+func (adapter *RegistryAdapter) List() []string {
+	return adapter.registry.ListTools()
+}
+
+func (adapter *RegistryAdapter) GetMetadata() map[string]mcptypes.ToolMetadata {
+	toolNames := adapter.registry.ListTools()
+	metadata := make(map[string]mcptypes.ToolMetadata)
+
+	for _, name := range toolNames {
+		if meta, err := adapter.registry.GetToolMetadata(name); err == nil {
+			// Convert from orchestration.ToolMetadata to mcptypes.ToolMetadata
+			metadata[name] = mcptypes.ToolMetadata{
+				Name:         meta.Name,
+				Description:  meta.Description,
+				Version:      meta.Version,
+				Category:     meta.Category,
+				Dependencies: meta.Dependencies,
+				Capabilities: meta.Capabilities,
+				Requirements: meta.Requirements,
+				Parameters:   convertParametersMapToString(meta.Parameters),
+				Examples:     convertExamplesToTypes(meta.Examples),
+			}
+		}
+	}
+
+	return metadata
+}
+
+// Helper function to convert parameters from map[string]interface{} to map[string]string
+func convertParametersMapToString(params map[string]interface{}) map[string]string {
+	result := make(map[string]string)
+	for key, value := range params {
+		if strValue, ok := value.(string); ok {
+			result[key] = strValue
+		} else {
+			result[key] = fmt.Sprintf("%v", value)
+		}
+	}
+	return result
+}
+
+// Helper function to convert examples from orchestration types to mcptypes
+func convertExamplesToTypes(examples []orchestration.ToolExample) []mcptypes.ToolExample {
+	result := make([]mcptypes.ToolExample, len(examples))
+	for i, example := range examples {
+		result[i] = mcptypes.ToolExample{
+			Name:        example.Name,
+			Description: example.Description,
+			Input:       convertToMapStringInterface(example.Input),
+			Output:      convertToMapStringInterface(example.Output),
+		}
+	}
+	return result
+}
+
+// Helper function to convert interface{} to map[string]interface{}
+func convertToMapStringInterface(input interface{}) map[string]interface{} {
+	if result, ok := input.(map[string]interface{}); ok {
+		return result
+	}
+	return make(map[string]interface{})
 }

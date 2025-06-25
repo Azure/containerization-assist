@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
 )
@@ -24,8 +25,8 @@ type WorkflowOrchestrator struct {
 // NewWorkflowOrchestrator creates a new complete workflow orchestrator
 func NewWorkflowOrchestrator(
 	db *bbolt.DB,
-	toolRegistry ToolRegistry,
-	toolOrchestrator ToolOrchestrator,
+	toolRegistry mcptypes.ToolRegistry,
+	toolOrchestrator mcptypes.ToolOrchestrator,
 	logger zerolog.Logger,
 ) *WorkflowOrchestrator {
 	// Create components
@@ -243,7 +244,7 @@ func ExampleIntegrationWithMCP(db *bbolt.DB, logger zerolog.Logger) {
 	// would be integrated into the existing MCP server
 
 	// Create tool registry (this would be the existing MCP tool registry)
-	var toolRegistry ToolRegistry
+	var toolRegistry mcptypes.ToolRegistry
 
 	// Create MCP tool orchestrator (this would be the existing MCP tool orchestrator)
 	// var mcpToolOrchestrator *MCPToolOrchestrator
@@ -252,7 +253,7 @@ func ExampleIntegrationWithMCP(db *bbolt.DB, logger zerolog.Logger) {
 	// toolOrchestrator := NewMCPToolOrchestratorAdapter(mcpToolOrchestrator, logger)
 
 	// For demo purposes, use a mock implementation
-	var toolOrchestrator ToolOrchestrator
+	var toolOrchestrator mcptypes.ToolOrchestrator
 
 	// Create workflow orchestrator
 	workflowOrchestrator := NewWorkflowOrchestrator(db, toolRegistry, toolOrchestrator, logger)

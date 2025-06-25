@@ -5,18 +5,18 @@ import (
 	"fmt"
 
 	obs "github.com/Azure/container-copilot/pkg/mcp/internal/observability"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // PromptManager manages conversation flow and tool orchestration
 type PromptManager struct {
 	sessionManager   *session.SessionManager
-	toolOrchestrator orchestration.ToolOrchestrator
+	toolOrchestrator mcptypes.ToolOrchestrator
 	preFlightChecker *obs.PreFlightChecker
 	preferenceStore  *utils.PreferenceStore
 	retryManager     *SimpleRetryManager
@@ -26,7 +26,7 @@ type PromptManager struct {
 // PromptManagerConfig holds configuration for the prompt manager
 type PromptManagerConfig struct {
 	SessionManager   *session.SessionManager
-	ToolOrchestrator orchestration.ToolOrchestrator
+	ToolOrchestrator mcptypes.ToolOrchestrator
 	PreferenceStore  *utils.PreferenceStore
 	Logger           zerolog.Logger
 }

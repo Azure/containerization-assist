@@ -121,7 +121,7 @@ type BuildExecutor interface {
 	Execute(ctx BuildContext, strategy BuildStrategy) (*ExecutionResult, error)
 
 	// ExecuteWithProgress runs the build with progress reporting
-	ExecuteWithProgress(ctx BuildContext, strategy BuildStrategy, reporter ProgressReporter) (*ExecutionResult, error)
+	ExecuteWithProgress(ctx BuildContext, strategy BuildStrategy, reporter BuildProgressReporter) (*ExecutionResult, error)
 
 	// Monitor monitors a running build
 	Monitor(buildID string) (*BuildStatus, error)

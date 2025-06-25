@@ -29,7 +29,7 @@ type ProfiledExecutionResult struct {
 }
 
 // NewProfiledOrchestrator creates a new profiled orchestrator wrapper
-func NewProfiledOrchestrator(orchestrator ToolOrchestrator, logger zerolog.Logger) *ProfiledOrchestrator {
+func NewProfiledOrchestrator(orchestrator mcp.Orchestrator, logger zerolog.Logger) *ProfiledOrchestrator {
 	// Check if profiling is enabled via environment variable
 	enabled := true
 	if envVal := os.Getenv("MCP_PROFILING_ENABLED"); envVal != "" {
@@ -66,11 +66,7 @@ func (po *ProfiledOrchestrator) ExecuteTool(
 		po.profiler.SetStage(toolName, sessionID, "validation")
 	}
 
-	// Validate arguments
-	if err := po.orchestrator.ValidateToolArgs(toolName, args); err != nil {
-		po.profiler.EndExecution(toolName, sessionID, false, "validation_error")
-		return nil, err
-	}
+	// Note: Validation is now handled internally by the orchestrator and individual tools
 
 	// Record dispatch complete
 	po.profiler.RecordDispatchComplete(toolName, sessionID)
@@ -80,8 +76,8 @@ func (po *ProfiledOrchestrator) ExecuteTool(
 		po.profiler.SetStage(toolName, sessionID, "execution")
 	}
 
-	// Execute the tool
-	result, err := po.orchestrator.ExecuteTool(ctx, toolName, args, session)
+	// Execute the tool (validation happens internally)
+	result, err := po.orchestrator.ExecuteTool(ctx, toolName, args)
 
 	// Record execution completion
 	success := err == nil
@@ -148,10 +144,7 @@ func (po *ProfiledOrchestrator) ExecuteToolWithBenchmark(
 	}
 }
 
-// ValidateToolArgs validates tool arguments (passthrough)
-func (po *ProfiledOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
-	return po.orchestrator.ValidateToolArgs(toolName, args)
-}
+// Note: ValidateToolArgs method removed as validation is handled internally by ExecuteTool
 
 // GetProfiler returns the underlying profiler for direct access
 func (po *ProfiledOrchestrator) GetProfiler() *ToolProfiler {

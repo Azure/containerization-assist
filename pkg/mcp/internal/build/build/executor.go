@@ -89,7 +89,7 @@ func (e *BuildExecutorImpl) Execute(ctx context.Context, buildCtx BuildContext, 
 }
 
 // ExecuteWithProgress runs a build with progress reporting
-func (e *BuildExecutorImpl) ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter ProgressReporter) (*ExecutionResult, error) {
+func (e *BuildExecutorImpl) ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter BuildProgressReporter) (*ExecutionResult, error) {
 	buildID := uuid.New().String()
 
 	// Create cancellable context
@@ -123,7 +123,7 @@ func (e *BuildExecutorImpl) ExecuteWithProgress(ctx context.Context, buildCtx Bu
 	}()
 
 	// Execute with progress tracking
-	reporter.ReportProgress(0, StageValidation, "Starting validation")
+	reporter.ReportOverall(0, "Starting validation")
 
 	result, err := e.executeWithProgressInternal(buildCtx2, buildCtx, strategy, activeBuild, reporter)
 
@@ -132,7 +132,7 @@ func (e *BuildExecutorImpl) ExecuteWithProgress(ctx context.Context, buildCtx Bu
 		return nil, err
 	}
 
-	reporter.ReportProgress(100, "completed", "Build completed successfully")
+	reporter.ReportOverall(100, "Build completed successfully")
 	return result, nil
 }
 
@@ -221,7 +221,7 @@ func (e *BuildExecutorImpl) runBuild(ctx context.Context, buildCtx BuildContext,
 	return buildResult, nil
 }
 
-func (e *BuildExecutorImpl) executeWithProgressInternal(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, activeBuild *activeBuild, reporter ProgressReporter) (*ExecutionResult, error) {
+func (e *BuildExecutorImpl) executeWithProgressInternal(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, activeBuild *activeBuild, reporter BuildProgressReporter) (*ExecutionResult, error) {
 	result := &ExecutionResult{
 		Performance: &PerformanceMetrics{},
 	}
@@ -281,7 +281,7 @@ func (e *BuildExecutorImpl) executeWithProgressInternal(ctx context.Context, bui
 
 		// Report progress
 		progress := completedWeight * 100
-		reporter.ReportProgress(progress, stage.name, fmt.Sprintf("Starting %s", stage.name))
+		reporter.ReportStage(progress, fmt.Sprintf("Starting %s", stage.name))
 
 		// Execute stage
 		stageStart := time.Now()

@@ -4,15 +4,16 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // StageValidator handles validation of workflow stages
 type StageValidator struct {
-	toolRegistry ToolRegistry
+	toolRegistry mcptypes.ToolRegistry
 }
 
 // NewStageValidator creates a new stage validator
-func NewStageValidator(toolRegistry ToolRegistry) *StageValidator {
+func NewStageValidator(toolRegistry mcptypes.ToolRegistry) *StageValidator {
 	return &StageValidator{
 		toolRegistry: toolRegistry,
 	}
@@ -69,7 +70,7 @@ func (sv *StageValidator) validateBasicRequirements(stage *workflow.WorkflowStag
 // validateTools validates that all tools exist and are available
 func (sv *StageValidator) validateTools(stage *workflow.WorkflowStage) error {
 	for _, toolName := range stage.Tools {
-		if err := sv.toolRegistry.ValidateTool(toolName); err != nil {
+		if _, err := sv.toolRegistry.Get(toolName); err != nil {
 			return fmt.Errorf("invalid tool %s in stage %s: %w", toolName, stage.Name, err)
 		}
 	}

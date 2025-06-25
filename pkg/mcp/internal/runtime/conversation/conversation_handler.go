@@ -9,8 +9,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -20,7 +20,7 @@ import (
 type ConversationHandler struct {
 	promptManager    *PromptManager
 	sessionManager   *session.SessionManager
-	toolOrchestrator orchestration.ToolOrchestrator
+	toolOrchestrator mcptypes.ToolOrchestrator
 	preferenceStore  *utils.PreferenceStore
 	logger           zerolog.Logger
 }
@@ -40,7 +40,7 @@ type ConversationHandlerConfig struct {
 // NewConversationHandler creates a new concrete conversation handler
 func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHandler, error) {
 	// Use provided orchestrator or create adapter
-	var toolOrchestrator orchestration.ToolOrchestrator
+	var toolOrchestrator mcptypes.ToolOrchestrator
 	if config.ToolOrchestrator != nil {
 		// Use the provided canonical orchestrator directly
 		toolOrchestrator = config.ToolOrchestrator

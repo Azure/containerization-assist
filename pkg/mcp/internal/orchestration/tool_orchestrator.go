@@ -2,8 +2,10 @@ package orchestration
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -90,8 +92,63 @@ func (o *MCPToolOrchestrator) ValidateToolArgs(toolName string, args interface{}
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*ToolMetadata, error) {
-	return o.toolRegistry.GetToolMetadata(toolName)
+func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+	localMetadata, err := o.toolRegistry.GetToolMetadata(toolName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from orchestration.ToolMetadata to mcptypes.ToolMetadata
+	converted := &mcptypes.ToolMetadata{
+		Name:         localMetadata.Name,
+		Description:  localMetadata.Description,
+		Version:      localMetadata.Version,
+		Category:     localMetadata.Category,
+		Dependencies: localMetadata.Dependencies,
+		Capabilities: localMetadata.Capabilities,
+		Requirements: localMetadata.Requirements,
+		Parameters:   make(map[string]string),
+		Examples:     convertExamples(localMetadata.Examples),
+	}
+
+	// Convert Parameters from map[string]interface{} to map[string]string
+	for key, value := range localMetadata.Parameters {
+		if strValue, ok := value.(string); ok {
+			converted.Parameters[key] = strValue
+		} else {
+			// Convert non-string values to string representation
+			converted.Parameters[key] = fmt.Sprintf("%v", value)
+		}
+	}
+
+	return converted, nil
+}
+
+// convertExamples converts from orchestration.ToolExample to mcptypes.ToolExample
+func convertExamples(examples []ToolExample) []mcptypes.ToolExample {
+	converted := make([]mcptypes.ToolExample, len(examples))
+	for i, example := range examples {
+		// Type assert Input and Output to map[string]interface{}
+		var input, output map[string]interface{}
+		if inputMap, ok := example.Input.(map[string]interface{}); ok {
+			input = inputMap
+		} else {
+			input = make(map[string]interface{})
+		}
+		if outputMap, ok := example.Output.(map[string]interface{}); ok {
+			output = outputMap
+		} else {
+			output = make(map[string]interface{})
+		}
+
+		converted[i] = mcptypes.ToolExample{
+			Name:        example.Name,
+			Description: example.Description,
+			Input:       input,
+			Output:      output,
+		}
+	}
+	return converted
 }
 
 // The following methods maintain backward compatibility but delegate to the new implementation

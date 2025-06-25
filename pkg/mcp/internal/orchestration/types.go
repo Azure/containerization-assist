@@ -1,9 +1,5 @@
 package orchestration
 
-import (
-	"context"
-)
-
 // SessionManager interface for MCP session management
 type SessionManager interface {
 	GetSession(sessionID string) (interface{}, error)

@@ -10,14 +10,15 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/execution"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // DefaultStageExecutor implements StageExecutor for executing workflow stages
 type DefaultStageExecutor struct {
 	logger           zerolog.Logger
-	toolRegistry     ToolRegistry
-	toolOrchestrator ToolOrchestrator
+	toolRegistry     mcptypes.ToolRegistry
+	toolOrchestrator mcptypes.ToolOrchestrator
 	secretRedactor   *SecretRedactor
 
 	// Execution strategies
@@ -29,8 +30,8 @@ type DefaultStageExecutor struct {
 // NewDefaultStageExecutor creates a new stage executor with modular execution strategies
 func NewDefaultStageExecutor(
 	logger zerolog.Logger,
-	toolRegistry ToolRegistry,
-	toolOrchestrator ToolOrchestrator,
+	toolRegistry mcptypes.ToolRegistry,
+	toolOrchestrator mcptypes.ToolOrchestrator,
 ) *DefaultStageExecutor {
 	// Create base executors
 	seqExec := execution.NewSequentialExecutor(logger)

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/alecthomas/jsonschema"
@@ -69,8 +68,9 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	if reg.frozen {
 		return types.NewRichError("INVALID_REQUEST", "tool registry frozen", "system_error")
 	}
-	if _, dup := reg.tools[t.GetName()]; dup {
-		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", t.GetName()), "validation_error")
+	metadata := t.GetMetadata()
+	if _, dup := reg.tools[metadata.Name]; dup {
+		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
 	}
 
 	reflector := jsonschema.Reflector{
@@ -91,7 +91,7 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	cleanInput := sanitizeSchema(inputSchema)
 	cleanOutput := sanitizeSchema(outputSchema)
 
-	reg.tools[t.GetName()] = &ToolRegistration{
+	reg.tools[metadata.Name] = &ToolRegistration{
 		Tool:         t,
 		InputSchema:  cleanInput,
 		OutputSchema: cleanOutput,
@@ -108,8 +108,8 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	}
 
 	reg.logger.Info().
-		Str("tool", t.GetName()).
-		Str("version", t.GetVersion()).
+		Str("tool", metadata.Name).
+		Str("version", metadata.Version).
 		Msg("registered")
 	return nil
 }

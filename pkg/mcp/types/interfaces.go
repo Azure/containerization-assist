@@ -134,7 +134,7 @@ type MCPError struct {
 // ArgConverter converts generic arguments to tool-specific types
 type ArgConverter func(args map[string]interface{}) (ToolArgs, error)
 
-// ResultConverter converts tool-specific results to generic types  
+// ResultConverter converts tool-specific results to generic types
 type ResultConverter func(result ToolResult) (map[string]interface{}, error)
 
 // =============================================================================
@@ -195,7 +195,7 @@ type SessionMetadata struct {
 }
 
 // =============================================================================
-// TRANSPORT TYPES (interface defined in main interfaces file) 
+// TRANSPORT TYPES (interface defined in main interfaces file)
 // =============================================================================
 
 // NOTE: Transport interface is now defined above with RequestHandler
@@ -694,7 +694,7 @@ type RecentError struct {
 
 // NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
 
-// ProgressTracker provides centralized progress reporting for tools  
+// ProgressTracker provides centralized progress reporting for tools
 type ProgressTracker interface {
 	// RunWithProgress executes an operation with standardized progress reporting
 	RunWithProgress(
