@@ -99,7 +99,11 @@ func (bg *BlueGreenStrategy) Deploy(ctx context.Context, config DeploymentConfig
 
 	// Report initial progress
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.1, "Initializing blue-green deployment")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.1, "Initializing blue-green deployment")
+		}
 	}
 
 	// Step 1: Validate prerequisites
@@ -119,7 +123,11 @@ func (bg *BlueGreenStrategy) Deploy(ctx context.Context, config DeploymentConfig
 		Msg("Environment colors determined")
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.2, fmt.Sprintf("Deploying to %s environment", newColor))
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.2, fmt.Sprintf("Deploying to %s environment", newColor))
+		}
 	}
 
 	// Step 3: Deploy to the new environment (green)
@@ -136,7 +144,11 @@ func (bg *BlueGreenStrategy) Deploy(ctx context.Context, config DeploymentConfig
 	})
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.5, fmt.Sprintf("Waiting for %s environment to be ready", newColor))
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.5, fmt.Sprintf("Waiting for %s environment to be ready", newColor))
+		}
 	}
 
 	// Step 4: Wait for new environment to be ready
@@ -148,7 +160,11 @@ func (bg *BlueGreenStrategy) Deploy(ctx context.Context, config DeploymentConfig
 	}
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.7, fmt.Sprintf("Validating %s environment health", newColor))
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.7, fmt.Sprintf("Validating %s environment health", newColor))
+		}
 	}
 
 	// Step 5: Perform health checks on new environment
@@ -160,7 +176,11 @@ func (bg *BlueGreenStrategy) Deploy(ctx context.Context, config DeploymentConfig
 	}
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.8, "Switching traffic to new environment")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.8, "Switching traffic to new environment")
+		}
 	}
 
 	// Step 6: Switch service to point to new environment
@@ -179,7 +199,11 @@ func (bg *BlueGreenStrategy) Deploy(ctx context.Context, config DeploymentConfig
 	})
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.9, "Cleaning up old environment")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.9, "Cleaning up old environment")
+		}
 	}
 
 	// Step 7: Clean up old environment (optional - for resource conservation)
@@ -210,7 +234,11 @@ func (bg *BlueGreenStrategy) Deploy(ctx context.Context, config DeploymentConfig
 	}
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(1.0, "Blue-green deployment completed successfully")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(1.0, "Blue-green deployment completed successfully")
+		}
 	}
 
 	bg.logger.Info().

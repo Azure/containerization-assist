@@ -107,7 +107,7 @@ type MCPError struct {
 // NOTE: ToolArgs interface is defined in pkg/mcp/interfaces.go
 type ArgConverter func(args map[string]interface{}) (interface{}, error)
 
-// ResultConverter converts tool-specific results to generic types  
+// ResultConverter converts tool-specific results to generic types
 // NOTE: ToolResult interface is defined in pkg/mcp/interfaces.go
 type ResultConverter func(result interface{}) (map[string]interface{}, error)
 

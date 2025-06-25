@@ -167,8 +167,8 @@ func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManage
 }
 
 // standardHealthCheckStages provides common stages for health check operations
-func standardHealthCheckStages() []mcptypes.ProgressStage {
-	return []mcptypes.ProgressStage{
+func standardHealthCheckStages() []internal.LocalProgressStage {
+	return []internal.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and namespace"},
 		{Name: "Query", Weight: 0.30, Description: "Querying Kubernetes resources"},
 		{Name: "Analyze", Weight: 0.30, Description: "Analyzing pod and service health"},
@@ -186,7 +186,7 @@ func (t *AtomicCheckHealthTool) ExecuteHealthCheck(ctx context.Context, args Ato
 // ExecuteWithContext runs the atomic health check with GoMCP progress tracking
 func (t *AtomicCheckHealthTool) ExecuteWithContext(serverCtx *server.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
 	// Create progress adapter for GoMCP using centralized health stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Health", Weight: 0.80, Description: "Checking health"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Health", Weight: 0.80, Description: "Checking health"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -208,7 +208,7 @@ func (t *AtomicCheckHealthTool) executeWithoutProgress(ctx context.Context, args
 }
 
 // performHealthCheck performs the actual health check
-func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter mcptypes.ProgressReporter) (*AtomicCheckHealthResult, error) {
+func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter interface{}) (*AtomicCheckHealthResult, error) {
 	startTime := time.Now()
 
 	// Get session

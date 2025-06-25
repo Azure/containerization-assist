@@ -3,8 +3,6 @@ package build
 import (
 	"context"
 	"time"
-
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // BuildStrategy defines the interface for different build strategies
@@ -188,7 +186,7 @@ type ExtendedBuildReporter interface {
 	NextStage(message string)
 	SetStage(stageIndex int, message string)
 	ReportOverall(progress float64, message string)
-	GetCurrentStage() (int, mcptypes.ProgressStage)
+	GetCurrentStage() (int, interface{})
 	ReportError(err error)
 	ReportWarning(message string)
 	ReportInfo(message string)

@@ -157,7 +157,11 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 	startTime := time.Now()
 
 	// Create progress adapter for GoMCP using standard scan stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Scan", Weight: 0.80, Description: "Scanning"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
+		{Name: "Initialize", Weight: 0.10, Description: "Loading session"},
+		{Name: "Scan", Weight: 0.80, Description: "Scanning"},
+		{Name: "Finalize", Weight: 0.10, Description: "Updating state"},
+	})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -184,7 +188,7 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter mcptypes.ProgressReporter) (*AtomicScanSecretsResult, error) {
+func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter interface{}) (*AtomicScanSecretsResult, error) {
 	// Stage 1: Initialize - Loading session and validating scan path
 	t.logger.Info().Msg("Loading session")
 
@@ -436,7 +440,7 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 }
 
 // performSecretScan performs the actual file scanning for secrets
-func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter mcptypes.ProgressReporter) ([]ScannedSecret, []FileSecretScanResult, int, error) {
+func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter interface{}) ([]ScannedSecret, []FileSecretScanResult, int, error) {
 	scanner := utils.NewSecretScanner()
 	var allSecrets []ScannedSecret
 	var fileResults []FileSecretScanResult
@@ -485,7 +489,11 @@ func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns,
 		// Report progress if available
 		if reporter != nil && totalFiles > 0 {
 			progress := float64(filesScanned) / float64(totalFiles)
-			reporter.ReportStage(progress, fmt.Sprintf("Scanned %d/%d files", filesScanned, totalFiles))
+			if progressReporter, ok := reporter.(interface {
+				ReportStage(float64, string)
+			}); ok {
+				progressReporter.ReportStage(progress, fmt.Sprintf("Scanned %d/%d files", filesScanned, totalFiles))
+			}
 		}
 
 		// Create file result

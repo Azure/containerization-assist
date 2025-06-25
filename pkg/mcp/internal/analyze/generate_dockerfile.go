@@ -296,7 +296,7 @@ func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Generate
 // ExecuteWithContext runs the Dockerfile generation with GoMCP progress tracking
 func (t *GenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
 	// Create progress adapter for GoMCP using standard generation stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Generate", Weight: 0.80, Description: "Generating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Generate", Weight: 0.80, Description: "Generating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Progress adapter removed - execute the core logic directly
 	t.logger.Info().Msg("Initializing Dockerfile generation")

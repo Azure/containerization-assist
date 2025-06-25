@@ -138,7 +138,7 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 	}
 
 	// Use centralized build stages for progress tracking
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
 		{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
 		{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},

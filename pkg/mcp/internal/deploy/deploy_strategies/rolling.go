@@ -90,7 +90,11 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 
 	// Report initial progress
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.1, "Initializing rolling update")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.1, "Initializing rolling update")
+		}
 	}
 
 	// Step 1: Validate prerequisites
@@ -100,7 +104,11 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 
 	// Step 2: Check for existing deployment and capture current version
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.2, "Checking existing deployment")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.2, "Checking existing deployment")
+		}
 	}
 
 	previousVersion, rollbackAvailable, err := r.getPreviousVersion(ctx, config)
@@ -112,7 +120,11 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 
 	// Step 3: Deploy manifests using rolling update
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.4, "Applying manifest updates")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.4, "Applying manifest updates")
+		}
 	}
 
 	deploymentResult, err := r.performRollingUpdate(ctx, config)
@@ -125,7 +137,11 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 
 	// Step 4: Wait for rollout to complete
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.6, "Waiting for rollout completion")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.6, "Waiting for rollout completion")
+		}
 	}
 
 	if err := r.waitForRolloutCompletion(ctx, config); err != nil {
@@ -134,7 +150,11 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 
 	// Step 5: Perform health checks
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.8, "Performing health checks")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.8, "Performing health checks")
+		}
 	}
 
 	healthStatus, readyReplicas, totalReplicas, err := r.performHealthChecks(ctx, config)
@@ -148,7 +168,11 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 
 	// Step 6: Finalize deployment
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(1.0, "Rolling update completed successfully")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(1.0, "Rolling update completed successfully")
+		}
 	}
 
 	result.Success = true

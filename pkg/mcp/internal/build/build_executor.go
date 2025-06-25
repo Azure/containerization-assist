@@ -120,7 +120,7 @@ func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, arg
 	}
 
 	// Use centralized build stages for progress tracking
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
 		{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
 		{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},
@@ -147,7 +147,7 @@ func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, arg
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
+func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter interface{}) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	e.logger.Info().Msg("Loading session")
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
