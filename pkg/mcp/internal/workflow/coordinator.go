@@ -9,11 +9,176 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Interface definitions for workflow components
+
+// StateMachine manages workflow state transitions
+type StateMachine interface {
+	TransitionState(session *WorkflowSession, status WorkflowStatus) error
+	IsTerminalState(status WorkflowStatus) bool
+}
+
+// Executor executes workflow stages
+type Executor interface {
+	ExecuteStageGroup(ctx context.Context, stages []WorkflowStage, session *WorkflowSession, spec *WorkflowSpec, enableParallel bool) ([]StageResult, error)
+}
+
+// WorkflowSessionManager manages workflow sessions
+type WorkflowSessionManager interface {
+	CreateSession(spec *WorkflowSpec) (*WorkflowSession, error)
+	GetSession(sessionID string) (*WorkflowSession, error)
+	UpdateSession(session *WorkflowSession) error
+}
+
+// DependencyResolver resolves stage dependencies
+type DependencyResolver interface {
+	ResolveDependencies(stages []WorkflowStage) ([][]WorkflowStage, error)
+}
+
+// CheckpointManager manages workflow checkpoints
+type CheckpointManager interface {
+	CreateCheckpoint(session *WorkflowSession, stageID string, description string, spec *WorkflowSpec) (*WorkflowCheckpoint, error)
+	RestoreFromCheckpoint(sessionID string, checkpointID string) (*WorkflowSession, error)
+	ListCheckpoints(sessionID string) ([]*WorkflowCheckpoint, error)
+}
+
+// Workflow type aliases (referencing orchestration types)
+type WorkflowSession struct {
+	ID               string                 `json:"id"`
+	WorkflowID       string                 `json:"workflow_id"`
+	WorkflowName     string                 `json:"workflow_name"`
+	Status           WorkflowStatus         `json:"status"`
+	CurrentStage     string                 `json:"current_stage"`
+	CompletedStages  []string               `json:"completed_stages"`
+	FailedStages     []string               `json:"failed_stages"`
+	SkippedStages    []string               `json:"skipped_stages"`
+	SharedContext    map[string]interface{} `json:"shared_context"`
+	ResourceBindings map[string]interface{} `json:"resource_bindings"`
+	StageResults     map[string]interface{} `json:"stage_results"`
+	LastActivity     time.Time              `json:"last_activity"`
+	StartTime        time.Time              `json:"start_time"`
+	CreatedAt        time.Time              `json:"created_at"`
+	UpdatedAt        time.Time              `json:"updated_at"`
+	Checkpoints      []WorkflowCheckpoint   `json:"checkpoints"`
+	ErrorContext     *WorkflowErrorContext  `json:"error_context,omitempty"`
+}
+
+type WorkflowStatus string
+
+const (
+	WorkflowStatusPending   WorkflowStatus = "pending"
+	WorkflowStatusRunning   WorkflowStatus = "running"
+	WorkflowStatusCompleted WorkflowStatus = "completed"
+	WorkflowStatusFailed    WorkflowStatus = "failed"
+	WorkflowStatusPaused    WorkflowStatus = "paused"
+	WorkflowStatusCancelled WorkflowStatus = "cancelled"
+)
+
+type WorkflowStage struct {
+	Name      string                 `json:"name"`
+	Type      string                 `json:"type"`
+	Tools     []string               `json:"tools"`
+	DependsOn []string               `json:"depends_on"`
+	Variables map[string]interface{} `json:"variables"`
+}
+
+type WorkflowSpec struct {
+	Metadata WorkflowMetadata   `json:"metadata"`
+	Spec     WorkflowDefinition `json:"spec"`
+}
+
+type WorkflowMetadata struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+type WorkflowDefinition struct {
+	Stages      []WorkflowStage        `json:"stages"`
+	Variables   map[string]interface{} `json:"variables"`
+	ErrorPolicy ErrorPolicy            `json:"error_policy"`
+}
+
+type ErrorPolicy struct {
+	Mode string `json:"mode"`
+}
+
+type WorkflowCheckpoint struct {
+	ID      string    `json:"id"`
+	StageID string    `json:"stage_id"`
+	Created time.Time `json:"created"`
+}
+
+type StageResult struct {
+	StageName string                 `json:"stage_name"`
+	Success   bool                   `json:"success"`
+	Results   map[string]interface{} `json:"results"`
+	Duration  time.Duration          `json:"duration"`
+	Artifacts []WorkflowArtifact     `json:"artifacts"`
+}
+
+type WorkflowArtifact struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+type WorkflowResult struct {
+	WorkflowID      string                 `json:"workflow_id"`
+	SessionID       string                 `json:"session_id"`
+	Status          WorkflowStatus         `json:"status"`
+	Success         bool                   `json:"success"`
+	Message         string                 `json:"message"`
+	Duration        time.Duration          `json:"duration"`
+	Results         map[string]interface{} `json:"results"`
+	Artifacts       []WorkflowArtifact     `json:"artifacts"`
+	StagesExecuted  int                    `json:"stages_executed"`
+	StagesCompleted int                    `json:"stages_completed"`
+	StagesFailed    int                    `json:"stages_failed"`
+	Metrics         WorkflowMetrics        `json:"metrics"`
+	ErrorSummary    *WorkflowErrorSummary  `json:"error_summary,omitempty"`
+}
+
+type WorkflowMetrics struct {
+	TotalDuration       time.Duration            `json:"total_duration"`
+	StageDurations      map[string]time.Duration `json:"stage_durations"`
+	ToolExecutionCounts map[string]int           `json:"tool_execution_counts"`
+}
+
+type WorkflowErrorContext struct {
+	ErrorHistory []WorkflowError `json:"error_history"`
+	RetryCount   int             `json:"retry_count"`
+	LastError    string          `json:"last_error"`
+}
+
+type WorkflowError struct {
+	StageName string `json:"stage_name"`
+	ErrorType string `json:"error_type"`
+	Severity  string `json:"severity"`
+	Retryable bool   `json:"retryable"`
+}
+
+type WorkflowErrorSummary struct {
+	TotalErrors       int            `json:"total_errors"`
+	CriticalErrors    int            `json:"critical_errors"`
+	RecoverableErrors int            `json:"recoverable_errors"`
+	ErrorsByType      map[string]int `json:"errors_by_type"`
+	ErrorsByStage     map[string]int `json:"errors_by_stage"`
+	RetryAttempts     int            `json:"retry_attempts"`
+	LastError         string         `json:"last_error"`
+	Recommendations   []string       `json:"recommendations"`
+}
+
+type ExecutionOptions struct {
+	SessionID            string                 `json:"session_id"`
+	ResumeFromCheckpoint string                 `json:"resume_from_checkpoint"`
+	EnableParallel       bool                   `json:"enable_parallel"`
+	CreateCheckpoints    bool                   `json:"create_checkpoints"`
+	Variables            map[string]interface{} `json:"variables"`
+}
+
 // Coordinator orchestrates workflow execution by coordinating between state machine and executor
 type Coordinator struct {
 	logger             zerolog.Logger
-	stateMachine       *StateMachine
-	executor           *Executor
+	stateMachine       StateMachine
+	executor           Executor
 	sessionManager     WorkflowSessionManager
 	dependencyResolver DependencyResolver
 	checkpointManager  CheckpointManager
@@ -22,8 +187,8 @@ type Coordinator struct {
 // NewCoordinator creates a new workflow coordinator
 func NewCoordinator(
 	logger zerolog.Logger,
-	stateMachine *StateMachine,
-	executor *Executor,
+	stateMachine StateMachine,
+	executor Executor,
 	sessionManager WorkflowSessionManager,
 	dependencyResolver DependencyResolver,
 	checkpointManager CheckpointManager,
