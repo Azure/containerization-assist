@@ -17,16 +17,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// BuildExecutor handles the execution of Docker builds with progress reporting
-type BuildExecutor struct {
+// BuildExecutorService handles the execution of Docker builds with progress reporting
+type BuildExecutorService struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
 // NewBuildExecutor creates a new build executor
-func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *BuildExecutor {
-	return &BuildExecutor{
+func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *BuildExecutorService {
+	return &BuildExecutorService{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
 		logger:          logger.With().Str("component", "build_executor").Logger(),
@@ -34,7 +34,7 @@ func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager mcptyp
 }
 
 // ExecuteWithFixes runs the atomic Docker image build with AI-driven fixing capabilities
-func (e *BuildExecutor) ExecuteWithFixes(ctx context.Context, args AtomicBuildImageArgs, fixingMixin interface{}) (*AtomicBuildImageResult, error) {
+func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args AtomicBuildImageArgs, fixingMixin interface{}) (*AtomicBuildImageResult, error) {
 
 	// Check if fixing is enabled
 	if fixingMixin == nil {
@@ -89,7 +89,7 @@ func (e *BuildExecutor) ExecuteWithFixes(ctx context.Context, args AtomicBuildIm
 }
 
 // ExecuteBuild runs the atomic Docker image build (deprecated: use ExecuteWithContext)
-func (e *BuildExecutor) ExecuteBuild(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
+func (e *BuildExecutorService) ExecuteBuild(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
 	// Fallback: execute without progress tracking for backward compatibility
 	startTime := time.Now()
 	result := &AtomicBuildImageResult{
@@ -105,7 +105,7 @@ func (e *BuildExecutor) ExecuteBuild(ctx context.Context, args AtomicBuildImageA
 }
 
 // ExecuteWithContext executes the tool with GoMCP server context for native progress tracking
-func (e *BuildExecutor) ExecuteWithContext(serverCtx *server.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
+func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
 	startTime := time.Now()
 
 	// Create result object early for error handling
@@ -147,7 +147,7 @@ func (e *BuildExecutor) ExecuteWithContext(serverCtx *server.Context, args Atomi
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
+func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	e.logger.Info().Msg("Loading session")
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
@@ -327,7 +327,7 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 }
 
 // executeWithoutProgress handles execution without progress tracking (fallback)
-func (e *BuildExecutor) executeWithoutProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time) (*AtomicBuildImageResult, error) {
+func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time) (*AtomicBuildImageResult, error) {
 	// Get session
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
 	if err != nil {
@@ -492,7 +492,7 @@ func (e *BuildExecutor) executeWithoutProgress(ctx context.Context, args AtomicB
 }
 
 // updateSessionState updates the session with build results
-func (e *BuildExecutor) updateSessionState(session *sessiontypes.SessionState, result *AtomicBuildImageResult) error {
+func (e *BuildExecutorService) updateSessionState(session *sessiontypes.SessionState, result *AtomicBuildImageResult) error {
 	// Update session with build results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -538,21 +538,21 @@ func (e *BuildExecutor) updateSessionState(session *sessiontypes.SessionState, r
 
 // Helper methods
 
-func (e *BuildExecutor) getImageTag(tag string) string {
+func (e *BuildExecutorService) getImageTag(tag string) string {
 	if tag == "" {
 		return "latest"
 	}
 	return tag
 }
 
-func (e *BuildExecutor) getPlatform(platform string) string {
+func (e *BuildExecutorService) getPlatform(platform string) string {
 	if platform == "" {
 		return "linux/amd64"
 	}
 	return platform
 }
 
-func (e *BuildExecutor) getBuildContext(context, workspaceDir string) string {
+func (e *BuildExecutorService) getBuildContext(context, workspaceDir string) string {
 	if context == "" {
 		// Default to repo directory in workspace
 		return filepath.Join(workspaceDir, "repo")
@@ -566,7 +566,7 @@ func (e *BuildExecutor) getBuildContext(context, workspaceDir string) string {
 	return context
 }
 
-func (e *BuildExecutor) getDockerfilePath(dockerfilePath, buildContext string) string {
+func (e *BuildExecutorService) getDockerfilePath(dockerfilePath, buildContext string) string {
 	if dockerfilePath == "" {
 		return filepath.Join(buildContext, "Dockerfile")
 	}
@@ -580,7 +580,7 @@ func (e *BuildExecutor) getDockerfilePath(dockerfilePath, buildContext string) s
 }
 
 // analyzeBuildContext analyzes the build context and Dockerfile
-func (e *BuildExecutor) analyzeBuildContext(result *AtomicBuildImageResult) error {
+func (e *BuildExecutorService) analyzeBuildContext(result *AtomicBuildImageResult) error {
 	ctx := result.BuildContext_Info
 
 	// Check if Dockerfile exists
@@ -628,7 +628,7 @@ func (e *BuildExecutor) analyzeBuildContext(result *AtomicBuildImageResult) erro
 }
 
 // analyzeBuildContextDirectory analyzes the build context directory
-func (e *BuildExecutor) analyzeBuildContextDirectory(result *AtomicBuildImageResult) error {
+func (e *BuildExecutorService) analyzeBuildContextDirectory(result *AtomicBuildImageResult) error {
 	ctx := result.BuildContext_Info
 
 	// Check for .dockerignore
@@ -675,7 +675,7 @@ func (e *BuildExecutor) analyzeBuildContextDirectory(result *AtomicBuildImageRes
 }
 
 // validateBuildPrerequisites validates that everything is ready for building
-func (e *BuildExecutor) validateBuildPrerequisites(result *AtomicBuildImageResult) error {
+func (e *BuildExecutorService) validateBuildPrerequisites(result *AtomicBuildImageResult) error {
 	ctx := result.BuildContext_Info
 
 	if !ctx.DockerfileExists {
@@ -702,7 +702,7 @@ func (e *BuildExecutor) validateBuildPrerequisites(result *AtomicBuildImageResul
 }
 
 // generateBuildContext generates rich context for Claude reasoning
-func (e *BuildExecutor) generateBuildContext(result *AtomicBuildImageResult) {
+func (e *BuildExecutorService) generateBuildContext(result *AtomicBuildImageResult) {
 	ctx := result.BuildContext_Info
 
 	// Generate build optimizations based on analysis
@@ -753,7 +753,7 @@ func (e *BuildExecutor) generateBuildContext(result *AtomicBuildImageResult) {
 }
 
 // addPushTroubleshootingTips adds troubleshooting tips for push failures
-func (e *BuildExecutor) addPushTroubleshootingTips(result *AtomicBuildImageResult, pushResult *coredocker.RegistryPushResult, registryURL string, err error) {
+func (e *BuildExecutorService) addPushTroubleshootingTips(result *AtomicBuildImageResult, pushResult *coredocker.RegistryPushResult, registryURL string, err error) {
 	// Check if we have detailed error information in pushResult
 	if pushResult != nil && pushResult.Error != nil {
 		// Check if this is an authentication error
@@ -787,7 +787,7 @@ func (e *BuildExecutor) addPushTroubleshootingTips(result *AtomicBuildImageResul
 }
 
 // addTroubleshootingTips adds troubleshooting tips based on build errors
-func (e *BuildExecutor) addTroubleshootingTips(result *AtomicBuildImageResult, err error) {
+func (e *BuildExecutorService) addTroubleshootingTips(result *AtomicBuildImageResult, err error) {
 	ctx := result.BuildContext_Info
 	errStr := strings.ToLower(err.Error())
 
@@ -820,7 +820,7 @@ func (e *BuildExecutor) addTroubleshootingTips(result *AtomicBuildImageResult, e
 }
 
 // runSecurityScan runs Trivy security scan on the built image
-func (e *BuildExecutor) runSecurityScan(ctx context.Context, session *sessiontypes.SessionState, result *AtomicBuildImageResult) error {
+func (e *BuildExecutorService) runSecurityScan(ctx context.Context, session *sessiontypes.SessionState, result *AtomicBuildImageResult) error {
 	// Create Trivy scanner
 	scanner := coredocker.NewTrivyScanner(e.logger)
 
@@ -928,7 +928,7 @@ func (e *BuildExecutor) runSecurityScan(ctx context.Context, session *sessiontyp
 }
 
 // generateBuildFailureAnalysis creates AI decision-making context for build failures
-func (e *BuildExecutor) generateBuildFailureAnalysis(err error, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) *BuildFailureAnalysis {
+func (e *BuildExecutorService) generateBuildFailureAnalysis(err error, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) *BuildFailureAnalysis {
 	analysis := &BuildFailureAnalysis{}
 	errStr := strings.ToLower(err.Error())
 
@@ -967,7 +967,7 @@ func (e *BuildExecutor) generateBuildFailureAnalysis(err error, buildResult *cor
 }
 
 // classifyFailure determines the type and stage of build failure
-func (e *BuildExecutor) classifyFailure(errStr string, buildResult *coredocker.BuildResult) (string, string) {
+func (e *BuildExecutorService) classifyFailure(errStr string, buildResult *coredocker.BuildResult) (string, string) {
 	failureType := types.UnknownString
 	failureStage := types.UnknownString
 
@@ -1009,7 +1009,7 @@ func (e *BuildExecutor) classifyFailure(errStr string, buildResult *coredocker.B
 }
 
 // identifyFailureCauses analyzes the failure to identify likely causes
-func (e *BuildExecutor) identifyFailureCauses(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []FailureCause {
+func (e *BuildExecutorService) identifyFailureCauses(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []FailureCause {
 	causes := []FailureCause{}
 
 	switch {
@@ -1077,7 +1077,7 @@ func (e *BuildExecutor) identifyFailureCauses(errStr string, buildResult *coredo
 }
 
 // generateSuggestedFixes provides specific remediation steps
-func (e *BuildExecutor) generateSuggestedFixes(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildFix {
+func (e *BuildExecutorService) generateSuggestedFixes(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildFix {
 	fixes := []BuildFix{}
 
 	switch {
@@ -1167,7 +1167,7 @@ func (e *BuildExecutor) generateSuggestedFixes(errStr string, buildResult *cored
 }
 
 // generateAlternativeStrategies provides different approaches to building
-func (e *BuildExecutor) generateAlternativeStrategies(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildStrategyRecommendation {
+func (e *BuildExecutorService) generateAlternativeStrategies(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildStrategyRecommendation {
 	strategies := []BuildStrategyRecommendation{}
 
 	// Base strategy alternatives
@@ -1220,7 +1220,7 @@ func (e *BuildExecutor) generateAlternativeStrategies(errStr string, buildResult
 }
 
 // analyzePerformanceImpact assesses the performance implications
-func (e *BuildExecutor) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) PerformanceAnalysis {
+func (e *BuildExecutorService) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) PerformanceAnalysis {
 	analysis := PerformanceAnalysis{}
 
 	// Analyze build time
@@ -1276,7 +1276,7 @@ func (e *BuildExecutor) analyzePerformanceImpact(buildResult *coredocker.BuildRe
 }
 
 // identifySecurityImplications analyzes security aspects of the build failure
-func (e *BuildExecutor) identifySecurityImplications(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []string {
+func (e *BuildExecutorService) identifySecurityImplications(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []string {
 	implications := []string{}
 
 	// Permission-related security implications

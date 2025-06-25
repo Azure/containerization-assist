@@ -13,20 +13,20 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// BuildValidator handles build validation and security scanning
-type BuildValidator struct {
+// BuildValidatorImpl handles build validation and security scanning
+type BuildValidatorImpl struct {
 	logger zerolog.Logger
 }
 
 // NewBuildValidator creates a new build validator
-func NewBuildValidator(logger zerolog.Logger) *BuildValidator {
-	return &BuildValidator{
+func NewBuildValidator(logger zerolog.Logger) *BuildValidatorImpl {
+	return &BuildValidatorImpl{
 		logger: logger,
 	}
 }
 
 // ValidateBuildPrerequisites validates that all prerequisites for building are met
-func (bv *BuildValidator) ValidateBuildPrerequisites(dockerfilePath string, buildContext string) error {
+func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, buildContext string) error {
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
 		return types.NewErrorBuilder("invalid_arguments",
@@ -62,7 +62,7 @@ func (bv *BuildValidator) ValidateBuildPrerequisites(dockerfilePath string, buil
 }
 
 // RunSecurityScan runs a security scan on the built image using Trivy
-func (bv *BuildValidator) RunSecurityScan(ctx context.Context, imageName string, imageTag string) (*coredocker.ScanResult, time.Duration, error) {
+func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName string, imageTag string) (*coredocker.ScanResult, time.Duration, error) {
 	startTime := time.Now()
 
 	// Check if Trivy is installed
@@ -132,7 +132,7 @@ func (bv *BuildValidator) RunSecurityScan(ctx context.Context, imageName string,
 }
 
 // AddPushTroubleshootingTips adds troubleshooting tips for push failures
-func (bv *BuildValidator) AddPushTroubleshootingTips(err error, registryURL string) []string {
+func (bv *BuildValidatorImpl) AddPushTroubleshootingTips(err error, registryURL string) []string {
 	tips := []string{}
 
 	errorMsg := err.Error()
@@ -164,7 +164,7 @@ func (bv *BuildValidator) AddPushTroubleshootingTips(err error, registryURL stri
 }
 
 // AddTroubleshootingTips adds general troubleshooting tips based on the error
-func (bv *BuildValidator) AddTroubleshootingTips(err error) []string {
+func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 	tips := []string{}
 
 	if err == nil {
@@ -219,7 +219,7 @@ func (bv *BuildValidator) AddTroubleshootingTips(err error) []string {
 }
 
 // ValidateArgs validates the atomic build image arguments
-func (bv *BuildValidator) ValidateArgs(args *AtomicBuildImageArgs) error {
+func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 	// Validate image name
 	if args.ImageName == "" {
 		return types.NewErrorBuilder("invalid_arguments", "image_name is required", "validation").

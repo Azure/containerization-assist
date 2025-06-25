@@ -755,14 +755,8 @@ type BaseAnalyzer interface {
 	GetCapabilities() BaseAnalyzerCapabilities
 }
 
-// BaseValidator defines the interface for all validators
-type BaseValidator interface {
-	// Validate performs validation and returns a result
-	Validate(ctx context.Context, input interface{}, options BaseValidationOptions) (*BaseValidationResult, error)
-
-	// GetName returns the validator name
-	GetName() string
-}
+// NOTE: BaseValidator interface removed to avoid duplication with base.Validator
+// Use github.com/Azure/container-copilot/pkg/mcp/internal/tools/base.Validator instead
 
 // BaseAnalysisOptions provides common options for analysis
 type BaseAnalysisOptions struct {

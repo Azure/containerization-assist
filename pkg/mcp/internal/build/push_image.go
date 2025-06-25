@@ -10,6 +10,7 @@ import (
 	"time"
 
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	types "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -59,8 +60,8 @@ func NewPushImageTool(logger zerolog.Logger) *PushImageTool {
 	}
 }
 
-// Execute pushes a Docker image to a registry
-func (t *PushImageTool) Execute(ctx context.Context, args PushImageArgs) (*PushImageResult, error) {
+// ExecuteTyped pushes a Docker image to a registry
+func (t *PushImageTool) ExecuteTyped(ctx context.Context, args PushImageArgs) (*PushImageResult, error) {
 	startTime := time.Now()
 
 	// Create base response
@@ -407,4 +408,133 @@ func (t *PushImageTool) validateImageExists(imageRef string) error {
 	// docker inspect <imageRef>
 	t.logger.Debug().Str("image_ref", imageRef).Msg("Validating image exists locally")
 	return nil
+}
+
+// Execute implements the unified Tool interface
+func (t *PushImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Convert generic args to typed args
+	var pushArgs PushImageArgs
+
+	switch a := args.(type) {
+	case PushImageArgs:
+		pushArgs = a
+	case map[string]interface{}:
+		// Convert from map to struct using JSON marshaling
+		jsonData, err := json.Marshal(a)
+		if err != nil {
+			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+		}
+		if err = json.Unmarshal(jsonData, &pushArgs); err != nil {
+			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
+		}
+	default:
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
+	}
+
+	// Call the typed execute method
+	return t.ExecuteTyped(ctx, pushArgs)
+}
+
+// Validate implements the unified Tool interface
+func (t *PushImageTool) Validate(ctx context.Context, args interface{}) error {
+	var pushArgs PushImageArgs
+
+	switch a := args.(type) {
+	case PushImageArgs:
+		pushArgs = a
+	case map[string]interface{}:
+		// Convert from map to struct using JSON marshaling
+		jsonData, err := json.Marshal(a)
+		if err != nil {
+			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+		}
+		if err = json.Unmarshal(jsonData, &pushArgs); err != nil {
+			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
+		}
+	default:
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
+	}
+
+	// Validate required fields
+	if pushArgs.SessionID == "" {
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+	}
+	if pushArgs.ImageRef.Repository == "" {
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "image_ref.repository is required", "validation_error")
+	}
+
+	return nil
+}
+
+// GetMetadata implements the unified Tool interface
+func (t *PushImageTool) GetMetadata() types.ToolMetadata {
+	return types.ToolMetadata{
+		Name:         "push_image",
+		Description:  "Pushes Docker images to container registries with retry and authentication support",
+		Version:      "1.0.0",
+		Category:     "registry",
+		Dependencies: []string{"build_image"},
+		Capabilities: []string{
+			"registry_push",
+			"authentication_handling",
+			"retry_logic",
+			"async_push",
+			"layer_caching",
+			"progress_tracking",
+			"multi_registry_support",
+		},
+		Requirements: []string{
+			"docker_daemon",
+			"image_exists_locally",
+			"registry_credentials",
+		},
+		Parameters: map[string]string{
+			"session_id":   "Required session identifier",
+			"image_ref":    "Image reference to push (required)",
+			"push_timeout": "Push timeout (default: 10m) (optional)",
+			"retry_count":  "Number of retry attempts (default: 3) (optional)",
+			"async_push":   "Run push asynchronously (optional)",
+		},
+		Examples: []types.ToolExample{
+			{
+				Name:        "Push to Registry",
+				Description: "Push an image to a container registry",
+				Input: map[string]interface{}{
+					"session_id": "push-session",
+					"image_ref": map[string]interface{}{
+						"registry":   "myregistry.azurecr.io",
+						"repository": "my-app",
+						"tag":        "v1.0.0",
+					},
+				},
+				Output: map[string]interface{}{
+					"success":   true,
+					"image_ref": "myregistry.azurecr.io/my-app:v1.0.0",
+					"registry":  "myregistry.azurecr.io",
+				},
+			},
+			{
+				Name:        "Push with Retry",
+				Description: "Push with custom retry configuration",
+				Input: map[string]interface{}{
+					"session_id": "push-session",
+					"image_ref": map[string]interface{}{
+						"registry":   "docker.io",
+						"repository": "username/my-app",
+						"tag":        "latest",
+					},
+					"retry_count":  5,
+					"push_timeout": "15m",
+				},
+				Output: map[string]interface{}{
+					"success": true,
+					"layers_info": map[string]interface{}{
+						"total_layers":  10,
+						"pushed_layers": 3,
+						"cached_layers": 7,
+					},
+				},
+			},
+		},
+	}
 }

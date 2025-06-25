@@ -78,8 +78,8 @@ type AtomicBuildImageTool struct {
 
 	// Module components
 	contextAnalyzer *BuildContextAnalyzer
-	validator       *BuildValidator
-	executor        *BuildExecutor
+	validator       *BuildValidatorImpl
+	executor        *BuildExecutorService
 	fixingMixin     *fixing.AtomicToolFixingMixin
 }
 

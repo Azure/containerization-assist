@@ -142,24 +142,7 @@ func (m *MockBaseAnalyzer) GetCapabilities() BaseAnalyzerCapabilities {
 	}
 }
 
-// MockBaseValidator implements BaseValidator interface
-type MockBaseValidator struct{}
-
-func (m *MockBaseValidator) Validate(ctx context.Context, input interface{}, options BaseValidationOptions) (*BaseValidationResult, error) {
-	return &BaseValidationResult{
-		IsValid:        true,
-		Score:          100,
-		Errors:         []BaseValidationError{},
-		Warnings:       []BaseValidationWarning{},
-		TotalIssues:    0,
-		CriticalIssues: 0,
-		Context:        map[string]interface{}{},
-	}, nil
-}
-
-func (m *MockBaseValidator) GetName() string {
-	return "mock-validator"
-}
+// MockBaseValidator removed - BaseValidator interface moved to base package
 
 // Test interface conformance
 func TestInterfaceConformance(t *testing.T) {
@@ -191,11 +174,7 @@ func TestInterfaceConformance(t *testing.T) {
 		t.Error("BaseAnalyzer interface not properly implemented")
 	}
 
-	// Test BaseValidator interface
-	var baseValidator BaseValidator = &MockBaseValidator{}
-	if baseValidator.GetName() != "mock-validator" {
-		t.Error("BaseValidator interface not properly implemented")
-	}
+	// BaseValidator test removed - interface moved to base package
 }
 
 // Test interface type completeness

@@ -53,7 +53,7 @@ type BuildResult struct {
 }
 
 // BuildValidator defines the interface for build validation
-type BuildValidatorInterface interface {
+type BuildValidator interface {
 	// ValidateDockerfile checks if the Dockerfile is valid
 	ValidateDockerfile(dockerfilePath string) (*ValidationResult, error)
 
@@ -117,7 +117,7 @@ type ComplianceViolation struct {
 }
 
 // BuildExecutor defines the interface for build execution
-type BuildExecutorInterface interface {
+type BuildExecutor interface {
 	// Execute runs the build with the selected strategy
 	Execute(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy) (*ExecutionResult, error)
 

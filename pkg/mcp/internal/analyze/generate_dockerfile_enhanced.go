@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,8 +37,8 @@ func NewGenerateDockerfileEnhancedTool(sessionManager mcptypes.ToolSessionManage
 	}
 }
 
-// Execute generates a Dockerfile based on repository analysis with enhanced template integration
-func (t *GenerateDockerfileEnhancedTool) Execute(ctx context.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
+// ExecuteTyped generates a Dockerfile based on repository analysis with enhanced template integration
+func (t *GenerateDockerfileEnhancedTool) ExecuteTyped(ctx context.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
 	// Create base response
 	response := &GenerateDockerfileResult{
 		BaseToolResponse: types.NewBaseResponse("generate_dockerfile", args.SessionID, args.DryRun),
@@ -531,4 +532,124 @@ func (t *GenerateDockerfileEnhancedTool) extractHealthCheck(content string) stri
 func (t *GenerateDockerfileEnhancedTool) validateDockerfile(ctx context.Context, content string) *coredocker.ValidationResult {
 	// Use the validator's ValidateDockerfile method
 	return t.validator.ValidateDockerfile(content)
+}
+
+// Execute implements the unified Tool interface
+func (t *GenerateDockerfileEnhancedTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Convert generic args to typed args
+	var dockerArgs GenerateDockerfileArgs
+
+	switch a := args.(type) {
+	case GenerateDockerfileArgs:
+		dockerArgs = a
+	case map[string]interface{}:
+		// Convert from map to struct using JSON marshaling
+		jsonData, err := json.Marshal(a)
+		if err != nil {
+			return nil, types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+		}
+		if err = json.Unmarshal(jsonData, &dockerArgs); err != nil {
+			return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for generate_dockerfile", "validation_error")
+		}
+	default:
+		return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for generate_dockerfile", "validation_error")
+	}
+
+	// Call the typed execute method
+	return t.ExecuteTyped(ctx, dockerArgs)
+}
+
+// Validate implements the unified Tool interface
+func (t *GenerateDockerfileEnhancedTool) Validate(ctx context.Context, args interface{}) error {
+	var dockerArgs GenerateDockerfileArgs
+
+	switch a := args.(type) {
+	case GenerateDockerfileArgs:
+		dockerArgs = a
+	case map[string]interface{}:
+		// Convert from map to struct using JSON marshaling
+		jsonData, err := json.Marshal(a)
+		if err != nil {
+			return types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+		}
+		if err = json.Unmarshal(jsonData, &dockerArgs); err != nil {
+			return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for generate_dockerfile", "validation_error")
+		}
+	default:
+		return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for generate_dockerfile", "validation_error")
+	}
+
+	// Validate required fields
+	if dockerArgs.SessionID == "" {
+		return types.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+	}
+
+	return nil
+}
+
+// GetMetadata implements the unified Tool interface
+func (t *GenerateDockerfileEnhancedTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:         "generate_dockerfile_enhanced",
+		Description:  "Generates optimized Dockerfiles using advanced template integration and best practices",
+		Version:      "2.0.0",
+		Category:     "build",
+		Dependencies: []string{"analyze_repository"},
+		Capabilities: []string{
+			"template_selection",
+			"multi_stage_builds",
+			"optimization_strategies",
+			"security_scanning",
+			"hadolint_validation",
+			"best_practices_enforcement",
+			"custom_template_support",
+		},
+		Requirements: []string{
+			"repository_analysis",
+			"filesystem_access",
+		},
+		Parameters: map[string]string{
+			"session_id":           "Required session identifier",
+			"analysis":             "Repository analysis result (optional, will fetch from session)",
+			"template":             "Template name (e.g., 'node', 'python', 'custom')",
+			"optimization":         "Optimization level: 'size', 'security', 'speed', 'balanced'",
+			"include_health_check": "Include HEALTHCHECK instruction",
+			"multi_stage":          "Use multi-stage build pattern",
+			"custom_template":      "Path to custom Dockerfile template",
+			"template_vars":        "Variables for custom template",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Generate with Template",
+				Description: "Generate Dockerfile using a specific template",
+				Input: map[string]interface{}{
+					"session_id":   "build-session",
+					"template":     "node",
+					"optimization": "balanced",
+					"multi_stage":  true,
+				},
+				Output: map[string]interface{}{
+					"dockerfile_path": "/workspace/session/Dockerfile",
+					"template_used":   "node-multi-stage",
+					"optimization":    "balanced",
+				},
+			},
+			{
+				Name:        "Generate with Custom Template",
+				Description: "Generate using custom template with variables",
+				Input: map[string]interface{}{
+					"session_id":      "build-session",
+					"custom_template": "/templates/custom.dockerfile",
+					"template_vars": map[string]string{
+						"NODE_VERSION": "18",
+						"APP_PORT":     "3000",
+					},
+				},
+				Output: map[string]interface{}{
+					"dockerfile_path": "/workspace/session/Dockerfile",
+					"template_used":   "custom",
+				},
+			},
+		},
+	}
 }

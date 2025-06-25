@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/pkg/utils"
 	"github.com/rs/zerolog"
 )
@@ -71,8 +73,8 @@ func NewAnalyzeRepositoryTool(logger zerolog.Logger) *AnalyzeRepositoryTool {
 	}
 }
 
-// Execute runs the repository analysis
-func (t *AnalyzeRepositoryTool) Execute(ctx context.Context, args AnalyzeRepositoryArgs) (*RepositoryAnalysisResult, error) {
+// ExecuteTyped runs the repository analysis
+func (t *AnalyzeRepositoryTool) ExecuteTyped(ctx context.Context, args AnalyzeRepositoryArgs) (*RepositoryAnalysisResult, error) {
 	startTime := time.Now()
 
 	sessionID := args.SessionID
@@ -305,4 +307,126 @@ func validateLocalPath(path string) error {
 
 func generateFileTree(path string) (string, error) {
 	return utils.GenerateSimpleFileTree(path)
+}
+
+// Execute implements the unified Tool interface
+func (t *AnalyzeRepositoryTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Convert generic args to typed args
+	var analyzeArgs AnalyzeRepositoryArgs
+
+	switch a := args.(type) {
+	case AnalyzeRepositoryArgs:
+		analyzeArgs = a
+	case map[string]interface{}:
+		// Convert from map to struct using JSON marshaling
+		jsonData, err := json.Marshal(a)
+		if err != nil {
+			return nil, types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+		}
+		if err = json.Unmarshal(jsonData, &analyzeArgs); err != nil {
+			return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for analyze_repository", "validation_error")
+		}
+	default:
+		return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for analyze_repository", "validation_error")
+	}
+
+	// Call the typed execute method
+	return t.ExecuteTyped(ctx, analyzeArgs)
+}
+
+// Validate implements the unified Tool interface
+func (t *AnalyzeRepositoryTool) Validate(ctx context.Context, args interface{}) error {
+	var analyzeArgs AnalyzeRepositoryArgs
+
+	switch a := args.(type) {
+	case AnalyzeRepositoryArgs:
+		analyzeArgs = a
+	case map[string]interface{}:
+		// Convert from map to struct using JSON marshaling
+		jsonData, err := json.Marshal(a)
+		if err != nil {
+			return types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+		}
+		if err = json.Unmarshal(jsonData, &analyzeArgs); err != nil {
+			return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for analyze_repository", "validation_error")
+		}
+	default:
+		return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for analyze_repository", "validation_error")
+	}
+
+	// Validate required fields
+	if analyzeArgs.SessionID == "" {
+		return types.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+	}
+	if analyzeArgs.Path == "" {
+		return types.NewRichError("INVALID_ARGUMENTS", "path is required", "validation_error")
+	}
+
+	return nil
+}
+
+// GetMetadata implements the unified Tool interface
+func (t *AnalyzeRepositoryTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:         "analyze_repository",
+		Description:  "Analyzes a repository to determine language, framework, dependencies and configuration",
+		Version:      "1.0.0",
+		Category:     "analysis",
+		Dependencies: []string{},
+		Capabilities: []string{
+			"language_detection",
+			"framework_detection",
+			"dependency_analysis",
+			"entrypoint_detection",
+			"security_scanning",
+			"file_tree_generation",
+		},
+		Requirements: []string{
+			"filesystem_access",
+			"path_validation",
+		},
+		Parameters: map[string]string{
+			"session_id":     "Required session identifier",
+			"path":           "Local directory path or GitHub URL (required)",
+			"context":        "Additional context about the application (optional)",
+			"language":       "Primary programming language hint (optional)",
+			"framework":      "Framework hint (e.g., express, django) (optional)",
+			"skip_file_tree": "Skip generating file tree for performance (optional)",
+			"sandbox":        "Run analysis in sandboxed environment (optional)",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic Repository Analysis",
+				Description: "Analyze a local repository",
+				Input: map[string]interface{}{
+					"session_id": "analysis-session",
+					"path":       "/home/user/my-project",
+				},
+				Output: map[string]interface{}{
+					"language":    "python",
+					"framework":   "django",
+					"port":        8000,
+					"run_command": "python manage.py runserver",
+				},
+			},
+			{
+				Name:        "Analysis with Context",
+				Description: "Analyze with additional context and hints",
+				Input: map[string]interface{}{
+					"session_id": "analysis-session",
+					"path":       "/home/user/node-app",
+					"context":    "REST API service with MongoDB",
+					"language":   "javascript",
+					"framework":  "express",
+				},
+				Output: map[string]interface{}{
+					"language":      "javascript",
+					"framework":     "express",
+					"database_type": "mongodb",
+					"port":          3000,
+					"run_command":   "npm start",
+				},
+			},
+		},
+	}
 }
