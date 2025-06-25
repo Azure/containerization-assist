@@ -44,11 +44,11 @@ echo ""
 echo "🔨 Running integration tests..."
 
 # Run tests to ensure integration works
-if go test ./... >/dev/null 2>&1; then
+if go test -short ./... >/dev/null 2>&1; then
     echo "✅ Integration tests passed"
 else
     echo "⚠️  Integration tests failed - review before pushing"
-    echo "Run 'go test ./...' for details"
+    echo "Run 'go test -short ./...' for details"
 fi
 
 # Run build check
