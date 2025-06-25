@@ -21,21 +21,8 @@ import (
 
 // NOTE: These interfaces are temporarily restored to avoid import cycles
 
-type ToolArgs interface {
-	GetSessionID() string
-	Validate() error
-}
-
-type ToolResult interface {
-	GetSuccess() bool
-}
-
-// Tool represents the unified interface for all MCP tools
-type Tool interface {
-	Execute(ctx context.Context, args interface{}) (interface{}, error)
-	GetMetadata() ToolMetadata
-	Validate(ctx context.Context, args interface{}) error
-}
+// NOTE: ToolArgs, ToolResult, and Tool interfaces are now defined in pkg/mcp/interfaces.go
+// Type aliases maintained for compatibility during migration
 
 // ToolMetadata contains comprehensive information about a tool
 type ToolMetadata struct {
@@ -58,14 +45,7 @@ type ToolExample struct {
 	Output      map[string]interface{} `json:"output"`
 }
 
-// ProgressReporter provides stage-aware progress reporting
-type ProgressReporter interface {
-	ReportStage(stageProgress float64, message string)
-	NextStage(message string)
-	SetStage(stageIndex int, message string)
-	ReportOverall(progress float64, message string)
-	GetCurrentStage() (int, ProgressStage)
-}
+// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
 
 // ProgressStage represents a stage in a multi-step operation
 type ProgressStage struct {
@@ -76,36 +56,18 @@ type ProgressStage struct {
 
 // NOTE: Session interface is now defined in pkg/mcp/interfaces.go
 
-// NOTE: Transport and RequestHandler interfaces are now defined in pkg/mcp/interfaces.go
+// Transport and RequestHandler interfaces - temporarily restored to avoid import cycles
+// These will eventually be removed once all references are updated to use pkg/mcp
 
-// NOTE: Orchestrator and ToolRegistry interfaces are now defined in pkg/mcp/interfaces.go
-
-// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
+// NOTE: Transport, RequestHandler, ProgressReporter, Tool, and ToolRegistry interfaces
+// are now defined in pkg/mcp/interfaces.go as the canonical source
 
 // NOTE: HealthChecker interface is now defined in pkg/mcp/interfaces.go
 
 // NOTE: These interfaces are now defined in pkg/mcp/interfaces.go
 // Keeping type aliases for compatibility during migration
 
-// Type aliases for interfaces that moved to pkg/mcp/interfaces.go
-type RequestHandler = interface {
-	HandleRequest(ctx context.Context, request interface{}) (interface{}, error)
-}
-
-type Transport = interface {
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
-	SendMessage(message interface{}) error
-	ReceiveMessage() (interface{}, error)
-	SetHandler(handler RequestHandler)
-}
-
-type ToolRegistry = interface {
-	Register(name string, factory func() Tool) error
-	Create(name string) (Tool, error)
-	List() []string
-	Exists(name string) bool
-}
+// NOTE: RequestHandler, Transport, and ToolRegistry interfaces are now defined in pkg/mcp/interfaces.go
 
 // ToolRegistry interface is now defined in pkg/mcp/interfaces.go
 
@@ -142,10 +104,12 @@ type MCPError struct {
 // =============================================================================
 
 // ArgConverter converts generic arguments to tool-specific types
-type ArgConverter func(args map[string]interface{}) (ToolArgs, error)
+// NOTE: ToolArgs interface is defined in pkg/mcp/interfaces.go
+type ArgConverter func(args map[string]interface{}) (interface{}, error)
 
-// ResultConverter converts tool-specific results to generic types
-type ResultConverter func(result ToolResult) (map[string]interface{}, error)
+// ResultConverter converts tool-specific results to generic types  
+// NOTE: ToolResult interface is defined in pkg/mcp/interfaces.go
+type ResultConverter func(result interface{}) (map[string]interface{}, error)
 
 // =============================================================================
 // SESSION TYPES (interface defined in main interfaces file)
@@ -290,7 +254,8 @@ type VulnerabilityCount struct {
 // NOTE: ToolRegistry interface is now defined in pkg/mcp/interfaces.go
 
 // ToolFactory creates new instances of tools
-type ToolFactory func() Tool
+// NOTE: Tool interface is defined in pkg/mcp/interfaces.go
+type ToolFactory func() interface{}
 
 // =============================================================================
 // AI CONTEXT INTERFACES
@@ -722,7 +687,7 @@ type ProgressTracker interface {
 		ctx context.Context,
 		operation string,
 		stages []ProgressStage,
-		fn func(ctx context.Context, reporter ProgressReporter) error,
+		fn func(ctx context.Context, reporter interface{}) error,
 	) error
 }
 
