@@ -39,43 +39,33 @@ type ChatTool struct {
 
 // Execute implements the unified Tool interface
 func (ct *ChatTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-	// Type assertion to get proper args
+	// Type assert the arguments
 	chatArgs, ok := args.(ChatToolArgs)
 	if !ok {
-		return nil, fmt.Errorf("invalid arguments type: expected ChatToolArgs, got %T", args)
+		return nil, fmt.Errorf("invalid argument type for chat tool: %T", args)
 	}
+	
+	return ct.ExecuteTyped(ctx, chatArgs)
+}
 
+// ExecuteTyped handles the chat tool execution with typed arguments
+func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 	ct.Logger.Debug().
-		Interface("args", chatArgs).
+		Interface("args", args).
 		Msg("Executing chat tool")
 
 	// Call the handler
-	result, err := ct.Handler(ctx, chatArgs)
+	result, err := ct.Handler(ctx, args)
 	if err != nil {
 		ct.Logger.Error().Err(err).Msg("Chat handler error")
 		return &ChatToolResult{
-			BaseToolResponse: types.NewBaseResponse("chat", chatArgs.SessionID, chatArgs.DryRun),
+			BaseToolResponse: types.NewBaseResponse("chat", args.SessionID, args.DryRun),
 			Success:          false,
 			Message:          fmt.Sprintf("Error: %v", err),
 		}, nil
 	}
 
 	return result, nil
-}
-
-// ExecuteTyped provides typed execution for backward compatibility
-func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
-	result, err := ct.Execute(ctx, args)
-	if err != nil {
-		return nil, err
-	}
-	
-	chatResult, ok := result.(*ChatToolResult)
-	if !ok {
-		return nil, fmt.Errorf("unexpected result type: %T", result)
-	}
-	
-	return chatResult, nil
 }
 
 // GetMetadata returns comprehensive metadata about the chat tool
