@@ -18,6 +18,46 @@ func NewAutoRegistrationAdapter() *AutoRegistrationAdapter {
 	}
 }
 
+// OrchestratorRegistryAdapter adapts the orchestrator's registry to the unified interface
+type OrchestratorRegistryAdapter struct {
+	orchestratorRegistry interface {
+		RegisterTool(name string, tool interface{}) error
+	}
+}
+
+// NewOrchestratorRegistryAdapter creates an adapter for the orchestrator registry
+func NewOrchestratorRegistryAdapter(orchestratorRegistry interface {
+	RegisterTool(name string, tool interface{}) error
+}) *OrchestratorRegistryAdapter {
+	return &OrchestratorRegistryAdapter{orchestratorRegistry: orchestratorRegistry}
+}
+
+// Register implements mcptypes.ToolRegistry by delegating to the orchestrator registry
+func (ora *OrchestratorRegistryAdapter) Register(name string, factory mcptypes.ToolFactory) error {
+	tool := factory()
+	return ora.orchestratorRegistry.RegisterTool(name, tool)
+}
+
+// Unregister is not implemented in the orchestrator registry
+func (ora *OrchestratorRegistryAdapter) Unregister(name string) error {
+	return fmt.Errorf("unregister not supported by orchestrator registry")
+}
+
+// Get is not implemented in the orchestrator registry
+func (ora *OrchestratorRegistryAdapter) Get(name string) (mcptypes.ToolFactory, error) {
+	return nil, fmt.Errorf("get not supported by orchestrator registry")
+}
+
+// List is not implemented in the orchestrator registry
+func (ora *OrchestratorRegistryAdapter) List() []string {
+	return []string{}
+}
+
+// GetMetadata is not implemented in the orchestrator registry
+func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcptypes.ToolMetadata {
+	return map[string]mcptypes.ToolMetadata{}
+}
+
 // RegisterAtomicTools registers all atomic tools that are ready for auto-registration
 func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.ToolRegistry) error {
 	// Tools that implement the unified interface properly
