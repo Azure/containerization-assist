@@ -3,7 +3,6 @@ package mcp
 import (
 	"testing"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
@@ -75,7 +74,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		response.WithAutoAdvance(types.StagePush, config)
 
 		// Test with autopilot enabled
-		prefsAutopilot := contract.UserPreferences{
+		prefsAutopilot := types.UserPreferences{
 			SkipConfirmations: true,
 		}
 
@@ -84,7 +83,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		}
 
 		// Test with autopilot disabled
-		prefsManual := contract.UserPreferences{
+		prefsManual := types.UserPreferences{
 			SkipConfirmations: false,
 		}
 
@@ -107,7 +106,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 
 		response.WithAutoAdvance(types.StagePush, lowConfidenceConfig)
 
-		prefs := contract.UserPreferences{
+		prefs := types.UserPreferences{
 			SkipConfirmations: true,
 		}
 

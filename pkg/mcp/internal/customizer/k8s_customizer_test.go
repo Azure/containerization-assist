@@ -12,7 +12,7 @@ import (
 
 func TestDeploymentCustomizer_CustomizeDeployment(t *testing.T) {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	customizer := NewDeploymentCustomizer(logger)
+	deploymentCustomizer := NewDeploymentCustomizer(logger)
 
 	// Create a test deployment manifest
 	tempDir := t.TempDir()
@@ -58,7 +58,7 @@ spec:
 		},
 	}
 
-	err := CustomizeDeployment(deploymentPath, opts)
+	err := deploymentCustomizer.CustomizeDeployment(deploymentPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeDeployment failed: %v", err)
 	}
@@ -91,7 +91,7 @@ spec:
 
 func TestServiceCustomizer_CustomizeService(t *testing.T) {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	customizer := NewServiceCustomizer(logger)
+	serviceCustomizer := NewServiceCustomizer(logger)
 
 	// Create a test service manifest
 	tempDir := t.TempDir()
@@ -139,7 +139,7 @@ spec:
 		},
 	}
 
-	err := CustomizeService(servicePath, opts)
+	err := serviceCustomizer.CustomizeService(servicePath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeService failed: %v", err)
 	}
@@ -180,7 +180,7 @@ spec:
 
 func TestConfigMapCustomizer_CustomizeConfigMap(t *testing.T) {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	customizer := NewConfigMapCustomizer(logger)
+	configMapCustomizer := NewConfigMapCustomizer(logger)
 
 	// Create a test configmap manifest
 	tempDir := t.TempDir()
@@ -211,7 +211,7 @@ data: {}
 		},
 	}
 
-	err := CustomizeConfigMap(configMapPath, opts)
+	err := configMapCustomizer.CustomizeConfigMap(configMapPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeConfigMap failed: %v", err)
 	}
@@ -247,7 +247,7 @@ data: {}
 
 func TestIngressCustomizer_CustomizeIngress(t *testing.T) {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	customizer := NewIngressCustomizer(logger)
+	ingressCustomizer := NewIngressCustomizer(logger)
 
 	// Create a test ingress manifest
 	tempDir := t.TempDir()
@@ -293,7 +293,7 @@ spec:
 		},
 	}
 
-	err := CustomizeIngress(ingressPath, opts)
+	err := ingressCustomizer.CustomizeIngress(ingressPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeIngress failed: %v", err)
 	}
@@ -337,7 +337,7 @@ spec:
 
 func TestSecretCustomizer_CustomizeSecret(t *testing.T) {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	customizer := NewSecretCustomizer(logger)
+	secretCustomizer := NewSecretCustomizer(logger)
 
 	// Create a test secret manifest
 	tempDir := t.TempDir()
@@ -364,7 +364,7 @@ data: {}
 		},
 	}
 
-	err := CustomizeSecret(secretPath, opts)
+	err := secretCustomizer.CustomizeSecret(secretPath, opts)
 	if err != nil {
 		t.Fatalf("CustomizeSecret failed: %v", err)
 	}

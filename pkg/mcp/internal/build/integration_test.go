@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -87,10 +86,10 @@ func TestIterativeFixerBasicFlow(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 	mockAnalyzer := NewMockAnalyzer()
 
-	fixer := fixing.NewDefaultIterativeFixer(mockAnalyzer, logger)
+	fixer := NewDefaultIterativeFixer(mockAnalyzer, logger)
 
 	ctx := context.Background()
-	fixingCtx := &fixing.FixingContext{
+	fixingCtx := &FixingContext{
 		SessionID:     "test-session",
 		ToolName:      "atomic_build_image",
 		OperationType: "build",
@@ -110,7 +109,7 @@ func TestIterativeFixerBasicFlow(t *testing.T) {
 
 func TestContextSharer(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
-	sharer := fixing.NewDefaultContextSharer(logger)
+	sharer := NewDefaultContextSharer(logger)
 
 	ctx := context.Background()
 	sessionID := "test-session"
@@ -155,7 +154,7 @@ CMD ["echo", "hello"]`
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 	mockAnalyzer := NewMockAnalyzer()
 
-	buildTool := fixing.NewBuildImageWithFixes(mockAnalyzer, logger)
+	buildTool := NewBuildImageWithFixes(mockAnalyzer, logger)
 
 	ctx := context.Background()
 
@@ -179,7 +178,7 @@ func TestAtomicToolFixingMixin(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 	mockAnalyzer := NewMockAnalyzer()
 
-	mixin := fixing.NewAtomicToolFixingMixin(mockAnalyzer, "test_tool", logger)
+	mixin := NewAtomicToolFixingMixin(mockAnalyzer, "test_tool", logger)
 
 	// Create a mock operation that fails once then succeeds
 	attempts := 0
@@ -202,7 +201,7 @@ func TestAtomicToolFixingMixin(t *testing.T) {
 }
 
 func TestFixingConfiguration(t *testing.T) {
-	config := fixing.GetEnhancedConfiguration("atomic_build_image")
+	config := GetEnhancedConfiguration("atomic_build_image")
 
 	assert.Equal(t, "atomic_build_image", config.ToolName)
 	assert.Equal(t, 3, config.MaxAttempts)
@@ -211,7 +210,7 @@ func TestFixingConfiguration(t *testing.T) {
 	assert.Contains(t, config.SpecializedPrompts, "dockerfile_analysis")
 
 	// Test default configuration
-	defaultConfig := fixing.GetEnhancedConfiguration("unknown_tool")
+	defaultConfig := GetEnhancedConfiguration("unknown_tool")
 	assert.Equal(t, "unknown_tool", defaultConfig.ToolName)
 	assert.Equal(t, 2, defaultConfig.MaxAttempts)
 	assert.False(t, defaultConfig.EnableRouting)

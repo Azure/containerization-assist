@@ -35,15 +35,24 @@ func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory,
 
 	// Create a tool instance to get metadata
 	toolInstance := factory()
-	_, ok := toolInstance.(interface{})
-	if !ok {
-		return fmt.Errorf("factory for tool %s does not produce a valid Tool instance", name)
+
+	// Try to get metadata from the tool if it implements the interface
+	if tool, ok := toolInstance.(interface{ GetMetadata() *mcptypes.ToolMetadata }); ok {
+		metadata := tool.GetMetadata()
+		if metadata != nil {
+			d.metadata[name] = *metadata
+		}
+	} else {
+		// Fallback metadata for tools that don't implement GetMetadata
+		d.metadata[name] = mcptypes.ToolMetadata{
+			Name:        name,
+			Description: "Tool registered without metadata",
+			Category:    "unknown",
+		}
 	}
-	// metadata := tool.GetMetadata()
 
 	d.tools[name] = factory
 	d.converters[name] = converter
-	// d.metadata[name] = metadata
 
 	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	mcp "github.com/Azure/container-copilot/pkg/mcp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -379,7 +378,7 @@ func (m *mockOrchestrator) ValidateToolArgs(toolName string, args interface{}) e
 	return nil
 }
 
-func (m *mockOrchestrator) RegisterTool(name string, tool mcp.Tool) error {
+func (m *mockOrchestrator) RegisterTool(name string, tool interface{}) error {
 	// Mock implementation - just return success
 	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,20 +14,20 @@ import (
 
 // MockK8sValidationClient for testing
 type MockK8sValidationClient struct {
-	validationResult  *observability.ValidationResult
-	dryRunResult      *observability.DryRunResult
+	validationResult  *ValidationResult
+	dryRunResult      *DryRunResult
 	supportedVersions []string
 	shouldError       bool
 }
 
-func (m *MockK8sValidationClient) ValidateManifest(ctx context.Context, manifest []byte) (*observability.ValidationResult, error) {
+func (m *MockK8sValidationClient) ValidateManifest(ctx context.Context, manifest []byte) (*ValidationResult, error) {
 	if m.shouldError {
 		return nil, assert.AnError
 	}
 	return m.validationResult, nil
 }
 
-func (m *MockK8sValidationClient) DryRunManifest(ctx context.Context, manifest []byte) (*observability.DryRunResult, error) {
+func (m *MockK8sValidationClient) DryRunManifest(ctx context.Context, manifest []byte) (*DryRunResult, error) {
 	if m.shouldError {
 		return nil, assert.AnError
 	}
@@ -47,18 +46,18 @@ func TestManifestValidator_ValidateManifestContent(t *testing.T) {
 
 	t.Run("valid deployment manifest", func(t *testing.T) {
 		mockClient := &MockK8sValidationClient{
-			validationResult: &observability.ValidationResult{
+			validationResult: &ValidationResult{
 				Valid:         true,
 				APIVersion:    "apps/v1",
 				Kind:          "Deployment",
 				SchemaVersion: "1.27",
 			},
-			dryRunResult: &observability.DryRunResult{
+			dryRunResult: &DryRunResult{
 				Accepted: true,
 			},
 		}
 
-		validator := observability.NewManifestValidator(logger, mockClient)
+		validator := NewManifestValidator(logger, mockClient)
 
 		manifest := `
 apiVersion: apps/v1
@@ -83,7 +82,7 @@ spec:
         - containerPort: 80
 `
 
-		options := observability.ManifestValidationOptions{
+		options := ManifestValidationOptions{
 			StrictValidation: true,
 		}
 
@@ -101,7 +100,7 @@ spec:
 	})
 
 	t.Run("invalid yaml manifest", func(t *testing.T) {
-		validator := observability.NewManifestValidator(logger, nil)
+		validator := NewManifestValidator(logger, nil)
 
 		invalidManifest := `
 apiVersion: apps/v1
@@ -111,7 +110,7 @@ metadata:
   invalid yaml: [
 `
 
-		options := observability.ManifestValidationOptions{}
+		options := ManifestValidationOptions{}
 
 		result, err := validator.ValidateManifestContent(context.Background(), []byte(invalidManifest), options)
 		require.NoError(t, err)
@@ -120,11 +119,11 @@ metadata:
 		assert.False(t, result.Valid)
 		assert.Len(t, result.Errors, 1)
 		assert.Equal(t, "INVALID_YAML", result.Errors[0].Code)
-		assert.Equal(t, observability.SeverityCritical, result.Errors[0].Severity)
+		assert.Equal(t, SeverityCritical, result.Errors[0].Severity)
 	})
 
 	t.Run("missing required fields", func(t *testing.T) {
-		validator := observability.NewManifestValidator(logger, nil)
+		validator := NewManifestValidator(logger, nil)
 
 		manifest := `
 apiVersion: apps/v1
@@ -134,7 +133,7 @@ metadata:
 # Missing spec field
 `
 
-		options := observability.ManifestValidationOptions{}
+		options := ManifestValidationOptions{}
 
 		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), options)
 		require.NoError(t, err)
@@ -155,7 +154,7 @@ metadata:
 	})
 
 	t.Run("allowed kinds validation", func(t *testing.T) {
-		validator := observability.NewManifestValidator(logger, nil)
+		validator := NewManifestValidator(logger, nil)
 
 		manifest := `
 apiVersion: v1
@@ -168,7 +167,7 @@ spec:
     image: nginx
 `
 
-		options := observability.ManifestValidationOptions{
+		options := ManifestValidationOptions{
 			AllowedKinds: []string{"Deployment", "Service"},
 		}
 
@@ -183,7 +182,7 @@ spec:
 	})
 
 	t.Run("required labels validation", func(t *testing.T) {
-		validator := observability.NewManifestValidator(logger, nil)
+		validator := NewManifestValidator(logger, nil)
 
 		manifest := `
 apiVersion: apps/v1
@@ -206,7 +205,7 @@ spec:
         image: nginx
 `
 
-		options := observability.ManifestValidationOptions{
+		options := ManifestValidationOptions{
 			RequiredLabels: []string{"environment", "version"},
 		}
 
@@ -225,7 +224,7 @@ spec:
 	})
 
 	t.Run("forbidden fields validation", func(t *testing.T) {
-		validator := observability.NewManifestValidator(logger, nil)
+		validator := NewManifestValidator(logger, nil)
 
 		manifest := `
 apiVersion: v1
@@ -239,7 +238,7 @@ spec:
     image: nginx
 `
 
-		options := observability.ManifestValidationOptions{
+		options := ManifestValidationOptions{
 			ForbiddenFields: []string{"spec.hostNetwork"},
 		}
 
@@ -253,7 +252,7 @@ spec:
 	})
 
 	t.Run("suggestions generation", func(t *testing.T) {
-		validator := observability.NewManifestValidator(logger, nil)
+		validator := NewManifestValidator(logger, nil)
 
 		manifest := `
 apiVersion: apps/v1
@@ -275,7 +274,7 @@ spec:
         image: nginx
 `
 
-		options := observability.ManifestValidationOptions{}
+		options := ManifestValidationOptions{}
 
 		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), options)
 		require.NoError(t, err)
@@ -352,16 +351,16 @@ metadata:
 		require.NoError(t, err)
 
 		mockClient := &MockK8sValidationClient{
-			validationResult: &observability.ValidationResult{
+			validationResult: &ValidationResult{
 				Valid: true,
 			},
-			dryRunResult: &observability.DryRunResult{
+			dryRunResult: &DryRunResult{
 				Accepted: true,
 			},
 		}
 
-		validator := observability.NewManifestValidator(logger, mockClient)
-		options := observability.ManifestValidationOptions{}
+		validator := NewManifestValidator(logger, mockClient)
+		options := ManifestValidationOptions{}
 
 		result, err := validator.ValidateManifestDirectory(context.Background(), tmpDir, options)
 		require.NoError(t, err)
@@ -402,8 +401,8 @@ metadata:
 	t.Run("empty directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		validator := observability.NewManifestValidator(logger, nil)
-		options := observability.ManifestValidationOptions{}
+		validator := NewManifestValidator(logger, nil)
+		options := ManifestValidationOptions{}
 
 		result, err := validator.ValidateManifestDirectory(context.Background(), tmpDir, options)
 		require.NoError(t, err)
@@ -418,8 +417,8 @@ metadata:
 	})
 
 	t.Run("non-existent directory", func(t *testing.T) {
-		validator := observability.NewManifestValidator(logger, nil)
-		options := observability.ManifestValidationOptions{}
+		validator := NewManifestValidator(logger, nil)
+		options := ManifestValidationOptions{}
 
 		result, err := validator.ValidateManifestDirectory(context.Background(), "/non/existent/path", options)
 		assert.Error(t, err)
@@ -429,7 +428,7 @@ metadata:
 
 func TestManifestValidator_SpecificValidations(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
-	validator := observability.NewManifestValidator(logger, nil)
+	validator := NewManifestValidator(logger, nil)
 
 	t.Run("service validation", func(t *testing.T) {
 		manifest := `
@@ -442,7 +441,7 @@ spec:
   # Missing ports
 `
 
-		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), observability.ManifestValidationOptions{})
+		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), ManifestValidationOptions{})
 		require.NoError(t, err)
 
 		// Should have warning about missing ports
@@ -465,7 +464,7 @@ metadata:
 # No data or binaryData
 `
 
-		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), observability.ManifestValidationOptions{})
+		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), ManifestValidationOptions{})
 		require.NoError(t, err)
 
 		// Should have warning about empty ConfigMap
@@ -489,7 +488,7 @@ type: custom/unusual-type
 # No data
 `
 
-		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), observability.ManifestValidationOptions{})
+		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), ManifestValidationOptions{})
 		require.NoError(t, err)
 
 		// Should have warnings about empty secret and unusual type
@@ -512,7 +511,7 @@ spec:
   # Empty rules
 `
 
-		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), observability.ManifestValidationOptions{})
+		result, err := validator.ValidateManifestContent(context.Background(), []byte(manifest), ManifestValidationOptions{})
 		require.NoError(t, err)
 
 		// Should have warning about empty rules
@@ -533,7 +532,7 @@ func TestManifestValidator_Performance(t *testing.T) {
 	}
 
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
-	validator := observability.NewManifestValidator(logger, nil)
+	validator := NewManifestValidator(logger, nil)
 
 	manifest := `
 apiVersion: apps/v1
@@ -558,7 +557,7 @@ spec:
         - containerPort: 80
 `
 
-	options := observability.ManifestValidationOptions{}
+	options := ManifestValidationOptions{}
 
 	// Validate multiple times to test performance
 	const iterations = 100

@@ -164,9 +164,9 @@ func TestMCPNoExternalAIDependencies(t *testing.T) {
 
 		// MCP analyzer doesn't need build tags since it's standalone
 		// Check that MCP analyzer exists and is separate from CLI analyzer
-		mcpAnalyzerPath := filepath.Join(mcpPath, "internal", "analyzer", "analyzer.go")
+		mcpAnalyzerPath := filepath.Join(mcpPath, "internal", "analyze", "analyzer.go")
 		if _, err := os.Stat(mcpAnalyzerPath); os.IsNotExist(err) {
-			t.Error("MCP analyzer.go should exist in pkg/mcp/internal/analyzer/")
+			t.Error("MCP analyzer.go should exist in pkg/mcp/internal/analyze/")
 		}
 	})
 }

@@ -123,3 +123,17 @@ func (e *ExecutionCapture) GetExecutions() []MockExecution {
 	copy(executions, e.executions)
 	return executions
 }
+
+// GetExecutionsForTool returns all captured executions for a specific tool
+func (e *ExecutionCapture) GetExecutionsForTool(toolName string) []MockExecution {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	var filtered []MockExecution
+	for _, execution := range e.executions {
+		if execution.ToolName == toolName {
+			filtered = append(filtered, execution)
+		}
+	}
+	return filtered
+}

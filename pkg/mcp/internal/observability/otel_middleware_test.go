@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,8 +13,8 @@ import (
 func TestOTELConfig(t *testing.T) {
 	logger := zerolog.New(os.Stderr)
 
-	t.Run("observability.NewDefaultOTELConfig", func(t *testing.T) {
-		config := observability.NewDefaultOTELConfig(logger)
+	t.Run("NewDefaultOTELConfig", func(t *testing.T) {
+		config := NewDefaultOTELConfig(logger)
 
 		assert.Equal(t, "container-kit-mcp", config.ServiceName)
 		assert.Equal(t, "1.0.0", config.ServiceVersion)
@@ -27,7 +26,7 @@ func TestOTELConfig(t *testing.T) {
 	})
 
 	t.Run("ValidateConfig", func(t *testing.T) {
-		config := observability.NewDefaultOTELConfig(logger)
+		config := NewDefaultOTELConfig(logger)
 
 		// Valid config should pass
 		err := config.Validate()
@@ -73,8 +72,8 @@ func TestOTELProvider(t *testing.T) {
 	logger := zerolog.New(os.Stderr)
 
 	t.Run("Initialize and Shutdown", func(t *testing.T) {
-		config := observability.NewDefaultOTELConfig(logger)
-		provider := observability.NewOTELProvider(config)
+		config := NewDefaultOTELConfig(logger)
+		provider := NewOTELProvider(config)
 
 		assert.False(t, provider.IsInitialized())
 
@@ -99,8 +98,8 @@ func TestOTELProvider(t *testing.T) {
 	})
 
 	t.Run("UpdateConfig", func(t *testing.T) {
-		config := observability.NewDefaultOTELConfig(logger)
-		provider := observability.NewOTELProvider(config)
+		config := NewDefaultOTELConfig(logger)
+		provider := NewOTELProvider(config)
 
 		updates := map[string]interface{}{
 			"otlp_endpoint":     "http://localhost:4318/v1/traces",
@@ -126,7 +125,7 @@ func TestOTELMiddleware(t *testing.T) {
 	logger := zerolog.New(os.Stderr)
 
 	t.Run("Tool span lifecycle", func(t *testing.T) {
-		middleware := observability.NewOTELMiddleware("test-service", logger)
+		middleware := NewOTELMiddleware("test-service", logger)
 		ctx := context.Background()
 
 		// Start tool span
@@ -154,7 +153,7 @@ func TestOTELMiddleware(t *testing.T) {
 	})
 
 	t.Run("Request span lifecycle", func(t *testing.T) {
-		middleware := observability.NewOTELMiddleware("test-service", logger)
+		middleware := NewOTELMiddleware("test-service", logger)
 		ctx := context.Background()
 
 		// Start request span
@@ -177,7 +176,7 @@ func TestOTELMiddleware(t *testing.T) {
 	})
 
 	t.Run("Conversation span lifecycle", func(t *testing.T) {
-		middleware := observability.NewOTELMiddleware("test-service", logger)
+		middleware := NewOTELMiddleware("test-service", logger)
 		ctx := context.Background()
 
 		// Start conversation span
@@ -195,7 +194,7 @@ func TestOTELMiddleware(t *testing.T) {
 	})
 
 	t.Run("Error handling", func(t *testing.T) {
-		middleware := observability.NewOTELMiddleware("test-service", logger)
+		middleware := NewOTELMiddleware("test-service", logger)
 		ctx := context.Background()
 
 		span := middleware.StartToolSpan(ctx, "failing_tool", nil)
@@ -213,7 +212,7 @@ func TestMCPServerInstrumentation(t *testing.T) {
 	logger := zerolog.New(os.Stderr)
 
 	t.Run("InstrumentTool success", func(t *testing.T) {
-		instrumentation := observability.NewMCPServerInstrumentation("test-service", logger)
+		instrumentation := NewMCPServerInstrumentation("test-service", logger)
 		ctx := context.Background()
 
 		expectedResult := map[string]interface{}{
@@ -233,7 +232,7 @@ func TestMCPServerInstrumentation(t *testing.T) {
 	})
 
 	t.Run("InstrumentTool failure", func(t *testing.T) {
-		instrumentation := observability.NewMCPServerInstrumentation("test-service", logger)
+		instrumentation := NewMCPServerInstrumentation("test-service", logger)
 		ctx := context.Background()
 
 		testErr := assert.AnError
@@ -253,7 +252,7 @@ func TestTelemetryManagerWithOTEL(t *testing.T) {
 	logger := zerolog.New(os.Stderr)
 
 	t.Run("TelemetryManager with OTEL", func(t *testing.T) {
-		otelConfig := &observability.OTELConfig{
+		otelConfig := &OTELConfig{
 			ServiceName:     "test-service",
 			ServiceVersion:  "1.0.0",
 			Environment:     "test",
@@ -262,14 +261,14 @@ func TestTelemetryManagerWithOTEL(t *testing.T) {
 			Logger:          logger,
 		}
 
-		config := observability.TelemetryConfig{
+		config := TelemetryConfig{
 			MetricsPort:      0, // Use random port
 			Logger:           logger,
 			EnableAutoExport: false, // Don't start HTTP server
 			OTELConfig:       otelConfig,
 		}
 
-		telemetryMgr := observability.NewTelemetryManager(config)
+		telemetryMgr := NewTelemetryManager(config)
 		assert.NotNil(t, telemetryMgr)
 		assert.True(t, telemetryMgr.IsOTELEnabled())
 
@@ -290,14 +289,14 @@ func TestTelemetryManagerWithOTEL(t *testing.T) {
 	})
 
 	t.Run("TelemetryManager without OTEL", func(t *testing.T) {
-		config := observability.TelemetryConfig{
+		config := TelemetryConfig{
 			MetricsPort:      0,
 			Logger:           logger,
 			EnableAutoExport: false,
 			OTELConfig:       nil, // No OTEL config
 		}
 
-		telemetryMgr := observability.NewTelemetryManager(config)
+		telemetryMgr := NewTelemetryManager(config)
 		assert.NotNil(t, telemetryMgr)
 		assert.False(t, telemetryMgr.IsOTELEnabled())
 
