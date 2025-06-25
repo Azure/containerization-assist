@@ -192,6 +192,19 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 	pipelineState.Metadata[pipeline.MetadataKey("platform")] = args.Platform
 	pipelineState.Metadata[pipeline.MetadataKey("build_args")] = args.BuildArgs
 
+	// Create Docker stage with nil AI client (MCP mode doesn't use external AI)
+	// The hosting LLM provides all reasoning; pipeline should work without AI client
+	dockerStage := &dockerstage.DockerStage{
+		AIClient:         nil, // No external AI in MCP - hosting LLM handles reasoning
+		UseDraftTemplate: true,
+		Parser:           &pipeline.DefaultParser{},
+	}
+
+	// Set up runner options for the pipeline stage
+	runnerOptions := pipeline.RunnerOptions{
+		TargetDirectory: workspaceDir,
+	}
+
 	// Check if this should be async based on timeout
 	buildTimeout := args.BuildTimeout
 	if buildTimeout == 0 {
@@ -218,19 +231,6 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 		
 		response.Duration = time.Since(startTime)
 		return response, nil
-	}
-
-	// Create Docker stage with nil AI client (MCP mode doesn't use external AI)
-	// The hosting LLM provides all reasoning; pipeline should work without AI client
-	dockerStage := &dockerstage.DockerStage{
-		AIClient:         nil, // No external AI in MCP - hosting LLM handles reasoning
-		UseDraftTemplate: true,
-		Parser:           &pipeline.DefaultParser{},
-	}
-
-	// Set up runner options for the pipeline stage
-	runnerOptions := pipeline.RunnerOptions{
-		TargetDirectory: workspaceDir,
 	}
 
 	response.Logs = append(response.Logs, "Starting Docker build using existing pipeline...")
@@ -311,7 +311,6 @@ func (t *BuildImageTool) normalizeImageRef(args BuildImageArgs) string {
 
 // executeAsyncBuild runs the build process asynchronously
 func (t *BuildImageTool) executeAsyncBuild(ctx context.Context, args BuildImageArgs, pipelineState *pipeline.PipelineState, dockerStage *dockerstage.DockerStage, runnerOptions pipeline.RunnerOptions, jobID string) error {
-	workspaceDir := t.pipelineAdapter.GetSessionWorkspace(args.SessionID)
 	
 	// Create a new context with timeout for the async build
 	buildTimeout := args.BuildTimeout
