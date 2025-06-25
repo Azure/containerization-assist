@@ -4,15 +4,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/core/analysis"
 )
 
-// Customizer is the base interface for all customizers
-type Customizer interface {
-	// Name returns the customizer name
-	Name() string
-
-	// Validate validates the customization options
-	Validate() error
-}
-
 // OptimizationStrategy represents different optimization approaches
 type OptimizationStrategy string
 

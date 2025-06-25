@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
+	"github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
@@ -346,21 +346,21 @@ func (ph *PerformanceHelper) BenchmarkHelper(b *testing.B, fn func()) {
 	}
 }
 
-// MockHealthChecker implements interfaces.HealthChecker for testing
+// MockHealthChecker implements types.HealthChecker for testing
 type MockHealthChecker struct {
-	SystemResourcesFunc     func() interfaces.SystemResources
-	SessionStatsFunc        func() interfaces.SessionHealthStats
-	CircuitBreakerStatsFunc func() map[string]interfaces.CircuitBreakerStatus
-	CheckServiceHealthFunc  func(ctx context.Context) []interfaces.ServiceHealth
-	JobQueueStatsFunc       func() interfaces.JobQueueStats
-	RecentErrorsFunc        func(limit int) []interfaces.RecentError
+	SystemResourcesFunc     func() types.SystemResources
+	SessionStatsFunc        func() types.SessionHealthStats
+	CircuitBreakerStatsFunc func() map[string]types.CircuitBreakerStatus
+	CheckServiceHealthFunc  func(ctx context.Context) []types.ServiceHealth
+	JobQueueStatsFunc       func() types.JobQueueStats
+	RecentErrorsFunc        func(limit int) []types.RecentError
 }
 
 // NewMockHealthChecker creates a new mock health checker with default implementations
 func NewMockHealthChecker() *MockHealthChecker {
 	return &MockHealthChecker{
-		SystemResourcesFunc: func() interfaces.SystemResources {
-			return interfaces.SystemResources{
+		SystemResourcesFunc: func() types.SystemResources {
+			return types.SystemResources{
 				CPUUsage:    50.0,
 				MemoryUsage: 60.0,
 				DiskUsage:   30.0,
@@ -370,8 +370,8 @@ func NewMockHealthChecker() *MockHealthChecker {
 				LastUpdated: time.Now(),
 			}
 		},
-		SessionStatsFunc: func() interfaces.SessionHealthStats {
-			return interfaces.SessionHealthStats{
+		SessionStatsFunc: func() types.SessionHealthStats {
+			return types.SessionHealthStats{
 				ActiveSessions:    5,
 				TotalSessions:     20,
 				FailedSessions:    1,
@@ -379,11 +379,11 @@ func NewMockHealthChecker() *MockHealthChecker {
 				SessionErrors:     0,
 			}
 		},
-		CircuitBreakerStatsFunc: func() map[string]interfaces.CircuitBreakerStatus {
-			return make(map[string]interfaces.CircuitBreakerStatus)
+		CircuitBreakerStatsFunc: func() map[string]types.CircuitBreakerStatus {
+			return make(map[string]types.CircuitBreakerStatus)
 		},
-		CheckServiceHealthFunc: func(ctx context.Context) []interfaces.ServiceHealth {
-			return []interfaces.ServiceHealth{
+		CheckServiceHealthFunc: func(ctx context.Context) []types.ServiceHealth {
+			return []types.ServiceHealth{
 				{
 					Name:         "test-service",
 					Status:       "healthy",
@@ -392,8 +392,8 @@ func NewMockHealthChecker() *MockHealthChecker {
 				},
 			}
 		},
-		JobQueueStatsFunc: func() interfaces.JobQueueStats {
-			return interfaces.JobQueueStats{
+		JobQueueStatsFunc: func() types.JobQueueStats {
+			return types.JobQueueStats{
 				QueuedJobs:      0,
 				RunningJobs:     1,
 				CompletedJobs:   10,
@@ -401,63 +401,63 @@ func NewMockHealthChecker() *MockHealthChecker {
 				AverageWaitTime: 1.0,
 			}
 		},
-		RecentErrorsFunc: func(limit int) []interfaces.RecentError {
-			return []interfaces.RecentError{}
+		RecentErrorsFunc: func(limit int) []types.RecentError {
+			return []types.RecentError{}
 		},
 	}
 }
 
-// GetSystemResources implements interfaces.HealthChecker
-func (m *MockHealthChecker) GetSystemResources() interfaces.SystemResources {
+// GetSystemResources implements types.HealthChecker
+func (m *MockHealthChecker) GetSystemResources() types.SystemResources {
 	if m.SystemResourcesFunc != nil {
 		return m.SystemResourcesFunc()
 	}
-	return interfaces.SystemResources{}
+	return types.SystemResources{}
 }
 
-// GetSessionStats implements interfaces.HealthChecker
-func (m *MockHealthChecker) GetSessionStats() interfaces.SessionHealthStats {
+// GetSessionStats implements types.HealthChecker
+func (m *MockHealthChecker) GetSessionStats() types.SessionHealthStats {
 	if m.SessionStatsFunc != nil {
 		return m.SessionStatsFunc()
 	}
-	return interfaces.SessionHealthStats{}
+	return types.SessionHealthStats{}
 }
 
-// GetCircuitBreakerStats implements interfaces.HealthChecker
-func (m *MockHealthChecker) GetCircuitBreakerStats() map[string]interfaces.CircuitBreakerStatus {
+// GetCircuitBreakerStats implements types.HealthChecker
+func (m *MockHealthChecker) GetCircuitBreakerStats() map[string]types.CircuitBreakerStatus {
 	if m.CircuitBreakerStatsFunc != nil {
 		return m.CircuitBreakerStatsFunc()
 	}
-	return make(map[string]interfaces.CircuitBreakerStatus)
+	return make(map[string]types.CircuitBreakerStatus)
 }
 
-// CheckServiceHealth implements interfaces.HealthChecker
-func (m *MockHealthChecker) CheckServiceHealth(ctx context.Context) []interfaces.ServiceHealth {
+// CheckServiceHealth implements types.HealthChecker
+func (m *MockHealthChecker) CheckServiceHealth(ctx context.Context) []types.ServiceHealth {
 	if m.CheckServiceHealthFunc != nil {
 		return m.CheckServiceHealthFunc(ctx)
 	}
-	return []interfaces.ServiceHealth{}
+	return []types.ServiceHealth{}
 }
 
-// GetJobQueueStats implements interfaces.HealthChecker
-func (m *MockHealthChecker) GetJobQueueStats() interfaces.JobQueueStats {
+// GetJobQueueStats implements types.HealthChecker
+func (m *MockHealthChecker) GetJobQueueStats() types.JobQueueStats {
 	if m.JobQueueStatsFunc != nil {
 		return m.JobQueueStatsFunc()
 	}
-	return interfaces.JobQueueStats{}
+	return types.JobQueueStats{}
 }
 
-// GetRecentErrors implements interfaces.HealthChecker
-func (m *MockHealthChecker) GetRecentErrors(limit int) []interfaces.RecentError {
+// GetRecentErrors implements types.HealthChecker
+func (m *MockHealthChecker) GetRecentErrors(limit int) []types.RecentError {
 	if m.RecentErrorsFunc != nil {
 		return m.RecentErrorsFunc(limit)
 	}
-	return []interfaces.RecentError{}
+	return []types.RecentError{}
 }
 
-// MockProgressReporter implements interfaces.ProgressReporter for testing
+// MockProgressReporter implements types.ProgressReporter for testing
 type MockProgressReporter struct {
-	stages            []interfaces.ProgressStage
+	stages            []types.ProgressStage
 	currentStage      int
 	stageProgress     float64
 	overallProgress   float64
@@ -469,14 +469,14 @@ type MockProgressReporter struct {
 }
 
 // NewMockProgressReporter creates a new mock progress reporter
-func NewMockProgressReporter(stages []interfaces.ProgressStage) *MockProgressReporter {
+func NewMockProgressReporter(stages []types.ProgressStage) *MockProgressReporter {
 	return &MockProgressReporter{
 		stages:   stages,
 		messages: make([]string, 0),
 	}
 }
 
-// ReportStage implements interfaces.ProgressReporter
+// ReportStage implements types.ProgressReporter
 func (m *MockProgressReporter) ReportStage(stageProgress float64, message string) {
 	m.stageProgress = stageProgress
 	m.messages = append(m.messages, message)
@@ -485,7 +485,7 @@ func (m *MockProgressReporter) ReportStage(stageProgress float64, message string
 	}
 }
 
-// NextStage implements interfaces.ProgressReporter
+// NextStage implements types.ProgressReporter
 func (m *MockProgressReporter) NextStage(message string) {
 	if m.currentStage < len(m.stages)-1 {
 		m.currentStage++
@@ -496,7 +496,7 @@ func (m *MockProgressReporter) NextStage(message string) {
 	}
 }
 
-// SetStage implements interfaces.ProgressReporter
+// SetStage implements types.ProgressReporter
 func (m *MockProgressReporter) SetStage(stageIndex int, message string) {
 	if stageIndex >= 0 && stageIndex < len(m.stages) {
 		m.currentStage = stageIndex
@@ -507,7 +507,7 @@ func (m *MockProgressReporter) SetStage(stageIndex int, message string) {
 	}
 }
 
-// ReportOverall implements interfaces.ProgressReporter
+// ReportOverall implements types.ProgressReporter
 func (m *MockProgressReporter) ReportOverall(progress float64, message string) {
 	m.overallProgress = progress
 	m.messages = append(m.messages, message)
@@ -516,12 +516,12 @@ func (m *MockProgressReporter) ReportOverall(progress float64, message string) {
 	}
 }
 
-// GetCurrentStage implements interfaces.ProgressReporter
-func (m *MockProgressReporter) GetCurrentStage() (int, interfaces.ProgressStage) {
+// GetCurrentStage implements types.ProgressReporter
+func (m *MockProgressReporter) GetCurrentStage() (int, types.ProgressStage) {
 	if m.currentStage < len(m.stages) {
 		return m.currentStage, m.stages[m.currentStage]
 	}
-	return m.currentStage, interfaces.ProgressStage{}
+	return m.currentStage, types.ProgressStage{}
 }
 
 // GetMessages returns all messages received by the mock

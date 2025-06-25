@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	_ "github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"

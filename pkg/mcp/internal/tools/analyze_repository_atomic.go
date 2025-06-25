@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/core/analysis"
 	"github.com/Azure/container-copilot/pkg/core/git"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/repository"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
@@ -134,7 +133,7 @@ func (t *AtomicAnalyzeRepositoryTool) executeWithoutProgress(ctx context.Context
 }
 
 // performAnalysis performs the actual repository analysis
-func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter interfaces.ProgressReporter) (*AtomicAnalysisResult, error) {
+func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter mcptypes.ProgressReporter) (*AtomicAnalysisResult, error) {
 	startTime := time.Now()
 
 	// Get or create session

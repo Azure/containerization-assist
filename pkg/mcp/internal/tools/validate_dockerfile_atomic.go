@@ -14,7 +14,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/constants"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -225,7 +224,7 @@ func (t *AtomicValidateDockerfileTool) executeWithoutProgress(ctx context.Contex
 }
 
 // performValidation performs the actual Dockerfile validation
-func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, args AtomicValidateDockerfileArgs, reporter interfaces.ProgressReporter) (*AtomicValidateDockerfileResult, error) {
+func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, args AtomicValidateDockerfileArgs, reporter mcptypes.ProgressReporter) (*AtomicValidateDockerfileResult, error) {
 	startTime := time.Now()
 
 	// Stage 1: Initialize

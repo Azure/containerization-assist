@@ -156,7 +156,7 @@ func TestToolDispatcher(t *testing.T) {
 		if len(tools) != 1 {
 			t.Errorf("Expected 1 tool in 'test' category, got %d", len(tools))
 		}
-		
+
 		// Test non-existent category
 		tools = dispatcher.GetToolsByCategory("non-existent")
 		if len(tools) != 0 {

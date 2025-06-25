@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
@@ -347,7 +346,7 @@ func (t *AtomicDeployKubernetesTool) ExecuteWithContext(serverCtx *server.Contex
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
+func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	t.logger.Info().Msg("Loading session")
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
@@ -761,7 +760,7 @@ func (op *KubernetesDeployOperation) applyFileChange(change mcptypes.FileChange)
 // Helper methods for the Execute implementation
 
 // performManifestGeneration generates Kubernetes manifests
-func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter interfaces.ProgressReporter) error {
+func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter mcptypes.ProgressReporter) error {
 	// Progress reporting removed
 
 	generationStart := time.Now()
@@ -829,7 +828,7 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 }
 
 // performDeployment deploys manifests to Kubernetes cluster
-func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter interfaces.ProgressReporter) error {
+func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter mcptypes.ProgressReporter) error {
 	// Progress reporting removed
 
 	deploymentStart := time.Now()
@@ -899,7 +898,7 @@ func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, sess
 }
 
 // performHealthCheck verifies deployment health
-func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter interfaces.ProgressReporter) error {
+func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter mcptypes.ProgressReporter) error {
 	// Progress reporting removed
 
 	healthStart := time.Now()

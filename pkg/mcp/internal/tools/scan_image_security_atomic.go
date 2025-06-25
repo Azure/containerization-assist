@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/constants"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -225,7 +224,7 @@ func (t *AtomicScanImageSecurityTool) executeWithoutProgress(ctx context.Context
 }
 
 // performSecurityScan performs the actual security scan
-func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, args AtomicScanImageSecurityArgs, reporter interfaces.ProgressReporter) (*AtomicScanImageSecurityResult, error) {
+func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, args AtomicScanImageSecurityArgs, reporter mcptypes.ProgressReporter) (*AtomicScanImageSecurityResult, error) {
 	startTime := time.Now()
 
 	// Get session
