@@ -78,8 +78,8 @@ type Server struct {
 	gomcpManager *GomcpManager
 
 	// OpenTelemetry components
-	otelProvider   *ops.OTELProvider
-	otelMiddleware *ops.MCPServerInstrumentation
+	otelProvider   *observability.OTELProvider
+	otelMiddleware *observability.MCPServerInstrumentation
 
 	// Shutdown coordination
 	shutdownMutex  sync.Mutex
@@ -195,14 +195,14 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 
 	// Initialize OpenTelemetry if enabled
-	var otelProvider *ops.OTELProvider
-	var otelMiddleware *ops.MCPServerInstrumentation
+	var otelProvider *observability.OTELProvider
+	var otelMiddleware *observability.MCPServerInstrumentation
 
 	if config.EnableOTEL {
 		logger.Info().Msg("Initializing OpenTelemetry middleware")
 
 		// Create OTEL configuration
-		otelConfig := &ops.OTELConfig{
+		otelConfig := &observability.OTELConfig{
 			ServiceName:     config.ServiceName,
 			ServiceVersion:  config.ServiceVersion,
 			Environment:     config.Environment,
@@ -221,7 +221,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		}
 
 		// Create and initialize OTEL provider
-		otelProvider = ops.NewOTELProvider(otelConfig)
+		otelProvider = observability.NewOTELProvider(otelConfig)
 		ctx := context.Background()
 		if err := otelProvider.Initialize(ctx); err != nil {
 			logger.Error().Err(err).Msg("Failed to initialize OpenTelemetry provider")
@@ -229,7 +229,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		}
 
 		// Create server instrumentation
-		otelMiddleware = ops.NewMCPServerInstrumentation(config.ServiceName, logger.With().Str("component", "otel_middleware").Logger())
+		otelMiddleware = observability.NewMCPServerInstrumentation(config.ServiceName, logger.With().Str("component", "otel_middleware").Logger())
 
 		logger.Info().
 			Str("service_name", config.ServiceName).
@@ -406,12 +406,12 @@ func (s *Server) GetJobManager() *orchestration.JobManager {
 }
 
 // GetOTELProvider returns the server's OpenTelemetry provider
-func (s *Server) GetOTELProvider() *ops.OTELProvider {
+func (s *Server) GetOTELProvider() *observability.OTELProvider {
 	return s.otelProvider
 }
 
 // GetOTELMiddleware returns the server's OpenTelemetry middleware
-func (s *Server) GetOTELMiddleware() *ops.MCPServerInstrumentation {
+func (s *Server) GetOTELMiddleware() *observability.MCPServerInstrumentation {
 	return s.otelMiddleware
 }
 

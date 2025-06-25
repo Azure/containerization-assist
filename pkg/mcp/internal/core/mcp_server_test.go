@@ -262,7 +262,7 @@ func TestConversationComponents(t *testing.T) {
 	})
 
 	t.Run("PreFlightChecker", func(t *testing.T) {
-		checker := ops.NewPreFlightChecker(logger)
+		checker := observability.NewPreFlightChecker(logger)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

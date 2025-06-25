@@ -40,7 +40,7 @@ type ConversationConfig struct {
 type ConversationComponents struct {
 	Handler         *conversation.ConversationHandler // Concrete conversation handler
 	PreferenceStore *utils.PreferenceStore
-	Telemetry       *ops.TelemetryManager
+	Telemetry       *observability.TelemetryManager
 }
 
 // EnableConversationMode integrates the conversation components into the server
@@ -59,10 +59,10 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 	}
 
 	// Initialize telemetry if enabled
-	var telemetryMgr *ops.TelemetryManager
+	var telemetryMgr *observability.TelemetryManager
 	if config.EnableTelemetry {
 		// Create OpenTelemetry configuration if enabled
-		var otelConfig *ops.OTELConfig
+		var otelConfig *observability.OTELConfig
 		if config.EnableOTEL {
 			serviceName := config.ServiceName
 			if serviceName == "" {
@@ -84,7 +84,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 				sampleRate = 1.0
 			}
 
-			otelConfig = &ops.OTELConfig{
+			otelConfig = &observability.OTELConfig{
 				ServiceName:     serviceName,
 				ServiceVersion:  serviceVersion,
 				Environment:     environment,
@@ -114,7 +114,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 				Msg("OpenTelemetry configuration created")
 		}
 
-		telemetryMgr = ops.NewTelemetryManager(ops.TelemetryConfig{
+		telemetryMgr = observability.NewTelemetryManager(observability.TelemetryConfig{
 			MetricsPort:      config.TelemetryPort,
 			P95Target:        2 * time.Second,
 			Logger:           s.logger,
@@ -199,7 +199,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 // Add these fields to the Server struct (in server.go):
 // conversationAdapter *conversation.ConversationAdapter
 // preferenceStore     *utils.PreferenceStore
-// telemetry          *ops.TelemetryManager
+// telemetry          *observability.TelemetryManager
 
 // ShutdownConversation gracefully shuts down conversation components
 func (s *Server) ShutdownConversation() error {

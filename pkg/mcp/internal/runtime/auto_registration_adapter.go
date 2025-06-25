@@ -169,10 +169,5 @@ func (ara *AutoRegistrationAdapter) createAtomicTools(deps ToolDependencies) map
 			deps.SessionManager,
 			deps.Logger,
 		),
-		"atomic_validate_dockerfile": build.NewAtomicValidateDockerfileTool(
-			deps.PipelineOperations,
-			deps.SessionManager,
-			deps.Logger,
-		),
 	}
 }
