@@ -457,10 +457,10 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 				}
 				newSession.Metadata["resumed_from"] = oldSessionInfo
 				if err := t.sessionManager.UpdateSession(newSession.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok { 
-			*state = *newSession 
-		}
-	}); err != nil {
+					if state, ok := s.(*sessiontypes.SessionState); ok {
+						*state = *newSession
+					}
+				}); err != nil {
 					t.logger.Warn().Err(err).Msg("Failed to save resumed session")
 				}
 
@@ -601,8 +601,8 @@ func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.S
 	session.Metadata["analysis_duration"] = result.AnalysisDuration.Seconds()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok { 
-			*state = *session 
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			*state = *session
 		}
 	})
 }

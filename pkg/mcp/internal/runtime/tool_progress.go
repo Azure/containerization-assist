@@ -11,7 +11,7 @@ import (
 
 // ToolProgressTracker provides tool-specific progress tracking
 type ToolProgressTracker struct {
-	toolName string
+	toolName  string
 	sessionID string
 	startTime time.Time
 }
@@ -19,7 +19,7 @@ type ToolProgressTracker struct {
 // NewToolProgressTracker creates a new tool progress tracker
 func NewToolProgressTracker(toolName, sessionID string) *ToolProgressTracker {
 	return &ToolProgressTracker{
-		toolName: toolName,
+		toolName:  toolName,
 		sessionID: sessionID,
 		startTime: time.Now(),
 	}

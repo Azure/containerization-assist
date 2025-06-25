@@ -44,7 +44,7 @@ func (v *ContextValidator) Validate(content string, options ValidationOptions) (
 	v.checkDockerignore(fileOps, result)
 	v.checkFilePaths(fileOps, result)
 
-	// Update result state  
+	// Update result state
 	if len(result.Errors) > 0 {
 		result.Valid = false
 	}
@@ -170,8 +170,8 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 		if op.Type == "ADD" && !v.isRemoteURL(op.Source) && !v.isArchive(op.Source) {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "add_local_files",
-				Line:       op.Line,
-				Message:    "Using ADD for local files",
+				Line:    op.Line,
+				Message: "Using ADD for local files",
 				//Suggestion: "Use COPY instead of ADD for local files",
 				//Impact:     "clarity",
 			})
@@ -181,8 +181,8 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 		if op.Destination == "/" {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "copy_to_root",
-				Line:       op.Line,
-				Message:    "Copying files directly to root directory",
+				Line:    op.Line,
+				Message: "Copying files directly to root directory",
 				//Suggestion: "Copy files to a specific directory instead of root",
 				//Impact:     "organization",
 			})
@@ -192,8 +192,8 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 		if filepath.IsAbs(op.Source) && !v.hasFromFlag(op.Flags) {
 			result.Errors = append(result.Errors, ValidationError{
 				//Type:     "absolute_source_path",
-				Line:     op.Line,
-				Message:  fmt.Sprintf("Absolute source path '%s' is not allowed", op.Source),
+				Line:    op.Line,
+				Message: fmt.Sprintf("Absolute source path '%s' is not allowed", op.Source),
 				//Severity: "error",
 			})
 		}
@@ -202,8 +202,8 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 		if v.isSensitiveFile(op.Source) {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "sensitive_file_copy",
-				Line:       op.Line,
-				Message:    fmt.Sprintf("Copying potentially sensitive file: %s", op.Source),
+				Line:    op.Line,
+				Message: fmt.Sprintf("Copying potentially sensitive file: %s", op.Source),
 				//Suggestion: "Ensure sensitive files are excluded via .dockerignore",
 				//Impact:     "security",
 			})
@@ -225,8 +225,8 @@ func (v *ContextValidator) checkBuildContextSize(operations []FileOperation, res
 		if strings.Contains(op.Source, "**") {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "recursive_wildcard",
-				Line:       op.Line,
-				Message:    "Using recursive wildcard in COPY/ADD",
+				Line:    op.Line,
+				Message: "Using recursive wildcard in COPY/ADD",
 				//Suggestion: "Be specific about files to copy to reduce build context",
 				//Impact:     "build_time",
 			})
@@ -236,8 +236,8 @@ func (v *ContextValidator) checkBuildContextSize(operations []FileOperation, res
 	if wholeDirCopies > 2 {
 		result.Warnings = append(result.Warnings, ValidationWarning{
 			//Type:       "excessive_dir_copies",
-			Line:       0,
-			Message:    fmt.Sprintf("Multiple whole directory copies detected (%d)", wholeDirCopies),
+			Line:    0,
+			Message: fmt.Sprintf("Multiple whole directory copies detected (%d)", wholeDirCopies),
 			//Suggestion: "Consider being more selective about what to copy",
 			//Impact:     "build_time",
 		})
@@ -269,8 +269,8 @@ func (v *ContextValidator) checkDockerignore(operations []FileOperation, result 
 				if strings.Contains(op.Source, pattern) {
 					result.Warnings = append(result.Warnings, ValidationWarning{
 						//Type:       "unfiltered_copy",
-						Line:       op.Line,
-						Message:    fmt.Sprintf("Copying '%s' - should this be in .dockerignore?", pattern),
+						Line:    op.Line,
+						Message: fmt.Sprintf("Copying '%s' - should this be in .dockerignore?", pattern),
 						//Suggestion: "Add unnecessary files to .dockerignore",
 						//Impact:     "build_time",
 					})
@@ -288,8 +288,8 @@ func (v *ContextValidator) checkFilePaths(operations []FileOperation, result *Va
 		if strings.Contains(op.Source, "..") {
 			result.Errors = append(result.Errors, ValidationError{
 				//Type:     "parent_dir_reference",
-				Line:     op.Line,
-				Message:  "Cannot reference parent directory in build context",
+				Line:    op.Line,
+				Message: "Cannot reference parent directory in build context",
 				//Severity: "error",
 			})
 		}
@@ -298,8 +298,8 @@ func (v *ContextValidator) checkFilePaths(operations []FileOperation, result *Va
 		if strings.Contains(op.Source, "\\") || strings.Contains(op.Destination, "\\") {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "windows_path",
-				Line:       op.Line,
-				Message:    "Windows-style path detected",
+				Line:    op.Line,
+				Message: "Windows-style path detected",
 				//Suggestion: "Use forward slashes for cross-platform compatibility",
 				//Impact:     "portability",
 			})
@@ -309,8 +309,8 @@ func (v *ContextValidator) checkFilePaths(operations []FileOperation, result *Va
 		if strings.Contains(op.Source, " ") || strings.Contains(op.Destination, " ") {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "spaces_in_path",
-				Line:       op.Line,
-				Message:    "Path contains spaces",
+				Line:    op.Line,
+				Message: "Path contains spaces",
 				//Suggestion: "Avoid spaces in file paths or properly quote them",
 				//Impact:     "reliability",
 			})
@@ -379,8 +379,8 @@ func (v *ContextValidator) ValidateWithContext(dockerfilePath, contextPath strin
 	if _, err := os.Stat(contextPath); os.IsNotExist(err) {
 		result.Errors = append(result.Errors, ValidationError{
 			//Type:     "missing_context",
-			Line:     0,
-			Message:  fmt.Sprintf("Build context directory does not exist: %s", contextPath),
+			Line:    0,
+			Message: fmt.Sprintf("Build context directory does not exist: %s", contextPath),
 			//Severity: "error",
 		})
 		result.Valid = false
@@ -392,8 +392,8 @@ func (v *ContextValidator) ValidateWithContext(dockerfilePath, contextPath strin
 	if _, err := os.Stat(dockerignorePath); os.IsNotExist(err) {
 		result.Warnings = append(result.Warnings, ValidationWarning{
 			//Type:       "missing_dockerignore",
-			Line:       0,
-			Message:    "No .dockerignore file found",
+			Line:    0,
+			Message: "No .dockerignore file found",
 			//Suggestion: "Create .dockerignore to exclude unnecessary files from build context",
 			//Impact:     "build_time",
 		})
@@ -408,8 +408,8 @@ func (v *ContextValidator) ValidateWithContext(dockerfilePath, contextPath strin
 		if size > 100*1024*1024 { // 100MB
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "large_context",
-				Line:       0,
-				Message:    fmt.Sprintf("Build context is large: %.2f MB", float64(size)/(1024*1024)),
+				Line:    0,
+				Message: fmt.Sprintf("Build context is large: %.2f MB", float64(size)/(1024*1024)),
 				//Suggestion: "Use .dockerignore to exclude unnecessary files",
 				//Impact:     "build_time",
 			})

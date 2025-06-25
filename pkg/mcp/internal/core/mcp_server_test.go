@@ -166,8 +166,10 @@ func TestSessionManager(t *testing.T) {
 			"framework": "gin",
 		}
 
-		err = sessionManager.UpdateSession(sessionID, func(s *sessiontypes.SessionState) {
-			s.RepoAnalysis = session.RepoAnalysis
+		err = sessionManager.UpdateSession(sessionID, func(s interface{}) {
+			if state, ok := s.(*sessiontypes.SessionState); ok {
+				state.RepoAnalysis = session.RepoAnalysis
+			}
 		})
 		require.NoError(t, err)
 

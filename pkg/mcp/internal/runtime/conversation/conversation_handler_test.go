@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
@@ -37,8 +37,10 @@ func (a *testSessionManagerAdapter) UpdateSession(session interface{}) error {
 	if s.SessionID == "" {
 		return fmt.Errorf("session ID is required")
 	}
-	return a.mgr.UpdateSession(s.SessionID, func(existing *sessiontypes.SessionState) {
-		*existing = *s
+	return a.mgr.UpdateSession(s.SessionID, func(existing interface{}) {
+		if state, ok := existing.(*sessiontypes.SessionState); ok {
+			*state = *s
+		}
 	})
 }
 
@@ -120,7 +122,7 @@ func TestHandleConversation(t *testing.T) {
 		// Setup
 		handler := createTestHandler(t, logger)
 
-		args := tools.ChatToolArgs{
+		args := runtime.ChatToolArgs{
 			Message:   "Hello, test message",
 			SessionID: "test-session-123",
 		}
@@ -139,7 +141,7 @@ func TestHandleConversation(t *testing.T) {
 		// Setup
 		handler := createTestHandler(t, logger)
 
-		args := tools.ChatToolArgs{
+		args := runtime.ChatToolArgs{
 			Message:   "", // Empty message
 			SessionID: "test-session-123",
 		}
@@ -160,7 +162,7 @@ func TestHandleConversation(t *testing.T) {
 		handler := createTestHandler(t, logger)
 
 		// Use a normal message
-		args := tools.ChatToolArgs{
+		args := runtime.ChatToolArgs{
 			Message:   "hello",
 			SessionID: "test-session-123",
 		}
@@ -191,11 +193,13 @@ func TestHandleAutoAdvance(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update session to enable autopilot
-		err = sessionMgr.UpdateSession("auto-advance-test", func(s *sessiontypes.SessionState) {
-			s.RepoAnalysis = map[string]interface{}{
-				"_context": map[string]interface{}{
-					"autopilot_enabled": true,
-				},
+		err = sessionMgr.UpdateSession("auto-advance-test", func(s interface{}) {
+			if state, ok := s.(*sessiontypes.SessionState); ok {
+				state.RepoAnalysis = map[string]interface{}{
+					"_context": map[string]interface{}{
+						"autopilot_enabled": true,
+					},
+				}
 			}
 		})
 		require.NoError(t, err)
@@ -279,7 +283,7 @@ func TestSessionManagement(t *testing.T) {
 		// Setup
 		handler := createTestHandler(t, logger)
 
-		args := tools.ChatToolArgs{
+		args := runtime.ChatToolArgs{
 			Message:   "Create new session",
 			SessionID: "", // No session ID provided
 		}
@@ -302,7 +306,7 @@ func TestSessionManagement(t *testing.T) {
 		_, err := sessionMgr.GetOrCreateSession("existing-session")
 		require.NoError(t, err)
 
-		args := tools.ChatToolArgs{
+		args := runtime.ChatToolArgs{
 			Message:   "Use existing session",
 			SessionID: "existing-session",
 		}
@@ -331,7 +335,7 @@ func TestPreferenceIntegration(t *testing.T) {
 		_, err := sessionMgr.GetOrCreateSession("pref-test")
 		require.NoError(t, err)
 
-		args := tools.ChatToolArgs{
+		args := runtime.ChatToolArgs{
 			Message:   "Test with preferences",
 			SessionID: "pref-test",
 		}
@@ -488,7 +492,7 @@ func BenchmarkHandleConversation(b *testing.B) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 	handler := createTestHandler(&testing.T{}, logger)
 
-	args := tools.ChatToolArgs{
+	args := runtime.ChatToolArgs{
 		Message:   "Benchmark test message",
 		SessionID: "bench-session",
 	}

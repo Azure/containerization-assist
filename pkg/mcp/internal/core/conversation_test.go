@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -60,14 +60,14 @@ func TestConversationFlow(t *testing.T) {
 
 	// Type assert to the concrete conversation handler type
 	adapter, ok := adapterInterface.(interface {
-		HandleConversation(ctx context.Context, args tools.ChatToolArgs) (*tools.ChatToolResult, error)
+		HandleConversation(ctx context.Context, args runtime.ChatToolArgs) (*runtime.ChatToolResult, error)
 	})
 	require.True(t, ok, "adapter should implement HandleConversation method")
 
 	ctx := context.Background()
 
 	t.Run("InitialGreeting", func(t *testing.T) {
-		chatArgs := tools.ChatToolArgs{
+		chatArgs := runtime.ChatToolArgs{
 			Message: "Hello, I want to containerize my application",
 		}
 
@@ -87,7 +87,7 @@ func TestConversationFlow(t *testing.T) {
 
 	t.Run("ConversationContinuation", func(t *testing.T) {
 		// First message to establish session
-		chatArgs1 := tools.ChatToolArgs{
+		chatArgs1 := runtime.ChatToolArgs{
 			Message: "I want to containerize my Go application",
 		}
 
@@ -99,7 +99,7 @@ func TestConversationFlow(t *testing.T) {
 		require.NotEmpty(t, sessionID)
 
 		// Continue the conversation with session ID
-		chatArgs2 := tools.ChatToolArgs{
+		chatArgs2 := runtime.ChatToolArgs{
 			Message:   "Yes, continue with the pre-flight checks",
 			SessionID: sessionID,
 		}
@@ -114,7 +114,7 @@ func TestConversationFlow(t *testing.T) {
 
 	t.Run("ErrorHandling", func(t *testing.T) {
 		// Test with empty message parameter
-		chatArgs := tools.ChatToolArgs{
+		chatArgs := runtime.ChatToolArgs{
 			Message:   "", // Empty message should cause error
 			SessionID: "test-session",
 		}

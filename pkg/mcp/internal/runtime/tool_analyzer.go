@@ -32,7 +32,7 @@ func (t *ToolAnalyzer) Analyze(ctx context.Context, input interface{}, options A
 
 	// Tool-specific analysis logic would go here
 	result.AddStrength("Tool is properly implemented")
-	
+
 	if options.GenerateRecommendations {
 		result.AddRecommendation(Recommendation{
 			ID:          "tool_optimization",

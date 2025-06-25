@@ -23,7 +23,7 @@ type ValidationOptions struct {
 	CheckBestPractices bool
 }
 
-// Note: ValidationResult, ValidationError, ValidationWarning, and SecurityIssue 
+// Note: ValidationResult, ValidationError, ValidationWarning, and SecurityIssue
 // are defined in common.go to avoid duplication
 
 // OptimizationTip represents an optimization suggestion

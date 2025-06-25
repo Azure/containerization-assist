@@ -88,8 +88,10 @@ func (lm *LabelManager) AddLabels(sessionID string, labels ...string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok { state.Labels = session.Labels
-	; } })
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			state.Labels = session.Labels
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
 	}
@@ -134,8 +136,10 @@ func (lm *LabelManager) RemoveLabels(sessionID string, labels ...string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok { state.Labels = session.Labels
-	; } })
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			state.Labels = session.Labels
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
 	}
@@ -175,8 +179,10 @@ func (lm *LabelManager) SetLabels(sessionID string, labels []string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok { state.Labels = session.Labels
-	; } })
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			state.Labels = session.Labels
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
 	}
@@ -231,8 +237,10 @@ func (lm *LabelManager) SetK8sLabels(sessionID string, labels map[string]string)
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok { state.K8sLabels = session.K8sLabels
-	; } })
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			state.K8sLabels = session.K8sLabels
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
 	}
@@ -270,8 +278,10 @@ func (lm *LabelManager) RemoveK8sLabel(sessionID string, key string) error {
 
 	// Save session
 	err = lm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok { state.Labels = session.Labels
-	; } })
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			state.Labels = session.Labels
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("failed to save session: %w", err)
 	}
