@@ -235,6 +235,122 @@ func generatePlaceholderValue(secretType string) string
 **Location**: `pkg/kind/kind.go:94`
 - Version-specific configuration for containerd (not needed with Kind v0.27.0+)
 
+## Error Handling Migration Process
+
+### Background
+The codebase underwent a systematic migration from `fmt.Errorf` to rich error types (`types.NewRichError`) to improve error handling, debugging, and observability.
+
+### Migration Results
+- **Starting adoption rate**: ~25.2% (270 rich errors / 1069 total errors)
+- **Final adoption rate**: **39.3%** (420 rich errors / 1069 total errors)
+- **Net improvement**: +14.1 percentage points
+- **Rich errors added**: 150 new instances
+
+### Migration Pattern
+
+#### Before (fmt.Errorf)
+```go
+return fmt.Errorf("operation failed: %w", err)
+return nil, fmt.Errorf("validation failed: %s", msg)
+```
+
+#### After (types.NewRichError)
+```go
+return types.NewRichError("OPERATION_FAILED", fmt.Sprintf("operation failed: %v", err), "error_category")
+return nil, types.NewRichError("VALIDATION_FAILED", fmt.Sprintf("validation failed: %s", msg), "validation_error")
+```
+
+### Error Categories Used
+- `validation_error` - Input validation and schema errors
+- `filesystem_error` - File system operations
+- `workflow_error` - Workflow orchestration issues  
+- `session_error` - Session management problems
+- `build_error` - Build and deployment operations
+- `database_error` - Database/storage operations
+- `compression_error` - Data compression/decompression
+- `integrity_error` - Data integrity checks
+- `test_error` - Test utilities and verification
+- `network_error` - Network and connectivity issues
+- `security_error` - Security and authentication issues
+- `configuration_error` - Configuration and setup issues
+- `template_error` - Template processing issues
+- `serialization_error` - JSON/YAML marshaling issues
+- `tool_error` - Tool execution and orchestration issues
+- `quota_error` - Resource quota and limits
+- `git_error` - Git operations and repository access
+
+### Systematic Migration Process
+
+#### 1. Identify High-Impact Files
+```bash
+# Find files with most fmt.Errorf instances
+find pkg/mcp/internal -name "*.go" -exec sh -c 'echo "$(grep -c "fmt\.Errorf" "$1") $1"' _ {} \; | sort -nr | head -10
+```
+
+#### 2. Track Progress
+```bash
+# Count current adoption rate
+fmt_errors=$(find pkg/mcp/internal -name "*.go" -exec grep -c "fmt\.Errorf" {} \; | awk '{sum += $1} END {print sum}')
+rich_errors=$(find pkg/mcp/internal -name "*.go" -exec grep -c "types\.NewRichError" {} \; | awk '{sum += $1} END {print sum}')
+adoption_rate=$(echo "scale=1; $rich_errors * 100 / ($fmt_errors + $rich_errors)" | bc)
+echo "Adoption rate: ${adoption_rate}%"
+```
+
+#### 3. Migration Template
+```go
+// Step 1: Add types import if not present
+import (
+    "github.com/Azure/container-copilot/pkg/mcp/internal/types"
+    // ... other imports
+)
+
+// Step 2: Convert fmt.Errorf patterns
+// Find:    return fmt.Errorf("operation failed: %w", err)
+// Replace: return types.NewRichError("OPERATION_FAILED", fmt.Sprintf("operation failed: %v", err), "appropriate_category")
+
+// Step 3: Use %v instead of %w in fmt.Sprintf (since we're wrapping in NewRichError)
+// Step 4: Choose appropriate error category from the list above
+// Step 5: Use descriptive error codes in UPPER_SNAKE_CASE
+```
+
+#### 4. Files Successfully Migrated (150+ instances)
+- `pkg/mcp/internal/utils/workspace.go` (19 instances)
+- `pkg/mcp/internal/session/manage_session_labels.go` (18 instances)  
+- `pkg/mcp/internal/workflow/coordinator.go` (16 instances)
+- `pkg/mcp/internal/orchestration/no_reflect_orchestrator.go` (17 instances)
+- `pkg/mcp/internal/orchestration/testutil/capture.go` (21 instances)
+- `pkg/mcp/internal/deploy/generate_manifests.go` (29 instances)  
+- `pkg/mcp/internal/orchestration/checkpoint_manager.go` (26 instances)
+- `pkg/mcp/internal/session/session/label_manager.go` (25 instances)
+- `pkg/mcp/internal/manifests/writer.go` (23 instances)
+
+#### 5. Remaining High-Impact Files
+Files still containing significant `fmt.Errorf` usage for future migration:
+- `pkg/mcp/internal/observability/preflight_checker.go` (32 instances)
+- `pkg/mcp/internal/deploy/validator.go` (32 instances)  
+- `pkg/mcp/internal/orchestration/no_reflect_orchestrator_impl.go` (31 instances)
+
+### Benefits of Rich Error Types
+1. **Better Debugging**: Structured error codes and categories
+2. **Improved Observability**: Consistent error classification for monitoring
+3. **Enhanced UX**: More meaningful error messages for users
+4. **Easier Testing**: Predictable error types for test assertions
+5. **Future-Proof**: Extensible for additional error metadata
+
+### Future Migration Targets
+To reach 40%+ adoption rate, focus on:
+1. Analysis and scanning modules
+2. Remaining orchestration components  
+3. Legacy build and deploy tools
+4. Validation and configuration modules
+
+### Best Practices for New Code
+1. Always use `types.NewRichError` for new error creation
+2. Choose appropriate error categories from the established list
+3. Use descriptive error codes in UPPER_SNAKE_CASE format
+4. Include relevant context in error messages
+5. Use `%v` instead of `%w` in `fmt.Sprintf` within rich errors
+
 ## Tracking
 
 Use the following labels in issue tracking:
@@ -244,3 +360,4 @@ Use the following labels in issue tracking:
 - `deprecated`: For deprecated methods
 - `migration`: For migration-related tasks
 - `critical-note`: For IMPORTANT/NOTE comments requiring attention
+- `error-handling`: For error handling migration tasks
