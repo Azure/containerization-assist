@@ -704,6 +704,13 @@ type CircuitBreakerStatus struct {
 	SuccessCount  int64     `json:"success_count"`
 }
 
+// Circuit breaker states
+const (
+	CircuitBreakerClosed   = "closed"
+	CircuitBreakerOpen     = "open"
+	CircuitBreakerHalfOpen = "half-open"
+)
+
 // ServiceHealth represents the health of an external service
 type ServiceHealth struct {
 	Name         string                 `json:"name"`
@@ -792,4 +799,217 @@ type SessionManagerStats struct {
 	AverageAge      float64 `json:"average_age_hours"`
 	OldestSession   string  `json:"oldest_session_id"`
 	NewestSession   string  `json:"newest_session_id"`
+}
+
+// =============================================================================
+// BASE TOOL INTERFACES (migrated from tools/base)
+// =============================================================================
+
+// BaseAnalyzer defines the interface for all analyzers
+type BaseAnalyzer interface {
+	// Analyze performs analysis and returns results
+	Analyze(ctx context.Context, input interface{}, options BaseAnalysisOptions) (*BaseAnalysisResult, error)
+
+	// GetName returns the analyzer name
+	GetName() string
+
+	// GetCapabilities returns what this analyzer can do
+	GetCapabilities() BaseAnalyzerCapabilities
+}
+
+// BaseValidator defines the interface for all validators
+type BaseValidator interface {
+	// Validate performs validation and returns a result
+	Validate(ctx context.Context, input interface{}, options BaseValidationOptions) (*BaseValidationResult, error)
+
+	// GetName returns the validator name
+	GetName() string
+}
+
+// BaseAnalysisOptions provides common options for analysis
+type BaseAnalysisOptions struct {
+	// Depth of analysis (shallow, normal, deep)
+	Depth string
+
+	// Specific aspects to analyze
+	Aspects []string
+
+	// Enable recommendations
+	GenerateRecommendations bool
+
+	// Custom analysis parameters
+	CustomParams map[string]interface{}
+}
+
+// BaseValidationOptions provides common options for validation
+type BaseValidationOptions struct {
+	// Severity level for filtering issues
+	Severity string
+
+	// Rules to ignore during validation
+	IgnoreRules []string
+
+	// Enable strict validation mode
+	StrictMode bool
+
+	// Custom validation parameters
+	CustomParams map[string]interface{}
+}
+
+// BaseAnalysisResult represents the result of analysis
+type BaseAnalysisResult struct {
+	// Summary of findings
+	Summary BaseAnalysisSummary
+
+	// Detailed findings
+	Findings []BaseFinding
+
+	// Recommendations based on analysis
+	Recommendations []BaseRecommendation
+
+	// Metrics collected during analysis
+	Metrics map[string]interface{}
+
+	// Risk assessment
+	RiskAssessment BaseRiskAssessment
+
+	// Additional context
+	Context  map[string]interface{}
+	Metadata BaseAnalysisMetadata
+}
+
+// BaseValidationResult represents the result of validation
+type BaseValidationResult struct {
+	// Overall validation status
+	IsValid bool
+	Score   int // 0-100
+
+	// Issues found during validation
+	Errors   []BaseValidationError
+	Warnings []BaseValidationWarning
+
+	// Summary statistics
+	TotalIssues    int
+	CriticalIssues int
+
+	// Additional context
+	Context  map[string]interface{}
+	Metadata BaseValidationMetadata
+}
+
+// BaseAnalyzerCapabilities describes what an analyzer can do
+type BaseAnalyzerCapabilities struct {
+	SupportedTypes   []string
+	SupportedAspects []string
+	RequiresContext  bool
+	SupportsDeepScan bool
+}
+
+// Support types for base interfaces
+type BaseAnalysisSummary struct {
+	TotalFindings    int
+	CriticalFindings int
+	Strengths        []string
+	Weaknesses       []string
+	OverallScore     int // 0-100
+}
+
+type BaseFinding struct {
+	ID          string
+	Type        string
+	Category    string
+	Severity    string
+	Title       string
+	Description string
+	Evidence    []string
+	Impact      string
+	Location    BaseFindingLocation
+}
+
+type BaseFindingLocation struct {
+	File      string
+	Line      int
+	Component string
+	Context   string
+}
+
+type BaseRecommendation struct {
+	ID          string
+	Priority    string // high, medium, low
+	Category    string
+	Title       string
+	Description string
+	Benefits    []string
+	Effort      string // low, medium, high
+	Impact      string // low, medium, high
+}
+
+type BaseRiskAssessment struct {
+	OverallRisk string // low, medium, high, critical
+	RiskFactors []BaseRiskFactor
+	Mitigations []BaseMitigation
+}
+
+type BaseRiskFactor struct {
+	ID          string
+	Category    string
+	Description string
+	Likelihood  string // low, medium, high
+	Impact      string // low, medium, high
+	Score       int
+}
+
+type BaseMitigation struct {
+	RiskID        string
+	Description   string
+	Effort        string
+	Effectiveness string
+}
+
+type BaseAnalysisMetadata struct {
+	AnalyzerName    string
+	AnalyzerVersion string
+	Duration        time.Duration
+	Timestamp       time.Time
+	Parameters      map[string]interface{}
+}
+
+type BaseValidationError struct {
+	Code          string
+	Type          string
+	Message       string
+	Severity      string // critical, high, medium, low
+	Location      BaseErrorLocation
+	Fix           string
+	Documentation string
+}
+
+type BaseValidationWarning struct {
+	Code       string
+	Type       string
+	Message    string
+	Suggestion string
+	Impact     string // performance, security, maintainability, etc.
+	Location   BaseWarningLocation
+}
+
+type BaseErrorLocation struct {
+	File   string
+	Line   int
+	Column int
+	Path   string // JSON path or similar
+}
+
+type BaseWarningLocation struct {
+	File string
+	Line int
+	Path string
+}
+
+type BaseValidationMetadata struct {
+	ValidatorName    string
+	ValidatorVersion string
+	Duration         time.Duration
+	Timestamp        time.Time
+	Parameters       map[string]interface{}
 }
