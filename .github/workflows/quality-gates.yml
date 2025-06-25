@@ -10,6 +10,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  statuses: write
 
 jobs:
   quality-checks:
@@ -257,22 +258,13 @@ jobs:
             body: comment
           });
 
-    # Set status check
-    - name: Set Commit Status
+    # Final step to ensure workflow status reflects gate results
+    - name: Final Quality Gate Status
       if: always()
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const status = '${{ steps.gates.outputs.gates_passed }}' === 'true' ? 'success' : 'failure';
-          const description = status === 'success' 
-            ? 'All quality gates passed' 
-            : 'Quality gates failed - see details';
-          
-          github.rest.repos.createCommitStatus({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            sha: context.sha,
-            state: status,
-            description: description,
-            context: 'quality-gates'
-          });
+      run: |
+        if [ "${{ steps.gates.outputs.gates_passed }}" != "true" ]; then
+          echo "❌ Quality gates failed"
+          exit 1
+        else
+          echo "✅ All quality gates passed"
+        fi
