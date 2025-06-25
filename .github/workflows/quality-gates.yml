@@ -1,0 +1,278 @@
+name: Quality Gates
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  quality-checks:
+    name: Quality Gate Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for comparisons
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: go mod download
+
+    # Run interface validation
+    - name: Validate Interfaces
+      id: interfaces
+      run: |
+        echo "🔍 Validating interface compliance..."
+        go run tools/validate-interfaces/main.go --metrics --metrics-output interface-metrics.json
+        
+        # Extract key metrics
+        ADOPTION_RATE=$(jq '.overview.adoption_rate' interface-metrics.json)
+        COMPLIANCE=$(jq '.overview.overall_compliance' interface-metrics.json)
+        ERRORS=$(jq '.compliance_report.interface_errors | length' interface-metrics.json)
+        
+        echo "adoption_rate=$ADOPTION_RATE" >> $GITHUB_OUTPUT
+        echo "compliance=$COMPLIANCE" >> $GITHUB_OUTPUT
+        echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+        
+        # Fail if there are interface errors
+        if [ "$ERRORS" -gt 0 ]; then
+          echo "❌ Found $ERRORS interface validation errors"
+          jq '.compliance_report.interface_errors' interface-metrics.json
+          exit 1
+        fi
+
+    # Run quality dashboard
+    - name: Generate Quality Metrics
+      id: quality
+      run: |
+        echo "📊 Generating quality metrics..."
+        go run tools/quality-dashboard/main.go \
+          -output quality-metrics.json \
+          -format json
+        
+        # Extract metrics
+        ERROR_HANDLING=$(jq '.error_handling.adoption_rate' quality-metrics.json)
+        TEST_COVERAGE=$(jq '.test_coverage.overall_coverage' quality-metrics.json)
+        BUILD_TIME=$(jq -r '.build_metrics.build_time' quality-metrics.json)
+        EMPTY_DIRS=$(jq '.directory_structure.empty_directories' quality-metrics.json)
+        TODOS=$(jq '.code_quality.todo_comments' quality-metrics.json)
+        
+        echo "error_handling=$ERROR_HANDLING" >> $GITHUB_OUTPUT
+        echo "test_coverage=$TEST_COVERAGE" >> $GITHUB_OUTPUT
+        echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+        echo "empty_dirs=$EMPTY_DIRS" >> $GITHUB_OUTPUT
+        echo "todos=$TODOS" >> $GITHUB_OUTPUT
+
+    # Quality gate checks
+    - name: Check Quality Gates
+      id: gates
+      run: |
+        echo "🚦 Checking quality gates..."
+        
+        # Define thresholds
+        MIN_ERROR_HANDLING=60.0  # Minimum 60% RichError adoption
+        MIN_TEST_COVERAGE=50.0   # Minimum 50% test coverage
+        MAX_BUILD_TIME=300       # Maximum 5 minutes build time
+        MAX_EMPTY_DIRS=5         # Maximum 5 empty directories
+        WARN_TODOS=50            # Warning if more than 50 TODOs
+        
+        # Check gates
+        GATES_PASSED=true
+        WARNINGS=""
+        
+        # Error handling adoption
+        if (( $(echo "${{ steps.quality.outputs.error_handling }} < $MIN_ERROR_HANDLING" | bc -l) )); then
+          echo "❌ Error handling adoption (${{ steps.quality.outputs.error_handling }}%) below minimum ($MIN_ERROR_HANDLING%)"
+          GATES_PASSED=false
+        fi
+        
+        # Test coverage
+        if (( $(echo "${{ steps.quality.outputs.test_coverage }} < $MIN_TEST_COVERAGE" | bc -l) )); then
+          echo "❌ Test coverage (${{ steps.quality.outputs.test_coverage }}%) below minimum ($MIN_TEST_COVERAGE%)"
+          GATES_PASSED=false
+        fi
+        
+        # Empty directories
+        if [ "${{ steps.quality.outputs.empty_dirs }}" -gt $MAX_EMPTY_DIRS ]; then
+          echo "⚠️  Warning: ${{ steps.quality.outputs.empty_dirs }} empty directories found (max: $MAX_EMPTY_DIRS)"
+          WARNINGS="${WARNINGS}\\n- Clean up empty directories"
+        fi
+        
+        # TODO comments
+        if [ "${{ steps.quality.outputs.todos }}" -gt $WARN_TODOS ]; then
+          echo "⚠️  Warning: ${{ steps.quality.outputs.todos }} TODO comments found (warning threshold: $WARN_TODOS)"
+          WARNINGS="${WARNINGS}\\n- Address TODO comments"
+        fi
+        
+        echo "gates_passed=$GATES_PASSED" >> $GITHUB_OUTPUT
+        echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+        
+        if [ "$GATES_PASSED" = "false" ]; then
+          exit 1
+        fi
+
+    # Compare with base branch (PR only)
+    - name: Compare with Base Branch
+      if: github.event_name == 'pull_request'
+      id: compare
+      run: |
+        echo "📈 Comparing with base branch..."
+        
+        # Checkout base branch
+        git checkout ${{ github.event.pull_request.base.sha }}
+        
+        # Generate base metrics
+        go run tools/quality-dashboard/main.go \
+          -output base-quality-metrics.json \
+          -format json || true
+        
+        # Switch back
+        git checkout ${{ github.event.pull_request.head.sha }}
+        
+        # Compare if base metrics exist
+        if [ -f base-quality-metrics.json ]; then
+          BASE_ERROR=$(jq '.error_handling.adoption_rate' base-quality-metrics.json)
+          BASE_COVERAGE=$(jq '.test_coverage.overall_coverage' base-quality-metrics.json)
+          
+          CURRENT_ERROR=${{ steps.quality.outputs.error_handling }}
+          CURRENT_COVERAGE=${{ steps.quality.outputs.test_coverage }}
+          
+          ERROR_DIFF=$(echo "$CURRENT_ERROR - $BASE_ERROR" | bc -l)
+          COVERAGE_DIFF=$(echo "$CURRENT_COVERAGE - $BASE_COVERAGE" | bc -l)
+          
+          echo "error_diff=$ERROR_DIFF" >> $GITHUB_OUTPUT
+          echo "coverage_diff=$COVERAGE_DIFF" >> $GITHUB_OUTPUT
+          
+          # Check for regression
+          if (( $(echo "$ERROR_DIFF < -5" | bc -l) )); then
+            echo "❌ Error handling adoption regressed by $ERROR_DIFF%"
+            exit 1
+          fi
+          
+          if (( $(echo "$COVERAGE_DIFF < -2" | bc -l) )); then
+            echo "❌ Test coverage regressed by $COVERAGE_DIFF%"
+            exit 1
+          fi
+        fi
+
+    # Upload artifacts
+    - name: Upload Quality Reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-reports
+        path: |
+          quality-metrics.json
+          interface-metrics.json
+          quality-dashboard.html
+
+    # Comment on PR
+    - name: Comment Quality Report on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read metrics
+          const qualityMetrics = JSON.parse(fs.readFileSync('quality-metrics.json', 'utf8'));
+          const interfaceMetrics = JSON.parse(fs.readFileSync('interface-metrics.json', 'utf8'));
+          
+          // Build comment
+          let comment = `## 📊 Quality Report
+          
+          ### 🎯 Quality Gates Status: ${{ steps.gates.outputs.gates_passed == 'true' && '✅ PASSED' || '❌ FAILED' }}
+          
+          #### Metrics Summary
+          | Metric | Value | Status |
+          |--------|-------|--------|
+          | Interface Compliance | ${{ steps.interfaces.outputs.compliance }}% | ${{ steps.interfaces.outputs.errors == '0' && '✅' || '❌' }} |
+          | Error Handling Adoption | ${{ steps.quality.outputs.error_handling }}% | ${Number(${{ steps.quality.outputs.error_handling }}) >= 60 ? '✅' : '❌'} |
+          | Test Coverage | ${{ steps.quality.outputs.test_coverage }}% | ${Number(${{ steps.quality.outputs.test_coverage }}) >= 50 ? '✅' : '❌'} |
+          | Build Time | ${{ steps.quality.outputs.build_time }} | ✅ |
+          | Empty Directories | ${{ steps.quality.outputs.empty_dirs }} | ${Number(${{ steps.quality.outputs.empty_dirs }}) <= 5 ? '✅' : '⚠️'} |
+          | TODO Comments | ${{ steps.quality.outputs.todos }} | ${Number(${{ steps.quality.outputs.todos }}) <= 50 ? '✅' : '⚠️'} |
+          `;
+          
+          // Add comparison if available
+          if ('${{ steps.compare.outputs.error_diff }}' !== '') {
+            comment += `
+          
+          #### 📈 Changes from Base Branch
+          | Metric | Change | Trend |
+          |--------|--------|-------|
+          | Error Handling | ${Number('${{ steps.compare.outputs.error_diff }}').toFixed(1)}% | ${Number('${{ steps.compare.outputs.error_diff }}') >= 0 ? '📈' : '📉'} |
+          | Test Coverage | ${Number('${{ steps.compare.outputs.coverage_diff }}').toFixed(1)}% | ${Number('${{ steps.compare.outputs.coverage_diff }}') >= 0 ? '📈' : '📉'} |
+          `;
+          }
+          
+          // Add top recommendations
+          if (qualityMetrics.recommendations && qualityMetrics.recommendations.length > 0) {
+            comment += `
+          
+          #### 💡 Top Recommendations
+          `;
+            qualityMetrics.recommendations.slice(0, 3).forEach(rec => {
+              comment += `- ${rec}\n`;
+            });
+          }
+          
+          // Add warnings
+          const warnings = '${{ steps.gates.outputs.warnings }}';
+          if (warnings) {
+            comment += `
+          
+          #### ⚠️  Warnings
+          ${warnings}`;
+          }
+          
+          comment += `
+          
+          ---
+          *Full reports available in the [workflow artifacts](${context.payload.pull_request.html_url}/checks)*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+    # Set status check
+    - name: Set Commit Status
+      if: always()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const status = '${{ steps.gates.outputs.gates_passed }}' === 'true' ? 'success' : 'failure';
+          const description = status === 'success' 
+            ? 'All quality gates passed' 
+            : 'Quality gates failed - see details';
+          
+          github.rest.repos.createCommitStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            sha: context.sha,
+            state: status,
+            description: description,
+            context: 'quality-gates'
+          });

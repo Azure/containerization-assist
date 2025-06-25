@@ -1,0 +1,97 @@
+{
+  "quality_gates": {
+    "error_handling": {
+      "minimum": 20.0,
+      "warning": 60.0,
+      "target": 80.0,
+      "description": "Percentage of RichError adoption"
+    },
+    "test_coverage": {
+      "minimum": 10.0,
+      "warning": 50.0,
+      "target": 70.0,
+      "description": "Overall test coverage percentage"
+    },
+    "interface_compliance": {
+      "minimum": 100.0,
+      "warning": 100.0,
+      "target": 100.0,
+      "description": "Percentage of tools with correct interfaces"
+    },
+    "build_time": {
+      "maximum": 300,
+      "warning": 120,
+      "target": 60,
+      "unit": "seconds",
+      "description": "Maximum acceptable build time"
+    },
+    "directory_depth": {
+      "maximum": 6,
+      "warning": 5,
+      "target": 4,
+      "description": "Maximum directory nesting level"
+    },
+    "function_length": {
+      "maximum": 100,
+      "warning": 75,
+      "target": 50,
+      "unit": "lines",
+      "description": "Maximum function length"
+    },
+    "cyclomatic_complexity": {
+      "maximum": 20,
+      "warning": 15,
+      "target": 10,
+      "description": "Maximum cyclomatic complexity per function"
+    },
+    "todo_comments": {
+      "maximum": 100,
+      "warning": 50,
+      "target": 20,
+      "description": "Maximum TODO/FIXME comments"
+    }
+  },
+  "pre_commit": {
+    "enabled_checks": [
+      "interface_validation",
+      "gofmt",
+      "go_vet"
+    ],
+    "warning_checks": [
+      "error_handling_adoption",
+      "test_coverage"
+    ]
+  },
+  "pre_push": {
+    "enabled_checks": [
+      "tests",
+      "build",
+      "interface_validation",
+      "error_handling_minimum"
+    ],
+    "strict_mode": true
+  },
+  "ci_pipeline": {
+    "fail_on_regression": true,
+    "regression_tolerance": {
+      "error_handling": 5.0,
+      "test_coverage": 2.0
+    },
+    "required_artifacts": [
+      "quality-metrics.json",
+      "interface-metrics.json",
+      "quality-dashboard.html"
+    ]
+  },
+  "reporting": {
+    "include_in_pr_comment": [
+      "interface_compliance",
+      "error_handling",
+      "test_coverage",
+      "build_time",
+      "recommendations"
+    ],
+    "max_recommendations": 5,
+    "show_trends": true
+  }
+}
