@@ -2,7 +2,7 @@ package tools
 
 import (
 	"fmt"
-	
+
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
@@ -62,23 +62,23 @@ func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcptypes.ToolMe
 func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.ToolRegistry) error {
 	// Tools that implement the unified interface properly
 	readyTools := map[string]func() interface{}{
-		"atomic_analyze_repository":    func() interface{} { return &AtomicAnalyzeRepositoryTool{} },
-		"atomic_build_image":           func() interface{} { return &AtomicBuildImageTool{} },
-		"atomic_check_health":          func() interface{} { return &AtomicCheckHealthTool{} },
-		"atomic_deploy_kubernetes":     func() interface{} { return &AtomicDeployKubernetesTool{} },
-		"atomic_generate_manifests":    func() interface{} { return &AtomicGenerateManifestsTool{} },
-		"atomic_pull_image":            func() interface{} { return &AtomicPullImageTool{} },
-		"atomic_push_image":            func() interface{} { return &AtomicPushImageTool{} },
-		"atomic_scan_image_security":   func() interface{} { return &AtomicScanImageSecurityTool{} },
-		"atomic_scan_secrets":          func() interface{} { return &AtomicScanSecretsTool{} },
-		"atomic_tag_image":             func() interface{} { return &AtomicTagImageTool{} },
-		"atomic_validate_dockerfile":   func() interface{} { return &AtomicValidateDockerfileTool{} },
+		"atomic_analyze_repository":  func() interface{} { return &AtomicAnalyzeRepositoryTool{} },
+		"atomic_build_image":         func() interface{} { return &AtomicBuildImageTool{} },
+		"atomic_check_health":        func() interface{} { return &AtomicCheckHealthTool{} },
+		"atomic_deploy_kubernetes":   func() interface{} { return &AtomicDeployKubernetesTool{} },
+		"atomic_generate_manifests":  func() interface{} { return &AtomicGenerateManifestsTool{} },
+		"atomic_pull_image":          func() interface{} { return &AtomicPullImageTool{} },
+		"atomic_push_image":          func() interface{} { return &AtomicPushImageTool{} },
+		"atomic_scan_image_security": func() interface{} { return &AtomicScanImageSecurityTool{} },
+		"atomic_scan_secrets":        func() interface{} { return &AtomicScanSecretsTool{} },
+		"atomic_tag_image":           func() interface{} { return &AtomicTagImageTool{} },
+		"atomic_validate_dockerfile": func() interface{} { return &AtomicValidateDockerfileTool{} },
 	}
 
 	registered := 0
 	for name, factory := range readyTools {
 		tool := factory()
-		
+
 		// Try to register as unified Tool interface
 		if unifiedTool, ok := tool.(mcptypes.Tool); ok {
 			err := toolRegistry.Register(name, func() mcptypes.Tool { return unifiedTool })
@@ -100,7 +100,7 @@ func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.To
 func (ara *AutoRegistrationAdapter) GetReadyToolNames() []string {
 	return []string{
 		"atomic_analyze_repository",
-		"atomic_build_image", 
+		"atomic_build_image",
 		"atomic_check_health",
 		"atomic_deploy_kubernetes",
 		"atomic_generate_manifests",

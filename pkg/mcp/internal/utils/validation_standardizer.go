@@ -106,7 +106,9 @@ func (vr *ValidationResult) GetFirstError() *ValidationError {
 // StandardValidateSession performs standard session validation
 func (svm *StandardizedValidationMixin) StandardValidateSession(
 	ctx context.Context,
-	sessionManager interface{ GetSession(sessionID string) (interface{}, error) },
+	sessionManager interface {
+		GetSession(sessionID string) (interface{}, error)
+	},
 	sessionID string,
 ) (*ValidatedSession, error) {
 	// Basic validation
@@ -451,4 +453,3 @@ func (svm *StandardizedValidationMixin) checkWritePermission(path string) error 
 	file.Close()
 	return nil
 }
-

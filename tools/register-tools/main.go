@@ -129,12 +129,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to find module root: %v", err)
 	}
-	
+
 	outputPath := *output
 	if !filepath.IsAbs(outputPath) {
 		outputPath = filepath.Join(moduleRoot, outputPath)
 	}
-	
+
 	outputDir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		log.Fatalf("Failed to create output directory: %v", err)

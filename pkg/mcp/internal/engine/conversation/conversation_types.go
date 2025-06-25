@@ -129,7 +129,6 @@ func (r *ConversationResponse) GetAutoAdvanceMessage() string {
 	return baseMsg
 }
 
-
 // Note: ErrorHandler is now in the errors package for centralized error management
 
 // Note: ToolOrchestrator methods are defined in tool_orchestrator.go

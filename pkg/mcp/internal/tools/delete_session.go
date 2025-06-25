@@ -204,9 +204,9 @@ func (t *DeleteSessionTool) GetMetadata() mcptypes.ToolMetadata {
 			"Workspace manager access",
 		},
 		Parameters: map[string]string{
-			"session_id":        "Required: The session ID to delete",
-			"force":             "Optional: Force deletion even if jobs are running",
-			"delete_workspace":  "Optional: Also delete the workspace directory",
+			"session_id":       "Required: The session ID to delete",
+			"force":            "Optional: Force deletion even if jobs are running",
+			"delete_workspace": "Optional: Also delete the workspace directory",
 		},
 		Examples: []mcptypes.ToolExample{
 			{

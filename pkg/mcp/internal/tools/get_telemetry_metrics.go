@@ -491,11 +491,11 @@ func (t *GetTelemetryMetricsTool) GetMetadata() mcptypes.ToolMetadata {
 					"format": "prometheus",
 				},
 				Output: map[string]interface{}{
-					"metrics":           "# HELP tool_execution_duration_seconds...",
-					"format":            "prometheus",
-					"metric_count":      45,
-					"export_timestamp":  "2024-12-17T10:30:00Z",
-					"server_uptime":     "24h30m",
+					"metrics":          "# HELP tool_execution_duration_seconds...",
+					"format":           "prometheus",
+					"metric_count":     45,
+					"export_timestamp": "2024-12-17T10:30:00Z",
+					"server_uptime":    "24h30m",
 				},
 			},
 			{

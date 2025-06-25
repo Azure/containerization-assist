@@ -44,7 +44,7 @@ func (ct *ChatTool) Execute(ctx context.Context, args interface{}) (interface{},
 	if !ok {
 		return nil, fmt.Errorf("invalid argument type for chat tool: %T", args)
 	}
-	
+
 	return ct.ExecuteTyped(ctx, chatArgs)
 }
 

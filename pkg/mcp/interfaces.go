@@ -102,22 +102,22 @@ type SessionState struct {
 
 // RepositoryInfo contains repository analysis information
 type RepositoryInfo struct {
-	Language    string                 `json:"language"`
-	Framework   string                 `json:"framework"`
-	Dependencies []string              `json:"dependencies"`
-	EntryPoint  string                 `json:"entry_point"`
-	Port        int                    `json:"port"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Language     string                 `json:"language"`
+	Framework    string                 `json:"framework"`
+	Dependencies []string               `json:"dependencies"`
+	EntryPoint   string                 `json:"entry_point"`
+	Port         int                    `json:"port"`
+	Metadata     map[string]interface{} `json:"metadata"`
 }
 
 // SecurityScanResult contains security scan information
 type SecurityScanResult struct {
-	HasVulnerabilities bool     `json:"has_vulnerabilities"`
-	CriticalCount      int      `json:"critical_count"`
-	HighCount          int      `json:"high_count"`
-	MediumCount        int      `json:"medium_count"`
-	LowCount           int      `json:"low_count"`
-	Vulnerabilities    []string `json:"vulnerabilities"`
+	HasVulnerabilities bool      `json:"has_vulnerabilities"`
+	CriticalCount      int       `json:"critical_count"`
+	HighCount          int       `json:"high_count"`
+	MediumCount        int       `json:"medium_count"`
+	LowCount           int       `json:"low_count"`
+	Vulnerabilities    []string  `json:"vulnerabilities"`
 	ScanTime           time.Time `json:"scan_time"`
 }
 
@@ -216,4 +216,3 @@ type ToolRegistry interface {
 	// GetMetadata returns metadata for a specific tool
 	GetMetadata(name string) (ToolMetadata, bool)
 }
-

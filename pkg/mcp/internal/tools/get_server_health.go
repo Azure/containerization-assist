@@ -292,18 +292,18 @@ func (t *GetServerHealthTool) GetMetadata() mcptypes.ToolMetadata {
 			{
 				Name:        "Basic health check",
 				Description: "Get basic server health status",
-				Input: map[string]interface{}{},
+				Input:       map[string]interface{}{},
 				Output: map[string]interface{}{
-					"status":          "healthy",
-					"uptime":          "24h30m",
+					"status": "healthy",
+					"uptime": "24h30m",
 					"system_resources": map[string]interface{}{
 						"memory_percent": 45.2,
 						"disk_percent":   25.8,
 						"cpu_count":      8,
 					},
 					"sessions": map[string]interface{}{
-						"active_sessions": 12,
-						"total_sessions":  15,
+						"active_sessions":  12,
+						"total_sessions":   15,
 						"sessions_percent": 80.0,
 					},
 					"warnings": []string{},

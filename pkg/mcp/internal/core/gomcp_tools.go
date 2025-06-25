@@ -258,12 +258,12 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 
 	// Use auto-registration adapter for zero-code approach
 	autoRegistry := tools.NewAutoRegistrationAdapter()
-	
+
 	// Create adapter for orchestrator registry to unified interface
 	registryAdapter := tools.NewOrchestratorRegistryAdapter(deps.ToolRegistry)
-	
+
 	deps.Logger.Info().Msg("🚀 Starting auto-registration of atomic tools")
-	
+
 	// Register tools ready for auto-registration
 	if err := autoRegistry.RegisterAtomicTools(registryAdapter); err != nil {
 		deps.Logger.Error().Err(err).Msg("Failed to auto-register atomic tools")
