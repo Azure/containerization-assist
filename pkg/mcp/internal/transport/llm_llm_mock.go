@@ -1,6 +1,6 @@
 //go:build test
 
-package llm
+package transport
 
 import (
 	"context"
