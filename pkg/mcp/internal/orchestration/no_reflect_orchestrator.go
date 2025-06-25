@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter/mcp"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // NoReflectToolOrchestrator provides type-safe tool execution without reflection
 type NoReflectToolOrchestrator struct {
-	toolRegistry    *MCPToolRegistry
-	sessionManager  SessionManager
-	logger          zerolog.Logger
-	toolFactory     *ToolFactory
-	pipelineAdapter interface{}
+	toolRegistry       *MCPToolRegistry
+	sessionManager     SessionManager
+	logger             zerolog.Logger
+	toolFactory        *ToolFactory
+	pipelineOperations interface{}
 }
 
 // NewNoReflectToolOrchestrator creates a new orchestrator without reflection
@@ -32,21 +32,26 @@ func NewNoReflectToolOrchestrator(
 	}
 }
 
-// SetPipelineAdapter sets the pipeline adapter and creates the tool factory
+// SetPipelineAdapter sets the pipeline adapter (deprecated - use SetPipelineOperations)
 func (o *NoReflectToolOrchestrator) SetPipelineAdapter(adapter interface{}) {
-	o.pipelineAdapter = adapter
+	o.SetPipelineOperations(adapter)
+}
+
+// SetPipelineOperations sets the pipeline operations and creates the tool factory
+func (o *NoReflectToolOrchestrator) SetPipelineOperations(operations interface{}) {
+	o.pipelineOperations = operations
 
 	// Try to assert to the correct type
-	if pipelineAdapter, ok := adapter.(*mcp.PipelineAdapter); ok {
+	if pipelineOps, ok := operations.(mcptypes.PipelineOperations); ok {
 		// Extract concrete session manager from the wrapper
 		if concreteSessionManager := o.extractConcreteSessionManager(); concreteSessionManager != nil {
-			o.toolFactory = NewToolFactory(pipelineAdapter, concreteSessionManager, o.logger)
+			o.toolFactory = NewToolFactory(pipelineOps, concreteSessionManager, o.logger)
 			o.logger.Debug().Msg("Tool factory successfully initialized with concrete session manager")
 		} else {
 			o.logger.Warn().Msg("Tool factory initialization requires concrete session manager - factory not created")
 		}
 	} else {
-		o.logger.Error().Msg("Failed to assert pipeline adapter to correct type")
+		o.logger.Error().Msg("Failed to assert pipeline operations to correct type")
 	}
 }
 

@@ -196,21 +196,21 @@ func (t *AtomicScanImageSecurityTool) ExecuteScan(ctx context.Context, args Atom
 // ExecuteWithContext runs the atomic security scan with GoMCP progress tracking
 func (t *AtomicScanImageSecurityTool) ExecuteWithContext(serverCtx *server.Context, args AtomicScanImageSecurityArgs) (*AtomicScanImageSecurityResult, error) {
 	// Create progress adapter for GoMCP using standard scan stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardScanStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	result, err := t.performSecurityScan(ctx, args, adapter)
+	result, err := t.performSecurityScan(ctx, args, nil)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Security scan failed")
+		t.logger.Info().Msg("Security scan failed")
 		if result != nil {
 			result.Success = false
 		}
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Security scan completed successfully")
+		t.logger.Info().Msg("Security scan completed successfully")
 	}
 
 	return result, nil
@@ -251,9 +251,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 		Msg("Starting atomic security scanning")
 
 	// Stage 1: Initialize
-	if reporter != nil {
-		reporter.ReportStage(0.0, "Initializing security scan")
-	}
+	// Progress reporting removed
 
 	// Create base result
 	result := &AtomicScanImageSecurityResult{
@@ -297,14 +295,10 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 		return result, nil
 	}
 
-	if reporter != nil {
-		reporter.ReportStage(0.8, "Scan environment prepared")
-	}
+	// Progress reporting removed
 
 	// Stage 2: Pull image if needed
-	if reporter != nil {
-		reporter.NextStage("Pulling image if needed")
-	}
+	// Progress reporting removed
 
 	// Create scanner and validate prerequisites
 	scanner := coredocker.NewTrivyScanner(t.logger)
@@ -316,15 +310,10 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 
 	result.Scanner = "trivy"
 
-	if reporter != nil {
-		reporter.ReportStage(0.5, "Scanner validated")
-	}
+	// Progress reporting removed
 
 	// Stage 3: Scan
-	if reporter != nil {
-		reporter.NextStage("Running security analysis")
-		reporter.ReportStage(0.1, "Starting vulnerability scan")
-	}
+	// Progress reporting removed
 
 	// Run security scan
 	severityThreshold := args.SeverityThreshold
@@ -341,9 +330,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 	// Store vulnerability types in scan context for later use
 	result.ScanContext["vuln_types"] = vulnTypes
 
-	if reporter != nil {
-		reporter.ReportStage(0.3, "Scanning for vulnerabilities")
-	}
+	// Progress reporting removed
 
 	scanResult, err := scanner.ScanImage(ctx, args.ImageName, severityThreshold)
 	if err != nil {
@@ -355,62 +342,43 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 	result.ScanResult = scanResult
 	result.Duration = time.Since(startTime)
 
-	if reporter != nil {
-		reporter.ReportStage(0.9, "Vulnerability scan complete")
-	}
+	// Progress reporting removed
 
 	// Stage 4: Analyze
-	if reporter != nil {
-		reporter.NextStage("Processing scan results")
-		reporter.ReportStage(0.1, "Analyzing vulnerabilities")
-	}
+	// Progress reporting removed
 
 	// Analyze scan results
 	t.analyzeScanResults(result, scanResult)
 
-	if reporter != nil {
-		reporter.ReportStage(0.3, "Generating recommendations")
-	}
+	// Progress reporting removed
 
 	// Generate security recommendations
 	t.generateSecurityRecommendations(result, args)
 
-	if reporter != nil {
-		reporter.ReportStage(0.5, "Assessing compliance")
-	}
+	// Progress reporting removed
 
 	// Assess compliance
 	t.assessCompliance(result)
 
-	if reporter != nil {
-		reporter.ReportStage(0.7, "Creating remediation plan")
-	}
+	// Progress reporting removed
 
 	// Generate remediation plan if requested
 	if args.IncludeRemediations && (result.VulnSummary.TotalVulnerabilities > 0 || len(result.CriticalFindings) > 0) {
 		result.RemediationPlan = t.generateRemediationPlan(result)
 	}
 
-	if reporter != nil {
-		reporter.ReportStage(0.9, "Analysis complete")
-	}
+	// Progress reporting removed
 
 	// Stage 5: Report
-	if reporter != nil {
-		reporter.NextStage("Generating security report")
-	}
+	// Progress reporting removed
 
 	// Generate report if requested
 	if args.GenerateReport {
-		if reporter != nil {
-			reporter.ReportStage(0.3, "Creating detailed report")
-		}
+		// Progress reporting removed
 		result.GeneratedReport = t.generateSecurityReport(result)
 	}
 
-	if reporter != nil {
-		reporter.ReportStage(0.7, "Finalizing results")
-	}
+	// Progress reporting removed
 
 	// Determine overall success
 	result.Success = t.determineOverallSuccess(result, args)
@@ -446,9 +414,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 		Dur("duration", result.Duration).
 		Msg("Security scan completed")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Security scan complete")
-	}
+	// Progress reporting removed
 
 	return result, nil
 }

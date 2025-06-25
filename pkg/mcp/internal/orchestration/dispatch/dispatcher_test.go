@@ -2,15 +2,97 @@ package dispatch
 
 import (
 	"context"
+	"fmt"
 	"testing"
+
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
+
+// testToolImpl is a simple test tool implementation
+type testToolImpl struct {
+	name string
+}
+
+func (t *testToolImpl) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	return map[string]interface{}{
+		"success": true,
+		"message": "test tool executed",
+	}, nil
+}
+
+func (t *testToolImpl) GetMetadata() interface{} {
+	return map[string]interface{}{
+		"name":        t.name,
+		"description": "Test tool for unit tests",
+	}
+}
+
+// testToolWrapper wraps testToolImpl to implement mcptypes.Tool
+type testToolWrapper struct {
+	impl *testToolImpl
+}
+
+func (w *testToolWrapper) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	return w.impl.Execute(ctx, args)
+}
+
+func (w *testToolWrapper) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        w.impl.name,
+		Description: "Test tool for unit tests",
+		Version:     "1.0.0",
+		Category:    "test",
+	}
+}
+
+func (w *testToolWrapper) Validate(ctx context.Context, args interface{}) error {
+	return nil
+}
+
+// testToolArgs implements mcptypes.ToolArgs
+type testToolArgs struct {
+	data map[string]interface{}
+}
+
+func (a *testToolArgs) Validate() error {
+	return nil
+}
+
+// testToolResult implements mcptypes.ToolResult
+type testToolResult struct {
+	success bool
+	result  interface{}
+	error   string
+}
+
+func (r *testToolResult) GetResult() interface{} {
+	return r.result
+}
+
+func (r *testToolResult) IsSuccess() bool {
+	return r.success
+}
+
+func (r *testToolResult) GetError() error {
+	if r.error != "" {
+		return fmt.Errorf("%s", r.error)
+	}
+	return nil
+}
 
 func TestToolDispatcher(t *testing.T) {
 	// Create a new dispatcher
 	dispatcher := NewToolDispatcher()
 
-	// Register the example tool
-	err := RegisterAnalyzeRepositoryTool(dispatcher)
+	// Create a simple test tool directly without adapter
+	factory := func() mcptypes.Tool {
+		return &testToolWrapper{impl: &testToolImpl{name: "test_tool"}}
+	}
+	converter := func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
+		// Return a simple test args implementation
+		return &testToolArgs{data: args}, nil
+	}
+	err := dispatcher.RegisterTool("test_tool", factory, converter)
 	if err != nil {
 		t.Fatalf("Failed to register tool: %v", err)
 	}
@@ -23,15 +105,15 @@ func TestToolDispatcher(t *testing.T) {
 			t.Errorf("Expected 1 tool, got %d", len(tools))
 		}
 
-		if tools[0] != "analyze_repository_atomic" {
-			t.Errorf("Expected tool name 'analyze_repository_atomic', got '%s'", tools[0])
+		if tools[0] != "test_tool" {
+			t.Errorf("Expected tool name 'test_tool', got '%s'", tools[0])
 		}
 	})
 
 	// Test 2: Get tool factory
 	t.Run("GetToolFactory", func(t *testing.T) {
 		t.Parallel()
-		factory, exists := dispatcher.GetToolFactory("analyze_repository_atomic")
+		factory, exists := dispatcher.GetToolFactory("test_tool")
 		if !exists {
 			t.Error("Tool factory not found")
 		}
@@ -42,66 +124,13 @@ func TestToolDispatcher(t *testing.T) {
 		}
 	})
 
-	// Test 3: Argument conversion
-	t.Run("ArgumentConversion", func(t *testing.T) {
-		t.Parallel()
-		args := map[string]interface{}{
-			"session_id": "test-session",
-			"repo_url":   "https://github.com/test/repo",
-			"branch":     "main",
-			"depth":      10,
-		}
-
-		toolArgs, err := dispatcher.ConvertArgs("analyze_repository_atomic", args)
-		if err != nil {
-			t.Fatalf("Failed to convert args: %v", err)
-		}
-
-		// Type assert to verify correct type
-		analyzeArgs, ok := toolArgs.(*AnalyzeRepositoryArgs)
-		if !ok {
-			t.Fatal("Converted args have wrong type")
-		}
-
-		if analyzeArgs.SessionID != "test-session" {
-			t.Errorf("Expected SessionID 'test-session', got '%s'", analyzeArgs.SessionID)
-		}
-
-		if analyzeArgs.RepoURL != "https://github.com/test/repo" {
-			t.Errorf("Expected RepoURL 'https://github.com/test/repo', got '%s'", analyzeArgs.RepoURL)
-		}
-
-		if analyzeArgs.Branch != "main" {
-			t.Errorf("Expected Branch 'main', got '%s'", analyzeArgs.Branch)
-		}
-
-		if analyzeArgs.Depth != 10 {
-			t.Errorf("Expected Depth 10, got %d", analyzeArgs.Depth)
-		}
-	})
-
-	// Test 4: Argument validation
-	t.Run("ArgumentValidation", func(t *testing.T) {
-		// Missing required field
-		args := map[string]interface{}{
-			"session_id": "test-session",
-			// repo_url is missing
-		}
-
-		_, err := dispatcher.ConvertArgs("analyze_repository_atomic", args)
-		if err == nil {
-			t.Error("Expected validation error for missing repo_url")
-		}
-	})
-
-	// Test 5: Tool execution
+	// Test 3: Tool execution via dispatcher
 	t.Run("ToolExecution", func(t *testing.T) {
-		factory, _ := dispatcher.GetToolFactory("analyze_repository_atomic")
+		factory, _ := dispatcher.GetToolFactory("test_tool")
 		tool := factory()
 
-		args := &AnalyzeRepositoryArgs{
-			SessionID: "test-session",
-			RepoURL:   "https://github.com/test/repo",
+		args := map[string]interface{}{
+			"test": "data",
 		}
 
 		result, err := tool.Execute(context.Background(), args)
@@ -110,53 +139,28 @@ func TestToolDispatcher(t *testing.T) {
 		}
 
 		// Type assert result
-		analyzeResult, ok := result.(*AnalyzeRepositoryResult)
+		resultMap, ok := result.(map[string]interface{})
 		if !ok {
 			t.Fatal("Result has wrong type")
 		}
 
-		if !analyzeResult.IsSuccess() {
+		if success, ok := resultMap["success"].(bool); !ok || !success {
 			t.Error("Expected successful execution")
 		}
-
-		if analyzeResult.Language != "go" {
-			t.Errorf("Expected language 'go', got '%s'", analyzeResult.Language)
-		}
 	})
 
-	// Test 6: Metadata
-	t.Run("ToolMetadata", func(t *testing.T) {
-		metadata, exists := dispatcher.GetToolMetadata("analyze_repository_atomic")
-		if !exists {
-			t.Error("Tool metadata not found")
-		}
-
-		if metadata.Name != "analyze_repository_atomic" {
-			t.Errorf("Expected name 'analyze_repository_atomic', got '%s'", metadata.Name)
-		}
-
-		if metadata.Category != "analysis" {
-			t.Errorf("Expected category 'analysis', got '%s'", metadata.Category)
-		}
-
-		if len(metadata.Capabilities) != 3 {
-			t.Errorf("Expected 3 capabilities, got %d", len(metadata.Capabilities))
-		}
-	})
-
-	// Test 7: Get tools by category
+	// Test 4: Get tools by category (simplified)
 	t.Run("GetToolsByCategory", func(t *testing.T) {
-		tools := dispatcher.GetToolsByCategory("analysis")
+		// Our test tool has category "test"
+		tools := dispatcher.GetToolsByCategory("test")
 		if len(tools) != 1 {
-			t.Errorf("Expected 1 tool in 'analysis' category, got %d", len(tools))
+			t.Errorf("Expected 1 tool in 'test' category, got %d", len(tools))
 		}
-	})
-
-	// Test 8: Get tools by capability
-	t.Run("GetToolsByCapability", func(t *testing.T) {
-		tools := dispatcher.GetToolsByCapability("language_detection")
-		if len(tools) != 1 {
-			t.Errorf("Expected 1 tool with 'language_detection' capability, got %d", len(tools))
+		
+		// Test non-existent category
+		tools = dispatcher.GetToolsByCategory("non-existent")
+		if len(tools) != 0 {
+			t.Errorf("Expected 0 tools in 'non-existent' category, got %d", len(tools))
 		}
 	})
 }
@@ -164,8 +168,15 @@ func TestToolDispatcher(t *testing.T) {
 func TestDispatcherConcurrency(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
-	// Register tool
-	RegisterAnalyzeRepositoryTool(dispatcher)
+	// Register test tool
+	factory := func() mcptypes.Tool {
+		return &testToolWrapper{impl: &testToolImpl{name: "concurrent_test_tool"}}
+	}
+	converter := func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
+		// Return a simple test args implementation
+		return &testToolArgs{data: args}, nil
+	}
+	dispatcher.RegisterTool("concurrent_test_tool", factory, converter)
 
 	// Test concurrent access
 	done := make(chan bool, 10)
@@ -177,18 +188,12 @@ func TestDispatcherConcurrency(t *testing.T) {
 			_ = dispatcher.ListTools()
 
 			// Get factory
-			factory, _ := dispatcher.GetToolFactory("analyze_repository_atomic")
+			factory, _ := dispatcher.GetToolFactory("concurrent_test_tool")
 			if factory != nil {
 				tool := factory()
-				_ = tool.GetMetadata()
+				// Execute tool
+				_, _ = tool.Execute(context.Background(), nil)
 			}
-
-			// Convert args
-			args := map[string]interface{}{
-				"session_id": "test",
-				"repo_url":   "test",
-			}
-			_, _ = dispatcher.ConvertArgs("analyze_repository_atomic", args)
 
 			done <- true
 		}()

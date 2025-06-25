@@ -3,10 +3,10 @@ package core
 import (
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter/mcp"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 
 // ServerStats provides comprehensive server statistics
@@ -34,33 +34,33 @@ func (s *Server) GetStats() *ServerStats {
 }
 
 // GetWorkspaceStats returns workspace statistics
-func (s *Server) GetWorkspaceStats() mcp.WorkspaceStats {
+func (s *Server) GetWorkspaceStats() types.WorkspaceStats {
 	stats := s.workspaceManager.GetStats()
-	return mcp.WorkspaceStats{
+	return types.WorkspaceStats{
 		TotalDiskUsage: stats.TotalDiskUsage,
 		SessionCount:   stats.TotalSessions,
 	}
 }
 
 // GetSessionManagerStats returns session manager statistics
-func (s *Server) GetSessionManagerStats() mcp.SessionManagerStats {
+func (s *Server) GetSessionManagerStats() types.SessionManagerStats {
 	stats := s.sessionManager.GetStats()
-	return mcp.SessionManagerStats{
+	return types.SessionManagerStats{
 		ActiveSessions: stats.ActiveSessions,
 		TotalSessions:  stats.TotalSessions,
 	}
 }
 
 // GetCircuitBreakerStats returns circuit breaker statistics
-func (s *Server) GetCircuitBreakerStats() map[string]mcp.CircuitBreakerStats {
+func (s *Server) GetCircuitBreakerStats() map[string]types.CircuitBreakerStats {
 	if s.circuitBreakers == nil {
 		return nil
 	}
 
 	stats := s.circuitBreakers.GetStats()
-	result := make(map[string]mcp.CircuitBreakerStats)
+	result := make(map[string]types.CircuitBreakerStats)
 	for name, stat := range stats {
-		result[name] = mcp.CircuitBreakerStats{
+		result[name] = types.CircuitBreakerStats{
 			State:        stat.State,
 			FailureCount: stat.FailureCount,
 			SuccessCount: int64(stat.SuccessCount),
@@ -71,8 +71,8 @@ func (s *Server) GetCircuitBreakerStats() map[string]mcp.CircuitBreakerStats {
 }
 
 // GetConfig returns server configuration
-func (s *Server) GetConfig() mcp.ServerConfig {
-	return mcp.ServerConfig{
+func (s *Server) GetConfig() types.ServerConfig {
+	return types.ServerConfig{
 		TotalDiskLimit: s.config.TotalDiskLimit,
 	}
 }

@@ -157,15 +157,15 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 	startTime := time.Now()
 
 	// Create progress adapter for GoMCP using standard scan stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardScanStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	result, err := t.executeWithProgress(ctx, args, startTime, adapter)
+	result, err := t.executeWithProgress(ctx, args, startTime, nil)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Secrets scan failed")
+		t.logger.Info().Msg("Secrets scan failed")
 		if result == nil {
 			// Create a minimal result if something went wrong
 			result = &AtomicScanSecretsResult{
@@ -177,7 +177,7 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 		}
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Secrets scan completed successfully")
+		t.logger.Info().Msg("Secrets scan completed successfully")
 	}
 
 	return result, nil
@@ -186,7 +186,7 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 // executeWithProgress handles the main execution with progress reporting
 func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter interfaces.ProgressReporter) (*AtomicScanSecretsResult, error) {
 	// Stage 1: Initialize - Loading session and validating scan path
-	reporter.ReportStage(0.1, "Loading session")
+	t.logger.Info().Msg("Loading session")
 
 	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
@@ -217,7 +217,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		SeverityBreakdown:   make(map[string]int),
 	}
 
-	reporter.ReportStage(0.5, "Session loaded")
+	t.logger.Info().Msg("Session loaded")
 
 	// Determine scan path
 	scanPath := args.ScanPath
@@ -233,10 +233,10 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		return result, types.NewRichError("SCAN_PATH_NOT_FOUND", fmt.Sprintf("scan path does not exist: %s", scanPath), types.ErrTypeSystem)
 	}
 
-	reporter.ReportStage(1.0, "Initialization complete")
+	t.logger.Info().Msg("Initialization complete")
 
 	// Stage 2: Analyze - Analyzing file patterns and scan configuration
-	reporter.NextStage("Analyzing scan configuration")
+	t.logger.Info().Msg("Analyzing scan configuration")
 
 	// Use provided file patterns or defaults
 	filePatterns := args.FilePatterns
@@ -250,10 +250,10 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		excludePatterns = []string{"*.git/*", "node_modules/*", "vendor/*", "*.log"}
 	}
 
-	reporter.ReportStage(1.0, "Scan configuration analyzed")
+	t.logger.Info().Msg("Scan configuration analyzed")
 
 	// Stage 3: Scan - Scanning files for secrets
-	reporter.NextStage("Scanning files for secrets")
+	t.logger.Info().Msg("Scanning files for secrets")
 
 	// Perform the actual secret scan
 	allSecrets, fileResults, filesScanned, err := t.performSecretScan(scanPath, filePatterns, excludePatterns, reporter)
@@ -269,28 +269,28 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 	result.DetectedSecrets = allSecrets
 	result.FileResults = fileResults
 
-	reporter.ReportStage(1.0, fmt.Sprintf("Scanned %d files, found %d secrets", filesScanned, len(allSecrets)))
+	t.logger.Info().Msg(fmt.Sprintf("Scanned %d files, found %d secrets", filesScanned, len(allSecrets)))
 
 	// Stage 4: Process - Processing results and generating recommendations
-	reporter.NextStage("Processing scan results")
+	t.logger.Info().Msg("Processing scan results")
 
 	result.SeverityBreakdown = t.calculateSeverityBreakdown(allSecrets)
 	result.SecurityScore = t.calculateSecurityScore(allSecrets)
 	result.RiskLevel = t.determineRiskLevel(result.SecurityScore, allSecrets)
 	result.Recommendations = t.generateRecommendations(allSecrets, args)
 
-	reporter.ReportStage(0.6, "Generated security analysis")
+	t.logger.Info().Msg("Generated security analysis")
 
 	// Generate remediation plan if requested
 	if args.SuggestRemediation && len(allSecrets) > 0 {
 		result.RemediationPlan = t.generateRemediationPlan(allSecrets)
-		reporter.ReportStage(0.8, "Generated remediation plan")
+		t.logger.Info().Msg("Generated remediation plan")
 	}
 
-	reporter.ReportStage(1.0, "Result processing complete")
+	t.logger.Info().Msg("Result processing complete")
 
 	// Stage 5: Finalize - Generating reports and remediation plans
-	reporter.NextStage("Finalizing results")
+	t.logger.Info().Msg("Finalizing results")
 
 	// Generate Kubernetes secrets if requested
 	if args.GenerateSecrets && len(allSecrets) > 0 {
@@ -299,7 +299,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 			t.logger.Warn().Err(err).Msg("Failed to generate Kubernetes secrets")
 		} else {
 			result.GeneratedSecrets = generatedSecrets
-			reporter.ReportStage(0.8, "Generated Kubernetes secrets")
+			t.logger.Info().Msg("Generated Kubernetes secrets")
 		}
 	}
 
@@ -315,7 +315,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		Dur("duration", result.Duration).
 		Msg("Secret scanning completed")
 
-	reporter.ReportStage(1.0, "Secret scanning completed")
+	t.logger.Info().Msg("Secret scanning completed")
 
 	return result, nil
 }
@@ -444,22 +444,21 @@ func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns,
 
 	// Count total files first for progress reporting
 	totalFiles := 0
-	if reporter != nil {
-		err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return nil
-			}
-			if t.shouldScanFile(path, filePatterns, excludePatterns) {
-				totalFiles++
-			}
-			return nil
-		})
+	// Progress reporting removed
+	err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			t.logger.Warn().Err(err).Msg("Failed to count files for progress")
+			return err
 		}
+		if !info.IsDir() && t.shouldScanFile(path, filePatterns, excludePatterns) {
+			totalFiles++
+		}
+		return nil
+	})
+	if err != nil {
+		t.logger.Warn().Err(err).Msg("Failed to count files for progress")
 	}
 
-	err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

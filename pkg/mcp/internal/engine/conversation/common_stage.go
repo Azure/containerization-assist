@@ -54,7 +54,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 	}
 
 	// Format scan results
-	if scanResult, ok := result.Result.(map[string]interface{}); ok {
+	if scanResult, ok := result.(map[string]interface{}); ok {
 		vulnerabilities := extractVulnerabilities(scanResult)
 		if len(vulnerabilities) > 0 {
 			response.Status = ResponseStatusWarning
@@ -197,7 +197,7 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 	}
 
 	// Extract logs from result
-	if healthResult, ok := result.Result.(map[string]interface{}); ok {
+	if healthResult, ok := result.(map[string]interface{}); ok {
 		if logs, ok := healthResult["logs"].(string); ok && logs != "" {
 			response.Status = ResponseStatusSuccess
 			response.Message = fmt.Sprintf("Pod logs:\n\n```\n%s\n```\n\nBased on these logs, what would you like to do?", logs)

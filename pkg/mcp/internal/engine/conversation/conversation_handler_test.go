@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -17,6 +18,29 @@ import (
 )
 
 // Mock implementations for testing
+
+// testSessionManagerAdapter implements orchestration.SessionManager interface
+type testSessionManagerAdapter struct {
+	mgr *session.SessionManager
+}
+
+func (a *testSessionManagerAdapter) GetSession(sessionID string) (interface{}, error) {
+	return a.mgr.GetSession(sessionID)
+}
+
+func (a *testSessionManagerAdapter) UpdateSession(session interface{}) error {
+	// Type assert and update through the real session manager
+	s, ok := session.(*sessiontypes.SessionState)
+	if !ok {
+		return fmt.Errorf("invalid session type: expected *sessiontypes.SessionState, got %T", session)
+	}
+	if s.SessionID == "" {
+		return fmt.Errorf("session ID is required")
+	}
+	return a.mgr.UpdateSession(s.SessionID, func(existing *sessiontypes.SessionState) {
+		*existing = *s
+	})
+}
 
 type mockOrchestrator struct {
 	executeCalls []executeCall
@@ -329,11 +353,14 @@ func createTestHandler(t *testing.T, logger zerolog.Logger) *ConversationHandler
 	sessionMgr := createTestSessionManager(t)
 	prefStore := createTestPreferenceStore(t)
 
+	// Create a session manager adapter that implements orchestration.SessionManager
+	sessionAdapter := &testSessionManagerAdapter{mgr: sessionMgr}
+
 	// Create a minimal orchestrator for testing
 	registry := orchestration.NewMCPToolRegistry(logger)
 	orchestrator := orchestration.NewMCPToolOrchestrator(
 		registry,
-		&sessionManagerAdapter{sessionMgr},
+		sessionAdapter,
 		logger,
 	)
 
@@ -389,59 +416,14 @@ func createTestPreferenceStore(t *testing.T) *preference.PreferenceStore {
 	return store
 }
 
-// Test the modernOrchestratorAdapter
-func TestModernOrchestratorAdapter(t *testing.T) {
-	logger := zerolog.New(nil).Level(zerolog.Disabled)
+// Test removed - modernOrchestratorAdapter is no longer used after adapter deletion
 
-	t.Run("successful tool execution", func(t *testing.T) {
-		// Setup
-
-		// Need to wrap in actual MCPToolOrchestrator structure
-		registry := orchestration.NewMCPToolRegistry(logger)
-		realOrch := orchestration.NewMCPToolOrchestrator(registry, nil, logger)
-
-		adapter := &modernOrchestratorAdapter{realOrch}
-
-		// Execute
-		ctx := context.Background()
-		session := &sessiontypes.SessionState{SessionID: "test"}
-		params := map[string]interface{}{"param": "value"}
-
-		result, err := adapter.ExecuteTool(ctx, "test-tool", params, session.SessionID)
-
-		// Verify - will fail because we don't have the tool registered
-		assert.Error(t, err) // Expected since tool isn't registered
-		assert.NotNil(t, result)
-		assert.False(t, result.Success)
-	})
-
-	t.Run("handles execution error", func(t *testing.T) {
-		// Setup
-		registry := orchestration.NewMCPToolRegistry(logger)
-		realOrch := orchestration.NewMCPToolOrchestrator(registry, nil, logger)
-		adapter := &modernOrchestratorAdapter{realOrch}
-
-		// Execute with non-existent tool
-		ctx := context.Background()
-		session := &sessiontypes.SessionState{SessionID: "test"}
-		params := map[string]interface{}{}
-
-		result, err := adapter.ExecuteTool(ctx, "non-existent-tool", params, session.SessionID)
-
-		// Verify
-		assert.Error(t, err)
-		assert.NotNil(t, result)
-		assert.False(t, result.Success)
-		assert.Contains(t, result.Error, "unknown tool")
-	})
-}
-
-// Test sessionManagerAdapter
+// Test testSessionManagerAdapter
 func TestSessionManagerAdapter(t *testing.T) {
 	t.Run("successful session update", func(t *testing.T) {
 		// Setup
 		sessionMgr := createTestSessionManager(t)
-		adapter := &sessionManagerAdapter{sessionMgr}
+		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
 		// Create a session first
 		_, err := sessionMgr.GetOrCreateSession("update-test")
@@ -473,7 +455,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 	t.Run("error on invalid type", func(t *testing.T) {
 		// Setup
 		sessionMgr := createTestSessionManager(t)
-		adapter := &sessionManagerAdapter{sessionMgr}
+		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
 		// Try to update with wrong type
 		err := adapter.UpdateSession("not a session")
@@ -486,7 +468,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 	t.Run("error on missing session ID", func(t *testing.T) {
 		// Setup
 		sessionMgr := createTestSessionManager(t)
-		adapter := &sessionManagerAdapter{sessionMgr}
+		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
 		// Try to update without session ID
 		session := &sessiontypes.SessionState{

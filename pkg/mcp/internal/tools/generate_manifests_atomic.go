@@ -32,8 +32,8 @@ type AtomicGenerateManifestsTool struct {
 	secretGenerator     *corek8s.SecretGenerator
 	fixingMixin         *fixing.AtomicToolFixingMixin
 	templateIntegration *TemplateIntegration
-	manifestsAdapter    *ManifestsAdapter
-	logger              zerolog.Logger
+	// manifestsAdapter removed - functionality integrated directly
+	logger zerolog.Logger
 }
 
 // NewAtomicGenerateManifestsTool creates a new atomic generate manifests tool
@@ -46,8 +46,8 @@ func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, session
 		secretGenerator:     corek8s.NewSecretGenerator(toolLogger),
 		fixingMixin:         nil, // Will be set via SetAnalyzer if fixing is enabled
 		templateIntegration: NewTemplateIntegration(toolLogger),
-		manifestsAdapter:    NewManifestsAdapter(adapter, toolLogger),
-		logger:              toolLogger,
+		// manifestsAdapter removed - functionality integrated directly
+		logger: toolLogger,
 	}
 }
 
@@ -135,22 +135,21 @@ func (t *AtomicGenerateManifestsTool) ExecuteManifestGeneration(ctx context.Cont
 
 // ExecuteWithContext runs the atomic manifest generation with GoMCP progress tracking
 func (t *AtomicGenerateManifestsTool) ExecuteWithContext(serverCtx *server.Context, args AtomicGenerateManifestsArgs) (*AtomicGenerateManifestsResult, error) {
-	// Create progress adapter for GoMCP using centralized generate stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardGenerateStages())
-
-	// Execute with progress tracking
+	// Execute without progress adapter (removed)
 	ctx := context.Background()
-	result, err := t.performManifestGeneration(ctx, args, adapter)
+	result, err := t.performManifestGeneration(ctx, args, nil)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Manifest generation failed")
+		// Progress tracking removed
+		t.logger.Info().Msg("Manifest generation failed")
 		if result != nil {
 			result.Success = false
 		}
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Manifest generation completed successfully")
+		// Progress tracking removed
+		t.logger.Info().Msg("Manifest generation completed successfully")
 	}
 
 	return result, nil
@@ -193,8 +192,9 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 	useRefactoredModules := os.Getenv("USE_REFACTORED_MANIFESTS") == "true"
 	if useRefactoredModules {
 		t.logger.Info().Msg("Using refactored manifest generation modules")
-		workspaceDir := t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-		return t.manifestsAdapter.GenerateManifestsWithModules(ctx, args, session, workspaceDir)
+		_ = t.pipelineAdapter.GetSessionWorkspace(session.SessionID) // workspaceDir would be used here
+		// ManifestsAdapter removed - return error for now
+		return nil, fmt.Errorf("refactored manifest generation not implemented without adapter")
 	}
 
 	// Create base response
@@ -225,9 +225,8 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 				Int("secrets_found", len(detectedSecrets)).
 				Msg("Sensitive environment variables detected")
 
-			if reporter != nil {
-				reporter.ReportStage(0.5, "Creating secrets externalization plan")
-			}
+			// Progress reporting removed
+			t.logger.Info().Msg("Creating secrets externalization plan")
 
 			// Create externalization plan based on mode
 			plan := t.createSecretsPlan(args, detectedSecrets)
@@ -241,9 +240,8 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 		}
 	}
 
-	if reporter != nil {
-		reporter.ReportStage(0.9, "Requirements analysis complete")
-	}
+	// Progress reporting removed
+	t.logger.Info().Msg("Requirements analysis complete")
 
 	// Step 3: Select template for manifest generation
 	t.logger.Info().Msg("Selecting template for manifest generation")
@@ -373,9 +371,8 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 		Dur("duration", result.TotalDuration).
 		Msg("Atomic manifest generation completed")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Manifest generation complete")
-	}
+	// Progress reporting removed
+	t.logger.Info().Msg("Manifest generation complete")
 
 	return result, nil
 }

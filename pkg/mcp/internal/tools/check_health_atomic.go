@@ -186,17 +186,17 @@ func (t *AtomicCheckHealthTool) ExecuteHealthCheck(ctx context.Context, args Ato
 // ExecuteWithContext runs the atomic health check with GoMCP progress tracking
 func (t *AtomicCheckHealthTool) ExecuteWithContext(serverCtx *server.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
 	// Create progress adapter for GoMCP using centralized health stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardHealthStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	result, err := t.performHealthCheck(ctx, args, adapter)
+	result, err := t.performHealthCheck(ctx, args, nil)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Health check failed")
+		t.logger.Info().Msg("Health check failed")
 	} else {
-		adapter.Complete("Health check completed successfully")
+		t.logger.Info().Msg("Health check completed successfully")
 	}
 
 	return result, err
@@ -245,9 +245,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		Msg("Starting atomic application health check")
 
 	// Stage 1: Initialize
-	if reporter != nil {
-		reporter.ReportStage(0.0, "Initializing health check")
-	}
+	// Progress reporting removed
 
 	// Create base response
 	result := &AtomicCheckHealthResult{
@@ -259,9 +257,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		HealthContext:       &HealthContext{},
 	}
 
-	if reporter != nil {
-		reporter.ReportStage(0.5, "Session and namespace loaded")
-	}
+	// Progress reporting removed
 
 	// Handle dry-run
 	if args.DryRun {
@@ -275,9 +271,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 	}
 
 	// Validate prerequisites
-	if reporter != nil {
-		reporter.ReportStage(0.8, "Validating prerequisites")
-	}
+	// Progress reporting removed
 
 	if err := t.validateHealthCheckPrerequisites(result, args); err != nil {
 		t.logger.Error().Err(err).
@@ -292,10 +286,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 	}
 
 	// Stage 2: Query Kubernetes resources
-	if reporter != nil {
-		reporter.NextStage("Querying Kubernetes resources")
-		reporter.ReportStage(0.1, "Fetching pod and service status")
-	}
+	// Progress reporting removed
 
 	// Perform health check using core operations
 	healthStartTime := time.Now()
@@ -351,9 +342,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		}
 	}
 
-	if reporter != nil {
-		reporter.ReportStage(0.9, "Resource query complete")
-	}
+	// Progress reporting removed
 
 	if err != nil {
 		t.logger.Error().Err(err).
@@ -377,24 +366,16 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		Msg("Application health check completed")
 
 	// Stage 3: Analyze pod and service health
-	if reporter != nil {
-		reporter.NextStage("Analyzing pod and service health")
-		reporter.ReportStage(0.1, "Processing health data")
-	}
+	// Progress reporting removed
 
 	// Analyze the health results to populate the context
 	result.Success = result.HealthResult != nil && result.HealthResult.Success
 
-	if reporter != nil {
-		reporter.ReportStage(0.5, "Health data analyzed")
-	}
+	// Progress reporting removed
 
 	// Stage 4: Wait for readiness if requested
 	if args.WaitForReady && (result.HealthResult == nil || !result.HealthResult.Success) {
-		if reporter != nil {
-			reporter.NextStage("Waiting for ready state")
-			reporter.ReportStage(0.1, "Starting readiness wait")
-		}
+		// Progress reporting removed
 
 		waitStartTime := time.Now()
 		timeout := t.getWaitTimeout(args.WaitTimeout)
@@ -421,23 +402,16 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 				Msg("Application did not become ready within timeout")
 		}
 
-		if reporter != nil {
-			reporter.ReportStage(0.9, "Readiness wait complete")
-		}
+		// Progress reporting removed
 	}
 
 	// Stage 5: Generate health report
-	if reporter != nil {
-		reporter.NextStage("Generating health report")
-		reporter.ReportStage(0.2, "Analyzing results in detail")
-	}
+	// Progress reporting removed
 
 	// Analyze health results in detail
 	t.analyzeApplicationHealth(result, args)
 
-	if reporter != nil {
-		reporter.ReportStage(0.8, "Health report generated")
-	}
+	// Progress reporting removed
 
 	result.TotalDuration = time.Since(startTime)
 	// Update BaseAIContextResult fields
@@ -455,9 +429,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		Dur("total_duration", result.TotalDuration).
 		Msg("Atomic application health check completed successfully")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Health check complete")
-	}
+	// Progress reporting removed
 
 	return result, nil
 }

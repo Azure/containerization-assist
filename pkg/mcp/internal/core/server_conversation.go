@@ -10,9 +10,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
-	mcpadapter "github.com/Azure/container-copilot/pkg/mcp/internal/adapter/mcp"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/engine/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/ops"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
 	"github.com/Azure/container-copilot/pkg/runner"
 )
@@ -134,8 +134,8 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 		k8s.NewKubeCmdRunner(cmdRunner),
 	)
 
-	// Create pipeline adapter
-	pipelineAdapter := mcpadapter.NewPipelineAdapter(
+	// Create pipeline operations
+	pipelineOps := pipeline.NewOperations(
 		s.sessionManager,
 		mcpClients,
 		s.logger,
@@ -147,14 +147,14 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 	// Use the server's canonical orchestrator instead of creating parallel orchestration
 	// This eliminates the tool registration conflicts and ensures single orchestration path
 	conversationHandler, err := conversation.NewConversationHandler(conversation.ConversationHandlerConfig{
-		SessionManager:   s.sessionManager,
-		SessionAdapter:   sessionAdapter,
-		PreferenceStore:  preferenceStore,
-		PipelineAdapter:  pipelineAdapter,
-		ToolOrchestrator: s.toolOrchestrator, // Use canonical orchestrator
-		Transport:        s.transport,
-		Logger:           s.logger,
-		Telemetry:        telemetryMgr,
+		SessionManager:     s.sessionManager,
+		SessionAdapter:     sessionAdapter,
+		PreferenceStore:    preferenceStore,
+		PipelineOperations: pipelineOps,
+		ToolOrchestrator:   s.toolOrchestrator, // Use canonical orchestrator
+		Transport:          s.transport,
+		Logger:             s.logger,
+		Telemetry:          telemetryMgr,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create conversation handler: %w", err)

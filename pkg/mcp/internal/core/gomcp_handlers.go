@@ -30,7 +30,7 @@ func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerS
 
 	// Detailed health check using atomic tool
 	healthTool := tools.NewAtomicCheckHealthTool(
-		deps.PipelineAdapter,
+		deps.PipelineOperations,
 		deps.AtomicSessionMgr,
 		deps.Logger.With().Str("tool", "check_health_atomic").Logger(),
 	)

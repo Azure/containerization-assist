@@ -70,8 +70,8 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse analysis results
-	if result.Success && result.Result != nil {
-		if analysis, ok := result.Result.(map[string]interface{}); ok {
+	if result != nil {
+		if analysis, ok := result.(map[string]interface{}); ok {
 			state.RepoAnalysis = analysis
 
 			// Extract key information
@@ -158,8 +158,8 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse Dockerfile result
-	if result.Success && result.Result != nil {
-		if dockerResult, ok := result.Result.(map[string]interface{}); ok {
+	if result != nil {
+		if dockerResult, ok := result.(map[string]interface{}); ok {
 			content := publicutils.GetStringFromMap(dockerResult, "content")
 			if content != "" {
 				state.Dockerfile.Content = content

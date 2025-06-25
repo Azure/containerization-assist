@@ -120,22 +120,22 @@ func (e *BuildExecutor) ExecuteWithContext(serverCtx *server.Context, args Atomi
 	}
 
 	// Use centralized build stages for progress tracking
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardBuildStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := e.executeWithProgress(ctx, args, result, startTime, adapter)
+	err := e.executeWithProgress(ctx, args, result, startTime, nil)
 
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Build failed")
+		e.logger.Info().Msg("Build failed")
 		result.Success = false
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Build completed successfully")
+		e.logger.Info().Msg("Build completed successfully")
 	}
 
 	return result, nil
@@ -144,7 +144,7 @@ func (e *BuildExecutor) ExecuteWithContext(serverCtx *server.Context, args Atomi
 // executeWithProgress handles the main execution with progress reporting
 func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
-	reporter.ReportStage(0.1, "Loading session")
+	e.logger.Info().Msg("Loading session")
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		e.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
@@ -165,7 +165,7 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 	result.BuildContext = e.getBuildContext(args.BuildContext, result.WorkspaceDir)
 	result.DockerfilePath = e.getDockerfilePath(args.DockerfilePath, result.BuildContext)
 
-	reporter.ReportStage(0.8, "Session initialized")
+	e.logger.Info().Msg("Session initialized")
 
 	// Handle dry-run
 	if args.DryRun {
@@ -176,12 +176,12 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 			fmt.Sprintf("Build context: %s", result.BuildContext),
 		}
 		result.Success = true
-		reporter.NextStage("Dry-run completed")
+		e.logger.Info().Msg("Dry-run completed")
 		return nil
 	}
 
 	// Stage 2: Analyze - Analyzing build context and dependencies
-	reporter.NextStage("Analyzing build context")
+	e.logger.Info().Msg("Analyzing build context")
 	if err := e.analyzeBuildContext(result); err != nil {
 		e.logger.Error().Err(err).
 			Str("dockerfile_path", result.DockerfilePath).
@@ -190,7 +190,7 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build context analysis failed: %v", err), "filesystem_error")
 	}
 
-	reporter.ReportStage(0.5, "Validating build prerequisites")
+	e.logger.Info().Msg("Validating build prerequisites")
 	if err := e.validateBuildPrerequisites(result); err != nil {
 		e.logger.Error().Err(err).
 			Str("dockerfile_path", result.DockerfilePath).
@@ -200,10 +200,10 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build prerequisites validation failed: %v", err), "validation_error")
 	}
 
-	reporter.ReportStage(1.0, "Analysis completed")
+	e.logger.Info().Msg("Analysis completed")
 
 	// Stage 3: Build - Building Docker image
-	reporter.NextStage("Building Docker image")
+	e.logger.Info().Msg("Building Docker image")
 	buildStartTime := time.Now()
 	buildResult, err := e.pipelineAdapter.BuildDockerImage(
 		session.SessionID, // Use compatibility method
@@ -251,10 +251,10 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 	}
 
 	result.Success = true
-	reporter.ReportStage(1.0, "Docker image built successfully")
+	e.logger.Info().Msg("Docker image built successfully")
 
 	// Stage 4: Verify - Running post-build verification
-	reporter.NextStage("Running security scan")
+	e.logger.Info().Msg("Running security scan")
 	if err := e.runSecurityScan(ctx, session, result); err != nil {
 		e.logger.Warn().Err(err).Msg("Security scan failed, but build was successful")
 		result.BuildContext_Info.TroubleshootingTips = append(
@@ -265,7 +265,7 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 
 	// Push image if requested
 	if args.PushAfterBuild && args.RegistryURL != "" {
-		reporter.ReportStage(0.7, "Pushing image to registry")
+		e.logger.Info().Msg("Pushing image to registry")
 		pushStartTime := time.Now()
 		// Construct full image ref with registry
 		registryImageRef := result.FullImageRef
@@ -307,17 +307,17 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 		}
 	}
 
-	reporter.ReportStage(1.0, "Verification completed")
+	e.logger.Info().Msg("Verification completed")
 
 	// Stage 5: Finalize - Cleaning up and saving results
-	reporter.NextStage("Finalizing")
+	e.logger.Info().Msg("Finalizing")
 	e.generateBuildContext(result)
 
 	if err := e.updateSessionState(session, result); err != nil {
 		e.logger.Warn().Err(err).Msg("Failed to update session state")
 	}
 
-	reporter.ReportStage(1.0, "Build completed successfully")
+	e.logger.Info().Msg("Build completed successfully")
 	return nil
 }
 

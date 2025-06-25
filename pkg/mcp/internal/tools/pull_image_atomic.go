@@ -139,11 +139,11 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	}
 
 	// Create progress adapter for GoMCP using standard pull stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardPullStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, adapter)
+	err := t.executeWithProgress(ctx, args, result, startTime, nil)
 
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
@@ -153,11 +153,11 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Pull failed")
+		t.logger.Info().Msg("Pull failed")
 		result.Success = false
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Pull completed successfully")
+		t.logger.Info().Msg("Pull completed successfully")
 	}
 
 	return result, nil
@@ -166,7 +166,7 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 // executeWithProgress handles the main execution with progress reporting
 func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
-	reporter.ReportStage(0.1, "Loading session")
+	t.logger.Info().Msg("Loading session")
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
@@ -183,7 +183,7 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 		Str("image_ref", args.ImageRef).
 		Msg("Starting atomic Docker pull")
 
-	reporter.ReportStage(0.8, "Session initialized")
+	t.logger.Info().Msg("Session initialized")
 
 	// Handle dry-run
 	if args.DryRun {
@@ -197,12 +197,12 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 			"This is a dry-run - no actual pull was performed",
 			"Remove dry_run flag to perform actual pull",
 		}
-		reporter.NextStage("Dry-run completed")
+		t.logger.Info().Msg("Dry-run completed")
 		return nil
 	}
 
 	// Stage 2: Authenticate - Authenticating with registry
-	reporter.NextStage("Validating prerequisites")
+	t.logger.Info().Msg("Validating prerequisites")
 	if err := t.validatePullPrerequisites(result, args); err != nil {
 		t.logger.Error().Err(err).
 			Str("session_id", session.SessionID).
@@ -214,10 +214,10 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 		})
 	}
 
-	reporter.ReportStage(1.0, "Prerequisites validated")
+	t.logger.Info().Msg("Prerequisites validated")
 
 	// Stage 3: Pull - Pulling Docker image layers
-	reporter.NextStage("Pulling Docker image")
+	t.logger.Info().Msg("Pulling Docker image")
 	return t.performPull(ctx, session, args, result, reporter)
 }
 
@@ -290,9 +290,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 // performPull contains the actual pull logic that can be used with or without progress reporting
 func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiontypes.SessionState, args AtomicPullImageArgs, result *AtomicPullImageResult, reporter interfaces.ProgressReporter) error {
 	// Report progress if reporter is available
-	if reporter != nil {
-		reporter.ReportStage(0.1, "Starting image pull")
-	}
+	// Progress reporting removed
 
 	// Extract registry from image reference
 	result.Registry = t.extractRegistryURL(args.ImageRef)
@@ -333,26 +331,18 @@ func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiont
 		Dur("pull_duration", result.PullDuration).
 		Msg("Docker pull completed successfully")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Pull completed successfully")
-	}
+	// Progress reporting removed
 
 	// Stage 4: Verify - Verifying pull results
-	if reporter != nil {
-		reporter.NextStage("Verifying pull results")
-	}
+	// Progress reporting removed
 
 	// Generate rich context for Claude reasoning
 	t.generatePullContext(result, args)
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Verification completed")
-	}
+	// Progress reporting removed
 
 	// Stage 5: Finalize - Updating session state
-	if reporter != nil {
-		reporter.NextStage("Finalizing")
-	}
+	// Progress reporting removed
 
 	// Update session state
 	if err := t.updateSessionState(session, result); err != nil {
@@ -365,9 +355,7 @@ func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiont
 		Bool("success", result.Success).
 		Msg("Atomic Docker pull completed")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Pull operation completed")
-	}
+	// Progress reporting removed
 
 	return nil
 }

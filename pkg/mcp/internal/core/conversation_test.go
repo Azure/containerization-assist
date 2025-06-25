@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/engine/conversation"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
@@ -371,19 +372,22 @@ func TestConversationToolResult(t *testing.T) {
 // MockConversationOrchestrator implements conversation.ToolOrchestrator for testing
 type MockConversationOrchestrator struct{}
 
-func (m *MockConversationOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, sessionID string) (*conversation.ToolResult, error) {
-	return &conversation.ToolResult{
-		CallID:        "test-call-" + toolName,
-		CorrelationID: "test-correlation",
-		ToolName:      toolName,
-		Success:       true,
-		Result: map[string]interface{}{
-			"tool":     toolName,
-			"success":  true,
-			"mock":     true,
-			"executed": true,
-		},
-		ExecutionTime: 100 * time.Millisecond,
-		Timestamp:     time.Now(),
+func (m *MockConversationOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
+	return map[string]interface{}{
+		"tool":     toolName,
+		"success":  true,
+		"mock":     true,
+		"executed": true,
+	}, nil
+}
+
+func (m *MockConversationOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
+	return nil
+}
+
+func (m *MockConversationOrchestrator) GetToolMetadata(toolName string) (*orchestration.ToolMetadata, error) {
+	return &orchestration.ToolMetadata{
+		Name:        toolName,
+		Description: "Mock tool for testing",
 	}, nil
 }

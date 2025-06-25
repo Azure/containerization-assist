@@ -322,22 +322,22 @@ func (t *AtomicDeployKubernetesTool) ExecuteWithContext(serverCtx *server.Contex
 	}
 
 	// Create progress adapter for GoMCP using centralized deploy stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardDeployStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, adapter)
+	err := t.executeWithProgress(ctx, args, result, startTime, nil)
 
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Deployment failed")
+		t.logger.Info().Msg("Deployment failed")
 		result.Success = false
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Deployment completed successfully")
+		t.logger.Info().Msg("Deployment completed successfully")
 	}
 
 	return result, nil
@@ -346,7 +346,7 @@ func (t *AtomicDeployKubernetesTool) ExecuteWithContext(serverCtx *server.Contex
 // executeWithProgress handles the main execution with progress reporting
 func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
-	reporter.ReportStage(0.1, "Loading session")
+	t.logger.Info().Msg("Loading session")
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
@@ -364,7 +364,7 @@ func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, ar
 		Str("namespace", args.Namespace).
 		Msg("Starting atomic Kubernetes deployment")
 
-	reporter.ReportStage(0.8, "Session initialized")
+	t.logger.Info().Msg("Session initialized")
 
 	// Handle dry-run
 	if args.DryRun {
@@ -375,18 +375,18 @@ func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, ar
 			"This is a dry-run - no actual deployment was performed",
 			"Remove dry_run flag to perform actual deployment",
 		}
-		reporter.NextStage("Dry-run completed")
+		t.logger.Info().Msg("Dry-run completed")
 		return nil
 	}
 
 	// Stage 2: Generate - Generating Kubernetes manifests
-	reporter.NextStage("Generating Kubernetes manifests")
+	t.logger.Info().Msg("Generating Kubernetes manifests")
 	if err := t.performManifestGeneration(ctx, session, args, result, reporter); err != nil {
 		return err
 	}
 
 	// Stage 3: Deploy - Deploying to cluster
-	reporter.NextStage("Deploying to cluster")
+	t.logger.Info().Msg("Deploying to cluster")
 	if !args.GenerateOnly {
 		if err := t.performDeployment(ctx, session, args, result, reporter); err != nil {
 			return err
@@ -394,7 +394,7 @@ func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, ar
 	}
 
 	// Stage 4: Verify - Verifying deployment health
-	reporter.NextStage("Verifying deployment health")
+	t.logger.Info().Msg("Verifying deployment health")
 	if !args.GenerateOnly && args.WaitForReady {
 		if err := t.performHealthCheck(ctx, session, args, result, reporter); err != nil {
 			return err
@@ -402,7 +402,7 @@ func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, ar
 	}
 
 	// Stage 5: Finalize - Saving deployment status
-	reporter.NextStage("Finalizing")
+	t.logger.Info().Msg("Finalizing")
 	if err := t.updateSessionState(session, result); err != nil {
 		t.logger.Warn().Err(err).Msg("Failed to update session state")
 	}
@@ -417,7 +417,7 @@ func (t *AtomicDeployKubernetesTool) executeWithProgress(ctx context.Context, ar
 		Bool("success", result.Success).
 		Msg("Atomic Kubernetes deployment completed")
 
-	reporter.ReportStage(1.0, "Deployment operation completed")
+	t.logger.Info().Msg("Deployment operation completed")
 	return nil
 }
 
@@ -759,9 +759,7 @@ func (op *KubernetesDeployOperation) applyFileChange(change mcptypes.FileChange)
 
 // performManifestGeneration generates Kubernetes manifests
 func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter interfaces.ProgressReporter) error {
-	if reporter != nil {
-		reporter.ReportStage(0.1, "Generating manifests")
-	}
+	// Progress reporting removed
 
 	generationStart := time.Now()
 
@@ -822,18 +820,14 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 		Str("namespace", args.Namespace).
 		Msg("Kubernetes manifests generated successfully")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Manifests generated")
-	}
+	// Progress reporting removed
 
 	return nil
 }
 
 // performDeployment deploys manifests to Kubernetes cluster
 func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter interfaces.ProgressReporter) error {
-	if reporter != nil {
-		reporter.ReportStage(0.1, "Deploying to cluster")
-	}
+	// Progress reporting removed
 
 	deploymentStart := time.Now()
 
@@ -896,18 +890,14 @@ func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, sess
 		Str("namespace", args.Namespace).
 		Msg("Kubernetes deployment completed successfully")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Deployment completed")
-	}
+	// Progress reporting removed
 
 	return nil
 }
 
 // performHealthCheck verifies deployment health
 func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, reporter interfaces.ProgressReporter) error {
-	if reporter != nil {
-		reporter.ReportStage(0.1, "Checking deployment health")
-	}
+	// Progress reporting removed
 
 	healthStart := time.Now()
 	timeout := 300 * time.Second // Default 5 minutes
@@ -990,9 +980,7 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 		Str("app_name", args.AppName).
 		Msg("Deployment health check passed")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Health check completed")
-	}
+	// Progress reporting removed
 
 	return nil
 }

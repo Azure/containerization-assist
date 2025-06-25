@@ -10,11 +10,12 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
-	mcpadapter "github.com/Azure/container-copilot/pkg/mcp/internal/adapter/mcp"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -101,12 +102,12 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 	// Create dependencies for tools
 	deps := gm.createToolDependencies(s)
 
-	// Set pipeline adapter on the orchestrator for type-safe dispatch
-	if deps.ToolOrchestrator != nil && deps.PipelineAdapter != nil && deps.AtomicSessionMgr != nil {
-		deps.ToolOrchestrator.SetPipelineAdapter(deps.PipelineAdapter)
+	// Set pipeline operations on the orchestrator for type-safe dispatch
+	if deps.ToolOrchestrator != nil && deps.PipelineOperations != nil && deps.AtomicSessionMgr != nil {
+		deps.ToolOrchestrator.SetPipelineOperations(deps.PipelineOperations)
 
 		// Create and set the tool factory with concrete types
-		toolFactory := orchestration.NewToolFactory(deps.PipelineAdapter, deps.AtomicSessionMgr, deps.Logger)
+		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, deps.Logger)
 
 		// Get the no-reflect dispatcher from the orchestrator and set the factory
 		// This is a workaround for the interface/concrete type mismatch
@@ -115,7 +116,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 			deps.Logger.Info().Msg("Tool factory set on no-reflect dispatcher")
 		}
 
-		deps.Logger.Info().Msg("Pipeline adapter set on tool orchestrator")
+		deps.Logger.Info().Msg("Pipeline operations set on tool orchestrator")
 	}
 
 	// Register core tools
@@ -154,15 +155,15 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 // ToolDependencies holds shared dependencies for tool creation
 type ToolDependencies struct {
-	Server           *Server
-	SessionManager   *session.SessionManager
-	ToolOrchestrator *orchestration.MCPToolOrchestrator
-	ToolRegistry     *orchestration.MCPToolRegistry
-	PipelineAdapter  *mcpadapter.PipelineAdapter // Keep for backward compatibility during transition
-	AtomicSessionMgr *session.SessionManager
-	MCPClients       *adapter.MCPClients
-	RegistryManager  *coredocker.RegistryManager
-	Logger           zerolog.Logger
+	Server             *Server
+	SessionManager     *session.SessionManager
+	ToolOrchestrator   *orchestration.MCPToolOrchestrator
+	ToolRegistry       *orchestration.MCPToolRegistry
+	PipelineOperations mcptypes.PipelineOperations // Direct pipeline operations without adapter
+	AtomicSessionMgr   *session.SessionManager
+	MCPClients         *adapter.MCPClients
+	RegistryManager    *coredocker.RegistryManager
+	Logger             zerolog.Logger
 }
 
 // getNoReflectDispatcher extracts the no-reflect dispatcher from the orchestrator
@@ -188,8 +189,8 @@ func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 		s.logger.Error().Err(err).Msg("Analyzer validation failed")
 	}
 
-	// Create pipeline adapter
-	pipelineAdapter := mcpadapter.NewPipelineAdapter(
+	// Create pipeline operations (no adapter needed)
+	pipelineOps := pipeline.NewOperations(
 		s.sessionManager,
 		mcpClients,
 		s.logger,
@@ -210,15 +211,15 @@ func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 	registryManager := coredocker.NewRegistryManager(legacyClients, s.logger)
 
 	return &ToolDependencies{
-		Server:           s,
-		SessionManager:   s.sessionManager,
-		ToolOrchestrator: s.toolOrchestrator,
-		ToolRegistry:     s.toolRegistry,
-		PipelineAdapter:  pipelineAdapter, // Keep for backward compatibility during transition
-		AtomicSessionMgr: atomicSessionMgr,
-		MCPClients:       mcpClients,
-		RegistryManager:  registryManager,
-		Logger:           s.logger,
+		Server:             s,
+		SessionManager:     s.sessionManager,
+		ToolOrchestrator:   s.toolOrchestrator,
+		ToolRegistry:       s.toolRegistry,
+		PipelineOperations: pipelineOps, // Direct pipeline operations
+		AtomicSessionMgr:   atomicSessionMgr,
+		MCPClients:         mcpClients,
+		RegistryManager:    registryManager,
+		Logger:             s.logger,
 	}
 }
 
@@ -258,12 +259,12 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	// Create atomic tools and register them with the orchestrator's tool registry
 	atomicTools := map[string]interface{}{
 		"analyze_repository_atomic": tools.NewAtomicAnalyzeRepositoryTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "analyze_repository_atomic").Logger(),
 		),
 		"build_image_atomic": tools.NewAtomicBuildImageTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
 		),
@@ -272,42 +273,42 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 			deps.Logger.With().Str("tool", "generate_dockerfile_atomic").Logger(),
 		),
 		"deploy_kubernetes_atomic": tools.NewAtomicDeployKubernetesTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "deploy_kubernetes_atomic").Logger(),
 		),
 		"validate_dockerfile_atomic": tools.NewAtomicValidateDockerfileTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "validate_dockerfile_atomic").Logger(),
 		),
 		"pull_image_atomic": tools.NewAtomicPullImageTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "pull_image_atomic").Logger(),
 		),
 		"tag_image_atomic": tools.NewAtomicTagImageTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "tag_image_atomic").Logger(),
 		),
 		"scan_image_security_atomic": tools.NewAtomicScanImageSecurityTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "scan_image_security_atomic").Logger(),
 		),
 		"scan_secrets_atomic": tools.NewAtomicScanSecretsTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "scan_secrets_atomic").Logger(),
 		),
 		"generate_manifests_atomic": tools.NewAtomicGenerateManifestsTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "generate_manifests_atomic").Logger(),
 		),
 		"push_image_atomic": tools.NewAtomicPushImageTool(
-			deps.PipelineAdapter,
+			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "push_image_atomic").Logger(),
 		),

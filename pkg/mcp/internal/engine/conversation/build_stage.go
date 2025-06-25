@@ -118,7 +118,7 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 	state.Context["build_dry_run_complete"] = true
 
 	// Format preview
-	details, _ := result.Result.(map[string]interface{})
+	details, _ := result.(map[string]interface{})
 	layers := publicutils.GetIntFromMap(details, "estimated_layers")
 	size := int64(publicutils.GetIntFromMap(details, "estimated_size"))
 	baseImage := publicutils.GetStringFromMap(details, "base_image")
@@ -194,7 +194,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Extract details from result
-	details, _ := result.Result.(map[string]interface{})
+	details, _ := result.(map[string]interface{})
 
 	// Update state with build results
 	state.Dockerfile.Built = true
@@ -341,15 +341,24 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 		// Log dry-run failure but continue
 		pm.logger.Debug().Err(err).Msg("Dry-run push failed, proceeding with actual push")
 	}
-	if dryResult != nil && !dryResult.Success {
-		response.Status = ResponseStatusError
-		response.Message = fmt.Sprintf("Registry access check failed: %s\n\nPlease authenticate with:\ndocker login %s",
-			dryResult.Error, registry)
-		response.Options = []Option{
-			{ID: "retry", Label: "I've authenticated, retry"},
-			{ID: "skip", Label: "Skip push"},
+	if dryResult != nil {
+		// Check if dry-run failed by examining the result
+		if dryResultMap, ok := dryResult.(map[string]interface{}); ok {
+			if success, ok := dryResultMap["success"].(bool); ok && !success {
+				errorMsg := "unknown error"
+				if errStr, ok := dryResultMap["error"].(string); ok {
+					errorMsg = errStr
+				}
+				response.Status = ResponseStatusError
+				response.Message = fmt.Sprintf("Registry access check failed: %s\n\nPlease authenticate with:\ndocker login %s",
+					errorMsg, registry)
+				response.Options = []Option{
+					{ID: "retry", Label: "I've authenticated, retry"},
+					{ID: "skip", Label: "Skip push"},
+				}
+				return response
+			}
 		}
-		return response
 	}
 
 	// Execute actual push

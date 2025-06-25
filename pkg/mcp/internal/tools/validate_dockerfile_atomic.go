@@ -173,20 +173,20 @@ type SecurityAnalysis struct {
 
 // AtomicValidateDockerfileTool implements atomic Dockerfile validation
 type AtomicValidateDockerfileTool struct {
-	pipelineAdapter   mcptypes.PipelineOperations
-	sessionManager    mcptypes.ToolSessionManager
-	dockerfileAdapter *DockerfileAdapter
-	logger            zerolog.Logger
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
+	// dockerfileAdapter removed - functionality integrated directly
+	logger zerolog.Logger
 }
 
 // NewAtomicValidateDockerfileTool creates a new atomic Dockerfile validation tool
 func NewAtomicValidateDockerfileTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
 	toolLogger := logger.With().Str("tool", "atomic_validate_dockerfile").Logger()
 	return &AtomicValidateDockerfileTool{
-		pipelineAdapter:   adapter,
-		sessionManager:    sessionManager,
-		dockerfileAdapter: NewDockerfileAdapter(toolLogger),
-		logger:            toolLogger,
+		pipelineAdapter: adapter,
+		sessionManager:  sessionManager,
+		// dockerfileAdapter removed - functionality integrated directly
+		logger: toolLogger,
 	}
 }
 
@@ -199,18 +199,18 @@ func (t *AtomicValidateDockerfileTool) ExecuteValidation(ctx context.Context, ar
 // ExecuteWithContext runs the atomic Dockerfile validation with GoMCP progress tracking
 func (t *AtomicValidateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	// Create progress adapter for GoMCP using standard validation stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardValidationStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	result, err := t.performValidation(ctx, args, adapter)
+	result, err := t.performValidation(ctx, args, nil)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Validation failed")
+		t.logger.Info().Msg("Validation failed")
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Validation completed successfully")
+		t.logger.Info().Msg("Validation completed successfully")
 	}
 
 	return result, nil
@@ -226,9 +226,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	startTime := time.Now()
 
 	// Stage 1: Initialize
-	if reporter != nil {
-		reporter.ReportStage(0.0, "Initializing Dockerfile validation")
-	}
+	// Progress reporting removed
 
 	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
@@ -244,9 +242,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
-	if reporter != nil {
-		reporter.ReportStage(0.5, "Session initialized")
-	}
+	// Progress reporting removed
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -262,9 +258,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	}
 
 	// Stage 2: Read Dockerfile
-	if reporter != nil {
-		reporter.NextStage("Reading Dockerfile")
-	}
+	// Progress reporting removed
 
 	// Determine Dockerfile path and content
 	var dockerfilePath string
@@ -284,9 +278,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 			dockerfilePath = filepath.Join(workspaceDir, "Dockerfile")
 		}
 
-		if reporter != nil {
-			reporter.ReportStage(0.3, "Reading Dockerfile from disk")
-		}
+		// Progress reporting removed
 
 		// Read Dockerfile content
 		content, err := os.ReadFile(dockerfilePath)
@@ -300,20 +292,17 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 	result.DockerfilePath = dockerfilePath
 
-	if reporter != nil {
-		reporter.ReportStage(0.9, "Dockerfile content loaded")
-	}
+	// Progress reporting removed
 
 	// Stage 3: Validate Dockerfile
-	if reporter != nil {
-		reporter.NextStage("Running validation checks")
-	}
+	// Progress reporting removed
 
 	// Check if we should use refactored modules
 	useRefactoredModules := os.Getenv("USE_REFACTORED_DOCKERFILE") == "true"
 	if useRefactoredModules {
 		t.logger.Info().Msg("Using refactored Dockerfile validation modules")
-		return t.dockerfileAdapter.ValidateWithModules(ctx, dockerfileContent, args)
+		// dockerfileAdapter removed - return error for now
+		return nil, fmt.Errorf("refactored Dockerfile validation not implemented without adapter")
 	}
 
 	// Perform validation using legacy code
@@ -321,9 +310,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	var validatorUsed string
 
 	if args.UseHadolint {
-		if reporter != nil {
-			reporter.ReportStage(0.2, "Running Hadolint validation")
-		}
+		// Progress reporting removed
 
 		// Try Hadolint validation first
 		hadolintValidator := coredocker.NewHadolintValidator(t.logger)
@@ -338,9 +325,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 	// Fall back to basic validation if Hadolint failed or wasn't requested
 	if validationResult == nil {
-		if reporter != nil {
-			reporter.ReportStage(0.6, "Running basic validation")
-		}
+		// Progress reporting removed
 
 		basicValidator := coredocker.NewValidator(t.logger)
 		validationResult = basicValidator.ValidateDockerfile(dockerfileContent)
@@ -352,52 +337,35 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	result.ValidatorUsed = validatorUsed
 	result.IsValid = validationResult.Valid
 
-	if reporter != nil {
-		reporter.ReportStage(0.8, "Processing validation results")
-	}
+	// Progress reporting removed
 
 	// Process validation results
 	t.processValidationResults(result, validationResult, args)
 
-	if reporter != nil {
-		reporter.ReportStage(0.95, "Validation checks completed")
-	}
+	// Progress reporting removed
 
 	// Stage 4: Analyze (additional checks)
 	if args.CheckSecurity || args.CheckOptimization || args.CheckBestPractices {
-		if reporter != nil {
-			reporter.NextStage("Performing additional analysis")
-			reporter.ReportStage(0.1, "Starting security and optimization analysis")
-		}
+		// Progress reporting removed
 
 		t.performAdditionalAnalysis(result, dockerfileContent, args)
 
-		if reporter != nil {
-			reporter.ReportStage(0.9, "Additional analysis completed")
-		}
+		// Progress reporting removed
 	}
 
 	// Stage 5: Generate fixes and suggestions
 	if args.GenerateFixes && !result.IsValid {
-		if reporter != nil {
-			reporter.NextStage("Generating fixes and suggestions")
-			reporter.ReportStage(0.2, "Analyzing issues for automatic fixes")
-		}
+		// Progress reporting removed
 
 		correctedDockerfile, fixes := t.generateCorrectedDockerfile(dockerfileContent, validationResult)
 		result.CorrectedDockerfile = correctedDockerfile
 		result.FixesApplied = fixes
 
-		if reporter != nil {
-			reporter.ReportStage(0.9, "Fix generation completed")
-		}
+		// Progress reporting removed
 	}
 
 	// Stage 6: Finalize
-	if reporter != nil {
-		reporter.NextStage("Finalizing validation")
-		reporter.ReportStage(0.3, "Calculating validation score")
-	}
+	// Progress reporting removed
 
 	// Calculate validation score
 	result.ValidationScore = t.calculateValidationScore(result)
@@ -408,9 +376,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	result.BaseAIContextResult.IsSuccessful = result.IsValid
 	result.BaseAIContextResult.Duration = result.Duration
 
-	if reporter != nil {
-		reporter.ReportStage(0.9, "Validation completed")
-	}
+	// Progress reporting removed
 
 	// Log results
 	t.logger.Info().

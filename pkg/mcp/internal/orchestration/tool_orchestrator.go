@@ -10,11 +10,11 @@ import (
 // MCPToolOrchestrator implements ToolOrchestrator for MCP atomic tools
 // This is the updated version that uses type-safe dispatch instead of reflection
 type MCPToolOrchestrator struct {
-	toolRegistry    *MCPToolRegistry
-	sessionManager  SessionManager
-	logger          zerolog.Logger
-	dispatcher      *NoReflectToolOrchestrator
-	pipelineAdapter interface{} // Store for passing to dispatcher
+	toolRegistry       *MCPToolRegistry
+	sessionManager     SessionManager
+	logger             zerolog.Logger
+	dispatcher         *NoReflectToolOrchestrator
+	pipelineOperations interface{} // Store for passing to dispatcher
 }
 
 // NewMCPToolOrchestrator creates a new tool orchestrator for MCP atomic tools
@@ -36,11 +36,16 @@ func (o *MCPToolOrchestrator) GetDispatcher() *NoReflectToolOrchestrator {
 	return o.dispatcher
 }
 
-// SetPipelineAdapter sets the pipeline adapter for tool creation
+// SetPipelineAdapter sets the pipeline adapter (deprecated - use SetPipelineOperations)
 func (o *MCPToolOrchestrator) SetPipelineAdapter(adapter interface{}) {
-	o.pipelineAdapter = adapter
+	o.SetPipelineOperations(adapter)
+}
+
+// SetPipelineOperations sets the pipeline operations for tool creation
+func (o *MCPToolOrchestrator) SetPipelineOperations(operations interface{}) {
+	o.pipelineOperations = operations
 	if o.dispatcher != nil {
-		o.dispatcher.SetPipelineAdapter(adapter)
+		o.dispatcher.SetPipelineOperations(operations)
 	}
 }
 

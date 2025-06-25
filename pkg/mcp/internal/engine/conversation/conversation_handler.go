@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	mcpadapter "github.com/Azure/container-copilot/pkg/mcp/internal/adapter/mcp"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/ops"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
@@ -12,6 +11,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -20,30 +20,30 @@ import (
 type ConversationHandler struct {
 	promptManager    *PromptManager
 	sessionManager   *session.SessionManager
-	toolOrchestrator ToolOrchestrator
+	toolOrchestrator orchestration.ToolOrchestrator
 	preferenceStore  *preference.PreferenceStore
 	logger           zerolog.Logger
 }
 
 // ConversationHandlerConfig holds configuration for the concrete conversation handler
 type ConversationHandlerConfig struct {
-	SessionManager   *session.SessionManager
-	SessionAdapter   *session.SessionManager // Pre-created session adapter for tools
-	PreferenceStore  *preference.PreferenceStore
-	PipelineAdapter  *mcpadapter.PipelineAdapter        // Concrete type instead of generic
-	ToolOrchestrator *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
-	Transport        interface{}                        // Accept both mcptypes.Transport and internal transport.Transport
-	Logger           zerolog.Logger
-	Telemetry        *ops.TelemetryManager
+	SessionManager     *session.SessionManager
+	SessionAdapter     *session.SessionManager // Pre-created session adapter for tools
+	PreferenceStore    *preference.PreferenceStore
+	PipelineOperations mcptypes.PipelineOperations        // Using interface instead of concrete adapter
+	ToolOrchestrator   *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
+	Transport          interface{}                        // Accept both mcptypes.Transport and internal transport.Transport
+	Logger             zerolog.Logger
+	Telemetry          *ops.TelemetryManager
 }
 
 // NewConversationHandler creates a new concrete conversation handler
 func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHandler, error) {
 	// Use provided orchestrator or create adapter
-	var toolOrchestrator ToolOrchestrator
+	var toolOrchestrator orchestration.ToolOrchestrator
 	if config.ToolOrchestrator != nil {
-		// Use the provided canonical orchestrator
-		toolOrchestrator = &modernOrchestratorAdapter{config.ToolOrchestrator}
+		// Use the provided canonical orchestrator directly
+		toolOrchestrator = config.ToolOrchestrator
 		config.Logger.Info().Msg("Using provided canonical orchestrator for conversation handler")
 	} else {
 		return nil, fmt.Errorf("tool orchestrator is required for conversation handler")

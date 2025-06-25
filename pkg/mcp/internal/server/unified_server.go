@@ -501,29 +501,22 @@ type ConversationOrchestratorAdapter struct {
 	logger           zerolog.Logger
 }
 
-func (adapter *ConversationOrchestratorAdapter) ExecuteTool(ctx context.Context, toolName string, args interface{}, sessionID string) (*conversation.ToolResult, error) {
+func (adapter *ConversationOrchestratorAdapter) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
 	// Execute tool using MCP orchestrator
-	result, err := adapter.toolOrchestrator.ExecuteTool(ctx, toolName, args, sessionID)
+	// The session can be either a string sessionID or a session object
+	result, err := adapter.toolOrchestrator.ExecuteTool(ctx, toolName, args, session)
 	if err != nil {
-		return &conversation.ToolResult{
-			CallID:        "error-" + toolName,
-			CorrelationID: "",
-			ToolName:      toolName,
-			Success:       false,
-			Error:         err.Error(),
-			ExecutionTime: 0,
-			Timestamp:     time.Now(),
-		}, err
+		return nil, err
 	}
 
-	// Convert result to conversation ToolResult format
-	return &conversation.ToolResult{
-		CallID:        "call-" + toolName,
-		CorrelationID: "",
-		ToolName:      toolName,
-		Success:       true,
-		Result:        result,
-		ExecutionTime: 100 * time.Millisecond, // Placeholder
-		Timestamp:     time.Now(),
-	}, nil
+	// Return result directly
+	return result, nil
+}
+
+func (adapter *ConversationOrchestratorAdapter) ValidateToolArgs(toolName string, args interface{}) error {
+	return adapter.toolOrchestrator.ValidateToolArgs(toolName, args)
+}
+
+func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*orchestration.ToolMetadata, error) {
+	return adapter.toolOrchestrator.GetToolMetadata(toolName)
 }

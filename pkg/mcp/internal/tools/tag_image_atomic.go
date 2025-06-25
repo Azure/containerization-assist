@@ -150,11 +150,11 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 	}
 
 	// Create progress adapter for GoMCP using standard tag stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardTagStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, adapter)
+	err := t.executeWithProgress(ctx, args, result, startTime, nil)
 
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
@@ -164,11 +164,11 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Tag failed")
+		t.logger.Info().Msg("Tag failed")
 		result.Success = false
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Tag completed successfully")
+		t.logger.Info().Msg("Tag completed successfully")
 	}
 
 	return result, nil
@@ -279,9 +279,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 	}
 
 	// Stage 1: Initialize
-	if reporter != nil {
-		reporter.ReportStage(0.1, "Loading session")
-	}
+	// Progress reporting removed
 
 	// Set session details
 	result.SessionID = session.SessionID // Use compatibility method
@@ -294,9 +292,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 		Msg("Starting atomic Docker tag")
 
 	// Stage 2: Check source image
-	if reporter != nil {
-		reporter.ReportStage(0.3, "Checking source image")
-	}
+	// Progress reporting removed
 
 	// Extract registry information for context
 	result.TagContext.SourceRegistry = t.extractRegistryURL(args.SourceImage)
@@ -304,9 +300,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 	result.TagContext.SameRegistry = result.TagContext.SourceRegistry == result.TagContext.TargetRegistry
 
 	// Stage 3: Tag Docker image using pipeline adapter
-	if reporter != nil {
-		reporter.ReportStage(0.4, "Tagging Docker image")
-	}
+	// Progress reporting removed
 
 	tagStartTime := time.Now()
 
@@ -338,9 +332,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 	}
 
 	// Stage 4: Verify operation
-	if reporter != nil {
-		reporter.ReportStage(0.15, "Verifying tag operation")
-	}
+	// Progress reporting removed
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -351,9 +343,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 		Msg("Completed atomic Docker tag")
 
 	// Stage 5: Finalize
-	if reporter != nil {
-		reporter.ReportStage(0.05, "Finalizing")
-	}
+	// Progress reporting removed
 
 	// Update session state
 	session.UpdateLastAccessed()

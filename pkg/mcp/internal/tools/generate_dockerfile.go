@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
+	_ "github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
@@ -296,20 +296,19 @@ func (t *GenerateDockerfileTool) Execute(ctx context.Context, args GenerateDocke
 // ExecuteWithContext runs the Dockerfile generation with GoMCP progress tracking
 func (t *GenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
 	// Create progress adapter for GoMCP using standard generation stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardGenerateStages())
+	// Progress adapter removed
 
-	// Report progress stages manually since this tool doesn't use the complex progress infrastructure
-	adapter.ReportStage(0.1, "Initializing Dockerfile generation")
+	// Progress adapter removed - execute the core logic directly
+	t.logger.Info().Msg("Initializing Dockerfile generation")
 
 	// Execute the core logic
 	result, err := t.Execute(context.Background(), args)
 
 	if err != nil {
-		adapter.Complete("Dockerfile generation failed")
+		t.logger.Info().Msg("Dockerfile generation failed")
 		return result, nil // Return nil result since this tool returns error directly
 	} else {
-		adapter.ReportStage(1.0, "Dockerfile generated successfully")
-		adapter.Complete("Dockerfile generation completed successfully")
+		t.logger.Info().Msg("Dockerfile generation completed successfully")
 	}
 
 	return result, nil

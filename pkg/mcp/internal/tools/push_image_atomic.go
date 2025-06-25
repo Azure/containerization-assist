@@ -132,22 +132,22 @@ func (t *AtomicPushImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	}
 
 	// Create progress adapter for GoMCP using standard push stages
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardPushStages())
+	// Progress adapter removed
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, adapter)
+	err := t.executeWithProgress(ctx, args, result, startTime, nil)
 
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Push failed")
+		t.logger.Info().Msg("Push failed")
 		result.Success = false
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Push completed successfully")
+		t.logger.Info().Msg("Push completed successfully")
 	}
 
 	return result, nil
@@ -156,7 +156,7 @@ func (t *AtomicPushImageTool) ExecuteWithContext(serverCtx *server.Context, args
 // executeWithProgress handles the main execution with progress reporting
 func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args AtomicPushImageArgs, result *AtomicPushImageResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
-	reporter.ReportStage(0.1, "Loading session")
+	t.logger.Info().Msg("Loading session")
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
@@ -173,7 +173,7 @@ func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args Atom
 		Str("image_ref", args.ImageRef).
 		Msg("Starting atomic Docker push")
 
-	reporter.ReportStage(0.8, "Session initialized")
+	t.logger.Info().Msg("Session initialized")
 
 	// Handle dry-run
 	if args.DryRun {
@@ -184,12 +184,12 @@ func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args Atom
 			"This is a dry-run - no actual push was performed",
 			"Remove dry_run flag to perform actual push",
 		}
-		reporter.NextStage("Dry-run completed")
+		t.logger.Info().Msg("Dry-run completed")
 		return nil
 	}
 
 	// Stage 2: Authenticate - Authenticating with registry
-	reporter.NextStage("Validating prerequisites")
+	t.logger.Info().Msg("Validating prerequisites")
 	if err := t.validatePushPrerequisites(result, args); err != nil {
 		t.logger.Error().Err(err).
 			Str("session_id", session.SessionID).
@@ -198,10 +198,10 @@ func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args Atom
 		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("push prerequisites validation failed: %v", err), "validation_error")
 	}
 
-	reporter.ReportStage(1.0, "Prerequisites validated")
+	t.logger.Info().Msg("Prerequisites validated")
 
 	// Stage 3: Push - Pushing Docker image layers
-	reporter.NextStage("Pushing Docker image")
+	t.logger.Info().Msg("Pushing Docker image")
 	return t.performPush(ctx, session, args, result, reporter)
 }
 
@@ -265,9 +265,7 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 // performPush contains the actual push logic that can be used with or without progress reporting
 func (t *AtomicPushImageTool) performPush(ctx context.Context, session *sessiontypes.SessionState, args AtomicPushImageArgs, result *AtomicPushImageResult, reporter interfaces.ProgressReporter) error {
 	// Report progress if reporter is available
-	if reporter != nil {
-		reporter.ReportStage(0.1, "Starting image push")
-	}
+	// Progress reporting removed
 
 	// Push Docker image using core operations
 	pushStartTime := time.Now()
@@ -332,26 +330,18 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *sessiont
 		Dur("push_duration", result.PushDuration).
 		Msg("Docker push completed successfully")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Push completed successfully")
-	}
+	// Progress reporting removed
 
 	// Stage 4: Verify - Verifying push results
-	if reporter != nil {
-		reporter.NextStage("Verifying push results")
-	}
+	// Progress reporting removed
 
 	// Generate rich context for Claude reasoning
 	t.generatePushContext(result, args)
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Verification completed")
-	}
+	// Progress reporting removed
 
 	// Stage 5: Finalize - Updating session state
-	if reporter != nil {
-		reporter.NextStage("Finalizing")
-	}
+	// Progress reporting removed
 
 	// Update session state
 	if err := t.updateSessionState(session, result); err != nil {
@@ -364,9 +354,7 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *sessiont
 		Bool("success", result.Success).
 		Msg("Atomic Docker push completed")
 
-	if reporter != nil {
-		reporter.ReportStage(1.0, "Push operation completed")
-	}
+	// Progress reporting removed
 
 	return nil
 }

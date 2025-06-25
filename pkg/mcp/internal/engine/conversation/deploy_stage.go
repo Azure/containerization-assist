@@ -149,7 +149,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse manifests from result
-	if resultData, ok := result.Result.(map[string]interface{}); ok {
+	if resultData, ok := result.(map[string]interface{}); ok {
 		if manifests, ok := resultData["manifests"].(map[string]interface{}); ok {
 			for name, content := range manifests {
 				contentStr, ok := content.(string)
@@ -250,7 +250,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 	}
 
 	// Extract the dry-run preview from the result
-	if toolResult, ok := result.Result.(map[string]interface{}); ok {
+	if toolResult, ok := result.(map[string]interface{}); ok {
 		dryRunPreview := publicutils.GetStringFromMap(toolResult, "dry_run_preview")
 		if dryRunPreview == "" {
 			dryRunPreview = "No changes detected - resources are already up to date"
@@ -366,7 +366,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 }
 
 // checkDeploymentHealth verifies deployment health
-func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *ConversationState, deployResult *ToolResult) *ConversationResponse {
+func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *ConversationState, deployResult interface{}) *ConversationResponse {
 	response := &ConversationResponse{
 		Stage:   types.StageDeployment,
 		Status:  ResponseStatusProcessing,

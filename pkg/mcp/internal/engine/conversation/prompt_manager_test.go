@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/rs/zerolog"
@@ -107,20 +108,23 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 // MockToolOrchestrator implements ToolOrchestrator interface for testing
 type MockToolOrchestrator struct{}
 
-func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, sessionID string) (*ToolResult, error) {
-	return &ToolResult{
-		CallID:        "test-call-" + toolName,
-		CorrelationID: "test-correlation",
-		ToolName:      toolName,
-		Success:       true,
-		Result: map[string]interface{}{
-			"tool":     toolName,
-			"success":  true,
-			"mock":     true,
-			"executed": true,
-		},
-		ExecutionTime: 100 * time.Millisecond,
-		Timestamp:     time.Now(),
+func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
+	return map[string]interface{}{
+		"tool":     toolName,
+		"success":  true,
+		"mock":     true,
+		"executed": true,
+	}, nil
+}
+
+func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
+	return nil
+}
+
+func (m *MockToolOrchestrator) GetToolMetadata(toolName string) (*orchestration.ToolMetadata, error) {
+	return &orchestration.ToolMetadata{
+		Name:        toolName,
+		Description: "Mock tool for testing",
 	}, nil
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/constants"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
+	_ "github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
@@ -138,22 +138,22 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 	}
 
 	// Use centralized build stages for progress tracking
-	adapter := NewGoMCPProgressAdapter(serverCtx, interfaces.StandardBuildStages())
+	// Progress adapter removed
 
 	// Delegate to executor with progress tracking
 	ctx := context.Background()
-	err := t.executor.executeWithProgress(ctx, args, result, startTime, adapter)
+	err := t.executor.executeWithProgress(ctx, args, result, startTime, nil)
 
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 
 	// Complete progress tracking
 	if err != nil {
-		adapter.Complete("Build failed")
+		t.logger.Info().Msg("Build failed")
 		result.Success = false
 		return result, nil // Return result with error info, not the error itself
 	} else {
-		adapter.Complete("Build completed successfully")
+		t.logger.Info().Msg("Build completed successfully")
 	}
 
 	return result, nil
