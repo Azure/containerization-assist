@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
@@ -88,12 +89,12 @@ func (cm *BoltCheckpointManager) compressData(data []byte) ([]byte, bool, error)
 
 	_, err := gzWriter.Write(data)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to write to gzip writer: %w", err)
+		return nil, false, mcptypes.WrapRichError(err, "GZIP_WRITE_FAILED", "failed to write to gzip writer", "compression_error")
 	}
 
 	err = gzWriter.Close()
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to close gzip writer: %w", err)
+		return nil, false, mcptypes.WrapRichError(err, "GZIP_CLOSE_FAILED", "failed to close gzip writer", "compression_error")
 	}
 
 	compressed := buf.Bytes()
@@ -124,7 +125,7 @@ func (cm *BoltCheckpointManager) decompressData(data []byte, isCompressed bool) 
 
 	gzReader, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		return nil, mcptypes.WrapRichError(err, "GZIP_READER_FAILED", "failed to create gzip reader", "decompression_error")
 	}
 	defer gzReader.Close()
 

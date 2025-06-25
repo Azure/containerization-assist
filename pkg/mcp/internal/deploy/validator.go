@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -29,13 +30,13 @@ func (v *ManifestValidator) ValidateManifest(manifest ManifestFile) error {
 
 	// Basic validation
 	if manifest.Content == "" {
-		return fmt.Errorf("manifest content is empty")
+		return mcptypes.NewRichError("MANIFEST_CONTENT_EMPTY", "manifest content is empty", "validation_error")
 	}
 
 	// Parse YAML to check structure
 	var doc map[string]interface{}
 	if err := yaml.Unmarshal([]byte(manifest.Content), &doc); err != nil {
-		return fmt.Errorf("invalid YAML: %w", err)
+		return mcptypes.WrapRichError(err, "INVALID_YAML", "invalid YAML", "parsing_error")
 	}
 
 	// Validate required fields

@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/registry/credential_providers"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -170,7 +171,7 @@ func (pfc *PreFlightChecker) getBuildChecks(state *sessiontypes.SessionState) []
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if state.Dockerfile.Content == "" {
-					return fmt.Errorf("Dockerfile not generated yet")
+					return mcptypes.NewRichError("DOCKERFILE_NOT_GENERATED", "Dockerfile not generated yet", "validation_error")
 				}
 				return nil
 			},
@@ -203,7 +204,7 @@ func (pfc *PreFlightChecker) getBuildChecks(state *sessiontypes.SessionState) []
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if !state.Dockerfile.ValidationResult.Valid && state.Dockerfile.ValidationResult.ErrorCount > 0 {
-					return fmt.Errorf("Dockerfile has %d critical validation errors", state.Dockerfile.ValidationResult.ErrorCount)
+					return mcptypes.NewRichError("DOCKERFILE_VALIDATION_FAILED", fmt.Sprintf("Dockerfile has %d critical validation errors", state.Dockerfile.ValidationResult.ErrorCount), "validation_error")
 				}
 				return nil
 			},
@@ -224,7 +225,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []P
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if !state.Dockerfile.Built || state.Dockerfile.ImageID == "" {
-					return fmt.Errorf("Docker image not built yet")
+					return mcptypes.NewRichError("IMAGE_NOT_BUILT", "Docker image not built yet", "validation_error")
 				}
 				return nil
 			},
@@ -238,7 +239,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []P
 			CheckFunc: func(ctx context.Context) error {
 				// Check if we have registry credentials
 				if state.ImageRef.Registry == "" {
-					return fmt.Errorf("no registry specified")
+					return mcptypes.NewRichError("NO_REGISTRY_SPECIFIED", "no registry specified", "configuration_error")
 				}
 
 				// Try to ping the registry using docker
@@ -253,7 +254,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []P
 					testImage = fmt.Sprintf("%s/hello-world:latest", state.ImageRef.Registry)
 					cmd = exec.CommandContext(ctx, "docker", "manifest", "inspect", testImage)
 					if err := cmd.Run(); err != nil {
-						return fmt.Errorf("cannot connect to registry %s: %w", state.ImageRef.Registry, err)
+						return mcptypes.WrapRichError(err, "REGISTRY_CONNECTION_FAILED", fmt.Sprintf("cannot connect to registry %s", state.ImageRef.Registry), "network_error")
 					}
 				}
 
@@ -280,10 +281,10 @@ func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []P
 			Category:    "security",
 			CheckFunc: func(ctx context.Context) error {
 				if state.SecurityScan.Summary.Critical > 0 {
-					return fmt.Errorf("image has %d CRITICAL vulnerabilities", state.SecurityScan.Summary.Critical)
+					return mcptypes.NewRichError("CRITICAL_VULNERABILITIES", fmt.Sprintf("image has %d CRITICAL vulnerabilities", state.SecurityScan.Summary.Critical), "security_error")
 				}
 				if state.SecurityScan.Summary.High > 3 {
-					return fmt.Errorf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.Summary.High)
+					return mcptypes.NewRichError("HIGH_VULNERABILITIES", fmt.Sprintf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.Summary.High), "security_error")
 				}
 				return nil
 			},
@@ -304,7 +305,7 @@ func (pfc *PreFlightChecker) getManifestChecks(state *sessiontypes.SessionState)
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if state.ImageRef.Repository == "" {
-					return fmt.Errorf("no image reference available")
+					return mcptypes.NewRichError("NO_IMAGE_REFERENCE", "no image reference available", "validation_error")
 				}
 				return nil
 			},
@@ -331,7 +332,7 @@ func (pfc *PreFlightChecker) getDeploymentChecks(state *sessiontypes.SessionStat
 			Category:    "kubernetes",
 			CheckFunc: func(ctx context.Context) error {
 				if len(state.K8sManifests) == 0 {
-					return fmt.Errorf("no Kubernetes manifests generated")
+					return mcptypes.NewRichError("NO_K8S_MANIFESTS", "no Kubernetes manifests generated", "validation_error")
 				}
 				return nil
 			},
@@ -477,12 +478,12 @@ func (pfc *PreFlightChecker) checkDockerDaemon(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "version", "--format", "{{.Server.Version}}")
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Docker daemon not accessible: %w", err)
+		return mcptypes.WrapRichError(err, "DOCKER_DAEMON_NOT_ACCESSIBLE", "Docker daemon not accessible", "system_error")
 	}
 
 	version := strings.TrimSpace(string(output))
 	if version == "" {
-		return fmt.Errorf("Docker daemon not running")
+		return mcptypes.NewRichError("DOCKER_DAEMON_NOT_RUNNING", "Docker daemon not running", "system_error")
 	}
 
 	pfc.logger.Debug().Str("docker_version", version).Msg("Docker daemon check passed")
@@ -494,7 +495,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.DockerRootDir}}")
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to get Docker root directory: %w", err)
+		return mcptypes.WrapRichError(err, "DOCKER_ROOT_DIR_FAILED", "failed to get Docker root directory", "system_error")
 	}
 
 	dockerRoot := strings.TrimSpace(string(output))
