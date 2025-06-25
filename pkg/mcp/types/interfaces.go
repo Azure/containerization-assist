@@ -7,37 +7,21 @@ import (
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 )
 
-// Unified MCP Interface Types
-// This package contains only the interface types to avoid circular imports
+// This file contains interface types to avoid circular imports
+// Core interfaces are duplicated here temporarily to resolve import cycles
 
 // =============================================================================
-// CORE INTERFACES (temporarily restored to avoid import cycles)
+// CORE INTERFACES (duplicated to avoid import cycles)
 // =============================================================================
 
-// TODO: Import cycles resolved - interface definitions moved to pkg/mcp/interfaces.go
-
-// NOTE: ToolArgs and ToolResult interfaces are now defined in pkg/mcp/interfaces.go
-
-// Type aliases to avoid breaking existing code during migration
-// These will eventually be removed once all references are updated
-
-type ToolArgs interface {
-	GetSessionID() string
-	Validate() error
-}
-
-type ToolResult interface {
-	GetSuccess() bool
-}
-
-// Tool represents the unified interface for all MCP tools
+// Tool represents the unified interface for all MCP tools (duplicate for import cycle resolution)
 type Tool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
 	GetMetadata() ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
 }
 
-// ToolMetadata contains comprehensive information about a tool
+// ToolMetadata contains comprehensive information about a tool (duplicate for import cycle resolution)
 type ToolMetadata struct {
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
@@ -50,7 +34,7 @@ type ToolMetadata struct {
 	Examples     []ToolExample     `json:"examples"`
 }
 
-// ToolExample represents an example usage of a tool
+// ToolExample represents an example usage of a tool (duplicate for import cycle resolution)
 type ToolExample struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -58,7 +42,18 @@ type ToolExample struct {
 	Output      map[string]interface{} `json:"output"`
 }
 
-// ProgressReporter provides stage-aware progress reporting
+// ToolArgs provides base interface for tool arguments (duplicate for import cycle resolution)
+type ToolArgs interface {
+	GetSessionID() string
+	Validate() error
+}
+
+// ToolResult provides base interface for tool results (duplicate for import cycle resolution)
+type ToolResult interface {
+	GetSuccess() bool
+}
+
+// ProgressReporter provides stage-aware progress reporting (duplicate for import cycle resolution)
 type ProgressReporter interface {
 	ReportStage(stageProgress float64, message string)
 	NextStage(message string)
@@ -67,37 +62,14 @@ type ProgressReporter interface {
 	GetCurrentStage() (int, ProgressStage)
 }
 
-// ProgressStage represents a stage in a multi-step operation
+// ProgressStage represents a stage in a multi-step operation (duplicate for import cycle resolution)
 type ProgressStage struct {
 	Name        string  // Human-readable stage name
 	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
 	Description string  // Optional detailed description
 }
 
-// NOTE: Session interface is now defined in pkg/mcp/interfaces.go
-
-// NOTE: Transport and RequestHandler interfaces are now defined in pkg/mcp/interfaces.go
-
-// NOTE: Orchestrator and ToolRegistry interfaces are now defined in pkg/mcp/interfaces.go
-
-// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
-
-// NOTE: HealthChecker interface is now defined in pkg/mcp/interfaces.go
-
-// Additional type aliases for compatibility during migration
-type ToolRegistry interface {
-	Register(name string, factory ToolFactory) error
-	Get(name string) (ToolFactory, error)
-	List() []string
-	GetMetadata() map[string]ToolMetadata
-}
-
-type ToolOrchestrator interface {
-	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
-	ValidateToolArgs(toolName string, args interface{}) error
-	GetToolMetadata(toolName string) (*ToolMetadata, error)
-}
-
+// Transport interface for different transport mechanisms (duplicate for import cycle resolution)
 type Transport interface {
 	Serve(ctx context.Context) error
 	Stop() error
@@ -105,10 +77,12 @@ type Transport interface {
 	SetHandler(handler RequestHandler)
 }
 
+// RequestHandler processes MCP requests (duplicate for import cycle resolution)
 type RequestHandler interface {
 	HandleRequest(ctx context.Context, req *MCPRequest) (*MCPResponse, error)
 }
 
+// MCP protocol types (duplicate for import cycle resolution)
 type MCPRequest struct {
 	ID     string      `json:"id"`
 	Method string      `json:"method"`
@@ -127,6 +101,84 @@ type MCPError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+// ToolRegistry manages tool registration (duplicate for import cycle resolution)
+type ToolRegistry interface {
+	Register(name string, factory ToolFactory) error
+	Get(name string) (ToolFactory, error)
+	List() []string
+	GetMetadata() map[string]ToolMetadata
+}
+
+// Health-related interfaces (duplicate for import cycle resolution)
+type SystemResources struct {
+	CPUUsage    float64   `json:"cpu_usage_percent"`
+	MemoryUsage float64   `json:"memory_usage_percent"`
+	DiskUsage   float64   `json:"disk_usage_percent"`
+	OpenFiles   int       `json:"open_files"`
+	GoRoutines  int       `json:"goroutines"`
+	HeapSize    int64     `json:"heap_size_bytes"`
+	LastUpdated time.Time `json:"last_updated"`
+}
+
+type SessionHealthStats struct {
+	ActiveSessions    int     `json:"active_sessions"`
+	TotalSessions     int     `json:"total_sessions"`
+	FailedSessions    int     `json:"failed_sessions"`
+	AverageSessionAge float64 `json:"average_session_age_minutes"`
+	SessionErrors     int     `json:"session_errors_last_hour"`
+}
+
+type CircuitBreakerStatus struct {
+	State         string    `json:"state"` // open, closed, half-open
+	FailureCount  int       `json:"failure_count"`
+	LastFailure   time.Time `json:"last_failure"`
+	NextRetry     time.Time `json:"next_retry"`
+	TotalRequests int64     `json:"total_requests"`
+	SuccessCount  int64     `json:"success_count"`
+}
+
+type ServiceHealth struct {
+	Name         string                 `json:"name"`
+	Status       string                 `json:"status"` // healthy, degraded, unhealthy
+	LastCheck    time.Time              `json:"last_check"`
+	ResponseTime time.Duration          `json:"response_time"`
+	ErrorMessage string                 `json:"error_message,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type JobQueueStats struct {
+	QueuedJobs      int     `json:"queued_jobs"`
+	RunningJobs     int     `json:"running_jobs"`
+	CompletedJobs   int64   `json:"completed_jobs"`
+	FailedJobs      int64   `json:"failed_jobs"`
+	AverageWaitTime float64 `json:"average_wait_time_seconds"`
+}
+
+type RecentError struct {
+	Timestamp time.Time              `json:"timestamp"`
+	Message   string                 `json:"message"`
+	Component string                 `json:"component"`
+	Severity  string                 `json:"severity"`
+	Context   map[string]interface{} `json:"context,omitempty"`
+}
+
+// HealthChecker provides system health checking capabilities (duplicate for import cycle resolution)
+type HealthChecker interface {
+	GetSystemResources() SystemResources
+	GetSessionStats() SessionHealthStats
+	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
+	CheckServiceHealth(ctx context.Context) []ServiceHealth
+	GetJobQueueStats() JobQueueStats
+	GetRecentErrors(limit int) []RecentError
+}
+
+// Circuit breaker states (duplicate for import cycle resolution)
+const (
+	CircuitBreakerClosed   = "closed"
+	CircuitBreakerOpen     = "open"
+	CircuitBreakerHalfOpen = "half-open"
+)
+
 // =============================================================================
 // SPECIALIZED TOOL TYPES (non-duplicated from main interfaces)
 // =============================================================================
@@ -135,15 +187,23 @@ type MCPError struct {
 type ArgConverter func(args map[string]interface{}) (ToolArgs, error)
 
 // ResultConverter converts tool-specific results to generic types
-type ResultConverter func(result ToolResult) (map[string]interface{}, error)
+type ResultConverter func(result interface{}) (map[string]interface{}, error)
+
+// ToolFactory creates new instances of tools
+type ToolFactory func() Tool
+
+// ToolOrchestrator interface for tool orchestration (unique to this file)
+type ToolOrchestrator interface {
+	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
+	ValidateToolArgs(toolName string, args interface{}) error
+	GetToolMetadata(toolName string) (*ToolMetadata, error)
+}
 
 // =============================================================================
-// SESSION TYPES (interface defined in main interfaces file)
+// SESSION TYPES (more comprehensive versions)
 // =============================================================================
 
-// NOTE: Session interface is now defined in pkg/mcp/interfaces.go
-
-// SessionState holds the unified session state
+// SessionState holds the unified session state (more comprehensive than interfaces.go version)
 type SessionState struct {
 	// Core fields
 	ID        string
@@ -195,29 +255,10 @@ type SessionMetadata struct {
 }
 
 // =============================================================================
-// TRANSPORT TYPES (interface defined in main interfaces file)
+// SUPPORTING TYPES (more comprehensive versions)
 // =============================================================================
 
-// NOTE: Transport interface is now defined above with RequestHandler
-// NOTE: MCP types are also defined above with Transport
-
-// =============================================================================
-// ORCHESTRATOR TYPES (interface defined in main interfaces file)
-// =============================================================================
-
-// NOTE: Orchestrator interface is now defined in pkg/mcp/interfaces.go
-
-// =============================================================================
-// SESSION MANAGER TYPES (interface defined in main interfaces file)
-// =============================================================================
-
-// NOTE: SessionManager interface is now defined in pkg/mcp/interfaces.go
-
-// =============================================================================
-// SUPPORTING TYPES
-// =============================================================================
-
-// RepositoryInfo contains information about analyzed repositories
+// RepositoryInfo contains information about analyzed repositories (more detailed than interfaces.go)
 type RepositoryInfo struct {
 	// Core analysis
 	Language     string   `json:"language"`
@@ -253,7 +294,7 @@ type FileStructure struct {
 	PackageManagers []string `json:"package_managers"`
 }
 
-// SecurityScanResult contains information about security scans
+// SecurityScanResult contains information about security scans (more detailed)
 type SecurityScanResult struct {
 	Success         bool               `json:"success"`
 	ScannedAt       time.Time          `json:"scanned_at"`
@@ -272,15 +313,6 @@ type VulnerabilityCount struct {
 	Unknown  int `json:"unknown"`
 	Total    int `json:"total"`
 }
-
-// =============================================================================
-// FACTORY AND REGISTRY TYPES (interface defined in main interfaces file)
-// =============================================================================
-
-// NOTE: ToolRegistry interface is now defined in pkg/mcp/interfaces.go
-
-// ToolFactory creates new instances of tools
-type ToolFactory func() Tool
 
 // =============================================================================
 // AI CONTEXT INTERFACES
@@ -533,8 +565,6 @@ type ToolSessionManager interface {
 }
 
 // Pipeline operation result types
-// Note: DockerBuildResult has been replaced by the unified BuildResult type above
-
 type DockerState struct {
 	Images     []string `json:"images"`
 	Containers []string `json:"containers"`
@@ -562,9 +592,6 @@ type KubernetesDeploymentResult struct {
 	Services    []string   `json:"services"`
 	Error       *RichError `json:"error,omitempty"`
 }
-
-// HealthCheckResult moved to unified types section above
-// PodStatus is used by the legacy HealthCheckResult type
 
 // =============================================================================
 // ERROR CODES
@@ -618,91 +645,8 @@ type TokenUsage struct {
 }
 
 // =============================================================================
-// HEALTH AND MONITORING TYPES (interface defined in main interfaces file)
+// PROGRESS TRACKING TYPES
 // =============================================================================
-
-// HealthChecker provides system health checking capabilities
-type HealthChecker interface {
-	GetSystemResources() SystemResources
-	GetSessionStats() SessionHealthStats
-	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
-	CheckServiceHealth(ctx context.Context) []ServiceHealth
-	GetJobQueueStats() JobQueueStats
-	GetRecentErrors(limit int) []RecentError
-}
-
-// NOTE: HealthChecker interface is now defined above
-
-// SystemResources represents system resource information
-type SystemResources struct {
-	CPUUsage    float64   `json:"cpu_usage_percent"`
-	MemoryUsage float64   `json:"memory_usage_percent"`
-	DiskUsage   float64   `json:"disk_usage_percent"`
-	OpenFiles   int       `json:"open_files"`
-	GoRoutines  int       `json:"goroutines"`
-	HeapSize    int64     `json:"heap_size_bytes"`
-	LastUpdated time.Time `json:"last_updated"`
-}
-
-// SessionHealthStats represents session-related health statistics
-type SessionHealthStats struct {
-	ActiveSessions    int     `json:"active_sessions"`
-	TotalSessions     int     `json:"total_sessions"`
-	FailedSessions    int     `json:"failed_sessions"`
-	AverageSessionAge float64 `json:"average_session_age_minutes"`
-	SessionErrors     int     `json:"session_errors_last_hour"`
-}
-
-// CircuitBreakerStatus represents the status of a circuit breaker
-type CircuitBreakerStatus struct {
-	State         string    `json:"state"` // open, closed, half-open
-	FailureCount  int       `json:"failure_count"`
-	LastFailure   time.Time `json:"last_failure"`
-	NextRetry     time.Time `json:"next_retry"`
-	TotalRequests int64     `json:"total_requests"`
-	SuccessCount  int64     `json:"success_count"`
-}
-
-// Circuit breaker states
-const (
-	CircuitBreakerClosed   = "closed"
-	CircuitBreakerOpen     = "open"
-	CircuitBreakerHalfOpen = "half-open"
-)
-
-// ServiceHealth represents the health of an external service
-type ServiceHealth struct {
-	Name         string                 `json:"name"`
-	Status       string                 `json:"status"` // healthy, degraded, unhealthy
-	LastCheck    time.Time              `json:"last_check"`
-	ResponseTime time.Duration          `json:"response_time"`
-	ErrorMessage string                 `json:"error_message,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// JobQueueStats represents job queue statistics
-type JobQueueStats struct {
-	QueuedJobs      int     `json:"queued_jobs"`
-	RunningJobs     int     `json:"running_jobs"`
-	CompletedJobs   int64   `json:"completed_jobs"`
-	FailedJobs      int64   `json:"failed_jobs"`
-	AverageWaitTime float64 `json:"average_wait_time_seconds"`
-}
-
-// RecentError represents a recent error for debugging
-type RecentError struct {
-	Timestamp time.Time              `json:"timestamp"`
-	Message   string                 `json:"message"`
-	Component string                 `json:"component"`
-	Severity  string                 `json:"severity"`
-	Context   map[string]interface{} `json:"context,omitempty"`
-}
-
-// =============================================================================
-// PROGRESS TRACKING TYPES (interface defined in main interfaces file)
-// =============================================================================
-
-// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
 
 // ProgressTracker provides centralized progress reporting for tools
 type ProgressTracker interface {
@@ -710,12 +654,10 @@ type ProgressTracker interface {
 	RunWithProgress(
 		ctx context.Context,
 		operation string,
-		stages []ProgressStage,
-		fn func(ctx context.Context, reporter ProgressReporter) error,
+		stages []interface{}, // Using interface{} to avoid import cycle
+		fn func(ctx context.Context, reporter interface{}) error,
 	) error
 }
-
-// NOTE: ProgressStage is defined above with ProgressReporter
 
 // SessionData represents session information for management tools
 type SessionData struct {
@@ -754,9 +696,6 @@ type BaseAnalyzer interface {
 	// GetCapabilities returns what this analyzer can do
 	GetCapabilities() BaseAnalyzerCapabilities
 }
-
-// NOTE: BaseValidator interface removed to avoid duplication with base.Validator
-// Use github.com/Azure/container-copilot/pkg/mcp/internal/tools/base.Validator instead
 
 // BaseAnalysisOptions provides common options for analysis
 type BaseAnalysisOptions struct {
