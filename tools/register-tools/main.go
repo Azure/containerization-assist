@@ -22,11 +22,12 @@ var (
 
 // ToolInfo represents a discovered tool implementation
 type ToolInfo struct {
-	Name       string // Struct name (e.g., "BuildImageTool")
-	Package    string // Package path (e.g., "pkg/mcp/internal/build")
-	ImportPath string // Full import path
-	ToolName   string // Registration name (e.g., "build_image")
-	FilePath   string // Source file path
+	Name        string // Struct name (e.g., "BuildImageTool")
+	Package     string // Package path (e.g., "pkg/mcp/internal/build")
+	PackageName string // Package name (e.g., "build")
+	ImportPath  string // Full import path
+	ToolName    string // Registration name (e.g., "build_image")
+	FilePath    string // Source file path
 }
 
 // RegistrationData contains all data needed for code generation
@@ -52,7 +53,7 @@ import (
 
 // Auto-generated tool registry
 var generatedToolRegistry = map[string]func() mcptypes.Tool{
-{{range .Tools}}	"{{.ToolName}}": func() mcptypes.Tool { return &{{.Name}}{} },
+{{range .Tools}}	"{{.ToolName}}": func() mcptypes.Tool { return &{{if ne .PackageName "tools"}}{{.PackageName}}.{{end}}{{.Name}}{} },
 {{end}}
 }
 
@@ -160,10 +161,13 @@ func discoverTools() ([]ToolInfo, error) {
 	// Search for tool implementations in the MCP internal packages
 	searchPaths := []string{
 		filepath.Join(moduleRoot, "pkg/mcp/internal/tools"),
-		filepath.Join(moduleRoot, "pkg/mcp/internal/build"),   // Future location after restructuring
-		filepath.Join(moduleRoot, "pkg/mcp/internal/deploy"),  // Future location after restructuring
-		filepath.Join(moduleRoot, "pkg/mcp/internal/scan"),    // Future location after restructuring
-		filepath.Join(moduleRoot, "pkg/mcp/internal/analyze"), // Future location after restructuring
+		filepath.Join(moduleRoot, "pkg/mcp/internal/build"),     // Build tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/deploy"),    // Deploy tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/scan"),      // Scan tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/analyze"),   // Analyze tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/session"),   // Session management tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/server"),    // Server management tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/conversation"), // Conversation tools
 	}
 
 	for _, searchPath := range searchPaths {
@@ -262,26 +266,25 @@ func discoverToolsInFile(filePath string) ([]ToolInfo, error) {
 
 			// Check if this looks like a tool (ends with "Tool")
 			if strings.HasSuffix(structName, "Tool") {
-				// For now, focus on atomic tools which are being standardized
-				if strings.Contains(structName, "Atomic") || strings.Contains(structName, "atomic") {
-					// Check if it has the required methods (simplified check)
-					if hasToolMethods(file, structName) {
-						toolName := convertToToolName(structName)
+				// Check if it has the required methods (simplified check)
+				if hasToolMethods(file, structName) {
+					toolName := convertToToolName(structName)
 
-						tools = append(tools, ToolInfo{
-							Name:       structName,
-							Package:    packagePath,
-							ImportPath: importPath,
-							ToolName:   toolName,
-							FilePath:   filePath,
-						})
+					// Extract the actual package name from the AST
+					actualPackageName := file.Name.Name
+					
+					tools = append(tools, ToolInfo{
+						Name:        structName,
+						Package:     packagePath,
+						PackageName: actualPackageName,
+						ImportPath:  importPath,
+						ToolName:    toolName,
+						FilePath:    filePath,
+					})
 
-						if *verbose {
-							fmt.Printf("   🔧 Found atomic tool: %s -> %s\n", structName, toolName)
-						}
+					if *verbose {
+						fmt.Printf("   🔧 Found tool: %s -> %s\n", structName, toolName)
 					}
-				} else if *verbose {
-					fmt.Printf("   ⏭️  Skipping non-atomic tool: %s (interface migration needed)\n", structName)
 				}
 			}
 		}

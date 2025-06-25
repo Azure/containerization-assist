@@ -92,8 +92,8 @@ type DockerfileAnalyzer interface {
 	Analyze(lines []string, context ValidationContext) interface{}
 }
 
-// Fixer defines the interface for generating fixes
-type Fixer interface {
+// DockerfileFixer defines the interface for generating fixes
+type DockerfileFixer interface {
 	GenerateFixes(content string, result *ValidationResult) (string, []string)
 }
 

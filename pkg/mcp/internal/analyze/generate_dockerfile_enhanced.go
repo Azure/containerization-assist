@@ -197,8 +197,8 @@ func (t *GenerateDockerfileEnhancedTool) ExecuteTyped(ctx context.Context, args 
 	session.Metadata["dockerfile_generated"] = true
 
 	if err := t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			*state = *session
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			*sess = *session
 		}
 	}); err != nil {
 		t.logger.Warn().Err(err).Msg("Failed to update session state")

@@ -184,7 +184,7 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter mcptypes.InternalProgressReporter) (*AtomicScanSecretsResult, error) {
+func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter mcptypes.ProgressReporter) (*AtomicScanSecretsResult, error) {
 	// Stage 1: Initialize - Loading session and validating scan path
 	t.logger.Info().Msg("Loading session")
 
@@ -436,7 +436,7 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 }
 
 // performSecretScan performs the actual file scanning for secrets
-func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter mcptypes.InternalProgressReporter) ([]ScannedSecret, []FileSecretScanResult, int, error) {
+func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter mcptypes.ProgressReporter) ([]ScannedSecret, []FileSecretScanResult, int, error) {
 	scanner := utils.NewSecretScanner()
 	var allSecrets []ScannedSecret
 	var fileResults []FileSecretScanResult

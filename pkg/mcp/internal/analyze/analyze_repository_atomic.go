@@ -134,7 +134,7 @@ func (t *AtomicAnalyzeRepositoryTool) executeWithoutProgress(ctx context.Context
 }
 
 // performAnalysis performs the actual repository analysis
-func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter mcptypes.InternalProgressReporter) (*AtomicAnalysisResult, error) {
+func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter mcptypes.ProgressReporter) (*AtomicAnalysisResult, error) {
 	startTime := time.Now()
 
 	// Get or create session
@@ -457,8 +457,8 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 				}
 				newSession.Metadata["resumed_from"] = oldSessionInfo
 				if err := t.sessionManager.UpdateSession(newSession.SessionID, func(s interface{}) {
-					if state, ok := s.(*sessiontypes.SessionState); ok {
-						*state = *newSession
+					if sess, ok := s.(*sessiontypes.SessionState); ok {
+						*sess = *newSession
 					}
 				}); err != nil {
 					t.logger.Warn().Err(err).Msg("Failed to save resumed session")
@@ -514,9 +514,9 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 	session.RepoPath = result.RepoPath
 	session.RepoURL = args.RepoURL
 	t.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			state.RepoPath = result.RepoPath
-			state.RepoURL = args.RepoURL
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			sess.RepoPath = result.RepoPath
+			sess.RepoURL = args.RepoURL
 		}
 	})
 
@@ -601,8 +601,8 @@ func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.S
 	session.Metadata["analysis_duration"] = result.AnalysisDuration.Seconds()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			*state = *session
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			*sess = *session
 		}
 	})
 }

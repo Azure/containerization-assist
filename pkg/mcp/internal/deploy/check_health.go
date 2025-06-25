@@ -208,7 +208,7 @@ func (t *AtomicCheckHealthTool) executeWithoutProgress(ctx context.Context, args
 }
 
 // performHealthCheck performs the actual health check
-func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter mcptypes.InternalProgressReporter) (*AtomicCheckHealthResult, error) {
+func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter mcptypes.ProgressReporter) (*AtomicCheckHealthResult, error) {
 	startTime := time.Now()
 
 	// Get session
@@ -758,8 +758,8 @@ func (t *AtomicCheckHealthTool) updateSessionState(session *sessiontypes.Session
 	session.UpdateLastAccessed()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			*state = *session
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			*sess = *session
 		}
 	})
 }

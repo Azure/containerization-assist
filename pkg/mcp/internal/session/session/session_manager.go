@@ -145,7 +145,7 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*session
 	return session, nil
 }
 
-// UpdateSession updates a session and persists the changes
+// UpdateSession updates a session and persists the changes (interface-compliant version)
 func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
@@ -165,6 +165,15 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 	}
 
 	return nil
+}
+
+// UpdateSessionTyped updates a session with a typed function (for backward compatibility)
+func (sm *SessionManager) UpdateSessionTyped(sessionID string, updater func(*sessiontypes.SessionState)) error {
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*sessiontypes.SessionState); ok {
+			updater(session)
+		}
+	})
 }
 
 // GetSessionConcrete retrieves a session by ID with concrete return type

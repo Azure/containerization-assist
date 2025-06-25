@@ -280,7 +280,7 @@ func TestServerMetrics(t *testing.T) {
 type mockFailingTransport struct {
 	failOnServe bool
 	serveErr    error
-	handler     mcptypes.InternalRequestHandler
+	handler     mcptypes.RequestHandler
 }
 
 func (m *mockFailingTransport) Serve(ctx context.Context) error {
@@ -291,15 +291,27 @@ func (m *mockFailingTransport) Serve(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockFailingTransport) Stop() error {
+func (m *mockFailingTransport) Start(ctx context.Context) error {
+	return m.Serve(ctx)
+}
+
+func (m *mockFailingTransport) Stop(ctx context.Context) error {
 	return nil
+}
+
+func (m *mockFailingTransport) SendMessage(message interface{}) error {
+	return nil
+}
+
+func (m *mockFailingTransport) ReceiveMessage() (interface{}, error) {
+	return nil, nil
 }
 
 func (m *mockFailingTransport) Name() string {
 	return "mock-failing-transport"
 }
 
-func (m *mockFailingTransport) SetHandler(handler mcptypes.InternalRequestHandler) {
+func (m *mockFailingTransport) SetHandler(handler mcptypes.RequestHandler) {
 	m.handler = handler
 }
 

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // Pre-flight check methods
@@ -157,8 +157,9 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 
 		// Save session to persist the context
 		if err := pm.sessionManager.UpdateSession(state.SessionID, func(s interface{}) {
-			if sessionState, ok := s.(*sessiontypes.SessionState); ok {
-				sessionState.RepoAnalysis = state.RepoAnalysis
+			if sess, ok := s.(*mcptypes.SessionState); ok {
+				sess.CurrentStage = string(response.Stage)
+				sess.Status = string(response.Status)
 			}
 		}); err != nil {
 			pm.logger.Warn().Err(err).Msg("Failed to save session after pre-flight checks")

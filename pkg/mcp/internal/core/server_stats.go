@@ -29,7 +29,7 @@ func (s *Server) GetStats() *ServerStats {
 		Sessions:        sessionStats,
 		Workspace:       workspaceStats,
 		CircuitBreakers: circuitStats,
-		Transport:       s.transport.Name(),
+		Transport:       s.config.TransportType,
 	}
 }
 

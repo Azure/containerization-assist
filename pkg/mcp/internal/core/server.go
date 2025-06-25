@@ -38,8 +38,8 @@ func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 			return fmt.Errorf("session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if state, ok := existing.(*sessiontypes.SessionState); ok {
-				*state = *sess
+			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
+				*existingState = *sess
 			}
 		})
 	case sessiontypes.SessionState:
@@ -47,8 +47,8 @@ func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 			return fmt.Errorf("session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if state, ok := existing.(*sessiontypes.SessionState); ok {
-				*state = sess
+			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
+				*existingState = sess
 			}
 		})
 	default:
@@ -64,7 +64,7 @@ type Server struct {
 	workspaceManager *utils.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
-	transport        mcptypes.InternalTransport
+	transport        mcptypes.Transport
 	logger           zerolog.Logger
 	startTime        time.Time
 
@@ -154,7 +154,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	})
 
 	// Initialize transport
-	var mcpTransport mcptypes.InternalTransport
+	var mcpTransport mcptypes.Transport
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -188,13 +188,10 @@ func NewServer(config ServerConfig) (*Server, error) {
 			Level: convertZerologToSlog(logger.GetLevel()),
 		})))
 
-	// Set GomcpManager on StdioTransport for proper lifecycle management
-	// Note: We need to import the transport package to access concrete types
-	if mcpTransport.Name() == "stdio" {
-		// For stdio transport, we need to set the gomcp manager if possible
-		if setter, ok := mcpTransport.(interface{ SetGomcpManager(interface{}) }); ok {
-			setter.SetGomcpManager(gomcpManager)
-		}
+	// Set GomcpManager on transport for proper lifecycle management
+	// Use type assertion since Transport interface doesn't have Name() method
+	if setter, ok := mcpTransport.(interface{ SetGomcpManager(interface{}) }); ok {
+		setter.SetGomcpManager(gomcpManager)
 	}
 
 	// Initialize OpenTelemetry if enabled
@@ -296,7 +293,7 @@ func (s *Server) IsConversationModeEnabled() bool {
 }
 
 // GetTransport returns the server's transport
-func (s *Server) GetTransport() mcptypes.InternalTransport {
+func (s *Server) GetTransport() mcptypes.Transport {
 	return s.transport
 }
 

@@ -164,7 +164,7 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time, reporter mcptypes.InternalProgressReporter) error {
+func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	t.logger.Info().Msg("Loading session")
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
@@ -288,7 +288,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 }
 
 // performPull contains the actual pull logic that can be used with or without progress reporting
-func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiontypes.SessionState, args AtomicPullImageArgs, result *AtomicPullImageResult, reporter mcptypes.InternalProgressReporter) error {
+func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiontypes.SessionState, args AtomicPullImageArgs, result *AtomicPullImageResult, reporter mcptypes.ProgressReporter) error {
 	// Report progress if reporter is available
 	// Progress reporting removed
 
@@ -428,8 +428,8 @@ func (t *AtomicPullImageTool) updateSessionState(session *sessiontypes.SessionSt
 	session.UpdateLastAccessed()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if state, ok := s.(*sessiontypes.SessionState); ok {
-			*state = *session
+		if sess, ok := s.(*sessiontypes.SessionState); ok {
+			*sess = *session
 		}
 	})
 }

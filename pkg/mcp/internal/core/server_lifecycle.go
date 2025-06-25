@@ -36,7 +36,8 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start transport serving
 	transportDone := make(chan error, 1)
 	go func() {
-		transportDone <- s.transport.Serve(ctx)
+		// Start transport - use gomcp manager since transport doesn't have Serve method
+		transportDone <- s.gomcpManager.StartServer()
 	}()
 
 	// Wait for context cancellation or transport error
@@ -56,7 +57,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // HandleRequest implements the RequestHandler interface
-func (s *Server) HandleRequest(ctx context.Context, req interface{}) (interface{}, error) {
+func (s *Server) HandleRequest(ctx context.Context, request interface{}) (interface{}, error) {
 	// This is handled by the underlying MCP library for stdio transport
 	// For HTTP transport, we would implement custom request routing here
 	return nil, fmt.Errorf("direct request handling not implemented")
@@ -176,7 +177,7 @@ CONTINUE_SHUTDOWN:
 
 	// Step 9: Stop transport
 	s.logger.Info().Msg("Stopping transport")
-	if err := s.transport.Stop(); err != nil {
+	if err := s.transport.Stop(context.Background()); err != nil {
 		s.logger.Error().Err(err).Msg("Error stopping transport")
 		shutdownErrors = append(shutdownErrors, fmt.Errorf("transport stop: %w", err))
 	}

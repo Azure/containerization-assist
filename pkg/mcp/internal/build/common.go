@@ -122,7 +122,7 @@ type BuildExecutor interface {
 	Execute(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy) (*ExecutionResult, error)
 
 	// ExecuteWithProgress runs the build with progress reporting
-	ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter BuildProgressReporter) (*ExecutionResult, error)
+	ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter ExtendedBuildReporter) (*ExecutionResult, error)
 
 	// Monitor monitors a running build
 	Monitor(buildID string) (*BuildStatus, error)
@@ -173,17 +173,17 @@ type BuildStatus struct {
 	EstimatedTime time.Duration
 }
 
-// BasicProgressReporter defines a simple interface for progress reporting
-type BasicProgressReporter interface {
+// BuildProgressReporter defines the interface for build-specific progress reporting
+type BuildProgressReporter interface {
 	ReportProgress(progress float64, stage string, message string)
 	ReportError(err error)
 	ReportWarning(message string)
 	ReportInfo(message string)
 }
 
-// BuildProgressReporter defines the interface for build progress reporting
+// ExtendedBuildReporter combines stage-aware and simple progress reporting
 // This extends the core progress reporting functionality
-type BuildProgressReporter interface {
+type ExtendedBuildReporter interface {
 	ReportStage(stageProgress float64, message string)
 	NextStage(message string)
 	SetStage(stageIndex int, message string)

@@ -7,7 +7,7 @@ import (
 
 // ToolAnalyzer provides tool-specific analysis functionality
 type ToolAnalyzer struct {
-	*BaseAnalyzer
+	*BaseAnalyzerImpl
 	toolName string
 }
 
@@ -21,14 +21,14 @@ func NewToolAnalyzer(toolName string) *ToolAnalyzer {
 	}
 
 	return &ToolAnalyzer{
-		BaseAnalyzer: NewBaseAnalyzer(fmt.Sprintf("tool_analyzer_%s", toolName), "1.0.0", capabilities),
-		toolName:     toolName,
+		BaseAnalyzerImpl: NewBaseAnalyzer(fmt.Sprintf("tool_analyzer_%s", toolName), "1.0.0", capabilities),
+		toolName:         toolName,
 	}
 }
 
 // Analyze performs tool-specific analysis
 func (t *ToolAnalyzer) Analyze(ctx context.Context, input interface{}, options AnalysisOptions) (*AnalysisResult, error) {
-	result := t.CreateResult()
+	result := t.BaseAnalyzerImpl.CreateResult()
 
 	// Tool-specific analysis logic would go here
 	result.AddStrength("Tool is properly implemented")

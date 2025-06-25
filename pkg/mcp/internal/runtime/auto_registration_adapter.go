@@ -32,7 +32,7 @@ func NewOrchestratorRegistryAdapter(orchestratorRegistry interface {
 	return &OrchestratorRegistryAdapter{orchestratorRegistry: orchestratorRegistry}
 }
 
-// Register implements mcptypes.InternalToolRegistry by delegating to the orchestrator registry
+// Register implements mcptypes.ToolRegistry by delegating to the orchestrator registry
 func (ora *OrchestratorRegistryAdapter) Register(name string, factory mcptypes.ToolFactory) error {
 	tool := factory()
 	return ora.orchestratorRegistry.RegisterTool(name, tool)
@@ -59,7 +59,7 @@ func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcptypes.ToolMe
 }
 
 // RegisterAtomicTools registers all atomic tools that are ready for auto-registration
-func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.InternalToolRegistry) error {
+func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.ToolRegistry) error {
 	// Since the actual tools need dependencies (PipelineOperations, SessionManager, Logger),
 	// we cannot instantiate them here without those dependencies.
 	// This auto-registration approach needs to be refactored to work with dependency injection.

@@ -34,7 +34,7 @@ type HTTPTransport struct {
 	rateLimiter    map[string]*rateLimiter
 	logBodies      bool
 	maxBodyLogSize int64
-	handler        mcptypes.InternalRequestHandler
+	handler        mcptypes.RequestHandler
 }
 
 // HTTPTransportConfig holds configuration for HTTP transport
@@ -212,20 +212,37 @@ func (t *HTTPTransport) Close() error {
 }
 
 // SetHandler sets the request handler for this transport
-func (t *HTTPTransport) SetHandler(handler mcptypes.InternalRequestHandler) {
+func (t *HTTPTransport) SetHandler(handler mcptypes.RequestHandler) {
 	t.handler = handler
 }
 
+// Start starts the HTTP transport - alias for Serve
+func (t *HTTPTransport) Start(ctx context.Context) error {
+	return t.Serve(ctx)
+}
+
 // Stop gracefully shuts down the HTTP transport
-func (t *HTTPTransport) Stop() error {
+func (t *HTTPTransport) Stop(ctx context.Context) error {
 	if t.server == nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	t.logger.Info().Msg("Stopping HTTP transport")
 	return t.server.Shutdown(ctx)
+}
+
+// SendMessage sends a message via HTTP (not applicable for HTTP REST API)
+func (t *HTTPTransport) SendMessage(message interface{}) error {
+	// HTTP transport doesn't use message-based communication
+	// Messages are sent via HTTP responses
+	return fmt.Errorf("SendMessage not applicable for HTTP transport")
+}
+
+// ReceiveMessage receives a message via HTTP (not applicable for HTTP REST API)
+func (t *HTTPTransport) ReceiveMessage() (interface{}, error) {
+	// HTTP transport doesn't use message-based communication
+	// Messages are received via HTTP requests
+	return nil, fmt.Errorf("ReceiveMessage not applicable for HTTP transport")
 }
 
 // Name returns the transport name

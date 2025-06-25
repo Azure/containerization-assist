@@ -10,21 +10,26 @@ import (
 
 // ToolValidator provides tool-specific validation functionality
 type ToolValidator struct {
-	*BaseValidator
+	*BaseValidatorImpl
 	toolName string
 }
 
 // NewToolValidator creates a new tool validator
 func NewToolValidator(toolName string) *ToolValidator {
 	return &ToolValidator{
-		BaseValidator: NewBaseValidator("tool_validator_"+toolName, "1.0.0"),
-		toolName:      toolName,
+		BaseValidatorImpl: NewBaseValidator("tool_validator_"+toolName, "1.0.0"),
+		toolName:          toolName,
 	}
 }
 
 // ValidateTool performs tool-specific validation
+// Validate implements the BaseValidator interface
+func (v *ToolValidator) Validate(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error) {
+	return v.ValidateTool(ctx, input, options)
+}
+
 func (v *ToolValidator) ValidateTool(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error) {
-	result := v.CreateResult()
+	result := v.BaseValidatorImpl.CreateResult()
 
 	// Tool-specific validation logic would go here
 	// This could include checking tool arguments, dependencies, etc.
