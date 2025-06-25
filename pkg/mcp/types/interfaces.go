@@ -59,6 +59,33 @@ type ProgressStage struct {
 // Transport and RequestHandler interfaces - temporarily restored to avoid import cycles
 // These will eventually be removed once all references are updated to use pkg/mcp
 
+// Transport represents the unified interface for MCP transport mechanisms
+type Transport interface {
+	// Serve starts the transport and serves requests
+	Serve(ctx context.Context) error
+
+	// Stop gracefully stops the transport
+	Stop(ctx context.Context) error
+
+	// Name returns the transport name
+	Name() string
+
+	// SetHandler sets the request handler
+	SetHandler(handler interface{})
+}
+
+// RequestHandler processes MCP requests
+type RequestHandler interface {
+	HandleRequest(ctx context.Context, req interface{}) (interface{}, error)
+}
+
+// Tool represents the unified interface for all MCP tools
+type Tool interface {
+	Execute(ctx context.Context, args interface{}) (interface{}, error)
+	GetMetadata() ToolMetadata
+	Validate(ctx context.Context, args interface{}) error
+}
+
 // NOTE: Transport, RequestHandler, ProgressReporter, Tool, and ToolRegistry interfaces
 // are now defined in pkg/mcp/interfaces.go as the canonical source
 

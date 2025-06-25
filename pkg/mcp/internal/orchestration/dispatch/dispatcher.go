@@ -36,7 +36,7 @@ func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory,
 
 	// Create a tool instance to get metadata
 	toolInstance := factory()
-	tool, ok := toolInstance.(mcp.Tool)
+	tool, ok := toolInstance.(mcptypes.Tool)
 	if !ok {
 		return fmt.Errorf("factory for tool %s does not produce a valid Tool instance", name)
 	}

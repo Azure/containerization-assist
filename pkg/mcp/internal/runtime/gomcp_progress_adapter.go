@@ -14,12 +14,12 @@ import (
 type GoMCPProgressAdapter struct {
 	serverCtx *server.Context
 	token     string
-	stages    []mcptypes.ProgressStage
+	stages    []interface{}
 	current   int
 }
 
 // NewGoMCPProgressAdapter creates a progress adapter using GoMCP native progress tokens
-func NewGoMCPProgressAdapter(serverCtx *server.Context, stages []mcptypes.ProgressStage) *GoMCPProgressAdapter {
+func NewGoMCPProgressAdapter(serverCtx *server.Context, stages []interface{}) *GoMCPProgressAdapter {
 	token := serverCtx.CreateProgressToken()
 
 	return &GoMCPProgressAdapter{
@@ -39,10 +39,18 @@ func (a *GoMCPProgressAdapter) ReportStage(stageProgress float64, message string
 	// Calculate overall progress based on current stage and stage progress
 	var overallProgress float64
 	for i := 0; i < a.current; i++ {
-		overallProgress += a.stages[i].Weight
+		if stage, ok := a.stages[i].(interface{ GetWeight() float64 }); ok {
+			overallProgress += stage.GetWeight()
+		} else if stage, ok := a.stages[i].(mcptypes.ProgressStage); ok {
+			overallProgress += stage.Weight
+		}
 	}
 	if a.current < len(a.stages) {
-		overallProgress += a.stages[a.current].Weight * stageProgress
+		if stage, ok := a.stages[a.current].(interface{ GetWeight() float64 }); ok {
+			overallProgress += stage.GetWeight() * stageProgress
+		} else if stage, ok := a.stages[a.current].(mcptypes.ProgressStage); ok {
+			overallProgress += stage.Weight * stageProgress
+		}
 	}
 
 	a.serverCtx.SendProgress(overallProgress, nil, message)
@@ -74,7 +82,9 @@ func (a *GoMCPProgressAdapter) ReportOverall(progress float64, message string) {
 // GetCurrentStage implements mcptypes.ProgressReporter
 func (a *GoMCPProgressAdapter) GetCurrentStage() (int, mcptypes.ProgressStage) {
 	if a.current >= 0 && a.current < len(a.stages) {
-		return a.current, a.stages[a.current]
+		if stage, ok := a.stages[a.current].(mcptypes.ProgressStage); ok {
+			return a.current, stage
+		}
 	}
 	return 0, mcptypes.ProgressStage{}
 }
@@ -90,8 +100,8 @@ func (a *GoMCPProgressAdapter) Complete(message string) {
 // with GoMCP progress tracking by wrapping it with a progress adapter
 func ExecuteToolWithGoMCPProgress[TArgs any, TResult any](
 	serverCtx *server.Context,
-	stages []mcptypes.ProgressStage,
-	executeFn func(ctx context.Context, args TArgs, reporter mcptypes.ProgressReporter) (TResult, error),
+	stages []interface{},
+	executeFn func(ctx context.Context, args TArgs, reporter interface{}) (TResult, error),
 	fallbackFn func(ctx context.Context, args TArgs) (TResult, error),
 	args TArgs,
 ) (TResult, error) {
