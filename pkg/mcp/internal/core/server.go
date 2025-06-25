@@ -64,7 +64,7 @@ type Server struct {
 	workspaceManager *utils.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
-	transport        mcptypes.Transport
+	transport        mcptypes.InternalTransport
 	logger           zerolog.Logger
 	startTime        time.Time
 
@@ -154,7 +154,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	})
 
 	// Initialize transport
-	var mcpTransport mcptypes.Transport
+	var mcpTransport mcptypes.InternalTransport
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -296,7 +296,7 @@ func (s *Server) IsConversationModeEnabled() bool {
 }
 
 // GetTransport returns the server's transport
-func (s *Server) GetTransport() mcptypes.Transport {
+func (s *Server) GetTransport() mcptypes.InternalTransport {
 	return s.transport
 }
 

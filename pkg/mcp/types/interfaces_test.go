@@ -153,14 +153,14 @@ func TestInterfaceConformance(t *testing.T) {
 	}
 
 	// Test HealthChecker interface
-	var healthChecker HealthChecker = &MockHealthChecker{}
+	var healthChecker InternalHealthChecker = &MockHealthChecker{}
 	stats := healthChecker.GetSessionStats()
 	if stats.ActiveSessions != 5 {
 		t.Error("HealthChecker interface not properly implemented")
 	}
 
 	// Test ProgressReporter interface
-	var progressReporter ProgressReporter = &MockProgressReporter{}
+	var progressReporter InternalProgressReporter = &MockProgressReporter{}
 	idx, stage := progressReporter.GetCurrentStage()
 	if idx != 0 || stage.Name != "test" {
 		t.Error("ProgressReporter interface not properly implemented")

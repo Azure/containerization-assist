@@ -83,12 +83,12 @@ type SecurityAnalysis struct {
 }
 
 // Validator defines the interface for Dockerfile validators
-type Validator interface {
+type DockerfileValidator interface {
 	Validate(content string, options ValidationOptions) (*ValidationResult, error)
 }
 
-// Analyzer defines the interface for specific analysis types
-type Analyzer interface {
+// DockerfileAnalyzer defines the interface for specific Dockerfile analysis types
+type DockerfileAnalyzer interface {
 	Analyze(lines []string, context ValidationContext) interface{}
 }
 

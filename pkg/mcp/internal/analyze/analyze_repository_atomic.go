@@ -134,7 +134,7 @@ func (t *AtomicAnalyzeRepositoryTool) executeWithoutProgress(ctx context.Context
 }
 
 // performAnalysis performs the actual repository analysis
-func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter mcptypes.ProgressReporter) (*AtomicAnalysisResult, error) {
+func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter mcptypes.InternalProgressReporter) (*AtomicAnalysisResult, error) {
 	startTime := time.Now()
 
 	// Get or create session

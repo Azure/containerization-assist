@@ -10,6 +10,7 @@ import (
 )
 
 // SecurityValidator handles Dockerfile security validation
+// Implements DockerfileValidator interface
 type SecurityValidator struct {
 	logger            zerolog.Logger
 	secretPatterns    []*regexp.Regexp

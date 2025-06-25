@@ -27,7 +27,7 @@ func (t *testToolImpl) GetMetadata() interface{} {
 	}
 }
 
-// testToolWrapper wraps testToolImpl to implement mcptypes.Tool
+// testToolWrapper wraps testToolImpl to implement mcptypes.InternalTool
 type testToolWrapper struct {
 	impl *testToolImpl
 }
@@ -49,7 +49,7 @@ func (w *testToolWrapper) Validate(ctx context.Context, args interface{}) error 
 	return nil
 }
 
-// testToolArgs implements mcptypes.ToolArgs
+// testToolArgs implements mcptypes.InternalToolArgs
 type testToolArgs struct {
 	data map[string]interface{}
 }
@@ -65,7 +65,7 @@ func (a *testToolArgs) GetSessionID() string {
 	return "test-session"
 }
 
-// testToolResult implements mcptypes.ToolResult
+// testToolResult implements mcptypes.InternalToolResult
 type testToolResult struct {
 	success bool
 	result  interface{}
@@ -139,7 +139,7 @@ func TestToolDispatcher(t *testing.T) {
 	t.Run("ToolExecution", func(t *testing.T) {
 		factory, _ := dispatcher.GetToolFactory("test_tool")
 		toolInstance := factory()
-		tool, ok := toolInstance.(mcptypes.Tool)
+		tool, ok := toolInstance.(mcptypes.InternalTool)
 		if !ok {
 			t.Fatalf("Tool factory did not return a valid Tool instance")
 		}
@@ -206,7 +206,7 @@ func TestDispatcherConcurrency(t *testing.T) {
 			factory, _ := dispatcher.GetToolFactory("concurrent_test_tool")
 			if factory != nil {
 				toolInstance := factory()
-				if tool, ok := toolInstance.(mcptypes.Tool); ok {
+				if tool, ok := toolInstance.(mcptypes.InternalTool); ok {
 					// Execute tool
 					_, _ = tool.Execute(context.Background(), nil)
 				}

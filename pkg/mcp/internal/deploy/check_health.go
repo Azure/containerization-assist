@@ -208,7 +208,7 @@ func (t *AtomicCheckHealthTool) executeWithoutProgress(ctx context.Context, args
 }
 
 // performHealthCheck performs the actual health check
-func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter mcptypes.ProgressReporter) (*AtomicCheckHealthResult, error) {
+func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter mcptypes.InternalProgressReporter) (*AtomicCheckHealthResult, error) {
 	startTime := time.Now()
 
 	// Get session

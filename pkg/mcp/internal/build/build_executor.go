@@ -147,7 +147,7 @@ func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, arg
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
+func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.InternalProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	e.logger.Info().Msg("Loading session")
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)

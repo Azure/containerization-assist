@@ -225,7 +225,7 @@ func (t *AtomicValidateDockerfileTool) executeWithoutProgress(ctx context.Contex
 }
 
 // performValidation performs the actual Dockerfile validation
-func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, args AtomicValidateDockerfileArgs, reporter mcptypes.ProgressReporter) (*AtomicValidateDockerfileResult, error) {
+func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, args AtomicValidateDockerfileArgs, reporter mcptypes.InternalProgressReporter) (*AtomicValidateDockerfileResult, error) {
 	startTime := time.Now()
 
 	// Stage 1: Initialize

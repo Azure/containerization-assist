@@ -17,7 +17,7 @@ type StdioTransport struct {
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
 	logger       zerolog.Logger
-	handler      mcptypes.RequestHandler
+	handler      mcptypes.InternalRequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
@@ -91,7 +91,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 }
 
 // SetHandler sets the request handler for this transport
-func (s *StdioTransport) SetHandler(handler mcptypes.RequestHandler) {
+func (s *StdioTransport) SetHandler(handler mcptypes.InternalRequestHandler) {
 	s.handler = handler
 }
 
@@ -219,7 +219,7 @@ func (s *StdioTransport) CreateRecoveryResponse(originalError error, recoverySte
 }
 
 // LogTransportInfo logs transport startup information
-func LogTransportInfo(transport mcptypes.Transport) {
+func LogTransportInfo(transport mcptypes.InternalTransport) {
 	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on %s transport: %s\n",
 		transport.Name(), transport.Name())
 }

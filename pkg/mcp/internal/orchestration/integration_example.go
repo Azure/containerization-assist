@@ -25,7 +25,7 @@ type WorkflowOrchestrator struct {
 // NewWorkflowOrchestrator creates a new complete workflow orchestrator
 func NewWorkflowOrchestrator(
 	db *bbolt.DB,
-	toolRegistry mcptypes.ToolRegistry,
+	toolRegistry mcptypes.InternalToolRegistry,
 	toolOrchestrator mcptypes.ToolOrchestrator,
 	logger zerolog.Logger,
 ) *WorkflowOrchestrator {
@@ -244,7 +244,7 @@ func ExampleIntegrationWithMCP(db *bbolt.DB, logger zerolog.Logger) {
 	// would be integrated into the existing MCP server
 
 	// Create tool registry (this would be the existing MCP tool registry)
-	var toolRegistry mcptypes.ToolRegistry
+	var toolRegistry mcptypes.InternalToolRegistry
 
 	// Create MCP tool orchestrator (this would be the existing MCP tool orchestrator)
 	// var mcpToolOrchestrator *MCPToolOrchestrator

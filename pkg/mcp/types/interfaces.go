@@ -19,17 +19,18 @@ type ArgConverter func(args map[string]interface{}) (interface{}, error)
 // ResultConverter converts tool-specific results to generic types
 type ResultConverter func(result interface{}) (map[string]interface{}, error)
 
-// ToolArgs is a marker interface for tool-specific argument types (lightweight version)
-type ToolArgs interface {
-	GetSessionID() string
-	Validate() error
-}
-
-// Tool interface (lightweight version to avoid import cycles)
-type Tool interface {
+// Internal lightweight interfaces (different names to avoid duplication with main interfaces)
+// InternalTool provides the core tool interface for internal use
+type InternalTool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
 	GetMetadata() ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
+}
+
+// InternalToolArgs is a marker interface for tool-specific argument types
+type InternalToolArgs interface {
+	GetSessionID() string
+	Validate() error
 }
 
 // ToolFactory creates new instances of tools
@@ -65,24 +66,25 @@ type ToolOrchestrator interface {
 	GetToolMetadata(toolName string) (interface{}, error)
 }
 
-// ToolRegistry manages tool registration and discovery (lightweight version)
-type ToolRegistry interface {
+// Internal lightweight interfaces for transport and registry
+// InternalToolRegistry manages tool registration and discovery
+type InternalToolRegistry interface {
 	Register(name string, factory ToolFactory) error
 	Get(name string) (ToolFactory, error)
 	List() []string
 	GetMetadata() map[string]ToolMetadata
 }
 
-// Transport represents the unified interface for MCP transport mechanisms (lightweight version)
-type Transport interface {
+// InternalTransport represents the unified interface for MCP transport mechanisms
+type InternalTransport interface {
 	Serve(ctx context.Context) error
 	Stop() error
 	Name() string
-	SetHandler(handler RequestHandler)
+	SetHandler(handler InternalRequestHandler)
 }
 
-// RequestHandler processes MCP requests (lightweight version)
-type RequestHandler interface {
+// InternalRequestHandler processes MCP requests
+type InternalRequestHandler interface {
 	HandleRequest(ctx context.Context, req interface{}) (interface{}, error)
 }
 
@@ -621,8 +623,8 @@ type RecentError struct {
 	Context   map[string]interface{} `json:"context,omitempty"`
 }
 
-// HealthChecker defines the interface for health checking operations (lightweight version)
-type HealthChecker interface {
+// InternalHealthChecker defines the interface for health checking operations
+type InternalHealthChecker interface {
 	GetSystemResources() SystemResources
 	GetSessionStats() SessionHealthStats
 	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
@@ -642,8 +644,8 @@ type ProgressStage struct {
 	Description string  // Optional detailed description
 }
 
-// ProgressReporter provides stage-aware progress reporting (lightweight version)
-type ProgressReporter interface {
+// InternalProgressReporter provides stage-aware progress reporting
+type InternalProgressReporter interface {
 	ReportStage(stageProgress float64, message string)
 	NextStage(message string)
 	SetStage(stageIndex int, message string)

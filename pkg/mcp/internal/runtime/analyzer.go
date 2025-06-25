@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Analyzer defines the base interface for all analyzers
-type Analyzer interface {
+// RuntimeAnalyzer defines the base interface for all runtime analyzers
+type RuntimeAnalyzer interface {
 	// Analyze performs analysis and returns results
 	Analyze(ctx context.Context, input interface{}, options AnalysisOptions) (*AnalysisResult, error)
 
@@ -314,11 +314,11 @@ func (c *AnalysisContext) Duration() time.Duration {
 
 // AnalyzerChain allows chaining multiple analyzers
 type AnalyzerChain struct {
-	analyzers []Analyzer
+	analyzers []RuntimeAnalyzer
 }
 
 // NewAnalyzerChain creates a new analyzer chain
-func NewAnalyzerChain(analyzers ...Analyzer) *AnalyzerChain {
+func NewAnalyzerChain(analyzers ...RuntimeAnalyzer) *AnalyzerChain {
 	return &AnalyzerChain{
 		analyzers: analyzers,
 	}

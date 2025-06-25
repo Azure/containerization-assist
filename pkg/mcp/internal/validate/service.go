@@ -18,7 +18,7 @@ import (
 // ValidationService provides centralized validation functionality
 type ValidationService struct {
 	logger     zerolog.Logger
-	validators map[string]runtime.Validator
+	validators map[string]runtime.RuntimeValidator
 	schemas    map[string]interface{}
 }
 
@@ -26,13 +26,13 @@ type ValidationService struct {
 func NewValidationService(logger zerolog.Logger) *ValidationService {
 	return &ValidationService{
 		logger:     logger.With().Str("service", "validation").Logger(),
-		validators: make(map[string]runtime.Validator),
+		validators: make(map[string]runtime.RuntimeValidator),
 		schemas:    make(map[string]interface{}),
 	}
 }
 
 // RegisterValidator registers a validator with the service
-func (s *ValidationService) RegisterValidator(name string, validator runtime.Validator) {
+func (s *ValidationService) RegisterValidator(name string, validator runtime.RuntimeValidator) {
 	s.validators[name] = validator
 	s.logger.Debug().Str("validator", name).Msg("Validator registered")
 }

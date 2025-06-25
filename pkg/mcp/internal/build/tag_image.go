@@ -175,7 +175,7 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 }
 
 // executeWithProgress runs the tag operation with progress reporting
-func (t *AtomicTagImageTool) executeWithProgress(ctx context.Context, args AtomicTagImageArgs, result *AtomicTagImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
+func (t *AtomicTagImageTool) executeWithProgress(ctx context.Context, args AtomicTagImageArgs, result *AtomicTagImageResult, startTime time.Time, reporter mcptypes.InternalProgressReporter) error {
 	return t.performTag(ctx, nil, args, result, reporter)
 }
 
@@ -259,7 +259,7 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 }
 
 // performTag executes the actual Docker tag operation
-func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontypes.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter mcptypes.ProgressReporter) error {
+func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontypes.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter mcptypes.InternalProgressReporter) error {
 	// Get session if not provided
 	if session == nil {
 		var err error

@@ -22,8 +22,8 @@ type GomcpManager struct {
 	server        server.Server
 	config        GomcpConfig
 	logger        slog.Logger
-	transport     mcptypes.Transport // Injected transport
-	isInitialized bool               // Prevent mutation after creation
+	transport     mcptypes.InternalTransport // Injected transport
+	isInitialized bool                       // Prevent mutation after creation
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -42,7 +42,7 @@ func NewGomcpManager(config GomcpConfig) *GomcpManager {
 }
 
 // WithTransport sets the transport for the gomcp manager
-func (gm *GomcpManager) WithTransport(t mcptypes.Transport) *GomcpManager {
+func (gm *GomcpManager) WithTransport(t mcptypes.InternalTransport) *GomcpManager {
 	if gm.isInitialized {
 		gm.logger.Error("cannot set transport: manager already initialized")
 		return gm
@@ -101,7 +101,7 @@ func (gm *GomcpManager) GetServer() server.Server {
 }
 
 // GetTransport returns the configured transport
-func (gm *GomcpManager) GetTransport() mcptypes.Transport {
+func (gm *GomcpManager) GetTransport() mcptypes.InternalTransport {
 	return gm.transport
 }
 

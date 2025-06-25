@@ -164,7 +164,7 @@ func (t *AtomicGenerateManifestsTool) executeWithoutProgress(ctx context.Context
 }
 
 // performManifestGeneration performs the actual manifest generation
-func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter mcptypes.ProgressReporter) (*AtomicGenerateManifestsResult, error) {
+func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter mcptypes.InternalProgressReporter) (*AtomicGenerateManifestsResult, error) {
 	startTime := time.Now()
 
 	// Get session

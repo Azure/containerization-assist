@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Validator defines the base interface for all validators
-type Validator interface {
+// RuntimeValidator defines the base interface for all runtime validators
+type RuntimeValidator interface {
 	// Validate performs validation and returns a result
 	Validate(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error)
 
@@ -270,11 +270,11 @@ func (c *ValidationContext) Duration() time.Duration {
 
 // ValidatorChain allows chaining multiple validators
 type ValidatorChain struct {
-	validators []Validator
+	validators []RuntimeValidator
 }
 
 // NewValidatorChain creates a new validator chain
-func NewValidatorChain(validators ...Validator) *ValidatorChain {
+func NewValidatorChain(validators ...RuntimeValidator) *ValidatorChain {
 	return &ValidatorChain{
 		validators: validators,
 	}

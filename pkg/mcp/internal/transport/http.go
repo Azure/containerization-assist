@@ -34,7 +34,7 @@ type HTTPTransport struct {
 	rateLimiter    map[string]*rateLimiter
 	logBodies      bool
 	maxBodyLogSize int64
-	handler        mcptypes.RequestHandler
+	handler        mcptypes.InternalRequestHandler
 }
 
 // HTTPTransportConfig holds configuration for HTTP transport
@@ -212,7 +212,7 @@ func (t *HTTPTransport) Close() error {
 }
 
 // SetHandler sets the request handler for this transport
-func (t *HTTPTransport) SetHandler(handler mcptypes.RequestHandler) {
+func (t *HTTPTransport) SetHandler(handler mcptypes.InternalRequestHandler) {
 	t.handler = handler
 }
 

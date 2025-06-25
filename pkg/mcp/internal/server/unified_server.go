@@ -544,7 +544,7 @@ func (adapter *RegistryAdapter) Get(name string) (mcptypes.ToolFactory, error) {
 
 	// Return a factory that creates the same tool instance
 	factory := func() interface{} {
-		return tool.(mcptypes.Tool)
+		return tool.(mcptypes.InternalTool)
 	}
 	return factory, nil
 }
