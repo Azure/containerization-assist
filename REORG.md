@@ -200,7 +200,34 @@ This plan consolidates the MCP reorganization strategy with feedback to create a
    // Use proper error types throughout
    ```
 
-3. **Standardize all tools** with unified patterns:
+3. **Fix non-functional fixer module integration** (Critical)
+   - **Problem**: All tools use `StubAnalyzer` which always returns errors
+   - **Root Cause**: `SetAnalyzer()` exists but is never called with working analyzer
+   - **Fix Implementation**:
+     ```go
+     // In conversation mode initialization
+     clients := adapter.NewMCPClients(docker, kind, kube)
+     if conversationMode {
+         callerAnalyzer := analyzer.NewCallerAnalyzer(transport, opts)
+         clients.SetAnalyzer(callerAnalyzer)
+     }
+     
+     // In atomic tools, check analyzer type before execution
+     func (t *BuildImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+         if _, isStub := t.clients.Analyzer.(*analyzer.StubAnalyzer); !isStub {
+             // Has working analyzer, use ExecuteWithFixes
+             return t.ExecuteWithFixes(ctx, args)
+         }
+         // Direct execution without fixes
+         return t.ExecuteWithContext(ctx, args)
+     }
+     ```
+   - **Files to Update**:
+     - All atomic tools in `internal/tools/`
+     - Conversation mode initialization
+     - Integration test setup
+
+4. **Standardize all tools** with unified patterns:
    ```go
    // Every tool follows this exact pattern
    type BuildImageTool struct { /* ... */ }
