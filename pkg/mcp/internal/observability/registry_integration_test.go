@@ -20,14 +20,14 @@ func TestRegistryAuthIntegration(t *testing.T) {
 	}
 
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
-	checker := ops.NewPreFlightChecker(logger)
+	checker := observability.NewPreFlightChecker(logger)
 
 	t.Run("docker config parsing integration", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create realistic docker config
-		dockerConfig := ops.DockerConfig{
-			Auths: map[string]ops.DockerAuth{
+		dockerConfig := observability.DockerConfig{
+			Auths: map[string]observability.DockerAuth{
 				"https://index.docker.io/v1/": {
 					Username: "dockeruser",
 					Password: "dockerpass",
@@ -63,7 +63,7 @@ func TestRegistryAuthIntegration(t *testing.T) {
 		content, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var parsedConfig ops.DockerConfig
+		var parsedConfig observability.DockerConfig
 		err = json.Unmarshal(content, &parsedConfig)
 		require.NoError(t, err)
 
@@ -161,8 +161,8 @@ func TestRegistryAuthIntegration(t *testing.T) {
 		assert.Greater(t, len(result.Checks), 0, "Should have run some checks")
 
 		// Categorize check results
-		checksByCategory := make(map[string][]ops.CheckResult)
-		checksByStatus := make(map[ops.CheckStatus]int)
+		checksByCategory := make(map[string][]observability.CheckResult)
+		checksByStatus := make(map[observability.CheckStatus]int)
 
 		for _, check := range result.Checks {
 			checksByCategory[check.Category] = append(checksByCategory[check.Category], check)
@@ -200,7 +200,7 @@ func TestRegistryAuthIntegration(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Test with only credential store
-		dockerConfig := ops.DockerConfig{
+		dockerConfig := observability.DockerConfig{
 			CredsStore: "desktop",
 		}
 
@@ -215,7 +215,7 @@ func TestRegistryAuthIntegration(t *testing.T) {
 		content, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var parsedConfig ops.DockerConfig
+		var parsedConfig observability.DockerConfig
 		err = json.Unmarshal(content, &parsedConfig)
 		require.NoError(t, err)
 
@@ -230,8 +230,8 @@ func TestRegistryAuthIntegration(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Complex config with auths, helpers, and store
-		dockerConfig := ops.DockerConfig{
-			Auths: map[string]ops.DockerAuth{
+		dockerConfig := observability.DockerConfig{
+			Auths: map[string]observability.DockerAuth{
 				"docker.io": {
 					Username: "user1",
 					Password: "pass1",
@@ -256,7 +256,7 @@ func TestRegistryAuthIntegration(t *testing.T) {
 		content, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var parsedConfig ops.DockerConfig
+		var parsedConfig observability.DockerConfig
 		err = json.Unmarshal(content, &parsedConfig)
 		require.NoError(t, err)
 
@@ -287,7 +287,7 @@ func TestPreflightPerformanceIntegration(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
 
 	t.Run("preflight check performance", func(t *testing.T) {
-		checker := ops.NewPreFlightChecker(logger)
+		checker := observability.NewPreFlightChecker(logger)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -324,7 +324,7 @@ func TestPreflightPerformanceIntegration(t *testing.T) {
 
 		for i := 0; i < numWorkers; i++ {
 			go func(workerID int) {
-				checker := ops.NewPreFlightChecker(logger)
+				checker := observability.NewPreFlightChecker(logger)
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 
@@ -350,14 +350,14 @@ func TestPreflightPerformanceIntegration(t *testing.T) {
 // Benchmark for realistic workloads
 func BenchmarkRegistryOperations(b *testing.B) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
-	checker := ops.NewPreFlightChecker(logger)
+	checker := observability.NewPreFlightChecker(logger)
 
 	b.Run("docker_config_parsing", func(b *testing.B) {
 		tmpDir := b.TempDir()
 
 		// Create a realistic docker config
-		dockerConfig := ops.DockerConfig{
-			Auths: map[string]ops.DockerAuth{
+		dockerConfig := observability.DockerConfig{
+			Auths: map[string]observability.DockerAuth{
 				"docker.io": {Username: "user1", Password: "pass1", Auth: "dXNlcjE6cGFzczE="},
 				"gcr.io":    {Username: "user2", Password: "pass2", Auth: "dXNlcjI6cGFzczI="},
 				"quay.io":   {Username: "user3", Password: "pass3", Auth: "dXNlcjM6cGFzczM="},
@@ -380,7 +380,7 @@ func BenchmarkRegistryOperations(b *testing.B) {
 				b.Fatalf("File read failed: %v", err)
 			}
 
-			var parsedConfig ops.DockerConfig
+			var parsedConfig observability.DockerConfig
 			err = json.Unmarshal(content, &parsedConfig)
 			if err != nil {
 				b.Fatalf("Config parsing failed: %v", err)
