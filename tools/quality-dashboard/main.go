@@ -14,29 +14,29 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 type QualityMetrics struct {
-	Timestamp         time.Time                   `json:"timestamp"`
-	ErrorHandling     ErrorHandlingMetrics        `json:"error_handling"`
-	DirectoryStructure DirectoryMetrics           `json:"directory_structure"`
-	TestCoverage      TestCoverageMetrics        `json:"test_coverage"`
-	BuildMetrics      BuildMetrics               `json:"build_metrics"`
-	CodeQuality       CodeQualityMetrics         `json:"code_quality"`
-	Recommendations   []string                   `json:"recommendations"`
+	Timestamp          time.Time            `json:"timestamp"`
+	ErrorHandling      ErrorHandlingMetrics `json:"error_handling"`
+	DirectoryStructure DirectoryMetrics     `json:"directory_structure"`
+	TestCoverage       TestCoverageMetrics  `json:"test_coverage"`
+	BuildMetrics       BuildMetrics         `json:"build_metrics"`
+	CodeQuality        CodeQualityMetrics   `json:"code_quality"`
+	Recommendations    []string             `json:"recommendations"`
 }
 
 type ErrorHandlingMetrics struct {
-	TotalErrors        int                       `json:"total_errors"`
-	RichErrors         int                       `json:"rich_errors"`
-	StandardErrors     int                       `json:"standard_errors"`
-	AdoptionRate       float64                   `json:"adoption_rate"`
-	FileBreakdown      map[string]ErrorStats     `json:"file_breakdown"`
-	PackageBreakdown   map[string]ErrorStats     `json:"package_breakdown"`
-	TopFilesToMigrate []FileErrorInfo           `json:"top_files_to_migrate"`
+	TotalErrors       int                   `json:"total_errors"`
+	RichErrors        int                   `json:"rich_errors"`
+	StandardErrors    int                   `json:"standard_errors"`
+	AdoptionRate      float64               `json:"adoption_rate"`
+	FileBreakdown     map[string]ErrorStats `json:"file_breakdown"`
+	PackageBreakdown  map[string]ErrorStats `json:"package_breakdown"`
+	TopFilesToMigrate []FileErrorInfo       `json:"top_files_to_migrate"`
 }
 
 type ErrorStats struct {
@@ -67,11 +67,11 @@ type PackageInfo struct {
 }
 
 type TestCoverageMetrics struct {
-	OverallCoverage   float64                     `json:"overall_coverage"`
-	PackageCoverage   map[string]CoverageInfo     `json:"package_coverage"`
-	UncoveredPackages []string                    `json:"uncovered_packages"`
-	TopCoverage       []PackageCoverageInfo       `json:"top_coverage"`
-	BottomCoverage    []PackageCoverageInfo       `json:"bottom_coverage"`
+	OverallCoverage   float64                 `json:"overall_coverage"`
+	PackageCoverage   map[string]CoverageInfo `json:"package_coverage"`
+	UncoveredPackages []string                `json:"uncovered_packages"`
+	TopCoverage       []PackageCoverageInfo   `json:"top_coverage"`
+	BottomCoverage    []PackageCoverageInfo   `json:"bottom_coverage"`
 }
 
 type CoverageInfo struct {
@@ -86,11 +86,11 @@ type PackageCoverageInfo struct {
 }
 
 type BuildMetrics struct {
-	BuildTime      time.Duration          `json:"build_time"`
-	TestTime       time.Duration          `json:"test_time"`
-	BinarySize     int64                  `json:"binary_size"`
-	Dependencies   int                    `json:"dependencies"`
-	BuildHistory   []BuildRecord          `json:"build_history,omitempty"`
+	BuildTime    time.Duration `json:"build_time"`
+	TestTime     time.Duration `json:"test_time"`
+	BinarySize   int64         `json:"binary_size"`
+	Dependencies int           `json:"dependencies"`
+	BuildHistory []BuildRecord `json:"build_history,omitempty"`
 }
 
 type BuildRecord struct {
@@ -100,10 +100,10 @@ type BuildRecord struct {
 }
 
 type CodeQualityMetrics struct {
-	CyclomaticComplexity map[string]int `json:"cyclomatic_complexity"`
-	LongFunctions        []FunctionInfo `json:"long_functions"`
+	CyclomaticComplexity map[string]int  `json:"cyclomatic_complexity"`
+	LongFunctions        []FunctionInfo  `json:"long_functions"`
 	DuplicateCode        []DuplicateInfo `json:"duplicate_code,omitempty"`
-	TODOComments         int            `json:"todo_comments"`
+	TODOComments         int             `json:"todo_comments"`
 }
 
 type FunctionInfo struct {
@@ -113,18 +113,18 @@ type FunctionInfo struct {
 }
 
 type DuplicateInfo struct {
-	File1      string `json:"file1"`
-	File2      string `json:"file2"`
+	File1      string  `json:"file1"`
+	File2      string  `json:"file2"`
 	Similarity float64 `json:"similarity"`
 }
 
 var (
-	rootDir        = flag.String("root", ".", "Root directory to analyze")
-	outputFile     = flag.String("output", "quality-metrics.json", "Output file for metrics")
-	outputFormat   = flag.String("format", "json", "Output format: json, text, or html")
-	watch          = flag.Bool("watch", false, "Watch mode - update metrics continuously")
-	watchInterval  = flag.Duration("interval", 5*time.Minute, "Watch interval")
-	historyFile    = flag.String("history", "", "File to store historical metrics")
+	rootDir       = flag.String("root", ".", "Root directory to analyze")
+	outputFile    = flag.String("output", "quality-metrics.json", "Output file for metrics")
+	outputFormat  = flag.String("format", "json", "Output format: json, text, or html")
+	watch         = flag.Bool("watch", false, "Watch mode - update metrics continuously")
+	watchInterval = flag.Duration("interval", 5*time.Minute, "Watch interval")
+	historyFile   = flag.String("history", "", "File to store historical metrics")
 )
 
 func main() {
@@ -163,7 +163,7 @@ func runOnce() error {
 
 func runWatchMode() {
 	log.Printf("Starting quality dashboard in watch mode (interval: %v)\n", *watchInterval)
-	
+
 	ticker := time.NewTicker(*watchInterval)
 	defer ticker.Stop()
 
@@ -298,7 +298,7 @@ func collectErrorHandlingMetrics(rootDir string) (*ErrorHandlingMetrics, error) 
 		standard int
 		rate     float64
 	}
-	
+
 	var files []fileError
 	for path, stats := range metrics.FileBreakdown {
 		if stats.Standard > 0 {
@@ -349,11 +349,11 @@ func collectDirectoryMetrics(rootDir string) (*DirectoryMetrics, error) {
 
 		if d.IsDir() {
 			metrics.TotalDirectories++
-			
+
 			// Calculate depth
 			depth := strings.Count(path, string(os.PathSeparator)) - baseDepth
 			metrics.DirectoriesByDepth[depth]++
-			
+
 			if depth > metrics.MaxDepth {
 				metrics.MaxDepth = depth
 			}
@@ -369,11 +369,11 @@ func collectDirectoryMetrics(rootDir string) (*DirectoryMetrics, error) {
 			// Analyze package structure
 			if strings.Contains(path, "/pkg/") || strings.Contains(path, "/cmd/") {
 				relPath, _ := filepath.Rel(rootDir, path)
-				
+
 				// Count Go files
 				goFiles := 0
 				subdirs := []string{}
-				
+
 				if entries, err := os.ReadDir(path); err == nil {
 					for _, entry := range entries {
 						if strings.HasSuffix(entry.Name(), ".go") {
@@ -392,7 +392,7 @@ func collectDirectoryMetrics(rootDir string) (*DirectoryMetrics, error) {
 
 				// Check for violations
 				if depth > 5 {
-					metrics.Violations = append(metrics.Violations, 
+					metrics.Violations = append(metrics.Violations,
 						fmt.Sprintf("Directory too deep (%d levels): %s", depth, relPath))
 				}
 			}
@@ -424,7 +424,7 @@ func collectTestCoverageMetrics(rootDir string) (*TestCoverageMetrics, error) {
 	// Parse coverage profile
 	if _, err := os.Stat(filepath.Join(rootDir, "coverage.tmp")); err == nil {
 		defer os.Remove(filepath.Join(rootDir, "coverage.tmp"))
-		
+
 		// Get coverage by package
 		cmd = exec.Command("go", "tool", "cover", "-func=coverage.tmp")
 		cmd.Dir = rootDir
@@ -450,7 +450,7 @@ func collectTestCoverageMetrics(rootDir string) (*TestCoverageMetrics, error) {
 				// Extract package and coverage
 				pkg := parts[0]
 				coverageStr := strings.TrimSuffix(parts[len(parts)-1], "%")
-				
+
 				if coverage, err := parseFloat(coverageStr); err == nil {
 					// For the total line
 					if strings.HasPrefix(line, "total:") {
@@ -509,7 +509,7 @@ func collectTestCoverageMetrics(rootDir string) (*TestCoverageMetrics, error) {
 		pkg string
 		cov float64
 	}
-	
+
 	var packages []pkgCov
 	for pkg, info := range metrics.PackageCoverage {
 		packages = append(packages, pkgCov{pkg, info.Coverage})
@@ -547,7 +547,7 @@ func collectBuildMetrics(rootDir string) (*BuildMetrics, error) {
 	cmd.Dir = rootDir
 	err := cmd.Run()
 	metrics.BuildTime = time.Since(start)
-	
+
 	if err != nil {
 		return metrics, fmt.Errorf("build failed: %w", err)
 	}
@@ -706,10 +706,10 @@ func generateRecommendations(metrics *QualityMetrics) []string {
 
 	// Error handling recommendations
 	if metrics.ErrorHandling.AdoptionRate < 80 {
-		recommendations = append(recommendations, 
-			fmt.Sprintf("🔴 Error Handling: Only %.1f%% adoption of RichError. Target: 80%%", 
+		recommendations = append(recommendations,
+			fmt.Sprintf("🔴 Error Handling: Only %.1f%% adoption of RichError. Target: 80%%",
 				metrics.ErrorHandling.AdoptionRate))
-		
+
 		if len(metrics.ErrorHandling.TopFilesToMigrate) > 0 {
 			recommendations = append(recommendations,
 				fmt.Sprintf("   Start with: %s (%d standard errors)",
@@ -727,7 +727,7 @@ func generateRecommendations(metrics *QualityMetrics) []string {
 
 	if metrics.DirectoryStructure.EmptyDirectories > 0 {
 		recommendations = append(recommendations,
-			fmt.Sprintf("🟡 Clean up %d empty directories", 
+			fmt.Sprintf("🟡 Clean up %d empty directories",
 				metrics.DirectoryStructure.EmptyDirectories))
 	}
 
@@ -736,7 +736,7 @@ func generateRecommendations(metrics *QualityMetrics) []string {
 		recommendations = append(recommendations,
 			fmt.Sprintf("🔴 Test Coverage: %.1f%% (target: 70%%)",
 				metrics.TestCoverage.OverallCoverage))
-		
+
 		if len(metrics.TestCoverage.BottomCoverage) > 0 {
 			recommendations = append(recommendations,
 				fmt.Sprintf("   Lowest coverage: %s (%.1f%%)",
@@ -761,7 +761,7 @@ func generateRecommendations(metrics *QualityMetrics) []string {
 	// Code quality recommendations
 	if metrics.CodeQuality.TODOComments > 50 {
 		recommendations = append(recommendations,
-			fmt.Sprintf("🟡 Address %d TODO/FIXME comments", 
+			fmt.Sprintf("🟡 Address %d TODO/FIXME comments",
 				metrics.CodeQuality.TODOComments))
 	}
 
@@ -816,8 +816,8 @@ func outputText(metrics *QualityMetrics) error {
 	fmt.Printf("ERROR HANDLING METRICS\n")
 	fmt.Printf("=====================\n")
 	fmt.Printf("Total Errors: %d\n", metrics.ErrorHandling.TotalErrors)
-	fmt.Printf("Rich Errors: %d (%.1f%%)\n", 
-		metrics.ErrorHandling.RichErrors, 
+	fmt.Printf("Rich Errors: %d (%.1f%%)\n",
+		metrics.ErrorHandling.RichErrors,
 		metrics.ErrorHandling.AdoptionRate)
 	fmt.Printf("Standard Errors: %d\n\n", metrics.ErrorHandling.StandardErrors)
 

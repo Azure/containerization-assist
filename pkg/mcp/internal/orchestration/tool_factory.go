@@ -16,7 +16,7 @@ import (
 type ToolFactory struct {
 	pipelineOperations mcptypes.PipelineOperations
 	sessionManager     *session.SessionManager
-	analyzer          mcptypes.AIAnalyzer
+	analyzer           mcptypes.AIAnalyzer
 	logger             zerolog.Logger
 }
 
@@ -30,7 +30,7 @@ func NewToolFactory(
 	return &ToolFactory{
 		pipelineOperations: pipelineOperations,
 		sessionManager:     sessionManager,
-		analyzer:          analyzer,
+		analyzer:           analyzer,
 		logger:             logger,
 	}
 }

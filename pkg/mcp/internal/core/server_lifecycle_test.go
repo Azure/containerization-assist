@@ -227,7 +227,7 @@ func TestServerTransportError(t *testing.T) {
 	// Use a very short timeout to simulate server startup hanging
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	
+
 	err = server.Start(ctx)
 	// The server should handle context cancellation gracefully
 	assert.NoError(t, err, "Server should shutdown gracefully on context cancellation")
@@ -260,7 +260,7 @@ func TestServerCleanupOnFailure(t *testing.T) {
 	// Use context cancellation to simulate interrupted startup
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	
+
 	err = server.Start(ctx)
 	// Server should handle graceful shutdown
 	assert.NoError(t, err, "Server should shutdown gracefully")
@@ -300,7 +300,6 @@ type mockFailingTransport struct {
 	serveErr    error
 	handler     InternalRequestHandler
 }
-
 
 func (m *mockFailingTransport) Serve(ctx context.Context) error {
 	if m.failOnServe {

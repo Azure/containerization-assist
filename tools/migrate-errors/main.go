@@ -12,39 +12,38 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"text/tabwriter"
 )
 
 type ErrorMigration struct {
-	File            string
-	Line            int
-	Column          int
-	OriginalCode    string
-	MigratedCode    string
-	ErrorType       string
-	Context         string
-	AutoMigratable  bool
+	File           string
+	Line           int
+	Column         int
+	OriginalCode   string
+	MigratedCode   string
+	ErrorType      string
+	Context        string
+	AutoMigratable bool
 }
 
 type MigrationStats struct {
-	TotalErrors      int
-	MigratedErrors   int
-	SkippedErrors    int
-	FilesProcessed   int
-	FilesModified    int
-	ErrorsByType     map[string]int
+	TotalErrors    int
+	MigratedErrors int
+	SkippedErrors  int
+	FilesProcessed int
+	FilesModified  int
+	ErrorsByType   map[string]int
 }
 
 var (
-	packagePath     = flag.String("package", "", "Package path to migrate (required)")
-	dryRun          = flag.Bool("dry-run", true, "Show what would be changed without modifying files")
-	verbose         = flag.Bool("verbose", false, "Show detailed migration information")
-	interactive     = flag.Bool("interactive", false, "Prompt for each migration")
-	outputReport    = flag.String("report", "", "Output migration report to file")
-	includeTests    = flag.Bool("include-tests", false, "Include test files in migration")
-	autoOnly        = flag.Bool("auto-only", false, "Only perform automatic migrations")
+	packagePath  = flag.String("package", "", "Package path to migrate (required)")
+	dryRun       = flag.Bool("dry-run", true, "Show what would be changed without modifying files")
+	verbose      = flag.Bool("verbose", false, "Show detailed migration information")
+	interactive  = flag.Bool("interactive", false, "Prompt for each migration")
+	outputReport = flag.String("report", "", "Output migration report to file")
+	includeTests = flag.Bool("include-tests", false, "Include test files in migration")
+	autoOnly     = flag.Bool("auto-only", false, "Only perform automatic migrations")
 )
 
 func main() {
@@ -163,11 +162,11 @@ func analyzeFile(filename string) ([]*ErrorMigration, error) {
 	}
 
 	var migrations []*ErrorMigration
-	
+
 	// Check if types package is imported
 	hasTypesImport := false
 	needsTypesImport := false
-	
+
 	for _, imp := range node.Imports {
 		if imp.Path.Value == `"github.com/Azure/container-copilot/pkg/types"` {
 			hasTypesImport = true
@@ -207,8 +206,6 @@ func analyzeCallExpr(call *ast.CallExpr, fset *token.FileSet, filename string) *
 		return nil
 	}
 
-	pos := fset.Position(call.Pos())
-	
 	switch funcName {
 	case "fmt.Errorf":
 		return analyzeFmtErrorf(call, fset, filename)
@@ -239,7 +236,7 @@ func analyzeFmtErrorf(call *ast.CallExpr, fset *token.FileSet, filename string) 
 	}
 
 	pos := fset.Position(call.Pos())
-	
+
 	// Extract format string
 	formatStr := extractStringLiteral(call.Args[0])
 	if formatStr == "" {
@@ -248,7 +245,7 @@ func analyzeFmtErrorf(call *ast.CallExpr, fset *token.FileSet, filename string) 
 
 	// Determine error type and context
 	errorType, context := categorizeError(formatStr)
-	
+
 	migration := &ErrorMigration{
 		File:           filename,
 		Line:           pos.Line,
@@ -279,7 +276,7 @@ func analyzeErrorsNew(call *ast.CallExpr, fset *token.FileSet, filename string) 
 	}
 
 	errorType, context := categorizeError(message)
-	
+
 	return &ErrorMigration{
 		File:           filename,
 		Line:           pos.Line,
@@ -298,7 +295,7 @@ func analyzeErrorsWrap(call *ast.CallExpr, fset *token.FileSet, filename string)
 	}
 
 	pos := fset.Position(call.Pos())
-	
+
 	// Extract the message
 	message := extractStringLiteral(call.Args[1])
 	if message == "" {
@@ -306,7 +303,7 @@ func analyzeErrorsWrap(call *ast.CallExpr, fset *token.FileSet, filename string)
 	}
 
 	errorType, context := categorizeError(message)
-	
+
 	return &ErrorMigration{
 		File:           filename,
 		Line:           pos.Line,
@@ -321,7 +318,7 @@ func analyzeErrorsWrap(call *ast.CallExpr, fset *token.FileSet, filename string)
 
 func categorizeError(message string) (errorType, context string) {
 	message = strings.ToLower(message)
-	
+
 	// Categorize based on keywords
 	switch {
 	case strings.Contains(message, "validation") || strings.Contains(message, "invalid"):
@@ -350,14 +347,14 @@ func isAutoMigratable(format string, args []ast.Expr) bool {
 	if strings.Contains(format, "%v") || strings.Contains(format, "%+v") {
 		return false // May need manual review
 	}
-	
+
 	// Check if any arguments are function calls (might have side effects)
 	for _, arg := range args {
 		if _, ok := arg.(*ast.CallExpr); ok {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -365,13 +362,13 @@ func generateRichError(errorType, format string, args []ast.Expr) string {
 	if len(args) == 0 {
 		return fmt.Sprintf(`types.NewRichError("%s", "%s")`, errorType, format)
 	}
-	
+
 	// Build the argument list
 	argStrs := make([]string, len(args))
 	for i, arg := range args {
 		argStrs[i] = nodeToString(arg)
 	}
-	
+
 	return fmt.Sprintf(`types.NewRichError("%s", "%s", %s)`, errorType, format, strings.Join(argStrs, ", "))
 }
 
@@ -399,7 +396,7 @@ func groupByFile(migrations []*ErrorMigration) map[string][]*ErrorMigration {
 
 func processMigrations(filename string, migrations []*ErrorMigration, stats *MigrationStats) error {
 	stats.FilesProcessed++
-	
+
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return err
@@ -421,7 +418,7 @@ func processMigrations(filename string, migrations []*ErrorMigration, stats *Mig
 	for _, migration := range migrations {
 		stats.TotalErrors++
 		stats.ErrorsByType[migration.ErrorType]++
-		
+
 		if *verbose {
 			printMigration(migration)
 		}
@@ -462,7 +459,7 @@ func processMigrations(filename string, migrations []*ErrorMigration, stats *Mig
 		if needsTypesImport(file) {
 			addTypesImport(file)
 		}
-		
+
 		// Write modified file
 		if err := writeFile(filename, file, fset); err != nil {
 			return err
@@ -470,7 +467,7 @@ func processMigrations(filename string, migrations []*ErrorMigration, stats *Mig
 	}
 
 	fmt.Printf("   Summary: %d migrated, %d skipped\n", migrated, skipped)
-	
+
 	return nil
 }
 
@@ -491,7 +488,7 @@ func addTypesImport(file *ast.File) {
 			Value: `"github.com/Azure/container-copilot/pkg/types"`,
 		},
 	}
-	
+
 	// Find or create import declaration
 	var importDecl *ast.GenDecl
 	for _, decl := range file.Decls {
@@ -500,7 +497,7 @@ func addTypesImport(file *ast.File) {
 			break
 		}
 	}
-	
+
 	if importDecl != nil {
 		importDecl.Specs = append(importDecl.Specs, importSpec)
 	}
@@ -511,7 +508,7 @@ func writeFile(filename string, file *ast.File, fset *token.FileSet) error {
 	if err := format.Node(&buf, fset, file); err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(filename, buf.Bytes(), 0644)
 }
 
@@ -537,11 +534,11 @@ func promptForMigration(m *ErrorMigration) bool {
 	fmt.Printf("Original: %s\n", m.OriginalCode)
 	fmt.Printf("Migrated: %s\n", m.MigratedCode)
 	fmt.Print("Apply migration? [y/N/q]: ")
-	
+
 	var response string
 	fmt.Scanln(&response)
 	response = strings.ToLower(strings.TrimSpace(response))
-	
+
 	switch response {
 	case "y", "yes":
 		return true
@@ -554,21 +551,21 @@ func promptForMigration(m *ErrorMigration) bool {
 func printSummary(stats *MigrationStats) {
 	fmt.Printf("\n📊 Migration Summary\n")
 	fmt.Printf("===================\n")
-	
+
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(w, "Files Processed:\t%d\n", stats.FilesProcessed)
 	fmt.Fprintf(w, "Files Modified:\t%d\n", stats.FilesModified)
 	fmt.Fprintf(w, "Total Errors Found:\t%d\n", stats.TotalErrors)
 	fmt.Fprintf(w, "Errors Migrated:\t%d\n", stats.MigratedErrors)
 	fmt.Fprintf(w, "Errors Skipped:\t%d\n", stats.SkippedErrors)
-	
+
 	if stats.TotalErrors > 0 {
 		successRate := float64(stats.MigratedErrors) / float64(stats.TotalErrors) * 100
 		fmt.Fprintf(w, "Migration Rate:\t%.1f%%\n", successRate)
 	}
-	
+
 	w.Flush()
-	
+
 	if len(stats.ErrorsByType) > 0 {
 		fmt.Printf("\nErrors by Type:\n")
 		w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -588,23 +585,23 @@ func saveReport(filename string, migrations []*ErrorMigration, stats *MigrationS
 
 	fmt.Fprintf(f, "Error Migration Report\n")
 	fmt.Fprintf(f, "=====================\n\n")
-	
+
 	fmt.Fprintf(f, "Summary:\n")
 	fmt.Fprintf(f, "- Files Processed: %d\n", stats.FilesProcessed)
 	fmt.Fprintf(f, "- Total Errors: %d\n", stats.TotalErrors)
 	fmt.Fprintf(f, "- Migrated: %d\n", stats.MigratedErrors)
 	fmt.Fprintf(f, "- Skipped: %d\n\n", stats.SkippedErrors)
-	
+
 	fmt.Fprintf(f, "Detailed Migrations:\n")
 	fmt.Fprintf(f, "===================\n\n")
-	
+
 	currentFile := ""
 	for _, m := range migrations {
 		if m.File != currentFile {
 			fmt.Fprintf(f, "\nFile: %s\n", m.File)
 			currentFile = m.File
 		}
-		
+
 		fmt.Fprintf(f, "\n  Line %d: %s\n", m.Line, m.ErrorType)
 		fmt.Fprintf(f, "  Original: %s\n", m.OriginalCode)
 		if m.AutoMigratable {
@@ -614,7 +611,7 @@ func saveReport(filename string, migrations []*ErrorMigration, stats *MigrationS
 			fmt.Fprintf(f, "  Status: Manual review required\n")
 		}
 	}
-	
+
 	fmt.Printf("\n📄 Report saved to: %s\n", filename)
 	return nil
 }

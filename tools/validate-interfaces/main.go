@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	verbose = flag.Bool("verbose", false, "Verbose output")
-	fix     = flag.Bool("fix", false, "Attempt to fix violations automatically")
-	metrics = flag.Bool("metrics", false, "Generate interface adoption metrics report")
+	verbose       = flag.Bool("verbose", false, "Verbose output")
+	fix           = flag.Bool("fix", false, "Attempt to fix violations automatically")
+	metrics       = flag.Bool("metrics", false, "Generate interface adoption metrics report")
 	metricsOutput = flag.String("metrics-output", "interface_metrics.json", "Output file for metrics report")
 )
 
@@ -66,46 +66,46 @@ type ValidationResult struct {
 
 // InterfaceMetrics tracks interface usage and adoption patterns
 type InterfaceMetrics struct {
-	Timestamp          time.Time                          `json:"timestamp"`
-	TotalInterfaces    int                                `json:"total_interfaces"`
-	TotalImplementors  int                                `json:"total_implementors"`
-	AdoptionRate       float64                            `json:"adoption_rate"`
-	InterfaceStats     map[string]*InterfaceUsageStats    `json:"interface_stats"`
-	ImplementorStats   map[string]*ImplementorStats       `json:"implementor_stats"`
-	PatternAnalysis    *InterfacePatternAnalysis          `json:"pattern_analysis"`
-	ComplianceReport   *ComplianceReport                  `json:"compliance_report"`
-	RecommendationList []string                           `json:"recommendations"`
+	Timestamp          time.Time                       `json:"timestamp"`
+	TotalInterfaces    int                             `json:"total_interfaces"`
+	TotalImplementors  int                             `json:"total_implementors"`
+	AdoptionRate       float64                         `json:"adoption_rate"`
+	InterfaceStats     map[string]*InterfaceUsageStats `json:"interface_stats"`
+	ImplementorStats   map[string]*ImplementorStats    `json:"implementor_stats"`
+	PatternAnalysis    *InterfacePatternAnalysis       `json:"pattern_analysis"`
+	ComplianceReport   *ComplianceReport               `json:"compliance_report"`
+	RecommendationList []string                        `json:"recommendations"`
 }
 
 // InterfaceUsageStats tracks usage statistics for a specific interface
 type InterfaceUsageStats struct {
-	InterfaceName     string            `json:"interface_name"`
-	ImplementorCount  int               `json:"implementor_count"`
-	Implementors      []string          `json:"implementors"`
-	Methods           []string          `json:"methods"`
-	PackageDistrib    map[string]int    `json:"package_distribution"`
-	AdoptionTrend     []AdoptionPoint   `json:"adoption_trend"`
-	MostUsedMethods   []MethodUsage     `json:"most_used_methods"`
+	InterfaceName    string          `json:"interface_name"`
+	ImplementorCount int             `json:"implementor_count"`
+	Implementors     []string        `json:"implementors"`
+	Methods          []string        `json:"methods"`
+	PackageDistrib   map[string]int  `json:"package_distribution"`
+	AdoptionTrend    []AdoptionPoint `json:"adoption_trend"`
+	MostUsedMethods  []MethodUsage   `json:"most_used_methods"`
 }
 
 // ImplementorStats tracks statistics for types that implement interfaces
 type ImplementorStats struct {
-	TypeName           string   `json:"type_name"`
-	Package            string   `json:"package"`
-	InterfacesImpl     []string `json:"interfaces_implemented"`
-	MethodCount        int      `json:"method_count"`
-	InterfaceCompliance float64 `json:"interface_compliance"`
-	PatternType        string   `json:"pattern_type"` // "unified", "legacy", "mixed"
+	TypeName            string   `json:"type_name"`
+	Package             string   `json:"package"`
+	InterfacesImpl      []string `json:"interfaces_implemented"`
+	MethodCount         int      `json:"method_count"`
+	InterfaceCompliance float64  `json:"interface_compliance"`
+	PatternType         string   `json:"pattern_type"` // "unified", "legacy", "mixed"
 }
 
 // InterfacePatternAnalysis provides insights into interface usage patterns
 type InterfacePatternAnalysis struct {
-	UnifiedPatternUsage   int     `json:"unified_pattern_usage"`
-	LegacyPatternUsage    int     `json:"legacy_pattern_usage"`
-	MixedPatternUsage     int     `json:"mixed_pattern_usage"`
-	PatternMigrationRate  float64 `json:"pattern_migration_rate"`
-	TopPatterns           []PatternUsage `json:"top_patterns"`
-	AntiPatterns          []AntiPattern  `json:"anti_patterns"`
+	UnifiedPatternUsage  int            `json:"unified_pattern_usage"`
+	LegacyPatternUsage   int            `json:"legacy_pattern_usage"`
+	MixedPatternUsage    int            `json:"mixed_pattern_usage"`
+	PatternMigrationRate float64        `json:"pattern_migration_rate"`
+	TopPatterns          []PatternUsage `json:"top_patterns"`
+	AntiPatterns         []AntiPattern  `json:"anti_patterns"`
 }
 
 // ComplianceReport tracks compliance with interface standards
@@ -131,8 +131,8 @@ type MethodUsage struct {
 
 // PatternUsage tracks common patterns in interface usage
 type PatternUsage struct {
-	PatternName string `json:"pattern_name"`
-	Count       int    `json:"count"`
+	PatternName string   `json:"pattern_name"`
+	Count       int      `json:"count"`
 	Examples    []string `json:"examples"`
 }
 
@@ -588,10 +588,10 @@ func generateInterfaceMetrics() *InterfaceMetrics {
 		}
 
 		packageName := file.Name.Name
-		
+
 		// Find interfaces and implementors in this file
 		analyzeFileForMetrics(file, path, packageName, interfaceMap, implementorMap, packageMap)
-		
+
 		return nil
 	})
 
@@ -602,10 +602,10 @@ func generateInterfaceMetrics() *InterfaceMetrics {
 	// Build interface usage stats
 	for interfaceName := range expectedInterfaces {
 		stats := &InterfaceUsageStats{
-			InterfaceName:  interfaceName,
-			Methods:        expectedInterfaces[interfaceName],
-			Implementors:   []string{},
-			PackageDistrib: make(map[string]int),
+			InterfaceName:   interfaceName,
+			Methods:         expectedInterfaces[interfaceName],
+			Implementors:    []string{},
+			PackageDistrib:  make(map[string]int),
 			MostUsedMethods: []MethodUsage{},
 		}
 
@@ -615,7 +615,7 @@ func generateInterfaceMetrics() *InterfaceMetrics {
 				if impl == interfaceName {
 					stats.Implementors = append(stats.Implementors, implementor)
 					stats.ImplementorCount++
-					
+
 					if pkg, exists := packageMap[implementor]; exists {
 						stats.PackageDistrib[pkg]++
 					}
@@ -664,9 +664,9 @@ func generateInterfaceMetrics() *InterfaceMetrics {
 }
 
 // analyzeFileForMetrics extracts interface and implementor information from a single file
-func analyzeFileForMetrics(file *ast.File, filePath, packageName string, 
-	interfaceMap map[string]*ast.InterfaceType, 
-	implementorMap map[string][]string, 
+func analyzeFileForMetrics(file *ast.File, filePath, packageName string,
+	interfaceMap map[string]*ast.InterfaceType,
+	implementorMap map[string][]string,
 	packageMap map[string]string) {
 
 	// Find interface definitions
@@ -704,34 +704,34 @@ func analyzeFileForMetrics(file *ast.File, filePath, packageName string,
 // findImplementedInterfaces determines which interfaces a struct implements
 func findImplementedInterfaces(file *ast.File, structName string) []string {
 	var interfaces []string
-	
+
 	// Look for methods that match expected interface methods
 	for interfaceName, expectedMethods := range expectedInterfaces {
 		if implementsInterface(file, structName, expectedMethods) {
 			interfaces = append(interfaces, interfaceName)
 		}
 	}
-	
+
 	return interfaces
 }
 
 // implementsInterface checks if a struct implements all methods of an interface
 func implementsInterface(file *ast.File, structName string, expectedMethods []string) bool {
 	foundMethods := make(map[string]bool)
-	
+
 	for _, decl := range file.Decls {
 		funcDecl, ok := decl.(*ast.FuncDecl)
 		if !ok || funcDecl.Recv == nil {
 			continue
 		}
-		
+
 		// Check if this method belongs to our struct
 		recvType := getReceiverType(funcDecl.Recv)
 		if recvType == structName || recvType == "*"+structName {
 			foundMethods[funcDecl.Name.Name] = true
 		}
 	}
-	
+
 	// Check if all expected methods are present
 	for _, expectedMethod := range expectedMethods {
 		methodName := strings.Split(expectedMethod, "(")[0]
@@ -739,7 +739,7 @@ func implementsInterface(file *ast.File, structName string, expectedMethods []st
 			return false
 		}
 	}
-	
+
 	return len(expectedMethods) > 0 // Only return true if there are methods to check
 }
 
@@ -748,10 +748,10 @@ func calculateCompliance(implementedInterfaces []string, expectedInterfaces map[
 	if len(expectedInterfaces) == 0 {
 		return 100.0
 	}
-	
+
 	implemented := len(implementedInterfaces)
 	expected := len(expectedInterfaces)
-	
+
 	return float64(implemented) / float64(expected) * 100.0
 }
 
@@ -759,7 +759,7 @@ func calculateCompliance(implementedInterfaces []string, expectedInterfaces map[
 func determinePatternType(interfaces []string, pkg string) string {
 	hasUnified := false
 	hasLegacy := false
-	
+
 	for _, iface := range interfaces {
 		if _, exists := expectedInterfaces[iface]; exists {
 			hasUnified = true
@@ -767,7 +767,7 @@ func determinePatternType(interfaces []string, pkg string) string {
 			hasLegacy = true
 		}
 	}
-	
+
 	if hasUnified && hasLegacy {
 		return "mixed"
 	} else if hasUnified {
@@ -775,7 +775,7 @@ func determinePatternType(interfaces []string, pkg string) string {
 	} else if hasLegacy {
 		return "legacy"
 	}
-	
+
 	return "unknown"
 }
 
@@ -792,13 +792,13 @@ func analyzeInterfacePatterns(implementorStats map[string]*ImplementorStats) *In
 		TopPatterns:  []PatternUsage{},
 		AntiPatterns: []AntiPattern{},
 	}
-	
+
 	unifiedCount := 0
 	legacyCount := 0
 	mixedCount := 0
-	
+
 	patternCounts := make(map[string]int)
-	
+
 	for _, stats := range implementorStats {
 		switch stats.PatternType {
 		case "unified":
@@ -808,34 +808,34 @@ func analyzeInterfacePatterns(implementorStats map[string]*ImplementorStats) *In
 		case "mixed":
 			mixedCount++
 		}
-		
+
 		patternCounts[stats.PatternType]++
 	}
-	
+
 	analysis.UnifiedPatternUsage = unifiedCount
 	analysis.LegacyPatternUsage = legacyCount
 	analysis.MixedPatternUsage = mixedCount
-	
+
 	totalPatterns := unifiedCount + legacyCount + mixedCount
 	if totalPatterns > 0 {
 		analysis.PatternMigrationRate = float64(unifiedCount) / float64(totalPatterns) * 100.0
 	}
-	
+
 	// Convert pattern counts to sorted list
 	type patternCount struct {
 		name  string
 		count int
 	}
-	
+
 	var patterns []patternCount
 	for pattern, count := range patternCounts {
 		patterns = append(patterns, patternCount{name: pattern, count: count})
 	}
-	
+
 	sort.Slice(patterns, func(i, j int) bool {
 		return patterns[i].count > patterns[j].count
 	})
-	
+
 	for _, pattern := range patterns {
 		analysis.TopPatterns = append(analysis.TopPatterns, PatternUsage{
 			PatternName: pattern.name,
@@ -843,7 +843,7 @@ func analyzeInterfacePatterns(implementorStats map[string]*ImplementorStats) *In
 			Examples:    []string{}, // Would be populated with actual examples
 		})
 	}
-	
+
 	// Identify anti-patterns
 	if mixedCount > 0 {
 		analysis.AntiPatterns = append(analysis.AntiPatterns, AntiPattern{
@@ -853,22 +853,22 @@ func analyzeInterfacePatterns(implementorStats map[string]*ImplementorStats) *In
 			Severity:    "warning",
 		})
 	}
-	
+
 	return analysis
 }
 
 // generateComplianceReport generates a compliance report
 func generateComplianceReport(interfaceStats map[string]*InterfaceUsageStats, implementorStats map[string]*ImplementorStats) *ComplianceReport {
 	report := &ComplianceReport{
-		InterfaceCompliance: make(map[string]float64),
-		MissingInterfaces:   []string{},
+		InterfaceCompliance:  make(map[string]float64),
+		MissingInterfaces:    []string{},
 		OrphanedImplementors: []string{},
-		NonCompliantTools:   []string{},
+		NonCompliantTools:    []string{},
 	}
-	
+
 	totalCompliance := 0.0
 	compliantCount := 0
-	
+
 	// Calculate interface-specific compliance
 	for interfaceName, stats := range interfaceStats {
 		if stats.ImplementorCount > 0 {
@@ -880,56 +880,56 @@ func generateComplianceReport(interfaceStats map[string]*InterfaceUsageStats, im
 			report.MissingInterfaces = append(report.MissingInterfaces, interfaceName)
 		}
 	}
-	
+
 	if compliantCount > 0 {
 		report.OverallCompliance = totalCompliance / float64(compliantCount)
 	}
-	
+
 	// Find orphaned implementors (no interfaces implemented)
 	for implementorName, stats := range implementorStats {
 		if len(stats.InterfacesImpl) == 0 {
 			report.OrphanedImplementors = append(report.OrphanedImplementors, implementorName)
 		}
-		
+
 		if stats.InterfaceCompliance < 50.0 {
 			report.NonCompliantTools = append(report.NonCompliantTools, implementorName)
 		}
 	}
-	
+
 	return report
 }
 
 // generateRecommendations generates actionable recommendations
 func generateRecommendations(metrics *InterfaceMetrics) []string {
 	var recommendations []string
-	
+
 	if metrics.ComplianceReport.OverallCompliance < 70.0 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"Overall interface compliance is below 70%. Focus on implementing missing interfaces.")
 	}
-	
+
 	if metrics.PatternAnalysis.LegacyPatternUsage > metrics.PatternAnalysis.UnifiedPatternUsage {
 		recommendations = append(recommendations,
 			"Legacy patterns outnumber unified patterns. Prioritize migration to unified interfaces.")
 	}
-	
+
 	if metrics.PatternAnalysis.MixedPatternUsage > 0 {
 		recommendations = append(recommendations,
 			"Some types use mixed interface patterns. Standardize on unified interfaces.")
 	}
-	
+
 	if len(metrics.ComplianceReport.OrphanedImplementors) > 0 {
 		recommendations = append(recommendations,
-			fmt.Sprintf("Found %d orphaned implementors with no interface implementations. Consider adding interface compliance.", 
+			fmt.Sprintf("Found %d orphaned implementors with no interface implementations. Consider adding interface compliance.",
 				len(metrics.ComplianceReport.OrphanedImplementors)))
 	}
-	
+
 	if len(metrics.ComplianceReport.MissingInterfaces) > 0 {
 		recommendations = append(recommendations,
 			fmt.Sprintf("Found %d interfaces with no implementations. Consider creating implementations or removing unused interfaces.",
 				len(metrics.ComplianceReport.MissingInterfaces)))
 	}
-	
+
 	return recommendations
 }
 
@@ -939,7 +939,7 @@ func saveMetricsReport(metrics *InterfaceMetrics, outputPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal metrics: %w", err)
 	}
-	
+
 	return os.WriteFile(outputPath, data, 0644)
 }
 
@@ -947,46 +947,46 @@ func saveMetricsReport(metrics *InterfaceMetrics, outputPath string) error {
 func printMetricsSummary(metrics *InterfaceMetrics) {
 	fmt.Println("\n📊 Interface Adoption Metrics Summary")
 	fmt.Println("====================================")
-	
+
 	fmt.Printf("Total Interfaces: %d\n", metrics.TotalInterfaces)
 	fmt.Printf("Total Implementors: %d\n", metrics.TotalImplementors)
 	fmt.Printf("Overall Adoption Rate: %.1f%%\n", metrics.AdoptionRate)
 	fmt.Printf("Overall Compliance: %.1f%%\n", metrics.ComplianceReport.OverallCompliance)
-	
+
 	fmt.Println("\n🎯 Pattern Analysis:")
 	fmt.Printf("  Unified Pattern Usage: %d\n", metrics.PatternAnalysis.UnifiedPatternUsage)
 	fmt.Printf("  Legacy Pattern Usage: %d\n", metrics.PatternAnalysis.LegacyPatternUsage)
 	fmt.Printf("  Mixed Pattern Usage: %d\n", metrics.PatternAnalysis.MixedPatternUsage)
 	fmt.Printf("  Migration Rate: %.1f%%\n", metrics.PatternAnalysis.PatternMigrationRate)
-	
+
 	fmt.Println("\n📈 Top Interfaces by Implementation Count:")
 	type interfaceCount struct {
 		name  string
 		count int
 	}
-	
+
 	var interfaces []interfaceCount
 	for name, stats := range metrics.InterfaceStats {
 		interfaces = append(interfaces, interfaceCount{name: name, count: stats.ImplementorCount})
 	}
-	
+
 	sort.Slice(interfaces, func(i, j int) bool {
 		return interfaces[i].count > interfaces[j].count
 	})
-	
+
 	for i, iface := range interfaces {
 		if i < 5 { // Show top 5
 			fmt.Printf("  %s: %d implementations\n", iface.name, iface.count)
 		}
 	}
-	
+
 	if len(metrics.RecommendationList) > 0 {
 		fmt.Println("\n💡 Recommendations:")
 		for _, rec := range metrics.RecommendationList {
 			fmt.Printf("  • %s\n", rec)
 		}
 	}
-	
+
 	if len(metrics.PatternAnalysis.AntiPatterns) > 0 {
 		fmt.Println("\n⚠️  Anti-patterns Detected:")
 		for _, ap := range metrics.PatternAnalysis.AntiPatterns {

@@ -14,7 +14,7 @@ import (
 type NoReflectToolOrchestrator struct {
 	toolRegistry       *MCPToolRegistry
 	sessionManager     SessionManager
-	analyzer          mcptypes.AIAnalyzer
+	analyzer           mcptypes.AIAnalyzer
 	logger             zerolog.Logger
 	toolFactory        *ToolFactory
 	pipelineOperations interface{}

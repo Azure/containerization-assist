@@ -135,7 +135,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 		kind.NewKindCmdRunner(cmdRunner),
 		k8s.NewKubeCmdRunner(cmdRunner),
 	)
-	
+
 	// In conversation mode, use CallerAnalyzer instead of StubAnalyzer
 	// This requires the transport to be able to forward prompts to the LLM
 	if transport, ok := s.transport.(contract.LLMTransport); ok {
@@ -145,12 +145,12 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 			PerCallTimeout: 60 * time.Second,
 		})
 		mcpClients.SetAnalyzer(callerAnalyzer)
-		
+
 		// Also set the analyzer on the tool orchestrator for fixing capabilities
 		if s.toolOrchestrator != nil {
 			s.toolOrchestrator.SetAnalyzer(callerAnalyzer)
 		}
-		
+
 		s.logger.Info().Msg("CallerAnalyzer enabled for conversation mode")
 	} else {
 		s.logger.Warn().Msg("Transport does not implement LLMTransport - using StubAnalyzer")
