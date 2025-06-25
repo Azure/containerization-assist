@@ -2,20 +2,16 @@
 
 AI-Powered Application Containerization and Kubernetes Deployment
 
-Container Kit automates the creation of Docker images and Kubernetes manifests using AI-guided workflows and atomic operations. It provides two modes of operation optimized for different use cases.
+Container Kit automates the creation of Docker images and Kubernetes manifests using AI-guided workflows. It provides atomic tools for precise control and conversational workflows for guided assistance.
 
 ## 🚀 Quick Start
 
-### MCP Server (Recommended)
-
-The MCP server provides both atomic tools and conversational workflows for containerization.
-
-**Prerequisites:**
+### Prerequisites
 - Go 1.21+
 - Docker
 - kubectl (optional, for Kubernetes features)
 
-**Setup:**
+### MCP Server Setup
 ```bash
 git clone https://github.com/Azure/container-copilot.git
 cd container-copilot
@@ -27,182 +23,63 @@ make mcp
 ./container-kit-mcp --version
 ```
 
-**Use with Claude Desktop:**
-Add to your Claude Desktop config and ask Claude: *"Help me containerize my application"*
-
-> **📖 Complete Setup Guide**: See [MCP_DOCUMENTATION.md](MCP_DOCUMENTATION.md) for detailed setup instructions, troubleshooting, and advanced configuration.
-
-### CLI Tool (Legacy)
-
-**Prerequisites:**
-- Go 1.21+
-- kubectl, Docker, Kind
-- Azure OpenAI (for AI features)
-
-**Setup:**
-```bash
-# Set Azure OpenAI credentials
-export AZURE_OPENAI_KEY=xxxxxxx
-export AZURE_OPENAI_ENDPOINT=xxxxxx
-export AZURE_OPENAI_DEPLOYMENT_ID=container-kit
-
-# Run containerization
-go run . generate <path/to/target-repo>
-```
-
-## 🛠️ Development Setup
-
-### Option 1: Development Container (Recommended)
-
-Get started in seconds with a fully configured development environment:
-
-**Prerequisites:**
-- [Docker](https://docs.docker.com/get-docker/)
-- [VS Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-
-**Setup:**
-1. Clone this repository
-2. Open in VS Code: `code .`
-3. Click "Reopen in Container" when prompted
-4. Wait for automatic setup (3-5 minutes first time)
-5. Start coding! All tools are pre-installed and configured.
-
-See [`.devcontainer/README.md`](.devcontainer/README.md) for full details.
-
-### Option 2: Local Development
-
-**Prerequisites:**
-- Go 1.21+
-- golangci-lint
-- Docker, kubectl, kind (for full functionality)
-
-**Setup:**
-```bash
-# Install golangci-lint
-curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
-
-# Build and test
-make mcp           # Build MCP server
-make test          # Run tests
-make lint          # Run linting
-make help          # See all available targets
-```
+### Use with Claude Desktop
+Add to your Claude Desktop config and ask: *"Help me containerize my application"*
 
 ## 📖 Documentation
 
-### Core Documentation
-- **[MCP Server Documentation](./MCP_DOCUMENTATION.md)** - Complete setup, tools, and usage guide
-- **[Architecture Overview](./docs/mcp-architecture.md)** - Unified interface architecture and system design
-- **[Interface Patterns](./docs/interface-patterns.md)** - Interface design patterns and dual-interface strategy
-- **[AI Integration Pattern](./docs/AI_INTEGRATION_PATTERN.md)** - AI integration guidelines and fixing capabilities
+### For Users
+- **[Complete User Guide](MCP_DOCUMENTATION.md)** - Setup, tools, configuration, and troubleshooting
+- **[Examples](examples/)** - Working code examples and patterns
 
-### Development Guides
-- **[Contributing Guide](./CONTRIBUTING.md)** - Development workflow and standards
-- **[Development Guidelines](./DEVELOPMENT_GUIDELINES.md)** - Coding standards and best practices
-- **[Adding New Tools](./docs/adding-new-tools.md)** - Comprehensive guide for tool development
-- **[Tool Standards](./docs/ATOMIC_TOOL_STANDARDS.md)** - Atomic tool design principles
-- **[Development Container](./.devcontainer/README.md)** - Instant development setup
-- **[Claude Code Guide](./CLAUDE.md)** - AI assistant development guidance
+### For Developers  
+- **[Architecture Guide](docs/mcp-architecture.md)** - Technical design and unified interface system
+- **[Tool Development Guide](docs/adding-new-tools.md)** - Building new tools and integrations
+- **[Interface Patterns](docs/interface-patterns.md)** - Design patterns and best practices
+- **[Technical Debt Inventory](docs/TECHNICAL_DEBT_INVENTORY.md)** - Current technical debt and cleanup tasks
 
-### Migration & Breaking Changes
-- **[Migration Guide](./docs/migration-guide.md)** - v1 to v2 migration instructions
-- **[Breaking Changes](./docs/breaking-changes.md)** - Detailed list of breaking changes in v2.0
-- **[Legacy References](./docs/LEGACY_REFERENCES.md)** - Reference to legacy pipeline patterns
-
-### Quality & Operations
-- **[Linting Strategy](./docs/LINTING.md)** - Code quality and error budget approach
-- **[CI/CD Quality Gates](./docs/quality-ci-cd.md)** - Continuous integration and quality automation
-- **[Security Policy](./SECURITY.md)** - Security guidelines and vulnerability reporting
-
-### Tool Documentation
-- **[Logs Export Tool](./docs/logs-export-tool.md)** - Server log export capabilities
-- **[Telemetry Export Tool](./docs/telemetry-export-tool.md)** - Metrics and telemetry export
-
-### Examples
-- **[Code Examples](./examples/)** - Working examples of tool implementations and patterns
+### For Contributors
+- **[Contributing Guide](CONTRIBUTING.md)** - Development workflow and standards
+- **[Development Guidelines](DEVELOPMENT_GUIDELINES.md)** - Coding standards and practices
+- **[Migration Guide](docs/migration-guide.md)** - v1 to v2 migration instructions
+- **[Breaking Changes](docs/breaking-changes.md)** - Breaking changes in v2.0
 
 ## 🏗️ Architecture
 
-Container Kit provides two operation modes with different architectural approaches:
+Container Kit provides atomic tools and conversational workflows through a unified interface system:
 
-- **MCP Server** (Primary): Atomic tools + conversational workflows with session persistence
-- **CLI Tool** (Legacy): Pipeline-based iterative refinement with AI integration
+- **Atomic Tools**: Individual containerization operations (analyze, build, deploy, scan)
+- **Conversation Mode**: Guided AI workflows for complete containerization
+- **Unified Interface**: Consistent tool patterns with auto-registration
 
-> **📖 Complete Architecture Guide**: See [Architecture Overview](./docs/mcp-architecture.md) for detailed technical design and unified interface system.
+> **📖 Technical Details**: See [Architecture Guide](docs/mcp-architecture.md) for complete system design.
 
-## 🛠️ Available Tools
+## 🛠️ Key Features
 
-### MCP Atomic Tools
-- `analyze_repository_atomic` - Analyze code for containerization
-- `generate_dockerfile` - Generate optimized Dockerfiles
-- `build_image_atomic` - Build Docker images with fixing capabilities
-- `push_image_atomic` - Push to registries
-- `pull_image_atomic` - Pull images from registries
-- `tag_image_atomic` - Tag Docker images
-- `generate_manifests_atomic` - Create Kubernetes manifests
-- `deploy_kubernetes_atomic` - Deploy to Kubernetes with fixing
-- `check_health_atomic` - Verify deployment health
-- `scan_image_security_atomic` - Security vulnerability scanning
-- `scan_secrets_atomic` - Secret detection and remediation
-- `validate_dockerfile_atomic` - Dockerfile validation and optimization
+- **AI-Guided Workflows**: Interactive containerization assistance
+- **Atomic Operations**: Precise control over each step
+- **Auto-Registration**: Zero-configuration tool discovery  
+- **Session Persistence**: Maintain state across operations
+- **Multi-Transport**: stdio and HTTP support
+- **Kubernetes Integration**: Generate and deploy manifests
+- **Security Scanning**: Built-in vulnerability detection
 
-### Conversation Mode
-- `chat` - Guided conversational workflow through complete containerization process
-
-### Management Tools
-- `list_sessions` - List active MCP sessions
-- `delete_session` - Clean up sessions and workspaces
-- `get_server_health` - Server status and capabilities
-- `get_logs` - Export server logs with filtering
-- `get_telemetry_metrics` - Export Prometheus metrics
-
-## 🧪 Testing
+## 🧪 Quick Example
 
 ```bash
-# Run automated tests
-./test/integration/run_tests.sh
+# Start MCP server
+./container-kit-mcp
 
-# Manual testing with Claude Desktop
-# See test/integration/mcp/claude_desktop_test.md
-
-# Run specific test suites
-make test                    # All tests
-go test ./pkg/mcp/...       # MCP-specific tests
-go test -tags integration   # Integration tests only
+# Use through Claude Desktop or direct API calls
+# Ask: "Analyze my Python Flask app and create a Dockerfile"
 ```
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
-
+We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for:
 - Development setup (devcontainer recommended)
-- Code style and standards
-- Testing requirements
+- Code standards and testing requirements  
 - Pull request process
-
-## 📊 Quality & Linting
-
-We use an error budget approach for code quality:
-
-```bash
-make lint              # Strict linting (fails on any issue)
-make lint-threshold    # Linting with error budget
-make lint-report       # Generate detailed reports
-```
-
-See [docs/LINTING.md](docs/LINTING.md) for our quality strategy.
-
-## 🚢 Deployment Models
-
-### MCP Server Deployment
-- **Development**: Local stdio transport with Claude Desktop
-- **Production**: HTTP transport with load balancing
-- **Cloud**: Container deployment with persistent volumes
-- **Instant Setup**: VS Code devcontainer with all tools pre-configured
-
-### CLI Deployment
-- **Local**: Direct execution with local Docker/Kind
-- **CI/CD**: Pipeline integration for automated containerization
 
 ## 📝 License
 
@@ -216,8 +93,4 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the documentation links above
-
-## 🏷️ Version
-
-See [releases](https://github.com/Azure/container-copilot/releases) for version history and changelog.
+- **Documentation**: Check the [Complete User Guide](MCP_DOCUMENTATION.md)
