@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quality Dashboard - 2025-06-25 14:35:13</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .metric { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .good { color: green; }
+        .warning { color: orange; }
+        .bad { color: red; }
+        h2 { color: #333; }
+        .chart { margin: 20px 0; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Quality Dashboard</h1>
+    <p>Generated: 2025-06-25T14:35:13-04:00</p>
+    
+    <div class="metric">
+        <h2>Error Handling</h2>
+        <p>Adoption Rate: <span class="bad">18.4%</span></p>
+        <p>Total Errors: 1535 (Rich: 283, Standard: 1252)</p>
+    </div>
+    
+    <div class="metric">
+        <h2>Test Coverage</h2>
+        <p>Overall Coverage: <span class="bad">12.0%</span></p>
+        <p>Uncovered Packages: 93</p>
+    </div>
+    
+    <div class="metric">
+        <h2>Build Performance</h2>
+        <p>Build Time: 1.899s</p>
+        <p>Test Time: 4.645s</p>
+    </div>
+    
+    <div class="metric">
+        <h2>Recommendations</h2>
+        <ul>
+        <li>&#x1F534; Error Handling: Only 18.4% adoption of RichError. Target: 80%</li>
+<li>   Start with: pkg/core/kubernetes/customizer.go (57 standard errors)</li>
+<li>&#x1F7E1; Directory Structure: Max depth is 6 (recommended: ≤5)</li>
+<li>&#x1F534; Test Coverage: 12.0% (target: 70%)</li>
+<li>   Lowest coverage: github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil (0.0%)</li>
+<li>&#x1F7E1; Add tests for 93 uncovered packages</li>
+<li>&#x1F7E1; Refactor 20 functions with >50 lines</li>
+<li>&#x1F7E1; Simplify 183 functions with complexity >10</li>
+        </ul>
+    </div>
+</body>
+</html>

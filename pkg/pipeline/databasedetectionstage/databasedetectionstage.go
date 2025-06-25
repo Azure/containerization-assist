@@ -112,7 +112,7 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 			logger.Debugf("Detected database type %s (version %s) in file %s", dbType, version, path)
 
 			// Update or add the database detection result in the map
-			if existing, exists := detectedDatabases[dbType]; exists && existing.Version == "unknown" || !exists{
+			if existing, exists := detectedDatabases[dbType]; exists && existing.Version == "unknown" || !exists {
 				// Only overwrite if the existing version is "unknown"
 				detectedDatabases[dbType] = &DatabaseDetectionResult{
 					Type:    string(dbType),
