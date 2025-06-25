@@ -40,8 +40,8 @@ func NewReport(ctx context.Context, state *PipelineState) *RunReport {
 	}
 
 	var detectedDatabases []DatabaseDetectionResult
-	if dbs, ok := state.Metadata["detectedDatabases"].([]DatabaseDetectionResult); ok {
-		detectedDatabases = dbs
+	if state.Metadata["detectedDatabaseErrors"] == nil && len(state.DetectedDatabases) > 0 {
+		detectedDatabases = state.DetectedDatabases
 	}
 
 	return &RunReport{
@@ -81,7 +81,7 @@ func formatMarkdownReport(ctx context.Context, state *PipelineState) string {
 	}
 
 	md.WriteString("\n## Detected Databases\n\n")
-	if state.Metadata["detectedDatabases"] == nil && len(state.DetectedDatabases) > 0 {
+	if state.Metadata["detectedDatabaseErrors"] == nil && len(state.DetectedDatabases) > 0 {
 		md.WriteString("| Database Type | Version | Source |\n")
 		md.WriteString("|---------------|---------|--------|\n")
 		for _, db := range state.DetectedDatabases {
