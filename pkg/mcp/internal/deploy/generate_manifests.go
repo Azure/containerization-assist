@@ -786,7 +786,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		Labels:          args.WorkflowLabels,
 	}
 	if err := serviceCustomizer.CustomizeService(servicePath, serviceOpts); err != nil {
-		return nil, fmt.Errorf("failed to customize service manifest: %w", err)
+		return nil, types.NewRichError("SERVICE_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize service manifest: %v", err), "build_error")
 	}
 
 	// Generate and customize ConfigMap if environment variables or data exists
@@ -827,7 +827,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		// Handle binary data if present
 		if len(args.BinaryData) > 0 {
 			if err := t.addBinaryDataToConfigMap(configMapPath, args.BinaryData); err != nil {
-				return nil, fmt.Errorf("failed to add binary data to configmap: %w", err)
+				return nil, types.NewRichError("CONFIGMAP_BINARY_DATA_FAILED", fmt.Sprintf("failed to add binary data to configmap: %v", err), "build_error")
 			}
 		}
 	} else {
@@ -840,7 +840,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 				Labels:    args.WorkflowLabels,
 			}
 			if err := configMapCustomizer.CustomizeConfigMap(configMapPath, configMapOptions); err != nil {
-				return nil, fmt.Errorf("failed to customize configmap manifest with workflow labels: %w", err)
+				return nil, types.NewRichError("CONFIGMAP_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize configmap manifest with workflow labels: %v", err), "build_error")
 			}
 		}
 	}
@@ -859,7 +859,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 			Labels:       args.WorkflowLabels,
 		}
 		if err := ingressCustomizer.CustomizeIngress(ingressPath, ingressOpts); err != nil {
-			return nil, fmt.Errorf("failed to customize ingress manifest: %w", err)
+			return nil, types.NewRichError("INGRESS_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize ingress manifest: %v", err), "build_error")
 		}
 	}
 
@@ -883,7 +883,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		}
 
 		if err := networkPolicyCustomizer.CustomizeNetworkPolicy(networkPolicyPath, networkPolicyOpts); err != nil {
-			return nil, fmt.Errorf("failed to customize networkpolicy manifest: %w", err)
+			return nil, types.NewRichError("NETWORKPOLICY_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize networkpolicy manifest: %v", err), "build_error")
 		}
 	}
 
@@ -897,7 +897,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 				Labels:    args.WorkflowLabels,
 			}
 			if err := configMapCustomizer.CustomizeConfigMap(configMapPath, configMapOptions); err != nil {
-				return nil, fmt.Errorf("failed to customize configmap manifest with workflow labels: %w", err)
+				return nil, types.NewRichError("CONFIGMAP_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize configmap manifest with workflow labels: %v", err), "build_error")
 			}
 		}
 	}
@@ -911,7 +911,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 			Labels:    args.WorkflowLabels,
 		}
 		if err := secretCustomizer.CustomizeSecret(secretPath, secretOpts); err != nil {
-			return nil, fmt.Errorf("failed to customize secret manifest: %w", err)
+			return nil, types.NewRichError("SECRET_CUSTOMIZATION_FAILED", fmt.Sprintf("failed to customize secret manifest: %v", err), "build_error")
 		}
 	}
 
@@ -919,13 +919,13 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 	if args.GeneratePullSecret && len(args.RegistrySecrets) > 0 {
 		registrySecretPath := filepath.Join(manifestPath, "registry-secret.yaml")
 		if err := t.generateRegistrySecret(registrySecretPath, args); err != nil {
-			return nil, fmt.Errorf("failed to generate registry secret: %w", err)
+			return nil, types.NewRichError("REGISTRY_SECRET_GENERATION_FAILED", fmt.Sprintf("failed to generate registry secret: %v", err), "build_error")
 		}
 
 		// Update deployment to use the pull secret
 		deploymentPath := filepath.Join(manifestPath, "deployment.yaml")
 		if err := t.addPullSecretToDeployment(deploymentPath, "registry-secret"); err != nil {
-			return nil, fmt.Errorf("failed to add pull secret to deployment: %w", err)
+			return nil, types.NewRichError("PULL_SECRET_ADDITION_FAILED", fmt.Sprintf("failed to add pull secret to deployment: %v", err), "build_error")
 		}
 	}
 
@@ -1037,12 +1037,12 @@ func (t *GenerateManifestsTool) writeNetworkPolicyTemplate(workspaceDir string) 
 func (t *GenerateManifestsTool) addBinaryDataToConfigMap(configMapPath string, binaryData map[string][]byte) error {
 	content, err := os.ReadFile(configMapPath)
 	if err != nil {
-		return fmt.Errorf("reading configmap manifest: %w", err)
+		return types.NewRichError("CONFIGMAP_READ_FAILED", fmt.Sprintf("reading configmap manifest: %v", err), "filesystem_error")
 	}
 
 	var configMap map[string]interface{}
 	if err := yaml.Unmarshal(content, &configMap); err != nil {
-		return fmt.Errorf("parsing configmap YAML: %w", err)
+		return types.NewRichError("CONFIGMAP_PARSE_FAILED", fmt.Sprintf("parsing configmap YAML: %v", err), "validation_error")
 	}
 
 	// Add binaryData section
@@ -1058,11 +1058,11 @@ func (t *GenerateManifestsTool) addBinaryDataToConfigMap(configMapPath string, b
 	// Write back the updated manifest
 	updatedContent, err := yaml.Marshal(configMap)
 	if err != nil {
-		return fmt.Errorf("marshaling updated configmap YAML: %w", err)
+		return types.NewRichError("CONFIGMAP_MARSHAL_FAILED", fmt.Sprintf("marshaling updated configmap YAML: %v", err), "validation_error")
 	}
 
 	if err := os.WriteFile(configMapPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated configmap manifest: %w", err)
+		return types.NewRichError("CONFIGMAP_WRITE_FAILED", fmt.Sprintf("writing updated configmap manifest: %v", err), "filesystem_error")
 	}
 
 	return nil
@@ -1121,7 +1121,7 @@ func (t *GenerateManifestsTool) generateRegistrySecret(secretPath string, args G
 	// Encode the entire docker config as base64
 	dockerConfigJSON, err := json.Marshal(dockerConfig)
 	if err != nil {
-		return fmt.Errorf("failed to marshal docker config: %w", err)
+		return types.NewRichError("DOCKER_CONFIG_MARSHAL_FAILED", fmt.Sprintf("failed to marshal docker config: %v", err), "validation_error")
 	}
 
 	pullSecret["data"].(map[string]interface{})[".dockerconfigjson"] = base64.StdEncoding.EncodeToString(dockerConfigJSON)
@@ -1129,11 +1129,11 @@ func (t *GenerateManifestsTool) generateRegistrySecret(secretPath string, args G
 	// Write the secret to file
 	secretContent, err := yaml.Marshal(pullSecret)
 	if err != nil {
-		return fmt.Errorf("failed to marshal pull secret YAML: %w", err)
+		return types.NewRichError("PULL_SECRET_MARSHAL_FAILED", fmt.Sprintf("failed to marshal pull secret YAML: %v", err), "validation_error")
 	}
 
 	if err := os.WriteFile(secretPath, secretContent, 0644); err != nil {
-		return fmt.Errorf("failed to write pull secret file: %w", err)
+		return types.NewRichError("PULL_SECRET_WRITE_FAILED", fmt.Sprintf("failed to write pull secret file: %v", err), "filesystem_error")
 	}
 
 	t.logger.Debug().
@@ -1148,12 +1148,12 @@ func (t *GenerateManifestsTool) generateRegistrySecret(secretPath string, args G
 func (t *GenerateManifestsTool) addPullSecretToDeployment(deploymentPath, secretName string) error {
 	content, err := os.ReadFile(deploymentPath)
 	if err != nil {
-		return fmt.Errorf("reading deployment manifest: %w", err)
+		return types.NewRichError("DEPLOYMENT_READ_FAILED", fmt.Sprintf("reading deployment manifest: %v", err), "filesystem_error")
 	}
 
 	var deployment map[string]interface{}
 	if err := yaml.Unmarshal(content, &deployment); err != nil {
-		return fmt.Errorf("parsing deployment YAML: %w", err)
+		return types.NewRichError("DEPLOYMENT_PARSE_FAILED", fmt.Sprintf("parsing deployment YAML: %v", err), "validation_error")
 	}
 
 	// Navigate to spec.template.spec.imagePullSecrets
@@ -1164,13 +1164,13 @@ func (t *GenerateManifestsTool) addPullSecretToDeployment(deploymentPath, secret
 	}
 
 	if err := t.updateNestedValue(deployment, pullSecrets, "spec", "template", "spec", "imagePullSecrets"); err != nil {
-		return fmt.Errorf("updating imagePullSecrets: %w", err)
+		return types.NewRichError("IMAGE_PULL_SECRETS_UPDATE_FAILED", fmt.Sprintf("updating imagePullSecrets: %v", err), "build_error")
 	}
 
 	// Write back the updated deployment
 	updatedContent, err := yaml.Marshal(deployment)
 	if err != nil {
-		return fmt.Errorf("marshaling updated deployment YAML: %w", err)
+		return types.NewRichError("DEPLOYMENT_MARSHAL_FAILED", fmt.Sprintf("marshaling updated deployment YAML: %v", err), "validation_error")
 	}
 
 	if err := os.WriteFile(deploymentPath, updatedContent, 0644); err != nil {
@@ -1277,7 +1277,7 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 	// Validate the manifest directory
 	batchResult, err := validator.ValidateManifestDirectory(ctx, manifestPath, validationOptions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate manifest directory: %w", err)
+		return nil, types.NewRichError("MANIFEST_VALIDATION_FAILED", fmt.Sprintf("failed to validate manifest directory: %v", err), "validation_error")
 	}
 
 	// Convert BatchValidationResult to ManifestValidationSummary
@@ -1338,7 +1338,7 @@ func (t *GenerateManifestsTool) validateGeneratedManifests(ctx context.Context, 
 // updateNestedValue updates a nested value in a YAML structure
 func (t *GenerateManifestsTool) updateNestedValue(obj interface{}, value interface{}, path ...interface{}) error {
 	if len(path) == 0 {
-		return fmt.Errorf("path cannot be empty")
+		return types.NewRichError("EMPTY_PATH", "path cannot be empty", "validation_error")
 	}
 
 	current := obj
@@ -1348,7 +1348,7 @@ func (t *GenerateManifestsTool) updateNestedValue(obj interface{}, value interfa
 		case map[string]interface{}:
 			keyStr, ok := path[i].(string)
 			if !ok {
-				return fmt.Errorf("non-string key at position %d", i)
+				return types.NewRichError("NON_STRING_KEY", fmt.Sprintf("non-string key at position %d", i), "validation_error")
 			}
 			next, exists := curr[keyStr]
 			if !exists {
@@ -1360,14 +1360,14 @@ func (t *GenerateManifestsTool) updateNestedValue(obj interface{}, value interfa
 		case []interface{}:
 			keyInt, ok := path[i].(int)
 			if !ok {
-				return fmt.Errorf("non-integer key at position %d for array", i)
+				return types.NewRichError("NON_INTEGER_KEY", fmt.Sprintf("non-integer key at position %d for array", i), "validation_error")
 			}
 			if keyInt >= len(curr) {
-				return fmt.Errorf("array index %d out of bounds at position %d", keyInt, i)
+				return types.NewRichError("ARRAY_INDEX_OUT_OF_BOUNDS", fmt.Sprintf("array index %d out of bounds at position %d", keyInt, i), "validation_error")
 			}
 			current = curr[keyInt]
 		default:
-			return fmt.Errorf("cannot navigate through non-map/non-array at position %d", i)
+			return types.NewRichError("INVALID_NAVIGATION_TARGET", fmt.Sprintf("cannot navigate through non-map/non-array at position %d", i), "validation_error")
 		}
 	}
 
@@ -1377,21 +1377,21 @@ func (t *GenerateManifestsTool) updateNestedValue(obj interface{}, value interfa
 	case map[string]interface{}:
 		keyStr, ok := finalKey.(string)
 		if !ok {
-			return fmt.Errorf("non-string final key")
+			return types.NewRichError("NON_STRING_FINAL_KEY", "non-string final key", "validation_error")
 		}
 		curr[keyStr] = value
 	case []interface{}:
 		keyInt, ok := finalKey.(int)
 		if !ok {
-			return fmt.Errorf("non-integer final key for array")
+			return types.NewRichError("NON_INTEGER_FINAL_KEY", "non-integer final key for array", "validation_error")
 		}
 		if keyInt < len(curr) {
 			curr[keyInt] = value
 		} else {
-			return fmt.Errorf("array index %d out of bounds for final key", keyInt)
+			return types.NewRichError("FINAL_ARRAY_INDEX_OUT_OF_BOUNDS", fmt.Sprintf("array index %d out of bounds for final key", keyInt), "validation_error")
 		}
 	default:
-		return fmt.Errorf("cannot set value on non-map/non-array")
+		return types.NewRichError("INVALID_VALUE_TARGET", "cannot set value on non-map/non-array", "validation_error")
 	}
 
 	return nil

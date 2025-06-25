@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"text/template"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/templates"
 	"github.com/rs/zerolog"
 )
@@ -26,7 +27,7 @@ func NewWriter(logger zerolog.Logger) *Writer {
 // EnsureDirectory creates the manifest directory if it doesn't exist
 func (w *Writer) EnsureDirectory(path string) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", path, err)
+		return types.NewRichError("DIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create directory %s: %v", path, err), "filesystem_error")
 	}
 	w.logger.Debug().Str("path", path).Msg("Ensured manifest directory exists")
 	return nil
@@ -35,7 +36,7 @@ func (w *Writer) EnsureDirectory(path string) error {
 // WriteFile writes content to a file
 func (w *Writer) WriteFile(filePath string, content []byte) error {
 	if err := os.WriteFile(filePath, content, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+		return types.NewRichError("FILE_WRITE_FAILED", fmt.Sprintf("failed to write file %s: %v", filePath, err), "filesystem_error")
 	}
 	w.logger.Debug().Str("file", filePath).Msg("Wrote manifest file")
 	return nil
@@ -48,17 +49,17 @@ func (w *Writer) WriteDeploymentTemplate(manifestPath string, opts GenerationOpt
 	// Use the embedded template system
 	templateContent, err := templates.Templates.ReadFile(filepath.Join("manifests", "manifest-basic", "deployment.yaml"))
 	if err != nil {
-		return fmt.Errorf("failed to read deployment template: %w", err)
+		return types.NewRichError("TEMPLATE_READ_FAILED", fmt.Sprintf("failed to read deployment template: %v", err), "template_error")
 	}
 
 	// Apply template substitutions
 	processed, err := w.processTemplate("deployment", string(templateContent), opts)
 	if err != nil {
-		return fmt.Errorf("failed to process deployment template: %w", err)
+		return types.NewRichError("TEMPLATE_PROCESSING_FAILED", fmt.Sprintf("failed to process deployment template: %v", err), "template_error")
 	}
 
 	if err := w.WriteFile(deploymentPath, []byte(processed)); err != nil {
-		return fmt.Errorf("failed to write deployment template: %w", err)
+		return types.NewRichError("TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write deployment template: %v", err), "template_error")
 	}
 
 	w.logger.Debug().
@@ -76,17 +77,17 @@ func (w *Writer) WriteServiceTemplate(manifestPath string, opts GenerationOption
 	// Use the embedded template system
 	templateContent, err := templates.Templates.ReadFile(filepath.Join("manifests", "manifest-basic", "service.yaml"))
 	if err != nil {
-		return fmt.Errorf("failed to read service template: %w", err)
+		return types.NewRichError("TEMPLATE_READ_FAILED", fmt.Sprintf("failed to read service template: %v", err), "template_error")
 	}
 
 	// Apply template substitutions
 	processed, err := w.processTemplate("service", string(templateContent), opts)
 	if err != nil {
-		return fmt.Errorf("failed to process service template: %w", err)
+		return types.NewRichError("TEMPLATE_PROCESSING_FAILED", fmt.Sprintf("failed to process service template: %v", err), "template_error")
 	}
 
 	if err := w.WriteFile(servicePath, []byte(processed)); err != nil {
-		return fmt.Errorf("failed to write service template: %w", err)
+		return types.NewRichError("TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write service template: %v", err), "template_error")
 	}
 
 	w.logger.Debug().
@@ -104,17 +105,17 @@ func (w *Writer) WriteConfigMapTemplate(manifestPath string, opts GenerationOpti
 	// Use the embedded template system
 	templateContent, err := templates.Templates.ReadFile(filepath.Join("manifests", "manifest-basic", "configmap.yaml"))
 	if err != nil {
-		return fmt.Errorf("failed to read configmap template: %w", err)
+		return types.NewRichError("TEMPLATE_READ_FAILED", fmt.Sprintf("failed to read configmap template: %v", err), "template_error")
 	}
 
 	// Apply template substitutions
 	processed, err := w.processTemplate("configmap", string(templateContent), opts)
 	if err != nil {
-		return fmt.Errorf("failed to process configmap template: %w", err)
+		return types.NewRichError("TEMPLATE_PROCESSING_FAILED", fmt.Sprintf("failed to process configmap template: %v", err), "template_error")
 	}
 
 	if err := w.WriteFile(configMapPath, []byte(processed)); err != nil {
-		return fmt.Errorf("failed to write configmap template: %w", err)
+		return types.NewRichError("TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write configmap template: %v", err), "template_error")
 	}
 
 	w.logger.Debug().
@@ -132,17 +133,17 @@ func (w *Writer) WriteIngressTemplate(manifestPath string, opts GenerationOption
 	// Use the embedded template system
 	templateContent, err := templates.Templates.ReadFile(filepath.Join("manifests", "manifest-basic", "ingress.yaml"))
 	if err != nil {
-		return fmt.Errorf("failed to read ingress template: %w", err)
+		return types.NewRichError("TEMPLATE_READ_FAILED", fmt.Sprintf("failed to read ingress template: %v", err), "template_error")
 	}
 
 	// Apply template substitutions
 	processed, err := w.processTemplate("ingress", string(templateContent), opts)
 	if err != nil {
-		return fmt.Errorf("failed to process ingress template: %w", err)
+		return types.NewRichError("TEMPLATE_PROCESSING_FAILED", fmt.Sprintf("failed to process ingress template: %v", err), "template_error")
 	}
 
 	if err := w.WriteFile(ingressPath, []byte(processed)); err != nil {
-		return fmt.Errorf("failed to write ingress template: %w", err)
+		return types.NewRichError("TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write ingress template: %v", err), "template_error")
 	}
 
 	w.logger.Debug().
@@ -160,17 +161,17 @@ func (w *Writer) WriteSecretTemplate(manifestPath string, opts GenerationOptions
 	// Use the embedded template system
 	templateContent, err := templates.Templates.ReadFile(filepath.Join("manifests", "manifest-basic", "secret.yaml"))
 	if err != nil {
-		return fmt.Errorf("failed to read secret template: %w", err)
+		return types.NewRichError("TEMPLATE_READ_FAILED", fmt.Sprintf("failed to read secret template: %v", err), "template_error")
 	}
 
 	// Apply template substitutions
 	processed, err := w.processTemplate("secret", string(templateContent), opts)
 	if err != nil {
-		return fmt.Errorf("failed to process secret template: %w", err)
+		return types.NewRichError("TEMPLATE_PROCESSING_FAILED", fmt.Sprintf("failed to process secret template: %v", err), "template_error")
 	}
 
 	if err := w.WriteFile(secretPath, []byte(processed)); err != nil {
-		return fmt.Errorf("failed to write secret template: %w", err)
+		return types.NewRichError("TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write secret template: %v", err), "template_error")
 	}
 
 	w.logger.Debug().
@@ -185,14 +186,14 @@ func (w *Writer) WriteSecretTemplate(manifestPath string, opts GenerationOptions
 func (w *Writer) WriteManifestFromTemplate(filePath, templatePath string, data interface{}) error {
 	templateContent, err := templates.Templates.ReadFile(templatePath)
 	if err != nil {
-		return fmt.Errorf("failed to read template %s: %w", templatePath, err)
+		return types.NewRichError("TEMPLATE_READ_FAILED", fmt.Sprintf("failed to read template %s: %v", templatePath, err), "template_error")
 	}
 
 	// If data is GenerationOptions, use processTemplate
 	if opts, ok := data.(GenerationOptions); ok {
 		processed, err := w.processTemplate(filepath.Base(templatePath), string(templateContent), opts)
 		if err != nil {
-			return fmt.Errorf("failed to process template: %w", err)
+			return types.NewRichError("TEMPLATE_PROCESSING_FAILED", fmt.Sprintf("failed to process template: %v", err), "template_error")
 		}
 		return w.WriteFile(filePath, []byte(processed))
 	}
@@ -200,12 +201,12 @@ func (w *Writer) WriteManifestFromTemplate(filePath, templatePath string, data i
 	// Otherwise, use Go templates directly
 	tmpl, err := template.New(filepath.Base(templatePath)).Parse(string(templateContent))
 	if err != nil {
-		return fmt.Errorf("failed to parse template: %w", err)
+		return types.NewRichError("TEMPLATE_PARSE_FAILED", fmt.Sprintf("failed to parse template: %v", err), "template_error")
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
+		return types.NewRichError("TEMPLATE_EXECUTION_FAILED", fmt.Sprintf("failed to execute template: %v", err), "template_error")
 	}
 
 	return w.WriteFile(filePath, buf.Bytes())
@@ -229,7 +230,7 @@ func (w *Writer) processTemplate(name string, templateContent string, opts Gener
 	// Parse the template
 	tmpl, err := template.New(name).Funcs(funcMap).Parse(templateContent)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
+		return "", types.NewRichError("TEMPLATE_PARSE_FAILED", fmt.Sprintf("failed to parse template: %v", err), "template_error")
 	}
 
 	// Prepare template data
@@ -265,7 +266,7 @@ func (w *Writer) processTemplate(name string, templateContent string, opts Gener
 	// Execute the template
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
+		return "", types.NewRichError("TEMPLATE_EXECUTION_FAILED", fmt.Sprintf("failed to execute template: %v", err), "template_error")
 	}
 
 	return buf.String(), nil

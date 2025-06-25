@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -101,7 +102,7 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 	// Get the args map
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("arguments must be a map[string]interface{}")
+		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", "arguments must be a map[string]interface{}", "validation_error")
 	}
 
 	// Type-safe dispatch based on tool name
@@ -131,7 +132,7 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 	case "validate_dockerfile_atomic":
 		return o.executeValidateDockerfile(ctx, argsMap)
 	default:
-		return nil, fmt.Errorf("unknown tool: %s", toolName)
+		return nil, types.NewRichError("UNKNOWN_TOOL", fmt.Sprintf("unknown tool: %s", toolName), "tool_error")
 	}
 }
 
@@ -144,48 +145,48 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 
 	// Check for session_id (required for all tools)
 	if _, exists := argsMap["session_id"]; !exists {
-		return fmt.Errorf("session_id is required for tool %s", toolName)
+		return types.NewRichError("SESSION_ID_REQUIRED", fmt.Sprintf("session_id is required for tool %s", toolName), "validation_error")
 	}
 
 	// Tool-specific validation
 	switch toolName {
 	case "analyze_repository_atomic":
 		if _, exists := argsMap["repo_url"]; !exists {
-			return fmt.Errorf("repo_url is required for analyze_repository_atomic")
+			return types.NewRichError("REPO_URL_REQUIRED", "repo_url is required for analyze_repository_atomic", "validation_error")
 		}
 	case "build_image_atomic":
 		if _, exists := argsMap["image_name"]; !exists {
-			return fmt.Errorf("image_name is required for build_image_atomic")
+			return types.NewRichError("IMAGE_NAME_REQUIRED", "image_name is required for build_image_atomic", "validation_error")
 		}
 	case "push_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("image_ref is required for push_image_atomic")
+			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for push_image_atomic", "validation_error")
 		}
 	case "pull_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("image_ref is required for pull_image_atomic")
+			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for pull_image_atomic", "validation_error")
 		}
 	case "tag_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("image_ref is required for tag_image_atomic")
+			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for tag_image_atomic", "validation_error")
 		}
 		if _, exists := argsMap["new_tag"]; !exists {
-			return fmt.Errorf("new_tag is required for tag_image_atomic")
+			return types.NewRichError("NEW_TAG_REQUIRED", "new_tag is required for tag_image_atomic", "validation_error")
 		}
 	case "scan_image_security_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("image_ref is required for scan_image_security_atomic")
+			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for scan_image_security_atomic", "validation_error")
 		}
 	case "generate_manifests_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("image_ref is required for generate_manifests_atomic")
+			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for generate_manifests_atomic", "validation_error")
 		}
 		if _, exists := argsMap["app_name"]; !exists {
-			return fmt.Errorf("app_name is required for generate_manifests_atomic")
+			return types.NewRichError("APP_NAME_REQUIRED", "app_name is required for generate_manifests_atomic", "validation_error")
 		}
 	case "deploy_kubernetes_atomic":
 		if _, exists := argsMap["manifest_path"]; !exists {
-			return fmt.Errorf("manifest_path is required for deploy_kubernetes_atomic")
+			return types.NewRichError("MANIFEST_PATH_REQUIRED", "manifest_path is required for deploy_kubernetes_atomic", "validation_error")
 		}
 	}
 
@@ -196,7 +197,7 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 
 func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+		return nil, types.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
 	}
 
 	// Create tool instance
@@ -209,13 +210,13 @@ func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, fmt.Errorf("session_id is required")
+		return nil, types.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
 	}
 
 	if repoURL, ok := getString(argsMap, "repo_url"); ok {
 		args.RepoURL = repoURL
 	} else {
-		return nil, fmt.Errorf("repo_url is required")
+		return nil, types.NewRichError("REPO_URL_REQUIRED", "repo_url is required", "validation_error")
 	}
 
 	// Extract optional fields

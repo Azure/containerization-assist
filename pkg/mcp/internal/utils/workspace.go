@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/utils"
 	"github.com/rs/zerolog"
 )
@@ -42,7 +43,7 @@ type WorkspaceConfig struct {
 // NewWorkspaceManager creates a new workspace manager
 func NewWorkspaceManager(config WorkspaceConfig) (*WorkspaceManager, error) {
 	if err := os.MkdirAll(config.BaseDir, 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create base directory: %w", err)
+		return nil, types.NewRichError("DIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create base directory: %v", err), "filesystem_error")
 	}
 
 	wm := &WorkspaceManager{
@@ -75,7 +76,7 @@ func (wm *WorkspaceManager) InitializeWorkspace(sessionID string) (string, error
 
 	// Create workspace directory
 	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
-		return "", fmt.Errorf("failed to create workspace: %w", err)
+		return "", types.NewRichError("WORKSPACE_CREATION_FAILED", fmt.Sprintf("failed to create workspace: %v", err), "filesystem_error")
 	}
 
 	// Create subdirectories
@@ -90,7 +91,7 @@ func (wm *WorkspaceManager) InitializeWorkspace(sessionID string) (string, error
 	for _, subdir := range subdirs {
 		subdirPath := filepath.Join(workspaceDir, subdir)
 		if err := os.MkdirAll(subdirPath, 0o755); err != nil {
-			return "", fmt.Errorf("failed to create subdirectory %s: %w", subdir, err)
+			return "", types.NewRichError("SUBDIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create subdirectory %s: %v", subdir, err), "filesystem_error")
 		}
 	}
 
@@ -105,11 +106,11 @@ func (wm *WorkspaceManager) CloneRepository(sessionID, repoURL string) error {
 
 	// Clean existing repo directory
 	if err := os.RemoveAll(repoDir); err != nil {
-		return fmt.Errorf("failed to clean repo directory: %w", err)
+		return types.NewRichError("REPO_CLEANUP_FAILED", fmt.Sprintf("failed to clean repo directory: %v", err), "filesystem_error")
 	}
 
 	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create repo directory: %w", err)
+		return types.NewRichError("REPO_DIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create repo directory: %v", err), "filesystem_error")
 	}
 
 	// Check quota before cloning
@@ -133,14 +134,14 @@ func (wm *WorkspaceManager) CloneRepository(sessionID, repoURL string) error {
 	select {
 	case err := <-done:
 		if err != nil {
-			return fmt.Errorf("failed to clone repository: %w", err)
+			return types.NewRichError("REPOSITORY_CLONE_FAILED", fmt.Sprintf("failed to clone repository: %v", err), "git_error")
 		}
 	case <-time.After(timeout):
 		if err := cmd.Process.Kill(); err != nil {
 			// Log kill error but still return timeout error
 			wm.logger.Warn().Err(err).Msg("Failed to kill git process during timeout")
 		}
-		return fmt.Errorf("repository clone timed out after %v", timeout)
+		return types.NewRichError("REPOSITORY_CLONE_TIMEOUT", fmt.Sprintf("repository clone timed out after %v", timeout), "git_error")
 	}
 
 	// Update disk usage
@@ -157,17 +158,17 @@ func (wm *WorkspaceManager) ValidateLocalPath(path string) error {
 	// Convert to absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return fmt.Errorf("failed to resolve absolute path: %w", err)
+		return types.NewRichError("PATH_RESOLUTION_FAILED", fmt.Sprintf("failed to resolve absolute path: %v", err), "filesystem_error")
 	}
 
 	// Check if path exists
 	if _, err := os.Stat(absPath); err != nil {
-		return fmt.Errorf("path does not exist: %s", absPath)
+		return types.NewRichError("PATH_NOT_FOUND", fmt.Sprintf("path does not exist: %s", absPath), "filesystem_error")
 	}
 
 	// Check for path traversal attempts
 	if strings.Contains(absPath, "..") {
-		return fmt.Errorf("path traversal not allowed: %s", absPath)
+		return types.NewRichError("PATH_TRAVERSAL_BLOCKED", fmt.Sprintf("path traversal not allowed: %s", absPath), "security_error")
 	}
 
 	// Additional security checks can be added here
@@ -187,7 +188,7 @@ func (wm *WorkspaceManager) CleanupWorkspace(sessionID string) error {
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
 
 	if err := os.RemoveAll(workspaceDir); err != nil {
-		return fmt.Errorf("failed to cleanup workspace: %w", err)
+		return types.NewRichError("WORKSPACE_CLEANUP_FAILED", fmt.Sprintf("failed to cleanup workspace: %v", err), "filesystem_error")
 	}
 
 	// Remove from disk usage tracking
@@ -213,15 +214,13 @@ func (wm *WorkspaceManager) CheckQuota(sessionID string, additionalBytes int64) 
 
 	// Check per-session quota
 	if currentUsage+additionalBytes > wm.maxSizePerSession {
-		return fmt.Errorf("session disk quota would be exceeded: %d + %d > %d",
-			currentUsage, additionalBytes, wm.maxSizePerSession)
+		return types.NewRichError("SESSION_QUOTA_EXCEEDED", fmt.Sprintf("session disk quota would be exceeded: %d + %d > %d", currentUsage, additionalBytes, wm.maxSizePerSession), "quota_error")
 	}
 
 	// Check global quota
 	totalUsage := wm.getTotalDiskUsage()
 	if totalUsage+additionalBytes > wm.totalMaxSize {
-		return fmt.Errorf("global disk quota would be exceeded: %d + %d > %d",
-			totalUsage, additionalBytes, wm.totalMaxSize)
+		return types.NewRichError("GLOBAL_QUOTA_EXCEEDED", fmt.Sprintf("global disk quota would be exceeded: %d + %d > %d", totalUsage, additionalBytes, wm.totalMaxSize), "quota_error")
 	}
 
 	return nil
@@ -242,7 +241,7 @@ func (wm *WorkspaceManager) UpdateDiskUsage(sessionID string) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to calculate disk usage: %w", err)
+		return types.NewRichError("DISK_USAGE_CALCULATION_FAILED", fmt.Sprintf("failed to calculate disk usage: %v", err), "filesystem_error")
 	}
 
 	wm.mutex.Lock()
@@ -271,7 +270,7 @@ func (wm *WorkspaceManager) EnforceGlobalQuota() error {
 	if totalUsage > wm.totalMaxSize {
 		// Find sessions that can be cleaned up (oldest first)
 		// This is a simplified implementation - could be more sophisticated
-		return fmt.Errorf("global disk quota exceeded: %d > %d", totalUsage, wm.totalMaxSize)
+		return types.NewRichError("GLOBAL_QUOTA_EXCEEDED", fmt.Sprintf("global disk quota exceeded: %d > %d", totalUsage, wm.totalMaxSize), "quota_error")
 	}
 
 	return nil
@@ -282,23 +281,23 @@ func (wm *WorkspaceManager) EnforceGlobalQuota() error {
 // SandboxedAnalysis runs repository analysis in a sandboxed environment
 func (wm *WorkspaceManager) SandboxedAnalysis(sessionID, repoPath string, options interface{}) (interface{}, error) {
 	if !wm.sandboxEnabled {
-		return nil, fmt.Errorf("sandboxing not enabled")
+		return nil, types.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
 	}
 
 	// Sandboxed execution not implemented
 	// Would require Docker-in-Docker or similar technology
-	return nil, fmt.Errorf("sandboxed analysis not implemented")
+	return nil, types.NewRichError("SANDBOXED_ANALYSIS_NOT_IMPLEMENTED", "sandboxed analysis not implemented", "feature_error")
 }
 
 // SandboxedBuild runs Docker build in a sandboxed environment
 func (wm *WorkspaceManager) SandboxedBuild(sessionID, dockerfilePath string, options interface{}) (interface{}, error) {
 	if !wm.sandboxEnabled {
-		return nil, fmt.Errorf("sandboxing not enabled")
+		return nil, types.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
 	}
 
 	// Sandboxed execution not implemented
 	// Would require Docker-in-Docker or similar technology
-	return nil, fmt.Errorf("sandboxed build not implemented")
+	return nil, types.NewRichError("SANDBOXED_BUILD_NOT_IMPLEMENTED", "sandboxed build not implemented", "feature_error")
 }
 
 // Helper methods

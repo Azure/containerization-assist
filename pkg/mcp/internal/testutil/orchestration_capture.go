@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -191,7 +192,7 @@ func NewExecutionVerifier(capture *ExecutionCapture, logger zerolog.Logger) *Exe
 func (ev *ExecutionVerifier) VerifyExecutionCount(expected int) error {
 	actual := ev.capture.GetExecutionCount()
 	if actual != expected {
-		return fmt.Errorf("expected %d executions, got %d", expected, actual)
+		return types.NewRichError("EXECUTION_COUNT_MISMATCH", fmt.Sprintf("expected %d executions, got %d", expected, actual), "test_error")
 	}
 	return nil
 }
@@ -200,7 +201,7 @@ func (ev *ExecutionVerifier) VerifyExecutionCount(expected int) error {
 func (ev *ExecutionVerifier) VerifyToolExecuted(toolName string) error {
 	executions := ev.capture.GetExecutionsForTool(toolName)
 	if len(executions) == 0 {
-		return fmt.Errorf("tool %s was not executed", toolName)
+		return types.NewRichError("TOOL_NOT_EXECUTED", fmt.Sprintf("tool %s was not executed", toolName), "test_error")
 	}
 	return nil
 }
@@ -210,7 +211,7 @@ func (ev *ExecutionVerifier) VerifyToolExecutionCount(toolName string, expected 
 	executions := ev.capture.GetExecutionsForTool(toolName)
 	actual := len(executions)
 	if actual != expected {
-		return fmt.Errorf("expected %d executions for tool %s, got %d", expected, toolName, actual)
+		return types.NewRichError("TOOL_EXECUTION_COUNT_MISMATCH", fmt.Sprintf("expected %d executions for tool %s, got %d", expected, toolName, actual), "test_error")
 	}
 	return nil
 }
@@ -219,13 +220,13 @@ func (ev *ExecutionVerifier) VerifyToolExecutionCount(toolName string, expected 
 func (ev *ExecutionVerifier) VerifyExecutionArgs(toolName string, expectedArgs interface{}) error {
 	executions := ev.capture.GetExecutionsForTool(toolName)
 	if len(executions) == 0 {
-		return fmt.Errorf("tool %s was not executed", toolName)
+		return types.NewRichError("TOOL_NOT_EXECUTED", fmt.Sprintf("tool %s was not executed", toolName), "test_error")
 	}
 
 	// Check the most recent execution
 	lastExecution := executions[len(executions)-1]
 	if !reflect.DeepEqual(lastExecution.Args, expectedArgs) {
-		return fmt.Errorf("expected args %v for tool %s, got %v", expectedArgs, toolName, lastExecution.Args)
+		return types.NewRichError("EXECUTION_ARGS_MISMATCH", fmt.Sprintf("expected args %v for tool %s, got %v", expectedArgs, toolName, lastExecution.Args), "test_error")
 	}
 
 	return nil
@@ -235,13 +236,13 @@ func (ev *ExecutionVerifier) VerifyExecutionArgs(toolName string, expectedArgs i
 func (ev *ExecutionVerifier) VerifyExecutionResult(toolName string, expectedResult interface{}) error {
 	executions := ev.capture.GetExecutionsForTool(toolName)
 	if len(executions) == 0 {
-		return fmt.Errorf("tool %s was not executed", toolName)
+		return types.NewRichError("TOOL_NOT_EXECUTED", fmt.Sprintf("tool %s was not executed", toolName), "test_error")
 	}
 
 	// Check the most recent execution
 	lastExecution := executions[len(executions)-1]
 	if !reflect.DeepEqual(lastExecution.Result, expectedResult) {
-		return fmt.Errorf("expected result %v for tool %s, got %v", expectedResult, toolName, lastExecution.Result)
+		return types.NewRichError("EXECUTION_RESULT_MISMATCH", fmt.Sprintf("expected result %v for tool %s, got %v", expectedResult, toolName, lastExecution.Result), "test_error")
 	}
 
 	return nil
@@ -251,13 +252,13 @@ func (ev *ExecutionVerifier) VerifyExecutionResult(toolName string, expectedResu
 func (ev *ExecutionVerifier) VerifyExecutionSuccess(toolName string) error {
 	executions := ev.capture.GetExecutionsForTool(toolName)
 	if len(executions) == 0 {
-		return fmt.Errorf("tool %s was not executed", toolName)
+		return types.NewRichError("TOOL_NOT_EXECUTED", fmt.Sprintf("tool %s was not executed", toolName), "test_error")
 	}
 
 	// Check the most recent execution
 	lastExecution := executions[len(executions)-1]
 	if lastExecution.Error != nil {
-		return fmt.Errorf("expected successful execution for tool %s, got error: %v", toolName, lastExecution.Error)
+		return types.NewRichError("EXECUTION_SHOULD_SUCCEED", fmt.Sprintf("expected successful execution for tool %s, got error: %v", toolName, lastExecution.Error), "test_error")
 	}
 
 	return nil
@@ -267,13 +268,13 @@ func (ev *ExecutionVerifier) VerifyExecutionSuccess(toolName string) error {
 func (ev *ExecutionVerifier) VerifyExecutionFailure(toolName string) error {
 	executions := ev.capture.GetExecutionsForTool(toolName)
 	if len(executions) == 0 {
-		return fmt.Errorf("tool %s was not executed", toolName)
+		return types.NewRichError("TOOL_NOT_EXECUTED", fmt.Sprintf("tool %s was not executed", toolName), "test_error")
 	}
 
 	// Check the most recent execution
 	lastExecution := executions[len(executions)-1]
 	if lastExecution.Error == nil {
-		return fmt.Errorf("expected failed execution for tool %s, but it succeeded", toolName)
+		return types.NewRichError("EXECUTION_SHOULD_FAIL", fmt.Sprintf("expected failed execution for tool %s, but it succeeded", toolName), "test_error")
 	}
 
 	return nil
@@ -283,7 +284,7 @@ func (ev *ExecutionVerifier) VerifyExecutionFailure(toolName string) error {
 func (ev *ExecutionVerifier) VerifyExecutionDuration(toolName string, minDuration, maxDuration time.Duration) error {
 	executions := ev.capture.GetExecutionsForTool(toolName)
 	if len(executions) == 0 {
-		return fmt.Errorf("tool %s was not executed", toolName)
+		return types.NewRichError("TOOL_NOT_EXECUTED", fmt.Sprintf("tool %s was not executed", toolName), "test_error")
 	}
 
 	// Check the most recent execution
@@ -291,11 +292,11 @@ func (ev *ExecutionVerifier) VerifyExecutionDuration(toolName string, minDuratio
 	duration := lastExecution.Duration
 
 	if duration < minDuration {
-		return fmt.Errorf("execution duration %v for tool %s is less than minimum %v", duration, toolName, minDuration)
+		return types.NewRichError("EXECUTION_DURATION_TOO_SHORT", fmt.Sprintf("execution duration %v for tool %s is less than minimum %v", duration, toolName, minDuration), "test_error")
 	}
 
 	if duration > maxDuration {
-		return fmt.Errorf("execution duration %v for tool %s exceeds maximum %v", duration, toolName, maxDuration)
+		return types.NewRichError("EXECUTION_DURATION_TOO_LONG", fmt.Sprintf("execution duration %v for tool %s exceeds maximum %v", duration, toolName, maxDuration), "test_error")
 	}
 
 	return nil
@@ -306,17 +307,17 @@ func (ev *ExecutionVerifier) VerifyExecutionOrder(expectedOrder []string) error 
 	executions := ev.capture.GetExecutions()
 
 	if len(executions) < len(expectedOrder) {
-		return fmt.Errorf("expected at least %d executions for order verification, got %d", len(expectedOrder), len(executions))
+		return types.NewRichError("INSUFFICIENT_EXECUTIONS_FOR_ORDER", fmt.Sprintf("expected at least %d executions for order verification, got %d", len(expectedOrder), len(executions)), "test_error")
 	}
 
 	for i, expectedTool := range expectedOrder {
 		if i >= len(executions) {
-			return fmt.Errorf("expected tool %s at position %d, but only %d executions occurred", expectedTool, i, len(executions))
+			return types.NewRichError("EXECUTION_ORDER_INCOMPLETE", fmt.Sprintf("expected tool %s at position %d, but only %d executions occurred", expectedTool, i, len(executions)), "test_error")
 		}
 
 		actualTool := executions[i].ToolName
 		if actualTool != expectedTool {
-			return fmt.Errorf("expected tool %s at position %d, got %s", expectedTool, i, actualTool)
+			return types.NewRichError("EXECUTION_ORDER_MISMATCH", fmt.Sprintf("expected tool %s at position %d, got %s", expectedTool, i, actualTool), "test_error")
 		}
 	}
 
@@ -327,7 +328,7 @@ func (ev *ExecutionVerifier) VerifyExecutionOrder(expectedOrder []string) error 
 func (ev *ExecutionVerifier) VerifyAllExecutionsSuccessful() error {
 	failed := ev.capture.GetFailedExecutions()
 	if len(failed) > 0 {
-		return fmt.Errorf("expected all executions to be successful, but %d failed", len(failed))
+		return types.NewRichError("EXECUTIONS_FAILED", fmt.Sprintf("expected all executions to be successful, but %d failed", len(failed)), "test_error")
 	}
 	return nil
 }
@@ -336,7 +337,7 @@ func (ev *ExecutionVerifier) VerifyAllExecutionsSuccessful() error {
 func (ev *ExecutionVerifier) VerifyNoExecutions() error {
 	count := ev.capture.GetExecutionCount()
 	if count > 0 {
-		return fmt.Errorf("expected no executions, but %d were captured", count)
+		return types.NewRichError("UNEXPECTED_EXECUTIONS", fmt.Sprintf("expected no executions, but %d were captured", count), "test_error")
 	}
 	return nil
 }
@@ -437,7 +438,7 @@ func (em *ExecutionMatcher) Verify() error {
 	// Verify expectations
 	if em.expectation.Count != nil {
 		if len(executions) != *em.expectation.Count {
-			return fmt.Errorf("expected %d matching executions, got %d", *em.expectation.Count, len(executions))
+			return types.NewRichError("MATCHING_EXECUTION_COUNT_MISMATCH", fmt.Sprintf("expected %d matching executions, got %d", *em.expectation.Count, len(executions)), "test_error")
 		}
 	}
 
@@ -448,24 +449,24 @@ func (em *ExecutionMatcher) Verify() error {
 		if em.expectation.Success != nil {
 			actualSuccess := lastExecution.Error == nil
 			if actualSuccess != *em.expectation.Success {
-				return fmt.Errorf("expected success=%v, got success=%v", *em.expectation.Success, actualSuccess)
+				return types.NewRichError("EXECUTION_SUCCESS_MISMATCH", fmt.Sprintf("expected success=%v, got success=%v", *em.expectation.Success, actualSuccess), "test_error")
 			}
 		}
 
 		if em.expectation.MinDuration != nil && lastExecution.Duration < *em.expectation.MinDuration {
-			return fmt.Errorf("execution duration %v is less than minimum %v", lastExecution.Duration, *em.expectation.MinDuration)
+			return types.NewRichError("EXECUTION_DURATION_TOO_SHORT", fmt.Sprintf("execution duration %v is less than minimum %v", lastExecution.Duration, *em.expectation.MinDuration), "test_error")
 		}
 
 		if em.expectation.MaxDuration != nil && lastExecution.Duration > *em.expectation.MaxDuration {
-			return fmt.Errorf("execution duration %v exceeds maximum %v", lastExecution.Duration, *em.expectation.MaxDuration)
+			return types.NewRichError("EXECUTION_DURATION_TOO_LONG", fmt.Sprintf("execution duration %v exceeds maximum %v", lastExecution.Duration, *em.expectation.MaxDuration), "test_error")
 		}
 
 		if em.expectation.Args != nil && !reflect.DeepEqual(lastExecution.Args, em.expectation.Args) {
-			return fmt.Errorf("expected args %v, got %v", em.expectation.Args, lastExecution.Args)
+			return types.NewRichError("EXECUTION_ARGS_MISMATCH", fmt.Sprintf("expected args %v, got %v", em.expectation.Args, lastExecution.Args), "test_error")
 		}
 
 		if em.expectation.Result != nil && !reflect.DeepEqual(lastExecution.Result, em.expectation.Result) {
-			return fmt.Errorf("expected result %v, got %v", em.expectation.Result, lastExecution.Result)
+			return types.NewRichError("EXECUTION_RESULT_MISMATCH", fmt.Sprintf("expected result %v, got %v", em.expectation.Result, lastExecution.Result), "test_error")
 		}
 	}
 
