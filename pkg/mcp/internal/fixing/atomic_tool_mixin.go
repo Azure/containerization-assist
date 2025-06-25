@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -17,7 +16,7 @@ type AtomicToolFixingMixin struct {
 }
 
 // NewAtomicToolFixingMixin creates a new fixing mixin
-func NewAtomicToolFixingMixin(analyzer analyzer.Analyzer, toolName string, logger zerolog.Logger) *AtomicToolFixingMixin {
+func NewAtomicToolFixingMixin(analyzer mcptypes.AIAnalyzer, toolName string, logger zerolog.Logger) *AtomicToolFixingMixin {
 	return &AtomicToolFixingMixin{
 		fixer:  NewAnalyzerIntegratedFixer(analyzer, logger),
 		config: GetEnhancedConfiguration(toolName),

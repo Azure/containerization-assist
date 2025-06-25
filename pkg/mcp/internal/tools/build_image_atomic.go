@@ -7,7 +7,6 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/constants"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
@@ -105,7 +104,7 @@ func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager
 }
 
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
-func (t *AtomicBuildImageTool) SetAnalyzer(analyzer analyzer.Analyzer) {
+func (t *AtomicBuildImageTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
 		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "atomic_build_image", t.logger)
 	}

@@ -21,10 +21,10 @@ type EnforcementCheck struct {
 
 func main() {
 	flag.Parse()
-	
+
 	fmt.Println("MCP Build-Time Enforcement")
 	fmt.Println("==========================")
-	
+
 	checks := []EnforcementCheck{
 		{
 			Name:        "Package Boundaries",
@@ -33,7 +33,7 @@ func main() {
 			Critical:    true,
 		},
 		{
-			Name:        "Interface Conformance", 
+			Name:        "Interface Conformance",
 			Description: "Check unified interface compliance",
 			Command:     "go run tools/validate-interfaces/main.go",
 			Critical:    true,
@@ -75,28 +75,28 @@ func main() {
 			Critical:    true,
 		},
 	}
-	
+
 	passed := 0
 	failed := 0
 	skipped := 0
-	
+
 	for i, check := range checks {
 		fmt.Printf("\n[%d/%d] %s\n", i+1, len(checks), check.Name)
 		fmt.Printf("📋 %s\n", check.Description)
-		
+
 		if *verbose {
 			fmt.Printf("🔧 Command: %s\n", check.Command)
 		}
-		
+
 		success := runCheck(check)
-		
+
 		if success {
 			fmt.Println("✅ PASSED")
 			passed++
 		} else if check.Critical {
 			fmt.Println("❌ FAILED (Critical)")
 			failed++
-			
+
 			if !*fix {
 				fmt.Printf("\n❌ Build enforcement failed on critical check: %s\n", check.Name)
 				fmt.Println("   Fix the issue above or use --fix flag for automatic fixes.")
@@ -117,13 +117,13 @@ func main() {
 			skipped++
 		}
 	}
-	
+
 	fmt.Printf("\n📊 Build Enforcement Summary\n")
 	fmt.Printf("============================\n")
 	fmt.Printf("✅ Passed: %d\n", passed)
 	fmt.Printf("❌ Failed: %d\n", failed)
 	fmt.Printf("⚠️  Skipped: %d\n", skipped)
-	
+
 	if failed > 0 {
 		fmt.Println("\n❌ Build enforcement failed!")
 		os.Exit(1)
@@ -137,14 +137,14 @@ func main() {
 func runCheck(check EnforcementCheck) bool {
 	cmd := exec.Command("bash", "-c", check.Command)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		if *verbose {
 			fmt.Printf("❌ Output: %s\n", string(output))
 		}
 		return false
 	}
-	
+
 	// Special handling for gofmt - it succeeds but outputs files if formatting is needed
 	if check.Name == "Go Fmt" && len(output) > 0 {
 		if *verbose {
@@ -152,13 +152,13 @@ func runCheck(check EnforcementCheck) bool {
 		}
 		return false
 	}
-	
+
 	return true
 }
 
 func runFix(check EnforcementCheck) bool {
 	var fixCommand string
-	
+
 	switch check.Name {
 	case "Go Fmt":
 		fixCommand = "gofmt -w ."
@@ -174,21 +174,21 @@ func runFix(check EnforcementCheck) bool {
 		fmt.Printf("   No auto-fix available for %s\n", check.Name)
 		return false
 	}
-	
+
 	if *verbose {
 		fmt.Printf("🔧 Fix command: %s\n", fixCommand)
 	}
-	
+
 	cmd := exec.Command("bash", "-c", fixCommand)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		if *verbose {
 			fmt.Printf("❌ Fix output: %s\n", string(output))
 		}
 		return false
 	}
-	
+
 	// Re-run the original check to verify the fix
 	return runCheck(check)
 }

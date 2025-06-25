@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
@@ -28,13 +27,13 @@ type FixingContext struct {
 // AnalyzerIntegratedFixer combines IterativeFixer with CallerAnalyzer
 type AnalyzerIntegratedFixer struct {
 	fixer        mcptypes.IterativeFixer
-	analyzer     analyzer.Analyzer
+	analyzer     mcptypes.AIAnalyzer
 	contextShare mcptypes.ContextSharer
 	logger       zerolog.Logger
 }
 
 // NewAnalyzerIntegratedFixer creates a fixer that integrates with CallerAnalyzer
-func NewAnalyzerIntegratedFixer(analyzer analyzer.Analyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
+func NewAnalyzerIntegratedFixer(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
 	// Create minimal working implementations for testing
 	fixer := &mockIterativeFixer{maxAttempts: 3, history: make([]mcptypes.FixAttempt, 0), analyzer: analyzer}
 	contextSharer := &mockContextSharer{context: make(map[string]interface{})}
@@ -312,7 +311,7 @@ func GetEnhancedConfiguration(toolName string) *EnhancedFixingConfiguration {
 type mockIterativeFixer struct {
 	maxAttempts int
 	history     []mcptypes.FixAttempt
-	analyzer    analyzer.Analyzer
+	analyzer    mcptypes.AIAnalyzer
 }
 
 func (m *mockIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mcptypes.FixingResult, error) {

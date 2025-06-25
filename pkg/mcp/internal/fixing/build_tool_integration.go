@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -20,7 +19,7 @@ type BuildImageWithFixes struct {
 }
 
 // NewBuildImageWithFixes creates a build tool with integrated fixing
-func NewBuildImageWithFixes(analyzer analyzer.Analyzer, logger zerolog.Logger) *BuildImageWithFixes {
+func NewBuildImageWithFixes(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *BuildImageWithFixes {
 	return &BuildImageWithFixes{
 		fixingMixin: NewAtomicToolFixingMixin(analyzer, "atomic_build_image", logger),
 		logger:      logger.With().Str("component", "build_image_with_fixes").Logger(),

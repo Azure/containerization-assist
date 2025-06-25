@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
@@ -72,8 +71,8 @@ func (m *MockAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate str
 	return "Mock formatted analysis response", nil
 }
 
-func (m *MockAnalyzer) GetTokenUsage() analyzer.TokenUsage {
-	return analyzer.TokenUsage{}
+func (m *MockAnalyzer) GetTokenUsage() mcptypes.TokenUsage {
+	return mcptypes.TokenUsage{}
 }
 
 func (m *MockAnalyzer) ResetTokenUsage() {

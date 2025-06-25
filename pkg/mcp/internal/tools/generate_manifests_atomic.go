@@ -12,7 +12,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/core/git"
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	corek8s "github.com/Azure/container-copilot/pkg/core/kubernetes"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
@@ -53,7 +52,7 @@ func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, session
 }
 
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
-func (t *AtomicGenerateManifestsTool) SetAnalyzer(analyzer analyzer.Analyzer) {
+func (t *AtomicGenerateManifestsTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
 		t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "generate_manifests_atomic", t.logger)
 	}

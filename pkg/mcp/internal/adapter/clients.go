@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
+	"github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -16,7 +17,7 @@ type MCPClients struct {
 	Docker   docker.DockerClient
 	Kind     kind.KindRunner
 	Kube     k8s.KubeRunner
-	Analyzer analyzer.Analyzer // Always use stub or caller analyzer - never external AI
+	Analyzer types.AIAnalyzer // Always use stub or caller analyzer - never external AI
 }
 
 // NewMCPClients creates MCP-specific clients with stub analyzer
@@ -33,7 +34,7 @@ func NewMCPClients(docker docker.DockerClient, kind kind.KindRunner, kube k8s.Ku
 // For tests: MockAnalyzer
 // For MCP with caller: CallerAnalyzer
 // For MCP without caller: StubAnalyzer (default)
-func (c *MCPClients) SetAnalyzer(a analyzer.Analyzer) {
+func (c *MCPClients) SetAnalyzer(a types.AIAnalyzer) {
 	c.Analyzer = a
 }
 

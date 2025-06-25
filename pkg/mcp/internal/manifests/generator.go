@@ -3,7 +3,6 @@ package manifests
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,25 +19,18 @@ type Generator interface {
 
 // ManifestGenerator implements the Generator interface
 type ManifestGenerator struct {
-	logger     zerolog.Logger
-	writer     *Writer
-	validator  *Validator
-	strategies map[string]ManifestStrategy
+	logger    zerolog.Logger
+	writer    *Writer
+	validator *Validator
 }
 
 // NewManifestGenerator creates a new manifest generator
 func NewManifestGenerator(logger zerolog.Logger) *ManifestGenerator {
-	gen := &ManifestGenerator{
-		logger:     logger.With().Str("component", "manifest_generator").Logger(),
-		writer:     NewWriter(logger),
-		validator:  NewValidator(logger),
-		strategies: make(map[string]ManifestStrategy),
+	return &ManifestGenerator{
+		logger:    logger.With().Str("component", "manifest_generator").Logger(),
+		writer:    NewWriter(logger),
+		validator: NewValidator(logger),
 	}
-
-	// Register default strategies
-	gen.registerDefaultStrategies()
-
-	return gen
 }
 
 // GenerateManifests generates Kubernetes manifests
@@ -129,17 +121,6 @@ func (g *ManifestGenerator) ValidateManifests(ctx context.Context, manifestPath 
 	return g.validator.ValidateDirectory(ctx, manifestPath)
 }
 
-// RegisterStrategy registers a custom manifest generation strategy
-func (g *ManifestGenerator) RegisterStrategy(name string, strategy ManifestStrategy) {
-	g.strategies[name] = strategy
-}
-
-// registerDefaultStrategies registers the default manifest generation strategies
-func (g *ManifestGenerator) registerDefaultStrategies() {
-	// Strategies will be registered externally to avoid import cycles
-	g.logger.Debug().Msg("Default strategies registration placeholder")
-}
-
 // Helper methods
 
 func (g *ManifestGenerator) getManifestPath(opts GenerationOptions) string {
@@ -155,98 +136,21 @@ func (g *ManifestGenerator) shouldGenerateConfigMap(opts GenerationOptions) bool
 }
 
 func (g *ManifestGenerator) generateDeployment(manifestPath string, opts GenerationOptions) error {
-	strategy, exists := g.strategies["deployment"]
-	if !exists {
-		// Fall back to basic template-based generation
-		return g.writer.WriteDeploymentTemplate(manifestPath, opts)
-	}
-
-	context := g.buildTemplateContext(opts)
-	content, err := strategy.GenerateManifest(opts, context)
-	if err != nil {
-		return err
-	}
-
-	return g.writer.WriteFile(filepath.Join(manifestPath, "deployment.yaml"), content)
+	return g.writer.WriteDeploymentTemplate(manifestPath, opts)
 }
 
 func (g *ManifestGenerator) generateService(manifestPath string, opts GenerationOptions) error {
-	strategy, exists := g.strategies["service"]
-	if !exists {
-		// Fall back to basic template-based generation
-		return g.writer.WriteServiceTemplate(manifestPath, opts)
-	}
-
-	context := g.buildTemplateContext(opts)
-	content, err := strategy.GenerateManifest(opts, context)
-	if err != nil {
-		return err
-	}
-
-	return g.writer.WriteFile(filepath.Join(manifestPath, "service.yaml"), content)
+	return g.writer.WriteServiceTemplate(manifestPath, opts)
 }
 
 func (g *ManifestGenerator) generateConfigMap(manifestPath string, opts GenerationOptions) error {
-	strategy, exists := g.strategies["configmap"]
-	if !exists {
-		// Fall back to basic template-based generation
-		return g.writer.WriteConfigMapTemplate(manifestPath, opts)
-	}
-
-	context := g.buildTemplateContext(opts)
-	content, err := strategy.GenerateManifest(opts, context)
-	if err != nil {
-		return err
-	}
-
-	return g.writer.WriteFile(filepath.Join(manifestPath, "configmap.yaml"), content)
+	return g.writer.WriteConfigMapTemplate(manifestPath, opts)
 }
 
 func (g *ManifestGenerator) generateIngress(manifestPath string, opts GenerationOptions) error {
-	strategy, exists := g.strategies["ingress"]
-	if !exists {
-		// Fall back to basic template-based generation
-		return g.writer.WriteIngressTemplate(manifestPath, opts)
-	}
-
-	context := g.buildTemplateContext(opts)
-	content, err := strategy.GenerateManifest(opts, context)
-	if err != nil {
-		return err
-	}
-
-	return g.writer.WriteFile(filepath.Join(manifestPath, "ingress.yaml"), content)
+	return g.writer.WriteIngressTemplate(manifestPath, opts)
 }
 
 func (g *ManifestGenerator) generateSecrets(manifestPath string, opts GenerationOptions) error {
-	strategy, exists := g.strategies["secret"]
-	if !exists {
-		// Fall back to basic template-based generation
-		return g.writer.WriteSecretTemplate(manifestPath, opts)
-	}
-
-	context := g.buildTemplateContext(opts)
-	content, err := strategy.GenerateManifest(opts, context)
-	if err != nil {
-		return err
-	}
-
-	return g.writer.WriteFile(filepath.Join(manifestPath, "secret.yaml"), content)
-}
-
-func (g *ManifestGenerator) buildTemplateContext(opts GenerationOptions) TemplateContext {
-	// Build template context from options
-	// This is a simplified version - could be enhanced based on repository analysis
-	return TemplateContext{
-		HasDatabase: len(opts.Secrets) > 0,
-		IsWebApp:    opts.IncludeIngress,
-		Port:        g.extractPortFromService(opts),
-	}
-}
-
-func (g *ManifestGenerator) extractPortFromService(opts GenerationOptions) int {
-	if len(opts.ServicePorts) > 0 {
-		return opts.ServicePorts[0].Port
-	}
-	return 8080 // Default port
+	return g.writer.WriteSecretTemplate(manifestPath, opts)
 }

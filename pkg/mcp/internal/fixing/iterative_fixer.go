@@ -6,19 +6,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // DefaultIterativeFixer implements the IterativeFixer interface using CallerAnalyzer
 type DefaultIterativeFixer struct {
-	analyzer analyzer.Analyzer
+	analyzer mcptypes.AIAnalyzer
 	logger   zerolog.Logger
 }
 
 // NewDefaultIterativeFixer creates a new iterative fixer
-func NewDefaultIterativeFixer(analyzer analyzer.Analyzer, logger zerolog.Logger) *DefaultIterativeFixer {
+func NewDefaultIterativeFixer(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *DefaultIterativeFixer {
 	return &DefaultIterativeFixer{
 		analyzer: analyzer,
 		logger:   logger.With().Str("component", "iterative_fixer").Logger(),

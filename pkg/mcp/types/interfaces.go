@@ -620,3 +620,33 @@ const (
 	ErrorCodeToolNotFound    = -32005
 	ErrorCodeValidationError = -32006
 )
+
+// =============================================================================
+// AI ANALYSIS INTERFACES
+// =============================================================================
+
+// AIAnalyzer provides a unified interface for all AI/LLM analysis operations
+// This interface resolves naming conflicts with other Analyzer interfaces
+type AIAnalyzer interface {
+	// Analyze performs basic text analysis with the LLM
+	Analyze(ctx context.Context, prompt string) (string, error)
+
+	// AnalyzeWithFileTools performs analysis with file system access
+	AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error)
+
+	// AnalyzeWithFormat performs analysis with formatted prompts
+	AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error)
+
+	// GetTokenUsage returns usage statistics (may be empty for non-Azure implementations)
+	GetTokenUsage() TokenUsage
+
+	// ResetTokenUsage resets usage statistics
+	ResetTokenUsage()
+}
+
+// TokenUsage holds the token usage information for LLM operations
+type TokenUsage struct {
+	CompletionTokens int `json:"completion_tokens"`
+	PromptTokens     int `json:"prompt_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}

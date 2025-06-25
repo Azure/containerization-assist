@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
+	"github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
@@ -31,7 +32,8 @@ type CallerAnalyzerOpts struct {
 }
 
 // Ensure interface compliance at compile time.
-var _ Analyzer = (*CallerAnalyzer)(nil)
+var _ types.AIAnalyzer = (*CallerAnalyzer)(nil)
+var _ types.AIAnalyzer = (*StubAnalyzer)(nil)
 
 // NewCallerAnalyzer creates an analyzer that sends prompts back to the hosting LLM
 func NewCallerAnalyzer(transport contract.LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzer {
@@ -131,13 +133,13 @@ func (c *CallerAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate s
 	return c.Analyze(ctx, formattedPrompt)
 }
 
-// GetTokenUsage implements Analyzer interface
+// GetTokenUsage implements AIAnalyzer interface
 // For MCP, we don't track token usage as the hosting LLM handles this
-func (c *CallerAnalyzer) GetTokenUsage() TokenUsage {
-	return TokenUsage{} // Always empty for MCP
+func (c *CallerAnalyzer) GetTokenUsage() types.TokenUsage {
+	return types.TokenUsage{} // Always empty for MCP
 }
 
-// ResetTokenUsage implements Analyzer interface
+// ResetTokenUsage implements AIAnalyzer interface
 // No-op for MCP as we don't track token usage
 func (c *CallerAnalyzer) ResetTokenUsage() {
 	// No-op for MCP
@@ -151,27 +153,27 @@ func NewStubAnalyzer() *StubAnalyzer {
 	return &StubAnalyzer{}
 }
 
-// Analyze implements Analyzer interface with stub behavior
+// Analyze implements AIAnalyzer interface with stub behavior
 func (s *StubAnalyzer) Analyze(ctx context.Context, prompt string) (string, error) {
 	return "", fmt.Errorf("stub analyzer: AI analysis not available in MCP mode")
 }
 
-// AnalyzeWithFileTools implements Analyzer interface with stub behavior
+// AnalyzeWithFileTools implements AIAnalyzer interface with stub behavior
 func (s *StubAnalyzer) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
 	return "", fmt.Errorf("stub analyzer: AI file analysis not available in MCP mode")
 }
 
-// AnalyzeWithFormat implements Analyzer interface with stub behavior
+// AnalyzeWithFormat implements AIAnalyzer interface with stub behavior
 func (s *StubAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
 	return "", fmt.Errorf("stub analyzer: AI analysis not available in MCP mode")
 }
 
-// GetTokenUsage implements Analyzer interface
-func (s *StubAnalyzer) GetTokenUsage() TokenUsage {
-	return TokenUsage{}
+// GetTokenUsage implements AIAnalyzer interface
+func (s *StubAnalyzer) GetTokenUsage() types.TokenUsage {
+	return types.TokenUsage{}
 }
 
-// ResetTokenUsage implements Analyzer interface
+// ResetTokenUsage implements AIAnalyzer interface
 func (s *StubAnalyzer) ResetTokenUsage() {
 	// No-op for stub
 }
