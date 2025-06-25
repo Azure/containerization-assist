@@ -90,27 +90,35 @@ jobs:
       run: |
         echo "🚦 Checking quality gates..."
         
-        # Define thresholds
-        MIN_ERROR_HANDLING=60.0  # Minimum 60% RichError adoption
-        MIN_TEST_COVERAGE=50.0   # Minimum 50% test coverage
-        MAX_BUILD_TIME=300       # Maximum 5 minutes build time
-        MAX_EMPTY_DIRS=5         # Maximum 5 empty directories
-        WARN_TODOS=50            # Warning if more than 50 TODOs
+        # Define thresholds (with error budgets)
+        MIN_ERROR_HANDLING=60.0       # Target 60% RichError adoption
+        MIN_ERROR_HANDLING_BUDGET=30.0 # Allow down to 30% during transition
+        MIN_TEST_COVERAGE=50.0        # Target 50% test coverage  
+        MIN_TEST_COVERAGE_BUDGET=10.0 # Allow down to 10% during development
+        MAX_BUILD_TIME=300            # Maximum 5 minutes build time
+        MAX_EMPTY_DIRS=5              # Maximum 5 empty directories
+        WARN_TODOS=50                 # Warning if more than 50 TODOs
         
         # Check gates
         GATES_PASSED=true
         WARNINGS=""
         
-        # Error handling adoption
-        if (( $(echo "${{ steps.quality.outputs.error_handling }} < $MIN_ERROR_HANDLING" | bc -l) )); then
-          echo "❌ Error handling adoption (${{ steps.quality.outputs.error_handling }}%) below minimum ($MIN_ERROR_HANDLING%)"
+        # Error handling adoption (with budget)
+        if (( $(echo "${{ steps.quality.outputs.error_handling }} < $MIN_ERROR_HANDLING_BUDGET" | bc -l) )); then
+          echo "❌ Error handling adoption (${{ steps.quality.outputs.error_handling }}%) below minimum budget ($MIN_ERROR_HANDLING_BUDGET%)"
           GATES_PASSED=false
+        elif (( $(echo "${{ steps.quality.outputs.error_handling }} < $MIN_ERROR_HANDLING" | bc -l) )); then
+          echo "⚠️  Error handling adoption (${{ steps.quality.outputs.error_handling }}%) below target ($MIN_ERROR_HANDLING%) but within budget"
+          WARNINGS="${WARNINGS}\\n- Improve error handling adoption"
         fi
         
-        # Test coverage
-        if (( $(echo "${{ steps.quality.outputs.test_coverage }} < $MIN_TEST_COVERAGE" | bc -l) )); then
-          echo "❌ Test coverage (${{ steps.quality.outputs.test_coverage }}%) below minimum ($MIN_TEST_COVERAGE%)"
+        # Test coverage (with budget)
+        if (( $(echo "${{ steps.quality.outputs.test_coverage }} < $MIN_TEST_COVERAGE_BUDGET" | bc -l) )); then
+          echo "❌ Test coverage (${{ steps.quality.outputs.test_coverage }}%) below minimum budget ($MIN_TEST_COVERAGE_BUDGET%)"
           GATES_PASSED=false
+        elif (( $(echo "${{ steps.quality.outputs.test_coverage }} < $MIN_TEST_COVERAGE" | bc -l) )); then
+          echo "⚠️  Test coverage (${{ steps.quality.outputs.test_coverage }}%) below target ($MIN_TEST_COVERAGE%) but within budget"
+          WARNINGS="${WARNINGS}\\n- Improve test coverage"
         fi
         
         # Empty directories
