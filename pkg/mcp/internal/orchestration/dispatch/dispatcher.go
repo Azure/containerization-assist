@@ -34,7 +34,11 @@ func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory,
 	}
 
 	// Create a tool instance to get metadata
-	tool := factory()
+	toolInstance := factory()
+	tool, ok := toolInstance.(mcptypes.Tool)
+	if !ok {
+		return fmt.Errorf("factory for tool %s does not produce a valid Tool instance", name)
+	}
 	metadata := tool.GetMetadata()
 
 	d.tools[name] = factory
@@ -70,9 +74,15 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcptype
 	}
 
 	// Use the converter to create tool-specific args
-	toolArgs, err := converter(argsMap)
+	convertedArgs, err := converter(argsMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert arguments for tool %s: %w", toolName, err)
+	}
+
+	// Type assert to ToolArgs interface
+	toolArgs, ok := convertedArgs.(mcptypes.ToolArgs)
+	if !ok {
+		return nil, fmt.Errorf("converter for tool %s does not produce valid ToolArgs", toolName)
 	}
 
 	// Validate the arguments

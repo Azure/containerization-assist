@@ -520,7 +520,7 @@ func (adapter *ConversationOrchestratorAdapter) ValidateToolArgs(toolName string
 	return adapter.toolOrchestrator.ValidateToolArgs(toolName, args)
 }
 
-func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (interface{}, error) {
 	return adapter.toolOrchestrator.GetToolMetadata(toolName)
 }
 
@@ -543,7 +543,7 @@ func (adapter *RegistryAdapter) Get(name string) (mcptypes.ToolFactory, error) {
 	}
 
 	// Return a factory that creates the same tool instance
-	factory := func() mcptypes.Tool {
+	factory := func() interface{} {
 		return tool.(mcptypes.Tool)
 	}
 	return factory, nil

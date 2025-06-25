@@ -173,8 +173,8 @@ type BuildStatus struct {
 	EstimatedTime time.Duration
 }
 
-// ProgressReporter defines the interface for progress reporting
-type ProgressReporter interface {
+// BasicProgressReporter defines a simple interface for progress reporting
+type BasicProgressReporter interface {
 	ReportProgress(progress float64, stage string, message string)
 	ReportError(err error)
 	ReportWarning(message string)

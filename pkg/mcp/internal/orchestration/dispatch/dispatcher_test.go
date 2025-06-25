@@ -96,10 +96,10 @@ func TestToolDispatcher(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Create a simple test tool directly without adapter
-	factory := func() mcptypes.Tool {
+	factory := func() interface{} {
 		return &testToolWrapper{impl: &testToolImpl{name: "test_tool"}}
 	}
-	converter := func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
+	converter := func(args map[string]interface{}) (interface{}, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
 	}
@@ -138,7 +138,11 @@ func TestToolDispatcher(t *testing.T) {
 	// Test 3: Tool execution via dispatcher
 	t.Run("ToolExecution", func(t *testing.T) {
 		factory, _ := dispatcher.GetToolFactory("test_tool")
-		tool := factory()
+		toolInstance := factory()
+		tool, ok := toolInstance.(mcptypes.Tool)
+		if !ok {
+			t.Fatalf("Tool factory did not return a valid Tool instance")
+		}
 
 		args := map[string]interface{}{
 			"test": "data",
@@ -180,10 +184,10 @@ func TestDispatcherConcurrency(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Register test tool
-	factory := func() mcptypes.Tool {
+	factory := func() interface{} {
 		return &testToolWrapper{impl: &testToolImpl{name: "concurrent_test_tool"}}
 	}
-	converter := func(args map[string]interface{}) (mcptypes.ToolArgs, error) {
+	converter := func(args map[string]interface{}) (interface{}, error) {
 		// Return a simple test args implementation
 		return &testToolArgs{data: args}, nil
 	}
@@ -201,9 +205,11 @@ func TestDispatcherConcurrency(t *testing.T) {
 			// Get factory
 			factory, _ := dispatcher.GetToolFactory("concurrent_test_tool")
 			if factory != nil {
-				tool := factory()
-				// Execute tool
-				_, _ = tool.Execute(context.Background(), nil)
+				toolInstance := factory()
+				if tool, ok := toolInstance.(mcptypes.Tool); ok {
+					// Execute tool
+					_, _ = tool.Execute(context.Background(), nil)
+				}
 			}
 
 			done <- true

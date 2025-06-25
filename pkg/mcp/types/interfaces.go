@@ -5,21 +5,38 @@ import (
 	"time"
 )
 
-// This file contains interface types to avoid circular imports
-// Core interfaces are duplicated here temporarily to resolve import cycles
+// This file contains non-duplicate interface types that are not in pkg/mcp/interfaces.go
+// All core interfaces are defined in pkg/mcp/interfaces.go as the single source of truth
 
 // =============================================================================
-// CORE INTERFACES (duplicated to avoid import cycles)
+// SPECIALIZED TOOL TYPES (non-duplicated from main interfaces)
 // =============================================================================
 
-// Tool represents the unified interface for all MCP tools (duplicate for import cycle resolution)
+// ArgConverter converts generic arguments to tool-specific types
+// Note: Returns interface{} to avoid import cycle with ToolArgs from main package
+type ArgConverter func(args map[string]interface{}) (interface{}, error)
+
+// ResultConverter converts tool-specific results to generic types
+type ResultConverter func(result interface{}) (map[string]interface{}, error)
+
+// ToolArgs is a marker interface for tool-specific argument types (lightweight version)
+type ToolArgs interface {
+	GetSessionID() string
+	Validate() error
+}
+
+// Tool interface (lightweight version to avoid import cycles)
 type Tool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
 	GetMetadata() ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
 }
 
-// ToolMetadata contains comprehensive information about a tool (duplicate for import cycle resolution)
+// ToolFactory creates new instances of tools
+// Note: Returns interface{} to avoid import cycle with Tool from main package
+type ToolFactory func() interface{}
+
+// ToolMetadata contains comprehensive information about a tool (lightweight version)
 type ToolMetadata struct {
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
@@ -32,7 +49,7 @@ type ToolMetadata struct {
 	Examples     []ToolExample     `json:"examples"`
 }
 
-// ToolExample represents an example usage of a tool (duplicate for import cycle resolution)
+// ToolExample represents an example usage of a tool (lightweight version)
 type ToolExample struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -40,66 +57,15 @@ type ToolExample struct {
 	Output      map[string]interface{} `json:"output"`
 }
 
-// ToolArgs provides base interface for tool arguments (duplicate for import cycle resolution)
-type ToolArgs interface {
-	GetSessionID() string
-	Validate() error
+// ToolOrchestrator interface for tool orchestration (unique to this file)
+// Note: Uses interface{} types to avoid import cycle with main package types
+type ToolOrchestrator interface {
+	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
+	ValidateToolArgs(toolName string, args interface{}) error
+	GetToolMetadata(toolName string) (interface{}, error)
 }
 
-// ToolResult provides base interface for tool results (duplicate for import cycle resolution)
-type ToolResult interface {
-	GetSuccess() bool
-}
-
-// ProgressReporter provides stage-aware progress reporting (duplicate for import cycle resolution)
-type ProgressReporter interface {
-	ReportStage(stageProgress float64, message string)
-	NextStage(message string)
-	SetStage(stageIndex int, message string)
-	ReportOverall(progress float64, message string)
-	GetCurrentStage() (int, ProgressStage)
-}
-
-// ProgressStage represents a stage in a multi-step operation (duplicate for import cycle resolution)
-type ProgressStage struct {
-	Name        string  // Human-readable stage name
-	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
-	Description string  // Optional detailed description
-}
-
-// Transport interface for different transport mechanisms (duplicate for import cycle resolution)
-type Transport interface {
-	Serve(ctx context.Context) error
-	Stop() error
-	Name() string
-	SetHandler(handler RequestHandler)
-}
-
-// RequestHandler processes MCP requests (duplicate for import cycle resolution)
-type RequestHandler interface {
-	HandleRequest(ctx context.Context, req *MCPRequest) (*MCPResponse, error)
-}
-
-// MCP protocol types (duplicate for import cycle resolution)
-type MCPRequest struct {
-	ID     string      `json:"id"`
-	Method string      `json:"method"`
-	Params interface{} `json:"params"`
-}
-
-type MCPResponse struct {
-	ID     string      `json:"id"`
-	Result interface{} `json:"result,omitempty"`
-	Error  *MCPError   `json:"error,omitempty"`
-}
-
-type MCPError struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
-}
-
-// ToolRegistry manages tool registration (duplicate for import cycle resolution)
+// ToolRegistry manages tool registration and discovery (lightweight version)
 type ToolRegistry interface {
 	Register(name string, factory ToolFactory) error
 	Get(name string) (ToolFactory, error)
@@ -107,94 +73,38 @@ type ToolRegistry interface {
 	GetMetadata() map[string]ToolMetadata
 }
 
-// Health-related interfaces (duplicate for import cycle resolution)
-type SystemResources struct {
-	CPUUsage    float64   `json:"cpu_usage_percent"`
-	MemoryUsage float64   `json:"memory_usage_percent"`
-	DiskUsage   float64   `json:"disk_usage_percent"`
-	OpenFiles   int       `json:"open_files"`
-	GoRoutines  int       `json:"goroutines"`
-	HeapSize    int64     `json:"heap_size_bytes"`
-	LastUpdated time.Time `json:"last_updated"`
+// Transport represents the unified interface for MCP transport mechanisms (lightweight version)
+type Transport interface {
+	Serve(ctx context.Context) error
+	Stop() error
+	Name() string
+	SetHandler(handler RequestHandler)
 }
 
-type SessionHealthStats struct {
-	ActiveSessions    int     `json:"active_sessions"`
-	TotalSessions     int     `json:"total_sessions"`
-	FailedSessions    int     `json:"failed_sessions"`
-	AverageSessionAge float64 `json:"average_session_age_minutes"`
-	SessionErrors     int     `json:"session_errors_last_hour"`
+// RequestHandler processes MCP requests (lightweight version)
+type RequestHandler interface {
+	HandleRequest(ctx context.Context, req interface{}) (interface{}, error)
 }
 
-type CircuitBreakerStatus struct {
-	State         string    `json:"state"` // open, closed, half-open
-	FailureCount  int       `json:"failure_count"`
-	LastFailure   time.Time `json:"last_failure"`
-	NextRetry     time.Time `json:"next_retry"`
-	TotalRequests int64     `json:"total_requests"`
-	SuccessCount  int64     `json:"success_count"`
+// MCPRequest represents an incoming MCP request (lightweight version)
+type MCPRequest struct {
+	ID     string      `json:"id"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
 }
 
-type ServiceHealth struct {
-	Name         string                 `json:"name"`
-	Status       string                 `json:"status"` // healthy, degraded, unhealthy
-	LastCheck    time.Time              `json:"last_check"`
-	ResponseTime time.Duration          `json:"response_time"`
-	ErrorMessage string                 `json:"error_message,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+// MCPResponse represents an MCP response (lightweight version)
+type MCPResponse struct {
+	ID     string      `json:"id"`
+	Result interface{} `json:"result,omitempty"`
+	Error  *MCPError   `json:"error,omitempty"`
 }
 
-type JobQueueStats struct {
-	QueuedJobs      int     `json:"queued_jobs"`
-	RunningJobs     int     `json:"running_jobs"`
-	CompletedJobs   int64   `json:"completed_jobs"`
-	FailedJobs      int64   `json:"failed_jobs"`
-	AverageWaitTime float64 `json:"average_wait_time_seconds"`
-}
-
-type RecentError struct {
-	Timestamp time.Time              `json:"timestamp"`
-	Message   string                 `json:"message"`
-	Component string                 `json:"component"`
-	Severity  string                 `json:"severity"`
-	Context   map[string]interface{} `json:"context,omitempty"`
-}
-
-// HealthChecker provides system health checking capabilities (duplicate for import cycle resolution)
-type HealthChecker interface {
-	GetSystemResources() SystemResources
-	GetSessionStats() SessionHealthStats
-	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
-	CheckServiceHealth(ctx context.Context) []ServiceHealth
-	GetJobQueueStats() JobQueueStats
-	GetRecentErrors(limit int) []RecentError
-}
-
-// Circuit breaker states (duplicate for import cycle resolution)
-const (
-	CircuitBreakerClosed   = "closed"
-	CircuitBreakerOpen     = "open"
-	CircuitBreakerHalfOpen = "half-open"
-)
-
-// =============================================================================
-// SPECIALIZED TOOL TYPES (non-duplicated from main interfaces)
-// =============================================================================
-
-// ArgConverter converts generic arguments to tool-specific types
-type ArgConverter func(args map[string]interface{}) (ToolArgs, error)
-
-// ResultConverter converts tool-specific results to generic types
-type ResultConverter func(result interface{}) (map[string]interface{}, error)
-
-// ToolFactory creates new instances of tools
-type ToolFactory func() Tool
-
-// ToolOrchestrator interface for tool orchestration (unique to this file)
-type ToolOrchestrator interface {
-	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
-	ValidateToolArgs(toolName string, args interface{}) error
-	GetToolMetadata(toolName string) (*ToolMetadata, error)
+// MCPError represents an MCP error response (lightweight version)
+type MCPError struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
 }
 
 // =============================================================================
@@ -643,8 +553,103 @@ type TokenUsage struct {
 }
 
 // =============================================================================
+// HEALTH CHECKING TYPES (lightweight versions to avoid import cycles)
+// =============================================================================
+
+// SystemResources represents system resource information
+type SystemResources struct {
+	CPUUsage    float64   `json:"cpu_usage_percent"`
+	MemoryUsage float64   `json:"memory_usage_percent"`
+	DiskUsage   float64   `json:"disk_usage_percent"`
+	OpenFiles   int       `json:"open_files"`
+	GoRoutines  int       `json:"goroutines"`
+	HeapSize    int64     `json:"heap_size_bytes"`
+	LastUpdated time.Time `json:"last_updated"`
+}
+
+// SessionHealthStats represents session-related health statistics
+type SessionHealthStats struct {
+	ActiveSessions    int     `json:"active_sessions"`
+	TotalSessions     int     `json:"total_sessions"`
+	FailedSessions    int     `json:"failed_sessions"`
+	AverageSessionAge float64 `json:"average_session_age_minutes"`
+	SessionErrors     int     `json:"session_errors_last_hour"`
+}
+
+// Circuit breaker states
+const (
+	CircuitBreakerClosed   = "closed"
+	CircuitBreakerOpen     = "open"
+	CircuitBreakerHalfOpen = "half-open"
+)
+
+// CircuitBreakerStatus represents the status of a circuit breaker
+type CircuitBreakerStatus struct {
+	State         string    `json:"state"` // open, closed, half-open
+	FailureCount  int       `json:"failure_count"`
+	LastFailure   time.Time `json:"last_failure"`
+	NextRetry     time.Time `json:"next_retry"`
+	TotalRequests int64     `json:"total_requests"`
+	SuccessCount  int64     `json:"success_count"`
+}
+
+// ServiceHealth represents the health of an external service
+type ServiceHealth struct {
+	Name         string                 `json:"name"`
+	Status       string                 `json:"status"` // healthy, degraded, unhealthy
+	LastCheck    time.Time              `json:"last_check"`
+	ResponseTime time.Duration          `json:"response_time"`
+	ErrorMessage string                 `json:"error_message,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// JobQueueStats represents job queue statistics
+type JobQueueStats struct {
+	QueuedJobs      int     `json:"queued_jobs"`
+	RunningJobs     int     `json:"running_jobs"`
+	CompletedJobs   int64   `json:"completed_jobs"`
+	FailedJobs      int64   `json:"failed_jobs"`
+	AverageWaitTime float64 `json:"average_wait_time_seconds"`
+}
+
+// RecentError represents a recent error for debugging
+type RecentError struct {
+	Timestamp time.Time              `json:"timestamp"`
+	Message   string                 `json:"message"`
+	Component string                 `json:"component"`
+	Severity  string                 `json:"severity"`
+	Context   map[string]interface{} `json:"context,omitempty"`
+}
+
+// HealthChecker defines the interface for health checking operations (lightweight version)
+type HealthChecker interface {
+	GetSystemResources() SystemResources
+	GetSessionStats() SessionHealthStats
+	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
+	CheckServiceHealth(ctx context.Context) []ServiceHealth
+	GetJobQueueStats() JobQueueStats
+	GetRecentErrors(limit int) []RecentError
+}
+
+// =============================================================================
 // PROGRESS TRACKING TYPES
 // =============================================================================
+
+// ProgressStage represents a stage in a multi-step operation (lightweight version to avoid import cycles)
+type ProgressStage struct {
+	Name        string  // Human-readable stage name
+	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
+	Description string  // Optional detailed description
+}
+
+// ProgressReporter provides stage-aware progress reporting (lightweight version)
+type ProgressReporter interface {
+	ReportStage(stageProgress float64, message string)
+	NextStage(message string)
+	SetStage(stageIndex int, message string)
+	ReportOverall(progress float64, message string)
+	GetCurrentStage() (int, ProgressStage)
+}
 
 // ProgressTracker provides centralized progress reporting for tools
 type ProgressTracker interface {

@@ -92,7 +92,7 @@ func (o *MCPToolOrchestrator) ValidateToolArgs(toolName string, args interface{}
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (interface{}, error) {
 	localMetadata, err := o.toolRegistry.GetToolMetadata(toolName)
 	if err != nil {
 		return nil, err
