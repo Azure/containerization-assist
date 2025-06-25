@@ -22,6 +22,11 @@ func NewToolValidator(toolName string) *ToolValidator {
 	}
 }
 
+// Validate implements the BaseValidator interface
+func (v *ToolValidator) Validate(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error) {
+	return v.ValidateTool(ctx, input, options)
+}
+
 // ValidateTool performs tool-specific validation
 // Validate implements the BaseValidator interface
 func (v *ToolValidator) Validate(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error) {
