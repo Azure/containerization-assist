@@ -16,8 +16,8 @@ import (
 // DefaultStageExecutor implements StageExecutor for executing workflow stages
 type DefaultStageExecutor struct {
 	logger           zerolog.Logger
-	toolRegistry     ToolRegistry
-	toolOrchestrator ToolOrchestrator
+	toolRegistry     InternalToolRegistry
+	toolOrchestrator InternalToolOrchestrator
 	secretRedactor   *SecretRedactor
 
 	// Execution strategies
@@ -29,8 +29,8 @@ type DefaultStageExecutor struct {
 // NewDefaultStageExecutor creates a new stage executor with modular execution strategies
 func NewDefaultStageExecutor(
 	logger zerolog.Logger,
-	toolRegistry ToolRegistry,
-	toolOrchestrator ToolOrchestrator,
+	toolRegistry InternalToolRegistry,
+	toolOrchestrator InternalToolOrchestrator,
 ) *DefaultStageExecutor {
 	// Create base executors
 	seqExec := execution.NewSequentialExecutor(logger)

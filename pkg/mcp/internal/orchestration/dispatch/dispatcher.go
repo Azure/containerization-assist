@@ -12,7 +12,7 @@ import (
 type ToolDispatcher struct {
 	tools      map[string]mcptypes.ToolFactory
 	converters map[string]mcptypes.ArgConverter
-	metadata   map[string]mcptypes.ToolMetadata
+	metadata   map[string]mcp.ToolMetadata
 	mu         sync.RWMutex
 }
 
@@ -21,7 +21,7 @@ func NewToolDispatcher() *ToolDispatcher {
 	return &ToolDispatcher{
 		tools:      make(map[string]mcptypes.ToolFactory),
 		converters: make(map[string]mcptypes.ArgConverter),
-		metadata:   make(map[string]mcptypes.ToolMetadata),
+		metadata:   make(map[string]mcp.ToolMetadata),
 	}
 }
 
@@ -36,7 +36,7 @@ func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory,
 
 	// Create a tool instance to get metadata
 	toolInstance := factory()
-	tool, ok := toolInstance.(mcptypes.Tool)
+	tool, ok := toolInstance.(mcp.Tool)
 	if !ok {
 		return fmt.Errorf("factory for tool %s does not produce a valid Tool instance", name)
 	}
@@ -95,7 +95,7 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcp.Too
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (d *ToolDispatcher) GetToolMetadata(name string) (mcptypes.ToolMetadata, bool) {
+func (d *ToolDispatcher) GetToolMetadata(name string) (mcp.ToolMetadata, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 

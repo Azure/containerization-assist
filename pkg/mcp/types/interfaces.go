@@ -24,6 +24,10 @@ import (
 // NOTE: ToolArgs, ToolResult, and Tool interfaces are now defined in pkg/mcp/interfaces.go
 // Type aliases maintained for compatibility during migration
 
+// ToolMetadata and ToolExample have been moved to pkg/mcp/interfaces.go
+// to avoid duplication. However, we need to define them here to avoid import cycles
+// when internal packages need to use these types.
+
 // ToolMetadata contains comprehensive information about a tool
 type ToolMetadata struct {
 	Name         string            `json:"name"`
@@ -56,35 +60,8 @@ type ProgressStage struct {
 
 // NOTE: Session interface is now defined in pkg/mcp/interfaces.go
 
-// Transport and RequestHandler interfaces - temporarily restored to avoid import cycles
-// These will eventually be removed once all references are updated to use pkg/mcp
-
-// Transport represents the unified interface for MCP transport mechanisms
-type Transport interface {
-	// Serve starts the transport and serves requests
-	Serve(ctx context.Context) error
-
-	// Stop gracefully stops the transport
-	Stop(ctx context.Context) error
-
-	// Name returns the transport name
-	Name() string
-
-	// SetHandler sets the request handler
-	SetHandler(handler interface{})
-}
-
-// RequestHandler processes MCP requests
-type RequestHandler interface {
-	HandleRequest(ctx context.Context, req interface{}) (interface{}, error)
-}
-
-// Tool represents the unified interface for all MCP tools
-type Tool interface {
-	Execute(ctx context.Context, args interface{}) (interface{}, error)
-	GetMetadata() ToolMetadata
-	Validate(ctx context.Context, args interface{}) error
-}
+// Transport, RequestHandler, and Tool interfaces have been moved to pkg/mcp/interfaces.go
+// to avoid duplication. Only type definitions remain in this file.
 
 // NOTE: Transport, RequestHandler, ProgressReporter, Tool, and ToolRegistry interfaces
 // are now defined in pkg/mcp/interfaces.go as the canonical source
@@ -98,12 +75,8 @@ type Tool interface {
 
 // ToolRegistry interface is now defined in pkg/mcp/interfaces.go
 
-// ToolOrchestrator interface is for internal use only
-type ToolOrchestrator interface {
-	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
-	ValidateToolArgs(toolName string, args interface{}) error
-	GetToolMetadata(toolName string) (*ToolMetadata, error)
-}
+// ToolOrchestrator interface has been moved to avoid duplication
+// Use the definition in pkg/mcp/internal/orchestration/interfaces.go for internal use
 
 // Transport interface is now defined in pkg/mcp/interfaces.go
 
@@ -131,7 +104,8 @@ type MCPError struct {
 // =============================================================================
 
 // ToolFactory creates new instances of tools
-type ToolFactory func() Tool
+// Returns interface{} to avoid import cycles - actual type is mcp.Tool
+type ToolFactory func() interface{}
 
 // ArgConverter converts generic arguments to tool-specific types
 // NOTE: ToolArgs interface is defined in pkg/mcp/interfaces.go

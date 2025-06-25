@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// MCPToolOrchestrator implements ToolOrchestrator for MCP atomic tools
+// MCPToolOrchestrator implements InternalToolOrchestrator for MCP atomic tools
 // This is the updated version that uses type-safe dispatch instead of reflection
 type MCPToolOrchestrator struct {
 	toolRegistry       *MCPToolRegistry

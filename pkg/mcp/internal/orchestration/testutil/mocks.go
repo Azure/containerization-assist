@@ -7,6 +7,7 @@ import (
 )
 
 // MockToolOrchestrator provides a controllable mock for testing tool execution
+// Note: The name is kept as MockToolOrchestrator for backward compatibility with existing tests
 type MockToolOrchestrator struct {
 	mu sync.RWMutex
 
@@ -52,7 +53,7 @@ func NewMockToolOrchestrator() *MockToolOrchestrator {
 	}
 }
 
-// ExecuteTool implements the ToolOrchestrator interface
+// ExecuteTool implements the InternalToolOrchestrator interface
 func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -102,7 +103,7 @@ func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string,
 	return result, err
 }
 
-// ValidateToolArgs implements the ToolOrchestrator interface
+// ValidateToolArgs implements the InternalToolOrchestrator interface
 func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -193,6 +194,7 @@ func (m *MockToolOrchestrator) Clear() {
 }
 
 // MockToolRegistry provides a controllable mock for testing tool registration
+// Note: The name is kept as MockToolRegistry for backward compatibility with existing tests
 type MockToolRegistry struct {
 	mu sync.RWMutex
 

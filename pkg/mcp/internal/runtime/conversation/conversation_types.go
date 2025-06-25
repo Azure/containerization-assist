@@ -58,7 +58,7 @@ type ArtifactSummary struct {
 	Size      int       `json:"size_bytes"`
 }
 
-// Note: ToolOrchestrator and ToolExecutor are defined in tool_orchestrator.go
+// Note: InternalToolOrchestrator is imported from the orchestration package
 
 // Note: UserPreferences and ResourceLimits are defined in conversation_state.go
 
@@ -131,4 +131,4 @@ func (r *ConversationResponse) GetAutoAdvanceMessage() string {
 
 // Note: ErrorHandler is now in the errors package for centralized error management
 
-// Note: ToolOrchestrator methods are defined in tool_orchestrator.go
+// Note: InternalToolOrchestrator is imported from the orchestration package

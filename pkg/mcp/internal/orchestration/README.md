@@ -174,7 +174,7 @@ The orchestration system is designed to seamlessly integrate with the existing M
 ### Tool Registry Integration
 
 ```go
-type ToolRegistry interface {
+type InternalToolRegistry interface {
     RegisterTool(name string, tool interface{}) error
     GetTool(name string) (interface{}, error)
     ListTools() []string
@@ -185,7 +185,7 @@ type ToolRegistry interface {
 ### Tool Orchestrator Integration
 
 ```go
-type ToolOrchestrator interface {
+type InternalToolOrchestrator interface {
     ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
     ValidateToolArgs(toolName string, args interface{}) error
     GetToolMetadata(toolName string) (*ToolMetadata, error)

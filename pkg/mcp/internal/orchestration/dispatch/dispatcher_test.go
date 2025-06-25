@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Azure/container-copilot/pkg/mcp"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
@@ -27,7 +28,7 @@ func (t *testToolImpl) GetMetadata() interface{} {
 	}
 }
 
-// testToolWrapper wraps testToolImpl to implement mcptypes.Tool
+// testToolWrapper wraps testToolImpl to implement mcp.Tool
 type testToolWrapper struct {
 	impl *testToolImpl
 }
@@ -36,8 +37,8 @@ func (w *testToolWrapper) Execute(ctx context.Context, args interface{}) (interf
 	return w.impl.Execute(ctx, args)
 }
 
-func (w *testToolWrapper) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (w *testToolWrapper) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:        w.impl.name,
 		Description: "Test tool for unit tests",
 		Version:     "1.0.0",
@@ -49,7 +50,7 @@ func (w *testToolWrapper) Validate(ctx context.Context, args interface{}) error 
 	return nil
 }
 
-// testToolArgs implements mcptypes.ToolArgs
+// testToolArgs implements mcp.ToolArgs
 type testToolArgs struct {
 	data map[string]interface{}
 }
@@ -96,7 +97,7 @@ func TestToolDispatcher(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Create a simple test tool directly without adapter
-	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
+	factory := mcptypes.ToolFactory(func() interface{} {
 		return &testToolWrapper{impl: &testToolImpl{name: "test_tool"}}
 	})
 	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (interface{}, error) {
@@ -139,7 +140,7 @@ func TestToolDispatcher(t *testing.T) {
 	t.Run("ToolExecution", func(t *testing.T) {
 		factory, _ := dispatcher.GetToolFactory("test_tool")
 		toolInstance := factory()
-		tool, ok := toolInstance.(mcptypes.Tool)
+		tool, ok := toolInstance.(mcp.Tool)
 		if !ok {
 			t.Fatalf("Tool factory did not return a valid Tool instance")
 		}
@@ -184,7 +185,7 @@ func TestDispatcherConcurrency(t *testing.T) {
 	dispatcher := NewToolDispatcher()
 
 	// Register test tool
-	factory := mcptypes.ToolFactory(func() mcptypes.Tool {
+	factory := mcptypes.ToolFactory(func() interface{} {
 		return &testToolWrapper{impl: &testToolImpl{name: "concurrent_test_tool"}}
 	})
 	converter := mcptypes.ArgConverter(func(args map[string]interface{}) (interface{}, error) {
@@ -206,7 +207,7 @@ func TestDispatcherConcurrency(t *testing.T) {
 			factory, _ := dispatcher.GetToolFactory("concurrent_test_tool")
 			if factory != nil {
 				toolInstance := factory()
-				if tool, ok := toolInstance.(mcptypes.Tool); ok {
+				if tool, ok := toolInstance.(mcp.Tool); ok {
 					// Execute tool
 					_, _ = tool.Execute(context.Background(), nil)
 				}

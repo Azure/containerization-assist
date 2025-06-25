@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/validate"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -41,7 +41,7 @@ func (m *ToolMiddleware) Use(middleware Middleware) {
 }
 
 // ExecuteWithMiddleware executes a tool with all middleware applied
-func (m *ToolMiddleware) ExecuteWithMiddleware(ctx context.Context, tool mcptypes.Tool, args interface{}) (interface{}, error) {
+func (m *ToolMiddleware) ExecuteWithMiddleware(ctx context.Context, tool mcp.Tool, args interface{}) (interface{}, error) {
 	// Create execution context
 	execCtx := &ExecutionContext{
 		Context:   ctx,
@@ -104,7 +104,7 @@ func (m *ToolMiddleware) recordExecution(execCtx *ExecutionContext, result inter
 // ExecutionContext provides context for tool execution
 type ExecutionContext struct {
 	Context   context.Context
-	Tool      mcptypes.Tool
+	Tool      mcp.Tool
 	Args      interface{}
 	StartTime time.Time
 	Metadata  map[string]interface{}

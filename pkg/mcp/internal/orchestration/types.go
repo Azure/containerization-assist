@@ -6,8 +6,8 @@ type SessionManager interface {
 	UpdateSession(session interface{}) error
 }
 
-// NOTE: ToolRegistry and Orchestrator interfaces are now defined in pkg/mcp/interfaces.go
-// However, due to import cycles, the orchestration package uses mcptypes.ToolRegistry and mcptypes.ToolOrchestrator
+// NOTE: InternalToolRegistry and InternalToolOrchestrator interfaces are now defined in interfaces.go
+// These local interfaces help avoid import cycles with pkg/mcp
 
 // ToolMetadata contains metadata about a tool
 type ToolMetadata struct {
