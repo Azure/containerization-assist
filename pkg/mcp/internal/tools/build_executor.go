@@ -9,7 +9,6 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -142,7 +141,7 @@ func (e *BuildExecutor) ExecuteWithContext(serverCtx *server.Context, args Atomi
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
+func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	e.logger.Info().Msg("Loading session")
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)

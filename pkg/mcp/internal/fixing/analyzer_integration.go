@@ -209,7 +209,7 @@ func (a *AnalyzerIntegratedFixer) GetFixingRecommendations(ctx context.Context, 
 	// Get available fix strategies from the fixer
 	strategyNames := a.fixer.GetFixStrategies()
 	strategies := make([]mcptypes.FixStrategy, 0, len(strategyNames))
-	
+
 	// Convert strategy names to FixStrategy objects
 	for i, name := range strategyNames {
 		strategies = append(strategies, mcptypes.FixStrategy{
@@ -219,7 +219,7 @@ func (a *AnalyzerIntegratedFixer) GetFixingRecommendations(ctx context.Context, 
 			Priority:    i + 1, // Lower index = higher priority
 		})
 	}
-	
+
 	return strategies, nil
 }
 
@@ -393,7 +393,7 @@ func (m *mockIterativeFixer) AttemptFix(ctx context.Context, issue interface{}, 
 
 func (m *mockIterativeFixer) GetFailureRouting() map[string]string {
 	return map[string]string{
-		"build_error": "dockerfile",
+		"build_error":  "dockerfile",
 		"deploy_error": "kubernetes",
 	}
 }

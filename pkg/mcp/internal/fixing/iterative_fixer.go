@@ -395,20 +395,20 @@ func (f *DefaultIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mc
 		// Try to create a basic FixingContext from the issue
 		return nil, fmt.Errorf("issue must be of type *FixingContext")
 	}
-	
+
 	// Ensure maxAttempts is set
 	if fixingCtx.MaxAttempts == 0 {
 		fixingCtx.MaxAttempts = f.maxAttempts
 	}
-	
+
 	// Call the internal attempt fix method
 	result, err := f.attemptFixInternal(ctx, fixingCtx)
-	
+
 	// Update fix history
 	if result != nil && len(result.AllAttempts) > 0 {
 		f.fixHistory = append(f.fixHistory, result.AllAttempts...)
 	}
-	
+
 	return result, err
 }
 
@@ -419,10 +419,10 @@ func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, issue interface{
 	if !ok {
 		return nil, fmt.Errorf("issue must be of type *FixingContext")
 	}
-	
+
 	// Set the specific attempt number
 	fixingCtx.MaxAttempts = attempt
-	
+
 	// Call the main Fix method
 	return f.Fix(ctx, fixingCtx)
 }

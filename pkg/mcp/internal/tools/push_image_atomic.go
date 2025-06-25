@@ -8,7 +8,6 @@ import (
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -154,7 +153,7 @@ func (t *AtomicPushImageTool) ExecuteWithContext(serverCtx *server.Context, args
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args AtomicPushImageArgs, result *AtomicPushImageResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
+func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args AtomicPushImageArgs, result *AtomicPushImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	t.logger.Info().Msg("Loading session")
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
@@ -263,7 +262,7 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 }
 
 // performPush contains the actual push logic that can be used with or without progress reporting
-func (t *AtomicPushImageTool) performPush(ctx context.Context, session *sessiontypes.SessionState, args AtomicPushImageArgs, result *AtomicPushImageResult, reporter interfaces.ProgressReporter) error {
+func (t *AtomicPushImageTool) performPush(ctx context.Context, session *sessiontypes.SessionState, args AtomicPushImageArgs, result *AtomicPushImageResult, reporter mcptypes.ProgressReporter) error {
 	// Report progress if reporter is available
 	// Progress reporting removed
 

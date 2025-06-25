@@ -8,7 +8,6 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
@@ -167,8 +166,8 @@ func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManage
 }
 
 // standardHealthCheckStages provides common stages for health check operations
-func standardHealthCheckStages() []interfaces.ProgressStage {
-	return []interfaces.ProgressStage{
+func standardHealthCheckStages() []mcptypes.ProgressStage {
+	return []mcptypes.ProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and namespace"},
 		{Name: "Query", Weight: 0.30, Description: "Querying Kubernetes resources"},
 		{Name: "Analyze", Weight: 0.30, Description: "Analyzing pod and service health"},
@@ -208,7 +207,7 @@ func (t *AtomicCheckHealthTool) executeWithoutProgress(ctx context.Context, args
 }
 
 // performHealthCheck performs the actual health check
-func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter interfaces.ProgressReporter) (*AtomicCheckHealthResult, error) {
+func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter mcptypes.ProgressReporter) (*AtomicCheckHealthResult, error) {
 	startTime := time.Now()
 
 	// Get session

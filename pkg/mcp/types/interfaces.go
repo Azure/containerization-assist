@@ -659,3 +659,137 @@ type TokenUsage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	TotalTokens      int `json:"total_tokens"`
 }
+
+// =============================================================================
+// HEALTH AND MONITORING INTERFACES
+// =============================================================================
+
+// HealthChecker defines the interface for health checking operations
+type HealthChecker interface {
+	GetSystemResources() SystemResources
+	GetSessionStats() SessionHealthStats
+	GetCircuitBreakerStats() map[string]CircuitBreakerStatus
+	CheckServiceHealth(ctx context.Context) []ServiceHealth
+	GetJobQueueStats() JobQueueStats
+	GetRecentErrors(limit int) []RecentError
+}
+
+// SystemResources represents system resource information
+type SystemResources struct {
+	CPUUsage    float64   `json:"cpu_usage_percent"`
+	MemoryUsage float64   `json:"memory_usage_percent"`
+	DiskUsage   float64   `json:"disk_usage_percent"`
+	OpenFiles   int       `json:"open_files"`
+	GoRoutines  int       `json:"goroutines"`
+	HeapSize    int64     `json:"heap_size_bytes"`
+	LastUpdated time.Time `json:"last_updated"`
+}
+
+// SessionHealthStats represents session-related health statistics
+type SessionHealthStats struct {
+	ActiveSessions    int     `json:"active_sessions"`
+	TotalSessions     int     `json:"total_sessions"`
+	FailedSessions    int     `json:"failed_sessions"`
+	AverageSessionAge float64 `json:"average_session_age_minutes"`
+	SessionErrors     int     `json:"session_errors_last_hour"`
+}
+
+// CircuitBreakerStatus represents the status of a circuit breaker
+type CircuitBreakerStatus struct {
+	State         string    `json:"state"` // open, closed, half-open
+	FailureCount  int       `json:"failure_count"`
+	LastFailure   time.Time `json:"last_failure"`
+	NextRetry     time.Time `json:"next_retry"`
+	TotalRequests int64     `json:"total_requests"`
+	SuccessCount  int64     `json:"success_count"`
+}
+
+// ServiceHealth represents the health of an external service
+type ServiceHealth struct {
+	Name         string                 `json:"name"`
+	Status       string                 `json:"status"` // healthy, degraded, unhealthy
+	LastCheck    time.Time              `json:"last_check"`
+	ResponseTime time.Duration          `json:"response_time"`
+	ErrorMessage string                 `json:"error_message,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// JobQueueStats represents job queue statistics
+type JobQueueStats struct {
+	QueuedJobs      int     `json:"queued_jobs"`
+	RunningJobs     int     `json:"running_jobs"`
+	CompletedJobs   int64   `json:"completed_jobs"`
+	FailedJobs      int64   `json:"failed_jobs"`
+	AverageWaitTime float64 `json:"average_wait_time_seconds"`
+}
+
+// RecentError represents a recent error for debugging
+type RecentError struct {
+	Timestamp time.Time              `json:"timestamp"`
+	Message   string                 `json:"message"`
+	Component string                 `json:"component"`
+	Severity  string                 `json:"severity"`
+	Context   map[string]interface{} `json:"context,omitempty"`
+}
+
+// =============================================================================
+// PROGRESS TRACKING INTERFACES
+// =============================================================================
+
+// ProgressReporter provides stage-aware progress reporting
+type ProgressReporter interface {
+	// ReportStage reports progress for the current stage
+	ReportStage(stageProgress float64, message string)
+
+	// NextStage advances to the next stage and reports its start
+	NextStage(message string)
+
+	// SetStage explicitly sets the current stage index
+	SetStage(stageIndex int, message string)
+
+	// ReportOverall reports overall progress directly (bypassing stage calculation)
+	ReportOverall(progress float64, message string)
+
+	// GetCurrentStage returns the current stage information
+	GetCurrentStage() (int, ProgressStage)
+}
+
+// ProgressTracker provides centralized progress reporting for tools
+type ProgressTracker interface {
+	// RunWithProgress executes an operation with standardized progress reporting
+	RunWithProgress(
+		ctx context.Context,
+		operation string,
+		stages []ProgressStage,
+		fn func(ctx context.Context, reporter ProgressReporter) error,
+	) error
+}
+
+// ProgressStage represents a stage in a multi-step operation
+type ProgressStage struct {
+	Name        string  // Human-readable stage name
+	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
+	Description string  // Optional detailed description
+}
+
+// SessionData represents session information for management tools
+type SessionData struct {
+	ID           string                 `json:"id"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+	ExpiresAt    time.Time              `json:"expires_at"`
+	CurrentStage string                 `json:"current_stage"`
+	Metadata     map[string]interface{} `json:"metadata"`
+	IsActive     bool                   `json:"is_active"`
+	LastAccess   time.Time              `json:"last_access"`
+}
+
+// SessionManagerStats represents statistics about session management
+type SessionManagerStats struct {
+	TotalSessions   int     `json:"total_sessions"`
+	ActiveSessions  int     `json:"active_sessions"`
+	ExpiredSessions int     `json:"expired_sessions"`
+	AverageAge      float64 `json:"average_age_hours"`
+	OldestSession   string  `json:"oldest_session_id"`
+	NewestSession   string  `json:"newest_session_id"`
+}

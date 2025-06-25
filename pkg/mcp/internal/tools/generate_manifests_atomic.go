@@ -14,7 +14,6 @@ import (
 	corek8s "github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
@@ -161,7 +160,7 @@ func (t *AtomicGenerateManifestsTool) executeWithoutProgress(ctx context.Context
 }
 
 // performManifestGeneration performs the actual manifest generation
-func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter interfaces.ProgressReporter) (*AtomicGenerateManifestsResult, error) {
+func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter mcptypes.ProgressReporter) (*AtomicGenerateManifestsResult, error) {
 	startTime := time.Now()
 
 	// Get session

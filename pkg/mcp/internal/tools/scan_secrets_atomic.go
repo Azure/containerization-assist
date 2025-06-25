@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
@@ -118,8 +117,8 @@ type GeneratedSecretManifest struct {
 }
 
 // standardSecretScanStages provides common stages for secret scanning operations
-func standardSecretScanStages() []interfaces.ProgressStage {
-	return []interfaces.ProgressStage{
+func standardSecretScanStages() []mcptypes.ProgressStage {
+	return []mcptypes.ProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating scan path"},
 		{Name: "Analyze", Weight: 0.15, Description: "Analyzing file patterns and scan configuration"},
 		{Name: "Scan", Weight: 0.50, Description: "Scanning files for secrets"},
@@ -184,7 +183,7 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter interfaces.ProgressReporter) (*AtomicScanSecretsResult, error) {
+func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter mcptypes.ProgressReporter) (*AtomicScanSecretsResult, error) {
 	// Stage 1: Initialize - Loading session and validating scan path
 	t.logger.Info().Msg("Loading session")
 
@@ -436,7 +435,7 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 }
 
 // performSecretScan performs the actual file scanning for secrets
-func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter interfaces.ProgressReporter) ([]ScannedSecret, []FileSecretScanResult, int, error) {
+func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter mcptypes.ProgressReporter) ([]ScannedSecret, []FileSecretScanResult, int, error) {
 	scanner := utils.NewSecretScanner()
 	var allSecrets []ScannedSecret
 	var fileResults []FileSecretScanResult
