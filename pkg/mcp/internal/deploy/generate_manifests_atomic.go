@@ -197,7 +197,7 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 		t.logger.Info().Msg("Using refactored manifest generation modules")
 		_ = t.pipelineAdapter.GetSessionWorkspace(session.SessionID) // workspaceDir would be used here
 		// ManifestsAdapter removed - return error for now
-		return nil, fmt.Errorf("refactored manifest generation not implemented without adapter")
+		return nil, types.NewRichError("FEATURE_NOT_IMPLEMENTED", "refactored manifest generation not implemented without adapter", types.ErrTypeSystem)
 	}
 
 	// Create base response
@@ -854,9 +854,7 @@ func (t *AtomicGenerateManifestsTool) Validate(ctx context.Context, args interfa
 			var err error
 			manifestArgs, err = convertToAtomicGenerateManifestsArgs(mapArgs)
 			if err != nil {
-				return mcperror.NewWithData("conversion_error", fmt.Sprintf("Failed to convert arguments: %v", err), map[string]interface{}{
-					"error": err.Error(),
-				})
+				return types.NewRichError("CONVERSION_ERROR", fmt.Sprintf("failed to convert arguments: %v", err), types.ErrTypeValidation)
 			}
 		} else {
 			return mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_generate_manifests", map[string]interface{}{

@@ -305,7 +305,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	if useRefactoredModules {
 		t.logger.Info().Msg("Using refactored Dockerfile validation modules")
 		// dockerfileAdapter removed - return error for now
-		return nil, fmt.Errorf("refactored Dockerfile validation not implemented without adapter")
+		return nil, types.NewRichError("FEATURE_NOT_IMPLEMENTED", "refactored Dockerfile validation not implemented without adapter", types.ErrTypeSystem)
 	}
 
 	// Perform validation using legacy code

@@ -609,17 +609,12 @@ func (t *AtomicAnalyzeRepositoryTool) isURL(path string) bool {
 func (t *AtomicAnalyzeRepositoryTool) validateLocalPath(path string) error {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return mcperror.NewWithData(mcperror.CodeInvalidPath, "Failed to resolve absolute path", map[string]interface{}{
-			"path": path,
-		})
+		return types.NewRichError("INVALID_PATH", fmt.Sprintf("failed to resolve absolute path for '%s': %v", path, err), types.ErrTypeValidation)
 	}
 
 	// Basic path validation (more could be added)
 	if strings.Contains(absPath, "..") {
-		return mcperror.NewWithData(mcperror.CodePermissionDenied, "Path traversal not allowed", map[string]interface{}{
-			"path":          path,
-			"resolved_path": absPath,
-		})
+		return types.NewRichError("PATH_TRAVERSAL_DENIED", fmt.Sprintf("path traversal not allowed for '%s' (resolved to: %s)", path, absPath), types.ErrTypeSecurity)
 	}
 
 	return nil

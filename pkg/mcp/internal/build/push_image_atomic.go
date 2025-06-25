@@ -160,7 +160,7 @@ func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args Atom
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("session not found: %s", args.SessionID), types.ErrTypeSession)
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
@@ -213,7 +213,7 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
-		return result, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return result, types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("session not found: %s", args.SessionID), types.ErrTypeSession)
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
@@ -782,19 +782,19 @@ func (t *AtomicPushImageTool) isRetryableError(errorType, message string) bool {
 func (t *AtomicPushImageTool) validateImageReference(imageRef string) error {
 	// Check for obviously invalid characters
 	if strings.Contains(imageRef, "//") {
-		return types.NewRichError("INVALID_ARGUMENTS", "image reference contains invalid double slashes", "invalid_format")
+		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("image reference '%s' contains invalid double slashes. Format should be: [registry/]name:tag", imageRef), "invalid_format")
 	}
 
 	// Check for multiple consecutive colons
 	if strings.Contains(imageRef, "::") {
-		return types.NewRichError("INVALID_ARGUMENTS", "image reference contains invalid double colons", "invalid_format")
+		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("image reference '%s' contains invalid double colons. Format should be: [registry/]name:tag", imageRef), "invalid_format")
 	}
 
 	// Basic format validation - should be [registry/]name:tag
 	// Split by colon to separate name and tag
 	parts := strings.Split(imageRef, ":")
 	if len(parts) > 2 {
-		return types.NewRichError("INVALID_ARGUMENTS", "image reference has too many colons", "invalid_format")
+		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("image reference '%s' has too many colons. Format should be: [registry/]name:tag", imageRef), "invalid_format")
 	}
 
 	if len(parts) == 2 {
@@ -803,17 +803,17 @@ func (t *AtomicPushImageTool) validateImageReference(imageRef string) error {
 
 		// Tag cannot be empty
 		if tag == "" {
-			return types.NewRichError("INVALID_ARGUMENTS", "image tag cannot be empty", "invalid_tag")
+			return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("image tag cannot be empty in '%s'. Format should be: [registry/]name:tag", imageRef), "invalid_tag")
 		}
 
 		// Tag cannot contain slashes
 		if strings.Contains(tag, "/") {
-			return types.NewRichError("INVALID_ARGUMENTS", "image tag cannot contain slashes", "invalid_tag")
+			return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("image tag '%s' cannot contain slashes in '%s'. Use registry/repository format for repository names", tag, imageRef), "invalid_tag")
 		}
 
 		// Name part validation
 		if namepart == "" {
-			return types.NewRichError("INVALID_ARGUMENTS", "image name cannot be empty", "invalid_name")
+			return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("image name cannot be empty in '%s'. Format should be: [registry/]name:tag", imageRef), "invalid_name")
 		}
 	}
 
