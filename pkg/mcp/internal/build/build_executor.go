@@ -1,9 +1,9 @@
 package build
 
 import (
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"context"
 	"fmt"
+	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"os"
 	"path/filepath"
 	"strings"

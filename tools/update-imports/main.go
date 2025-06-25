@@ -38,8 +38,8 @@ var importMappings = map[string]string{
 	"github.com/tng/workspace/prod/pkg/mcp/internal/orchestration/workflow": "github.com/tng/workspace/prod/pkg/mcp/internal/workflow",
 
 	// Observability package
-	"github.com/tng/workspace/prod/pkg/logger":                     "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
-	"github.com/tng/workspace/prod/pkg/mcp/internal/ops":          "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
+	"github.com/tng/workspace/prod/pkg/logger":           "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
+	"github.com/tng/workspace/prod/pkg/mcp/internal/ops": "github.com/tng/workspace/prod/pkg/mcp/internal/observability",
 
 	// Validation package
 	"github.com/tng/workspace/prod/pkg/mcp/internal/validate": "github.com/tng/workspace/prod/pkg/mcp/internal/validate",

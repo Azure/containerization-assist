@@ -2,8 +2,8 @@ package deploy
 
 import (
 	"context"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -25,7 +25,7 @@ func NewManifestsAdapter(adapter mcptypes.PipelineOperations, logger zerolog.Log
 func (m *ManifestsAdapter) GenerateManifestsWithModules(ctx context.Context, args AtomicGenerateManifestsArgs, session *sessiontypes.SessionState, workspaceDir string) (*AtomicGenerateManifestsResult, error) {
 	// Stub implementation - in production this would use the refactored modules
 	m.logger.Info().Msg("GenerateManifestsWithModules called - using stub implementation")
-	
+
 	// Return a basic result indicating we're using the refactored modules
 	return &AtomicGenerateManifestsResult{
 		Success: true,

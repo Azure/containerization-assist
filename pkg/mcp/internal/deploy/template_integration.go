@@ -20,11 +20,11 @@ func NewTemplateIntegration(logger zerolog.Logger) *TemplateIntegration {
 func (t *TemplateIntegration) SelectManifestTemplate(args AtomicGenerateManifestsArgs, repoInfo map[string]interface{}) (interface{}, error) {
 	// Stub implementation - in production this would analyze the repository and args to select the best template
 	t.logger.Info().Msg("SelectManifestTemplate called - using stub implementation")
-	
+
 	// Return a basic template context
 	return map[string]interface{}{
-		"template":    "default",
-		"confidence":  0.8,
-		"reasoning":   "Default template selected (stub implementation)",
+		"template":   "default",
+		"confidence": 0.8,
+		"reasoning":  "Default template selected (stub implementation)",
 	}, nil
 }

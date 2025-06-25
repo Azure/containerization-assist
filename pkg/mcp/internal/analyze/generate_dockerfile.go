@@ -1,17 +1,17 @@
 package analyze
 
 import (
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"context"
 	"fmt"
+	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"os"
 	"path/filepath"
 	"strings"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )

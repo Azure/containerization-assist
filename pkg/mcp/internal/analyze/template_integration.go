@@ -20,21 +20,21 @@ func NewTemplateIntegration(logger zerolog.Logger) *TemplateIntegration {
 func (t *TemplateIntegration) SelectDockerfileTemplate(repositoryData map[string]interface{}, templateName string) (*DockerfileTemplateContext, error) {
 	// Default implementation
 	ctx := &DockerfileTemplateContext{
-		SelectedTemplate:    templateName,
-		DetectedLanguage:    "go",
-		DetectedFramework:   "gin",
-		SelectionMethod:     "default",
-		SelectionConfidence: 0.8,
-		AvailableTemplates:  []TemplateOptionInternal{},
-		AlternativeOptions:  []AlternativeTemplateOption{},
-		SelectionReasoning:  []string{"Default template selected"},
+		SelectedTemplate:     templateName,
+		DetectedLanguage:     "go",
+		DetectedFramework:    "gin",
+		SelectionMethod:      "default",
+		SelectionConfidence:  0.8,
+		AvailableTemplates:   []TemplateOptionInternal{},
+		AlternativeOptions:   []AlternativeTemplateOption{},
+		SelectionReasoning:   []string{"Default template selected"},
 		CustomizationOptions: make(map[string]interface{}),
 	}
-	
+
 	if templateName == "" {
 		ctx.SelectedTemplate = "go"
 	}
-	
+
 	return ctx, nil
 }
 

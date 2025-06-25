@@ -9,8 +9,8 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"

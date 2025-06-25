@@ -1,9 +1,9 @@
 package deploy
 
 import (
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"context"
 	"fmt"
+	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"strings"
 	"time"
 
@@ -41,7 +41,7 @@ type AtomicCheckHealthArgs struct {
 type AtomicCheckHealthResult struct {
 	types.BaseToolResponse
 	internal.BaseAIContextResult      // Embed AI context methods
-	Success             bool `json:"success"`
+	Success                      bool `json:"success"`
 
 	// Session context
 	SessionID     string `json:"session_id"`

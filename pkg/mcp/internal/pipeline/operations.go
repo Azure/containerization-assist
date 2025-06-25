@@ -9,9 +9,9 @@ import (
 	_ "github.com/Azure/container-copilot/pkg/docker"
 	_ "github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )

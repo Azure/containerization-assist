@@ -1,9 +1,9 @@
 package build
 
 import (
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"context"
 	"fmt"
+	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"strings"
 	"time"
 
@@ -44,7 +44,7 @@ type AtomicTagImageArgs struct {
 type AtomicTagImageResult struct {
 	types.BaseToolResponse
 	internal.BaseAIContextResult      // Embedded for AI context methods
-	Success             bool `json:"success"`
+	Success                      bool `json:"success"`
 
 	// Session context
 	SessionID    string `json:"session_id"`

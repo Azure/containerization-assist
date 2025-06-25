@@ -60,40 +60,11 @@ func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcptypes.ToolMe
 
 // RegisterAtomicTools registers all atomic tools that are ready for auto-registration
 func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.ToolRegistry) error {
-	// Tools that implement the unified interface properly
-	readyTools := map[string]func() interface{}{
-		"atomic_analyze_repository":  func() interface{} { return &AtomicAnalyzeRepositoryTool{} },
-		"atomic_build_image":         func() interface{} { return &AtomicBuildImageTool{} },
-		"atomic_check_health":        func() interface{} { return &AtomicCheckHealthTool{} },
-		"atomic_deploy_kubernetes":   func() interface{} { return &AtomicDeployKubernetesTool{} },
-		"atomic_generate_manifests":  func() interface{} { return &AtomicGenerateManifestsTool{} },
-		"atomic_pull_image":          func() interface{} { return &AtomicPullImageTool{} },
-		"atomic_push_image":          func() interface{} { return &AtomicPushImageTool{} },
-		"atomic_scan_image_security": func() interface{} { return &AtomicScanImageSecurityTool{} },
-		"atomic_scan_secrets":        func() interface{} { return &AtomicScanSecretsTool{} },
-		"atomic_tag_image":           func() interface{} { return &AtomicTagImageTool{} },
-		"atomic_validate_dockerfile": func() interface{} { return &AtomicValidateDockerfileTool{} },
-	}
-
-	registered := 0
-	for name, factory := range readyTools {
-		tool := factory()
-
-		// Try to register as unified Tool interface
-		if unifiedTool, ok := tool.(mcptypes.Tool); ok {
-			err := toolRegistry.Register(name, func() mcptypes.Tool { return unifiedTool })
-			if err != nil {
-				return fmt.Errorf("failed to register unified tool %s: %w", name, err)
-			}
-			registered++
-			fmt.Printf("🔧 Auto-registered unified tool: %s\n", name)
-		} else {
-			fmt.Printf("⏳ Tool %s not yet migrated to unified interface\n", name)
-		}
-	}
-
-	fmt.Printf("✅ Auto-registered %d atomic tools with zero boilerplate\n", registered)
-	return nil
+	// Since the actual tools need dependencies (PipelineOperations, SessionManager, Logger),
+	// we cannot instantiate them here without those dependencies.
+	// This auto-registration approach needs to be refactored to work with dependency injection.
+	// For now, return an error indicating this needs to be handled differently.
+	return fmt.Errorf("auto-registration not yet implemented for dependency-injected tools - use manual registration in gomcp_tools.go")
 }
 
 // GetReadyToolNames returns tools that are ready for auto-registration

@@ -12,8 +12,8 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
 	stdioutils "github.com/Azure/container-copilot/pkg/mcp/internal/transport/stdio"

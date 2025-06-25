@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

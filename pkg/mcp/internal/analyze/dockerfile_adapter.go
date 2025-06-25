@@ -22,7 +22,7 @@ func NewDockerfileAdapter(logger zerolog.Logger) *DockerfileAdapter {
 func (d *DockerfileAdapter) ValidateWithModules(ctx context.Context, dockerfileContent string, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	// Stub implementation - in production this would use the refactored modules
 	d.logger.Info().Msg("ValidateWithModules called - using stub implementation")
-	
+
 	// Return a basic validation result
 	return &AtomicValidateDockerfileResult{
 		BaseToolResponse: types.NewBaseResponse("validate_dockerfile", args.SessionID, args.DryRun),

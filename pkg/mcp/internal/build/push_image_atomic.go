@@ -37,7 +37,7 @@ type AtomicPushImageArgs struct {
 type AtomicPushImageResult struct {
 	types.BaseToolResponse
 	internal.BaseAIContextResult      // Embed AI context methods
-	Success             bool `json:"success"`
+	Success                      bool `json:"success"`
 
 	// Session context
 	SessionID    string `json:"session_id"`

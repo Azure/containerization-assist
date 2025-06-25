@@ -38,7 +38,7 @@ type AtomicBuildImageArgs struct {
 type AtomicBuildImageResult struct {
 	types.BaseToolResponse
 	internal.BaseAIContextResult      // Embedded for AI context methods
-	Success             bool `json:"success"`
+	Success                      bool `json:"success"`
 
 	// Session context
 	SessionID    string `json:"session_id"`
