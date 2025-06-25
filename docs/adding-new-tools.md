@@ -34,7 +34,14 @@ type Tool interface {
 
 ## Auto-Registration System
 
-Tools are automatically discovered and registered using Go's code generation features.
+The auto-registration system eliminates the need for manual tool registration by using build-time code generation. This provides automatic tool discovery and registration with zero boilerplate.
+
+### How It Works
+
+1. **Build-Time Discovery**: The registration generator scans the codebase for tool implementations
+2. **Automatic Registration**: Generated code registers all discovered tools at startup
+3. **Type Safety**: Full compile-time verification of interface implementation
+4. **Zero Boilerplate**: No manual registration or adapter code needed
 
 ### Step 1: Create Your Tool
 
@@ -44,33 +51,62 @@ Place your tool in the appropriate domain directory:
 - `pkg/mcp/internal/scan/` - Security scanning tools
 - `pkg/mcp/internal/analyze/` - Analysis tools
 
-### Step 2: Add Registration Marker
+### Step 2: Implement the Tool Interface
 
-Add a registration comment above your tool struct:
+Your tool struct name must end with "Tool" to be discovered:
 
 ```go
-//go:generate go run ../../tools/register-tools.go
+package build
 
-// MyNewTool performs specific functionality
-// +tool:name=my_new_tool
-// +tool:category=build
-// +tool:description=Does something useful
-type MyNewTool struct {
+type MyNewTool struct {  // ✓ Ends with "Tool"
     clients  *adapter.MCPClients
     logger   zerolog.Logger
+}
+
+// Implement all required methods
+func (t *MyNewTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+    // Implementation
+}
+
+func (t *MyNewTool) GetMetadata() mcptypes.ToolMetadata {
+    return mcptypes.ToolMetadata{
+        Name: "my_new",  // Will be registered as "my_new"
+        // ... metadata
+    }
+}
+
+func (t *MyNewTool) Validate(ctx context.Context, args interface{}) error {
+    // Validation
 }
 ```
 
 ### Step 3: Run Code Generation
 
 ```bash
+# Generate registration code
 go generate ./...
+
+# Or manually run the generator
+go run tools/register_tools.go
 ```
 
 This will automatically:
-- Discover your tool
-- Generate registration code
-- Update the tool registry
+- Scan all packages for tools
+- Validate interface implementation
+- Generate registration code in `pkg/mcp/internal/registry/generated.go`
+- Register tools with standardized names (e.g., `BuildImageTool` → `build_image`)
+
+### Tool Naming Convention
+
+Tool names are automatically derived from struct names:
+- `BuildImageTool` → `build_image`
+- `DeployKubernetesTool` → `deploy_kubernetes`
+- `ScanImageSecurityTool` → `scan_image_security`
+
+The conversion follows these rules:
+1. Remove "Tool" suffix
+2. Convert CamelCase to snake_case
+3. Lowercase all characters
 
 ## Domain-Specific Examples
 
@@ -707,10 +743,23 @@ func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, er
 
 If your tool isn't being discovered:
 
-1. Check the `+tool:` annotations are correct
-2. Ensure the tool implements the correct interface
-3. Run `go generate ./...` from the repository root
-4. Check for any generation errors
+1. **Check struct naming**: Ensure struct name ends with "Tool"
+2. **Verify location**: Tool must be in one of the domain directories
+3. **Run generation**: Execute `go generate ./...` from repository root
+4. **Check generated file**: Verify tool appears in `pkg/mcp/internal/registry/generated.go`
+5. **Build errors**: Run `go build ./...` to check for compilation issues
+
+Debug commands:
+```bash
+# List discovered tools
+go run tools/register_tools.go --list
+
+# Verify tool implementation
+go run tools/validate_tools.go
+
+# Check registration code
+cat pkg/mcp/internal/registry/generated.go | grep "my_tool"
+```
 
 ### Interface Compliance
 
@@ -721,11 +770,59 @@ Ensure your tool implements all required methods:
 var _ mcptypes.InternalTool = (*MyTool)(nil)
 ```
 
+Common interface issues:
+- Missing methods (Execute, GetMetadata, Validate)
+- Incorrect method signatures
+- Wrong return types
+
 ### Registration Conflicts
 
 If you get "tool already registered" errors:
-1. Ensure unique tool names
-2. Check for duplicate registrations
+1. Ensure unique tool names across all packages
+2. Check that tool names don't conflict after snake_case conversion
 3. Verify the auto-registration didn't run twice
+4. Look for manual registration of the same tool
+
+### Build Integration
+
+Add to your build process:
+
+```makefile
+# Makefile
+.PHONY: generate
+generate:
+	go generate ./...
+
+.PHONY: build
+build: generate
+	go build ./...
+```
+
+### Auto-Registration Validation
+
+Validate registration with this script:
+
+```bash
+#!/bin/bash
+# tools/validate_registration.sh
+
+echo "🔍 Validating auto-registration system..."
+
+# Generate registration
+go generate ./...
+
+# Check for compilation errors
+if go build ./...; then
+    echo "✅ Registration code compiles successfully"
+else
+    echo "❌ Registration code has compilation errors"
+    exit 1
+fi
+
+# Verify all tools are registered
+go run tools/test_auto_registration.go
+
+echo "✅ Auto-registration validation complete"
+```
 
 This completes the tool development guide with comprehensive examples for each domain and best practices for creating robust, well-integrated tools in the MCP system.

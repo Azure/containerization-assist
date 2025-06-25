@@ -2,7 +2,42 @@
 
 ## Overview
 
-The Container Kit MCP (Model Context Protocol) system has been reorganized around a unified interface pattern that provides both public and internal interfaces to handle import cycles while maintaining a clean, single source of truth for interface definitions.
+Container Kit is an AI-powered tool that automates application containerization and Kubernetes manifest generation. The MCP (Model Context Protocol) system has been reorganized around a unified interface pattern that provides both public and internal interfaces to handle import cycles while maintaining a clean, single source of truth for interface definitions.
+
+## Two-Mode Architecture
+
+Container Kit provides two distinct modes of operation:
+
+### 1. MCP Server (Primary) - Atomic + Conversational
+The MCP server is the modern, recommended approach with enhanced AI integration:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MCP Server                               │
+├─────────────────────────────────────────────────────────────┤
+│  Transport Layer (stdio/http)                              │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────────────────────┐   │
+│  │  Unified Tools  │  │    Conversation Mode           │   │
+│  │  (Auto-Reg)    │  │                                 │   │
+│  │                 │  │ • Chat Tool                     │   │
+│  │ Tool Interface  │  │ • Prompt Manager                │   │
+│  │ ├─analyze       │  │ • Session State                 │   │
+│  │ ├─build         │  │ • Observability                 │   │
+│  │ ├─deploy        │  │                                 │   │
+│  │ ├─scan          │  └─────────────────────────────────┘   │
+│  │ └─validate      │                                        │
+│  └─────────────────┘                                        │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐                  │
+│  │ Session Manager │  │ Workflow Orch   │                  │
+│  │ (Unified)       │  │ (Simplified)    │                  │
+│  └─────────────────┘  └─────────────────┘                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2. CLI Tool - Pipeline-Based (Legacy)
+The original CLI uses a three-stage iterative pipeline for direct execution.
 
 ## Unified Interface System
 

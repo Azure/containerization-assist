@@ -92,18 +92,34 @@ make help          # See all available targets
 
 ### Core Documentation
 - **[MCP Server Documentation](./MCP_DOCUMENTATION.md)** - Complete setup, tools, and usage guide
-- **[Architecture Overview](./ARCHITECTURE.md)** - Technical design and system architecture  
+- **[Architecture Overview](./docs/mcp-architecture.md)** - Unified interface architecture and system design
+- **[Interface Patterns](./docs/interface-patterns.md)** - Interface design patterns and dual-interface strategy
 - **[AI Integration Pattern](./docs/AI_INTEGRATION_PATTERN.md)** - AI integration guidelines and fixing capabilities
 
-### Development
+### Development Guides
 - **[Contributing Guide](./CONTRIBUTING.md)** - Development workflow and standards
+- **[Development Guidelines](./DEVELOPMENT_GUIDELINES.md)** - Coding standards and best practices
+- **[Adding New Tools](./docs/adding-new-tools.md)** - Comprehensive guide for tool development
+- **[Tool Standards](./docs/ATOMIC_TOOL_STANDARDS.md)** - Atomic tool design principles
 - **[Development Container](./.devcontainer/README.md)** - Instant development setup
-- **[Development Guide](./CLAUDE.md)** - Claude Code development guidance
-- **[Linting Strategy](./docs/LINTING.md)** - Code quality and error budget approach
+- **[Claude Code Guide](./CLAUDE.md)** - AI assistant development guidance
 
-### Operations
+### Migration & Breaking Changes
+- **[Migration Guide](./docs/migration-guide.md)** - v1 to v2 migration instructions
+- **[Breaking Changes](./docs/breaking-changes.md)** - Detailed list of breaking changes in v2.0
+- **[Legacy References](./docs/LEGACY_REFERENCES.md)** - Reference to legacy pipeline patterns
+
+### Quality & Operations
+- **[Linting Strategy](./docs/LINTING.md)** - Code quality and error budget approach
+- **[CI/CD Quality Gates](./docs/quality-ci-cd.md)** - Continuous integration and quality automation
 - **[Security Policy](./SECURITY.md)** - Security guidelines and vulnerability reporting
-- **[Support Guide](./SUPPORT.md)** - Getting help and troubleshooting
+
+### Tool Documentation
+- **[Logs Export Tool](./docs/logs-export-tool.md)** - Server log export capabilities
+- **[Telemetry Export Tool](./docs/telemetry-export-tool.md)** - Metrics and telemetry export
+
+### Examples
+- **[Code Examples](./examples/)** - Working examples of tool implementations and patterns
 
 ## 🏗️ Architecture
 
@@ -112,7 +128,7 @@ Container Kit provides two operation modes with different architectural approach
 - **MCP Server** (Primary): Atomic tools + conversational workflows with session persistence
 - **CLI Tool** (Legacy): Pipeline-based iterative refinement with AI integration
 
-> **📖 Complete Architecture Guide**: See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical design and system components.
+> **📖 Complete Architecture Guide**: See [Architecture Overview](./docs/mcp-architecture.md) for detailed technical design and unified interface system.
 
 ## 🛠️ Available Tools
 

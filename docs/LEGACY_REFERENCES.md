@@ -1,6 +1,8 @@
 # Legacy Implementation References
 
-When implementing missing functionality in the MCP module, consult these legacy pipeline components for patterns and implementation guidance:
+> **Note**: This document references the legacy pipeline implementation. The MCP system now uses the unified interface pattern described in [interface-patterns.md](interface-patterns.md) and [adding-new-tools.md](adding-new-tools.md).
+
+When implementing missing functionality or understanding historical patterns, these legacy pipeline components provide reference implementations:
 
 ## Docker Operations
 **Location**: `pkg/pipeline/dockerstage/`
