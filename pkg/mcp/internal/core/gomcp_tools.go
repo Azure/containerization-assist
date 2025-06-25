@@ -15,10 +15,11 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
+	mcpserver "github.com/Azure/container-copilot/pkg/mcp/internal/server"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/pkg/runner"
 	"github.com/localrivet/gomcp/server"
@@ -230,23 +231,23 @@ func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 // registerCoreTools registers essential core tools using standardized patterns
 func (gm *GomcpManager) registerCoreTools(deps *ToolDependencies) error {
 	// Create registrar for this function
-	registrar := tools.NewStandardToolRegistrar(gm.server, deps.Logger)
+	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
 	// Server health/status tool
-	tools.RegisterSimpleTool(registrar, "server_status",
+	runtime.RegisterSimpleTool(registrar, "server_status",
 		"[Advanced] Diagnostic tool for debugging server issues - not needed for normal operations",
 		func(ctx *server.Context, args *ServerStatusArgs) (*ServerStatusResult, error) {
 			return gm.handleServerStatus(deps, args)
 		})
 
 	// Session management tools
-	tools.RegisterSimpleTool(registrar, "list_sessions",
+	runtime.RegisterSimpleTool(registrar, "list_sessions",
 		"List all active containerization sessions with their metadata and status",
 		func(ctx *server.Context, args *SessionListArgs) (*SessionListResult, error) {
 			return gm.handleListSessions(deps, args)
 		})
 
-	tools.RegisterSimpleTool(registrar, "delete_session",
+	runtime.RegisterSimpleTool(registrar, "delete_session",
 		"Delete a containerization session and clean up its resources",
 		func(ctx *server.Context, args *SessionDeleteArgs) (*SessionDeleteResult, error) {
 			return gm.handleDeleteSession(deps, args)
@@ -258,7 +259,7 @@ func (gm *GomcpManager) registerCoreTools(deps *ToolDependencies) error {
 // registerAtomicTools registers containerization workflow tools via auto-registration
 func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	// Create registrar for this function
-	registrar := tools.NewStandardToolRegistrar(gm.server, deps.Logger)
+	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
 	// Create atomic tools and register them with the orchestrator's tool registry
 	atomicTools := map[string]interface{}{
@@ -348,7 +349,7 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	}
 
 	// Special validation tool that delegates to orchestrator with modified args
-	tools.RegisterSimpleTool(registrar, "validate_deployment",
+	runtime.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
 		func(ctx *server.Context, args *deploy.AtomicDeployKubernetesArgs) (*deploy.AtomicDeployKubernetesResult, error) {
 			// Set dry run mode for validation
@@ -375,10 +376,10 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 // registerUtilityTools registers utility and management tools using standardized patterns
 func (gm *GomcpManager) registerUtilityTools(deps *ToolDependencies) error {
 	// Create registrar for this function
-	registrar := tools.NewStandardToolRegistrar(gm.server, deps.Logger)
+	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
 	// Job management
-	tools.RegisterSimpleTool(registrar, "get_job_status",
+	runtime.RegisterSimpleTool(registrar, "get_job_status",
 		"Get the status of a running or completed job",
 		func(ctx *server.Context, args *JobStatusArgs) (*JobStatusResult, error) {
 			return gm.handleJobStatus(deps, args)
@@ -389,10 +390,10 @@ func (gm *GomcpManager) registerUtilityTools(deps *ToolDependencies) error {
 }
 
 // registerResources registers GoMCP resources for streaming access to logs and telemetry
-func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar, deps *ToolDependencies) error {
+func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) error {
 	// Logs Resource - provides streaming access to server logs
-	logProvider := tools.CreateGlobalLogProvider()
-	tools.RegisterResource(registrar, "logs/{level}", "Server logs filtered by level (trace, debug, info, warn, error)",
+	logProvider := mcpserver.CreateGlobalLogProvider()
+	runtime.RegisterResource(registrar, "logs/{level}", "Server logs filtered by level (trace, debug, info, warn, error)",
 		func(ctx *server.Context, args struct {
 			Level     string `path:"level"`
 			Pattern   string `json:"pattern,omitempty"`
@@ -401,7 +402,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 			Format    string `json:"format,omitempty"`
 		}) (interface{}, error) {
 			// Convert to tool args format for compatibility
-			toolArgs := tools.GetLogsArgs{
+			toolArgs := mcpserver.GetLogsArgs{
 				Level:     args.Level,
 				Pattern:   args.Pattern,
 				TimeRange: args.TimeRange,
@@ -420,7 +421,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				toolArgs.Limit = 100
 			}
 
-			logsTool := tools.NewGetLogsTool(
+			logsTool := mcpserver.NewGetLogsTool(
 				deps.Logger.With().Str("resource", "logs").Logger(),
 				logProvider,
 			)
@@ -428,14 +429,14 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 		})
 
 	// Simplified logs resource for direct access
-	tools.RegisterResource(registrar, "logs", "All server logs with default filtering",
+	runtime.RegisterResource(registrar, "logs", "All server logs with default filtering",
 		func(ctx *server.Context, args struct {
 			Pattern   string `json:"pattern,omitempty"`
 			TimeRange string `json:"time_range,omitempty"`
 			Limit     int    `json:"limit,omitempty"`
 			Format    string `json:"format,omitempty"`
 		}) (interface{}, error) {
-			toolArgs := tools.GetLogsArgs{
+			toolArgs := mcpserver.GetLogsArgs{
 				Level:     "info",
 				Pattern:   args.Pattern,
 				TimeRange: args.TimeRange,
@@ -450,7 +451,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				toolArgs.Limit = 100
 			}
 
-			logsTool := tools.NewGetLogsTool(
+			logsTool := mcpserver.NewGetLogsTool(
 				deps.Logger.With().Str("resource", "logs").Logger(),
 				logProvider,
 			)
@@ -461,40 +462,40 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 	sessionLabelManager := &sessionLabelManagerWrapper{sm: deps.SessionManager}
 
 	// Register session label tools using utility pattern
-	tools.RegisterSimpleTool(registrar, "add_session_label",
+	runtime.RegisterSimpleTool(registrar, "add_session_label",
 		"Add a label to a session for organization and filtering",
-		func(ctx *server.Context, args *tools.AddSessionLabelArgs) (*tools.AddSessionLabelResult, error) {
-			addLabelTool := tools.NewAddSessionLabelTool(
+		func(ctx *server.Context, args *sessiontypes.AddSessionLabelArgs) (*sessiontypes.AddSessionLabelResult, error) {
+			addLabelTool := sessiontypes.NewAddSessionLabelTool(
 				deps.Logger.With().Str("tool", "add_session_label").Logger(),
 				sessionLabelManager,
 			)
 			return addLabelTool.ExecuteTyped(context.Background(), *args)
 		})
 
-	tools.RegisterSimpleTool(registrar, "remove_session_label",
+	runtime.RegisterSimpleTool(registrar, "remove_session_label",
 		"Remove a label from a session",
-		func(ctx *server.Context, args *tools.RemoveSessionLabelArgs) (*tools.RemoveSessionLabelResult, error) {
-			removeLabelTool := tools.NewRemoveSessionLabelTool(
+		func(ctx *server.Context, args *sessiontypes.RemoveSessionLabelArgs) (*sessiontypes.RemoveSessionLabelResult, error) {
+			removeLabelTool := sessiontypes.NewRemoveSessionLabelTool(
 				deps.Logger.With().Str("tool", "remove_session_label").Logger(),
 				sessionLabelManager,
 			)
 			return removeLabelTool.ExecuteTyped(context.Background(), *args)
 		})
 
-	tools.RegisterSimpleTool(registrar, "update_session_labels",
+	runtime.RegisterSimpleTool(registrar, "update_session_labels",
 		"Update all labels on a session (replace existing labels)",
-		func(ctx *server.Context, args *tools.UpdateSessionLabelsArgs) (*tools.UpdateSessionLabelsResult, error) {
-			updateLabelsTool := tools.NewUpdateSessionLabelsTool(
+		func(ctx *server.Context, args *sessiontypes.UpdateSessionLabelsArgs) (*sessiontypes.UpdateSessionLabelsResult, error) {
+			updateLabelsTool := sessiontypes.NewUpdateSessionLabelsTool(
 				deps.Logger.With().Str("tool", "update_session_labels").Logger(),
 				sessionLabelManager,
 			)
 			return updateLabelsTool.ExecuteTyped(context.Background(), *args)
 		})
 
-	tools.RegisterSimpleTool(registrar, "list_session_labels",
+	runtime.RegisterSimpleTool(registrar, "list_session_labels",
 		"List all labels across sessions with optional usage statistics",
-		func(ctx *server.Context, args *tools.ListSessionLabelsArgs) (*tools.ListSessionLabelsResult, error) {
-			listLabelsTool := tools.NewListSessionLabelsTool(
+		func(ctx *server.Context, args *sessiontypes.ListSessionLabelsArgs) (*sessiontypes.ListSessionLabelsResult, error) {
+			listLabelsTool := sessiontypes.NewListSessionLabelsTool(
 				deps.Logger.With().Str("tool", "list_session_labels").Logger(),
 				sessionLabelManager,
 			)
@@ -506,7 +507,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 		deps.Server.conversationComponents != nil &&
 		deps.Server.conversationComponents.Telemetry != nil {
 
-		tools.RegisterResource(registrar, "telemetry/metrics", "Prometheus telemetry metrics from the MCP server",
+		runtime.RegisterResource(registrar, "telemetry/metrics", "Prometheus telemetry metrics from the MCP server",
 			func(ctx *server.Context, args struct {
 				Format       string   `json:"format,omitempty"`
 				MetricNames  []string `json:"metric_names,omitempty"`
@@ -514,7 +515,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				TimeRange    string   `json:"time_range,omitempty"`
 				IncludeEmpty bool     `json:"include_empty,omitempty"`
 			}) (interface{}, error) {
-				toolArgs := tools.GetTelemetryMetricsArgs{
+				toolArgs := mcpserver.GetTelemetryMetricsArgs{
 					Format:       args.Format,
 					MetricNames:  args.MetricNames,
 					IncludeHelp:  args.IncludeHelp,
@@ -526,7 +527,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 					toolArgs.Format = "prometheus"
 				}
 
-				telemetryTool := tools.NewGetTelemetryMetricsTool(
+				telemetryTool := mcpserver.NewGetTelemetryMetricsTool(
 					deps.Logger.With().Str("resource", "telemetry").Logger(),
 					deps.Server.conversationComponents.Telemetry,
 				)
@@ -534,14 +535,14 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 			})
 
 		// Metrics by specific name pattern
-		tools.RegisterResource(registrar, "telemetry/metrics/{name}", "Specific telemetry metric by name pattern",
+		runtime.RegisterResource(registrar, "telemetry/metrics/{name}", "Specific telemetry metric by name pattern",
 			func(ctx *server.Context, args struct {
 				Name         string `path:"name"`
 				Format       string `json:"format,omitempty"`
 				IncludeHelp  bool   `json:"include_help,omitempty"`
 				IncludeEmpty bool   `json:"include_empty,omitempty"`
 			}) (interface{}, error) {
-				toolArgs := tools.GetTelemetryMetricsArgs{
+				toolArgs := mcpserver.GetTelemetryMetricsArgs{
 					Format:       args.Format,
 					MetricNames:  []string{args.Name},
 					IncludeHelp:  args.IncludeHelp,
@@ -552,7 +553,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 					toolArgs.Format = "prometheus"
 				}
 
-				telemetryTool := tools.NewGetTelemetryMetricsTool(
+				telemetryTool := mcpserver.NewGetTelemetryMetricsTool(
 					deps.Logger.With().Str("resource", "telemetry").Logger(),
 					deps.Server.conversationComponents.Telemetry,
 				)
@@ -570,9 +571,9 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 	}
 
 	// Create registrar for this function
-	registrar := tools.NewStandardToolRegistrar(gm.server, deps.Logger)
+	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
-	tools.RegisterSimpleTool(registrar, "chat",
+	runtime.RegisterSimpleTool(registrar, "chat",
 		"Interact with the AI assistant for guided containerization workflow",
 		func(ctx *server.Context, args *ChatArgs) (*ChatResult, error) {
 			return gm.handleChat(deps, args)
@@ -581,7 +582,7 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 	return nil
 }
 
-// sessionLabelManagerWrapper adapts session.SessionManager to tools.SessionLabelManager interface
+// sessionLabelManagerWrapper adapts session.SessionManager to runtime.SessionLabelManager interface
 type sessionLabelManagerWrapper struct {
 	sm *session.SessionManager
 }
@@ -602,28 +603,28 @@ func (w *sessionLabelManagerWrapper) GetAllLabels() []string {
 	return w.sm.GetAllLabels()
 }
 
-func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (tools.SessionLabelData, error) {
+func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.SessionLabelData, error) {
 	sessionInterface, err := w.sm.GetSession(sessionID)
 	if err != nil {
-		return tools.SessionLabelData{}, err
+		return sessiontypes.SessionLabelData{}, err
 	}
 
 	session, ok := sessionInterface.(*sessiontypes.SessionState)
 	if !ok {
-		return tools.SessionLabelData{}, fmt.Errorf("unexpected session type")
+		return sessiontypes.SessionLabelData{}, fmt.Errorf("unexpected session type")
 	}
 
-	return tools.SessionLabelData{
+	return sessiontypes.SessionLabelData{
 		SessionID: session.SessionID,
 		Labels:    session.Labels,
 	}, nil
 }
 
-func (w *sessionLabelManagerWrapper) ListSessions() []tools.SessionLabelData {
+func (w *sessionLabelManagerWrapper) ListSessions() []sessiontypes.SessionLabelData {
 	summaries := w.sm.ListSessionSummaries()
-	result := make([]tools.SessionLabelData, len(summaries))
+	result := make([]sessiontypes.SessionLabelData, len(summaries))
 	for i, summary := range summaries {
-		result[i] = tools.SessionLabelData{
+		result[i] = sessiontypes.SessionLabelData{
 			SessionID: summary.SessionID,
 			Labels:    summary.Labels,
 		}
@@ -632,7 +633,7 @@ func (w *sessionLabelManagerWrapper) ListSessions() []tools.SessionLabelData {
 }
 
 // registerOrchestratorTool creates a GoMCP handler that delegates to the orchestrator
-func (gm *GomcpManager) registerOrchestratorTool(registrar *tools.StandardToolRegistrar, toolName, atomicToolName, description string, deps *ToolDependencies) {
+func (gm *GomcpManager) registerOrchestratorTool(registrar *runtime.StandardToolRegistrar, toolName, atomicToolName, description string, deps *ToolDependencies) {
 	deps.Logger.Debug().
 		Str("tool", toolName).
 		Str("atomic_tool", atomicToolName).

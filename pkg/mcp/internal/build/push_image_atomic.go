@@ -698,8 +698,10 @@ func (t *AtomicPushImageTool) updateSessionState(session *sessiontypes.SessionSt
 	session.UpdateLastAccessed()
 
 	// UpdateSession expects typed function for updateFunc
-	updateFunc := func(s *sessiontypes.SessionState) {
-		*s = *session
+	updateFunc := func(s interface{}) {
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			*state = *session
+		}
 	}
 	return t.sessionManager.UpdateSession(session.SessionID, updateFunc)
 }

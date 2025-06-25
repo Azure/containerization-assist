@@ -146,7 +146,7 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*session
 }
 
 // UpdateSession updates a session and persists the changes
-func (sm *SessionManager) UpdateSession(sessionID string, updater func(*sessiontypes.SessionState)) error {
+func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -298,8 +298,10 @@ func (sm *SessionManager) GetOrCreateSessionFromRepo(repoURL string) (interface{
 	}
 
 	// Update the session with repo URL
-	err = sm.UpdateSession(session.SessionID, func(s *sessiontypes.SessionState) {
-		s.RepoURL = repoURL
+	err = sm.UpdateSession(session.SessionID, func(s interface{}) {
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			state.RepoURL = repoURL
+		}
 	})
 	if err != nil {
 		return nil, err
@@ -428,22 +430,28 @@ func (sm *SessionManager) Stop() error {
 
 // AddSessionLabel adds a label to a session
 func (sm *SessionManager) AddSessionLabel(sessionID, label string) error {
-	return sm.UpdateSession(sessionID, func(session *sessiontypes.SessionState) {
-		session.AddLabel(label)
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*sessiontypes.SessionState); ok {
+			session.AddLabel(label)
+		}
 	})
 }
 
 // RemoveSessionLabel removes a label from a session
 func (sm *SessionManager) RemoveSessionLabel(sessionID, label string) error {
-	return sm.UpdateSession(sessionID, func(session *sessiontypes.SessionState) {
-		session.RemoveLabel(label)
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*sessiontypes.SessionState); ok {
+			session.RemoveLabel(label)
+		}
 	})
 }
 
 // SetSessionLabels replaces all labels for a session
 func (sm *SessionManager) SetSessionLabels(sessionID string, labels []string) error {
-	return sm.UpdateSession(sessionID, func(session *sessiontypes.SessionState) {
-		session.SetLabels(labels)
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*sessiontypes.SessionState); ok {
+			session.SetLabels(labels)
+		}
 	})
 }
 

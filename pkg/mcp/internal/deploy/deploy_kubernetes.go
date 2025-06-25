@@ -1025,7 +1025,11 @@ func (t *AtomicDeployKubernetesTool) updateSessionState(session *sessiontypes.Se
 
 	session.UpdateLastAccessed()
 
-	return t.sessionManager.UpdateSession(session.SessionID, func(s *sessiontypes.SessionState) { *s = *session })
+	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			*state = *session
+		}
+	})
 }
 
 // Error handling methods

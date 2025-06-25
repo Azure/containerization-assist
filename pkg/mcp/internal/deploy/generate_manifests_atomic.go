@@ -522,8 +522,10 @@ func (t *AtomicGenerateManifestsTool) updateSessionState(session *sessiontypes.S
 
 	session.UpdateLastAccessed()
 
-	return t.sessionManager.UpdateSession(session.SessionID, func(s *sessiontypes.SessionState) {
-		*s = *session
+	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			*state = *session
+		}
 	})
 }
 
@@ -1227,7 +1229,7 @@ func (m *mockSessionManager) GetOrCreateSession(repoURL string) (interface{}, er
 	}, nil
 }
 
-func (m *mockSessionManager) UpdateSession(sessionID string, updateFunc func(*sessiontypes.SessionState)) error {
+func (m *mockSessionManager) UpdateSession(sessionID string, updateFunc func(interface{})) error {
 	// Mock implementation
 	return nil
 }

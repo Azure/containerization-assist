@@ -37,15 +37,19 @@ func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 		if sess.SessionID == "" {
 			return fmt.Errorf("session ID is required for updates")
 		}
-		return s.sessionManager.UpdateSession(sess.SessionID, func(existing *sessiontypes.SessionState) {
-			*existing = *sess
+		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
+			if state, ok := existing.(*sessiontypes.SessionState); ok {
+				*state = *sess
+			}
 		})
 	case sessiontypes.SessionState:
 		if sess.SessionID == "" {
 			return fmt.Errorf("session ID is required for updates")
 		}
-		return s.sessionManager.UpdateSession(sess.SessionID, func(existing *sessiontypes.SessionState) {
-			*existing = sess
+		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
+			if state, ok := existing.(*sessiontypes.SessionState); ok {
+				*state = sess
+			}
 		})
 	default:
 		// If we can't convert, just succeed silently to maintain compatibility

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools/base"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -18,7 +18,7 @@ import (
 // ValidationService provides centralized validation functionality
 type ValidationService struct {
 	logger     zerolog.Logger
-	validators map[string]base.Validator
+	validators map[string]runtime.Validator
 	schemas    map[string]interface{}
 }
 
@@ -26,13 +26,13 @@ type ValidationService struct {
 func NewValidationService(logger zerolog.Logger) *ValidationService {
 	return &ValidationService{
 		logger:     logger.With().Str("service", "validation").Logger(),
-		validators: make(map[string]base.Validator),
+		validators: make(map[string]runtime.Validator),
 		schemas:    make(map[string]interface{}),
 	}
 }
 
 // RegisterValidator registers a validator with the service
-func (s *ValidationService) RegisterValidator(name string, validator base.Validator) {
+func (s *ValidationService) RegisterValidator(name string, validator runtime.Validator) {
 	s.validators[name] = validator
 	s.logger.Debug().Str("validator", name).Msg("Validator registered")
 }
@@ -44,8 +44,8 @@ func (s *ValidationService) RegisterSchema(name string, schema interface{}) {
 }
 
 // ValidateSessionID validates a session ID
-func (s *ValidationService) ValidateSessionID(sessionID string) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateSessionID(sessionID string) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	if sessionID == "" {
 		errors.AddField("session_id", "Session ID is required")
@@ -66,8 +66,8 @@ func (s *ValidationService) ValidateSessionID(sessionID string) *base.Validation
 }
 
 // ValidateImageReference validates a Docker image reference
-func (s *ValidationService) ValidateImageReference(imageRef string) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateImageReference(imageRef string) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	if imageRef == "" {
 		errors.AddField("image_ref", "Image reference is required")
@@ -97,8 +97,8 @@ func (s *ValidationService) ValidateImageReference(imageRef string) *base.Valida
 }
 
 // ValidateFilePath validates a file path exists and is accessible
-func (s *ValidationService) ValidateFilePath(path string, mustExist bool) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateFilePath(path string, mustExist bool) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	if path == "" {
 		errors.AddField("file_path", "File path is required")
@@ -133,8 +133,8 @@ func (s *ValidationService) ValidateFilePath(path string, mustExist bool) *base.
 }
 
 // ValidateJSON validates JSON content against a schema
-func (s *ValidationService) ValidateJSON(content []byte, schemaName string) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateJSON(content []byte, schemaName string) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	// Basic JSON validation
 	var data interface{}
@@ -154,8 +154,8 @@ func (s *ValidationService) ValidateJSON(content []byte, schemaName string) *bas
 }
 
 // ValidateYAML validates YAML content
-func (s *ValidationService) ValidateYAML(content []byte) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateYAML(content []byte) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	var data interface{}
 	if err := yaml.Unmarshal(content, &data); err != nil {
@@ -166,8 +166,8 @@ func (s *ValidationService) ValidateYAML(content []byte) *base.ValidationErrorSe
 }
 
 // ValidateResourceLimits validates CPU and memory resource specifications
-func (s *ValidationService) ValidateResourceLimits(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateResourceLimits(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	// Validate CPU request
 	if cpuRequest != "" {
@@ -218,8 +218,8 @@ func (s *ValidationService) ValidateResourceLimits(cpuRequest, memoryRequest, cp
 }
 
 // ValidateNamespace validates a Kubernetes namespace name
-func (s *ValidationService) ValidateNamespace(namespace string) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateNamespace(namespace string) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	if namespace == "" {
 		return errors // Empty namespace is allowed (defaults to "default")
@@ -253,8 +253,8 @@ func (s *ValidationService) ValidateNamespace(namespace string) *base.Validation
 }
 
 // ValidateEnvironmentVariables validates environment variable names and values
-func (s *ValidationService) ValidateEnvironmentVariables(envVars map[string]string) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidateEnvironmentVariables(envVars map[string]string) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	for name, value := range envVars {
 		// Validate variable name
@@ -277,8 +277,8 @@ func (s *ValidationService) ValidateEnvironmentVariables(envVars map[string]stri
 }
 
 // ValidatePort validates a port number
-func (s *ValidationService) ValidatePort(port int) *base.ValidationErrorSet {
-	errors := base.NewValidationErrorSet()
+func (s *ValidationService) ValidatePort(port int) *runtime.ValidationErrorSet {
+	errors := runtime.NewValidationErrorSet()
 
 	if port < 1 || port > 65535 {
 		errors.AddField("port", "Port must be between 1 and 65535")
@@ -296,7 +296,7 @@ func (s *ValidationService) ValidatePort(port int) *base.ValidationErrorSet {
 func (s *ValidationService) BatchValidate(ctx context.Context, items []ValidationItem) *BatchValidationResult {
 	result := &BatchValidationResult{
 		TotalItems: len(items),
-		Results:    make(map[string]*base.ValidationResult),
+		Results:    make(map[string]*runtime.ValidationResult),
 		StartTime:  time.Now(),
 	}
 
@@ -398,7 +398,7 @@ type ValidationItem struct {
 	ID            string
 	ValidatorName string
 	Data          interface{}
-	Options       base.ValidationOptions
+	Options       runtime.ValidationOptions
 }
 
 // BatchValidationResult represents the result of batch validation
@@ -406,7 +406,7 @@ type BatchValidationResult struct {
 	TotalItems   int
 	ValidItems   int
 	InvalidItems int
-	Results      map[string]*base.ValidationResult
+	Results      map[string]*runtime.ValidationResult
 	StartTime    time.Time
 	Duration     time.Duration
 }

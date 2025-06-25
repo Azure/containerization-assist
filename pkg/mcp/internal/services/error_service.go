@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools/base"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/rs/zerolog"
 )
 
@@ -92,7 +92,7 @@ func (s *ErrorService) HandleError(ctx context.Context, err error, context Error
 // enrichError enriches an error with additional context
 func (s *ErrorService) enrichError(err error, context ErrorContext) error {
 	// If it's already a ToolError, add context
-	if toolErr, ok := err.(*base.ToolError); ok {
+	if toolErr, ok := err.(*runtime.ToolError); ok {
 		toolErr.Context.Tool = context.Tool
 		toolErr.Context.Operation = context.Operation
 		toolErr.Context.Stage = context.Stage
@@ -107,7 +107,7 @@ func (s *ErrorService) enrichError(err error, context ErrorContext) error {
 	}
 
 	// Wrap as ToolError
-	return base.NewErrorBuilder("WRAPPED_ERROR", err.Error()).
+	return runtime.NewErrorBuilder("WRAPPED_ERROR", err.Error()).
 		WithCause(err).
 		WithTool(context.Tool).
 		WithOperation(context.Operation).
@@ -222,7 +222,7 @@ func (a *ErrorAggregator) GetSummary() ErrorSummary {
 		summary.ByTool[record.Context.Tool]++
 
 		// Count by severity and type if it's a ToolError
-		if toolErr, ok := record.Error.(*base.ToolError); ok {
+		if toolErr, ok := record.Error.(*runtime.ToolError); ok {
 			summary.BySeverity[string(toolErr.Severity)]++
 			summary.ByType[string(toolErr.Type)]++
 		} else {
@@ -330,18 +330,18 @@ func NewLoggingErrorHandler(logger zerolog.Logger) *LoggingErrorHandler {
 
 // Handle logs the error
 func (h *LoggingErrorHandler) Handle(ctx context.Context, err error, context ErrorContext) error {
-	if toolErr, ok := err.(*base.ToolError); ok {
+	if toolErr, ok := err.(*runtime.ToolError); ok {
 		// Log with appropriate level based on severity
 		event := h.logger.Error()
 
 		switch toolErr.Severity {
-		case base.SeverityCritical:
+		case runtime.SeverityCritical:
 			event = h.logger.Error()
-		case base.SeverityHigh:
+		case runtime.SeverityHigh:
 			event = h.logger.Error()
-		case base.SeverityMedium:
+		case runtime.SeverityMedium:
 			event = h.logger.Warn()
-		case base.SeverityLow:
+		case runtime.SeverityLow:
 			event = h.logger.Info()
 		}
 
@@ -369,14 +369,14 @@ func (h *LoggingErrorHandler) Handle(ctx context.Context, err error, context Err
 // RetryableErrorHandler determines if errors are retryable
 type RetryableErrorHandler struct {
 	logger  zerolog.Logger
-	handler *base.ErrorHandler
+	handler *runtime.ErrorHandler
 }
 
 // NewRetryableErrorHandler creates a new retryable error handler
 func NewRetryableErrorHandler(logger zerolog.Logger) *RetryableErrorHandler {
 	return &RetryableErrorHandler{
 		logger:  logger.With().Str("handler", "retryable").Logger(),
-		handler: base.NewErrorHandler(logger),
+		handler: runtime.NewErrorHandler(logger),
 	}
 }
 

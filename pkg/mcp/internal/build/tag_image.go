@@ -349,8 +349,10 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 	session.UpdateLastAccessed()
 
 	// Save session state
-	return t.sessionManager.UpdateSession(session.SessionID, func(s *sessiontypes.SessionState) {
-		*s = *session
+	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			*state = *session
+		}
 	})
 }
 

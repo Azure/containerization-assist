@@ -3,8 +3,6 @@ package types
 import (
 	"context"
 	"time"
-
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 )
 
 // This file contains interface types to avoid circular imports
@@ -556,7 +554,7 @@ type ToolSessionManager interface {
 	GetSessionInterface(sessionID string) (interface{}, error)
 	GetOrCreateSession(sessionID string) (interface{}, error)
 	GetOrCreateSessionFromRepo(repoURL string) (interface{}, error)
-	UpdateSession(sessionID string, updateFunc func(*sessiontypes.SessionState)) error
+	UpdateSession(sessionID string, updateFunc func(interface{})) error
 	DeleteSession(ctx context.Context, sessionID string) error
 
 	// Session listing and searching

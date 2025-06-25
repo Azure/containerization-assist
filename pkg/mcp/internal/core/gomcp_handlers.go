@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 
@@ -237,8 +237,8 @@ func (gm *GomcpManager) handleChat(deps *ToolDependencies, args *ChatArgs) (*Cha
 	// Use the concrete conversation handler directly
 	handler := deps.Server.conversationComponents.Handler
 
-	// Convert ChatArgs to tools.ChatToolArgs
-	toolArgs := tools.ChatToolArgs{
+	// Convert ChatArgs to runtime.ChatToolArgs
+	toolArgs := runtime.ChatToolArgs{
 		Message:   args.Message,
 		SessionID: args.SessionID,
 	}
@@ -256,7 +256,7 @@ func (gm *GomcpManager) handleChat(deps *ToolDependencies, args *ChatArgs) (*Cha
 		}, nil
 	}
 
-	// Convert tools.ChatToolResult back to ChatResult
+	// Convert runtime.ChatToolResult back to ChatResult
 	response := result.Message
 	if !result.Success {
 		response = fmt.Sprintf("Conversation processing failed: %s", result.Message)

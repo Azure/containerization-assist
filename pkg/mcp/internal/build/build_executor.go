@@ -531,8 +531,10 @@ func (e *BuildExecutorService) updateSessionState(session *sessiontypes.SessionS
 
 	session.UpdateLastAccessed()
 
-	return e.sessionManager.UpdateSession(session.SessionID, func(s *sessiontypes.SessionState) {
-		*s = *session
+	return e.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			*state = *session
+		}
 	})
 }
 

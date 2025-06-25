@@ -156,8 +156,10 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 		state.RepoAnalysis["_context"] = state.Context
 
 		// Save session to persist the context
-		if err := pm.sessionManager.UpdateSession(state.SessionID, func(s *sessiontypes.SessionState) {
-			s.RepoAnalysis = state.RepoAnalysis
+		if err := pm.sessionManager.UpdateSession(state.SessionID, func(s interface{}) {
+			if sessionState, ok := s.(*sessiontypes.SessionState); ok {
+				sessionState.RepoAnalysis = state.RepoAnalysis
+			}
 		}); err != nil {
 			pm.logger.Warn().Err(err).Msg("Failed to save session after pre-flight checks")
 		}

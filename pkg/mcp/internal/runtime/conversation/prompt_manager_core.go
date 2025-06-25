@@ -162,9 +162,11 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	convState.AddConversationTurn(turn)
 
 	// Update session
-	err = pm.sessionManager.UpdateSession(sessionID, func(s *sessiontypes.SessionState) {
-		// Copy conversation state back
-		*s = *convState.SessionState
+	err = pm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
+		if state, ok := s.(*sessiontypes.SessionState); ok {
+			// Copy conversation state back
+			*state = *convState.SessionState
+		}
 	})
 	if err != nil {
 		pm.logger.Warn().Err(err).Msg("Failed to update session")

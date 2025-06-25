@@ -62,7 +62,11 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 		return fmt.Errorf("session ID is required")
 	}
 
-	return o.sessionManager.UpdateSession(sessionID, func(state *sessiontypes.SessionState) {
+	return o.sessionManager.UpdateSession(sessionID, func(s interface{}) {
+		state, ok := s.(*sessiontypes.SessionState)
+		if !ok {
+			return
+		}
 		// Update session based on result type
 		switch r := result.(type) {
 		case *mcptypes.BuildResult:

@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
