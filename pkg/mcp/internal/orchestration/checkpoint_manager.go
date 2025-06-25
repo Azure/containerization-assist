@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
@@ -87,12 +89,12 @@ func (cm *BoltCheckpointManager) compressData(data []byte) ([]byte, bool, error)
 
 	_, err := gzWriter.Write(data)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to write to gzip writer: %w", err)
+		return nil, false, types.NewRichError("GZIP_WRITE_FAILED", fmt.Sprintf("failed to write to gzip writer: %v", err), "compression_error")
 	}
 
 	err = gzWriter.Close()
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to close gzip writer: %w", err)
+		return nil, false, types.NewRichError("GZIP_CLOSE_FAILED", fmt.Sprintf("failed to close gzip writer: %v", err), "compression_error")
 	}
 
 	compressed := buf.Bytes()
@@ -123,13 +125,13 @@ func (cm *BoltCheckpointManager) decompressData(data []byte, isCompressed bool) 
 
 	gzReader, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		return nil, types.NewRichError("GZIP_READER_CREATION_FAILED", fmt.Sprintf("failed to create gzip reader: %v", err), "compression_error")
 	}
 	defer gzReader.Close()
 
 	decompressed, err := io.ReadAll(gzReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decompress data: %w", err)
+		return nil, types.NewRichError("DECOMPRESSION_FAILED", fmt.Sprintf("failed to decompress data: %v", err), "compression_error")
 	}
 
 	return decompressed, nil
@@ -153,7 +155,7 @@ func (cm *BoltCheckpointManager) verifyChecksum(data []byte, expectedChecksum st
 
 	actualChecksum := cm.calculateChecksum(data)
 	if actualChecksum != expectedChecksum {
-		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
+		return types.NewRichError("CHECKSUM_MISMATCH", fmt.Sprintf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum), "integrity_error")
 	}
 
 	return nil
@@ -195,19 +197,19 @@ func (cm *BoltCheckpointManager) CreateCheckpoint(
 	err := cm.db.Update(func(tx *bbolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(checkpointsBucket))
 		if err != nil {
-			return fmt.Errorf("failed to create checkpoints bucket: %w", err)
+			return types.NewRichError("CHECKPOINT_BUCKET_CREATION_FAILED", fmt.Sprintf("failed to create checkpoints bucket: %v", err), "database_error")
 		}
 
 		// Marshal checkpoint data
 		checkpointData, err := json.Marshal(checkpoint)
 		if err != nil {
-			return fmt.Errorf("failed to marshal checkpoint: %w", err)
+			return types.NewRichError("CHECKPOINT_MARSHAL_FAILED", fmt.Sprintf("failed to marshal checkpoint: %v", err), "serialization_error")
 		}
 
 		// Compress data if enabled
 		compressedData, isCompressed, err := cm.compressData(checkpointData)
 		if err != nil {
-			return fmt.Errorf("failed to compress checkpoint data: %w", err)
+			return types.NewRichError("CHECKPOINT_COMPRESSION_FAILED", fmt.Sprintf("failed to compress checkpoint data: %v", err), "compression_error")
 		}
 
 		// Calculate checksum for integrity
@@ -232,7 +234,7 @@ func (cm *BoltCheckpointManager) CreateCheckpoint(
 		// Marshal envelope
 		envelopeData, err := json.Marshal(envelope)
 		if err != nil {
-			return fmt.Errorf("failed to marshal checkpoint envelope: %w", err)
+			return types.NewRichError("CHECKPOINT_ENVELOPE_MARSHAL_FAILED", fmt.Sprintf("failed to marshal checkpoint envelope: %v", err), "serialization_error")
 		}
 
 		// Use composite key: sessionID_checkpointID for easy querying
@@ -241,7 +243,7 @@ func (cm *BoltCheckpointManager) CreateCheckpoint(
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to store checkpoint: %w", err)
+		return nil, types.NewRichError("CHECKPOINT_STORAGE_FAILED", fmt.Sprintf("failed to store checkpoint: %v", err), "database_error")
 	}
 
 	cm.logger.Info().
@@ -288,19 +290,19 @@ func (cm *BoltCheckpointManager) CreateIncrementalCheckpoint(
 	err = cm.db.Update(func(tx *bbolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(checkpointsBucket))
 		if err != nil {
-			return fmt.Errorf("failed to create checkpoints bucket: %w", err)
+			return types.NewRichError("CHECKPOINT_BUCKET_CREATION_FAILED", fmt.Sprintf("failed to create checkpoints bucket: %v", err), "database_error")
 		}
 
 		// Marshal checkpoint data
 		checkpointData, err := json.Marshal(deltaCheckpoint)
 		if err != nil {
-			return fmt.Errorf("failed to marshal incremental checkpoint: %w", err)
+			return types.NewRichError("INCREMENTAL_CHECKPOINT_MARSHAL_FAILED", fmt.Sprintf("failed to marshal incremental checkpoint: %v", err), "serialization_error")
 		}
 
 		// Compress data if enabled
 		compressedData, isCompressed, err := cm.compressData(checkpointData)
 		if err != nil {
-			return fmt.Errorf("failed to compress incremental checkpoint data: %w", err)
+			return types.NewRichError("INCREMENTAL_CHECKPOINT_COMPRESSION_FAILED", fmt.Sprintf("failed to compress incremental checkpoint data: %v", err), "compression_error")
 		}
 
 		// Calculate checksum for integrity
@@ -327,7 +329,7 @@ func (cm *BoltCheckpointManager) CreateIncrementalCheckpoint(
 		// Marshal envelope
 		envelopeData, err := json.Marshal(envelope)
 		if err != nil {
-			return fmt.Errorf("failed to marshal incremental checkpoint envelope: %w", err)
+			return types.NewRichError("INCREMENTAL_CHECKPOINT_ENVELOPE_MARSHAL_FAILED", fmt.Sprintf("failed to marshal incremental checkpoint envelope: %v", err), "serialization_error")
 		}
 
 		// Use composite key: sessionID_checkpointID for easy querying
@@ -336,7 +338,7 @@ func (cm *BoltCheckpointManager) CreateIncrementalCheckpoint(
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to store incremental checkpoint: %w", err)
+		return nil, types.NewRichError("INCREMENTAL_CHECKPOINT_STORAGE_FAILED", fmt.Sprintf("failed to store incremental checkpoint: %v", err), "database_error")
 	}
 
 	cm.logger.Info().
@@ -439,13 +441,13 @@ func (cm *BoltCheckpointManager) RestoreFromCheckpoint(
 	err := cm.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(checkpointsBucket))
 		if bucket == nil {
-			return fmt.Errorf("checkpoints bucket not found")
+			return types.NewRichError("CHECKPOINTS_BUCKET_NOT_FOUND", "checkpoints bucket not found", "database_error")
 		}
 
 		key := fmt.Sprintf("%s_%s", sessionID, checkpointID)
 		envelopeData := bucket.Get([]byte(key))
 		if envelopeData == nil {
-			return fmt.Errorf("checkpoint not found: %s", checkpointID)
+			return types.NewRichError("CHECKPOINT_NOT_FOUND", fmt.Sprintf("checkpoint not found: %s", checkpointID), "database_error")
 		}
 
 		// Try to unmarshal as envelope first (new format)
@@ -454,7 +456,7 @@ func (cm *BoltCheckpointManager) RestoreFromCheckpoint(
 			// New envelope format - decompress and verify integrity
 			decompressedData, err := cm.decompressData(envelope.Data, envelope.Compressed)
 			if err != nil {
-				return fmt.Errorf("failed to decompress checkpoint data: %w", err)
+				return types.NewRichError("CHECKPOINT_DECOMPRESSION_FAILED", fmt.Sprintf("failed to decompress checkpoint data: %v", err), "compression_error")
 			}
 
 			// Verify checksum if integrity is enabled
@@ -485,7 +487,7 @@ func (cm *BoltCheckpointManager) RestoreFromCheckpoint(
 	// Reconstruct session from checkpoint
 	session, err := cm.reconstructSession(checkpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to reconstruct session from checkpoint: %w", err)
+		return nil, types.NewRichError("SESSION_RECONSTRUCTION_FAILED", fmt.Sprintf("failed to reconstruct session from checkpoint: %v", err), "workflow_error")
 	}
 
 	cm.logger.Info().
@@ -527,7 +529,7 @@ func (cm *BoltCheckpointManager) ListCheckpoints(sessionID string) ([]*WorkflowC
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to list checkpoints: %w", err)
+		return nil, types.NewRichError("CHECKPOINT_LIST_FAILED", fmt.Sprintf("failed to list checkpoints: %v", err), "database_error")
 	}
 
 	// Sort checkpoints by timestamp (newest first)
@@ -554,7 +556,7 @@ func (cm *BoltCheckpointManager) DeleteCheckpoint(checkpointID string) error {
 	err := cm.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(checkpointsBucket))
 		if bucket == nil {
-			return fmt.Errorf("checkpoints bucket not found")
+			return types.NewRichError("CHECKPOINTS_BUCKET_NOT_FOUND", "checkpoints bucket not found", "database_error")
 		}
 
 		// Find the checkpoint by scanning all keys
@@ -567,11 +569,11 @@ func (cm *BoltCheckpointManager) DeleteCheckpoint(checkpointID string) error {
 			}
 		}
 
-		return fmt.Errorf("checkpoint not found: %s", checkpointID)
+		return types.NewRichError("CHECKPOINT_NOT_FOUND", fmt.Sprintf("checkpoint not found: %s", checkpointID), "database_error")
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to delete checkpoint: %w", err)
+		return types.NewRichError("CHECKPOINT_DELETE_FAILED", fmt.Sprintf("failed to delete checkpoint: %v", err), "database_error")
 	}
 
 	cm.logger.Info().
@@ -611,7 +613,7 @@ func (cm *BoltCheckpointManager) DeleteSessionCheckpoints(sessionID string) erro
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to delete session checkpoints: %w", err)
+		return types.NewRichError("SESSION_CHECKPOINTS_DELETE_FAILED", fmt.Sprintf("failed to delete session checkpoints: %v", err), "database_error")
 	}
 
 	cm.logger.Info().
@@ -650,7 +652,7 @@ func (cm *BoltCheckpointManager) CleanupExpiredCheckpoints(maxAge time.Duration)
 	})
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to find expired checkpoints: %w", err)
+		return 0, types.NewRichError("EXPIRED_CHECKPOINTS_FIND_FAILED", fmt.Sprintf("failed to find expired checkpoints: %v", err), "database_error")
 	}
 
 	// Delete expired checkpoints
@@ -676,7 +678,7 @@ func (cm *BoltCheckpointManager) CleanupExpiredCheckpoints(maxAge time.Duration)
 	})
 
 	if err != nil {
-		return deletedCount, fmt.Errorf("failed to delete expired checkpoints: %w", err)
+		return deletedCount, types.NewRichError("EXPIRED_CHECKPOINTS_DELETE_FAILED", fmt.Sprintf("failed to delete expired checkpoints: %v", err), "database_error")
 	}
 
 	cm.logger.Info().
@@ -695,7 +697,7 @@ func (cm *BoltCheckpointManager) GetLatestCheckpoint(sessionID string) (*Workflo
 	}
 
 	if len(checkpoints) == 0 {
-		return nil, fmt.Errorf("no checkpoints found for session: %s", sessionID)
+		return nil, types.NewRichError("NO_CHECKPOINTS_FOUND", fmt.Sprintf("no checkpoints found for session: %s", sessionID), "database_error")
 	}
 
 	// Checkpoints are already sorted by timestamp (newest first)
@@ -743,7 +745,7 @@ func (cm *BoltCheckpointManager) GetCheckpointMetrics() (*CheckpointMetrics, err
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get checkpoint metrics: %w", err)
+		return nil, types.NewRichError("CHECKPOINT_METRICS_FAILED", fmt.Sprintf("failed to get checkpoint metrics: %v", err), "database_error")
 	}
 
 	return metrics, nil
