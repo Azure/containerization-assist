@@ -217,6 +217,24 @@ func generatePlaceholderValue(secretType string) string
 3. **Phase 3** (6 months): Remove deprecated code
 4. **Phase 4** (9 months): Remove compatibility layers
 
+## Critical Implementation Notes
+
+### AI Integration Requirements
+**Location**: Legacy pipeline stages
+- `pkg/pipeline/dockerstage/dockerstage.go:272`: Critical formatting requirement for AI-generated Dockerfile fixes
+- `pkg/pipeline/repoanalysisstage/repoanalysisstage.go:130`: Must actively use tools for repository analysis
+- `pkg/pipeline/manifeststage/manifeststage.go:84`: Must NOT change app names or container image names
+
+### Interface Migration Notes
+**Location**: Multiple MCP files
+- `pkg/mcp/types/interfaces.go`: Extensive notes about interface consolidation
+- Multiple files referencing moved interfaces from `types/interfaces.go` to `pkg/mcp/interfaces.go`
+- Temporary restoration of interfaces to avoid import cycles
+
+### Infrastructure Notes
+**Location**: `pkg/kind/kind.go:94`
+- Version-specific configuration for containerd (not needed with Kind v0.27.0+)
+
 ## Tracking
 
 Use the following labels in issue tracking:
@@ -225,3 +243,4 @@ Use the following labels in issue tracking:
 - `legacy-code`: For legacy compatibility code
 - `deprecated`: For deprecated methods
 - `migration`: For migration-related tasks
+- `critical-note`: For IMPORTANT/NOTE comments requiring attention
