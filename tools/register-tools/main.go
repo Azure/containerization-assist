@@ -161,12 +161,12 @@ func discoverTools() ([]ToolInfo, error) {
 	// Search for tool implementations in the MCP internal packages
 	searchPaths := []string{
 		filepath.Join(moduleRoot, "pkg/mcp/internal/tools"),
-		filepath.Join(moduleRoot, "pkg/mcp/internal/build"),     // Build tools
-		filepath.Join(moduleRoot, "pkg/mcp/internal/deploy"),    // Deploy tools
-		filepath.Join(moduleRoot, "pkg/mcp/internal/scan"),      // Scan tools
-		filepath.Join(moduleRoot, "pkg/mcp/internal/analyze"),   // Analyze tools
-		filepath.Join(moduleRoot, "pkg/mcp/internal/session"),   // Session management tools
-		filepath.Join(moduleRoot, "pkg/mcp/internal/server"),    // Server management tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/build"),        // Build tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/deploy"),       // Deploy tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/scan"),         // Scan tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/analyze"),      // Analyze tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/session"),      // Session management tools
+		filepath.Join(moduleRoot, "pkg/mcp/internal/server"),       // Server management tools
 		filepath.Join(moduleRoot, "pkg/mcp/internal/conversation"), // Conversation tools
 	}
 
@@ -272,7 +272,7 @@ func discoverToolsInFile(filePath string) ([]ToolInfo, error) {
 
 					// Extract the actual package name from the AST
 					actualPackageName := file.Name.Name
-					
+
 					tools = append(tools, ToolInfo{
 						Name:        structName,
 						Package:     packagePath,

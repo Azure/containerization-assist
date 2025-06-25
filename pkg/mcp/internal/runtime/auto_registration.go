@@ -5,51 +5,49 @@ package runtime
 
 import (
 	"fmt"
-	
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/server"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
-
+	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // Auto-generated tool registry
 var generatedToolRegistry = map[string]func() mcptypes.Tool{
 	// "build_image": func() mcptypes.Tool { return &build.BuildImageTool{} }, // TODO: Update to unified interface
 	"atomic_build_image": func() mcptypes.Tool { return &build.AtomicBuildImageTool{} },
-	"atomic_pull_image": func() mcptypes.Tool { return &build.AtomicPullImageTool{} },
+	"atomic_pull_image":  func() mcptypes.Tool { return &build.AtomicPullImageTool{} },
 	// "push_image": func() mcptypes.Tool { return &build.PushImageTool{} }, // TODO: Update to unified interface
-	"atomic_push_image": func() mcptypes.Tool { return &build.AtomicPushImageTool{} },
-	"atomic_tag_image": func() mcptypes.Tool { return &build.AtomicTagImageTool{} },
-	"atomic_check_health": func() mcptypes.Tool { return &deploy.AtomicCheckHealthTool{} },
-	"atomic_deploy_kubernetes": func() mcptypes.Tool { return &deploy.AtomicDeployKubernetesTool{} },
-	"generate_manifests": func() mcptypes.Tool { return &deploy.GenerateManifestsTool{} },
-	"atomic_generate_manifests": func() mcptypes.Tool { return &deploy.AtomicGenerateManifestsTool{} },
-	"validate_deployment": func() mcptypes.Tool { return &deploy.ValidateDeploymentTool{} },
-	"atomic_scan_image_security": func() mcptypes.Tool { return &scan.AtomicScanImageSecurityTool{} },
-	"atomic_scan_secrets": func() mcptypes.Tool { return &scan.AtomicScanSecretsTool{} },
+	"atomic_push_image":           func() mcptypes.Tool { return &build.AtomicPushImageTool{} },
+	"atomic_tag_image":            func() mcptypes.Tool { return &build.AtomicTagImageTool{} },
+	"atomic_check_health":         func() mcptypes.Tool { return &deploy.AtomicCheckHealthTool{} },
+	"atomic_deploy_kubernetes":    func() mcptypes.Tool { return &deploy.AtomicDeployKubernetesTool{} },
+	"generate_manifests":          func() mcptypes.Tool { return &deploy.GenerateManifestsTool{} },
+	"atomic_generate_manifests":   func() mcptypes.Tool { return &deploy.AtomicGenerateManifestsTool{} },
+	"validate_deployment":         func() mcptypes.Tool { return &deploy.ValidateDeploymentTool{} },
+	"atomic_scan_image_security":  func() mcptypes.Tool { return &scan.AtomicScanImageSecurityTool{} },
+	"atomic_scan_secrets":         func() mcptypes.Tool { return &scan.AtomicScanSecretsTool{} },
 	"analyze_repository_redirect": func() mcptypes.Tool { return &analyze.AnalyzeRepositoryRedirectTool{} },
-	"atomic_analyze_repository": func() mcptypes.Tool { return &analyze.AtomicAnalyzeRepositoryTool{} },
+	"atomic_analyze_repository":   func() mcptypes.Tool { return &analyze.AtomicAnalyzeRepositoryTool{} },
 	// "analyze_repository": func() mcptypes.Tool { return &analyze.AnalyzeRepositoryTool{} }, // TODO: Update to unified interface
 	"generate_dockerfile": func() mcptypes.Tool { return &analyze.GenerateDockerfileTool{} },
 	// "generate_dockerfile_enhanced": func() mcptypes.Tool { return &analyze.GenerateDockerfileEnhancedTool{} }, // TODO: Update to unified interface
 	"atomic_validate_dockerfile": func() mcptypes.Tool { return &analyze.AtomicValidateDockerfileTool{} },
-	"delete_session": func() mcptypes.Tool { return &session.DeleteSessionTool{} },
-	"list_sessions": func() mcptypes.Tool { return &session.ListSessionsTool{} },
-	"add_session_label": func() mcptypes.Tool { return &session.AddSessionLabelTool{} },
-	"remove_session_label": func() mcptypes.Tool { return &session.RemoveSessionLabelTool{} },
-	"update_session_labels": func() mcptypes.Tool { return &session.UpdateSessionLabelsTool{} },
-	"list_session_labels": func() mcptypes.Tool { return &session.ListSessionLabelsTool{} },
-	"get_job_status": func() mcptypes.Tool { return &server.GetJobStatusTool{} },
-	"get_logs": func() mcptypes.Tool { return &server.GetLogsTool{} },
-	"get_server_health": func() mcptypes.Tool { return &server.GetServerHealthTool{} },
-	"get_telemetry_metrics": func() mcptypes.Tool { return &server.GetTelemetryMetricsTool{} },
-	"chat": func() mcptypes.Tool { return &conversation.ChatTool{} },
-
+	"delete_session":             func() mcptypes.Tool { return &session.DeleteSessionTool{} },
+	"list_sessions":              func() mcptypes.Tool { return &session.ListSessionsTool{} },
+	"add_session_label":          func() mcptypes.Tool { return &session.AddSessionLabelTool{} },
+	"remove_session_label":       func() mcptypes.Tool { return &session.RemoveSessionLabelTool{} },
+	"update_session_labels":      func() mcptypes.Tool { return &session.UpdateSessionLabelsTool{} },
+	"list_session_labels":        func() mcptypes.Tool { return &session.ListSessionLabelsTool{} },
+	"get_job_status":             func() mcptypes.Tool { return &server.GetJobStatusTool{} },
+	"get_logs":                   func() mcptypes.Tool { return &server.GetLogsTool{} },
+	"get_server_health":          func() mcptypes.Tool { return &server.GetServerHealthTool{} },
+	"get_telemetry_metrics":      func() mcptypes.Tool { return &server.GetTelemetryMetricsTool{} },
+	"chat":                       func() mcptypes.Tool { return &conversation.ChatTool{} },
 }
 
 // RegisterAllTools registers all discovered tools with the given registry

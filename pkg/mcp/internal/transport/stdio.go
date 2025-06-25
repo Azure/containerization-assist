@@ -95,7 +95,7 @@ func (s *StdioTransport) SetHandler(handler mcptypes.RequestHandler) {
 	s.handler = handler
 }
 
-// Start starts the stdio transport - alias for Serve  
+// Start starts the stdio transport - alias for Serve
 func (s *StdioTransport) Start(ctx context.Context) error {
 	return s.Serve(ctx)
 }
@@ -112,7 +112,7 @@ func (s *StdioTransport) SendMessage(message interface{}) error {
 	return fmt.Errorf("SendMessage should be handled by gomcp server for stdio transport")
 }
 
-// ReceiveMessage receives a message via stdio (delegated to gomcp server)  
+// ReceiveMessage receives a message via stdio (delegated to gomcp server)
 func (s *StdioTransport) ReceiveMessage() (interface{}, error) {
 	// For stdio transport, message receiving is handled by the gomcp server
 	// This is typically not called directly
