@@ -199,8 +199,25 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 	}
 
 	if args.AsyncBuild || buildTimeout > 2*time.Minute {
-		t.logger.Warn().Msg("Async builds not yet implemented, running synchronously")
-		response.Logs = append(response.Logs, "Note: Async builds not yet implemented, running synchronously")
+		// Start async build
+		jobID := fmt.Sprintf("build_job_%d", time.Now().UnixNano())
+		response.JobID = jobID
+		response.Success = true
+		response.Logs = append(response.Logs, fmt.Sprintf("Starting async build with job ID: %s", jobID))
+		
+		// Start async build in goroutine
+		go func() {
+			t.logger.Info().Str("job_id", jobID).Msg("Starting async build process")
+			asyncErr := t.executeAsyncBuild(ctx, args, pipelineState, dockerStage, runnerOptions, jobID)
+			if asyncErr != nil {
+				t.logger.Error().Err(asyncErr).Str("job_id", jobID).Msg("Async build failed")
+			} else {
+				t.logger.Info().Str("job_id", jobID).Msg("Async build completed successfully")
+			}
+		}()
+		
+		response.Duration = time.Since(startTime)
+		return response, nil
 	}
 
 	// Create Docker stage with nil AI client (MCP mode doesn't use external AI)
@@ -290,6 +307,58 @@ func (t *BuildImageTool) normalizeImageRef(args BuildImageArgs) string {
 	}
 
 	return fmt.Sprintf("%s/%s:latest", registry, imageName)
+}
+
+// executeAsyncBuild runs the build process asynchronously
+func (t *BuildImageTool) executeAsyncBuild(ctx context.Context, args BuildImageArgs, pipelineState *pipeline.PipelineState, dockerStage *dockerstage.DockerStage, runnerOptions pipeline.RunnerOptions, jobID string) error {
+	workspaceDir := t.pipelineAdapter.GetSessionWorkspace(args.SessionID)
+	
+	// Create a new context with timeout for the async build
+	buildTimeout := args.BuildTimeout
+	if buildTimeout == 0 {
+		buildTimeout = 10 * time.Minute
+	}
+	
+	asyncCtx, cancel := context.WithTimeout(context.Background(), buildTimeout)
+	defer cancel()
+	
+	t.logger.Info().
+		Str("job_id", jobID).
+		Str("session_id", args.SessionID).
+		Dur("timeout", buildTimeout).
+		Msg("Executing async Docker build")
+	
+	// Execute the Docker stage using existing pipeline logic
+	err := dockerStage.Run(asyncCtx, pipelineState, t.clients, runnerOptions)
+	if err != nil {
+		t.logger.Error().
+			Err(err).
+			Str("job_id", jobID).
+			Msg("Async Docker stage execution failed")
+		
+		// Store build failure in session for later retrieval
+		if updateErr := t.pipelineAdapter.UpdateSessionFromDockerResults(args.SessionID, pipelineState); updateErr != nil {
+			t.logger.Warn().Err(updateErr).Str("job_id", jobID).Msg("Failed to update session with async build failure")
+		}
+		
+		return err
+	}
+	
+	// Build succeeded - update session with results
+	t.logger.Info().
+		Str("job_id", jobID).
+		Str("image_id", pipelineState.ImageName).
+		Msg("Async build completed successfully")
+	
+	if err := t.pipelineAdapter.UpdateSessionFromDockerResults(args.SessionID, pipelineState); err != nil {
+		t.logger.Error().
+			Err(err).
+			Str("job_id", jobID).
+			Msg("Failed to update session with async build results")
+		return err
+	}
+	
+	return nil
 }
 
 // Execute implements the unified Tool interface

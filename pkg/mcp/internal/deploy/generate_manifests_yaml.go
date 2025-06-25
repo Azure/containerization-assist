@@ -92,17 +92,33 @@ func (t *AtomicGenerateManifestsTool) applyResourceLimits(manifestResult *corek8
 		return nil
 	}
 
-	// Resource limits would be applied to the deployment manifest
-	// This is a placeholder for now - in a full implementation, you would parse and modify
-	// the existing deployment YAML to add resource specifications
+	// Find and modify the deployment manifest to add resource specifications
+	for i, manifest := range manifestResult.Manifests {
+		if manifest.Kind == "Deployment" {
+			// Add resource limits to the deployment YAML
+			updatedContent, err := t.addResourceLimitsToDeployment(manifest.Content, args)
+			if err != nil {
+				t.logger.Error().Err(err).Msg("Failed to add resource limits to deployment")
+				return fmt.Errorf("failed to add resource limits: %w", err)
+			}
+			
+			// Update the manifest with resource limits
+			manifestResult.Manifests[i].Content = updatedContent
+			manifestResult.Manifests[i].Size = len(updatedContent)
+			
+			t.logger.Info().
+				Str("cpu_request", args.CPURequest).
+				Str("memory_request", args.MemoryRequest).
+				Str("cpu_limit", args.CPULimit).
+				Str("memory_limit", args.MemoryLimit).
+				Str("deployment_name", manifest.Name).
+				Msg("Applied resource limits to deployment manifest")
+			
+			return nil
+		}
+	}
 
-	t.logger.Info().
-		Str("cpu_request", args.CPURequest).
-		Str("memory_request", args.MemoryRequest).
-		Str("cpu_limit", args.CPULimit).
-		Str("memory_limit", args.MemoryLimit).
-		Msg("Would apply resource limits to deployment (not yet implemented)")
-
+	t.logger.Warn().Msg("No deployment manifest found to apply resource limits")
 	return nil
 }
 
@@ -204,4 +220,110 @@ spec:
 `, name, namespace, appName, host, serviceName, port, host, name, host)
 
 	return yaml
+}
+
+// addResourceLimitsToDeployment adds resource limits to a deployment YAML
+func (t *AtomicGenerateManifestsTool) addResourceLimitsToDeployment(deploymentYAML string, args AtomicGenerateManifestsArgs) (string, error) {
+	// Build resource specification
+	resourcesYAML := t.buildResourcesYAML(args)
+	if resourcesYAML == "" {
+		return deploymentYAML, nil // No resources to add
+	}
+
+	// Find the containers section and add resources
+	lines := strings.Split(deploymentYAML, "\n")
+	var result []string
+	inContainers := false
+	containerIndent := ""
+	resourcesAdded := false
+
+	for i, line := range lines {
+		result = append(result, line)
+		
+		// Look for containers section
+		if strings.Contains(line, "containers:") {
+			inContainers = true
+			continue
+		}
+		
+		// If we're in containers and find a container definition
+		if inContainers && strings.Contains(line, "- name:") {
+			// Determine indentation
+			containerIndent = strings.Repeat(" ", len(line)-len(strings.TrimLeft(line, " ")))
+			
+			// Look ahead to find the end of this container spec
+			// Add resources before the next container or end of containers
+			j := i + 1
+			for j < len(lines) {
+				nextLine := lines[j]
+				if strings.TrimSpace(nextLine) == "" {
+					j++
+					continue
+				}
+				
+				// If we hit another container or end of containers section, add resources here
+				if strings.Contains(nextLine, "- name:") || 
+				   (!strings.HasPrefix(nextLine, containerIndent) && strings.TrimSpace(nextLine) != "") {
+					// Insert resources before this line
+					resourceLines := strings.Split(resourcesYAML, "\n")
+					for _, resLine := range resourceLines {
+						if strings.TrimSpace(resLine) != "" {
+							result = append(result, containerIndent+"  "+resLine)
+						}
+					}
+					resourcesAdded = true
+					break
+				}
+				j++
+			}
+			
+			// If we reached the end without finding another container, add resources at the end
+			if !resourcesAdded && j >= len(lines) {
+				resourceLines := strings.Split(resourcesYAML, "\n")
+				for _, resLine := range resourceLines {
+					if strings.TrimSpace(resLine) != "" {
+						result = append(result, containerIndent+"  "+resLine)
+					}
+				}
+				resourcesAdded = true
+			}
+		}
+	}
+
+	return strings.Join(result, "\n"), nil
+}
+
+// buildResourcesYAML creates the resources YAML block
+func (t *AtomicGenerateManifestsTool) buildResourcesYAML(args AtomicGenerateManifestsArgs) string {
+	hasRequests := args.CPURequest != "" || args.MemoryRequest != ""
+	hasLimits := args.CPULimit != "" || args.MemoryLimit != ""
+	
+	if !hasRequests && !hasLimits {
+		return ""
+	}
+	
+	var yaml strings.Builder
+	yaml.WriteString("resources:\n")
+	
+	if hasRequests {
+		yaml.WriteString("  requests:\n")
+		if args.CPURequest != "" {
+			yaml.WriteString(fmt.Sprintf("    cpu: %s\n", args.CPURequest))
+		}
+		if args.MemoryRequest != "" {
+			yaml.WriteString(fmt.Sprintf("    memory: %s\n", args.MemoryRequest))
+		}
+	}
+	
+	if hasLimits {
+		yaml.WriteString("  limits:\n")
+		if args.CPULimit != "" {
+			yaml.WriteString(fmt.Sprintf("    cpu: %s\n", args.CPULimit))
+		}
+		if args.MemoryLimit != "" {
+			yaml.WriteString(fmt.Sprintf("    memory: %s\n", args.MemoryLimit))
+		}
+	}
+	
+	return yaml.String()
 }
