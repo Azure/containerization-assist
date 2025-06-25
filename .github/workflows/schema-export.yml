@@ -87,42 +87,73 @@ jobs:
             const fs = require('fs');
             const schema = JSON.parse(fs.readFileSync('docs/tools.schema.json', 'utf8'));
             
-            // Format tools by category
-            let toolsList = '';
-            if (schema.tools?.by_category) {
-              for (const [category, tools] of Object.entries(schema.tools.by_category)) {
-                toolsList += `\n#### ${category} Tools\n`;
-                for (const tool of tools) {
-                  toolsList += `- **${tool.name}**: ${tool.description}\n`;
-                }
-              }
-            }
+            // GitHub comment limit is 65536 characters
+            const maxBodyLength = 65000; // Leave buffer for safety
             
-            const comment = `## 🔧 Tool Schema Update
+            // Start with essential info
+            let comment = `## 🔧 Tool Schema Update
             
             This PR includes changes to MCP tool definitions. The tool schema has been automatically updated:
             
-            - **Schema version**: ${schema.schema_version}
-            - **Generated**: ${schema.generated_at}
+            - **Schema version**: ${schema.schema_version || 'N/A'}
+            - **Generated**: ${schema.generated_at || 'N/A'}
             - **Total tools**: ${schema.tools?.total_count || 0}
-            - **Description**: ${schema.description}
-            
-            ### Available Tools (${schema.tools?.total_count || 0} total):
-            ${toolsList || 'No tools found'}
-            
-            ### Capabilities:
-            ${schema.capabilities?.ai_features?.map(feature => `- 🤖 ${feature}`).join('\n') || ''}
-            
-            ### Security Features:
-            ${schema.capabilities?.security?.map(feature => `- 🔒 ${feature}`).join('\n') || ''}
-            
-            ### Resources:
-            ${schema.resources?.available_resources?.map(resource => `- 📊 ${resource}`).join('\n') || ''}
-            
-            The updated schema is available at \`docs/tools.schema.json\` and can be used by IDE plugins and LLMs for tool discovery.
-            
-            **Note**: ${schema.tools?.note || 'Tools are automatically registered with GoMCP'}
+            - **Description**: ${schema.description || 'N/A'}
             `;
+            
+            // Add tools list if space allows
+            if (schema.tools?.by_category && comment.length < maxBodyLength * 0.3) {
+              let toolsList = '\n### Available Tools:\n';
+              let toolCount = 0;
+              const maxTools = 20; // Limit number of tools shown
+              
+              for (const [category, tools] of Object.entries(schema.tools.by_category)) {
+                if (toolCount >= maxTools) break;
+                
+                toolsList += `\n#### ${category} Tools\n`;
+                for (const tool of tools.slice(0, Math.min(5, maxTools - toolCount))) {
+                  toolsList += `- **${tool.name}**: ${tool.description?.substring(0, 100) || 'No description'}${tool.description?.length > 100 ? '...' : ''}\n`;
+                  toolCount++;
+                  if (toolCount >= maxTools) break;
+                }
+              }
+              
+              if (Object.values(schema.tools.by_category).flat().length > maxTools) {
+                toolsList += `\n*... and ${Object.values(schema.tools.by_category).flat().length - maxTools} more tools. See the full schema file for details.*\n`;
+              }
+              
+              // Only add if we have space
+              if (comment.length + toolsList.length < maxBodyLength * 0.8) {
+                comment += toolsList;
+              }
+            }
+            
+            // Add capabilities if space allows
+            if (schema.capabilities?.ai_features && comment.length < maxBodyLength * 0.7) {
+              const capabilities = schema.capabilities.ai_features.slice(0, 5).map(feature => `- 🤖 ${feature.substring(0, 80)}`).join('\n');
+              const capSection = `\n### Key Capabilities:\n${capabilities}\n`;
+              if (comment.length + capSection.length < maxBodyLength * 0.9) {
+                comment += capSection;
+              }
+            }
+            
+            // Always add footer
+            comment += `\nThe updated schema is available at \`docs/tools.schema.json\` and can be used by IDE plugins and LLMs for tool discovery.`;
+            
+            // Final safety check
+            if (comment.length > maxBodyLength) {
+              comment = `## 🔧 Tool Schema Update
+              
+              This PR includes changes to MCP tool definitions:
+              
+              - **Total tools**: ${schema.tools?.total_count || 0}
+              - **Schema version**: ${schema.schema_version || 'N/A'}
+              - **Generated**: ${schema.generated_at || 'N/A'}
+              
+              The schema update is too large to display in this comment. Please check the \`docs/tools.schema.json\` file for the complete schema definition.
+              
+              **Note**: Tools are automatically registered with GoMCP`;
+            }
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
