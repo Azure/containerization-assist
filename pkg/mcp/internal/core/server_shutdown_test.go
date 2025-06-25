@@ -114,8 +114,10 @@ func TestServerShutdownComponents(t *testing.T) {
 	assert.NotNil(t, server.conversationComponents.Telemetry)
 
 	// Create a session
-	session, err := server.sessionManager.GetOrCreateSession("")
+	sessionInterface, err := server.sessionManager.GetOrCreateSession("")
 	require.NoError(t, err)
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	require.True(t, ok, "session should be of correct type")
 	assert.NotEmpty(t, session.SessionID)
 
 	// Get initial stats

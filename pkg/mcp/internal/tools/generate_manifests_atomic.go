@@ -293,7 +293,7 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 	)
 
 	result.GenerationDuration = time.Since(generationStartTime)
-	
+
 	// Convert from mcptypes.KubernetesManifestResult to kubernetes.ManifestGenerationResult
 	if manifestResult != nil {
 		result.ManifestResult = &kubernetes.ManifestGenerationResult{
@@ -1022,10 +1022,11 @@ func (m *mockPipelineAdapter) GenerateDockerfile(sessionID, language, framework 
 	return "Dockerfile", nil
 }
 
-func (m *mockPipelineAdapter) BuildDockerImage(sessionID, imageRef, dockerfilePath string) (*mcptypes.DockerBuildResult, error) {
-	return &mcptypes.DockerBuildResult{
-		Success: true,
+func (m *mockPipelineAdapter) BuildDockerImage(sessionID, imageRef, dockerfilePath string) (*mcptypes.BuildResult, error) {
+	return &mcptypes.BuildResult{
+		Success:  true,
 		ImageRef: imageRef,
+		ImageID:  "mock-image-id",
 	}, nil
 }
 
@@ -1114,7 +1115,7 @@ func (m *mockSessionManager) GetOrCreateSession(repoURL string) (interface{}, er
 	}, nil
 }
 
-func (m *mockSessionManager) UpdateSession(sessionID string, updateFunc interface{}) error {
+func (m *mockSessionManager) UpdateSession(sessionID string, updateFunc func(*sessiontypes.SessionState)) error {
 	// Mock implementation
 	return nil
 }
@@ -1130,6 +1131,18 @@ func (m *mockSessionManager) ListSessions(ctx context.Context, filter map[string
 func (m *mockSessionManager) FindSessionByRepo(ctx context.Context, repoURL string) (interface{}, error) {
 	return &sessiontypes.SessionState{
 		SessionID: "mock-session-id",
+		Metadata:  make(map[string]interface{}),
+	}, nil
+}
+
+func (m *mockSessionManager) GetSessionInterface(sessionID string) (interface{}, error) {
+	return m.GetSession(sessionID)
+}
+
+func (m *mockSessionManager) GetOrCreateSessionFromRepo(repoURL string) (interface{}, error) {
+	return &sessiontypes.SessionState{
+		SessionID: "mock-session-from-repo",
+		RepoURL:   repoURL,
 		Metadata:  make(map[string]interface{}),
 	}, nil
 }

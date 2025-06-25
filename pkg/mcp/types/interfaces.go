@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 	"time"
+
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 )
 
 // Unified MCP Interface Types
@@ -481,6 +483,47 @@ type FixAttempt struct {
 }
 
 // =============================================================================
+// UNIFIED RESULT TYPES
+// =============================================================================
+
+// BuildResult represents the result of a Docker build operation
+type BuildResult struct {
+	ImageID  string      `json:"image_id"`
+	ImageRef string      `json:"image_ref"`
+	Success  bool        `json:"success"`
+	Error    *BuildError `json:"error,omitempty"`
+	Logs     string      `json:"logs,omitempty"`
+}
+
+// BuildError represents a build error with structured information
+type BuildError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+// HealthCheckResult represents the result of a health check operation
+type HealthCheckResult struct {
+	Healthy     bool              `json:"healthy"`
+	Status      string            `json:"status"`
+	PodStatuses []PodStatus       `json:"pod_statuses"`
+	Error       *HealthCheckError `json:"error,omitempty"`
+}
+
+// PodStatus represents the status of a Kubernetes pod
+type PodStatus struct {
+	Name   string `json:"name"`
+	Ready  bool   `json:"ready"`
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// HealthCheckError represents a health check error
+type HealthCheckError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+// =============================================================================
 // LEGACY INTERFACES (to be refactored)
 // =============================================================================
 
@@ -491,7 +534,7 @@ type PipelineOperations interface {
 	UpdateSessionFromDockerResults(sessionID string, result interface{}) error
 
 	// Docker operations
-	BuildDockerImage(sessionID, imageRef, dockerfilePath string) (*DockerBuildResult, error)
+	BuildDockerImage(sessionID, imageRef, dockerfilePath string) (*BuildResult, error)
 	PullDockerImage(sessionID, imageRef string) error
 	PushDockerImage(sessionID, imageRef string) error
 	TagDockerImage(sessionID, sourceRef, targetRef string) error
@@ -512,8 +555,10 @@ type ToolSessionManager interface {
 	// Session CRUD operations
 	// Note: These return internal session types for now - to be migrated to unified types
 	GetSession(sessionID string) (interface{}, error)
-	GetOrCreateSession(repoURL string) (interface{}, error)
-	UpdateSession(sessionID string, updateFunc interface{}) error
+	GetSessionInterface(sessionID string) (interface{}, error)
+	GetOrCreateSession(sessionID string) (interface{}, error)
+	GetOrCreateSessionFromRepo(repoURL string) (interface{}, error)
+	UpdateSession(sessionID string, updateFunc func(*sessiontypes.SessionState)) error
 	DeleteSession(ctx context.Context, sessionID string) error
 
 	// Session listing and searching
@@ -522,13 +567,7 @@ type ToolSessionManager interface {
 }
 
 // Pipeline operation result types
-type DockerBuildResult struct {
-	Success   bool       `json:"success"`
-	ImageID   string     `json:"image_id"`
-	ImageRef  string     `json:"image_ref"`
-	BuildTime string     `json:"build_time"`
-	Error     *RichError `json:"error,omitempty"`
-}
+// Note: DockerBuildResult has been replaced by the unified BuildResult type above
 
 type DockerState struct {
 	Images     []string `json:"images"`
@@ -558,19 +597,8 @@ type KubernetesDeploymentResult struct {
 	Error       *RichError `json:"error,omitempty"`
 }
 
-type HealthCheckResult struct {
-	Healthy     bool        `json:"healthy"`
-	Message     string      `json:"message"`
-	PodStatuses []PodStatus `json:"pod_statuses"`
-	Error       *RichError  `json:"error,omitempty"`
-}
-
-type PodStatus struct {
-	Name   string `json:"name"`
-	Ready  bool   `json:"ready"`
-	Status string `json:"status"`
-	Reason string `json:"reason,omitempty"`
-}
+// HealthCheckResult moved to unified types section above
+// PodStatus is used by the legacy HealthCheckResult type
 
 // =============================================================================
 // ERROR CODES

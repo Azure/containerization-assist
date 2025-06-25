@@ -90,7 +90,7 @@ func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerS
 
 // handleListSessions implements the list_sessions tool logic
 func (gm *GomcpManager) handleListSessions(deps *ToolDependencies, args *SessionListArgs) (*SessionListResult, error) {
-	sessions := deps.Server.sessionManager.ListSessions()
+	sessions := deps.Server.sessionManager.ListSessionSummaries()
 	var sessionData []map[string]interface{}
 
 	for _, session := range sessions {
@@ -131,7 +131,7 @@ func (gm *GomcpManager) handleDeleteSession(deps *ToolDependencies, args *Sessio
 		}, nil
 	}
 
-	err := deps.Server.sessionManager.DeleteSession(args.SessionID)
+	err := deps.Server.sessionManager.DeleteSession(context.Background(), args.SessionID)
 	if err != nil {
 		return &SessionDeleteResult{
 			Success:   false,

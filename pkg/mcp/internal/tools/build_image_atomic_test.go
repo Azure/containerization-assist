@@ -12,6 +12,7 @@ import (
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,54 +46,46 @@ type testBuildPipelineAdapter struct {
 	buildCallArgs   []string
 }
 
-func (t *testBuildPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*coredocker.BuildResult, error) {
+func (t *testBuildPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*mcptypes.BuildResult, error) {
 	t.buildCallCount++
 	t.buildCallArgs = []string{sessionID, imageName, dockerfilePath}
 
 	if t.shouldFailBuild {
-		return t.buildResult, t.buildError
+		if t.buildResult != nil {
+			// Convert coredocker.BuildResult to mcptypes.BuildResult
+			return &mcptypes.BuildResult{
+				Success:  t.buildResult.Success,
+				ImageID:  t.buildResult.ImageID,
+				ImageRef: t.buildResult.ImageRef,
+				Logs:     strings.Join(t.buildResult.Logs, "\n"),
+			}, t.buildError
+		}
+		return nil, t.buildError
 	}
 	if t.buildResult != nil {
-		return t.buildResult, nil
+		// Convert coredocker.BuildResult to mcptypes.BuildResult
+		return &mcptypes.BuildResult{
+			Success:  t.buildResult.Success,
+			ImageID:  t.buildResult.ImageID,
+			ImageRef: t.buildResult.ImageRef,
+			Logs:     strings.Join(t.buildResult.Logs, "\n"),
+		}, nil
 	}
 	// Default result
-	return &coredocker.BuildResult{
+	return &mcptypes.BuildResult{
 		Success:  true,
 		ImageID:  "sha256:abc123def456",
 		ImageRef: imageName,
-		Duration: 5 * time.Second,
-		Logs:     []string{"Step 1/5 : FROM golang:1.21-alpine", "... Build complete"},
+		Logs:     "Step 1/5 : FROM golang:1.21-alpine\n... Build complete",
 	}, nil
 }
 
-func (t *testBuildPipelineAdapter) PushDockerImage(sessionID, imageName, registryURL string) (*coredocker.RegistryPushResult, error) {
+func (t *testBuildPipelineAdapter) PushDockerImage(sessionID, imageRef string) error {
 	if t.shouldFailPush {
-		return t.pushResult, t.pushError
+		return t.pushError
 	}
-	if t.pushResult != nil {
-		return t.pushResult, nil
-	}
-	// Default result
-	return &coredocker.RegistryPushResult{
-		Success:  true,
-		Registry: registryURL,
-		ImageRef: imageName,
-		Duration: 3 * time.Second,
-		Output:   "Push complete",
-	}, nil
-}
-
-// Context management methods for testing
-func (t *testBuildPipelineAdapter) SetContext(sessionID string, ctx context.Context) {
-	// No-op for tests
-}
-
-func (t *testBuildPipelineAdapter) GetContext(sessionID string) context.Context {
-	return context.Background()
-}
-
-func (t *testBuildPipelineAdapter) ClearContext(sessionID string) {
-	// No-op for tests
+	// Default success - no error returned
+	return nil
 }
 
 func setupBuildTest(t *testing.T, sessionID string, setupFunc func(*testBuildPipelineAdapter, *testSessionManager)) (*AtomicBuildImageTool, *testBuildPipelineAdapter, *testSessionManager) {
@@ -654,8 +647,10 @@ func TestAtomicBuildImageTool_SessionStateUpdate(t *testing.T) {
 	assert.True(t, result.Success)
 
 	// Verify session state was updated
-	session, err := sessionMgr.GetSession("state-test-session")
+	sessionInterface, err := sessionMgr.GetSession("state-test-session")
 	require.NoError(t, err)
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	require.True(t, ok, "Session should be *sessiontypes.SessionState")
 
 	// Check current stage derivation from StageHistory
 	expectedStage := "image_built"

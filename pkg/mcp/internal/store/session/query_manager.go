@@ -340,11 +340,11 @@ func (qm *SessionQueryManager) sortSessions(sessions []*sessiontypes.SessionStat
 func (qm *SessionQueryManager) getAllSessions() ([]*sessiontypes.SessionState, error) {
 	// This is a simplified implementation - in a production system,
 	// we would want to optimize this to avoid loading all sessions into memory
-	sessionSummaries := qm.sessionManager.ListSessions()
+	sessionSummaries := qm.sessionManager.ListSessionSummaries()
 
 	var sessions []*sessiontypes.SessionState
 	for _, summary := range sessionSummaries {
-		session, err := qm.sessionManager.GetSession(summary.SessionID)
+		session, err := qm.sessionManager.GetSessionConcrete(summary.SessionID)
 		if err != nil {
 			qm.logger.Warn().
 				Str("session_id", summary.SessionID).

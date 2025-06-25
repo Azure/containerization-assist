@@ -23,6 +23,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/pkg/pipeline"
 	"github.com/rs/zerolog"
 )
@@ -99,9 +100,15 @@ func NewPipelineAdapter(sessionManager *session.SessionManager, mcpClients *adap
 
 // ConvertToRepositoryAnalysisState converts MCP session to repository analysis pipeline state
 func (a *PipelineAdapter) ConvertToRepositoryAnalysisState(sessionID, targetRepo, extraContext string) (*pipeline.PipelineState, error) {
-	session, err := a.sessionManager.GetSession(sessionID)
+	sessionInterface, err := a.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	// Type assert to concrete session type
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		return nil, fmt.Errorf("session type assertion failed")
 	}
 
 	// Create pipeline state with session context
@@ -140,11 +147,17 @@ func (a *PipelineAdapter) ConvertToRepositoryAnalysisState(sessionID, targetRepo
 	return state, nil
 }
 
-// ConvertToDockerState converts MCP session to Docker pipeline state
-func (a *PipelineAdapter) ConvertToDockerState(sessionID, imageName, registryURL string) (*pipeline.PipelineState, error) {
-	session, err := a.sessionManager.GetSession(sessionID)
+// ConvertToDockerPipelineState converts MCP session to Docker pipeline state
+func (a *PipelineAdapter) ConvertToDockerPipelineState(sessionID, imageName, registryURL string) (*pipeline.PipelineState, error) {
+	sessionInterface, err := a.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	// Type assert to concrete session type
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		return nil, fmt.Errorf("session type assertion failed")
 	}
 
 	state := &pipeline.PipelineState{
@@ -188,9 +201,15 @@ func (a *PipelineAdapter) ConvertToDockerState(sessionID, imageName, registryURL
 
 // ConvertToManifestState converts MCP session to manifest pipeline state
 func (a *PipelineAdapter) ConvertToManifestState(sessionID, namespace string) (*pipeline.PipelineState, error) {
-	session, err := a.sessionManager.GetSession(sessionID)
+	sessionInterface, err := a.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	// Type assert to concrete session type
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		return nil, fmt.Errorf("session type assertion failed")
 	}
 
 	state := &pipeline.PipelineState{
@@ -273,7 +292,12 @@ func (a *PipelineAdapter) UpdateSessionFromRepositoryAnalysis(sessionID string, 
 }
 
 // UpdateSessionFromDockerResults updates session state with Docker stage results
-func (a *PipelineAdapter) UpdateSessionFromDockerResults(sessionID string, pipelineState *pipeline.PipelineState) error {
+func (a *PipelineAdapter) UpdateSessionFromDockerResults(sessionID string, result interface{}) error {
+	// Type assert the result to the expected type
+	pipelineState, ok := result.(*pipeline.PipelineState)
+	if !ok {
+		return fmt.Errorf("invalid result type for UpdateSessionFromDockerResults")
+	}
 	// Update Dockerfile state if generated
 	if pipelineState.Dockerfile.Content != "" {
 		err := a.sessionManager.UpdateSession(sessionID, func(session *sessiontypes.SessionState) {
@@ -404,11 +428,19 @@ func (a *PipelineAdapter) InjectClients(pipelineState *pipeline.PipelineState) e
 
 // GetSessionWorkspace returns the workspace directory for a session
 func (a *PipelineAdapter) GetSessionWorkspace(sessionID string) string {
-	session, err := a.sessionManager.GetSession(sessionID)
-	if err != nil || session == nil {
+	sessionInterface, err := a.sessionManager.GetSession(sessionID)
+	if err != nil || sessionInterface == nil {
 		// Return a default path if session not found
 		return filepath.Join("/tmp/container-kit/workspaces", sessionID)
 	}
+
+	// Type assert to concrete session type
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		// Return a default path if type assertion fails
+		return filepath.Join("/tmp/container-kit/workspaces", sessionID)
+	}
+
 	return session.WorkspaceDir
 }
 
@@ -463,32 +495,80 @@ func (a *PipelineAdapter) CloneRepository(sessionID, repoURL, branch string) (*g
 	return a.CloneRepositoryWithContext(context.Background(), sessionID, repoURL, branch)
 }
 
-func (a *PipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*coredocker.BuildResult, error) {
-	return a.BuildDockerImageWithContext(context.Background(), sessionID, imageName, dockerfilePath)
+func (a *PipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*mcptypes.BuildResult, error) {
+	coreResult, err := a.BuildDockerImageWithContext(context.Background(), sessionID, imageName, dockerfilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert core.BuildResult to unified types.BuildResult
+	result := &mcptypes.BuildResult{
+		ImageID:  coreResult.ImageID,
+		ImageRef: coreResult.ImageRef,
+		Success:  coreResult.Success,
+		Logs:     strings.Join(coreResult.Logs, "\n"),
+	}
+
+	if coreResult.Error != nil {
+		result.Error = &mcptypes.BuildError{
+			Type:    coreResult.Error.Type,
+			Message: coreResult.Error.Message,
+		}
+		result.Success = false
+	}
+
+	return result, nil
 }
 
-func (a *PipelineAdapter) PushDockerImage(sessionID, imageName, registryURL string) (*coredocker.RegistryPushResult, error) {
-	return a.PushDockerImageWithContext(context.Background(), sessionID, imageName, registryURL)
+func (a *PipelineAdapter) PushDockerImage(sessionID, imageName string) error {
+	// Extract registry URL from image name if needed
+	_, err := a.PushDockerImageWithContext(context.Background(), sessionID, imageName, "")
+	return err
 }
 
-func (a *PipelineAdapter) TagDockerImage(sessionID, sourceImage, targetImage string) (*coredocker.TagResult, error) {
-	return a.TagDockerImageWithContext(context.Background(), sessionID, sourceImage, targetImage)
+func (a *PipelineAdapter) TagDockerImage(sessionID, sourceImage, targetImage string) error {
+	_, err := a.TagDockerImageWithContext(context.Background(), sessionID, sourceImage, targetImage)
+	return err
 }
 
-func (a *PipelineAdapter) PullDockerImage(sessionID, imageRef string) (*coredocker.PullResult, error) {
-	return a.PullDockerImageWithContext(context.Background(), sessionID, imageRef)
+func (a *PipelineAdapter) PullDockerImage(sessionID, imageRef string) error {
+	_, err := a.PullDockerImageWithContext(context.Background(), sessionID, imageRef)
+	return err
 }
 
-func (a *PipelineAdapter) GenerateKubernetesManifests(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*kubernetes.ManifestGenerationResult, error) {
-	return a.GenerateKubernetesManifestsWithContext(context.Background(), sessionID, imageName, appName, port, cpuRequest, memoryRequest, cpuLimit, memoryLimit)
-}
+func (a *PipelineAdapter) CheckApplicationHealth(sessionID, namespace, labelSelector string, timeout time.Duration) (*mcptypes.HealthCheckResult, error) {
+	coreResult, err := a.CheckApplicationHealthWithContext(context.Background(), sessionID, namespace, labelSelector, timeout)
+	if err != nil {
+		return nil, err
+	}
 
-func (a *PipelineAdapter) DeployToKubernetes(sessionID, manifestPath, namespace string) (*kubernetes.DeploymentResult, error) {
-	return a.DeployToKubernetesWithContext(context.Background(), sessionID, manifestPath, namespace)
-}
+	// Convert core.kubernetes.HealthCheckResult to unified types.HealthCheckResult
+	result := &mcptypes.HealthCheckResult{
+		Healthy:     coreResult.Success,
+		Status:      fmt.Sprintf("Health check completed. Pods: %d/%d ready", coreResult.Summary.ReadyPods, coreResult.Summary.TotalPods),
+		PodStatuses: make([]mcptypes.PodStatus, 0),
+	}
 
-func (a *PipelineAdapter) CheckApplicationHealth(sessionID, namespace, labelSelector string, timeout time.Duration) (*kubernetes.HealthCheckResult, error) {
-	return a.CheckApplicationHealthWithContext(context.Background(), sessionID, namespace, labelSelector, timeout)
+	// Convert pod statuses if they exist
+	for _, pod := range coreResult.Pods {
+		podStatus := mcptypes.PodStatus{
+			Name:   pod.Name,
+			Ready:  pod.Ready,
+			Status: pod.Status,
+			Reason: pod.Phase,
+		}
+		result.PodStatuses = append(result.PodStatuses, podStatus)
+	}
+
+	if coreResult.Error != nil {
+		result.Error = &mcptypes.HealthCheckError{
+			Type:    "health_check_failed",
+			Message: coreResult.Error.Message,
+		}
+		result.Healthy = false
+	}
+
+	return result, nil
 }
 
 func (a *PipelineAdapter) PreviewDeployment(sessionID, manifestPath, namespace string) (string, error) {
@@ -805,6 +885,125 @@ func (a *PipelineAdapter) detectDefaultBranch(repoURL string) (string, error) {
 	}
 
 	return "", fmt.Errorf("could not parse default branch from git ls-remote output")
+}
+
+// AcquireResource manages resource allocation for a session
+func (pa *PipelineAdapter) AcquireResource(sessionID, resourceType string) error {
+	pa.logger.Debug().
+		Str("session_id", sessionID).
+		Str("resource_type", resourceType).
+		Msg("Acquiring resource")
+
+	// For now, this is a no-op as resource management is handled by session manager
+	// In the future, this could track resource quotas, locks, etc.
+	return nil
+}
+
+// ReleaseResource manages resource cleanup for a session
+func (pa *PipelineAdapter) ReleaseResource(sessionID, resourceType string) error {
+	pa.logger.Debug().
+		Str("session_id", sessionID).
+		Str("resource_type", resourceType).
+		Msg("Releasing resource")
+
+	// For now, this is a no-op as resource management is handled by session manager
+	// In the future, this could track resource quotas, locks, etc.
+	return nil
+}
+
+// Interface compatibility methods - simplified versions for the unified interface
+
+// ConvertToDockerState creates a simple Docker state for interface compatibility
+func (a *PipelineAdapter) ConvertToDockerState(sessionID string) (*mcptypes.DockerState, error) {
+	// This is the interface-compatible version that returns unified DockerState
+	return &mcptypes.DockerState{
+		Images:     []string{},
+		Containers: []string{},
+		Networks:   []string{},
+		Volumes:    []string{},
+	}, nil
+}
+
+// DeployToKubernetes simplified interface method
+func (a *PipelineAdapter) DeployToKubernetes(sessionID string, manifests []string) (*mcptypes.KubernetesDeploymentResult, error) {
+	// For interface compatibility, deploy the first manifest to default namespace
+	if len(manifests) == 0 {
+		return &mcptypes.KubernetesDeploymentResult{
+			Success: false,
+			Error: &mcptypes.RichError{
+				Code:    "NO_MANIFESTS",
+				Message: "No manifests provided for deployment",
+			},
+		}, nil
+	}
+
+	result, err := a.DeployToKubernetesWithContext(context.Background(), sessionID, manifests[0], "default")
+	if err != nil {
+		return &mcptypes.KubernetesDeploymentResult{
+			Success: false,
+			Error: &mcptypes.RichError{
+				Code:    "DEPLOYMENT_FAILED",
+				Message: err.Error(),
+			},
+		}, nil
+	}
+
+	// Extract deployment and service names from resources
+	deployments := []string{}
+	services := []string{}
+	for _, resource := range result.Resources {
+		if resource.Kind == "Deployment" {
+			deployments = append(deployments, resource.Name)
+		} else if resource.Kind == "Service" {
+			services = append(services, resource.Name)
+		}
+	}
+
+	return &mcptypes.KubernetesDeploymentResult{
+		Success:     result.Success,
+		Namespace:   result.Namespace,
+		Deployments: deployments,
+		Services:    services,
+	}, nil
+}
+
+// GenerateKubernetesManifests simplified interface method
+func (a *PipelineAdapter) GenerateKubernetesManifests(sessionID, imageRef, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*mcptypes.KubernetesManifestResult, error) {
+	result, err := a.GenerateKubernetesManifestsWithContext(context.Background(), sessionID, imageRef, appName, port, cpuRequest, memoryRequest, cpuLimit, memoryLimit)
+	if err != nil {
+		return &mcptypes.KubernetesManifestResult{
+			Success: false,
+			Error: &mcptypes.RichError{
+				Code:    "MANIFEST_GENERATION_FAILED",
+				Message: err.Error(),
+			},
+		}, nil
+	}
+
+	// Convert kubernetes.ManifestGenerationResult to mcptypes.KubernetesManifestResult
+	manifestResult := &mcptypes.KubernetesManifestResult{
+		Success:   result.Success,
+		Manifests: make([]mcptypes.GeneratedManifest, 0),
+	}
+
+	// Convert manifests if available
+	for _, manifest := range result.Manifests {
+		manifestResult.Manifests = append(manifestResult.Manifests, mcptypes.GeneratedManifest{
+			Kind:    manifest.Kind,
+			Name:    manifest.Name,
+			Path:    manifest.Path,
+			Content: manifest.Content,
+		})
+	}
+
+	if result.Error != nil {
+		manifestResult.Error = &mcptypes.RichError{
+			Code:    "GENERATION_ERROR",
+			Message: result.Error.Message,
+		}
+	}
+
+	return manifestResult, nil
 }
 
 // Removed convertMetadataToStringMap - now using types.MetadataManager for type-safe metadata access

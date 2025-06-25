@@ -51,9 +51,15 @@ func (t *GenerateDockerfileEnhancedTool) Execute(ctx context.Context, args Gener
 		Msg("Starting enhanced Dockerfile generation")
 
 	// Get session to access repository analysis
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		return nil, types.NewRichError("SESSION_ACCESS_FAILED", "failed to get session "+args.SessionID+": "+err.Error(), types.ErrTypeSession)
+	}
+
+	// Type assert to concrete session type
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	if !ok {
+		return nil, types.NewRichError("INTERNAL_ERROR", "session type assertion failed", "type_error")
 	}
 
 	// Use template integration for enhanced template selection

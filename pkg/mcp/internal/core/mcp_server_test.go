@@ -131,14 +131,20 @@ func TestSessionManager(t *testing.T) {
 		sessionID := "test-session-123"
 
 		// Create session
-		session, err := sessionManager.GetOrCreateSession(sessionID)
+		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
+
+		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		require.True(t, ok, "session should be of correct type")
 		assert.Equal(t, sessionID, session.SessionID)
 		assert.NotEmpty(t, session.WorkspaceDir)
 
 		// Retrieve session
-		retrieved, err := sessionManager.GetSession(sessionID)
+		retrievedInterface, err := sessionManager.GetSession(sessionID)
 		require.NoError(t, err)
+
+		retrieved, ok := retrievedInterface.(*sessiontypes.SessionState)
+		require.True(t, ok, "retrieved session should be of correct type")
 		assert.Equal(t, sessionID, retrieved.SessionID)
 		assert.Equal(t, session.WorkspaceDir, retrieved.WorkspaceDir)
 	})
@@ -147,8 +153,11 @@ func TestSessionManager(t *testing.T) {
 		sessionID := "persist-test-456"
 
 		// Create session with some data
-		session, err := sessionManager.GetOrCreateSession(sessionID)
+		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
+
+		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		require.True(t, ok, "session should be of correct type")
 
 		// Update session with test data
 		session.RepoURL = "https://github.com/test/repo"
@@ -163,8 +172,11 @@ func TestSessionManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Retrieve and verify persistence
-		retrieved, err := sessionManager.GetSession(sessionID)
+		retrievedInterface, err := sessionManager.GetSession(sessionID)
 		require.NoError(t, err)
+
+		retrieved, ok := retrievedInterface.(*sessiontypes.SessionState)
+		require.True(t, ok, "retrieved session should be of correct type")
 		assert.Equal(t, "https://github.com/test/repo", retrieved.RepoURL)
 		assert.Equal(t, "Go", retrieved.RepoAnalysis["language"])
 		assert.Equal(t, "gin", retrieved.RepoAnalysis["framework"])

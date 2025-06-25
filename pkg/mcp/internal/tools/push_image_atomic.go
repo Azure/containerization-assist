@@ -280,13 +280,37 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *sessiont
 
 	if err != nil {
 		result.Success = false
+
+		// Detect error type for proper error construction
+		errorType := types.ErrorCategoryUnknown
+		if strings.Contains(strings.ToLower(err.Error()), "authentication") ||
+			strings.Contains(strings.ToLower(err.Error()), "login") ||
+			strings.Contains(strings.ToLower(err.Error()), "auth") ||
+			strings.Contains(strings.ToLower(err.Error()), "denied") {
+			errorType = types.ErrorCategoryAuthError
+		} else if strings.Contains(strings.ToLower(err.Error()), "network") ||
+			strings.Contains(strings.ToLower(err.Error()), "timeout") ||
+			strings.Contains(strings.ToLower(err.Error()), "no such host") {
+			errorType = types.NetworkError
+		} else if strings.Contains(strings.ToLower(err.Error()), "rate limit") ||
+			strings.Contains(strings.ToLower(err.Error()), "toomanyrequests") {
+			errorType = types.ErrorCategoryRateLimit
+		}
+
 		result.PushResult = &coredocker.RegistryPushResult{
 			Success:  false,
 			ImageRef: result.ImageRef,
 			Registry: result.RegistryURL,
+			Error: &coredocker.RegistryError{
+				Type:     errorType,
+				Message:  err.Error(),
+				ImageRef: result.ImageRef,
+				Registry: result.RegistryURL,
+				Output:   err.Error(),
+			},
 		}
 		// Log push failure
-		t.handlePushError(ctx, err, nil, result)
+		t.handlePushError(ctx, err, result.PushResult, result)
 		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("push failed: %v", err), "push_error")
 	}
 
@@ -685,11 +709,9 @@ func (t *AtomicPushImageTool) updateSessionState(session *sessiontypes.SessionSt
 
 	session.UpdateLastAccessed()
 
-	// UpdateSession expects interface{} for updateFunc
-	updateFunc := func(sessionInterface interface{}) {
-		if s, ok := sessionInterface.(*sessiontypes.SessionState); ok {
-			*s = *session
-		}
+	// UpdateSession expects typed function for updateFunc
+	updateFunc := func(s *sessiontypes.SessionState) {
+		*s = *session
 	}
 	return t.sessionManager.UpdateSession(session.SessionID, updateFunc)
 }

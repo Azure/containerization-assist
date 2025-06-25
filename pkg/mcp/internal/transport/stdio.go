@@ -17,6 +17,7 @@ type StdioTransport struct {
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
 	logger       zerolog.Logger
+	handler      mcptypes.RequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
@@ -44,7 +45,10 @@ func NewStdioTransportWithLogger(logger zerolog.Logger) *StdioTransport {
 }
 
 // Serve starts the stdio transport and blocks until context cancellation
-func (s *StdioTransport) Serve(ctx context.Context, handler mcptypes.RequestHandler) error {
+func (s *StdioTransport) Serve(ctx context.Context) error {
+	if s.handler == nil {
+		return fmt.Errorf("request handler not set")
+	}
 	s.logger.Info().Msg("Starting stdio transport")
 
 	// Prefer using GomcpManager if available, fallback to server
@@ -84,6 +88,16 @@ func (s *StdioTransport) Serve(ctx context.Context, handler mcptypes.RequestHand
 		s.logger.Info().Msg("Stdio server finished")
 		return nil
 	}
+}
+
+// SetHandler sets the request handler for this transport
+func (s *StdioTransport) SetHandler(handler mcptypes.RequestHandler) {
+	s.handler = handler
+}
+
+// Stop gracefully shuts down the stdio transport (alias for Close for interface compatibility)
+func (s *StdioTransport) Stop() error {
+	return s.Close()
 }
 
 // Close shuts down the transport

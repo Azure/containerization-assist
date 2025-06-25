@@ -306,7 +306,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		30*time.Second, // Default timeout for health checks
 	)
 	result.HealthCheckDuration = time.Since(healthStartTime)
-	
+
 	// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
 	if healthResult != nil {
 		result.HealthResult = &kubernetes.HealthCheckResult{
@@ -332,9 +332,9 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		}
 		// Update summary
 		result.HealthResult.Summary = kubernetes.HealthSummary{
-			TotalPods: len(result.HealthResult.Pods),
-			ReadyPods: 0,
-			FailedPods: 0,
+			TotalPods:   len(result.HealthResult.Pods),
+			ReadyPods:   0,
+			FailedPods:  0,
 			PendingPods: 0,
 		}
 		for _, pod := range result.HealthResult.Pods {
@@ -917,19 +917,19 @@ func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.Health
 	if result == nil {
 		return nil
 	}
-	
+
 	k8sResult := &kubernetes.HealthCheckResult{
 		Success:   result.Healthy,
 		Namespace: namespace,
 	}
-	
+
 	if result.Error != nil {
 		k8sResult.Error = &kubernetes.HealthCheckError{
 			Type:    result.Error.Type,
 			Message: result.Error.Message,
 		}
 	}
-	
+
 	// Convert pod statuses
 	for _, ps := range result.PodStatuses {
 		podStatus := kubernetes.DetailedPodStatus{
@@ -940,7 +940,7 @@ func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.Health
 		}
 		k8sResult.Pods = append(k8sResult.Pods, podStatus)
 	}
-	
+
 	// Update summary
 	k8sResult.Summary = kubernetes.HealthSummary{
 		TotalPods:   len(k8sResult.Pods),
@@ -948,7 +948,7 @@ func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.Health
 		FailedPods:  0,
 		PendingPods: 0,
 	}
-	
+
 	for _, pod := range k8sResult.Pods {
 		if pod.Ready {
 			k8sResult.Summary.ReadyPods++
@@ -958,10 +958,10 @@ func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.Health
 			k8sResult.Summary.PendingPods++
 		}
 	}
-	
+
 	if k8sResult.Summary.TotalPods > 0 {
 		k8sResult.Summary.HealthyRatio = float64(k8sResult.Summary.ReadyPods) / float64(k8sResult.Summary.TotalPods)
 	}
-	
+
 	return k8sResult
 }

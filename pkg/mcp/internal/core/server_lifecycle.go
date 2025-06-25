@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // Start starts the MCP server
@@ -31,10 +31,13 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to register tools with gomcp: %w", err)
 	}
 
+	// Set the server as the request handler for the transport
+	s.transport.SetHandler(s)
+
 	// Start transport serving
 	transportDone := make(chan error, 1)
 	go func() {
-		transportDone <- s.transport.Serve(ctx, s)
+		transportDone <- s.transport.Serve(ctx)
 	}()
 
 	// Wait for context cancellation or transport error
@@ -54,7 +57,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // HandleRequest implements the RequestHandler interface
-func (s *Server) HandleRequest(ctx context.Context, req *transport.MCPRequest) (*transport.MCPResponse, error) {
+func (s *Server) HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error) {
 	// This is handled by the underlying MCP library for stdio transport
 	// For HTTP transport, we would implement custom request routing here
 	return nil, fmt.Errorf("direct request handling not implemented")
@@ -85,11 +88,7 @@ func (s *Server) shutdown() error {
 
 	// Step 1: Stop accepting new requests (transport specific)
 	s.logger.Info().Msg("Stopping transport from accepting new requests")
-	if httpTransport, ok := s.transport.(*transport.HTTPTransport); ok {
-		// For HTTP transport, we need to signal it to stop accepting new connections
-		// This is handled by the transport.Close() method below
-		_ = httpTransport
-	}
+	// Transport-specific stop handling is done via the unified Close() method
 
 	// Step 2: Wait for in-flight requests to complete (with timeout)
 	s.logger.Info().Msg("Waiting for in-flight requests to complete")
@@ -176,11 +175,11 @@ CONTINUE_SHUTDOWN:
 		s.logger.Info().Int("log_count", logBuffer.Size()).Msg("Final log buffer statistics")
 	}
 
-	// Step 9: Close transport
-	s.logger.Info().Msg("Closing transport")
-	if err := s.transport.Close(); err != nil {
-		s.logger.Error().Err(err).Msg("Error closing transport")
-		shutdownErrors = append(shutdownErrors, fmt.Errorf("transport close: %w", err))
+	// Step 9: Stop transport
+	s.logger.Info().Msg("Stopping transport")
+	if err := s.transport.Stop(); err != nil {
+		s.logger.Error().Err(err).Msg("Error stopping transport")
+		shutdownErrors = append(shutdownErrors, fmt.Errorf("transport stop: %w", err))
 	}
 
 	// Step 10: Shutdown OpenTelemetry provider

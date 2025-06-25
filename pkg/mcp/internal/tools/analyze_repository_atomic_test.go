@@ -7,11 +7,10 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/analysis"
-	"github.com/Azure/container-copilot/pkg/core/docker"
 	"github.com/Azure/container-copilot/pkg/core/git"
-	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,102 +90,51 @@ CMD ["./main"]
 	return dockerfile, nil
 }
 
-func (t *testPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*docker.BuildResult, error) {
+func (t *testPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*mcptypes.BuildResult, error) {
 	// Return a minimal happy-path build result for testing
-	return &docker.BuildResult{
+	return &mcptypes.BuildResult{
 		Success:  true,
 		ImageID:  "sha256:abc123def456",
 		ImageRef: imageName,
-		Logs:     []string{"Step 1/5 : FROM golang:1.21-alpine", "Successfully built abc123def456"},
-		Duration: 30 * time.Second,
-		Context: map[string]interface{}{
-			"dockerfile_path": dockerfilePath,
-			"session_id":      sessionID,
-		},
+		Logs:     "Step 1/5 : FROM golang:1.21-alpine\nSuccessfully built abc123def456",
 	}, nil
 }
 
-func (t *testPipelineAdapter) PushDockerImage(sessionID, imageName, registryURL string) (*docker.RegistryPushResult, error) {
-	// Return a minimal happy-path push result for testing
-	return &docker.RegistryPushResult{
-		Success:  true,
-		ImageRef: imageName,
-		Registry: registryURL,
-		Output:   "The push refers to repository [" + registryURL + "/" + imageName + "]",
-		Duration: 45 * time.Second,
-		Context: map[string]interface{}{
-			"session_id": sessionID,
-			"digest":     "sha256:fedcba987654321",
-		},
-	}, nil
+func (t *testPipelineAdapter) PushDockerImage(sessionID, imageName string) error {
+	// Return success for tests
+	return nil
 }
 
-func (t *testPipelineAdapter) GenerateKubernetesManifests(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*kubernetes.ManifestGenerationResult, error) {
+func (t *testPipelineAdapter) GenerateKubernetesManifests(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*mcptypes.KubernetesManifestResult, error) {
 	// Return a minimal happy-path manifest generation result for testing
-	return &kubernetes.ManifestGenerationResult{
+	return &mcptypes.KubernetesManifestResult{
 		Success: true,
-		Manifests: []kubernetes.GeneratedManifest{
-			{Name: "deployment", Kind: "Deployment", Path: fmt.Sprintf("/workspace/%s/manifests/deployment.yaml", sessionID), Valid: true},
-			{Name: "service", Kind: "Service", Path: fmt.Sprintf("/workspace/%s/manifests/service.yaml", sessionID), Valid: true},
-			{Name: "configmap", Kind: "ConfigMap", Path: fmt.Sprintf("/workspace/%s/manifests/configmap.yaml", sessionID), Valid: true},
-		},
-		Template:  "standard",
-		OutputDir: fmt.Sprintf("/workspace/%s/manifests", sessionID),
-		Duration:  5 * time.Second,
-		Context: map[string]interface{}{
-			"app_name":   appName,
-			"image_name": imageName,
-			"port":       port,
-			"session_id": sessionID,
+		Manifests: []mcptypes.GeneratedManifest{
+			{Name: "deployment", Kind: "Deployment", Path: fmt.Sprintf("/workspace/%s/manifests/deployment.yaml", sessionID), Content: "apiVersion: apps/v1\nkind: Deployment"},
+			{Name: "service", Kind: "Service", Path: fmt.Sprintf("/workspace/%s/manifests/service.yaml", sessionID), Content: "apiVersion: v1\nkind: Service"},
+			{Name: "configmap", Kind: "ConfigMap", Path: fmt.Sprintf("/workspace/%s/manifests/configmap.yaml", sessionID), Content: "apiVersion: v1\nkind: ConfigMap"},
 		},
 	}, nil
 }
 
-func (t *testPipelineAdapter) DeployToKubernetes(sessionID, manifestPath, namespace string) (*kubernetes.DeploymentResult, error) {
+func (t *testPipelineAdapter) DeployToKubernetes(sessionID string, manifests []string) (*mcptypes.KubernetesDeploymentResult, error) {
 	// Return a minimal happy-path deployment result for testing
-	return &kubernetes.DeploymentResult{
-		Success:      true,
-		ManifestPath: manifestPath,
-		Namespace:    namespace,
-		Resources: []kubernetes.DeployedResource{
-			{Kind: "Deployment", Name: "test-app", Namespace: namespace, Status: "Running", Ready: true, Age: "30s"},
-			{Kind: "Service", Name: "test-app-svc", Namespace: namespace, Status: "Active", Ready: true, Age: "30s"},
-		},
-		Output:   "deployment.apps/test-app created\nservice/test-app-svc created",
-		Duration: 60 * time.Second,
-		Context: map[string]interface{}{
-			"session_id": sessionID,
-			"replicas":   2,
-			"ready_pods": 2,
-		},
+	return &mcptypes.KubernetesDeploymentResult{
+		Success:     true,
+		Namespace:   "default",
+		Deployments: []string{"test-app"},
+		Services:    []string{"test-app-svc"},
 	}, nil
 }
 
-func (t *testPipelineAdapter) CheckApplicationHealth(sessionID, namespace, labelSelector string, timeout time.Duration) (*kubernetes.HealthCheckResult, error) {
+func (t *testPipelineAdapter) CheckApplicationHealth(sessionID, namespace, deploymentName string, timeout time.Duration) (*mcptypes.HealthCheckResult, error) {
 	// Return a minimal happy-path health check result for testing
-	return &kubernetes.HealthCheckResult{
-		Success:   true,
-		Namespace: namespace,
-		Pods: []kubernetes.DetailedPodStatus{
-			{Name: "test-app-1", Namespace: namespace, Status: "Running", Phase: "Running", Ready: true, Restarts: 0, Age: "30s"},
-			{Name: "test-app-2", Namespace: namespace, Status: "Running", Phase: "Running", Ready: true, Restarts: 0, Age: "30s"},
-		},
-		Services: []kubernetes.DetailedServiceStatus{
-			{Name: "test-app-svc", Namespace: namespace, Type: "ClusterIP", ClusterIP: "10.96.100.1", Age: "30s"},
-		},
-		Summary: kubernetes.HealthSummary{
-			TotalPods:     2,
-			ReadyPods:     2,
-			FailedPods:    0,
-			PendingPods:   0,
-			TotalServices: 1,
-			HealthyRatio:  1.0,
-		},
-		Duration: 5 * time.Second,
-		Context: map[string]interface{}{
-			"session_id":     sessionID,
-			"label_selector": labelSelector,
-			"timeout":        timeout.String(),
+	return &mcptypes.HealthCheckResult{
+		Healthy: true,
+		Status:  "All pods are running and ready",
+		PodStatuses: []mcptypes.PodStatus{
+			{Name: "test-app-1", Ready: true, Status: "Running", Reason: "Running"},
+			{Name: "test-app-2", Ready: true, Status: "Running", Reason: "Running"},
 		},
 	}, nil
 }
@@ -226,21 +174,43 @@ func (t *testPipelineAdapter) ClearContext(sessionID string) {
 	// No-op for tests
 }
 
-func (t *testPipelineAdapter) TagDockerImage(sessionID, sourceImage, targetImage string) (*docker.TagResult, error) {
+func (t *testPipelineAdapter) TagDockerImage(sessionID, sourceImage, targetImage string) error {
 	// Return success for tests
-	return &docker.TagResult{
-		Success:     true,
-		SourceImage: sourceImage,
-		TargetImage: targetImage,
+	return nil
+}
+
+func (t *testPipelineAdapter) PullDockerImage(sessionID, imageRef string) error {
+	// Return success for tests
+	return nil
+}
+
+// AcquireResource manages resource allocation for a session (required by PipelineOperations interface)
+func (t *testPipelineAdapter) AcquireResource(sessionID, resourceType string) error {
+	// Mock implementation for tests
+	return nil
+}
+
+// ReleaseResource manages resource cleanup for a session (required by PipelineOperations interface)
+func (t *testPipelineAdapter) ReleaseResource(sessionID, resourceType string) error {
+	// Mock implementation for tests
+	return nil
+}
+
+// ConvertToDockerState creates a simple Docker state for interface compatibility
+func (t *testPipelineAdapter) ConvertToDockerState(sessionID string) (*mcptypes.DockerState, error) {
+	// Mock implementation for tests
+	return &mcptypes.DockerState{
+		Images:     []string{},
+		Containers: []string{},
+		Networks:   []string{},
+		Volumes:    []string{},
 	}, nil
 }
 
-func (t *testPipelineAdapter) PullDockerImage(sessionID, imageRef string) (*docker.PullResult, error) {
-	// Return success for tests
-	return &docker.PullResult{
-		Success:  true,
-		ImageRef: imageRef,
-	}, nil
+// UpdateSessionFromDockerResults updates session state with Docker stage results (required by PipelineOperations interface)
+func (t *testPipelineAdapter) UpdateSessionFromDockerResults(sessionID string, result interface{}) error {
+	// Mock implementation for tests
+	return nil
 }
 
 // testSessionManager implements mcptypes.ToolSessionManager for testing
@@ -256,7 +226,7 @@ func newTestSessionManager() *testSessionManager {
 	}
 }
 
-func (t *testSessionManager) GetSession(sessionID string) (*sessiontypes.SessionState, error) {
+func (t *testSessionManager) GetSession(sessionID string) (interface{}, error) {
 	if t.shouldFailGet {
 		return nil, fmt.Errorf("failed to get session")
 	}
@@ -277,6 +247,7 @@ func (t *testSessionManager) CreateSession() (*sessiontypes.SessionState, error)
 		CreatedAt:    time.Now(),
 		LastAccessed: time.Now(),
 		ExpiresAt:    time.Now().Add(24 * time.Hour),
+		WorkspaceDir: fmt.Sprintf("/workspace/%s", sessionID),
 	}
 	t.sessions[sessionID] = session
 	return session, nil
@@ -296,13 +267,56 @@ func (t *testSessionManager) UpdateSession(sessionID string, updateFunc func(*se
 	return nil
 }
 
-func (t *testSessionManager) GetOrCreateSession(sessionID string) (*sessiontypes.SessionState, error) {
+func (t *testSessionManager) GetOrCreateSession(sessionID string) (interface{}, error) {
 	if sessionID != "" {
 		if session, exists := t.sessions[sessionID]; exists {
 			return session, nil
 		}
 	}
-	return t.CreateSession()
+	session, err := t.CreateSession()
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+// Interface compatibility methods for ToolSessionManager
+
+func (t *testSessionManager) GetSessionInterface(sessionID string) (interface{}, error) {
+	return t.GetSession(sessionID)
+}
+
+func (t *testSessionManager) GetOrCreateSessionFromRepo(repoURL string) (interface{}, error) {
+	session, err := t.CreateSession()
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+func (t *testSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+	delete(t.sessions, sessionID)
+	return nil
+}
+
+func (t *testSessionManager) ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error) {
+	var sessions []interface{}
+	for _, session := range t.sessions {
+		sessions = append(sessions, session)
+	}
+	return sessions, nil
+}
+
+func (t *testSessionManager) FindSessionByRepo(ctx context.Context, repoURL string) (interface{}, error) {
+	// Mock implementation - return first session or create new one
+	for _, session := range t.sessions {
+		return session, nil
+	}
+	session, err := t.CreateSession()
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
 }
 
 func TestAtomicAnalyzeRepositoryTool_Execute(t *testing.T) {

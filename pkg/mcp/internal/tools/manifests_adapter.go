@@ -48,23 +48,23 @@ func (w *manifestsPipelineWrapper) GenerateKubernetesManifests(sessionID, imageR
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert from mcptypes.KubernetesManifestResult to kubernetes.ManifestGenerationResult
 	if manifestResult == nil {
 		return nil, nil
 	}
-	
+
 	result := &kubernetes.ManifestGenerationResult{
 		Success: manifestResult.Success,
 	}
-	
+
 	if manifestResult.Error != nil {
 		result.Error = &kubernetes.ManifestError{
 			Type:    manifestResult.Error.Type,
 			Message: manifestResult.Error.Message,
 		}
 	}
-	
+
 	// Convert manifests
 	for _, manifest := range manifestResult.Manifests {
 		result.Manifests = append(result.Manifests, kubernetes.GeneratedManifest{
@@ -74,7 +74,7 @@ func (w *manifestsPipelineWrapper) GenerateKubernetesManifests(sessionID, imageR
 			Content: manifest.Content,
 		})
 	}
-	
+
 	return result, nil
 }
 

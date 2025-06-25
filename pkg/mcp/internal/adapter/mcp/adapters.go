@@ -7,10 +7,44 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 )
+
+// HealthServerInterface defines the interface for server health operations
+// This is a local interface to break circular dependencies
+type HealthServerInterface interface {
+	GetWorkspaceStats() WorkspaceStats
+	GetConfig() ServerConfig
+	GetSessionManagerStats() SessionManagerStats
+	GetCircuitBreakerStats() map[string]CircuitBreakerStats
+	GetStartTime() time.Time
+}
+
+// WorkspaceStats represents workspace statistics
+type WorkspaceStats struct {
+	TotalDiskUsage int64
+	SessionCount   int
+}
+
+// ServerConfig represents server configuration
+type ServerConfig struct {
+	TotalDiskLimit int64
+}
+
+// SessionManagerStats represents session manager statistics
+type SessionManagerStats struct {
+	ActiveSessions int
+	TotalSessions  int
+}
+
+// CircuitBreakerStats represents circuit breaker statistics
+type CircuitBreakerStats struct {
+	State        string
+	FailureCount int
+	SuccessCount int64
+	LastFailure  *time.Time
+}
 
 // WorkspaceManagerAdapter adapts WorkspaceManager to tools interfaces
 type WorkspaceManagerAdapter struct {
@@ -47,11 +81,11 @@ func (a *WorkspaceManagerAdapter) GetWorkspaceSize(sessionID string) (int64, err
 
 // ServerHealthAdapter makes Server implement tools.HealthChecker
 type ServerHealthAdapter struct {
-	server adapter.ServerInterface
+	server HealthServerInterface
 }
 
 // NewServerHealthAdapter creates a new ServerHealthAdapter
-func NewServerHealthAdapter(server adapter.ServerInterface) *ServerHealthAdapter {
+func NewServerHealthAdapter(server HealthServerInterface) *ServerHealthAdapter {
 	return &ServerHealthAdapter{
 		server: server,
 	}
@@ -110,7 +144,7 @@ func (a *ServerHealthAdapter) GetCircuitBreakerStats() map[string]tools.CircuitB
 			Name:      name,
 			State:     stats.State,
 			Failures:  stats.FailureCount,
-			Successes: stats.SuccessCount,
+			Successes: int(stats.SuccessCount),
 		}
 		if stats.LastFailure != nil {
 			cbStatus.LastFailure = *stats.LastFailure

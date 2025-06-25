@@ -781,7 +781,7 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 		"", // memoryLimit - not specified for deploy tool
 	)
 	result.GenerationDuration = time.Since(generationStart)
-	
+
 	// Convert from mcptypes.KubernetesManifestResult to kubernetes.ManifestGenerationResult
 	if manifestResult != nil {
 		result.ManifestResult = &kubernetes.ManifestGenerationResult{
@@ -850,7 +850,7 @@ func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, sess
 		manifests,
 	)
 	result.DeploymentDuration = time.Since(deploymentStart)
-	
+
 	// Convert from mcptypes.KubernetesDeploymentResult to kubernetes.DeploymentResult
 	if deployResult != nil {
 		result.DeploymentResult = &kubernetes.DeploymentResult{
@@ -923,7 +923,7 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 		timeout,
 	)
 	result.HealthCheckDuration = time.Since(healthStart)
-	
+
 	// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
 	if healthResult != nil {
 		result.HealthResult = &kubernetes.HealthCheckResult{

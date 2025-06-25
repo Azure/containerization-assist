@@ -211,7 +211,7 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 		result.DockerfilePath,
 	)
 	result.BuildDuration = time.Since(buildStartTime)
-	// Convert from mcptypes.DockerBuildResult to coredocker.BuildResult
+	// Convert from mcptypes.BuildResult to coredocker.BuildResult
 	if buildResult != nil {
 		result.BuildResult = &coredocker.BuildResult{
 			Success:  buildResult.Success,
@@ -280,10 +280,19 @@ func (e *BuildExecutor) executeWithProgress(ctx context.Context, args AtomicBuil
 
 		// Create pushResult based on error
 		if err != nil {
+			// Detect authentication errors from error message
+			errorType := "push_error"
+			if strings.Contains(strings.ToLower(err.Error()), "authentication") ||
+				strings.Contains(strings.ToLower(err.Error()), "unauthorized") ||
+				strings.Contains(strings.ToLower(err.Error()), "login") ||
+				strings.Contains(strings.ToLower(err.Error()), "auth") {
+				errorType = "auth_error"
+			}
+
 			result.PushResult = &coredocker.RegistryPushResult{
 				Success: false,
 				Error: &coredocker.RegistryError{
-					Type:    "push_error",
+					Type:    errorType,
 					Message: err.Error(),
 				},
 			}
@@ -393,7 +402,7 @@ func (e *BuildExecutor) executeWithoutProgress(ctx context.Context, args AtomicB
 	buildStartTime := time.Now()
 	buildResult, err := e.pipelineAdapter.BuildDockerImage(session.SessionID, result.FullImageRef, result.DockerfilePath)
 	result.BuildDuration = time.Since(buildStartTime)
-	// Convert from mcptypes.DockerBuildResult to coredocker.BuildResult
+	// Convert from mcptypes.BuildResult to coredocker.BuildResult
 	if buildResult != nil {
 		result.BuildResult = &coredocker.BuildResult{
 			Success:  buildResult.Success,
@@ -440,10 +449,19 @@ func (e *BuildExecutor) executeWithoutProgress(ctx context.Context, args AtomicB
 		result.PushDuration = time.Since(pushStartTime)
 
 		if err != nil {
+			// Detect authentication errors from error message
+			errorType := "push_error"
+			if strings.Contains(strings.ToLower(err.Error()), "authentication") ||
+				strings.Contains(strings.ToLower(err.Error()), "unauthorized") ||
+				strings.Contains(strings.ToLower(err.Error()), "login") ||
+				strings.Contains(strings.ToLower(err.Error()), "auth") {
+				errorType = "auth_error"
+			}
+
 			result.PushResult = &coredocker.RegistryPushResult{
 				Success: false,
 				Error: &coredocker.RegistryError{
-					Type:    "push_error",
+					Type:    errorType,
 					Message: err.Error(),
 				},
 			}

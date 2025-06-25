@@ -34,6 +34,7 @@ type HTTPTransport struct {
 	rateLimiter    map[string]*rateLimiter
 	logBodies      bool
 	maxBodyLogSize int64
+	handler        mcptypes.RequestHandler
 }
 
 // HTTPTransportConfig holds configuration for HTTP transport
@@ -167,7 +168,10 @@ func (t *HTTPTransport) handleOptions(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serve starts the HTTP server and handles requests
-func (t *HTTPTransport) Serve(ctx context.Context, handler mcptypes.RequestHandler) error {
+func (t *HTTPTransport) Serve(ctx context.Context) error {
+	if t.handler == nil {
+		return fmt.Errorf("request handler not set")
+	}
 	t.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", t.port),
 		Handler:      t.router,
@@ -200,6 +204,23 @@ func (t *HTTPTransport) Close() error {
 		return nil
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.logger.Info().Msg("Stopping HTTP transport")
+	return t.server.Shutdown(ctx)
+}
+
+// SetHandler sets the request handler for this transport
+func (t *HTTPTransport) SetHandler(handler mcptypes.RequestHandler) {
+	t.handler = handler
+}
+
+// Stop gracefully shuts down the HTTP transport
+func (t *HTTPTransport) Stop() error {
+	if t.server == nil {
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
