@@ -161,6 +161,9 @@ const (
 
 // UserPreferences stores user's choices throughout the conversation
 type UserPreferences struct {
+	// Global preferences
+	SkipConfirmations bool `json:"skip_confirmations"`
+
 	// Repository preferences
 	SkipFileTree bool   `json:"skip_file_tree"`
 	Branch       string `json:"branch,omitempty"`

@@ -10,6 +10,43 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Tool interface for common tool operations
+type Tool interface {
+	Execute(ctx context.Context, args interface{}) (interface{}, error)
+}
+
+// ToolWithMetadata interface for tools that provide metadata
+type ToolWithMetadata interface {
+	Tool
+	GetMetadata() (*mcptypes.ToolMetadata, error)
+}
+
+// ToolWithValidation interface for tools that provide validation
+type ToolWithValidation interface {
+	Tool
+	Validate(args interface{}) error
+}
+
+// getToolName safely extracts tool name from interface{} tool
+func getToolName(tool interface{}) string {
+	if t, ok := tool.(ToolWithMetadata); ok {
+		if metadata, err := t.GetMetadata(); err == nil && metadata != nil {
+			return metadata.Name
+		}
+	}
+	return "unknown"
+}
+
+// getToolMetadata safely extracts tool metadata from interface{} tool
+func getToolMetadata(tool interface{}) *mcptypes.ToolMetadata {
+	if t, ok := tool.(ToolWithMetadata); ok {
+		if metadata, err := t.GetMetadata(); err == nil {
+			return metadata
+		}
+	}
+	return &mcptypes.ToolMetadata{Name: "unknown"}
+}
+
 // ToolMiddleware provides middleware functionality for atomic tools
 type ToolMiddleware struct {
 	validationService *build.ValidationService
@@ -67,7 +104,10 @@ func (m *ToolMiddleware) ExecuteWithMiddleware(ctx context.Context, tool interfa
 func (m *ToolMiddleware) buildChain(execCtx *ExecutionContext) HandlerFunc {
 	// Start with the actual tool execution
 	handler := func(ctx *ExecutionContext) (interface{}, error) {
-		return ctx.Tool.Execute(ctx.Context, ctx.Args)
+		if tool, ok := ctx.Tool.(Tool); ok {
+			return tool.Execute(ctx.Context, ctx.Args)
+		}
+		return nil, fmt.Errorf("tool does not implement Tool interface")
 	}
 
 	// Wrap with middleware in reverse order
@@ -84,7 +124,7 @@ func (m *ToolMiddleware) recordExecution(execCtx *ExecutionContext, result inter
 	duration := time.Since(execCtx.StartTime)
 
 	execution := ToolExecution{
-		Tool:      execCtx.Tool.GetMetadata().Name,
+		Tool:      getToolName(execCtx.Tool),
 		Operation: "execute",
 		StartTime: execCtx.StartTime,
 		EndTime:   time.Now(),
@@ -135,13 +175,16 @@ func NewValidationMiddleware(service *build.ValidationService, logger zerolog.Lo
 // Wrap wraps the handler with validation
 func (m *ValidationMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 	return func(ctx *ExecutionContext) (interface{}, error) {
-		// Validate arguments using the tool's validation
-		if err := ctx.Tool.Validate(ctx.Context, ctx.Args); err != nil {
-			m.logger.Error().Err(err).Str("tool", ctx.Tool.GetMetadata().Name).Msg("Validation failed")
-			return nil, err
+		// Validate arguments using the tool's validation if available
+		if tool, ok := ctx.Tool.(ToolWithValidation); ok {
+			if err := tool.Validate(ctx.Args); err != nil {
+				m.logger.Error().Err(err).Str("tool", getToolName(ctx.Tool)).Msg("Validation failed")
+				return nil, err
+			}
+			m.logger.Debug().Str("tool", getToolName(ctx.Tool)).Msg("Validation passed")
+		} else {
+			m.logger.Debug().Str("tool", getToolName(ctx.Tool)).Msg("Tool does not implement validation")
 		}
-
-		m.logger.Debug().Str("tool", ctx.Tool.GetMetadata().Name).Msg("Validation passed")
 
 		// Continue to next middleware
 		return next(ctx)
@@ -164,7 +207,7 @@ func NewLoggingMiddleware(logger zerolog.Logger) *LoggingMiddleware {
 func (m *LoggingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 	return func(ctx *ExecutionContext) (interface{}, error) {
 		m.logger.Info().
-			Str("tool", ctx.Tool.GetMetadata().Name).
+			Str("tool", getToolName(ctx.Tool)).
 			Msg("Tool execution started")
 
 		result, err := next(ctx)
@@ -172,12 +215,12 @@ func (m *LoggingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 		if err != nil {
 			m.logger.Error().
 				Err(err).
-				Str("tool", ctx.Tool.GetMetadata().Name).
+				Str("tool", getToolName(ctx.Tool)).
 				Dur("duration", time.Since(ctx.StartTime)).
 				Msg("Tool execution failed")
 		} else {
 			m.logger.Info().
-				Str("tool", ctx.Tool.GetMetadata().Name).
+				Str("tool", getToolName(ctx.Tool)).
 				Dur("duration", time.Since(ctx.StartTime)).
 				Msg("Tool execution completed successfully")
 		}
@@ -208,7 +251,7 @@ func (m *ErrorHandlingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 		if err != nil {
 			// Create error context
 			errorCtx := ErrorContext{
-				Tool:      ctx.Tool.GetMetadata().Name,
+				Tool:      getToolName(ctx.Tool),
 				Operation: "execute",
 				Fields:    make(map[string]interface{}),
 			}
@@ -245,7 +288,7 @@ func NewMetricsMiddleware(service *TelemetryService, logger zerolog.Logger) *Met
 func (m *MetricsMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 	return func(ctx *ExecutionContext) (interface{}, error) {
 		// Create performance tracker
-		tracker := m.service.CreatePerformanceTracker(ctx.Tool.GetMetadata().Name, "execute")
+		tracker := m.service.CreatePerformanceTracker(getToolName(ctx.Tool), "execute")
 		tracker.Start()
 
 		result, err := next(ctx)
@@ -261,7 +304,7 @@ func (m *MetricsMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 		}
 
 		m.logger.Debug().
-			Str("tool", ctx.Tool.GetMetadata().Name).
+			Str("tool", getToolName(ctx.Tool)).
 			Dur("duration", duration).
 			Bool("success", err == nil).
 			Msg("Metrics recorded")
@@ -289,7 +332,7 @@ func (m *RecoveryMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 			if r := recover(); r != nil {
 				m.logger.Error().
 					Interface("panic", r).
-					Str("tool", ctx.Tool.GetMetadata().Name).
+					Str("tool", getToolName(ctx.Tool)).
 					Msg("Panic recovered during tool execution")
 
 				err = fmt.Errorf("tool execution panicked: %v", r)
@@ -335,7 +378,7 @@ func (m *ContextMiddleware) extractMetadata(ctx *ExecutionContext) {
 	}
 
 	// Add tool metadata
-	metadata := ctx.Tool.GetMetadata()
+	metadata := getToolMetadata(ctx.Tool)
 	ctx.Metadata["tool_name"] = metadata.Name
 	ctx.Metadata["tool_version"] = metadata.Version
 }
@@ -387,7 +430,7 @@ func (m *TimeoutMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 			ctx.Context = originalCtx
 
 			m.logger.Error().
-				Str("tool", ctx.Tool.GetMetadata().Name).
+				Str("tool", getToolName(ctx.Tool)).
 				Dur("timeout", m.timeout).
 				Msg("Tool execution timed out")
 

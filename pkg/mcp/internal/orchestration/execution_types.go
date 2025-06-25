@@ -2,7 +2,11 @@ package orchestration
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // ExecutionStage represents a stage in workflow execution
@@ -13,7 +17,7 @@ type ExecutionStage struct {
 	Tools       []string               `json:"tools"`
 	DependsOn   []string               `json:"depends_on"`
 	Variables   map[string]interface{} `json:"variables"`
-	Timeout     time.Duration          `json:"timeout"`
+	Timeout     *time.Duration         `json:"timeout"`
 	MaxRetries  int                    `json:"max_retries"`
 	Parallel    bool                   `json:"parallel"`
 	Conditions  []StageCondition       `json:"conditions"`
@@ -45,7 +49,7 @@ type ExecutionSession struct {
 	ErrorContext     map[string]interface{} `json:"error_context"`
 	WorkflowVersion  string                 `json:"workflow_version"`
 	Labels           map[string]string      `json:"labels"`
-	EndTime          time.Time              `json:"end_time"`
+	EndTime          *time.Time             `json:"end_time"`
 }
 
 // ExecutionArtifact represents an artifact from execution
@@ -179,8 +183,8 @@ type SessionFilter struct {
 	WorkflowID   string            `json:"workflow_id,omitempty"`
 	WorkflowName string            `json:"workflow_name,omitempty"`
 	StartAfter   time.Time         `json:"start_after,omitempty"`
-	StartTime    time.Time         `json:"start_time,omitempty"`
-	EndTime      time.Time         `json:"end_time,omitempty"`
+	StartTime    *time.Time        `json:"start_time,omitempty"`
+	EndTime      *time.Time        `json:"end_time,omitempty"`
 	Labels       map[string]string `json:"labels,omitempty"`
 	Offset       int               `json:"offset,omitempty"`
 	Limit        int               `json:"limit,omitempty"`
@@ -188,11 +192,13 @@ type SessionFilter struct {
 
 type StageResult struct {
 	StageID   string                 `json:"stage_id"`
+	StageName string                 `json:"stage_name"`
 	Success   bool                   `json:"success"`
 	Error     *WorkflowError         `json:"error,omitempty"`
 	Results   map[string]interface{} `json:"results"`
 	Duration  time.Duration          `json:"duration"`
 	Artifacts []ExecutionArtifact    `json:"artifacts"`
+	Metrics   map[string]interface{} `json:"metrics"`
 }
 
 type WorkflowSpecWorkflowStage = ExecutionStage
@@ -257,8 +263,9 @@ type ErrorRule struct {
 }
 
 type FailureAction struct {
-	Action string                `json:"action"`
-	Retry  *RetryPolicyExecution `json:"retry,omitempty"`
+	Action     string                `json:"action"`
+	Retry      *RetryPolicyExecution `json:"retry,omitempty"`
+	RedirectTo string                `json:"redirect_to,omitempty"`
 }
 
 // ExecuteToolFunc is the signature for tool execution functions
@@ -337,4 +344,66 @@ func WithCreateCheckpoints(enable bool) ExecutionOption {
 
 func WithEnableParallel(enable bool) ExecutionOption {
 	return ExecutionOption{Parallel: enable}
+}
+
+// VariableContext contains variables available for expansion
+type VariableContext struct {
+	WorkflowVars    map[string]string      `json:"workflow_vars"`
+	StageVars       map[string]interface{} `json:"stage_vars"`
+	SessionContext  map[string]interface{} `json:"session_context"`
+	EnvironmentVars map[string]string      `json:"environment_vars"`
+	Secrets         map[string]string      `json:"secrets"`
+}
+
+// VariableResolver handles variable expansion
+type VariableResolver struct {
+	logger zerolog.Logger
+}
+
+// NewVariableResolver creates a new variable resolver
+func NewVariableResolver(logger zerolog.Logger) *VariableResolver {
+	return &VariableResolver{
+		logger: logger.With().Str("component", "variable_resolver").Logger(),
+	}
+}
+
+// Expand expands variables in the given string using the provided context
+func (vr *VariableResolver) Expand(input string, context *VariableContext) string {
+	// Simple variable expansion implementation
+	result := input
+
+	// Replace workflow variables
+	for key, value := range context.WorkflowVars {
+		placeholder := fmt.Sprintf("${%s}", key)
+		result = strings.ReplaceAll(result, placeholder, value)
+	}
+
+	// Replace stage variables
+	for key, value := range context.StageVars {
+		if strValue, ok := value.(string); ok {
+			placeholder := fmt.Sprintf("${%s}", key)
+			result = strings.ReplaceAll(result, placeholder, strValue)
+		}
+	}
+
+	// Replace session context variables
+	for key, value := range context.SessionContext {
+		if strValue, ok := value.(string); ok {
+			placeholder := fmt.Sprintf("${%s}", key)
+			result = strings.ReplaceAll(result, placeholder, strValue)
+		}
+	}
+
+	// Replace environment variables
+	for key, value := range context.EnvironmentVars {
+		placeholder := fmt.Sprintf("${%s}", key)
+		result = strings.ReplaceAll(result, placeholder, value)
+	}
+
+	return result
+}
+
+// ResolveVariables is an alias for Expand for backward compatibility
+func (vr *VariableResolver) ResolveVariables(input string, context *VariableContext) string {
+	return vr.Expand(input, context)
 }

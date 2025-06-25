@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
 // Start starts the MCP server
@@ -56,11 +57,17 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
-// HandleRequest implements the RequestHandler interface
-func (s *Server) HandleRequest(ctx context.Context, request interface{}) (interface{}, error) {
+// HandleRequest implements the LocalRequestHandler interface
+func (s *Server) HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error) {
 	// This is handled by the underlying MCP library for stdio transport
 	// For HTTP transport, we would implement custom request routing here
-	return nil, fmt.Errorf("direct request handling not implemented")
+	return &mcptypes.MCPResponse{
+		ID: req.ID,
+		Error: &mcptypes.MCPError{
+			Code:    -32601,
+			Message: "direct request handling not implemented",
+		},
+	}, nil
 }
 
 // Stop gracefully stops the MCP server

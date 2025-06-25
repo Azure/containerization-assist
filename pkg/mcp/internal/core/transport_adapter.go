@@ -47,14 +47,8 @@ func (ta *TransportAdapter) Name() string {
 }
 
 // SetHandler sets the request handler
-func (ta *TransportAdapter) SetHandler(handler interface{}) {
-	// Type assert to the expected handler type
-	if h, ok := handler.(transport.LocalRequestHandler); ok {
-		ta.internal.SetHandler(h)
-	} else if h, ok := handler.(InternalRequestHandler); ok {
-		// Wrap the InternalRequestHandler to LocalRequestHandler
-		ta.internal.SetHandler(&requestHandlerAdapter{handler: h})
-	}
+func (ta *TransportAdapter) SetHandler(handler transport.LocalRequestHandler) {
+	ta.internal.SetHandler(handler)
 }
 
 // requestHandlerAdapter adapts InternalRequestHandler to transport.LocalRequestHandler

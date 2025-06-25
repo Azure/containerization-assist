@@ -10,7 +10,6 @@ import (
 
 	// Execution types are in the orchestration package
 	// Workflow types would go here when implemented
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -191,7 +190,11 @@ func (se *DefaultStageExecutor) prepareToolArgs(
 
 	// Add stage variables with enhanced expansion
 	for k, v := range stage.Variables {
-		args[k] = se.expandVariableEnhanced(v, session, stage)
+		if strValue, ok := v.(string); ok {
+			args[k] = se.expandVariableEnhanced(strValue, session, stage)
+		} else {
+			args[k] = v
+		}
 	}
 
 	// Add session context
@@ -241,11 +244,7 @@ func (se *DefaultStageExecutor) expandVariableEnhanced(value string, session *Wo
 	}
 
 	// Expand variables
-	expanded, err := resolver.ResolveVariables(value, context)
-	if err != nil {
-		se.logger.Warn().Err(err).Str("value", value).Msg("Failed to expand variables")
-		return value // Return original on error
-	}
+	expanded := resolver.ResolveVariables(value, context)
 
 	return expanded
 }

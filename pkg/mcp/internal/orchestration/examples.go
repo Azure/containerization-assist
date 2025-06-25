@@ -4,6 +4,11 @@ import (
 	"time"
 )
 
+// Helper function to convert time.Duration to pointer
+func timePtr(d time.Duration) *time.Duration {
+	return &d
+}
+
 // GetExampleWorkflows returns a collection of example workflow specifications
 func GetExampleWorkflows() map[string]*WorkflowSpec {
 	return map[string]*WorkflowSpec{
@@ -39,7 +44,7 @@ func getContainerizationPipeline() *WorkflowSpec {
 					Conditions: []StageCondition{
 						{Key: "repo_url", Operator: "required"},
 					},
-					Timeout: 10 * time.Minute,
+					Timeout: timePtr(10 * time.Minute),
 				},
 				{
 					Name:      "dockerfile-generation",
@@ -55,7 +60,7 @@ func getContainerizationPipeline() *WorkflowSpec {
 					Tools:     []string{"validate_dockerfile_atomic", "scan_secrets_atomic"},
 					DependsOn: []string{"dockerfile-generation"},
 					Parallel:  true,
-					Timeout:   5 * time.Minute,
+					Timeout:   timePtr(5 * time.Minute),
 				},
 				{
 					Name:      "build",
@@ -90,14 +95,14 @@ func getContainerizationPipeline() *WorkflowSpec {
 					Tools:     []string{"deploy_kubernetes_atomic"},
 					DependsOn: []string{"deployment-prep"},
 					Parallel:  false,
-					Timeout:   15 * time.Minute,
+					Timeout:   timePtr(15 * time.Minute),
 				},
 				{
 					Name:      "validation",
 					Tools:     []string{"check_health_atomic"},
 					DependsOn: []string{"deployment"},
 					Parallel:  false,
-					Timeout:   5 * time.Minute,
+					Timeout:   timePtr(5 * time.Minute),
 				},
 			},
 			Variables: map[string]interface{}{
@@ -210,7 +215,7 @@ func getDevelopmentWorkflow() *WorkflowSpec {
 					Tools:     []string{"analyze_repository_atomic"},
 					DependsOn: []string{},
 					Parallel:  false,
-					Timeout:   2 * time.Minute,
+					Timeout:   timePtr(2 * time.Minute),
 				},
 				{
 					Name:      "build-and-test",
@@ -313,7 +318,7 @@ func getProductionDeployment() *WorkflowSpec {
 					Tools:     []string{"deploy_kubernetes_atomic"},
 					DependsOn: []string{"production-manifests"},
 					Parallel:  false,
-					Timeout:   30 * time.Minute,
+					Timeout:   timePtr(30 * time.Minute),
 					Variables: map[string]interface{}{
 						"deployment_strategy": "rolling",
 						"max_unavailable":     "25%",
@@ -324,7 +329,7 @@ func getProductionDeployment() *WorkflowSpec {
 					Tools:     []string{"check_health_atomic"},
 					DependsOn: []string{"production-deployment"},
 					Parallel:  false,
-					Timeout:   10 * time.Minute,
+					Timeout:   timePtr(10 * time.Minute),
 					RetryPolicy: &RetryPolicyExecution{
 						MaxAttempts:  5,
 						BackoffMode:  "linear",
@@ -417,7 +422,7 @@ func getCICDPipeline() *WorkflowSpec {
 					Tools:     []string{"check_health_atomic"},
 					DependsOn: []string{"staging-deploy"},
 					Parallel:  false,
-					Timeout:   15 * time.Minute,
+					Timeout:   timePtr(15 * time.Minute),
 				},
 				{
 					Name:      "production-promotion",

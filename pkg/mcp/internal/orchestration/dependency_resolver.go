@@ -177,7 +177,7 @@ func (dr *DefaultDependencyResolver) GetDependencyGraph(stages []WorkflowStage) 
 		}
 
 		// Add stage properties
-		if stage.Timeout > 0 {
+		if stage.Timeout != nil && *stage.Timeout > 0 {
 			node.Properties["timeout"] = stage.Timeout.String()
 		}
 		if stage.RetryPolicy != nil {

@@ -1,6 +1,9 @@
 package core
 
-import "context"
+import (
+	"context"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
+)
 
 // InternalTransport is a local interface to avoid import cycles with pkg/mcp
 // This interface matches mcp.Transport
@@ -12,7 +15,7 @@ type InternalTransport interface {
 	Stop(ctx context.Context) error
 
 	// SetHandler sets the request handler
-	SetHandler(handler interface{})
+	SetHandler(handler transport.LocalRequestHandler)
 }
 
 // InternalRequestHandler is a local interface to avoid import cycles with pkg/mcp

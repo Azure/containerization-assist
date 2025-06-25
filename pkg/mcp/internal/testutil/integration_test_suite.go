@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
 	orchestrationtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/testutil"
 	profilingtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -15,8 +16,40 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/Azure/container-copilot/pkg/runner"
 )
+
+// llmTransportAdapter adapts types.LLMTransport to analyze.LLMTransport
+type llmTransportAdapter struct {
+	transport types.LLMTransport
+}
+
+// SendPrompt implements analyze.LLMTransport by converting to InvokeTool call
+func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
+	ctx := context.Background()
+	payload := map[string]any{
+		"prompt": prompt,
+	}
+
+	// Call the chat tool with the prompt
+	ch, err := a.transport.InvokeTool(ctx, "chat", payload, false)
+	if err != nil {
+		return "", err
+	}
+
+	// Read the response from the channel
+	for msg := range ch {
+		var response string
+		if err := json.Unmarshal(msg, &response); err == nil {
+			return response, nil
+		}
+		// If unmarshaling as string fails, return the raw message as string
+		return string(msg), nil
+	}
+
+	return "", nil
+}
 
 // ConversationConfig holds configuration for conversation mode
 type ConversationConfig struct {
@@ -129,7 +162,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 
 	// Create clients for pipeline adapter
 	cmdRunner := &runner.DefaultCommandRunner{}
-	mcpClients := core.NewMCPClients(
+	mcpClients := mcptypes.NewMCPClients(
 		docker.NewDockerCmdRunner(cmdRunner),
 		kind.NewKindCmdRunner(cmdRunner),
 		k8s.NewKubeCmdRunner(cmdRunner),
@@ -138,7 +171,9 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 	// In conversation mode, use CallerAnalyzer instead of StubAnalyzer
 	// This requires the transport to be able to forward prompts to the LLM
 	if transport, ok := s.transport.(types.LLMTransport); ok {
-		callerAnalyzer := analyze.NewCallerAnalyzer(transport, analyze.CallerAnalyzerOpts{
+		// Create adapter to bridge types.LLMTransport to analyze.LLMTransport
+		adapter := &llmTransportAdapter{transport: transport}
+		callerAnalyzer := analyze.NewCallerAnalyzer(adapter, analyze.CallerAnalyzerOpts{
 			ToolName:       "chat",
 			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
 			PerCallTimeout: 60 * time.Second,

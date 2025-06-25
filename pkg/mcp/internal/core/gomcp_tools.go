@@ -165,7 +165,7 @@ type ToolDependencies struct {
 	ToolRegistry       *orchestration.MCPToolRegistry
 	PipelineOperations mcptypes.PipelineOperations // Direct pipeline operations without adapter
 	AtomicSessionMgr   *session.SessionManager
-	MCPClients         *adapter.MCPClients
+	MCPClients         *mcptypes.MCPClients
 	RegistryManager    *coredocker.RegistryManager
 	Logger             zerolog.Logger
 }
@@ -180,15 +180,14 @@ func getNoReflectDispatcher(orchestrator *orchestration.MCPToolOrchestrator) *or
 func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 	// Create clients for atomic tools
 	cmdRunner := &runner.DefaultCommandRunner{}
-	mcpClients := adapter.NewMCPClients(
+	mcpClients := mcptypes.NewMCPClients(
 		docker.NewDockerCmdRunner(cmdRunner),
 		kind.NewKindCmdRunner(cmdRunner),
 		k8s.NewKubeCmdRunner(cmdRunner),
 	)
 
 	// Validate analyzer configuration for production use
-	transportEnabled := s.IsConversationModeEnabled() || gm.transport != nil
-	if err := mcpClients.ValidateAnalyzerForProduction(s.logger, transportEnabled); err != nil {
+	if err := mcpClients.ValidateAnalyzerForProduction(s.logger); err != nil {
 		// Log critical error but don't fail startup - let it continue with warning
 		s.logger.Error().Err(err).Msg("Analyzer validation failed")
 	}

@@ -398,7 +398,12 @@ func (s *UnifiedMCPServer) executeWorkflowTool(ctx context.Context, args map[str
 
 		var options []orchestration.ExecutionOption
 		if vars := variables; vars != nil {
-			options = append(options, orchestration.WithVariables(vars))
+			// Convert map[string]string to map[string]interface{}
+			interfaceVars := make(map[string]interface{})
+			for k, v := range vars {
+				interfaceVars[k] = v
+			}
+			options = append(options, orchestration.WithVariables(interfaceVars))
 		}
 
 		return s.workflowOrchestrator.ExecuteWorkflow(ctx, workflowName, options...)

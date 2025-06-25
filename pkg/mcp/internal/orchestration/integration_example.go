@@ -6,7 +6,6 @@ import (
 	"time"
 
 	// "github.com/Azure/container-copilot/pkg/mcp/internal/workflow" // TODO: Implement workflow package
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
 )
