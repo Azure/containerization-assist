@@ -209,6 +209,10 @@ func TestConversationState(t *testing.T) {
 
 // TestConversationStages tests individual conversation stages
 func TestConversationStages(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
 	tmpDir, err := os.MkdirTemp("", "conversation-stages-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
