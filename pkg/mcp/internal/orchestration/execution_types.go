@@ -165,25 +165,25 @@ type ExecutionOption struct {
 }
 
 type WorkflowResult struct {
-	Success   bool                   `json:"success"`
-	Results   map[string]interface{} `json:"results"`
-	Error     *WorkflowError         `json:"error,omitempty"`
-	Duration  time.Duration          `json:"duration"`
-	Artifacts []ExecutionArtifact    `json:"artifacts"`
-	SessionID       string           `json:"session_id"`
-	StagesCompleted int              `json:"stages_completed"`
+	Success         bool                   `json:"success"`
+	Results         map[string]interface{} `json:"results"`
+	Error           *WorkflowError         `json:"error,omitempty"`
+	Duration        time.Duration          `json:"duration"`
+	Artifacts       []ExecutionArtifact    `json:"artifacts"`
+	SessionID       string                 `json:"session_id"`
+	StagesCompleted int                    `json:"stages_completed"`
 }
 
 type SessionFilter struct {
-	Status       string                 `json:"status,omitempty"`
-	WorkflowID   string                 `json:"workflow_id,omitempty"`
-	WorkflowName string                 `json:"workflow_name,omitempty"`
-	StartAfter   time.Time              `json:"start_after,omitempty"`
-	StartTime    time.Time              `json:"start_time,omitempty"`
-	EndTime      time.Time              `json:"end_time,omitempty"`
-	Labels       map[string]string      `json:"labels,omitempty"`
-	Offset       int                    `json:"offset,omitempty"`
-	Limit        int                    `json:"limit,omitempty"`
+	Status       string            `json:"status,omitempty"`
+	WorkflowID   string            `json:"workflow_id,omitempty"`
+	WorkflowName string            `json:"workflow_name,omitempty"`
+	StartAfter   time.Time         `json:"start_after,omitempty"`
+	StartTime    time.Time         `json:"start_time,omitempty"`
+	EndTime      time.Time         `json:"end_time,omitempty"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	Offset       int               `json:"offset,omitempty"`
+	Limit        int               `json:"limit,omitempty"`
 }
 
 type StageResult struct {
