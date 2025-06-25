@@ -147,6 +147,9 @@ jobs:
       run: |
         echo "📈 Comparing with base branch..."
         
+        # Stash any uncommitted changes
+        git stash push -m "temp stash for base comparison" || true
+        
         # Checkout base branch
         git checkout ${{ github.event.pull_request.base.sha }}
         
@@ -157,6 +160,9 @@ jobs:
         
         # Switch back
         git checkout ${{ github.event.pull_request.head.sha }}
+        
+        # Restore stashed changes
+        git stash pop || true
         
         # Compare if base metrics exist
         if [ -f base-quality-metrics.json ]; then
