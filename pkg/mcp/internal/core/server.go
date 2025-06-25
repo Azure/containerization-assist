@@ -168,12 +168,13 @@ func NewServer(config ServerConfig) (*Server, error) {
 			LogLevel:       config.LogLevel,
 		}
 		httpTransport := transport.NewHTTPTransport(httpConfig)
-		mcpTransport = httpTransport
+		mcpTransport = NewTransportAdapter(httpTransport)
 	case "stdio":
 		fallthrough
 	default:
 		// Use factory for consistent stdio transport creation
-		mcpTransport = stdioutils.NewDefaultStdioTransport(logger)
+		stdioTransport := stdioutils.NewDefaultStdioTransport(logger)
+		mcpTransport = NewTransportAdapter(stdioTransport)
 	}
 
 	// Create gomcp manager with builder pattern

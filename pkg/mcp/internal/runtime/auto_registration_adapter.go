@@ -59,7 +59,7 @@ func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcptypes.ToolMe
 }
 
 // RegisterAtomicTools registers all atomic tools that are ready for auto-registration
-func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.ToolRegistry) error {
+func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry interface{}) error {
 	// Since the actual tools need dependencies (PipelineOperations, SessionManager, Logger),
 	// we cannot instantiate them here without those dependencies.
 	// This auto-registration approach needs to be refactored to work with dependency injection.

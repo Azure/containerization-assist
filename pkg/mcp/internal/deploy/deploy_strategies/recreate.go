@@ -94,7 +94,11 @@ func (r *RecreateStrategy) Deploy(ctx context.Context, config DeploymentConfig) 
 
 	// Report initial progress
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.1, "Initializing recreate deployment")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.1, "Initializing recreate deployment")
+		}
 	}
 
 	// Step 1: Validate prerequisites
@@ -114,10 +118,14 @@ func (r *RecreateStrategy) Deploy(ctx context.Context, config DeploymentConfig) 
 		Msg("Current deployment state determined")
 
 	if config.ProgressReporter != nil {
-		if currentExists {
-			config.ProgressReporter.ReportStage(0.2, "Terminating existing deployment")
-		} else {
-			config.ProgressReporter.ReportStage(0.2, "No existing deployment found, proceeding with creation")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			if currentExists {
+				reporter.ReportStage(0.2, "Terminating existing deployment")
+			} else {
+				reporter.ReportStage(0.2, "No existing deployment found, proceeding with creation")
+			}
 		}
 	}
 
@@ -135,7 +143,11 @@ func (r *RecreateStrategy) Deploy(ctx context.Context, config DeploymentConfig) 
 		})
 
 		if config.ProgressReporter != nil {
-			config.ProgressReporter.ReportStage(0.4, "Waiting for termination to complete")
+			if reporter, ok := config.ProgressReporter.(interface {
+				ReportStage(float64, string)
+			}); ok {
+				reporter.ReportStage(0.4, "Waiting for termination to complete")
+			}
 		}
 
 		// Wait for termination to complete
@@ -145,7 +157,11 @@ func (r *RecreateStrategy) Deploy(ctx context.Context, config DeploymentConfig) 
 	}
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.5, "Creating new deployment")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.5, "Creating new deployment")
+		}
 	}
 
 	// Step 4: Create new deployment
@@ -161,7 +177,11 @@ func (r *RecreateStrategy) Deploy(ctx context.Context, config DeploymentConfig) 
 	})
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.7, "Waiting for new deployment to be ready")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.7, "Waiting for new deployment to be ready")
+		}
 	}
 
 	// Step 5: Wait for new deployment to be ready
@@ -173,7 +193,11 @@ func (r *RecreateStrategy) Deploy(ctx context.Context, config DeploymentConfig) 
 	}
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(0.9, "Validating deployment health")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(0.9, "Validating deployment health")
+		}
 	}
 
 	// Step 6: Perform final health checks
@@ -217,7 +241,11 @@ func (r *RecreateStrategy) Deploy(ctx context.Context, config DeploymentConfig) 
 	}
 
 	if config.ProgressReporter != nil {
-		config.ProgressReporter.ReportStage(1.0, "Recreate deployment completed successfully")
+		if reporter, ok := config.ProgressReporter.(interface {
+			ReportStage(float64, string)
+		}); ok {
+			reporter.ReportStage(1.0, "Recreate deployment completed successfully")
+		}
 	}
 
 	r.logger.Info().

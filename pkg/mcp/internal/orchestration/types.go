@@ -7,7 +7,7 @@ type SessionManager interface {
 }
 
 // NOTE: ToolRegistry and Orchestrator interfaces are now defined in pkg/mcp/interfaces.go
-// Use mcp.ToolRegistry and mcp.Orchestrator for the unified interfaces
+// However, due to import cycles, the orchestration package uses mcptypes.ToolRegistry and mcptypes.ToolOrchestrator
 
 // ToolMetadata contains metadata about a tool
 type ToolMetadata struct {

@@ -19,8 +19,8 @@ import (
 )
 
 // standardPullStages provides common stages for pull operations
-func standardPullStages() []mcptypes.ProgressStage {
-	return []mcptypes.ProgressStage{
+func standardPullStages() []internal.LocalProgressStage {
+	return []internal.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
 		{Name: "Authenticate", Weight: 0.15, Description: "Authenticating with registry"},
 		{Name: "Pull", Weight: 0.60, Description: "Pulling Docker image layers"},
@@ -139,7 +139,7 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	}
 
 	// Create progress adapter for GoMCP using standard pull stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Pull", Weight: 0.80, Description: "Pulling image"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Pull", Weight: 0.80, Description: "Pulling image"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -164,7 +164,7 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 }
 
 // executeWithProgress handles the main execution with progress reporting
-func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time, reporter mcptypes.ProgressReporter) error {
+func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time, reporter interface{}) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	t.logger.Info().Msg("Loading session")
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
@@ -288,7 +288,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 }
 
 // performPull contains the actual pull logic that can be used with or without progress reporting
-func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiontypes.SessionState, args AtomicPullImageArgs, result *AtomicPullImageResult, reporter mcptypes.ProgressReporter) error {
+func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiontypes.SessionState, args AtomicPullImageArgs, result *AtomicPullImageResult, reporter interface{}) error {
 	// Report progress if reporter is available
 	// Progress reporting removed
 

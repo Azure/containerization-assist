@@ -4,9 +4,24 @@ import (
 	"context"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 )
+
+// LocalProgressReporter provides progress reporting (local interface to avoid import cycles)
+type LocalProgressReporter interface {
+	ReportStage(stageProgress float64, message string)
+	NextStage(message string)
+	SetStage(stageIndex int, message string)
+	ReportOverall(progress float64, message string)
+	GetCurrentStage() (int, LocalProgressStage)
+}
+
+// LocalProgressStage represents a stage in a multi-step operation (local type to avoid import cycles)
+type LocalProgressStage struct {
+	Name        string  // Human-readable stage name
+	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
+	Description string  // Optional detailed description
+}
 
 // GoMCPProgressAdapter provides a bridge between the existing ProgressReporter interface
 // and GoMCP's native progress tokens. This allows existing tools to use GoMCP progress
@@ -14,12 +29,12 @@ import (
 type GoMCPProgressAdapter struct {
 	serverCtx *server.Context
 	token     string
-	stages    []mcptypes.ProgressStage
+	stages    []LocalProgressStage
 	current   int
 }
 
 // NewGoMCPProgressAdapter creates a progress adapter using GoMCP native progress tokens
-func NewGoMCPProgressAdapter(serverCtx *server.Context, stages []mcptypes.ProgressStage) *GoMCPProgressAdapter {
+func NewGoMCPProgressAdapter(serverCtx *server.Context, stages []LocalProgressStage) *GoMCPProgressAdapter {
 	token := serverCtx.CreateProgressToken()
 
 	return &GoMCPProgressAdapter{
@@ -72,11 +87,11 @@ func (a *GoMCPProgressAdapter) ReportOverall(progress float64, message string) {
 }
 
 // GetCurrentStage implements mcptypes.ProgressReporter
-func (a *GoMCPProgressAdapter) GetCurrentStage() (int, mcptypes.ProgressStage) {
+func (a *GoMCPProgressAdapter) GetCurrentStage() (int, LocalProgressStage) {
 	if a.current >= 0 && a.current < len(a.stages) {
 		return a.current, a.stages[a.current]
 	}
-	return 0, mcptypes.ProgressStage{}
+	return 0, LocalProgressStage{}
 }
 
 // Complete finalizes the progress tracking
@@ -90,8 +105,8 @@ func (a *GoMCPProgressAdapter) Complete(message string) {
 // with GoMCP progress tracking by wrapping it with a progress adapter
 func ExecuteToolWithGoMCPProgress[TArgs any, TResult any](
 	serverCtx *server.Context,
-	stages []mcptypes.ProgressStage,
-	executeFn func(ctx context.Context, args TArgs, reporter mcptypes.ProgressReporter) (TResult, error),
+	stages []LocalProgressStage,
+	executeFn func(ctx context.Context, args TArgs, reporter LocalProgressReporter) (TResult, error),
 	fallbackFn func(ctx context.Context, args TArgs) (TResult, error),
 	args TArgs,
 ) (TResult, error) {

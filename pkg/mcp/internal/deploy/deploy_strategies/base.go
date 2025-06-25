@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -77,7 +76,7 @@ type DeploymentConfig struct {
 
 	// Dependencies
 	K8sDeployer      K8sDeployerAdapter
-	ProgressReporter mcptypes.ProgressReporter
+	ProgressReporter interface{} // Progress reporting interface
 	Logger           zerolog.Logger
 }
 

@@ -529,13 +529,13 @@ type RegistryAdapter struct {
 	registry *orchestration.MCPToolRegistry
 }
 
-func (adapter *RegistryAdapter) Register(name string, factory func() mcptypes.Tool) error {
+func (adapter *RegistryAdapter) Register(name string, factory func() interface{}) error {
 	// Create tool instance from factory and register it
 	tool := factory()
 	return adapter.registry.RegisterTool(name, tool)
 }
 
-func (adapter *RegistryAdapter) Get(name string) (mcptypes.ToolFactory, error) {
+func (adapter *RegistryAdapter) Get(name string) (func() interface{}, error) {
 	// Get tool instance and wrap it in a factory
 	tool, err := adapter.registry.GetTool(name)
 	if err != nil {
@@ -543,19 +543,23 @@ func (adapter *RegistryAdapter) Get(name string) (mcptypes.ToolFactory, error) {
 	}
 
 	// Return a factory that creates the same tool instance
-	factory := func() mcptypes.Tool {
-		return tool.(mcptypes.Tool)
+	factory := func() interface{} {
+		return tool
 	}
 	return factory, nil
 }
 
-func (adapter *RegistryAdapter) Create(name string) (mcptypes.Tool, error) {
+func (adapter *RegistryAdapter) Create(name string) (interface{}, error) {
 	// Get the tool from the registry
 	tool, err := adapter.registry.GetTool(name)
 	if err != nil {
 		return nil, err
 	}
-	return tool.(mcptypes.Tool), nil
+	return tool, nil
+}
+
+func (adapter *RegistryAdapter) GetTool(name string) (interface{}, error) {
+	return adapter.registry.GetTool(name)
 }
 
 func (adapter *RegistryAdapter) Exists(name string) bool {

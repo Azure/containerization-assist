@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Azure/container-copilot/pkg/mcp"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
@@ -58,7 +59,7 @@ func (d *ToolDispatcher) GetToolFactory(name string) (mcptypes.ToolFactory, bool
 }
 
 // ConvertArgs converts generic arguments to tool-specific types
-func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcptypes.ToolArgs, error) {
+func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcp.ToolArgs, error) {
 	d.mu.RLock()
 	converter, exists := d.converters[toolName]
 	d.mu.RUnlock()
@@ -80,7 +81,7 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (mcptype
 	}
 
 	// Type assert to ToolArgs interface
-	toolArgs, ok := convertedArgs.(mcptypes.ToolArgs)
+	toolArgs, ok := convertedArgs.(mcp.ToolArgs)
 	if !ok {
 		return nil, fmt.Errorf("converter for tool %s does not produce valid ToolArgs", toolName)
 	}

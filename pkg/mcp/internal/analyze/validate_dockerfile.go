@@ -202,7 +202,7 @@ func (t *AtomicValidateDockerfileTool) ExecuteValidation(ctx context.Context, ar
 // ExecuteWithContext runs the atomic Dockerfile validation with GoMCP progress tracking
 func (t *AtomicValidateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	// Create progress adapter for GoMCP using standard validation stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Validate", Weight: 0.80, Description: "Validating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Validate", Weight: 0.80, Description: "Validating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -225,7 +225,7 @@ func (t *AtomicValidateDockerfileTool) executeWithoutProgress(ctx context.Contex
 }
 
 // performValidation performs the actual Dockerfile validation
-func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, args AtomicValidateDockerfileArgs, reporter mcptypes.ProgressReporter) (*AtomicValidateDockerfileResult, error) {
+func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, args AtomicValidateDockerfileArgs, reporter interface{}) (*AtomicValidateDockerfileResult, error) {
 	startTime := time.Now()
 
 	// Stage 1: Initialize

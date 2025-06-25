@@ -108,7 +108,7 @@ func (t *AtomicAnalyzeRepositoryTool) ExecuteRepositoryAnalysis(ctx context.Cont
 // ExecuteWithContext runs the atomic repository analysis with GoMCP progress tracking
 func (t *AtomicAnalyzeRepositoryTool) ExecuteWithContext(serverCtx *server.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
 	// Create progress adapter for GoMCP using standard analysis stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Analyze", Weight: 0.80, Description: "Analyzing"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Analyze", Weight: 0.80, Description: "Analyzing"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -134,7 +134,7 @@ func (t *AtomicAnalyzeRepositoryTool) executeWithoutProgress(ctx context.Context
 }
 
 // performAnalysis performs the actual repository analysis
-func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter mcptypes.ProgressReporter) (*AtomicAnalysisResult, error) {
+func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter interface{}) (*AtomicAnalysisResult, error) {
 	startTime := time.Now()
 
 	// Get or create session

@@ -136,7 +136,7 @@ func (t *AtomicGenerateManifestsTool) ExecuteManifestGeneration(ctx context.Cont
 // ExecuteWithContext runs the atomic manifest generation with GoMCP progress tracking
 func (t *AtomicGenerateManifestsTool) ExecuteWithContext(serverCtx *server.Context, args AtomicGenerateManifestsArgs) (*AtomicGenerateManifestsResult, error) {
 	// Create progress adapter for GoMCP using centralized generate stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Generate", Weight: 0.80, Description: "Generating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Generate", Weight: 0.80, Description: "Generating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -164,7 +164,7 @@ func (t *AtomicGenerateManifestsTool) executeWithoutProgress(ctx context.Context
 }
 
 // performManifestGeneration performs the actual manifest generation
-func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter mcptypes.ProgressReporter) (*AtomicGenerateManifestsResult, error) {
+func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Context, args AtomicGenerateManifestsArgs, reporter interface{}) (*AtomicGenerateManifestsResult, error) {
 	startTime := time.Now()
 
 	// Get session

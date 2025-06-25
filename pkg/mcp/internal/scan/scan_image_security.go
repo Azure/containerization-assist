@@ -199,7 +199,11 @@ func (t *AtomicScanImageSecurityTool) ExecuteScan(ctx context.Context, args Atom
 // ExecuteWithContext runs the atomic security scan with GoMCP progress tracking
 func (t *AtomicScanImageSecurityTool) ExecuteWithContext(serverCtx *server.Context, args AtomicScanImageSecurityArgs) (*AtomicScanImageSecurityResult, error) {
 	// Create progress adapter for GoMCP using standard scan stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []mcptypes.ProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Scan", Weight: 0.80, Description: "Scanning"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
+		{Name: "Initialize", Weight: 0.10, Description: "Loading session"},
+		{Name: "Scan", Weight: 0.80, Description: "Scanning"},
+		{Name: "Finalize", Weight: 0.10, Description: "Updating state"},
+	})
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -225,7 +229,7 @@ func (t *AtomicScanImageSecurityTool) executeWithoutProgress(ctx context.Context
 }
 
 // performSecurityScan performs the actual security scan
-func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, args AtomicScanImageSecurityArgs, reporter mcptypes.ProgressReporter) (*AtomicScanImageSecurityResult, error) {
+func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, args AtomicScanImageSecurityArgs, reporter interface{}) (*AtomicScanImageSecurityResult, error) {
 	startTime := time.Now()
 
 	// Get session
