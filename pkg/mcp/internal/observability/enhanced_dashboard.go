@@ -1079,7 +1079,7 @@ func (ed *EnhancedDashboard) broadcastMetrics() {
 	ed.wsLock.RLock()
 	defer ed.wsLock.RUnlock()
 
-	metrics := map[string]interface{}{
+	metricsData := map[string]interface{}{
 		"type": "metrics",
 		"metrics": map[string]interface{}{
 			"throughput":  ed.realtimeMetrics.Throughput.Rate(),
@@ -1092,7 +1092,7 @@ func (ed *EnhancedDashboard) broadcastMetrics() {
 		// Send metrics to connection (stub implementation)
 		// In a real implementation, this would use websocket.Conn.WriteJSON
 		_ = conn
-		_ = metrics
+		_ = metricsData
 	}
 }
 
