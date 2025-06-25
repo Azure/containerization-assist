@@ -101,11 +101,11 @@ func (t *AtomicGenerateManifestsTool) applyResourceLimits(manifestResult *corek8
 				t.logger.Error().Err(err).Msg("Failed to add resource limits to deployment")
 				return fmt.Errorf("failed to add resource limits: %w", err)
 			}
-			
+
 			// Update the manifest with resource limits
 			manifestResult.Manifests[i].Content = updatedContent
 			manifestResult.Manifests[i].Size = len(updatedContent)
-			
+
 			t.logger.Info().
 				Str("cpu_request", args.CPURequest).
 				Str("memory_request", args.MemoryRequest).
@@ -113,7 +113,7 @@ func (t *AtomicGenerateManifestsTool) applyResourceLimits(manifestResult *corek8
 				Str("memory_limit", args.MemoryLimit).
 				Str("deployment_name", manifest.Name).
 				Msg("Applied resource limits to deployment manifest")
-			
+
 			return nil
 		}
 	}
@@ -239,18 +239,18 @@ func (t *AtomicGenerateManifestsTool) addResourceLimitsToDeployment(deploymentYA
 
 	for i, line := range lines {
 		result = append(result, line)
-		
+
 		// Look for containers section
 		if strings.Contains(line, "containers:") {
 			inContainers = true
 			continue
 		}
-		
+
 		// If we're in containers and find a container definition
 		if inContainers && strings.Contains(line, "- name:") {
 			// Determine indentation
 			containerIndent = strings.Repeat(" ", len(line)-len(strings.TrimLeft(line, " ")))
-			
+
 			// Look ahead to find the end of this container spec
 			// Add resources before the next container or end of containers
 			j := i + 1
@@ -260,10 +260,10 @@ func (t *AtomicGenerateManifestsTool) addResourceLimitsToDeployment(deploymentYA
 					j++
 					continue
 				}
-				
+
 				// If we hit another container or end of containers section, add resources here
-				if strings.Contains(nextLine, "- name:") || 
-				   (!strings.HasPrefix(nextLine, containerIndent) && strings.TrimSpace(nextLine) != "") {
+				if strings.Contains(nextLine, "- name:") ||
+					(!strings.HasPrefix(nextLine, containerIndent) && strings.TrimSpace(nextLine) != "") {
 					// Insert resources before this line
 					resourceLines := strings.Split(resourcesYAML, "\n")
 					for _, resLine := range resourceLines {
@@ -276,7 +276,7 @@ func (t *AtomicGenerateManifestsTool) addResourceLimitsToDeployment(deploymentYA
 				}
 				j++
 			}
-			
+
 			// If we reached the end without finding another container, add resources at the end
 			if !resourcesAdded && j >= len(lines) {
 				resourceLines := strings.Split(resourcesYAML, "\n")
@@ -297,14 +297,14 @@ func (t *AtomicGenerateManifestsTool) addResourceLimitsToDeployment(deploymentYA
 func (t *AtomicGenerateManifestsTool) buildResourcesYAML(args AtomicGenerateManifestsArgs) string {
 	hasRequests := args.CPURequest != "" || args.MemoryRequest != ""
 	hasLimits := args.CPULimit != "" || args.MemoryLimit != ""
-	
+
 	if !hasRequests && !hasLimits {
 		return ""
 	}
-	
+
 	var yaml strings.Builder
 	yaml.WriteString("resources:\n")
-	
+
 	if hasRequests {
 		yaml.WriteString("  requests:\n")
 		if args.CPURequest != "" {
@@ -314,7 +314,7 @@ func (t *AtomicGenerateManifestsTool) buildResourcesYAML(args AtomicGenerateMani
 			yaml.WriteString(fmt.Sprintf("    memory: %s\n", args.MemoryRequest))
 		}
 	}
-	
+
 	if hasLimits {
 		yaml.WriteString("  limits:\n")
 		if args.CPULimit != "" {
@@ -324,6 +324,6 @@ func (t *AtomicGenerateManifestsTool) buildResourcesYAML(args AtomicGenerateMani
 			yaml.WriteString(fmt.Sprintf("    memory: %s\n", args.MemoryLimit))
 		}
 	}
-	
+
 	return yaml.String()
 }
