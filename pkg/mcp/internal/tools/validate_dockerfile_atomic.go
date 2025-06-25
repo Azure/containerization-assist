@@ -1183,6 +1183,117 @@ func (t *AtomicValidateDockerfileTool) GetCapabilities() contract.ToolCapabiliti
 	}
 }
 
+// GetMetadata returns comprehensive metadata about the tool
+func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_validate_dockerfile",
+		Description: "Validates Dockerfiles against best practices, security standards, and optimization guidelines with automatic fix generation",
+		Version:     "1.0.0",
+		Category:    "validation",
+		Dependencies: []string{
+			"session_manager",
+			"docker_access",
+			"file_system_access",
+			"hadolint_optional",
+		},
+		Capabilities: []string{
+			"dockerfile_validation",
+			"syntax_checking",
+			"security_analysis",
+			"best_practices_validation",
+			"optimization_analysis",
+			"fix_generation",
+			"hadolint_integration",
+			"base_image_analysis",
+			"layer_optimization",
+		},
+		Requirements: []string{
+			"valid_session_id",
+			"dockerfile_content_or_path",
+		},
+		Parameters: map[string]string{
+			"session_id":           "string - Session ID for session context",
+			"dockerfile_path":      "string - Path to Dockerfile (default: session workspace/Dockerfile)",
+			"dockerfile_content":   "string - Dockerfile content to validate (alternative to path)",
+			"use_hadolint":         "bool - Use Hadolint for advanced validation",
+			"severity":             "string - Minimum severity to report (info, warning, error)",
+			"ignore_rules":         "[]string - Hadolint rules to ignore (e.g., DL3008, DL3009)",
+			"trusted_registries":   "[]string - List of trusted registries for base image validation",
+			"check_security":       "bool - Perform security-focused checks",
+			"check_optimization":   "bool - Check for image size optimization opportunities",
+			"check_best_practices": "bool - Validate against Docker best practices",
+			"include_suggestions":  "bool - Include remediation suggestions",
+			"generate_fixes":       "bool - Generate corrected Dockerfile",
+			"dry_run":              "bool - Validate without making changes",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic Dockerfile Validation",
+				Description: "Validate a Dockerfile for syntax and basic issues",
+				Input: map[string]interface{}{
+					"session_id":           "session-123",
+					"dockerfile_path":      "/workspace/Dockerfile",
+					"check_best_practices": true,
+				},
+				Output: map[string]interface{}{
+					"success":           true,
+					"is_valid":          true,
+					"validation_score":  85,
+					"total_issues":      2,
+					"critical_issues":   0,
+					"validator_used":    "basic",
+				},
+			},
+			{
+				Name:        "Advanced Security Validation",
+				Description: "Comprehensive validation with security and optimization checks",
+				Input: map[string]interface{}{
+					"session_id":           "session-456",
+					"use_hadolint":         true,
+					"check_security":       true,
+					"check_optimization":   true,
+					"check_best_practices": true,
+					"include_suggestions":  true,
+					"trusted_registries": []string{
+						"docker.io",
+						"gcr.io",
+						"registry.access.redhat.com",
+					},
+				},
+				Output: map[string]interface{}{
+					"success":             true,
+					"is_valid":            false,
+					"validation_score":    45,
+					"total_issues":        8,
+					"critical_issues":     2,
+					"security_issues":     3,
+					"optimization_tips":   5,
+					"validator_used":      "hadolint",
+				},
+			},
+			{
+				Name:        "Validation with Fix Generation",
+				Description: "Validate Dockerfile and generate corrected version",
+				Input: map[string]interface{}{
+					"session_id":          "session-789",
+					"dockerfile_content":  "FROM ubuntu\nRUN apt-get install -y curl\nUSER root",
+					"generate_fixes":      true,
+					"check_security":      true,
+					"include_suggestions": true,
+				},
+				Output: map[string]interface{}{
+					"success":             true,
+					"is_valid":            false,
+					"validation_score":    30,
+					"total_issues":        4,
+					"fixes_applied":       []string{"Added apt-get update", "Added cache cleanup", "Added non-root user"},
+					"corrected_dockerfile": "FROM ubuntu:20.04\nRUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*\nRUN adduser -D appuser\nUSER appuser",
+				},
+			},
+		},
+	}
+}
+
 // Validate validates the tool arguments
 func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)

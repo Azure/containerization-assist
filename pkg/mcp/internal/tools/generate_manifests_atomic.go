@@ -726,6 +726,118 @@ func (t *AtomicGenerateManifestsTool) GetCapabilities() contract.ToolCapabilitie
 	}
 }
 
+// GetMetadata returns comprehensive metadata about the tool
+func (t *AtomicGenerateManifestsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_generate_manifests",
+		Description: "Generates Kubernetes deployment manifests including deployments, services, ingress, and secrets with GitOps support and automatic secret detection",
+		Version:     "1.0.0",
+		Category:    "kubernetes",
+		Dependencies: []string{
+			"session_manager",
+			"kubernetes_access",
+			"docker_image",
+		},
+		Capabilities: []string{
+			"manifest_generation",
+			"secret_detection",
+			"secret_externalization", 
+			"gitops_ready_output",
+			"template_selection",
+			"resource_optimization",
+			"ingress_generation",
+			"configmap_generation",
+		},
+		Requirements: []string{
+			"valid_session_id",
+			"docker_image_reference",
+		},
+		Parameters: map[string]string{
+			"session_id":        "string - Session ID for session context",
+			"image_ref":         "string - Docker image reference (required)",
+			"app_name":          "string - Application name (optional, derived from image if not provided)",
+			"namespace":         "string - Kubernetes namespace (default: default)",
+			"replicas":          "int - Number of replicas (default: 1)",
+			"port":              "int - Application port (default: 8080)",
+			"service_type":      "string - Kubernetes service type (ClusterIP, NodePort, LoadBalancer)",
+			"include_ingress":   "bool - Generate Ingress manifest",
+			"secret_handling":   "string - Secret handling strategy (auto, prompt, inline)",
+			"secret_manager":    "string - Secret manager type (kubernetes, vault, azure)",
+			"cpu_request":       "string - CPU resource request (e.g., '100m')",
+			"memory_request":    "string - Memory resource request (e.g., '128Mi')",
+			"cpu_limit":         "string - CPU resource limit (e.g., '500m')",
+			"memory_limit":      "string - Memory resource limit (e.g., '512Mi')",
+			"generate_helm":     "bool - Generate Helm chart templates",
+			"gitops_ready":      "bool - Ensure manifests are GitOps ready (no inline secrets)",
+			"environment":       "map[string]string - Environment variables",
+			"dry_run":           "bool - Validate without generating files",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic Manifest Generation",
+				Description: "Generate basic Kubernetes manifests for a containerized application",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+					"image_ref":  "myapp:latest",
+					"app_name":   "myapp",
+					"namespace":  "default",
+				},
+				Output: map[string]interface{}{
+					"success":           true,
+					"manifests_generated": 2,
+					"manifest_types":     []string{"Deployment", "Service"},
+					"output_directory":   "/workspace/manifests",
+				},
+			},
+			{
+				Name:        "Production-Ready with Resources",
+				Description: "Generate manifests with resource limits and ingress for production",
+				Input: map[string]interface{}{
+					"session_id":       "session-456",
+					"image_ref":        "myregistry.io/myapp:v1.2.3",
+					"app_name":         "myapp",
+					"namespace":        "production",
+					"replicas":         3,
+					"include_ingress":  true,
+					"cpu_request":      "100m",
+					"memory_request":   "256Mi",
+					"cpu_limit":        "500m",
+					"memory_limit":     "512Mi",
+					"gitops_ready":     true,
+				},
+				Output: map[string]interface{}{
+					"success":               true,
+					"manifests_generated":   3,
+					"manifest_types":        []string{"Deployment", "Service", "Ingress"},
+					"secrets_externalized":  0,
+					"gitops_ready":          true,
+				},
+			},
+			{
+				Name:        "With Secret Management",
+				Description: "Generate manifests with automatic secret detection and externalization",
+				Input: map[string]interface{}{
+					"session_id":      "session-789",
+					"image_ref":       "myapp:latest",
+					"secret_handling": "auto",
+					"environment": map[string]interface{}{
+						"DATABASE_URL": "postgresql://user:secret@host:5432/db",
+						"API_KEY":      "sk-1234567890abcdef",
+						"DEBUG":        "false",
+					},
+				},
+				Output: map[string]interface{}{
+					"success":              true,
+					"secrets_detected":     2,
+					"secrets_externalized": 2,
+					"secret_manifests":     []string{"app-secrets.yaml"},
+					"security_level":       "high",
+				},
+			},
+		},
+	}
+}
+
 // Validate validates the tool arguments
 func (t *AtomicGenerateManifestsTool) Validate(ctx context.Context, args interface{}) error {
 	manifestArgs, ok := args.(AtomicGenerateManifestsArgs)

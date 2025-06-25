@@ -1122,6 +1122,113 @@ func (t *AtomicScanSecretsTool) GetCapabilities() contract.ToolCapabilities {
 	}
 }
 
+// GetMetadata returns comprehensive metadata about the tool
+func (t *AtomicScanSecretsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_scan_secrets",
+		Description: "Scans files for hardcoded secrets, credentials, and sensitive data with automatic remediation suggestions and Kubernetes Secret generation",
+		Version:     "1.0.0",
+		Category:    "security",
+		Dependencies: []string{
+			"session_manager",
+			"file_system_access",
+		},
+		Capabilities: []string{
+			"secret_detection",
+			"pattern_matching",
+			"file_scanning",
+			"security_analysis",
+			"remediation_planning",
+			"kubernetes_secret_generation",
+			"risk_assessment",
+			"compliance_checking",
+		},
+		Requirements: []string{
+			"valid_session_id",
+			"file_system_access",
+		},
+		Parameters: map[string]string{
+			"session_id":            "string - Session ID for session context",
+			"scan_path":             "string - Path to scan (default: session workspace)",
+			"file_patterns":         "[]string - File patterns to include (e.g., '*.py', '*.js')",
+			"exclude_patterns":      "[]string - File patterns to exclude from scan",
+			"scan_dockerfiles":      "bool - Include Dockerfiles in scan",
+			"scan_manifests":        "bool - Include Kubernetes manifests in scan",
+			"scan_source_code":      "bool - Include source code files in scan",
+			"scan_env_files":        "bool - Include .env files in scan",
+			"suggest_remediation":   "bool - Provide remediation suggestions",
+			"generate_secrets":      "bool - Generate Kubernetes Secret manifests",
+			"dry_run":               "bool - Scan without making changes",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic Secret Scan",
+				Description: "Scan session workspace for hardcoded secrets",
+				Input: map[string]interface{}{
+					"session_id":        "session-123",
+					"scan_source_code":  true,
+					"scan_env_files":    true,
+					"scan_dockerfiles":  true,
+				},
+				Output: map[string]interface{}{
+					"success":       true,
+					"files_scanned": 25,
+					"secrets_found": 3,
+					"risk_level":    "medium",
+					"security_score": 75,
+				},
+			},
+			{
+				Name:        "Comprehensive Security Scan",
+				Description: "Full security scan with remediation and secret generation",
+				Input: map[string]interface{}{
+					"session_id":            "session-456",
+					"scan_path":             "/workspace/myapp",
+					"suggest_remediation":   true,
+					"generate_secrets":      true,
+					"scan_dockerfiles":      true,
+					"scan_manifests":        true,
+					"scan_source_code":      true,
+					"scan_env_files":        true,
+				},
+				Output: map[string]interface{}{
+					"success":            true,
+					"files_scanned":      42,
+					"secrets_found":      7,
+					"security_score":     45,
+					"risk_level":         "high",
+					"generated_secrets":  2,
+					"remediation_steps":  5,
+				},
+			},
+			{
+				Name:        "Targeted Configuration Scan",
+				Description: "Scan specific file patterns for configuration secrets",
+				Input: map[string]interface{}{
+					"session_id": "session-789",
+					"file_patterns": []string{
+						"*.yaml",
+						"*.yml", 
+						"*.json",
+						".env*",
+					},
+					"exclude_patterns": []string{
+						"node_modules/*",
+						"*.log",
+					},
+				},
+				Output: map[string]interface{}{
+					"success":         true,
+					"files_scanned":   12,
+					"secrets_found":   2,
+					"security_score":  85,
+					"risk_level":      "low",
+				},
+			},
+		},
+	}
+}
+
 // Validate validates the tool arguments
 func (t *AtomicScanSecretsTool) Validate(ctx context.Context, args interface{}) error {
 	scanArgs, ok := args.(AtomicScanSecretsArgs)

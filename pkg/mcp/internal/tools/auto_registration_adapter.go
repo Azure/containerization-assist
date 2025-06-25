@@ -62,13 +62,17 @@ func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcptypes.ToolMe
 func (ara *AutoRegistrationAdapter) RegisterAtomicTools(toolRegistry mcptypes.ToolRegistry) error {
 	// Tools that implement the unified interface properly
 	readyTools := map[string]func() interface{}{
-		"atomic_analyze_repository":  func() interface{} { return &AtomicAnalyzeRepositoryTool{} },
-		"atomic_build_image":         func() interface{} { return &AtomicBuildImageTool{} },
-		"atomic_deploy_kubernetes":   func() interface{} { return &AtomicDeployKubernetesTool{} },
-		"atomic_pull_image":          func() interface{} { return &AtomicPullImageTool{} },
-		"atomic_push_image":          func() interface{} { return &AtomicPushImageTool{} },
-		"atomic_scan_image_security": func() interface{} { return &AtomicScanImageSecurityTool{} },
-		"atomic_tag_image":           func() interface{} { return &AtomicTagImageTool{} },
+		"atomic_analyze_repository":    func() interface{} { return &AtomicAnalyzeRepositoryTool{} },
+		"atomic_build_image":           func() interface{} { return &AtomicBuildImageTool{} },
+		"atomic_check_health":          func() interface{} { return &AtomicCheckHealthTool{} },
+		"atomic_deploy_kubernetes":     func() interface{} { return &AtomicDeployKubernetesTool{} },
+		"atomic_generate_manifests":    func() interface{} { return &AtomicGenerateManifestsTool{} },
+		"atomic_pull_image":            func() interface{} { return &AtomicPullImageTool{} },
+		"atomic_push_image":            func() interface{} { return &AtomicPushImageTool{} },
+		"atomic_scan_image_security":   func() interface{} { return &AtomicScanImageSecurityTool{} },
+		"atomic_scan_secrets":          func() interface{} { return &AtomicScanSecretsTool{} },
+		"atomic_tag_image":             func() interface{} { return &AtomicTagImageTool{} },
+		"atomic_validate_dockerfile":   func() interface{} { return &AtomicValidateDockerfileTool{} },
 	}
 
 	registered := 0
@@ -97,20 +101,21 @@ func (ara *AutoRegistrationAdapter) GetReadyToolNames() []string {
 	return []string{
 		"atomic_analyze_repository",
 		"atomic_build_image", 
+		"atomic_check_health",
 		"atomic_deploy_kubernetes",
+		"atomic_generate_manifests",
 		"atomic_pull_image",
 		"atomic_push_image",
 		"atomic_scan_image_security",
+		"atomic_scan_secrets",
 		"atomic_tag_image",
+		"atomic_validate_dockerfile",
 	}
 }
 
 // GetPendingToolNames returns tools that need interface migration
 func (ara *AutoRegistrationAdapter) GetPendingToolNames() []string {
 	return []string{
-		"atomic_check_health",         // Missing GetMetadata
-		"atomic_generate_manifests",   // Missing GetMetadata  
-		"atomic_scan_secrets",         // Missing GetMetadata
-		"atomic_validate_dockerfile",  // Missing GetMetadata
+		// All atomic tools now implement the unified mcptypes.Tool interface
 	}
 }

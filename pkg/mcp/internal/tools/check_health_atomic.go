@@ -835,6 +835,78 @@ func (t *AtomicCheckHealthTool) GetCapabilities() contract.ToolCapabilities {
 	}
 }
 
+// GetMetadata returns comprehensive metadata about the tool
+func (t *AtomicCheckHealthTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "atomic_check_health",
+		Description: "Performs comprehensive health checks on Kubernetes applications including pod status, service availability, and resource utilization",
+		Version:     "1.0.0",
+		Category:    "monitoring",
+		Dependencies: []string{
+			"kubernetes_access",
+			"network_access",
+		},
+		Capabilities: []string{
+			"endpoint_monitoring",
+			"kubernetes_probes",
+			"custom_checks",
+			"pod_analysis",
+			"service_discovery",
+			"health_scoring",
+		},
+		Requirements: []string{
+			"kubernetes_access",
+			"network_access",
+		},
+		Parameters: map[string]string{
+			"session_id":        "string - Session ID for session context",
+			"namespace":         "string - Kubernetes namespace (default: default)",
+			"app_name":          "string - Application name for label selection",
+			"label_selector":    "string - Custom label selector",
+			"include_services":  "bool - Include service health checks",
+			"include_events":    "bool - Include pod events in analysis",
+			"wait_for_ready":    "bool - Wait for pods to become ready",
+			"wait_timeout":      "int - Wait timeout in seconds",
+			"detailed_analysis": "bool - Perform detailed container analysis",
+			"include_logs":      "bool - Include recent container logs",
+			"log_lines":         "int - Number of log lines to include",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic Health Check",
+				Description: "Check health of application with app name",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+					"app_name":   "my-app",
+					"namespace":  "default",
+				},
+				Output: map[string]interface{}{
+					"success":        true,
+					"overall_status": "healthy",
+					"health_score":   1.0,
+					"pods_ready":     3,
+					"pods_total":     3,
+				},
+			},
+			{
+				Name:        "Health Check with Wait",
+				Description: "Check health and wait for application to become ready",
+				Input: map[string]interface{}{
+					"session_id":     "session-123",
+					"label_selector": "app=my-app,version=v1",
+					"wait_for_ready": true,
+					"wait_timeout":   300,
+				},
+				Output: map[string]interface{}{
+					"success":        true,
+					"overall_status": "healthy",
+					"wait_duration":  "45s",
+				},
+			},
+		},
+	}
+}
+
 // Validate validates the tool arguments
 func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) error {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)

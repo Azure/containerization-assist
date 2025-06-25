@@ -28,11 +28,11 @@ func TestAutoRegistrationAdapter(t *testing.T) {
 	fmt.Println("🎯 Auto-registration system operational!")
 	
 	// Verify we have the expected number of tools
-	if len(readyTools) != 7 {
-		t.Errorf("Expected 7 ready tools, got %d", len(readyTools))
+	if len(readyTools) != 11 {
+		t.Errorf("Expected 11 ready tools, got %d", len(readyTools))
 	}
 	
-	if len(pendingTools) != 4 {
-		t.Errorf("Expected 4 pending tools, got %d", len(pendingTools))
+	if len(pendingTools) != 0 {
+		t.Errorf("Expected 0 pending tools, got %d", len(pendingTools))
 	}
 }
