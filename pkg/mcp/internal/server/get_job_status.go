@@ -50,7 +50,7 @@ func (t *GetJobStatusTool) Execute(ctx context.Context, args interface{}) (inter
 	// Type assertion to get proper args
 	jobArgs, ok := args.(GetJobStatusArgs)
 	if !ok {
-		return nil, fmt.Errorf("invalid arguments type: expected GetJobStatusArgs, got %T", args)
+		return nil, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetJobStatusArgs, got %T", args), "validation_error")
 	}
 
 	return t.ExecuteTyped(ctx, jobArgs)
@@ -213,22 +213,22 @@ func (t *GetJobStatusTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *GetJobStatusTool) Validate(ctx context.Context, args interface{}) error {
 	jobArgs, ok := args.(GetJobStatusArgs)
 	if !ok {
-		return fmt.Errorf("invalid arguments type: expected GetJobStatusArgs, got %T", args)
+		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetJobStatusArgs, got %T", args), "validation_error")
 	}
 
 	// Validate required fields
 	if jobArgs.JobID == "" {
-		return fmt.Errorf("job_id is required and cannot be empty")
+		return types.NewRichError("INVALID_ARGUMENTS", "job_id is required and cannot be empty", "validation_error")
 	}
 
 	// Validate job ID format
 	if len(jobArgs.JobID) < 3 || len(jobArgs.JobID) > 100 {
-		return fmt.Errorf("job_id must be between 3 and 100 characters")
+		return types.NewRichError("INVALID_ARGUMENTS", "job_id must be between 3 and 100 characters", "validation_error")
 	}
 
 	// Validate job function is available
 	if t.getJobFunc == nil {
-		return fmt.Errorf("job retrieval function is not configured")
+		return types.NewRichError("CONFIG_ERROR", "Job retrieval function is not configured", "config_error")
 	}
 
 	return nil

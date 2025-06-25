@@ -112,7 +112,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 		deps.ToolOrchestrator.SetPipelineOperations(deps.PipelineOperations)
 
 		// Create and set the tool factory with concrete types
-		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, deps.Logger)
+		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, deps.MCPClients.Analyzer, deps.Logger)
 
 		// Get the no-reflect dispatcher from the orchestrator and set the factory
 		// This is a workaround for the interface/concrete type mismatch

@@ -16,6 +16,7 @@ import (
 type ToolFactory struct {
 	pipelineOperations mcptypes.PipelineOperations
 	sessionManager     *session.SessionManager
+	analyzer          mcptypes.AIAnalyzer
 	logger             zerolog.Logger
 }
 
@@ -23,11 +24,13 @@ type ToolFactory struct {
 func NewToolFactory(
 	pipelineOperations mcptypes.PipelineOperations,
 	sessionManager *session.SessionManager,
+	analyzer mcptypes.AIAnalyzer,
 	logger zerolog.Logger,
 ) *ToolFactory {
 	return &ToolFactory{
 		pipelineOperations: pipelineOperations,
 		sessionManager:     sessionManager,
+		analyzer:          analyzer,
 		logger:             logger,
 	}
 }
@@ -39,7 +42,11 @@ func (f *ToolFactory) CreateAnalyzeRepositoryTool() *analyze.AtomicAnalyzeReposi
 
 // CreateBuildImageTool creates an instance of AtomicBuildImageTool
 func (f *ToolFactory) CreateBuildImageTool() *build.AtomicBuildImageTool {
-	return build.NewAtomicBuildImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := build.NewAtomicBuildImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	if f.analyzer != nil {
+		tool.SetAnalyzer(f.analyzer)
+	}
+	return tool
 }
 
 // CreatePushImageTool creates an instance of AtomicPushImageTool
@@ -59,7 +66,11 @@ func (f *ToolFactory) CreateTagImageTool() *build.AtomicTagImageTool {
 
 // CreateScanImageSecurityTool creates an instance of AtomicScanImageSecurityTool
 func (f *ToolFactory) CreateScanImageSecurityTool() *scan.AtomicScanImageSecurityTool {
-	return scan.NewAtomicScanImageSecurityTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := scan.NewAtomicScanImageSecurityTool(f.pipelineOperations, f.sessionManager, f.logger)
+	if f.analyzer != nil {
+		tool.SetAnalyzer(f.analyzer)
+	}
+	return tool
 }
 
 // CreateScanSecretsTool creates an instance of AtomicScanSecretsTool
@@ -69,12 +80,20 @@ func (f *ToolFactory) CreateScanSecretsTool() *scan.AtomicScanSecretsTool {
 
 // CreateGenerateManifestsTool creates an instance of AtomicGenerateManifestsTool
 func (f *ToolFactory) CreateGenerateManifestsTool() *deploy.AtomicGenerateManifestsTool {
-	return deploy.NewAtomicGenerateManifestsTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := deploy.NewAtomicGenerateManifestsTool(f.pipelineOperations, f.sessionManager, f.logger)
+	if f.analyzer != nil {
+		tool.SetAnalyzer(f.analyzer)
+	}
+	return tool
 }
 
 // CreateDeployKubernetesTool creates an instance of AtomicDeployKubernetesTool
 func (f *ToolFactory) CreateDeployKubernetesTool() *deploy.AtomicDeployKubernetesTool {
-	return deploy.NewAtomicDeployKubernetesTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := deploy.NewAtomicDeployKubernetesTool(f.pipelineOperations, f.sessionManager, f.logger)
+	if f.analyzer != nil {
+		tool.SetAnalyzer(f.analyzer)
+	}
+	return tool
 }
 
 // CreateCheckHealthTool creates an instance of AtomicCheckHealthTool
@@ -89,7 +108,11 @@ func (f *ToolFactory) CreateGenerateDockerfileTool() *analyze.GenerateDockerfile
 
 // CreateValidateDockerfileTool creates an instance of AtomicValidateDockerfileTool
 func (f *ToolFactory) CreateValidateDockerfileTool() *analyze.AtomicValidateDockerfileTool {
-	return analyze.NewAtomicValidateDockerfileTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := analyze.NewAtomicValidateDockerfileTool(f.pipelineOperations, f.sessionManager, f.logger)
+	if f.analyzer != nil {
+		tool.SetAnalyzer(f.analyzer)
+	}
+	return tool
 }
 
 // CreateTool creates a tool by name

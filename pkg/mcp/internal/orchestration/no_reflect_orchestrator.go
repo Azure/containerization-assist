@@ -14,6 +14,7 @@ import (
 type NoReflectToolOrchestrator struct {
 	toolRegistry       *MCPToolRegistry
 	sessionManager     SessionManager
+	analyzer          mcptypes.AIAnalyzer
 	logger             zerolog.Logger
 	toolFactory        *ToolFactory
 	pipelineOperations interface{}
@@ -45,7 +46,7 @@ func (o *NoReflectToolOrchestrator) SetPipelineOperations(operations interface{}
 	if pipelineOps, ok := operations.(mcptypes.PipelineOperations); ok {
 		// Extract concrete session manager from the wrapper
 		if concreteSessionManager := o.extractConcreteSessionManager(); concreteSessionManager != nil {
-			o.toolFactory = NewToolFactory(pipelineOps, concreteSessionManager, o.logger)
+			o.toolFactory = NewToolFactory(pipelineOps, concreteSessionManager, o.analyzer, o.logger)
 			o.logger.Debug().Msg("Tool factory successfully initialized with concrete session manager")
 		} else {
 			o.logger.Warn().Msg("Tool factory initialization requires concrete session manager - factory not created")
@@ -74,6 +75,20 @@ func (o *NoReflectToolOrchestrator) extractConcreteSessionManager() *session.Ses
 // SetToolFactory sets the tool factory directly (for use when we have concrete types)
 func (o *NoReflectToolOrchestrator) SetToolFactory(factory *ToolFactory) {
 	o.toolFactory = factory
+}
+
+// SetAnalyzer sets the AI analyzer for tool fixing capabilities
+func (o *NoReflectToolOrchestrator) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+	o.analyzer = analyzer
+	// If tool factory already exists, recreate it with the analyzer
+	if o.toolFactory != nil && o.pipelineOperations != nil {
+		if pipelineOps, ok := o.pipelineOperations.(mcptypes.PipelineOperations); ok {
+			if concreteSessionManager := o.extractConcreteSessionManager(); concreteSessionManager != nil {
+				o.toolFactory = NewToolFactory(pipelineOps, concreteSessionManager, o.analyzer, o.logger)
+				o.logger.Debug().Msg("Tool factory recreated with analyzer")
+			}
+		}
+	}
 }
 
 // ExecuteTool executes a tool using type-safe dispatch without reflection

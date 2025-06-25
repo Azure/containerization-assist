@@ -10,6 +10,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/api/contract"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
@@ -133,6 +135,26 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 		kind.NewKindCmdRunner(cmdRunner),
 		k8s.NewKubeCmdRunner(cmdRunner),
 	)
+	
+	// In conversation mode, use CallerAnalyzer instead of StubAnalyzer
+	// This requires the transport to be able to forward prompts to the LLM
+	if transport, ok := s.transport.(contract.LLMTransport); ok {
+		callerAnalyzer := analyzer.NewCallerAnalyzer(transport, analyzer.CallerAnalyzerOpts{
+			ToolName:       "chat",
+			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
+			PerCallTimeout: 60 * time.Second,
+		})
+		mcpClients.SetAnalyzer(callerAnalyzer)
+		
+		// Also set the analyzer on the tool orchestrator for fixing capabilities
+		if s.toolOrchestrator != nil {
+			s.toolOrchestrator.SetAnalyzer(callerAnalyzer)
+		}
+		
+		s.logger.Info().Msg("CallerAnalyzer enabled for conversation mode")
+	} else {
+		s.logger.Warn().Msg("Transport does not implement LLMTransport - using StubAnalyzer")
+	}
 
 	// Create pipeline operations
 	pipelineOps := pipeline.NewOperations(

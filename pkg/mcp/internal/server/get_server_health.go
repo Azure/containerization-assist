@@ -68,7 +68,7 @@ func (t *GetServerHealthTool) Execute(ctx context.Context, args interface{}) (in
 	// Type assertion to get proper args
 	healthArgs, ok := args.(GetServerHealthArgs)
 	if !ok {
-		return nil, fmt.Errorf("invalid arguments type: expected GetServerHealthArgs, got %T", args)
+		return nil, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetServerHealthArgs, got %T", args), "validation_error")
 	}
 
 	return t.ExecuteTyped(ctx, healthArgs)
@@ -287,12 +287,12 @@ func (t *GetServerHealthTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *GetServerHealthTool) Validate(ctx context.Context, args interface{}) error {
 	_, ok := args.(GetServerHealthArgs)
 	if !ok {
-		return fmt.Errorf("invalid arguments type: expected GetServerHealthArgs, got %T", args)
+		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetServerHealthArgs, got %T", args), "validation_error")
 	}
 
 	// Validate health checker is available
 	if t.healthChecker == nil {
-		return fmt.Errorf("health checker is not configured")
+		return types.NewRichError("CONFIG_ERROR", "Health checker is not configured", "server_config")
 	}
 
 	return nil

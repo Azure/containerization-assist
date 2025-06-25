@@ -51,6 +51,13 @@ func (o *MCPToolOrchestrator) SetPipelineOperations(operations interface{}) {
 	}
 }
 
+// SetAnalyzer sets the AI analyzer for tool fixing capabilities
+func (o *MCPToolOrchestrator) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+	if o.dispatcher != nil {
+		o.dispatcher.SetAnalyzer(analyzer)
+	}
+}
+
 // ExecuteTool executes a tool with the given arguments and session context
 func (o *MCPToolOrchestrator) ExecuteTool(
 	ctx context.Context,
