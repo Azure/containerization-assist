@@ -1,19 +1,14 @@
 package observability
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 // TelemetryExporter provides advanced telemetry export capabilities
@@ -26,30 +21,30 @@ type TelemetryExporter struct {
 
 // DashboardData holds pre-computed dashboard metrics
 type DashboardData struct {
-	LastUpdated time.Time                 `json:"last_updated"`
-	Summary     map[string]interface{}    `json:"summary"`
-	Trends      map[string]TrendData      `json:"trends"`
-	Alerts      []Alert                   `json:"alerts"`
-	SLOStatus   map[string]SLOStatus      `json:"slo_status"`
+	LastUpdated time.Time              `json:"last_updated"`
+	Summary     map[string]interface{} `json:"summary"`
+	Trends      map[string]TrendData   `json:"trends"`
+	Alerts      []Alert                `json:"alerts"`
+	SLOStatus   map[string]SLOStatus   `json:"slo_status"`
 }
 
 // TrendData represents metric trends
 type TrendData struct {
-	Current  float64   `json:"current"`
-	Previous float64   `json:"previous"`
-	Change   float64   `json:"change"`
-	Trend    string    `json:"trend"` // up, down, stable
+	Current   float64   `json:"current"`
+	Previous  float64   `json:"previous"`
+	Change    float64   `json:"change"`
+	Trend     string    `json:"trend"` // up, down, stable
 	Sparkline []float64 `json:"sparkline"`
 }
 
 // Alert represents an active alert
 type Alert struct {
-	Name        string    `json:"name"`
-	Severity    string    `json:"severity"`
-	Message     string    `json:"message"`
-	StartTime   time.Time `json:"start_time"`
-	Value       float64   `json:"value"`
-	Threshold   float64   `json:"threshold"`
+	Name      string    `json:"name"`
+	Severity  string    `json:"severity"`
+	Message   string    `json:"message"`
+	StartTime time.Time `json:"start_time"`
+	Value     float64   `json:"value"`
+	Threshold float64   `json:"threshold"`
 }
 
 // SLOStatus represents SLO compliance status
@@ -84,7 +79,7 @@ func NewTelemetryExporter(enhancedManager *EnhancedTelemetryManager) *TelemetryE
 			SLOStatus: make(map[string]SLOStatus),
 		},
 	}
-	
+
 	// Define default alert rules
 	exporter.alertRules = []AlertRule{
 		{
@@ -133,17 +128,17 @@ func NewTelemetryExporter(enhancedManager *EnhancedTelemetryManager) *TelemetryE
 			Message:    "SLO compliance below target",
 		},
 	}
-	
+
 	// Start background updater
 	go exporter.startDashboardUpdater()
-	
+
 	return exporter
 }
 
 // ServeHTTP implements http.Handler for the telemetry exporter
 func (te *TelemetryExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	
+
 	switch {
 	case path == "/metrics":
 		te.servePrometheusMetrics(w, r)
@@ -172,10 +167,10 @@ func (te *TelemetryExporter) servePrometheusMetrics(w http.ResponseWriter, r *ht
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	contentType := expfmt.Negotiate(r.Header)
 	encoder := expfmt.NewEncoder(w, contentType)
-	
+
 	for _, mf := range mfs {
 		if err := encoder.Encode(mf); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -187,12 +182,12 @@ func (te *TelemetryExporter) servePrometheusMetrics(w http.ResponseWriter, r *ht
 func (te *TelemetryExporter) serveEnhancedMetrics(w http.ResponseWriter, r *http.Request) {
 	// Enhanced metrics with additional context
 	metrics := te.enhancedManager.GetEnhancedMetrics()
-	
+
 	// Add dashboard data
 	te.mu.RLock()
 	metrics["dashboard"] = te.dashboardData
 	te.mu.RUnlock()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(metrics)
 }
@@ -443,22 +438,22 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
     </script>
 </body>
 </html>`
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(dashboardHTML))
 }
 
 func (te *TelemetryExporter) serveHealth(w http.ResponseWriter, r *http.Request) {
 	health := map[string]interface{}{
-		"status": "healthy",
+		"status":    "healthy",
 		"timestamp": time.Now(),
 		"checks": map[string]string{
 			"telemetry": "ok",
 			"dashboard": "ok",
-			"alerts": "ok",
+			"alerts":    "ok",
 		},
 	}
-	
+
 	// Check if any critical alerts are active
 	te.mu.RLock()
 	criticalAlerts := 0
@@ -468,12 +463,12 @@ func (te *TelemetryExporter) serveHealth(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	te.mu.RUnlock()
-	
+
 	if criticalAlerts > 0 {
 		health["status"] = "degraded"
 		health["critical_alerts"] = criticalAlerts
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(health)
 }
@@ -482,17 +477,17 @@ func (te *TelemetryExporter) serveAlerts(w http.ResponseWriter, r *http.Request)
 	te.mu.RLock()
 	alerts := te.dashboardData.Alerts
 	te.mu.RUnlock()
-	
+
 	response := map[string]interface{}{
-		"alerts": alerts,
-		"total": len(alerts),
+		"alerts":      alerts,
+		"total":       len(alerts),
 		"by_severity": map[string]int{},
 	}
-	
+
 	for _, alert := range alerts {
 		response["by_severity"].(map[string]int)[alert.Severity]++
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -501,7 +496,7 @@ func (te *TelemetryExporter) serveSLOStatus(w http.ResponseWriter, r *http.Reque
 	te.mu.RLock()
 	sloStatus := te.dashboardData.SLOStatus
 	te.mu.RUnlock()
-	
+
 	// Calculate summary
 	totalSLOs := len(sloStatus)
 	compliantSLOs := 0
@@ -510,16 +505,16 @@ func (te *TelemetryExporter) serveSLOStatus(w http.ResponseWriter, r *http.Reque
 			compliantSLOs++
 		}
 	}
-	
+
 	response := map[string]interface{}{
 		"slos": sloStatus,
 		"summary": map[string]interface{}{
-			"total": totalSLOs,
-			"compliant": compliantSLOs,
+			"total":           totalSLOs,
+			"compliant":       compliantSLOs,
 			"compliance_rate": float64(compliantSLOs) / float64(totalSLOs) * 100,
 		},
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -527,7 +522,7 @@ func (te *TelemetryExporter) serveSLOStatus(w http.ResponseWriter, r *http.Reque
 func (te *TelemetryExporter) serveAPI(w http.ResponseWriter, r *http.Request) {
 	// API endpoints for programmatic access
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/")
-	
+
 	switch path {
 	case "query":
 		te.handleQuery(w, r)
@@ -545,17 +540,17 @@ func (te *TelemetryExporter) handleQuery(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "metric parameter required", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Get metric value
 	metrics := te.enhancedManager.GetEnhancedMetrics()
 	value := extractMetricValue(metrics, metric)
-	
+
 	response := map[string]interface{}{
-		"metric": metric,
-		"value": value,
+		"metric":    metric,
+		"value":     value,
 		"timestamp": time.Now(),
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -566,7 +561,7 @@ func (te *TelemetryExporter) handleExport(w http.ResponseWriter, r *http.Request
 	if format == "" {
 		format = "json"
 	}
-	
+
 	switch format {
 	case "json":
 		te.serveEnhancedMetrics(w, r)
@@ -580,7 +575,7 @@ func (te *TelemetryExporter) handleExport(w http.ResponseWriter, r *http.Request
 func (te *TelemetryExporter) startDashboardUpdater() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		te.updateDashboard()
 		te.checkAlerts()
@@ -590,41 +585,41 @@ func (te *TelemetryExporter) startDashboardUpdater() {
 
 func (te *TelemetryExporter) updateDashboard() {
 	metrics := te.enhancedManager.GetEnhancedMetrics()
-	
+
 	te.mu.Lock()
 	defer te.mu.Unlock()
-	
+
 	// Update summary
 	te.dashboardData.Summary = metrics
 	te.dashboardData.LastUpdated = time.Now()
-	
+
 	// Calculate trends (simplified - in production, store historical data)
 	te.dashboardData.Trends["error_rate"] = TrendData{
-		Current: metrics["performance"].(map[string]interface{})["error_rate"].(float64),
+		Current:  metrics["performance"].(map[string]interface{})["error_rate"].(float64),
 		Previous: 0, // Would be from historical data
-		Change: 0,
-		Trend: "stable",
+		Change:   0,
+		Trend:    "stable",
 	}
-	
+
 	te.dashboardData.Trends["throughput"] = TrendData{
-		Current: metrics["performance"].(map[string]interface{})["throughput"].(float64),
+		Current:  metrics["performance"].(map[string]interface{})["throughput"].(float64),
 		Previous: 0,
-		Change: 0,
-		Trend: "stable",
+		Change:   0,
+		Trend:    "stable",
 	}
-	
+
 	te.dashboardData.Trends["availability"] = TrendData{
-		Current: metrics["performance"].(map[string]interface{})["availability"].(float64),
+		Current:  metrics["performance"].(map[string]interface{})["availability"].(float64),
 		Previous: 99.9,
-		Change: 0.05,
-		Trend: "up",
+		Change:   0.05,
+		Trend:    "up",
 	}
 }
 
 func (te *TelemetryExporter) checkAlerts() {
 	metrics := te.enhancedManager.GetEnhancedMetrics()
 	newAlerts := []Alert{}
-	
+
 	for _, rule := range te.alertRules {
 		value := extractMetricValue(metrics, rule.Query)
 		if evaluateCondition(value, rule.Threshold, rule.Comparator) {
@@ -636,7 +631,7 @@ func (te *TelemetryExporter) checkAlerts() {
 					break
 				}
 			}
-			
+
 			if !exists {
 				newAlerts = append(newAlerts, Alert{
 					Name:      rule.Name,
@@ -649,7 +644,7 @@ func (te *TelemetryExporter) checkAlerts() {
 			}
 		}
 	}
-	
+
 	te.mu.Lock()
 	te.dashboardData.Alerts = newAlerts
 	te.mu.Unlock()
@@ -658,7 +653,7 @@ func (te *TelemetryExporter) checkAlerts() {
 func (te *TelemetryExporter) updateSLOStatus() {
 	te.mu.Lock()
 	defer te.mu.Unlock()
-	
+
 	// Example SLO calculations
 	te.dashboardData.SLOStatus["availability"] = SLOStatus{
 		Name:            "Availability",
@@ -668,7 +663,7 @@ func (te *TelemetryExporter) updateSLOStatus() {
 		ErrorBudgetLeft: 50.0, // 50% of error budget remaining
 		BurnRate:        0.5,  // Burning error budget at 0.5x rate
 	}
-	
+
 	te.dashboardData.SLOStatus["latency_p95"] = SLOStatus{
 		Name:            "P95 Latency < 1s",
 		Target:          95.0,
@@ -677,7 +672,7 @@ func (te *TelemetryExporter) updateSLOStatus() {
 		ErrorBudgetLeft: 70.0,
 		BurnRate:        0.3,
 	}
-	
+
 	te.dashboardData.SLOStatus["error_rate"] = SLOStatus{
 		Name:            "Error Rate < 1%",
 		Target:          99.0,
@@ -693,7 +688,7 @@ func (te *TelemetryExporter) updateSLOStatus() {
 func extractMetricValue(metrics map[string]interface{}, path string) float64 {
 	parts := strings.Split(path, ".")
 	current := metrics
-	
+
 	for i, part := range parts {
 		if i == len(parts)-1 {
 			if val, ok := current[part].(float64); ok {
@@ -707,7 +702,7 @@ func extractMetricValue(metrics map[string]interface{}, path string) float64 {
 			}
 		}
 	}
-	
+
 	return 0
 }
 

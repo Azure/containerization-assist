@@ -3,8 +3,6 @@ package observability
 import (
 	"embed"
 	"encoding/json"
-	"fmt"
-	"html/template"
 	"net/http"
 	"sort"
 	"sync"
@@ -19,17 +17,17 @@ type EnhancedDashboard struct {
 	telemetryManager *EnhancedTelemetryManager
 	tracingManager   *TracingManager
 	exporter         *TelemetryExporter
-	
+
 	// Real-time data
-	realtimeMetrics  *RealtimeMetrics
-	historicalData   *HistoricalMetrics
-	
+	realtimeMetrics *RealtimeMetrics
+	historicalData  *HistoricalMetrics
+
 	// WebSocket connections
-	wsConnections    map[string]*WSConnection
-	wsLock           sync.RWMutex
-	
+	wsConnections map[string]*WSConnection
+	wsLock        sync.RWMutex
+
 	// Dashboard configuration
-	config           *DashboardConfig
+	config *DashboardConfig
 }
 
 // RealtimeMetrics holds real-time metric data
@@ -43,35 +41,35 @@ type RealtimeMetrics struct {
 
 // HistoricalMetrics stores historical data
 type HistoricalMetrics struct {
-	mu              sync.RWMutex
-	HourlyMetrics   map[time.Time]*MetricSnapshot
-	DailyMetrics    map[time.Time]*MetricSnapshot
-	WeeklyMetrics   map[time.Time]*MetricSnapshot
+	mu            sync.RWMutex
+	HourlyMetrics map[time.Time]*MetricSnapshot
+	DailyMetrics  map[time.Time]*MetricSnapshot
+	WeeklyMetrics map[time.Time]*MetricSnapshot
 }
 
 // MetricSnapshot represents metrics at a point in time
 type MetricSnapshot struct {
-	Timestamp        time.Time
-	ErrorRate        float64
-	Throughput       float64
-	AvgLatency       float64
-	P95Latency       float64
-	P99Latency       float64
-	ErrorHandling    float64
-	TestCoverage     float64
-	ActiveSessions   int
-	MemoryUsage      int64
-	CPUUsage         float64
+	Timestamp      time.Time
+	ErrorRate      float64
+	Throughput     float64
+	AvgLatency     float64
+	P95Latency     float64
+	P99Latency     float64
+	ErrorHandling  float64
+	TestCoverage   float64
+	ActiveSessions int
+	MemoryUsage    int64
+	CPUUsage       float64
 }
 
 // OperationMetrics tracks metrics for an ongoing operation
 type OperationMetrics struct {
-	Name             string
-	StartTime        time.Time
-	Duration         time.Duration
-	Status           string
-	Progress         float64
-	SubOperations    []*SubOperation
+	Name          string
+	StartTime     time.Time
+	Duration      time.Duration
+	Status        string
+	Progress      float64
+	SubOperations []*SubOperation
 }
 
 // SubOperation represents a sub-operation within a larger operation
@@ -85,9 +83,9 @@ type SubOperation struct {
 
 // WSConnection represents a WebSocket connection
 type WSConnection struct {
-	ID         string
-	Conn       interface{} // Would be *websocket.Conn
-	LastPing   time.Time
+	ID            string
+	Conn          interface{} // Would be *websocket.Conn
+	LastPing      time.Time
 	Subscriptions []string
 }
 
@@ -103,15 +101,15 @@ type DashboardConfig struct {
 
 // SlidingWindow tracks values over a time window
 type SlidingWindow struct {
-	window   time.Duration
-	buckets  map[time.Time]float64
-	mu       sync.RWMutex
+	window  time.Duration
+	buckets map[time.Time]float64
+	mu      sync.RWMutex
 }
 
 // LatencyTracker tracks latency distributions
 type LatencyTracker struct {
-	buckets  map[string]*LatencyBucket
-	mu       sync.RWMutex
+	buckets map[string]*LatencyBucket
+	mu      sync.RWMutex
 }
 
 // LatencyBucket holds latency data for a specific operation
@@ -130,7 +128,7 @@ func NewEnhancedDashboard(telemetry *EnhancedTelemetryManager, tracing *TracingM
 		EnableHistorical: true,
 		Theme:            "dark",
 	}
-	
+
 	dashboard := &EnhancedDashboard{
 		telemetryManager: telemetry,
 		tracingManager:   tracing,
@@ -144,24 +142,24 @@ func NewEnhancedDashboard(telemetry *EnhancedTelemetryManager, tracing *TracingM
 			ActiveOperations: make(map[string]*OperationMetrics),
 		},
 		historicalData: &HistoricalMetrics{
-			HourlyMetrics:  make(map[time.Time]*MetricSnapshot),
-			DailyMetrics:   make(map[time.Time]*MetricSnapshot),
-			WeeklyMetrics:  make(map[time.Time]*MetricSnapshot),
+			HourlyMetrics: make(map[time.Time]*MetricSnapshot),
+			DailyMetrics:  make(map[time.Time]*MetricSnapshot),
+			WeeklyMetrics: make(map[time.Time]*MetricSnapshot),
 		},
 	}
-	
+
 	// Start background workers
 	go dashboard.startMetricsCollector()
 	go dashboard.startHistoricalAggregator()
 	go dashboard.startWebSocketBroadcaster()
-	
+
 	return dashboard
 }
 
 // ServeHTTP handles HTTP requests for the dashboard
 func (ed *EnhancedDashboard) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	
+
 	switch path {
 	case "/dashboard":
 		ed.serveDashboardHTML(w, r)
@@ -862,7 +860,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
     </script>
 </body>
 </html>`
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(dashboardHTML))
 }
@@ -870,10 +868,10 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
 func (ed *EnhancedDashboard) serveRealtimeMetrics(w http.ResponseWriter, r *http.Request) {
 	ed.realtimeMetrics.mu.RLock()
 	defer ed.realtimeMetrics.mu.RUnlock()
-	
+
 	// Get current metrics from telemetry manager
 	telemetryMetrics := ed.telemetryManager.GetEnhancedMetrics()
-	
+
 	// Combine with realtime data
 	response := map[string]interface{}{
 		"timestamp":       time.Now(),
@@ -886,7 +884,7 @@ func (ed *EnhancedDashboard) serveRealtimeMetrics(w http.ResponseWriter, r *http
 		"quality_score":   telemetryMetrics["quality"].(map[string]float64)["overall_score"],
 		"historical":      ed.getHistoricalData(r.URL.Query().Get("range")),
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -896,13 +894,13 @@ func (ed *EnhancedDashboard) serveHistoricalMetrics(w http.ResponseWriter, r *ht
 	if timeRange == "" {
 		timeRange = "24h"
 	}
-	
+
 	ed.historicalData.mu.RLock()
 	defer ed.historicalData.mu.RUnlock()
-	
+
 	var metrics []*MetricSnapshot
 	now := time.Now()
-	
+
 	switch timeRange {
 	case "1h":
 		// Get hourly metrics for last hour
@@ -933,12 +931,12 @@ func (ed *EnhancedDashboard) serveHistoricalMetrics(w http.ResponseWriter, r *ht
 			}
 		}
 	}
-	
+
 	// Sort by timestamp
 	sort.Slice(metrics, func(i, j int) bool {
 		return metrics[i].Timestamp.Before(metrics[j].Timestamp)
 	})
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"range":   timeRange,
@@ -949,17 +947,17 @@ func (ed *EnhancedDashboard) serveHistoricalMetrics(w http.ResponseWriter, r *ht
 func (ed *EnhancedDashboard) serveActiveOperations(w http.ResponseWriter, r *http.Request) {
 	ed.realtimeMetrics.mu.RLock()
 	defer ed.realtimeMetrics.mu.RUnlock()
-	
+
 	operations := make([]*OperationMetrics, 0, len(ed.realtimeMetrics.ActiveOperations))
 	for _, op := range ed.realtimeMetrics.ActiveOperations {
 		operations = append(operations, op)
 	}
-	
+
 	// Sort by start time
 	sort.Slice(operations, func(i, j int) bool {
 		return operations[i].StartTime.After(operations[j].StartTime)
 	})
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(operations)
 }
@@ -977,7 +975,7 @@ func (ed *EnhancedDashboard) serveTraces(w http.ResponseWriter, r *http.Request)
 			"timestamp":  time.Now().Add(-5 * time.Minute),
 		},
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(traces)
 }
@@ -994,7 +992,7 @@ func (ed *EnhancedDashboard) serveAlerts(w http.ResponseWriter, r *http.Request)
 			"started":  time.Now().Add(-15 * time.Minute),
 		},
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(alerts)
 }
@@ -1015,7 +1013,7 @@ func (ed *EnhancedDashboard) serveStaticAssets(w http.ResponseWriter, r *http.Re
 func (ed *EnhancedDashboard) startMetricsCollector() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		ed.collectRealtimeMetrics()
 	}
@@ -1024,7 +1022,7 @@ func (ed *EnhancedDashboard) startMetricsCollector() {
 func (ed *EnhancedDashboard) startHistoricalAggregator() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		ed.aggregateHistoricalMetrics()
 	}
@@ -1033,7 +1031,7 @@ func (ed *EnhancedDashboard) startHistoricalAggregator() {
 func (ed *EnhancedDashboard) startWebSocketBroadcaster() {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		ed.broadcastMetrics()
 	}
@@ -1047,31 +1045,31 @@ func (ed *EnhancedDashboard) collectRealtimeMetrics() {
 func (ed *EnhancedDashboard) aggregateHistoricalMetrics() {
 	ed.historicalData.mu.Lock()
 	defer ed.historicalData.mu.Unlock()
-	
+
 	now := time.Now()
 	hourKey := now.Truncate(time.Hour)
 	dayKey := now.Truncate(24 * time.Hour)
-	
+
 	// Create snapshot
 	snapshot := &MetricSnapshot{
-		Timestamp:     now,
-		ErrorRate:     ed.realtimeMetrics.ErrorRate.Rate(),
-		Throughput:    ed.realtimeMetrics.Throughput.Rate(),
-		AvgLatency:    ed.getLatencyPercentile(50),
-		P95Latency:    ed.getLatencyPercentile(95),
-		P99Latency:    ed.getLatencyPercentile(99),
-		MemoryUsage:   getMemoryUsage(),
-		CPUUsage:      getCPUUsage(),
+		Timestamp:   now,
+		ErrorRate:   ed.realtimeMetrics.ErrorRate.Rate(),
+		Throughput:  ed.realtimeMetrics.Throughput.Rate(),
+		AvgLatency:  ed.getLatencyPercentile(50),
+		P95Latency:  ed.getLatencyPercentile(95),
+		P99Latency:  ed.getLatencyPercentile(99),
+		MemoryUsage: getMemoryUsage(),
+		CPUUsage:    getCPUUsage(),
 	}
-	
+
 	// Store hourly
 	ed.historicalData.HourlyMetrics[hourKey] = snapshot
-	
+
 	// Store daily average
 	if _, exists := ed.historicalData.DailyMetrics[dayKey]; !exists {
 		ed.historicalData.DailyMetrics[dayKey] = snapshot
 	}
-	
+
 	// Clean old data
 	ed.cleanOldMetrics()
 }
@@ -1080,7 +1078,7 @@ func (ed *EnhancedDashboard) broadcastMetrics() {
 	// Broadcast to WebSocket connections
 	ed.wsLock.RLock()
 	defer ed.wsLock.RUnlock()
-	
+
 	metrics := map[string]interface{}{
 		"type": "metrics",
 		"metrics": map[string]interface{}{
@@ -1089,23 +1087,26 @@ func (ed *EnhancedDashboard) broadcastMetrics() {
 			"p95_latency": ed.getLatencyPercentile(95),
 		},
 	}
-	
+
 	for _, conn := range ed.wsConnections {
 		// Send metrics to connection
-		_ = conn
+		if err := conn.WriteJSON(metrics); err != nil {
+			// Log error but continue with other connections
+			continue
+		}
 	}
 }
 
 func (ed *EnhancedDashboard) cleanOldMetrics() {
 	cutoff := time.Now().Add(-ed.config.RetentionPeriod)
-	
+
 	// Clean hourly metrics older than 7 days
 	for t := range ed.historicalData.HourlyMetrics {
 		if t.Before(cutoff) {
 			delete(ed.historicalData.HourlyMetrics, t)
 		}
 	}
-	
+
 	// Clean daily metrics older than retention period
 	for t := range ed.historicalData.DailyMetrics {
 		if t.Before(cutoff) {
@@ -1142,10 +1143,10 @@ func NewSlidingWindow(window time.Duration) *SlidingWindow {
 func (sw *SlidingWindow) Add(value float64) {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
-	
+
 	now := time.Now()
 	sw.buckets[now] = value
-	
+
 	// Clean old entries
 	cutoff := now.Add(-sw.window)
 	for t := range sw.buckets {
@@ -1158,16 +1159,16 @@ func (sw *SlidingWindow) Add(value float64) {
 func (sw *SlidingWindow) Rate() float64 {
 	sw.mu.RLock()
 	defer sw.mu.RUnlock()
-	
+
 	if len(sw.buckets) == 0 {
 		return 0
 	}
-	
+
 	sum := 0.0
 	for _, v := range sw.buckets {
 		sum += v
 	}
-	
+
 	return sum / sw.window.Seconds()
 }
 

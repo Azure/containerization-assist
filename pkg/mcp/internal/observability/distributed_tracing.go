@@ -21,17 +21,17 @@ import (
 
 // DistributedTracingConfig holds configuration for distributed tracing
 type DistributedTracingConfig struct {
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
-	OTLPEndpoint    string
-	SampleRate      float64
-	MaxTraceSize    int
-	BatchTimeout    time.Duration
-	ExportTimeout   time.Duration
-	MaxExportBatch  int
-	MaxQueueSize    int
-	Headers         map[string]string
+	ServiceName    string
+	ServiceVersion string
+	Environment    string
+	OTLPEndpoint   string
+	SampleRate     float64
+	MaxTraceSize   int
+	BatchTimeout   time.Duration
+	ExportTimeout  time.Duration
+	MaxExportBatch int
+	MaxQueueSize   int
+	Headers        map[string]string
 }
 
 // TracingManager manages distributed tracing
@@ -174,7 +174,7 @@ func (tm *TracingManager) StartSpan(ctx context.Context, name string, opts ...tr
 // StartToolSpan starts a span for tool execution
 func (tm *TracingManager) StartToolSpan(ctx context.Context, toolName string, operation string) (context.Context, trace.Span) {
 	spanName := fmt.Sprintf("tool.%s.%s", toolName, operation)
-	
+
 	opts := []trace.SpanStartOption{
 		trace.WithAttributes(
 			attribute.String("tool.name", toolName),
@@ -190,7 +190,7 @@ func (tm *TracingManager) StartToolSpan(ctx context.Context, toolName string, op
 // StartHTTPSpan starts a span for HTTP operations
 func (tm *TracingManager) StartHTTPSpan(ctx context.Context, method, path string) (context.Context, trace.Span) {
 	spanName := fmt.Sprintf("%s %s", method, path)
-	
+
 	opts := []trace.SpanStartOption{
 		trace.WithAttributes(
 			attribute.String("http.method", method),
@@ -206,7 +206,7 @@ func (tm *TracingManager) StartHTTPSpan(ctx context.Context, method, path string
 // StartDatabaseSpan starts a span for database operations
 func (tm *TracingManager) StartDatabaseSpan(ctx context.Context, dbType, operation, table string) (context.Context, trace.Span) {
 	spanName := fmt.Sprintf("db.%s.%s", dbType, operation)
-	
+
 	opts := []trace.SpanStartOption{
 		trace.WithAttributes(
 			attribute.String("db.type", dbType),
@@ -226,7 +226,7 @@ func (tm *TracingManager) RecordError(ctx context.Context, err error, opts ...tr
 	if span.IsRecording() {
 		span.RecordError(err, opts...)
 		span.SetStatus(codes.Error, err.Error())
-		
+
 		// Add error attributes
 		span.SetAttributes(
 			attribute.String("error.type", fmt.Sprintf("%T", err)),
@@ -270,10 +270,10 @@ func (tm *TracingManager) GetTraceContext(ctx context.Context) *TraceContext {
 
 	spanCtx := span.SpanContext()
 	tc := &TraceContext{
-		TraceID:  spanCtx.TraceID().String(),
-		SpanID:   spanCtx.SpanID().String(),
-		Flags:    byte(spanCtx.TraceFlags()),
-		Baggage:  make(map[string]string),
+		TraceID: spanCtx.TraceID().String(),
+		SpanID:  spanCtx.SpanID().String(),
+		Flags:   byte(spanCtx.TraceFlags()),
+		Baggage: make(map[string]string),
 	}
 
 	// Extract baggage
@@ -294,7 +294,7 @@ func (tm *TracingManager) CreateChildContext(parent *TraceContext) context.Conte
 	}
 
 	// Parse span ID as parent
-	_, err := trace.SpanIDFromHex(parent.SpanID)
+	_, err = trace.SpanIDFromHex(parent.SpanID)
 	if err != nil {
 		return context.Background()
 	}
@@ -408,7 +408,7 @@ func TracingMiddleware(tm *TracingManager) func(next http.Handler) http.Handler 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Extract trace context from headers
 			ctx := tm.ExtractContext(r.Context(), propagation.HeaderCarrier(r.Header))
-			
+
 			// Start HTTP span
 			ctx, span := tm.StartHTTPSpan(ctx, r.Method, r.URL.Path)
 			defer span.End()
@@ -422,7 +422,7 @@ func TracingMiddleware(tm *TracingManager) func(next http.Handler) http.Handler 
 
 			// Wrap response writer to capture status
 			wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
-			
+
 			// Call next handler
 			next.ServeHTTP(wrapped, r.WithContext(ctx))
 
@@ -450,4 +450,3 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
 }
-

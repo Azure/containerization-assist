@@ -50,18 +50,18 @@ func (ti *TracingIntegration) TraceToolExecution(ctx context.Context, toolName s
 
 	// Main execution phase
 	ctx, execSpan := ti.manager.StartSpan(ctx, fmt.Sprintf("%s.execution", toolName))
-	
+
 	// Execute the tool
 	start := time.Now()
 	err := fn(ctx)
 	duration := time.Since(start)
-	
+
 	// Record execution metrics
 	execSpan.SetAttributes(
 		attribute.Float64("tool.execution.duration_ms", duration.Seconds()*1000),
 		attribute.Bool("tool.execution.success", err == nil),
 	)
-	
+
 	if err != nil {
 		ti.manager.RecordError(ctx, err)
 	}
@@ -108,12 +108,12 @@ func (ti *TracingIntegration) TraceWorkflow(ctx context.Context, workflowName st
 
 		// Execute step
 		err := ti.executeWorkflowStep(stepCtx, step)
-		
+
 		if err != nil {
 			ti.manager.RecordError(stepCtx, err)
 			stepSpan.SetAttributes(attribute.Bool("workflow.step.success", false))
 			stepSpan.End()
-			
+
 			// Decide whether to continue or abort
 			if !step.ContinueOnError {
 				span.SetAttributes(
@@ -125,7 +125,7 @@ func (ti *TracingIntegration) TraceWorkflow(ctx context.Context, workflowName st
 		} else {
 			stepSpan.SetAttributes(attribute.Bool("workflow.step.success", true))
 		}
-		
+
 		stepSpan.End()
 	}
 
@@ -151,7 +151,7 @@ func (ti *TracingIntegration) executeWorkflowStep(ctx context.Context, step Work
 	}
 
 	// Record step start
-	ti.manager.AddEvent(ctx, "step_started", 
+	ti.manager.AddEvent(ctx, "step_started",
 		attribute.String("step.name", step.Name),
 		attribute.String("step.type", step.Type),
 	)
@@ -230,7 +230,7 @@ func (ti *TracingIntegration) TraceAsyncOperation(ctx context.Context, operation
 		span.SetAttributes(attribute.Bool("async.success", true))
 		ti.manager.AddEvent(ctx, "async_operation_completed")
 		return nil
-		
+
 	case <-ctx.Done():
 		err := ctx.Err()
 		ti.manager.RecordError(ctx, err)
@@ -255,7 +255,7 @@ func (ti *TracingIntegration) TraceBatch(ctx context.Context, batchName string, 
 
 	successCount := 0
 	errorCount := 0
-	
+
 	// Process each item
 	for i, item := range items {
 		// Start item span
@@ -267,7 +267,7 @@ func (ti *TracingIntegration) TraceBatch(ctx context.Context, batchName string, 
 
 		// Process item
 		err := processFn(itemCtx, item)
-		
+
 		if err != nil {
 			ti.manager.RecordError(itemCtx, err)
 			itemSpan.SetAttributes(attribute.Bool("batch.item.success", false))
@@ -276,7 +276,7 @@ func (ti *TracingIntegration) TraceBatch(ctx context.Context, batchName string, 
 			itemSpan.SetAttributes(attribute.Bool("batch.item.success", true))
 			successCount++
 		}
-		
+
 		itemSpan.End()
 	}
 
