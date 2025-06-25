@@ -790,7 +790,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		Labels:          args.WorkflowLabels,
 	}
 	if err := serviceCustomizer.CustomizeService(servicePath, serviceOpts); err != nil {
-		return nil, mcptypes.WrapRichError(err, "SERVICE_CUSTOMIZATION_FAILED", "failed to customize service manifest", "configuration_error")
+		return nil, fmt.Errorf("failed to customize service manifest: %w", err)
 	}
 
 	// Generate and customize ConfigMap if environment variables or data exists
@@ -831,7 +831,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		// Handle binary data if present
 		if len(args.BinaryData) > 0 {
 			if err := t.addBinaryDataToConfigMap(configMapPath, args.BinaryData); err != nil {
-				return nil, mcptypes.WrapRichError(err, "CONFIGMAP_BINARY_DATA_FAILED", "failed to add binary data to configmap", "processing_error")
+				return nil, fmt.Errorf("failed to add binary data to configmap: %w", err)
 			}
 		}
 	} else {
@@ -844,7 +844,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 				Labels:    args.WorkflowLabels,
 			}
 			if err := configMapCustomizer.CustomizeConfigMap(configMapPath, configMapOptions); err != nil {
-				return nil, mcptypes.WrapRichError(err, "CONFIGMAP_WORKFLOW_LABELS_FAILED", "failed to customize configmap manifest with workflow labels", "configuration_error")
+				return nil, fmt.Errorf("failed to customize configmap manifest with workflow labels: %w", err)
 			}
 		}
 	}
@@ -863,7 +863,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 			Labels:       args.WorkflowLabels,
 		}
 		if err := ingressCustomizer.CustomizeIngress(ingressPath, ingressOpts); err != nil {
-			return nil, mcptypes.WrapRichError(err, "INGRESS_CUSTOMIZATION_FAILED", "failed to customize ingress manifest", "configuration_error")
+			return nil, fmt.Errorf("failed to customize ingress manifest: %w", err)
 		}
 	}
 
@@ -887,7 +887,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		}
 
 		if err := networkPolicyCustomizer.CustomizeNetworkPolicy(networkPolicyPath, networkPolicyOpts); err != nil {
-			return nil, mcptypes.WrapRichError(err, "NETWORKPOLICY_CUSTOMIZATION_FAILED", "failed to customize networkpolicy manifest", "configuration_error")
+			return nil, fmt.Errorf("failed to customize networkpolicy manifest: %w", err)
 		}
 	}
 
@@ -901,7 +901,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 				Labels:    args.WorkflowLabels,
 			}
 			if err := configMapCustomizer.CustomizeConfigMap(configMapPath, configMapOptions); err != nil {
-				return nil, mcptypes.WrapRichError(err, "CONFIGMAP_WORKFLOW_LABELS_FAILED", "failed to customize configmap manifest with workflow labels", "configuration_error")
+				return nil, fmt.Errorf("failed to customize configmap manifest with workflow labels: %w", err)
 			}
 		}
 	}
