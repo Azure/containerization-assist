@@ -12,8 +12,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
-	"github.com/localrivet/gomcp/server"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
@@ -92,13 +92,13 @@ type TagContext struct {
 
 // AtomicTagImageTool implements atomic Docker image tagging using core operations
 type AtomicTagImageTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
 // NewAtomicTagImageTool creates a new atomic tag image tool
-func NewAtomicTagImageTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
+func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_tag_image").Logger()
 	return &AtomicTagImageTool{
 		pipelineAdapter: adapter,
@@ -185,7 +185,7 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 	t.logger.Info().Msg("Starting tag operation without progress tracking")
 
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		result.Success = false
@@ -199,6 +199,7 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Set session details
 	result.SessionID = session.SessionID // Use compatibility method
@@ -262,7 +263,10 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 	// Get session if not provided
 	if session == nil {
 		var err error
-		session, err = t.sessionManager.GetSession(args.SessionID)
+		sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
+		if err == nil {
+			session = sessionInterface.(*sessiontypes.SessionState)
+		}
 		if err != nil {
 			t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 			return types.NewSessionError(args.SessionID, "tag_image").
@@ -306,7 +310,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 
 	tagStartTime := time.Now()
 
-	tagResult, err := t.pipelineAdapter.TagDockerImage(session.SessionID, args.SourceImage, args.TargetImage)
+	err := t.pipelineAdapter.TagDockerImage(session.SessionID, args.SourceImage, args.TargetImage)
 	result.TagDuration = time.Since(tagStartTime)
 
 	if err != nil {
@@ -319,27 +323,18 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 	}
 
 	// Update result with tag operation details
-	result.Success = tagResult.Success
-	result.TagResult = tagResult
+	result.Success = true
+	result.TagResult = &docker.TagResult{
+		Success:     true,
+		SourceImage: args.SourceImage,
+		TargetImage: args.TargetImage,
+	}
 
-	if tagResult.Success {
-		result.TagContext.TagStatus = "successful"
-		result.TagContext.NextStepSuggestions = []string{
-			fmt.Sprintf("Image %s successfully tagged as %s", args.SourceImage, args.TargetImage),
-			"You can now use the new tag for deployment or pushing",
-			fmt.Sprintf("New tag available: %s", args.TargetImage),
-		}
-	} else {
-		result.TagContext.TagStatus = "failed"
-		result.TagContext.NextStepSuggestions = []string{
-			"Check if the source image exists and is accessible",
-			"Verify Docker daemon is running and accessible",
-			"Ensure proper permissions for Docker operations",
-		}
-		if tagResult.Error != nil {
-			result.TagContext.ErrorType = tagResult.Error.Type
-			result.TagContext.ErrorCategory = tagResult.Error.Type
-		}
+	result.TagContext.TagStatus = "successful"
+	result.TagContext.NextStepSuggestions = []string{
+		fmt.Sprintf("Image %s successfully tagged as %s", args.SourceImage, args.TargetImage),
+		"You can now use the new tag for deployment or pushing",
+		fmt.Sprintf("New tag available: %s", args.TargetImage),
 	}
 
 	// Stage 4: Verify operation
@@ -438,7 +433,6 @@ func (t *AtomicTagImageTool) extractRegistryURL(imageRef string) string {
 	return "docker.io" // Default registry
 }
 
-
 // Validate validates the tool arguments
 func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) error {
 	tagArgs, ok := args.(AtomicTagImageArgs)
@@ -502,10 +496,10 @@ func (t *AtomicTagImageTool) Execute(ctx context.Context, args interface{}) (int
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicTagImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
-		Name:        "atomic_tag_image",
-		Description: "Tags Docker images with new names for versioning, environment promotion, or registry organization",
-		Version:     constants.AtomicToolVersion,
-		Category:    "docker",
+		Name:         "atomic_tag_image",
+		Description:  "Tags Docker images with new names for versioning, environment promotion, or registry organization",
+		Version:      constants.AtomicToolVersion,
+		Category:     "docker",
 		Dependencies: []string{"docker"},
 		Capabilities: []string{
 			"supports_dry_run",
@@ -521,9 +515,9 @@ func (t *AtomicTagImageTool) GetMetadata() mcptypes.ToolMetadata {
 				Name:        "basic_tag",
 				Description: "Tag a Docker image with new name",
 				Input: map[string]interface{}{
-					"session_id":    "session-123",
-					"source_image":  "myapp:latest",
-					"target_image":  "myregistry.azurecr.io/myapp:v1.0.0",
+					"session_id":   "session-123",
+					"source_image": "myapp:latest",
+					"target_image": "myregistry.azurecr.io/myapp:v1.0.0",
 				},
 				Output: map[string]interface{}{
 					"success":      true,

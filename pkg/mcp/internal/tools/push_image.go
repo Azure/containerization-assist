@@ -348,19 +348,19 @@ func (t *PushImageTool) generateErrorSuggestions(err error) []string {
 // checkDockerLogin verifies Docker credentials are configured
 func (t *PushImageTool) checkDockerLogin(registry string) error {
 	t.logger.Debug().Str("registry", registry).Msg("Checking Docker credentials")
-	
+
 	// Check environment variables first
 	if os.Getenv("DOCKER_USERNAME") != "" && os.Getenv("DOCKER_PASSWORD") != "" {
 		t.logger.Debug().Msg("Found Docker credentials in environment variables")
 		return nil
 	}
-	
+
 	// Check Docker config file
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	configPath := filepath.Join(homeDir, ".docker", "config.json")
 	if _, err := os.Stat(configPath); err != nil {
 		if os.IsNotExist(err) {
@@ -368,36 +368,36 @@ func (t *PushImageTool) checkDockerLogin(registry string) error {
 		}
 		return fmt.Errorf("error accessing Docker config: %w", err)
 	}
-	
+
 	// Read and parse config
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read Docker config: %w", err)
 	}
-	
+
 	var config struct {
 		Auths map[string]struct {
 			Auth string `json:"auth"`
 		} `json:"auths"`
 		CredsStore string `json:"credsStore"`
 	}
-	
+
 	if err := json.Unmarshal(configData, &config); err != nil {
 		return fmt.Errorf("failed to parse Docker config: %w", err)
 	}
-	
+
 	// Check if registry has auth
 	if auth, ok := config.Auths[registry]; ok && auth.Auth != "" {
 		t.logger.Debug().Msg("Found registry authentication in Docker config")
 		return nil
 	}
-	
+
 	// Check for credential helper
 	if config.CredsStore != "" {
 		t.logger.Debug().Str("credsStore", config.CredsStore).Msg("Docker credential helper configured")
 		return nil
 	}
-	
+
 	return fmt.Errorf("no Docker credentials found for registry %s. Please run 'docker login %s' first", registry, registry)
 }
 

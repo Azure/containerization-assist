@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/core/analysis"
-	"github.com/Azure/container-copilot/pkg/core/docker"
 	"github.com/Azure/container-copilot/pkg/core/git"
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	corek8s "github.com/Azure/container-copilot/pkg/core/kubernetes"
@@ -21,14 +20,15 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
 // AtomicGenerateManifestsTool implements atomic Kubernetes manifest generation with secret handling
 type AtomicGenerateManifestsTool struct {
-	pipelineAdapter     PipelineOperations
-	sessionManager      ToolSessionManager
+	pipelineAdapter     mcptypes.PipelineOperations
+	sessionManager      mcptypes.ToolSessionManager
 	secretScanner       *utils.SecretScanner
 	secretGenerator     *corek8s.SecretGenerator
 	fixingMixin         *fixing.AtomicToolFixingMixin
@@ -38,7 +38,7 @@ type AtomicGenerateManifestsTool struct {
 }
 
 // NewAtomicGenerateManifestsTool creates a new atomic generate manifests tool
-func NewAtomicGenerateManifestsTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicGenerateManifestsTool {
+func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateManifestsTool {
 	toolLogger := logger.With().Str("tool", "atomic_generate_manifests").Logger()
 	return &AtomicGenerateManifestsTool{
 		pipelineAdapter:     adapter,
@@ -91,10 +91,11 @@ func (t *AtomicGenerateManifestsTool) ExecuteWithFixes(ctx context.Context, args
 	}
 
 	// Get session and workspace info
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		return nil, types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("session not found: %s", args.SessionID), types.ErrTypeSession)
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 	workspaceDir := t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 
 	t.logger.Info().
@@ -166,7 +167,7 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 	startTime := time.Now()
 
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicGenerateManifestsResult{
 			BaseToolResponse:          types.NewBaseResponse("atomic_generate_manifests", args.SessionID, args.DryRun),
@@ -181,6 +182,7 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("session not found: %s", args.SessionID), types.ErrTypeSession)
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -291,7 +293,29 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 	)
 
 	result.GenerationDuration = time.Since(generationStartTime)
-	result.ManifestResult = manifestResult
+	
+	// Convert from mcptypes.KubernetesManifestResult to kubernetes.ManifestGenerationResult
+	if manifestResult != nil {
+		result.ManifestResult = &kubernetes.ManifestGenerationResult{
+			Success:   manifestResult.Success,
+			OutputDir: result.WorkspaceDir,
+		}
+		if manifestResult.Error != nil {
+			result.ManifestResult.Error = &kubernetes.ManifestError{
+				Type:    manifestResult.Error.Type,
+				Message: manifestResult.Error.Message,
+			}
+		}
+		// Convert manifests
+		for _, manifest := range manifestResult.Manifests {
+			result.ManifestResult.Manifests = append(result.ManifestResult.Manifests, kubernetes.GeneratedManifest{
+				Kind:    manifest.Kind,
+				Name:    manifest.Name,
+				Path:    manifest.Path,
+				Content: manifest.Content,
+			})
+		}
+	}
 
 	if err != nil {
 		t.logger.Error().Err(err).
@@ -321,7 +345,7 @@ func (t *AtomicGenerateManifestsTool) performManifestGeneration(ctx context.Cont
 	}
 
 	// Step 6: Enhance manifests based on configuration
-	if err := t.enhanceManifests(session.SessionID, manifestResult, args, result); err != nil {
+	if err := t.enhanceManifests(session.SessionID, result.ManifestResult, args, result); err != nil {
 		t.logger.Warn().Err(err).Msg("Failed to enhance manifests with additional configuration")
 	}
 
@@ -570,7 +594,7 @@ func (op *ManifestGenerationOperation) ExecuteOnce(ctx context.Context) error {
 }
 
 // GetFailureAnalysis analyzes why the manifest generation failed
-func (op *ManifestGenerationOperation) GetFailureAnalysis(ctx context.Context, err error) (*types.RichError, error) {
+func (op *ManifestGenerationOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
 	op.logger.Error().
 		Err(err).
 		Str("session_id", op.args.SessionID).
@@ -579,32 +603,12 @@ func (op *ManifestGenerationOperation) GetFailureAnalysis(ctx context.Context, e
 	// Create a rich error with context
 	// Log the error instead of creating a RichError
 	op.logger.Error().Err(err).Msg("Manifest generation failed")
-	richError := types.NewRichError("MANIFEST_GENERATION_FAILED", fmt.Sprintf("Manifest generation failed: %v", err), types.ErrTypeDeployment)
-	richError.Context.Operation = "manifest_generation"
-	richError.Context.Stage = "kubernetes_manifests"
-
-	// Initialize metadata if nil
-	if richError.Context.Metadata == nil {
-		richError.Context.Metadata = types.NewErrorMetadata("", "generate_manifests", "manifest_generation")
-	}
-
-	// Add context metadata
-	richError.Context.Metadata.WithDeploymentContext(&types.DeploymentMetadata{
-		Namespace: op.args.Namespace,
-	}).
-		AddCustom("app_name", op.args.AppName).
-		AddCustom("image_ref", op.args.ImageRef).
-		AddCustom("replicas", op.args.Replicas).
-		AddCustom("service_type", op.args.ServiceType).
-		AddCustom("gitops_ready", op.args.GitOpsReady).
-		AddCustom("generate_helm", op.args.GenerateHelm)
-
-	// Add workspace information
-	if op.workspaceDir != "" {
-		manifestPath := filepath.Join(op.workspaceDir, "manifests")
-		if _, err := os.Stat(manifestPath); err == nil {
-			richError.Context.Metadata.AddCustom("manifest_path", manifestPath)
-		}
+	// Create a rich error for mcptypes
+	richError := &mcptypes.RichError{
+		Code:     "MANIFEST_GENERATION_FAILED",
+		Type:     "deployment",
+		Severity: "high",
+		Message:  fmt.Sprintf("Manifest generation failed: %v", err),
 	}
 
 	// Analyze error patterns
@@ -612,78 +616,30 @@ func (op *ManifestGenerationOperation) GetFailureAnalysis(ctx context.Context, e
 	switch {
 	case strings.Contains(errStr, "invalid image"):
 		richError.Type = "invalid_image"
-		richError.Severity = types.SeverityHigh
-		richError.Resolution.ImmediateSteps = append(richError.Resolution.ImmediateSteps,
-			types.ResolutionStep{
-				Order:       1,
-				Action:      "verify_image",
-				Description: "Verify the image reference is valid and accessible",
-			},
-			types.ResolutionStep{
-				Order:       2,
-				Action:      "check_auth",
-				Description: "Check if the image requires authentication",
-			},
-		)
+		richError.Severity = "high"
 
 	case strings.Contains(errStr, "resource limits"):
 		richError.Type = "resource_configuration"
-		richError.Severity = types.SeverityMedium
-		richError.Resolution.ImmediateSteps = append(richError.Resolution.ImmediateSteps,
-			types.ResolutionStep{
-				Order:       1,
-				Action:      "adjust_resources",
-				Description: "Adjust CPU and memory limits to valid values",
-			},
-			types.ResolutionStep{
-				Order:       2,
-				Action:      "validate_resources",
-				Description: "Ensure requests are not larger than limits",
-			},
-		)
+		richError.Severity = "medium"
 
 	case strings.Contains(errStr, "secret") || strings.Contains(errStr, "sensitive"):
 		richError.Type = "secret_handling"
-		richError.Severity = types.SeverityHigh
-		richError.Resolution.ImmediateSteps = append(richError.Resolution.ImmediateSteps,
-			types.ResolutionStep{
-				Order:       1,
-				Action:      "review_secrets",
-				Description: "Review secret handling configuration",
-			},
-			types.ResolutionStep{
-				Order:       2,
-				Action:      "externalize_secrets",
-				Description: "Consider using external secret management",
-			},
-		)
+		richError.Severity = "high"
 
 	case strings.Contains(errStr, "template") || strings.Contains(errStr, "render"):
 		richError.Type = "template_error"
-		richError.Severity = types.SeverityMedium
-		richError.Resolution.ImmediateSteps = append(richError.Resolution.ImmediateSteps,
-			types.ResolutionStep{
-				Order:       1,
-				Action:      "check_syntax",
-				Description: "Check template syntax and variables",
-			},
-			types.ResolutionStep{
-				Order:       2,
-				Action:      "verify_values",
-				Description: "Verify all required template values are provided",
-			},
-		)
+		richError.Severity = "medium"
 
 	default:
 		richError.Type = "general_manifest_error"
-		richError.Severity = types.SeverityMedium
+		richError.Severity = "medium"
 	}
 
 	return richError, nil
 }
 
 // PrepareForRetry prepares the manifest generation for another attempt
-func (op *ManifestGenerationOperation) PrepareForRetry(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *ManifestGenerationOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("session_id", op.args.SessionID).
 		Int("attempt", fixAttempt.AttemptNumber).
@@ -720,34 +676,33 @@ func (op *ManifestGenerationOperation) PrepareForRetry(ctx context.Context, fixA
 
 	// Apply any argument changes suggested by the fix
 	if fixAttempt.FixStrategy.Name == "adjust_resources" {
-		// AI might suggest adjusting resource limits in the Dependencies array
-		for _, dep := range fixAttempt.FixStrategy.Dependencies {
-			if dep == "cpu_request" && len(fixAttempt.FixStrategy.Commands) > 0 {
-				// Extract CPU request from commands or file changes
-				for _, change := range fixAttempt.FixStrategy.FileChanges {
-					if strings.Contains(change.Reason, "cpu_request") {
-						// Parse the new CPU request value from the change
-						op.logger.Info().
-							Str("reason", change.Reason).
-							Msg("Adjusting CPU request based on fix strategy")
-					}
-				}
-			}
-			if dep == "memory_request" && len(fixAttempt.FixStrategy.Commands) > 0 {
-				// Extract memory request from commands or file changes
-				for _, change := range fixAttempt.FixStrategy.FileChanges {
-					if strings.Contains(change.Reason, "memory_request") {
-						// Parse the new memory request value from the change
-						op.logger.Info().
-							Str("reason", change.Reason).
-							Msg("Adjusting memory request based on fix strategy")
-					}
-				}
+		// AI might suggest adjusting resource limits through file changes
+		for _, change := range fixAttempt.FixStrategy.FileChanges {
+			if strings.Contains(change.Reason, "cpu_request") || strings.Contains(change.Reason, "memory_request") {
+				op.logger.Info().
+					Str("reason", change.Reason).
+					Msg("Adjusting resources based on fix strategy")
 			}
 		}
 	}
 
 	return nil
+}
+
+// CanRetry determines if the operation can be retried
+func (op *ManifestGenerationOperation) CanRetry() bool {
+	return true // Manifest generation can always be retried
+}
+
+// GetLastError returns the last error encountered
+func (op *ManifestGenerationOperation) GetLastError() error {
+	// For now, return nil as we don't track errors in the operation
+	return nil
+}
+
+// Execute runs the operation
+func (op *ManifestGenerationOperation) Execute(ctx context.Context) error {
+	return op.ExecuteOnce(ctx)
 }
 
 // SimpleTool interface implementation
@@ -1048,23 +1003,13 @@ func convertAtomicGenerateManifestsResultToMap(result *AtomicGenerateManifestsRe
 // Mock implementations for standalone usage
 type mockPipelineAdapter struct{}
 
-func (m *mockPipelineAdapter) GenerateKubernetesManifests(sessionID, imageRef, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*corek8s.ManifestGenerationResult, error) {
-	// Mock implementation - in real usage, this would call the actual pipeline
-	return &corek8s.ManifestGenerationResult{
-		Success:   true,
-		OutputDir: fmt.Sprintf("/tmp/container-copilot/%s/manifests", sessionID),
-		Manifests: []corek8s.GeneratedManifest{
-			{Name: appName, Kind: "Deployment", Path: "deployment.yaml"},
-			{Name: appName, Kind: "Service", Path: "service.yaml"},
-		},
-	}, nil
-}
+// Remove duplicate - this is implemented below with correct signature
 
 func (m *mockPipelineAdapter) GetSessionWorkspace(sessionID string) string {
 	return fmt.Sprintf("/tmp/container-copilot/%s", sessionID)
 }
 
-// Implement remaining PipelineOperations methods
+// Implement remaining mcptypes.PipelineOperations methods
 func (m *mockPipelineAdapter) AnalyzeRepository(sessionID, repoPath string) (*analysis.AnalysisResult, error) {
 	return &analysis.AnalysisResult{}, nil
 }
@@ -1077,29 +1022,14 @@ func (m *mockPipelineAdapter) GenerateDockerfile(sessionID, language, framework 
 	return "Dockerfile", nil
 }
 
-func (m *mockPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (*docker.BuildResult, error) {
-	return &docker.BuildResult{}, nil
+func (m *mockPipelineAdapter) BuildDockerImage(sessionID, imageRef, dockerfilePath string) (*mcptypes.DockerBuildResult, error) {
+	return &mcptypes.DockerBuildResult{
+		Success: true,
+		ImageRef: imageRef,
+	}, nil
 }
 
-func (m *mockPipelineAdapter) PushDockerImage(sessionID, imageName, registryURL string) (*docker.RegistryPushResult, error) {
-	return &docker.RegistryPushResult{}, nil
-}
-
-func (m *mockPipelineAdapter) TagDockerImage(sessionID, sourceImage, targetImage string) (*docker.TagResult, error) {
-	return &docker.TagResult{}, nil
-}
-
-func (m *mockPipelineAdapter) PullDockerImage(sessionID, imageRef string) (*docker.PullResult, error) {
-	return &docker.PullResult{}, nil
-}
-
-func (m *mockPipelineAdapter) DeployToKubernetes(sessionID, manifestPath, namespace string) (*kubernetes.DeploymentResult, error) {
-	return &kubernetes.DeploymentResult{}, nil
-}
-
-func (m *mockPipelineAdapter) CheckApplicationHealth(sessionID, namespace, labelSelector string, timeout time.Duration) (*kubernetes.HealthCheckResult, error) {
-	return &kubernetes.HealthCheckResult{}, nil
-}
+// Remove duplicates - these are implemented below with correct signatures
 
 func (m *mockPipelineAdapter) PreviewDeployment(sessionID, manifestPath, namespace string) (string, error) {
 	return "preview", nil
@@ -1115,9 +1045,60 @@ func (m *mockPipelineAdapter) GetContext(sessionID string) context.Context {
 }
 func (m *mockPipelineAdapter) ClearContext(sessionID string) {}
 
+// Add missing PipelineOperations methods
+func (m *mockPipelineAdapter) UpdateSessionFromDockerResults(sessionID string, result interface{}) error {
+	return nil
+}
+
+func (m *mockPipelineAdapter) PullDockerImage(sessionID, imageRef string) error {
+	return nil
+}
+
+func (m *mockPipelineAdapter) PushDockerImage(sessionID, imageRef string) error {
+	return nil
+}
+
+func (m *mockPipelineAdapter) TagDockerImage(sessionID, sourceRef, targetRef string) error {
+	return nil
+}
+
+func (m *mockPipelineAdapter) ConvertToDockerState(sessionID string) (*mcptypes.DockerState, error) {
+	return &mcptypes.DockerState{}, nil
+}
+
+func (m *mockPipelineAdapter) GenerateKubernetesManifests(sessionID, imageRef, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*mcptypes.KubernetesManifestResult, error) {
+	return &mcptypes.KubernetesManifestResult{
+		Success: true,
+		Manifests: []mcptypes.GeneratedManifest{
+			{Kind: "Deployment", Name: appName + "-deployment", Path: "deployment.yaml", Content: ""},
+			{Kind: "Service", Name: appName + "-service", Path: "service.yaml", Content: ""},
+		},
+	}, nil
+}
+
+func (m *mockPipelineAdapter) DeployToKubernetes(sessionID string, manifests []string) (*mcptypes.KubernetesDeploymentResult, error) {
+	return &mcptypes.KubernetesDeploymentResult{
+		Success: true,
+	}, nil
+}
+
+func (m *mockPipelineAdapter) CheckApplicationHealth(sessionID, namespace, deploymentName string, timeout time.Duration) (*mcptypes.HealthCheckResult, error) {
+	return &mcptypes.HealthCheckResult{
+		Healthy: true,
+	}, nil
+}
+
+func (m *mockPipelineAdapter) AcquireResource(sessionID, resourceType string) error {
+	return nil
+}
+
+func (m *mockPipelineAdapter) ReleaseResource(sessionID, resourceType string) error {
+	return nil
+}
+
 type mockSessionManager struct{}
 
-func (m *mockSessionManager) GetSession(sessionID string) (*sessiontypes.SessionState, error) {
+func (m *mockSessionManager) GetSession(sessionID string) (interface{}, error) {
 	// Mock implementation
 	return &sessiontypes.SessionState{
 		SessionID: sessionID,
@@ -1125,15 +1106,30 @@ func (m *mockSessionManager) GetSession(sessionID string) (*sessiontypes.Session
 	}, nil
 }
 
-func (m *mockSessionManager) GetOrCreateSession(sessionID string) (*sessiontypes.SessionState, error) {
+func (m *mockSessionManager) GetOrCreateSession(repoURL string) (interface{}, error) {
 	// Mock implementation
 	return &sessiontypes.SessionState{
-		SessionID: sessionID,
+		SessionID: "mock-session-id",
 		Metadata:  make(map[string]interface{}),
 	}, nil
 }
 
-func (m *mockSessionManager) UpdateSession(sessionID string, updateFunc func(*sessiontypes.SessionState)) error {
+func (m *mockSessionManager) UpdateSession(sessionID string, updateFunc interface{}) error {
 	// Mock implementation
 	return nil
+}
+
+func (m *mockSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+	return nil
+}
+
+func (m *mockSessionManager) ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error) {
+	return []interface{}{}, nil
+}
+
+func (m *mockSessionManager) FindSessionByRepo(ctx context.Context, repoURL string) (interface{}, error) {
+	return &sessiontypes.SessionState{
+		SessionID: "mock-session-id",
+		Metadata:  make(map[string]interface{}),
+	}, nil
 }

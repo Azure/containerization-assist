@@ -411,7 +411,7 @@ func (c *Coordinator) updateStageCompletionState(session *WorkflowSession, stage
 	for i, result := range results {
 		if i < len(stageGroup) {
 			stageName := stageGroup[i].Name
-			
+
 			if result.Success {
 				// Add to completed stages if not already there
 				if !c.containsString(session.CompletedStages, stageName) {
@@ -429,11 +429,11 @@ func (c *Coordinator) updateStageCompletionState(session *WorkflowSession, stage
 			}
 		}
 	}
-	
+
 	// Update session
 	session.LastActivity = time.Now()
 	session.UpdatedAt = time.Now()
-	
+
 	// Persist the updated state
 	if err := c.sessionManager.UpdateSession(session); err != nil {
 		c.logger.Warn().Err(err).Msg("Failed to update stage completion state")
@@ -474,7 +474,7 @@ func (c *Coordinator) ResumeFromStage(ctx context.Context, sessionID, stageName 
 			break
 		}
 	}
-	
+
 	if !stageExists {
 		return nil, fmt.Errorf("stage '%s' not found in workflow", stageName)
 	}

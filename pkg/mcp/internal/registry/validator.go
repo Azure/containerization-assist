@@ -247,8 +247,8 @@ func (rv *RegistryValidator) testPermissions(ctx context.Context, registryURL st
 
 	// Test repository access (this is a simplified test)
 	// In a real implementation, you'd test with actual repositories
-	permissions.CanPull = true  // If authenticated, usually can pull
-	permissions.CanPush = true  // This would need more sophisticated testing
+	permissions.CanPull = true // If authenticated, usually can pull
+	permissions.CanPush = true // This would need more sophisticated testing
 
 	return permissions, nil
 }
@@ -317,7 +317,7 @@ func (rv *RegistryValidator) normalizeRegistryURL(registryURL string) string {
 // ValidateMultipleRegistries validates multiple registries concurrently
 func (rv *RegistryValidator) ValidateMultipleRegistries(ctx context.Context, registries map[string]*RegistryCredentials) (map[string]*ValidationResult, error) {
 	results := make(map[string]*ValidationResult)
-	
+
 	// For simplicity, validate sequentially
 	// In production, this could be done concurrently with goroutines
 	for registryURL, creds := range registries {

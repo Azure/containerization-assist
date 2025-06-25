@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -25,10 +26,10 @@ func NewDefaultIterativeFixer(analyzer analyzer.Analyzer, logger zerolog.Logger)
 }
 
 // AttemptFix tries to fix a failure using AI analysis with iterative loops
-func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, fixingCtx *FixingContext) (*FixingResult, error) {
+func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, fixingCtx *FixingContext) (*mcptypes.FixingResult, error) {
 	startTime := time.Now()
-	result := &FixingResult{
-		AllAttempts:   []FixAttempt{},
+	result := &mcptypes.FixingResult{
+		AllAttempts:   []mcptypes.FixAttempt{},
 		TotalAttempts: 0,
 	}
 
@@ -100,7 +101,7 @@ func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, fixingCtx *Fixin
 }
 
 // GetFixStrategies analyzes an error and returns potential fix strategies
-func (f *DefaultIterativeFixer) GetFixStrategies(ctx context.Context, fixingCtx *FixingContext) ([]FixStrategy, error) {
+func (f *DefaultIterativeFixer) GetFixStrategies(ctx context.Context, fixingCtx *FixingContext) ([]mcptypes.FixStrategy, error) {
 	// Build comprehensive prompt for AI analysis
 	prompt := f.buildAnalysisPrompt(fixingCtx)
 
@@ -130,9 +131,9 @@ func (f *DefaultIterativeFixer) GetFixStrategies(ctx context.Context, fixingCtx 
 }
 
 // ApplyFix applies a specific fix strategy
-func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingContext, strategy FixStrategy) (*FixAttempt, error) {
+func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingContext, strategy mcptypes.FixStrategy) (*mcptypes.FixAttempt, error) {
 	startTime := time.Now()
-	attempt := &FixAttempt{
+	attempt := &mcptypes.FixAttempt{
 		AttemptNumber: len(fixingCtx.AttemptHistory) + 1,
 		StartTime:     startTime,
 		FixStrategy:   strategy,
@@ -177,7 +178,7 @@ func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingC
 }
 
 // ValidateFix checks if a fix was successful by attempting the operation
-func (f *DefaultIterativeFixer) ValidateFix(ctx context.Context, fixingCtx *FixingContext, attempt *FixAttempt) (bool, error) {
+func (f *DefaultIterativeFixer) ValidateFix(ctx context.Context, fixingCtx *FixingContext, attempt *mcptypes.FixAttempt) (bool, error) {
 	// This is a simplified validation - in a real implementation,
 	// this would trigger the actual operation (build, deploy, etc.)
 	// to verify the fix worked
@@ -221,8 +222,8 @@ Rich Error Details:
 - Type: %s
 - Severity: %s
 - Message: %s
-`, fixingCtx.ErrorDetails.Code, fixingCtx.ErrorDetails.Type,
-			fixingCtx.ErrorDetails.Severity, fixingCtx.ErrorDetails.Message))
+`, fixingCtx.ErrorDetails["code"], fixingCtx.ErrorDetails["type"],
+			fixingCtx.ErrorDetails["severity"], fixingCtx.ErrorDetails["message"]))
 	}
 
 	// Add previous attempt history for context
@@ -278,7 +279,7 @@ STRATEGY 2:
 }
 
 // buildFixApplicationPrompt creates a prompt for applying a specific fix
-func (f *DefaultIterativeFixer) buildFixApplicationPrompt(fixingCtx *FixingContext, strategy FixStrategy) string {
+func (f *DefaultIterativeFixer) buildFixApplicationPrompt(fixingCtx *FixingContext, strategy mcptypes.FixStrategy) string {
 	var prompt strings.Builder
 
 	prompt.WriteString(fmt.Sprintf(`You are applying a specific fix strategy for a %s operation failure.
@@ -321,12 +322,12 @@ Be precise and ensure the fix addresses the specific error while maintaining fun
 }
 
 // parseFixStrategies parses AI response into structured fix strategies
-func (f *DefaultIterativeFixer) parseFixStrategies(response string) ([]FixStrategy, error) {
-	var strategies []FixStrategy
+func (f *DefaultIterativeFixer) parseFixStrategies(response string) ([]mcptypes.FixStrategy, error) {
+	var strategies []mcptypes.FixStrategy
 
 	// Simple parsing - in production this would be more robust
 	lines := strings.Split(response, "\n")
-	var currentStrategy *FixStrategy
+	var currentStrategy *mcptypes.FixStrategy
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -335,7 +336,7 @@ func (f *DefaultIterativeFixer) parseFixStrategies(response string) ([]FixStrate
 			if currentStrategy != nil {
 				strategies = append(strategies, *currentStrategy)
 			}
-			currentStrategy = &FixStrategy{}
+			currentStrategy = &mcptypes.FixStrategy{}
 		} else if currentStrategy != nil {
 			if strings.HasPrefix(line, "Name: ") {
 				currentStrategy.Name = strings.TrimPrefix(line, "Name: ")
@@ -347,7 +348,12 @@ func (f *DefaultIterativeFixer) parseFixStrategies(response string) ([]FixStrate
 			} else if strings.HasPrefix(line, "Type: ") {
 				currentStrategy.Type = strings.TrimPrefix(line, "Type: ")
 			} else if strings.HasPrefix(line, "EstimatedTime: ") {
-				currentStrategy.EstimatedTime = strings.TrimPrefix(line, "EstimatedTime: ")
+				// Parse duration, default to 1 minute if parsing fails
+				if duration, err := time.ParseDuration(strings.TrimPrefix(line, "EstimatedTime: ")); err == nil {
+					currentStrategy.EstimatedTime = duration
+				} else {
+					currentStrategy.EstimatedTime = 1 * time.Minute
+				}
 			}
 		}
 	}

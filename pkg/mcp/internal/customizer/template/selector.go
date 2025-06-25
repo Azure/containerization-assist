@@ -135,10 +135,16 @@ func (s *Selector) getLanguageTemplate(language string) string {
 
 // CreateTemplateContext creates a template context from repository analysis
 func (s *Selector) CreateTemplateContext(repoAnalysis *analysis.AnalysisResult) *customizer.TemplateContext {
+	// Convert dependencies to string array
+	deps := make([]string, len(repoAnalysis.Dependencies))
+	for i, dep := range repoAnalysis.Dependencies {
+		deps[i] = dep.Name
+	}
+
 	ctx := &customizer.TemplateContext{
 		Language:     repoAnalysis.Language,
 		Framework:    repoAnalysis.Framework,
-		Dependencies: repoAnalysis.Dependencies,
+		Dependencies: deps,
 	}
 
 	// Analyze repository characteristics

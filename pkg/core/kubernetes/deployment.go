@@ -423,29 +423,29 @@ func (dm *DeploymentManager) validateManifestFile(manifestPath string) error {
 		}
 		return fmt.Errorf("error accessing manifest file: %w", err)
 	}
-	
+
 	if info.IsDir() {
 		return fmt.Errorf("manifest path is a directory, not a file: %s", manifestPath)
 	}
-	
+
 	// Read and validate YAML
 	file, err := os.Open(manifestPath)
 	if err != nil {
 		return fmt.Errorf("cannot read manifest file: %w", err)
 	}
 	defer file.Close()
-	
+
 	content, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("error reading manifest content: %w", err)
 	}
-	
+
 	// Parse YAML to ensure it's valid
 	var data interface{}
 	if err := yaml.Unmarshal(content, &data); err != nil {
 		return fmt.Errorf("invalid YAML in manifest file: %w", err)
 	}
-	
+
 	// Basic Kubernetes resource validation
 	if m, ok := data.(map[string]interface{}); ok {
 		// Check for required fields
@@ -459,7 +459,7 @@ func (dm *DeploymentManager) validateManifestFile(manifestPath string) error {
 			return fmt.Errorf("manifest missing required field: metadata")
 		}
 	}
-	
+
 	return nil
 }
 

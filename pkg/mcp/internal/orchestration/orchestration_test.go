@@ -69,12 +69,12 @@ func TestOrchestratorIntegration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Test that the orchestrator handles various argument types
 			result, err := orchestrator.ExecuteTool(ctx, tc.toolName, tc.args, nil)
-			
+
 			// Since we don't have a tool factory set up, we expect a specific error
 			assert.Error(t, err, "Should return error without tool factory")
 			assert.Contains(t, err.Error(), "tool factory not initialized", "Should indicate missing tool factory")
 			assert.Nil(t, result, "Result should be nil when factory not initialized")
-			
+
 			t.Logf("Tool %s correctly handled arguments, got expected error: %v", tc.toolName, err)
 		})
 	}
@@ -95,12 +95,12 @@ func TestTypeSafeDispatchEnabled(t *testing.T) {
 	}
 
 	result, err := orchestrator.ExecuteTool(context.Background(), "analyze_repository_atomic", args, nil)
-	
-	// Since we don't have a tool factory, we expect a specific error 
+
+	// Since we don't have a tool factory, we expect a specific error
 	assert.Error(t, err, "Should return error without tool factory")
 	assert.Contains(t, err.Error(), "tool factory not initialized", "Should indicate missing tool factory")
 	assert.Nil(t, result, "Result should be nil when factory not initialized")
-	
+
 	t.Logf("No-reflection dispatch correctly handled missing factory: %v", err)
 }
 
@@ -111,11 +111,11 @@ func TestGetToolsByCategory(t *testing.T) {
 
 	// Test category-based tool discovery
 	categories := []string{"analysis", "build", "deployment", "security"}
-	
+
 	for _, category := range categories {
 		tools := registry.GetToolsByCategory(category)
 		t.Logf("Tools with category '%s': %v", category, tools)
-		
+
 		// We should have at least some tools for each major category
 		if category == "analysis" || category == "build" {
 			assert.Greater(t, len(tools), 0, "Expected tools for category: %s", category)
@@ -146,7 +146,7 @@ func TestOrchestratorPipelineIntegration(t *testing.T) {
 		{
 			tool: "validate_dockerfile_atomic",
 			args: map[string]interface{}{
-				"session_id":     "test-session",
+				"session_id":      "test-session",
 				"dockerfile_path": "./Dockerfile",
 			},
 		},
@@ -157,12 +157,12 @@ func TestOrchestratorPipelineIntegration(t *testing.T) {
 	for i, step := range toolSequence {
 		t.Run(step.tool, func(t *testing.T) {
 			result, err := orchestrator.ExecuteTool(ctx, step.tool, step.args, nil)
-			
+
 			// Without tool factory, should get expected error
 			assert.Error(t, err, "Step %d should return error without tool factory", i)
 			assert.Contains(t, err.Error(), "tool factory not initialized", "Should indicate missing tool factory")
 			assert.Nil(t, result, "Step %d result should be nil when factory not initialized", i)
-			
+
 			t.Logf("Step %d (%s) correctly handled missing factory: %v", i, step.tool, err)
 		})
 	}
@@ -196,9 +196,9 @@ func TestToolDispatchRouting(t *testing.T) {
 			name:     "Known tool - build_image_atomic",
 			toolName: "build_image_atomic",
 			args: map[string]interface{}{
-				"session_id":  "test-session",
-				"image_name":  "myapp",
-				"image_tag":   "latest",
+				"session_id": "test-session",
+				"image_name": "myapp",
+				"image_tag":  "latest",
 			},
 			wantErr: "tool factory not initialized",
 		},
@@ -212,7 +212,7 @@ func TestToolDispatchRouting(t *testing.T) {
 		},
 		{
 			name:     "Invalid arguments - not a map",
-			toolName: "analyze_repository_atomic", 
+			toolName: "analyze_repository_atomic",
 			args:     "invalid",
 			wantErr:  "arguments must be a map[string]interface{}",
 		},
@@ -221,11 +221,11 @@ func TestToolDispatchRouting(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := orchestrator.ExecuteTool(context.Background(), tc.toolName, tc.args, nil)
-			
+
 			assert.Error(t, err, "Should return error")
 			assert.Contains(t, err.Error(), tc.wantErr, "Error should contain expected message")
 			assert.Nil(t, result, "Result should be nil on error")
-			
+
 			t.Logf("Tool %s correctly returned error: %v", tc.toolName, err)
 		})
 	}

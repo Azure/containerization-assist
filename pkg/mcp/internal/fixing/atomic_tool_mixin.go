@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -26,7 +26,7 @@ func NewAtomicToolFixingMixin(analyzer analyzer.Analyzer, toolName string, logge
 }
 
 // ExecuteWithRetry executes an operation with AI-driven retry logic
-func (m *AtomicToolFixingMixin) ExecuteWithRetry(ctx context.Context, sessionID string, baseDir string, operation FixableOperation) error {
+func (m *AtomicToolFixingMixin) ExecuteWithRetry(ctx context.Context, sessionID string, baseDir string, operation mcptypes.FixableOperation) error {
 	m.logger.Info().
 		Str("session_id", sessionID).
 		Str("tool", m.config.ToolName).
@@ -134,7 +134,7 @@ func (m *AtomicToolFixingMixin) ExecuteWithRetry(ctx context.Context, sessionID 
 }
 
 // GetRecommendations provides fixing recommendations without executing fixes
-func (m *AtomicToolFixingMixin) GetRecommendations(ctx context.Context, sessionID string, err error, baseDir string) ([]FixStrategy, error) {
+func (m *AtomicToolFixingMixin) GetRecommendations(ctx context.Context, sessionID string, err error, baseDir string) ([]mcptypes.FixStrategy, error) {
 	return m.fixer.GetFixingRecommendations(ctx, sessionID, m.config.ToolName, err, baseDir)
 }
 
@@ -144,7 +144,7 @@ func (m *AtomicToolFixingMixin) AnalyzeError(ctx context.Context, sessionID stri
 }
 
 // shouldAttemptFix determines if fixing should be attempted based on error characteristics
-func (m *AtomicToolFixingMixin) shouldAttemptFix(richError *types.RichError) bool {
+func (m *AtomicToolFixingMixin) shouldAttemptFix(richError *mcptypes.RichError) bool {
 	// Don't attempt fixing for certain error types
 	nonFixableTypes := []string{
 		"permission_denied",
@@ -176,16 +176,16 @@ func (m *AtomicToolFixingMixin) shouldAttemptFix(richError *types.RichError) boo
 // BuildOperationWrapper wraps build operations with fixing capabilities
 type BuildOperationWrapper struct {
 	originalOperation func(ctx context.Context) error
-	failureAnalyzer   func(ctx context.Context, err error) (*types.RichError, error)
-	retryPreparer     func(ctx context.Context, fixAttempt *FixAttempt) error
+	failureAnalyzer   func(ctx context.Context, err error) (*mcptypes.RichError, error)
+	retryPreparer     func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error
 	logger            zerolog.Logger
 }
 
 // NewBuildOperationWrapper creates a wrapper for build operations
 func NewBuildOperationWrapper(
 	operation func(ctx context.Context) error,
-	analyzer func(ctx context.Context, err error) (*types.RichError, error),
-	preparer func(ctx context.Context, fixAttempt *FixAttempt) error,
+	analyzer func(ctx context.Context, err error) (*mcptypes.RichError, error),
+	preparer func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error,
 	logger zerolog.Logger,
 ) *BuildOperationWrapper {
 	return &BuildOperationWrapper{
@@ -196,19 +196,19 @@ func NewBuildOperationWrapper(
 	}
 }
 
-// ExecuteOnce implements FixableOperation
+// ExecuteOnce implements mcptypes.FixableOperation
 func (w *BuildOperationWrapper) ExecuteOnce(ctx context.Context) error {
 	return w.originalOperation(ctx)
 }
 
-// GetFailureAnalysis implements FixableOperation
-func (w *BuildOperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*types.RichError, error) {
+// GetFailureAnalysis implements mcptypes.FixableOperation
+func (w *BuildOperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
 	if w.failureAnalyzer != nil {
 		return w.failureAnalyzer(ctx, err)
 	}
 
 	// Default analysis
-	return &types.RichError{
+	return &mcptypes.RichError{
 		Code:     "OPERATION_FAILED",
 		Type:     "build_error",
 		Severity: "High",
@@ -216,8 +216,8 @@ func (w *BuildOperationWrapper) GetFailureAnalysis(ctx context.Context, err erro
 	}, nil
 }
 
-// PrepareForRetry implements FixableOperation
-func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *FixAttempt) error {
+// PrepareForRetry implements mcptypes.FixableOperation
+func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if w.retryPreparer != nil {
 		return w.retryPreparer(ctx, fixAttempt)
 	}
@@ -240,7 +240,7 @@ func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt 
 //         func(ctx context.Context, err error) (*types.RichError, error) {
 //             return t.analyzeFailure(ctx, err, args)
 //         },
-//         func(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+//         func(ctx context.Context, fixAttempt *fixing.mcptypes.FixAttempt) error {
 //             return t.applyFix(ctx, fixAttempt, args)
 //         },
 //         t.logger,

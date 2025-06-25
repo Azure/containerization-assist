@@ -23,27 +23,27 @@ type WorkflowMetadata struct {
 
 // WorkflowDefinition contains the workflow execution specification
 type WorkflowDefinition struct {
-	Stages              []WorkflowStage               `yaml:"stages" json:"stages"`
-	Variables           map[string]string             `yaml:"variables,omitempty" json:"variables,omitempty"`
-	ErrorPolicy         ErrorPolicy                   `yaml:"errorPolicy,omitempty" json:"errorPolicy,omitempty"`
-	Timeout             *time.Duration                `yaml:"timeout,omitempty" json:"timeout,omitempty"`
-	RetryPolicy         *RetryPolicy                  `yaml:"retryPolicy,omitempty" json:"retryPolicy,omitempty"`
-	ConcurrencyConfig   *ConcurrencyConfig            `yaml:"concurrency,omitempty" json:"concurrency,omitempty"`
-	StageTypeRetryPolicies map[string]*RetryPolicy   `yaml:"stageTypeRetryPolicies,omitempty" json:"stageTypeRetryPolicies,omitempty"`
+	Stages                 []WorkflowStage         `yaml:"stages" json:"stages"`
+	Variables              map[string]string       `yaml:"variables,omitempty" json:"variables,omitempty"`
+	ErrorPolicy            ErrorPolicy             `yaml:"errorPolicy,omitempty" json:"errorPolicy,omitempty"`
+	Timeout                *time.Duration          `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	RetryPolicy            *RetryPolicy            `yaml:"retryPolicy,omitempty" json:"retryPolicy,omitempty"`
+	ConcurrencyConfig      *ConcurrencyConfig      `yaml:"concurrency,omitempty" json:"concurrency,omitempty"`
+	StageTypeRetryPolicies map[string]*RetryPolicy `yaml:"stageTypeRetryPolicies,omitempty" json:"stageTypeRetryPolicies,omitempty"`
 }
 
 // WorkflowStage represents a single stage in the workflow
 type WorkflowStage struct {
-	Name          string                   `yaml:"name" json:"name"`
-	Type          string                   `yaml:"type,omitempty" json:"type,omitempty"` // Stage type for categorization (build, test, deploy, etc.)
-	Tools         []string                 `yaml:"tools" json:"tools"`
-	DependsOn     []string                 `yaml:"depends_on,omitempty" json:"depends_on,omitempty"`
-	Parallel      bool                     `yaml:"parallel,omitempty" json:"parallel,omitempty"`
-	Conditions    []StageCondition         `yaml:"conditions,omitempty" json:"conditions,omitempty"`
-	Variables     map[string]string        `yaml:"variables,omitempty" json:"variables,omitempty"`
-	Timeout       *time.Duration           `yaml:"timeout,omitempty" json:"timeout,omitempty"`
-	RetryPolicy   *RetryPolicy             `yaml:"retryPolicy,omitempty" json:"retryPolicy,omitempty"`
-	OnFailure     *FailureAction           `yaml:"onFailure,omitempty" json:"onFailure,omitempty"`
+	Name        string            `yaml:"name" json:"name"`
+	Type        string            `yaml:"type,omitempty" json:"type,omitempty"` // Stage type for categorization (build, test, deploy, etc.)
+	Tools       []string          `yaml:"tools" json:"tools"`
+	DependsOn   []string          `yaml:"depends_on,omitempty" json:"depends_on,omitempty"`
+	Parallel    bool              `yaml:"parallel,omitempty" json:"parallel,omitempty"`
+	Conditions  []StageCondition  `yaml:"conditions,omitempty" json:"conditions,omitempty"`
+	Variables   map[string]string `yaml:"variables,omitempty" json:"variables,omitempty"`
+	Timeout     *time.Duration    `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	RetryPolicy *RetryPolicy      `yaml:"retryPolicy,omitempty" json:"retryPolicy,omitempty"`
+	OnFailure   *FailureAction    `yaml:"onFailure,omitempty" json:"onFailure,omitempty"`
 }
 
 // StageCondition defines conditions for stage execution

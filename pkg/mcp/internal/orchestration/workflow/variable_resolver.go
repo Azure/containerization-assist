@@ -39,11 +39,11 @@ func (vr *VariableResolver) ResolveVariables(input string, context *VariableCont
 
 	// Enhanced regex to support ${var}, ${var:-default}, and ${env:VAR} syntax
 	re := regexp.MustCompile(`\$\{([^}]+)\}`)
-	
+
 	result := re.ReplaceAllStringFunc(input, func(match string) string {
 		// Extract variable expression (remove ${ and })
 		expr := match[2 : len(match)-1]
-		
+
 		// Handle different variable types
 		if strings.HasPrefix(expr, "env:") {
 			// Environment variable: ${env:VAR_NAME}
@@ -57,7 +57,7 @@ func (vr *VariableResolver) ResolveVariables(input string, context *VariableCont
 			vr.logger.Warn().Str("env_var", envKey).Msg("Environment variable not found")
 			return match // Return original if not found
 		}
-		
+
 		if strings.HasPrefix(expr, "secret:") {
 			// Secret reference: ${secret:SECRET_NAME}
 			secretKey := expr[7:]
@@ -67,7 +67,7 @@ func (vr *VariableResolver) ResolveVariables(input string, context *VariableCont
 			vr.logger.Warn().Str("secret", secretKey).Msg("Secret not found")
 			return match
 		}
-		
+
 		// Handle default values: ${var:-default}
 		parts := strings.SplitN(expr, ":-", 2)
 		varName := parts[0]
@@ -75,22 +75,22 @@ func (vr *VariableResolver) ResolveVariables(input string, context *VariableCont
 		if len(parts) > 1 {
 			defaultValue = parts[1]
 		}
-		
+
 		// Resolve variable with precedence: stage -> workflow -> session -> env
 		if value := vr.resolveVariable(varName, context); value != "" {
 			return value
 		}
-		
+
 		// Return default value if provided
 		if defaultValue != "" {
 			return defaultValue
 		}
-		
+
 		// Log warning for missing variable
 		vr.logger.Warn().Str("variable", varName).Msg("Variable not found")
 		return match // Return original if not found
 	})
-	
+
 	return result, nil
 }
 
@@ -121,31 +121,31 @@ func (vr *VariableResolver) ResolveTemplate(templateStr string, context *Variabl
 // ValidateVariables checks if all required variables are available
 func (vr *VariableResolver) ValidateVariables(input string, context *VariableContext) []string {
 	var missing []string
-	
+
 	re := regexp.MustCompile(`\$\{([^}]+)\}`)
 	matches := re.FindAllStringSubmatch(input, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			expr := match[1]
-			
+
 			// Skip if it has a default value
 			if strings.Contains(expr, ":-") {
 				continue
 			}
-			
+
 			// Skip environment variables (they can be optional)
 			if strings.HasPrefix(expr, "env:") {
 				continue
 			}
-			
+
 			// Check if variable exists
 			if vr.resolveVariable(expr, context) == "" {
 				missing = append(missing, expr)
 			}
 		}
 	}
-	
+
 	return missing
 }
 
@@ -153,40 +153,40 @@ func (vr *VariableResolver) ValidateVariables(input string, context *VariableCon
 
 func (vr *VariableResolver) resolveVariable(name string, context *VariableContext) string {
 	// Priority: stage variables -> workflow variables -> session context -> environment
-	
+
 	// 1. Stage-level variables (highest priority)
 	if context.StageVars != nil {
 		if value, exists := context.StageVars[name]; exists {
 			return value
 		}
 	}
-	
+
 	// 2. Workflow-level variables
 	if context.WorkflowVars != nil {
 		if value, exists := context.WorkflowVars[name]; exists {
 			return value
 		}
 	}
-	
+
 	// 3. Session context
 	if context.SessionContext != nil {
 		if value, exists := context.SessionContext[name]; exists {
 			return fmt.Sprintf("%v", value)
 		}
 	}
-	
+
 	// 4. Environment variables (lowest priority)
 	if context.EnvironmentVars != nil {
 		if value, exists := context.EnvironmentVars[name]; exists {
 			return value
 		}
 	}
-	
+
 	// 5. System environment variables
 	if value := os.Getenv(name); value != "" {
 		return value
 	}
-	
+
 	return ""
 }
 
@@ -241,30 +241,30 @@ func (vr *VariableResolver) getTemplateFunctions(context *VariableContext) templ
 
 func (vr *VariableResolver) buildTemplateData(context *VariableContext) map[string]interface{} {
 	data := make(map[string]interface{})
-	
+
 	// Add all variable contexts
 	if context.WorkflowVars != nil {
 		for k, v := range context.WorkflowVars {
 			data[k] = v
 		}
 	}
-	
+
 	if context.StageVars != nil {
 		for k, v := range context.StageVars {
 			data[k] = v // Stage variables override workflow variables
 		}
 	}
-	
+
 	if context.SessionContext != nil {
 		for k, v := range context.SessionContext {
 			data[k] = v
 		}
 	}
-	
+
 	// Add helper contexts
 	data["env"] = context.EnvironmentVars
 	data["secrets"] = context.Secrets
-	
+
 	return data
 }
 

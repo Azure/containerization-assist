@@ -287,7 +287,7 @@ func (bg *BlueGreenStrategy) checkResourceAvailability(ctx context.Context, conf
 func (bg *BlueGreenStrategy) determineEnvironmentColors(ctx context.Context, config DeploymentConfig) (current, new string, err error) {
 	// Check which environment is currently active by looking at the service selector
 	// This is a simplified implementation - in production, you'd query the actual service
-	
+
 	// Default assumption: if blue exists, deploy green; otherwise deploy blue
 	blueDeploymentName := fmt.Sprintf("%s-blue", config.AppName)
 	greenDeploymentName := fmt.Sprintf("%s-green", config.AppName)
@@ -393,7 +393,7 @@ func (bg *BlueGreenStrategy) switchTraffic(ctx context.Context, config Deploymen
 
 	// In a real implementation, this would update the Kubernetes service selector
 	// to point to the new color's pods. For now, we'll simulate this.
-	
+
 	// This would typically involve:
 	// 1. Get the current service
 	// 2. Update the selector to match the target color's labels

@@ -353,9 +353,9 @@ func (r *RollingUpdateStrategy) performRollback(ctx context.Context, config Depl
 func (r *RollingUpdateStrategy) checkClusterConnection(ctx context.Context, config DeploymentConfig) error {
 	// Simple check by trying to list pods in the target namespace
 	testConfig := kubernetes.HealthCheckOptions{
-		Namespace:   config.Namespace,
+		Namespace:     config.Namespace,
 		LabelSelector: "app=test-connection",
-		Timeout:     10 * time.Second,
+		Timeout:       10 * time.Second,
 	}
 
 	// This is a simple connectivity test - we expect it might fail if no pods exist
@@ -417,9 +417,9 @@ func (r *RollingUpdateStrategy) handleDeploymentError(result *DeploymentResult, 
 // createFailureAnalysis creates detailed failure analysis for troubleshooting
 func (r *RollingUpdateStrategy) createFailureAnalysis(err error, stage string) *FailureAnalysis {
 	analysis := &FailureAnalysis{
-		Stage:   stage,
-		Reason:  "deployment_failed",
-		Message: err.Error(),
+		Stage:    stage,
+		Reason:   "deployment_failed",
+		Message:  err.Error(),
 		CanRetry: true,
 	}
 

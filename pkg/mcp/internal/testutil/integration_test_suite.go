@@ -493,9 +493,9 @@ func (mpa *MockPipelineAdapter) Clear() {
 func NewTestClientSets() *adapter.MCPClients {
 	// Create mock clients with test implementations
 	return &adapter.MCPClients{
-		Docker:   nil, // Mock docker client can be injected as needed
-		Kind:     nil, // Mock kind runner can be injected as needed
-		Kube:     nil, // Mock kube runner can be injected as needed
+		Docker:   nil,                        // Mock docker client can be injected as needed
+		Kind:     nil,                        // Mock kind runner can be injected as needed
+		Kube:     nil,                        // Mock kube runner can be injected as needed
 		Analyzer: analyzer.NewStubAnalyzer(), // Use stub analyzer for testing
 	}
 }

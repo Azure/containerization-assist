@@ -100,29 +100,29 @@ type BoundaryViolation struct {
 
 func main() {
 	flag.Parse()
-	
+
 	fmt.Println("MCP Package Boundary Validation Tool")
 	fmt.Println("====================================")
-	
+
 	violations := []BoundaryViolation{}
-	
+
 	// Check each package boundary rule
 	for _, rule := range boundaryRules {
 		fmt.Printf("🔍 Checking package: %s\n", rule.Package)
-		
+
 		packageViolations, err := checkPackageBoundaries(rule)
 		if err != nil {
 			log.Printf("⚠️  Failed to check package %s: %v", rule.Package, err)
 			continue
 		}
-		
+
 		violations = append(violations, packageViolations...)
-		
+
 		if *verbose {
 			fmt.Printf("   Found %d violations\n", len(packageViolations))
 		}
 	}
-	
+
 	// Check for circular dependencies
 	fmt.Println("🔍 Checking for circular dependencies...")
 	circularViolations, err := checkCircularDependencies()
@@ -131,14 +131,14 @@ func main() {
 	} else {
 		violations = append(violations, circularViolations...)
 	}
-	
+
 	// Report results
 	fmt.Println("\n📊 Package Boundary Validation Results")
 	fmt.Println("======================================")
-	
+
 	errors := 0
 	warnings := 0
-	
+
 	for _, violation := range violations {
 		switch violation.Severity {
 		case "error":
@@ -148,16 +148,16 @@ func main() {
 			fmt.Printf("⚠️  WARNING: %s\n", formatViolation(violation))
 			warnings++
 		}
-		
+
 		if *verbose {
 			fmt.Printf("   File: %s:%d\n", violation.File, violation.LineNumber)
 			fmt.Printf("   Rule: %s\n", violation.Rule.Description)
 		}
 		fmt.Println()
 	}
-	
+
 	fmt.Printf("Summary: %d errors, %d warnings\n", errors, warnings)
-	
+
 	if errors > 0 {
 		fmt.Println("\n❌ Package boundary validation failed!")
 		fmt.Println("   Fix the boundary violations above before proceeding.")
@@ -172,7 +172,7 @@ func main() {
 
 func checkPackageBoundaries(rule BoundaryRule) ([]BoundaryViolation, error) {
 	var violations []BoundaryViolation
-	
+
 	// Check if package exists
 	if _, err := os.Stat(rule.Package); os.IsNotExist(err) {
 		// Package doesn't exist yet - this is expected during migration
@@ -181,65 +181,65 @@ func checkPackageBoundaries(rule BoundaryRule) ([]BoundaryViolation, error) {
 		}
 		return violations, nil
 	}
-	
+
 	// Find all Go files in the package
 	err := filepath.WalkDir(rule.Package, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if d.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		
+
 		fileViolations, err := checkFileImports(path, rule)
 		if err != nil {
 			return err
 		}
-		
+
 		violations = append(violations, fileViolations...)
 		return nil
 	})
-	
+
 	return violations, err
 }
 
 func checkFileImports(filePath string, rule BoundaryRule) ([]BoundaryViolation, error) {
 	var violations []BoundaryViolation
-	
+
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
 		return violations, fmt.Errorf("failed to parse file %s: %w", filePath, err)
 	}
-	
+
 	// Check each import
 	for _, decl := range file.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok || genDecl.Tok != token.IMPORT {
 			continue
 		}
-		
+
 		for _, spec := range genDecl.Specs {
 			importSpec, ok := spec.(*ast.ImportSpec)
 			if !ok {
 				continue
 			}
-			
+
 			importPath := strings.Trim(importSpec.Path.Value, `"`)
-			
+
 			// Skip standard library and external dependencies
 			if !strings.Contains(importPath, "github.com/tng/workspace/prod/pkg/mcp") {
 				continue
 			}
-			
+
 			violation := checkImportViolation(filePath, importPath, rule, fset.Position(importSpec.Pos()).Line)
 			if violation != nil {
 				violations = append(violations, *violation)
 			}
 		}
 	}
-	
+
 	return violations, nil
 }
 
@@ -257,7 +257,7 @@ func checkImportViolation(filePath, importPath string, rule BoundaryRule, lineNu
 			}
 		}
 	}
-	
+
 	// In strict mode, check if import is in allowed list
 	if *strict && len(rule.AllowedDeps) > 0 {
 		allowed := false
@@ -267,7 +267,7 @@ func checkImportViolation(filePath, importPath string, rule BoundaryRule, lineNu
 				break
 			}
 		}
-		
+
 		// Also allow standard library and external deps
 		if !allowed && strings.Contains(importPath, "github.com/tng/workspace/prod/pkg/mcp") {
 			return &BoundaryViolation{
@@ -280,49 +280,49 @@ func checkImportViolation(filePath, importPath string, rule BoundaryRule, lineNu
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 func checkCircularDependencies() ([]BoundaryViolation, error) {
 	var violations []BoundaryViolation
-	
+
 	// Build dependency graph
 	depGraph := make(map[string][]string)
-	
+
 	err := filepath.WalkDir("pkg/mcp", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if d.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		
+
 		// Get package name from path
 		packagePath := filepath.Dir(path)
-		
+
 		// Parse file to get imports
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
 			return nil // Skip files that can't be parsed
 		}
-		
+
 		for _, decl := range file.Decls {
 			genDecl, ok := decl.(*ast.GenDecl)
 			if !ok || genDecl.Tok != token.IMPORT {
 				continue
 			}
-			
+
 			for _, spec := range genDecl.Specs {
 				importSpec, ok := spec.(*ast.ImportSpec)
 				if !ok {
 					continue
 				}
-				
+
 				importPath := strings.Trim(importSpec.Path.Value, `"`)
-				
+
 				// Only consider internal MCP imports
 				if strings.Contains(importPath, "github.com/tng/workspace/prod/pkg/mcp/internal") {
 					// Convert import path to local package path
@@ -331,18 +331,18 @@ func checkCircularDependencies() ([]BoundaryViolation, error) {
 				}
 			}
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return violations, err
 	}
-	
+
 	// Check for cycles using DFS
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
-	
+
 	for pkg := range depGraph {
 		if !visited[pkg] {
 			if cycle := findCycle(pkg, depGraph, visited, recStack, []string{}); len(cycle) > 0 {
@@ -358,7 +358,7 @@ func checkCircularDependencies() ([]BoundaryViolation, error) {
 			}
 		}
 	}
-	
+
 	return violations, nil
 }
 
@@ -366,7 +366,7 @@ func findCycle(pkg string, depGraph map[string][]string, visited, recStack map[s
 	visited[pkg] = true
 	recStack[pkg] = true
 	path = append(path, pkg)
-	
+
 	for _, dep := range depGraph[pkg] {
 		if !visited[dep] {
 			if cycle := findCycle(dep, depGraph, visited, recStack, path); len(cycle) > 0 {
@@ -386,7 +386,7 @@ func findCycle(pkg string, depGraph map[string][]string, visited, recStack map[s
 			}
 		}
 	}
-	
+
 	recStack[pkg] = false
 	return nil
 }
@@ -395,7 +395,7 @@ func formatViolation(violation BoundaryViolation) string {
 	if violation.Rule.Description == "Circular dependency detected" {
 		return fmt.Sprintf("Circular dependency: %s", violation.Import)
 	}
-	
-	return fmt.Sprintf("Package %s imports forbidden dependency: %s", 
+
+	return fmt.Sprintf("Package %s imports forbidden dependency: %s",
 		violation.Package, violation.Import)
 }

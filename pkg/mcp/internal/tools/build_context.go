@@ -59,12 +59,12 @@ func (bca *BuildContextAnalyzer) AnalyzeBuildContext(dockerfilePath string, buil
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerfilePath); err == nil {
 		info.DockerfileExists = true
-		
+
 		// Parse Dockerfile for base image and exposed ports
 		if content, err := os.ReadFile(dockerfilePath); err == nil {
 			lines := strings.Split(string(content), "\n")
 			info.DockerfileLines = len(lines)
-			
+
 			for _, line := range lines {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "FROM ") {
@@ -181,7 +181,7 @@ func (bca *BuildContextAnalyzer) GenerateBuildContext(
 			"build_args":      buildArgs,
 		},
 		"environment": map[string]interface{}{
-			"docker_available": true, // Assumed since we're building
+			"docker_available": true,    // Assumed since we're building
 			"registry_config":  "local", // Default to local
 		},
 	}
@@ -221,12 +221,12 @@ func GetBuildContext(buildContext string, workspaceDir string) (string, error) {
 	if buildContext == "" {
 		buildContext = workspaceDir
 	}
-	
+
 	// Ensure absolute path
 	if !filepath.IsAbs(buildContext) {
 		buildContext = filepath.Join(workspaceDir, buildContext)
 	}
-	
+
 	// Validate the path exists
 	if _, err := os.Stat(buildContext); err != nil {
 		return "", types.NewErrorBuilder("invalid_arguments", "build context directory does not exist", "validation").
@@ -235,7 +235,7 @@ func GetBuildContext(buildContext string, workspaceDir string) (string, error) {
 			WithField("buildContext", buildContext).
 			Build()
 	}
-	
+
 	return buildContext, nil
 }
 
@@ -244,11 +244,11 @@ func GetDockerfilePath(dockerfilePath string, buildContext string) (string, erro
 	if dockerfilePath == "" {
 		dockerfilePath = filepath.Join(buildContext, "Dockerfile")
 	}
-	
+
 	// Ensure absolute path
 	if !filepath.IsAbs(dockerfilePath) {
 		dockerfilePath = filepath.Join(buildContext, dockerfilePath)
 	}
-	
+
 	return dockerfilePath, nil
 }

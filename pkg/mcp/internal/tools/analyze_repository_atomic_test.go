@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testPipelineAdapter implements PipelineOperations for testing
+// testPipelineAdapter implements mcptypes.PipelineOperations for testing
 type testPipelineAdapter struct {
 	workspaceDir       string
 	analysisResult     *analysis.AnalysisResult
@@ -243,7 +243,7 @@ func (t *testPipelineAdapter) PullDockerImage(sessionID, imageRef string) (*dock
 	}, nil
 }
 
-// testSessionManager implements ToolSessionManager for testing
+// testSessionManager implements mcptypes.ToolSessionManager for testing
 type testSessionManager struct {
 	sessions         map[string]*sessiontypes.SessionState
 	shouldFailCreate bool

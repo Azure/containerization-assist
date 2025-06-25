@@ -13,16 +13,16 @@ import (
 type K8sDeployerAdapter interface {
 	// Deploy performs the actual deployment
 	Deploy(config kubernetes.DeploymentConfig) (*kubernetes.DeploymentResult, error)
-	
+
 	// CheckApplicationHealth checks the health of a deployment
 	CheckApplicationHealth(ctx context.Context, options kubernetes.HealthCheckOptions) (*kubernetes.HealthCheckResult, error)
-	
+
 	// WaitForRollout waits for a rollout to complete
 	WaitForRollout(ctx context.Context, config kubernetes.RolloutConfig) error
-	
+
 	// GetRolloutHistory gets the rollout history for a deployment
 	GetRolloutHistory(ctx context.Context, config kubernetes.RolloutHistoryConfig) (*kubernetes.RolloutHistory, error)
-	
+
 	// RollbackDeployment performs a rollback operation
 	RollbackDeployment(ctx context.Context, config kubernetes.RollbackConfig) error
 }
@@ -83,24 +83,24 @@ type DeploymentConfig struct {
 
 // DeploymentResult contains the results of a deployment
 type DeploymentResult struct {
-	Success      bool
-	Strategy     string
-	StartTime    time.Time
-	EndTime      time.Time
-	Duration     time.Duration
-	
+	Success   bool
+	Strategy  string
+	StartTime time.Time
+	EndTime   time.Time
+	Duration  time.Duration
+
 	// Kubernetes resources created/updated
 	Resources []DeployedResource
-	
+
 	// Health check results
-	HealthStatus   string
-	ReadyReplicas  int
-	TotalReplicas  int
-	
+	HealthStatus  string
+	ReadyReplicas int
+	TotalReplicas int
+
 	// Rollback information
 	RollbackAvailable bool
 	PreviousVersion   string
-	
+
 	// Error details if failed
 	Error           error
 	FailureAnalysis *FailureAnalysis
@@ -150,7 +150,7 @@ func (bs *BaseStrategy) WaitForDeployment(ctx context.Context, config Deployment
 		LabelSelector: "app=" + deploymentName,
 		Timeout:       config.WaitTimeout,
 	}
-	
+
 	result, err := config.K8sDeployer.CheckApplicationHealth(ctx, healthOptions)
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (bs *BaseStrategy) GetServiceEndpoint(ctx context.Context, config Deploymen
 	// This would interact with Kubernetes to get the actual endpoint
 	// For now, return a placeholder
 	endpoint := ""
-	
+
 	switch config.ServiceType {
 	case "LoadBalancer":
 		endpoint = "pending-external-ip"
@@ -181,7 +181,7 @@ func (bs *BaseStrategy) GetServiceEndpoint(ctx context.Context, config Deploymen
 	default:
 		endpoint = config.AppName + "." + config.Namespace + ".svc.cluster.local"
 	}
-	
+
 	return endpoint, nil
 }
 

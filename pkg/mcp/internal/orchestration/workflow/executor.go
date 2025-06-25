@@ -13,12 +13,12 @@ import (
 
 // Executor handles the execution of workflow stages
 type Executor struct {
-	logger              zerolog.Logger
-	stageExecutor       StageExecutor
-	errorRouter         ErrorRouter
-	stateMachine        *StateMachine
-	circuitBreakerMgr   *StageCircuitBreakerManager
-	mu                  sync.Mutex
+	logger            zerolog.Logger
+	stageExecutor     StageExecutor
+	errorRouter       ErrorRouter
+	stateMachine      *StateMachine
+	circuitBreakerMgr *StageCircuitBreakerManager
+	mu                sync.Mutex
 }
 
 // NewExecutor creates a new workflow executor
@@ -55,14 +55,14 @@ func (e *Executor) ExecuteStage(
 		stageType = "default"
 	}
 	circuitBreaker := e.circuitBreakerMgr.GetCircuitBreaker(stageType)
-	
+
 	if !circuitBreaker.CanExecute(stage.Name) {
 		e.logger.Warn().
 			Str("stage_name", stage.Name).
 			Str("stage_type", stageType).
 			Str("circuit_state", string(circuitBreaker.GetState())).
 			Msg("Stage execution blocked by circuit breaker")
-		
+
 		return &StageResult{
 			StageName: stage.Name,
 			Success:   false,
@@ -147,7 +147,7 @@ func (e *Executor) ExecuteStage(
 		if lastErr == nil && result != nil {
 			// Success - record in circuit breaker
 			circuitBreaker.RecordSuccess(stage.Name)
-			
+
 			result.Duration = duration
 			if err := e.stateMachine.UpdateStageStatus(session, stage.Name, StageStatusCompleted); err != nil {
 				e.logger.Warn().Err(err).Msg("Failed to update completed stage status")
@@ -181,7 +181,7 @@ func (e *Executor) ExecuteStage(
 	// All retry attempts exhausted - record failure in circuit breaker
 	workflowError := e.createWorkflowError(stage.Name, "", lastErr)
 	circuitBreaker.RecordFailure(stage.Name, lastErr)
-	
+
 	if err := e.handleStageFailure(ctx, stage, session, workflowError, workflowSpec); err != nil {
 		return nil, err
 	}

@@ -110,13 +110,13 @@ type SessionState struct {
 
 // SessionMetadata contains session metadata
 type SessionMetadata struct {
-	CreatedAt       time.Time `json:"created_at"`
-	LastAccessedAt  time.Time `json:"last_accessed_at"`
-	ExpiresAt       time.Time `json:"expires_at"`
-	WorkspaceSize   int64     `json:"workspace_size"`
-	OperationCount  int       `json:"operation_count"`
-	CurrentStage    string    `json:"current_stage"`
-	Labels          []string  `json:"labels"`
+	CreatedAt      time.Time `json:"created_at"`
+	LastAccessedAt time.Time `json:"last_accessed_at"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	WorkspaceSize  int64     `json:"workspace_size"`
+	OperationCount int       `json:"operation_count"`
+	CurrentStage   string    `json:"current_stage"`
+	Labels         []string  `json:"labels"`
 }
 
 // =============================================================================
@@ -264,12 +264,12 @@ type FileStructure struct {
 
 // SecurityScanResult contains information about security scans
 type SecurityScanResult struct {
-	Success         bool                `json:"success"`
-	ScannedAt       time.Time           `json:"scanned_at"`
-	ImageRef        string              `json:"image_ref"`
-	Scanner         string              `json:"scanner"`
-	Vulnerabilities VulnerabilityCount  `json:"vulnerabilities"`
-	FixableCount    int                 `json:"fixable_count"`
+	Success         bool               `json:"success"`
+	ScannedAt       time.Time          `json:"scanned_at"`
+	ImageRef        string             `json:"image_ref"`
+	Scanner         string             `json:"scanner"`
+	Vulnerabilities VulnerabilityCount `json:"vulnerabilities"`
+	FixableCount    int                `json:"fixable_count"`
 }
 
 // VulnerabilityCount provides vulnerability counts by severity

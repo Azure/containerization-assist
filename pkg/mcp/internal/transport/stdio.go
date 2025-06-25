@@ -205,7 +205,7 @@ func (s *StdioTransport) CreateRecoveryResponse(originalError error, recoverySte
 }
 
 // LogTransportInfo logs transport startup information
-func LogTransportInfo(transport Transport) {
+func LogTransportInfo(transport mcptypes.Transport) {
 	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on %s transport: %s\n",
 		transport.Name(), transport.Name())
 }

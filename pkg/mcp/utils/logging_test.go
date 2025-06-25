@@ -15,10 +15,10 @@ func TestLogger(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
 		logger := NewLoggerWithWriter("test", &buf)
-		
+
 		logger.Info("test message", Str("key", "value"))
 		output := buf.String()
-		
+
 		if !strings.Contains(output, "test message") {
 			t.Errorf("expected output to contain 'test message', got: %s", output)
 		}
@@ -29,7 +29,7 @@ func TestLogger(t *testing.T) {
 			t.Errorf("expected output to contain component, got: %s", output)
 		}
 	})
-	
+
 	t.Run("log levels", func(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
@@ -59,33 +59,33 @@ func TestLogger(t *testing.T) {
 				expected: `"level":"debug"`,
 			},
 		}
-		
+
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				var buf bytes.Buffer
 				logger := NewLoggerWithWriter("test", &buf)
-				
+
 				tc.logFunc(logger, "test message")
 				output := buf.String()
-				
+
 				if !strings.Contains(output, tc.expected) {
 					t.Errorf("expected output to contain %s, got: %s", tc.expected, output)
 				}
 			})
 		}
 	})
-	
+
 	t.Run("error logging", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
 		logger := NewLoggerWithWriter("test", &buf)
-		
+
 		testErr := errors.New("test error")
 		logger.Error("error occurred", testErr, Str("context", "testing"))
 		output := buf.String()
-		
+
 		if !strings.Contains(output, `"level":"error"`) {
 			t.Errorf("expected error level, got: %s", output)
 		}
@@ -96,26 +96,26 @@ func TestLogger(t *testing.T) {
 			t.Errorf("expected context field, got: %s", output)
 		}
 	})
-	
+
 	t.Run("field types", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
 		logger := NewLoggerWithWriter("test", &buf)
-		
-		logger.Info("test", 
+
+		logger.Info("test",
 			Str("string", "value"),
 			Int("int", 42),
 			Int64("int64", int64(123)),
 			Bool("bool", true),
 			Any("any", map[string]string{"foo": "bar"}),
 		)
-		
+
 		output := buf.String()
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("failed to parse JSON output: %v", err)
 		}
-		
+
 		if result["string"] != "value" {
 			t.Errorf("expected string field to be 'value', got: %v", result["string"])
 		}
@@ -129,20 +129,20 @@ func TestLogger(t *testing.T) {
 			t.Errorf("expected bool field to be true, got: %v", result["bool"])
 		}
 	})
-	
+
 	t.Run("with fields", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
 		logger := NewLoggerWithWriter("test", &buf)
-		
+
 		childLogger := logger.With(
 			Str("service", "api"),
 			Int("version", 1),
 		)
-		
+
 		childLogger.Info("child message")
 		output := buf.String()
-		
+
 		if !strings.Contains(output, `"service":"api"`) {
 			t.Errorf("expected service field, got: %s", output)
 		}
@@ -150,32 +150,32 @@ func TestLogger(t *testing.T) {
 			t.Errorf("expected version field, got: %s", output)
 		}
 	})
-	
+
 	t.Run("with context", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
 		logger := NewLoggerWithWriter("test", &buf)
-		
+
 		ctx := context.Background()
 		contextLogger := logger.WithContext(ctx)
-		
+
 		contextLogger.Info("context message")
 		output := buf.String()
-		
+
 		if !strings.Contains(output, "context message") {
 			t.Errorf("expected context message, got: %s", output)
 		}
 	})
-	
+
 	t.Run("global logger", func(t *testing.T) {
 		t.Parallel()
 		// Reset global logger for test
 		globalLogger = nil
 		globalLoggerOnce = sync.Once{}
-		
+
 		logger1 := GetGlobalLogger()
 		logger2 := GetGlobalLogger()
-		
+
 		if logger1 != logger2 {
 			t.Error("expected global logger to be singleton")
 		}

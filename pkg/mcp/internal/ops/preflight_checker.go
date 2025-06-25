@@ -56,9 +56,9 @@ type RegistryAuthSummary struct {
 
 // PreFlightChecker validates system requirements before starting workflow
 type PreFlightChecker struct {
-	logger         zerolog.Logger
-	timeout        time.Duration
-	registryMgr    *registry.MultiRegistryManager
+	logger            zerolog.Logger
+	timeout           time.Duration
+	registryMgr       *registry.MultiRegistryManager
 	registryValidator *registry.RegistryValidator
 }
 
@@ -589,7 +589,7 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 		if creds != nil {
 			hasAnyAuth = true
 			authResults[registryURL] = fmt.Sprintf("Authenticated via %s (%s)", creds.Source, creds.AuthMethod)
-			
+
 			// Validate registry access
 			if err := pfc.registryMgr.ValidateRegistryAccess(ctx, registryURL); err != nil {
 				authResults[registryURL] += fmt.Sprintf(" - Validation failed: %v", err)

@@ -13,8 +13,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/mcperror"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
-	"github.com/localrivet/gomcp/server"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
@@ -96,13 +96,13 @@ type PullContext struct {
 
 // AtomicPullImageTool implements atomic Docker image pull using core operations
 type AtomicPullImageTool struct {
-	pipelineAdapter PipelineOperations
-	sessionManager  ToolSessionManager
+	pipelineAdapter mcptypes.PipelineOperations
+	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
 // NewAtomicPullImageTool creates a new atomic pull image tool
-func NewAtomicPullImageTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicPullImageTool {
+func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicPullImageTool {
 	return &AtomicPullImageTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -167,11 +167,12 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time, reporter interfaces.ProgressReporter) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	reporter.ReportStage(0.1, "Loading session")
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return mcperror.NewSessionNotFound(args.SessionID)
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Set session details
 	result.SessionID = session.SessionID
@@ -223,13 +224,14 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 // executeWithoutProgress handles execution without progress tracking (fallback)
 func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time) (*AtomicPullImageResult, error) {
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
 		return result, mcperror.NewSessionNotFound(args.SessionID)
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Set session details
 	result.SessionID = session.SessionID
@@ -298,7 +300,7 @@ func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiont
 	// Pull Docker image using pipeline adapter
 	pullStartTime := time.Now()
 
-	pullResult, err := t.pipelineAdapter.PullDockerImage(session.SessionID, args.ImageRef)
+	err := t.pipelineAdapter.PullDockerImage(session.SessionID, args.ImageRef)
 	result.PullDuration = time.Since(pullStartTime)
 
 	if err != nil {
@@ -310,27 +312,18 @@ func (t *AtomicPullImageTool) performPull(ctx context.Context, session *sessiont
 		})
 	}
 
-	// Update result with pull operation details
-	result.Success = pullResult.Success
-	result.PullResult = pullResult
+	// Update result with pull operation status
+	result.Success = true
+	result.PullResult = &docker.PullResult{
+		Success:  true,
+		ImageRef: args.ImageRef,
+		Registry: result.Registry,
+	}
 
-	if pullResult.Success {
-		result.PullContext.PullStatus = "successful"
-		result.PullContext.NextStepSuggestions = []string{
-			fmt.Sprintf("Image %s pulled successfully", args.ImageRef),
-			"You can now use this image for building or deployment",
-		}
-	} else {
-		result.PullContext.PullStatus = "failed"
-		result.PullContext.NextStepSuggestions = []string{
-			"Check if the image reference is correct",
-			"Verify network connectivity to the registry",
-			"Ensure proper authentication for private registries",
-		}
-		if pullResult.Error != nil {
-			result.PullContext.ErrorType = pullResult.Error.Type
-			result.PullContext.ErrorCategory = pullResult.Error.Type
-		}
+	result.PullContext.PullStatus = "successful"
+	result.PullContext.NextStepSuggestions = []string{
+		fmt.Sprintf("Image %s pulled successfully", args.ImageRef),
+		"You can now use this image for building or deployment",
 	}
 
 	t.logger.Info().
@@ -550,20 +543,20 @@ func (r *AtomicPullImageResult) GetAlternativeStrategies() []ai_context.Alternat
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicPullImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
-		Name:        "atomic_pull_image",
-		Description: "Pulls Docker images from container registries with authentication support and detailed progress tracking",
-		Version:     "1.0.0",
-		Category:    "docker",
+		Name:         "atomic_pull_image",
+		Description:  "Pulls Docker images from container registries with authentication support and detailed progress tracking",
+		Version:      "1.0.0",
+		Category:     "docker",
 		Dependencies: []string{"docker"},
 		Capabilities: []string{
 			"supports_streaming",
 		},
 		Requirements: []string{"docker_daemon"},
 		Parameters: map[string]string{
-			"image_ref":    "required - Full image reference to pull",
-			"timeout":      "optional - Pull timeout in seconds",
-			"retry_count":  "optional - Number of retry attempts",
-			"force":        "optional - Force pull even if image exists",
+			"image_ref":   "required - Full image reference to pull",
+			"timeout":     "optional - Pull timeout in seconds",
+			"retry_count": "optional - Number of retry attempts",
+			"force":       "optional - Force pull even if image exists",
 		},
 		Examples: []mcptypes.ToolExample{
 			{

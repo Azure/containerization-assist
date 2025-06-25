@@ -24,49 +24,49 @@ type DependencyIssue struct {
 
 func main() {
 	flag.Parse()
-	
+
 	fmt.Println("MCP Dependency Hygiene Check")
 	fmt.Println("============================")
-	
+
 	var issues []DependencyIssue
-	
+
 	// 1. Check go.mod tidy status
 	fmt.Println("🔍 Checking go mod tidy status...")
 	tidyIssues := checkGoModTidy()
 	issues = append(issues, tidyIssues...)
-	
+
 	// 2. Check for circular dependencies
 	fmt.Println("🔍 Checking for circular dependencies...")
 	circularIssues := checkCircularDependencies()
 	issues = append(issues, circularIssues...)
-	
+
 	// 3. Check for unused dependencies
 	fmt.Println("🔍 Checking for unused dependencies...")
 	unusedIssues := checkUnusedDependencies()
 	issues = append(issues, unusedIssues...)
-	
+
 	// 4. Check for version conflicts
 	fmt.Println("🔍 Checking for version conflicts...")
 	versionIssues := checkVersionConflicts()
 	issues = append(issues, versionIssues...)
-	
+
 	// 5. Check for vulnerable dependencies
 	fmt.Println("🔍 Checking for vulnerable dependencies...")
 	vulnIssues := checkVulnerabilities()
 	issues = append(issues, vulnIssues...)
-	
+
 	// 6. Check for duplicate dependencies
 	fmt.Println("🔍 Checking for duplicate dependencies...")
 	duplicateIssues := checkDuplicateDependencies()
 	issues = append(issues, duplicateIssues...)
-	
+
 	// Report results
 	fmt.Println("\n📊 Dependency Hygiene Results")
 	fmt.Println("=============================")
-	
+
 	errors := 0
 	warnings := 0
-	
+
 	for _, issue := range issues {
 		switch issue.Severity {
 		case "error":
@@ -80,11 +80,11 @@ func main() {
 				fmt.Printf("ℹ️  INFO: %s\n", issue.Description)
 			}
 		}
-		
+
 		if *verbose && issue.File != "" {
 			fmt.Printf("   File: %s\n", issue.File)
 		}
-		
+
 		if *fix && issue.Command != "" {
 			fmt.Printf("   🔧 Fixing: %s\n", issue.Command)
 			if err := runCommand(issue.Command); err != nil {
@@ -95,17 +95,17 @@ func main() {
 		}
 		fmt.Println()
 	}
-	
+
 	fmt.Printf("Summary: %d errors, %d warnings\n", errors, warnings)
-	
+
 	if errors > 0 {
 		fmt.Println("\n❌ Dependency hygiene check failed!")
 		fmt.Println("   Fix the errors above before proceeding.")
-		
+
 		if !*fix {
 			fmt.Println("   Use --fix flag to attempt automatic fixes.")
 		}
-		
+
 		os.Exit(1)
 	} else if warnings > 0 {
 		fmt.Println("\n⚠️  Dependency hygiene check passed with warnings.")
@@ -117,7 +117,7 @@ func main() {
 
 func checkGoModTidy() []DependencyIssue {
 	var issues []DependencyIssue
-	
+
 	// Run go mod tidy and check if it makes changes
 	cmd := exec.Command("go", "mod", "tidy")
 	output, err := cmd.CombinedOutput()
@@ -130,7 +130,7 @@ func checkGoModTidy() []DependencyIssue {
 		})
 		return issues
 	}
-	
+
 	// Check if go.mod or go.sum changed
 	if len(output) > 0 {
 		issues = append(issues, DependencyIssue{
@@ -140,7 +140,7 @@ func checkGoModTidy() []DependencyIssue {
 			Command:     "go mod tidy",
 		})
 	}
-	
+
 	// Verify the module
 	cmd = exec.Command("go", "mod", "verify")
 	output, err = cmd.CombinedOutput()
@@ -152,13 +152,13 @@ func checkGoModTidy() []DependencyIssue {
 			Command:     "go mod download",
 		})
 	}
-	
+
 	return issues
 }
 
 func checkCircularDependencies() []DependencyIssue {
 	var issues []DependencyIssue
-	
+
 	// Use go mod graph to check for cycles
 	cmd := exec.Command("go", "mod", "graph")
 	output, err := cmd.Output()
@@ -170,16 +170,16 @@ func checkCircularDependencies() []DependencyIssue {
 		})
 		return issues
 	}
-	
+
 	// Parse the dependency graph
 	dependencies := make(map[string][]string)
 	lines := strings.Split(string(output), "\n")
-	
+
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		
+
 		parts := strings.Fields(line)
 		if len(parts) >= 2 {
 			from := parts[0]
@@ -187,7 +187,7 @@ func checkCircularDependencies() []DependencyIssue {
 			dependencies[from] = append(dependencies[from], to)
 		}
 	}
-	
+
 	// Check for cycles (simplified check)
 	cycles := findCycles(dependencies)
 	for _, cycle := range cycles {
@@ -197,13 +197,13 @@ func checkCircularDependencies() []DependencyIssue {
 			Severity:    "error",
 		})
 	}
-	
+
 	return issues
 }
 
 func checkUnusedDependencies() []DependencyIssue {
 	var issues []DependencyIssue
-	
+
 	// Check if go mod why works for our dependencies
 	cmd := exec.Command("go", "list", "-m", "all")
 	output, err := cmd.Output()
@@ -215,25 +215,25 @@ func checkUnusedDependencies() []DependencyIssue {
 		})
 		return issues
 	}
-	
+
 	// Parse module list
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "github.com/tng/workspace/prod") {
 			continue
 		}
-		
+
 		parts := strings.Fields(line)
 		if len(parts) >= 1 {
 			module := parts[0]
-			
+
 			// Check if this module is actually used
 			whyCmd := exec.Command("go", "mod", "why", module)
 			whyOutput, err := whyCmd.Output()
 			if err != nil {
 				continue
 			}
-			
+
 			// If "go mod why" returns no explanation, the module might be unused
 			if strings.Contains(string(whyOutput), "(main module does not need") {
 				issues = append(issues, DependencyIssue{
@@ -244,13 +244,13 @@ func checkUnusedDependencies() []DependencyIssue {
 			}
 		}
 	}
-	
+
 	return issues
 }
 
 func checkVersionConflicts() []DependencyIssue {
 	var issues []DependencyIssue
-	
+
 	// Get dependency list with versions
 	cmd := exec.Command("go", "list", "-m", "-versions", "all")
 	output, err := cmd.Output()
@@ -262,30 +262,30 @@ func checkVersionConflicts() []DependencyIssue {
 		})
 		return issues
 	}
-	
+
 	// Parse for potential version conflicts
 	lines := strings.Split(string(output), "\n")
 	moduleVersions := make(map[string][]string)
-	
+
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		
+
 		parts := strings.Fields(line)
 		if len(parts) >= 2 {
 			module := parts[0]
 			version := parts[1]
-			
+
 			// Skip our own module
 			if strings.HasPrefix(module, "github.com/tng/workspace/prod") {
 				continue
 			}
-			
+
 			moduleVersions[module] = append(moduleVersions[module], version)
 		}
 	}
-	
+
 	// Check for modules with multiple versions (potential conflict)
 	for module, versions := range moduleVersions {
 		if len(versions) > 1 {
@@ -296,13 +296,13 @@ func checkVersionConflicts() []DependencyIssue {
 			})
 		}
 	}
-	
+
 	return issues
 }
 
 func checkVulnerabilities() []DependencyIssue {
 	var issues []DependencyIssue
-	
+
 	// Check if govulncheck is available
 	cmd := exec.Command("govulncheck", "--version")
 	if err := cmd.Run(); err != nil {
@@ -314,11 +314,11 @@ func checkVulnerabilities() []DependencyIssue {
 		})
 		return issues
 	}
-	
+
 	// Run vulnerability check
 	cmd = exec.Command("govulncheck", "./...")
 	output, err := cmd.CombinedOutput()
-	
+
 	// govulncheck returns non-zero exit code when vulnerabilities are found
 	if err != nil {
 		// Parse the output to understand the vulnerabilities
@@ -337,13 +337,13 @@ func checkVulnerabilities() []DependencyIssue {
 			})
 		}
 	}
-	
+
 	return issues
 }
 
 func checkDuplicateDependencies() []DependencyIssue {
 	var issues []DependencyIssue
-	
+
 	// Read go.mod file
 	goModContent, err := os.ReadFile("go.mod")
 	if err != nil {
@@ -354,16 +354,16 @@ func checkDuplicateDependencies() []DependencyIssue {
 		})
 		return issues
 	}
-	
+
 	// Parse go.mod for duplicate entries
 	scanner := bufio.NewScanner(strings.NewReader(string(goModContent)))
 	seenDeps := make(map[string]int)
 	lineNum := 0
-	
+
 	for scanner.Scan() {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Look for require statements
 		if strings.HasPrefix(line, "require") && !strings.HasPrefix(line, "require (") {
 			// Single require statement
@@ -381,7 +381,7 @@ func checkDuplicateDependencies() []DependencyIssue {
 			}
 		}
 	}
-	
+
 	// Check for duplicates
 	for module, count := range seenDeps {
 		if count > 1 {
@@ -394,7 +394,7 @@ func checkDuplicateDependencies() []DependencyIssue {
 			})
 		}
 	}
-	
+
 	return issues
 }
 
@@ -402,7 +402,7 @@ func findCycles(dependencies map[string][]string) [][]string {
 	var cycles [][]string
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
-	
+
 	for module := range dependencies {
 		if !visited[module] {
 			if cycle := dfs(module, dependencies, visited, recStack, []string{}); len(cycle) > 0 {
@@ -410,7 +410,7 @@ func findCycles(dependencies map[string][]string) [][]string {
 			}
 		}
 	}
-	
+
 	return cycles
 }
 
@@ -418,7 +418,7 @@ func dfs(module string, dependencies map[string][]string, visited, recStack map[
 	visited[module] = true
 	recStack[module] = true
 	path = append(path, module)
-	
+
 	for _, dep := range dependencies[module] {
 		if !visited[dep] {
 			if cycle := dfs(dep, dependencies, visited, recStack, path); len(cycle) > 0 {
@@ -438,7 +438,7 @@ func dfs(module string, dependencies map[string][]string, visited, recStack map[
 			}
 		}
 	}
-	
+
 	recStack[module] = false
 	return nil
 }
@@ -448,12 +448,12 @@ func runCommand(command string) error {
 	if len(parts) == 0 {
 		return fmt.Errorf("empty command")
 	}
-	
+
 	cmd := exec.Command(parts[0], parts[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("command failed: %v\nOutput: %s", err, string(output))
 	}
-	
+
 	return nil
 }

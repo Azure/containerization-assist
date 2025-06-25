@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyzer"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -218,11 +219,11 @@ func TestFixingConfiguration(t *testing.T) {
 	assert.False(t, defaultConfig.EnableRouting)
 }
 
-// MockOperation implements FixableOperation for testing
+// MockOperation implements mcptypes.FixableOperation for testing
 type MockOperation struct {
 	executeFunc         func(ctx context.Context) error
 	failureAnalysisFunc func(ctx context.Context, err error) (*types.RichError, error)
-	prepareRetryFunc    func(ctx context.Context, fixAttempt *fixing.FixAttempt) error
+	prepareRetryFunc    func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error
 }
 
 func (m *MockOperation) ExecuteOnce(ctx context.Context) error {
@@ -245,7 +246,7 @@ func (m *MockOperation) GetFailureAnalysis(ctx context.Context, err error) (*typ
 	}, nil
 }
 
-func (m *MockOperation) PrepareForRetry(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (m *MockOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if m.prepareRetryFunc != nil {
 		return m.prepareRetryFunc(ctx, fixAttempt)
 	}
@@ -253,12 +254,12 @@ func (m *MockOperation) PrepareForRetry(ctx context.Context, fixAttempt *fixing.
 }
 
 func TestFixAttemptSerialization(t *testing.T) {
-	fixAttempt := fixing.FixAttempt{
+	fixAttempt := mcptypes.FixAttempt{
 		AttemptNumber: 1,
 		StartTime:     time.Now(),
 		EndTime:       time.Now().Add(time.Minute),
 		Duration:      time.Minute,
-		FixStrategy: fixing.FixStrategy{
+		mcptypes.FixStrategy: *mcptypes.FixStrategy{
 			Name:        "Test Fix",
 			Description: "A test fix strategy",
 			Priority:    1,
@@ -278,7 +279,7 @@ func TestFixAttemptSerialization(t *testing.T) {
 }
 
 func TestFixStrategyValidation(t *testing.T) {
-	strategy := fixing.FixStrategy{
+	strategy := mcptypes.FixStrategy{
 		Name:          "Fix Base Image",
 		Description:   "Update the Docker base image to a valid one",
 		Priority:      1,

@@ -11,43 +11,43 @@ import (
 type CircuitBreakerState string
 
 const (
-	CircuitBreakerClosed   CircuitBreakerState = "closed"   // Normal operation
-	CircuitBreakerOpen     CircuitBreakerState = "open"     // Failing, rejecting requests
+	CircuitBreakerClosed   CircuitBreakerState = "closed"    // Normal operation
+	CircuitBreakerOpen     CircuitBreakerState = "open"      // Failing, rejecting requests
 	CircuitBreakerHalfOpen CircuitBreakerState = "half_open" // Testing if service recovered
 )
 
 // CircuitBreakerConfig defines circuit breaker behavior
 type CircuitBreakerConfig struct {
-	FailureThreshold   int           // Number of failures before opening
-	SuccessThreshold   int           // Number of successes to close from half-open
-	Timeout            time.Duration // Time to wait before half-open
-	WindowSize         time.Duration // Rolling window for failure counting
-	MaxRetries         int           // Maximum retries per stage
+	FailureThreshold int           // Number of failures before opening
+	SuccessThreshold int           // Number of successes to close from half-open
+	Timeout          time.Duration // Time to wait before half-open
+	WindowSize       time.Duration // Rolling window for failure counting
+	MaxRetries       int           // Maximum retries per stage
 }
 
 // CircuitBreaker implements circuit breaker pattern for stage execution
 type CircuitBreaker struct {
-	logger   zerolog.Logger
-	config   CircuitBreakerConfig
-	state    CircuitBreakerState
-	failures int
-	successes int
+	logger          zerolog.Logger
+	config          CircuitBreakerConfig
+	state           CircuitBreakerState
+	failures        int
+	successes       int
 	lastFailureTime time.Time
-	window   *RollingWindow
-	mu       sync.RWMutex
+	window          *RollingWindow
+	mu              sync.RWMutex
 }
 
 // RollingWindow tracks failures in a time window
 type RollingWindow struct {
-	events    []time.Time
+	events     []time.Time
 	windowSize time.Duration
-	mu        sync.Mutex
+	mu         sync.Mutex
 }
 
 // NewRollingWindow creates a new rolling window
 func NewRollingWindow(windowSize time.Duration) *RollingWindow {
 	return &RollingWindow{
-		events:    make([]time.Time, 0),
+		events:     make([]time.Time, 0),
 		windowSize: windowSize,
 	}
 }
@@ -56,10 +56,10 @@ func NewRollingWindow(windowSize time.Duration) *RollingWindow {
 func (rw *RollingWindow) AddEvent() {
 	rw.mu.Lock()
 	defer rw.mu.Unlock()
-	
+
 	now := time.Now()
 	rw.events = append(rw.events, now)
-	
+
 	// Remove old events outside the window
 	cutoff := now.Add(-rw.windowSize)
 	var filtered []time.Time
@@ -75,17 +75,17 @@ func (rw *RollingWindow) AddEvent() {
 func (rw *RollingWindow) Count() int {
 	rw.mu.Lock()
 	defer rw.mu.Unlock()
-	
+
 	now := time.Now()
 	cutoff := now.Add(-rw.windowSize)
-	
+
 	count := 0
 	for _, event := range rw.events {
 		if event.After(cutoff) {
 			count++
 		}
 	}
-	
+
 	return count
 }
 
@@ -108,10 +108,10 @@ func NewCircuitBreaker(logger zerolog.Logger, config CircuitBreakerConfig) *Circ
 	}
 
 	return &CircuitBreaker{
-		logger:  logger.With().Str("component", "circuit_breaker").Logger(),
-		config:  config,
-		state:   CircuitBreakerClosed,
-		window:  NewRollingWindow(config.WindowSize),
+		logger: logger.With().Str("component", "circuit_breaker").Logger(),
+		config: config,
+		state:  CircuitBreakerClosed,
+		window: NewRollingWindow(config.WindowSize),
 	}
 }
 
@@ -203,14 +203,14 @@ func (cb *CircuitBreaker) GetState() CircuitBreakerState {
 func (cb *CircuitBreaker) GetStats() CircuitBreakerStats {
 	cb.mu.RLock()
 	defer cb.mu.RUnlock()
-	
+
 	return CircuitBreakerStats{
-		State:            cb.state,
-		Failures:         cb.failures,
-		Successes:        cb.successes,
-		WindowFailures:   cb.window.Count(),
-		LastFailureTime:  cb.lastFailureTime,
-		TimeUntilRetry:   cb.getTimeUntilRetry(),
+		State:           cb.state,
+		Failures:        cb.failures,
+		Successes:       cb.successes,
+		WindowFailures:  cb.window.Count(),
+		LastFailureTime: cb.lastFailureTime,
+		TimeUntilRetry:  cb.getTimeUntilRetry(),
 	}
 }
 
@@ -219,12 +219,12 @@ func (cb *CircuitBreaker) getTimeUntilRetry() time.Duration {
 	if cb.state != CircuitBreakerOpen {
 		return 0
 	}
-	
+
 	elapsed := time.Since(cb.lastFailureTime)
 	if elapsed >= cb.config.Timeout {
 		return 0
 	}
-	
+
 	return cb.config.Timeout - elapsed
 }
 
@@ -232,23 +232,23 @@ func (cb *CircuitBreaker) getTimeUntilRetry() time.Duration {
 func (cb *CircuitBreaker) Reset() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	cb.state = CircuitBreakerClosed
 	cb.failures = 0
 	cb.successes = 0
 	cb.window = NewRollingWindow(cb.config.WindowSize)
-	
+
 	cb.logger.Info().Msg("Circuit breaker manually reset")
 }
 
 // CircuitBreakerStats contains circuit breaker statistics
 type CircuitBreakerStats struct {
-	State            CircuitBreakerState `json:"state"`
-	Failures         int                 `json:"failures"`
-	Successes        int                 `json:"successes"`
-	WindowFailures   int                 `json:"window_failures"`
-	LastFailureTime  time.Time           `json:"last_failure_time"`
-	TimeUntilRetry   time.Duration       `json:"time_until_retry"`
+	State           CircuitBreakerState `json:"state"`
+	Failures        int                 `json:"failures"`
+	Successes       int                 `json:"successes"`
+	WindowFailures  int                 `json:"window_failures"`
+	LastFailureTime time.Time           `json:"last_failure_time"`
+	TimeUntilRetry  time.Duration       `json:"time_until_retry"`
 }
 
 // StageCircuitBreakerManager manages circuit breakers for different stage types
@@ -266,10 +266,10 @@ func NewStageCircuitBreakerManager(logger zerolog.Logger) *StageCircuitBreakerMa
 		breakers: make(map[string]*CircuitBreaker),
 		configs:  make(map[string]CircuitBreakerConfig),
 	}
-	
+
 	// Set default configs for different stage types
 	manager.setDefaultConfigs()
-	
+
 	return manager
 }
 
@@ -282,7 +282,7 @@ func (scbm *StageCircuitBreakerManager) setDefaultConfigs() {
 		WindowSize:       15 * time.Minute,
 		MaxRetries:       3,
 	}
-	
+
 	scbm.configs["test"] = CircuitBreakerConfig{
 		FailureThreshold: 5,
 		SuccessThreshold: 3,
@@ -290,7 +290,7 @@ func (scbm *StageCircuitBreakerManager) setDefaultConfigs() {
 		WindowSize:       10 * time.Minute,
 		MaxRetries:       2,
 	}
-	
+
 	scbm.configs["deploy"] = CircuitBreakerConfig{
 		FailureThreshold: 2,
 		SuccessThreshold: 1,
@@ -298,7 +298,7 @@ func (scbm *StageCircuitBreakerManager) setDefaultConfigs() {
 		WindowSize:       30 * time.Minute,
 		MaxRetries:       5,
 	}
-	
+
 	scbm.configs["analysis"] = CircuitBreakerConfig{
 		FailureThreshold: 4,
 		SuccessThreshold: 2,
@@ -306,7 +306,7 @@ func (scbm *StageCircuitBreakerManager) setDefaultConfigs() {
 		WindowSize:       15 * time.Minute,
 		MaxRetries:       3,
 	}
-	
+
 	// Default config for unknown stage types
 	scbm.configs["default"] = CircuitBreakerConfig{
 		FailureThreshold: 5,
@@ -325,28 +325,28 @@ func (scbm *StageCircuitBreakerManager) GetCircuitBreaker(stageType string) *Cir
 		return breaker
 	}
 	scbm.mu.RUnlock()
-	
+
 	// Create new circuit breaker
 	scbm.mu.Lock()
 	defer scbm.mu.Unlock()
-	
+
 	// Double-check after acquiring write lock
 	if breaker, exists := scbm.breakers[stageType]; exists {
 		return breaker
 	}
-	
+
 	config, exists := scbm.configs[stageType]
 	if !exists {
 		config = scbm.configs["default"]
 	}
-	
+
 	breaker := NewCircuitBreaker(scbm.logger, config)
 	scbm.breakers[stageType] = breaker
-	
+
 	scbm.logger.Info().
 		Str("stage_type", stageType).
 		Msg("Created new circuit breaker for stage type")
-	
+
 	return breaker
 }
 
@@ -354,9 +354,9 @@ func (scbm *StageCircuitBreakerManager) GetCircuitBreaker(stageType string) *Cir
 func (scbm *StageCircuitBreakerManager) SetConfig(stageType string, config CircuitBreakerConfig) {
 	scbm.mu.Lock()
 	defer scbm.mu.Unlock()
-	
+
 	scbm.configs[stageType] = config
-	
+
 	// Reset existing breaker to use new config
 	if breaker, exists := scbm.breakers[stageType]; exists {
 		breaker.config = config
@@ -368,12 +368,12 @@ func (scbm *StageCircuitBreakerManager) SetConfig(stageType string, config Circu
 func (scbm *StageCircuitBreakerManager) GetAllStats() map[string]CircuitBreakerStats {
 	scbm.mu.RLock()
 	defer scbm.mu.RUnlock()
-	
+
 	stats := make(map[string]CircuitBreakerStats)
 	for stageType, breaker := range scbm.breakers {
 		stats[stageType] = breaker.GetStats()
 	}
-	
+
 	return stats
 }
 
@@ -381,10 +381,10 @@ func (scbm *StageCircuitBreakerManager) GetAllStats() map[string]CircuitBreakerS
 func (scbm *StageCircuitBreakerManager) ResetAll() {
 	scbm.mu.RLock()
 	defer scbm.mu.RUnlock()
-	
+
 	for _, breaker := range scbm.breakers {
 		breaker.Reset()
 	}
-	
+
 	scbm.logger.Info().Msg("Reset all circuit breakers")
 }

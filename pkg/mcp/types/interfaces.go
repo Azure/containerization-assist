@@ -92,6 +92,7 @@ type Session interface {
 type SessionState struct {
 	// Core fields
 	ID        string
+	SessionID string // Alias for ID for compatibility
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	ExpiresAt time.Time
@@ -102,6 +103,7 @@ type SessionState struct {
 	// Repository state
 	RepositoryAnalyzed bool
 	RepositoryInfo     *RepositoryInfo
+	RepoURL            string // Repository URL
 
 	// Build state
 	DockerfileGenerated bool
@@ -117,6 +119,8 @@ type SessionState struct {
 
 	// Progress tracking
 	CurrentStage string
+	Status       string // Session status
+	Stage        string // Current stage alias
 	Errors       []string
 	Metadata     map[string]interface{}
 
@@ -126,13 +130,13 @@ type SessionState struct {
 
 // SessionMetadata contains session metadata
 type SessionMetadata struct {
-	CreatedAt       time.Time `json:"created_at"`
-	LastAccessedAt  time.Time `json:"last_accessed_at"`
-	ExpiresAt       time.Time `json:"expires_at"`
-	WorkspaceSize   int64     `json:"workspace_size"`
-	OperationCount  int       `json:"operation_count"`
-	CurrentStage    string    `json:"current_stage"`
-	Labels          []string  `json:"labels"`
+	CreatedAt      time.Time `json:"created_at"`
+	LastAccessedAt time.Time `json:"last_accessed_at"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	WorkspaceSize  int64     `json:"workspace_size"`
+	OperationCount int       `json:"operation_count"`
+	CurrentStage   string    `json:"current_stage"`
+	Labels         []string  `json:"labels"`
 }
 
 // =============================================================================
@@ -276,12 +280,12 @@ type FileStructure struct {
 
 // SecurityScanResult contains information about security scans
 type SecurityScanResult struct {
-	Success         bool                `json:"success"`
-	ScannedAt       time.Time           `json:"scanned_at"`
-	ImageRef        string              `json:"image_ref"`
-	Scanner         string              `json:"scanner"`
-	Vulnerabilities VulnerabilityCount  `json:"vulnerabilities"`
-	FixableCount    int                 `json:"fixable_count"`
+	Success         bool               `json:"success"`
+	ScannedAt       time.Time          `json:"scanned_at"`
+	ImageRef        string             `json:"image_ref"`
+	Scanner         string             `json:"scanner"`
+	Vulnerabilities VulnerabilityCount `json:"vulnerabilities"`
+	FixableCount    int                `json:"fixable_count"`
 }
 
 // VulnerabilityCount provides vulnerability counts by severity
@@ -360,6 +364,213 @@ type TradeoffAnalysis struct{}
 type AlternativeStrategy struct{}
 type ComparisonMatrix struct{}
 type DecisionRecommendation struct{}
+
+// =============================================================================
+// FIXING INTERFACES
+// =============================================================================
+
+// IterativeFixer provides iterative fixing capabilities
+type IterativeFixer interface {
+	// Fix attempts to fix an issue iteratively
+	Fix(ctx context.Context, issue interface{}) (*FixingResult, error)
+
+	// SetMaxAttempts sets the maximum number of fix attempts
+	SetMaxAttempts(max int)
+
+	// GetFixHistory returns the history of fix attempts
+	GetFixHistory() []FixAttempt
+}
+
+// ContextSharer provides context sharing capabilities
+type ContextSharer interface {
+	// ShareContext shares context between operations
+	ShareContext(ctx context.Context, key string, value interface{}) error
+
+	// GetSharedContext retrieves shared context
+	GetSharedContext(ctx context.Context, key string) (interface{}, bool)
+}
+
+// FixingResult represents the result of a fixing operation
+type FixingResult struct {
+	Success         bool                   `json:"success"`
+	Error           error                  `json:"error,omitempty"`
+	FixApplied      string                 `json:"fix_applied"`
+	Attempts        int                    `json:"attempts"`
+	Duration        time.Duration          `json:"duration"`
+	TotalDuration   time.Duration          `json:"total_duration"`
+	TotalAttempts   int                    `json:"total_attempts"`
+	FixHistory      []FixAttempt           `json:"fix_history"`
+	AllAttempts     []FixAttempt           `json:"all_attempts"`
+	FinalAttempt    *FixAttempt            `json:"final_attempt"`
+	RecommendedNext []string               `json:"recommended_next"`
+	Metadata        map[string]interface{} `json:"metadata"`
+}
+
+// FixStrategy represents a strategy for fixing issues
+type FixStrategy struct {
+	Name          string                             `json:"name"`
+	Description   string                             `json:"description"`
+	Type          string                             `json:"type"`
+	Priority      int                                `json:"priority"`
+	EstimatedTime time.Duration                      `json:"estimated_time"`
+	Applicable    func(error) bool                   `json:"-"`
+	Apply         func(context.Context, error) error `json:"-"`
+	FileChanges   []FileChange                       `json:"file_changes,omitempty"`
+	Commands      []string                           `json:"commands,omitempty"`
+	Metadata      map[string]interface{}             `json:"metadata"`
+}
+
+// FileChange represents a file modification in a fix strategy
+type FileChange struct {
+	FilePath   string `json:"file_path"`
+	Operation  string `json:"operation"`
+	Content    string `json:"content,omitempty"`
+	NewContent string `json:"new_content,omitempty"`
+	Reason     string `json:"reason"`
+}
+
+// FixableOperation represents an operation that can be fixed
+type FixableOperation interface {
+	// ExecuteOnce runs the operation once
+	ExecuteOnce(ctx context.Context) error
+
+	// GetFailureAnalysis analyzes failure and returns rich error
+	GetFailureAnalysis(ctx context.Context, err error) (*RichError, error)
+
+	// PrepareForRetry prepares the operation for retry
+	PrepareForRetry(ctx context.Context, fixAttempt *FixAttempt) error
+
+	// Execute runs the operation
+	Execute(ctx context.Context) error
+
+	// CanRetry determines if the operation can be retried
+	CanRetry() bool
+
+	// GetLastError returns the last error encountered
+	GetLastError() error
+}
+
+// RichError provides detailed error information
+type RichError struct {
+	Code     string `json:"code"`
+	Type     string `json:"type"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+}
+
+// Error implements the error interface
+func (e *RichError) Error() string {
+	return e.Message
+}
+
+// FixAttempt represents a single fix attempt
+type FixAttempt struct {
+	AttemptNumber  int                    `json:"attempt_number"`
+	Strategy       string                 `json:"strategy"`
+	FixStrategy    FixStrategy            `json:"fix_strategy"`
+	Error          error                  `json:"error,omitempty"`
+	Success        bool                   `json:"success"`
+	Duration       time.Duration          `json:"duration"`
+	StartTime      time.Time              `json:"start_time"`
+	EndTime        time.Time              `json:"end_time"`
+	AnalysisPrompt string                 `json:"analysis_prompt,omitempty"`
+	AnalysisResult string                 `json:"analysis_result,omitempty"`
+	Changes        []string               `json:"changes"`
+	FixedContent   string                 `json:"fixed_content,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata"`
+}
+
+// =============================================================================
+// LEGACY INTERFACES (to be refactored)
+// =============================================================================
+
+// PipelineOperations provides pipeline-related operations
+type PipelineOperations interface {
+	// Session management
+	GetSessionWorkspace(sessionID string) string
+	UpdateSessionFromDockerResults(sessionID string, result interface{}) error
+
+	// Docker operations
+	BuildDockerImage(sessionID, imageRef, dockerfilePath string) (*DockerBuildResult, error)
+	PullDockerImage(sessionID, imageRef string) error
+	PushDockerImage(sessionID, imageRef string) error
+	TagDockerImage(sessionID, sourceRef, targetRef string) error
+	ConvertToDockerState(sessionID string) (*DockerState, error)
+
+	// Kubernetes operations
+	GenerateKubernetesManifests(sessionID, imageRef, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*KubernetesManifestResult, error)
+	DeployToKubernetes(sessionID string, manifests []string) (*KubernetesDeploymentResult, error)
+	CheckApplicationHealth(sessionID, namespace, deploymentName string, timeout time.Duration) (*HealthCheckResult, error)
+
+	// Resource management
+	AcquireResource(sessionID, resourceType string) error
+	ReleaseResource(sessionID, resourceType string) error
+}
+
+// ToolSessionManager manages tool sessions
+type ToolSessionManager interface {
+	// Session CRUD operations
+	// Note: These return internal session types for now - to be migrated to unified types
+	GetSession(sessionID string) (interface{}, error)
+	GetOrCreateSession(repoURL string) (interface{}, error)
+	UpdateSession(sessionID string, updateFunc interface{}) error
+	DeleteSession(ctx context.Context, sessionID string) error
+
+	// Session listing and searching
+	ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error)
+	FindSessionByRepo(ctx context.Context, repoURL string) (interface{}, error)
+}
+
+// Pipeline operation result types
+type DockerBuildResult struct {
+	Success   bool       `json:"success"`
+	ImageID   string     `json:"image_id"`
+	ImageRef  string     `json:"image_ref"`
+	BuildTime string     `json:"build_time"`
+	Error     *RichError `json:"error,omitempty"`
+}
+
+type DockerState struct {
+	Images     []string `json:"images"`
+	Containers []string `json:"containers"`
+	Networks   []string `json:"networks"`
+	Volumes    []string `json:"volumes"`
+}
+
+type KubernetesManifestResult struct {
+	Success   bool                `json:"success"`
+	Manifests []GeneratedManifest `json:"manifests"`
+	Error     *RichError          `json:"error,omitempty"`
+}
+
+type GeneratedManifest struct {
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+type KubernetesDeploymentResult struct {
+	Success     bool       `json:"success"`
+	Namespace   string     `json:"namespace"`
+	Deployments []string   `json:"deployments"`
+	Services    []string   `json:"services"`
+	Error       *RichError `json:"error,omitempty"`
+}
+
+type HealthCheckResult struct {
+	Healthy     bool        `json:"healthy"`
+	Message     string      `json:"message"`
+	PodStatuses []PodStatus `json:"pod_statuses"`
+	Error       *RichError  `json:"error,omitempty"`
+}
+
+type PodStatus struct {
+	Name   string `json:"name"`
+	Ready  bool   `json:"ready"`
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
+}
 
 // =============================================================================
 // ERROR CODES

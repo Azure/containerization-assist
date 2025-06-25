@@ -15,6 +15,8 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/constants"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/interfaces"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -171,14 +173,14 @@ type SecurityAnalysis struct {
 
 // AtomicValidateDockerfileTool implements atomic Dockerfile validation
 type AtomicValidateDockerfileTool struct {
-	pipelineAdapter   PipelineOperations
-	sessionManager    ToolSessionManager
+	pipelineAdapter   mcptypes.PipelineOperations
+	sessionManager    mcptypes.ToolSessionManager
 	dockerfileAdapter *DockerfileAdapter
 	logger            zerolog.Logger
 }
 
 // NewAtomicValidateDockerfileTool creates a new atomic Dockerfile validation tool
-func NewAtomicValidateDockerfileTool(adapter PipelineOperations, sessionManager ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
+func NewAtomicValidateDockerfileTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
 	toolLogger := logger.With().Str("tool", "atomic_validate_dockerfile").Logger()
 	return &AtomicValidateDockerfileTool{
 		pipelineAdapter:   adapter,
@@ -187,7 +189,6 @@ func NewAtomicValidateDockerfileTool(adapter PipelineOperations, sessionManager 
 		logger:            toolLogger,
 	}
 }
-
 
 // ExecuteValidation runs the atomic Dockerfile validation
 func (t *AtomicValidateDockerfileTool) ExecuteValidation(ctx context.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
@@ -230,7 +231,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	}
 
 	// Get session
-	session, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicValidateDockerfileResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_validate_dockerfile", args.SessionID, args.DryRun),
@@ -241,6 +242,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, nil
 	}
+	session := sessionInterface.(*sessiontypes.SessionState)
 
 	if reporter != nil {
 		reporter.ReportStage(0.5, "Session initialized")

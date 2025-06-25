@@ -53,10 +53,12 @@ func (o *NoReflectToolOrchestrator) SetPipelineAdapter(adapter interface{}) {
 // extractConcreteSessionManager attempts to extract the concrete session manager
 func (o *NoReflectToolOrchestrator) extractConcreteSessionManager() *session.SessionManager {
 	// Try to extract from sessionManagerAdapterImpl if it exists
-	if adapter, ok := o.sessionManager.(interface{ GetConcreteSessionManager() *session.SessionManager }); ok {
+	if adapter, ok := o.sessionManager.(interface {
+		GetConcreteSessionManager() *session.SessionManager
+	}); ok {
 		return adapter.GetConcreteSessionManager()
 	}
-	
+
 	// Since the interfaces have different signatures, we cannot directly type assert
 	// The orchestration.SessionManager interface is designed to work with interface{}
 	// while the concrete session.SessionManager works with typed SessionState

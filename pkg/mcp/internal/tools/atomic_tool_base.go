@@ -8,12 +8,13 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // AtomicToolBase provides common functionality for all atomic tools
 type AtomicToolBase struct {
-	pipelineAdapter PipelineOperations
+	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  *session.SessionManager
 	validationMixin *utils.StandardizedValidationMixin
 	logger          zerolog.Logger
@@ -23,7 +24,7 @@ type AtomicToolBase struct {
 // NewAtomicToolBase creates a new atomic tool base
 func NewAtomicToolBase(
 	name string,
-	adapter PipelineOperations,
+	adapter mcptypes.PipelineOperations,
 	sessionManager *session.SessionManager,
 	logger zerolog.Logger,
 ) *AtomicToolBase {
@@ -97,7 +98,7 @@ func (base *AtomicToolBase) ValidateAndPrepareExecution(
 }
 
 // GetPipelineAdapter returns the pipeline adapter
-func (base *AtomicToolBase) GetPipelineAdapter() PipelineOperations {
+func (base *AtomicToolBase) GetPipelineAdapter() mcptypes.PipelineOperations {
 	return base.pipelineAdapter
 }
 

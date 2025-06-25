@@ -37,7 +37,7 @@ func (m *MockAtomicPipelineAdapter) SavePipelineState(sessionID string, state in
 	return args.Error(0)
 }
 
-// Implement all PipelineOperations methods (stubs for testing)
+// Implement all mcptypes.PipelineOperations methods (stubs for testing)
 func (m *MockAtomicPipelineAdapter) AnalyzeRepository(sessionID, repoPath string) (*analysis.AnalysisResult, error) {
 	args := m.Called(sessionID, repoPath)
 	return args.Get(0).(*analysis.AnalysisResult), args.Error(1)

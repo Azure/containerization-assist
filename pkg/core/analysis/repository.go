@@ -719,7 +719,7 @@ func (ra *RepositoryAnalyzer) extractGoDependencies(filePath string) []Dependenc
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		
+
 		// Handle require block
 		if strings.HasPrefix(line, "require (") {
 			inRequireBlock = true
@@ -729,7 +729,7 @@ func (ra *RepositoryAnalyzer) extractGoDependencies(filePath string) []Dependenc
 			inRequireBlock = false
 			continue
 		}
-		
+
 		// Parse single require statement
 		if strings.HasPrefix(line, "require ") {
 			parts := strings.Fields(line[8:]) // Remove "require "
@@ -744,7 +744,7 @@ func (ra *RepositoryAnalyzer) extractGoDependencies(filePath string) []Dependenc
 			}
 			continue
 		}
-		
+
 		// Parse dependencies within require block
 		if inRequireBlock && line != "" && !strings.HasPrefix(line, "//") {
 			parts := strings.Fields(line)
@@ -793,7 +793,7 @@ func (ra *RepositoryAnalyzer) extractPortFromPackageJson(filePath string) int {
 	}
 
 	var pkg struct {
-		Scripts map[string]string `json:"scripts"`
+		Scripts map[string]string      `json:"scripts"`
 		Config  map[string]interface{} `json:"config"`
 	}
 

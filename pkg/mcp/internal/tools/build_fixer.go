@@ -9,9 +9,9 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/fixing"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/types/session"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -617,7 +617,7 @@ func (op *DockerBuildOperation) GetFailureAnalysis(ctx context.Context, err erro
 }
 
 // PrepareForRetry applies fixes and prepares for the next build attempt
-func (op *DockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *DockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_strategy", fixAttempt.FixStrategy.Name).
 		Msg("Preparing for retry after fix")
@@ -639,7 +639,7 @@ func (op *DockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt 
 }
 
 // applyDockerfileFix applies fixes to the Dockerfile
-func (op *DockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *DockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if fixAttempt.FixedContent == "" {
 		return types.NewRichError("INVALID_ARGUMENTS", "no fixed Dockerfile content provided", "missing_content")
 	}
@@ -664,7 +664,7 @@ func (op *DockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttem
 }
 
 // applyDependencyFix applies dependency-related fixes
-func (op *DockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *DockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().Msg("Applying dependency fix")
 
 	// Apply file changes specified in the fix strategy
@@ -693,7 +693,7 @@ func (op *DockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttem
 }
 
 // applyConfigFix applies configuration-related fixes
-func (op *DockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *DockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().Msg("Applying configuration fix")
 
 	// Apply file changes specified in the fix strategy
@@ -722,7 +722,7 @@ func (op *DockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *
 }
 
 // applyGenericFix applies generic fixes
-func (op *DockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *fixing.FixAttempt) error {
+func (op *DockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	op.logger.Info().Msg("Applying generic fix")
 
 	// If there's fixed content, treat it as a Dockerfile fix
@@ -761,7 +761,7 @@ func (op *DockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt 
 }
 
 // applyFileChange applies a single file change from a fix strategy
-func (op *DockerBuildOperation) applyFileChange(change fixing.FileChange) error {
+func (op *DockerBuildOperation) applyFileChange(change mcptypes.FileChange) error {
 	// Ensure the directory exists for the target file
 	dir := filepath.Dir(change.FilePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {

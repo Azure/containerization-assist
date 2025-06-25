@@ -37,11 +37,11 @@ type LabelIndex struct {
 
 // CachedQuery represents a cached query result
 type CachedQuery struct {
-	Query      string
-	Result     []string
-	Timestamp  time.Time
-	ExpiresAt  time.Time
-	HitCount   int
+	Query     string
+	Result    []string
+	Timestamp time.Time
+	ExpiresAt time.Time
+	HitCount  int
 }
 
 // NewLabelIndex creates a new label index
@@ -215,12 +215,12 @@ func (li *LabelIndex) GetIndexStats() IndexStats {
 	defer li.mutex.RUnlock()
 
 	return IndexStats{
-		TotalSessions:     len(li.sessionToLabels),
-		TotalLabels:       len(li.labelToSessions),
-		TotalK8sLabels:    li.countK8sLabels(),
-		CachedQueries:     len(li.queryCache),
-		LastUpdated:       li.lastUpdated,
-		IndexSize:         li.indexSize,
+		TotalSessions:  len(li.sessionToLabels),
+		TotalLabels:    len(li.labelToSessions),
+		TotalK8sLabels: li.countK8sLabels(),
+		CachedQueries:  len(li.queryCache),
+		LastUpdated:    li.lastUpdated,
+		IndexSize:      li.indexSize,
 	}
 }
 

@@ -25,9 +25,9 @@ type LabelValidator struct {
 	ReservedPrefixes []string // Reserved prefixes like "kubernetes.io/"
 
 	// Custom validation rules
-	RequiredLabels   []string                   // Labels that must be present
-	ForbiddenLabels  []string                   // Labels that are not allowed
-	LabelPatterns    map[string]*regexp.Regexp // Pattern validation for specific labels
+	RequiredLabels  []string                  // Labels that must be present
+	ForbiddenLabels []string                  // Labels that are not allowed
+	LabelPatterns   map[string]*regexp.Regexp // Pattern validation for specific labels
 }
 
 // NewLabelManager creates a new label manager
@@ -328,7 +328,7 @@ func (v *LabelValidator) ValidateLabel(label string) error {
 		if len(parts) == 2 {
 			prefix := parts[0]
 			value := parts[1]
-			
+
 			if pattern, exists := v.LabelPatterns[prefix]; exists {
 				if !pattern.MatchString(value) {
 					return fmt.Errorf("label value %q does not match required pattern for prefix %q", value, prefix)

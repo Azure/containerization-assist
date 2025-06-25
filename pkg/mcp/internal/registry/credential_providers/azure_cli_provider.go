@@ -118,8 +118,8 @@ func (acp *AzureCLIProvider) isAzureRegistry(registryURL string) bool {
 	// Check if URL contains Azure Container Registry patterns
 	azurePatterns := []string{
 		".azurecr.io",
-		".azurecr.cn",  // Azure China
-		".azurecr.us",  // Azure Government
+		".azurecr.cn", // Azure China
+		".azurecr.us", // Azure Government
 	}
 
 	url := strings.ToLower(registryURL)
@@ -153,8 +153,8 @@ func (acp *AzureCLIProvider) getAccessToken(registryName string) (*AzureTokenRes
 	defer cancel()
 
 	// Execute az acr get-access-token command
-	cmd := exec.CommandContext(ctx, "az", "acr", "get-access-token", 
-		"--name", registryName, 
+	cmd := exec.CommandContext(ctx, "az", "acr", "get-access-token",
+		"--name", registryName,
 		"--output", "json")
 
 	output, err := cmd.Output()
@@ -186,9 +186,9 @@ func (acp *AzureCLIProvider) tryAlternativeLogin(registryName string) (*AzureTok
 	defer cancel()
 
 	// Try az acr login which might work for older CLI versions
-	loginCmd := exec.CommandContext(ctx, "az", "acr", "login", 
-		"--name", registryName, 
-		"--expose-token", 
+	loginCmd := exec.CommandContext(ctx, "az", "acr", "login",
+		"--name", registryName,
+		"--expose-token",
 		"--output", "json")
 
 	output, err := loginCmd.Output()
@@ -235,9 +235,9 @@ func (acp *AzureCLIProvider) GetResourceGroupName(registryName string) (string, 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "az", "acr", "show", 
-		"--name", registryName, 
-		"--query", "resourceGroup", 
+	cmd := exec.CommandContext(ctx, "az", "acr", "show",
+		"--name", registryName,
+		"--query", "resourceGroup",
 		"--output", "tsv")
 
 	output, err := cmd.Output()
@@ -254,8 +254,8 @@ func (acp *AzureCLIProvider) ValidateAccess(registryName string) error {
 	defer cancel()
 
 	// Try to list repositories to validate access
-	cmd := exec.CommandContext(ctx, "az", "acr", "repository", "list", 
-		"--name", registryName, 
+	cmd := exec.CommandContext(ctx, "az", "acr", "repository", "list",
+		"--name", registryName,
 		"--output", "json")
 
 	if err := cmd.Run(); err != nil {

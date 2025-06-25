@@ -517,39 +517,39 @@ func exportToolSchemas(outputPath string) error {
 		{"name": "server_status", "category": "Core", "description": "[Advanced] Diagnostic tool for debugging server issues"},
 		{"name": "list_sessions", "category": "Core", "description": "List all active containerization sessions with their metadata and status"},
 		{"name": "delete_session", "category": "Core", "description": "Delete a containerization session and clean up its resources"},
-		
+
 		// Repository Analysis
 		{"name": "analyze_repository_atomic", "category": "Analysis", "description": "Analyze a repository to determine language, framework, and containerization requirements"},
-		
+
 		// Dockerfile Operations
 		{"name": "generate_dockerfile_atomic", "category": "Dockerfile", "description": "Generate a Dockerfile using AI or templates based on repository analysis"},
 		{"name": "validate_dockerfile_atomic", "category": "Dockerfile", "description": "Validate a Dockerfile for syntax errors and best practices"},
-		
+
 		// Container Image Operations
 		{"name": "build_image_atomic", "category": "Image", "description": "Build a Docker image from a Dockerfile with automatic error fixing"},
 		{"name": "pull_image_atomic", "category": "Image", "description": "Pull a Docker image from a registry"},
 		{"name": "push_image_atomic", "category": "Image", "description": "Push a Docker image to a registry with authentication"},
 		{"name": "tag_image_atomic", "category": "Image", "description": "Tag a Docker image with a new name or version"},
-		
+
 		// Security Scanning
 		{"name": "scan_image_security_atomic", "category": "Security", "description": "Scan a Docker image for security vulnerabilities using Trivy"},
 		{"name": "scan_secrets_atomic", "category": "Security", "description": "Scan code and configuration files for exposed secrets"},
-		
+
 		// Kubernetes Operations
 		{"name": "generate_manifests_atomic", "category": "Kubernetes", "description": "Generate Kubernetes manifests (Deployment, Service, etc.) for an application"},
 		{"name": "deploy_kubernetes_atomic", "category": "Kubernetes", "description": "Deploy an application to Kubernetes with automatic error fixing"},
-		
+
 		// Health Checks
 		{"name": "check_health_atomic", "category": "Health", "description": "Check the health and readiness of deployed applications"},
 	}
-	
+
 	// Group tools by category
 	toolsByCategory := make(map[string][]map[string]string)
 	for _, tool := range availableTools {
 		category := tool["category"]
 		toolsByCategory[category] = append(toolsByCategory[category], tool)
 	}
-	
+
 	// Use GoMCP automatic schema generation instead of manual schema export
 	// GoMCP automatically generates schemas for all registered tools and resources
 	schemas := map[string]interface{}{
@@ -567,8 +567,8 @@ func exportToolSchemas(outputPath string) error {
 		"tools": map[string]interface{}{
 			"total_count": len(availableTools),
 			"by_category": toolsByCategory,
-			"categories": []string{"Core", "Analysis", "Dockerfile", "Image", "Security", "Kubernetes", "Health"},
-			"note": "All tools registered with GoMCP automatically have schemas generated from their argument and result struct types",
+			"categories":  []string{"Core", "Analysis", "Dockerfile", "Image", "Security", "Kubernetes", "Health"},
+			"note":        "All tools registered with GoMCP automatically have schemas generated from their argument and result struct types",
 			"automatic_features": []string{
 				"JSON Schema generation from Go struct types",
 				"Automatic validation based on struct tags",

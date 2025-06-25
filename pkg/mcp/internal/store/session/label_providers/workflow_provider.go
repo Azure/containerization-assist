@@ -11,10 +11,10 @@ import (
 // WorkflowLabelProvider provides automatic workflow-related labels
 type WorkflowLabelProvider struct {
 	// Configuration for automatic labeling
-	ToolBasedLabels   bool // Add labels based on tools used
-	TimeBasedLabels   bool // Add time-based labels
-	StageBasedLabels  bool // Add workflow stage labels
-	ProgressLabels    bool // Add progress tracking labels
+	ToolBasedLabels  bool // Add labels based on tools used
+	TimeBasedLabels  bool // Add time-based labels
+	StageBasedLabels bool // Add workflow stage labels
+	ProgressLabels   bool // Add progress tracking labels
 }
 
 // LabelProvider interface for automatic label generation
@@ -236,7 +236,7 @@ func (w *WorkflowLabelProvider) determineWorkflowStage(session *sessiontypes.Ses
 
 	for _, execution := range session.StageHistory {
 		toolName := strings.ToLower(execution.Tool)
-		
+
 		if strings.Contains(toolName, "analyze") || strings.Contains(toolName, "scan") {
 			hasAnalysis = true
 		} else if strings.Contains(toolName, "build") || strings.Contains(toolName, "dockerfile") {
