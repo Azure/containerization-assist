@@ -294,7 +294,7 @@ func (tm *TracingManager) CreateChildContext(parent *TraceContext) context.Conte
 	}
 
 	// Parse span ID as parent
-	_, err = trace.SpanIDFromHex(parent.SpanID)
+	spanID, err := trace.SpanIDFromHex(parent.SpanID)
 	if err != nil {
 		return context.Background()
 	}
@@ -302,7 +302,7 @@ func (tm *TracingManager) CreateChildContext(parent *TraceContext) context.Conte
 	// Create span context
 	spanCtx := trace.NewSpanContext(trace.SpanContextConfig{
 		TraceID:    traceID,
-		SpanID:     trace.SpanID{}, // Will be generated
+		SpanID:     spanID,
 		TraceFlags: trace.TraceFlags(parent.Flags),
 		Remote:     true,
 	})
