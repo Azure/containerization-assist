@@ -11,9 +11,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ToolOrchestrator interface for local use (to avoid import cycles)
+type ToolOrchestrator interface {
+	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
+}
+
 // ProfiledOrchestrator wraps an orchestrator with profiling capabilities
 type ProfiledOrchestrator struct {
-	orchestrator mcptypes.ToolOrchestrator
+	orchestrator ToolOrchestrator
 	profiler     *ToolProfiler
 	logger       zerolog.Logger
 }
@@ -29,7 +34,7 @@ type ProfiledExecutionResult struct {
 }
 
 // NewProfiledOrchestrator creates a new profiled orchestrator wrapper
-func NewProfiledOrchestrator(orchestrator mcptypes.ToolOrchestrator, logger zerolog.Logger) *ProfiledOrchestrator {
+func NewProfiledOrchestrator(orchestrator ToolOrchestrator, logger zerolog.Logger) *ProfiledOrchestrator {
 	// Check if profiling is enabled via environment variable
 	enabled := true
 	if envVal := os.Getenv("MCP_PROFILING_ENABLED"); envVal != "" {

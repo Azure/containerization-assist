@@ -12,8 +12,8 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"

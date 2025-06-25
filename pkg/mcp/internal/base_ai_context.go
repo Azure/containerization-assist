@@ -2,9 +2,6 @@ package internal
 
 import (
 	"time"
-
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	ai_context "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 )
 
 // BaseAIContextResult provides common AI context implementations for all atomic tool results
@@ -31,7 +28,7 @@ func NewBaseAIContextResult(operationType string, isSuccessful bool, duration ti
 	}
 }
 
-// CalculateScore implements ai_context.Assessable with unified scoring logic
+// CalculateScore implements unified scoring logic
 func (b BaseAIContextResult) CalculateScore() int {
 	if !b.IsSuccessful {
 		return 20 // Poor score for failed operations
@@ -83,7 +80,7 @@ func (b BaseAIContextResult) CalculateScore() int {
 	return baseScore
 }
 
-// DetermineRiskLevel implements ai_context.Assessable with unified risk assessment
+// DetermineRiskLevel implements unified risk assessment
 func (b BaseAIContextResult) DetermineRiskLevel() string {
 	score := b.CalculateScore()
 
@@ -99,7 +96,7 @@ func (b BaseAIContextResult) DetermineRiskLevel() string {
 	}
 }
 
-// GetStrengths implements ai_context.Assessable with operation-specific strengths
+// GetStrengths implements operation-specific strengths
 func (b BaseAIContextResult) GetStrengths() []string {
 	var strengths []string
 
@@ -144,7 +141,7 @@ func (b BaseAIContextResult) GetStrengths() []string {
 	return strengths
 }
 
-// GetChallenges implements ai_context.Assessable with operation-specific challenges
+// GetChallenges implements operation-specific challenges
 func (b BaseAIContextResult) GetChallenges() []string {
 	var challenges []string
 
@@ -201,90 +198,7 @@ func (b BaseAIContextResult) GetChallenges() []string {
 	return challenges
 }
 
-// GetAssessment implements ai_context.Assessable with unified assessment
-func (b BaseAIContextResult) GetAssessment() *ai_context.UnifiedAssessment {
-	// Determine overall health based on score
-	var overallHealth string
-	score := b.CalculateScore()
-	switch {
-	case score >= 80:
-		overallHealth = "excellent"
-	case score >= 60:
-		overallHealth = "good"
-	case score >= 40:
-		overallHealth = "fair"
-	default:
-		overallHealth = "poor"
-	}
-
-	strengths := b.GetStrengths()
-	challenges := b.GetChallenges()
-
-	// Create strength assessment areas
-	var strengthAreas []ai_context.AssessmentArea
-	for i, strength := range strengths {
-		if i < 3 { // Limit to top 3 strengths
-			strengthAreas = append(strengthAreas, ai_context.AssessmentArea{
-				Area:        "strength_" + b.OperationType,
-				Category:    "operational",
-				Description: strength,
-				Impact:      "high",
-				Evidence:    []string{strength},
-				Score:       score,
-			})
-		}
-	}
-
-	// Create challenge assessment areas
-	var challengeAreas []ai_context.AssessmentArea
-	for i, challenge := range challenges {
-		if i < 3 { // Limit to top 3 challenges
-			challengeAreas = append(challengeAreas, ai_context.AssessmentArea{
-				Area:        "challenge_" + b.OperationType,
-				Category:    "operational",
-				Description: challenge,
-				Impact:      "medium",
-				Evidence:    []string{challenge},
-				Score:       score,
-			})
-		}
-	}
-
-	return &ai_context.UnifiedAssessment{
-		ReadinessScore:    score,
-		RiskLevel:         b.DetermineRiskLevel(),
-		ConfidenceLevel:   90, // High confidence for atomic operations
-		OverallHealth:     overallHealth,
-		StrengthAreas:     strengthAreas,
-		ChallengeAreas:    challengeAreas,
-		RiskFactors:       []ai_context.RiskFactor{},     // Default empty
-		DecisionFactors:   []ai_context.DecisionFactor{}, // Default empty
-		AssessmentBasis:   []ai_context.EvidenceItem{},   // Default empty
-		QualityIndicators: b.GetMetadataForAI(),
-	}
-}
-
-// GetAIContext implements ai_context.ContextEnriched with operation context
-func (b BaseAIContextResult) GetAIContext() *ai_context.ToolContext {
-	return &ai_context.ToolContext{
-		ToolName:        b.OperationType + "_atomic",
-		OperationID:     "", // Can be set by individual tools
-		Timestamp:       time.Now(),
-		Assessment:      b.GetAssessment(),
-		Recommendations: []ai_context.Recommendation{},    // Default empty, tools can override
-		DecisionPoints:  []ai_context.DecisionPoint{},     // Default empty, tools can override
-		TradeOffs:       []ai_context.TradeoffAnalysis{},  // Default empty, tools can override
-		Insights:        []ai_context.ContextualInsight{}, // Default empty, tools can override
-	}
-}
-
-// EnrichWithInsights implements ai_context.ContextEnriched (no-op by default)
-func (b BaseAIContextResult) EnrichWithInsights(insights []*ai_context.ContextualInsight) {
-	// Default implementation does nothing
-	// Individual tools can override if they need insight processing
-}
-
-// GetMetadataForAI implements ai_context.ContextEnriched with basic metadata
+// GetMetadataForAI provides basic metadata for AI context
 func (b BaseAIContextResult) GetMetadataForAI() map[string]interface{} {
 	return map[string]interface{}{
 		"operation_type": b.OperationType,
@@ -295,20 +209,4 @@ func (b BaseAIContextResult) GetMetadataForAI() map[string]interface{} {
 		"score":          b.CalculateScore(),
 		"risk_level":     b.DetermineRiskLevel(),
 	}
-}
-
-// ToolAIContextProvider is a helper interface for tools to embed BaseAIContextResult
-// This interface captures the methods that BaseAIContextResult actually implements
-type ToolAIContextProvider interface {
-	// Assessment capabilities (from legacy Assessable interface)
-	CalculateScore() int
-	DetermineRiskLevel() string
-	GetStrengths() []string
-	GetChallenges() []string
-	GetAssessment() *ai_context.UnifiedAssessment
-
-	// Context enrichment capabilities (from legacy ContextEnriched interface)
-	GetAIContext() *ai_context.ToolContext
-	EnrichWithInsights(insights []*ai_context.ContextualInsight)
-	GetMetadataForAI() map[string]interface{}
 }

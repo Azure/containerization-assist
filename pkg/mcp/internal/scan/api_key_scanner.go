@@ -17,12 +17,22 @@ type APIKeyScanner struct {
 	logger   zerolog.Logger
 }
 
+// Severity represents the severity of a finding
+type Severity string
+
+const (
+	SeverityLow      Severity = "low"
+	SeverityMedium   Severity = "medium"
+	SeverityHigh     Severity = "high"
+	SeverityCritical Severity = "critical"
+)
+
 // APIKeyPattern represents a pattern for detecting specific API keys
 type APIKeyPattern struct {
 	Name        string
 	Pattern     *regexp.Regexp
 	Confidence  float64
-	Severity    scan.Severity
+	Severity    Severity
 	Description string
 }
 

@@ -70,9 +70,9 @@ type AtomicAnalyzeRepositoryTool struct {
 	sessionManager  mcptypes.ToolSessionManager
 	// errorHandler field removed - using direct error handling
 	logger           zerolog.Logger
-	repoCloner       *repository.Cloner
-	repoAnalyzer     *repository.Analyzer
-	contextGenerator *repository.ContextGenerator
+	repoCloner       *git.Cloner
+	repoAnalyzer     *analysis.Analyzer
+	contextGenerator *analysis.ContextGenerator
 }
 
 // NewAtomicAnalyzeRepositoryTool creates a new atomic analyze repository tool
@@ -82,9 +82,9 @@ func NewAtomicAnalyzeRepositoryTool(adapter mcptypes.PipelineOperations, session
 		sessionManager:  sessionManager,
 		// errorHandler initialization removed - using direct error handling
 		logger:           logger.With().Str("tool", "atomic_analyze_repository").Logger(),
-		repoCloner:       repository.NewCloner(logger),
-		repoAnalyzer:     repository.NewAnalyzer(logger),
-		contextGenerator: repository.NewContextGenerator(logger),
+		repoCloner:       git.NewCloner(logger),
+		repoAnalyzer:     analysis.NewAnalyzer(logger),
+		contextGenerator: analysis.NewContextGenerator(logger),
 	}
 }
 
@@ -724,9 +724,17 @@ func (t *AtomicAnalyzeRepositoryTool) GetVersion() string {
 	return t.GetMetadata().Version
 }
 
+// ToolCapabilities for local use (to avoid import cycles)
+type ToolCapabilities struct {
+	SupportsDryRun    bool
+	SupportsStreaming bool
+	IsLongRunning     bool
+	RequiresAuth      bool
+}
+
 // GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicAnalyzeRepositoryTool) GetCapabilities() contract.ToolCapabilities {
-	return contract.ToolCapabilities{
+func (t *AtomicAnalyzeRepositoryTool) GetCapabilities() ToolCapabilities {
+	return ToolCapabilities{
 		SupportsDryRun:    true,
 		SupportsStreaming: true,
 		IsLongRunning:     true,

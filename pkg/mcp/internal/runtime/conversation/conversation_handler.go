@@ -133,7 +133,7 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 		return response, nil
 	}
 
-	// Get user preferences to check auto-advance settings  
+	// Get user preferences to check auto-advance settings
 	var userPrefs types.UserPreferences = types.UserPreferences{
 		SkipConfirmations: false,
 	}

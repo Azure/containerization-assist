@@ -8,16 +8,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
+// LLMTransport interface for local use (to avoid import cycles)
+type LLMTransport interface {
+	SendPrompt(prompt string) (string, error)
+}
+
 // CallerAnalyzer forwards prompts to the hosting LLM via LLMTransport
 // This allows MCP tools to get AI reasoning without external dependencies
 type CallerAnalyzer struct {
-	transport      contract.LLMTransport
+	transport      LLMTransport
 	toolName       string
 	systemPreamble string
 	timeout        time.Duration
@@ -32,11 +36,11 @@ type CallerAnalyzerOpts struct {
 }
 
 // Ensure interface compliance at compile time.
-var _ types.AIAnalyzer = (*CallerAnalyzer)(nil)
-var _ types.AIAnalyzer = (*StubAnalyzer)(nil)
+var _ mcptypes.AIAnalyzer = (*CallerAnalyzer)(nil)
+var _ mcptypes.AIAnalyzer = (*StubAnalyzer)(nil)
 
 // NewCallerAnalyzer creates an analyzer that sends prompts back to the hosting LLM
-func NewCallerAnalyzer(transport contract.LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzer {
+func NewCallerAnalyzer(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzer {
 	if opts.ToolName == "" {
 		opts.ToolName = "chat"
 	}
@@ -135,8 +139,8 @@ func (c *CallerAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate s
 
 // GetTokenUsage implements AIAnalyzer interface
 // For MCP, we don't track token usage as the hosting LLM handles this
-func (c *CallerAnalyzer) GetTokenUsage() types.TokenUsage {
-	return types.TokenUsage{} // Always empty for MCP
+func (c *CallerAnalyzer) GetTokenUsage() mcptypes.TokenUsage {
+	return mcptypes.TokenUsage{} // Always empty for MCP
 }
 
 // ResetTokenUsage implements AIAnalyzer interface
@@ -169,8 +173,8 @@ func (s *StubAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate str
 }
 
 // GetTokenUsage implements AIAnalyzer interface
-func (s *StubAnalyzer) GetTokenUsage() types.TokenUsage {
-	return types.TokenUsage{}
+func (s *StubAnalyzer) GetTokenUsage() mcptypes.TokenUsage {
+	return mcptypes.TokenUsage{}
 }
 
 // ResetTokenUsage implements AIAnalyzer interface

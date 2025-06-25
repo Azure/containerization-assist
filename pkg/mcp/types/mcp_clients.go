@@ -1,12 +1,12 @@
 package types
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Azure/container-copilot/pkg/docker"
 	"github.com/Azure/container-copilot/pkg/k8s"
 	"github.com/Azure/container-copilot/pkg/kind"
-	analyzer "github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
 	"github.com/rs/zerolog"
 )
 
@@ -25,7 +25,7 @@ func NewMCPClients(docker docker.DockerClient, kind kind.KindRunner, kube k8s.Ku
 		Docker:   docker,
 		Kind:     kind,
 		Kube:     kube,
-		Analyzer: analyzer.NewStubAnalyzer(), // Default to stub - no external AI
+		Analyzer: &stubAnalyzer{}, // Default to stub - no external AI
 	}
 }
 
@@ -47,11 +47,38 @@ func (mc *MCPClients) ValidateAnalyzerForProduction(logger zerolog.Logger) error
 
 	// Check for known safe analyzer types
 	switch analyzerType {
-	case "*analyze.StubAnalyzer", "*analyze.CallerAnalyzer":
+	case "*types.stubAnalyzer", "*analyze.StubAnalyzer", "*analyze.CallerAnalyzer":
 		logger.Info().Str("analyzer_type", analyzerType).Msg("Using safe analyzer for production")
 		return nil
 	default:
 		logger.Warn().Str("analyzer_type", analyzerType).Msg("Unknown analyzer type - may not be safe for production")
 		return fmt.Errorf("analyzer type %s may not be safe for production", analyzerType)
 	}
+}
+
+// stubAnalyzer is a local stub implementation to avoid import cycles
+type stubAnalyzer struct{}
+
+// Analyze returns a basic stub response
+func (s *stubAnalyzer) Analyze(ctx context.Context, prompt string) (string, error) {
+	return "stub analysis result", nil
+}
+
+// AnalyzeWithFileTools returns a basic stub response
+func (s *stubAnalyzer) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+	return "stub analysis result", nil
+}
+
+// AnalyzeWithFormat returns a basic stub response
+func (s *stubAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
+	return "stub analysis result", nil
+}
+
+// GetTokenUsage returns empty usage
+func (s *stubAnalyzer) GetTokenUsage() TokenUsage {
+	return TokenUsage{}
+}
+
+// ResetTokenUsage does nothing for stub
+func (s *stubAnalyzer) ResetTokenUsage() {
 }

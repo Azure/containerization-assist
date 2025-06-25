@@ -175,7 +175,7 @@ type SecurityAnalysis struct {
 type AtomicValidateDockerfileTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
-	fixingMixin     *fixing.AtomicToolFixingMixin
+	// fixingMixin removed - functionality integrated directly
 	// dockerfileAdapter removed - functionality integrated directly
 	logger zerolog.Logger
 }

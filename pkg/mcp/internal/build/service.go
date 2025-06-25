@@ -135,7 +135,7 @@ func (s *ValidationService) ValidateJSON(content []byte, schemaName string) erro
 	// Basic JSON validation
 	var data interface{}
 	if err := json.Unmarshal(content, &data); err != nil {
-			return fmt.Errorf("invalid JSON: %v", err)
+		return fmt.Errorf("invalid JSON: %v", err)
 	}
 
 	// Schema validation if schema is registered
@@ -300,7 +300,7 @@ func (s *ValidationService) BatchValidate(ctx context.Context, items []Validatio
 		// TODO: Implement validator interface without runtime dependency
 		// For now, skip validation
 		_ = validatorInterface
-		
+
 		// Placeholder validation result
 		result.Results[item.ID] = &ValidationResult{
 			Valid: true,
