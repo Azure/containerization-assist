@@ -3,7 +3,6 @@ package orchestration
 import (
 	"context"
 	"time"
-
 )
 
 // ExecuteToolFunc is the signature for tool execution functions
@@ -16,12 +15,12 @@ type ExecuteToolFunc func(
 
 // ExecutionResult represents the result of executing tools
 type ExecutionResult struct {
-	Success   bool                        `json:"success"`
-	Results   map[string]interface{}      `json:"results"`
-	Artifacts []WorkflowArtifact `json:"artifacts"`
-	Metrics   map[string]interface{}      `json:"metrics"`
-	Duration  time.Duration               `json:"duration"`
-	Error     *ExecutionError             `json:"error,omitempty"`
+	Success   bool                   `json:"success"`
+	Results   map[string]interface{} `json:"results"`
+	Artifacts []WorkflowArtifact     `json:"artifacts"`
+	Metrics   map[string]interface{} `json:"metrics"`
+	Duration  time.Duration          `json:"duration"`
+	Error     *ExecutionError        `json:"error,omitempty"`
 }
 
 // ExecutionError provides detailed error information

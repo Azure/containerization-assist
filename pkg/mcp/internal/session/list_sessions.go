@@ -76,15 +76,6 @@ type SessionData struct {
 	Metadata       map[string]string
 }
 
-// SessionManagerStats is already defined in session_manager.go
-// type SessionManagerStats struct {
-// 	TotalSessions   int
-// 	ActiveSessions  int
-// 	ExpiredSessions int
-// 	TotalDiskUsage  int64
-// 	ServerStartTime time.Time
-// }
-
 // ListSessionsTool implements the list_sessions MCP tool
 type ListSessionsTool struct {
 	logger         zerolog.Logger

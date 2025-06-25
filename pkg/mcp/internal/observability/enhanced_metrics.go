@@ -12,10 +12,10 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// MetricsCollector provides enhanced metrics collection for MCP operations
-type MetricsCollector struct {
+// EnhancedMetricsCollector provides enhanced metrics collection for MCP operations
+type EnhancedMetricsCollector struct {
 	logger zerolog.Logger
-	config *config.ObservabilityConfig
+	config *types.ObservabilityConfig
 	meter  metric.Meter
 	mu     sync.RWMutex
 
@@ -44,11 +44,11 @@ type MetricsCollector struct {
 	customMetrics map[string]interface{}
 }
 
-// NewMetricsCollector creates a new enhanced metrics collector
-func NewMetricsCollector(logger zerolog.Logger, config *config.ObservabilityConfig) (*MetricsCollector, error) {
+// NewEnhancedMetricsCollector creates a new enhanced metrics collector
+func NewEnhancedMetricsCollector(logger zerolog.Logger, config *types.ObservabilityConfig) (*EnhancedMetricsCollector, error) {
 	meter := otel.Meter("container-copilot-mcp")
 
-	mc := &MetricsCollector{
+	mc := &EnhancedMetricsCollector{
 		logger:        logger.With().Str("component", "metrics").Logger(),
 		config:        config,
 		meter:         meter,
@@ -63,7 +63,7 @@ func NewMetricsCollector(logger zerolog.Logger, config *config.ObservabilityConf
 }
 
 // initializeMetrics creates all metric instruments
-func (mc *MetricsCollector) initializeMetrics() error {
+func (mc *EnhancedMetricsCollector) initializeMetrics() error {
 	var err error
 
 	// Tool execution metrics
@@ -227,7 +227,7 @@ func (mc *MetricsCollector) initializeMetrics() error {
 }
 
 // RecordToolExecution records a tool execution event
-func (mc *MetricsCollector) RecordToolExecution(ctx context.Context, toolName string, duration time.Duration, success bool, errorCode string) {
+func (mc *EnhancedMetricsCollector) RecordToolExecution(ctx context.Context, toolName string, duration time.Duration, success bool, errorCode string) {
 	labels := []attribute.KeyValue{
 		attribute.String("tool_name", toolName),
 		attribute.Bool("success", success),
@@ -261,7 +261,7 @@ func (mc *MetricsCollector) RecordToolExecution(ctx context.Context, toolName st
 }
 
 // RecordSessionStart records the start of a session
-func (mc *MetricsCollector) RecordSessionStart(ctx context.Context, sessionID string) {
+func (mc *EnhancedMetricsCollector) RecordSessionStart(ctx context.Context, sessionID string) {
 	labels := []attribute.KeyValue{
 		attribute.String("session_id", sessionID),
 	}
@@ -271,7 +271,7 @@ func (mc *MetricsCollector) RecordSessionStart(ctx context.Context, sessionID st
 }
 
 // RecordSessionEnd records the end of a session
-func (mc *MetricsCollector) RecordSessionEnd(ctx context.Context, sessionID string, duration time.Duration) {
+func (mc *EnhancedMetricsCollector) RecordSessionEnd(ctx context.Context, sessionID string, duration time.Duration) {
 	labels := []attribute.KeyValue{
 		attribute.String("session_id", sessionID),
 	}
@@ -281,7 +281,7 @@ func (mc *MetricsCollector) RecordSessionEnd(ctx context.Context, sessionID stri
 }
 
 // UpdateResourceUsage updates resource usage metrics
-func (mc *MetricsCollector) UpdateResourceUsage(ctx context.Context, resourceType string, usage float64) {
+func (mc *EnhancedMetricsCollector) UpdateResourceUsage(ctx context.Context, resourceType string, usage float64) {
 	labels := []attribute.KeyValue{
 		attribute.String("resource_type", resourceType),
 	}
@@ -290,14 +290,14 @@ func (mc *MetricsCollector) UpdateResourceUsage(ctx context.Context, resourceTyp
 }
 
 // UpdateSystemMetrics updates system-level performance metrics
-func (mc *MetricsCollector) UpdateSystemMetrics(ctx context.Context, memoryBytes int64, cpuRatio float64, diskBytes int64) {
+func (mc *EnhancedMetricsCollector) UpdateSystemMetrics(ctx context.Context, memoryBytes int64, cpuRatio float64, diskBytes int64) {
 	mc.memoryUsage.Record(ctx, memoryBytes)
 	mc.cpuUsage.Record(ctx, cpuRatio)
 	mc.diskUsage.Record(ctx, diskBytes)
 }
 
 // UpdateBusinessMetrics updates business-level metrics
-func (mc *MetricsCollector) UpdateBusinessMetrics(ctx context.Context, successRate, errorRate, throughput, p95Latency, p99Latency float64) {
+func (mc *EnhancedMetricsCollector) UpdateBusinessMetrics(ctx context.Context, successRate, errorRate, throughput, p95Latency, p99Latency float64) {
 	mc.successRate.Record(ctx, successRate)
 	mc.errorRate.Record(ctx, errorRate)
 	mc.throughput.Record(ctx, throughput)
@@ -306,7 +306,7 @@ func (mc *MetricsCollector) UpdateBusinessMetrics(ctx context.Context, successRa
 }
 
 // CreateCustomCounter creates a custom counter metric
-func (mc *MetricsCollector) CreateCustomCounter(name, description, unit string) (metric.Int64Counter, error) {
+func (mc *EnhancedMetricsCollector) CreateCustomCounter(name, description, unit string) (metric.Int64Counter, error) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -330,7 +330,7 @@ func (mc *MetricsCollector) CreateCustomCounter(name, description, unit string) 
 }
 
 // CreateCustomGauge creates a custom gauge metric
-func (mc *MetricsCollector) CreateCustomGauge(name, description, unit string) (metric.Float64Gauge, error) {
+func (mc *EnhancedMetricsCollector) CreateCustomGauge(name, description, unit string) (metric.Float64Gauge, error) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -354,7 +354,7 @@ func (mc *MetricsCollector) CreateCustomGauge(name, description, unit string) (m
 }
 
 // CreateCustomHistogram creates a custom histogram metric
-func (mc *MetricsCollector) CreateCustomHistogram(name, description, unit string, buckets []float64) (metric.Float64Histogram, error) {
+func (mc *EnhancedMetricsCollector) CreateCustomHistogram(name, description, unit string, buckets []float64) (metric.Float64Histogram, error) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -379,12 +379,12 @@ func (mc *MetricsCollector) CreateCustomHistogram(name, description, unit string
 }
 
 // GetMeter returns the OpenTelemetry meter for advanced usage
-func (mc *MetricsCollector) GetMeter() metric.Meter {
+func (mc *EnhancedMetricsCollector) GetMeter() metric.Meter {
 	return mc.meter
 }
 
 // Close performs cleanup when shutting down
-func (mc *MetricsCollector) Close() error {
+func (mc *EnhancedMetricsCollector) Close() error {
 	mc.logger.Info().Msg("Metrics collector shutting down")
 	return nil
 }

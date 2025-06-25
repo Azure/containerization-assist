@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	ai_context "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 )
 
 // BaseAIContextResult provides common AI context implementations for all atomic tool results

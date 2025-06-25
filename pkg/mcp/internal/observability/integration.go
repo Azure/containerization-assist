@@ -13,12 +13,12 @@ import (
 
 // ProfiledOrchestrator wraps an orchestrator with profiling capabilities
 type ProfiledOrchestrator struct {
-	orchestrator interface{}
+	orchestrator mcptypes.ToolOrchestrator
 	profiler     *ToolProfiler
 	logger       zerolog.Logger
 }
 
-// NOTE: Using unified interface{} interface instead of local ToolOrchestrator
+// NOTE: Using internal mcptypes.ToolOrchestrator interface to avoid import cycles
 
 // ProfiledExecutionResult wraps the execution result with profiling data
 type ProfiledExecutionResult struct {
@@ -29,7 +29,7 @@ type ProfiledExecutionResult struct {
 }
 
 // NewProfiledOrchestrator creates a new profiled orchestrator wrapper
-func NewProfiledOrchestrator(orchestrator interface{}, logger zerolog.Logger) *ProfiledOrchestrator {
+func NewProfiledOrchestrator(orchestrator mcptypes.ToolOrchestrator, logger zerolog.Logger) *ProfiledOrchestrator {
 	// Check if profiling is enabled via environment variable
 	enabled := true
 	if envVal := os.Getenv("MCP_PROFILING_ENABLED"); envVal != "" {
@@ -77,7 +77,7 @@ func (po *ProfiledOrchestrator) ExecuteTool(
 	}
 
 	// Execute the tool (validation happens internally)
-	result, err := po.orchestrator.ExecuteTool(ctx, toolName, args)
+	result, err := po.orchestrator.ExecuteTool(ctx, toolName, args, session)
 
 	// Record execution completion
 	success := err == nil

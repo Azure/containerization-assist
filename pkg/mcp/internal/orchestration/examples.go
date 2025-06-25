@@ -2,7 +2,6 @@ package orchestration
 
 import (
 	"time"
-
 )
 
 // GetExampleWorkflows returns a collection of example workflow specifications

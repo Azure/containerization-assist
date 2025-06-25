@@ -58,18 +58,6 @@ type ConversationContext struct {
 	UpdatedAt       time.Time              `json:"updated_at"`
 }
 
-// UserPreferences is already defined in common.go
-// type UserPreferences struct {
-// 	PreferredRegistry   string            `json:"preferred_registry,omitempty"`
-// 	PreferredNamespace  string            `json:"preferred_namespace,omitempty"`
-// 	DefaultOptimization string            `json:"default_optimization,omitempty"` // size, speed, security
-// 	SkipConfirmations   bool              `json:"skip_confirmations"`
-// 	VerboseOutput       bool              `json:"verbose_output"`
-// 	AutoCleanup         bool              `json:"auto_cleanup"`
-// 	CustomBuildArgs     map[string]string `json:"custom_build_args,omitempty"`
-// 	TargetPlatform      string            `json:"target_platform,omitempty"`
-// }
-
 // ProjectContext captures detected information about the project being containerized
 type ProjectContext struct {
 	Language           string            `json:"language,omitempty"`
@@ -165,20 +153,6 @@ type ContractValidationError struct {
 	Severity   string `json:"severity"` // "error", "warning"
 	Suggestion string `json:"suggestion,omitempty"`
 }
-
-// Conversation stages already defined in common.go
-// const (
-// 	StageWelcome    = "welcome"
-// 	StageAnalysis   = "analysis"
-// 	StageDockerfile = "dockerfile"
-// 	StageManifests  = "manifests"
-// 	StageBuild      = "build"
-// 	StageDeploy     = "deploy"
-// 	StageValidation = "validation"
-// 	StageCleanup    = "cleanup"
-// 	StageComplete   = "complete"
-// 	StageError      = "error"
-// )
 
 // Transition triggers
 const (

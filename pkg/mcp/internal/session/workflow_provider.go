@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
 )
 
 // WorkflowLabelProvider provides automatic workflow-related labels

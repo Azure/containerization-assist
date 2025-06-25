@@ -545,7 +545,7 @@ type SessionManagerStats struct {
 	TotalDiskUsage   int64     `json:"total_disk_usage_bytes"`
 	MaxSessions      int       `json:"max_sessions"`
 	TotalDiskLimit   int64     `json:"total_disk_limit_bytes"`
-	ServerStartTime  time.Time `json:"server_start_time,omitempty"`
+	ServerStartTime  time.Time `json:"server_start_time"`
 }
 
 // SessionFilters defines criteria for filtering sessions

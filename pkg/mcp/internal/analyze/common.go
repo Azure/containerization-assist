@@ -28,7 +28,7 @@ type AnalysisEngine interface {
 	GetName() string
 
 	// Analyze performs analysis on the repository
-	Analyze(ctx context.Context, config AnalysisConfig) (*AnalysisResult, error)
+	Analyze(ctx context.Context, config AnalysisConfig) (*EngineAnalysisResult, error)
 
 	// GetCapabilities returns what this engine can analyze
 	GetCapabilities() []string
@@ -45,8 +45,8 @@ type AnalysisConfig struct {
 	Logger         zerolog.Logger
 }
 
-// AnalysisOptions provides options for analysis
-type AnalysisOptions struct {
+// EngineAnalysisOptions provides options for analysis engines (renamed to avoid conflict with types.go)
+type EngineAnalysisOptions struct {
 	IncludeFrameworks    bool
 	IncludeDependencies  bool
 	IncludeConfiguration bool
@@ -56,8 +56,8 @@ type AnalysisOptions struct {
 	MaxDepth             int
 }
 
-// AnalysisResult represents the result from an analysis engine
-type AnalysisResult struct {
+// EngineAnalysisResult represents the result from an analysis engine (renamed to avoid conflict with types.go)
+type EngineAnalysisResult struct {
 	Engine     string
 	Success    bool
 	Duration   time.Duration
@@ -147,7 +147,7 @@ func (o *AnalysisOrchestrator) RegisterEngine(engine AnalysisEngine) {
 func (o *AnalysisOrchestrator) Analyze(ctx context.Context, config AnalysisConfig) (*CombinedAnalysisResult, error) {
 	result := &CombinedAnalysisResult{
 		StartTime:     time.Now(),
-		EngineResults: make(map[string]*AnalysisResult),
+		EngineResults: make(map[string]*EngineAnalysisResult),
 		AllFindings:   make([]Finding, 0),
 		Summary:       make(map[string]interface{}),
 	}
@@ -180,7 +180,7 @@ func (o *AnalysisOrchestrator) Analyze(ctx context.Context, config AnalysisConfi
 type CombinedAnalysisResult struct {
 	StartTime     time.Time
 	Duration      time.Duration
-	EngineResults map[string]*AnalysisResult
+	EngineResults map[string]*EngineAnalysisResult
 	AllFindings   []Finding
 	Summary       map[string]interface{}
 }

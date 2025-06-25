@@ -16,7 +16,7 @@ import (
 // SLOMonitor monitors Service Level Objectives and tracks error budget
 type SLOMonitor struct {
 	logger zerolog.Logger
-	config *config.ObservabilityConfig
+	config *types.ObservabilityConfig
 	meter  metric.Meter
 	mu     sync.RWMutex
 
@@ -72,7 +72,7 @@ type AlertState struct {
 }
 
 // NewSLOMonitor creates a new SLO monitor
-func NewSLOMonitor(logger zerolog.Logger, config *config.ObservabilityConfig) (*SLOMonitor, error) {
+func NewSLOMonitor(logger zerolog.Logger, config *types.ObservabilityConfig) (*SLOMonitor, error) {
 	meter := otel.Meter("container-copilot-mcp-slo")
 
 	monitor := &SLOMonitor{
@@ -470,7 +470,7 @@ func (sm *SLOMonitor) evaluateAlertCondition(condition string) bool {
 }
 
 // sendAlert sends alert notifications
-func (sm *SLOMonitor) sendAlert(rule config.AlertRule, state *AlertState) {
+func (sm *SLOMonitor) sendAlert(rule types.AlertRule, state *AlertState) {
 	// Implementation would send to configured channels
 	// For now, just log
 	sm.logger.Error().

@@ -367,14 +367,14 @@ func (tm *TelemetryManager) GetMetrics() (map[string]interface{}, error) {
 	return metrics, nil
 }
 
-// GetPerformanceReport generates a performance report
-func (tm *TelemetryManager) GetPerformanceReport() PerformanceReport {
+// GetSLOPerformanceReport generates a performance report
+func (tm *TelemetryManager) GetSLOPerformanceReport() SLOPerformanceReport {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
 	// Gather tool performance stats
 	// This is simplified - in production, you'd query Prometheus
-	report := PerformanceReport{
+	report := SLOPerformanceReport{
 		Timestamp:      time.Now(),
 		P95Target:      tm.p95Target,
 		ToolStats:      make(map[string]ToolPerformanceStats),
@@ -437,7 +437,7 @@ func (tm *TelemetryManager) monitorPerformance() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		report := tm.GetPerformanceReport()
+		report := tm.GetSLOPerformanceReport()
 		if report.ViolationCount > 0 {
 			tm.logger.Warn().
 				Int("violations", report.ViolationCount).
@@ -502,8 +502,8 @@ func (tm *TelemetryManager) UpdateOTELConfig(updates map[string]interface{}) {
 	}
 }
 
-// PerformanceReport represents a performance analysis report
-type PerformanceReport struct {
+// SLOPerformanceReport represents a performance analysis report
+type SLOPerformanceReport struct {
 	Timestamp      time.Time                       `json:"timestamp"`
 	P95Target      time.Duration                   `json:"p95_target"`
 	ToolStats      map[string]ToolPerformanceStats `json:"tool_stats"`

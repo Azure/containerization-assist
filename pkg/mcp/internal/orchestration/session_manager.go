@@ -391,11 +391,11 @@ func (sm *BoltWorkflowSessionManager) GetSessionMetrics() (*SessionMetrics, erro
 
 // SessionMetrics contains metrics about workflow sessions
 type SessionMetrics struct {
-	TotalSessions    int                             `json:"total_sessions"`
-	StatusCounts     map[WorkflowStatus]int `json:"status_counts"`
-	WorkflowCounts   map[string]int                  `json:"workflow_counts"`
-	AverageDurations map[string]time.Duration        `json:"average_durations"`
-	LastActivity     time.Time                       `json:"last_activity"`
+	TotalSessions    int                      `json:"total_sessions"`
+	StatusCounts     map[WorkflowStatus]int   `json:"status_counts"`
+	WorkflowCounts   map[string]int           `json:"workflow_counts"`
+	AverageDurations map[string]time.Duration `json:"average_durations"`
+	LastActivity     time.Time                `json:"last_activity"`
 }
 
 // labelsMatch checks if session labels match the filter labels

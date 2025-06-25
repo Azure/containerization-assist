@@ -18,14 +18,14 @@ import (
 // Operations implements mcptypes.PipelineOperations directly without adapter pattern
 type Operations struct {
 	sessionManager *session.SessionManager
-	clients        *adapter.MCPClients
+	clients        *mcptypes.MCPClients
 	logger         zerolog.Logger
 }
 
 // NewOperations creates a new pipeline operations implementation
 func NewOperations(
 	sessionManager *session.SessionManager,
-	clients *adapter.MCPClients,
+	clients *mcptypes.MCPClients,
 	logger zerolog.Logger,
 ) *Operations {
 	return &Operations{

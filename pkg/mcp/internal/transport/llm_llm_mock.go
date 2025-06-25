@@ -13,10 +13,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// MockLLMTransport implements both contract.LLMTransport and legacy SendPrompt for testing
+// MockLLMTransport implements both types.LLMTransport and legacy SendPrompt for testing
 type MockLLMTransport struct {
-	responses       map[string]contract.ToolInvocationResponse
-	promptResponses map[string]*contract.LLMResponse // For SendPrompt method
+	responses       map[string]types.ToolInvocationResponse
+	promptResponses map[string]*types.LLMResponse // For SendPrompt method
 	callHistory     []MockCall
 	simulateDelay   time.Duration
 	logger          zerolog.Logger
@@ -27,15 +27,15 @@ type MockCall struct {
 	CallType string // "tool" or "prompt"
 	ToolName string
 	Payload  map[string]any
-	Envelope *contract.PromptEnvelope // For SendPrompt calls
+	Envelope *types.PromptEnvelope // For SendPrompt calls
 	Stream   bool
 }
 
 // NewMockLLMTransport creates a new mock LLM transport
 func NewMockLLMTransport(logger zerolog.Logger) *MockLLMTransport {
 	return &MockLLMTransport{
-		responses:       make(map[string]contract.ToolInvocationResponse),
-		promptResponses: make(map[string]*contract.LLMResponse),
+		responses:       make(map[string]types.ToolInvocationResponse),
+		promptResponses: make(map[string]*types.LLMResponse),
 		callHistory:     make([]MockCall, 0),
 		logger:          logger.With().Str("component", "mock_llm_transport").Logger(),
 	}
@@ -47,12 +47,12 @@ func NewMockToolInvokerTransport(logger zerolog.Logger) *MockLLMTransport {
 }
 
 // SetResponse configures a canned response for a specific tool call
-func (m *MockLLMTransport) SetResponse(toolName string, response contract.ToolInvocationResponse) {
+func (m *MockLLMTransport) SetResponse(toolName string, response types.ToolInvocationResponse) {
 	m.responses[toolName] = response
 }
 
 // SetDefaultResponse sets a default response for all tool calls
-func (m *MockLLMTransport) SetDefaultResponse(response contract.ToolInvocationResponse) {
+func (m *MockLLMTransport) SetDefaultResponse(response types.ToolInvocationResponse) {
 	m.responses["*"] = response
 }
 
@@ -68,13 +68,13 @@ func (m *MockLLMTransport) GetCallHistory() []MockCall {
 
 // Reset clears all responses and call history
 func (m *MockLLMTransport) Reset() {
-	m.responses = make(map[string]contract.ToolInvocationResponse)
-	m.promptResponses = make(map[string]*contract.LLMResponse)
+	m.responses = make(map[string]types.ToolInvocationResponse)
+	m.promptResponses = make(map[string]*types.LLMResponse)
 	m.callHistory = make([]MockCall, 0)
 	m.simulateDelay = 0
 }
 
-// InvokeTool implements contract.LLMTransport
+// InvokeTool implements types.LLMTransport
 func (m *MockLLMTransport) InvokeTool(ctx context.Context, name string, payload map[string]any, stream bool) (<-chan json.RawMessage, error) {
 	m.logger.Debug().
 		Str("tool_name", name).
@@ -107,7 +107,7 @@ func (m *MockLLMTransport) InvokeTool(ctx context.Context, name string, payload 
 		}
 
 		// Look up response
-		var response contract.ToolInvocationResponse
+		var response types.ToolInvocationResponse
 		var found bool
 
 		// Try specific tool name first
@@ -160,7 +160,7 @@ func (m *MockLLMTransport) InvokeTool(ctx context.Context, name string, payload 
 }
 
 // generateDefaultResponse creates intelligent default responses for common scenarios
-func (m *MockLLMTransport) generateDefaultResponse(toolName string, payload map[string]any) contract.ToolInvocationResponse {
+func (m *MockLLMTransport) generateDefaultResponse(toolName string, payload map[string]any) types.ToolInvocationResponse {
 	message, _ := payload["message"].(string) //nolint:errcheck // Will use empty string if not present
 
 	// Generate contextual responses based on the message content
@@ -178,21 +178,21 @@ func (m *MockLLMTransport) generateDefaultResponse(toolName string, payload map[
 		content = fmt.Sprintf("Mock response for tool '%s': %s", toolName, strings.TrimSpace(message))
 	}
 
-	return contract.ToolInvocationResponse{
+	return types.ToolInvocationResponse{
 		Content: content,
 		Error:   "",
 	}
 }
 
 // SetPromptResponse configures a response for a specific stage/correlation ID
-func (m *MockLLMTransport) SetPromptResponse(key string, response *contract.LLMResponse) {
+func (m *MockLLMTransport) SetPromptResponse(key string, response *types.LLMResponse) {
 	m.promptResponses[key] = response
 }
 
 // SetPromptResponseFunc sets a function to generate responses dynamically
-func (m *MockLLMTransport) SetPromptResponseFunc(fn func(*contract.PromptEnvelope) *contract.LLMResponse) {
+func (m *MockLLMTransport) SetPromptResponseFunc(fn func(*types.PromptEnvelope) *types.LLMResponse) {
 	// Store as a special key that SendPrompt will check
-	m.promptResponses["_func_"] = &contract.LLMResponse{
+	m.promptResponses["_func_"] = &types.LLMResponse{
 		Metadata: map[string]interface{}{
 			"_responseFunc": fn,
 		},
@@ -200,7 +200,7 @@ func (m *MockLLMTransport) SetPromptResponseFunc(fn func(*contract.PromptEnvelop
 }
 
 // SendPrompt implements the legacy prompt-based interface for compatibility
-func (m *MockLLMTransport) SendPrompt(ctx context.Context, envelope *contract.PromptEnvelope) (*contract.LLMResponse, error) {
+func (m *MockLLMTransport) SendPrompt(ctx context.Context, envelope *types.PromptEnvelope) (*types.LLMResponse, error) {
 	m.logger.Debug().
 		Str("session_id", envelope.SessionID).
 		Str("stage", envelope.Stage).
@@ -225,7 +225,7 @@ func (m *MockLLMTransport) SendPrompt(ctx context.Context, envelope *contract.Pr
 
 	// Check for response function
 	if funcResp, ok := m.promptResponses["_func_"]; ok {
-		if fn, ok := funcResp.Metadata["_responseFunc"].(func(*contract.PromptEnvelope) *contract.LLMResponse); ok {
+		if fn, ok := funcResp.Metadata["_responseFunc"].(func(*types.PromptEnvelope) *types.LLMResponse); ok {
 			return fn(envelope), nil
 		}
 	}
@@ -252,22 +252,22 @@ func (m *MockLLMTransport) SendPrompt(ctx context.Context, envelope *contract.Pr
 }
 
 // generateDefaultPromptResponse creates stage-aware default responses
-func (m *MockLLMTransport) generateDefaultPromptResponse(envelope *contract.PromptEnvelope) *contract.LLMResponse {
-	response := &contract.LLMResponse{
+func (m *MockLLMTransport) generateDefaultPromptResponse(envelope *types.PromptEnvelope) *types.LLMResponse {
+	response := &types.LLMResponse{
 		CorrelationID: envelope.CorrelationID,
 		Timestamp:     time.Now(),
 		Confidence:    0.9,
 	}
 
 	switch envelope.Stage {
-	case contract.StageWelcome:
+	case types.StageWelcome:
 		response.ResponseMessage = "Welcome! Let's analyze your repository."
-		response.NextStage = contract.StageAnalysis
+		response.NextStage = types.StageAnalysis
 		response.RequiresInput = false
 
-	case contract.StageAnalysis:
+	case types.StageAnalysis:
 		response.ResponseMessage = "I'll analyze your repository structure and dependencies."
-		response.ToolCalls = []contract.ToolCall{
+		response.ToolCalls = []types.ToolCall{
 			{
 				ToolName:      "analyze_repository",
 				Arguments:     map[string]interface{}{"repo_url": "./"},
@@ -277,9 +277,9 @@ func (m *MockLLMTransport) generateDefaultPromptResponse(envelope *contract.Prom
 			},
 		}
 
-	case contract.StageDockerfile:
+	case types.StageDockerfile:
 		response.ResponseMessage = "I'll generate an optimized Dockerfile for your application."
-		response.ToolCalls = []contract.ToolCall{
+		response.ToolCalls = []types.ToolCall{
 			{
 				ToolName:      "generate_dockerfile",
 				Arguments:     map[string]interface{}{},
@@ -289,9 +289,9 @@ func (m *MockLLMTransport) generateDefaultPromptResponse(envelope *contract.Prom
 			},
 		}
 
-	case contract.StageBuild:
+	case types.StageBuild:
 		response.ResponseMessage = "Building your Docker image..."
-		response.ToolCalls = []contract.ToolCall{
+		response.ToolCalls = []types.ToolCall{
 			{
 				ToolName:      "build_image",
 				Arguments:     map[string]interface{}{"dry_run": false},
@@ -310,4 +310,4 @@ func (m *MockLLMTransport) generateDefaultPromptResponse(envelope *contract.Prom
 }
 
 // Ensure interface compliance
-var _ contract.LLMTransport = (*MockLLMTransport)(nil)
+var _ types.LLMTransport = (*MockLLMTransport)(nil)

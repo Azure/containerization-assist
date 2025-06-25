@@ -11,7 +11,6 @@ import (
 	"github.com/Azure/container-copilot/pkg/core/git"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcperror "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
@@ -55,18 +54,13 @@ type AtomicAnalysisResult struct {
 	TotalDuration    time.Duration `json:"total_duration"`
 
 	// Rich context for Claude reasoning
-	AnalysisContext *repository.AnalysisContext `json:"analysis_context"`
+	AnalysisContext *AnalysisContext `json:"analysis_context"`
 
 	// AI context for decision-making
 	ContainerizationAssessment *ContainerizationAssessment `json:"containerization_assessment"`
 }
 
-// Type aliases for backward compatibility - using local types from types.go
-// TODO: These should eventually be moved to a proper repository package
-// type ContainerizationAssessment = repository.ContainerizationAssessment
-// type TechnologyStackAssessment = repository.TechnologyStackAssessment
-// type ContainerizationRisk = repository.ContainerizationRisk
-// type DeploymentRecommendation = repository.DeploymentRecommendation
+// Note: ContainerizationAssessment and related types are defined in types.go
 
 // Uses interfaces from interfaces.go to avoid import cycles
 
@@ -172,7 +166,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		WorkspaceDir:               t.pipelineAdapter.GetSessionWorkspace(session.SessionID),
 		RepoURL:                    args.RepoURL,
 		Branch:                     args.Branch,
-		AnalysisContext:            &repository.AnalysisContext{},
+		AnalysisContext:            &AnalysisContext{},
 		ContainerizationAssessment: &ContainerizationAssessment{},
 	}
 
@@ -294,7 +288,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 			}
 
 			// Populate analysis context from cache
-			result.AnalysisContext = &repository.AnalysisContext{
+			result.AnalysisContext = &AnalysisContext{
 				FilesAnalyzed:               session.ScanSummary.FilesAnalyzed,
 				ConfigFilesFound:            session.ScanSummary.ConfigFilesFound,
 				EntryPointsFound:            session.ScanSummary.EntryPointsFound,
@@ -343,7 +337,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 	// Progress reporting removed
 
 	analysisStartTime := time.Now()
-	analysisOpts := repository.AnalysisOptions{
+	analysisOpts := AnalysisOptions{
 		RepoPath:     result.CloneDir,
 		Context:      args.Context,
 		LanguageHint: args.LanguageHint,
@@ -493,7 +487,7 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 	session := sessionInterface.(*sessiontypes.SessionState)
 
 	// Prepare clone options
-	cloneOpts := repository.CloneOptions{
+	cloneOpts := CloneOptions{
 		RepoURL:   args.RepoURL,
 		Branch:    args.Branch,
 		Shallow:   args.Shallow,

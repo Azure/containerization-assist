@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// HTTPLLMTransport implements contract.LLMTransport for HTTP transport
+// HTTPLLMTransport implements types.LLMTransport for HTTP transport
 // It can invoke tools back to the hosting LLM via HTTP requests
 type HTTPLLMTransport struct {
 	client  *http.Client
@@ -45,7 +45,7 @@ func NewHTTPLLMTransport(config HTTPLLMTransportConfig, logger zerolog.Logger) *
 	}
 }
 
-// InvokeTool implements contract.LLMTransport
+// InvokeTool implements types.LLMTransport
 // For HTTP, this means making an HTTP request to the hosting LLM
 func (h *HTTPLLMTransport) InvokeTool(ctx context.Context, name string, payload map[string]any, stream bool) (<-chan json.RawMessage, error) {
 	h.logger.Debug().
@@ -65,7 +65,7 @@ func (h *HTTPLLMTransport) InvokeTool(ctx context.Context, name string, payload 
 		if h.baseURL == "" {
 			h.logger.Error().Msg("Base URL not configured for HTTP LLM transport")
 
-			errorResponse := contract.ToolInvocationResponse{
+			errorResponse := types.ToolInvocationResponse{
 				Content: "",
 				Error:   "HTTP LLM transport not configured (missing base URL)",
 			}
@@ -111,7 +111,7 @@ func (h *HTTPLLMTransport) InvokeTool(ctx context.Context, name string, payload 
 		if err != nil {
 			h.logger.Error().Err(err).Msg("Failed to make HTTP request to hosting LLM")
 
-			errorResponse := contract.ToolInvocationResponse{
+			errorResponse := types.ToolInvocationResponse{
 				Content: "",
 				Error:   fmt.Sprintf("HTTP request failed: %v", err),
 			}
@@ -145,7 +145,7 @@ func (h *HTTPLLMTransport) InvokeTool(ctx context.Context, name string, payload 
 				Str("response", string(responseBytes)).
 				Msg("HTTP request returned error status")
 
-			errorResponse := contract.ToolInvocationResponse{
+			errorResponse := types.ToolInvocationResponse{
 				Content: "",
 				Error:   fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(responseBytes)),
 			}
@@ -175,4 +175,4 @@ func (h *HTTPLLMTransport) InvokeTool(ctx context.Context, name string, payload 
 }
 
 // Ensure interface compliance
-var _ contract.LLMTransport = (*HTTPLLMTransport)(nil)
+var _ types.LLMTransport = (*HTTPLLMTransport)(nil)
