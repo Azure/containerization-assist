@@ -13,7 +13,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/runner"
 )
 
@@ -37,7 +37,7 @@ type ConversationConfig struct {
 // ConversationComponents holds the conversation mode components
 type ConversationComponents struct {
 	Handler         *conversation.ConversationHandler // Concrete conversation handler
-	PreferenceStore *preference.PreferenceStore
+	PreferenceStore *utils.PreferenceStore
 	Telemetry       *ops.TelemetryManager
 }
 
@@ -51,7 +51,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 		prefsPath = filepath.Join(s.config.WorkspaceDir, "preferences.db")
 	}
 
-	preferenceStore, err := preference.NewPreferenceStore(prefsPath, s.logger, config.PreferencesEncryptionKey)
+	preferenceStore, err := utils.NewPreferenceStore(prefsPath, s.logger, config.PreferencesEncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to create preference store: %w", err)
 	}
@@ -176,7 +176,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 
 // Add these fields to the Server struct (in server.go):
 // conversationAdapter *conversation.ConversationAdapter
-// preferenceStore     *preference.PreferenceStore
+// preferenceStore     *utils.PreferenceStore
 // telemetry          *ops.TelemetryManager
 
 // ShutdownConversation gracefully shuts down conversation components

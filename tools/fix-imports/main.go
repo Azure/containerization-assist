@@ -10,7 +10,8 @@ import (
 // Fix import mappings based on actual migrations
 var fixMappings = map[string]string{
 	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session":        "github.com/Azure/container-copilot/pkg/mcp/internal/session",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types/session":        "github.com/Azure/container-copilot/pkg/mcp/internal/session",
+	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference":     "github.com/Azure/container-copilot/pkg/mcp/internal/utils",
+	"github.com/Azure/container-copilot/pkg/mcp/internal/store":                "github.com/Azure/container-copilot/pkg/mcp/internal/utils",
 	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze":              "github.com/Azure/container-copilot/pkg/mcp/internal/analyze",
 	"github.com/Azure/container-copilot/pkg/mcp/internal/scan":                 "github.com/Azure/container-copilot/pkg/mcp/internal/scan",
 	"github.com/Azure/container-copilot/pkg/mcp/internal/scan/scanners":        "github.com/Azure/container-copilot/pkg/mcp/internal/scan/scanners",

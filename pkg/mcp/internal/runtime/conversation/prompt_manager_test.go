@@ -8,7 +8,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ func TestNewPromptManager(t *testing.T) {
 
 	// Create preference store
 	tempDir := t.TempDir()
-	prefStore, err := preference.NewPreferenceStore(filepath.Join(tempDir, "prefs.db"), logger, "")
+	prefStore, err := utils.NewPreferenceStore(filepath.Join(tempDir, "prefs.db"), logger, "")
 	require.NoError(t, err)
 	defer prefStore.Close()
 
@@ -62,7 +62,7 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 
 	// Create preference store
 	tempDir := t.TempDir()
-	prefStore, err := preference.NewPreferenceStore(filepath.Join(tempDir, "prefs.db"), logger, "")
+	prefStore, err := utils.NewPreferenceStore(filepath.Join(tempDir, "prefs.db"), logger, "")
 	require.NoError(t, err)
 	defer prefStore.Close()
 
@@ -133,7 +133,7 @@ func TestPromptManagerErrorHandling(t *testing.T) {
 
 	// Create preference store
 	tempDir := t.TempDir()
-	prefStore, err := preference.NewPreferenceStore(filepath.Join(tempDir, "prefs.db"), logger, "")
+	prefStore, err := utils.NewPreferenceStore(filepath.Join(tempDir, "prefs.db"), logger, "")
 	require.NoError(t, err)
 	defer prefStore.Close()
 

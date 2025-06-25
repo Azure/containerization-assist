@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -18,7 +18,7 @@ type PromptManager struct {
 	sessionManager   *session.SessionManager
 	toolOrchestrator orchestration.ToolOrchestrator
 	preFlightChecker *obs.PreFlightChecker
-	preferenceStore  *preference.PreferenceStore
+	preferenceStore  *utils.PreferenceStore
 	retryManager     *SimpleRetryManager
 	logger           zerolog.Logger
 }
@@ -27,7 +27,7 @@ type PromptManager struct {
 type PromptManagerConfig struct {
 	SessionManager   *session.SessionManager
 	ToolOrchestrator orchestration.ToolOrchestrator
-	PreferenceStore  *preference.PreferenceStore
+	PreferenceStore  *utils.PreferenceStore
 	Logger           zerolog.Logger
 }
 

@@ -14,10 +14,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
 	stdioutils "github.com/Azure/container-copilot/pkg/mcp/internal/transport/stdio"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -58,7 +57,7 @@ func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 type Server struct {
 	config           ServerConfig
 	sessionManager   *session.SessionManager
-	workspaceManager *store.WorkspaceManager
+	workspaceManager *utils.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
 	transport        mcptypes.Transport
@@ -127,7 +126,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 
 	// Initialize workspace manager
-	workspaceManager, err := store.NewWorkspaceManager(store.WorkspaceConfig{
+	workspaceManager, err := utils.NewWorkspaceManager(utils.WorkspaceConfig{
 		BaseDir:           config.WorkspaceDir,
 		MaxSizePerSession: config.MaxDiskPerSession,
 		TotalMaxSize:      config.TotalDiskLimit,

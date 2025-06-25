@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
@@ -21,7 +21,7 @@ type ConversationHandler struct {
 	promptManager    *PromptManager
 	sessionManager   *session.SessionManager
 	toolOrchestrator orchestration.ToolOrchestrator
-	preferenceStore  *preference.PreferenceStore
+	preferenceStore  *utils.PreferenceStore
 	logger           zerolog.Logger
 }
 
@@ -29,7 +29,7 @@ type ConversationHandler struct {
 type ConversationHandlerConfig struct {
 	SessionManager     *session.SessionManager
 	SessionAdapter     *session.SessionManager // Pre-created session adapter for tools
-	PreferenceStore    *preference.PreferenceStore
+	PreferenceStore    *utils.PreferenceStore
 	PipelineOperations mcptypes.PipelineOperations        // Using interface instead of concrete adapter
 	ToolOrchestrator   *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
 	Transport          interface{}                        // Accept both mcptypes.Transport and internal transport.Transport

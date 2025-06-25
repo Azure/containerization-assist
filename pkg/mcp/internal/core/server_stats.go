@@ -5,7 +5,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 
@@ -13,7 +13,7 @@ import (
 type ServerStats struct {
 	Uptime          time.Duration                                 `json:"uptime"`
 	Sessions        *session.SessionManagerStats                  `json:"sessions"`
-	Workspace       *store.WorkspaceStats                         `json:"workspace"`
+	Workspace       *utils.WorkspaceStats                         `json:"workspace"`
 	CircuitBreakers map[string]*orchestration.CircuitBreakerStats `json:"circuit_breakers"`
 	Transport       string                                        `json:"transport"`
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
@@ -398,11 +398,11 @@ func createTestSessionManager(t *testing.T) *session.SessionManager {
 	return mgr
 }
 
-func createTestPreferenceStore(t *testing.T) *preference.PreferenceStore {
+func createTestPreferenceStore(t *testing.T) *utils.PreferenceStore {
 	tempDir := t.TempDir()
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 
-	store, err := preference.NewPreferenceStore(
+	store, err := utils.NewPreferenceStore(
 		tempDir+"/preferences.db",
 		logger,
 		"", // No encryption for tests

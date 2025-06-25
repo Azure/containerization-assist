@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
@@ -88,7 +88,7 @@ func NewUnifiedMCPServer(
 
 	// Initialize chat components if needed
 	if mode == ModeDual || mode == ModeChat {
-		preferenceStore, err := preference.NewPreferenceStore("/tmp/mcp-preferences.db", logger, "")
+		preferenceStore, err := utils.NewPreferenceStore("/tmp/mcp-preferences.db", logger, "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create preference store: %w", err)
 		}

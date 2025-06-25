@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	internalutils "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -234,14 +234,14 @@ func TestConversationComponents(t *testing.T) {
 
 	t.Run("PreferenceStore", func(t *testing.T) {
 		prefsPath := filepath.Join(tmpDir, "preferences.db")
-		preferenceStore, err := preference.NewPreferenceStore(prefsPath, logger, "")
+		preferenceStore, err := internalutils.NewPreferenceStore(prefsPath, logger, "")
 		require.NoError(t, err)
 		defer preferenceStore.Close()
 
 		userID := "test-user-123"
 
 		// Test storing and retrieving preferences
-		prefs := &preference.GlobalPreferences{
+		prefs := &internalutils.GlobalPreferences{
 			UserID:              userID,
 			DefaultOptimization: "size",
 			DefaultNamespace:    "test-namespace",

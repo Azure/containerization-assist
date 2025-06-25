@@ -11,10 +11,9 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/tools"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -228,7 +227,7 @@ func TestConversationStages(t *testing.T) {
 	require.NoError(t, err)
 	defer sessionManager.Stop()
 
-	preferenceStore, err := preference.NewPreferenceStore(
+	preferenceStore, err := utils.NewPreferenceStore(
 		filepath.Join(tmpDir, "preferences.db"),
 		logger,
 		"", // empty encryption passphrase for test
