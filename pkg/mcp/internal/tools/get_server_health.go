@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -113,8 +114,19 @@ func NewGetServerHealthTool(logger zerolog.Logger, healthChecker HealthChecker) 
 	}
 }
 
-// Execute checks and returns server health status
-func (t *GetServerHealthTool) Execute(ctx context.Context, args GetServerHealthArgs) (*GetServerHealthResult, error) {
+// Execute implements the unified Tool interface
+func (t *GetServerHealthTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	healthArgs, ok := args.(GetServerHealthArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected GetServerHealthArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, healthArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *GetServerHealthTool) ExecuteTyped(ctx context.Context, args GetServerHealthArgs) (*GetServerHealthResult, error) {
 	t.logger.Info().
 		Bool("include_details", args.IncludeDetails).
 		Msg("Checking server health")
@@ -245,4 +257,96 @@ func (t *GetServerHealthTool) calculateOverallStatus(
 	}
 
 	return status, warnings
+}
+
+// GetMetadata returns comprehensive metadata about the server health tool
+func (t *GetServerHealthTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "get_server_health",
+		Description: "Check comprehensive server health including resources, services, and circuit breakers",
+		Version:     "1.0.0",
+		Category:    "Monitoring",
+		Dependencies: []string{
+			"Health Checker",
+			"System Monitor",
+			"Circuit Breakers",
+			"Service Health Checks",
+		},
+		Capabilities: []string{
+			"System resource monitoring",
+			"Session health tracking",
+			"Circuit breaker status",
+			"External service health",
+			"Job queue monitoring",
+			"Error tracking",
+			"Overall health assessment",
+		},
+		Requirements: []string{
+			"Health checker instance",
+			"System monitoring access",
+		},
+		Parameters: map[string]string{
+			"include_details": "Optional: Include detailed metrics and recent errors",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic health check",
+				Description: "Get basic server health status",
+				Input: map[string]interface{}{},
+				Output: map[string]interface{}{
+					"status":          "healthy",
+					"uptime":          "24h30m",
+					"system_resources": map[string]interface{}{
+						"memory_percent": 45.2,
+						"disk_percent":   25.8,
+						"cpu_count":      8,
+					},
+					"sessions": map[string]interface{}{
+						"active_sessions": 12,
+						"total_sessions":  15,
+						"sessions_percent": 80.0,
+					},
+					"warnings": []string{},
+				},
+			},
+			{
+				Name:        "Detailed health check with warnings",
+				Description: "Get detailed health status including recent errors",
+				Input: map[string]interface{}{
+					"include_details": true,
+				},
+				Output: map[string]interface{}{
+					"status": "degraded",
+					"uptime": "12h15m",
+					"warnings": []string{
+						"High memory usage: 92.1%",
+						"Circuit breaker docker_registry is open",
+					},
+					"recent_errors": []map[string]interface{}{
+						{
+							"timestamp": "2024-12-17T10:30:00Z",
+							"tool":      "build_image",
+							"error":     "Docker daemon connection failed",
+							"count":     3,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the server health tool
+func (t *GetServerHealthTool) Validate(ctx context.Context, args interface{}) error {
+	_, ok := args.(GetServerHealthArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected GetServerHealthArgs, got %T", args)
+	}
+
+	// Validate health checker is available
+	if t.healthChecker == nil {
+		return fmt.Errorf("health checker is not configured")
+	}
+
+	return nil
 }

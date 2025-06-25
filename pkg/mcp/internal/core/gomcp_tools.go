@@ -399,7 +399,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				deps.Logger.With().Str("resource", "logs").Logger(),
 				logProvider,
 			)
-			return logsTool.Execute(context.Background(), toolArgs)
+			return logsTool.ExecuteTyped(context.Background(), toolArgs)
 		})
 
 	// Simplified logs resource for direct access
@@ -429,7 +429,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				deps.Logger.With().Str("resource", "logs").Logger(),
 				logProvider,
 			)
-			return logsTool.Execute(context.Background(), toolArgs)
+			return logsTool.ExecuteTyped(context.Background(), toolArgs)
 		})
 
 	// Session label management tools - using standardized utility registration
@@ -443,7 +443,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				deps.Logger.With().Str("tool", "add_session_label").Logger(),
 				sessionLabelManager,
 			)
-			return addLabelTool.Execute(context.Background(), *args)
+			return addLabelTool.ExecuteTyped(context.Background(), *args)
 		})
 
 	tools.RegisterSimpleTool(registrar, "remove_session_label",
@@ -453,7 +453,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				deps.Logger.With().Str("tool", "remove_session_label").Logger(),
 				sessionLabelManager,
 			)
-			return removeLabelTool.Execute(context.Background(), *args)
+			return removeLabelTool.ExecuteTyped(context.Background(), *args)
 		})
 
 	tools.RegisterSimpleTool(registrar, "update_session_labels",
@@ -463,7 +463,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				deps.Logger.With().Str("tool", "update_session_labels").Logger(),
 				sessionLabelManager,
 			)
-			return updateLabelsTool.Execute(context.Background(), *args)
+			return updateLabelsTool.ExecuteTyped(context.Background(), *args)
 		})
 
 	tools.RegisterSimpleTool(registrar, "list_session_labels",
@@ -473,7 +473,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 				deps.Logger.With().Str("tool", "list_session_labels").Logger(),
 				sessionLabelManager,
 			)
-			return listLabelsTool.Execute(context.Background(), *args)
+			return listLabelsTool.ExecuteTyped(context.Background(), *args)
 		})
 
 	// Telemetry Resource (if enabled)
@@ -505,7 +505,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 					deps.Logger.With().Str("resource", "telemetry").Logger(),
 					deps.Server.conversationComponents.Telemetry,
 				)
-				return telemetryTool.Execute(context.Background(), toolArgs)
+				return telemetryTool.ExecuteTyped(context.Background(), toolArgs)
 			})
 
 		// Metrics by specific name pattern
@@ -531,7 +531,7 @@ func (gm *GomcpManager) registerResources(registrar *tools.StandardToolRegistrar
 					deps.Logger.With().Str("resource", "telemetry").Logger(),
 					deps.Server.conversationComponents.Telemetry,
 				)
-				return telemetryTool.Execute(context.Background(), toolArgs)
+				return telemetryTool.ExecuteTyped(context.Background(), toolArgs)
 			})
 	}
 

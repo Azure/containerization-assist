@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -86,8 +87,19 @@ func NewGetLogsTool(logger zerolog.Logger, logProvider LogProvider) *GetLogsTool
 	}
 }
 
-// Execute retrieves server logs based on the provided filters
-func (t *GetLogsTool) Execute(ctx context.Context, args GetLogsArgs) (*GetLogsResult, error) {
+// Execute implements the unified Tool interface
+func (t *GetLogsTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	logsArgs, ok := args.(GetLogsArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected GetLogsArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, logsArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *GetLogsTool) ExecuteTyped(ctx context.Context, args GetLogsArgs) (*GetLogsResult, error) {
 	t.logger.Info().
 		Str("level", args.Level).
 		Str("time_range", args.TimeRange).
@@ -194,4 +206,142 @@ func CreateGlobalLogProvider() LogProvider {
 		buffer = utils.GetGlobalLogBuffer()
 	}
 	return NewRingBufferLogProvider(buffer)
+}
+
+// GetMetadata returns comprehensive metadata about the get logs tool
+func (t *GetLogsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "get_logs",
+		Description: "Retrieve server logs with filtering, pattern matching, and format options",
+		Version:     "1.0.0",
+		Category:    "Monitoring",
+		Dependencies: []string{
+			"Log Provider",
+			"Ring Buffer",
+			"Log Capture System",
+		},
+		Capabilities: []string{
+			"Log retrieval",
+			"Level filtering",
+			"Time range filtering",
+			"Pattern matching",
+			"Format conversion",
+			"Entry limiting",
+			"Caller information",
+		},
+		Requirements: []string{
+			"Log provider instance",
+			"Log capture enabled",
+		},
+		Parameters: map[string]string{
+			"level":           "Optional: Minimum log level (trace, debug, info, warn, error)",
+			"time_range":      "Optional: Time range filter (e.g. '5m', '1h', '24h')",
+			"pattern":         "Optional: Pattern to search for in logs",
+			"limit":           "Optional: Maximum number of log entries (default: 100)",
+			"format":          "Optional: Output format (json, text)",
+			"include_callers": "Optional: Include caller information (default: false)",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Get recent error logs",
+				Description: "Retrieve error-level logs from the last hour",
+				Input: map[string]interface{}{
+					"level":      "error",
+					"time_range": "1h",
+					"limit":      50,
+				},
+				Output: map[string]interface{}{
+					"logs": []map[string]interface{}{
+						{
+							"timestamp": "2024-12-17T10:30:00Z",
+							"level":     "error",
+							"message":   "Failed to connect to Docker daemon",
+							"component": "docker_client",
+						},
+					},
+					"total_count":    1000,
+					"filtered_count": 15,
+					"time_range":     "1h",
+					"format":         "json",
+				},
+			},
+			{
+				Name:        "Search for specific pattern in text format",
+				Description: "Find logs containing 'build_image' pattern in text format",
+				Input: map[string]interface{}{
+					"pattern":         "build_image",
+					"format":          "text",
+					"include_callers": true,
+					"limit":           25,
+				},
+				Output: map[string]interface{}{
+					"log_text":       "2024-12-17T10:30:00Z INFO Starting build_image operation caller=tools/build_image.go:45\n...",
+					"total_count":    1000,
+					"filtered_count": 8,
+					"format":         "text",
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the get logs tool
+func (t *GetLogsTool) Validate(ctx context.Context, args interface{}) error {
+	logsArgs, ok := args.(GetLogsArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected GetLogsArgs, got %T", args)
+	}
+
+	// Validate log level
+	if logsArgs.Level != "" {
+		validLevels := map[string]bool{
+			"trace": true,
+			"debug": true,
+			"info":  true,
+			"warn":  true,
+			"error": true,
+		}
+		if !validLevels[logsArgs.Level] {
+			return fmt.Errorf("invalid level: %s (valid values: trace, debug, info, warn, error)", logsArgs.Level)
+		}
+	}
+
+	// Validate format
+	if logsArgs.Format != "" {
+		validFormats := map[string]bool{
+			"json": true,
+			"text": true,
+		}
+		if !validFormats[logsArgs.Format] {
+			return fmt.Errorf("invalid format: %s (valid values: json, text)", logsArgs.Format)
+		}
+	}
+
+	// Validate limit
+	if logsArgs.Limit < 0 {
+		return fmt.Errorf("limit cannot be negative")
+	}
+	if logsArgs.Limit > 10000 {
+		return fmt.Errorf("limit cannot exceed 10,000 entries")
+	}
+
+	// Validate time range format if provided
+	if logsArgs.TimeRange != "" {
+		_, err := time.ParseDuration(logsArgs.TimeRange)
+		if err != nil {
+			return fmt.Errorf("invalid time_range format: %v (use duration format like '5m', '1h', '24h')", err)
+		}
+	}
+
+	// Validate pattern length
+	if len(logsArgs.Pattern) > 500 {
+		return fmt.Errorf("pattern is too long (max 500 characters)")
+	}
+
+	// Validate log provider is available
+	if t.logProvider == nil {
+		return fmt.Errorf("log provider is not configured")
+	}
+
+	return nil
 }

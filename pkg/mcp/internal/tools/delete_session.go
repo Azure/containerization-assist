@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -59,8 +60,19 @@ func NewDeleteSessionTool(logger zerolog.Logger, sessionManager SessionDeleter, 
 	}
 }
 
-// Execute deletes a session and optionally its workspace
-func (t *DeleteSessionTool) Execute(ctx context.Context, args DeleteSessionArgs) (*DeleteSessionResult, error) {
+// Execute implements the unified Tool interface
+func (t *DeleteSessionTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	deleteArgs, ok := args.(DeleteSessionArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected DeleteSessionArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, deleteArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *DeleteSessionTool) ExecuteTyped(ctx context.Context, args DeleteSessionArgs) (*DeleteSessionResult, error) {
 	t.logger.Info().
 		Str("session_id", args.SessionID).
 		Bool("force", args.Force).
@@ -164,4 +176,100 @@ func (t *DeleteSessionTool) Execute(ctx context.Context, args DeleteSessionArgs)
 		Msg("Session deleted successfully")
 
 	return result, nil
+}
+
+// GetMetadata returns comprehensive metadata about the delete session tool
+func (t *DeleteSessionTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "delete_session",
+		Description: "Delete a session and optionally its workspace with safety checks",
+		Version:     "1.0.0",
+		Category:    "Session Management",
+		Dependencies: []string{
+			"Session Manager",
+			"Workspace Manager",
+			"Job Manager",
+		},
+		Capabilities: []string{
+			"Session deletion",
+			"Workspace cleanup",
+			"Job cancellation",
+			"Force deletion",
+			"Disk space reclamation",
+			"Safety validation",
+		},
+		Requirements: []string{
+			"Valid session ID",
+			"Session manager access",
+			"Workspace manager access",
+		},
+		Parameters: map[string]string{
+			"session_id":        "Required: The session ID to delete",
+			"force":             "Optional: Force deletion even if jobs are running",
+			"delete_workspace":  "Optional: Also delete the workspace directory",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Delete inactive session",
+				Description: "Delete a session with no active jobs",
+				Input: map[string]interface{}{
+					"session_id": "session-123",
+				},
+				Output: map[string]interface{}{
+					"session_id":        "session-123",
+					"deleted":           true,
+					"workspace_deleted": false,
+					"jobs_cancelled":    []string{},
+					"disk_reclaimed":    0,
+					"message":           "Session session-123 deleted successfully",
+				},
+			},
+			{
+				Name:        "Force delete with workspace cleanup",
+				Description: "Force delete a session with active jobs and clean up workspace",
+				Input: map[string]interface{}{
+					"session_id":       "session-456",
+					"force":            true,
+					"delete_workspace": true,
+				},
+				Output: map[string]interface{}{
+					"session_id":        "session-456",
+					"deleted":           true,
+					"workspace_deleted": true,
+					"jobs_cancelled":    []string{"job-789", "job-790"},
+					"disk_reclaimed":    1048576,
+					"message":           "Session session-456 deleted successfully",
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the delete session tool
+func (t *DeleteSessionTool) Validate(ctx context.Context, args interface{}) error {
+	deleteArgs, ok := args.(DeleteSessionArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected DeleteSessionArgs, got %T", args)
+	}
+
+	// Validate required fields
+	if deleteArgs.SessionID == "" {
+		return fmt.Errorf("session_id is required and cannot be empty")
+	}
+
+	// Validate session ID format
+	if len(deleteArgs.SessionID) < 3 || len(deleteArgs.SessionID) > 100 {
+		return fmt.Errorf("session_id must be between 3 and 100 characters")
+	}
+
+	// Validate managers are available
+	if t.sessionManager == nil {
+		return fmt.Errorf("session manager is not configured")
+	}
+
+	if t.workspaceManager == nil && deleteArgs.DeleteWorkspace {
+		return fmt.Errorf("workspace manager is not configured but delete_workspace is requested")
+	}
+
+	return nil
 }

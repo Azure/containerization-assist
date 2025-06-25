@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -98,8 +99,19 @@ func NewListSessionsTool(logger zerolog.Logger, sessionManager ListSessionsManag
 	}
 }
 
-// Execute lists all sessions with filtering and sorting
-func (t *ListSessionsTool) Execute(ctx context.Context, args ListSessionsArgs) (*ListSessionsResult, error) {
+// Execute implements the unified Tool interface
+func (t *ListSessionsTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	listArgs, ok := args.(ListSessionsArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected ListSessionsArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, listArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *ListSessionsTool) ExecuteTyped(ctx context.Context, args ListSessionsArgs) (*ListSessionsResult, error) {
 	t.logger.Info().
 		Str("status", args.Status).
 		Strs("labels", args.Labels).
@@ -319,4 +331,156 @@ func (t *ListSessionsTool) sortSessions(sessions []*SessionData, sortBy, sortOrd
 			}
 		}
 	}
+}
+
+// GetMetadata returns comprehensive metadata about the list sessions tool
+func (t *ListSessionsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "list_sessions",
+		Description: "List and filter active sessions with detailed statistics and sorting options",
+		Version:     "1.0.0",
+		Category:    "Session Management",
+		Dependencies: []string{
+			"Session Manager",
+			"Session Storage",
+		},
+		Capabilities: []string{
+			"Session enumeration",
+			"Multi-criteria filtering",
+			"Flexible sorting",
+			"Status-based filtering",
+			"Label-based filtering",
+			"Repository filtering",
+			"Statistics reporting",
+		},
+		Requirements: []string{
+			"Session manager instance",
+			"Session storage access",
+		},
+		Parameters: map[string]string{
+			"status":     "Optional: Filter by status (active, expired, all)",
+			"labels":     "Optional: Sessions must have ALL these labels",
+			"any_label":  "Optional: Sessions must have ANY of these labels",
+			"repo_url":   "Optional: Filter by repository URL",
+			"limit":      "Optional: Maximum sessions to return (default: 100)",
+			"sort_by":    "Optional: Sort field (created, updated, disk_usage, labels)",
+			"sort_order": "Optional: Sort order (asc, desc)",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "List all active sessions",
+				Description: "Get all currently active sessions",
+				Input: map[string]interface{}{
+					"status": "active",
+					"limit":  50,
+				},
+				Output: map[string]interface{}{
+					"sessions": []map[string]interface{}{
+						{
+							"session_id":      "session-123",
+							"status":          "active",
+							"created_at":      "2024-12-17T10:00:00Z",
+							"updated_at":      "2024-12-17T10:30:00Z",
+							"disk_usage":      1024000,
+							"workspace_path":  "/workspaces/session-123",
+							"active_jobs":     2,
+							"labels":          []string{"development", "nodejs"},
+						},
+					},
+					"total_sessions":   10,
+					"active_count":     5,
+					"expired_count":    3,
+					"total_disk_used":  10240000,
+					"server_uptime":    "24h30m",
+				},
+			},
+			{
+				Name:        "Filter by labels and repository",
+				Description: "Find sessions with specific labels and repository",
+				Input: map[string]interface{}{
+					"labels":   []string{"production", "backend"},
+					"repo_url": "https://github.com/company/api-service",
+					"sort_by":  "updated",
+				},
+				Output: map[string]interface{}{
+					"sessions": []map[string]interface{}{
+						{
+							"session_id":     "session-456",
+							"status":         "active",
+							"labels":         []string{"production", "backend", "api"},
+							"repo_url":       "https://github.com/company/api-service",
+							"workspace_path": "/workspaces/session-456",
+						},
+					},
+					"total_sessions":  1,
+					"active_count":    1,
+					"expired_count":   0,
+					"total_disk_used": 5120000,
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the list sessions tool
+func (t *ListSessionsTool) Validate(ctx context.Context, args interface{}) error {
+	listArgs, ok := args.(ListSessionsArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected ListSessionsArgs, got %T", args)
+	}
+
+	// Validate status filter
+	if listArgs.Status != "" {
+		validStatuses := map[string]bool{
+			"active":  true,
+			"expired": true,
+			"all":     true,
+			"idle":    true,
+		}
+		if !validStatuses[listArgs.Status] {
+			return fmt.Errorf("invalid status filter: %s (valid values: active, expired, idle, all)", listArgs.Status)
+		}
+	}
+
+	// Validate limit
+	if listArgs.Limit < 0 {
+		return fmt.Errorf("limit cannot be negative")
+	}
+	if listArgs.Limit > 1000 {
+		return fmt.Errorf("limit cannot exceed 1000")
+	}
+
+	// Validate sort_by
+	if listArgs.SortBy != "" {
+		validSortFields := map[string]bool{
+			"created":    true,
+			"updated":    true,
+			"disk_usage": true,
+			"labels":     true,
+		}
+		if !validSortFields[listArgs.SortBy] {
+			return fmt.Errorf("invalid sort_by field: %s (valid values: created, updated, disk_usage, labels)", listArgs.SortBy)
+		}
+	}
+
+	// Validate sort_order
+	if listArgs.SortOrder != "" {
+		if listArgs.SortOrder != "asc" && listArgs.SortOrder != "desc" {
+			return fmt.Errorf("invalid sort_order: %s (valid values: asc, desc)", listArgs.SortOrder)
+		}
+	}
+
+	// Validate repository URL format
+	if listArgs.RepoURL != "" {
+		if len(listArgs.RepoURL) < 10 || len(listArgs.RepoURL) > 500 {
+			return fmt.Errorf("repo_url length must be between 10 and 500 characters")
+		}
+	}
+
+	// Validate session manager is available
+	if t.sessionManager == nil {
+		return fmt.Errorf("session manager is not configured")
+	}
+
+	return nil
 }

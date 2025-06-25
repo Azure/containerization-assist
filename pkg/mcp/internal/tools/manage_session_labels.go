@@ -2,9 +2,11 @@ package tools
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -113,8 +115,19 @@ func NewAddSessionLabelTool(logger zerolog.Logger, sessionManager SessionLabelMa
 	}
 }
 
-// Execute adds a label to a session
-func (t *AddSessionLabelTool) Execute(ctx context.Context, args AddSessionLabelArgs) (*AddSessionLabelResult, error) {
+// Execute implements the unified Tool interface
+func (t *AddSessionLabelTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	addArgs, ok := args.(AddSessionLabelArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected AddSessionLabelArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, addArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *AddSessionLabelTool) ExecuteTyped(ctx context.Context, args AddSessionLabelArgs) (*AddSessionLabelResult, error) {
 	targetSessionID := args.TargetSessionID
 	if targetSessionID == "" {
 		targetSessionID = args.SessionID
@@ -191,8 +204,19 @@ func NewRemoveSessionLabelTool(logger zerolog.Logger, sessionManager SessionLabe
 	}
 }
 
-// Execute removes a label from a session
-func (t *RemoveSessionLabelTool) Execute(ctx context.Context, args RemoveSessionLabelArgs) (*RemoveSessionLabelResult, error) {
+// Execute implements the unified Tool interface
+func (t *RemoveSessionLabelTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	removeArgs, ok := args.(RemoveSessionLabelArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected RemoveSessionLabelArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, removeArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *RemoveSessionLabelTool) ExecuteTyped(ctx context.Context, args RemoveSessionLabelArgs) (*RemoveSessionLabelResult, error) {
 	targetSessionID := args.TargetSessionID
 	if targetSessionID == "" {
 		targetSessionID = args.SessionID
@@ -269,8 +293,19 @@ func NewUpdateSessionLabelsTool(logger zerolog.Logger, sessionManager SessionLab
 	}
 }
 
-// Execute updates all labels on a session
-func (t *UpdateSessionLabelsTool) Execute(ctx context.Context, args UpdateSessionLabelsArgs) (*UpdateSessionLabelsResult, error) {
+// Execute implements the unified Tool interface
+func (t *UpdateSessionLabelsTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	updateArgs, ok := args.(UpdateSessionLabelsArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected UpdateSessionLabelsArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, updateArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *UpdateSessionLabelsTool) ExecuteTyped(ctx context.Context, args UpdateSessionLabelsArgs) (*UpdateSessionLabelsResult, error) {
 	targetSessionID := args.TargetSessionID
 	if targetSessionID == "" {
 		targetSessionID = args.SessionID
@@ -352,8 +387,19 @@ func NewListSessionLabelsTool(logger zerolog.Logger, sessionManager SessionLabel
 	}
 }
 
-// Execute lists all labels across sessions with optional usage statistics
-func (t *ListSessionLabelsTool) Execute(ctx context.Context, args ListSessionLabelsArgs) (*ListSessionLabelsResult, error) {
+// Execute implements the unified Tool interface
+func (t *ListSessionLabelsTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	listArgs, ok := args.(ListSessionLabelsArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected ListSessionLabelsArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, listArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *ListSessionLabelsTool) ExecuteTyped(ctx context.Context, args ListSessionLabelsArgs) (*ListSessionLabelsResult, error) {
 	t.logger.Info().
 		Bool("include_count", args.IncludeCount).
 		Msg("Listing session labels")
@@ -404,4 +450,278 @@ func (t *ListSessionLabelsTool) Execute(ctx context.Context, args ListSessionLab
 		Msg("Labels listed successfully")
 
 	return result, nil
+}
+
+// GetMetadata returns comprehensive metadata about the add session label tool
+func (t *AddSessionLabelTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "add_session_label",
+		Description: "Add a label to a session for categorization and filtering",
+		Version:     "1.0.0",
+		Category:    "Session Management",
+		Dependencies: []string{
+			"Session Manager",
+			"Label Manager",
+		},
+		Capabilities: []string{
+			"Label addition",
+			"Session targeting",
+			"Label validation",
+			"Duplicate prevention",
+		},
+		Requirements: []string{
+			"Valid session ID",
+			"Non-empty label",
+			"Session manager access",
+		},
+		Parameters: map[string]string{
+			"target_session_id": "Optional: Target session ID (default: current session)",
+			"label":             "Required: Label to add to the session",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Add development label",
+				Description: "Add a development label to current session",
+				Input: map[string]interface{}{
+					"label": "development",
+				},
+				Output: map[string]interface{}{
+					"success":           true,
+					"target_session_id": "session-123",
+					"label":             "development",
+					"all_labels":        []string{"development"},
+					"message":           "Successfully added label 'development' to session session-123",
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the add session label tool
+func (t *AddSessionLabelTool) Validate(ctx context.Context, args interface{}) error {
+	addArgs, ok := args.(AddSessionLabelArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected AddSessionLabelArgs, got %T", args)
+	}
+
+	// Validate label
+	if strings.TrimSpace(addArgs.Label) == "" {
+		return fmt.Errorf("label is required and cannot be empty")
+	}
+
+	if len(addArgs.Label) > 100 {
+		return fmt.Errorf("label is too long (max 100 characters)")
+	}
+
+	// Validate session manager is available
+	if t.sessionManager == nil {
+		return fmt.Errorf("session manager is not configured")
+	}
+
+	return nil
+}
+
+// GetMetadata returns comprehensive metadata about the remove session label tool
+func (t *RemoveSessionLabelTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "remove_session_label",
+		Description: "Remove a label from a session",
+		Version:     "1.0.0",
+		Category:    "Session Management",
+		Dependencies: []string{
+			"Session Manager",
+			"Label Manager",
+		},
+		Capabilities: []string{
+			"Label removal",
+			"Session targeting",
+			"Label validation",
+		},
+		Requirements: []string{
+			"Valid session ID",
+			"Existing label",
+			"Session manager access",
+		},
+		Parameters: map[string]string{
+			"target_session_id": "Optional: Target session ID (default: current session)",
+			"label":             "Required: Label to remove from the session",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Remove development label",
+				Description: "Remove a development label from current session",
+				Input: map[string]interface{}{
+					"label": "development",
+				},
+				Output: map[string]interface{}{
+					"success":           true,
+					"target_session_id": "session-123",
+					"label":             "development",
+					"all_labels":        []string{},
+					"message":           "Successfully removed label 'development' from session session-123",
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the remove session label tool
+func (t *RemoveSessionLabelTool) Validate(ctx context.Context, args interface{}) error {
+	removeArgs, ok := args.(RemoveSessionLabelArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected RemoveSessionLabelArgs, got %T", args)
+	}
+
+	// Validate label
+	if strings.TrimSpace(removeArgs.Label) == "" {
+		return fmt.Errorf("label is required and cannot be empty")
+	}
+
+	// Validate session manager is available
+	if t.sessionManager == nil {
+		return fmt.Errorf("session manager is not configured")
+	}
+
+	return nil
+}
+
+// GetMetadata returns comprehensive metadata about the update session labels tool
+func (t *UpdateSessionLabelsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "update_session_labels",
+		Description: "Update all labels on a session with a complete new set",
+		Version:     "1.0.0",
+		Category:    "Session Management",
+		Dependencies: []string{
+			"Session Manager",
+			"Label Manager",
+		},
+		Capabilities: []string{
+			"Bulk label update",
+			"Label replacement",
+			"Session targeting",
+			"Label validation",
+		},
+		Requirements: []string{
+			"Valid session ID",
+			"Session manager access",
+		},
+		Parameters: map[string]string{
+			"target_session_id": "Optional: Target session ID (default: current session)",
+			"labels":            "Required: Complete set of labels to apply",
+			"replace":           "Optional: Replace all existing labels (default: true)",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Set production labels",
+				Description: "Replace all labels with production environment labels",
+				Input: map[string]interface{}{
+					"labels":  []string{"production", "backend", "api"},
+					"replace": true,
+				},
+				Output: map[string]interface{}{
+					"success":           true,
+					"target_session_id": "session-123",
+					"previous_labels":   []string{"development"},
+					"new_labels":        []string{"production", "backend", "api"},
+					"message":           "Successfully updated labels for session session-123",
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the update session labels tool
+func (t *UpdateSessionLabelsTool) Validate(ctx context.Context, args interface{}) error {
+	updateArgs, ok := args.(UpdateSessionLabelsArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected UpdateSessionLabelsArgs, got %T", args)
+	}
+
+	// Validate labels array
+	if len(updateArgs.Labels) > 50 {
+		return fmt.Errorf("too many labels (max 50)")
+	}
+
+	for _, label := range updateArgs.Labels {
+		if strings.TrimSpace(label) == "" {
+			return fmt.Errorf("labels cannot contain empty strings")
+		}
+		if len(label) > 100 {
+			return fmt.Errorf("label '%s' is too long (max 100 characters)", label)
+		}
+	}
+
+	// Validate session manager is available
+	if t.sessionManager == nil {
+		return fmt.Errorf("session manager is not configured")
+	}
+
+	return nil
+}
+
+// GetMetadata returns comprehensive metadata about the list session labels tool
+func (t *ListSessionLabelsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "list_session_labels",
+		Description: "List all labels across sessions with usage statistics",
+		Version:     "1.0.0",
+		Category:    "Session Management",
+		Dependencies: []string{
+			"Session Manager",
+			"Label Manager",
+		},
+		Capabilities: []string{
+			"Label enumeration",
+			"Usage statistics",
+			"Label counting",
+			"Summary reporting",
+		},
+		Requirements: []string{
+			"Session manager access",
+		},
+		Parameters: map[string]string{
+			"include_count": "Optional: Include usage count for each label",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "List all labels with counts",
+				Description: "Get all labels across sessions with usage statistics",
+				Input: map[string]interface{}{
+					"include_count": true,
+				},
+				Output: map[string]interface{}{
+					"all_labels": []string{"development", "production", "backend", "frontend"},
+					"label_counts": map[string]int{
+						"development": 5,
+						"production":  3,
+						"backend":     4,
+						"frontend":    2,
+					},
+					"summary": map[string]interface{}{
+						"total_labels":         4,
+						"total_sessions":       8,
+						"labeled_sessions":     6,
+						"unlabeled_sessions":   2,
+						"average_labels_per_session": 1,
+					},
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the list session labels tool
+func (t *ListSessionLabelsTool) Validate(ctx context.Context, args interface{}) error {
+	_, ok := args.(ListSessionLabelsArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected ListSessionLabelsArgs, got %T", args)
+	}
+
+	// Validate session manager is available
+	if t.sessionManager == nil {
+		return fmt.Errorf("session manager is not configured")
+	}
+
+	return nil
 }

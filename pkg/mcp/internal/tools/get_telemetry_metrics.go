@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -74,8 +75,19 @@ func NewGetTelemetryMetricsTool(logger zerolog.Logger, telemetry TelemetryExport
 	}
 }
 
-// Execute exports telemetry metrics
-func (t *GetTelemetryMetricsTool) Execute(ctx context.Context, args GetTelemetryMetricsArgs) (*GetTelemetryMetricsResult, error) {
+// Execute implements the unified Tool interface
+func (t *GetTelemetryMetricsTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	// Type assertion to get proper args
+	telemetryArgs, ok := args.(GetTelemetryMetricsArgs)
+	if !ok {
+		return nil, fmt.Errorf("invalid arguments type: expected GetTelemetryMetricsArgs, got %T", args)
+	}
+
+	return t.ExecuteTyped(ctx, telemetryArgs)
+}
+
+// ExecuteTyped provides typed execution for backward compatibility
+func (t *GetTelemetryMetricsTool) ExecuteTyped(ctx context.Context, args GetTelemetryMetricsArgs) (*GetTelemetryMetricsResult, error) {
 	t.logger.Info().
 		Str("format", args.Format).
 		Int("filter_count", len(args.MetricNames)).
@@ -437,4 +449,113 @@ func (t *GetTelemetryMetricsTool) countMetricFamilies(families []*dto.MetricFami
 		count += len(mf.GetMetric())
 	}
 	return count
+}
+
+// GetMetadata returns comprehensive metadata about the telemetry metrics tool
+func (t *GetTelemetryMetricsTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "get_telemetry_metrics",
+		Description: "Export telemetry metrics in Prometheus format with filtering and analysis",
+		Version:     "1.0.0",
+		Category:    "Monitoring",
+		Dependencies: []string{
+			"Prometheus Client",
+			"Telemetry Exporter",
+			"Metrics Registry",
+		},
+		Capabilities: []string{
+			"Metric export",
+			"Format conversion",
+			"Metric filtering",
+			"Time range filtering",
+			"Performance analysis",
+			"Help text inclusion",
+			"Empty metric removal",
+		},
+		Requirements: []string{
+			"Prometheus metrics registry",
+			"Telemetry collection enabled",
+		},
+		Parameters: map[string]string{
+			"format":        "Optional: Output format (prometheus, json)",
+			"metric_names":  "Optional: Filter metrics by exact name match",
+			"include_help":  "Optional: Include metric help text (default: true)",
+			"time_range":    "Optional: Time range filter (duration or RFC3339)",
+			"include_empty": "Optional: Include metrics with zero values (default: false)",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Export all metrics",
+				Description: "Export all available metrics in Prometheus format",
+				Input: map[string]interface{}{
+					"format": "prometheus",
+				},
+				Output: map[string]interface{}{
+					"metrics":           "# HELP tool_execution_duration_seconds...",
+					"format":            "prometheus",
+					"metric_count":      45,
+					"export_timestamp":  "2024-12-17T10:30:00Z",
+					"server_uptime":     "24h30m",
+				},
+			},
+			{
+				Name:        "Filter specific metrics",
+				Description: "Export only tool execution metrics from the last hour",
+				Input: map[string]interface{}{
+					"metric_names": []string{"tool_execution_duration_seconds", "tool_execution_total"},
+					"time_range":   "1h",
+					"include_help": false,
+				},
+				Output: map[string]interface{}{
+					"metrics":          "tool_execution_duration_seconds{tool=\"build_image\"} 2.5\n...",
+					"format":           "prometheus",
+					"metric_count":     12,
+					"export_timestamp": "2024-12-17T10:30:00Z",
+				},
+			},
+		},
+	}
+}
+
+// Validate checks if the provided arguments are valid for the telemetry metrics tool
+func (t *GetTelemetryMetricsTool) Validate(ctx context.Context, args interface{}) error {
+	telemetryArgs, ok := args.(GetTelemetryMetricsArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected GetTelemetryMetricsArgs, got %T", args)
+	}
+
+	// Validate format
+	if telemetryArgs.Format != "" {
+		validFormats := map[string]bool{
+			"prometheus": true,
+			"json":       true,
+		}
+		if !validFormats[telemetryArgs.Format] {
+			return fmt.Errorf("invalid format: %s (valid values: prometheus, json)", telemetryArgs.Format)
+		}
+	}
+
+	// Validate metric names
+	if len(telemetryArgs.MetricNames) > 100 {
+		return fmt.Errorf("too many metric names (max 100)")
+	}
+
+	for _, name := range telemetryArgs.MetricNames {
+		if name == "" {
+			return fmt.Errorf("metric names cannot be empty")
+		}
+		if len(name) > 200 {
+			return fmt.Errorf("metric name '%s' is too long (max 200 characters)", name)
+		}
+	}
+
+	// Validate time range format if provided
+	if telemetryArgs.TimeRange != "" {
+		_, err := t.parseTimeRange(telemetryArgs.TimeRange)
+		if err != nil {
+			return fmt.Errorf("invalid time_range format: %v", err)
+		}
+	}
+
+	return nil
 }
