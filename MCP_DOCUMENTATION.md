@@ -376,3 +376,84 @@ Assistant uses:
 
 ```
 User: "I want to containerize and deploy my application"
+
+Assistant uses:
+chat(message="I'll help you containerize and deploy your application...")
+- Guides through repository analysis
+- Assists with Dockerfile creation
+- Helps with image building and deployment
+- Provides troubleshooting and optimization advice
+```
+
+## Testing
+
+### Automated Testing
+```bash
+# Run all automated tests
+./test/integration/run_tests.sh
+
+# Run specific test suites
+make test                    # All tests
+go test ./pkg/mcp/...       # MCP-specific tests
+go test -tags integration   # Integration tests only
+```
+
+### Manual Testing with Claude Desktop
+For manual testing procedures, see [test/integration/mcp/claude_desktop_test.md](test/integration/mcp/claude_desktop_test.md).
+
+### Quality Assurance
+```bash
+make lint              # Strict linting (fails on any issue)
+make lint-threshold    # Linting with error budget
+make lint-report       # Generate detailed reports
+```
+
+See [docs/LINTING.md](docs/LINTING.md) for our quality strategy.
+
+## Deployment Models
+
+### MCP Server Deployment Options
+- **Development**: Local stdio transport with Claude Desktop
+- **Production**: HTTP transport with load balancing
+- **Cloud**: Container deployment with persistent volumes
+- **Instant Setup**: VS Code devcontainer with all tools pre-configured
+
+### CLI Tool Deployment (Legacy)
+- **Local**: Direct execution with local Docker/Kind
+- **CI/CD**: Pipeline integration for automated containerization
+
+### Performance Considerations
+- Session persistence uses BoltDB for lightweight storage
+- Tool registration is performed at startup for optimal performance
+- HTTP transport supports concurrent connections
+- Memory usage scales with active session count
+
+## Advanced Configuration
+
+### Environment Variables
+- `CONTAINER_KIT_LOG_LEVEL`: Set logging level (debug, info, warn, error)
+- `CONTAINER_KIT_SESSION_DIR`: Custom session storage directory
+- `CONTAINER_KIT_METRICS_PORT`: Metrics server port (default: 8080)
+
+### Transport Configuration
+#### stdio Transport (Default)
+Used with Claude Desktop and terminal applications.
+
+#### HTTP Transport
+```bash
+./container-kit-mcp --transport=http --port=8080
+```
+
+### Session Management
+Sessions are automatically created and persisted. You can manage them using:
+- `list_sessions` - View all active sessions
+- `delete_session` - Clean up specific sessions
+- Session data is stored in BoltDB for reliability
+
+## Development and Extension
+
+For detailed development information, see:
+- [Architecture Guide](docs/mcp-architecture.md) - Technical system design
+- [Tool Development Guide](docs/adding-new-tools.md) - Creating new tools
+- [Contributing Guide](CONTRIBUTING.md) - Development workflow
+- [Development Guidelines](DEVELOPMENT_GUIDELINES.md) - Coding standards
