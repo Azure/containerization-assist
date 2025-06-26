@@ -23,7 +23,7 @@ jobs:
       coverage: true
       upload-coverage: true
       coverage-flags: 'mcp'
-  
+
   # Example 2: CLI build with binary output
   cli-build:
     name: CLI Build & Binary
@@ -36,7 +36,7 @@ jobs:
       build-binary: true
       binary-output: 'container-kit'
       binary-main: './main.go'
-  
+
   # Example 3: Core packages (no tags)
   core-build:
     name: Core Packages Build
@@ -48,7 +48,7 @@ jobs:
       run-race-tests: true
       run-lint: false
       coverage: true
-  
+
   # Example 4: MCP Server binary
   mcp-server-build:
     name: MCP Server Binary
@@ -60,7 +60,7 @@ jobs:
       binary-output: 'container-kit-mcp'
       binary-main: './cmd/mcp-server'
       run-tests: false  # Skip tests for binary-only build
-  
+
   # Example 5: Cross-platform matrix using reusable workflow
   cross-platform:
     name: Cross-Platform ${{ matrix.os }}
@@ -77,7 +77,7 @@ jobs:
       binary-main: './main.go'
       run-tests: false
       run-race-tests: false
-  
+
   # Example 6: Integration tests
   integration-tests:
     name: Integration Tests
@@ -89,7 +89,7 @@ jobs:
       run-race-tests: true
       coverage: true
       coverage-flags: 'integration'
-  
+
   # Job that depends on the reusable workflow outputs
   summary:
     name: Build Summary
@@ -106,7 +106,7 @@ jobs:
           echo "| MCP | ${{ needs.mcp-build.outputs.build-success }} | ${{ needs.mcp-build.outputs.test-success }} | ${{ needs.mcp-build.outputs.coverage-percentage }}% |" >> $GITHUB_STEP_SUMMARY
           echo "| CLI | ${{ needs.cli-build.outputs.build-success }} | ${{ needs.cli-build.outputs.test-success }} | N/A |" >> $GITHUB_STEP_SUMMARY
           echo "| Core | ${{ needs.core-build.outputs.build-success }} | ${{ needs.core-build.outputs.test-success }} | ${{ needs.core-build.outputs.coverage-percentage }}% |" >> $GITHUB_STEP_SUMMARY
-          
+
           # Check if any builds failed
           if [ "${{ needs.mcp-build.outputs.build-success }}" != "true" ] || \
              [ "${{ needs.cli-build.outputs.build-success }}" != "true" ] || \

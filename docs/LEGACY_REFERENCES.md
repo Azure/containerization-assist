@@ -11,7 +11,7 @@ When implementing missing functionality or understanding historical patterns, th
 - Registry operations (push, pull, tag)
 - Dockerfile generation and validation
 
-## Kubernetes Operations  
+## Kubernetes Operations
 **Location**: `pkg/pipeline/manifeststage/`
 - Kubernetes manifest generation patterns
 - Deployment fix patterns and error handling

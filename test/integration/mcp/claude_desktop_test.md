@@ -59,7 +59,7 @@ After updating the configuration, restart Claude Desktop to load the MCP server.
 I want to containerize my Go application. Can you help me through the process step by step?
 ```
 
-**Expected Result**: 
+**Expected Result**:
 - Claude should start a conversation flow using the `chat` tool
 - You should see a guided workflow with pre-flight checks
 - Each stage should offer clear options and next steps

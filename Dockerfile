@@ -12,7 +12,7 @@ ENV PORT=80
 EXPOSE 80
 
 WORKDIR /app
-COPY --from=builder /build/app-binary . 
+COPY --from=builder /build/app-binary .
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 

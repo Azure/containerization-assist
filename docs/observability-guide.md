@@ -120,7 +120,7 @@ if err != nil {
 }
 
 // Add custom events
-tracingManager.AddEvent(ctx, "validation_completed", 
+tracingManager.AddEvent(ctx, "validation_completed",
     attribute.String("validator", "schema"),
     attribute.Bool("passed", true),
 )
@@ -262,16 +262,16 @@ func (t *MyTool) Execute(ctx context.Context) error {
     // Start tool span
     ctx, span := tracingManager.StartToolSpan(ctx, "my_tool", "execute")
     defer span.End()
-    
+
     // Record start
     start := time.Now()
-    
+
     // Execute tool logic
     err := t.doWork(ctx)
-    
+
     // Record metrics
     enhancedManager.RecordToolExecution(ctx, "my_tool", time.Since(start), err == nil, categorizeError(err))
-    
+
     return err
 }
 ```

@@ -119,7 +119,7 @@ package build
 import (
     "context"
     "fmt"
-    
+
     "github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
     mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
     "github.com/rs/zerolog"
@@ -262,7 +262,7 @@ package deploy
 import (
     "context"
     "fmt"
-    
+
     "github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
     mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
     "github.com/rs/zerolog"
@@ -353,7 +353,7 @@ package scan
 import (
     "context"
     "fmt"
-    
+
     mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
@@ -397,7 +397,7 @@ package analyze
 
 import (
     "context"
-    
+
     mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 )
 
@@ -436,33 +436,33 @@ package build
 import (
     "context"
     "testing"
-    
+
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/require"
 )
 
 func TestOptimizeImageTool_Execute(t *testing.T) {
     tool := NewOptimizeImageTool(nil, testLogger)
-    
+
     args := &OptimizeImageArgs{
         SessionID: "test-session",
         ImageName: "test:latest",
         TargetSize: "minimal",
     }
-    
+
     result, err := tool.Execute(context.Background(), args)
     require.NoError(t, err)
-    
+
     optimizeResult, ok := result.(*OptimizeImageResult)
     require.True(t, ok)
-    
+
     assert.Greater(t, optimizeResult.ReductionRatio, 0.0)
     assert.NotEmpty(t, optimizeResult.OptimizedImage)
 }
 
 func TestOptimizeImageTool_Validate(t *testing.T) {
     tool := NewOptimizeImageTool(nil, testLogger)
-    
+
     tests := []struct {
         name    string
         args    interface{}
@@ -489,7 +489,7 @@ func TestOptimizeImageTool_Validate(t *testing.T) {
             wantErr: true,
         },
     }
-    
+
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             err := tool.Validate(context.Background(), tt.args)
@@ -512,28 +512,28 @@ func TestOptimizeImageTool_Integration(t *testing.T) {
     if testing.Short() {
         t.Skip("Skipping integration test")
     }
-    
+
     // Setup test environment
     clients := setupTestClients(t)
     tool := NewOptimizeImageTool(clients, testLogger)
-    
+
     // Build a test image first
     buildResult := buildTestImage(t, clients)
-    
+
     // Run optimization
     args := &OptimizeImageArgs{
         SessionID: "test-session",
         ImageName: buildResult.ImageName,
         TargetSize: "minimal",
     }
-    
+
     result, err := tool.Execute(context.Background(), args)
     require.NoError(t, err)
-    
+
     // Verify optimization worked
     optimizeResult := result.(*OptimizeImageResult)
     assert.Less(t, optimizeResult.OptimizedSize, optimizeResult.OriginalSize)
-    
+
     // Verify optimized image exists
     exists := verifyImageExists(t, clients, optimizeResult.OptimizedImage)
     assert.True(t, exists)
@@ -571,23 +571,23 @@ For long-running operations, use progress reporting:
 ```go
 func (t *MyTool) ExecuteWithProgress(ctx context.Context, args interface{}, reporter mcptypes.ProgressReporter) (interface{}, error) {
     reporter.ReportStage(0.0, "Starting operation")
-    
+
     // Step 1: 30% of work
     if err := t.step1(); err != nil {
         return nil, err
     }
     reporter.ReportStage(0.3, "Completed step 1")
-    
+
     // Step 2: 60% of work
     if err := t.step2(); err != nil {
         return nil, err
     }
     reporter.ReportStage(0.9, "Completed step 2")
-    
+
     // Finalize
     result := t.finalize()
     reporter.ReportStage(1.0, "Operation complete")
-    
+
     return result, nil
 }
 ```
@@ -602,22 +602,22 @@ func (t *MyTool) Validate(ctx context.Context, args interface{}) error {
     if !ok {
         return fmt.Errorf("expected *MyToolArgs, got %T", args)
     }
-    
+
     // Required fields
     if toolArgs.RequiredField == "" {
         return fmt.Errorf("required_field is mandatory")
     }
-    
+
     // Validate enums
     if !isValidOption(toolArgs.Option) {
         return fmt.Errorf("invalid option: %s", toolArgs.Option)
     }
-    
+
     // Validate ranges
     if toolArgs.Count < 1 || toolArgs.Count > 100 {
         return fmt.Errorf("count must be between 1 and 100")
     }
-    
+
     return nil
 }
 ```
@@ -682,7 +682,7 @@ func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, er
         Str("session_id", toolArgs.SessionID).
         Interface("args", args).
         Msg("Starting tool execution")
-    
+
     // On error
     if err != nil {
         t.logger.Error().
@@ -691,7 +691,7 @@ func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, er
             Msg("Tool execution failed")
         return nil, err
     }
-    
+
     // On success
     t.logger.Info().
         Interface("result", result).
@@ -712,7 +712,7 @@ func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, er
         return nil, ctx.Err()
     default:
     }
-    
+
     // For long operations, check periodically
     for _, item := range items {
         select {
@@ -725,7 +725,7 @@ func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, er
             }
         }
     }
-    
+
     return result, nil
 }
 ```

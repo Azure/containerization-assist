@@ -71,7 +71,7 @@ type FixingCapable interface {
 ```go
 type AtomicToolNameArgs struct {
     types.BaseToolArgs                    // Required: includes SessionID, DryRun
-    
+
     // Tool-specific arguments with proper validation tags
     RequiredField string `json:"required_field" jsonschema:"required" description:"Field description"`
     OptionalField string `json:"optional_field,omitempty" description:"Optional field description"`
@@ -83,20 +83,20 @@ type AtomicToolNameArgs struct {
 type AtomicToolNameResult struct {
     types.BaseToolResponse                // Required: includes common response fields
     Success bool `json:"success"`        // Required: operation success status
-    
+
     // Session context (standard across all tools)
     SessionID    string `json:"session_id"`
     WorkspaceDir string `json:"workspace_dir"`
-    
+
     // Tool-specific results
     OperationResult *SpecificResult `json:"operation_result"`
-    
+
     // Timing information (standard pattern)
     Duration time.Duration `json:"duration"`
-    
+
     // AI context for decision-making (required for AI enhancement)
     AIContext *AIContextInfo `json:"ai_context"`
-    
+
     // Rich error information if operation failed
     Error *types.RichError `json:"error,omitempty"`
 }
@@ -125,7 +125,7 @@ err := t.progressTracker.RunWithProgress(ctx, "Operation Name", core.StandardBui
 ### 2. Available Centralized Stage Types
 
 - `core.StandardBuildStages()` - For build operations
-- `core.StandardDeployStages()` - For deployment operations  
+- `core.StandardDeployStages()` - For deployment operations
 - `core.StandardScanStages()` - For security scanning operations
 - `core.StandardAnalysisStages()` - For repository analysis operations
 - `core.StandardPushStages()` - For registry push operations
@@ -141,13 +141,13 @@ err := t.progressTracker.RunWithProgress(ctx, "Operation Name", core.StandardBui
 func (t *AtomicToolName) Execute(ctx context.Context, args Args) (*Result, error) {
     startTime := time.Now()
     result := &Result{...} // Initialize result early for error handling
-    
+
     // Use RunWithProgress if we have a progress tracker
     if t.progressTracker != nil {
         err := t.progressTracker.RunWithProgress(ctx, "Operation Name", core.StandardXxxStages(), func(ctx context.Context, reporter interfaces.ProgressReporter) error {
             return t.executeWithProgress(ctx, args, result, startTime, reporter)
         })
-        
+
         result.Duration = time.Since(startTime)
         if err != nil {
             result.Success = false
@@ -155,7 +155,7 @@ func (t *AtomicToolName) Execute(ctx context.Context, args Args) (*Result, error
         }
         return result, nil
     }
-    
+
     // Fallback: execute without progress tracking
     return t.executeWithoutProgress(ctx, args, result, startTime)
 }
@@ -169,18 +169,18 @@ func (t *AtomicToolName) executeWithProgress(ctx context.Context, args Args, res
     reporter.ReportStage(0.1, "Loading session")
     // ... do initialization work ...
     reporter.ReportStage(1.0, "Session loaded")
-    
+
     // Stage 2: Process (weight: 0.60)
     reporter.NextStage("Processing data")
     // ... do processing work with interim progress ...
     reporter.ReportStage(0.5, "Half done")
     // ... continue processing ...
     reporter.ReportStage(1.0, "Processing complete")
-    
+
     // Continue through remaining stages...
     reporter.NextStage("Finalizing")
     reporter.ReportStage(1.0, "Operation completed")
-    
+
     return nil
 }
 ```
@@ -227,19 +227,19 @@ if !pathResult.Valid {
 ```go
 func (t *AtomicToolName) PreValidate(ctx context.Context, args Args) error {
     validationMixin := utils.NewStandardizedValidationMixin(t.logger)
-    
+
     // Session validation
     _, richError := validationMixin.StandardValidateSession(ctx, t.sessionManager, args.SessionID)
     if richError != nil {
         return fmt.Errorf("session validation failed: %s", richError.Message)
     }
-    
+
     // Required field validation
     validationResult := validationMixin.StandardValidateRequiredFields(args, []string{"RequiredField"})
     if !validationResult.Valid {
         return fmt.Errorf("field validation failed: %s", validationResult.GetFirstError().Message)
     }
-    
+
     // Custom validation logic specific to this tool
     return t.validateCustomRequirements(ctx, args)
 }
@@ -349,7 +349,7 @@ func (r *ToolResult) GetStrengths() []string { /* Implementation */ }
 func (r *ToolResult) GetChallenges() []string { /* Implementation */ }
 func (r *ToolResult) GetAssessment() *ai_context.UnifiedAssessment { /* Implementation */ }
 
-// Implement ai_context.Enrichable  
+// Implement ai_context.Enrichable
 func (r *ToolResult) EnrichWithContext(insights []ai_context.ToolContextualInsight) { /* Implementation */ }
 func (r *ToolResult) GetEnrichmentMetadata() map[string]interface{} { /* Implementation */ }
 ```
@@ -361,12 +361,12 @@ type ToolAIContext struct {
     // Operation insights
     OperationComplexity string   `json:"operation_complexity"` // simple, moderate, complex
     PerformanceMetrics  Metrics  `json:"performance_metrics"`
-    
+
     // Decision-making context
     AlternativeApproaches []string `json:"alternative_approaches"`
     RiskFactors          []string `json:"risk_factors"`
     Recommendations      []string `json:"recommendations"`
-    
+
     // Learning context
     CommonIssues        []Issue   `json:"common_issues"`
     OptimizationTips    []string  `json:"optimization_tips"`
@@ -405,7 +405,7 @@ func TestAtomicToolName_Execute(t *testing.T) {
         },
         // More test cases...
     }
-    
+
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             // Test implementation
@@ -417,7 +417,7 @@ func TestAtomicToolName_Execute(t *testing.T) {
 ### 2. Required Test Coverage
 
 - **Happy path execution**
-- **Input validation failures**  
+- **Input validation failures**
 - **Session validation failures**
 - **Permission errors**
 - **Network errors** (if applicable)
@@ -453,11 +453,11 @@ type AtomicToolName struct {
 ```go
 type AtomicToolNameArgs struct {
     types.BaseToolArgs
-    
+
     // RequiredField specifies [purpose and constraints]
     // This field is required and must [validation requirements]
     RequiredField string `json:"required_field" jsonschema:"required,minLength=1" description:"Field description with constraints"`
-    
+
     // OptionalField provides [purpose and default behavior]
     // When not specified, [default behavior description]
     OptionalField string `json:"optional_field,omitempty" description:"Optional field with default behavior"`
@@ -485,14 +485,14 @@ Tools must work seamlessly with the pipeline adapter:
 func (t *AtomicToolName) Execute(ctx context.Context, args Args) (*Result, error) {
     // Get session workspace through adapter
     workspaceDir := t.pipelineAdapter.GetSessionWorkspace(session.ID)
-    
+
     // Use adapter for resource management
     resource, err := t.pipelineAdapter.AcquireResource(ctx, "docker")
     if err != nil {
         return nil, err
     }
     defer t.pipelineAdapter.ReleaseResource(resource)
-    
+
     // Continue with tool implementation...
 }
 ```
@@ -526,7 +526,7 @@ func (t *AtomicToolName) Execute(ctx context.Context, args Args) (*Result, error
             t.logger.Warn().Err(err).Msg("Failed to cleanup resources")
         }
     }()
-    
+
     // Tool implementation...
 }
 ```
@@ -545,7 +545,7 @@ func (t *AtomicToolName) Execute(ctx context.Context, args Args) (*Result, error
             Error: errors.NewSecurityError("PATH_TRAVERSAL", "Path traversal attempt detected").Build(),
         }, nil
     }
-    
+
     // Continue with sanitized inputs...
 }
 ```
@@ -560,7 +560,7 @@ func (t *AtomicToolName) Execute(ctx context.Context, args Args) (*Result, error
         Str("operation", "tool_execution").
         // Do NOT log passwords, tokens, or other secrets
         Msg("Starting tool execution")
-    
+
     // Use secure credential handling
     creds, err := t.getSecureCredentials(ctx, args.CredentialRef)
     if err != nil {

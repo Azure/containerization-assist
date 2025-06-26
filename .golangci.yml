@@ -12,7 +12,7 @@ linters:
   default: standard
 
   enable:
-    - staticcheck         
+    - staticcheck
     - revive
     - gosec
     - nilerr
@@ -28,53 +28,72 @@ linters:
     - asciicheck
     - misspell
     - forbidigo
+    # New critical linters
+    - gocyclo      # Cyclomatic complexity
+    - errcheck     # Unchecked errors
+    - govet        # Suspicious constructs
+    - exhaustive   # Exhaustive switch/select
+    - gocritic     # Diagnostic linter
+    - godox        # TODO/FIXME/BUG detection
+    - testpackage  # Test package naming
 
   disable:
-    - lll                  
-    - gocyclo              
+    - lll
 
-  settings:
-    govet:                 
-      enable:
-        - shadow           
-    revive:
-      severity: warning
-      rules:
-        - name: exported
-    errcheck:
-      check-type-assertions: true
-      check-blank: true
-    funlen:
-      lines: 120
-      statements: 50
-    forbidigo:
-      forbid:
-        - pattern: 'fmt\.Errorf'
-          msg: 'Use types.NewRichError instead of fmt.Errorf in tools for better error context'
-        - pattern: 'fmt\.Print(f|ln)?'
-          msg: 'Use utils.Logger instead of fmt.Print* for structured logging'
-        - pattern: 'log\.Fatal(f|ln)?'
-          msg: 'Use utils.Logger.Fatal instead of log.Fatal* for consistent error handling'
-        - pattern: 'log\.Panic(f|ln)?'
-          msg: 'Use proper error handling instead of log.Panic*'
+linters-settings:
+  govet:
+    enable:
+      - shadow
+      - all
+  revive:
+    severity: warning
+    rules:
+      - name: exported
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - (fmt.Print*)  # Already forbidden by forbidigo
+  funlen:
+    lines: 100     # Tightened from 120
+    statements: 50
+  gocyclo:
+    min-complexity: 25  # Adjusted threshold for ratcheting strategy
+  godox:
+    keywords:
+      - TODO
+      - HACK
+      - FIXME
+      - BUG
+      - OPTIMIZE
+  forbidigo:
+    forbid:
+      - pattern: 'fmt\.Errorf'
+        msg: 'Use types.NewRichError instead of fmt.Errorf in tools for better error context'
+      - pattern: 'fmt\.Print(f|ln)?'
+        msg: 'Use utils.Logger instead of fmt.Print* for structured logging'
+      - pattern: 'log\.Fatal(f|ln)?'
+        msg: 'Use utils.Logger.Fatal instead of log.Fatal* for consistent error handling'
+      - pattern: 'log\.Panic(f|ln)?'
+        msg: 'Use proper error handling instead of log.Panic*'
 
   exclusions:
-    generated: strict      
+    generated: strict
     warn-unused: true
-    paths:                  
+    paths:
       - '^vendor(/|$)'
       - '^third_party(/|$)'
       - '^docs(/|$)'
       - '^resources(/|$)'
       - '^scripts(/|$)'
       - '^cmd/[^/]+/generated(/|$)'
-      - '.*_generated\.go$'  
+      - '.*_generated\.go$'
     rules:
       - path: '_test\.go$'
         linters: [funlen, gocognit]
 
-formatters:                 
-  enable: [gofumpt, gci]
+formatters:
+  enable: [gofumpt]
   settings:
     gofumpt:
       extra-rules: true
@@ -85,14 +104,18 @@ formatters:
         - Default
 
 issues:
-  # Error budget approach - allow up to 50 total issues
-  max-issues: 50
-  
-  # Or set per-linter limits
-  max-issues-per-linter: 10
-  max-same-issues: 5
-  
+  # Tightened error budgets
+  max-issues: 25             # Down from 50
+
+  # Tightened per-linter limits
+  max-issues-per-linter: 5   # Down from 10
+  max-same-issues: 3         # Down from 5
+
   # Exit with code 0 even if issues are found (for gradual adoption)
   # exit-code: 0
-  
+
   exclude-use-default: false
+
+  # Only check new code in PRs for gradual adoption
+  new: true
+  new-from-rev: "main"

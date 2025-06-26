@@ -45,7 +45,7 @@ package {{.PackageName}}
 
 import (
 	"fmt"
-	
+
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
 {{range .Imports}}	"{{.}}"
 {{end}}

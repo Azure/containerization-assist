@@ -18,7 +18,7 @@ while IFS= read -r line; do
     # Extract filename and check if this TODO is allowed
     filename=$(echo "$line" | cut -d: -f1)
     is_allowed=false
-    
+
     # Check against allowed TODOs
     if [ -f "$ALLOWED_TODOS_FILE" ]; then
       while IFS= read -r allowed; do
@@ -26,17 +26,17 @@ while IFS= read -r line; do
         if [[ "$allowed" =~ ^#.*$ ]] || [ -z "$allowed" ]; then
           continue
         fi
-        
+
         allowed_file=$(echo "$allowed" | cut -d: -f1)
         allowed_pattern=$(echo "$allowed" | cut -d: -f2)
-        
+
         if [[ "$filename" == "$allowed_file" ]] && [[ "$line" == *"$allowed_pattern"* ]]; then
           is_allowed=true
           break
         fi
       done < "$ALLOWED_TODOS_FILE"
     fi
-    
+
     if [ "$is_allowed" = false ]; then
       UNTRACKED_TODOS="${UNTRACKED_TODOS}${line}\n"
     fi

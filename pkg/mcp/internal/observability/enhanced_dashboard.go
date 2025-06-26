@@ -201,39 +201,39 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             --accent-error: #e0245e;
             --border-color: #38444d;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
         }
-        
+
         .dashboard {
             display: grid;
             grid-template-columns: 250px 1fr;
             height: 100vh;
         }
-        
+
         .sidebar {
             background: var(--bg-secondary);
             padding: 20px;
             border-right: 1px solid var(--border-color);
         }
-        
+
         .logo {
             font-size: 24px;
             font-weight: bold;
             margin-bottom: 30px;
             color: var(--accent-primary);
         }
-        
+
         .nav-item {
             display: block;
             padding: 12px 16px;
@@ -243,39 +243,39 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             border-radius: 8px;
             transition: all 0.2s;
         }
-        
+
         .nav-item:hover {
             background: var(--bg-tertiary);
             color: var(--text-primary);
         }
-        
+
         .nav-item.active {
             background: var(--accent-primary);
             color: white;
         }
-        
+
         .main-content {
             padding: 20px;
             overflow-y: auto;
         }
-        
+
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
         }
-        
+
         .header h1 {
             font-size: 28px;
             font-weight: 600;
         }
-        
+
         .time-range {
             display: flex;
             gap: 10px;
         }
-        
+
         .time-btn {
             padding: 8px 16px;
             background: var(--bg-tertiary);
@@ -285,25 +285,25 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .time-btn:hover {
             background: var(--bg-secondary);
             color: var(--text-primary);
         }
-        
+
         .time-btn.active {
             background: var(--accent-primary);
             color: white;
             border-color: var(--accent-primary);
         }
-        
+
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
-        
+
         .metric-card {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
@@ -312,52 +312,52 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             position: relative;
             overflow: hidden;
         }
-        
+
         .metric-card.alert {
             border-color: var(--accent-error);
         }
-        
+
         .metric-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 16px;
         }
-        
+
         .metric-title {
             color: var(--text-secondary);
             font-size: 14px;
             font-weight: 500;
         }
-        
+
         .metric-badge {
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 12px;
             font-weight: 600;
         }
-        
+
         .metric-badge.success {
             background: rgba(23, 191, 99, 0.2);
             color: var(--accent-success);
         }
-        
+
         .metric-badge.warning {
             background: rgba(255, 173, 31, 0.2);
             color: var(--accent-warning);
         }
-        
+
         .metric-badge.error {
             background: rgba(224, 36, 94, 0.2);
             color: var(--accent-error);
         }
-        
+
         .metric-value {
             font-size: 36px;
             font-weight: 700;
             margin-bottom: 8px;
         }
-        
+
         .metric-trend {
             display: flex;
             align-items: center;
@@ -365,19 +365,19 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             color: var(--text-secondary);
             font-size: 14px;
         }
-        
+
         .trend-icon {
             font-size: 16px;
         }
-        
+
         .trend-up {
             color: var(--accent-success);
         }
-        
+
         .trend-down {
             color: var(--accent-error);
         }
-        
+
         .chart-container {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
@@ -386,24 +386,24 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             margin-bottom: 20px;
             height: 400px;
         }
-        
+
         .chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
-        
+
         .chart-title {
             font-size: 18px;
             font-weight: 600;
         }
-        
+
         .chart-legend {
             display: flex;
             gap: 20px;
         }
-        
+
         .legend-item {
             display: flex;
             align-items: center;
@@ -411,20 +411,20 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             font-size: 14px;
             color: var(--text-secondary);
         }
-        
+
         .legend-dot {
             width: 12px;
             height: 12px;
             border-radius: 50%;
         }
-        
+
         .operations-list {
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 24px;
         }
-        
+
         .operation-item {
             display: flex;
             justify-content: space-between;
@@ -432,46 +432,46 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             padding: 16px 0;
             border-bottom: 1px solid var(--border-color);
         }
-        
+
         .operation-item:last-child {
             border-bottom: none;
         }
-        
+
         .operation-name {
             font-weight: 500;
         }
-        
+
         .operation-status {
             display: flex;
             align-items: center;
             gap: 12px;
         }
-        
+
         .status-indicator {
             width: 8px;
             height: 8px;
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
-        
+
         .status-running {
             background: var(--accent-primary);
         }
-        
+
         .status-success {
             background: var(--accent-success);
         }
-        
+
         .status-error {
             background: var(--accent-error);
         }
-        
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
-        
+
         .progress-bar {
             width: 100px;
             height: 4px;
@@ -479,18 +479,18 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             border-radius: 2px;
             overflow: hidden;
         }
-        
+
         .progress-fill {
             height: 100%;
             background: var(--accent-primary);
             transition: width 0.3s ease;
         }
-        
+
         #chart {
             width: 100%;
             height: 100%;
         }
-        
+
         .loading {
             display: flex;
             justify-content: center;
@@ -498,7 +498,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             height: 100%;
             color: var(--text-secondary);
         }
-        
+
         .spinner {
             width: 40px;
             height: 40px;
@@ -507,7 +507,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -528,7 +528,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                 <a href="#alerts" class="nav-item">Alerts</a>
             </nav>
         </aside>
-        
+
         <main class="main-content">
             <div class="header">
                 <h1>System Overview</h1>
@@ -539,13 +539,13 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     <button class="time-btn" data-range="30d">30D</button>
                 </div>
             </div>
-            
+
             <div class="metrics-grid" id="metrics-grid">
                 <div class="loading">
                     <div class="spinner"></div>
                 </div>
             </div>
-            
+
             <div class="chart-container">
                 <div class="chart-header">
                     <h2 class="chart-title">System Performance</h2>
@@ -570,7 +570,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     </div>
                 </div>
             </div>
-            
+
             <div class="operations-list" id="operations-list">
                 <h2 style="margin-bottom: 20px;">Active Operations</h2>
                 <div class="loading">
@@ -579,7 +579,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
             </div>
         </main>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
         // Dashboard JavaScript
@@ -590,34 +590,34 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                 this.timeRange = '24h';
                 this.init();
             }
-            
+
             init() {
                 this.connectWebSocket();
                 this.loadMetrics();
                 this.setupEventListeners();
                 this.startPolling();
             }
-            
+
             connectWebSocket() {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 this.ws = new WebSocket(` + "`${protocol}//${window.location.host}/ws`" + `);
-                
+
                 this.ws.onopen = () => {
                     console.log('WebSocket connected');
                     this.ws.send(JSON.stringify({ type: 'subscribe', topics: ['metrics', 'operations'] }));
                 };
-                
+
                 this.ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
                     this.handleRealtimeUpdate(data);
                 };
-                
+
                 this.ws.onclose = () => {
                     console.log('WebSocket disconnected, reconnecting...');
                     setTimeout(() => this.connectWebSocket(), 5000);
                 };
             }
-            
+
             async loadMetrics() {
                 try {
                     const response = await fetch('/api/metrics/realtime');
@@ -628,7 +628,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     console.error('Failed to load metrics:', error);
                 }
             }
-            
+
             async loadOperations() {
                 try {
                     const response = await fetch('/api/operations');
@@ -638,7 +638,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     console.error('Failed to load operations:', error);
                 }
             }
-            
+
             updateMetricsGrid(data) {
                 const grid = document.getElementById('metrics-grid');
                 const metrics = [
@@ -685,14 +685,14 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                         status: data.quality_score < 60 ? 'warning' : 'success'
                     }
                 ];
-                
+
                 grid.innerHTML = metrics.map(metric => this.createMetricCard(metric)).join('');
             }
-            
+
             createMetricCard(metric) {
                 const trendIcon = metric.trend > 0 ? '↑' : metric.trend < 0 ? '↓' : '→';
                 const trendClass = metric.trend > 0 ? 'trend-up' : metric.trend < 0 ? 'trend-down' : '';
-                
+
                 return ` + "`" + `
                     <div class="metric-card ${metric.status === 'error' ? 'alert' : ''}">
                         <div class="metric-header">
@@ -707,7 +707,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     </div>
                 ` + "`" + `;
             }
-            
+
             updateChart(data) {
                 const ctx = document.getElementById('chart');
                 if (!this.chart) {
@@ -785,7 +785,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                         }
                     });
                 }
-                
+
                 // Update with historical data
                 if (data.historical) {
                     this.chart.data.labels = data.historical.timestamps;
@@ -795,14 +795,14 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     this.chart.update();
                 }
             }
-            
+
             updateOperationsList(operations) {
                 const container = document.getElementById('operations-list');
                 if (!operations || operations.length === 0) {
                     container.innerHTML = '<h2>Active Operations</h2><p style="color: var(--text-secondary);">No active operations</p>';
                     return;
                 }
-                
+
                 const operationsHTML = operations.map(op => ` + "`" + `
                     <div class="operation-item">
                         <div class="operation-name">${op.name}</div>
@@ -815,10 +815,10 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                         </div>
                     </div>
                 ` + "`" + `).join('');
-                
+
                 container.innerHTML = '<h2>Active Operations</h2>' + operationsHTML;
             }
-            
+
             handleRealtimeUpdate(data) {
                 if (data.type === 'metrics') {
                     this.updateMetricsGrid(data.metrics);
@@ -826,7 +826,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     this.updateOperationsList(data.operations);
                 }
             }
-            
+
             setupEventListeners() {
                 document.querySelectorAll('.time-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
@@ -836,7 +836,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                         this.loadMetrics();
                     });
                 });
-                
+
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.addEventListener('click', (e) => {
                         e.preventDefault();
@@ -846,7 +846,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                     });
                 });
             }
-            
+
             startPolling() {
                 setInterval(() => {
                     this.loadMetrics();
@@ -854,7 +854,7 @@ func (ed *EnhancedDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.R
                 }, 5000);
             }
         }
-        
+
         // Initialize dashboard
         new Dashboard();
     </script>

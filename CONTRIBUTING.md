@@ -75,7 +75,7 @@ If you prefer to set up your local environment manually:
    ```bash
    # Build CLI version
    go build -o container-kit .
-   
+
    # Build MCP server
    go build -tags mcp -o container-kit-mcp ./cmd/mcp-server
    ```
@@ -84,10 +84,10 @@ If you prefer to set up your local environment manually:
    ```bash
    # Run all tests
    go test ./...
-   
+
    # Run MCP-specific tests
    go test -tags mcp ./pkg/mcp/...
-   
+
    # Run with race detection
    go test -race ./...
    ```
@@ -150,16 +150,16 @@ container-copilot/
    ```bash
    # Format code
    go fmt ./...
-   
+
    # Run static analysis
    go vet ./...
-   
+
    # Run tests
    go test ./...
-   
+
    # Check for race conditions
    go test -race ./pkg/mcp/...
-   
+
    # Clean up dependencies
    go mod tidy
    ```
@@ -214,7 +214,7 @@ func TestNewTool(t *testing.T) {
             wantErr:  false,
         },
     }
-    
+
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             result, err := NewTool(tt.input)
@@ -286,26 +286,80 @@ Brief description of changes and motivation.
 
 ## Code Style
 
+### Code Quality Requirements
+
+All pull requests must pass the following checks:
+
+1. **Formatting Check**: Code must be formatted with `gofmt -s` and `goimports`
+2. **Linting**: Must pass golangci-lint with our configuration
+3. **No New TODOs**: New TODO/HACK/FIXME comments block merge
+4. **Error Handling**: All errors must be checked (enforced by errcheck)
+
+#### Ratcheting Strategy
+
+We use a **ratcheting approach** to gradually improve code quality without blocking development:
+
+- **Cyclomatic Complexity**: New functions should target complexity < 15 (gradually reducing to < 10)
+- **Lint Issues**: Total issues must not increase from baseline
+- **Only New Code Checked**: PR checks focus on modified files to avoid blocking on legacy code
+
+To check current baselines:
+```bash
+# Check complexity baseline
+make complexity-check
+
+# See most complex functions
+make complexity-top
+
+# Check lint baseline
+make lint-ratchet
+```
+
+### Running Checks Locally
+
+```bash
+# Install pre-commit hooks (one-time setup)
+make install-hooks
+
+# Format your code
+make fmt
+
+# Check formatting without modifying files
+make fmt-check
+
+# Run all linters
+make lint-strict
+
+# Run pre-commit checks manually
+make pre-commit
+```
+
 ### Go Guidelines
 
 - Follow standard Go conventions
 - Use descriptive variable names
 - Add comments for exported functions
-- Handle errors appropriately
+- Handle errors appropriately - use `types.NewRichError` instead of `fmt.Errorf`
+- Use `utils.Logger` instead of `fmt.Print*` or `log.*`
 - Use interfaces for testability
+- Keep functions under 100 lines
+- Avoid deep nesting (cyclomatic complexity < 10)
 
-### Formatting
+### Pre-commit Hooks
+
+We use pre-commit hooks to ensure code quality. Install them with:
 
 ```bash
-# Format all code
-go fmt ./...
-
-# Run linter
-golangci-lint run
-
-# Check for common issues
-go vet ./...
+make install-hooks
 ```
+
+This will automatically check:
+- Code formatting (gofmt, goimports)
+- Trailing whitespace
+- YAML syntax
+- File size limits
+- Go module tidiness
+- Linting issues
 
 ### Documentation
 
@@ -346,25 +400,25 @@ go vet ./...
        RequiredParam string `json:"required_param" jsonschema:"required"`
        OptionalParam int    `json:"optional_param,omitempty"`
    }
-   
+
    type AtomicMyNewToolResult struct {
        types.BaseToolResponse
        BaseAIContextResult // Embed AI context methods
-       
+
        // Tool-specific results
        Success bool `json:"success"`
        Data    interface{} `json:"data"`
-       
+
        // Rich context for AI reasoning
        Context *MyToolContext `json:"context"`
    }
-   
+
    type AtomicMyNewTool struct {
        pipelineAdapter PipelineAdapter
        sessionManager  SessionManager
        logger          zerolog.Logger
    }
-   
+
    func (t *AtomicMyNewTool) Execute(ctx context.Context, args AtomicMyNewToolArgs) (*AtomicMyNewToolResult, error) {
        // Implementation following atomic tool patterns
    }

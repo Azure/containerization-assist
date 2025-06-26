@@ -1,0 +1,39 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-yaml
+    exclude: '^templates/.*\.yaml$'  # Exclude Go template files
+  - id: check-added-large-files
+    args: ['--maxkb=1000']
+
+- repo: https://github.com/golangci/golangci-lint
+  rev: v1.62.0
+  hooks:
+  - id: golangci-lint
+    args: ['--fix']
+
+- repo: local
+  hooks:
+  - id: go-fmt
+    name: go fmt
+    entry: bash -c 'gofmt -s -w .'
+    language: system
+    types: [go]
+    pass_filenames: false
+
+  - id: go-imports
+    name: goimports
+    entry: bash -c 'goimports -w .'
+    language: system
+    types: [go]
+    pass_filenames: false
+
+  - id: go-mod-tidy
+    name: go mod tidy
+    entry: bash -c 'go mod tidy'
+    language: system
+    types: [go]
+    pass_filenames: false

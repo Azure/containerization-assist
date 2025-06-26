@@ -310,7 +310,7 @@ Type: %s
 Apply the "%s" fix strategy by:
 
 1. Examining current files using file reading tools
-2. Generating the exact fixed content 
+2. Generating the exact fixed content
 3. Providing specific file modifications needed
 
 Focus on the %s type fix. Return the fixed content between:

@@ -49,13 +49,13 @@ Every tool response should include:
 type EnhancedToolResult struct {
     // Standard operational results
     Success bool `json:"success"`
-    
+
     // Rich context for AI reasoning
     Context *DecisionContext `json:"context"`
-    
+
     // Failure analysis (when operations fail)
     FailureAnalysis *FailureAnalysis `json:"failure_analysis,omitempty"`
-    
+
     // Standard error information
     Error *types.RichError `json:"error,omitempty"`
 }
@@ -67,16 +67,16 @@ type EnhancedToolResult struct {
 type DecisionContext struct {
     // Assessment and analysis
     Assessment       *QualityAssessment     `json:"assessment"`
-    
+
     // Multiple options with trade-offs
     Options          []OptionWithTradeoffs  `json:"options"`
-    
+
     // Recommendations with rationale
     Recommendations  []Recommendation       `json:"recommendations"`
-    
+
     // Next steps and guidance
     NextSteps        []ActionableStep       `json:"next_steps"`
-    
+
     // Monitoring and observability
     Observability    *ObservabilityGuidance `json:"observability"`
 }
@@ -92,17 +92,17 @@ type DecisionContext struct {
 type ContainerizationAssessment struct {
     // Quantified readiness (0-100 scale)
     ReadinessScore     int      `json:"readiness_score"`
-    
+
     // Identified strengths and challenges
     StrengthAreas      []string `json:"strength_areas"`
     ChallengeAreas     []string `json:"challenge_areas"`
-    
+
     // Technology recommendations
     TechnologyStack    TechnologyRecommendations `json:"technology_stack"`
-    
+
     // Deployment options with complexity ratings
     DeploymentOptions  []DeploymentOption `json:"deployment_options"`
-    
+
     // Risk analysis with mitigation strategies
     RiskAnalysis       RiskAssessment `json:"risk_analysis"`
 }
@@ -119,16 +119,16 @@ type BuildFailureAnalysis struct {
     // Failure classification
     FailureType        string              `json:"failure_type"`
     FailureStage       string              `json:"failure_stage"`
-    
+
     // Root cause analysis
     RootCauses         []string            `json:"root_causes"`
-    
+
     // Immediate remediation steps
     RemediationSteps   []RemediationAction `json:"remediation_steps"`
-    
+
     // Alternative build strategies
     AlternativeStrategies []BuildStrategy  `json:"alternative_strategies"`
-    
+
     // Performance optimization guidance
     OptimizationTips   []OptimizationTip   `json:"optimization_tips"`
 }
@@ -145,16 +145,16 @@ type DeploymentStrategyContext struct {
     // Strategy analysis and recommendations
     RecommendedStrategy string                    `json:"recommended_strategy"`
     StrategyOptions     []DeploymentStrategyOption `json:"strategy_options"`
-    
+
     // Resource sizing with rationale
     ResourceSizing      ResourceRecommendation    `json:"resource_sizing"`
-    
+
     // Security posture assessment
     SecurityPosture     SecurityAssessment        `json:"security_posture"`
-    
+
     // Environment-specific configurations
     EnvironmentProfiles []EnvironmentProfile      `json:"environment_profiles"`
-    
+
     // Scaling analysis
     ScalingGuidance     ScalingRecommendation     `json:"scaling_guidance"`
 }
@@ -172,20 +172,20 @@ type DeploymentFailureAnalysis struct {
     FailureType         string   `json:"failure_type"`
     ImpactSeverity      string   `json:"impact_severity"`
     RootCauses          []string `json:"root_causes"`
-    
+
     // Immediate remediation
     ImmediateActions    []DeploymentRemediationAction `json:"immediate_actions"`
-    
+
     // Alternative approaches
     AlternativeApproaches []DeploymentAlternative     `json:"alternative_approaches"`
-    
+
     // Diagnostic and monitoring guidance
     DiagnosticCommands  []DiagnosticCommand         `json:"diagnostic_commands"`
     MonitoringSetup     MonitoringRecommendation    `json:"monitoring_setup"`
-    
+
     // Rollback strategy
     RollbackStrategy    RollbackGuidance            `json:"rollback_strategy"`
-    
+
     // Performance optimization
     PerformanceTuning   PerformanceOptimization     `json:"performance_tuning"`
 }
@@ -268,7 +268,7 @@ func (t *MyTool) Execute(ctx context.Context, args MyToolArgs) (*MyToolResult, e
         Success: true,
         Context: &MyContext{},
     }
-    
+
     // Perform mechanical operations
     operationResult, err := t.performOperation(args)
     if err != nil {
@@ -276,10 +276,10 @@ func (t *MyTool) Execute(ctx context.Context, args MyToolArgs) (*MyToolResult, e
         result.FailureAnalysis = t.generateFailureAnalysis(err)
         return result, nil
     }
-    
+
     // Generate rich context for AI reasoning
     result.Context = t.generateRichContext(operationResult, args)
-    
+
     return result, nil
 }
 ```
@@ -292,13 +292,13 @@ func (t *MyTool) generateFailureAnalysis(err error) *FailureAnalysis {
         FailureType: t.classifyFailure(err),
         RootCauses:  t.identifyRootCauses(err),
     }
-    
+
     // Add immediate actions based on failure type
     analysis.ImmediateActions = t.generateRemediationSteps(err)
-    
+
     // Suggest alternative approaches
     analysis.Alternatives = t.suggestAlternatives(err)
-    
+
     return analysis
 }
 ```
@@ -425,7 +425,7 @@ err := fixingMixin.ExecuteWithRetry(ctx, sessionID, baseDir, operation)
 
 ---
 
-**Last Updated**: 2025-06-22  
-**Pattern Version**: 2.0  
+**Last Updated**: 2025-06-22
+**Pattern Version**: 2.0
 **Tools Implementing Pattern**: analyze_repository, build_image, generate_manifests, deploy_kubernetes
 **Fixing Integration**: atomic_build_image, atomic_deploy_kubernetes, generate_manifests_atomic

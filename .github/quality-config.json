@@ -1,0 +1,81 @@
+{
+  "ratcheting_strategy": {
+    "description": "Gradual improvement approach for code quality",
+    "principles": [
+      "Prevent regression from baseline",
+      "Only check new/modified code in PRs",
+      "Allow tolerance for minor variations",
+      "Focus on gradual improvement over time"
+    ]
+  },
+  "linting": {
+    "error_budgets": {
+      "mcp": {
+        "errors": 100,
+        "warnings": 50
+      },
+      "core": {
+        "errors": 50,
+        "warnings": 30
+      },
+      "combined": {
+        "errors": 150,
+        "warnings": 100
+      }
+    },
+    "new_code_only": true,
+    "baseline_branch": "main"
+  },
+  "complexity": {
+    "thresholds": {
+      "fail": 25,
+      "warn": 20,
+      "target": 15
+    },
+    "check_new_code_only": true,
+    "ratcheting_enabled": true,
+    "current_baseline": {
+      "over_30": 9,
+      "over_25": 15,
+      "over_20": 34,
+      "over_15": 84,
+      "over_10": 263
+    },
+    "known_complex_functions": [
+      "(*AtomicCheckHealthTool).performHealthCheck",
+      "(*AtomicGenerateManifestsTool).performManifestGeneration",
+      "convertToAtomicGenerateManifestsArgs",
+      "collectTestCoverageMetrics"
+    ]
+  },
+  "formatting": {
+    "enforce": "warn",
+    "tools": ["gofmt -s", "goimports"],
+    "auto_fix_available": true
+  },
+  "technical_debt": {
+    "todo_limit_per_pr": 10,
+    "warn_threshold": 5,
+    "track_total": true
+  },
+  "test_coverage": {
+    "target": 50,
+    "minimum": 10,
+    "regression_tolerance": 2
+  },
+  "error_handling": {
+    "adoption_target": 60,
+    "minimum_budget": 30,
+    "regression_tolerance": 5
+  },
+  "quality_gates": {
+    "interface_validation": {
+      "enforce": true,
+      "allow_warnings": true
+    },
+    "dependency_hygiene": {
+      "enforce": false,
+      "track_only": true
+    }
+  }
+}

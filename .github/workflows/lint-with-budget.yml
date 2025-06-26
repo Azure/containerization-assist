@@ -13,15 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-      
+
       - name: Install golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
-      
+
       # Option 1: Use the threshold script
       - name: Run linter with threshold
         env:
@@ -30,7 +30,7 @@ jobs:
         run: |
           chmod +x ./scripts/lint-with-threshold.sh
           ./scripts/lint-with-threshold.sh ./pkg/mcp/...
-      
+
       # Option 2: Use golangci-lint directly with custom logic
       - name: Run linter and check threshold
         id: lint
@@ -39,24 +39,24 @@ jobs:
           golangci-lint run --out-format json ./pkg/mcp/... > lint-results.json || true
           ISSUE_COUNT=$(jq '.Issues | length' lint-results.json || echo "0")
           echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
-          
+
           # Generate summary
           echo "## Lint Results" >> $GITHUB_STEP_SUMMARY
           echo "Total issues: $ISSUE_COUNT" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ $ISSUE_COUNT -gt 0 ]; then
             echo "### Issues by Linter" >> $GITHUB_STEP_SUMMARY
             jq -r '.Issues | group_by(.FromLinter) | map("- **\(.[0].FromLinter)**: \(length)") | .[]' lint-results.json >> $GITHUB_STEP_SUMMARY
           fi
-      
+
       - name: Check error budget
         env:
           ERROR_THRESHOLD: 50
           WARN_THRESHOLD: 30
         run: |
           ISSUE_COUNT=${{ steps.lint.outputs.issue_count }}
-          
+
           if [ $ISSUE_COUNT -gt $ERROR_THRESHOLD ]; then
             echo "❌ Lint check failed: $ISSUE_COUNT issues found (threshold: $ERROR_THRESHOLD)"
             exit 1
@@ -65,7 +65,7 @@ jobs:
           else
             echo "✅ Lint check passed: $ISSUE_COUNT issues found"
           fi
-      
+
       # Option 3: Post results as PR comment
       - name: Comment PR
         if: github.event_name == 'pull_request' && steps.lint.outputs.issue_count > 0
@@ -75,10 +75,10 @@ jobs:
             const issueCount = ${{ steps.lint.outputs.issue_count }};
             const errorThreshold = 50;
             const warnThreshold = 30;
-            
+
             let status = '✅';
             let message = 'within acceptable limits';
-            
+
             if (issueCount > errorThreshold) {
               status = '❌';
               message = `exceeds error threshold (${errorThreshold})`;
@@ -86,22 +86,22 @@ jobs:
               status = '⚠️';
               message = `exceeds warning threshold (${warnThreshold})`;
             }
-            
+
             const comment = `## Lint Results ${status}
-            
+
             **Total issues found:** ${issueCount} - ${message}
-            
+
             | Threshold | Limit | Status |
             |-----------|-------|--------|
             | Error | ${errorThreshold} | ${issueCount > errorThreshold ? '❌ Exceeded' : '✅ OK'} |
             | Warning | ${warnThreshold} | ${issueCount > warnThreshold ? '⚠️ Exceeded' : '✅ OK'} |
-            
+
             <details>
             <summary>View detailed results</summary>
-            
+
             Run \`golangci-lint run ./pkg/mcp/...\` locally to see all issues.
             </details>`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
