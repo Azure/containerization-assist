@@ -183,6 +183,34 @@ jobs:
 | `reusable-go-build.yml` | **Reusable build workflow** | 🆕 **New** |
 | `example-reusable-usage.yml` | Examples of reusable workflow usage | 📝 Example |
 
+## CI Status Consolidation
+
+To reduce PR comment noise, we use a consolidated CI status approach:
+
+### Individual Workflows
+- **security-scan.yml** - Runs security scans, uploads artifacts
+- **quality-gates.yml** - Runs quality checks, uploads artifacts  
+- **core-coverage-enforcement.yml** - Runs coverage checks, posts coverage comment (kept separate due to detailed reporting needs)
+- **lint-dashboard.yml** - Runs lint checks, uploads artifacts
+
+### Consolidation
+- **ci-status-consolidator.yml** - Triggered after individual workflows complete
+- Downloads artifacts from all related workflows for the PR
+- Creates/updates a single consolidated CI status comment
+- Provides overview of all CI results in one place
+
+### Benefits
+- Single CI status comment per PR instead of 4+ separate comments
+- Clear overview of all CI results
+- Automatically updates as workflows complete
+- Maintains detailed individual workflow logs and artifacts
+
+### Coverage Exception
+The core coverage workflow retains its individual PR comment because:
+- It provides detailed per-package coverage breakdown
+- Users need granular coverage information for decision making
+- The detailed table format doesn't fit well in the consolidated summary
+
 ## Next Steps
 
 1. **Migrate existing workflows** to use `reusable-go-build.yml`
