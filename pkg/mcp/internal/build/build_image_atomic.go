@@ -237,8 +237,8 @@ func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (i
 			Build()
 	}
 
-	// Call the typed Execute method
-	return t.ExecuteTyped(ctx, buildArgs)
+	// Execute with nil server context (no progress tracking)
+	return t.ExecuteWithContext(nil, buildArgs)
 }
 
 // Legacy interface methods for backward compatibility
@@ -266,12 +266,6 @@ func (t *AtomicBuildImageTool) GetCapabilities() types.ToolCapabilities {
 		IsLongRunning:     true,
 		RequiresAuth:      false,
 	}
-}
-
-// ExecuteTyped provides the original typed execute method
-func (t *AtomicBuildImageTool) ExecuteTyped(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
-	// Execute with nil server context (no progress tracking)
-	return t.ExecuteWithContext(nil, args)
 }
 
 // Helper methods
