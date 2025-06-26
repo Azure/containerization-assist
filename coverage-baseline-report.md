@@ -68,7 +68,7 @@ This report provides a baseline assessment of test coverage across the Container
 
 ## Key Findings
 
-1. **Critical Coverage Gaps**: 
+1. **Critical Coverage Gaps**:
    - Core MCP functionality has only 18.5% coverage
    - Essential Docker and Kubernetes packages are below 20%
    - Command-line tools have minimal coverage (1.3% for mcp-server)

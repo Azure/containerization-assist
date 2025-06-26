@@ -15,7 +15,7 @@ jobs:
   core-coverage:
     name: Core Package Coverage Check
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -57,28 +57,28 @@ jobs:
           "./pkg/ai/..."
           "./pkg/clients/..."
         )
-        
+
         # Run tests with coverage for each core package
         echo "## Core Package Coverage Report" > core-coverage-report.md
         echo "" >> core-coverage-report.md
         echo "| Package | Coverage | Status |" >> core-coverage-report.md
         echo "|---------|----------|--------|" >> core-coverage-report.md
-        
+
         FAILED_PACKAGES=""
         for pkg in "${CORE_PACKAGES[@]}"; do
           echo "Testing package: $pkg"
-          
+
           # Run test and capture coverage
           if go test -coverprofile=temp-coverage.out -covermode=atomic $pkg > /dev/null 2>&1; then
             if [ -f temp-coverage.out ]; then
               # Extract coverage percentage
               COV=$(go tool cover -func=temp-coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-              
+
               # Check if empty (no code)
               if [ -z "$COV" ]; then
                 COV="0.0"
               fi
-              
+
               # Determine status
               STATUS="❌ Below 80%"
               if (( $(echo "$COV >= 80" | bc -l) )); then
@@ -86,11 +86,11 @@ jobs:
               elif (( $(echo "$COV >= 60" | bc -l) )); then
                 STATUS="⚠️ Below target"
               fi
-              
+
               # Add to report
               PKG_NAME=$(echo $pkg | sed 's/\.\.\.//')
               echo "| $PKG_NAME | ${COV}% | $STATUS |" >> core-coverage-report.md
-              
+
               # Track failures
               if (( $(echo "$COV < 80" | bc -l) )); then
                 FAILED_PACKAGES="$FAILED_PACKAGES\n- $PKG_NAME: ${COV}%"
@@ -104,16 +104,16 @@ jobs:
             FAILED_PACKAGES="$FAILED_PACKAGES\n- $pkg: 0.0% (test failed)"
           fi
         done
-        
+
         # Generate combined coverage
         go test -coverprofile=combined-coverage.out -covermode=atomic ${CORE_PACKAGES[@]}
         go tool cover -html=combined-coverage.out -o core-coverage.html
-        
+
         # Add summary to report
         echo "" >> core-coverage-report.md
         echo "## Summary" >> core-coverage-report.md
         echo "" >> core-coverage-report.md
-        
+
         if [ -n "$FAILED_PACKAGES" ]; then
           echo "### ❌ Packages Below 80% Target:" >> core-coverage-report.md
           echo -e "$FAILED_PACKAGES" >> core-coverage-report.md
@@ -122,7 +122,7 @@ jobs:
         else
           echo "### ✅ All Core Packages Meet Coverage Target!" >> core-coverage-report.md
         fi
-        
+
         # Output to step summary
         cat core-coverage-report.md >> $GITHUB_STEP_SUMMARY
 
@@ -142,7 +142,7 @@ jobs:
         script: |
           const fs = require('fs');
           const report = fs.readFileSync('core-coverage-report.md', 'utf8');
-          
+
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
