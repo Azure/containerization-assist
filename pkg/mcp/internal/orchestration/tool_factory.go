@@ -3,12 +3,12 @@ package orchestration
 import (
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

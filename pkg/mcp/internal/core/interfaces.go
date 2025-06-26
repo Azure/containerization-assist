@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
+	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 )
 
 // InternalTransport is a local interface to avoid import cycles with pkg/mcp

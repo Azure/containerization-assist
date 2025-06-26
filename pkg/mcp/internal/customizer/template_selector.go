@@ -3,7 +3,7 @@ package customizer
 import (
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/rs/zerolog"
 )
 

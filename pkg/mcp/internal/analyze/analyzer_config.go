@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

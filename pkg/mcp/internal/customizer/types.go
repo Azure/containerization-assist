@@ -1,7 +1,7 @@
 package customizer
 
 import (
-	"github.com/Azure/container-copilot/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/core/analysis"
 )
 
 // OptimizationStrategy represents different optimization approaches

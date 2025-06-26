@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/logger"
-	"github.com/Azure/container-copilot/templates"
+	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/templates"
 	"sigs.k8s.io/yaml"
 )
 

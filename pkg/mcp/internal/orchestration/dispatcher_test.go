@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // testToolImpl is a simple test tool implementation

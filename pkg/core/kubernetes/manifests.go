@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/rs/zerolog"
 	"sigs.k8s.io/yaml"
 )

@@ -3,7 +3,7 @@ package deploy
 import (
 	"context"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -19,7 +19,7 @@ type AtomicGenerateManifestsTool struct {
 
 // NewAtomicGenerateManifestsTool creates a basic atomic tool for compatibility
 func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateManifestsTool {
-	baseTool := NewGenerateManifestsTool(logger, "/tmp/container-copilot")
+	baseTool := NewGenerateManifestsTool(logger, "/tmp/container-kit")
 	return &AtomicGenerateManifestsTool{
 		logger:   logger.With().Str("tool", "atomic_generate_manifests").Logger(),
 		baseTool: baseTool,

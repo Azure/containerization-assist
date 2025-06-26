@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
+	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // Handler methods for direct GoMCP tool registration

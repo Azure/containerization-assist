@@ -36,8 +36,8 @@ The fastest way to get started with a fully configured environment:
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/YOUR-USERNAME/container-copilot.git
-   cd container-copilot
+   git clone https://github.com/YOUR-USERNAME/container-kit.git
+   cd container-kit
    ```
 
 2. **Open in Dev Container**
@@ -62,8 +62,8 @@ If you prefer to set up your local environment manually:
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/YOUR-USERNAME/container-copilot.git
-   cd container-copilot
+   git clone https://github.com/YOUR-USERNAME/container-kit.git
+   cd container-kit
    ```
 
 2. **Install Dependencies**
@@ -101,7 +101,7 @@ If you prefer to set up your local environment manually:
 ## Project Structure
 
 ```
-container-copilot/
+container-kit/
 ├── cmd/                    # Main applications
 │   ├── mcp-server/        # MCP server binary
 │   └── root.go            # CLI root command

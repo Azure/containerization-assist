@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/genericutils"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/genericutils"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // Analysis and Dockerfile generation helpers

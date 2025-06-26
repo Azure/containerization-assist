@@ -14,7 +14,7 @@ package mcp
 import (
 	"context"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/core"
 )
 
 // Essential Public API Types

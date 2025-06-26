@@ -4,7 +4,7 @@ This document defines the development standards for atomic tools in the MCP (Mod
 
 ## Overview
 
-Atomic tools are the foundational building blocks of the container-copilot system. They provide deterministic, composable operations that can be used independently or orchestrated together in workflows.
+Atomic tools are the foundational building blocks of the container-kit system. They provide deterministic, composable operations that can be used independently or orchestrated together in workflows.
 
 ## Architecture Standards
 
@@ -115,7 +115,7 @@ func standardBuildStages() []interfaces.ProgressStage {
 }
 
 // ✅ CORRECT: Use centralized stages
-import "github.com/Azure/container-copilot/pkg/mcp/internal/core"
+import "github.com/Azure/container-kit/pkg/mcp/internal/core"
 
 err := t.progressTracker.RunWithProgress(ctx, "Operation Name", core.StandardBuildStages(), func(...) {
     // Implementation
@@ -190,7 +190,7 @@ func (t *AtomicToolName) executeWithProgress(ctx context.Context, args Args, res
 ### 1. Use Standardized Validation Utilities
 
 ```go
-import "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
+import "github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
 // Initialize validation mixin
 validationMixin := utils.NewStandardizedValidationMixin(t.logger)
@@ -252,7 +252,7 @@ func (t *AtomicToolName) PreValidate(ctx context.Context, args Args) error {
 **Always use the error builders for consistent error formatting:**
 
 ```go
-import "github.com/Azure/container-copilot/pkg/mcp/internal/errors"
+import "github.com/Azure/container-kit/pkg/mcp/internal/errors"
 
 // ✅ CORRECT: Use error builders
 richError := errors.NewSystemError(

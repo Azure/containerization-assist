@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

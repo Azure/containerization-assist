@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/genericutils"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
+	"github.com/Azure/container-kit/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
 
 // getIntFromMap safely extracts an int value from a map with JSON number conversion support

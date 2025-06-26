@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/clients"
-	"github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/logger"
-	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/container-kit/pkg/clients"
+	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
 // ManifestStage implements the pipeline.PipelineStage interface for Kubernetes manifests

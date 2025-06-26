@@ -1,7 +1,7 @@
 package deploy
 
 import (
-	"github.com/Azure/container-copilot/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 )
 
 // ManifestGeneratorInterface defines the interface for manifest generation

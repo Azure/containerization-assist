@@ -3,8 +3,8 @@ package core
 import (
 	"context"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/transport"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // TransportAdapter adapts internal transport to mcptypes.Transport interface

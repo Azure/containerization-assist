@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -73,7 +73,7 @@ type AlertState struct {
 
 // NewSLOMonitor creates a new SLO monitor
 func NewSLOMonitor(logger zerolog.Logger, config *types.ObservabilityConfig) (*SLOMonitor, error) {
-	meter := otel.Meter("container-copilot-mcp-slo")
+	meter := otel.Meter("container-kit-mcp-slo")
 
 	monitor := &SLOMonitor{
 		logger:      logger.With().Str("component", "slo_monitor").Logger(),

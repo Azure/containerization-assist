@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
 // TestFormatFileOperationLogs tests the FormatFileOperationLogs function

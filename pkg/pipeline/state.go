@@ -1,9 +1,9 @@
 package pipeline
 
 import (
-	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/docker"
-	"github.com/Azure/container-copilot/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/k8s"
 )
 
 // PipelineState holds state across steps and iterations

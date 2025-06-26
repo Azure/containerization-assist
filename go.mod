@@ -1,4 +1,4 @@
-module github.com/Azure/container-copilot
+module github.com/Azure/container-kit
 
 go 1.24.1
 

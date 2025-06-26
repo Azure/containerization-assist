@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
 // MockMetadataManager provides a controllable mock for metadata operations

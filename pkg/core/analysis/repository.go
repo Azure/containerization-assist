@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/utils"
+	"github.com/Azure/container-kit/pkg/utils"
 	"github.com/rs/zerolog"
 )
 

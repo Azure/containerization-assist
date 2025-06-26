@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/logger"
-	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/utils"
+	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/utils"
 )
 
 // Ensure DatabaseDetectionStage implements pipeline.PipelineStage interface.

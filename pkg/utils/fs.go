@@ -1,6 +1,6 @@
 // Package utils provides common utility functions for file system operations,
 // directory tree generation, and other shared functionality used throughout
-// the container-copilot application.
+// the container-kit application.
 package utils
 
 import (
