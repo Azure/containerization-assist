@@ -148,7 +148,7 @@ jobs:
       - name: Check Artifact Directory Size
         run: |
           max_size_bytes=$((20 * 1024 * 1024))  # 20 MiB in bytes
-          echo "Artifact Directory Size:"
+          echo "Max Artifact Directory Size: $max_size_bytes bytes"
           size_in_bytes=$(du -sb test-repo/artifacts/ | cut -f1)
           echo "Artifact Directory Size in bytes: $size_in_bytes"
           if [ "$size_in_bytes" -gt "$max_size_bytes" ]; then
