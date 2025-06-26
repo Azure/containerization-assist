@@ -29,6 +29,16 @@ func NewMCPClients(docker docker.DockerClient, kind kind.KindRunner, kube k8s.Ku
 	}
 }
 
+// NewMCPClientsWithAnalyzer creates MCP-specific clients with a specific analyzer
+func NewMCPClientsWithAnalyzer(docker docker.DockerClient, kind kind.KindRunner, kube k8s.KubeRunner, analyzer AIAnalyzer) *MCPClients {
+	return &MCPClients{
+		Docker:   docker,
+		Kind:     kind,
+		Kube:     kube,
+		Analyzer: analyzer,
+	}
+}
+
 // SetAnalyzer allows dependency injection of the analyzer implementation
 func (mc *MCPClients) SetAnalyzer(analyzer AIAnalyzer) {
 	mc.Analyzer = analyzer

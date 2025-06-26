@@ -113,12 +113,6 @@ func (t *AtomicBuildImageTool) ExecuteWithFixes(ctx context.Context, args Atomic
 	return t.executor.ExecuteWithFixes(ctx, args, nil)
 }
 
-// ExecuteBuild runs the atomic Docker image build (deprecated: use ExecuteWithContext)
-func (t *AtomicBuildImageTool) ExecuteBuild(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
-	// Use executor for backward compatibility
-	return t.executor.ExecuteBuild(ctx, args)
-}
-
 // ExecuteWithContext executes the tool with GoMCP server context for native progress tracking
 func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
 	startTime := time.Now()
@@ -276,7 +270,8 @@ func (t *AtomicBuildImageTool) GetCapabilities() types.ToolCapabilities {
 
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicBuildImageTool) ExecuteTyped(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
-	return t.ExecuteBuild(ctx, args)
+	// Execute with nil server context (no progress tracking)
+	return t.ExecuteWithContext(nil, args)
 }
 
 // Helper methods

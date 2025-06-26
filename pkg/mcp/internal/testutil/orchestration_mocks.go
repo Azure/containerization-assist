@@ -128,13 +128,6 @@ func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{
 	return err
 }
 
-// SetPipelineAdapter implements dependency injection for testing
-func (m *MockToolOrchestrator) SetPipelineAdapter(adapter interface{}) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.PipelineAdapter = adapter
-}
-
 // Test utility methods
 
 // GetExecutionCount returns the number of tool executions

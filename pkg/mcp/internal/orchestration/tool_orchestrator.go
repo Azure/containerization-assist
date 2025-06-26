@@ -38,11 +38,6 @@ func (o *MCPToolOrchestrator) GetDispatcher() *NoReflectToolOrchestrator {
 	return o.dispatcher
 }
 
-// SetPipelineAdapter sets the pipeline adapter (deprecated - use SetPipelineOperations)
-func (o *MCPToolOrchestrator) SetPipelineAdapter(adapter interface{}) {
-	o.SetPipelineOperations(adapter)
-}
-
 // SetPipelineOperations sets the pipeline operations for tool creation
 func (o *MCPToolOrchestrator) SetPipelineOperations(operations interface{}) {
 	o.pipelineOperations = operations
