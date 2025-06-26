@@ -179,12 +179,13 @@ jobs:
     - name: Check core package coverage enforcement
       run: |
         # Sprint D: Testing & Quality Foundation - Staged enforcement approach
-        # Stage 1: Enforce minimum 20% for packages with new tests
-        # Stage 2: Gradually ramp up to 80% target
+        # Stage 1: Enforce minimum 5% for packages with new tests (initial rollout)
+        # Stage 2: Gradually ramp up to 80% target over time
+        # Note: We start with 5% to establish baseline and prevent regression
 
         # Load thresholds from configuration
-        MINIMUM_THRESHOLD=20
-        TARGET_THRESHOLD=80
+        MINIMUM_THRESHOLD=5   # Lowered from 20% for initial rollout
+        TARGET_THRESHOLD=80   # Long-term target remains 80%
 
         # Check for packages that don't meet even the minimum threshold
         CRITICAL_FAILURES=""

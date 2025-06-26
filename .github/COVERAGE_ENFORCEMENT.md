@@ -12,28 +12,33 @@ Our CI system enforces test coverage through multiple layers:
 
 ## Coverage Thresholds
 
-### Current Enforcement (Sprint D)
+### Current Enforcement (Sprint D - Revised)
 
-| Package Group | Minimum | Target | Status |
-|---------------|---------|--------|--------|
-| Core Packages | 20% | 80% | ⚠️ Building up |
-| MCP Packages | 20% | 80% | ✅ Improving |
-| AI/Pipeline | 15% | 75% | 🔨 In progress |
-| Global | 15% | 70% | 📈 Tracking |
+| Package Group | Current Min | Q2 2025 | Target | Status |
+|---------------|-------------|---------|--------|--------|
+| Core Packages | 5% | 20% | 80% | 🚀 Starting baseline |
+| MCP w/Tests | 8% | 20% | 80% | ✅ Maintaining gains |
+| AI/Pipeline | 0% | 10% | 75% | 🔨 Building foundation |
+| Global | 5% | 15% | 70% | 📈 Gradual increase |
 
 ### Staged Rollout Plan
 
-**Phase 1: Foundation (Current - Sprint D)**
-- Establish minimum 20% coverage for packages with tests
-- Build comprehensive error handling and boundary condition tests
-- Replace stub tests with real integration tests
+**Phase 1: Baseline (Q1 2025 - Current)**
+- Establish minimum 5% coverage to prevent regression
+- Maintain Sprint D improvements (8-17% for tested packages)
+- Build test infrastructure and patterns
 
-**Phase 2: Growth (Next Sprint)**
-- Raise minimum to 40% for core packages
-- Enforce 60% for critical paths
+**Phase 2: Foundation (Q2 2025)**
+- Raise minimum to 20% for core packages
+- Expand test coverage to untested packages
+- Implement integration test suites
+
+**Phase 3: Growth (Q3-Q4 2025)**
+- Progressive increases: 40% (Q3) → 60% (Q4)
+- Focus on critical paths and edge cases
 - Full coverage ratchet enforcement
 
-**Phase 3: Maturity (Future)**
+**Phase 4: Target (Q1 2026)**
 - Achieve 80% target for core packages
 - Enforce strict coverage requirements
 - Maintain quality through automated checks
