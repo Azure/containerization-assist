@@ -190,22 +190,10 @@ jobs:
 
                   # Check if it's a test-only package
                   if [[ "$OUTPUT" == *"no non-test Go files"* ]]; then
-                    echo "Test-only package detected: $p - trying go test -c"
-                    if [ -z "$tags" ]; then
-                      TEST_OUTPUT=$(go test -c -o /dev/null "$p" 2>&1)
-                      TEST_EXIT_CODE=$?
-                    else
-                      TEST_OUTPUT=$(go test -c -tags="$tags" -o /dev/null "$p" 2>&1)
-                      TEST_EXIT_CODE=$?
-                    fi
-
-                    if [ $TEST_EXIT_CODE -eq 0 ]; then
-                      echo "✅ Test compilation successful for: $p"
-                    else
-                      echo "❌ Test compilation failed for: $p"
-                      echo "$TEST_OUTPUT"
-                      BUILD_SUCCESS=false
-                    fi
+                    echo "Test-only package detected: $p - skipping build (will be handled during test phase)"
+                    # Test-only packages don't need to be built separately
+                    # They will be compiled and run during the test phase
+                    continue
                   elif [ $EXIT_CODE -ne 0 ]; then
                     echo "$OUTPUT"
                     BUILD_SUCCESS=false
