@@ -95,4 +95,14 @@ func RegisterResource[TArgs any](
 	r.logger.Info().Str("resource", path).Msg("Resource registered successfully")
 }
 
+// RegisterSimpleToolWithFixedSchema is now just an alias since the fork has the fix
+func RegisterSimpleToolWithFixedSchema[TArgs, TResult any](
+	r *StandardToolRegistrar,
+	name, description string,
+	toolFunc SimpleToolFunc[TArgs, TResult],
+) {
+	// Since we're using the fixed fork, just delegate to RegisterSimpleTool
+	RegisterSimpleTool(r, name, description, toolFunc)
+}
+
 // ToolDependencies is defined in gomcp_tools.go to avoid circular imports

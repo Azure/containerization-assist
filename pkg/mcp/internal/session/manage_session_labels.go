@@ -46,9 +46,10 @@ type RemoveSessionLabelResult struct {
 
 // UpdateSessionLabelsArgs represents arguments for updating all labels on a session
 type UpdateSessionLabelsArgs struct {
-	types.BaseToolArgs
+	DryRun          bool     `json:"dry_run,omitempty" description:"Preview changes without executing"`
+	SessionID       string   `json:"session_id,omitempty" description:"Session ID for state correlation"`
 	TargetSessionID string   `json:"target_session_id,omitempty" description:"Target session ID (default: current session)"`
-	Labels          []string `json:"labels" description:"Complete set of labels to apply to the session"`
+	Labels          []string `json:"labels" jsonschema:"type=array,items={type:string}" description:"Complete set of labels to apply to the session"`
 	Replace         bool     `json:"replace,omitempty" description:"Replace all existing labels (default: true)"`
 }
 

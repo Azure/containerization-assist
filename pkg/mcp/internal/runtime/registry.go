@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
-	"github.com/alecthomas/jsonschema"
+	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"
 )
 
@@ -74,23 +74,33 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
 	}
 
-	reflector := jsonschema.Reflector{
-		RequiredFromJSONSchemaTags: true, // respects `jsonschema:",required"`
+	// Use invopop/jsonschema which properly handles array items
+	reg.logger.Info().Str("tool", metadata.Name).Msg("🔧 Using invopop/jsonschema for schema generation with array fixes")
+
+	reflector := &jsonschema.Reflector{
+		RequiredFromJSONSchemaTags: true,
 		AllowAdditionalProperties:  false,
-		DoNotReference:             true, // no "$ref" / "$defs"
+		DoNotReference:             true, // avoid $ref/$defs for better compatibility
 	}
 	var a TArgs
 	var r TResult
 
-	// Generate schemas using reflector
+	// Generate schemas using invopop reflector
 	inputSchema := reflector.Reflect(a)
 	outputSchema := reflector.Reflect(r)
 
-	inputSchema.Version = ""  // drop $schema
-	outputSchema.Version = "" // drop $schema
+	// Remove schema version for compatibility
+	inputSchema.Version = ""
+	outputSchema.Version = ""
 
-	cleanInput := sanitizeSchema(inputSchema)
-	cleanOutput := sanitizeSchema(outputSchema)
+	// Convert to map format and apply compatibility fixes
+	cleanInput := sanitizeInvopopSchema(inputSchema)
+	cleanOutput := sanitizeInvopopSchema(outputSchema)
+
+	// Log if we fixed any arrays
+	if hasArrays := containsArrays(cleanInput); hasArrays {
+		reg.logger.Info().Str("tool", metadata.Name).Msg("✅ Generated schema with proper array items using invopop/jsonschema")
+	}
 
 	reg.tools[metadata.Name] = &ToolRegistration{
 		Tool:         t,
@@ -115,23 +125,38 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	return nil
 }
 
-// sanitizeSchema converts a *jsonschema.Schema to map[string]any and removes
-// every keyword Copilot's AJV-Draft-07 validator chokes on.
-func sanitizeSchema(raw *jsonschema.Schema) map[string]any {
-	// 1. Marshal + unmarshal once so we can walk the structure.
-	b, err := json.Marshal(raw)
+// sanitizeInvopopSchema converts invopop jsonschema.Schema to map[string]any
+// and removes keywords that GitHub Copilot's AJV-Draft-7 validator cannot handle
+func sanitizeInvopopSchema(schema *jsonschema.Schema) map[string]interface{} {
+	// Marshal and unmarshal to get map format
+	schemaBytes, err := json.Marshal(schema)
 	if err != nil {
-		// Return empty map if marshaling fails
-		return make(map[string]any)
-	}
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
-		// Return empty map if unmarshaling fails
-		return make(map[string]any)
+		return make(map[string]interface{})
 	}
 
-	utils.RemoveCopilotIncompatible(m)
-	return m
+	var schemaMap map[string]interface{}
+	if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
+		return make(map[string]interface{})
+	}
+
+	// Apply GitHub Copilot compatibility fixes
+	utils.RemoveCopilotIncompatible(schemaMap)
+
+	return schemaMap
+}
+
+// containsArrays checks if a schema contains any array fields (for logging purposes)
+func containsArrays(schema map[string]interface{}) bool {
+	if properties, ok := schema["properties"].(map[string]interface{}); ok {
+		for _, prop := range properties {
+			if propMap, ok := prop.(map[string]interface{}); ok {
+				if propMap["type"] == "array" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 ///////////////////////////////////////////////////////////////////////////////

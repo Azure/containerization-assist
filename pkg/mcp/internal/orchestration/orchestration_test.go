@@ -109,17 +109,28 @@ func TestGetToolsByCategory(t *testing.T) {
 	logger := zerolog.Nop()
 	registry := NewMCPToolRegistry(logger)
 
-	// Test category-based tool discovery
-	categories := []string{"analysis", "build", "deployment", "security"}
+	// Register some test tools manually since the registry starts empty
+	err := registry.RegisterTool("analyze_repository_atomic", &mockTool{})
+	assert.NoError(t, err)
 
-	for _, category := range categories {
+	err = registry.RegisterTool("build_image_atomic", &mockTool{})
+	assert.NoError(t, err)
+
+	err = registry.RegisterTool("scan_image_security_atomic", &mockTool{})
+	assert.NoError(t, err)
+
+	// Test category-based tool discovery
+	categories := map[string]int{
+		"analysis":   1, // should have analyze_repository_atomic
+		"build":      1, // should have build_image_atomic
+		"security":   1, // should have scan_image_security_atomic
+		"deployment": 0, // should have no tools
+	}
+
+	for category, expectedCount := range categories {
 		tools := registry.GetToolsByCategory(category)
 		t.Logf("Tools with category '%s': %v", category, tools)
-
-		// We should have at least some tools for each major category
-		if category == "analysis" || category == "build" {
-			assert.Greater(t, len(tools), 0, "Expected tools for category: %s", category)
-		}
+		assert.Equal(t, expectedCount, len(tools), "Expected %d tools for category: %s", expectedCount, category)
 	}
 }
 
