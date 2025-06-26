@@ -4,27 +4,54 @@ AI-Powered Application Containerization and Kubernetes Deployment
 
 Container Kit automates the creation of Docker images and Kubernetes manifests using AI-guided workflows. It provides atomic tools for precise control and conversational workflows for guided assistance.
 
-## 🚀 Quick Start
+## 🚀 Quick Install
+
+### One-Line Installation
+
+**Linux/macOS:**
+```bash
+curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/install.sh | bash
+```
+
+**Windows (PowerShell as Administrator):**
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https://raw.githubusercontent.com/Azure/container-kit/main/scripts/install.ps1 -OutFile install.ps1; ./install.ps1; Remove-Item install.ps1
+```
+
+### Verify Installation
+```bash
+container-kit --version
+```
+
+For detailed installation options and troubleshooting, see the [Quickstart Guide](docs/quickstart.md).
+
+## 🏃 Quick Start
 
 ### Prerequisites
-- Go 1.21+
 - Docker
 - kubectl (optional, for Kubernetes features)
+- Azure OpenAI access (for AI features)
 
-### MCP Server Setup
+### Basic Usage
+```bash
+# Containerize your application
+container-kit generate /path/to/your/app
+
+# Use the guided setup
+container-kit setup --target-repo /path/to/your/app
+```
+
+### Building from Source
 ```bash
 git clone https://github.com/Azure/container-kit.git
 cd container-kit
 
+# Build the CLI
+go build -o container-kit .
+
 # Build the MCP server
 make mcp
-
-# Test the server
-./container-kit-mcp --version
 ```
-
-### Use with Claude Desktop
-Add to your Claude Desktop config and ask: *"Help me containerize my application"*
 
 ## 📖 Documentation
 
