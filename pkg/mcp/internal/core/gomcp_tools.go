@@ -25,6 +25,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// contextKey is used as a key for context values to avoid collisions
+type contextKey string
+
+const mcpContextKey contextKey = "mcp_context"
+
 // Typed args and result structs for GoMCP tools
 
 // ServerStatusArgs defines arguments for server status tool
@@ -398,7 +403,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 				"dry_run":       args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "analyze_repository_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -432,7 +437,7 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 				"dry_run":              args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -469,7 +474,7 @@ func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegist
 				"dry_run":          args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "build_image_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -501,7 +506,7 @@ func (gm *GomcpManager) registerPullImage(registrar *runtime.StandardToolRegistr
 				"dry_run":     args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "pull_image_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -532,7 +537,7 @@ func (gm *GomcpManager) registerTagImage(registrar *runtime.StandardToolRegistra
 				"dry_run":      args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "tag_image_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -565,7 +570,7 @@ func (gm *GomcpManager) registerPushImage(registrar *runtime.StandardToolRegistr
 				"dry_run":      args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "push_image_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -603,7 +608,7 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 				"dry_run":         true,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "deploy_kubernetes_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -652,7 +657,7 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 				"dry_run":         args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -685,7 +690,7 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 				"dry_run":              args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -715,7 +720,7 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 				"dry_run":              args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -746,7 +751,7 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 				"dry_run":             args.DryRun,
 			}
 
-			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
@@ -1026,7 +1031,7 @@ func (gm *GomcpManager) registerOrchestratorTool(registrar *runtime.StandardTool
 
 	gm.server.Tool(toolName, description, func(ctx *gomcpserver.Context, args interface{}) (interface{}, error) {
 		// Execute through the canonical orchestrator - create proper context
-		goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+		goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 		result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, atomicToolName, args, nil)
 		if err != nil {
 			deps.Logger.Error().
