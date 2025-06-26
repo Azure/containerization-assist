@@ -10,6 +10,10 @@ jobs:
   security-scan:
     runs-on: ubuntu-latest
     name: Security Scanning
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
 
     steps:
     - uses: actions/checkout@v4
@@ -113,6 +117,7 @@ jobs:
       if: github.event_name == 'pull_request' && always()
       uses: actions/github-script@v6
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
           let comment = '## 🔒 Security Scan Results\n\n';
