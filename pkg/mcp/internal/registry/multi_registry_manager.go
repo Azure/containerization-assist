@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -169,9 +170,10 @@ func (mrm *MultiRegistryManager) ValidateRegistryAccess(ctx context.Context, reg
 		return fmt.Errorf("failed to get credentials: %w", err)
 	}
 
-	// Implement actual registry connectivity test\n	if err := mrm.testRegistryConnectivity(ctx, normalizedRegistry, creds); err != nil {\n		return fmt.Errorf(\"registry connectivity test failed: %w\", err)\n	}
-	// This would involve making a request to the registry API
-	// For now, we just validate that we have credentials
+	// Implement actual registry connectivity test
+	if err := mrm.testRegistryConnectivity(ctx, normalizedRegistry, creds); err != nil {
+		return fmt.Errorf("registry connectivity test failed: %w", err)
+	}
 
 	if creds == nil {
 		return fmt.Errorf("no credentials available for registry %s", normalizedRegistry)
@@ -383,4 +385,108 @@ func (mrm *MultiRegistryManager) matchesPattern(registry, pattern string) bool {
 
 	// This is a simplified implementation - in production, use proper regex
 	return strings.Contains(registry, strings.ReplaceAll(pattern, "*", ""))
+}
+
+// testRegistryConnectivity tests connectivity to a registry using Docker API
+func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, registry string, _ *RegistryCredentials) error {
+	// Get timeout from config or use default
+	timeout := 15 * time.Second
+	if config, exists := mrm.GetRegistryConfig(registry); exists && config.Timeout > 0 {
+		timeout = config.Timeout
+	}
+
+	// Create context with timeout for the connectivity test
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	mrm.logger.Debug().
+		Str("registry", registry).
+		Dur("timeout", timeout).
+		Msg("Testing registry connectivity")
+
+	// Get appropriate test images for the registry
+	testImages := mrm.getTestImagesForRegistry(registry)
+
+	var lastErr error
+	// Try to connect to the registry using docker manifest inspect
+	for _, testImage := range testImages {
+		cmd := exec.CommandContext(ctx, "docker", "manifest", "inspect", testImage)
+		err := cmd.Run()
+		if err == nil {
+			mrm.logger.Info().
+				Str("registry", registry).
+				Str("test_image", testImage).
+				Dur("timeout", timeout).
+				Msg("Registry connectivity test passed")
+			return nil
+		}
+		lastErr = err
+		mrm.logger.Debug().
+			Str("registry", registry).
+			Str("test_image", testImage).
+			Err(err).
+			Msg("Test image failed, trying next")
+
+		// Check for timeout or network-specific errors
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("registry connectivity test timed out after %v for registry %s", timeout, registry)
+		}
+	}
+
+	// Classify the error for better reporting
+	if lastErr != nil {
+		errStr := lastErr.Error()
+		switch {
+		case strings.Contains(errStr, "no such host") || strings.Contains(errStr, "name resolution"):
+			return fmt.Errorf("registry DNS resolution failed for %s: %w", registry, lastErr)
+		case strings.Contains(errStr, "connection refused") || strings.Contains(errStr, "connection reset"):
+			return fmt.Errorf("registry connection refused for %s: %w", registry, lastErr)
+		case strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline exceeded"):
+			return fmt.Errorf("registry connection timeout for %s: %w", registry, lastErr)
+		case strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "authentication"):
+			return fmt.Errorf("registry authentication failed for %s: %w", registry, lastErr)
+		case strings.Contains(errStr, "forbidden") || strings.Contains(errStr, "access denied"):
+			return fmt.Errorf("registry access denied for %s: %w", registry, lastErr)
+		default:
+			return fmt.Errorf("registry connectivity test failed for %s: %w", registry, lastErr)
+		}
+	}
+
+	// If all test images failed without a specific error, return generic error
+	return fmt.Errorf("failed to connect to registry %s: no test images accessible", registry)
+}
+
+// getTestImagesForRegistry returns appropriate test images for different registries
+func (mrm *MultiRegistryManager) getTestImagesForRegistry(registry string) []string {
+	switch {
+	case strings.Contains(registry, "docker.io") || strings.Contains(registry, "index.docker.io"):
+		return []string{"docker.io/library/hello-world:latest", "hello-world:latest"}
+	case strings.Contains(registry, "ghcr.io"):
+		return []string{"ghcr.io/containerbase/base:latest"}
+	case strings.Contains(registry, "quay.io"):
+		return []string{"quay.io/prometheus/busybox:latest"}
+	case strings.Contains(registry, "gcr.io"):
+		return []string{"gcr.io/google-containers/pause:latest"}
+	case strings.Contains(registry, "mcr.microsoft.com"):
+		return []string{"mcr.microsoft.com/hello-world:latest"}
+	case strings.Contains(registry, "amazonaws.com"):
+		// For AWS ECR, try common base images
+		return []string{
+			fmt.Sprintf("%s/amazonlinux:latest", registry),
+			fmt.Sprintf("%s/alpine:latest", registry),
+		}
+	case strings.Contains(registry, "azurecr.io"):
+		// For Azure Container Registry, try common base images
+		return []string{
+			fmt.Sprintf("%s/hello-world:latest", registry),
+			fmt.Sprintf("%s/alpine:latest", registry),
+		}
+	default:
+		// For unknown registries, try generic approaches
+		return []string{
+			fmt.Sprintf("%s/hello-world:latest", registry),
+			fmt.Sprintf("%s/library/hello-world:latest", registry),
+			fmt.Sprintf("%s/alpine:latest", registry),
+		}
+	}
 }
