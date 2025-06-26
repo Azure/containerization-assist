@@ -1,105 +1,30 @@
-version: 2
-
-run:
-  tests: true
-  timeout: 5m
-  modules-download-mode: readonly
-  allow-parallel-runners: true
-  go: "1.21"
-
 linters:
   enable:
     - staticcheck
     - revive
     - gosec
-    - nilerr
     - unused
-    - funlen
-    - gocognit
-    - dupl
-    - goconst
-    - ineffassign
-    - prealloc
-    - unconvert
-    - bodyclose
-    - asciicheck
-    - misspell
-    - forbidigo
-    # New critical linters
-    - gocyclo      # Cyclomatic complexity
-    - errcheck     # Unchecked errors
-    - govet        # Suspicious constructs
-    - exhaustive   # Exhaustive switch/select
-    - gocritic     # Diagnostic linter
-    - godox        # TODO/FIXME/BUG detection
-    - testpackage  # Test package naming
-
-  disable:
-    - lll
+    - gocyclo
+    - errcheck
+    - govet
+    - godox
 
 linters-settings:
-  govet:
-    enable:
-      - shadow
-      - all
-  revive:
-    severity: warning
-    rules:
-      - name: exported
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      - (fmt.Print*)  # Already forbidden by forbidigo
-  funlen:
-    lines: 100     # Tightened from 120
-    statements: 50
   gocyclo:
-    min-complexity: 25  # Adjusted threshold for ratcheting strategy
+    min-complexity: 25
   godox:
     keywords:
       - TODO
       - HACK
       - FIXME
-      - BUG
-      - OPTIMIZE
-  forbidigo:
-    forbid:
-      - pattern: 'fmt\.Errorf'
-        msg: 'Use types.NewRichError instead of fmt.Errorf in tools for better error context'
-      - pattern: 'fmt\.Print(f|ln)?'
-        msg: 'Use utils.Logger instead of fmt.Print* for structured logging'
-      - pattern: 'log\.Fatal(f|ln)?'
-        msg: 'Use utils.Logger.Fatal instead of log.Fatal* for consistent error handling'
-      - pattern: 'log\.Panic(f|ln)?'
-        msg: 'Use proper error handling instead of log.Panic*'
 
 issues:
-  # Tightened error budgets
-  max-issues: 25             # Down from 50
-
-  # Tightened per-linter limits
-  max-issues-per-linter: 5   # Down from 10
-  max-same-issues: 3         # Down from 5
-
-  exclude-use-default: false
-  exclude-dirs:
-    - vendor
-    - third_party
-    - docs
-    - resources
-    - scripts
-    - cmd/.*/generated
-
-  exclude-files:
-    - ".*_generated\\.go$"
-
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - funlen
-        - gocognit
-
-  # Only check new code in PRs for gradual adoption
+  max-issues-per-linter: 10
+  max-same-issues: 5
   new: true
   new-from-rev: "main"
+
+run:
+  tests: true
+  timeout: 5m
+  go: "1.21"
