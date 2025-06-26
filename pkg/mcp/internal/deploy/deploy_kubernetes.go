@@ -267,7 +267,7 @@ func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionM
 }
 
 // SetAnalyzer sets the analyzer for the tool
-func (t *AtomicDeployKubernetesTool) SetAnalyzer(analyzer interface{}) {
+func (t *AtomicDeployKubernetesTool) SetAnalyzer(_ interface{}) {
 	// Note: This method is required for factory compatibility
 	// The deploy tool doesn't currently use the analyzer directly
 }
@@ -356,7 +356,7 @@ func (t *AtomicDeployKubernetesTool) ExecuteDeployment(ctx context.Context, args
 }
 
 // ExecuteWithContext executes the tool with GoMCP server context for native progress tracking
-func (t *AtomicDeployKubernetesTool) ExecuteWithContext(serverCtx *server.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
+func (t *AtomicDeployKubernetesTool) ExecuteWithContext(_ *server.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
 	// Delegate to main execution method
 	return t.ExecuteDeployment(context.Background(), args)
 }
