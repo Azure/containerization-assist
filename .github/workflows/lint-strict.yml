@@ -61,7 +61,7 @@ jobs:
     - name: golangci-lint (new code only)
       uses: golangci/golangci-lint-action@v6
       with:
-        version: v1.62.0
+        version: latest
         args: --timeout=10m --new-from-rev=origin/${{ github.base_ref }}
 
   technical-debt-check:
