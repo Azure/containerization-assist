@@ -16,12 +16,12 @@ import (
 )
 
 var (
-	verbose        = flag.Bool("verbose", false, "Verbose output")
-	fix            = flag.Bool("fix", false, "Attempt to fix violations automatically")
-	metrics        = flag.Bool("metrics", false, "Generate interface adoption metrics report")
-	metricsOutput  = flag.String("metrics-output", "interface_metrics.json", "Output file for metrics report")
-	errorBudget    = flag.Int("error-budget", 0, "Allow up to N interface validation errors before failing")
-	warningBudget  = flag.Int("warning-budget", -1, "Allow up to N interface validation warnings before failing (-1 = unlimited)")
+	verbose       = flag.Bool("verbose", false, "Verbose output")
+	fix           = flag.Bool("fix", false, "Attempt to fix violations automatically")
+	metrics       = flag.Bool("metrics", false, "Generate interface adoption metrics report")
+	metricsOutput = flag.String("metrics-output", "interface_metrics.json", "Output file for metrics report")
+	errorBudget   = flag.Int("error-budget", 0, "Allow up to N interface validation errors before failing")
+	warningBudget = flag.Int("warning-budget", -1, "Allow up to N interface validation warnings before failing (-1 = unlimited)")
 )
 
 // Expected unified interfaces that should exist after Team A's work

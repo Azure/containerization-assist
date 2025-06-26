@@ -86,7 +86,7 @@ type Server struct {
 }
 
 // NewServer creates a new MCP server
-func NewServer(config ServerConfig) (*Server, error) {
+func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	// Setup logger
 	logLevel, err := zerolog.ParseLevel(config.LogLevel)
 	if err != nil {
@@ -128,7 +128,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 
 	// Initialize workspace manager
-	workspaceManager, err := utils.NewWorkspaceManager(utils.WorkspaceConfig{
+	workspaceManager, err := utils.NewWorkspaceManager(ctx, utils.WorkspaceConfig{
 		BaseDir:           config.WorkspaceDir,
 		MaxSizePerSession: config.MaxDiskPerSession,
 		TotalMaxSize:      config.TotalDiskLimit,

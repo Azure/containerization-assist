@@ -175,7 +175,7 @@ func main() {
 		Msg("Starting Container Kit MCP Server")
 
 	// Create server
-	server, err := mcp.NewServer(config)
+	server, err := mcp.NewServer(context.Background(), config)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create server")
 		os.Exit(1)
@@ -268,13 +268,14 @@ func main() {
 		}
 	}
 
-	ctx := context.Background()
-
 	// Handle demo mode
 	if *demo != "" {
 		log.Warn().Msg("Demo mode temporarily disabled due to API restructuring")
 		return
 	}
+
+	// Create context for server operation
+	ctx := context.Background()
 
 	// Start server in a goroutine so we can handle shutdown
 	serverErr := make(chan error, 1)

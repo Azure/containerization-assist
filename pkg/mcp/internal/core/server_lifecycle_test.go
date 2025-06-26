@@ -90,7 +90,7 @@ func TestServerCreation(t *testing.T) {
 				tt.setupFunc(&config)
 			}
 
-			server, err := NewServer(config)
+			server, err := NewServer(context.Background(), config)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -132,7 +132,7 @@ func TestServerComponentInitializationFailure(t *testing.T) {
 		config.WorkspaceDir = "/root/invalid/workspace"
 		config.StorePath = ""
 
-		_, err := NewServer(config)
+		_, err := NewServer(context.Background(), config)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to initialize session manager")
 	})
@@ -143,7 +143,7 @@ func TestServerComponentInitializationFailure(t *testing.T) {
 		// This will fail due to permission issues
 		config.StorePath = "/root/invalid/path/sessions.db"
 
-		_, err := NewServer(config)
+		_, err := NewServer(context.Background(), config)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create storage directory")
 	})
@@ -160,7 +160,7 @@ func TestServerGracefulDegradation(t *testing.T) {
 	config.StorePath = ""
 	config.TransportType = "stdio"
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	t.Run("conversation mode fails to enable", func(t *testing.T) {
@@ -195,7 +195,7 @@ func TestServerStopIdempotency(t *testing.T) {
 	config.StorePath = ""
 	config.TransportType = "stdio"
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// First stop
@@ -221,7 +221,7 @@ func TestServerTransportError(t *testing.T) {
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = ""
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// Use a very short timeout to simulate server startup hanging
@@ -252,7 +252,7 @@ func TestServerCleanupOnFailure(t *testing.T) {
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = filepath.Join(t.TempDir(), "sessions.db")
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// Check that storage file was created
@@ -284,7 +284,7 @@ func TestServerMetrics(t *testing.T) {
 	config.WorkspaceDir = t.TempDir()
 	config.StorePath = ""
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// Verify start time is set
@@ -376,7 +376,7 @@ func TestServerConfigValidation(t *testing.T) {
 			config.WorkspaceDir = t.TempDir()
 			config.StorePath = ""
 
-			server, err := NewServer(config)
+			server, err := NewServer(context.Background(), config)
 			if tt.valid {
 				assert.NoError(t, err)
 				assert.NotNil(t, server)
@@ -398,7 +398,7 @@ func TestServerResourceLimits(t *testing.T) {
 	config.StorePath = ""
 	config.MaxSessions = 2 // Low limit for testing
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// Create sessions up to the limit
@@ -450,7 +450,7 @@ func TestServerLogCapture(t *testing.T) {
 	config.StorePath = ""
 	config.LogLevel = "debug"
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// Log something

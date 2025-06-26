@@ -12,6 +12,8 @@
 package mcp
 
 import (
+	"context"
+
 	"github.com/Azure/container-copilot/pkg/mcp/internal/core"
 )
 
@@ -33,8 +35,8 @@ type ConversationConfig = core.ConversationConfig
 
 // NewServer creates a new MCP server with the given configuration.
 // This is the primary entry point for creating MCP servers.
-func NewServer(config ServerConfig) (*Server, error) {
-	return core.NewServer(config)
+func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
+	return core.NewServer(ctx, config)
 }
 
 // DefaultServerConfig returns a default server configuration.
