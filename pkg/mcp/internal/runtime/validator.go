@@ -2,8 +2,9 @@ package runtime
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // BaseValidator defines the base interface for all validators
@@ -293,7 +294,7 @@ func (c *ValidatorChain) Validate(ctx context.Context, input interface{}, option
 	for _, validator := range c.validators {
 		vResult, err := validator.Validate(ctx, input, options)
 		if err != nil {
-			return nil, fmt.Errorf("validator %s failed: %w", validator.GetName(), err)
+			return nil, errors.Wrapf(err, "runtime/validator", "validator %s failed", validator.GetName())
 		}
 
 		// Merge results
