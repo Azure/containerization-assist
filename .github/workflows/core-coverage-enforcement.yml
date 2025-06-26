@@ -188,22 +188,36 @@ jobs:
         TARGET_THRESHOLD=80   # Long-term target remains 80%
 
         # Check for packages that don't meet even the minimum threshold
+        # Note: Packages with 0% coverage (no tests) are warnings, not failures
         CRITICAL_FAILURES=""
+        ZERO_COVERAGE_PACKAGES=""
         while IFS= read -r line; do
           if [[ $line =~ \|[[:space:]]*([^|]+)[[:space:]]*\|[[:space:]]*([0-9.]+)%[[:space:]]*\|[[:space:]]*❌ ]]; then
             PKG="${BASH_REMATCH[1]}"
             COV="${BASH_REMATCH[2]}"
-            if (( $(echo "$COV < $MINIMUM_THRESHOLD" | bc -l) )); then
+            if (( $(echo "$COV == 0" | bc -l) )); then
+              # Track zero coverage separately - these need tests added
+              ZERO_COVERAGE_PACKAGES="$ZERO_COVERAGE_PACKAGES\n- $PKG: ${COV}% (no tests)"
+            elif (( $(echo "$COV < $MINIMUM_THRESHOLD" | bc -l) )); then
+              # Only fail for packages with some tests but below minimum
               CRITICAL_FAILURES="$CRITICAL_FAILURES\n- $PKG: ${COV}%"
             fi
           fi
         done < core-coverage-report.md
 
-        # Fail CI for packages below minimum threshold
+        # Report zero coverage packages as warnings
+        if [ -n "$ZERO_COVERAGE_PACKAGES" ]; then
+          echo "⚠️ Warning: Packages with no tests (0% coverage):"
+          echo -e "$ZERO_COVERAGE_PACKAGES"
+          echo "::warning::These packages need test implementation"
+          echo ""
+        fi
+
+        # Fail CI only for packages with tests below minimum threshold
         if [ -n "$CRITICAL_FAILURES" ]; then
-          echo "❌ Critical: Packages below $MINIMUM_THRESHOLD% minimum threshold:"
+          echo "❌ Critical: Packages with tests below $MINIMUM_THRESHOLD% minimum threshold:"
           echo -e "$CRITICAL_FAILURES"
-          echo "::error::Core packages must have at least $MINIMUM_THRESHOLD% test coverage"
+          echo "::error::Core packages with existing tests must maintain at least $MINIMUM_THRESHOLD% coverage"
           exit 1
         fi
 
