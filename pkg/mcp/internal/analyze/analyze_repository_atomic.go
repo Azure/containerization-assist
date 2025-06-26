@@ -792,13 +792,8 @@ func (t *AtomicAnalyzeRepositoryTool) extractFieldsFromInterface(v interface{}) 
 	// This is a more direct approach - check for specific interface methods or use a map conversion
 	// Since we can't import orchestration package, we'll use interface{} conversion tricks
 
-	// Try to get the underlying value and convert via intermediate representation
-	if ptr, ok := v.(interface{}); ok {
-		// Convert to map via JSON marshaling/unmarshaling as a fallback
-		return t.convertViaJSON(ptr)
-	}
-
-	return nil
+	// Convert to map via JSON marshaling/unmarshaling as a fallback
+	return t.convertViaJSON(v)
 }
 
 // convertViaJSON converts via JSON marshaling/unmarshaling
