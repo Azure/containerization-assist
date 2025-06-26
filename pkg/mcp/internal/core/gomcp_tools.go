@@ -327,17 +327,17 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	}
 
 	// Now create GoMCP handlers that delegate to the orchestrator
-	// Most tools can use the orchestrator delegation (no array schema issues)
+	// Tools that can use the orchestrator delegation (no array schema issues)
 	toolDescriptions := map[string]string{
 		"analyze_repository":  "Analyze a repository to detect language, framework, and containerization requirements",
 		"build_image":         "Build a Docker image from the analyzed repository using generated Dockerfile",
 		"generate_dockerfile": "Generate a Dockerfile for the analyzed repository",
-		"validate_dockerfile": "Validate a Dockerfile for best practices and potential issues",
-		"pull_image":          "Pull a Docker image from a container registry",
-		"tag_image":           "Tag a Docker image with a new name or reference",
-		"scan_image_security": "Scan Docker images for security vulnerabilities using Trivy",
-		"scan_secrets":        "Scan source code and configuration files for exposed secrets",
-		// NOTE: generate_manifests removed from here - registered separately with fixed schema
+		// NOTE: validate_dockerfile removed - has array schema issues (ignore_rules, trusted_registries)
+		"pull_image": "Pull a Docker image from a container registry",
+		"tag_image":  "Tag a Docker image with a new name or reference",
+		// NOTE: scan_image_security removed - has array schema issues (vuln_types)
+		// NOTE: scan_secrets removed - has array schema issues (exclude_patterns, file_patterns)
+		// NOTE: generate_manifests removed - registered separately with fixed schema
 		"push_image": "Push the built Docker image to a container registry",
 	}
 
@@ -369,8 +369,8 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 			return nil, fmt.Errorf("unexpected result type from deploy_kubernetes_atomic: %T", result)
 		})
 
-	// Register tools with array schema issues using runtime.RegisterSimpleTool (uses our fixed schema generator)
-	runtime.RegisterSimpleTool(registrar, "generate_manifests",
+	// Register generate_manifests with fixed schema using invopop/jsonschema
+	runtime.RegisterSimpleToolWithFixedSchema(registrar, "generate_manifests",
 		"Generate Kubernetes manifests for the containerized application",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicGenerateManifestsArgs) (*deploy.AtomicGenerateManifestsResult, error) {
 			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
@@ -382,6 +382,51 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 				return manifestsResult, nil
 			}
 			return nil, fmt.Errorf("unexpected result type from generate_manifests_atomic: %T", result)
+		})
+
+	// Register validate_dockerfile with fixed schema (has array fields: ignore_rules, trusted_registries)
+	runtime.RegisterSimpleToolWithFixedSchema(registrar, "validate_dockerfile",
+		"Validate a Dockerfile for best practices and potential issues",
+		func(ctx *gomcpserver.Context, args *analyze.AtomicValidateDockerfileArgs) (*analyze.AtomicValidateDockerfileResult, error) {
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile_atomic", *args, nil)
+			if err != nil {
+				return nil, err
+			}
+			if validateResult, ok := result.(*analyze.AtomicValidateDockerfileResult); ok {
+				return validateResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from validate_dockerfile_atomic: %T", result)
+		})
+
+	// Register scan_image_security with fixed schema (has array field: vuln_types)
+	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_image_security",
+		"Scan Docker images for security vulnerabilities using Trivy",
+		func(ctx *gomcpserver.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security_atomic", *args, nil)
+			if err != nil {
+				return nil, err
+			}
+			if scanResult, ok := result.(*scan.AtomicScanImageSecurityResult); ok {
+				return scanResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from scan_image_security_atomic: %T", result)
+		})
+
+	// Register scan_secrets with fixed schema (has array fields: exclude_patterns, file_patterns)
+	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_secrets",
+		"Scan source code and configuration files for exposed secrets",
+		func(ctx *gomcpserver.Context, args *scan.AtomicScanSecretsArgs) (*scan.AtomicScanSecretsResult, error) {
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets_atomic", *args, nil)
+			if err != nil {
+				return nil, err
+			}
+			if scanResult, ok := result.(*scan.AtomicScanSecretsResult); ok {
+				return scanResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from scan_secrets_atomic: %T", result)
 		})
 
 	return nil
@@ -496,7 +541,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 			return removeLabelTool.ExecuteTyped(context.Background(), *args)
 		})
 
-	runtime.RegisterSimpleTool(registrar, "update_session_labels",
+	runtime.RegisterSimpleToolWithFixedSchema(registrar, "update_session_labels",
 		"Update all labels on a session (replace existing labels)",
 		func(ctx *gomcpserver.Context, args *sessiontypes.UpdateSessionLabelsArgs) (*sessiontypes.UpdateSessionLabelsResult, error) {
 			updateLabelsTool := sessiontypes.NewUpdateSessionLabelsTool(
@@ -645,6 +690,7 @@ func (w *sessionLabelManagerWrapper) ListSessions() []sessiontypes.SessionLabelD
 	}
 	return result
 }
+
 
 // registerOrchestratorTool creates a GoMCP handler that delegates to the orchestrator
 func (gm *GomcpManager) registerOrchestratorTool(registrar *runtime.StandardToolRegistrar, toolName, atomicToolName, description string, deps *ToolDependencies) {

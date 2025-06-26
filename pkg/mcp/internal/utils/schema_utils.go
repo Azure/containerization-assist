@@ -1,5 +1,30 @@
 package utils
 
+import (
+	"encoding/json"
+
+	"github.com/invopop/jsonschema"
+)
+
+// RemoveCopilotIncompatibleFromSchema converts invopop jsonschema.Schema to map and removes incompatible fields
+func RemoveCopilotIncompatibleFromSchema(schema *jsonschema.Schema) map[string]interface{} {
+	// Marshal and unmarshal to get map format
+	schemaBytes, err := json.Marshal(schema)
+	if err != nil {
+		return make(map[string]interface{})
+	}
+	
+	var schemaMap map[string]interface{}
+	if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
+		return make(map[string]interface{})
+	}
+
+	// Apply compatibility fixes
+	RemoveCopilotIncompatible(schemaMap)
+	
+	return schemaMap
+}
+
 // AddMissingArrayItems recursively adds missing "items" fields for arrays
 // that don't have them, which is required by MCP validation.
 // It safely handles nested objects, arrays, and various JSON schema structures.
