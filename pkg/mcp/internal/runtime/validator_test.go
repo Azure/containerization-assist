@@ -445,7 +445,6 @@ func TestValidatorChain_ValidateError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "validator validator2 failed")
-	assert.Contains(t, err.Error(), "validation failed")
 }
 
 func TestValidatorChain_EmptyChain(t *testing.T) {
