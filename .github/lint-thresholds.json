@@ -1,0 +1,42 @@
+{
+  "comment": "Lint error budgets for different package groups",
+  "thresholds": {
+    "mcp": {
+      "error": 100,
+      "warning": 50,
+      "description": "MCP packages have more technical debt"
+    },
+    "core": {
+      "error": 50,
+      "warning": 30,
+      "description": "Core packages should maintain higher quality"
+    },
+    "cli": {
+      "error": 50,
+      "warning": 30,
+      "description": "CLI packages"
+    },
+    "combined": {
+      "error": 150,
+      "warning": 100,
+      "description": "Combined MCP and core packages"
+    },
+    "all": {
+      "error": 200,
+      "warning": 150,
+      "description": "All packages combined"
+    }
+  },
+  "reduction_targets": {
+    "2024-Q1": {
+      "mcp": 80,
+      "core": 40,
+      "all": 150
+    },
+    "2024-Q2": {
+      "mcp": 60,
+      "core": 30,
+      "all": 100
+    }
+  }
+}
