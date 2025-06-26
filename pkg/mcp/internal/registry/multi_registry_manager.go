@@ -11,6 +11,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	// DefaultRegistryTimeout is the default timeout for registry connectivity tests
+	DefaultRegistryTimeout = 15 * time.Second
+)
 // MultiRegistryManager coordinates authentication across multiple registries
 type MultiRegistryManager struct {
 	config          *MultiRegistryConfig
@@ -390,7 +394,7 @@ func (mrm *MultiRegistryManager) matchesPattern(registry, pattern string) bool {
 // testRegistryConnectivity tests connectivity to a registry using Docker API
 func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, registry string, _ *RegistryCredentials) error {
 	// Get timeout from config or use default
-	timeout := 15 * time.Second
+	timeout := DefaultRegistryTimeout
 	if config, exists := mrm.GetRegistryConfig(registry); exists && config.Timeout > 0 {
 		timeout = config.Timeout
 	}
@@ -403,6 +407,11 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 		Str("registry", registry).
 		Dur("timeout", timeout).
 		Msg("Testing registry connectivity")
+
+	// Check if docker command is available
+	if err := mrm.checkDockerAvailability(ctx); err != nil {
+		return fmt.Errorf("docker command not available for registry connectivity test: %w", err)
+	}
 
 	// Get appropriate test images for the registry
 	testImages := mrm.getTestImagesForRegistry(registry)
@@ -489,4 +498,30 @@ func (mrm *MultiRegistryManager) getTestImagesForRegistry(registry string) []str
 			fmt.Sprintf("%s/alpine:latest", registry),
 		}
 	}
+}
+
+// checkDockerAvailability verifies that the docker command is available and accessible
+func (mrm *MultiRegistryManager) checkDockerAvailability(ctx context.Context) error {
+	// First check if docker command exists in PATH
+	cmd := exec.CommandContext(ctx, "docker", "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		if _, pathErr := exec.LookPath("docker"); pathErr != nil {
+			return fmt.Errorf("docker command not found in PATH - please install Docker CLI")
+		}
+		return fmt.Errorf("docker command exists but not accessible: %w", err)
+	}
+
+	// Log docker version for debugging
+	version := strings.TrimSpace(string(output))
+	mrm.logger.Debug().Str("docker_version", version).Msg("Docker command availability verified")
+
+	// Optionally check if docker daemon is running (quick check)
+	cmd = exec.CommandContext(ctx, "docker", "info", "--format", "{{.ServerVersion}}")
+	if err := cmd.Run(); err != nil {
+		mrm.logger.Warn().Err(err).Msg("Docker daemon may not be running - registry connectivity tests may fail")
+		// Don't fail here as docker manifest inspect might still work in some scenarios
+	}
+
+	return nil
 }
