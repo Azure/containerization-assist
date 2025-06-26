@@ -15,6 +15,11 @@ on:
       - 'cmd/mcp-server/**'
   workflow_dispatch: # Allow manual trigger
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   export-schemas:
     name: Export Tool Schemas

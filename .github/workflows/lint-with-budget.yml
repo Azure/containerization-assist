@@ -8,6 +8,11 @@ on:
       - 'go.sum'
       - '.golangci.yml'
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   lint:
     runs-on: ubuntu-latest

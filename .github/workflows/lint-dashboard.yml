@@ -10,6 +10,10 @@ on:
     paths:
       - '.github/lint-thresholds.json'
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   lint-report:
     name: Generate Lint Report
