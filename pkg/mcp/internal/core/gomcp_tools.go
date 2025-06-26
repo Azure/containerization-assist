@@ -327,36 +327,256 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	}
 
 	// Now create GoMCP handlers that delegate to the orchestrator
-	// Tools that can use the orchestrator delegation (no array schema issues)
-	toolDescriptions := map[string]string{
-		"analyze_repository":  "Analyze a repository to detect language, framework, and containerization requirements",
-		"build_image":         "Build a Docker image from the analyzed repository using generated Dockerfile",
-		"generate_dockerfile": "Generate a Dockerfile for the analyzed repository",
-		// NOTE: validate_dockerfile removed - has array schema issues (ignore_rules, trusted_registries)
-		"pull_image": "Pull a Docker image from a container registry",
-		"tag_image":  "Tag a Docker image with a new name or reference",
-		// NOTE: scan_image_security removed - has array schema issues (vuln_types)
-		// NOTE: scan_secrets removed - has array schema issues (exclude_patterns, file_patterns)
-		// NOTE: generate_manifests removed - registered separately with fixed schema
-		"push_image": "Push the built Docker image to a container registry",
-	}
+	// Register analyze_repository with proper schema
+	runtime.RegisterSimpleTool(registrar, "analyze_repository",
+		"Analyze a repository to detect language, framework, and containerization requirements",
+		func(ctx *gomcpserver.Context, args *analyze.AtomicAnalyzeRepositoryArgs) (*analyze.AtomicAnalysisResult, error) {
+			// If session_id is not provided, create a new session
+			if args.SessionID == "" {
+				sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
+				if err != nil {
+					return nil, fmt.Errorf("failed to create session: %w", err)
+				}
+				if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
+					args.SessionID = session.SessionID
+					deps.Logger.Info().Str("session_id", args.SessionID).Msg("Created new session for analyze_repository")
+				}
+			}
 
-	// Register GoMCP handlers that delegate to orchestrator
-	for toolName, description := range toolDescriptions {
-		atomicToolName := toolName + "_atomic"
-		gm.registerOrchestratorTool(registrar, toolName, atomicToolName, description, deps)
-	}
+			// Convert typed args to map[string]interface{} for the orchestrator
+			argsMap := map[string]interface{}{
+				"session_id":    args.SessionID,
+				"repo_url":      args.RepoURL,
+				"branch":        args.Branch,
+				"context":       args.Context,
+				"language_hint": args.LanguageHint,
+				"shallow":       args.Shallow,
+				"dry_run":       args.DryRun,
+			}
+
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "analyze_repository_atomic", argsMap, nil)
+			if err != nil {
+				return nil, err
+			}
+			if analysisResult, ok := result.(*analyze.AtomicAnalysisResult); ok {
+				return analysisResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from analyze_repository_atomic: %T", result)
+		})
+
+	// Register generate_dockerfile with proper schema
+	runtime.RegisterSimpleTool(registrar, "generate_dockerfile",
+		"Generate a Dockerfile for the analyzed repository",
+		func(ctx *gomcpserver.Context, args *analyze.GenerateDockerfileArgs) (*analyze.GenerateDockerfileResult, error) {
+			// If session_id is not provided, create a new session
+			if args.SessionID == "" {
+				sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
+				if err != nil {
+					return nil, fmt.Errorf("failed to create session: %w", err)
+				}
+				if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
+					args.SessionID = session.SessionID
+					deps.Logger.Info().Str("session_id", args.SessionID).Msg("Created new session for generate_dockerfile")
+				}
+			}
+
+			// Convert typed args to map[string]interface{} for the orchestrator
+			argsMap := map[string]interface{}{
+				"session_id":           args.SessionID,
+				"base_image":           args.BaseImage,
+				"template":             args.Template,
+				"optimization":         args.Optimization,
+				"include_health_check": args.IncludeHealthCheck,
+				"build_args":           args.BuildArgs,
+				"platform":             args.Platform,
+				"dry_run":              args.DryRun,
+			}
+
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile", argsMap, nil)
+			if err != nil {
+				return nil, err
+			}
+			if dockerfileResult, ok := result.(*analyze.GenerateDockerfileResult); ok {
+				return dockerfileResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from generate_dockerfile: %T", result)
+		})
+
+	// Register build_image with proper schema
+	runtime.RegisterSimpleTool(registrar, "build_image",
+		"Build a Docker image from the analyzed repository using generated Dockerfile",
+		func(ctx *gomcpserver.Context, args *build.AtomicBuildImageArgs) (*build.AtomicBuildImageResult, error) {
+			if args.SessionID == "" {
+				sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
+				if err != nil {
+					return nil, fmt.Errorf("failed to create session: %w", err)
+				}
+				if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
+					args.SessionID = session.SessionID
+					deps.Logger.Info().Str("session_id", args.SessionID).Msg("Created new session for build_image")
+				}
+			}
+
+			argsMap := map[string]interface{}{
+				"session_id":       args.SessionID,
+				"image_name":       args.ImageName,
+				"image_tag":        args.ImageTag,
+				"dockerfile_path":  args.DockerfilePath,
+				"build_context":    args.BuildContext,
+				"build_args":       args.BuildArgs,
+				"platform":         args.Platform,
+				"no_cache":         args.NoCache,
+				"push_after_build": args.PushAfterBuild,
+				"registry_url":     args.RegistryURL,
+				"dry_run":          args.DryRun,
+			}
+
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "build_image_atomic", argsMap, nil)
+			if err != nil {
+				return nil, err
+			}
+			if buildResult, ok := result.(*build.AtomicBuildImageResult); ok {
+				return buildResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from build_image_atomic: %T", result)
+		})
+
+	// Register pull_image with proper schema
+	runtime.RegisterSimpleTool(registrar, "pull_image",
+		"Pull a Docker image from a container registry",
+		func(ctx *gomcpserver.Context, args *build.AtomicPullImageArgs) (*build.AtomicPullImageResult, error) {
+			if args.SessionID == "" {
+				sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
+				if err != nil {
+					return nil, fmt.Errorf("failed to create session: %w", err)
+				}
+				if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
+					args.SessionID = session.SessionID
+					deps.Logger.Info().Str("session_id", args.SessionID).Msg("Created new session for pull_image")
+				}
+			}
+
+			argsMap := map[string]interface{}{
+				"session_id":  args.SessionID,
+				"image_ref":   args.ImageRef,
+				"timeout":     args.Timeout,
+				"retry_count": args.RetryCount,
+				"force":       args.Force,
+				"dry_run":     args.DryRun,
+			}
+
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "pull_image_atomic", argsMap, nil)
+			if err != nil {
+				return nil, err
+			}
+			if pullResult, ok := result.(*build.AtomicPullImageResult); ok {
+				return pullResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from pull_image_atomic: %T", result)
+		})
+
+	// Register tag_image with proper schema
+	runtime.RegisterSimpleTool(registrar, "tag_image",
+		"Tag a Docker image with a new name or reference",
+		func(ctx *gomcpserver.Context, args *build.AtomicTagImageArgs) (*build.AtomicTagImageResult, error) {
+			if args.SessionID == "" {
+				sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
+				if err != nil {
+					return nil, fmt.Errorf("failed to create session: %w", err)
+				}
+				if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
+					args.SessionID = session.SessionID
+					deps.Logger.Info().Str("session_id", args.SessionID).Msg("Created new session for tag_image")
+				}
+			}
+
+			argsMap := map[string]interface{}{
+				"session_id":   args.SessionID,
+				"source_image": args.SourceImage,
+				"target_image": args.TargetImage,
+				"force":        args.Force,
+				"dry_run":      args.DryRun,
+			}
+
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "tag_image_atomic", argsMap, nil)
+			if err != nil {
+				return nil, err
+			}
+			if tagResult, ok := result.(*build.AtomicTagImageResult); ok {
+				return tagResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from tag_image_atomic: %T", result)
+		})
+
+	// Register push_image with proper schema
+	runtime.RegisterSimpleTool(registrar, "push_image",
+		"Push the built Docker image to a container registry",
+		func(ctx *gomcpserver.Context, args *build.AtomicPushImageArgs) (*build.AtomicPushImageResult, error) {
+			if args.SessionID == "" {
+				sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
+				if err != nil {
+					return nil, fmt.Errorf("failed to create session: %w", err)
+				}
+				if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
+					args.SessionID = session.SessionID
+					deps.Logger.Info().Str("session_id", args.SessionID).Msg("Created new session for push_image")
+				}
+			}
+
+			argsMap := map[string]interface{}{
+				"session_id":   args.SessionID,
+				"image_ref":    args.ImageRef,
+				"registry_url": args.RegistryURL,
+				"timeout":      args.Timeout,
+				"retry_count":  args.RetryCount,
+				"force":        args.Force,
+				"dry_run":      args.DryRun,
+			}
+
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "push_image_atomic", argsMap, nil)
+			if err != nil {
+				return nil, err
+			}
+			if pushResult, ok := result.(*build.AtomicPushImageResult); ok {
+				return pushResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from push_image_atomic: %T", result)
+		})
 
 	// Special validation tool that delegates to orchestrator with modified args
 	runtime.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicDeployKubernetesArgs) (*deploy.AtomicDeployKubernetesResult, error) {
-			// Set dry run mode for validation
-			args.DryRun = true
+			// Convert typed args to map for orchestrator
+			argsMap := map[string]interface{}{
+				"session_id":      args.SessionID,
+				"image_ref":       args.ImageRef,
+				"app_name":        args.AppName,
+				"namespace":       args.Namespace,
+				"replicas":        args.Replicas,
+				"port":            args.Port,
+				"service_type":    args.ServiceType,
+				"include_ingress": args.IncludeIngress,
+				"environment":     args.Environment,
+				"cpu_request":     args.CPURequest,
+				"memory_request":  args.MemoryRequest,
+				"cpu_limit":       args.CPULimit,
+				"memory_limit":    args.MemoryLimit,
+				"generate_only":   args.GenerateOnly,
+				"wait_for_ready":  args.WaitForReady,
+				"wait_timeout":    args.WaitTimeout,
+				"dry_run":         true, // Force dry run for validation
+			}
 
 			// Call through orchestrator - create proper context
 			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "deploy_kubernetes_atomic", *args, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "deploy_kubernetes_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -373,8 +593,30 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "generate_manifests",
 		"Generate Kubernetes manifests for the containerized application",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicGenerateManifestsArgs) (*deploy.AtomicGenerateManifestsResult, error) {
+			// Convert typed args to map for orchestrator
+			argsMap := map[string]interface{}{
+				"session_id":      args.SessionID,
+				"image_ref":       args.ImageRef.Repository,
+				"app_name":        args.AppName,
+				"namespace":       args.Namespace,
+				"port":            args.Port,
+				"replicas":        args.Replicas,
+				"cpu_request":     args.CPURequest,
+				"memory_request":  args.MemoryRequest,
+				"cpu_limit":       args.CPULimit,
+				"memory_limit":    args.MemoryLimit,
+				"include_ingress": args.IncludeIngress,
+				"service_type":    args.ServiceType,
+				"environment":     args.Environment,
+				"secret_handling": args.SecretHandling,
+				"secret_manager":  args.SecretManager,
+				"generate_helm":   args.GenerateHelm,
+				"gitops_ready":    args.GitOpsReady,
+				"dry_run":         args.DryRun,
+			}
+
 			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests_atomic", *args, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -388,8 +630,25 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "validate_dockerfile",
 		"Validate a Dockerfile for best practices and potential issues",
 		func(ctx *gomcpserver.Context, args *analyze.AtomicValidateDockerfileArgs) (*analyze.AtomicValidateDockerfileResult, error) {
+			// Convert typed args to map for orchestrator
+			argsMap := map[string]interface{}{
+				"session_id":           args.SessionID,
+				"dockerfile_path":      args.DockerfilePath,
+				"dockerfile_content":   args.DockerfileContent,
+				"use_hadolint":         args.UseHadolint,
+				"severity":             args.Severity,
+				"ignore_rules":         args.IgnoreRules,
+				"trusted_registries":   args.TrustedRegistries,
+				"check_security":       args.CheckSecurity,
+				"check_optimization":   args.CheckOptimization,
+				"check_best_practices": args.CheckBestPractices,
+				"include_suggestions":  args.IncludeSuggestions,
+				"generate_fixes":       args.GenerateFixes,
+				"dry_run":              args.DryRun,
+			}
+
 			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile_atomic", *args, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -403,8 +662,22 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_image_security",
 		"Scan Docker images for security vulnerabilities using Trivy",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
+			// Convert typed args to map for orchestrator
+			argsMap := map[string]interface{}{
+				"session_id":           args.SessionID,
+				"image_name":           args.ImageName,
+				"severity_threshold":   args.SeverityThreshold,
+				"vuln_types":           args.VulnTypes,
+				"include_fixable":      args.IncludeFixable,
+				"max_results":          args.MaxResults,
+				"include_remediations": args.IncludeRemediations,
+				"generate_report":      args.GenerateReport,
+				"fail_on_critical":     args.FailOnCritical,
+				"dry_run":              args.DryRun,
+			}
+
 			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security_atomic", *args, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -418,8 +691,23 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_secrets",
 		"Scan source code and configuration files for exposed secrets",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanSecretsArgs) (*scan.AtomicScanSecretsResult, error) {
+			// Convert typed args to map for orchestrator
+			argsMap := map[string]interface{}{
+				"session_id":          args.SessionID,
+				"scan_path":           args.ScanPath,
+				"file_patterns":       args.FilePatterns,
+				"exclude_patterns":    args.ExcludePatterns,
+				"scan_dockerfiles":    args.ScanDockerfiles,
+				"scan_manifests":      args.ScanManifests,
+				"scan_source_code":    args.ScanSourceCode,
+				"scan_env_files":      args.ScanEnvFiles,
+				"suggest_remediation": args.SuggestRemediation,
+				"generate_secrets":    args.GenerateSecrets,
+				"dry_run":             args.DryRun,
+			}
+
 			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets_atomic", *args, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -690,7 +978,6 @@ func (w *sessionLabelManagerWrapper) ListSessions() []sessiontypes.SessionLabelD
 	}
 	return result
 }
-
 
 // registerOrchestratorTool creates a GoMCP handler that delegates to the orchestrator
 func (gm *GomcpManager) registerOrchestratorTool(registrar *runtime.StandardToolRegistrar, toolName, atomicToolName, description string, deps *ToolDependencies) {

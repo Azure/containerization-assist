@@ -13,7 +13,7 @@ func RemoveCopilotIncompatibleFromSchema(schema *jsonschema.Schema) map[string]i
 	if err != nil {
 		return make(map[string]interface{})
 	}
-	
+
 	var schemaMap map[string]interface{}
 	if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
 		return make(map[string]interface{})
@@ -21,7 +21,7 @@ func RemoveCopilotIncompatibleFromSchema(schema *jsonschema.Schema) map[string]i
 
 	// Apply compatibility fixes
 	RemoveCopilotIncompatible(schemaMap)
-	
+
 	return schemaMap
 }
 

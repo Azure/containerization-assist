@@ -377,32 +377,32 @@ func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface
 
 	if methodType.NumIn() >= 3 { // receiver, context, args
 		argsType := methodType.In(2)
-		
+
 		// Use invopop/jsonschema to generate proper JSON schema
 		reflector := &jsonschema.Reflector{
 			RequiredFromJSONSchemaTags: true,
 			AllowAdditionalProperties:  false,
 			DoNotReference:             true,
 		}
-		
+
 		schema := reflector.Reflect(argsType)
-		
+
 		// Convert to map
 		schemaJSON, err := json.Marshal(schema)
 		if err != nil {
 			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to marshal schema")
 			return map[string]interface{}{}
 		}
-		
+
 		var schemaMap map[string]interface{}
 		if err := json.Unmarshal(schemaJSON, &schemaMap); err != nil {
 			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to unmarshal schema")
 			return map[string]interface{}{}
 		}
-		
+
 		// Sanitize the schema to ensure array types have items
 		r.sanitizeInvopopSchema(schemaMap)
-		
+
 		return schemaMap
 	}
 
@@ -445,25 +445,25 @@ func (r *MCPToolRegistry) inferOutputSchema(tool interface{}) map[string]interfa
 			AllowAdditionalProperties:  false,
 			DoNotReference:             true,
 		}
-		
+
 		schema := reflector.Reflect(returnType)
-		
+
 		// Convert to map
 		schemaJSON, err := json.Marshal(schema)
 		if err != nil {
 			r.logger.Error().Err(err).Str("type", returnType.Name()).Msg("Failed to marshal output schema")
 			return map[string]interface{}{}
 		}
-		
+
 		var schemaMap map[string]interface{}
 		if err := json.Unmarshal(schemaJSON, &schemaMap); err != nil {
 			r.logger.Error().Err(err).Str("type", returnType.Name()).Msg("Failed to unmarshal output schema")
 			return map[string]interface{}{}
 		}
-		
+
 		// Sanitize the schema to ensure array types have items
 		r.sanitizeInvopopSchema(schemaMap)
-		
+
 		return schemaMap
 	}
 
