@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -147,11 +149,52 @@ func (pss *ProductionSecretScanner) ScanWithCustomPatterns(path string) ([]Detec
 
 	var secrets []DetectedSecret
 
-	// This would need file system scanning implementation
-	// For now, return the patterns for demonstration
-	for _, pattern := range pss.customPatterns {
-		pss.logger.Debug().Str("pattern", pattern.ID).Msg("Checking pattern")
+	// Traverse the file system and scan files for secrets using custom patterns
+	err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			pss.logger.Warn().Err(err).Str("file", filePath).Msg("Error accessing file")
+			return nil // Continue scanning other files
+		}
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+		// Read file contents
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			pss.logger.Warn().Err(err).Str("file", filePath).Msg("Error reading file")
+			return nil // Continue scanning other files
+		}
+		// Apply custom patterns
+		for _, pattern := range pss.customPatterns {
+			pss.logger.Debug().Str("pattern", pattern.ID).Str("file", filePath).Msg("Checking pattern")
+			if pattern.Regex == nil {
+				pss.logger.Warn().Str("pattern", pattern.ID).Msg("Pattern regex is nil")
+				continue
+			}
+			matches := pattern.Regex.FindAllString(string(content), -1)
+			for _, match := range matches {
+				secret := DetectedSecret{
+					Type:       pattern.ID,
+					Value:      match,
+					Redacted:   pss.redactSecret(match),
+					Pattern:    pattern.Regex.String(),
+					File:       filePath,
+					Line:       -1, // Line number extraction could be added later
+					Column:     -1, // Column extraction could be added later
+					Confidence: pattern.Confidence,
+					IsVerified: false,
+				}
+				secrets = append(secrets, secret)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		pss.logger.Error().Err(err).Msg("Error during file traversal")
+		return nil, err
 	}
+	pss.logger.Info().Int("secrets_found", len(secrets)).Msg("Custom pattern scan completed")
 
 	return secrets, nil
 }
