@@ -15,6 +15,29 @@ const (
 	// DefaultRegistryTimeout is the default timeout for registry connectivity tests
 	DefaultRegistryTimeout = 15 * time.Second
 )
+
+// CommandExecutor interface abstracts command execution for better testability
+type CommandExecutor interface {
+	// ExecuteCommand runs a command with the given context and returns output and error
+	ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error)
+	// CommandExists checks if a command exists in PATH
+	CommandExists(name string) bool
+}
+
+// DefaultCommandExecutor implements CommandExecutor using os/exec
+type DefaultCommandExecutor struct{}
+
+// ExecuteCommand runs a command using os/exec
+func (d *DefaultCommandExecutor) ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	return cmd.Output()
+}
+
+// CommandExists checks if a command exists in PATH
+func (d *DefaultCommandExecutor) CommandExists(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
 // MultiRegistryManager coordinates authentication across multiple registries
 type MultiRegistryManager struct {
 	config          *MultiRegistryConfig
@@ -22,6 +45,7 @@ type MultiRegistryManager struct {
 	credentialCache map[string]*CachedCredentials
 	cacheMutex      sync.RWMutex
 	logger          zerolog.Logger
+	cmdExecutor     CommandExecutor
 }
 
 // MultiRegistryConfig defines configuration for multiple registries
@@ -89,7 +113,13 @@ func NewMultiRegistryManager(config *MultiRegistryConfig, logger zerolog.Logger)
 		providers:       make([]CredentialProvider, 0),
 		credentialCache: make(map[string]*CachedCredentials),
 		logger:          logger.With().Str("component", "multi_registry_manager").Logger(),
+		cmdExecutor:     &DefaultCommandExecutor{},
 	}
+}
+
+// SetCommandExecutor sets a custom command executor (primarily for testing)
+func (mrm *MultiRegistryManager) SetCommandExecutor(executor CommandExecutor) {
+	mrm.cmdExecutor = executor
 }
 
 // RegisterProvider adds a credential provider to the manager
@@ -419,8 +449,7 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 	var lastErr error
 	// Try to connect to the registry using docker manifest inspect
 	for _, testImage := range testImages {
-		cmd := exec.CommandContext(ctx, "docker", "manifest", "inspect", testImage)
-		err := cmd.Run()
+		_, err := mrm.cmdExecutor.ExecuteCommand(ctx, "docker", "manifest", "inspect", testImage)
 		if err == nil {
 			mrm.logger.Info().
 				Str("registry", registry).
@@ -503,12 +532,13 @@ func (mrm *MultiRegistryManager) getTestImagesForRegistry(registry string) []str
 // checkDockerAvailability verifies that the docker command is available and accessible
 func (mrm *MultiRegistryManager) checkDockerAvailability(ctx context.Context) error {
 	// First check if docker command exists in PATH
-	cmd := exec.CommandContext(ctx, "docker", "--version")
-	output, err := cmd.Output()
+	if !mrm.cmdExecutor.CommandExists("docker") {
+		return fmt.Errorf("docker command not found in PATH - please install Docker CLI")
+	}
+
+	// Check if docker command is accessible
+	output, err := mrm.cmdExecutor.ExecuteCommand(ctx, "docker", "--version")
 	if err != nil {
-		if _, pathErr := exec.LookPath("docker"); pathErr != nil {
-			return fmt.Errorf("docker command not found in PATH - please install Docker CLI")
-		}
 		return fmt.Errorf("docker command exists but not accessible: %w", err)
 	}
 
@@ -517,8 +547,8 @@ func (mrm *MultiRegistryManager) checkDockerAvailability(ctx context.Context) er
 	mrm.logger.Debug().Str("docker_version", version).Msg("Docker command availability verified")
 
 	// Optionally check if docker daemon is running (quick check)
-	cmd = exec.CommandContext(ctx, "docker", "info", "--format", "{{.ServerVersion}}")
-	if err := cmd.Run(); err != nil {
+	_, err = mrm.cmdExecutor.ExecuteCommand(ctx, "docker", "info", "--format", "{{.ServerVersion}}")
+	if err != nil {
 		mrm.logger.Warn().Err(err).Msg("Docker daemon may not be running - registry connectivity tests may fail")
 		// Don't fail here as docker manifest inspect might still work in some scenarios
 	}

@@ -173,6 +173,25 @@ func TestMultiRegistryManager_ValidateRegistryAccess(t *testing.T) {
 
 	manager := NewMultiRegistryManager(config, logger)
 	manager.AddProvider(mockProvider)
+	
+	// Set up mock command executor for testing
+	mockExecutor := NewMockCommandExecutor()
+	// Mock docker version check
+	mockExecutor.SetResponse("docker --version", []byte("Docker version 20.10.14"), nil)
+	// Mock docker info check
+	mockExecutor.SetResponse("docker info --format {{.ServerVersion}}", []byte("20.10.14"), nil)
+	// Mock successful registry connectivity tests
+	mockExecutor.SetResponse("docker manifest inspect docker.io/library/hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect private.registry.com/hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect private.registry.com/library/hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect https://index.docker.io/v1//hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect https://index.docker.io/v1//library/hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect DOCKER.IO/hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect DOCKER.IO/library/hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect docker.io//hello-world:latest", []byte("{}"), nil)
+	mockExecutor.SetResponse("docker manifest inspect docker.io//library/hello-world:latest", []byte("{}"), nil)
+	manager.SetCommandExecutor(mockExecutor)
 
 	tests := []struct {
 		name         string
@@ -418,4 +437,49 @@ func (m *MockCredentialProvider) Supports(registry string) bool {
 // AddProvider method for testing (assuming it exists on the real implementation)
 func (mrm *MultiRegistryManager) AddProvider(provider CredentialProvider) {
 	mrm.providers = append(mrm.providers, provider)
+}
+
+// MockCommandExecutor for testing
+type MockCommandExecutor struct {
+	// Map of command to response
+	responses map[string]struct {
+		output []byte
+		err    error
+	}
+	// Track executed commands for assertions
+	executedCommands []string
+}
+
+func NewMockCommandExecutor() *MockCommandExecutor {
+	return &MockCommandExecutor{
+		responses: make(map[string]struct {
+			output []byte
+			err    error
+		}),
+		executedCommands: make([]string, 0),
+	}
+}
+
+func (m *MockCommandExecutor) ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := name + " " + strings.Join(args, " ")
+	m.executedCommands = append(m.executedCommands, cmd)
+	
+	if response, exists := m.responses[cmd]; exists {
+		return response.output, response.err
+	}
+	
+	// Default behavior for unknown commands
+	return nil, fmt.Errorf("command not found: %s", cmd)
+}
+
+func (m *MockCommandExecutor) CommandExists(name string) bool {
+	// For testing, we'll assume docker exists unless explicitly set otherwise
+	return name == "docker"
+}
+
+func (m *MockCommandExecutor) SetResponse(cmd string, output []byte, err error) {
+	m.responses[cmd] = struct {
+		output []byte
+		err    error
+	}{output: output, err: err}
 }
