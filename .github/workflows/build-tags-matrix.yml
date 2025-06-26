@@ -74,7 +74,7 @@ jobs:
         echo "Available packages:"
         go list ./cmd/...
         echo "Checking specific package:"
-        go list -f '{{.ImportPath}} {{.Dir}} {{.Error}}' github.com/Azure/container-copilot/cmd/mcp-server || echo "Package list failed"
+        go list -f '{{.ImportPath}} {{.Dir}} {{.Error}}' github.com/Azure/container-kit/cmd/mcp-server || echo "Package list failed"
         echo "=== End Debug ==="
 
     - name: Build test - ${{ matrix.name }}

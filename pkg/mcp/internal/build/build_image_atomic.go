@@ -6,15 +6,15 @@ import (
 	"path/filepath"
 	"time"
 
-	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
 // Import the unified interface types
-// These will be available from "github.com/Azure/container-copilot/pkg/mcp" after interface migration
+// These will be available from "github.com/Azure/container-kit/pkg/mcp" after interface migration
 
 // AtomicBuildImageArgs defines arguments for atomic Docker image building
 type AtomicBuildImageArgs struct {

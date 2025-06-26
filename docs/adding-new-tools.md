@@ -120,8 +120,8 @@ import (
     "context"
     "fmt"
 
-    "github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
-    mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+    "github.com/Azure/container-kit/pkg/mcp/internal/adapter"
+    mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
     "github.com/rs/zerolog"
 )
 
@@ -263,8 +263,8 @@ import (
     "context"
     "fmt"
 
-    "github.com/Azure/container-copilot/pkg/mcp/internal/adapter"
-    mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+    "github.com/Azure/container-kit/pkg/mcp/internal/adapter"
+    mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
     "github.com/rs/zerolog"
 )
 
@@ -354,7 +354,7 @@ import (
     "context"
     "fmt"
 
-    mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+    mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // VulnerabilityScanTool scans for known vulnerabilities
@@ -398,7 +398,7 @@ package analyze
 import (
     "context"
 
-    mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+    mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // DependencyAnalyzerTool analyzes project dependencies
@@ -547,7 +547,7 @@ func TestOptimizeImageTool_Integration(t *testing.T) {
 Use rich errors for better debugging:
 
 ```go
-import "github.com/Azure/container-copilot/pkg/mcp/types"
+import "github.com/Azure/container-kit/pkg/mcp/types"
 
 func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
     if err := t.validatePrerequisites(); err != nil {

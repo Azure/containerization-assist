@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/container-kit/pkg/logger"
 )
 
 type LLMConfig struct {

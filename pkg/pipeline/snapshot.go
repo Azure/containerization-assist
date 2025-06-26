@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-kit/pkg/logger"
 )
 
 // ReportDirectory is the directory where the iteration snapshots will be stored along with a report of the run

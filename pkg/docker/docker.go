@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/templates"
+	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/container-kit/templates"
 )
 
 type Dockerfile struct {

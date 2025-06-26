@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

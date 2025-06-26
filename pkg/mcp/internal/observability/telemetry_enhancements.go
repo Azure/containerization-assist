@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"go.opentelemetry.io/otel"

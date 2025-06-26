@@ -60,8 +60,8 @@ The MCP server eliminates the need for external API keys by leveraging the calli
 ### Building from Source
 
 ```bash
-git clone https://github.com/Azure/container-copilot.git
-cd container-copilot
+git clone https://github.com/Azure/container-kit.git
+cd container-kit
 
 # Build the MCP server (recommended)
 make mcp
@@ -79,8 +79,8 @@ For contributors, use the development container for instant setup:
 
 ```bash
 # Prerequisites: VS Code + Dev Containers extension
-git clone https://github.com/Azure/container-copilot.git
-cd container-copilot
+git clone https://github.com/Azure/container-kit.git
+cd container-kit
 code .  # Open in VS Code, click "Reopen in Container"
 ```
 
@@ -100,7 +100,7 @@ Add to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "container-kit": {
-      "command": "/path/to/container-copilot/container-kit-mcp",
+      "command": "/path/to/container-kit/container-kit-mcp",
       "args": ["--transport=stdio"]
     }
   }

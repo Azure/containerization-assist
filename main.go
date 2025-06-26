@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/Azure/container-copilot/cmd"
+	"github.com/Azure/container-kit/cmd"
 )
 
 func main() {

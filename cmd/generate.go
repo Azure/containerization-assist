@@ -9,16 +9,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/clients"
-	"github.com/Azure/container-copilot/pkg/docker"
-	"github.com/Azure/container-copilot/pkg/filetree"
-	"github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/logger"
-	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/databasedetectionstage"
-	"github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
-	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
-	"github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage"
+	"github.com/Azure/container-kit/pkg/clients"
+	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/filetree"
+	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/pipeline/databasedetectionstage"
+	"github.com/Azure/container-kit/pkg/pipeline/dockerstage"
+	"github.com/Azure/container-kit/pkg/pipeline/manifeststage"
+	"github.com/Azure/container-kit/pkg/pipeline/repoanalysisstage"
 )
 
 func generate(ctx context.Context, targetDir string, registry string, enableDraftDockerfile bool, generateSnapshot bool, generateReport bool, c *clients.Clients, extraContext string) error {

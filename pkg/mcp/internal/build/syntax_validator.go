@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/rs/zerolog"
 )
 

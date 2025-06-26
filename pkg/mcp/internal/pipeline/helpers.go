@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/genericutils"
-	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
 // MetadataManager provides type-safe access to pipeline metadata

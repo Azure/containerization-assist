@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime"
+	"github.com/Azure/container-kit/pkg/mcp/internal/runtime"
 	"github.com/rs/zerolog"
 )
 

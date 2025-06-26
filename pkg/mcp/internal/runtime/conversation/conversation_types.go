@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // ConversationResponse represents the response to a user prompt

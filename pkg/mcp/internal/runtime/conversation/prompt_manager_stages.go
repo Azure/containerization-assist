@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // handleWelcomeStage handles the welcome stage where users choose their workflow mode

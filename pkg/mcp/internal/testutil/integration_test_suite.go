@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	orchestrationtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/testutil"
-	profilingtestutil "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
+	orchestrationtestutil "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/testutil"
+	profilingtestutil "github.com/Azure/container-kit/pkg/mcp/internal/profiling/testutil"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

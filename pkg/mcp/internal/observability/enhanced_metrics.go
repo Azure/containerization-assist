@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -46,7 +46,7 @@ type EnhancedMetricsCollector struct {
 
 // NewEnhancedMetricsCollector creates a new enhanced metrics collector
 func NewEnhancedMetricsCollector(logger zerolog.Logger, config *types.ObservabilityConfig) (*EnhancedMetricsCollector, error) {
-	meter := otel.Meter("container-copilot-mcp")
+	meter := otel.Meter("container-kit-mcp")
 
 	mc := &EnhancedMetricsCollector{
 		logger:        logger.With().Str("component", "metrics").Logger(),

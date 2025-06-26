@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/core/kubernetes"
-	"github.com/Azure/container-copilot/pkg/k8s"
-	customizerk8s "github.com/Azure/container-copilot/pkg/mcp/internal/customizer"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/k8s"
+	customizerk8s "github.com/Azure/container-kit/pkg/mcp/internal/customizer"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -229,7 +229,7 @@ type ManifestInfo struct {
 // GenerateManifests is a Copilot-compatible wrapper that accepts untyped arguments
 func GenerateManifests(ctx context.Context, args map[string]interface{}) (map[string]interface{}, error) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
-	workspaceBase := "/tmp/container-copilot"
+	workspaceBase := "/tmp/container-kit"
 
 	tool := NewGenerateManifestsTool(logger, workspaceBase)
 

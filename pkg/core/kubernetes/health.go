@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/clients"
+	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/rs/zerolog"
 )
 

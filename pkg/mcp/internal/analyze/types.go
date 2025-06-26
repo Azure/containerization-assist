@@ -3,8 +3,8 @@ package analyze
 import (
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/core/analysis"
-	"github.com/Azure/container-copilot/pkg/core/git"
+	"github.com/Azure/container-kit/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/core/git"
 )
 
 // CloneOptions represents options for cloning a repository

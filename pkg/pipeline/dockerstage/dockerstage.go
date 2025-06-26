@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/clients"
-	"github.com/Azure/container-copilot/pkg/docker"
-	"github.com/Azure/container-copilot/pkg/logger"
-	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/manifeststage"
+	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/container-kit/pkg/clients"
+	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/pipeline/manifeststage"
 )
 
 // DockerStage implements the pipeline.PipelineStage interface for Dockerfiles

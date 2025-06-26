@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/Azure/container-copilot/pkg/runner"
+	"github.com/Azure/container-kit/pkg/runner"
 )
 
 type KubeRunner interface {

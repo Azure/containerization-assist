@@ -168,7 +168,7 @@ func analyzeFile(filename string) ([]*ErrorMigration, error) {
 	needsTypesImport := false
 
 	for _, imp := range node.Imports {
-		if imp.Path.Value == `"github.com/Azure/container-copilot/pkg/types"` {
+		if imp.Path.Value == `"github.com/Azure/container-kit/pkg/types"` {
 			hasTypesImport = true
 			break
 		}
@@ -473,7 +473,7 @@ func processMigrations(filename string, migrations []*ErrorMigration, stats *Mig
 
 func needsTypesImport(file *ast.File) bool {
 	for _, imp := range file.Imports {
-		if imp.Path.Value == `"github.com/Azure/container-copilot/pkg/types"` {
+		if imp.Path.Value == `"github.com/Azure/container-kit/pkg/types"` {
 			return false
 		}
 	}
@@ -485,7 +485,7 @@ func addTypesImport(file *ast.File) {
 	importSpec := &ast.ImportSpec{
 		Path: &ast.BasicLit{
 			Kind:  token.STRING,
-			Value: `"github.com/Azure/container-copilot/pkg/types"`,
+			Value: `"github.com/Azure/container-kit/pkg/types"`,
 		},
 	}
 

@@ -3,11 +3,11 @@ package core
 import (
 	"testing"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 

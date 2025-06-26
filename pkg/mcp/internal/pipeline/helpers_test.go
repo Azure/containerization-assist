@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 )
 

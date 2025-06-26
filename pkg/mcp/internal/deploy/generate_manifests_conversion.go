@@ -1,7 +1,7 @@
 package deploy
 
 import (
-	"github.com/Azure/container-copilot/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/genericutils"
 )
 
 // getStringValue safely extracts a string value from a map

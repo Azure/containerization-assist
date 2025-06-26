@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/rs/zerolog"
 )
 

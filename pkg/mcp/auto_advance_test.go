@@ -3,8 +3,8 @@ package mcp
 import (
 	"testing"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 func TestConversationResponseAutoAdvance(t *testing.T) {

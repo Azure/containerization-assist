@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-kit/pkg/logger"
 )
 
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents

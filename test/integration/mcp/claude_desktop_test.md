@@ -31,7 +31,7 @@ Add the following to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "container-kit": {
-      "command": "/path/to/container-copilot/container-kit-mcp",
+      "command": "/path/to/container-kit/container-kit-mcp",
       "env": {
         "CONTAINER_KIT_WORKSPACE_DIR": "/tmp/container-kit-workspaces",
         "CONTAINER_KIT_LOG_LEVEL": "info"
@@ -41,7 +41,7 @@ Add the following to your Claude Desktop configuration file:
 }
 ```
 
-Replace `/path/to/container-copilot/container-kit-mcp` with the actual path to your built binary.
+Replace `/path/to/container-kit/container-kit-mcp` with the actual path to your built binary.
 
 ### 3. Restart Claude Desktop
 

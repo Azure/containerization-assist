@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-kit/pkg/logger"
 )
 
 func (c *Clients) TestOpenAIConn(ctx context.Context) error {

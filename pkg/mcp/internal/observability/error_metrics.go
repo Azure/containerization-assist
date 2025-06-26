@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel"
@@ -97,7 +97,7 @@ func NewErrorMetrics() *ErrorMetrics {
 		)
 
 		// Initialize OpenTelemetry metrics
-		meter := otel.Meter("github.com/Azure/container-copilot/mcp")
+		meter := otel.Meter("github.com/Azure/container-kit/mcp")
 
 		em.otelErrorCounter, _ = meter.Int64Counter(
 			"mcp.errors",
@@ -118,7 +118,7 @@ func NewErrorMetrics() *ErrorMetrics {
 		)
 
 		// Initialize tracer
-		em.tracer = otel.Tracer("github.com/Azure/container-copilot/mcp/errors")
+		em.tracer = otel.Tracer("github.com/Azure/container-kit/mcp/errors")
 
 		errorMetricsInstance = em
 	})

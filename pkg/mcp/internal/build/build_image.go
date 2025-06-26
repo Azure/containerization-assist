@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/core/analysis"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	types "github.com/Azure/container-copilot/pkg/mcp/types"
-	"github.com/Azure/container-copilot/pkg/pipeline"
-	"github.com/Azure/container-copilot/pkg/pipeline/dockerstage"
+	"github.com/Azure/container-kit/pkg/core/analysis"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
+	types "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/pipeline/dockerstage"
 	"github.com/rs/zerolog"
 )
 
