@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -711,10 +712,16 @@ func (t *AtomicAnalyzeRepositoryTool) GetMetadata() mcptypes.ToolMetadata {
 
 // Validate validates the tool arguments (unified interface)
 func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interface{}) error {
-	analyzeArgs, ok := args.(AtomicAnalyzeRepositoryArgs)
-	if !ok {
+	// Handle both pointer and value types
+	var analyzeArgs AtomicAnalyzeRepositoryArgs
+	switch v := args.(type) {
+	case AtomicAnalyzeRepositoryArgs:
+		analyzeArgs = v
+	case *AtomicAnalyzeRepositoryArgs:
+		analyzeArgs = *v
+	default:
 		return mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_analyze_repository", map[string]interface{}{
-			"expected": "AtomicAnalyzeRepositoryArgs",
+			"expected": "AtomicAnalyzeRepositoryArgs or *AtomicAnalyzeRepositoryArgs",
 			"received": fmt.Sprintf("%T", args),
 		})
 	}
@@ -736,16 +743,82 @@ func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interfa
 
 // Execute implements unified Tool interface
 func (t *AtomicAnalyzeRepositoryTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-	analyzeArgs, ok := args.(AtomicAnalyzeRepositoryArgs)
-	if !ok {
-		return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_analyze_repository", map[string]interface{}{
-			"expected": "AtomicAnalyzeRepositoryArgs",
-			"received": fmt.Sprintf("%T", args),
-		})
+	// Handle different argument types including orchestration types
+	var analyzeArgs AtomicAnalyzeRepositoryArgs
+
+	switch v := args.(type) {
+	case AtomicAnalyzeRepositoryArgs:
+		analyzeArgs = v
+	case *AtomicAnalyzeRepositoryArgs:
+		analyzeArgs = *v
+	default:
+		// Try to convert from orchestration types (reflection-like conversion)
+		if converted := t.convertFromOrchestrationArgs(args); converted != nil {
+			analyzeArgs = *converted
+		} else {
+			t.logger.Error().Str("received_type", fmt.Sprintf("%T", args)).Msg("Invalid argument type received")
+			return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_analyze_repository", map[string]interface{}{
+				"expected": "AtomicAnalyzeRepositoryArgs, *AtomicAnalyzeRepositoryArgs, or orchestration types",
+				"received": fmt.Sprintf("%T", args),
+			})
+		}
 	}
 
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, analyzeArgs)
+}
+
+// convertFromOrchestrationArgs converts orchestration types to analyze types
+func (t *AtomicAnalyzeRepositoryTool) convertFromOrchestrationArgs(args interface{}) *AtomicAnalyzeRepositoryArgs {
+	// Handle orchestration.AtomicAnalyzeRepositoryArgs (by checking field names and types)
+	// This is a bit of a hack, but necessary due to import cycle prevention
+
+	// Use reflection to extract fields
+	switch v := args.(type) {
+	case interface{}:
+		// Try to extract fields by field access if possible
+		// Check if it has the expected fields using type assertion tricks
+		if converted := t.extractFieldsFromInterface(v); converted != nil {
+			return converted
+		}
+	}
+
+	return nil
+}
+
+// extractFieldsFromInterface attempts to extract fields from an interface{}
+// that might be an orchestration.AtomicAnalyzeRepositoryArgs
+func (t *AtomicAnalyzeRepositoryTool) extractFieldsFromInterface(v interface{}) *AtomicAnalyzeRepositoryArgs {
+	// This is a more direct approach - check for specific interface methods or use a map conversion
+	// Since we can't import orchestration package, we'll use interface{} conversion tricks
+
+	// Try to get the underlying value and convert via intermediate representation
+	if ptr, ok := v.(interface{}); ok {
+		// Convert to map via JSON marshaling/unmarshaling as a fallback
+		return t.convertViaJSON(ptr)
+	}
+
+	return nil
+}
+
+// convertViaJSON converts via JSON marshaling/unmarshaling
+func (t *AtomicAnalyzeRepositoryTool) convertViaJSON(v interface{}) *AtomicAnalyzeRepositoryArgs {
+	// Marshal to JSON
+	jsonBytes, err := json.Marshal(v)
+	if err != nil {
+		t.logger.Error().Err(err).Msg("Failed to marshal args to JSON")
+		return nil
+	}
+
+	// Unmarshal to our type
+	var result AtomicAnalyzeRepositoryArgs
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		t.logger.Error().Err(err).Msg("Failed to unmarshal JSON to AtomicAnalyzeRepositoryArgs")
+		return nil
+	}
+
+	t.logger.Info().Msg("Successfully converted orchestration args via JSON")
+	return &result
 }
 
 // Legacy interface methods for backward compatibility

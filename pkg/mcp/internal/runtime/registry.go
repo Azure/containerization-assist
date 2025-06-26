@@ -76,7 +76,7 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 
 	// Use invopop/jsonschema which properly handles array items
 	reg.logger.Info().Str("tool", metadata.Name).Msg("🔧 Using invopop/jsonschema for schema generation with array fixes")
-	
+
 	reflector := &jsonschema.Reflector{
 		RequiredFromJSONSchemaTags: true,
 		AllowAdditionalProperties:  false,
@@ -125,7 +125,7 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	return nil
 }
 
-// sanitizeInvopopSchema converts invopop jsonschema.Schema to map[string]any 
+// sanitizeInvopopSchema converts invopop jsonschema.Schema to map[string]any
 // and removes keywords that GitHub Copilot's AJV-Draft-7 validator cannot handle
 func sanitizeInvopopSchema(schema *jsonschema.Schema) map[string]interface{} {
 	// Marshal and unmarshal to get map format
@@ -133,7 +133,7 @@ func sanitizeInvopopSchema(schema *jsonschema.Schema) map[string]interface{} {
 	if err != nil {
 		return make(map[string]interface{})
 	}
-	
+
 	var schemaMap map[string]interface{}
 	if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
 		return make(map[string]interface{})
@@ -141,7 +141,7 @@ func sanitizeInvopopSchema(schema *jsonschema.Schema) map[string]interface{} {
 
 	// Apply GitHub Copilot compatibility fixes
 	utils.RemoveCopilotIncompatible(schemaMap)
-	
+
 	return schemaMap
 }
 
