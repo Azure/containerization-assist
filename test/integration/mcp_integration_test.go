@@ -120,7 +120,9 @@ func TestMCPServerBinaryIntegration(t *testing.T) {
 				t.Errorf("Server exited with error: %v", err)
 			}
 		case <-time.After(5 * time.Second):
-			cmd.Process.Kill()
+			if err := cmd.Process.Kill(); err != nil {
+				t.Logf("Failed to kill process: %v", err)
+			}
 			t.Error("Server did not shut down gracefully")
 		}
 	})
@@ -352,7 +354,11 @@ func TestPerformanceAndLoad(t *testing.T) {
 
 		for i := 0; i < numRequests; i++ {
 			go func(id int) {
-				request := requestTemplate
+				// Create a deep copy of the request template
+				request := make(map[string]interface{})
+				for k, v := range requestTemplate {
+					request[k] = v
+				}
 				request["id"] = id
 
 				_, err := json.Marshal(request)

@@ -128,13 +128,13 @@ func TestStandardizedValidationMixin_StandardValidatePath(t *testing.T) {
 
 	// Create test files and directories
 	testFile := filepath.Join(tempDir, "test.txt")
-	require.NoError(t, os.WriteFile(testFile, []byte("test"), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte("test"), 0600))
 
 	testDir := filepath.Join(tempDir, "testdir")
 	require.NoError(t, os.Mkdir(testDir, 0755))
 
 	readOnlyFile := filepath.Join(tempDir, "readonly.txt")
-	require.NoError(t, os.WriteFile(readOnlyFile, []byte("readonly"), 0444))
+	require.NoError(t, os.WriteFile(readOnlyFile, []byte("readonly"), 0400))
 
 	tests := []struct {
 		name          string

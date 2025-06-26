@@ -14,6 +14,108 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Helper function to process JSON vulnerabilities
+func processJSONVulnerabilities(trivyResult *coredocker.TrivyResult, scanResult *coredocker.ScanResult) {
+	for _, result := range trivyResult.Results {
+		for _, vuln := range result.Vulnerabilities {
+			// Create vulnerability object
+			vulnerability := coredocker.Vulnerability{
+				VulnerabilityID:  vuln.VulnerabilityID,
+				PkgName:          vuln.PkgName,
+				InstalledVersion: vuln.InstalledVersion,
+				FixedVersion:     vuln.FixedVersion,
+				Severity:         vuln.Severity,
+				Title:            vuln.Title,
+				Description:      vuln.Description,
+				References:       vuln.References,
+			}
+
+			if vuln.Layer.DiffID != "" {
+				vulnerability.Layer = vuln.Layer.DiffID
+			}
+
+			scanResult.Vulnerabilities = append(scanResult.Vulnerabilities, vulnerability)
+
+			// Update summary counts
+			switch vuln.Severity {
+			case "CRITICAL":
+				scanResult.Summary.Critical++
+			case "HIGH":
+				scanResult.Summary.High++
+			case "MEDIUM":
+				scanResult.Summary.Medium++
+			case "LOW":
+				scanResult.Summary.Low++
+			default:
+				scanResult.Summary.Unknown++
+			}
+			scanResult.Summary.Total++
+
+			// Count fixable vulnerabilities
+			if vuln.FixedVersion != "" {
+				scanResult.Summary.Fixable++
+			}
+		}
+	}
+}
+
+// Helper function to count vulnerabilities from string
+func countVulnerabilitiesFromString(outputStr string, scanResult *coredocker.ScanResult) {
+	severityLevels := []struct {
+		level string
+		field *int
+	}{
+		{"CRITICAL", &scanResult.Summary.Critical},
+		{"HIGH", &scanResult.Summary.High},
+		{"MEDIUM", &scanResult.Summary.Medium},
+		{"LOW", &scanResult.Summary.Low},
+		{"UNKNOWN", &scanResult.Summary.Unknown},
+	}
+
+	for _, severity := range severityLevels {
+		count := strings.Count(outputStr, severity.level)
+		if count > 0 {
+			*severity.field = count
+			scanResult.Summary.Total += count
+		}
+	}
+}
+
+// Helper function to verify scan results
+func verifyScanResults(t *testing.T, tt struct {
+	name            string
+	trivyOutput     string
+	expectedTotal   int
+	expectedCrit    int
+	expectedHigh    int
+	expectedMedium  int
+	expectedLow     int
+	expectedUnknown int
+	expectedFixable int
+	shouldFallback  bool
+}, scanResult *coredocker.ScanResult) {
+	assert.Equal(t, tt.expectedTotal, scanResult.Summary.Total, "Total vulnerabilities mismatch")
+	assert.Equal(t, tt.expectedCrit, scanResult.Summary.Critical, "Critical vulnerabilities mismatch")
+	assert.Equal(t, tt.expectedHigh, scanResult.Summary.High, "High vulnerabilities mismatch")
+	assert.Equal(t, tt.expectedMedium, scanResult.Summary.Medium, "Medium vulnerabilities mismatch")
+	assert.Equal(t, tt.expectedLow, scanResult.Summary.Low, "Low vulnerabilities mismatch")
+	assert.Equal(t, tt.expectedFixable, scanResult.Summary.Fixable, "Fixable vulnerabilities mismatch")
+
+	// Verify vulnerability details for valid JSON
+	if !tt.shouldFallback && tt.expectedTotal > 0 {
+		assert.Len(t, scanResult.Vulnerabilities, tt.expectedTotal)
+
+		// Check first vulnerability details
+		if len(scanResult.Vulnerabilities) > 0 {
+			firstVuln := scanResult.Vulnerabilities[0]
+			assert.NotEmpty(t, firstVuln.VulnerabilityID)
+			assert.NotEmpty(t, firstVuln.PkgName)
+			assert.NotEmpty(t, firstVuln.InstalledVersion)
+			assert.NotEmpty(t, firstVuln.Severity)
+		}
+	}
+}
+
 func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 
 	tests := []struct {
@@ -184,106 +286,15 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 			}
 
 			if err == nil {
-				// Process parsed JSON (same logic as in build_validator.go)
-				for _, result := range trivyResult.Results {
-					for _, vuln := range result.Vulnerabilities {
-						vulnerability := coredocker.Vulnerability{
-							VulnerabilityID:  vuln.VulnerabilityID,
-							PkgName:          vuln.PkgName,
-							InstalledVersion: vuln.InstalledVersion,
-							FixedVersion:     vuln.FixedVersion,
-							Severity:         vuln.Severity,
-							Title:            vuln.Title,
-							Description:      vuln.Description,
-							References:       vuln.References,
-						}
-
-						if vuln.Layer.DiffID != "" {
-							vulnerability.Layer = vuln.Layer.DiffID
-						}
-
-						scanResult.Vulnerabilities = append(scanResult.Vulnerabilities, vulnerability)
-
-						switch vuln.Severity {
-						case "CRITICAL":
-							scanResult.Summary.Critical++
-						case "HIGH":
-							scanResult.Summary.High++
-						case "MEDIUM":
-							scanResult.Summary.Medium++
-						case "LOW":
-							scanResult.Summary.Low++
-						default:
-							scanResult.Summary.Unknown++
-						}
-						scanResult.Summary.Total++
-
-						if vuln.FixedVersion != "" {
-							scanResult.Summary.Fixable++
-						}
-					}
-				}
+				// Process parsed JSON
+				processJSONVulnerabilities(&trivyResult, scanResult)
 			} else if tt.shouldFallback {
-				// Test fallback string matching (same logic as in build_validator.go)
-				outputStr := tt.trivyOutput
-
-				// Count CRITICAL vulnerabilities
-				criticalCount := strings.Count(outputStr, "CRITICAL")
-				if criticalCount > 0 {
-					scanResult.Summary.Critical = criticalCount
-					scanResult.Summary.Total += criticalCount
-				}
-
-				// Count HIGH vulnerabilities
-				highCount := strings.Count(outputStr, "HIGH")
-				if highCount > 0 {
-					scanResult.Summary.High = highCount
-					scanResult.Summary.Total += highCount
-				}
-
-				// Count MEDIUM vulnerabilities
-				mediumCount := strings.Count(outputStr, "MEDIUM")
-				if mediumCount > 0 {
-					scanResult.Summary.Medium = mediumCount
-					scanResult.Summary.Total += mediumCount
-				}
-
-				// Count LOW vulnerabilities
-				lowCount := strings.Count(outputStr, "LOW")
-				if lowCount > 0 {
-					scanResult.Summary.Low = lowCount
-					scanResult.Summary.Total += lowCount
-				}
-
-				// Count UNKNOWN vulnerabilities
-				unknownCount := strings.Count(outputStr, "UNKNOWN")
-				if unknownCount > 0 {
-					scanResult.Summary.Unknown = unknownCount
-					scanResult.Summary.Total += unknownCount
-				}
+				// Test fallback string matching
+				countVulnerabilitiesFromString(tt.trivyOutput, scanResult)
 			}
 
 			// Verify results
-			assert.Equal(t, tt.expectedTotal, scanResult.Summary.Total, "Total vulnerabilities mismatch")
-			assert.Equal(t, tt.expectedCrit, scanResult.Summary.Critical, "Critical vulnerabilities mismatch")
-			assert.Equal(t, tt.expectedHigh, scanResult.Summary.High, "High vulnerabilities mismatch")
-			assert.Equal(t, tt.expectedMedium, scanResult.Summary.Medium, "Medium vulnerabilities mismatch")
-			assert.Equal(t, tt.expectedLow, scanResult.Summary.Low, "Low vulnerabilities mismatch")
-			assert.Equal(t, tt.expectedFixable, scanResult.Summary.Fixable, "Fixable vulnerabilities mismatch")
-
-			// Verify vulnerability details for valid JSON
-			if !tt.shouldFallback && tt.expectedTotal > 0 {
-				assert.Len(t, scanResult.Vulnerabilities, tt.expectedTotal)
-
-				// Check first vulnerability details
-				if len(scanResult.Vulnerabilities) > 0 {
-					firstVuln := scanResult.Vulnerabilities[0]
-					assert.NotEmpty(t, firstVuln.VulnerabilityID)
-					assert.NotEmpty(t, firstVuln.PkgName)
-					assert.NotEmpty(t, firstVuln.InstalledVersion)
-					assert.NotEmpty(t, firstVuln.Severity)
-				}
-			}
+			verifyScanResults(t, tt, scanResult)
 		})
 	}
 }
@@ -305,7 +316,7 @@ func TestBuildValidator_ValidateBuildPrerequisites(t *testing.T) {
 			name: "Valid Dockerfile and context",
 			setupFunc: func() (string, string) {
 				dockerfilePath := filepath.Join(tempDir, "Dockerfile")
-				err := os.WriteFile(dockerfilePath, []byte("FROM alpine:latest\nRUN echo hello"), 0644)
+				err := os.WriteFile(dockerfilePath, []byte("FROM alpine:latest\nRUN echo hello"), 0600)
 				require.NoError(t, err)
 				return dockerfilePath, tempDir
 			},
@@ -323,7 +334,7 @@ func TestBuildValidator_ValidateBuildPrerequisites(t *testing.T) {
 			name: "Missing build context",
 			setupFunc: func() (string, string) {
 				dockerfilePath := filepath.Join(tempDir, "Dockerfile2")
-				err := os.WriteFile(dockerfilePath, []byte("FROM alpine:latest"), 0644)
+				err := os.WriteFile(dockerfilePath, []byte("FROM alpine:latest"), 0600)
 				require.NoError(t, err)
 				return dockerfilePath, filepath.Join(tempDir, "nonexistent")
 			},
@@ -334,7 +345,7 @@ func TestBuildValidator_ValidateBuildPrerequisites(t *testing.T) {
 			name: "Valid empty Dockerfile",
 			setupFunc: func() (string, string) {
 				dockerfilePath := filepath.Join(tempDir, "Dockerfile.empty")
-				err := os.WriteFile(dockerfilePath, []byte(""), 0644)
+				err := os.WriteFile(dockerfilePath, []byte(""), 0600)
 				require.NoError(t, err)
 				return dockerfilePath, tempDir
 			},

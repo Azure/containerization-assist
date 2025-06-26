@@ -2,10 +2,8 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
@@ -160,7 +158,7 @@ func TestWorkspaceManager_ValidateLocalPath(t *testing.T) {
 
 	// Create some test paths
 	validFile := filepath.Join(tempDir, "valid.txt")
-	require.NoError(t, os.WriteFile(validFile, []byte("test"), 0644))
+	require.NoError(t, os.WriteFile(validFile, []byte("test"), 0600))
 
 	validDir := filepath.Join(tempDir, "validdir")
 	require.NoError(t, os.Mkdir(validDir, 0755))
@@ -247,40 +245,6 @@ func TestWorkspaceManager_ValidateLocalPath(t *testing.T) {
 	}
 }
 
-// Helper function to simulate path validation
-func validateLocalPath(path, baseDir string) error {
-	if path == "" {
-		return fmt.Errorf("path cannot be empty")
-	}
-
-	// Check for path traversal
-	if filepath.IsAbs(path) && !strings.HasPrefix(path, baseDir) {
-		return fmt.Errorf("absolute paths not allowed outside workspace")
-	}
-
-	if strings.Contains(path, "..") {
-		return fmt.Errorf("path traversal detected")
-	}
-
-	// Check for hidden files
-	if strings.HasPrefix(filepath.Base(path), ".") || strings.Contains(path, "/.") {
-		return fmt.Errorf("hidden files not allowed")
-	}
-
-	// Resolve path
-	fullPath := path
-	if !filepath.IsAbs(path) {
-		fullPath = filepath.Join(baseDir, path)
-	}
-
-	// Check existence
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return fmt.Errorf("path does not exist: %s", path)
-	}
-
-	return nil
-}
-
 func TestWorkspaceManager_UpdateDiskUsage(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -362,7 +326,7 @@ func TestWorkspaceManager_UpdateDiskUsage(t *testing.T) {
 
 					// Create file with specified size
 					data := make([]byte, size)
-					require.NoError(t, os.WriteFile(filePath, data, 0644))
+					require.NoError(t, os.WriteFile(filePath, data, 0600))
 				}
 			}
 
