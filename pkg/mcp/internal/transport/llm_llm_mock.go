@@ -41,11 +41,6 @@ func NewMockLLMTransport(logger zerolog.Logger) *MockLLMTransport {
 	}
 }
 
-// Deprecated: Use NewMockLLMTransport instead
-func NewMockToolInvokerTransport(logger zerolog.Logger) *MockLLMTransport {
-	return NewMockLLMTransport(logger)
-}
-
 // SetResponse configures a canned response for a specific tool call
 func (m *MockLLMTransport) SetResponse(toolName string, response types.ToolInvocationResponse) {
 	m.responses[toolName] = response
