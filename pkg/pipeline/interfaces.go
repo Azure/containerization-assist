@@ -31,6 +31,7 @@ type RunnerOptions struct {
 	MaxIterations             int //Maximum number of iterations per stage
 	CompleteLoopMaxIterations int // Maximum times entire pipeline can be run
 	GenerateSnapshot          bool
+	SnapshotCompletions       bool
 	GenerateReport            bool
 	TargetDirectory           string
 }

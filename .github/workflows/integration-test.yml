@@ -164,7 +164,7 @@ jobs:
           pattern: cc-run-*
           path: results
 
-      - name: Integreation Test Results Summary
+      - name: Integration Test Results Summary
         id: aggregate_results
         run: |
           tests_per_repo=5
