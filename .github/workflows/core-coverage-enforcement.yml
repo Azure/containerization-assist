@@ -178,11 +178,54 @@ jobs:
 
     - name: Check core package coverage enforcement
       run: |
-        # This will fail the job if any core package is below 80%
-        # For now, we'll make it a warning since we're establishing baseline
+        # Sprint D: Testing & Quality Foundation - Staged enforcement approach
+        # Stage 1: Enforce minimum 5% for packages with new tests (initial rollout)
+        # Stage 2: Gradually ramp up to 80% target over time
+        # Note: We start with 5% to establish baseline and prevent regression
+
+        # Load thresholds from configuration
+        MINIMUM_THRESHOLD=5   # Lowered from 20% for initial rollout
+        TARGET_THRESHOLD=80   # Long-term target remains 80%
+
+        # Check for packages that don't meet even the minimum threshold
+        # Note: Packages with 0% coverage (no tests) are warnings, not failures
+        CRITICAL_FAILURES=""
+        ZERO_COVERAGE_PACKAGES=""
+        while IFS= read -r line; do
+          if [[ $line =~ \|[[:space:]]*([^|]+)[[:space:]]*\|[[:space:]]*([0-9.]+)%[[:space:]]*\|[[:space:]]*❌ ]]; then
+            PKG="${BASH_REMATCH[1]}"
+            COV="${BASH_REMATCH[2]}"
+            if (( $(echo "$COV == 0" | bc -l) )); then
+              # Track zero coverage separately - these need tests added
+              ZERO_COVERAGE_PACKAGES="$ZERO_COVERAGE_PACKAGES\n- $PKG: ${COV}% (no tests)"
+            elif (( $(echo "$COV < $MINIMUM_THRESHOLD" | bc -l) )); then
+              # Only fail for packages with some tests but below minimum
+              CRITICAL_FAILURES="$CRITICAL_FAILURES\n- $PKG: ${COV}%"
+            fi
+          fi
+        done < core-coverage-report.md
+
+        # Report zero coverage packages as warnings
+        if [ -n "$ZERO_COVERAGE_PACKAGES" ]; then
+          echo "⚠️ Warning: Packages with no tests (0% coverage):"
+          echo -e "$ZERO_COVERAGE_PACKAGES"
+          echo "::warning::These packages need test implementation"
+          echo ""
+        fi
+
+        # Fail CI only for packages with tests below minimum threshold
+        if [ -n "$CRITICAL_FAILURES" ]; then
+          echo "❌ Critical: Packages with tests below $MINIMUM_THRESHOLD% minimum threshold:"
+          echo -e "$CRITICAL_FAILURES"
+          echo "::error::Core packages with existing tests must maintain at least $MINIMUM_THRESHOLD% coverage"
+          exit 1
+        fi
+
+        # Warn for packages below target threshold
         if grep -q "❌ Below 80%" core-coverage-report.md; then
           echo "::warning::Some core packages are below the 80% coverage target"
+          echo "::warning::Sprint D target: Work toward 80% coverage for core packages"
           echo "See the coverage report for details"
-          # Uncomment the line below to enforce the check
-          # exit 1
+        else
+          echo "✅ All core packages meet the coverage requirements!"
         fi
