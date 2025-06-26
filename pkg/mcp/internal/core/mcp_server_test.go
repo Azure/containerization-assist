@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-copilot/pkg/genericutils"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
@@ -338,15 +339,15 @@ CMD ["./main"]`
 		}
 
 		// Test string extraction
-		result := utils.GetStringFromMap(testMap, "string_key")
+		result := genericutils.MapGetWithDefault[string](testMap, "string_key", "")
 		assert.Equal(t, "string_value", result)
 
 		// Test non-existent key
-		result = utils.GetStringFromMap(testMap, "missing_key")
+		result = genericutils.MapGetWithDefault[string](testMap, "missing_key", "")
 		assert.Equal(t, "", result)
 
 		// Test wrong type
-		result = utils.GetStringFromMap(testMap, "int_key")
+		result = genericutils.MapGetWithDefault[string](testMap, "int_key", "")
 		assert.Equal(t, "", result)
 	})
 }
