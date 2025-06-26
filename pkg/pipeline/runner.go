@@ -132,7 +132,7 @@ func (r *Runner) Run(
 				Outcome:    outcome,
 			})
 			if opts.GenerateSnapshot {
-				if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
+				if err := WriteIterationSnapshot(state, opts.TargetDirectory, opts.SnapshotCompletions, stage); err != nil {
 					return fmt.Errorf("writing iteration snapshot: %w", err)
 				}
 			}

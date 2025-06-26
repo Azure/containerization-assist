@@ -145,6 +145,17 @@ jobs:
           fi
           echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
 
+      - name: Check Artifact Directory Size
+        run: |
+          max_size_bytes=$((20 * 1024 * 1024))  # 20 MiB in bytes
+          echo "Max Artifact Directory Size: $max_size_bytes bytes"
+          size_in_bytes=$(du -sb test-repo/artifacts/ | cut -f1)
+          echo "Artifact Directory Size in bytes: $size_in_bytes"
+          if [ "$size_in_bytes" -gt "$max_size_bytes" ]; then
+            echo "❌ Artifact Directory Size $size_in_bytes exceeds $max_size_bytes"
+            exit 1
+          fi
+
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -164,7 +175,7 @@ jobs:
           pattern: cc-run-*
           path: results
 
-      - name: Integreation Test Results Summary
+      - name: Integration Test Results Summary
         id: aggregate_results
         run: |
           tests_per_repo=5

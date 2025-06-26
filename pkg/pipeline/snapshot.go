@@ -17,7 +17,7 @@ const ReportDirectory = ".container-kit"
 // WriteIterationSnapshot creates a snapshot of the current pipeline iteration.
 // The function accepts a variadic parameter `stages`, which is a list of PipelineStage objects.
 // Each stage can contribute its errors to the snapshot, which are included in the metadata.
-func WriteIterationSnapshot(state *PipelineState, targetDir string, stages ...PipelineStage) error {
+func WriteIterationSnapshot(state *PipelineState, targetDir string, snapshotCompletions bool, stages ...PipelineStage) error {
 	snapDir := filepath.Join(targetDir, ReportDirectory, fmt.Sprintf("iteration_%d", state.IterationCount))
 	if err := os.MkdirAll(snapDir, 0755); err != nil {
 		return fmt.Errorf("creating container-kit-snapshot directory: %w", err)
@@ -57,7 +57,7 @@ func WriteIterationSnapshot(state *PipelineState, targetDir string, stages ...Pi
 			meta["manifest_errors"] = v
 		}
 	}
-	if len(state.LLMCompletions) > 0 {
+	if snapshotCompletions && len(state.LLMCompletions) > 0 {
 		meta["llm_completions"] = state.LLMCompletions
 
 		completionsJSON, err := json.MarshalIndent(state.LLMCompletions, "", "  ")

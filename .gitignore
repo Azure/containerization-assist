@@ -464,5 +464,9 @@ test-repos/
 *.swp
 *.swo
 
-# Generated quality metrics
+quality-dashboard.html
+quality-history.json
 quality-metrics.json
+performance_baseline.json
+interface_metrics.json
+coverage-baseline-report.md
