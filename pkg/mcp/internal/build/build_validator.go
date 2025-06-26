@@ -2,6 +2,7 @@ package build
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -110,16 +111,86 @@ func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName str
 		Context:         make(map[string]interface{}),
 	}
 
-	// TODO: Properly parse Trivy JSON output
-	// For now, just check if output contains vulnerability keywords
-	outputStr := string(output)
-	if strings.Contains(outputStr, "CRITICAL") {
-		scanResult.Summary.Critical = 1
-		scanResult.Summary.Total = 1
-	}
-	if strings.Contains(outputStr, "HIGH") {
-		scanResult.Summary.High = 1
-		scanResult.Summary.Total++
+	// Parse Trivy JSON output
+	var trivyResult coredocker.TrivyResult
+	if err := json.Unmarshal(output, &trivyResult); err != nil {
+		bv.logger.Warn().
+			Err(err).
+			Str("output", string(output)).
+			Msg("Failed to parse Trivy JSON output, falling back to string matching")
+
+		// Fallback to string matching if JSON parsing fails
+		outputStr := string(output)
+		if strings.Contains(outputStr, "CRITICAL") {
+			scanResult.Summary.Critical = 1
+			scanResult.Summary.Total = 1
+		}
+		if strings.Contains(outputStr, "HIGH") {
+			scanResult.Summary.High = 1
+			scanResult.Summary.Total++
+		}
+	} else {
+		// Process properly parsed JSON results
+		for _, result := range trivyResult.Results {
+			for _, vuln := range result.Vulnerabilities {
+				// Add to vulnerabilities list
+				vulnerability := coredocker.Vulnerability{
+					VulnerabilityID:  vuln.VulnerabilityID,
+					PkgName:          vuln.PkgName,
+					InstalledVersion: vuln.InstalledVersion,
+					FixedVersion:     vuln.FixedVersion,
+					Severity:         vuln.Severity,
+					Title:            vuln.Title,
+					Description:      vuln.Description,
+					References:       vuln.References,
+				}
+
+				if vuln.Layer.DiffID != "" {
+					vulnerability.Layer = vuln.Layer.DiffID
+				}
+
+				scanResult.Vulnerabilities = append(scanResult.Vulnerabilities, vulnerability)
+
+				// Update summary counts
+				switch strings.ToUpper(vuln.Severity) {
+				case "CRITICAL":
+					scanResult.Summary.Critical++
+				case "HIGH":
+					scanResult.Summary.High++
+				case "MEDIUM":
+					scanResult.Summary.Medium++
+				case "LOW":
+					scanResult.Summary.Low++
+				default:
+					scanResult.Summary.Unknown++
+				}
+				scanResult.Summary.Total++
+
+				// Count fixable vulnerabilities
+				if vuln.FixedVersion != "" {
+					scanResult.Summary.Fixable++
+				}
+			}
+		}
+
+		// Add remediation recommendations for critical and high vulnerabilities
+		if scanResult.Summary.Critical > 0 || scanResult.Summary.High > 0 {
+			scanResult.Remediation = append(scanResult.Remediation, coredocker.RemediationStep{
+				Priority:    1,
+				Action:      "update_base_image",
+				Description: "Update base image to latest version to fix known vulnerabilities",
+				Command:     "docker pull <base-image>:latest",
+			})
+
+			if scanResult.Summary.Fixable > 0 {
+				scanResult.Remediation = append(scanResult.Remediation, coredocker.RemediationStep{
+					Priority:    2,
+					Action:      "update_packages",
+					Description: fmt.Sprintf("Update %d packages with available fixes", scanResult.Summary.Fixable),
+					Command:     "Update package versions in Dockerfile or run package manager update commands",
+				})
+			}
+		}
 	}
 
 	duration := time.Since(startTime)

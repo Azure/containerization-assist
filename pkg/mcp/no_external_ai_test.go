@@ -1,3 +1,8 @@
+// Package mcp contains policy compliance tests for the MCP (Model Context Protocol) implementation.
+// This file specifically tests that the MCP package maintains independence from external AI services.
+// NOTE: This is an intentionally orphaned test file that validates architectural constraints
+// rather than testing a specific implementation file.
+
 package mcp
 
 import (
