@@ -38,7 +38,17 @@ func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args Atomic
 	// Check if fixing is enabled
 	if fixingMixin == nil {
 		e.logger.Warn().Msg("AI-driven fixing not enabled, falling back to regular execution")
-		return e.ExecuteBuild(ctx, args)
+		startTime := time.Now()
+		result := &AtomicBuildImageResult{
+			BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
+			BaseAIContextResult: mcptypes.NewBaseAIContextResult("build", false, 0),
+			SessionID:           args.SessionID,
+			ImageName:           args.ImageName,
+			ImageTag:            e.getImageTag(args.ImageTag),
+			Platform:            e.getPlatform(args.Platform),
+			BuildContext_Info:   &BuildContextInfo{},
+		}
+		return e.executeWithoutProgress(ctx, args, result, startTime)
 	}
 
 	// First validate basic requirements
@@ -84,12 +94,6 @@ func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args Atomic
 
 	// Note: The actual fixing logic would be handled by the fixingMixin
 	// This is a simplified version that just falls back to regular execution
-	return e.ExecuteBuild(ctx, args)
-}
-
-// ExecuteBuild runs the atomic Docker image build (deprecated: use ExecuteWithContext)
-func (e *BuildExecutorService) ExecuteBuild(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
-	// Fallback: execute without progress tracking for backward compatibility
 	startTime := time.Now()
 	result := &AtomicBuildImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),

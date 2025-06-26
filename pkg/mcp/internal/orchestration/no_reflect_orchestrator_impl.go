@@ -73,8 +73,8 @@ func (o *NoReflectToolOrchestrator) executeBuildImage(ctx context.Context, argsM
 		args.RegistryURL = registryURL
 	}
 
-	// Execute the tool
-	return tool.ExecuteBuild(ctx, args)
+	// Execute the tool with context (without progress tracking)
+	return tool.ExecuteWithContext(nil, args)
 }
 
 func (o *NoReflectToolOrchestrator) executePushImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {

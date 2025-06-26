@@ -45,11 +45,6 @@ func NewNoReflectToolOrchestrator(
 	}
 }
 
-// SetPipelineAdapter sets the pipeline adapter (deprecated - use SetPipelineOperations)
-func (o *NoReflectToolOrchestrator) SetPipelineAdapter(adapter interface{}) {
-	o.SetPipelineOperations(adapter)
-}
-
 // SetPipelineOperations sets the pipeline operations and creates the tool factory
 func (o *NoReflectToolOrchestrator) SetPipelineOperations(operations interface{}) {
 	o.pipelineOperations = operations

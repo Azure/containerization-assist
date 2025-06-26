@@ -156,3 +156,52 @@ func (s *StubAnalyzer) GetTokenUsage() mcptypes.TokenUsage {
 func (s *StubAnalyzer) ResetTokenUsage() {
 	// No-op for stub
 }
+
+// AnalyzerFactory creates the appropriate analyzer based on configuration
+type AnalyzerFactory struct {
+	logger       zerolog.Logger
+	enableAI     bool
+	transport    LLMTransport
+	analyzerOpts CallerAnalyzerOpts
+}
+
+// NewAnalyzerFactory creates a new analyzer factory
+func NewAnalyzerFactory(logger zerolog.Logger, enableAI bool, transport LLMTransport) *AnalyzerFactory {
+	return &AnalyzerFactory{
+		logger:    logger,
+		enableAI:  enableAI,
+		transport: transport,
+		analyzerOpts: CallerAnalyzerOpts{
+			ToolName:       "chat",
+			SystemPrompt:   "You are an AI assistant helping with container analysis and deployment.",
+			PerCallTimeout: 60 * time.Second,
+		},
+	}
+}
+
+// SetAnalyzerOptions configures the CallerAnalyzer options
+func (f *AnalyzerFactory) SetAnalyzerOptions(opts CallerAnalyzerOpts) {
+	f.analyzerOpts = opts
+}
+
+// CreateAnalyzer creates the appropriate analyzer based on configuration
+func (f *AnalyzerFactory) CreateAnalyzer() mcptypes.AIAnalyzer {
+	if f.enableAI && f.transport != nil {
+		f.logger.Info().Msg("Creating CallerAnalyzer for AI-enabled mode")
+		return NewCallerAnalyzer(f.transport, f.analyzerOpts)
+	}
+
+	f.logger.Info().Msg("Creating StubAnalyzer (AI disabled or no transport)")
+	return NewStubAnalyzer()
+}
+
+// CreateAnalyzerFromEnv creates an analyzer based on environment configuration
+// Note: This returns a stub analyzer since we don't have transport available here
+func CreateAnalyzerFromEnv(logger zerolog.Logger) mcptypes.AIAnalyzer {
+	// Use centralized configuration logic
+	config := DefaultAnalyzerConfig()
+	config.LoadFromEnv()
+
+	// Delegate to the config-based creator
+	return CreateAnalyzerFromConfig(config, logger)
+}
