@@ -21,6 +21,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Type aliases for atomic manifest generation
+type AtomicGenerateManifestsArgs = GenerateManifestsArgs
+type AtomicGenerateManifestsResult = GenerateManifestsResult
+
 // AtomicGenerateManifestsTool implements atomic Kubernetes manifest generation with secret handling
 type AtomicGenerateManifestsTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
