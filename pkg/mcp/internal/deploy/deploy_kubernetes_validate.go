@@ -126,7 +126,7 @@ func (t *AtomicDeployKubernetesTool) updateSessionState(session *sessiontypes.Se
 	session.Metadata["last_deployment_app"] = result.AppName
 	session.Metadata["last_deployment_success"] = result.Success
 	session.Metadata["deployed_image_ref"] = result.ImageRef
-	session.Metadata["deployment_namespace"] = result.Namespace
+	// Note: deployment_namespace already set above in success case
 	session.Metadata["deployment_app"] = result.AppName
 	session.Metadata["deployment_success"] = result.Success
 

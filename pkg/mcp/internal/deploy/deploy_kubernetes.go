@@ -372,7 +372,9 @@ func extractAppNameFromImage(imageRef string) string {
 		}
 		return lastPart
 	}
-	return "app" // fallback
+	// Log warning for ambiguous fallback case
+	zerolog.Ctx(context.Background()).Warn().Str("imageRef", imageRef).Msg("Failed to extract app name from image reference, using fallback value 'unknown-app'")
+	return "unknown-app" // fallback
 }
 
 // GetMetadata returns comprehensive tool metadata
