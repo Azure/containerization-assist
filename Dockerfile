@@ -1,4 +1,4 @@
-FROM tomcat:9-jdk11
+FROM tomcat:10-jdk11
 
 WORKDIR /build
 COPY go.mod go.sum ./
