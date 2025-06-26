@@ -85,45 +85,98 @@ func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, sess
 	return nil
 }
 
-// handleDeploymentError creates an error for deployment failures
-func (t *AtomicDeployKubernetesTool) handleDeploymentError(_ context.Context, err error, _ *kubernetes.DeploymentResult, _ *AtomicDeployKubernetesResult) error {
+// handleDeploymentError creates an error for deployment failures and enriches the result with failure analysis
+func (t *AtomicDeployKubernetesTool) handleDeploymentError(_ context.Context, err error, _ *kubernetes.DeploymentResult, result *AtomicDeployKubernetesResult) error {
+	// Analyze the deployment error
+	richError, _ := analyzeDeploymentError(err)
+
+	// Create failure analysis
+	result.FailureAnalysis = &DeploymentFailureAnalysis{
+		FailureType:    richError.Type,
+		FailureStage:   "deployment",
+		RootCauses:     []string{richError.Message},
+		ImpactSeverity: richError.Severity,
+	}
+
+	// Add immediate actions based on error type
+	switch richError.Type {
+	case "image_error":
+		result.FailureAnalysis.ImmediateActions = []DeploymentRemediationAction{
+			{
+				Priority:    1,
+				Action:      "Verify image exists",
+				Command:     fmt.Sprintf("docker pull %s", result.ImageRef),
+				Description: "Check if the image exists and can be pulled",
+				Expected:    "Image should be successfully pulled",
+				RiskLevel:   "low",
+			},
+			{
+				Priority:    2,
+				Action:      "Check registry credentials",
+				Command:     "kubectl get secret -n " + result.Namespace,
+				Description: "Verify registry credentials are configured",
+				Expected:    "Registry secrets should be present",
+				RiskLevel:   "low",
+			},
+		}
+	case "manifest_error":
+		result.FailureAnalysis.ImmediateActions = []DeploymentRemediationAction{
+			{
+				Priority:    1,
+				Action:      "Validate manifests",
+				Command:     "kubectl apply --dry-run=client -f k8s/",
+				Description: "Validate manifest syntax",
+				Expected:    "Manifests should validate successfully",
+				RiskLevel:   "low",
+			},
+		}
+	case "resource_error":
+		result.FailureAnalysis.ImmediateActions = []DeploymentRemediationAction{
+			{
+				Priority:    1,
+				Action:      "Check cluster resources",
+				Command:     "kubectl top nodes",
+				Description: "Check available cluster resources",
+				Expected:    "Sufficient resources should be available",
+				RiskLevel:   "low",
+			},
+		}
+	}
+
+	// Add diagnostic commands
+	result.FailureAnalysis.DiagnosticCommands = []DiagnosticCommand{
+		{
+			Purpose:     "Check deployment status",
+			Command:     fmt.Sprintf("kubectl describe deployment %s -n %s", result.AppName, result.Namespace),
+			Explanation: "Shows detailed deployment status and events",
+		},
+		{
+			Purpose:     "Check pod status",
+			Command:     fmt.Sprintf("kubectl get pods -n %s -l app=%s", result.Namespace, result.AppName),
+			Explanation: "Lists pods and their current state",
+		},
+		{
+			Purpose:     "View pod logs",
+			Command:     fmt.Sprintf("kubectl logs -n %s -l app=%s --tail=50", result.Namespace, result.AppName),
+			Explanation: "Shows recent application logs",
+		},
+	}
+
+	// Update deployment context with error details
+	if result.DeploymentContext != nil {
+		result.DeploymentContext.DeploymentStatus = "failed"
+		result.DeploymentContext.DeploymentErrors = append(result.DeploymentContext.DeploymentErrors, richError.Message)
+
+		// Add troubleshooting tips
+		result.DeploymentContext.TroubleshootingTips = []string{
+			"Check if the namespace exists: kubectl get namespace " + result.Namespace,
+			"Verify image pull policy and registry access",
+			"Check resource quotas: kubectl describe resourcequota -n " + result.Namespace,
+			"Review recent events: kubectl get events -n " + result.Namespace + " --sort-by=.lastTimestamp",
+		}
+	}
+
 	return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("kubernetes deployment failed: %v", err), "deployment_error")
-}
-
-// ExecuteWithFixes runs the atomic Kubernetes deployment with AI-driven fixing capabilities
-func (t *AtomicDeployKubernetesTool) ExecuteWithFixes(ctx context.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
-	if t.fixingMixin == nil {
-		// Fall back to normal execution if no fixing mixin is available
-		return t.ExecuteWithContext(nil, args)
-	}
-
-	// Get session for context
-	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
-	}
-	session := sessionInterface.(*sessiontypes.SessionState)
-	workspaceDir := t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-
-	// Create a fixable operation wrapper
-	operation := &KubernetesDeployOperation{
-		tool:         t,
-		args:         args,
-		session:      session,
-		workspaceDir: workspaceDir,
-		namespace:    args.Namespace,
-		manifests:    []string{}, // Will be populated during execution
-		logger:       t.logger,
-	}
-
-	// Use the fixing mixin for retry logic
-	err = t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, workspaceDir, operation)
-	if err != nil {
-		return nil, err
-	}
-
-	// If we get here, the operation succeeded - build success result
-	return t.buildSuccessResult(ctx, args, session)
 }
 
 // buildSuccessResult creates a success result after fixing operations complete

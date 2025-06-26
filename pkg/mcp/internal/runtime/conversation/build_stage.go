@@ -201,24 +201,9 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 		response.Status = ResponseStatusError
 
 		// Attempt automatic fix before showing manual options
-		if pm.conversationHandler != nil {
-			autoFixResult, autoFixErr := pm.conversationHandler.attemptAutoFix(ctx, response.SessionID, types.StageBuild, err, state)
-			if autoFixErr == nil && autoFixResult != nil {
-				if autoFixResult.Success {
-					// Auto-fix succeeded, update response
-					response.Status = ResponseStatusSuccess
-					response.Message = fmt.Sprintf("Build issue resolved automatically!\n\nFixes applied: %s", strings.Join(autoFixResult.AttemptedFixes, ", "))
-					response.Options = []Option{
-						{ID: "continue", Label: "Continue to next stage", Recommended: true},
-						{ID: "review", Label: "Review changes"},
-					}
-					return response
-				}
-				// Auto-fix failed, show what was attempted and fallback options
-				response.Message = fmt.Sprintf("Build failed: %v\n\nAttempted fixes: %s\n\nWould you like to:", err, strings.Join(autoFixResult.AttemptedFixes, ", "))
-				response.Options = autoFixResult.FallbackOptions
-				return response
-			}
+		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, types.StageBuild, err, state) {
+			return response
 		}
 
 		// Fallback to original behavior if auto-fix is not available
@@ -422,7 +407,20 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 		}
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
-		response.Message = fmt.Sprintf("Failed to push Docker image: %v", err)
+
+		// Attempt automatic fix before showing manual options
+		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, types.StagePush, err, state) {
+			return response
+		}
+
+		// Fallback to original behavior if auto-fix is not available
+		response.Message = fmt.Sprintf("Failed to push Docker image: %v\n\nWould you like to:", err)
+		response.Options = []Option{
+			{ID: "retry", Label: "Retry push"},
+			{ID: "local", Label: "Skip push, keep local"},
+			{ID: "registry", Label: "Change registry"},
+		}
 		return response
 	}
 

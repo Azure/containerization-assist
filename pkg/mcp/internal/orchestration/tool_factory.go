@@ -17,6 +17,7 @@ type ToolFactory struct {
 	pipelineOperations mcptypes.PipelineOperations
 	sessionManager     *session.SessionManager
 	analyzer           mcptypes.AIAnalyzer
+	analyzerHelper     *AnalyzerHelper
 	logger             zerolog.Logger
 }
 
@@ -31,6 +32,7 @@ func NewToolFactory(
 		pipelineOperations: pipelineOperations,
 		sessionManager:     sessionManager,
 		analyzer:           analyzer,
+		analyzerHelper:     NewAnalyzerHelper(analyzer, logger),
 		logger:             logger,
 	}
 }
@@ -44,32 +46,42 @@ func (f *ToolFactory) CreateAnalyzeRepositoryTool() *analyze.AtomicAnalyzeReposi
 func (f *ToolFactory) CreateBuildImageTool() *build.AtomicBuildImageTool {
 	tool := build.NewAtomicBuildImageTool(f.pipelineOperations, f.sessionManager, f.logger)
 	if f.analyzer != nil {
-		tool.SetAnalyzer(f.analyzer)
+		// Get enhanced analyzer for build integration
+		enhancedAnalyzer := f.analyzerHelper.GetEnhancedBuildAnalyzer()
+		tool.SetAnalyzer(enhancedAnalyzer)
 	}
 	return tool
 }
 
 // CreatePushImageTool creates an instance of AtomicPushImageTool
 func (f *ToolFactory) CreatePushImageTool() *build.AtomicPushImageTool {
-	return build.NewAtomicPushImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := build.NewAtomicPushImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	initializer := NewBuildToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "push_image")
+	return tool
 }
 
 // CreatePullImageTool creates an instance of AtomicPullImageTool
 func (f *ToolFactory) CreatePullImageTool() *build.AtomicPullImageTool {
-	return build.NewAtomicPullImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := build.NewAtomicPullImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	initializer := NewBuildToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "pull_image")
+	return tool
 }
 
 // CreateTagImageTool creates an instance of AtomicTagImageTool
 func (f *ToolFactory) CreateTagImageTool() *build.AtomicTagImageTool {
-	return build.NewAtomicTagImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := build.NewAtomicTagImageTool(f.pipelineOperations, f.sessionManager, f.logger)
+	initializer := NewBuildToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "tag_image")
+	return tool
 }
 
 // CreateScanImageSecurityTool creates an instance of AtomicScanImageSecurityTool
 func (f *ToolFactory) CreateScanImageSecurityTool() *scan.AtomicScanImageSecurityTool {
 	tool := scan.NewAtomicScanImageSecurityTool(f.pipelineOperations, f.sessionManager, f.logger)
-	if f.analyzer != nil {
-		tool.SetAnalyzer(f.analyzer)
-	}
+	// Note: Scan tools may need different analyzer interface
+	// TODO: Implement proper scan analyzer when scan integration is completed
 	return tool
 }
 
@@ -81,24 +93,25 @@ func (f *ToolFactory) CreateScanSecretsTool() *scan.AtomicScanSecretsTool {
 // CreateGenerateManifestsTool creates an instance of AtomicGenerateManifestsTool
 func (f *ToolFactory) CreateGenerateManifestsTool() *deploy.AtomicGenerateManifestsTool {
 	tool := deploy.NewAtomicGenerateManifestsTool(f.pipelineOperations, f.sessionManager, f.logger)
-	if f.analyzer != nil {
-		tool.SetAnalyzer(f.analyzer)
-	}
+	// Note: Deploy tools may need different analyzer interface
+	// TODO: Implement proper deploy analyzer when deploy integration is completed
 	return tool
 }
 
 // CreateDeployKubernetesTool creates an instance of AtomicDeployKubernetesTool
 func (f *ToolFactory) CreateDeployKubernetesTool() *deploy.AtomicDeployKubernetesTool {
 	tool := deploy.NewAtomicDeployKubernetesTool(f.pipelineOperations, f.sessionManager, f.logger)
-	if f.analyzer != nil {
-		tool.SetAnalyzer(f.analyzer)
-	}
+	// Note: Deploy tools may need different analyzer interface
+	// TODO: Implement proper deploy analyzer when deploy integration is completed
 	return tool
 }
 
 // CreateCheckHealthTool creates an instance of AtomicCheckHealthTool
 func (f *ToolFactory) CreateCheckHealthTool() *deploy.AtomicCheckHealthTool {
-	return deploy.NewAtomicCheckHealthTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := deploy.NewAtomicCheckHealthTool(f.pipelineOperations, f.sessionManager, f.logger)
+	initializer := NewDeployToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "check_health")
+	return tool
 }
 
 // CreateGenerateDockerfileTool creates an instance of GenerateDockerfileTool
@@ -110,7 +123,11 @@ func (f *ToolFactory) CreateGenerateDockerfileTool() *analyze.GenerateDockerfile
 func (f *ToolFactory) CreateValidateDockerfileTool() *analyze.AtomicValidateDockerfileTool {
 	tool := analyze.NewAtomicValidateDockerfileTool(f.pipelineOperations, f.sessionManager, f.logger)
 	if f.analyzer != nil {
-		tool.SetAnalyzer(f.analyzer)
+		// Create a default analyzer for analyze tools
+		analyzer := f.analyzerHelper.SetupAnalyzeToolAnalyzer("validate_dockerfile")
+		if analyzer != nil {
+			tool.SetAnalyzer(analyzer)
+		}
 	}
 	return tool
 }
@@ -145,4 +162,9 @@ func (f *ToolFactory) CreateTool(toolName string) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
+}
+
+// GetEnhancedBuildAnalyzer returns the enhanced build analyzer instance
+func (f *ToolFactory) GetEnhancedBuildAnalyzer() *build.EnhancedBuildAnalyzer {
+	return f.analyzerHelper.GetEnhancedBuildAnalyzer()
 }

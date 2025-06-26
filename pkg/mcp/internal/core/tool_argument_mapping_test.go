@@ -109,21 +109,19 @@ func TestGenerateManifestsArgumentMapping(t *testing.T) {
 			SessionID: "test-session-123",
 			DryRun:    false,
 		},
-		ImageRef:       types.ImageReference{Repository: "myregistry.com/myapp:v1.0.0"},
-		AppName:        "myapp",
-		Namespace:      "production",
-		Port:           8080,
-		Replicas:       3,
-		CPURequest:     "100m",
-		MemoryRequest:  "128Mi",
-		CPULimit:       "500m",
-		MemoryLimit:    "512Mi",
+		ImageRef:     types.ImageReference{Repository: "myregistry.com/myapp:v1.0.0"},
+		AppName:      "myapp",
+		Namespace:    "production",
+		ServicePorts: []deploy.ServicePort{{Port: 8080}},
+		Replicas:     3,
+		Resources: deploy.ResourceRequests{
+			CPU:    "100m",
+			Memory: "128Mi",
+		},
 		IncludeIngress: true,
 		ServiceType:    "ClusterIP",
 		Environment:    map[string]string{"ENV": "production"},
-		SecretHandling: "k8s-secrets",
-		GenerateHelm:   false,
-		GitOpsReady:    true,
+		HelmTemplate:   false,
 	}
 
 	argsMap := map[string]interface{}{
@@ -131,19 +129,14 @@ func TestGenerateManifestsArgumentMapping(t *testing.T) {
 		"image_ref":       testArgs.ImageRef.Repository,
 		"app_name":        testArgs.AppName,
 		"namespace":       testArgs.Namespace,
-		"port":            testArgs.Port,
+		"port":            testArgs.ServicePorts[0].Port,
 		"replicas":        testArgs.Replicas,
-		"cpu_request":     testArgs.CPURequest,
-		"memory_request":  testArgs.MemoryRequest,
-		"cpu_limit":       testArgs.CPULimit,
-		"memory_limit":    testArgs.MemoryLimit,
+		"cpu_request":     testArgs.Resources.CPU,
+		"memory_request":  testArgs.Resources.Memory,
 		"include_ingress": testArgs.IncludeIngress,
 		"service_type":    testArgs.ServiceType,
 		"environment":     testArgs.Environment,
-		"secret_handling": testArgs.SecretHandling,
-		"secret_manager":  testArgs.SecretManager,
-		"generate_helm":   testArgs.GenerateHelm,
-		"gitops_ready":    testArgs.GitOpsReady,
+		"generate_helm":   testArgs.HelmTemplate,
 		"dry_run":         testArgs.DryRun,
 	}
 
@@ -156,18 +149,14 @@ func TestGenerateManifestsArgumentMapping(t *testing.T) {
 	assert.Equal(t, 3, argsMap["replicas"])
 	assert.Equal(t, "100m", argsMap["cpu_request"])
 	assert.Equal(t, "128Mi", argsMap["memory_request"])
-	assert.Equal(t, "500m", argsMap["cpu_limit"])
-	assert.Equal(t, "512Mi", argsMap["memory_limit"])
 	assert.Equal(t, true, argsMap["include_ingress"])
 	assert.Equal(t, "ClusterIP", argsMap["service_type"])
 	assert.Equal(t, map[string]string{"ENV": "production"}, argsMap["environment"])
-	assert.Equal(t, "k8s-secrets", argsMap["secret_handling"])
 	assert.Equal(t, false, argsMap["generate_helm"])
-	assert.Equal(t, true, argsMap["gitops_ready"])
 	assert.Equal(t, false, argsMap["dry_run"])
 
 	// Verify we have exactly the expected number of fields
-	assert.Len(t, argsMap, 18, "Args map should contain exactly 18 fields")
+	assert.Len(t, argsMap, 13, "Args map should contain exactly 13 fields")
 }
 
 func TestScanImageSecurityArgumentMapping(t *testing.T) {

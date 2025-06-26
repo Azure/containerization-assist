@@ -96,6 +96,8 @@ type AtomicPullImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
+	analyzer        ToolAnalyzer
+	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicPullImageTool creates a new atomic pull image tool
@@ -107,8 +109,64 @@ func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager 
 	}
 }
 
+// SetAnalyzer sets the analyzer for failure analysis
+func (t *AtomicPullImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
+	t.analyzer = analyzer
+}
+
+// SetFixingMixin sets the fixing mixin for automatic error recovery
+func (t *AtomicPullImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
+	t.fixingMixin = mixin
+}
+
+// ExecuteWithFixes runs the atomic Docker image pull with automatic fixes
+func (t *AtomicPullImageTool) ExecuteWithFixes(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
+	if t.fixingMixin != nil && !args.DryRun {
+		// Create wrapper operation for pull process
+		var result *AtomicPullImageResult
+		operation := NewPullOperationWrapper(
+			func(ctx context.Context) error {
+				var err error
+				result, err = t.executePullCore(ctx, args)
+				if err != nil {
+					return err
+				}
+				if !result.Success {
+					return fmt.Errorf("pull operation failed")
+				}
+				return nil
+			},
+			func() error {
+				if t.analyzer != nil {
+					return t.analyzer.AnalyzePullFailure(args.ImageRef, args.SessionID)
+				}
+				return nil
+			},
+			func() error {
+				// Prepare workspace for fixes
+				return nil
+			},
+		)
+
+		// Execute with retry and fixing
+		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	// Fallback to standard execution
+	return t.executePullCore(ctx, args)
+}
+
 // ExecutePullImage runs the atomic Docker image pull (legacy method)
 func (t *AtomicPullImageTool) ExecutePullImage(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
+	return t.executePullCore(ctx, args)
+}
+
+// executePullCore contains the core pull logic
+func (t *AtomicPullImageTool) executePullCore(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
 	startTime := time.Now()
 
 	// Create result object early for error handling

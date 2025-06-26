@@ -141,7 +141,20 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 		}
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
-		response.Message = fmt.Sprintf("Failed to generate Kubernetes manifests: %v", err)
+
+		// Attempt automatic fix before showing manual options
+		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, types.StageManifests, err, state) {
+			return response
+		}
+
+		// Fallback to original behavior if auto-fix is not available
+		response.Message = fmt.Sprintf("Failed to generate Kubernetes manifests: %v\n\nWould you like to:", err)
+		response.Options = []Option{
+			{ID: "retry", Label: "Retry manifest generation"},
+			{ID: "manual", Label: "Create manifests manually"},
+			{ID: "skip", Label: "Skip and use existing manifests"},
+		}
 		return response
 	}
 
@@ -318,6 +331,13 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
 
+		// Attempt automatic fix before showing manual options
+		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, types.StageDeployment, err, state) {
+			return response
+		}
+
+		// Fallback to original behavior if auto-fix is not available
 		// Check if rollback is available
 		if state.LastKnownGood != nil && state.Preferences.AutoRollback {
 			response.Message = fmt.Sprintf(
@@ -330,7 +350,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 				{ID: "retry", Label: "Retry deployment"},
 			}
 		} else {
-			response.Message = fmt.Sprintf("Deployment failed: %v", err)
+			response.Message = fmt.Sprintf("Deployment failed: %v\n\nWould you like to:", err)
 			response.Options = []Option{
 				{ID: "logs", Label: "Show pod logs"},
 				{ID: "retry", Label: "Retry deployment"},

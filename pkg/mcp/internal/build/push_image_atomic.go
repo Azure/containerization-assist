@@ -86,6 +86,8 @@ type AtomicPushImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
+	analyzer        ToolAnalyzer
+	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicPushImageTool creates a new atomic push image tool
@@ -97,8 +99,64 @@ func NewAtomicPushImageTool(adapter mcptypes.PipelineOperations, sessionManager 
 	}
 }
 
+// SetAnalyzer sets the analyzer for failure analysis
+func (t *AtomicPushImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
+	t.analyzer = analyzer
+}
+
+// SetFixingMixin sets the fixing mixin for automatic error recovery
+func (t *AtomicPushImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
+	t.fixingMixin = mixin
+}
+
+// ExecuteWithFixes runs the atomic Docker image push with automatic fixes
+func (t *AtomicPushImageTool) ExecuteWithFixes(ctx context.Context, args AtomicPushImageArgs) (*AtomicPushImageResult, error) {
+	if t.fixingMixin != nil && !args.DryRun {
+		// Create wrapper operation for push process
+		var result *AtomicPushImageResult
+		operation := NewPushOperationWrapper(
+			func(ctx context.Context) error {
+				var err error
+				result, err = t.executePushCore(ctx, args)
+				if err != nil {
+					return err
+				}
+				if !result.Success {
+					return fmt.Errorf("push operation failed")
+				}
+				return nil
+			},
+			func() error {
+				if t.analyzer != nil {
+					return t.analyzer.AnalyzePushFailure(args.ImageRef, args.SessionID)
+				}
+				return nil
+			},
+			func() error {
+				// Prepare workspace for fixes
+				return nil
+			},
+		)
+
+		// Execute with retry and fixing
+		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	// Fallback to standard execution
+	return t.executePushCore(ctx, args)
+}
+
 // ExecutePush runs the atomic Docker image push
 func (t *AtomicPushImageTool) ExecutePush(ctx context.Context, args AtomicPushImageArgs) (*AtomicPushImageResult, error) {
+	return t.executePushCore(ctx, args)
+}
+
+// executePushCore contains the core push logic
+func (t *AtomicPushImageTool) executePushCore(ctx context.Context, args AtomicPushImageArgs) (*AtomicPushImageResult, error) {
 	startTime := time.Now()
 
 	// Create result object early for error handling

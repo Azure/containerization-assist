@@ -10,6 +10,7 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	constants "github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -192,7 +193,9 @@ type AtomicValidateDockerfileTool struct {
 	sessionManager  mcptypes.ToolSessionManager
 	// fixingMixin removed - functionality integrated directly
 	// dockerfileAdapter removed - functionality integrated directly
-	logger zerolog.Logger
+	logger      zerolog.Logger
+	analyzer    ToolAnalyzer
+	fixingMixin *build.AtomicToolFixingMixin
 }
 
 // NewAtomicValidateDockerfileTool creates a new atomic Dockerfile validation tool
@@ -205,6 +208,16 @@ func NewAtomicValidateDockerfileTool(adapter mcptypes.PipelineOperations, sessio
 		// dockerfileAdapter removed - functionality integrated directly
 		logger: toolLogger,
 	}
+}
+
+// SetAnalyzer sets the analyzer for failure analysis
+func (t *AtomicValidateDockerfileTool) SetAnalyzer(analyzer ToolAnalyzer) {
+	t.analyzer = analyzer
+}
+
+// SetFixingMixin sets the fixing mixin for automatic error recovery
+func (t *AtomicValidateDockerfileTool) SetFixingMixin(mixin *build.AtomicToolFixingMixin) {
+	t.fixingMixin = mixin
 }
 
 // ExecuteValidation runs the atomic Dockerfile validation
@@ -1152,11 +1165,4 @@ func (t *AtomicValidateDockerfileTool) Execute(ctx context.Context, args interfa
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicValidateDockerfileTool) ExecuteTyped(ctx context.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	return t.ExecuteValidation(ctx, args)
-}
-
-// SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
-func (t *AtomicValidateDockerfileTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
-	if analyzer != nil {
-		// Fixing mixin integration removed - implement directly if needed
-	}
 }
