@@ -175,13 +175,38 @@ jobs:
 
 ## Current Workflows
 
+### **Primary Workflows**
+| Workflow | Purpose | Triggers | Status |
+|----------|---------|----------|---------|
+| `unit-test.yml` | Unit tests for all packages + binary builds | PR | ✅ Active |
+| `code-quality.yml` | **Consolidated linting & quality checks** | PR, Daily, Main push | 🆕 **New** |
+| `quality-gates.yml` | Comprehensive quality metrics & gates | PR, Main push | ✅ Active |
+| `security-scan.yml` | Security scanning (Trivy, GitLeaks) | PR, Main push | ✅ Active |
+| `core-coverage-enforcement.yml` | Core package coverage requirements | PR | ✅ Active |
+| `ci-status-consolidator.yml` | **Aggregates CI results into single comment** | After other workflows | 🆕 **New** |
+
+### **Integration & Release**
+| Workflow | Purpose | Triggers | Status |
+|----------|---------|----------|---------|
+| `mcp-integration-tests.yml` | MCP integration tests with Kind | PR | ✅ Active |
+| `integration-test.yml` | Large-scale external repo testing | PR | ✅ Active |
+| `release.yml` | Release management with GoReleaser | Manual | ✅ Active |
+| `schema-export.yml` | MCP tool schema generation | Manual | ✅ Active |
+
+### **Infrastructure & Examples**
 | Workflow | Purpose | Status |
 |----------|---------|---------|
-| `unit-test.yml` | Unit tests for core and MCP packages | ✅ Active |
-| `mcp-integration-tests.yml` | MCP integration tests with Kind | ✅ Active |
-| `build-tags-matrix.yml` | Build tag validation matrix | ✅ Active |
-| `reusable-go-build.yml` | **Reusable build workflow** | 🆕 **New** |
+| `reusable-go-build.yml` | **Reusable build workflow** | 🔧 **Infrastructure** |
 | `example-reusable-usage.yml` | Examples of reusable workflow usage | 📝 Example |
+| `coverage-ratchet.yml` | Global coverage tracking | ✅ Active |
+
+### **Recently Consolidated** 🎯
+| Replaced Workflows | Replaced By | Lines Saved |
+|-------------------|-------------|-------------|
+| `build-tags-matrix.yml` | Extended `unit-test.yml` | ~400 lines |
+| `lint-dashboard.yml` + `lint-strict.yml` + `lint-with-budget.yml` | `code-quality.yml` | ~300 lines |
+
+**Total Reduction**: 16 → 12 workflows (25% fewer files, 700+ lines saved)
 
 ## CI Status Consolidation
 
@@ -211,9 +236,30 @@ The core coverage workflow retains its individual PR comment because:
 - Users need granular coverage information for decision making
 - The detailed table format doesn't fit well in the consolidated summary
 
+## Key Improvements Made
+
+### **Phase 1 Consolidation Complete** ✅
+1. **Deleted `build-tags-matrix.yml`** - 400+ lines of duplicate build logic eliminated
+2. **Consolidated 3 linting workflows** into single `code-quality.yml`
+3. **Standardized Go versions** to '1.24' across all workflows
+4. **Implemented CI comment consolidation** to reduce PR noise
+
+### **Benefits Achieved**
+- **25% fewer workflow files** (16 → 12)
+- **700+ lines of code eliminated**
+- **Consistent Go version management**
+- **Single CI status comment per PR**
+- **Easier maintenance and updates**
+
 ## Next Steps
 
-1. **Migrate existing workflows** to use `reusable-go-build.yml`
-2. **Update documentation** when patterns change
-3. **Add more reusable workflows** for Docker, security scanning, etc.
-4. **Pin action versions** to commit SHAs for security
+### **Phase 2 Opportunities** (Future improvements)
+1. **Merge integration test workflows** - Combine `integration-test.yml` + `mcp-integration-tests.yml`
+2. **Consolidate coverage workflows** - Merge `core-coverage-enforcement.yml` + `coverage-ratchet.yml`
+3. **Extract common composite actions** - For golangci-lint installation, error budget checking
+4. **Create reusable security workflow** - Extract security scanning patterns
+
+### **Maintenance**
+1. **Monitor new consolidation opportunities** as workflows evolve
+2. **Pin action versions** to commit SHAs for security
+3. **Update documentation** when patterns change
