@@ -16,12 +16,13 @@ import (
 
 // PromptManager manages conversation flow and tool orchestration
 type PromptManager struct {
-	sessionManager   *session.SessionManager
-	toolOrchestrator orchestration.InternalToolOrchestrator
-	preFlightChecker *obs.PreFlightChecker
-	preferenceStore  *utils.PreferenceStore
-	retryManager     *SimpleRetryManager
-	logger           zerolog.Logger
+	sessionManager      *session.SessionManager
+	toolOrchestrator    orchestration.InternalToolOrchestrator
+	preFlightChecker    *obs.PreFlightChecker
+	preferenceStore     *utils.PreferenceStore
+	retryManager        *SimpleRetryManager
+	conversationHandler *ConversationHandler
+	logger              zerolog.Logger
 }
 
 // PromptManagerConfig holds configuration for the prompt manager
@@ -42,6 +43,11 @@ func NewPromptManager(config PromptManagerConfig) *PromptManager {
 		retryManager:     NewSimpleRetryManager(config.Logger),
 		logger:           config.Logger,
 	}
+}
+
+// SetConversationHandler sets the conversation handler for auto-fix functionality
+func (pm *PromptManager) SetConversationHandler(handler *ConversationHandler) {
+	pm.conversationHandler = handler
 }
 
 // newResponse creates a new ConversationResponse with the session ID set
