@@ -76,7 +76,7 @@ type AtomicBuildImageTool struct {
 	contextAnalyzer *BuildContextAnalyzer
 	validator       *BuildValidatorImpl
 	executor        *BuildExecutorService
-	// fixingMixin     *fixing.AtomicToolFixingMixin // TODO: fixing package not implemented
+	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicBuildImageTool creates a new atomic build image tool
@@ -95,21 +95,23 @@ func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager
 		contextAnalyzer: contextAnalyzer,
 		validator:       validator,
 		executor:        executor,
-		// fixingMixin:     nil, // TODO: fixing package not implemented
+		fixingMixin:     nil, // Will be set via SetAnalyzer
 	}
 }
 
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
 func (t *AtomicBuildImageTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
-		// t.fixingMixin = fixing.NewAtomicToolFixingMixin(analyzer, "atomic_build_image", t.logger) // TODO: fixing package not implemented
+		t.fixingMixin = NewAtomicToolFixingMixin(analyzer, "atomic_build_image", t.logger)
 	}
 }
 
 // ExecuteWithFixes runs the atomic Docker image build with AI-driven fixing capabilities
 func (t *AtomicBuildImageTool) ExecuteWithFixes(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
 	// Delegate to executor with fixing mixin
-	// TODO: fixing not implemented yet
+	if t.fixingMixin != nil {
+		return t.executor.ExecuteWithFixes(ctx, args, t.fixingMixin)
+	}
 	return t.executor.ExecuteWithFixes(ctx, args, nil)
 }
 

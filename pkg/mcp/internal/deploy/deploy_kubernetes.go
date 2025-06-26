@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal"
+	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
@@ -269,8 +270,8 @@ type DeploymentContext struct {
 type AtomicDeployKubernetesTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
-	// fixingMixin removed - functionality integrated directly
-	logger zerolog.Logger
+	fixingMixin     *build.AtomicToolFixingMixin
+	logger          zerolog.Logger
 }
 
 // NewAtomicDeployKubernetesTool creates a new atomic deploy Kubernetes tool
@@ -278,8 +279,8 @@ func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionM
 	return &AtomicDeployKubernetesTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
-		// fixingMixin removed - functionality integrated directly
-		logger: logger.With().Str("tool", "atomic_deploy_kubernetes").Logger(),
+		fixingMixin:     nil, // Will be set via SetAnalyzer
+		logger:          logger.With().Str("tool", "atomic_deploy_kubernetes").Logger(),
 	}
 }
 
@@ -496,6 +497,58 @@ func (t *AtomicDeployKubernetesTool) executeWithoutProgress(ctx context.Context,
 	return result, nil
 }
 
+// ExecuteWithFixes runs the atomic Kubernetes deployment with AI-driven fixing capabilities
+func (t *AtomicDeployKubernetesTool) ExecuteWithFixes(ctx context.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
+	if t.fixingMixin == nil {
+		// Fall back to normal execution if no fixing mixin is available
+		return t.ExecuteWithContext(nil, args)
+	}
+
+	// Get session for context
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+	session := sessionInterface.(*sessiontypes.SessionState)
+	workspaceDir := t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
+
+	// Create a fixable operation wrapper
+	operation := &KubernetesDeployOperation{
+		tool:         t,
+		args:         args,
+		session:      session,
+		workspaceDir: workspaceDir,
+		namespace:    args.Namespace,
+		manifests:    []string{}, // Will be populated during execution
+		logger:       t.logger,
+	}
+
+	// Use the fixing mixin for retry logic
+	err = t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, workspaceDir, operation)
+	if err != nil {
+		return nil, err
+	}
+
+	// If we get here, the operation succeeded - build success result
+	return t.buildSuccessResult(ctx, args, session)
+}
+
+// buildSuccessResult creates a success result after fixing operations complete
+func (t *AtomicDeployKubernetesTool) buildSuccessResult(_ context.Context, args AtomicDeployKubernetesArgs, _ *sessiontypes.SessionState) (*AtomicDeployKubernetesResult, error) {
+	result := &AtomicDeployKubernetesResult{
+		BaseToolResponse:    types.NewBaseResponse("atomic_deploy_kubernetes", args.SessionID, args.DryRun),
+		BaseAIContextResult: internal.NewBaseAIContextResult("deploy", true, 0),
+		SessionID:           args.SessionID,
+		ImageRef:            args.ImageRef,
+		AppName:             args.AppName,
+		Namespace:           args.Namespace,
+		Success:             true,
+	}
+
+	result.BaseAIContextResult.IsSuccessful = true
+	return result, nil
+}
+
 // KubernetesDeployOperation implements FixableOperation for Kubernetes deployments
 type KubernetesDeployOperation struct {
 	tool         *AtomicDeployKubernetesTool
@@ -541,9 +594,26 @@ func (op *KubernetesDeployOperation) ExecuteOnce(ctx context.Context) error {
 }
 
 // GetFailureAnalysis analyzes why the Kubernetes deployment failed
-func (op *KubernetesDeployOperation) GetFailureAnalysis(ctx context.Context, err error) (error, error) {
+func (op *KubernetesDeployOperation) GetFailureAnalysis(_ context.Context, err error) (*mcptypes.RichError, error) {
 	op.logger.Debug().Err(err).Msg("Analyzing Kubernetes deployment failure")
-	return err, nil
+
+	// Convert error to RichError if it's not already one
+	if richError, ok := err.(*types.RichError); ok {
+		return &mcptypes.RichError{
+			Code:     richError.Code,
+			Type:     richError.Type,
+			Severity: richError.Severity,
+			Message:  richError.Message,
+		}, nil
+	}
+
+	// Create a default RichError for non-rich errors
+	return &mcptypes.RichError{
+		Code:     "DEPLOYMENT_FAILED",
+		Type:     "deployment_error",
+		Severity: "High",
+		Message:  err.Error(),
+	}, nil
 }
 
 // PrepareForRetry applies fixes and prepares for the next deployment attempt
@@ -566,6 +636,24 @@ func (op *KubernetesDeployOperation) PrepareForRetry(ctx context.Context, fixAtt
 			Msg("Unknown fix type, applying generic fix")
 		return op.applyGenericFix(ctx, fixAttempt)
 	}
+}
+
+// CanRetry determines if the deployment operation can be retried
+func (op *KubernetesDeployOperation) CanRetry() bool {
+	// Kubernetes deployments can generally be retried unless there are fundamental issues
+	return true
+}
+
+// Execute runs the operation (alias for ExecuteOnce for compatibility)
+func (op *KubernetesDeployOperation) Execute(ctx context.Context) error {
+	return op.ExecuteOnce(ctx)
+}
+
+// GetLastError returns the last error encountered (implementation for interface)
+func (op *KubernetesDeployOperation) GetLastError() error {
+	// This would typically store the last error in a field
+	// For now, return nil as errors are handled in real-time
+	return nil
 }
 
 // applyManifestFix applies fixes to Kubernetes manifests
@@ -1196,6 +1284,6 @@ func (t *AtomicDeployKubernetesTool) ExecuteTyped(ctx context.Context, args Atom
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
 func (t *AtomicDeployKubernetesTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
 	if analyzer != nil {
-		// Fixing mixin integration removed - implement directly if needed
+		t.fixingMixin = build.NewAtomicToolFixingMixin(analyzer, "atomic_deploy_kubernetes", t.logger)
 	}
 }

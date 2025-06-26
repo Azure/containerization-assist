@@ -129,51 +129,5 @@ jobs:
           coverage.xml
           coverage-summary.txt
 
-    - name: Comment coverage on PR
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const coverage = fs.readFileSync('coverage-summary.txt', 'utf8');
-
-          // GitHub comment limit is 65536 characters
-          const maxBodyLength = 65000; // Leave some buffer
-          const maxCoverageLength = maxBodyLength - 100; // Account for markdown formatting
-
-          let coverageText = coverage;
-          let truncated = false;
-
-          if (coverage.length > maxCoverageLength) {
-            // Keep the header and tail of the coverage report
-            const lines = coverage.split('\n');
-            const totalLine = lines[lines.length - 1] || lines[lines.length - 2]; // Get the total line
-
-            // Calculate how many lines we can include
-            const headerLines = 20; // Show first 20 lines
-            const footerLines = 5;  // Show last 5 lines including total
-
-            const header = lines.slice(0, headerLines).join('\n');
-            const footer = lines.slice(-footerLines).join('\n');
-
-            coverageText = header + '\n\n... (truncated - showing first ' + headerLines + ' and last ' + footerLines + ' lines) ...\n\n' + footer;
-            truncated = true;
-          }
-
-          let body = `## Coverage Report\n\`\`\`\n${coverageText}\n\`\`\``;
-
-          if (truncated) {
-            body += '\n\n*Note: Full coverage report was truncated due to size limits. Check the workflow artifacts for the complete report.*';
-          }
-
-          // Final safety check
-          if (body.length > maxBodyLength) {
-            body = '## Coverage Report\n\nThe coverage report is too large to display in a comment. Please check the workflow artifacts for the full report.';
-          }
-
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: body
-          });
+    # Coverage report commenting removed - only keeping core package coverage
+    # The general coverage data is still available in artifacts and step summary
