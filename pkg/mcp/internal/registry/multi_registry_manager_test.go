@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,7 +156,7 @@ func TestMultiRegistryManager_ValidateRegistryAccess(t *testing.T) {
 	// Create mock credential provider
 	mockProvider := &MockCredentialProvider{
 		credentials: map[string]*RegistryCredentials{
-			"docker.io": {
+			"https://index.docker.io/v1/": {
 				Username:   "testuser",
 				Password:   "testpass",
 				AuthMethod: "basic",
@@ -167,6 +168,7 @@ func TestMultiRegistryManager_ValidateRegistryAccess(t *testing.T) {
 				Source:     "config",
 			},
 		},
+		available: true,
 	}
 
 	manager := NewMultiRegistryManager(config, logger)
@@ -239,13 +241,14 @@ func TestMultiRegistryManager_GetCredentials(t *testing.T) {
 
 	mockProvider := &MockCredentialProvider{
 		credentials: map[string]*RegistryCredentials{
-			"docker.io": {
+			"https://index.docker.io/v1/": {
 				Username:   "testuser",
 				Password:   "testpass",
 				AuthMethod: "basic",
 				Source:     "config",
 			},
 		},
+		available: true,
 	}
 
 	manager := NewMultiRegistryManager(config, logger)
@@ -343,9 +346,26 @@ type MockCredentialProvider struct {
 }
 
 func (m *MockCredentialProvider) GetCredentials(registry string) (*RegistryCredentials, error) {
+	// Try exact match first
 	if creds, exists := m.credentials[registry]; exists {
 		return creds, nil
 	}
+
+	// Try normalized registry names for docker.io variants
+	normalized := registry
+	if strings.EqualFold(registry, "docker.io") || strings.EqualFold(registry, "index.docker.io") ||
+		registry == "index.docker.io/v1/" {
+		normalized = "https://index.docker.io/v1/"
+	}
+	// Handle case with trailing slash
+	if strings.EqualFold(registry, "docker.io/") {
+		normalized = "https://index.docker.io/v1/"
+	}
+
+	if creds, exists := m.credentials[normalized]; exists {
+		return creds, nil
+	}
+
 	return nil, fmt.Errorf("no credentials found for registry %s", registry)
 }
 
@@ -362,7 +382,23 @@ func (m *MockCredentialProvider) GetPriority() int {
 }
 
 func (m *MockCredentialProvider) Supports(registry string) bool {
-	_, exists := m.credentials[registry]
+	// Try exact match first
+	if _, exists := m.credentials[registry]; exists {
+		return true
+	}
+
+	// Try normalized registry names for docker.io variants
+	normalized := registry
+	if strings.EqualFold(registry, "docker.io") || strings.EqualFold(registry, "index.docker.io") ||
+		registry == "index.docker.io/v1/" {
+		normalized = "https://index.docker.io/v1/"
+	}
+	// Handle case with trailing slash
+	if strings.EqualFold(registry, "docker.io/") {
+		normalized = "https://index.docker.io/v1/"
+	}
+
+	_, exists := m.credentials[normalized]
 	return exists
 }
 

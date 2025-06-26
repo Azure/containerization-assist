@@ -178,11 +178,39 @@ jobs:
 
     - name: Check core package coverage enforcement
       run: |
-        # This will fail the job if any core package is below 80%
-        # For now, we'll make it a warning since we're establishing baseline
+        # Sprint D: Testing & Quality Foundation - Staged enforcement approach
+        # Stage 1: Enforce minimum 20% for packages with new tests
+        # Stage 2: Gradually ramp up to 80% target
+
+        # Load thresholds from configuration
+        MINIMUM_THRESHOLD=20
+        TARGET_THRESHOLD=80
+
+        # Check for packages that don't meet even the minimum threshold
+        CRITICAL_FAILURES=""
+        while IFS= read -r line; do
+          if [[ $line =~ \|[[:space:]]*([^|]+)[[:space:]]*\|[[:space:]]*([0-9.]+)%[[:space:]]*\|[[:space:]]*❌ ]]; then
+            PKG="${BASH_REMATCH[1]}"
+            COV="${BASH_REMATCH[2]}"
+            if (( $(echo "$COV < $MINIMUM_THRESHOLD" | bc -l) )); then
+              CRITICAL_FAILURES="$CRITICAL_FAILURES\n- $PKG: ${COV}%"
+            fi
+          fi
+        done < core-coverage-report.md
+
+        # Fail CI for packages below minimum threshold
+        if [ -n "$CRITICAL_FAILURES" ]; then
+          echo "❌ Critical: Packages below $MINIMUM_THRESHOLD% minimum threshold:"
+          echo -e "$CRITICAL_FAILURES"
+          echo "::error::Core packages must have at least $MINIMUM_THRESHOLD% test coverage"
+          exit 1
+        fi
+
+        # Warn for packages below target threshold
         if grep -q "❌ Below 80%" core-coverage-report.md; then
           echo "::warning::Some core packages are below the 80% coverage target"
+          echo "::warning::Sprint D target: Work toward 80% coverage for core packages"
           echo "See the coverage report for details"
-          # Uncomment the line below to enforce the check
-          # exit 1
+        else
+          echo "✅ All core packages meet the coverage requirements!"
         fi
