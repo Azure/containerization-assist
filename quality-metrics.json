@@ -1391,447 +1391,447 @@
   "test_coverage": {
     "overall_coverage": 12,
     "package_coverage": {
-      "github.com/Azure/container-copilot": {
+      "github.com/Azure/container-kit": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/cmd": {
+      "github.com/Azure/container-kit/cmd": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/cmd/mcp-server": {
+      "github.com/Azure/container-kit/cmd/mcp-server": {
         "coverage": 0.1953125,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/cmd/tool-generator": {
+      "github.com/Azure/container-kit/cmd/tool-generator": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/ai": {
+      "github.com/Azure/container-kit/pkg/ai": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/clients": {
+      "github.com/Azure/container-kit/pkg/clients": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/core/analysis": {
+      "github.com/Azure/container-kit/pkg/core/analysis": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/core/docker": {
+      "github.com/Azure/container-kit/pkg/core/docker": {
         "coverage": 99.9699462890625,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/core/git": {
+      "github.com/Azure/container-kit/pkg/core/git": {
         "coverage": 44.74375,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/core/kubernetes": {
+      "github.com/Azure/container-kit/pkg/core/kubernetes": {
         "coverage": 60.92695770263672,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/deps": {
+      "github.com/Azure/container-kit/pkg/deps": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/docker": {
+      "github.com/Azure/container-kit/pkg/docker": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/filetree": {
+      "github.com/Azure/container-kit/pkg/filetree": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/k8s": {
+      "github.com/Azure/container-kit/pkg/k8s": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/kind": {
+      "github.com/Azure/container-kit/pkg/kind": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/logger": {
+      "github.com/Azure/container-kit/pkg/logger": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp": {
+      "github.com/Azure/container-kit/pkg/mcp": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal": {
+      "github.com/Azure/container-kit/pkg/mcp/internal": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/adapter": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/adapter": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/ai_context": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/ai_context": {
         "coverage": 65.18553214073181,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/analyze": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/analyze": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/analyzer": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/analyzer": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/build": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/build": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/config": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/config": {
         "coverage": 99.8796875,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/conversation": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/conversation": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/core": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/core": {
         "coverage": 5.1436944257298824,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/customizer/docker": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/customizer/docker": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/customizer/kubernetes": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/customizer/kubernetes": {
         "coverage": 77.89126663208008,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/customizer/template": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/customizer/template": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/deploy": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/deploy": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/deploy/deploy_strategies": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/deploy/deploy_strategies": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/fixing": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/fixing": {
         "coverage": 2.496770912722053,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/jsonrpc": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/jsonrpc": {
         "coverage": 97.725,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/manifests": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/manifests": {
         "coverage": 35.382015826072895,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/mcperror": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/mcperror": {
         "coverage": 31.843163806200028,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/observability": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/observability": {
         "coverage": 2.865000367392216,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/orchestration": {
         "coverage": 85.01792689636349,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/dispatch": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/dispatch": {
         "coverage": 20.25234375,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/errors": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/errors": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/execution": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/execution": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/orchestration/testutil": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/testutil": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/pipeline": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/pipeline": {
         "coverage": 0.012194427382200956,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/pipeline/testutil": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/pipeline/testutil": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/profiling": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/profiling": {
         "coverage": 93.56706366960584,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/profiling/testutil": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/registry": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/registry": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/registry/credential_providers": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/registry/credential_providers": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/repository": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/repository": {
         "coverage": 67.70262697618455,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/runtime": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/runtime": {
         "coverage": 3.531074827274762e-36,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation": {
         "coverage": 12.89897108078011,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/scan": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/scan": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/scan/scanners": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/scan/scanners": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/server": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/server": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/services": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/services": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/session": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/session": {
         "coverage": 93.05625074505807,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/session/session": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/session/session": {
         "coverage": 5.4041840447105475e-15,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/session/session/label_providers": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/session/session/label_providers": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/testutil": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/testutil": {
         "coverage": 45.19223075357731,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/transport": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/transport": {
         "coverage": 99.17357631530035,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/transport/llm": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/transport/llm": {
         "coverage": 35.225,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/transport/stdio": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/transport/stdio": {
         "coverage": 0.006103515625,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/types": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/types": {
         "coverage": 8.881784197001252e-14,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/utils": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/utils": {
         "coverage": 1.4884993700718822e-14,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/validate": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/validate": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/internal/workflow": {
+      "github.com/Azure/container-kit/pkg/mcp/internal/workflow": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/testing": {
+      "github.com/Azure/container-kit/pkg/mcp/testing": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/types": {
+      "github.com/Azure/container-kit/pkg/mcp/types": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/mcp/utils": {
+      "github.com/Azure/container-kit/pkg/mcp/utils": {
         "coverage": 2.031022674015153,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/pipeline": {
+      "github.com/Azure/container-kit/pkg/pipeline": {
         "coverage": 0.94703369140625,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/pipeline/databasedetectionstage": {
+      "github.com/Azure/container-kit/pkg/pipeline/databasedetectionstage": {
         "coverage": 95.064453125,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/pipeline/dockerstage": {
+      "github.com/Azure/container-kit/pkg/pipeline/dockerstage": {
         "coverage": 28.207421875,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/pipeline/manifeststage": {
+      "github.com/Azure/container-kit/pkg/pipeline/manifeststage": {
         "coverage": 41.306640625,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/pipeline/repoanalysisstage": {
+      "github.com/Azure/container-kit/pkg/pipeline/repoanalysisstage": {
         "coverage": 21.875,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/runner": {
+      "github.com/Azure/container-kit/pkg/runner": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/templating": {
+      "github.com/Azure/container-kit/pkg/templating": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/pkg/utils": {
+      "github.com/Azure/container-kit/pkg/utils": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/test/manual": {
+      "github.com/Azure/container-kit/test/manual": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/build-enforcement": {
+      "github.com/Azure/container-kit/tools/build-enforcement": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/check-boundaries": {
+      "github.com/Azure/container-kit/tools/check-boundaries": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/check-hygiene": {
+      "github.com/Azure/container-kit/tools/check-hygiene": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/fix-imports": {
+      "github.com/Azure/container-kit/tools/fix-imports": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/measure-performance": {
+      "github.com/Azure/container-kit/tools/measure-performance": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/migrate": {
+      "github.com/Azure/container-kit/tools/migrate": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/migrate-tools": {
+      "github.com/Azure/container-kit/tools/migrate-tools": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/quality-dashboard": {
+      "github.com/Azure/container-kit/tools/quality-dashboard": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/register-tools": {
+      "github.com/Azure/container-kit/tools/register-tools": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/test-migration": {
+      "github.com/Azure/container-kit/tools/test-migration": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/update-imports": {
+      "github.com/Azure/container-kit/tools/update-imports": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
       },
-      "github.com/Azure/container-copilot/tools/validate-interfaces": {
+      "github.com/Azure/container-kit/tools/validate-interfaces": {
         "coverage": 0,
         "statements": 0,
         "covered": 0
@@ -1934,45 +1934,45 @@
     ],
     "top_coverage": [
       {
-        "package": "github.com/Azure/container-copilot/pkg/core/docker",
+        "package": "github.com/Azure/container-kit/pkg/core/docker",
         "coverage": 99.9699462890625
       },
       {
-        "package": "github.com/Azure/container-copilot/pkg/mcp/internal/config",
+        "package": "github.com/Azure/container-kit/pkg/mcp/internal/config",
         "coverage": 99.8796875
       },
       {
-        "package": "github.com/Azure/container-copilot/pkg/mcp/internal/transport",
+        "package": "github.com/Azure/container-kit/pkg/mcp/internal/transport",
         "coverage": 99.17357631530035
       },
       {
-        "package": "github.com/Azure/container-copilot/pkg/mcp/internal/jsonrpc",
+        "package": "github.com/Azure/container-kit/pkg/mcp/internal/jsonrpc",
         "coverage": 97.725
       },
       {
-        "package": "github.com/Azure/container-copilot/pkg/pipeline/databasedetectionstage",
+        "package": "github.com/Azure/container-kit/pkg/pipeline/databasedetectionstage",
         "coverage": 95.064453125
       }
     ],
     "bottom_coverage": [
       {
-        "package": "github.com/Azure/container-copilot",
+        "package": "github.com/Azure/container-kit",
         "coverage": 0
       },
       {
-        "package": "github.com/Azure/container-copilot/pkg/mcp/internal/server",
+        "package": "github.com/Azure/container-kit/pkg/mcp/internal/server",
         "coverage": 0
       },
       {
-        "package": "github.com/Azure/container-copilot/cmd/tool-generator",
+        "package": "github.com/Azure/container-kit/cmd/tool-generator",
         "coverage": 0
       },
       {
-        "package": "github.com/Azure/container-copilot/pkg/mcp/internal/profiling/testutil",
+        "package": "github.com/Azure/container-kit/pkg/mcp/internal/profiling/testutil",
         "coverage": 0
       },
       {
-        "package": "github.com/Azure/container-copilot/pkg/utils",
+        "package": "github.com/Azure/container-kit/pkg/utils",
         "coverage": 0
       }
     ]
@@ -5787,7 +5787,7 @@
     "   Start with: pkg/core/kubernetes/customizer.go (57 standard errors)",
     "🟡 Directory Structure: Max depth is 6 (recommended: ≤5)",
     "🔴 Test Coverage: 12.0% (target: 70%)",
-    "   Lowest coverage: github.com/Azure/container-copilot (0.0%)",
+    "   Lowest coverage: github.com/Azure/container-kit (0.0%)",
     "🟡 Add tests for 93 uncovered packages",
     "🟡 Refactor 20 functions with \u003e50 lines",
     "🟡 Simplify 183 functions with complexity \u003e10"

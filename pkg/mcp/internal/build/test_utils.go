@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // testPipelineAdapter implements mcptypes.PipelineOperations for testing

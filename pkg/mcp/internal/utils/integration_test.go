@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	"github.com/Azure/container-copilot/pkg/core/kubernetes"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // MockBuildResult simulates a build tool result for testing

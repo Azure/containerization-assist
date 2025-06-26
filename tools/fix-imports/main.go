@@ -9,16 +9,16 @@ import (
 
 // Fix import mappings based on actual migrations
 var fixMappings = map[string]string{
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/session":        "github.com/Azure/container-copilot/pkg/mcp/internal/session",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store/preference":     "github.com/Azure/container-copilot/pkg/mcp/internal/utils",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/store":                "github.com/Azure/container-copilot/pkg/mcp/internal/utils",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze":              "github.com/Azure/container-copilot/pkg/mcp/internal/analyze",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/scan":                 "github.com/Azure/container-copilot/pkg/mcp/internal/scan",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/scan/scanners":        "github.com/Azure/container-copilot/pkg/mcp/internal/scan/scanners",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation": "github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability":        "github.com/Azure/container-copilot/pkg/mcp/internal/observability",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/workflow":             "github.com/Azure/container-copilot/pkg/mcp/internal/workflow",
-	"github.com/Azure/container-copilot/pkg/mcp/internal/validate":             "github.com/Azure/container-copilot/pkg/mcp/internal/build",
+	"github.com/Azure/container-kit/pkg/mcp/internal/store/session":        "github.com/Azure/container-kit/pkg/mcp/internal/session",
+	"github.com/Azure/container-kit/pkg/mcp/internal/store/preference":     "github.com/Azure/container-kit/pkg/mcp/internal/utils",
+	"github.com/Azure/container-kit/pkg/mcp/internal/store":                "github.com/Azure/container-kit/pkg/mcp/internal/utils",
+	"github.com/Azure/container-kit/pkg/mcp/internal/analyze":              "github.com/Azure/container-kit/pkg/mcp/internal/analyze",
+	"github.com/Azure/container-kit/pkg/mcp/internal/scan":                 "github.com/Azure/container-kit/pkg/mcp/internal/scan",
+	"github.com/Azure/container-kit/pkg/mcp/internal/scan/scanners":        "github.com/Azure/container-kit/pkg/mcp/internal/scan/scanners",
+	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation": "github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation",
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability":        "github.com/Azure/container-kit/pkg/mcp/internal/observability",
+	"github.com/Azure/container-kit/pkg/mcp/internal/workflow":             "github.com/Azure/container-kit/pkg/mcp/internal/workflow",
+	"github.com/Azure/container-kit/pkg/mcp/internal/validate":             "github.com/Azure/container-kit/pkg/mcp/internal/build",
 }
 
 func main() {

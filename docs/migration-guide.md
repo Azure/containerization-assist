@@ -13,8 +13,8 @@ The Container Kit MCP system has undergone a significant reorganization to impro
 **Before (v1.x)**:
 ```go
 import (
-    "github.com/Azure/container-copilot/pkg/mcp"
-    "github.com/Azure/container-copilot/pkg/mcp/tools"
+    "github.com/Azure/container-kit/pkg/mcp"
+    "github.com/Azure/container-kit/pkg/mcp/tools"
 )
 
 // Tools implemented various interfaces from different packages
@@ -27,7 +27,7 @@ func (t *MyTool) Run(ctx context.Context, params tools.RunParams) error {
 
 **After (v2.0)**:
 ```go
-import "github.com/Azure/container-copilot/pkg/mcp"
+import "github.com/Azure/container-kit/pkg/mcp"
 
 // All tools now implement the unified Tool interface
 type MyTool struct{}
@@ -92,7 +92,7 @@ return fmt.Errorf("operation failed: %v", err)
 
 **After**:
 ```go
-import "github.com/Azure/container-copilot/pkg/mcp/types"
+import "github.com/Azure/container-kit/pkg/mcp/types"
 
 return types.NewRichError(
     "OPERATION_FAILED",
@@ -137,13 +137,13 @@ Replace all old import paths with the new unified imports:
 ```go
 // Replace these:
 import (
-    "github.com/Azure/container-copilot/pkg/mcp/tools"
-    "github.com/Azure/container-copilot/pkg/mcp/tools/interfaces"
-    "github.com/Azure/container-copilot/pkg/mcp/common"
+    "github.com/Azure/container-kit/pkg/mcp/tools"
+    "github.com/Azure/container-kit/pkg/mcp/tools/interfaces"
+    "github.com/Azure/container-kit/pkg/mcp/common"
 )
 
 // With this:
-import "github.com/Azure/container-copilot/pkg/mcp"
+import "github.com/Azure/container-kit/pkg/mcp"
 ```
 
 ### Step 2: Implement the New Interface
@@ -155,7 +155,7 @@ package mytool
 
 import (
     "context"
-    "github.com/Azure/container-copilot/pkg/mcp"
+    "github.com/Azure/container-kit/pkg/mcp"
 )
 
 // Ensure compliance at compile time
@@ -253,7 +253,7 @@ type MyToolResult struct {
 Migrate to rich error types:
 
 ```go
-import "github.com/Azure/container-copilot/pkg/mcp/types"
+import "github.com/Azure/container-kit/pkg/mcp/types"
 
 // Before
 if err != nil {
@@ -505,7 +505,7 @@ go run tools/validate-interfaces/main.go
 
 - **Documentation**: See `docs/adding-new-tools.md` for detailed examples
 - **Examples**: Check `pkg/mcp/examples/` for reference implementations
-- **Issues**: Report migration issues at https://github.com/Azure/container-copilot/issues
+- **Issues**: Report migration issues at https://github.com/Azure/container-kit/issues
 - **Interface Reference**: See `pkg/mcp/interfaces.go` for complete interface definitions
 
 ## Version Compatibility

@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/templates"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/templates"
 	"gopkg.in/yaml.v3"
 )
 

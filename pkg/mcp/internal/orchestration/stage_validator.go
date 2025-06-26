@@ -2,7 +2,7 @@ package orchestration
 
 import (
 	"fmt"
-	// "github.com/Azure/container-copilot/pkg/mcp/internal/workflow" // TODO: Implement workflow package
+	// "github.com/Azure/container-kit/pkg/mcp/internal/workflow" // TODO: Implement workflow package
 )
 
 // StageValidator handles validation of workflow stages

@@ -7,17 +7,17 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/docker"
-	"github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/kind"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/pipeline"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/runtime/conversation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
-	"github.com/Azure/container-copilot/pkg/runner"
+	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/kind"
+	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
+	"github.com/Azure/container-kit/pkg/mcp/internal/pipeline"
+	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/runner"
 )
 
 // llmTransportAdapter adapts types.LLMTransport to analyze.LLMTransport

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	coredocker "github.com/Azure/container-copilot/pkg/core/docker"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
-	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )

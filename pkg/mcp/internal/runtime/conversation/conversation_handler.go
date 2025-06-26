@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/conversation"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
+	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

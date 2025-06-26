@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/Azure/container-copilot/pkg/docker"
-	_ "github.com/Azure/container-copilot/pkg/k8s"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	_ "github.com/Azure/container-kit/pkg/docker"
+	_ "github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 

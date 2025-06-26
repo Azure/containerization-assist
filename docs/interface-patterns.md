@@ -155,7 +155,7 @@ Internal packages (under `pkg/mcp/internal/`) use the Internal prefixed interfac
 // pkg/mcp/internal/build/build_tool.go
 package build
 
-import mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+import mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 
 type BuildImageTool struct {
     // tool implementation
@@ -186,7 +186,7 @@ External packages and public APIs use the main interfaces:
 // External tool implementation
 package mytool
 
-import "github.com/Azure/container-copilot/pkg/mcp"
+import "github.com/Azure/container-kit/pkg/mcp"
 
 type MyTool struct {
     // tool implementation

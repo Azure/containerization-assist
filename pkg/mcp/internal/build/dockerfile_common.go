@@ -1,7 +1,7 @@
 package build
 
 import (
-	"github.com/Azure/container-copilot/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/docker"
 )
 
 // ValidationContext provides context for validation operations

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"

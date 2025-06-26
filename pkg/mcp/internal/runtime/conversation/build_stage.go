@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
 
 // handleBuildStage handles the Docker image build stage

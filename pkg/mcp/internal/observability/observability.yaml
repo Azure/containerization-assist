@@ -7,14 +7,14 @@ opentelemetry:
 
   # Service identification
   service:
-    name: "container-copilot-mcp"
+    name: "container-kit-mcp"
     version: "${APP_VERSION:-dev}"
     environment: "${ENVIRONMENT:-development}"
 
   # Resource attributes
   resource:
     attributes:
-      service.name: "container-copilot-mcp"
+      service.name: "container-kit-mcp"
       service.version: "${APP_VERSION:-dev}"
       deployment.environment: "${ENVIRONMENT:-development}"
       k8s.cluster.name: "${CLUSTER_NAME:-}"

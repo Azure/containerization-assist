@@ -46,7 +46,7 @@ package {{.PackageName}}
 import (
 	"fmt"
 
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 {{range .Imports}}	"{{.}}"
 {{end}}
 )
@@ -243,7 +243,7 @@ func discoverToolsInFile(filePath string) ([]ToolInfo, error) {
 	}
 
 	packagePath := strings.ReplaceAll(relPath, string(filepath.Separator), "/")
-	importPath := "github.com/Azure/container-copilot/" + packagePath
+	importPath := "github.com/Azure/container-kit/" + packagePath
 
 	// Look for struct types that look like tools
 	for _, decl := range file.Decls {
@@ -365,7 +365,7 @@ func generateRegistrationCode(tools []ToolInfo) (string, error) {
 	// Collect unique imports
 	importSet := make(map[string]bool)
 	for _, tool := range tools {
-		if tool.ImportPath != "github.com/Azure/container-copilot/pkg/mcp/internal/tools" {
+		if tool.ImportPath != "github.com/Azure/container-kit/pkg/mcp/internal/tools" {
 			importSet[tool.ImportPath] = true
 		}
 	}

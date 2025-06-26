@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/genericutils"
 )
 
 // ExtractBaseImage extracts the base image from Dockerfile content

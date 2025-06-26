@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-copilot/pkg/ai"
-	"github.com/Azure/container-copilot/pkg/logger"
-	"github.com/Azure/container-copilot/pkg/pipeline"
+	"github.com/Azure/container-kit/pkg/ai"
+	"github.com/Azure/container-kit/pkg/logger"
+	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
 // RepoAnalysisStage implements the pipeline.PipelineStage interface for repository analysis

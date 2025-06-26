@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/Azure/container-copilot/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog/log"
 )
 

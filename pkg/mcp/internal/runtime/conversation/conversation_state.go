@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // RetryState tracks retry attempts for a specific operation

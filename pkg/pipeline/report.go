@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/logger"
+	"github.com/Azure/container-kit/pkg/logger"
 )
 
 type RunOutcome string

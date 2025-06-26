@@ -12,8 +12,8 @@ This development container provides a fully configured environment for Container
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/Azure/container-copilot.git
-   cd container-copilot
+   git clone https://github.com/Azure/container-kit.git
+   cd container-kit
    ```
 
 2. **Open in VS Code**:
@@ -168,8 +168,8 @@ Update `forwardPorts` and `portsAttributes` in `devcontainer.json`.
 
 ## 🆘 Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/Azure/container-copilot/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Azure/container-copilot/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Azure/container-kit/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Azure/container-kit/discussions)
 - **Documentation**: [MCP Documentation](../MCP_DOCUMENTATION.md)
 
 ---

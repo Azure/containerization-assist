@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/rs/zerolog"
 )
 

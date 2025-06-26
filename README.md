@@ -13,8 +13,8 @@ Container Kit automates the creation of Docker images and Kubernetes manifests u
 
 ### MCP Server Setup
 ```bash
-git clone https://github.com/Azure/container-copilot.git
-cd container-copilot
+git clone https://github.com/Azure/container-kit.git
+cd container-kit
 
 # Build the MCP server
 make mcp

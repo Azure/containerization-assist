@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-copilot/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/rs/zerolog"
 )
 

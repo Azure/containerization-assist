@@ -3,7 +3,7 @@ package deploy
 import (
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // GenerationOptions contains options for manifest generation

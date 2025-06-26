@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/mcp/internal/observability"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // Pre-flight check methods

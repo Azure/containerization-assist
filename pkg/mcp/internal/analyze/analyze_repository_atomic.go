@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-copilot/pkg/core/analysis"
-	"github.com/Azure/container-copilot/pkg/core/git"
-	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
-	mcperror "github.com/Azure/container-copilot/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/core/git"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcperror "github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
