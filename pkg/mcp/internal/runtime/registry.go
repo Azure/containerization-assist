@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
-	"github.com/invopop/jsonschema"
+	"github.com/localrivet/gomcp/util/schema"
 	"github.com/rs/zerolog"
 )
 
@@ -74,33 +74,34 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
 	}
 
-	// Use invopop/jsonschema which properly handles array items
-	reg.logger.Info().Str("tool", metadata.Name).Msg("🔧 Using invopop/jsonschema for schema generation with array fixes")
-
-	reflector := &jsonschema.Reflector{
-		RequiredFromJSONSchemaTags: true,
-		AllowAdditionalProperties:  false,
-		DoNotReference:             true, // avoid $ref/$defs for better compatibility
-	}
+	// Use GoMCP's built-in schema generator
+	gomcpGenerator := schema.NewGenerator()
 	var a TArgs
 	var r TResult
 
-	// Generate schemas using invopop reflector
-	inputSchema := reflector.Reflect(a)
-	outputSchema := reflector.Reflect(r)
-
-	// Remove schema version for compatibility
-	inputSchema.Version = ""
-	outputSchema.Version = ""
-
-	// Convert to map format and apply compatibility fixes
-	cleanInput := sanitizeInvopopSchema(inputSchema)
-	cleanOutput := sanitizeInvopopSchema(outputSchema)
-
-	// Log if we fixed any arrays
-	if hasArrays := containsArrays(cleanInput); hasArrays {
-		reg.logger.Info().Str("tool", metadata.Name).Msg("✅ Generated schema with proper array items using invopop/jsonschema")
+	// Generate schemas using GoMCP's generator
+	inputSchema, err := gomcpGenerator.GenerateSchema(a)
+	if err != nil {
+		return types.NewRichError("SCHEMA_GENERATION_ERROR", fmt.Sprintf("failed to generate input schema for %s: %v", metadata.Name, err), "internal_error")
 	}
+
+	outputSchema, err := gomcpGenerator.GenerateSchema(r)
+	if err != nil {
+		return types.NewRichError("SCHEMA_GENERATION_ERROR", fmt.Sprintf("failed to generate output schema for %s: %v", metadata.Name, err), "internal_error")
+	}
+
+	// Convert to JSON and back to get map[string]interface{} format
+	inputSchemaMap := convertGoMCPSchemaToMap(inputSchema)
+	outputSchemaMap := convertGoMCPSchemaToMap(outputSchema)
+
+	// Apply post-processing fixes for array items and GitHub Copilot compatibility
+	utils.AddMissingArrayItems(inputSchemaMap)
+	utils.AddMissingArrayItems(outputSchemaMap)
+	utils.RemoveCopilotIncompatible(inputSchemaMap)
+	utils.RemoveCopilotIncompatible(outputSchemaMap)
+
+	cleanInput := inputSchemaMap
+	cleanOutput := outputSchemaMap
 
 	reg.tools[metadata.Name] = &ToolRegistration{
 		Tool:         t,
@@ -125,38 +126,59 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	return nil
 }
 
-// sanitizeInvopopSchema converts invopop jsonschema.Schema to map[string]any
-// and removes keywords that GitHub Copilot's AJV-Draft-7 validator cannot handle
-func sanitizeInvopopSchema(schema *jsonschema.Schema) map[string]interface{} {
-	// Marshal and unmarshal to get map format
-	schemaBytes, err := json.Marshal(schema)
-	if err != nil {
-		return make(map[string]interface{})
-	}
+// convertGoMCPSchemaToMap converts GoMCP's schema format to standard JSON Schema map format
+func convertGoMCPSchemaToMap(gomcpSchema map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
 
-	var schemaMap map[string]interface{}
-	if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
-		return make(map[string]interface{})
-	}
-
-	// Apply GitHub Copilot compatibility fixes
-	utils.RemoveCopilotIncompatible(schemaMap)
-
-	return schemaMap
-}
-
-// containsArrays checks if a schema contains any array fields (for logging purposes)
-func containsArrays(schema map[string]interface{}) bool {
-	if properties, ok := schema["properties"].(map[string]interface{}); ok {
-		for _, prop := range properties {
-			if propMap, ok := prop.(map[string]interface{}); ok {
-				if propMap["type"] == "array" {
-					return true
+	// Copy most fields directly
+	for key, value := range gomcpSchema {
+		if key == "properties" {
+			// Convert PropertyDetail map to standard interface{} map
+			if propDetails, ok := value.(map[string]schema.PropertyDetail); ok {
+				convertedProps := make(map[string]interface{})
+				for propName, detail := range propDetails {
+					propMap := map[string]interface{}{
+						"type": detail.Type,
+					}
+					if detail.Description != "" {
+						propMap["description"] = detail.Description
+					}
+					if len(detail.Enum) > 0 {
+						propMap["enum"] = detail.Enum
+					}
+					if detail.Format != "" {
+						propMap["format"] = detail.Format
+					}
+					if detail.Minimum != nil {
+						propMap["minimum"] = *detail.Minimum
+					}
+					if detail.Maximum != nil {
+						propMap["maximum"] = *detail.Maximum
+					}
+					if detail.MinLength != nil {
+						propMap["minLength"] = *detail.MinLength
+					}
+					if detail.MaxLength != nil {
+						propMap["maxLength"] = *detail.MaxLength
+					}
+					if detail.Pattern != "" {
+						propMap["pattern"] = detail.Pattern
+					}
+					if detail.Default != nil {
+						propMap["default"] = detail.Default
+					}
+					convertedProps[propName] = propMap
 				}
+				result[key] = convertedProps
+			} else {
+				result[key] = value
 			}
+		} else {
+			result[key] = value
 		}
 	}
-	return false
+
+	return result
 }
 
 ///////////////////////////////////////////////////////////////////////////////
