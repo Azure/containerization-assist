@@ -38,6 +38,26 @@ test-mcp:
 test-all:
 	go test -race ./...
 
+.PHONY: coverage
+coverage:
+	@echo "Running test coverage analysis..."
+	@./scripts/coverage.sh
+
+.PHONY: coverage-html
+coverage-html:
+	@echo "Generating HTML coverage report..."
+	@mkdir -p coverage
+	go test -coverprofile=coverage/coverage.out -covermode=atomic ./pkg/mcp/...
+	go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+	@echo "Coverage report generated: coverage/coverage.html"
+
+.PHONY: coverage-baseline
+coverage-baseline:
+	@echo "Setting coverage baseline..."
+	@mkdir -p coverage
+	go test -cover ./pkg/mcp/... 2>&1 | grep "coverage:" | grep -o "[0-9]\+\.[0-9]\+%" > coverage/baseline.txt
+	@echo "Coverage baseline saved to coverage/baseline.txt"
+
 .PHONY: bench
 bench:
 	@echo "Running MCP performance benchmarks..."
@@ -241,6 +261,11 @@ help:
 	@echo "  test-all          Run all tests"
 	@echo "  bench             Run performance benchmarks (target: <300μs P95)"
 	@echo "  bench-baseline    Create performance baseline"
+	@echo ""
+	@echo "Coverage targets:"
+	@echo "  coverage          Run test coverage analysis with thresholds"
+	@echo "  coverage-html     Generate HTML coverage report"
+	@echo "  coverage-baseline Set current coverage as baseline"
 	@echo ""
 	@echo "Code quality targets:"
 	@echo "  fmt               Format all Go code"
