@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	publicutils "github.com/Azure/container-copilot/pkg/mcp/utils"
+	"github.com/Azure/container-copilot/pkg/genericutils"
 	"github.com/Azure/container-copilot/pkg/pipeline"
 )
 
@@ -93,7 +93,7 @@ func NewAnalysisConverter() *AnalysisConverter {
 
 // ToMap safely converts repository analysis to map format
 func (c *AnalysisConverter) ToMap(analysis interface{}) (map[string]interface{}, error) {
-	analysisMap, err := publicutils.SafeCast[map[string]interface{}](analysis)
+	analysisMap, err := genericutils.SafeCast[map[string]interface{}](analysis)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert analysis to map: %w", err)
 	}
@@ -102,17 +102,17 @@ func (c *AnalysisConverter) ToMap(analysis interface{}) (map[string]interface{},
 
 // GetLanguage extracts language from analysis map
 func (c *AnalysisConverter) GetLanguage(analysisMap map[string]interface{}) string {
-	return publicutils.MapGetWithDefault(analysisMap, "language", "")
+	return genericutils.MapGetWithDefault[string](analysisMap, "language", "")
 }
 
 // GetFramework extracts framework from analysis map
 func (c *AnalysisConverter) GetFramework(analysisMap map[string]interface{}) string {
-	return publicutils.MapGetWithDefault(analysisMap, "framework", "")
+	return genericutils.MapGetWithDefault[string](analysisMap, "framework", "")
 }
 
 // GetPort extracts port from analysis map
 func (c *AnalysisConverter) GetPort(analysisMap map[string]interface{}) int {
-	if port, ok := publicutils.MapGet[int](analysisMap, "port"); ok {
+	if port, ok := genericutils.MapGet[int](analysisMap, "port"); ok {
 		return port
 	}
 	return 0

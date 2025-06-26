@@ -332,7 +332,7 @@ func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context
 	}
 
 	if imageRef, ok := getString(argsMap, "image_ref"); ok {
-		args.ImageRef = imageRef
+		args.ImageRef = types.ImageReference{Repository: imageRef}
 	} else {
 		return nil, types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required", "validation_error")
 	}

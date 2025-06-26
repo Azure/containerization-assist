@@ -3,6 +3,8 @@ package utils
 import (
 	"fmt"
 	"strings"
+
+	"github.com/Azure/container-copilot/pkg/genericutils"
 )
 
 // ExtractBaseImage extracts the base image from Dockerfile content
@@ -34,36 +36,31 @@ func FormatBytes(bytes int64) string {
 }
 
 // GetStringFromMap safely extracts a string value from a map
+// Deprecated: Use genericutils.MapGetWithDefault[string] instead
 func GetStringFromMap(m map[string]interface{}, key string) string {
-	if val, ok := m[key]; ok {
-		if str, ok := val.(string); ok {
-			return str
-		}
-	}
-	return ""
+	return genericutils.MapGetWithDefault[string](m, key, "")
 }
 
 // GetIntFromMap safely extracts an int value from a map
+// Deprecated: Use genericutils.MapGetWithDefault[int] instead
 func GetIntFromMap(m map[string]interface{}, key string) int {
-	if val, ok := m[key]; ok {
-		switch v := val.(type) {
-		case int:
-			return v
-		case float64:
-			return int(v)
-		case int64:
-			return int(v)
-		}
+	// Try direct int first
+	if val, ok := genericutils.MapGet[int](m, key); ok {
+		return val
+	}
+	// Try float64 (common in JSON)
+	if val, ok := genericutils.MapGet[float64](m, key); ok {
+		return int(val)
+	}
+	// Try int64
+	if val, ok := genericutils.MapGet[int64](m, key); ok {
+		return int(val)
 	}
 	return 0
 }
 
 // GetBoolFromMap safely extracts a bool value from a map
+// Deprecated: Use genericutils.MapGetWithDefault[bool] instead
 func GetBoolFromMap(m map[string]interface{}, key string) bool {
-	if val, ok := m[key]; ok {
-		if b, ok := val.(bool); ok {
-			return b
-		}
-	}
-	return false
+	return genericutils.MapGetWithDefault[bool](m, key, false)
 }

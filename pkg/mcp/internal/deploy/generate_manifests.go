@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,14 +15,13 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
-	"github.com/Azure/container-copilot/templates"
 	"github.com/rs/zerolog"
-	"gopkg.in/yaml.v3"
 )
 
 // GenerateManifestsArgs represents the arguments for the generate_manifests tool
 type GenerateManifestsArgs struct {
 	types.BaseToolArgs
+	AppName            string               `json:"app_name,omitempty" description:"Application name for labels and naming"`
 	ImageRef           types.ImageReference `json:"image_ref" description:"Container image reference"`
 	Namespace          string               `json:"namespace,omitempty" description:"Kubernetes namespace"`
 	ServiceType        string               `json:"service_type,omitempty" description:"Service type (ClusterIP, NodePort, LoadBalancer)"`
@@ -51,6 +49,17 @@ type GenerateManifestsArgs struct {
 	// NetworkPolicy configuration
 	IncludeNetworkPolicy bool               `json:"include_network_policy,omitempty" description:"Generate NetworkPolicy resource"`
 	NetworkPolicySpec    *NetworkPolicySpec `json:"network_policy_spec,omitempty" description:"NetworkPolicy specification"`
+
+	// Compatibility fields for orchestration layer
+	Port           int    `json:"port,omitempty" description:"Application port"`
+	CPURequest     string `json:"cpu_request,omitempty" description:"CPU request"`
+	MemoryRequest  string `json:"memory_request,omitempty" description:"Memory request"`
+	CPULimit       string `json:"cpu_limit,omitempty" description:"CPU limit"`
+	MemoryLimit    string `json:"memory_limit,omitempty" description:"Memory limit"`
+	SecretHandling string `json:"secret_handling,omitempty" description:"Secret handling strategy"`
+	SecretManager  string `json:"secret_manager,omitempty" description:"Secret manager type"`
+	GenerateHelm   bool   `json:"generate_helm,omitempty" description:"Generate Helm chart"`
+	GitOpsReady    bool   `json:"gitops_ready,omitempty" description:"Make GitOps ready"`
 }
 
 // ManifestSecretRef represents a reference to a Kubernetes secret
@@ -465,31 +474,6 @@ func convertToGenerateManifestsArgs(args map[string]interface{}) (GenerateManife
 	}
 
 	return result, nil
-}
-
-// Helper functions for safe type conversion
-func getStringValue(m map[string]interface{}, key string) string {
-	if v, ok := m[key].(string); ok {
-		return v
-	}
-	return ""
-}
-
-func getIntValue(m map[string]interface{}, key string) int {
-	if v, ok := m[key].(float64); ok {
-		return int(v)
-	}
-	if v, ok := m[key].(int); ok {
-		return v
-	}
-	return 0
-}
-
-func getBoolValue(m map[string]interface{}, key string) bool {
-	if v, ok := m[key].(bool); ok {
-		return v
-	}
-	return false
 }
 
 // convertGenerateManifestsResultToMap converts typed result to untyped map
@@ -995,194 +979,6 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		Msg("Manifest generation completed")
 
 	return response, nil
-}
-
-// writeIngressTemplate writes the ingress template to the workspace
-func (t *GenerateManifestsTool) writeIngressTemplate(workspaceDir string) error {
-	// Import the templates package to access embedded files
-	data, err := templates.Templates.ReadFile("manifests/manifest-basic/ingress.yaml")
-	if err != nil {
-		return types.NewRichError("INGRESS_TEMPLATE_READ_FAILED", fmt.Sprintf("reading embedded ingress template: %v", err), types.ErrTypeSystem)
-	}
-
-	manifestPath := filepath.Join(workspaceDir, "manifests")
-	destPath := filepath.Join(manifestPath, "ingress.yaml")
-
-	if err := os.WriteFile(destPath, data, 0644); err != nil {
-		return types.NewRichError("INGRESS_TEMPLATE_WRITE_FAILED", fmt.Sprintf("writing ingress template: %v", err), types.ErrTypeSystem)
-	}
-
-	return nil
-}
-
-// writeNetworkPolicyTemplate writes the networkpolicy template to the workspace
-func (t *GenerateManifestsTool) writeNetworkPolicyTemplate(workspaceDir string) error {
-	// Import the templates package to access embedded files
-	data, err := templates.Templates.ReadFile("manifests/manifest-basic/networkpolicy.yaml")
-	if err != nil {
-		return types.NewRichError("NETWORKPOLICY_TEMPLATE_READ_FAILED", fmt.Sprintf("reading embedded networkpolicy template: %v", err), types.ErrTypeSystem)
-	}
-
-	manifestPath := filepath.Join(workspaceDir, "manifests")
-	destPath := filepath.Join(manifestPath, "networkpolicy.yaml")
-
-	if err := os.WriteFile(destPath, data, 0644); err != nil {
-		return types.NewRichError("NETWORKPOLICY_TEMPLATE_WRITE_FAILED", fmt.Sprintf("writing networkpolicy template: %v", err), types.ErrTypeSystem)
-	}
-
-	return nil
-}
-
-// addBinaryDataToConfigMap adds binary data to an existing ConfigMap manifest
-func (t *GenerateManifestsTool) addBinaryDataToConfigMap(configMapPath string, binaryData map[string][]byte) error {
-	content, err := os.ReadFile(configMapPath)
-	if err != nil {
-		return types.NewRichError("CONFIGMAP_READ_FAILED", fmt.Sprintf("reading configmap manifest: %v", err), "filesystem_error")
-	}
-
-	var configMap map[string]interface{}
-	if err := yaml.Unmarshal(content, &configMap); err != nil {
-		return types.NewRichError("CONFIGMAP_PARSE_FAILED", fmt.Sprintf("parsing configmap YAML: %v", err), "validation_error")
-	}
-
-	// Add binaryData section
-	if len(binaryData) > 0 {
-		binaryDataMap := make(map[string]interface{})
-		for key, data := range binaryData {
-			// Kubernetes expects base64 encoded binary data
-			binaryDataMap[key] = base64.StdEncoding.EncodeToString(data)
-		}
-		configMap["binaryData"] = binaryDataMap
-	}
-
-	// Write back the updated manifest
-	updatedContent, err := yaml.Marshal(configMap)
-	if err != nil {
-		return types.NewRichError("CONFIGMAP_MARSHAL_FAILED", fmt.Sprintf("marshaling updated configmap YAML: %v", err), "validation_error")
-	}
-
-	if err := os.WriteFile(configMapPath, updatedContent, 0644); err != nil {
-		return types.NewRichError("CONFIGMAP_WRITE_FAILED", fmt.Sprintf("writing updated configmap manifest: %v", err), "filesystem_error")
-	}
-
-	return nil
-}
-
-// generateRegistrySecret generates a Kubernetes secret for registry authentication
-func (t *GenerateManifestsTool) generateRegistrySecret(secretPath string, args GenerateManifestsArgs) error {
-	// Create the pull secret structure
-	pullSecret := map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Secret",
-		"metadata": map[string]interface{}{
-			"name":      "registry-secret",
-			"namespace": args.Namespace,
-			"labels": map[string]interface{}{
-				"app.kubernetes.io/managed-by": "container-copilot",
-			},
-		},
-		"type": "kubernetes.io/dockerconfigjson",
-		"data": map[string]interface{}{},
-	}
-
-	// Add workflow labels if present
-	if len(args.WorkflowLabels) > 0 {
-		labels := pullSecret["metadata"].(map[string]interface{})["labels"].(map[string]interface{})
-		for k, v := range args.WorkflowLabels {
-			if _, exists := labels[k]; !exists {
-				labels[k] = v
-			}
-		}
-	}
-
-	// Build the docker config JSON
-	dockerConfig := map[string]interface{}{
-		"auths": map[string]interface{}{},
-	}
-
-	auths := dockerConfig["auths"].(map[string]interface{})
-	for _, regSecret := range args.RegistrySecrets {
-		// Create base64 encoded auth string
-		authString := base64.StdEncoding.EncodeToString([]byte(regSecret.Username + ":" + regSecret.Password))
-
-		registryAuth := map[string]interface{}{
-			"username": regSecret.Username,
-			"password": regSecret.Password,
-			"auth":     authString,
-		}
-
-		if regSecret.Email != "" {
-			registryAuth["email"] = regSecret.Email
-		}
-
-		auths[regSecret.Registry] = registryAuth
-	}
-
-	// Encode the entire docker config as base64
-	dockerConfigJSON, err := json.Marshal(dockerConfig)
-	if err != nil {
-		return types.NewRichError("DOCKER_CONFIG_MARSHAL_FAILED", fmt.Sprintf("failed to marshal docker config: %v", err), "validation_error")
-	}
-
-	pullSecret["data"].(map[string]interface{})[".dockerconfigjson"] = base64.StdEncoding.EncodeToString(dockerConfigJSON)
-
-	// Write the secret to file
-	secretContent, err := yaml.Marshal(pullSecret)
-	if err != nil {
-		return types.NewRichError("PULL_SECRET_MARSHAL_FAILED", fmt.Sprintf("failed to marshal pull secret YAML: %v", err), "validation_error")
-	}
-
-	if err := os.WriteFile(secretPath, secretContent, 0644); err != nil {
-		return types.NewRichError("PULL_SECRET_WRITE_FAILED", fmt.Sprintf("failed to write pull secret file: %v", err), "filesystem_error")
-	}
-
-	t.logger.Debug().
-		Str("secret_path", secretPath).
-		Int("registry_count", len(args.RegistrySecrets)).
-		Msg("Successfully generated registry pull secret")
-
-	return nil
-}
-
-// addPullSecretToDeployment adds imagePullSecrets to a deployment
-func (t *GenerateManifestsTool) addPullSecretToDeployment(deploymentPath, secretName string) error {
-	content, err := os.ReadFile(deploymentPath)
-	if err != nil {
-		return types.NewRichError("DEPLOYMENT_READ_FAILED", fmt.Sprintf("reading deployment manifest: %v", err), "filesystem_error")
-	}
-
-	var deployment map[string]interface{}
-	if err := yaml.Unmarshal(content, &deployment); err != nil {
-		return types.NewRichError("DEPLOYMENT_PARSE_FAILED", fmt.Sprintf("parsing deployment YAML: %v", err), "validation_error")
-	}
-
-	// Navigate to spec.template.spec.imagePullSecrets
-	pullSecrets := []interface{}{
-		map[string]interface{}{
-			"name": secretName,
-		},
-	}
-
-	if err := t.updateNestedValue(deployment, pullSecrets, "spec", "template", "spec", "imagePullSecrets"); err != nil {
-		return types.NewRichError("IMAGE_PULL_SECRETS_UPDATE_FAILED", fmt.Sprintf("updating imagePullSecrets: %v", err), "build_error")
-	}
-
-	// Write back the updated deployment
-	updatedContent, err := yaml.Marshal(deployment)
-	if err != nil {
-		return types.NewRichError("DEPLOYMENT_MARSHAL_FAILED", fmt.Sprintf("marshaling updated deployment YAML: %v", err), "validation_error")
-	}
-
-	if err := os.WriteFile(deploymentPath, updatedContent, 0644); err != nil {
-		return fmt.Errorf("writing updated deployment manifest: %w", err)
-	}
-
-	t.logger.Debug().
-		Str("deployment_path", deploymentPath).
-		Str("secret_name", secretName).
-		Msg("Successfully added pull secret to deployment")
-
-	return nil
 }
 
 // SimpleTool interface implementation
