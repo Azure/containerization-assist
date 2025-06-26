@@ -462,3 +462,6 @@ test-repos/
 *~
 *.swp
 *.swo
+
+# Generated quality metrics
+quality-metrics.json

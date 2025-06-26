@@ -26,7 +26,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.21'
+        go-version: '1.24'
 
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -200,77 +200,8 @@ jobs:
           interface-metrics.json
           quality-dashboard.html
 
-    # Comment on PR
-    - name: Comment Quality Report on PR
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-
-          // Read metrics
-          const qualityMetrics = JSON.parse(fs.readFileSync('quality-metrics.json', 'utf8'));
-          const interfaceMetrics = JSON.parse(fs.readFileSync('interface-metrics.json', 'utf8'));
-
-          // Build comment
-          let comment = `## 📊 Quality Report
-
-          ### 🎯 Quality Gates Status: ${{ steps.gates.outputs.gates_passed == 'true' && '✅ PASSED' || '❌ FAILED' }}
-
-          #### Metrics Summary
-          | Metric | Value | Status |
-          |--------|-------|--------|
-          | Interface Compliance | ${{ steps.interfaces.outputs.compliance }}% | ${{ steps.interfaces.outputs.errors == '0' && '✅' || '❌' }} |
-          | Error Handling Adoption | ${{ steps.quality.outputs.error_handling }}% | ${Number(${{ steps.quality.outputs.error_handling }}) >= 60 ? '✅' : '❌'} |
-          | Test Coverage | ${{ steps.quality.outputs.test_coverage }}% | ${Number(${{ steps.quality.outputs.test_coverage }}) >= 50 ? '✅' : '❌'} |
-          | Build Time | ${{ steps.quality.outputs.build_time }} | ✅ |
-          | Empty Directories | ${{ steps.quality.outputs.empty_dirs }} | ${Number(${{ steps.quality.outputs.empty_dirs }}) <= 5 ? '✅' : '⚠️'} |
-          | TODO Comments | ${{ steps.quality.outputs.todos }} | ${Number(${{ steps.quality.outputs.todos }}) <= 50 ? '✅' : '⚠️'} |
-          `;
-
-          // Add comparison if available
-          if ('${{ steps.compare.outputs.error_diff }}' !== '') {
-            comment += `
-
-          #### 📈 Changes from Base Branch
-          | Metric | Change | Trend |
-          |--------|--------|-------|
-          | Error Handling | ${Number('${{ steps.compare.outputs.error_diff }}').toFixed(1)}% | ${Number('${{ steps.compare.outputs.error_diff }}') >= 0 ? '📈' : '📉'} |
-          | Test Coverage | ${Number('${{ steps.compare.outputs.coverage_diff }}').toFixed(1)}% | ${Number('${{ steps.compare.outputs.coverage_diff }}') >= 0 ? '📈' : '📉'} |
-          `;
-          }
-
-          // Add top recommendations
-          if (qualityMetrics.recommendations && qualityMetrics.recommendations.length > 0) {
-            comment += `
-
-          #### 💡 Top Recommendations
-          `;
-            qualityMetrics.recommendations.slice(0, 3).forEach(rec => {
-              comment += `- ${rec}\n`;
-            });
-          }
-
-          // Add warnings
-          const warnings = '${{ steps.gates.outputs.warnings }}';
-          if (warnings) {
-            comment += `
-
-          #### ⚠️  Warnings
-          ${warnings}`;
-          }
-
-          comment += `
-
-          ---
-          *Full reports available in the [workflow artifacts](${context.payload.pull_request.html_url}/checks)*`;
-
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+    # Note: Individual PR comments disabled in favor of consolidated CI status  
+    # The CI Status Consolidator workflow will aggregate all results
 
     # Final step to ensure workflow status reflects gate results
     - name: Final Quality Gate Status

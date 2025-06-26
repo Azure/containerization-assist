@@ -23,7 +23,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version: '1.24'
 
     - name: Install Trivy
       run: |
@@ -113,76 +113,5 @@ jobs:
           trivy-deps.json
         retention-days: 30
 
-    - name: Comment PR with Security Results
-      if: github.event_name == 'pull_request' && always()
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const fs = require('fs');
-          let comment = '## 🔒 Security Scan Results\n\n';
-
-          // Read GitLeaks results
-          try {
-            const gitleaksData = fs.readFileSync('gitleaks-report.json', 'utf8');
-            const gitleaksResults = JSON.parse(gitleaksData);
-            const criticalSecrets = gitleaksResults.filter(r =>
-              r.RuleID.includes('aws') || r.RuleID.includes('github') || r.RuleID.includes('stripe')
-            ).length;
-            const totalSecrets = gitleaksResults.length;
-
-            comment += `### Secret Scanning (GitLeaks)\n`;
-            comment += `- **Critical secrets**: ${criticalSecrets}\n`;
-            comment += `- **Total secrets**: ${totalSecrets}\n`;
-
-            if (criticalSecrets > 0) {
-              comment += `- ❌ **Action Required**: Critical secrets detected!\n`;
-            } else if (totalSecrets > 0) {
-              comment += `- ⚠️ **Review Recommended**: Some secrets detected\n`;
-            } else {
-              comment += `- ✅ **Passed**: No secrets detected\n`;
-            }
-          } catch (e) {
-            comment += `### Secret Scanning (GitLeaks)\n- ✅ **Passed**: No secrets detected\n`;
-          }
-
-          comment += '\n';
-
-          // Read Trivy results
-          try {
-            const trivyData = fs.readFileSync('trivy-deps.json', 'utf8');
-            const trivyResults = JSON.parse(trivyData);
-            let criticalVulns = 0;
-            let highVulns = 0;
-
-            trivyResults.Results?.forEach(result => {
-              result.Vulnerabilities?.forEach(vuln => {
-                if (vuln.Severity === 'CRITICAL') criticalVulns++;
-                if (vuln.Severity === 'HIGH') highVulns++;
-              });
-            });
-
-            comment += `### Vulnerability Scanning (Trivy)\n`;
-            comment += `- **Critical vulnerabilities**: ${criticalVulns}\n`;
-            comment += `- **High vulnerabilities**: ${highVulns}\n`;
-
-            if (criticalVulns > 0) {
-              comment += `- ❌ **Action Required**: Critical vulnerabilities detected!\n`;
-            } else if (highVulns > 5) {
-              comment += `- ⚠️ **Review Recommended**: Many high vulnerabilities detected\n`;
-            } else {
-              comment += `- ✅ **Passed**: Acceptable vulnerability levels\n`;
-            }
-          } catch (e) {
-            comment += `### Vulnerability Scanning (Trivy)\n- ✅ **Passed**: No vulnerabilities detected\n`;
-          }
-
-          comment += '\n---\n';
-          comment += '*Security scan completed automatically*';
-
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+    # Note: Individual PR comments disabled in favor of consolidated CI status
+    # The CI Status Consolidator workflow will aggregate all results
