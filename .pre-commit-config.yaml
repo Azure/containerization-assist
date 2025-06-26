@@ -10,7 +10,7 @@ repos:
     args: ['--maxkb=1000']
 
 - repo: https://github.com/golangci/golangci-lint
-  rev: v1.63.0
+  rev: v1.62.0
   hooks:
   - id: golangci-lint
     args: ['--fix']
