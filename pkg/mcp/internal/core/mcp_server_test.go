@@ -46,7 +46,7 @@ func TestMCPServerBasics(t *testing.T) {
 		testConfig := config
 		testConfig.StorePath = filepath.Join(tmpDir, "sessions_creation.db")
 
-		server, err := NewServer(testConfig)
+		server, err := NewServer(context.Background(), testConfig)
 		require.NoError(t, err)
 		assert.NotNil(t, server)
 
@@ -62,7 +62,7 @@ func TestMCPServerBasics(t *testing.T) {
 		testConfig := config
 		testConfig.StorePath = filepath.Join(tmpDir, "sessions_conversation.db")
 
-		server, err := NewServer(testConfig)
+		server, err := NewServer(context.Background(), testConfig)
 		require.NoError(t, err)
 		defer server.Stop()
 
@@ -84,7 +84,7 @@ func TestMCPServerBasics(t *testing.T) {
 		testConfig := config
 		testConfig.StorePath = filepath.Join(tmpDir, "sessions_telemetry.db")
 
-		server, err := NewServer(testConfig)
+		server, err := NewServer(context.Background(), testConfig)
 		require.NoError(t, err)
 		defer server.Stop()
 

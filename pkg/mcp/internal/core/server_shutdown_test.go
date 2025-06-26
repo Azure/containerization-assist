@@ -29,7 +29,7 @@ func TestServerGracefulShutdown(t *testing.T) {
 	config.HTTPPort = 0           // Use random port for testing
 
 	// Create server
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	t.Run("shutdown with no active sessions", func(t *testing.T) {
@@ -56,7 +56,7 @@ func TestServerShutdownWithActiveJobs(t *testing.T) {
 	config.HTTPPort = 0           // Use random port for testing
 
 	// Create server
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// Create a mock job in the job manager
@@ -108,7 +108,7 @@ func TestServerShutdownComponents(t *testing.T) {
 	config.HTTPPort = 0           // Use random port for testing
 
 	// Create server
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 
 	// Enable conversation mode

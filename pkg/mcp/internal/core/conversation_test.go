@@ -42,7 +42,7 @@ func TestConversationFlow(t *testing.T) {
 		LogLevel:          "error",
 	}
 
-	server, err := NewServer(config)
+	server, err := NewServer(context.Background(), config)
 	require.NoError(t, err)
 	defer server.Stop()
 

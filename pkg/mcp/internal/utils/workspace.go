@@ -1,13 +1,13 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/utils"
@@ -41,7 +41,7 @@ type WorkspaceConfig struct {
 }
 
 // NewWorkspaceManager creates a new workspace manager
-func NewWorkspaceManager(config WorkspaceConfig) (*WorkspaceManager, error) {
+func NewWorkspaceManager(ctx context.Context, config WorkspaceConfig) (*WorkspaceManager, error) {
 	if err := os.MkdirAll(config.BaseDir, 0o755); err != nil {
 		return nil, types.NewRichError("DIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create base directory: %v", err), "filesystem_error")
 	}
@@ -57,7 +57,7 @@ func NewWorkspaceManager(config WorkspaceConfig) (*WorkspaceManager, error) {
 	}
 
 	// Initialize disk usage tracking
-	if err := wm.refreshDiskUsage(); err != nil {
+	if err := wm.refreshDiskUsage(ctx); err != nil {
 		wm.logger.Warn().Err(err).Msg("Failed to initialize disk usage tracking")
 	}
 
@@ -65,7 +65,7 @@ func NewWorkspaceManager(config WorkspaceConfig) (*WorkspaceManager, error) {
 }
 
 // InitializeWorkspace creates a new workspace for a session
-func (wm *WorkspaceManager) InitializeWorkspace(sessionID string) (string, error) {
+func (wm *WorkspaceManager) InitializeWorkspace(ctx context.Context, sessionID string) (string, error) {
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
 
 	// Check if workspace already exists
@@ -100,7 +100,7 @@ func (wm *WorkspaceManager) InitializeWorkspace(sessionID string) (string, error
 }
 
 // CloneRepository clones a Git repository to the session workspace
-func (wm *WorkspaceManager) CloneRepository(sessionID, repoURL string) error {
+func (wm *WorkspaceManager) CloneRepository(ctx context.Context, sessionID, repoURL string) error {
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
 	repoDir := filepath.Join(workspaceDir, "repo")
 
@@ -119,33 +119,19 @@ func (wm *WorkspaceManager) CloneRepository(sessionID, repoURL string) error {
 	}
 
 	// Clone repository with depth limit for security
-	cmd := exec.Command("git", "clone", "--depth", "1", "--single-branch", repoURL, repoDir)
-
-	// Set timeout for clone operation
-	timeout := 5 * time.Minute
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--single-branch", repoURL, repoDir)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0") // Disable interactive prompts
 
-	// Run with timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Run()
-	}()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			return types.NewRichError("REPOSITORY_CLONE_FAILED", fmt.Sprintf("failed to clone repository: %v", err), "git_error")
+	// Run command with context cancellation
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return types.NewRichError("REPOSITORY_CLONE_CANCELLED", "repository clone was cancelled", "cancellation_error")
 		}
-	case <-time.After(timeout):
-		if err := cmd.Process.Kill(); err != nil {
-			// Log kill error but still return timeout error
-			wm.logger.Warn().Err(err).Msg("Failed to kill git process during timeout")
-		}
-		return types.NewRichError("REPOSITORY_CLONE_TIMEOUT", fmt.Sprintf("repository clone timed out after %v", timeout), "git_error")
+		return types.NewRichError("REPOSITORY_CLONE_FAILED", fmt.Sprintf("failed to clone repository: %v", err), "git_error")
 	}
 
 	// Update disk usage
-	if err := wm.UpdateDiskUsage(sessionID); err != nil {
+	if err := wm.UpdateDiskUsage(ctx, sessionID); err != nil {
 		wm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update disk usage after clone")
 	}
 
@@ -154,7 +140,7 @@ func (wm *WorkspaceManager) CloneRepository(sessionID, repoURL string) error {
 }
 
 // ValidateLocalPath validates and sanitizes a local path
-func (wm *WorkspaceManager) ValidateLocalPath(path string) error {
+func (wm *WorkspaceManager) ValidateLocalPath(ctx context.Context, path string) error {
 	// Convert to absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -184,7 +170,7 @@ func (wm *WorkspaceManager) GetFilePath(sessionID, relativePath string) string {
 }
 
 // CleanupWorkspace removes a session's workspace
-func (wm *WorkspaceManager) CleanupWorkspace(sessionID string) error {
+func (wm *WorkspaceManager) CleanupWorkspace(ctx context.Context, sessionID string) error {
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
 
 	if err := os.RemoveAll(workspaceDir); err != nil {
@@ -201,7 +187,11 @@ func (wm *WorkspaceManager) CleanupWorkspace(sessionID string) error {
 }
 
 // GenerateFileTree creates a string representation of the file tree
-func (wm *WorkspaceManager) GenerateFileTree(path string) (string, error) {
+func (wm *WorkspaceManager) GenerateFileTree(ctx context.Context, path string) (string, error) {
+	// Check for context cancellation
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
 	return utils.GenerateSimpleFileTree(path)
 }
 
@@ -227,11 +217,15 @@ func (wm *WorkspaceManager) CheckQuota(sessionID string, additionalBytes int64) 
 }
 
 // UpdateDiskUsage calculates and updates disk usage for a session
-func (wm *WorkspaceManager) UpdateDiskUsage(sessionID string) error {
+func (wm *WorkspaceManager) UpdateDiskUsage(ctx context.Context, sessionID string) error {
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
 
 	var totalSize int64
 	err := filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {
+		// Check for context cancellation
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err != nil {
 			return err
 		}
@@ -279,7 +273,7 @@ func (wm *WorkspaceManager) EnforceGlobalQuota() error {
 // Sandboxing methods
 
 // SandboxedAnalysis runs repository analysis in a sandboxed environment
-func (wm *WorkspaceManager) SandboxedAnalysis(sessionID, repoPath string, options interface{}) (interface{}, error) {
+func (wm *WorkspaceManager) SandboxedAnalysis(ctx context.Context, sessionID, repoPath string, options interface{}) (interface{}, error) {
 	if !wm.sandboxEnabled {
 		return nil, types.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
 	}
@@ -290,7 +284,7 @@ func (wm *WorkspaceManager) SandboxedAnalysis(sessionID, repoPath string, option
 }
 
 // SandboxedBuild runs Docker build in a sandboxed environment
-func (wm *WorkspaceManager) SandboxedBuild(sessionID, dockerfilePath string, options interface{}) (interface{}, error) {
+func (wm *WorkspaceManager) SandboxedBuild(ctx context.Context, sessionID, dockerfilePath string, options interface{}) (interface{}, error) {
 	if !wm.sandboxEnabled {
 		return nil, types.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
 	}
@@ -302,16 +296,20 @@ func (wm *WorkspaceManager) SandboxedBuild(sessionID, dockerfilePath string, opt
 
 // Helper methods
 
-func (wm *WorkspaceManager) refreshDiskUsage() error {
+func (wm *WorkspaceManager) refreshDiskUsage(ctx context.Context) error {
 	sessions, err := os.ReadDir(wm.baseDir)
 	if err != nil {
 		return err
 	}
 
 	for _, session := range sessions {
+		// Check for context cancellation
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if session.IsDir() {
 			sessionID := session.Name()
-			if err := wm.UpdateDiskUsage(sessionID); err != nil {
+			if err := wm.UpdateDiskUsage(ctx, sessionID); err != nil {
 				wm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update disk usage")
 			}
 		}
