@@ -187,13 +187,13 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 `
-	require.NoError(t, os.WriteFile(filepath.Join(appDir, "main.go"), []byte(mainGo), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(appDir, "main.go"), []byte(mainGo), 0600))
 
 	goMod := `module example.com/hello
 
 go 1.21
 `
-	require.NoError(t, os.WriteFile(filepath.Join(appDir, "go.mod"), []byte(goMod), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(appDir, "go.mod"), []byte(goMod), 0600))
 
 	// Test workflow steps
 	workflowSteps := []struct {
