@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
 
 // handleManifestsStage handles Kubernetes manifest generation
@@ -251,7 +251,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 
 	// Extract the dry-run preview from the result
 	if toolResult, ok := result.(map[string]interface{}); ok {
-		dryRunPreview := publicutils.GetStringFromMap(toolResult, "dry_run_preview")
+		dryRunPreview := genericutils.MapGetWithDefault[string](toolResult, "dry_run_preview", "")
 		if dryRunPreview == "" {
 			dryRunPreview = "No changes detected - resources are already up to date"
 		}

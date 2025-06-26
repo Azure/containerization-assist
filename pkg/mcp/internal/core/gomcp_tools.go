@@ -636,6 +636,13 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "generate_manifests",
 		"Generate Kubernetes manifests for the containerized application",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicGenerateManifestsArgs) (*deploy.AtomicGenerateManifestsResult, error) {
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "generate_manifests")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
 			argsMap := map[string]interface{}{
 				"session_id":      args.SessionID,
 				"image_ref":       args.ImageRef.Repository,
@@ -674,6 +681,13 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "validate_dockerfile",
 		"Validate a Dockerfile for best practices and potential issues",
 		func(ctx *gomcpserver.Context, args *analyze.AtomicValidateDockerfileArgs) (*analyze.AtomicValidateDockerfileResult, error) {
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "validate_dockerfile")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
 			argsMap := map[string]interface{}{
 				"session_id":           args.SessionID,
 				"dockerfile_path":      args.DockerfilePath,
@@ -707,6 +721,13 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_image_security",
 		"Scan Docker images for security vulnerabilities using Trivy",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_image_security")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
 			argsMap := map[string]interface{}{
 				"session_id":           args.SessionID,
 				"image_name":           args.ImageName,
@@ -737,6 +758,13 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_secrets",
 		"Scan source code and configuration files for exposed secrets",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanSecretsArgs) (*scan.AtomicScanSecretsResult, error) {
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_secrets")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
 			argsMap := map[string]interface{}{
 				"session_id":          args.SessionID,
 				"scan_path":           args.ScanPath,
