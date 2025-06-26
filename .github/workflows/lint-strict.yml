@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
@@ -54,7 +54,7 @@ jobs:
       with:
         fetch-depth: 0  # Need full history for new-from-rev
 
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
@@ -112,7 +112,7 @@ jobs:
       with:
         fetch-depth: 0  # Need full history for diff
 
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
@@ -169,7 +169,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
