@@ -28,7 +28,7 @@ func TestMCPServerBinaryIntegration(t *testing.T) {
 	tempDir := t.TempDir()
 	binaryPath := filepath.Join(tempDir, "mcp-server")
 
-	buildCmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/mcp-server")
+	buildCmd := exec.Command("go", "build", "-o", binaryPath, "../../cmd/mcp-server")
 	buildOutput, err := buildCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Failed to build MCP server: %v\nOutput: %s", err, buildOutput)
