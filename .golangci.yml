@@ -1,16 +1,13 @@
-version: "2"
+version: 2
 
 run:
   tests: true
   timeout: 5m
   modules-download-mode: readonly
   allow-parallel-runners: true
-  relative-path-mode: gomod
-  go: "1.24"
+  go: "1.21"
 
 linters:
-  default: standard
-
   enable:
     - staticcheck
     - revive
@@ -77,32 +74,6 @@ linters-settings:
       - pattern: 'log\.Panic(f|ln)?'
         msg: 'Use proper error handling instead of log.Panic*'
 
-  exclusions:
-    generated: strict
-    warn-unused: true
-    paths:
-      - '^vendor(/|$)'
-      - '^third_party(/|$)'
-      - '^docs(/|$)'
-      - '^resources(/|$)'
-      - '^scripts(/|$)'
-      - '^cmd/[^/]+/generated(/|$)'
-      - '.*_generated\.go$'
-    rules:
-      - path: '_test\.go$'
-        linters: [funlen, gocognit]
-
-formatters:
-  enable: [gofumpt]
-  settings:
-    gofumpt:
-      extra-rules: true
-    gci:
-      section-separator: "\n"
-      sections:
-        - Standard
-        - Default
-
 issues:
   # Tightened error budgets
   max-issues: 25             # Down from 50
@@ -111,10 +82,23 @@ issues:
   max-issues-per-linter: 5   # Down from 10
   max-same-issues: 3         # Down from 5
 
-  # Exit with code 0 even if issues are found (for gradual adoption)
-  # exit-code: 0
-
   exclude-use-default: false
+  exclude-dirs:
+    - vendor
+    - third_party
+    - docs
+    - resources
+    - scripts
+    - cmd/.*/generated
+
+  exclude-files:
+    - ".*_generated\\.go$"
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - funlen
+        - gocognit
 
   # Only check new code in PRs for gradual adoption
   new: true
