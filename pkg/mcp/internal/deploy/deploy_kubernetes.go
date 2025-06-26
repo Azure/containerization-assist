@@ -3,10 +3,11 @@ package deploy
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/container-copilot/pkg/mcp/internal"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Azure/container-copilot/pkg/mcp/internal"
 
 	"github.com/Azure/container-copilot/pkg/core/kubernetes"
 	sessiontypes "github.com/Azure/container-copilot/pkg/mcp/internal/session"

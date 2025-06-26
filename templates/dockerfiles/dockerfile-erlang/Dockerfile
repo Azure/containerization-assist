@@ -37,4 +37,3 @@ RUN ln -s /opt/rel/bin/$(cat /opt/rel/__relname) /opt/rel/bin/start_script
 ENTRYPOINT ["/opt/rel/bin/start_script"]
 
 CMD ["foreground"]
-

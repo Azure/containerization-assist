@@ -443,13 +443,13 @@ Test that your implementations satisfy both interfaces:
 ```go
 func TestToolImplementsInterfaces(t *testing.T) {
     tool := &MyTool{}
-    
+
     // Should implement external interface
     var _ mcp.Tool = tool
-    
+
     // Should implement internal interface
     var _ mcptypes.InternalTool = tool
-    
+
     // Test actual functionality
     ctx := context.Background()
     result, err := tool.Execute(ctx, nil)
@@ -503,7 +503,7 @@ type Tool interface {
     Execute(ctx context.Context, args interface{}) (interface{}, error)
     GetMetadata() ToolMetadata
     Validate(ctx context.Context, args interface{}) error
-    
+
     // Deprecated: Use GetMetadata().Version instead
     // Will be removed in v2.0
     GetVersion() string

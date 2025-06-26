@@ -32,7 +32,7 @@ Add to your Claude Desktop config and ask: *"Help me containerize my application
 - **[Complete User Guide](MCP_DOCUMENTATION.md)** - Setup, tools, configuration, and troubleshooting
 - **[Examples](examples/)** - Working code examples and patterns
 
-### For Developers  
+### For Developers
 - **[Architecture Guide](docs/mcp-architecture.md)** - Technical design and unified interface system
 - **[Tool Development Guide](docs/adding-new-tools.md)** - Building new tools and integrations
 - **[Interface Patterns](docs/interface-patterns.md)** - Design patterns and best practices
@@ -58,7 +58,7 @@ Container Kit provides atomic tools and conversational workflows through a unifi
 
 - **AI-Guided Workflows**: Interactive containerization assistance
 - **Atomic Operations**: Precise control over each step
-- **Auto-Registration**: Zero-configuration tool discovery  
+- **Auto-Registration**: Zero-configuration tool discovery
 - **Session Persistence**: Maintain state across operations
 - **Multi-Transport**: stdio and HTTP support
 - **Kubernetes Integration**: Generate and deploy manifests
@@ -78,7 +78,7 @@ Container Kit provides atomic tools and conversational workflows through a unifi
 
 We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for:
 - Development setup (devcontainer recommended)
-- Code standards and testing requirements  
+- Code standards and testing requirements
 - Pull request process
 
 ## 📝 License

@@ -172,10 +172,10 @@ func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, er
     if !ok {
         return nil, fmt.Errorf("invalid arguments type: expected *MyToolArgs, got %T", args)
     }
-    
+
     // Your tool logic here
     result := t.performWork(myArgs)
-    
+
     // Return results instead of just error
     return result, nil
 }
@@ -216,12 +216,12 @@ func (t *MyTool) Validate(ctx context.Context, args interface{}) error {
     if !ok {
         return fmt.Errorf("invalid arguments type")
     }
-    
+
     // Validate your arguments
     if myArgs.InputFile == "" {
         return fmt.Errorf("input_file is required")
     }
-    
+
     return nil
 }
 ```
@@ -294,20 +294,20 @@ Update your tests to match the new interface:
 ```go
 func TestMyTool_Execute(t *testing.T) {
     tool := &MyTool{}
-    
+
     args := &MyToolArgs{
         SessionID: "test-session",
         InputFile: "test.txt",
     }
-    
+
     // Test validation
     err := tool.Validate(context.Background(), args)
     assert.NoError(t, err)
-    
+
     // Test execution
     result, err := tool.Execute(context.Background(), args)
     assert.NoError(t, err)
-    
+
     // Check result type
     myResult, ok := result.(*MyToolResult)
     assert.True(t, ok)
@@ -347,18 +347,18 @@ For long-running operations:
 
 ```go
 func (t *MyTool) ExecuteWithProgress(
-    ctx context.Context, 
-    args interface{}, 
+    ctx context.Context,
+    args interface{},
     reporter mcp.ProgressReporter,
 ) (interface{}, error) {
     reporter.ReportStage(0.0, "Starting operation")
-    
+
     // Do work...
     reporter.ReportStage(0.5, "Halfway complete")
-    
+
     // More work...
     reporter.ReportStage(1.0, "Operation complete")
-    
+
     return result, nil
 }
 ```
@@ -407,10 +407,10 @@ type LegacyToolAdapter struct {
 func (a *LegacyToolAdapter) Execute(ctx context.Context, args interface{}) (interface{}, error) {
     // Convert new args to old format
     oldParams := convertToOldParams(args)
-    
+
     // Call old method
     err := a.legacyTool.Run(ctx, oldParams)
-    
+
     // Return nil result for compatibility
     return nil, err
 }
@@ -448,12 +448,12 @@ Test with the MCP system:
 func TestToolIntegration(t *testing.T) {
     // Create orchestrator
     orchestrator := mcp.NewOrchestrator()
-    
+
     // Register your tool
     tool := NewMyTool()
     err := orchestrator.RegisterTool(tool)
     assert.NoError(t, err)
-    
+
     // Execute through orchestrator
     result, err := orchestrator.ExecuteTool(
         context.Background(),

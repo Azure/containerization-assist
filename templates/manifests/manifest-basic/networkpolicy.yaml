@@ -13,45 +13,45 @@ spec:
     matchLabels:
       app: {{ .AppName }}
   policyTypes:
-  - Ingress
-  - Egress
+    - Ingress
+    - Egress
   ingress:
-  # Allow ingress from pods with label app={{ .AppName }}-frontend
-  - from:
-    - podSelector:
-        matchLabels:
-          app: {{ .AppName }}-frontend
-    ports:
-    - protocol: TCP
-      port: 8080
-  # Allow ingress for health checks from all pods in namespace
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: {{ .Namespace }}
-    ports:
-    - protocol: TCP
-      port: 8080
+    # Allow ingress from pods with label app={{ .AppName }}-frontend
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ .AppName }}-frontend
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow ingress for health checks from all pods in namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Namespace }}
+      ports:
+        - protocol: TCP
+          port: 8080
   egress:
-  # Allow egress to DNS
-  - to: []
-    ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
-  # Allow egress to pods with label app={{ .AppName }}-backend
-  - to:
-    - podSelector:
-        matchLabels:
-          app: {{ .AppName }}-backend
-    ports:
-    - protocol: TCP
-      port: 5432
-  # Allow egress to external services (customize as needed)
-  - to: []
-    ports:
-    - protocol: TCP
-      port: 443
-    - protocol: TCP
-      port: 80
+    # Allow egress to DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow egress to pods with label app={{ .AppName }}-backend
+    - to:
+        - podSelector:
+            matchLabels:
+              app: {{ .AppName }}-backend
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow egress to external services (customize as needed)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

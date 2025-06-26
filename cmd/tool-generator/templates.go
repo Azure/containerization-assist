@@ -90,12 +90,12 @@ func (g *GenericToolArgs) Validate() error {
 	if g.Args == nil {
 		return fmt.Errorf("args cannot be nil")
 	}
-	
+
 	// Check for session_id
 	if _, ok := g.Args["session_id"]; !ok {
 		return fmt.Errorf("session_id is required")
 	}
-	
+
 	return nil
 }
 `
@@ -124,7 +124,7 @@ func RegisterAllTools(d *dispatch.ToolDispatcher) error {
 		return err
 	}
 	{{end}}
-	
+
 	return nil
 }
 

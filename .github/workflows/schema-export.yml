@@ -15,26 +15,31 @@ on:
       - 'cmd/mcp-server/**'
   workflow_dispatch: # Allow manual trigger
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   export-schemas:
     name: Export Tool Schemas
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: write
       pull-requests: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-          
+
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -44,16 +49,16 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-            
+
       - name: Build MCP server
         run: |
           go mod download
           go build -o container-kit-mcp ./cmd/mcp-server
-          
+
       - name: Export tool schemas
         run: |
           ./container-kit-mcp --export-schemas --schema-output=docs/tools.schema.json
-          
+
       - name: Check for schema changes
         id: schema-changes
         run: |
@@ -65,7 +70,7 @@ jobs:
             echo "Tool schemas have been updated"
             git diff docs/tools.schema.json
           fi
-          
+
       - name: Commit updated schemas (main branch only)
         if: steps.schema-changes.outputs.changed == 'true' && github.ref == 'refs/heads/main'
         run: |
@@ -75,10 +80,10 @@ jobs:
           git commit -m "Update tool schemas
 
           🤖 Generated with GitHub Actions
-          
+
           Auto-updated tool schemas based on latest MCP tool definitions."
           git push
-          
+
       - name: Comment on PR with schema changes
         if: steps.schema-changes.outputs.changed == 'true' && github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -86,30 +91,30 @@ jobs:
           script: |
             const fs = require('fs');
             const schema = JSON.parse(fs.readFileSync('docs/tools.schema.json', 'utf8'));
-            
+
             // GitHub comment limit is 65536 characters
             const maxBodyLength = 65000; // Leave buffer for safety
-            
+
             // Start with essential info
             let comment = `## 🔧 Tool Schema Update
-            
+
             This PR includes changes to MCP tool definitions. The tool schema has been automatically updated:
-            
+
             - **Schema version**: ${schema.schema_version || 'N/A'}
             - **Generated**: ${schema.generated_at || 'N/A'}
             - **Total tools**: ${schema.tools?.total_count || 0}
             - **Description**: ${schema.description || 'N/A'}
             `;
-            
+
             // Add tools list if space allows
             if (schema.tools?.by_category && comment.length < maxBodyLength * 0.3) {
               let toolsList = '\n### Available Tools:\n';
               let toolCount = 0;
               const maxTools = 20; // Limit number of tools shown
-              
+
               for (const [category, tools] of Object.entries(schema.tools.by_category)) {
                 if (toolCount >= maxTools) break;
-                
+
                 toolsList += `\n#### ${category} Tools\n`;
                 for (const tool of tools.slice(0, Math.min(5, maxTools - toolCount))) {
                   toolsList += `- **${tool.name}**: ${tool.description?.substring(0, 100) || 'No description'}${tool.description?.length > 100 ? '...' : ''}\n`;
@@ -117,17 +122,17 @@ jobs:
                   if (toolCount >= maxTools) break;
                 }
               }
-              
+
               if (Object.values(schema.tools.by_category).flat().length > maxTools) {
                 toolsList += `\n*... and ${Object.values(schema.tools.by_category).flat().length - maxTools} more tools. See the full schema file for details.*\n`;
               }
-              
+
               // Only add if we have space
               if (comment.length + toolsList.length < maxBodyLength * 0.8) {
                 comment += toolsList;
               }
             }
-            
+
             // Add capabilities if space allows
             if (schema.capabilities?.ai_features && comment.length < maxBodyLength * 0.7) {
               const capabilities = schema.capabilities.ai_features.slice(0, 5).map(feature => `- 🤖 ${feature.substring(0, 80)}`).join('\n');
@@ -136,32 +141,32 @@ jobs:
                 comment += capSection;
               }
             }
-            
+
             // Always add footer
             comment += `\nThe updated schema is available at \`docs/tools.schema.json\` and can be used by IDE plugins and LLMs for tool discovery.`;
-            
+
             // Final safety check
             if (comment.length > maxBodyLength) {
               comment = `## 🔧 Tool Schema Update
-              
+
               This PR includes changes to MCP tool definitions:
-              
+
               - **Total tools**: ${schema.tools?.total_count || 0}
               - **Schema version**: ${schema.schema_version || 'N/A'}
               - **Generated**: ${schema.generated_at || 'N/A'}
-              
+
               The schema update is too large to display in this comment. Please check the \`docs/tools.schema.json\` file for the complete schema definition.
-              
+
               **Note**: Tools are automatically registered with GoMCP`;
             }
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: comment
             });
-            
+
       - name: Upload schema as artifact
         uses: actions/upload-artifact@v4
         with:

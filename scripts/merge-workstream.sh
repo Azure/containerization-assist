@@ -22,13 +22,13 @@ for WORKSTREAM in "$@"; do
     BRANCH_NAME="workstream/$WORKSTREAM"
     echo ""
     echo "🔀 Merging $BRANCH_NAME..."
-    
+
     # Check if branch exists
     if ! git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
         echo "  ❌ Branch $BRANCH_NAME does not exist on remote"
         continue
     fi
-    
+
     # Merge the workstream
     if git merge "origin/$BRANCH_NAME" --no-edit; then
         echo "  ✅ Successfully merged $BRANCH_NAME"

@@ -25,7 +25,7 @@ if pgrep -f "container-kit-mcp.*--transport=stdio" > /dev/null 2>&1; then
     pkill -f "container-kit-mcp.*--transport=stdio"
     # Give processes time to clean up
     sleep 0.5
-    
+
     # If FORCE_CLEANUP is set, use SIGKILL after waiting
     if [ -n "$FORCE_CLEANUP" ] && pgrep -f "container-kit-mcp.*--transport=stdio" > /dev/null 2>&1; then
         if [ -n "$DEBUG" ]; then
@@ -45,10 +45,10 @@ if [ -f "${PREFS_PATH}" ] && ! pgrep -f "container-kit-mcp" > /dev/null 2>&1; th
         if [ -n "$DEBUG" ]; then
             echo "Preferences database exists but no process is using it, checking for stale locks..." >&2
         fi
-        
+
         # Try to remove any .lock file that BoltDB might have created
         rm -f "${PREFS_PATH}.lock" 2>/dev/null
-        
+
         # Also check if we can open the file for writing (this will fail if locked)
         if ! (echo -n "" >> "${PREFS_PATH}" 2>/dev/null); then
             if [ -n "$DEBUG" ]; then
@@ -74,10 +74,10 @@ if [ -f "${STORE_PATH}" ] && ! pgrep -f "container-kit-mcp" > /dev/null 2>&1; th
         if [ -n "$DEBUG" ]; then
             echo "Database file exists but no process is using it, checking for stale locks..." >&2
         fi
-        
+
         # Try to remove any .lock file that BoltDB might have created
         rm -f "${STORE_PATH}.lock" 2>/dev/null
-        
+
         # Also check if we can open the file for writing (this will fail if locked)
         if ! (echo -n "" >> "${STORE_PATH}" 2>/dev/null); then
             if [ -n "$DEBUG" ]; then

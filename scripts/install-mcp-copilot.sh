@@ -70,14 +70,14 @@ echo -e "${BLUE}Setting up GitHub Copilot integration...${NC}"
 if [ -d ".vscode" ]; then
     WORKSPACE_DIR="$(pwd)"
     echo "Found VS Code workspace at: $WORKSPACE_DIR"
-    
+
     # Create or update .vscode/mcp.json
     MCP_CONFIG_FILE="$WORKSPACE_DIR/.vscode/mcp.json"
     echo "Creating MCP configuration: $MCP_CONFIG_FILE"
-    
+
     # Create .vscode directory if it doesn't exist
     mkdir -p "$WORKSPACE_DIR/.vscode"
-    
+
     # Create the MCP configuration
     cat > "$MCP_CONFIG_FILE" << EOF
 {
@@ -91,10 +91,10 @@ if [ -d ".vscode" ]; then
   }
 }
 EOF
-    
+
     echo -e "${GREEN}MCP configuration created!${NC}"
     echo "Configuration file: $MCP_CONFIG_FILE"
-    
+
     # Add to .gitignore if it exists
     if [ -f ".gitignore" ]; then
         if ! grep -q "\.vscode/mcp\.json" .gitignore; then
@@ -104,7 +104,7 @@ EOF
             echo ".vscode/mcp.json" >> .gitignore
         fi
     fi
-    
+
 else
     echo -e "${YELLOW}Not in a VS Code workspace. You'll need to manually create .vscode/mcp.json${NC}"
     echo ""
@@ -150,7 +150,7 @@ read -p "Would you like to test the MCP server? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Testing MCP server..."
-    
+
     # Check for existing processes first
     if ps aux | grep -v grep | grep container-kit-mcp >/dev/null; then
         echo -e "${YELLOW}Warning: Found existing Container Kit MCP processes:${NC}"
@@ -159,7 +159,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "You may want to terminate them first before testing."
         echo ""
     fi
-    
+
     # Test the server can start properly by redirecting logs
     echo "Starting server test (logs redirected to /tmp/container-kit-test.log)..."
     if timeout 3s "$WRAPPER_SCRIPT" > /tmp/container-kit-test.log 2>&1; then
@@ -174,14 +174,14 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
             tail -5 /tmp/container-kit-test.log
         fi
     fi
-    
+
     # Quick check that it registered tools
     if grep -q "Successfully registered all atomic tools" /tmp/container-kit-test.log 2>/dev/null; then
         echo -e "${GREEN}✅ Tools registered successfully${NC}"
     else
         echo -e "${YELLOW}⚠️  Could not verify tool registration${NC}"
     fi
-    
+
     echo ""
     echo -e "${GREEN}Test completed!${NC}"
     echo "Note: The server logs have been saved to /tmp/container-kit-test.log"

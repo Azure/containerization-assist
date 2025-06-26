@@ -147,7 +147,7 @@ Add these status checks as required:
 jobs:
   quality:
     uses: ./.github/workflows/quality-gates.yml
-    
+
   build:
     needs: quality
     # ... rest of build

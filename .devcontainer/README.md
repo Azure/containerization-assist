@@ -35,10 +35,10 @@ This development container provides a fully configured environment for Container
    ```bash
    # Build the MCP server
    make mcp
-   
+
    # Run tests
    make test
-   
+
    # Run linting
    make lint
    ```

@@ -874,25 +874,25 @@ func outputHTML(metrics *QualityMetrics) error {
 <body>
     <h1>Quality Dashboard</h1>
     <p>Generated: %s</p>
-    
+
     <div class="metric">
         <h2>Error Handling</h2>
         <p>Adoption Rate: <span class="%s">%.1f%%</span></p>
         <p>Total Errors: %d (Rich: %d, Standard: %d)</p>
     </div>
-    
+
     <div class="metric">
         <h2>Test Coverage</h2>
         <p>Overall Coverage: <span class="%s">%.1f%%</span></p>
         <p>Uncovered Packages: %d</p>
     </div>
-    
+
     <div class="metric">
         <h2>Build Performance</h2>
         <p>Build Time: %v</p>
         <p>Test Time: %v</p>
     </div>
-    
+
     <div class="metric">
         <h2>Recommendations</h2>
         <ul>

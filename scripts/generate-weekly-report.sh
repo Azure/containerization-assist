@@ -84,7 +84,7 @@ echo "✅ Summary created"
 if [ "$1" == "--notify" ]; then
     echo ""
     echo "4️⃣ Sending notifications..."
-    
+
     # Example: Post to Slack (requires webhook URL)
     if [ -n "$SLACK_WEBHOOK_URL" ]; then
         SUMMARY=$(cat "$REPORTS_DIR/latest-summary.txt" | head -20)
@@ -92,12 +92,12 @@ if [ "$1" == "--notify" ]; then
             --data "{\"text\":\"$SUMMARY\"}" \
             "$SLACK_WEBHOOK_URL"
     fi
-    
+
     # Example: Send email (requires mail configured)
     if command -v mail &> /dev/null && [ -n "$REPORT_EMAIL" ]; then
         cat "$REPORTS_DIR/latest.txt" | mail -s "Weekly Quality Report - Week $WEEK_NUM" "$REPORT_EMAIL"
     fi
-    
+
     echo "✅ Notifications sent"
 fi
 

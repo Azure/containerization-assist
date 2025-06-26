@@ -4,13 +4,13 @@ last_updated: "2024-06-23T00:00:00Z"
 # OpenTelemetry Configuration
 opentelemetry:
   enabled: true
-  
+
   # Service identification
   service:
     name: "container-copilot-mcp"
     version: "${APP_VERSION:-dev}"
     environment: "${ENVIRONMENT:-development}"
-    
+
   # Resource attributes
   resource:
     attributes:
@@ -21,16 +21,16 @@ opentelemetry:
       k8s.namespace.name: "${NAMESPACE:-default}"
       k8s.pod.name: "${POD_NAME:-}"
       k8s.node.name: "${NODE_NAME:-}"
-  
+
   # Tracing configuration
   tracing:
     enabled: true
-    
+
     # Sampling configuration
     sampling:
       type: "probabilistic"  # always_on, always_off, probabilistic, rate_limiting
       rate: 0.1  # 10% sampling rate for production
-      
+
     # Trace export configuration
     exporters:
       - type: "otlp"
@@ -38,21 +38,21 @@ opentelemetry:
         headers:
           authorization: "Bearer ${OTEL_AUTH_TOKEN:-}"
         timeout: "30s"
-        
+
       - type: "jaeger"
         endpoint: "${JAEGER_ENDPOINT:-http://localhost:14268/api/traces}"
         enabled: false
-        
+
     # Trace attributes
     attributes:
       include_environment: true
       include_process_info: true
       include_host_info: true
-      
+
   # Metrics configuration
   metrics:
     enabled: true
-    
+
     # Metric export configuration
     exporters:
       - type: "otlp"
@@ -61,37 +61,37 @@ opentelemetry:
           authorization: "Bearer ${OTEL_AUTH_TOKEN:-}"
         timeout: "30s"
         interval: "60s"
-        
+
       - type: "prometheus"
         endpoint: ":8080/metrics"
         enabled: true
-        
+
     # Custom metrics configuration
     custom_metrics:
       # Tool execution metrics
       tool_executions:
         enabled: true
         histogram_buckets: [0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0]
-        
+
       # Error rate metrics
       error_rates:
         enabled: true
         counter_labels: ["tool_name", "error_code", "error_category"]
-        
+
       # Resource usage metrics
       resource_usage:
         enabled: true
         gauge_labels: ["resource_type", "tool_name"]
-        
+
       # Session metrics
       session_metrics:
         enabled: true
         histogram_buckets: [1, 5, 10, 30, 60, 300, 600]
-        
+
   # Logging configuration
   logging:
     enabled: true
-    
+
     # Log export configuration
     exporters:
       - type: "otlp"
@@ -99,7 +99,7 @@ opentelemetry:
         headers:
           authorization: "Bearer ${OTEL_AUTH_TOKEN:-}"
         timeout: "30s"
-        
+
     # Log attributes
     attributes:
       include_trace_context: true
@@ -109,28 +109,28 @@ opentelemetry:
 # SLO Configuration
 slo:
   enabled: true
-  
+
   # Tool execution SLOs
   tool_execution:
     availability:
       target: 99.5  # 99.5% availability
       window: "30d"
-      
+
     latency:
       target: 95.0  # 95th percentile
       threshold: "10s"  # 95% of requests under 10s
       window: "7d"
-      
+
     error_rate:
       target: 1.0  # Less than 1% error rate
       window: "24h"
-      
+
   # Session management SLOs
   session_management:
     availability:
       target: 99.9  # 99.9% availability
       window: "30d"
-      
+
     response_time:
       target: 99.0  # 99th percentile
       threshold: "5s"  # 99% of requests under 5s
@@ -139,19 +139,19 @@ slo:
 # Alerting Configuration
 alerting:
   enabled: true
-  
+
   # Alert channels
   channels:
     - name: "slack"
       type: "slack"
       webhook_url: "${SLACK_WEBHOOK_URL:-}"
       enabled: true
-      
+
     - name: "pagerduty"
       type: "pagerduty"
       integration_key: "${PAGERDUTY_KEY:-}"
       enabled: false
-      
+
   # Alert rules
   rules:
     # High error rate alert
@@ -160,21 +160,21 @@ alerting:
       condition: "rate(tool_execution_errors_total[5m]) > 0.05"
       severity: "warning"
       channels: ["slack"]
-      
+
     # SLO breach alert
     - name: "slo_breach"
       description: "SLO target is being breached"
       condition: "slo_error_budget_remaining < 0.1"
       severity: "critical"
       channels: ["slack", "pagerduty"]
-      
+
     # High latency alert
     - name: "high_latency"
       description: "Tool execution latency is too high"
       condition: "histogram_quantile(0.95, tool_execution_duration_seconds) > 30"
       severity: "warning"
       channels: ["slack"]
-      
+
     # Resource exhaustion alert
     - name: "resource_exhaustion"
       description: "System resources are running low"
@@ -185,49 +185,49 @@ alerting:
 # Dashboard Configuration
 dashboards:
   enabled: true
-  
+
   # Grafana dashboards
   grafana:
     enabled: true
     url: "${GRAFANA_URL:-http://localhost:3000}"
     api_key: "${GRAFANA_API_KEY:-}"
-    
+
     # Dashboard definitions
     definitions:
       - name: "MCP Server Overview"
         file: "dashboards/overview.json"
-        
+
       - name: "Tool Execution Metrics"
         file: "dashboards/tools.json"
-        
+
       - name: "SLO Dashboard"
         file: "dashboards/slo.json"
 
 # Health Check Configuration
 health_checks:
   enabled: true
-  
+
   # Health check endpoints
   endpoints:
     liveness:
       path: "/health/live"
       port: 8080
-      
+
     readiness:
       path: "/health/ready"
       port: 8080
-      
+
     startup:
       path: "/health/startup"
       port: 8080
-      
+
   # Health check probes
   probes:
     - name: "database_connectivity"
       type: "tcp"
       target: "localhost:5432"
       timeout: "5s"
-      
+
     - name: "external_api"
       type: "http"
       target: "https://api.example.com/health"
@@ -240,12 +240,12 @@ performance:
   profiling:
     enabled: true
     endpoint: ":6060"  # pprof endpoint
-    
+
   # Sampling
   sampling:
     cpu_profile_rate: 100  # Hz
     memory_profile_rate: 1024  # bytes
-    
+
   # Limits
   limits:
     max_concurrent_tools: 50

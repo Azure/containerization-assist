@@ -38,19 +38,19 @@ fi
 # Check if a custom project root was provided
 if [[ $# -gt 1 ]]; then
   PROJECT_ROOT="$2"
-  
+
   # Convert relative project root to absolute path
   if [[ ! "$PROJECT_ROOT" = /* ]]; then
     PROJECT_ROOT="$(pwd)/$PROJECT_ROOT"
     echo "ℹ️ Converted project root path to absolute: $PROJECT_ROOT"
   fi
-  
+
   # Validate that the project root exists
   if [[ ! -d "$PROJECT_ROOT" ]]; then
     echo "❌ Error: Project root '$PROJECT_ROOT' does not exist or is not a directory"
     exit 1
   fi
-  
+
   echo "ℹ️ Using custom project root: $PROJECT_ROOT"
 else
   # Calculate project root based on script location if not provided
@@ -112,7 +112,7 @@ attempt=1
 
 # More reliable check that includes connection with the specified user
 wait_for_postgres() {
-  docker exec ${POSTGRES_CONTAINER_NAME} pg_isready -U ${POSTGRES_USER} > /dev/null 2>&1 || 
+  docker exec ${POSTGRES_CONTAINER_NAME} pg_isready -U ${POSTGRES_USER} > /dev/null 2>&1 ||
   docker exec ${POSTGRES_CONTAINER_NAME} pg_isready -U postgres > /dev/null 2>&1
 }
 
@@ -130,7 +130,7 @@ done
 
 echo "✅ PostgreSQL is up and running"
 echo "  - Container: ${POSTGRES_CONTAINER_NAME}"
-echo "  - Connection: localhost:${POSTGRES_PORT}" 
+echo "  - Connection: localhost:${POSTGRES_PORT}"
 echo "  - Database: ${POSTGRES_DB}"
 
 echo "✅ Target repository: $TARGET_REPO"

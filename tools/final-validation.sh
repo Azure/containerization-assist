@@ -41,11 +41,11 @@ run_check() {
     local name="$1"
     local command="$2"
     local critical="$3"  # true/false
-    
+
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     echo
     echo "🔍 Running: $name"
-    
+
     if eval "$command" >/dev/null 2>&1; then
         print_status "$name passed"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
@@ -115,7 +115,7 @@ echo "📚 Validating documentation..."
 
 REQUIRED_DOCS=(
     "ARCHITECTURE_NEW.md"
-    "INTERFACES.md" 
+    "INTERFACES.md"
     "AUTO_REGISTRATION.md"
     "MIGRATION_SUMMARY.md"
     "TEAM_D_PLAN.md"
@@ -161,7 +161,7 @@ echo "📊 Validating performance..."
 if [ -f "performance_baseline.json" ]; then
     print_status "Performance baseline exists"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    
+
     # Check if we can measure current performance
     if [ -f "tools/measure-performance/main.go" ]; then
         print_info "Performance measurement tools available"

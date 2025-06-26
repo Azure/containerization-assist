@@ -39,7 +39,7 @@ For each conflicted file (likely `pkg/mcp/internal/core/gomcp_tools.go`):
 # <<<<<<< HEAD
 # (current changes)
 # =======
-# (stashed changes) 
+# (stashed changes)
 # >>>>>>> Stashed changes
 
 # Remove conflict markers and choose the correct code

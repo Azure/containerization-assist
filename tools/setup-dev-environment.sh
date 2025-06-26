@@ -121,7 +121,7 @@ TOOL_DIRS=$(find $TOOLS_DIR -mindepth 1 -maxdepth 1 -type d)
 for tool_dir in $TOOL_DIRS; do
     tool_name=$(basename $tool_dir)
     echo "  Building $tool_name..."
-    
+
     if go build -o "bin/$tool_name" "./$tool_dir/main.go" 2>/dev/null; then
         print_status "Built $tool_name"
     else

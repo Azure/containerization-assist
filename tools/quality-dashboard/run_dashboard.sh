@@ -17,7 +17,7 @@ run_dashboard() {
     local format=$1
     local output=$2
     local extra_args="${3:-}"
-    
+
     echo "📊 Generating $format report..."
     go run "$SCRIPT_DIR/main.go" \
         -root "$ROOT_DIR" \
@@ -41,23 +41,23 @@ if command -v jq &> /dev/null; then
     COVERAGE=$(jq '.test_coverage.overall_coverage' quality-metrics.json)
     BUILD_TIME=$(jq -r '.build_metrics.build_time' quality-metrics.json)
     TODOS=$(jq '.code_quality.todo_comments' quality-metrics.json)
-    
+
     echo "• Error Handling Adoption: ${ERROR_RATE}%"
     echo "• Test Coverage: ${COVERAGE}%"
     echo "• Build Time: ${BUILD_TIME}"
     echo "• TODO Comments: ${TODOS}"
-    
+
     # Check quality gates
     echo ""
     echo "🚦 Quality Gates:"
     echo "================="
-    
+
     if (( $(echo "$ERROR_RATE >= 80" | bc -l) )); then
         echo "✅ Error handling adoption meets target (≥80%)"
     else
         echo "❌ Error handling adoption below target (<80%)"
     fi
-    
+
     if (( $(echo "$COVERAGE >= 70" | bc -l) )); then
         echo "✅ Test coverage meets target (≥70%)"
     else

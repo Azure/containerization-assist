@@ -61,7 +61,7 @@ func main() {
 		if err := json.Unmarshal(scanner.Bytes(), &req); err != nil {
 			continue
 		}
-		
+
 		// Handle tools/call method
 		if req.Method == "tools/call" {
 			params, ok := req.Params.(map[string]interface{})
@@ -69,10 +69,10 @@ func main() {
 				sendError(req.ID, -32602, "Invalid params")
 				continue
 			}
-			
+
 			toolName, _ := params["name"].(string)
 			args, _ := params["arguments"].(map[string]interface{})
-			
+
 			// Simple echo tool
 			if toolName == "echo" {
 				message, _ := args["message"].(string)

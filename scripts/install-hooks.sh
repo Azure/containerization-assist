@@ -1,15 +1,14 @@
 #!/bin/bash
 
-# Install pre-commit hooks for quality checks
+# Install pre-commit hooks for quality checks using pre-commit framework
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-HOOKS_DIR="$ROOT_DIR/.git/hooks"
 
-echo "🪝 Installing quality pre-commit hooks..."
-echo "========================================"
+echo "🪝 Installing pre-commit framework hooks..."
+echo "=========================================="
 
 # Create hooks directory if it doesn't exist
 mkdir -p "$HOOKS_DIR"
@@ -61,14 +60,14 @@ METRICS_OUTPUT=$(go run "$ROOT_DIR/tools/quality-dashboard/main.go" -format json
 if command -v jq &> /dev/null && [ "$METRICS_OUTPUT" != "{}" ]; then
     ERROR_RATE=$(echo "$METRICS_OUTPUT" | jq '.error_handling.adoption_rate // 0')
     COVERAGE=$(echo "$METRICS_OUTPUT" | jq '.test_coverage.overall_coverage // 0')
-    
+
     # Warning thresholds (not blocking)
     if (( $(echo "$ERROR_RATE < 30" | bc -l 2>/dev/null || echo 0) )); then
         echo -e "${YELLOW}⚠️  Warning: Error handling adoption is low (${ERROR_RATE}%)${NC}"
     else
         echo -e "${GREEN}✅ Error handling adoption: ${ERROR_RATE}%${NC}"
     fi
-    
+
     if (( $(echo "$COVERAGE < 40" | bc -l 2>/dev/null || echo 0) )); then
         echo -e "${YELLOW}⚠️  Warning: Test coverage is low (${COVERAGE}%)${NC}"
     else
@@ -86,13 +85,13 @@ if [ -n "$STAGED_GO_FILES" ]; then
     if [ "$FMT_ERRORS" -gt 0 ]; then
         echo -e "${YELLOW}⚠️  Found $FMT_ERRORS new fmt.Errorf calls - consider using RichError${NC}"
     fi
-    
+
     # Check for missing error handling
     UNCHECKED_ERRORS=$(git diff --cached -U0 | grep -E '^\+.*err\s*:=.*' | grep -v 'if err' | wc -l || true)
     if [ "$UNCHECKED_ERRORS" -gt 0 ]; then
         echo -e "${YELLOW}⚠️  Found $UNCHECKED_ERRORS potential unchecked errors${NC}"
     fi
-    
+
     # Run gofmt check
     echo -e "\n${YELLOW}4. Running gofmt...${NC}"
     UNFORMATTED=$(echo "$STAGED_GO_FILES" | xargs gofmt -l 2>/dev/null || true)
@@ -104,7 +103,7 @@ if [ -n "$STAGED_GO_FILES" ]; then
     else
         echo -e "${GREEN}✅ All files are properly formatted${NC}"
     fi
-    
+
     # Run go vet on staged files
     echo -e "\n${YELLOW}5. Running go vet...${NC}"
     if echo "$STAGED_GO_FILES" | xargs go vet 2>&1; then
@@ -176,13 +175,13 @@ METRICS=$(go run "$ROOT_DIR/tools/quality-dashboard/main.go" -format json -outpu
 if [ "$METRICS" != "{}" ] && command -v jq &> /dev/null; then
     ERROR_RATE=$(echo "$METRICS" | jq '.error_handling.adoption_rate // 0')
     INTERFACE_ERRORS=$(go run "$ROOT_DIR/tools/validate-interfaces/main.go" --check-only 2>&1 | grep -c "error" || echo 0)
-    
+
     # Strict checks for push
     if [ "$INTERFACE_ERRORS" -gt 0 ]; then
         echo -e "${RED}❌ Cannot push with interface validation errors${NC}"
         exit 1
     fi
-    
+
     if (( $(echo "$ERROR_RATE < 20" | bc -l 2>/dev/null || echo 0) )); then
         echo -e "${RED}❌ Error handling adoption too low for push (${ERROR_RATE}% < 20%)${NC}"
         echo "Please improve error handling before pushing"

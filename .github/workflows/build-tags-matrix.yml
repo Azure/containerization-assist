@@ -18,37 +18,37 @@ jobs:
           - name: "Core Packages Build"
             packages: "./pkg/core/... ./pkg/pipeline/... ./pkg/docker/... ./pkg/k8s/... ./pkg/kind/... ./pkg/utils/..."
             description: "Build core packages"
-            
+
           # Test MCP server build
           - name: "MCP Server Build"
             packages: "./pkg/mcp/... ./cmd/mcp-server/..."
             description: "Build MCP server components"
-            
+
           # Test CLI build
-          - name: "CLI Build" 
+          - name: "CLI Build"
             packages: "./pkg/ai/... ./cmd/... ./main.go"
             description: "Build CLI components"
-            
+
           # Test remaining packages not covered by other builds
           - name: "Additional Packages Build"
             packages: "./templates/... ./main.go"
             description: "Build remaining packages and main"
-            
+
           # Test integration tests compilation
           - name: "Integration Test Compilation"
             packages: "./test/integration/..."
             description: "Compile integration tests"
             test_only: true
-            
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Go
       uses: actions/setup-go@v5 # v5.5.0
       with:
         go-version: '1.22'
-        
+
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
@@ -56,10 +56,10 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-          
+
     - name: Download dependencies
       run: go mod download
-      
+
     - name: Debug environment for mcp-server build
       run: |
         echo "=== Environment Debug ==="
@@ -76,35 +76,35 @@ jobs:
         echo "Checking specific package:"
         go list -f '{{.ImportPath}} {{.Dir}} {{.Error}}' github.com/Azure/container-copilot/cmd/mcp-server || echo "Package list failed"
         echo "=== End Debug ==="
-      
+
     - name: Build test - ${{ matrix.name }}
       id: build
       run: |
         echo "Testing: ${{ matrix.description }}"
         echo "Packages: ${{ matrix.packages }}"
-        
+
         # Check if this is a test-only build
         if [ "${{ matrix.test_only }}" = "true" ]; then
           echo "Test-only build mode - using go test -c for compilation"
           TEST_SUCCESS=true
-          
+
           for pkg in ${{ matrix.packages }}; do
             # For package paths with wildcards
             if [[ "$pkg" == *"..." ]]; then
               # List all packages matching the pattern
               PKGS=$(go list "$pkg" 2>/dev/null || echo "")
-              
+
               if [ -z "$PKGS" ]; then
                 echo "No packages found for pattern: $pkg"
                 continue
               fi
-              
+
               # Test compile each package
               for p in $PKGS; do
                 echo "Test compiling package: $p"
                 TEST_OUTPUT=$(go test -c -o /dev/null "$p" 2>&1)
                 TEST_EXIT_CODE=$?
-                
+
                 if [ $TEST_EXIT_CODE -eq 0 ]; then
                   echo "✅ Test compilation successful for: $p"
                 else
@@ -118,7 +118,7 @@ jobs:
               echo "Test compiling package: $pkg"
               TEST_OUTPUT=$(go test -c -o /dev/null "$pkg" 2>&1)
               TEST_EXIT_CODE=$?
-              
+
               if [ $TEST_EXIT_CODE -eq 0 ]; then
                 echo "✅ Test compilation successful for: $pkg"
               else
@@ -128,53 +128,53 @@ jobs:
               fi
             fi
           done
-          
+
           if [ "$TEST_SUCCESS" = false ]; then
             echo "Test compilation failed"
             exit 1
           else
             echo "Test compilation succeeded"
           fi
-          
+
         else
           # Normal build mode
           echo "Normal build mode - using go build"
           BUILD_SUCCESS=true
-        
+
         for pkg in ${{ matrix.packages }}; do
           echo "Processing package: $pkg"
-          
+
           # Special handling for main.go
           if [[ "$pkg" == *"main.go" ]]; then
             echo "Building main.go file..."
             go build -v "$pkg" || BUILD_SUCCESS=false
             continue
           fi
-          
+
           # For package paths with wildcards
           if [[ "$pkg" == *"..." ]]; then
             # List all packages matching the pattern
             PKGS=$(go list "$pkg" 2>/dev/null || echo "")
-            
+
             if [ -z "$PKGS" ]; then
               echo "No packages found for pattern: $pkg"
               continue
             fi
-            
+
             # Build each package
             for p in $PKGS; do
               echo "Building package: $p"
               echo "Running command: go build -v \"$p\""
-              
+
               # Capture both stdout and stderr separately
               STDOUT_FILE=$(mktemp)
               STDERR_FILE=$(mktemp)
-              
+
               # Use temp directory for output to avoid naming conflicts
               TEMP_OUTPUT=$(mktemp)
               echo "Temp output file: $TEMP_OUTPUT"
               echo "Building with: go build -o \"$TEMP_OUTPUT\" -v \"$p\""
-              
+
               # Special debugging for mcp-server package
               if [[ "$p" == *"mcp-server"* ]]; then
                 echo "=== Special mcp-server debugging ==="
@@ -186,22 +186,22 @@ jobs:
                 go list -f '{{.Deps}}' "$p" | head -5 || echo "Could not list deps"
                 echo "=== End mcp-server debugging ==="
               fi
-              
+
               # Try the build and capture everything
               go build -o "$TEMP_OUTPUT" -v "$p" > "$STDOUT_FILE" 2> "$STDERR_FILE"
               EXIT_CODE=$?
-              
+
               echo "Build command completed with exit code: $EXIT_CODE"
-              
+
               STDOUT_CONTENT=$(cat "$STDOUT_FILE")
               STDERR_CONTENT=$(cat "$STDERR_FILE")
-              
+
               echo "Build stdout for $p:"
               echo "$STDOUT_CONTENT"
               echo "Build stderr for $p:"
               echo "$STDERR_CONTENT"
               echo "Exit code: $EXIT_CODE"
-              
+
               # If build failed, try without -o flag to get better error message
               if [ $EXIT_CODE -ne 0 ]; then
                 echo "Build with -o flag failed, retrying without -o for better error message..."
@@ -210,29 +210,29 @@ jobs:
                 echo "Retry output:"
                 echo "$RETRY_OUTPUT"
                 echo "Retry exit code: $RETRY_EXIT_CODE"
-                
+
                 # If retry gives us more information, use it
                 if [ -n "$RETRY_OUTPUT" ] && [ ${#RETRY_OUTPUT} -gt ${#STDERR_CONTENT} ]; then
                   STDERR_CONTENT="$RETRY_OUTPUT"
                 fi
               fi
-              
+
               # Cleanup temp files
               rm -f "$STDOUT_FILE" "$STDERR_FILE" "$TEMP_OUTPUT"
-              
+
               # Combine for compatibility with existing logic
               if [ -n "$STDERR_CONTENT" ]; then
                 OUTPUT="$STDOUT_CONTENT"$'\n'"$STDERR_CONTENT"
               else
                 OUTPUT="$STDOUT_CONTENT"
               fi
-              
+
               # Check if it's a test-only package (more robust detection)
               if [[ "$OUTPUT" == *"no non-test Go files"* ]] || [[ "$EXIT_CODE" -ne 0 && "$OUTPUT" == *"no non-test Go files"* ]] || [[ "$EXIT_CODE" -ne 0 && "$p" == *"/test/"* ]]; then
                 echo "Test-only package detected: $p - trying go test -c"
                 TEST_OUTPUT=$(go test -c -o /dev/null "$p" 2>&1)
                 TEST_EXIT_CODE=$?
-                
+
                 if [ $TEST_EXIT_CODE -eq 0 ]; then
                   echo "✅ Test compilation successful for: $p"
                 else
@@ -252,41 +252,41 @@ jobs:
             # Direct package path
             echo "Building package: $pkg"
             echo "Running command: go build -v \"$pkg\""
-            
+
             # Capture both stdout and stderr separately
             STDOUT_FILE=$(mktemp)
             STDERR_FILE=$(mktemp)
-            
+
             # Use temp directory for output to avoid naming conflicts
             TEMP_OUTPUT=$(mktemp)
             go build -o "$TEMP_OUTPUT" -v "$pkg" > "$STDOUT_FILE" 2> "$STDERR_FILE"
             EXIT_CODE=$?
-            
+
             STDOUT_CONTENT=$(cat "$STDOUT_FILE")
             STDERR_CONTENT=$(cat "$STDERR_FILE")
-            
+
             echo "Build stdout for $pkg:"
             echo "$STDOUT_CONTENT"
             echo "Build stderr for $pkg:"
             echo "$STDERR_CONTENT"
             echo "Exit code: $EXIT_CODE"
-            
+
             # Cleanup temp files
             rm -f "$STDOUT_FILE" "$STDERR_FILE" "$TEMP_OUTPUT"
-            
+
             # Combine for compatibility with existing logic
             if [ -n "$STDERR_CONTENT" ]; then
               OUTPUT="$STDOUT_CONTENT"$'\n'"$STDERR_CONTENT"
             else
               OUTPUT="$STDOUT_CONTENT"
             fi
-            
+
             # Check if it's a test-only package
             if [[ "$OUTPUT" == *"no non-test Go files"* ]] || [[ "$EXIT_CODE" -ne 0 && "$OUTPUT" == *"no non-test Go files"* ]]; then
               echo "Test-only package detected: $pkg - trying go test -c"
               TEST_OUTPUT=$(go test -c -o /dev/null "$pkg" 2>&1)
               TEST_EXIT_CODE=$?
-              
+
               if [ $TEST_EXIT_CODE -eq 0 ]; then
                 echo "✅ Test compilation successful for: $pkg"
               else
@@ -304,7 +304,7 @@ jobs:
             fi
           fi
         done
-        
+
           # Check build result
           if [ "$BUILD_SUCCESS" = false ]; then
             echo "Build failed"
@@ -313,38 +313,38 @@ jobs:
             echo "Build succeeded"
           fi
         fi
-        
+
     - name: Test build - ${{ matrix.name }}
       id: test
       run: |
         echo "Running tests for: ${{ matrix.description }}"
-        
+
         # Skip testing if this was a test-only compilation check
         if [ "${{ matrix.test_only }}" = "true" ]; then
           echo "Skipping test execution for test-only compilation check"
           exit 0
         fi
-        
+
         # Run tests for the packages, skipping main.go files
         TEST_SUCCESS=true
-        
+
         for pkg in ${{ matrix.packages }}; do
           # Skip main.go for testing
           if [[ "$pkg" == *"main.go" ]]; then
             echo "Skipping test for main.go file: $pkg"
             continue
           fi
-          
+
           # For package paths with wildcards
           if [[ "$pkg" == *"..." ]]; then
             # List all packages matching the pattern
             PKGS=$(go list "$pkg" 2>/dev/null || echo "")
-            
+
             if [ -z "$PKGS" ]; then
               echo "No packages found for testing pattern: $pkg"
               continue
             fi
-            
+
             # Test each package
             for p in $PKGS; do
               echo "Testing package: $p"
@@ -356,7 +356,7 @@ jobs:
             go test -v "$pkg" || TEST_SUCCESS=false
           fi
         done
-        
+
         if [ "$TEST_SUCCESS" = false ]; then
           echo "Tests failed"
           exit 1

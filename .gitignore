@@ -10,12 +10,13 @@ docs/notes
 *.userosscache
 *.sln.docstates
 .env
+.idea
 .env.copy
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 # Binary files (must be specific to avoid ignoring source files)
 /mcp-server
-/simple-server  
+/simple-server
 /container-kit-mcp
 /container-copilot
 /container-kit
@@ -42,7 +43,7 @@ docs/notes
 
 # Demo binaries
 /demo/cli-tool
-/demo/container-kit-cli  
+/demo/container-kit-cli
 /demo/container-kit-mcp
 /demo/mcp-server
 

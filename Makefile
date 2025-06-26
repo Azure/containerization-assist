@@ -67,6 +67,35 @@ lint-all:
 	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	golangci-lint run ./...
 
+.PHONY: fmt
+fmt:
+	@echo "Running formatters..."
+	@gofmt -s -w .
+	@goimports -w .
+	@go mod tidy
+	@echo "✅ Formatting complete!"
+
+.PHONY: fmt-check
+fmt-check:
+	@echo "Checking formatting..."
+	@unformatted=$$(gofmt -s -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "❌ The following files need formatting:"; \
+		echo "$$unformatted"; \
+		echo ""; \
+		echo "Run 'make fmt' to fix formatting issues"; \
+		exit 1; \
+	fi
+	@echo "✅ All files are properly formatted"
+
+.PHONY: install-hooks
+install-hooks:
+	@./scripts/install-precommit-hooks.sh
+
+.PHONY: pre-commit
+pre-commit:
+	@pre-commit run --all-files
+
 .PHONY: clean
 clean:
 	rm -f container-kit-mcp
@@ -144,6 +173,22 @@ lint-baseline:
 lint-ratchet:
 	@./scripts/lint-ratchet.sh ./pkg/mcp/...
 
+.PHONY: complexity-baseline
+complexity-baseline:
+	@./scripts/complexity-baseline.sh baseline
+
+.PHONY: complexity-check
+complexity-check:
+	@./scripts/complexity-baseline.sh check
+
+.PHONY: complexity-report
+complexity-report:
+	@./scripts/complexity-baseline.sh report
+
+.PHONY: complexity-top
+complexity-top:
+	@./scripts/complexity-baseline.sh top
+
 # Team D: Infrastructure & Quality targets
 .PHONY: validate-structure
 validate-structure:
@@ -197,10 +242,23 @@ help:
 	@echo "  bench             Run performance benchmarks (target: <300μs P95)"
 	@echo "  bench-baseline    Create performance baseline"
 	@echo ""
+	@echo "Code quality targets:"
+	@echo "  fmt               Format all Go code"
+	@echo "  fmt-check         Check if code is formatted"
+	@echo "  install-hooks     Install pre-commit hooks"
+	@echo "  pre-commit        Run pre-commit checks manually"
+	@echo ""
 	@echo "Linting targets:"
 	@echo "  lint              Run linting with error budget (threshold: 100 issues)"
 	@echo "  lint-strict       Run linting in strict mode (shows all issues)"
 	@echo "  lint-report       Generate detailed lint report"
+	@echo "  lint-ratchet      Ensure lint issues don't increase"
+	@echo ""
+	@echo "Complexity targets:"
+	@echo "  complexity-baseline  Set current complexity as baseline"
+	@echo "  complexity-check     Check if complexity improved"
+	@echo "  complexity-report    Show complex functions"
+	@echo "  complexity-top       Show most complex functions"
 	@echo "  lint-baseline     Set current issue count as baseline"
 	@echo "  lint-ratchet      Ensure issues don't increase from baseline"
 	@echo "  lint-all          Run linting on all packages (strict mode)"
