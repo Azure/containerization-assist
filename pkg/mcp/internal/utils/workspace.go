@@ -141,20 +141,40 @@ func (wm *WorkspaceManager) CloneRepository(ctx context.Context, sessionID, repo
 
 // ValidateLocalPath validates and sanitizes a local path
 func (wm *WorkspaceManager) ValidateLocalPath(ctx context.Context, path string) error {
-	// Convert to absolute path
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return types.NewRichError("PATH_RESOLUTION_FAILED", fmt.Sprintf("failed to resolve absolute path: %v", err), "filesystem_error")
+	// Check for empty path first
+	if path == "" {
+		return types.NewRichError("EMPTY_PATH", "path cannot be empty", "validation_error")
+	}
+
+	// Convert to absolute path - relative paths are relative to workspace base directory
+	var absPath string
+	if filepath.IsAbs(path) {
+		absPath = path
+	} else {
+		absPath = filepath.Join(wm.baseDir, path)
+	}
+
+	// Check for absolute paths outside workspace
+	if filepath.IsAbs(path) && !strings.HasPrefix(absPath, wm.baseDir) {
+		return types.NewRichError("ABSOLUTE_PATH_BLOCKED", "absolute paths not allowed outside workspace", "security_error")
+	}
+
+	// Check for path traversal attempts (before conversion to absolute path)
+	if strings.Contains(path, "..") {
+		return types.NewRichError("PATH_TRAVERSAL_BLOCKED", "path traversal not allowed", "security_error")
+	}
+
+	// Check for hidden files - check each path component
+	pathComponents := strings.Split(path, string(filepath.Separator))
+	for _, component := range pathComponents {
+		if component != "" && strings.HasPrefix(component, ".") && component != "." && component != ".." {
+			return types.NewRichError("HIDDEN_FILES_BLOCKED", "hidden files not allowed", "security_error")
+		}
 	}
 
 	// Check if path exists
 	if _, err := os.Stat(absPath); err != nil {
 		return types.NewRichError("PATH_NOT_FOUND", fmt.Sprintf("path does not exist: %s", absPath), "filesystem_error")
-	}
-
-	// Check for path traversal attempts
-	if strings.Contains(absPath, "..") {
-		return types.NewRichError("PATH_TRAVERSAL_BLOCKED", fmt.Sprintf("path traversal not allowed: %s", absPath), "security_error")
 	}
 
 	// Additional security checks can be added here
@@ -219,6 +239,15 @@ func (wm *WorkspaceManager) CheckQuota(sessionID string, additionalBytes int64) 
 // UpdateDiskUsage calculates and updates disk usage for a session
 func (wm *WorkspaceManager) UpdateDiskUsage(ctx context.Context, sessionID string) error {
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
+
+	// Check if directory exists
+	if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
+		// Directory doesn't exist, set usage to 0
+		wm.mutex.Lock()
+		wm.diskUsage[sessionID] = 0
+		wm.mutex.Unlock()
+		return nil
+	}
 
 	var totalSize int64
 	err := filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {

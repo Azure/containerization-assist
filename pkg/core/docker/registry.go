@@ -380,8 +380,8 @@ func (rm *RegistryManager) extractRegistry(imageRef string) string {
 		return "docker.io" // Default registry
 	}
 
-	// Check if first part looks like a registry (contains dots)
-	if strings.Contains(parts[0], ".") {
+	// Check if first part looks like a registry (contains dots or is localhost with port)
+	if strings.Contains(parts[0], ".") || strings.HasPrefix(parts[0], "localhost:") {
 		return parts[0]
 	}
 

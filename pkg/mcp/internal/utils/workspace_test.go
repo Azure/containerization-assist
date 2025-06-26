@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -225,8 +226,14 @@ func TestWorkspaceManager_ValidateLocalPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a simplified validation function for testing
-			err := validateLocalPath(tt.path, tempDir)
+			// Create workspace manager for testing
+			wm := &WorkspaceManager{
+				baseDir:   tempDir,
+				logger:    zerolog.Nop(),
+				diskUsage: make(map[string]int64),
+			}
+
+			err := wm.ValidateLocalPath(context.Background(), tt.path)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -360,7 +367,7 @@ func TestWorkspaceManager_UpdateDiskUsage(t *testing.T) {
 			}
 
 			// Run the test
-			err := wm.UpdateDiskUsage(tt.sessionID)
+			err := wm.UpdateDiskUsage(context.Background(), tt.sessionID)
 
 			if tt.expectError {
 				assert.Error(t, err)
