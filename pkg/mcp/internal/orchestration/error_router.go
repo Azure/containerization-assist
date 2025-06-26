@@ -151,6 +151,9 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 	er.recoveryManager.InitializeDefaultStrategies()
 	er.retryManager.InitializeDefaultPolicies()
 
+	// Initialize Sprint A enhanced cross-tool escalation rules
+	er.InitializeSprintAEscalationRules()
+
 	// Default rules for common error types
 
 	// Fatal errors - immediate failure with no retry
