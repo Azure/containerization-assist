@@ -327,6 +327,7 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 	}
 
 	// Now create GoMCP handlers that delegate to the orchestrator
+	// Most tools can use the orchestrator delegation (no array schema issues)
 	toolDescriptions := map[string]string{
 		"analyze_repository":  "Analyze a repository to detect language, framework, and containerization requirements",
 		"build_image":         "Build a Docker image from the analyzed repository using generated Dockerfile",
@@ -336,8 +337,8 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 		"tag_image":           "Tag a Docker image with a new name or reference",
 		"scan_image_security": "Scan Docker images for security vulnerabilities using Trivy",
 		"scan_secrets":        "Scan source code and configuration files for exposed secrets",
-		"generate_manifests":  "Generate Kubernetes manifests for the containerized application",
-		"push_image":          "Push the built Docker image to a container registry",
+		// NOTE: generate_manifests removed from here - registered separately with fixed schema
+		"push_image": "Push the built Docker image to a container registry",
 	}
 
 	// Register GoMCP handlers that delegate to orchestrator
@@ -366,6 +367,21 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 			}
 
 			return nil, fmt.Errorf("unexpected result type from deploy_kubernetes_atomic: %T", result)
+		})
+
+	// Register tools with array schema issues using runtime.RegisterSimpleTool (uses our fixed schema generator)
+	runtime.RegisterSimpleTool(registrar, "generate_manifests",
+		"Generate Kubernetes manifests for the containerized application",
+		func(ctx *gomcpserver.Context, args *deploy.AtomicGenerateManifestsArgs) (*deploy.AtomicGenerateManifestsResult, error) {
+			goCtx := context.WithValue(context.Background(), "mcp_context", ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests_atomic", *args, nil)
+			if err != nil {
+				return nil, err
+			}
+			if manifestsResult, ok := result.(*deploy.AtomicGenerateManifestsResult); ok {
+				return manifestsResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from generate_manifests_atomic: %T", result)
 		})
 
 	return nil

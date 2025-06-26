@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-copilot/pkg/mcp/types"
-	"github.com/alecthomas/jsonschema"
+	"github.com/localrivet/gomcp/util/schema"
 	"github.com/rs/zerolog"
 )
 
@@ -74,23 +74,34 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
 	}
 
-	reflector := jsonschema.Reflector{
-		RequiredFromJSONSchemaTags: true, // respects `jsonschema:",required"`
-		AllowAdditionalProperties:  false,
-		DoNotReference:             true, // no "$ref" / "$defs"
-	}
+	// Use GoMCP's built-in schema generator
+	gomcpGenerator := schema.NewGenerator()
 	var a TArgs
 	var r TResult
 
-	// Generate schemas using reflector
-	inputSchema := reflector.Reflect(a)
-	outputSchema := reflector.Reflect(r)
+	// Generate schemas using GoMCP's generator
+	inputSchema, err := gomcpGenerator.GenerateSchema(a)
+	if err != nil {
+		return types.NewRichError("SCHEMA_GENERATION_ERROR", fmt.Sprintf("failed to generate input schema for %s: %v", metadata.Name, err), "internal_error")
+	}
 
-	inputSchema.Version = ""  // drop $schema
-	outputSchema.Version = "" // drop $schema
+	outputSchema, err := gomcpGenerator.GenerateSchema(r)
+	if err != nil {
+		return types.NewRichError("SCHEMA_GENERATION_ERROR", fmt.Sprintf("failed to generate output schema for %s: %v", metadata.Name, err), "internal_error")
+	}
 
-	cleanInput := sanitizeSchema(inputSchema)
-	cleanOutput := sanitizeSchema(outputSchema)
+	// Convert to JSON and back to get map[string]interface{} format
+	inputSchemaMap := convertGoMCPSchemaToMap(inputSchema)
+	outputSchemaMap := convertGoMCPSchemaToMap(outputSchema)
+
+	// Apply post-processing fixes for array items and GitHub Copilot compatibility
+	utils.AddMissingArrayItems(inputSchemaMap)
+	utils.AddMissingArrayItems(outputSchemaMap)
+	utils.RemoveCopilotIncompatible(inputSchemaMap)
+	utils.RemoveCopilotIncompatible(outputSchemaMap)
+
+	cleanInput := inputSchemaMap
+	cleanOutput := outputSchemaMap
 
 	reg.tools[metadata.Name] = &ToolRegistration{
 		Tool:         t,
@@ -115,23 +126,59 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	return nil
 }
 
-// sanitizeSchema converts a *jsonschema.Schema to map[string]any and removes
-// every keyword Copilot's AJV-Draft-07 validator chokes on.
-func sanitizeSchema(raw *jsonschema.Schema) map[string]any {
-	// 1. Marshal + unmarshal once so we can walk the structure.
-	b, err := json.Marshal(raw)
-	if err != nil {
-		// Return empty map if marshaling fails
-		return make(map[string]any)
-	}
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
-		// Return empty map if unmarshaling fails
-		return make(map[string]any)
+// convertGoMCPSchemaToMap converts GoMCP's schema format to standard JSON Schema map format
+func convertGoMCPSchemaToMap(gomcpSchema map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Copy most fields directly
+	for key, value := range gomcpSchema {
+		if key == "properties" {
+			// Convert PropertyDetail map to standard interface{} map
+			if propDetails, ok := value.(map[string]schema.PropertyDetail); ok {
+				convertedProps := make(map[string]interface{})
+				for propName, detail := range propDetails {
+					propMap := map[string]interface{}{
+						"type": detail.Type,
+					}
+					if detail.Description != "" {
+						propMap["description"] = detail.Description
+					}
+					if len(detail.Enum) > 0 {
+						propMap["enum"] = detail.Enum
+					}
+					if detail.Format != "" {
+						propMap["format"] = detail.Format
+					}
+					if detail.Minimum != nil {
+						propMap["minimum"] = *detail.Minimum
+					}
+					if detail.Maximum != nil {
+						propMap["maximum"] = *detail.Maximum
+					}
+					if detail.MinLength != nil {
+						propMap["minLength"] = *detail.MinLength
+					}
+					if detail.MaxLength != nil {
+						propMap["maxLength"] = *detail.MaxLength
+					}
+					if detail.Pattern != "" {
+						propMap["pattern"] = detail.Pattern
+					}
+					if detail.Default != nil {
+						propMap["default"] = detail.Default
+					}
+					convertedProps[propName] = propMap
+				}
+				result[key] = convertedProps
+			} else {
+				result[key] = value
+			}
+		} else {
+			result[key] = value
+		}
 	}
 
-	utils.RemoveCopilotIncompatible(m)
-	return m
+	return result
 }
 
 ///////////////////////////////////////////////////////////////////////////////

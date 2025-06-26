@@ -1,5 +1,35 @@
 package utils
 
+// AddMissingArrayItems recursively adds missing "items" fields for arrays
+// that don't have them, which is required by MCP validation.
+// It safely handles nested objects, arrays, and various JSON schema structures.
+func AddMissingArrayItems(schema map[string]interface{}) {
+	// Recursively process all map values
+	for _, value := range schema {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			// Check if this is an array type definition without items
+			if v["type"] == "array" {
+				if _, hasItems := v["items"]; !hasItems {
+					// Add default string items for array types
+					// This is safe for most MCP array use cases
+					v["items"] = map[string]interface{}{"type": "string"}
+				}
+			}
+			// Recursively process nested objects (like "properties", "definitions", etc.)
+			AddMissingArrayItems(v)
+
+		case []interface{}:
+			// Handle arrays of schema objects (like in "oneOf", "anyOf", etc.)
+			for _, elem := range v {
+				if m, ok := elem.(map[string]interface{}); ok {
+					AddMissingArrayItems(m)
+				}
+			}
+		}
+	}
+}
+
 // RemoveCopilotIncompatible recursively strips meta-schema fields that
 // Copilot's AJV-Draft-7 validator cannot handle.
 func RemoveCopilotIncompatible(node map[string]any) {
