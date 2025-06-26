@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sync"
@@ -9,6 +10,7 @@ import (
 	"github.com/Azure/container-copilot/pkg/mcp/internal/build"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-copilot/pkg/mcp/internal/scan"
+	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"
 )
 
@@ -40,8 +42,9 @@ func NewMCPToolRegistry(logger zerolog.Logger) *MCPToolRegistry {
 		logger:   logger.With().Str("component", "tool_registry").Logger(),
 	}
 
-	// Register all atomic tools
-	registry.registerAtomicTools()
+	// Don't auto-register tools here - they should be registered with proper dependencies
+	// by the code that creates them (e.g., gomcp_tools.go)
+	// registry.registerAtomicTools()
 
 	return registry
 }
@@ -370,40 +373,40 @@ func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface
 	}
 
 	// Analyze method parameters
-	params := make(map[string]interface{})
 	methodType := executeMethod.Type
 
 	if methodType.NumIn() >= 3 { // receiver, context, args
 		argsType := methodType.In(2)
-		if argsType.Kind() == reflect.Struct {
-			params["args_type"] = argsType.Name()
-
-			// Extract field information
-			fields := make(map[string]interface{})
-			for i := 0; i < argsType.NumField(); i++ {
-				field := argsType.Field(i)
-				if field.IsExported() {
-					fieldInfo := map[string]interface{}{
-						"type":     field.Type.String(),
-						"required": !field.Anonymous,
-					}
-
-					// Extract JSON tags for additional metadata
-					if jsonTag := field.Tag.Get("json"); jsonTag != "" {
-						fieldInfo["json_name"] = jsonTag
-					}
-					if descTag := field.Tag.Get("description"); descTag != "" {
-						fieldInfo["description"] = descTag
-					}
-
-					fields[field.Name] = fieldInfo
-				}
-			}
-			params["fields"] = fields
+		
+		// Use invopop/jsonschema to generate proper JSON schema
+		reflector := &jsonschema.Reflector{
+			RequiredFromJSONSchemaTags: true,
+			AllowAdditionalProperties:  false,
+			DoNotReference:             true,
 		}
+		
+		schema := reflector.Reflect(argsType)
+		
+		// Convert to map
+		schemaJSON, err := json.Marshal(schema)
+		if err != nil {
+			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to marshal schema")
+			return map[string]interface{}{}
+		}
+		
+		var schemaMap map[string]interface{}
+		if err := json.Unmarshal(schemaJSON, &schemaMap); err != nil {
+			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to unmarshal schema")
+			return map[string]interface{}{}
+		}
+		
+		// Sanitize the schema to ensure array types have items
+		r.sanitizeInvopopSchema(schemaMap)
+		
+		return schemaMap
 	}
 
-	return params
+	return map[string]interface{}{}
 }
 
 func (r *MCPToolRegistry) inferOutputSchema(tool interface{}) map[string]interface{} {
@@ -428,7 +431,6 @@ func (r *MCPToolRegistry) inferOutputSchema(tool interface{}) map[string]interfa
 	}
 
 	// Analyze method return types
-	schema := make(map[string]interface{})
 	methodType := executeMethod.Type
 
 	if methodType.NumOut() >= 1 {
@@ -437,22 +439,35 @@ func (r *MCPToolRegistry) inferOutputSchema(tool interface{}) map[string]interfa
 			returnType = returnType.Elem()
 		}
 
-		if returnType.Kind() == reflect.Struct {
-			schema["result_type"] = returnType.Name()
-
-			// Extract field information
-			fields := make(map[string]interface{})
-			for i := 0; i < returnType.NumField(); i++ {
-				field := returnType.Field(i)
-				if field.IsExported() {
-					fields[field.Name] = field.Type.String()
-				}
-			}
-			schema["fields"] = fields
+		// Use invopop/jsonschema to generate proper JSON schema
+		reflector := &jsonschema.Reflector{
+			RequiredFromJSONSchemaTags: true,
+			AllowAdditionalProperties:  false,
+			DoNotReference:             true,
 		}
+		
+		schema := reflector.Reflect(returnType)
+		
+		// Convert to map
+		schemaJSON, err := json.Marshal(schema)
+		if err != nil {
+			r.logger.Error().Err(err).Str("type", returnType.Name()).Msg("Failed to marshal output schema")
+			return map[string]interface{}{}
+		}
+		
+		var schemaMap map[string]interface{}
+		if err := json.Unmarshal(schemaJSON, &schemaMap); err != nil {
+			r.logger.Error().Err(err).Str("type", returnType.Name()).Msg("Failed to unmarshal output schema")
+			return map[string]interface{}{}
+		}
+		
+		// Sanitize the schema to ensure array types have items
+		r.sanitizeInvopopSchema(schemaMap)
+		
+		return schemaMap
 	}
 
-	return schema
+	return map[string]interface{}{}
 }
 
 func (r *MCPToolRegistry) generateExamples(name string) []ToolExample {
@@ -503,5 +518,44 @@ func (r *MCPToolRegistry) generateExamples(name string) []ToolExample {
 			Input:       map[string]interface{}{"session_id": "example-session"},
 			Output:      map[string]interface{}{"success": true},
 		},
+	}
+}
+
+// sanitizeInvopopSchema ensures that all array types have an "items" property
+func (r *MCPToolRegistry) sanitizeInvopopSchema(schema map[string]interface{}) {
+	if schema == nil {
+		return
+	}
+
+	// Check if this is an array type that needs items
+	if schemaType, ok := schema["type"].(string); ok && schemaType == "array" {
+		if _, hasItems := schema["items"]; !hasItems {
+			// Default to string items if not specified
+			schema["items"] = map[string]interface{}{
+				"type": "string",
+			}
+			r.logger.Warn().
+				Str("schema_type", "array").
+				Msg("Added missing items property to array schema")
+		}
+	}
+
+	// Recursively check properties
+	if properties, ok := schema["properties"].(map[string]interface{}); ok {
+		for _, propValue := range properties {
+			if propSchema, ok := propValue.(map[string]interface{}); ok {
+				r.sanitizeInvopopSchema(propSchema)
+			}
+		}
+	}
+
+	// Check items if this is an array
+	if items, ok := schema["items"].(map[string]interface{}); ok {
+		r.sanitizeInvopopSchema(items)
+	}
+
+	// Check additional properties
+	if additionalProps, ok := schema["additionalProperties"].(map[string]interface{}); ok {
+		r.sanitizeInvopopSchema(additionalProps)
 	}
 }
