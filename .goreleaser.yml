@@ -1,0 +1,120 @@
+# .goreleaser.yml
+# Build configuration for container-kit
+
+version: 2
+
+project_name: container-kit
+
+before:
+  hooks:
+    # Ensure module download and verify
+    - go mod download
+    - go mod verify
+
+builds:
+  - id: container-kit
+    main: ./main.go
+    binary: container-kit
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Skip unsupported combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE*
+      - README.md
+      - docs/quickstart.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+  groups:
+    - title: '🚀 Features'
+      regexp: '^feat'
+    - title: '🐛 Bug Fixes'
+      regexp: '^fix'
+    - title: '🔨 Refactoring'
+      regexp: '^refactor'
+    - title: '⚡ Performance Improvements'
+      regexp: '^perf'
+    - title: '🔐 Security'
+      regexp: '^security'
+    - title: 'Other Changes'
+      order: 999
+
+release:
+  github:
+    owner: Azure
+    name: container-kit
+
+  # Release notes template
+  header: |
+    ## Container Kit {{ .Tag }}
+
+    Welcome to Container Kit {{ .Tag }}! This release includes several improvements and bug fixes.
+
+    ### Installation
+
+    #### Quick Install (Linux/macOS)
+    ```bash
+    curl -sSL https://raw.githubusercontent.com/Azure/container-kit/main/scripts/install.sh | bash
+    ```
+
+    #### Manual Download
+    Download the appropriate binary for your platform from the assets below.
+
+  footer: |
+    ## Thanks!
+
+    Thanks to all contributors who made this release possible!
+
+    **Full Changelog**: https://github.com/Azure/container-kit/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+  # Announce releases
+  announce:
+    enabled: false
+
+  # Set draft to true for manual review before publishing
+  draft: false
+
+  # Automatically close milestone with matching name
+  milestone:
+    close: true
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+# GitHub Action specific configuration
+github_urls:
+  download: https://github.com
+
+metadata:
+  mod_timestamp: '{{ .CommitTimestamp }}'

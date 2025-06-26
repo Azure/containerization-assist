@@ -6,9 +6,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
+
+// getIntFromMap safely extracts an int value from a map with JSON number conversion support
+func getIntFromMap(m map[string]interface{}, key string) int {
+	// Try direct int first
+	if val, ok := genericutils.MapGet[int](m, key); ok {
+		return val
+	}
+	// Try float64 (common in JSON)
+	if val, ok := genericutils.MapGet[float64](m, key); ok {
+		return int(val)
+	}
+	// Try int64
+	if val, ok := genericutils.MapGet[int64](m, key); ok {
+		return int(val)
+	}
+	return 0
+}
 
 // handleBuildStage handles the Docker image build stage
 func (pm *PromptManager) handleBuildStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
@@ -119,9 +137,9 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 
 	// Format preview
 	details, _ := result.(map[string]interface{})
-	layers := publicutils.GetIntFromMap(details, "estimated_layers")
-	size := int64(publicutils.GetIntFromMap(details, "estimated_size"))
-	baseImage := publicutils.GetStringFromMap(details, "base_image")
+	layers := getIntFromMap(details, "estimated_layers")
+	size := int64(getIntFromMap(details, "estimated_size"))
+	baseImage := genericutils.MapGetWithDefault[string](details, "base_image", "")
 
 	response.Message = fmt.Sprintf(
 		"Build Preview:\n"+
@@ -249,7 +267,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 			"- Build time: %s\n\n"+
 			"Would you like to push this image to a registry?",
 		imageTag,
-		publicutils.FormatBytes(int64(publicutils.GetIntFromMap(details, "size"))),
+		publicutils.FormatBytes(int64(getIntFromMap(details, "size"))),
 		duration.Round(time.Second))
 
 	response.Options = []Option{

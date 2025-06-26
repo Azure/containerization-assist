@@ -1,0 +1,334 @@
+name: Code Quality & Linting
+
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.golangci.yml'
+      - '.github/lint-thresholds.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/lint-thresholds.json'
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  # Quick format and quality checks for PRs
+  format-and-quality:
+    if: github.event_name == 'pull_request'
+    name: Format & Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Check formatting
+      run: |
+        # Check gofmt
+        unformatted=$(gofmt -s -l .)
+        if [ -n "$unformatted" ]; then
+          echo "⚠️ The following files need formatting:"
+          echo "$unformatted"
+          echo ""
+          echo "Run 'make fmt' to fix formatting issues"
+          echo "::warning::Files need formatting: $unformatted"
+        else
+          echo "✅ All files are properly formatted"
+        fi
+
+        # Check goimports
+        if command -v goimports >/dev/null 2>&1; then
+          goimports_output=$(goimports -l .)
+          if [ -n "$goimports_output" ]; then
+            echo "⚠️ The following files need import formatting:"
+            echo "$goimports_output"
+            echo "::warning::Files need import formatting: $goimports_output"
+          else
+            echo "✅ All imports are properly formatted"
+          fi
+        fi
+
+    - name: Technical debt tracking
+      run: |
+        # Count TODO/HACK/FIXME comments in changed files
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # Get list of changed Go files
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD | grep '\.go$' || true)
+          
+          if [ -n "$changed_files" ]; then
+            # Count technical debt comments in changed files
+            debt_count=$(echo "$changed_files" | xargs grep -l 'TODO\|HACK\|FIXME' | wc -l)
+            total_debt=$(echo "$changed_files" | xargs grep -c 'TODO\|HACK\|FIXME' | awk '{sum+=$1} END {print sum+0}')
+            
+            echo "Technical debt in changed files: $total_debt comments in $debt_count files"
+            
+            if [ "$total_debt" -gt 10 ]; then
+              echo "❌ Too many technical debt comments added ($total_debt > 10)"
+              echo "::error::Reduce technical debt comments to 10 or fewer"
+              exit 1
+            elif [ "$total_debt" -gt 5 ]; then
+              echo "⚠️ Warning: $total_debt technical debt comments added"
+              echo "::warning::Consider reducing technical debt"
+            else
+              echo "✅ Technical debt within acceptable limits"
+            fi
+          fi
+        fi
+
+    - name: Complexity check
+      run: |
+        # Install gocyclo for complexity checking
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+        
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # Get changed Go files
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD | grep '\.go$' || true)
+          
+          if [ -n "$changed_files" ]; then
+            # Check complexity of changed files
+            high_complexity=$(echo "$changed_files" | xargs gocyclo -over 25 2>/dev/null || true)
+            medium_complexity=$(echo "$changed_files" | xargs gocyclo -over 20 2>/dev/null | grep -v "cyclomatic complexity 2[6-9]\|3[0-9]" || true)
+            
+            if [ -n "$high_complexity" ]; then
+              echo "❌ High complexity functions found:"
+              echo "$high_complexity"
+              echo "::error::Reduce cyclomatic complexity to 25 or below"
+              exit 1
+            elif [ -n "$medium_complexity" ]; then
+              echo "⚠️ Medium complexity functions found:"
+              echo "$medium_complexity"
+              echo "::warning::Consider reducing complexity below 20"
+            else
+              echo "✅ Code complexity within acceptable limits"
+            fi
+          fi
+        fi
+
+  # Comprehensive linting with budgets
+  lint-comprehensive:
+    name: Comprehensive Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+        sudo apt-get update && sudo apt-get install -y jq bc
+
+    - name: Load thresholds
+      id: thresholds
+      run: |
+        if [ -f .github/lint-thresholds.json ]; then
+          echo "mcp_error=$(jq -r '.thresholds.mcp.error' .github/lint-thresholds.json)" >> $GITHUB_OUTPUT
+          echo "mcp_warning=$(jq -r '.thresholds.mcp.warning' .github/lint-thresholds.json)" >> $GITHUB_OUTPUT
+          echo "core_error=$(jq -r '.thresholds.core.error' .github/lint-thresholds.json)" >> $GITHUB_OUTPUT
+          echo "core_warning=$(jq -r '.thresholds.core.warning' .github/lint-thresholds.json)" >> $GITHUB_OUTPUT
+        else
+          # Fallback defaults
+          echo "mcp_error=100" >> $GITHUB_OUTPUT
+          echo "mcp_warning=50" >> $GITHUB_OUTPUT
+          echo "core_error=50" >> $GITHUB_OUTPUT
+          echo "core_warning=30" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run comprehensive lint analysis
+      run: |
+        mkdir -p lint-reports
+        
+        # Function to analyze package group
+        analyze_package() {
+          local name=$1
+          local packages=$2
+          local error_threshold=$3
+          local warning_threshold=$4
+          local output="lint-reports/${name}.json"
+
+          echo "Analyzing $name packages: $packages"
+          golangci-lint run --out-format json --timeout=10m $packages > "$output" || true
+
+          # Generate statistics
+          local error_count=$(jq '[.Issues[] | select(.Severity == "error")] | length' "$output" 2>/dev/null || echo "0")
+          local warning_count=$(jq '[.Issues[] | select(.Severity == "warning")] | length' "$output" 2>/dev/null || echo "0")
+          local total_count=$(jq '.Issues | length' "$output" 2>/dev/null || echo "0")
+
+          echo "${name}_errors=$error_count" >> lint-stats.txt
+          echo "${name}_warnings=$warning_count" >> lint-stats.txt
+          echo "${name}_total=$total_count" >> lint-stats.txt
+
+          # Determine status
+          local status="✅ OK"
+          if [ $error_count -gt $error_threshold ]; then
+            status="❌ Over Error Limit"
+          elif [ $warning_count -gt $warning_threshold ]; then
+            status="⚠️ Over Warning Limit"  
+          fi
+
+          # Generate report section
+          echo "### $name Packages" >> lint-report.md
+          echo "**Errors:** $error_count (limit: $error_threshold) | **Warnings:** $warning_count (limit: $warning_threshold) | **Status:** $status" >> lint-report.md
+          echo "" >> lint-report.md
+
+          if [ $total_count -gt 0 ]; then
+            echo "#### By Linter" >> lint-report.md
+            jq -r '.Issues | group_by(.FromLinter) | map("- \(.[0].FromLinter): \(length)") | .[]' "$output" >> lint-report.md
+            echo "" >> lint-report.md
+          fi
+        }
+
+        # Initialize report
+        echo "# Lint Report - $(date +%Y-%m-%d)" > lint-report.md
+        echo "" >> lint-report.md
+
+        # Run analysis for each package group
+        analyze_package "MCP" "./pkg/mcp/..." ${{ steps.thresholds.outputs.mcp_error }} ${{ steps.thresholds.outputs.mcp_warning }}
+        analyze_package "Core" "./pkg/core/... ./pkg/pipeline/... ./pkg/utils/..." ${{ steps.thresholds.outputs.core_error }} ${{ steps.thresholds.outputs.core_warning }}
+        analyze_package "CLI" "./pkg/ai/... ./cmd/..." 50 30
+
+        # Load statistics for summary
+        source lint-stats.txt
+
+        # Check for budget violations
+        BUDGET_VIOLATIONS=""
+        if [ $MCP_errors -gt ${{ steps.thresholds.outputs.mcp_error }} ]; then
+          BUDGET_VIOLATIONS="$BUDGET_VIOLATIONS\n- MCP: $MCP_errors errors (limit: ${{ steps.thresholds.outputs.mcp_error }})"
+        fi
+        if [ $Core_errors -gt ${{ steps.thresholds.outputs.core_error }} ]; then
+          BUDGET_VIOLATIONS="$BUDGET_VIOLATIONS\n- Core: $Core_errors errors (limit: ${{ steps.thresholds.outputs.core_error }})"
+        fi
+
+        echo "budget_violations=$BUDGET_VIOLATIONS" >> $GITHUB_OUTPUT
+
+        # Add summary
+        echo "## Summary" >> lint-report.md
+        echo "" >> lint-report.md
+        echo "| Package Group | Errors | Warnings | Status |" >> lint-report.md
+        echo "|---------------|--------|----------|--------|" >> lint-report.md
+        echo "| MCP | $MCP_errors | $MCP_warnings | $([ $MCP_errors -gt ${{ steps.thresholds.outputs.mcp_error }} ] && echo "❌ Over Error" || echo "✅ OK") |" >> lint-report.md
+        echo "| Core | $Core_errors | $Core_warnings | $([ $Core_errors -gt ${{ steps.thresholds.outputs.core_error }} ] && echo "❌ Over Error" || echo "✅ OK") |" >> lint-report.md
+        echo "| CLI | $CLI_errors | $CLI_warnings | $([ $CLI_errors -gt 50 ] && echo "❌ Over Error" || echo "✅ OK") |" >> lint-report.md
+
+        # Fail if over error budgets
+        if [ -n "$BUDGET_VIOLATIONS" ] && [ "$BUDGET_VIOLATIONS" != "" ]; then
+          echo "❌ Error budget violations found"
+          echo -e "$BUDGET_VIOLATIONS"
+          exit 1
+        fi
+      id: lint_analysis
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('lint-report.md', 'utf8');
+          
+          // Look for existing lint comments to replace
+          const comments = await github.rest.issues.listComments({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+          });
+
+          const existingComment = comments.data.find(comment =>
+            comment.body.includes('# Lint Report') && 
+            comment.user.type === 'Bot'
+          );
+
+          const commentBody = `${report}\n\n---\n*Updated automatically by Code Quality workflow*`;
+
+          if (existingComment) {
+            await github.rest.issues.updateComment({
+              comment_id: existingComment.id,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+          } else {
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+          }
+
+    - name: Create issue if over threshold (scheduled runs)
+      if: github.event_name == 'schedule' && steps.lint_analysis.outputs.budget_violations != ''
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('lint-report.md', 'utf8');
+
+          // Check if there's already an open issue
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: 'lint-budget-exceeded',
+            state: 'open'
+          });
+
+          if (issues.data.length === 0) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Lint Error Budget Exceeded',
+              body: report + '\n\n---\n\nThis issue was automatically created because lint errors exceed the configured thresholds.',
+              labels: ['lint-budget-exceeded', 'technical-debt']
+            });
+          }
+
+    - name: Upload lint reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: lint-reports
+        path: lint-reports/
+        retention-days: 30
+
+    - name: Update baseline (on main branch)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        source lint-stats.txt
+        echo "{
+          \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+          \"counts\": {
+            \"mcp_errors\": $MCP_errors,
+            \"mcp_warnings\": $MCP_warnings,
+            \"core_errors\": $Core_errors,
+            \"core_warnings\": $Core_warnings,
+            \"cli_errors\": $CLI_errors,
+            \"cli_warnings\": $CLI_warnings
+          }
+        }" > .lint-baseline.json
+
+        if ! git diff --quiet .lint-baseline.json; then
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .lint-baseline.json
+          git commit -m "chore: update lint baseline [skip ci]"
+          git push
+        fi

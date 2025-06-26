@@ -1,0 +1,117 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scanning
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Install Trivy
+      run: |
+        sudo apt-get update
+        sudo apt-get install wget apt-transport-https gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update
+        sudo apt-get install trivy
+
+    - name: Install GitLeaks
+      run: |
+        wget https://github.com/zricethezav/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz
+        tar -xzf gitleaks_8.18.0_linux_x64.tar.gz
+        sudo mv gitleaks /usr/local/bin/
+
+    - name: Run Secret Scanning with GitLeaks
+      run: |
+        gitleaks detect --source . --format json --report-path gitleaks-report.json --verbose || true
+      continue-on-error: true
+
+    - name: Check GitLeaks Results
+      run: |
+        if [ -f gitleaks-report.json ]; then
+          CRITICAL_COUNT=$(jq '[.[] | select(.RuleID | contains("aws") or contains("github") or contains("stripe"))] | length' gitleaks-report.json 2>/dev/null || echo "0")
+          HIGH_COUNT=$(jq '[.[] | select(.RuleID | contains("api") or contains("token"))] | length' gitleaks-report.json 2>/dev/null || echo "0")
+          TOTAL_COUNT=$(jq 'length' gitleaks-report.json 2>/dev/null || echo "0")
+
+          echo "Security Scan Results:"
+          echo "- Critical secrets: $CRITICAL_COUNT"
+          echo "- High-risk secrets: $HIGH_COUNT"
+          echo "- Total secrets found: $TOTAL_COUNT"
+
+          if [ "$CRITICAL_COUNT" -gt "0" ]; then
+            echo "❌ CRITICAL: Found $CRITICAL_COUNT critical secrets!"
+            echo "Critical secrets found:"
+            jq -r '.[] | select(.RuleID | contains("aws") or contains("github") or contains("stripe")) | "  - " + .RuleID + " in " + .File + ":" + (.StartLine | tostring)' gitleaks-report.json
+            exit 1
+          elif [ "$HIGH_COUNT" -gt "3" ]; then
+            echo "⚠️  WARNING: Found $HIGH_COUNT high-risk secrets (threshold: 3)"
+            echo "Consider reviewing these findings before merging"
+          else
+            echo "✅ Security scan passed"
+          fi
+        else
+          echo "✅ No secrets detected"
+        fi
+
+    - name: Run Vulnerability Scanning with Trivy
+      run: |
+        # Scan for vulnerabilities in Go dependencies
+        trivy fs --format json --output trivy-deps.json . || true
+      continue-on-error: true
+
+    - name: Check Trivy Results
+      run: |
+        if [ -f trivy-deps.json ]; then
+          CRITICAL_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-deps.json 2>/dev/null || echo "0")
+          HIGH_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-deps.json 2>/dev/null || echo "0")
+
+          echo "Vulnerability Scan Results:"
+          echo "- Critical vulnerabilities: $CRITICAL_VULNS"
+          echo "- High vulnerabilities: $HIGH_VULNS"
+
+          if [ "$CRITICAL_VULNS" -gt "0" ]; then
+            echo "❌ CRITICAL: Found $CRITICAL_VULNS critical vulnerabilities!"
+            echo "Critical vulnerabilities:"
+            jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL") | "  - " + .VulnerabilityID + ": " + .Title' trivy-deps.json
+            exit 1
+          elif [ "$HIGH_VULNS" -gt "5" ]; then
+            echo "⚠️  WARNING: Found $HIGH_VULNS high vulnerabilities (threshold: 5)"
+            echo "Consider updating dependencies before merging"
+          else
+            echo "✅ Vulnerability scan passed"
+          fi
+        else
+          echo "✅ No vulnerabilities detected"
+        fi
+
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          gitleaks-report.json
+          trivy-deps.json
+        retention-days: 30
+
+    # Note: Individual PR comments disabled in favor of consolidated CI status
+    # The CI Status Consolidator workflow will aggregate all results

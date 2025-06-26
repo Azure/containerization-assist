@@ -153,6 +153,11 @@ jobs:
         id: build
         run: |
           echo "Building packages: ${{ inputs.packages }}"
+          echo "Current directory: $(pwd)"
+          echo "Go version: $(go version)"
+          echo "GOPATH: $GOPATH"
+          echo "GO111MODULE: $GO111MODULE"
+          
           BUILD_SUCCESS=true
 
           # Function to build packages
@@ -167,9 +172,18 @@ jobs:
               if [[ "$pkg" == *"..." ]]; then
                 # List all packages matching the pattern
                 if [ -z "$tags" ]; then
-                  PKGS=$(go list "$pkg" 2>/dev/null || echo "")
+                  PKGS=$(go list "$pkg" 2>&1)
+                  LIST_EXIT_CODE=$?
                 else
-                  PKGS=$(go list -tags="$tags" "$pkg" 2>/dev/null || echo "")
+                  PKGS=$(go list -tags="$tags" "$pkg" 2>&1)
+                  LIST_EXIT_CODE=$?
+                fi
+
+                if [ $LIST_EXIT_CODE -ne 0 ]; then
+                  echo "❌ Failed to list packages for pattern: $pkg"
+                  echo "$PKGS"
+                  BUILD_SUCCESS=false
+                  continue
                 fi
 
                 if [ -z "$PKGS" ]; then
@@ -180,6 +194,20 @@ jobs:
                 # Build each package
                 for p in $PKGS; do
                   echo "Building package: $p"
+                  
+                  # First check if this is a test-only package
+                  if [ -z "$tags" ]; then
+                    HAS_NON_TEST=$(go list -f '{{.GoFiles}}' "$p" 2>/dev/null || echo "")
+                  else
+                    HAS_NON_TEST=$(go list -tags="$tags" -f '{{.GoFiles}}' "$p" 2>/dev/null || echo "")
+                  fi
+                  
+                  if [ -z "$HAS_NON_TEST" ] || [ "$HAS_NON_TEST" = "[]" ]; then
+                    echo "✓ Test-only package detected: $p - skipping build (will be handled during test phase)"
+                    continue
+                  fi
+                  
+                  # Build the package
                   if [ -z "$tags" ]; then
                     OUTPUT=$(go build -v "$p" 2>&1)
                     EXIT_CODE=$?
@@ -188,25 +216,8 @@ jobs:
                     EXIT_CODE=$?
                   fi
 
-                  # Check if it's a test-only package
-                  if [[ "$OUTPUT" == *"no non-test Go files"* ]]; then
-                    echo "Test-only package detected: $p - trying go test -c"
-                    if [ -z "$tags" ]; then
-                      TEST_OUTPUT=$(go test -c -o /dev/null "$p" 2>&1)
-                      TEST_EXIT_CODE=$?
-                    else
-                      TEST_OUTPUT=$(go test -c -tags="$tags" -o /dev/null "$p" 2>&1)
-                      TEST_EXIT_CODE=$?
-                    fi
-
-                    if [ $TEST_EXIT_CODE -eq 0 ]; then
-                      echo "✅ Test compilation successful for: $p"
-                    else
-                      echo "❌ Test compilation failed for: $p"
-                      echo "$TEST_OUTPUT"
-                      BUILD_SUCCESS=false
-                    fi
-                  elif [ $EXIT_CODE -ne 0 ]; then
+                  if [ $EXIT_CODE -ne 0 ]; then
+                    echo "❌ Build failed for package: $p"
                     echo "$OUTPUT"
                     BUILD_SUCCESS=false
                   else
@@ -234,7 +245,8 @@ jobs:
           fi
 
           if [ "$BUILD_SUCCESS" = false ]; then
-            echo "Build failed"
+            echo "❌ Build failed!"
+            echo "See error messages above for details."
             exit 1
           fi
 

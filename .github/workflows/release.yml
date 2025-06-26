@@ -1,12 +1,13 @@
 # .github/workflows/release.yml
-name: goreleaser
+name: Release
 
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'New tag name'
+      version:
+        description: 'Release version (e.g., v1.0.0)'
         required: true
+        type: string
 
 permissions:
   contents: write
@@ -15,30 +16,88 @@ permissions:
   # id-token: write
 
 jobs:
-  goreleaser:
+  # Run tests before creating the release
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - run: git tag ${{ github.event.inputs.tag }}
-      - run: git push origin ${{ github.event.inputs.tag }}
+
       - name: Set up Go
-        uses: actions/setup-go@v5 # v5.5.0
+        uses: actions/setup-go@v5
         with:
-          go-version: stable
-      # More assembly might be required: Docker logins, GPG, etc.
-      # It all depends on your needs.
+          go-version: '1.24'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Check test coverage
+        run: go tool cover -func=coverage.out
+
+  # Validate version format
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate semantic version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "Error: Version '$VERSION' does not follow semantic versioning"
+            echo "Expected format: v1.2.3 or v1.2.3-beta.1"
+            exit 1
+          fi
+
+  # Create release with GoReleaser
+  release:
+    name: Create Release
+    needs: [test, validate-version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag ${{ github.event.inputs.version }}
+          git push origin ${{ github.event.inputs.version }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          # either 'goreleaser' (default) or 'goreleaser-pro'
           distribution: goreleaser
-          # 'latest', 'nightly', or a semver
           version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Your GoReleaser Pro key, if you are using the 'goreleaser-pro' distribution
-          # GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}

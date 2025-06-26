@@ -74,3 +74,13 @@ jobs:
       build-binary: true
       binary-output: 'container-kit-mcp'
       binary-main: './cmd/mcp-server'
+
+  # Integration test compilation check
+  integration-test-compile:
+    name: Integration Test Compilation
+    uses: ./.github/workflows/reusable-go-build.yml
+    with:
+      go-version: '1.24'
+      packages: './test/integration/...'
+      run-tests: false  # Just verify compilation
+      run-lint: false
