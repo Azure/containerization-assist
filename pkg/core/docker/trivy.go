@@ -282,12 +282,20 @@ func (ts *TrivyScanner) generateRemediationSteps(result *ScanResult) {
 		})
 		priority++
 
-		// Check for base image updates
+		// Check for base image updates - look for packages that are typically part of base images
 		hasBaseImageVulns := false
+		baseImagePkgs := []string{"base-image", "alpine-base", "ubuntu-base", "centos-base"}
 		for _, vuln := range result.Vulnerabilities {
-			if (vuln.Severity == "CRITICAL" || vuln.Severity == "HIGH") && strings.Contains(vuln.PkgName, "base") {
-				hasBaseImageVulns = true
-				break
+			if vuln.Severity == "CRITICAL" || vuln.Severity == "HIGH" {
+				for _, basePkg := range baseImagePkgs {
+					if strings.Contains(vuln.PkgName, basePkg) {
+						hasBaseImageVulns = true
+						break
+					}
+				}
+				if hasBaseImageVulns {
+					break
+				}
 			}
 		}
 
