@@ -2,10 +2,10 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -63,12 +63,12 @@ func (gm *GomcpManager) WithLogger(logger slog.Logger) *GomcpManager {
 // Initialize creates and configures the gomcp server
 func (gm *GomcpManager) Initialize() error {
 	if gm.isInitialized {
-		return fmt.Errorf("manager already initialized")
+		return errors.Internal("core/gomcp-manager", "manager already initialized")
 	}
 
 	// Validate transport is set
 	if gm.transport == nil {
-		return fmt.Errorf("transport must be set before initialization")
+		return errors.Config("core/gomcp-manager", "transport must be set before initialization")
 	}
 
 	// Create gomcp server
@@ -99,7 +99,7 @@ func (gm *GomcpManager) GetTransport() InternalTransport {
 // StartServer starts the gomcp server after all tools are registered
 func (gm *GomcpManager) StartServer() error {
 	if !gm.isInitialized {
-		return fmt.Errorf("manager not initialized")
+		return errors.Internal("core/gomcp-manager", "manager not initialized")
 	}
 	gm.logger.Info("Starting gomcp server with all tools registered")
 	return gm.server.Run()
@@ -160,7 +160,7 @@ func (gm *GomcpManager) Shutdown(ctx context.Context) error {
 
 	// Return first error if any occurred
 	if len(shutdownErrors) > 0 {
-		return fmt.Errorf("shutdown completed with %d errors, first error: %w", len(shutdownErrors), shutdownErrors[0])
+		return errors.Wrapf(shutdownErrors[0], "core/gomcp-manager", "shutdown completed with %d errors", len(shutdownErrors))
 	}
 
 	gm.logger.Info("gomcp manager shutdown completed successfully")

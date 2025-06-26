@@ -98,20 +98,19 @@ release:
 
     **Full Changelog**: https://github.com/Azure/container-kit/compare/{{ .PreviousTag }}...{{ .Tag }}
 
+  # Announce releases
+  announce:
+    enabled: false
+
   # Set draft to true for manual review before publishing
   draft: false
 
+  # Automatically close milestone with matching name
+  milestone:
+    close: true
+
 snapshot:
   version_template: "{{ .Tag }}-next"
-
-# Announce releases (moved to top level in v2)
-announce:
-  skip: true
-
-# Milestone management (moved to top level in v2)
-milestones:
-  - close: true
-    fail_on_error: false
 
 # GitHub Action specific configuration
 github_urls:

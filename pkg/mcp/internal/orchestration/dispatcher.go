@@ -1,9 +1,9 @@
 package orchestration
 
 import (
-	"fmt"
 	"sync"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
@@ -30,7 +30,7 @@ func (d *ToolDispatcher) RegisterTool(name string, factory mcptypes.ToolFactory,
 	defer d.mu.Unlock()
 
 	if _, exists := d.tools[name]; exists {
-		return fmt.Errorf("tool %s is already registered", name)
+		return errors.Validationf("orchestration/dispatcher", "tool %s is already registered", name)
 	}
 
 	// Create a tool instance to get metadata
@@ -73,19 +73,19 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (interfa
 	d.mu.RUnlock()
 
 	if !exists {
-		return nil, fmt.Errorf("no argument converter found for tool %s", toolName)
+		return nil, errors.Resourcef("orchestration/dispatcher", "no argument converter found for tool %s", toolName)
 	}
 
 	// Convert args to map if necessary
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("arguments must be a map[string]interface{}")
+		return nil, errors.Validation("orchestration/dispatcher", "arguments must be a map[string]interface{}")
 	}
 
 	// Use the converter to create tool-specific args
 	convertedArgs, err := converter(argsMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert arguments for tool %s: %w", toolName, err)
+		return nil, errors.Wrapf(err, "orchestration/dispatcher", "failed to convert arguments for tool %s", toolName)
 	}
 
 	// Type assert to ToolArgs interface
@@ -96,7 +96,7 @@ func (d *ToolDispatcher) ConvertArgs(toolName string, args interface{}) (interfa
 
 	// Validate the arguments
 	if err := toolArgs.Validate(); err != nil {
-		return nil, fmt.Errorf("argument validation failed for tool %s: %w", toolName, err)
+		return nil, errors.Wrapf(err, "orchestration/dispatcher", "argument validation failed for tool %s", toolName)
 	}
 
 	return toolArgs, nil
@@ -160,15 +160,15 @@ func (d *ToolDispatcher) ValidateTool(name string) error {
 	defer d.mu.RUnlock()
 
 	if _, exists := d.tools[name]; !exists {
-		return fmt.Errorf("tool %s is not registered", name)
+		return errors.Resourcef("orchestration/dispatcher", "tool %s is not registered", name)
 	}
 
 	if _, exists := d.converters[name]; !exists {
-		return fmt.Errorf("tool %s has no argument converter", name)
+		return errors.Resourcef("orchestration/dispatcher", "tool %s has no argument converter", name)
 	}
 
 	if _, exists := d.metadata[name]; !exists {
-		return fmt.Errorf("tool %s has no metadata", name)
+		return errors.Resourcef("orchestration/dispatcher", "tool %s has no metadata", name)
 	}
 
 	return nil
