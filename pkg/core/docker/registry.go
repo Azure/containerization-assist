@@ -347,8 +347,22 @@ func (rm *RegistryManager) validatePushInputs(imageRef string, options PushOptio
 		return fmt.Errorf("image reference is required")
 	}
 
+	// Basic image reference validation - check for dash at start/end of image name
+	if strings.HasPrefix(imageRef, "-") {
+		return fmt.Errorf("invalid image reference format: %s", imageRef)
+	}
+
 	if !strings.Contains(imageRef, ":") {
 		return fmt.Errorf("image reference should include a tag: %s", imageRef)
+	}
+
+	// Extract image name part (before the colon) and validate it
+	colonIndex := strings.LastIndex(imageRef, ":")
+	if colonIndex > 0 {
+		imageName := imageRef[:colonIndex]
+		if strings.HasSuffix(imageName, "-") {
+			return fmt.Errorf("invalid image reference format: %s", imageRef)
+		}
 	}
 
 	return nil
@@ -406,6 +420,14 @@ func (rm *RegistryManager) categorizePullError(err error, output string) string 
 	errStr := strings.ToLower(err.Error())
 	outputStr := strings.ToLower(output)
 
+	// Check for not found errors first (more specific than generic "denied")
+	if strings.Contains(errStr, "not found") || strings.Contains(outputStr, "not found") ||
+		strings.Contains(errStr, "does not exist") || strings.Contains(outputStr, "does not exist") ||
+		strings.Contains(errStr, "manifest unknown") || strings.Contains(outputStr, "manifest unknown") ||
+		strings.Contains(errStr, "repository does not exist") || strings.Contains(outputStr, "repository does not exist") {
+		return "not_found"
+	}
+
 	// Authentication errors
 	if strings.Contains(errStr, "unauthorized") || strings.Contains(outputStr, "unauthorized") ||
 		strings.Contains(errStr, "authentication") || strings.Contains(outputStr, "authentication") ||
@@ -420,14 +442,6 @@ func (rm *RegistryManager) categorizePullError(err error, output string) string 
 		return "network_error"
 	}
 
-	// Not found errors (specific to pulls)
-	if strings.Contains(errStr, "not found") || strings.Contains(outputStr, "not found") ||
-		strings.Contains(errStr, "does not exist") || strings.Contains(outputStr, "does not exist") ||
-		strings.Contains(errStr, "manifest unknown") || strings.Contains(outputStr, "manifest unknown") ||
-		strings.Contains(errStr, "repository does not exist") || strings.Contains(outputStr, "repository does not exist") {
-		return "not_found"
-	}
-
 	// Default to generic pull error
 	return "pull_error"
 }
@@ -437,9 +451,25 @@ func (rm *RegistryManager) validatePullInputs(imageRef string) error {
 		return fmt.Errorf("image reference is required")
 	}
 
-	// Basic image reference validation
-	if strings.HasPrefix(imageRef, "-") || strings.HasSuffix(imageRef, "-") {
+	// Basic image reference validation - check for dash at start of image reference
+	if strings.HasPrefix(imageRef, "-") {
 		return fmt.Errorf("invalid image reference format: %s", imageRef)
+	}
+
+	// For images with tags (containing ":"), check if image name ends with dash
+	if strings.Contains(imageRef, ":") {
+		colonIndex := strings.LastIndex(imageRef, ":")
+		if colonIndex > 0 {
+			imageName := imageRef[:colonIndex]
+			if strings.HasSuffix(imageName, "-") {
+				return fmt.Errorf("invalid image reference format: %s", imageRef)
+			}
+		}
+	} else {
+		// For images without tags, check if the entire string ends with dash
+		if strings.HasSuffix(imageRef, "-") {
+			return fmt.Errorf("invalid image reference format: %s", imageRef)
+		}
 	}
 
 	return nil
@@ -456,8 +486,24 @@ func (rm *RegistryManager) validateTagInputs(sourceImage, targetImage string) er
 
 	// Validate both image references
 	for _, img := range []string{sourceImage, targetImage} {
-		if strings.HasPrefix(img, "-") || strings.HasSuffix(img, "-") {
+		if strings.HasPrefix(img, "-") {
 			return fmt.Errorf("invalid image reference format: %s", img)
+		}
+
+		// For images with tags (containing ":"), check if image name ends with dash
+		if strings.Contains(img, ":") {
+			colonIndex := strings.LastIndex(img, ":")
+			if colonIndex > 0 {
+				imageName := img[:colonIndex]
+				if strings.HasSuffix(imageName, "-") {
+					return fmt.Errorf("invalid image reference format: %s", img)
+				}
+			}
+		} else {
+			// For images without tags, check if the entire string ends with dash
+			if strings.HasSuffix(img, "-") {
+				return fmt.Errorf("invalid image reference format: %s", img)
+			}
 		}
 	}
 

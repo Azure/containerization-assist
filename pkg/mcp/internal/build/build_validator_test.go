@@ -24,6 +24,7 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 		expectedHigh    int
 		expectedMedium  int
 		expectedLow     int
+		expectedUnknown int
 		expectedFixable int
 		shouldFallback  bool
 	}{
@@ -84,6 +85,7 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 			expectedHigh:    1,
 			expectedMedium:  1,
 			expectedLow:     1,
+			expectedUnknown: 0,
 			expectedFixable: 3,
 			shouldFallback:  false,
 		},
@@ -104,11 +106,31 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 			name: "Invalid JSON - fallback to string matching",
 			trivyOutput: `This is not valid JSON
 			CRITICAL: Found critical vulnerability
-			HIGH: Found high vulnerability`,
-			expectedTotal:   2,
+			HIGH: Found high vulnerability
+			MEDIUM: Found medium vulnerability
+			LOW: Found low vulnerability
+			UNKNOWN: Found unknown vulnerability`,
+			expectedTotal:   5,
 			expectedCrit:    1,
 			expectedHigh:    1,
-			expectedMedium:  0,
+			expectedMedium:  1,
+			expectedLow:     1,
+			expectedFixable: 0,
+			shouldFallback:  true,
+		},
+		{
+			name: "Invalid JSON with multiple severity counts",
+			trivyOutput: `This is not valid JSON with multiple vulnerabilities
+			CRITICAL vulnerability 1 found
+			CRITICAL vulnerability 2 found
+			HIGH severity issue detected
+			HIGH priority fix needed
+			HIGH impact found
+			MEDIUM level warning`,
+			expectedTotal:   6,
+			expectedCrit:    2,
+			expectedHigh:    3,
+			expectedMedium:  1,
 			expectedLow:     0,
 			expectedFixable: 0,
 			shouldFallback:  true,
@@ -202,15 +224,42 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 					}
 				}
 			} else if tt.shouldFallback {
-				// Test fallback string matching
+				// Test fallback string matching (same logic as in build_validator.go)
 				outputStr := tt.trivyOutput
-				if strings.Contains(outputStr, "CRITICAL") {
-					scanResult.Summary.Critical = 1
-					scanResult.Summary.Total = 1
+
+				// Count CRITICAL vulnerabilities
+				criticalCount := strings.Count(outputStr, "CRITICAL")
+				if criticalCount > 0 {
+					scanResult.Summary.Critical = criticalCount
+					scanResult.Summary.Total += criticalCount
 				}
-				if strings.Contains(outputStr, "HIGH") {
-					scanResult.Summary.High = 1
-					scanResult.Summary.Total++
+
+				// Count HIGH vulnerabilities
+				highCount := strings.Count(outputStr, "HIGH")
+				if highCount > 0 {
+					scanResult.Summary.High = highCount
+					scanResult.Summary.Total += highCount
+				}
+
+				// Count MEDIUM vulnerabilities
+				mediumCount := strings.Count(outputStr, "MEDIUM")
+				if mediumCount > 0 {
+					scanResult.Summary.Medium = mediumCount
+					scanResult.Summary.Total += mediumCount
+				}
+
+				// Count LOW vulnerabilities
+				lowCount := strings.Count(outputStr, "LOW")
+				if lowCount > 0 {
+					scanResult.Summary.Low = lowCount
+					scanResult.Summary.Total += lowCount
+				}
+
+				// Count UNKNOWN vulnerabilities
+				unknownCount := strings.Count(outputStr, "UNKNOWN")
+				if unknownCount > 0 {
+					scanResult.Summary.Unknown = unknownCount
+					scanResult.Summary.Total += unknownCount
 				}
 			}
 

@@ -120,14 +120,42 @@ func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName str
 			Msg("Failed to parse Trivy JSON output, falling back to string matching")
 
 		// Fallback to string matching if JSON parsing fails
+		// Count all severity levels to avoid undercounting vulnerabilities
 		outputStr := string(output)
-		if strings.Contains(outputStr, "CRITICAL") {
-			scanResult.Summary.Critical = 1
-			scanResult.Summary.Total = 1
+
+		// Count CRITICAL vulnerabilities
+		criticalCount := strings.Count(outputStr, "CRITICAL")
+		if criticalCount > 0 {
+			scanResult.Summary.Critical = criticalCount
+			scanResult.Summary.Total += criticalCount
 		}
-		if strings.Contains(outputStr, "HIGH") {
-			scanResult.Summary.High = 1
-			scanResult.Summary.Total++
+
+		// Count HIGH vulnerabilities
+		highCount := strings.Count(outputStr, "HIGH")
+		if highCount > 0 {
+			scanResult.Summary.High = highCount
+			scanResult.Summary.Total += highCount
+		}
+
+		// Count MEDIUM vulnerabilities
+		mediumCount := strings.Count(outputStr, "MEDIUM")
+		if mediumCount > 0 {
+			scanResult.Summary.Medium = mediumCount
+			scanResult.Summary.Total += mediumCount
+		}
+
+		// Count LOW vulnerabilities
+		lowCount := strings.Count(outputStr, "LOW")
+		if lowCount > 0 {
+			scanResult.Summary.Low = lowCount
+			scanResult.Summary.Total += lowCount
+		}
+
+		// Count UNKNOWN vulnerabilities
+		unknownCount := strings.Count(outputStr, "UNKNOWN")
+		if unknownCount > 0 {
+			scanResult.Summary.Unknown = unknownCount
+			scanResult.Summary.Total += unknownCount
 		}
 	} else {
 		// Process properly parsed JSON results
