@@ -143,12 +143,38 @@ jobs:
           const fs = require('fs');
           const report = fs.readFileSync('core-coverage-report.md', 'utf8');
 
-          github.rest.issues.createComment({
+          // Look for existing core coverage comments to replace
+          const comments = await github.rest.issues.listComments({
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: report
           });
+
+          // Find existing core coverage comment
+          const existingComment = comments.data.find(comment =>
+            comment.body.includes('## Core Package Coverage Report') &&
+            comment.user.type === 'Bot'
+          );
+
+          if (existingComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              comment_id: existingComment.id,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+            console.log(`Updated existing core coverage comment: ${existingComment.id}`);
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+            console.log('Created new core coverage comment');
+          }
 
     - name: Check core package coverage enforcement
       run: |
