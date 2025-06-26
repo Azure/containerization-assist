@@ -234,13 +234,22 @@ func (gm *GomcpManager) handleChat(deps *ToolDependencies, args *ChatArgs) (*Cha
 		}, nil
 	}
 
+	// Ensure session ID is set
+	sessionID, err := gm.ensureSessionID(args.SessionID, deps, "chat")
+	if err != nil {
+		return &ChatResult{
+			Response:  fmt.Sprintf("Failed to create session: %v", err),
+			SessionID: args.SessionID,
+		}, nil
+	}
+
 	// Use the concrete conversation handler directly
 	handler := deps.Server.conversationComponents.Handler
 
 	// Convert ChatArgs to conversation.ChatToolArgs
 	toolArgs := conversation.ChatToolArgs{
 		Message:   args.Message,
-		SessionID: args.SessionID,
+		SessionID: sessionID,
 	}
 
 	// Create context with timeout for conversation processing
