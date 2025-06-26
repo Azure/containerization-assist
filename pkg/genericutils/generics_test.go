@@ -1,15 +1,13 @@
-package utils
+package genericutils
 
 import (
 	"errors"
 	"testing"
-
-	"github.com/Azure/container-copilot/pkg/mcp/internal/types"
 )
 
 func TestMapGet(t *testing.T) {
 	m := map[string]interface{}{
-		"string": types.TestStringHello,
+		"string": "hello",
 		"int":    42,
 		"float":  3.14,
 		"bool":   true,
@@ -28,7 +26,7 @@ func TestMapGet(t *testing.T) {
 		{
 			name:   "get string",
 			key:    "string",
-			want:   types.TestStringHello,
+			want:   "hello",
 			wantOk: true,
 			testFunc: func() (interface{}, bool) {
 				return MapGet[string](m, "string")
@@ -161,8 +159,8 @@ func TestSafeCast(t *testing.T) {
 	}{
 		{
 			name:    "cast string",
-			value:   types.TestStringHello,
-			want:    types.TestStringHello,
+			value:   "hello",
+			want:    "hello",
 			wantErr: false,
 		},
 		{
@@ -211,17 +209,17 @@ func TestSafeCast(t *testing.T) {
 
 func TestOptional(t *testing.T) {
 	// Test with value
-	opt := NewOptional(types.TestStringHello)
+	opt := NewOptional("hello")
 	if !opt.IsPresent() {
 		t.Error("Optional should be present")
 	}
 
 	val, ok := opt.Get()
-	if !ok || val != types.TestStringHello {
+	if !ok || val != "hello" {
 		t.Errorf("Get() = %v, %v; want hello, true", val, ok)
 	}
 
-	if opt.OrElse("default") != types.TestStringHello {
+	if opt.OrElse("default") != "hello" {
 		t.Error("OrElse should return the value when present")
 	}
 
@@ -402,13 +400,13 @@ func TestTypedMap(t *testing.T) {
 
 func TestPointerUtilities(t *testing.T) {
 	// Test Ptr
-	p := Ptr(types.TestStringHello)
-	if *p != types.TestStringHello {
+	p := Ptr("hello")
+	if *p != "hello" {
 		t.Error("Ptr should return pointer to value")
 	}
 
 	// Test DerefOr
-	if DerefOr(p, "default") != types.TestStringHello {
+	if DerefOr(p, "default") != "hello" {
 		t.Error("DerefOr should return dereferenced value")
 	}
 
@@ -445,13 +443,13 @@ func TestUtilityFunctions(t *testing.T) {
 		t.Error("IsZero should detect zero values")
 	}
 
-	if IsZero(1) || IsZero(types.TestStringHello) {
+	if IsZero(1) || IsZero("hello") {
 		t.Error("IsZero should not detect non-zero values")
 	}
 
 	// Test Coalesce
-	result := Coalesce("", "", types.TestStringHello, "world")
-	if result != types.TestStringHello {
+	result := Coalesce("", "", "hello", "world")
+	if result != "hello" {
 		t.Error("Coalesce should return first non-zero value")
 	}
 

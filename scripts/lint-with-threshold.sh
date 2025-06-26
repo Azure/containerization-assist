@@ -21,14 +21,14 @@ if [ $LINT_EXIT_CODE -eq 0 ]; then
     echo "✅ No linting issues found!"
 else
     ISSUE_COUNT=$(echo "$LINT_OUTPUT" | jq -r '.Issues | length' 2>/dev/null || echo "0")
-    
+
     if [ "$ISSUE_COUNT" = "0" ]; then
         # Fallback: try to parse non-JSON output
         ISSUE_COUNT=$(golangci-lint run $LINT_ARGS 2>&1 | grep -E "^[^:]+:[0-9]+:[0-9]+:" | wc -l)
     fi
-    
+
     echo "Found $ISSUE_COUNT linting issues"
-    
+
     # Show summary by linter
     echo ""
     echo "Issues by linter:"

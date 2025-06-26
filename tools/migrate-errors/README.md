@@ -112,7 +112,7 @@ Start with files that have the most errors:
 ```bash
 # Find top candidates from quality dashboard
 go run tools/quality-dashboard/main.go -format json | \
-  jq -r '.error_handling.top_files_to_migrate[] | 
+  jq -r '.error_handling.top_files_to_migrate[] |
   "\(.path): \(.standard_errors) errors"'
 ```
 
@@ -159,7 +159,7 @@ Include in your quality gates workflow:
     go run tools/migrate-errors/main.go \
       -package ./pkg \
       -report error-migration.txt
-    
+
     OPPORTUNITIES=$(grep "Total Errors Found:" error-migration.txt | awk '{print $4}')
     if [ "$OPPORTUNITIES" -gt 100 ]; then
       echo "⚠️ Found $OPPORTUNITIES error migration opportunities"

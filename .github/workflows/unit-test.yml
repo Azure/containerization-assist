@@ -1,6 +1,6 @@
 name: Unit Tests
 
-on: 
+on:
   pull_request:
     branches:
       - main
@@ -21,7 +21,7 @@ jobs:
       lint-warn-threshold: 30
       coverage: true
 
-  # MCP packages 
+  # MCP packages
   mcp-test:
     name: MCP Packages
     uses: ./.github/workflows/reusable-go-build.yml
@@ -35,10 +35,10 @@ jobs:
       lint-error-threshold: 100  # Higher threshold for MCP as it has more issues currently
       lint-warn-threshold: 50
       coverage: true
-      
+
   # CLI packages
   cli-test:
-    name: CLI Packages  
+    name: CLI Packages
     uses: ./.github/workflows/reusable-go-build.yml
     with:
       go-version: '1.24'
@@ -62,7 +62,7 @@ jobs:
       build-binary: true
       binary-output: 'container-kit'
       binary-main: './main.go'
-      
+
   # Build MCP server (no tags needed)
   build-mcp:
     name: Build MCP Server

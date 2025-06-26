@@ -22,27 +22,27 @@ jobs:
   test:
     name: Integration Tests
     runs-on: ubuntu-latest
-    
+
     services:
       docker:
         image: docker:dind
         options: --privileged
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5 # v5.5.0
       with:
         go-version: '1.24'
-    
+
     - name: Install Kind
       run: |
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
         chmod +x ./kind
         sudo mv ./kind /usr/local/bin/kind
-    
+
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
@@ -50,45 +50,45 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-    
+
     - name: Download dependencies
       run: go mod download
-    
+
     - name: Run unit tests
       run: go test -v ./pkg/mcp/... -short
-    
+
     - name: Run unit tests with race detector
       run: go test -race -v ./pkg/mcp/... -short
-    
+
     - name: Build MCP server
       run: go build -o container-kit-mcp ./cmd/mcp-server
-    
+
     - name: Run integration tests
       run: |
         export CONTAINER_KIT_TEST_WORKSPACE="/tmp/container-kit-test"
         export CONTAINER_KIT_LOG_LEVEL="debug"
         mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
         go test -v ./test/integration/...
-    
+
     - name: Run integration tests with race detector
       run: |
         export CONTAINER_KIT_TEST_WORKSPACE="/tmp/container-kit-test-race"
         export CONTAINER_KIT_LOG_LEVEL="debug"
         mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
         go test -race -v ./test/integration/...
-    
+
     - name: Generate coverage report
       run: |
         go test -coverprofile=coverage.out ./pkg/mcp/... ./pkg/core/...
         go tool cover -func=coverage.out
-    
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
         flags: integration
         name: mcp-integration
-    
+
     - name: Upload test artifacts
       if: failure()
       uses: actions/upload-artifact@v4
@@ -99,20 +99,20 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5 # v5.5.0
       with:
         go-version: '1.24'
-    
+
     - name: Install golangci-lint
       run: |
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
-    
+
     - name: Run golangci-lint with threshold
       id: lint
       env:
@@ -122,28 +122,28 @@ jobs:
         echo "Running linter with error budget..."
         echo "Error threshold: $LINT_ERROR_THRESHOLD"
         echo "Warning threshold: $LINT_WARN_THRESHOLD"
-        
+
         # Run linter and capture results
         golangci-lint run --out-format json --timeout=5m --config=.golangci.yml ./pkg/mcp/... ./pkg/core/... > lint-results.json || true
-        
+
         # Count issues
         ISSUE_COUNT=$(jq '.Issues | length' lint-results.json 2>/dev/null || echo "0")
         echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
-        
+
         # Generate summary
         echo "## Lint Results" >> $GITHUB_STEP_SUMMARY
         echo "Total issues: $ISSUE_COUNT" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         if [ $ISSUE_COUNT -gt 0 ]; then
           echo "### Issues by Linter" >> $GITHUB_STEP_SUMMARY
           jq -r '.Issues | group_by(.FromLinter) | map("- **\(.[0].FromLinter)**: \(length)") | .[]' lint-results.json >> $GITHUB_STEP_SUMMARY
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Top 5 Most Common Issues" >> $GITHUB_STEP_SUMMARY
           jq -r '.Issues | group_by(.Text) | sort_by(-length) | .[0:5] | map("- \(length)x: \(.[0].Text | split("\n")[0])") | .[]' lint-results.json >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         # Check thresholds
         if [ $ISSUE_COUNT -gt $LINT_ERROR_THRESHOLD ]; then
           echo "❌ Lint check failed: $ISSUE_COUNT issues found (threshold: $LINT_ERROR_THRESHOLD)"
@@ -159,11 +159,11 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
@@ -171,7 +171,7 @@ jobs:
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-results.sarif'
-    
+
     - name: Upload Trivy scan results
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: github/codeql-action/upload-sarif@v3

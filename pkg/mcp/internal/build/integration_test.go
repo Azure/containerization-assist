@@ -49,7 +49,7 @@ Name: Fix Dockerfile base image
 Description: Update the base image to a valid one
 Priority: 1
 Type: dockerfile
-Commands: 
+Commands:
 FileChanges: Dockerfile:update:fix base image
 Validation: Verify base image is pullable
 EstimatedTime: 2 minutes

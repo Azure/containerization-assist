@@ -2,6 +2,7 @@ package build
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -66,8 +67,7 @@ func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName str
 	startTime := time.Now()
 
 	// Check if Trivy is installed
-	cmd := exec.Command("trivy", "--version")
-	if err := cmd.Run(); err != nil {
+	if !bv.isTrivyInstalled() {
 		bv.logger.Warn().Msg("Trivy not found, skipping security scan")
 		return nil, 0, nil
 	}
@@ -76,22 +76,73 @@ func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName str
 	bv.logger.Info().Str("image", fullImageRef).Msg("Running security scan with Trivy")
 
 	// Run Trivy scan
+	output, err := bv.executeTrivyScan(ctx, fullImageRef)
+	if err != nil {
+		return nil, time.Since(startTime), bv.createScanError(fullImageRef)
+	}
+
+	// Initialize scan result
+	scanResult := bv.initializeScanResult(fullImageRef, startTime)
+
+	// Parse Trivy JSON output
+	var trivyResult coredocker.TrivyResult
+	if err := json.Unmarshal(output, &trivyResult); err != nil {
+		bv.logger.Warn().
+			Err(err).
+			Str("output", string(output)).
+			Msg("Failed to parse Trivy JSON output, falling back to string matching")
+
+		// Fallback to string matching if JSON parsing fails
+		bv.countVulnerabilitiesFromString(string(output), scanResult)
+	} else {
+		// Process properly parsed JSON results
+		bv.processJSONResults(&trivyResult, scanResult)
+
+		// Add remediation recommendations
+		bv.addRemediationSteps(scanResult)
+	}
+
+	duration := time.Since(startTime)
+	bv.logger.Info().
+		Dur("duration", duration).
+		Interface("summary", scanResult.Summary).
+		Msg("Security scan completed")
+
+	return scanResult, duration, nil
+}
+
+// Helper method to check if Trivy is installed
+func (bv *BuildValidatorImpl) isTrivyInstalled() bool {
+	cmd := exec.Command("trivy", "--version")
+	return cmd.Run() == nil
+}
+
+// Helper method to execute Trivy scan
+func (bv *BuildValidatorImpl) executeTrivyScan(ctx context.Context, fullImageRef string) ([]byte, error) {
 	scanCmd := exec.CommandContext(ctx, "trivy", "image", "--format", "json", "--quiet", fullImageRef)
 	output, err := scanCmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
 			bv.logger.Warn().Str("stderr", string(exitErr.Stderr)).Msg("Trivy scan failed")
 		}
-		return nil, time.Since(startTime), types.NewErrorBuilder("internal_server_error",
-			"Security scan failed", "execution").
-			WithSeverity("medium").
-			WithOperation("RunSecurityScan").
-			WithField("image", fullImageRef).
-			Build()
+		return nil, err
 	}
+	return output, nil
+}
 
-	// Parse the scan results (simplified for now)
-	scanResult := &coredocker.ScanResult{
+// Helper method to create scan error
+func (bv *BuildValidatorImpl) createScanError(fullImageRef string) error {
+	return types.NewErrorBuilder("internal_server_error",
+		"Security scan failed", "execution").
+		WithSeverity("medium").
+		WithOperation("RunSecurityScan").
+		WithField("image", fullImageRef).
+		Build()
+}
+
+// Helper method to initialize scan result
+func (bv *BuildValidatorImpl) initializeScanResult(fullImageRef string, startTime time.Time) *coredocker.ScanResult {
+	return &coredocker.ScanResult{
 		Success:  true,
 		ImageRef: fullImageRef,
 		ScanTime: time.Now(),
@@ -109,26 +160,96 @@ func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName str
 		Remediation:     []coredocker.RemediationStep{},
 		Context:         make(map[string]interface{}),
 	}
+}
 
-	// TODO: Properly parse Trivy JSON output
-	// For now, just check if output contains vulnerability keywords
-	outputStr := string(output)
-	if strings.Contains(outputStr, "CRITICAL") {
-		scanResult.Summary.Critical = 1
-		scanResult.Summary.Total = 1
+// Helper method to count vulnerabilities from string output
+func (bv *BuildValidatorImpl) countVulnerabilitiesFromString(outputStr string, scanResult *coredocker.ScanResult) {
+	severityLevels := []struct {
+		level string
+		field *int
+	}{
+		{"CRITICAL", &scanResult.Summary.Critical},
+		{"HIGH", &scanResult.Summary.High},
+		{"MEDIUM", &scanResult.Summary.Medium},
+		{"LOW", &scanResult.Summary.Low},
+		{"UNKNOWN", &scanResult.Summary.Unknown},
 	}
-	if strings.Contains(outputStr, "HIGH") {
-		scanResult.Summary.High = 1
-		scanResult.Summary.Total++
+
+	for _, severity := range severityLevels {
+		count := strings.Count(outputStr, severity.level)
+		if count > 0 {
+			*severity.field = count
+			scanResult.Summary.Total += count
+		}
+	}
+}
+
+// Helper method to process JSON results
+func (bv *BuildValidatorImpl) processJSONResults(trivyResult *coredocker.TrivyResult, scanResult *coredocker.ScanResult) {
+	for _, result := range trivyResult.Results {
+		for _, vuln := range result.Vulnerabilities {
+			// Create vulnerability object
+			vulnerability := coredocker.Vulnerability{
+				VulnerabilityID:  vuln.VulnerabilityID,
+				PkgName:          vuln.PkgName,
+				InstalledVersion: vuln.InstalledVersion,
+				FixedVersion:     vuln.FixedVersion,
+				Severity:         vuln.Severity,
+				Title:            vuln.Title,
+				Description:      vuln.Description,
+				References:       vuln.References,
+			}
+
+			if vuln.Layer.DiffID != "" {
+				vulnerability.Layer = vuln.Layer.DiffID
+			}
+
+			scanResult.Vulnerabilities = append(scanResult.Vulnerabilities, vulnerability)
+
+			// Update summary counts
+			switch strings.ToUpper(vuln.Severity) {
+			case "CRITICAL":
+				scanResult.Summary.Critical++
+			case "HIGH":
+				scanResult.Summary.High++
+			case "MEDIUM":
+				scanResult.Summary.Medium++
+			case "LOW":
+				scanResult.Summary.Low++
+			default:
+				scanResult.Summary.Unknown++
+			}
+			scanResult.Summary.Total++
+
+			// Count fixable vulnerabilities
+			if vuln.FixedVersion != "" {
+				scanResult.Summary.Fixable++
+			}
+		}
+	}
+}
+
+// Helper method to add remediation steps
+func (bv *BuildValidatorImpl) addRemediationSteps(scanResult *coredocker.ScanResult) {
+	if scanResult.Summary.Critical == 0 && scanResult.Summary.High == 0 {
+		return
 	}
 
-	duration := time.Since(startTime)
-	bv.logger.Info().
-		Dur("duration", duration).
-		Interface("summary", scanResult.Summary).
-		Msg("Security scan completed")
+	scanResult.Remediation = append(scanResult.Remediation, coredocker.RemediationStep{
+		Priority:    1,
+		Action:      "update_base_image",
+		Description: "Update base image to latest version to fix known vulnerabilities",
+		Command:     "docker pull <base-image>:latest",
+	})
 
-	return scanResult, duration, nil
+	if scanResult.Summary.Fixable > 0 {
+		scanResult.Remediation = append(scanResult.Remediation, coredocker.RemediationStep{
+			Priority:    2,
+			Action:      "update_packages",
+			Description: fmt.Sprintf("Update %d packages with available fixes", scanResult.Summary.Fixable),
+			Command:     "Update package versions in Dockerfile or run package manager update commands",
+		})
+	}
 }
 
 // AddPushTroubleshootingTips adds troubleshooting tips for push failures

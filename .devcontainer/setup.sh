@@ -162,7 +162,7 @@ cat > ~/.devcontainer-welcome << 'EOF'
 
 Quick start commands:
   make mcp              # Build MCP server
-  make test             # Run all tests  
+  make test             # Run all tests
   make lint             # Run linting
   test-mcp              # Run MCP-specific tests
   build-mcp             # Build MCP server binary
@@ -175,7 +175,7 @@ Useful aliases have been set up:
 The environment includes:
   ✅ Go 1.21+
   ✅ golangci-lint
-  ✅ kubectl & kind  
+  ✅ kubectl & kind
   ✅ Docker-in-Docker
   ✅ VS Code extensions
   ✅ Pre-commit hooks

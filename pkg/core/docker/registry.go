@@ -347,8 +347,22 @@ func (rm *RegistryManager) validatePushInputs(imageRef string, options PushOptio
 		return fmt.Errorf("image reference is required")
 	}
 
+	// Basic image reference validation - check for dash at start/end of image name
+	if strings.HasPrefix(imageRef, "-") {
+		return fmt.Errorf("invalid image reference format: %s", imageRef)
+	}
+
 	if !strings.Contains(imageRef, ":") {
 		return fmt.Errorf("image reference should include a tag: %s", imageRef)
+	}
+
+	// Extract image name part (before the colon) and validate it
+	colonIndex := strings.LastIndex(imageRef, ":")
+	if colonIndex > 0 {
+		imageName := imageRef[:colonIndex]
+		if strings.HasSuffix(imageName, "-") {
+			return fmt.Errorf("invalid image reference format: %s", imageRef)
+		}
 	}
 
 	return nil
@@ -366,8 +380,8 @@ func (rm *RegistryManager) extractRegistry(imageRef string) string {
 		return "docker.io" // Default registry
 	}
 
-	// Check if first part looks like a registry (contains dots)
-	if strings.Contains(parts[0], ".") {
+	// Check if first part looks like a registry (contains dots or is localhost with port)
+	if strings.Contains(parts[0], ".") || strings.HasPrefix(parts[0], "localhost:") {
 		return parts[0]
 	}
 
@@ -379,22 +393,17 @@ func (rm *RegistryManager) categorizeError(err error, output string) string {
 	outputStr := strings.ToLower(output)
 
 	// Authentication errors
-	if strings.Contains(errStr, "unauthorized") || strings.Contains(outputStr, "unauthorized") ||
-		strings.Contains(errStr, "authentication") || strings.Contains(outputStr, "authentication") ||
-		strings.Contains(errStr, "denied") || strings.Contains(outputStr, "denied") {
+	if rm.isAuthError(errStr, outputStr) {
 		return "auth_error"
 	}
 
 	// Network errors
-	if strings.Contains(errStr, "network") || strings.Contains(outputStr, "network") ||
-		strings.Contains(errStr, "timeout") || strings.Contains(outputStr, "timeout") ||
-		strings.Contains(errStr, "connection") || strings.Contains(outputStr, "connection") {
+	if rm.isNetworkError(errStr, outputStr) {
 		return "network_error"
 	}
 
 	// Not found errors
-	if strings.Contains(errStr, "not found") || strings.Contains(outputStr, "not found") ||
-		strings.Contains(errStr, "does not exist") || strings.Contains(outputStr, "does not exist") {
+	if rm.isPushNotFoundError(errStr, outputStr) {
 		return "not_found"
 	}
 
@@ -402,34 +411,91 @@ func (rm *RegistryManager) categorizeError(err error, output string) string {
 	return "push_error"
 }
 
+// Helper method to check if error is a not found error for push operations
+func (rm *RegistryManager) isPushNotFoundError(errStr, outputStr string) bool {
+	notFoundPatterns := []string{
+		"not found",
+		"does not exist",
+	}
+
+	for _, pattern := range notFoundPatterns {
+		if strings.Contains(errStr, pattern) || strings.Contains(outputStr, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 func (rm *RegistryManager) categorizePullError(err error, output string) string {
 	errStr := strings.ToLower(err.Error())
 	outputStr := strings.ToLower(output)
 
+	// Check for not found errors first (more specific than generic "denied")
+	if rm.isNotFoundError(errStr, outputStr) {
+		return "not_found"
+	}
+
 	// Authentication errors
-	if strings.Contains(errStr, "unauthorized") || strings.Contains(outputStr, "unauthorized") ||
-		strings.Contains(errStr, "authentication") || strings.Contains(outputStr, "authentication") ||
-		strings.Contains(errStr, "denied") || strings.Contains(outputStr, "denied") {
+	if rm.isAuthError(errStr, outputStr) {
 		return "auth_error"
 	}
 
 	// Network errors
-	if strings.Contains(errStr, "network") || strings.Contains(outputStr, "network") ||
-		strings.Contains(errStr, "timeout") || strings.Contains(outputStr, "timeout") ||
-		strings.Contains(errStr, "connection") || strings.Contains(outputStr, "connection") {
+	if rm.isNetworkError(errStr, outputStr) {
 		return "network_error"
-	}
-
-	// Not found errors (specific to pulls)
-	if strings.Contains(errStr, "not found") || strings.Contains(outputStr, "not found") ||
-		strings.Contains(errStr, "does not exist") || strings.Contains(outputStr, "does not exist") ||
-		strings.Contains(errStr, "manifest unknown") || strings.Contains(outputStr, "manifest unknown") ||
-		strings.Contains(errStr, "repository does not exist") || strings.Contains(outputStr, "repository does not exist") {
-		return "not_found"
 	}
 
 	// Default to generic pull error
 	return "pull_error"
+}
+
+// Helper method to check if error is a not found error
+func (rm *RegistryManager) isNotFoundError(errStr, outputStr string) bool {
+	notFoundPatterns := []string{
+		"not found",
+		"does not exist",
+		"manifest unknown",
+		"repository does not exist",
+	}
+
+	for _, pattern := range notFoundPatterns {
+		if strings.Contains(errStr, pattern) || strings.Contains(outputStr, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// Helper method to check if error is an authentication error
+func (rm *RegistryManager) isAuthError(errStr, outputStr string) bool {
+	authPatterns := []string{
+		"unauthorized",
+		"authentication",
+		"denied",
+	}
+
+	for _, pattern := range authPatterns {
+		if strings.Contains(errStr, pattern) || strings.Contains(outputStr, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// Helper method to check if error is a network error
+func (rm *RegistryManager) isNetworkError(errStr, outputStr string) bool {
+	networkPatterns := []string{
+		"network",
+		"timeout",
+		"connection",
+	}
+
+	for _, pattern := range networkPatterns {
+		if strings.Contains(errStr, pattern) || strings.Contains(outputStr, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func (rm *RegistryManager) validatePullInputs(imageRef string) error {
@@ -437,9 +503,25 @@ func (rm *RegistryManager) validatePullInputs(imageRef string) error {
 		return fmt.Errorf("image reference is required")
 	}
 
-	// Basic image reference validation
-	if strings.HasPrefix(imageRef, "-") || strings.HasSuffix(imageRef, "-") {
+	// Basic image reference validation - check for dash at start of image reference
+	if strings.HasPrefix(imageRef, "-") {
 		return fmt.Errorf("invalid image reference format: %s", imageRef)
+	}
+
+	// For images with tags (containing ":"), check if image name ends with dash
+	if strings.Contains(imageRef, ":") {
+		colonIndex := strings.LastIndex(imageRef, ":")
+		if colonIndex > 0 {
+			imageName := imageRef[:colonIndex]
+			if strings.HasSuffix(imageName, "-") {
+				return fmt.Errorf("invalid image reference format: %s", imageRef)
+			}
+		}
+	} else {
+		// For images without tags, check if the entire string ends with dash
+		if strings.HasSuffix(imageRef, "-") {
+			return fmt.Errorf("invalid image reference format: %s", imageRef)
+		}
 	}
 
 	return nil
@@ -456,8 +538,24 @@ func (rm *RegistryManager) validateTagInputs(sourceImage, targetImage string) er
 
 	// Validate both image references
 	for _, img := range []string{sourceImage, targetImage} {
-		if strings.HasPrefix(img, "-") || strings.HasSuffix(img, "-") {
+		if strings.HasPrefix(img, "-") {
 			return fmt.Errorf("invalid image reference format: %s", img)
+		}
+
+		// For images with tags (containing ":"), check if image name ends with dash
+		if strings.Contains(img, ":") {
+			colonIndex := strings.LastIndex(img, ":")
+			if colonIndex > 0 {
+				imageName := img[:colonIndex]
+				if strings.HasSuffix(imageName, "-") {
+					return fmt.Errorf("invalid image reference format: %s", img)
+				}
+			}
+		} else {
+			// For images without tags, check if the entire string ends with dash
+			if strings.HasSuffix(img, "-") {
+				return fmt.Errorf("invalid image reference format: %s", img)
+			}
 		}
 	}
 

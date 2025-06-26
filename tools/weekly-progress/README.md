@@ -88,7 +88,7 @@ Prioritized list with:
 ### Text Format
 ```
 ═══════════════════════════════════════════
-       WEEKLY QUALITY PROGRESS REPORT       
+       WEEKLY QUALITY PROGRESS REPORT
 ═══════════════════════════════════════════
 
 Period: Jan 3, 2024 - Jan 10, 2024
@@ -166,7 +166,7 @@ Add to your GitHub Actions workflow:
   if: github.event.schedule == '0 9 * * 1'  # Monday 9 AM
   run: |
     ./scripts/generate-weekly-report.sh
-    
+
 - name: Upload Weekly Report
   uses: actions/upload-artifact@v4
   with:

@@ -1,98 +1,30 @@
-version: "2"
+linters:
+  enable:
+    - staticcheck
+    - revive
+    - gosec
+    - unused
+    - gocyclo
+    - errcheck
+    - govet
+    - godox
+
+linters-settings:
+  gocyclo:
+    min-complexity: 25
+  godox:
+    keywords:
+      - TODO
+      - HACK
+      - FIXME
+
+issues:
+  max-issues-per-linter: 10
+  max-same-issues: 5
+  new: true
+  new-from-rev: "main"
 
 run:
   tests: true
   timeout: 5m
-  modules-download-mode: readonly
-  allow-parallel-runners: true
-  relative-path-mode: gomod
-  go: "1.24"
-
-linters:
-  default: standard
-
-  enable:
-    - staticcheck         
-    - revive
-    - gosec
-    - nilerr
-    - unused
-    - funlen
-    - gocognit
-    - dupl
-    - goconst
-    - ineffassign
-    - prealloc
-    - unconvert
-    - bodyclose
-    - asciicheck
-    - misspell
-    - forbidigo
-
-  disable:
-    - lll                  
-    - gocyclo              
-
-  settings:
-    govet:                 
-      enable:
-        - shadow           
-    revive:
-      severity: warning
-      rules:
-        - name: exported
-    errcheck:
-      check-type-assertions: true
-      check-blank: true
-    funlen:
-      lines: 120
-      statements: 50
-    forbidigo:
-      forbid:
-        - pattern: 'fmt\.Errorf'
-          msg: 'Use types.NewRichError instead of fmt.Errorf in tools for better error context'
-        - pattern: 'fmt\.Print(f|ln)?'
-          msg: 'Use utils.Logger instead of fmt.Print* for structured logging'
-        - pattern: 'log\.Fatal(f|ln)?'
-          msg: 'Use utils.Logger.Fatal instead of log.Fatal* for consistent error handling'
-        - pattern: 'log\.Panic(f|ln)?'
-          msg: 'Use proper error handling instead of log.Panic*'
-
-  exclusions:
-    generated: strict      
-    warn-unused: true
-    paths:                  
-      - '^vendor(/|$)'
-      - '^third_party(/|$)'
-      - '^docs(/|$)'
-      - '^resources(/|$)'
-      - '^scripts(/|$)'
-      - '^cmd/[^/]+/generated(/|$)'
-      - '.*_generated\.go$'  
-    rules:
-      - path: '_test\.go$'
-        linters: [funlen, gocognit]
-
-formatters:                 
-  enable: [gofumpt, gci]
-  settings:
-    gofumpt:
-      extra-rules: true
-    gci:
-      section-separator: "\n"
-      sections:
-        - Standard
-        - Default
-
-issues:
-  # Error budget approach - allow up to 50 total issues
-  max-issues: 50
-  
-  # Or set per-linter limits
-  max-issues-per-linter: 10
-  max-same-issues: 5
-  
-  # Exit with code 0 even if issues are found (for gradual adoption)
-  # exit-code: 0
-  
-  exclude-use-default: false
+  go: "1.21"

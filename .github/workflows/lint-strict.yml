@@ -1,0 +1,201 @@
+name: Code Quality Checks
+
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.golangci.yml'
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Check formatting
+      run: |
+        # Check gofmt
+        unformatted=$(gofmt -s -l .)
+        if [ -n "$unformatted" ]; then
+          echo "⚠️ The following files need formatting:"
+          echo "$unformatted"
+          echo ""
+          echo "Run 'make fmt' to fix formatting issues"
+          echo ""
+          echo "::warning::Found ${#unformatted[@]} files that need formatting"
+          # Don't fail - just warn for consistency with ratcheting approach
+        else
+          echo "✅ All files are properly formatted"
+        fi
+
+        # Check goimports
+        go install golang.org/x/tools/cmd/goimports@latest
+        unimported=$(goimports -l .)
+        if [ -n "$unimported" ]; then
+          echo "⚠️ The following files have import issues:"
+          echo "$unimported"
+          echo ""
+          echo "Run 'make fmt' to fix import issues"
+          echo "::warning::Found ${#unimported[@]} files with import issues"
+        else
+          echo "✅ All imports are properly organized"
+        fi
+
+  lint-new-code:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for new-from-rev
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: golangci-lint (new code only)
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=10m --new-from-rev=origin/${{ github.base_ref }}
+
+  technical-debt-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for diff
+
+    - name: Check for TODO/HACK comments (ratcheting)
+      run: |
+        # Count existing TODOs in base branch
+        git checkout origin/${{ github.base_ref }}
+        EXISTING_TODOS=$(grep -r "TODO\|HACK\|FIXME" --include="*.go" . | wc -l || echo "0")
+
+        # Count TODOs in PR branch
+        git checkout ${{ github.sha }}
+        CURRENT_TODOS=$(grep -r "TODO\|HACK\|FIXME" --include="*.go" . | wc -l || echo "0")
+
+        echo "Technical debt markers:"
+        echo "Base branch: $EXISTING_TODOS"
+        echo "This PR: $CURRENT_TODOS"
+        echo "Change: $((CURRENT_TODOS - EXISTING_TODOS))"
+
+        # Show new TODOs added
+        NEW_TODOS=$(git diff origin/${{ github.base_ref }}..HEAD | grep -E '^\+.*TODO|HACK|FIXME' | wc -l)
+        if [ "$NEW_TODOS" -gt 0 ]; then
+          echo ""
+          echo "⚠️ Found $NEW_TODOS new TODO/HACK comments:"
+          git diff origin/${{ github.base_ref }}..HEAD | grep -E '^\+.*TODO|HACK|FIXME' -B 2 -A 2
+
+          # Warn if significant increase
+          if [ "$NEW_TODOS" -gt 5 ]; then
+            echo "::warning::Added $NEW_TODOS new technical debt markers - consider addressing some before merging"
+          fi
+        fi
+
+        # Only fail if there's a massive increase (ratcheting with tolerance)
+        if [ "$((CURRENT_TODOS - EXISTING_TODOS))" -gt 10 ]; then
+          echo "❌ Too many new TODOs added (limit: 10 per PR)"
+          exit 1
+        fi
+
+  complexity-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for diff
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Check cyclomatic complexity in changed files
+      run: |
+        # Install gocyclo
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+
+        # Get changed Go files
+        CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD | grep '\.go$' || true)
+
+        if [ -n "$CHANGED_FILES" ]; then
+          echo "Checking cyclomatic complexity in changed files..."
+
+          # Track if we have any very complex functions
+          very_complex_count=0
+
+          # Check complexity only in changed files
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              # Check for functions over 25 (fail threshold)
+              very_complex=$(gocyclo -over 25 "$file" || true)
+              if [ -n "$very_complex" ]; then
+                echo "❌ Very complex functions (>25) in $file:"
+                echo "$very_complex"
+                very_complex_count=$((very_complex_count + 1))
+              fi
+
+              # Check for functions over 20 (warning threshold)
+              complex=$(gocyclo -over 20 "$file" || true)
+              if [ -n "$complex" ]; then
+                echo "⚠️ Complex functions (>20) in $file:"
+                echo "$complex"
+                echo "::warning file=$file::Functions with cyclomatic complexity > 20"
+              fi
+            fi
+          done
+
+          # Fail only for very complex new functions
+          if [ "$very_complex_count" -gt 0 ]; then
+            echo ""
+            echo "❌ Found functions with cyclomatic complexity > 25"
+            echo "Please refactor these before merging"
+            exit 1
+          else
+            echo "✅ No extremely complex functions added"
+          fi
+        else
+          echo "✅ No Go files changed"
+        fi
+
+  error-handling-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Check error handling
+      run: |
+        # Check for unchecked errors in changed files
+        echo "Checking error handling in changed files..."
+
+        # Get changed Go files
+        CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD | grep '\.go$' || true)
+
+        if [ -n "$CHANGED_FILES" ]; then
+          warning_count=0
+          # Look for common patterns of unchecked errors
+          for file in $CHANGED_FILES; do
+            # Check for assignments that look like they return errors but aren't checked
+            unchecked=$(grep -n 'err :=' "$file" | grep -v 'if err' | grep -v '// nolint' | grep -v '// ignore' || true)
+            if [ -n "$unchecked" ]; then
+              echo "⚠️ Potential unchecked errors in $file:"
+              echo "$unchecked"
+              warning_count=$((warning_count + 1))
+              echo "::warning file=$file::Potential unchecked errors found"
+            fi
+          done
+
+          if [ "$warning_count" -eq 0 ]; then
+            echo "✅ No obvious unchecked errors found"
+          fi
+        fi

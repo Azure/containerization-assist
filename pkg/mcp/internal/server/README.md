@@ -68,17 +68,17 @@ import (
 
 func main() {
     logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-    
+
     // Open database
     db, err := bbolt.Open("/tmp/mcp.db", 0600, nil)
     if err != nil {
         panic(err)
     }
     defer db.Close()
-    
+
     // Create legacy orchestrator (from existing MCP system)
     legacyOrchestrator := createLegacyOrchestrator()
-    
+
     // Create unified server in dual mode
     server, err := server.NewUnifiedMCPServer(
         db,
@@ -89,7 +89,7 @@ func main() {
     if err != nil {
         panic(err)
     }
-    
+
     // Server is ready to handle both chat and workflow requests
     startMCPServer(server)
 }

@@ -116,10 +116,10 @@ func TestFunctionName_Scenario(t *testing.T) {
     // Arrange
     ctx := context.Background()
     args := buildTestArgs()
-    
+
     // Act
     result, err := functionUnderTest(ctx, args)
-    
+
     // Assert
     require.NoError(t, err)
     assert.Equal(t, expected, result.Field)
@@ -294,7 +294,7 @@ return &RichError{
 ```
 pkg/mcp/internal/
 ├── tools/           # Tool implementations
-├── core/           # Core server functionality  
+├── core/           # Core server functionality
 ├── types/          # Shared type definitions
 ├── utils/          # Shared utilities
 ├── transport/      # Transport layer
@@ -308,11 +308,11 @@ import (
     "context"
     "fmt"
     "os"
-    
+
     // Third-party
     "github.com/rs/zerolog"
     "github.com/stretchr/testify/assert"
-    
+
     // Internal
     "github.com/Azure/container-copilot/pkg/mcp/internal/types"
     "github.com/Azure/container-copilot/pkg/mcp/utils"
@@ -388,6 +388,6 @@ make bench                 # Performance benchmarks
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: 2025-06-24  
+**Version**: 1.0
+**Last Updated**: 2025-06-24
 **Next Review**: Quarterly (2025-09-24)

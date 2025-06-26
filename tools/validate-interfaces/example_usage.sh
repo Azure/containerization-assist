@@ -22,10 +22,10 @@ if [ -f "detailed_interface_metrics.json" ]; then
     echo "Total implementors found: $(jq '.total_implementors' detailed_interface_metrics.json)"
     echo "Overall compliance: $(jq '.compliance_report.overall_compliance' detailed_interface_metrics.json)%"
     echo "Migration rate: $(jq '.pattern_analysis.pattern_migration_rate' detailed_interface_metrics.json)%"
-    
+
     echo -e "\nTop interface by adoption:"
     jq -r '.interface_stats | to_entries | sort_by(.value.implementor_count) | reverse | .[0] | "\(.key): \(.value.implementor_count) implementations"' detailed_interface_metrics.json
-    
+
     echo -e "\nRecommendations:"
     jq -r '.recommendations[]' detailed_interface_metrics.json | sed 's/^/  • /'
 fi

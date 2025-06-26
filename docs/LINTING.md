@@ -96,7 +96,7 @@ jq '.Issues | group_by(.FromLinter) | map({linter: .[0].FromLinter, count: lengt
    ```go
    // Bad
    result, _ := someFunc()
-   
+
    // Good
    result, err := someFunc()
    if err != nil {
@@ -116,7 +116,7 @@ jq '.Issues | group_by(.FromLinter) | map({linter: .[0].FromLinter, count: lengt
    if err != nil {
        err := doSomethingElse() // shadows outer err
    }
-   
+
    // Good
    err := doSomething()
    if err != nil {

@@ -201,14 +201,14 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { 
+        body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 20px;
             background: #f5f7fa;
         }
         .container { max-width: 1400px; margin: 0 auto; }
-        .header { 
+        .header {
             background: white;
             padding: 20px;
             border-radius: 8px;
@@ -256,12 +256,12 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
             border-radius: 4px;
             border-left: 4px solid;
         }
-        .alert.critical { 
-            background: #fee; 
+        .alert.critical {
+            background: #fee;
             border-color: #ef4444;
         }
-        .alert.warning { 
-            background: #fef3c7; 
+        .alert.warning {
+            background: #fef3c7;
             border-color: #f59e0b;
         }
         .slo-grid {
@@ -297,35 +297,35 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
             <h1>MCP Telemetry Dashboard</h1>
             <p>Real-time observability and monitoring</p>
         </div>
-        
+
         <div id="metrics-container">Loading...</div>
         <div id="alerts-container"></div>
         <div id="slo-container"></div>
     </div>
-    
+
     <script>
         async function updateDashboard() {
             try {
                 const response = await fetch('/metrics/enhanced');
                 const data = await response.json();
-                
+
                 // Update metrics
                 const metricsHtml = generateMetricsHTML(data);
                 document.getElementById('metrics-container').innerHTML = metricsHtml;
-                
+
                 // Update alerts
                 const alertsHtml = generateAlertsHTML(data.dashboard?.alerts || []);
                 document.getElementById('alerts-container').innerHTML = alertsHtml;
-                
+
                 // Update SLOs
                 const sloHtml = generateSLOHTML(data.dashboard?.slo_status || {});
                 document.getElementById('slo-container').innerHTML = sloHtml;
-                
+
             } catch (error) {
                 console.error('Failed to update dashboard:', error);
             }
         }
-        
+
         function generateMetricsHTML(data) {
             const metrics = [
                 {
@@ -359,18 +359,18 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
                     trend: data.dashboard?.trends?.goroutines
                 }
             ];
-            
-            return '<div class="metrics-grid">' + 
-                metrics.map(m => generateMetricCard(m)).join('') + 
+
+            return '<div class="metrics-grid">' +
+                metrics.map(m => generateMetricCard(m)).join('') +
                 '</div>';
         }
-        
+
         function generateMetricCard(metric) {
             const trendClass = metric.trend?.trend || 'stable';
             const trendSymbol = trendClass === 'up' ? '↑' : trendClass === 'down' ? '↓' : '→';
-            const trendText = metric.trend ? 
+            const trendText = metric.trend ?
                 ` + "`" + `<div class="trend ${trendClass}">${trendSymbol} ${Math.abs(metric.trend.change).toFixed(1)}%</div>` + "`" + ` : '';
-            
+
             return ` + "`" + `
                 <div class="metric-card">
                     <div class="metric-label">${metric.label}</div>
@@ -379,12 +379,12 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
                 </div>
             ` + "`" + `;
         }
-        
+
         function generateAlertsHTML(alerts) {
             if (!alerts || alerts.length === 0) {
                 return '';
             }
-            
+
             return ` + "`" + `
                 <div class="alerts">
                     <h2>Active Alerts</h2>
@@ -398,30 +398,30 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
                 </div>
             ` + "`" + `;
         }
-        
+
         function generateSLOHTML(sloStatus) {
             const slos = Object.entries(sloStatus);
             if (slos.length === 0) {
                 return '';
             }
-            
+
             return ` + "`" + `
                 <div class="alerts">
                     <h2>SLO Status</h2>
                     <div class="slo-grid">
                         ${slos.map(([name, slo]) => {
-                            const fillClass = slo.compliant ? '' : 
+                            const fillClass = slo.compliant ? '' :
                                 slo.error_budget_left < 20 ? 'critical' : 'warning';
                             return ` + "`" + `
                                 <div class="slo-item">
                                     <strong>${slo.name}</strong>
                                     <div class="slo-bar">
-                                        <div class="slo-fill ${fillClass}" 
+                                        <div class="slo-fill ${fillClass}"
                                              style="width: ${slo.current}%"></div>
                                     </div>
                                     <small>
-                                        Current: ${slo.current.toFixed(2)}% | 
-                                        Target: ${slo.target}% | 
+                                        Current: ${slo.current.toFixed(2)}% |
+                                        Target: ${slo.target}% |
                                         Budget: ${slo.error_budget_left.toFixed(1)}%
                                     </small>
                                 </div>
@@ -431,7 +431,7 @@ func (te *TelemetryExporter) serveDashboard(w http.ResponseWriter, r *http.Reque
                 </div>
             ` + "`" + `;
         }
-        
+
         // Update every 10 seconds
         updateDashboard();
         setInterval(updateDashboard, 10000);

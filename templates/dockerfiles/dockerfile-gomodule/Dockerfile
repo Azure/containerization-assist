@@ -12,5 +12,5 @@ ENV PORT=80
 EXPOSE 80
 
 WORKDIR /app
-COPY --from=builder /build/app-binary . 
+COPY --from=builder /build/app-binary .
 CMD ["/app/app-binary"]

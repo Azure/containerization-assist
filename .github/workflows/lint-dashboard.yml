@@ -10,25 +10,29 @@ on:
     paths:
       - '.github/lint-thresholds.json'
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   lint-report:
     name: Generate Lint Report
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
-    
+
     - name: Install tools
       run: |
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
         sudo apt-get update && sudo apt-get install -y jq
-    
+
     - name: Load thresholds
       id: thresholds
       run: |
@@ -36,60 +40,60 @@ jobs:
         echo "mcp_warning=$(jq -r '.thresholds.mcp.warning' .github/lint-thresholds.json)" >> $GITHUB_OUTPUT
         echo "core_error=$(jq -r '.thresholds.core.error' .github/lint-thresholds.json)" >> $GITHUB_OUTPUT
         echo "core_warning=$(jq -r '.thresholds.core.warning' .github/lint-thresholds.json)" >> $GITHUB_OUTPUT
-    
+
     - name: Run comprehensive lint analysis
       run: |
         # Create report directory
         mkdir -p lint-reports
-        
+
         # Function to analyze package group
         analyze_package() {
           local name=$1
           local packages=$2
           local output="lint-reports/${name}.json"
-          
+
           echo "Analyzing $name packages: $packages"
           golangci-lint run --out-format json --timeout=10m $packages > "$output" || true
-          
+
           # Generate statistics
           local count=$(jq '.Issues | length' "$output" 2>/dev/null || echo "0")
           echo "${name}_count=$count" >> lint-stats.txt
-          
+
           # Generate report
           echo "### $name Packages" >> lint-report.md
           echo "**Total Issues:** $count" >> lint-report.md
           echo "" >> lint-report.md
-          
+
           if [ $count -gt 0 ]; then
             echo "#### By Linter" >> lint-report.md
             jq -r '.Issues | group_by(.FromLinter) | map("- \(.[0].FromLinter): \(length)") | .[]' "$output" >> lint-report.md
             echo "" >> lint-report.md
-            
+
             echo "#### By Severity" >> lint-report.md
             jq -r '.Issues | group_by(.Severity) | map("- \(.[0].Severity // "warning"): \(length)") | .[]' "$output" >> lint-report.md
             echo "" >> lint-report.md
           fi
         }
-        
+
         # Initialize report
         echo "# Lint Report - $(date +%Y-%m-%d)" > lint-report.md
         echo "" >> lint-report.md
-        
+
         # Analyze each package group
         analyze_package "MCP" "./pkg/mcp/..."
         analyze_package "Core" "./pkg/core/... ./pkg/pipeline/... ./pkg/utils/... ./pkg/docker/... ./pkg/k8s/... ./pkg/kind/..."
         analyze_package "CLI" "./pkg/ai/..."
         analyze_package "All" "./..."
-        
+
         # Load statistics
         source lint-stats.txt
-        
+
         # Generate summary
         echo "## Summary" >> lint-report.md
         echo "" >> lint-report.md
         echo "| Package Group | Issues | Error Threshold | Warning Threshold | Status |" >> lint-report.md
         echo "|---------------|--------|-----------------|-------------------|--------|" >> lint-report.md
-        
+
         # MCP status
         if [ $MCP_count -gt ${{ steps.thresholds.outputs.mcp_error }} ]; then
           mcp_status="❌ Over Error"
@@ -99,7 +103,7 @@ jobs:
           mcp_status="✅ OK"
         fi
         echo "| MCP | $MCP_count | ${{ steps.thresholds.outputs.mcp_error }} | ${{ steps.thresholds.outputs.mcp_warning }} | $mcp_status |" >> lint-report.md
-        
+
         # Core status
         if [ $Core_count -gt ${{ steps.thresholds.outputs.core_error }} ]; then
           core_status="❌ Over Error"
@@ -109,24 +113,24 @@ jobs:
           core_status="✅ OK"
         fi
         echo "| Core | $Core_count | ${{ steps.thresholds.outputs.core_error }} | ${{ steps.thresholds.outputs.core_warning }} | $core_status |" >> lint-report.md
-        
+
         echo "" >> lint-report.md
-        
+
         # Progress tracking
         echo "## Progress Tracking" >> lint-report.md
         echo "" >> lint-report.md
         echo "### Historical Trend" >> lint-report.md
         echo "_(This section will be populated as we collect more data)_" >> lint-report.md
         echo "" >> lint-report.md
-        
+
         # Top issues
         echo "## Top Issues to Fix" >> lint-report.md
         echo "" >> lint-report.md
         jq -s '[.[] | .Issues // []] | add | group_by(.Text) | sort_by(-length) | .[0:10] | map("1. **\(length)x**: \(.[0].Text | split("\n")[0]) (\(.[0].FromLinter))")[]' lint-reports/*.json >> lint-report.md
-        
+
         # Copy to step summary
         cat lint-report.md >> $GITHUB_STEP_SUMMARY
-    
+
     - name: Create issue if over threshold
       if: github.event_name == 'schedule'
       uses: actions/github-script@v7
@@ -134,10 +138,10 @@ jobs:
         script: |
           const fs = require('fs');
           const report = fs.readFileSync('lint-report.md', 'utf8');
-          
+
           // Check if we're over any error thresholds
           const overError = report.includes('❌ Over Error');
-          
+
           if (overError) {
             // Check if there's already an open issue
             const issues = await github.rest.issues.listForRepo({
@@ -146,7 +150,7 @@ jobs:
               labels: 'lint-budget-exceeded',
               state: 'open'
             });
-            
+
             if (issues.data.length === 0) {
               // Create new issue
               await github.rest.issues.create({
@@ -158,14 +162,14 @@ jobs:
               });
             }
           }
-    
+
     - name: Upload lint reports
       uses: actions/upload-artifact@v4
       with:
         name: lint-reports
         path: lint-reports/
         retention-days: 30
-    
+
     - name: Update baseline (on main branch)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
@@ -180,7 +184,7 @@ jobs:
             \"all\": $All_count
           }
         }" > .lint-baseline.json
-        
+
         # Commit if changed
         if ! git diff --quiet .lint-baseline.json; then
           git config user.name "github-actions[bot]"

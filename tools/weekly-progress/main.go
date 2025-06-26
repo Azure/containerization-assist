@@ -592,7 +592,7 @@ func generateHTMLReport(report *WeeklyReport) string {
     <div class="container">
         <h1>Weekly Quality Progress Report</h1>
         <p><strong>Period:</strong> {{.StartDate.Format "Jan 2, 2006"}} - {{.EndDate.Format "Jan 2, 2006"}}</p>
-        
+
         <h2>📊 Key Metrics</h2>
         <div class="metrics-grid">
             <div class="metric-card">

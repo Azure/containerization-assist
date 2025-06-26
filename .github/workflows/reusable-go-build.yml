@@ -8,112 +8,112 @@ on:
         required: false
         type: string
         default: '1.24'
-      
+
       build-tags:
         description: 'Build tags to use (comma-separated)'
         required: false
         type: string
         default: ''
-      
+
       packages:
         description: 'Packages to build/test (space-separated)'
         required: false
         type: string
         default: './...'
-      
+
       enable-cache:
         description: 'Enable Go modules cache'
         required: false
         type: boolean
         default: true
-      
+
       run-tests:
         description: 'Run tests'
         required: false
         type: boolean
         default: true
-      
+
       run-race-tests:
         description: 'Run tests with race detector'
         required: false
         type: boolean
         default: true
-      
+
       run-lint:
         description: 'Run golangci-lint'
         required: false
         type: boolean
         default: false
-      
+
       lint-args:
         description: 'Additional arguments for golangci-lint'
         required: false
         type: string
         default: '--timeout=5m'
-      
+
       lint-error-threshold:
         description: 'Maximum allowed lint issues (0 = no limit)'
         required: false
         type: number
         default: 0
-      
+
       lint-warn-threshold:
         description: 'Warning threshold for lint issues'
         required: false
         type: number
         default: 0
-      
+
       build-binary:
         description: 'Build binary'
         required: false
         type: boolean
         default: false
-      
+
       binary-output:
         description: 'Output path for binary'
         required: false
         type: string
         default: ''
-      
+
       binary-main:
         description: 'Main package for binary'
         required: false
         type: string
         default: './main.go'
-      
+
       coverage:
         description: 'Generate coverage report'
         required: false
         type: boolean
         default: false
-      
+
       upload-coverage:
         description: 'Upload coverage to Codecov'
         required: false
         type: boolean
         default: false
-      
+
       coverage-flags:
         description: 'Codecov flags'
         required: false
         type: string
         default: ''
-      
+
       runner-os:
         description: 'Runner OS'
         required: false
         type: string
         default: 'ubuntu-latest'
-    
+
     outputs:
       build-success:
         description: 'Whether build succeeded'
         value: ${{ jobs.build.outputs.build-success }}
-      
+
       test-success:
         description: 'Whether tests succeeded'
         value: ${{ jobs.build.outputs.test-success }}
-      
+
       coverage-percentage:
         description: 'Test coverage percentage'
         value: ${{ jobs.build.outputs.coverage-percentage }}
@@ -122,21 +122,21 @@ jobs:
   build:
     name: Go Build & Test
     runs-on: ${{ inputs.runner-os }}
-    
+
     outputs:
       build-success: ${{ steps.build.outcome == 'success' }}
       test-success: ${{ steps.test.outcome == 'success' }}
       coverage-percentage: ${{ steps.coverage.outputs.percentage }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v5 # v5.5.0
         with:
           go-version: ${{ inputs.go-version }}
-      
+
       - name: Cache Go modules
         if: ${{ inputs.enable-cache }}
         uses: actions/cache@v4
@@ -145,24 +145,24 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      
+
       - name: Download dependencies
         run: go mod download
-      
+
       - name: Build packages
         id: build
         run: |
           echo "Building packages: ${{ inputs.packages }}"
           BUILD_SUCCESS=true
-          
+
           # Function to build packages
           build_packages() {
             local tags="$1"
             local packages="$2"
-            
+
             for pkg in $packages; do
               echo "Processing package: $pkg"
-              
+
               # For package paths with wildcards
               if [[ "$pkg" == *"..." ]]; then
                 # List all packages matching the pattern
@@ -171,12 +171,12 @@ jobs:
                 else
                   PKGS=$(go list -tags="$tags" "$pkg" 2>/dev/null || echo "")
                 fi
-                
+
                 if [ -z "$PKGS" ]; then
                   echo "No packages found for pattern: $pkg"
                   continue
                 fi
-                
+
                 # Build each package
                 for p in $PKGS; do
                   echo "Building package: $p"
@@ -187,7 +187,7 @@ jobs:
                     OUTPUT=$(go build -v -tags="$tags" "$p" 2>&1)
                     EXIT_CODE=$?
                   fi
-                  
+
                   # Check if it's a test-only package
                   if [[ "$OUTPUT" == *"no non-test Go files"* ]]; then
                     echo "Test-only package detected: $p - trying go test -c"
@@ -198,7 +198,7 @@ jobs:
                       TEST_OUTPUT=$(go test -c -tags="$tags" -o /dev/null "$p" 2>&1)
                       TEST_EXIT_CODE=$?
                     fi
-                    
+
                     if [ $TEST_EXIT_CODE -eq 0 ]; then
                       echo "✅ Test compilation successful for: $p"
                     else
@@ -224,7 +224,7 @@ jobs:
               fi
             done
           }
-          
+
           if [ -z "${{ inputs.build-tags }}" ]; then
             echo "Building without tags..."
             build_packages "" "${{ inputs.packages }}"
@@ -232,12 +232,12 @@ jobs:
             echo "Building with tags: ${{ inputs.build-tags }}"
             build_packages "${{ inputs.build-tags }}" "${{ inputs.packages }}"
           fi
-          
+
           if [ "$BUILD_SUCCESS" = false ]; then
             echo "Build failed"
             exit 1
           fi
-      
+
       - name: Build binary
         if: ${{ inputs.build-binary }}
         run: |
@@ -245,7 +245,7 @@ jobs:
           if [ -n "${{ inputs.binary-output }}" ]; then
             output_flag="-o ${{ inputs.binary-output }}"
           fi
-          
+
           if [ -z "${{ inputs.build-tags }}" ]; then
             echo "Building binary without tags..."
             go build $output_flag ${{ inputs.binary-main }}
@@ -253,7 +253,7 @@ jobs:
             echo "Building binary with tags: ${{ inputs.build-tags }}"
             go build -tags="${{ inputs.build-tags }}" $output_flag ${{ inputs.binary-main }}
           fi
-      
+
       - name: Run tests
         id: test
         if: ${{ inputs.run-tests }}
@@ -266,7 +266,7 @@ jobs:
             echo "Testing with tags: ${{ inputs.build-tags }}"
             go test -tags="${{ inputs.build-tags }}" ${{ inputs.packages }}
           fi
-      
+
       - name: Run tests with race detector
         id: test-race
         if: ${{ inputs.run-race-tests && runner.os == 'Linux' }}
@@ -279,7 +279,7 @@ jobs:
             echo "Race testing with tags: ${{ inputs.build-tags }}"
             go test -race -tags="${{ inputs.build-tags }}" ${{ inputs.packages }}
           fi
-      
+
       - name: Run golangci-lint
         id: lint
         if: ${{ inputs.run-lint }}
@@ -290,27 +290,27 @@ jobs:
             echo "Installing golangci-lint..."
             curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
           fi
-          
+
           # Run linter and capture results
           echo "Running golangci-lint..."
           if [ "${{ inputs.lint-error-threshold }}" -gt 0 ]; then
             # Run with JSON output for threshold checking
             golangci-lint run --out-format json ${{ inputs.lint-args }} ${{ inputs.packages }} > lint-results.json || true
-            
+
             # Count issues
             ISSUE_COUNT=$(jq '.Issues | length' lint-results.json 2>/dev/null || echo "0")
             echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
-            
+
             # Generate summary
             echo "## Lint Results" >> $GITHUB_STEP_SUMMARY
             echo "Total issues: $ISSUE_COUNT" >> $GITHUB_STEP_SUMMARY
-            
+
             if [ $ISSUE_COUNT -gt 0 ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "### Issues by Linter" >> $GITHUB_STEP_SUMMARY
               jq -r '.Issues | group_by(.FromLinter) | map("- **\(.[0].FromLinter)**: \(length)") | .[]' lint-results.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
             fi
-            
+
             # Check thresholds
             if [ $ISSUE_COUNT -gt ${{ inputs.lint-error-threshold }} ]; then
               echo "❌ Lint check failed: $ISSUE_COUNT issues found (threshold: ${{ inputs.lint-error-threshold }})"
@@ -324,7 +324,7 @@ jobs:
             # Standard linting without threshold
             golangci-lint run ${{ inputs.lint-args }} ${{ inputs.packages }}
           fi
-      
+
       - name: Generate coverage report
         id: coverage
         if: ${{ inputs.coverage }}
@@ -335,14 +335,14 @@ jobs:
           else
             go test -tags="${{ inputs.build-tags }}" -coverprofile=coverage.out ${{ inputs.packages }}
           fi
-          
+
           # Extract coverage percentage
           coverage_percent=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "percentage=$coverage_percent" >> $GITHUB_OUTPUT
-          
+
           echo "Coverage: $coverage_percent%"
           go tool cover -func=coverage.out
-      
+
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && inputs.coverage }}
         uses: codecov/codecov-action@v4
@@ -350,14 +350,14 @@ jobs:
           file: ./coverage.out
           flags: ${{ inputs.coverage-flags }}
           fail_ci_if_error: false
-      
+
       - name: Upload binary artifact
         if: ${{ inputs.build-binary && inputs.binary-output != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.binary-output }}-${{ runner.os }}
           path: ${{ inputs.binary-output }}
-      
+
       - name: Print summary
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY

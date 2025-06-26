@@ -15,7 +15,7 @@ jobs:
   coverage-check:
     name: Coverage Budget & Ratchet
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -23,12 +23,12 @@ jobs:
         fetch-depth: 0  # Need full history for ratchet comparison
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -65,20 +65,20 @@ jobs:
         # Extract total coverage
         TOTAL_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
         echo "Total coverage: ${TOTAL_COV}%"
-        
+
         # Read minimum threshold from config
         MIN_THRESHOLD=$(cat .github/coverage-thresholds.json | jq -r '.global.line_coverage.minimum')
         TARGET_THRESHOLD=$(cat .github/coverage-thresholds.json | jq -r '.global.line_coverage.target')
-        
+
         echo "Minimum threshold: ${MIN_THRESHOLD}%"
         echo "Target threshold: ${TARGET_THRESHOLD}%"
-        
+
         # Check if coverage meets minimum
         if (( $(echo "$TOTAL_COV < $MIN_THRESHOLD" | bc -l) )); then
           echo "❌ Coverage ${TOTAL_COV}% is below minimum threshold ${MIN_THRESHOLD}%"
           exit 1
         fi
-        
+
         # Check if coverage meets target
         if (( $(echo "$TOTAL_COV >= $TARGET_THRESHOLD" | bc -l) )); then
           echo "✅ Coverage ${TOTAL_COV}% meets target threshold ${TARGET_THRESHOLD}%"
@@ -92,19 +92,19 @@ jobs:
         # Get base branch coverage
         git checkout ${{ github.event.pull_request.base.sha }}
         go test -coverprofile=base-coverage.out ./... > /dev/null 2>&1 || true
-        
+
         if [ -f base-coverage.out ]; then
           BASE_COV=$(go tool cover -func=base-coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           git checkout ${{ github.event.pull_request.head.sha }}
           CURRENT_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          
+
           echo "Base coverage: ${BASE_COV}%"
           echo "Current coverage: ${CURRENT_COV}%"
-          
+
           # Calculate difference
           DIFF=$(echo "$CURRENT_COV - $BASE_COV" | bc -l)
           TOLERANCE=$(cat .github/coverage-thresholds.json | jq -r '.ratchet.regression_tolerance')
-          
+
           if (( $(echo "$DIFF < -$TOLERANCE" | bc -l) )); then
             echo "❌ Coverage regression detected: ${DIFF}% (tolerance: -${TOLERANCE}%)"
             echo "## Coverage Ratchet Failed ❌" >> $GITHUB_STEP_SUMMARY
@@ -131,46 +131,46 @@ jobs:
 
     - name: Comment coverage on PR
       if: github.event_name == 'pull_request'
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       with:
         script: |
           const fs = require('fs');
           const coverage = fs.readFileSync('coverage-summary.txt', 'utf8');
-          
+
           // GitHub comment limit is 65536 characters
           const maxBodyLength = 65000; // Leave some buffer
           const maxCoverageLength = maxBodyLength - 100; // Account for markdown formatting
-          
+
           let coverageText = coverage;
           let truncated = false;
-          
+
           if (coverage.length > maxCoverageLength) {
             // Keep the header and tail of the coverage report
             const lines = coverage.split('\n');
             const totalLine = lines[lines.length - 1] || lines[lines.length - 2]; // Get the total line
-            
+
             // Calculate how many lines we can include
             const headerLines = 20; // Show first 20 lines
             const footerLines = 5;  // Show last 5 lines including total
-            
+
             const header = lines.slice(0, headerLines).join('\n');
             const footer = lines.slice(-footerLines).join('\n');
-            
+
             coverageText = header + '\n\n... (truncated - showing first ' + headerLines + ' and last ' + footerLines + ' lines) ...\n\n' + footer;
             truncated = true;
           }
-          
+
           let body = `## Coverage Report\n\`\`\`\n${coverageText}\n\`\`\``;
-          
+
           if (truncated) {
             body += '\n\n*Note: Full coverage report was truncated due to size limits. Check the workflow artifacts for the complete report.*';
           }
-          
+
           // Final safety check
           if (body.length > maxBodyLength) {
             body = '## Coverage Report\n\nThe coverage report is too large to display in a comment. Please check the workflow artifacts for the full report.';
           }
-          
+
           github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,

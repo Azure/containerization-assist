@@ -18,22 +18,22 @@ for WORKTREE in $WORKTREES; do
     echo ""
     echo "📂 Syncing worktree: $WORKTREE"
     cd "$WORKTREE"
-    
+
     # Get current branch
     CURRENT_BRANCH=$(git branch --show-current)
-    
+
     # Skip if we're on gambtho/mcp itself to prevent circular merges
     if [ "$CURRENT_BRANCH" = "gambtho/mcp" ]; then
         echo "  ⏭️  Skipping gambtho/mcp branch (base branch should not be modified)"
         continue
     fi
-    
+
     # Check if this is a dry run
     if [ "$DRY_RUN" = "true" ]; then
         echo "  🧪 DRY RUN: Would sync $CURRENT_BRANCH with origin/gambtho/mcp"
         continue
     fi
-    
+
     # Check for uncommitted changes
     HAS_UNCOMMITTED=false
     if ! git diff --quiet || ! git diff --cached --quiet; then
@@ -41,15 +41,15 @@ for WORKTREE in $WORKTREES; do
         git stash push -m "Auto-stash before sync $(date)"
         HAS_UNCOMMITTED=true
     fi
-    
+
     # Fetch latest
     echo "  📥 Fetching latest changes..."
     git fetch origin
-    
+
     # Check if there are changes to sync
     LOCAL_COMMIT=$(git rev-parse HEAD)
     REMOTE_COMMIT=$(git rev-parse origin/gambtho/mcp)
-    
+
     if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
         echo "  ✅ Already up to date with origin/gambtho/mcp"
     else
@@ -81,7 +81,7 @@ for WORKTREE in $WORKTREES; do
             fi
         fi
     fi
-    
+
     # Pop stash if we stashed
     if [ "$HAS_UNCOMMITTED" = "true" ]; then
         if git stash list | grep -q "Auto-stash before sync"; then
@@ -95,7 +95,7 @@ for WORKTREE in $WORKTREES; do
             fi
         fi
     fi
-    
+
     # Quick build check (optional)
     if command -v go >/dev/null 2>&1; then
         echo "  🔨 Quick build check..."
@@ -105,12 +105,12 @@ for WORKTREE in $WORKTREES; do
             echo "  ⚠️  Build check failed - may need attention"
         fi
     fi
-    
+
     # Safety check: Ensure we never accidentally push to gambtho/mcp
     if [ "$CURRENT_BRANCH" != "gambtho/mcp" ]; then
         echo "  🔒 Safety check: Branch $CURRENT_BRANCH confirmed (not gambtho/mcp)"
     fi
-    
+
     echo "  ✅ Worktree synced!"
 done
 
