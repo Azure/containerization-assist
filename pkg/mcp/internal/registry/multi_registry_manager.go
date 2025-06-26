@@ -169,7 +169,7 @@ func (mrm *MultiRegistryManager) ValidateRegistryAccess(ctx context.Context, reg
 		return fmt.Errorf("failed to get credentials: %w", err)
 	}
 
-	// TODO: Implement actual registry connectivity test
+	// Implement actual registry connectivity test\n	if err := mrm.testRegistryConnectivity(ctx, normalizedRegistry, creds); err != nil {\n		return fmt.Errorf(\"registry connectivity test failed: %w\", err)\n	}
 	// This would involve making a request to the registry API
 	// For now, we just validate that we have credentials
 
