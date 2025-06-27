@@ -18,9 +18,16 @@ type PipelineState struct {
 	Success        bool
 	TokenUsage     ai.TokenUsage
 	Metadata       map[MetadataKey]any //Flexible storage
+	DetectedDatabases []DatabaseDetectionResult
 	StageHistory   []StageVisit
 	ExtraContext   string             // Additional context for AI models passed from the CLI
 	LLMCompletions []ai.LLMCompletion `json:"llm_completions,omitempty"`
+}
+
+type DatabaseDetectionResult struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
 }
 
 type StageOutcome string
