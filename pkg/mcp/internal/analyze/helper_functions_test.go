@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -364,7 +365,7 @@ func TestCalculateDirectorySize(t *testing.T) {
 	}
 }
 
-// Test AnalyzeRepositoryRedirectTool metadata and constructor
+// Test AnalyzeRepositoryRedirectTool metadata, constructor, and validation
 func TestAnalyzeRepositoryRedirectTool(t *testing.T) {
 	logger := zerolog.Nop()
 
@@ -421,6 +422,76 @@ func TestAnalyzeRepositoryRedirectTool(t *testing.T) {
 			t.Errorf("Expected capability '%s' not found", capability)
 		}
 	}
+
+	// Test Validate function
+	t.Run("Validate", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Test valid arguments with repo_path
+		validArgs := map[string]interface{}{
+			"session_id": "session-123",
+			"repo_path":  "/tmp/test-repo",
+		}
+		err := tool.Validate(ctx, validArgs)
+		if err != nil {
+			t.Errorf("Validate should not return error for valid args: %v", err)
+		}
+
+		// Test valid arguments with path instead of repo_path
+		validArgsPath := map[string]interface{}{
+			"session_id": "session-123",
+			"path":       "/tmp/test-repo",
+		}
+		err = tool.Validate(ctx, validArgsPath)
+		if err != nil {
+			t.Errorf("Validate should not return error for valid args with path: %v", err)
+		}
+
+		// Test valid arguments without session_id (should be optional)
+		validArgsNoSession := map[string]interface{}{
+			"repo_path": "/tmp/test-repo",
+		}
+		err = tool.Validate(ctx, validArgsNoSession)
+		if err != nil {
+			t.Errorf("Validate should not return error when session_id is missing: %v", err)
+		}
+
+		// Test invalid argument type
+		invalidArgs := "not a map"
+		err = tool.Validate(ctx, invalidArgs)
+		if err == nil {
+			t.Error("Validate should return error for invalid argument type")
+		}
+		if !contains(err.Error(), "invalid argument type") {
+			t.Errorf("Error should mention invalid argument type, got: %s", err.Error())
+		}
+
+		// Test missing repo_path and path
+		missingPathArgs := map[string]interface{}{
+			"session_id": "session-123",
+		}
+		err = tool.Validate(ctx, missingPathArgs)
+		if err == nil {
+			t.Error("Validate should return error when both repo_path and path are missing")
+		}
+		if !contains(err.Error(), "repo_path or path is required") {
+			t.Errorf("Error should mention required path, got: %s", err.Error())
+		}
+
+		// Test empty repo_path and path
+		emptyPathArgs := map[string]interface{}{
+			"session_id": "session-123",
+			"repo_path":  "",
+			"path":       "",
+		}
+		err = tool.Validate(ctx, emptyPathArgs)
+		if err == nil {
+			t.Error("Validate should return error when both repo_path and path are empty")
+		}
+		if !contains(err.Error(), "repo_path or path is required") {
+			t.Errorf("Error should mention required path, got: %s", err.Error())
+		}
+	})
 }
 
 // Test types and constructors
