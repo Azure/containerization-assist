@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -33,7 +34,7 @@ func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 	switch sess := session.(type) {
 	case *sessiontypes.SessionState:
 		if sess.SessionID == "" {
-			return fmt.Errorf("session ID is required for updates")
+			return errors.Validation("core/server", "session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
 			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
@@ -42,7 +43,7 @@ func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 		})
 	case sessiontypes.SessionState:
 		if sess.SessionID == "" {
-			return fmt.Errorf("session ID is required for updates")
+			return errors.Validation("core/server", "session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
 			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
@@ -108,7 +109,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	if config.StorePath != "" {
 		if err := os.MkdirAll(filepath.Dir(config.StorePath), 0o755); err != nil {
 			logger.Error().Err(err).Str("path", config.StorePath).Msg("Failed to create storage directory")
-			return nil, fmt.Errorf("failed to create storage directory %s: %w", config.StorePath, err)
+			return nil, errors.Wrapf(err, "core/server", "failed to create storage directory %s", config.StorePath)
 		}
 	}
 
@@ -124,7 +125,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize session manager")
-		return nil, fmt.Errorf("failed to initialize session manager: %w", err)
+		return nil, errors.Wrap(err, "core/server", "failed to initialize session manager")
 	}
 
 	// Initialize workspace manager
@@ -138,7 +139,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize workspace manager")
-		return nil, fmt.Errorf("failed to initialize workspace manager: %w", err)
+		return nil, errors.Wrap(err, "core/server", "failed to initialize workspace manager")
 	}
 
 	// Initialize circuit breakers
@@ -215,7 +216,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		// Validate OTEL configuration
 		if err := otelConfig.Validate(); err != nil {
 			logger.Error().Err(err).Msg("Failed to validate OpenTelemetry configuration")
-			return nil, fmt.Errorf("failed to validate OpenTelemetry configuration: %w", err)
+			return nil, errors.Wrap(err, "core/server", "failed to validate OpenTelemetry configuration")
 		}
 
 		// Create and initialize OTEL provider
@@ -223,7 +224,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		ctx := context.Background()
 		if err := otelProvider.Initialize(ctx); err != nil {
 			logger.Error().Err(err).Msg("Failed to initialize OpenTelemetry provider")
-			return nil, fmt.Errorf("failed to initialize OpenTelemetry provider: %w", err)
+			return nil, errors.Wrap(err, "core/server", "failed to initialize OpenTelemetry provider")
 		}
 
 		// Create server instrumentation
@@ -309,7 +310,7 @@ func (s *Server) GetWorkspaceManager() interface{} {
 func (s *Server) ExportToolSchemas(outputPath string) error {
 	// Get the tool registry from gomcp manager
 	if s.gomcpManager == nil || !s.gomcpManager.isInitialized {
-		return fmt.Errorf("server not properly initialized")
+		return errors.Internal("core/server", "server not properly initialized")
 	}
 
 	s.logger.Info().
@@ -332,17 +333,17 @@ func (s *Server) ExportToolSchemas(outputPath string) error {
 
 	// Ensure output directory exists
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+		return errors.Wrap(err, "core/server", "failed to create output directory")
 	}
 
 	// Write to file
 	data, err := json.MarshalIndent(schemas, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
+		return errors.Wrap(err, "core/server", "failed to marshal JSON")
 	}
 
 	if err := os.WriteFile(outputPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
+		return errors.Wrap(err, "core/server", "failed to write file")
 	}
 
 	s.logger.Info().

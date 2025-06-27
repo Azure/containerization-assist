@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -338,15 +339,15 @@ CMD ["./main"]`
 		}
 
 		// Test string extraction
-		result := utils.GetStringFromMap(testMap, "string_key")
+		result := genericutils.MapGetWithDefault[string](testMap, "string_key", "")
 		assert.Equal(t, "string_value", result)
 
 		// Test non-existent key
-		result = utils.GetStringFromMap(testMap, "missing_key")
+		result = genericutils.MapGetWithDefault[string](testMap, "missing_key", "")
 		assert.Equal(t, "", result)
 
 		// Test wrong type
-		result = utils.GetStringFromMap(testMap, "int_key")
+		result = genericutils.MapGetWithDefault[string](testMap, "int_key", "")
 		assert.Equal(t, "", result)
 	})
 }
@@ -358,15 +359,15 @@ func TestErrorHandling(t *testing.T) {
 		wrappedErr := utils.WrapError(originalErr, "test operation")
 
 		assert.Error(t, wrappedErr)
-		assert.Contains(t, wrappedErr.Error(), "failed to test operation")
+		assert.Contains(t, wrappedErr.Error(), "test operation")
 		assert.Contains(t, wrappedErr.Error(), originalErr.Error())
 	})
 
 	t.Run("NewError", func(t *testing.T) {
-		err := utils.NewError("test operation", "something went wrong")
+		err := utils.NewError("test operation: something went wrong", map[string]interface{}{"operation": "test"})
 
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to test operation")
+		assert.Contains(t, err.Error(), "test operation")
 		assert.Contains(t, err.Error(), "something went wrong")
 	})
 

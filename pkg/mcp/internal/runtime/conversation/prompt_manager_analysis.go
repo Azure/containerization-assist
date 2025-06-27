@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/genericutils"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
 
 // Analysis and Dockerfile generation helpers
@@ -75,11 +75,11 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 			state.RepoAnalysis = analysis
 
 			// Extract key information
-			language := publicutils.GetStringFromMap(analysis, "language")
+			language := genericutils.MapGetWithDefault[string](analysis, "language", "")
 			if language == "" {
 				language = "Unknown"
 			}
-			framework := publicutils.GetStringFromMap(analysis, "framework")
+			framework := genericutils.MapGetWithDefault[string](analysis, "framework", "")
 			entryPoints := pm.getStringSliceFromMap(analysis, "entry_points", []string{})
 
 			// Build response message
@@ -160,10 +160,10 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 	// Parse Dockerfile result
 	if result != nil {
 		if dockerResult, ok := result.(map[string]interface{}); ok {
-			content := publicutils.GetStringFromMap(dockerResult, "content")
+			content := genericutils.MapGetWithDefault[string](dockerResult, "content", "")
 			if content != "" {
 				state.Dockerfile.Content = content
-				path := publicutils.GetStringFromMap(dockerResult, "file_path")
+				path := genericutils.MapGetWithDefault[string](dockerResult, "file_path", "")
 				if path == "" {
 					path = "Dockerfile"
 				}
@@ -173,7 +173,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 				if validationData, ok := dockerResult["validation"].(map[string]interface{}); ok {
 					// Convert validation result to simplified format for storage
 					validation := &sessiontypes.ValidationResult{
-						Valid:       publicutils.GetBoolFromMap(validationData, "valid"),
+						Valid:       genericutils.MapGetWithDefault[bool](validationData, "valid", false),
 						ValidatedAt: time.Now(),
 					}
 
@@ -182,7 +182,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 						validation.ErrorCount = len(errors)
 						for _, err := range errors {
 							if errMap, ok := err.(map[string]interface{}); ok {
-								msg := publicutils.GetStringFromMap(errMap, "message")
+								msg := genericutils.MapGetWithDefault[string](errMap, "message", "")
 								if msg != "" {
 									validation.Errors = append(validation.Errors, msg)
 								}
@@ -194,7 +194,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 						validation.WarningCount = len(warnings)
 						for _, warn := range warnings {
 							if warnMap, ok := warn.(map[string]interface{}); ok {
-								msg := publicutils.GetStringFromMap(warnMap, "message")
+								msg := genericutils.MapGetWithDefault[string](warnMap, "message", "")
 								if msg != "" {
 									validation.Warnings = append(validation.Warnings, msg)
 								}

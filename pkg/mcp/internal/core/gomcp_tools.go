@@ -393,14 +393,9 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap := map[string]interface{}{
-				"session_id":    args.SessionID,
-				"repo_url":      args.RepoURL,
-				"branch":        args.Branch,
-				"context":       args.Context,
-				"language_hint": args.LanguageHint,
-				"shallow":       args.Shallow,
-				"dry_run":       args.DryRun,
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -426,15 +421,9 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 			}
 			args.SessionID = sessionID
 
-			argsMap := map[string]interface{}{
-				"session_id":           args.SessionID,
-				"base_image":           args.BaseImage,
-				"template":             args.Template,
-				"optimization":         args.Optimization,
-				"include_health_check": args.IncludeHealthCheck,
-				"build_args":           args.BuildArgs,
-				"platform":             args.Platform,
-				"dry_run":              args.DryRun,
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -460,18 +449,9 @@ func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegist
 			}
 			args.SessionID = sessionID
 
-			argsMap := map[string]interface{}{
-				"session_id":       args.SessionID,
-				"image_name":       args.ImageName,
-				"image_tag":        args.ImageTag,
-				"dockerfile_path":  args.DockerfilePath,
-				"build_context":    args.BuildContext,
-				"build_args":       args.BuildArgs,
-				"platform":         args.Platform,
-				"no_cache":         args.NoCache,
-				"push_after_build": args.PushAfterBuild,
-				"registry_url":     args.RegistryURL,
-				"dry_run":          args.DryRun,
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -497,13 +477,9 @@ func (gm *GomcpManager) registerPullImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap := map[string]interface{}{
-				"session_id":  args.SessionID,
-				"image_ref":   args.ImageRef,
-				"timeout":     args.Timeout,
-				"retry_count": args.RetryCount,
-				"force":       args.Force,
-				"dry_run":     args.DryRun,
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -529,12 +505,9 @@ func (gm *GomcpManager) registerTagImage(registrar *runtime.StandardToolRegistra
 			}
 			args.SessionID = sessionID
 
-			argsMap := map[string]interface{}{
-				"session_id":   args.SessionID,
-				"source_image": args.SourceImage,
-				"target_image": args.TargetImage,
-				"force":        args.Force,
-				"dry_run":      args.DryRun,
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -560,14 +533,9 @@ func (gm *GomcpManager) registerPushImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap := map[string]interface{}{
-				"session_id":   args.SessionID,
-				"image_ref":    args.ImageRef,
-				"registry_url": args.RegistryURL,
-				"timeout":      args.Timeout,
-				"retry_count":  args.RetryCount,
-				"force":        args.Force,
-				"dry_run":      args.DryRun,
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -588,25 +556,12 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 	runtime.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicDeployKubernetesArgs) (*deploy.AtomicDeployKubernetesResult, error) {
-			argsMap := map[string]interface{}{
-				"session_id":      args.SessionID,
-				"image_ref":       args.ImageRef,
-				"app_name":        args.AppName,
-				"namespace":       args.Namespace,
-				"replicas":        args.Replicas,
-				"port":            args.Port,
-				"service_type":    args.ServiceType,
-				"include_ingress": args.IncludeIngress,
-				"environment":     args.Environment,
-				"cpu_request":     args.CPURequest,
-				"memory_request":  args.MemoryRequest,
-				"cpu_limit":       args.CPULimit,
-				"memory_limit":    args.MemoryLimit,
-				"generate_only":   args.GenerateOnly,
-				"wait_for_ready":  args.WaitForReady,
-				"wait_timeout":    args.WaitTimeout,
-				"dry_run":         true,
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
+			// Force dry_run to true for validation
+			argsMap["dry_run"] = true
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "deploy_kubernetes_atomic", argsMap, nil)
@@ -636,26 +591,19 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "generate_manifests",
 		"Generate Kubernetes manifests for the containerized application",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicGenerateManifestsArgs) (*deploy.AtomicGenerateManifestsResult, error) {
-			argsMap := map[string]interface{}{
-				"session_id":      args.SessionID,
-				"image_ref":       args.ImageRef.Repository,
-				"app_name":        args.AppName,
-				"namespace":       args.Namespace,
-				"port":            args.Port,
-				"replicas":        args.Replicas,
-				"cpu_request":     args.CPURequest,
-				"memory_request":  args.MemoryRequest,
-				"cpu_limit":       args.CPULimit,
-				"memory_limit":    args.MemoryLimit,
-				"include_ingress": args.IncludeIngress,
-				"service_type":    args.ServiceType,
-				"environment":     args.Environment,
-				"secret_handling": args.SecretHandling,
-				"secret_manager":  args.SecretManager,
-				"generate_helm":   args.GenerateHelm,
-				"gitops_ready":    args.GitOpsReady,
-				"dry_run":         args.DryRun,
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "generate_manifests")
+			if err != nil {
+				return nil, err
 			}
+			args.SessionID = sessionID
+
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+			}
+			// Special handling for image_ref field
+			argsMap["image_ref"] = args.ImageRef.Repository
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
 			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests_atomic", argsMap, nil)
@@ -674,20 +622,16 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "validate_dockerfile",
 		"Validate a Dockerfile for best practices and potential issues",
 		func(ctx *gomcpserver.Context, args *analyze.AtomicValidateDockerfileArgs) (*analyze.AtomicValidateDockerfileResult, error) {
-			argsMap := map[string]interface{}{
-				"session_id":           args.SessionID,
-				"dockerfile_path":      args.DockerfilePath,
-				"dockerfile_content":   args.DockerfileContent,
-				"use_hadolint":         args.UseHadolint,
-				"severity":             args.Severity,
-				"ignore_rules":         args.IgnoreRules,
-				"trusted_registries":   args.TrustedRegistries,
-				"check_security":       args.CheckSecurity,
-				"check_optimization":   args.CheckOptimization,
-				"check_best_practices": args.CheckBestPractices,
-				"include_suggestions":  args.IncludeSuggestions,
-				"generate_fixes":       args.GenerateFixes,
-				"dry_run":              args.DryRun,
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "validate_dockerfile")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -707,17 +651,16 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_image_security",
 		"Scan Docker images for security vulnerabilities using Trivy",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
-			argsMap := map[string]interface{}{
-				"session_id":           args.SessionID,
-				"image_name":           args.ImageName,
-				"severity_threshold":   args.SeverityThreshold,
-				"vuln_types":           args.VulnTypes,
-				"include_fixable":      args.IncludeFixable,
-				"max_results":          args.MaxResults,
-				"include_remediations": args.IncludeRemediations,
-				"generate_report":      args.GenerateReport,
-				"fail_on_critical":     args.FailOnCritical,
-				"dry_run":              args.DryRun,
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_image_security")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -737,18 +680,16 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_secrets",
 		"Scan source code and configuration files for exposed secrets",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanSecretsArgs) (*scan.AtomicScanSecretsResult, error) {
-			argsMap := map[string]interface{}{
-				"session_id":          args.SessionID,
-				"scan_path":           args.ScanPath,
-				"file_patterns":       args.FilePatterns,
-				"exclude_patterns":    args.ExcludePatterns,
-				"scan_dockerfiles":    args.ScanDockerfiles,
-				"scan_manifests":      args.ScanManifests,
-				"scan_source_code":    args.ScanSourceCode,
-				"scan_env_files":      args.ScanEnvFiles,
-				"suggest_remediation": args.SuggestRemediation,
-				"generate_secrets":    args.GenerateSecrets,
-				"dry_run":             args.DryRun,
+			// Ensure session ID is set
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_secrets")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
+			argsMap, err := BuildArgsMap(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)

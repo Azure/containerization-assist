@@ -77,6 +77,7 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		GenerateSnapshot:          generateSnapshot,
 		GenerateReport:            generateReport,
 		TargetDirectory:           targetDir,
+		SnapshotCompletions:       snapshotCompletions,
 	}
 
 	runner := pipeline.NewRunner([]*pipeline.StageConfig{
@@ -134,6 +135,7 @@ func init() {
 	generateCmd.PersistentFlags().StringVarP(&registry, "registry", "r", "localhost:5001", "Docker registry to push the image to")
 	generateCmd.PersistentFlags().StringVarP(&dockerfileGenerator, "dockerfile-generator", "", "draft", "Which generator to use for the Dockerfile, options: draft, none")
 	generateCmd.PersistentFlags().BoolVarP(&generateSnapshot, "snapshot", "s", false, "Generate a snapshot of the Dockerfile and Kubernetes manifests generated in each iteration")
+	generateCmd.PersistentFlags().BoolVarP(&snapshotCompletions, "snapshot-completions", "", false, "Include LLM completions in snapshots")
 	generateCmd.PersistentFlags().BoolVarP(&generateReport, "report", "R", false, "Generate final run summary reports (JSON and Markdown).")
 	generateCmd.PersistentFlags().StringVarP(&targetRepo, "target-repo", "t", "", "Path to the repo to containerize")
 	generateCmd.PersistentFlags().DurationVarP(&timeout, "timeout", "", 10*time.Minute, "Timeout duration for generating artifacts")

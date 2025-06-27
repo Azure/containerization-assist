@@ -224,15 +224,6 @@ func (r Result[T]) Get() (T, bool) {
 	return r.value, r.err == nil
 }
 
-// Unwrap returns the value or panics if there's an error.
-// DEPRECATED: Use UnwrapOr or handle the error properly instead.
-func (r Result[T]) Unwrap() T {
-	if r.err != nil {
-		panic(fmt.Errorf("called Unwrap on error Result: %w", r.err))
-	}
-	return r.value
-}
-
 // Expect returns the value or panics with a custom message if there's an error.
 // Prefer this over Unwrap() when you want to provide context.
 func (r Result[T]) Expect(msg string) T {
@@ -248,15 +239,6 @@ func (r Result[T]) UnwrapOr(defaultValue T) T {
 		return defaultValue
 	}
 	return r.value
-}
-
-// UnwrapErr returns the error or panics if there's no error.
-// DEPRECATED: Check IsErr() first or handle both cases properly.
-func (r Result[T]) UnwrapErr() error {
-	if r.err == nil {
-		panic(fmt.Errorf("called UnwrapErr on ok Result"))
-	}
-	return r.err
 }
 
 // ExpectErr returns the error or panics with a custom message if there's no error.

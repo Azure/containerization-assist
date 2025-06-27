@@ -6,9 +6,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
+
+// getIntFromMap safely extracts an int value from a map with JSON number conversion support
+func getIntFromMap(m map[string]interface{}, key string) int {
+	// Try direct int first
+	if val, ok := genericutils.MapGet[int](m, key); ok {
+		return val
+	}
+	// Try float64 (common in JSON)
+	if val, ok := genericutils.MapGet[float64](m, key); ok {
+		return int(val)
+	}
+	// Try int64
+	if val, ok := genericutils.MapGet[int64](m, key); ok {
+		return int(val)
+	}
+	return 0
+}
 
 // handleBuildStage handles the Docker image build stage
 func (pm *PromptManager) handleBuildStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
@@ -119,9 +137,9 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 
 	// Format preview
 	details, _ := result.(map[string]interface{})
-	layers := publicutils.GetIntFromMap(details, "estimated_layers")
-	size := int64(publicutils.GetIntFromMap(details, "estimated_size"))
-	baseImage := publicutils.GetStringFromMap(details, "base_image")
+	layers := getIntFromMap(details, "estimated_layers")
+	size := int64(getIntFromMap(details, "estimated_size"))
+	baseImage := genericutils.MapGetWithDefault[string](details, "base_image", "")
 
 	response.Message = fmt.Sprintf(
 		"Build Preview:\n"+
@@ -183,24 +201,9 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 		response.Status = ResponseStatusError
 
 		// Attempt automatic fix before showing manual options
-		if pm.conversationHandler != nil {
-			autoFixResult, autoFixErr := pm.conversationHandler.attemptAutoFix(ctx, response.SessionID, types.StageBuild, err, state)
-			if autoFixErr == nil && autoFixResult != nil {
-				if autoFixResult.Success {
-					// Auto-fix succeeded, update response
-					response.Status = ResponseStatusSuccess
-					response.Message = fmt.Sprintf("Build issue resolved automatically!\n\nFixes applied: %s", strings.Join(autoFixResult.AttemptedFixes, ", "))
-					response.Options = []Option{
-						{ID: "continue", Label: "Continue to next stage", Recommended: true},
-						{ID: "review", Label: "Review changes"},
-					}
-					return response
-				}
-				// Auto-fix failed, show what was attempted and fallback options
-				response.Message = fmt.Sprintf("Build failed: %v\n\nAttempted fixes: %s\n\nWould you like to:", err, strings.Join(autoFixResult.AttemptedFixes, ", "))
-				response.Options = autoFixResult.FallbackOptions
-				return response
-			}
+		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, types.StageBuild, err, state) {
+			return response
 		}
 
 		// Fallback to original behavior if auto-fix is not available
@@ -249,7 +252,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 			"- Build time: %s\n\n"+
 			"Would you like to push this image to a registry?",
 		imageTag,
-		publicutils.FormatBytes(int64(publicutils.GetIntFromMap(details, "size"))),
+		publicutils.FormatBytes(int64(getIntFromMap(details, "size"))),
 		duration.Round(time.Second))
 
 	response.Options = []Option{
@@ -404,7 +407,20 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 		}
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
-		response.Message = fmt.Sprintf("Failed to push Docker image: %v", err)
+
+		// Attempt automatic fix before showing manual options
+		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, types.StagePush, err, state) {
+			return response
+		}
+
+		// Fallback to original behavior if auto-fix is not available
+		response.Message = fmt.Sprintf("Failed to push Docker image: %v\n\nWould you like to:", err)
+		response.Options = []Option{
+			{ID: "retry", Label: "Retry push"},
+			{ID: "local", Label: "Skip push, keep local"},
+			{ID: "registry", Label: "Change registry"},
+		}
 		return response
 	}
 

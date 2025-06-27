@@ -44,26 +44,33 @@ type ChatResult struct {
 }
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	// Start the MCP server
 	cmd := exec.Command("./container-kit-mcp", "--transport", "stdio", "--conversation", "--log-level", "info")
 
 	// Set up pipes
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		log.Fatal("Failed to get stdin pipe:", err)
+		return fmt.Errorf("failed to get stdin pipe: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal("Failed to get stdout pipe:", err)
+		return fmt.Errorf("failed to get stdout pipe: %w", err)
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		log.Fatal("Failed to get stderr pipe:", err)
+		return fmt.Errorf("failed to get stderr pipe: %w", err)
 	}
 
 	// Start the server
 	if err := cmd.Start(); err != nil {
-		log.Fatal("Failed to start server:", err)
+		return fmt.Errorf("failed to start server: %w", err)
 	}
 	defer cmd.Process.Kill()
 
@@ -104,13 +111,13 @@ func main() {
 
 	if err := encoder.Encode(initReq); err != nil {
 		log.Printf("Failed to send init request: %v", err)
-		return
+		return fmt.Errorf("failed to send init request: %w", err)
 	}
 
 	var initResp MCPResponse
 	if err := decoder.Decode(&initResp); err != nil {
 		log.Printf("Failed to read init response: %v", err)
-		return
+		return fmt.Errorf("failed to read init response: %w", err)
 	}
 
 	fmt.Printf("Initialize response: %+v\n", initResp)
@@ -126,13 +133,13 @@ func main() {
 
 	if err := encoder.Encode(listReq); err != nil {
 		log.Printf("Failed to send list tools request: %v", err)
-		return
+		return fmt.Errorf("failed to send list tools request: %w", err)
 	}
 
 	var listResp MCPResponse
 	if err := decoder.Decode(&listResp); err != nil {
 		log.Printf("Failed to read list tools response: %v", err)
-		return
+		return fmt.Errorf("failed to read list tools response: %w", err)
 	}
 
 	fmt.Printf("Tools list response: %s\n", string(listResp.Result))
@@ -155,6 +162,7 @@ func main() {
 	}
 
 	fmt.Println("\nTest completed!")
+	return nil
 }
 
 var requestID = 2

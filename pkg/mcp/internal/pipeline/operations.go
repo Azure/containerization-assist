@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/Azure/container-kit/pkg/docker"
-	_ "github.com/Azure/container-kit/pkg/k8s"
+	_ "github.com/Azure/container-kit/pkg/docker" // init docker client
+	_ "github.com/Azure/container-kit/pkg/k8s"    // init k8s client
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"

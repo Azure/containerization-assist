@@ -32,6 +32,7 @@ var (
 	registry            string
 	dockerfileGenerator string
 	generateSnapshot    bool
+	snapshotCompletions bool
 	generateReport      bool
 	timeout             time.Duration
 	maxDepth            int

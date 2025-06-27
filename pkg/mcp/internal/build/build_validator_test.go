@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,7 @@ func processJSONVulnerabilities(trivyResult *coredocker.TrivyResult, scanResult 
 	for _, result := range trivyResult.Results {
 		for _, vuln := range result.Vulnerabilities {
 			// Create vulnerability object
-			vulnerability := coredocker.Vulnerability{
+			vulnerability := coresecurity.Vulnerability{
 				VulnerabilityID:  vuln.VulnerabilityID,
 				PkgName:          vuln.PkgName,
 				InstalledVersion: vuln.InstalledVersion,
@@ -271,9 +272,9 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 			scanResult := &coredocker.ScanResult{
 				Success:         true,
 				ImageRef:        "test:latest",
-				Summary:         coredocker.VulnerabilitySummary{},
-				Vulnerabilities: []coredocker.Vulnerability{},
-				Remediation:     []coredocker.RemediationStep{},
+				Summary:         coresecurity.VulnerabilitySummary{},
+				Vulnerabilities: []coresecurity.Vulnerability{},
+				Remediation:     []coresecurity.RemediationStep{},
 				Context:         make(map[string]interface{}),
 			}
 
