@@ -184,6 +184,134 @@ func (t *AtomicScanSecretsEnhancedTool) GetDescription() string {
 	return "Enhanced secret scanning with pattern and entropy detection"
 }
 
+// GetMetadata returns comprehensive tool metadata (implements unified Tool interface)
+func (t *AtomicScanSecretsEnhancedTool) GetMetadata() mcptypes.ToolMetadata {
+	return mcptypes.ToolMetadata{
+		Name:        "scan_secrets_enhanced",
+		Description: "Enhanced atomic secret scanner with AI-powered analysis and detailed reporting",
+		Version:     "1.0.0",
+		Category:    "security",
+		Dependencies: []string{
+			"security_scanner",
+		},
+		Capabilities: []string{
+			"entropy_detection",
+			"pattern_matching",
+			"false_positive_reduction",
+			"risk_assessment",
+			"verification",
+			"reporting",
+		},
+		Requirements: []string{
+			"file_system_access",
+			"pattern_database",
+		},
+		Parameters: map[string]string{
+			"session_id":               "required - Session ID for the scan",
+			"target_path":              "required - Path to scan (file or directory)",
+			"recursive":                "optional - Recursively scan directories",
+			"file_types":               "optional - File types to scan",
+			"enable_entropy_detection": "optional - Enable entropy-based detection",
+			"min_confidence":           "optional - Minimum confidence threshold",
+			"custom_patterns":          "optional - Additional regex patterns",
+			"max_file_size":            "optional - Maximum file size to scan",
+			"verify_findings":          "optional - Attempt to verify findings",
+			"exclude_false_positives":  "optional - Exclude likely false positives",
+			"generate_report":          "optional - Generate detailed report",
+			"output_format":            "optional - Output format (json, sarif, markdown)",
+		},
+		Examples: []mcptypes.ToolExample{
+			{
+				Name:        "Basic secret scan",
+				Description: "Scan a directory for secrets",
+				Input: map[string]interface{}{
+					"session_id":  "scan-session-123",
+					"target_path": "/path/to/project",
+					"recursive":   true,
+				},
+				Output: map[string]interface{}{
+					"success":          true,
+					"secrets_found":    5,
+					"high_risk_count":  2,
+					"scan_duration_ms": 1500,
+				},
+			},
+			{
+				Name:        "Enhanced scan with verification",
+				Description: "Scan with verification and detailed reporting",
+				Input: map[string]interface{}{
+					"session_id":               "scan-session-456",
+					"target_path":              "/path/to/config",
+					"enable_entropy_detection": true,
+					"verify_findings":          true,
+					"generate_report":          true,
+					"output_format":            "markdown",
+				},
+				Output: map[string]interface{}{
+					"success":          true,
+					"verified_secrets": 3,
+					"false_positives":  2,
+					"report_generated": true,
+				},
+			},
+		},
+	}
+}
+
+// Validate validates the tool arguments (implements unified Tool interface)
+func (t *AtomicScanSecretsEnhancedTool) Validate(ctx context.Context, args interface{}) error {
+	// Handle both pointer and value types
+	var scanArgs AtomicScanSecretsEnhancedArgs
+	switch v := args.(type) {
+	case AtomicScanSecretsEnhancedArgs:
+		scanArgs = v
+	case *AtomicScanSecretsEnhancedArgs:
+		scanArgs = *v
+	default:
+		return fmt.Errorf("invalid argument type for scan_secrets_enhanced: expected AtomicScanSecretsEnhancedArgs, got %T", args)
+	}
+
+	// Validate required fields
+	if scanArgs.SessionID == "" {
+		return fmt.Errorf("session_id is required")
+	}
+
+	if scanArgs.TargetPath == "" {
+		return fmt.Errorf("target_path is required")
+	}
+
+	// Validate confidence threshold
+	if scanArgs.MinConfidence < 0.0 || scanArgs.MinConfidence > 1.0 {
+		return fmt.Errorf("min_confidence must be between 0.0 and 1.0, got %f", scanArgs.MinConfidence)
+	}
+
+	// Validate file size limit
+	if scanArgs.MaxFileSize < 0 {
+		return fmt.Errorf("max_file_size must be non-negative, got %d", scanArgs.MaxFileSize)
+	}
+
+	// Validate output format
+	if scanArgs.OutputFormat != "" {
+		validFormats := map[string]bool{
+			"json":     true,
+			"sarif":    true,
+			"markdown": true,
+		}
+		if !validFormats[scanArgs.OutputFormat] {
+			return fmt.Errorf("invalid output_format: %s (valid options: json, sarif, markdown)", scanArgs.OutputFormat)
+		}
+	}
+
+	// Validate custom patterns
+	for i, pattern := range scanArgs.CustomPatterns {
+		if strings.TrimSpace(pattern) == "" {
+			return fmt.Errorf("custom_patterns[%d] cannot be empty", i)
+		}
+	}
+
+	return nil
+}
+
 // Execute performs enhanced secret scanning
 func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	typedArgs, ok := args.(AtomicScanSecretsEnhancedArgs)

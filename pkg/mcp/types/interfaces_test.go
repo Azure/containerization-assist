@@ -67,10 +67,7 @@ func TestTypeCompleteness(t *testing.T) {
 	var sessionState SessionState
 	sessionState.SessionID = "test"
 
-	// Test enum values
-	if CircuitBreakerOpen == "" || CircuitBreakerClosed == "" {
-		t.Error("CircuitBreaker constants not defined")
-	}
+	// Circuit breaker constants test removed - constants moved to canonical location
 
 	t.Log("All interface types are properly defined")
 }

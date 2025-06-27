@@ -371,7 +371,7 @@ update_pr_comment() {
         cat "$report_file"
         return
     fi
-    
+
     # Verify we can access the PR
     if ! gh pr view "$pr_number" >/dev/null 2>&1; then
         error "Cannot access PR #$pr_number - this may be due to permissions or the PR not existing"
@@ -435,7 +435,7 @@ generate_quality_metrics() {
 
     # Temporarily disable exit on error for arithmetic operations
     set +e
-    
+
     # Calculate overall test coverage
     local total_coverage=0
     local package_count=0
@@ -497,7 +497,7 @@ generate_quality_metrics() {
 EOF
 
     log "Quality metrics generated: $metrics_file"
-    
+
     # Re-enable exit on error
     set -e
 }
