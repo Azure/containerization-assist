@@ -5,8 +5,12 @@
 repomix.md
 .claude
 coverage.out
+coverage/
 plan.md
 docs/notes
+cover.out
+coverage_final.out
+coverage_new.out
 # User-specific files
 *.rsuser
 *.suo

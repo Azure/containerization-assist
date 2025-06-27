@@ -12,7 +12,7 @@ echo "Warning threshold: $WARN_THRESHOLD"
 echo ""
 
 # Run golangci-lint and capture output
-LINT_OUTPUT=$(golangci-lint run --out-format json $LINT_ARGS 2>&1)
+LINT_OUTPUT=$(golangci-lint run $LINT_ARGS 2>&1)
 LINT_EXIT_CODE=$?
 
 # Count issues
@@ -20,19 +20,15 @@ if [ $LINT_EXIT_CODE -eq 0 ]; then
     ISSUE_COUNT=0
     echo "✅ No linting issues found!"
 else
-    ISSUE_COUNT=$(echo "$LINT_OUTPUT" | jq -r '.Issues | length' 2>/dev/null || echo "0")
-
-    if [ "$ISSUE_COUNT" = "0" ]; then
-        # Fallback: try to parse non-JSON output
-        ISSUE_COUNT=$(golangci-lint run $LINT_ARGS 2>&1 | grep -E "^[^:]+:[0-9]+:[0-9]+:" | wc -l)
-    fi
+    # Count issues from text output
+    ISSUE_COUNT=$(echo "$LINT_OUTPUT" | grep -E "^[^:]+:[0-9]+:[0-9]+:" | wc -l)
 
     echo "Found $ISSUE_COUNT linting issues"
 
     # Show summary by linter
     echo ""
     echo "Issues by linter:"
-    echo "$LINT_OUTPUT" | jq -r '.Issues | group_by(.FromLinter) | map({linter: .[0].FromLinter, count: length}) | .[] | "\(.linter): \(.count)"' 2>/dev/null || \
+    # Since we can't use JSON output with v2.1.0, parse text output
         golangci-lint run $LINT_ARGS 2>&1 | grep -oE '\([a-z]+\)$' | sort | uniq -c
 fi
 

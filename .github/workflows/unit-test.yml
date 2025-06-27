@@ -15,10 +15,10 @@ jobs:
       packages: './pkg/core/... ./pkg/pipeline/... ./pkg/utils/... ./pkg/docker/... ./pkg/k8s/... ./pkg/kind/...'
       run-tests: true
       run-race-tests: true
-      run-lint: true
-      lint-args: '--timeout=5m --config=.golangci.yml'
-      lint-error-threshold: 50
-      lint-warn-threshold: 30
+      run-lint: false  # Disabled - handled by code-quality.yml
+      # lint-args: '--timeout=5m --config=.golangci.yml'
+      # lint-error-threshold: 50
+      # lint-warn-threshold: 30
       coverage: true
 
   # MCP packages
@@ -30,10 +30,10 @@ jobs:
       packages: './pkg/mcp/...'
       run-tests: true
       run-race-tests: true
-      run-lint: true
-      lint-args: '--timeout=5m --config=.golangci.yml'
-      lint-error-threshold: 100  # Higher threshold for MCP as it has more issues currently
-      lint-warn-threshold: 50
+      run-lint: false  # Disabled - handled by code-quality.yml
+      # lint-args: '--timeout=5m --config=.golangci.yml'
+      # lint-error-threshold: 100  # Higher threshold for MCP as it has more issues currently
+      # lint-warn-threshold: 50
       coverage: true
 
   # CLI packages
@@ -45,10 +45,10 @@ jobs:
       packages: './pkg/ai/...'
       run-tests: true
       run-race-tests: true
-      run-lint: true
-      lint-args: '--timeout=5m --config=.golangci.yml'
-      lint-error-threshold: 50
-      lint-warn-threshold: 30
+      run-lint: false  # Disabled - handled by code-quality.yml
+      # lint-args: '--timeout=5m --config=.golangci.yml'
+      # lint-error-threshold: 50
+      # lint-warn-threshold: 30
       coverage: true
 
   # Build CLI binary

@@ -186,7 +186,7 @@ lint-report:
 .PHONY: lint-baseline
 lint-baseline:
 	@echo "Setting current lint count as baseline..."
-	@golangci-lint run --out-format json ./pkg/mcp/... 2>/dev/null | jq '.Issues | length' > .lint-baseline || echo "0" > .lint-baseline
+	@golangci-lint run ./pkg/mcp/... 2>&1 | grep -E "^[^:]+:[0-9]+:[0-9]+:" | wc -l > .lint-baseline || echo "0" > .lint-baseline
 	@echo "Baseline set to: $$(cat .lint-baseline) issues"
 
 .PHONY: lint-ratchet
