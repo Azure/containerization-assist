@@ -374,5 +374,3 @@ func (p *ManifestStage) Deploy(ctx context.Context, state *pipeline.PipelineStat
 	logger.Info("Deploying Kubernetes manifests...\n")
 	return DeployStateManifests(ctx, state, c)
 }
-
-func SetImageName()
