@@ -37,17 +37,18 @@ func generate(ctx context.Context, targetDir string, registry string, enableDraf
 		return fmt.Errorf("reaching registry %s: %w", registry, err)
 	}
 
+	const defaultAppName = "test-app"
 	// Derive app name from target directory
 	appName := filepath.Base(targetDir)
 	if appName == "." || appName == "/" {
-		appName = "app" // fallback to default
+		appName = defaultAppName // fallback to default
 	}
 	// Sanitize app name for Kubernetes (lowercase, alphanumeric + hyphens)
 	appName = strings.ToLower(appName)
 	appName = regexp.MustCompile(`[^a-z0-9-]`).ReplaceAllString(appName, "-")
 	appName = strings.Trim(appName, "-")
 	if appName == "" {
-		appName = "app"
+		appName = defaultAppName
 	}
 
 	// Initialize pipeline state
