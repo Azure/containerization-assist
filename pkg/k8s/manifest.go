@@ -145,9 +145,9 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, im
 
 		destPath := filepath.Join(manifestsDir, filename)
 		logger.Infof("Updating image name to %s in deployment manifest: %s", imageNameAndTag, destPath)
-		data = []byte(strings.ReplaceAll(string(data), DefaultImageAndTag, imageNameAndTag))
-
-		logger.Debugf("Writing manifest file: %s", destPath)
+		updatedData := strings.ReplaceAll(string(data), DefaultImageAndTag, imageNameAndTag)
+		logger.Debugf("Writing updated manifest to: %s", destPath)
+		data = []byte(updatedData)
 		if err := os.WriteFile(destPath, data, 0644); err != nil {
 			return fmt.Errorf("writing file %q: %w", destPath, err)
 		}
