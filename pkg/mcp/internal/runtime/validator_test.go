@@ -11,10 +11,10 @@ import (
 
 // Mock validator for testing
 type mockValidator struct {
-	name           string
-	validateFunc   func(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error)
-	shouldError    bool
-	errorResult    error
+	name         string
+	validateFunc func(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error)
+	shouldError  bool
+	errorResult  error
 }
 
 func (m *mockValidator) Validate(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error) {
@@ -41,7 +41,7 @@ func (m *mockValidator) GetName() string {
 
 func TestNewBaseValidator(t *testing.T) {
 	validator := NewBaseValidator("test_validator", "1.0.0")
-	
+
 	assert.NotNil(t, validator)
 	assert.Equal(t, "test_validator", validator.Name)
 	assert.Equal(t, "1.0.0", validator.Version)
@@ -51,7 +51,7 @@ func TestNewBaseValidator(t *testing.T) {
 func TestBaseValidatorImpl_CreateResult(t *testing.T) {
 	validator := NewBaseValidator("test_validator", "1.0.0")
 	result := validator.CreateResult()
-	
+
 	assert.NotNil(t, result)
 	assert.True(t, result.IsValid)
 	assert.Equal(t, 100, result.Score)
@@ -67,12 +67,12 @@ func TestBaseValidatorImpl_CreateResult(t *testing.T) {
 func TestValidationResult_AddError(t *testing.T) {
 	validator := NewBaseValidator("test", "1.0")
 	result := validator.CreateResult()
-	
+
 	// Initially valid
 	assert.True(t, result.IsValid)
 	assert.Equal(t, 0, result.TotalIssues)
 	assert.Equal(t, 0, result.CriticalIssues)
-	
+
 	// Add critical error
 	criticalError := ValidationError{
 		Code:     "CRITICAL_ERROR",
@@ -80,13 +80,13 @@ func TestValidationResult_AddError(t *testing.T) {
 		Severity: "critical",
 	}
 	result.AddError(criticalError)
-	
+
 	assert.False(t, result.IsValid)
 	assert.Equal(t, 1, result.TotalIssues)
 	assert.Equal(t, 1, result.CriticalIssues)
 	assert.Len(t, result.Errors, 1)
 	assert.Equal(t, criticalError, result.Errors[0])
-	
+
 	// Add high severity error
 	highError := ValidationError{
 		Code:     "HIGH_ERROR",
@@ -94,10 +94,10 @@ func TestValidationResult_AddError(t *testing.T) {
 		Severity: "high",
 	}
 	result.AddError(highError)
-	
+
 	assert.Equal(t, 2, result.TotalIssues)
 	assert.Equal(t, 2, result.CriticalIssues)
-	
+
 	// Add medium severity error
 	mediumError := ValidationError{
 		Code:     "MEDIUM_ERROR",
@@ -105,7 +105,7 @@ func TestValidationResult_AddError(t *testing.T) {
 		Severity: "medium",
 	}
 	result.AddError(mediumError)
-	
+
 	assert.Equal(t, 3, result.TotalIssues)
 	assert.Equal(t, 2, result.CriticalIssues) // Only critical and high count
 }
@@ -113,14 +113,14 @@ func TestValidationResult_AddError(t *testing.T) {
 func TestValidationResult_AddWarning(t *testing.T) {
 	validator := NewBaseValidator("test", "1.0")
 	result := validator.CreateResult()
-	
+
 	warning := ValidationWarning{
 		Code:    "STYLE_WARNING",
 		Message: "Style recommendation",
 		Impact:  "maintainability",
 	}
 	result.AddWarning(warning)
-	
+
 	assert.Equal(t, 1, result.TotalIssues)
 	assert.Equal(t, 0, result.CriticalIssues) // Warnings don't count as critical
 	assert.Len(t, result.Warnings, 1)
@@ -129,10 +129,10 @@ func TestValidationResult_AddWarning(t *testing.T) {
 
 func TestValidationResult_CalculateScore(t *testing.T) {
 	tests := []struct {
-		name           string
-		errors         []ValidationError
-		warnings       []ValidationWarning
-		expectedScore  int
+		name          string
+		errors        []ValidationError
+		warnings      []ValidationWarning
+		expectedScore int
 	}{
 		{
 			name:          "no issues",
@@ -223,7 +223,7 @@ func TestValidationResult_CalculateScore(t *testing.T) {
 				Errors:   tt.errors,
 				Warnings: tt.warnings,
 			}
-			
+
 			result.CalculateScore()
 			assert.Equal(t, tt.expectedScore, result.Score)
 		})
@@ -245,7 +245,7 @@ func TestValidationResult_Merge(t *testing.T) {
 			"key1": "value1",
 		},
 	}
-	
+
 	result2 := &ValidationResult{
 		IsValid: false,
 		Errors: []ValidationError{
@@ -261,9 +261,9 @@ func TestValidationResult_Merge(t *testing.T) {
 			"key2": "value2",
 		},
 	}
-	
+
 	result1.Merge(result2)
-	
+
 	assert.False(t, result1.IsValid) // Should be false if any merged result is false
 	assert.Len(t, result1.Errors, 2)
 	assert.Len(t, result1.Warnings, 3)
@@ -278,9 +278,9 @@ func TestValidationResult_MergeNil(t *testing.T) {
 		IsValid:     true,
 		TotalIssues: 1,
 	}
-	
+
 	result.Merge(nil)
-	
+
 	// Should be unchanged
 	assert.True(t, result.IsValid)
 	assert.Equal(t, 1, result.TotalIssues)
@@ -301,15 +301,15 @@ func TestValidationResult_FilterBySeverity(t *testing.T) {
 		TotalIssues:    6,
 		CriticalIssues: 2,
 	}
-	
+
 	// Filter to high and above
 	result.FilterBySeverity("high")
-	
-	assert.Len(t, result.Errors, 2) // critical and high only
-	assert.Len(t, result.Warnings, 2) // warnings unchanged
-	assert.Equal(t, 4, result.TotalIssues) // 2 errors + 2 warnings
+
+	assert.Len(t, result.Errors, 2)           // critical and high only
+	assert.Len(t, result.Warnings, 2)         // warnings unchanged
+	assert.Equal(t, 4, result.TotalIssues)    // 2 errors + 2 warnings
 	assert.Equal(t, 2, result.CriticalIssues) // critical and high
-	
+
 	// Check that correct errors remain
 	assert.Equal(t, "E1", result.Errors[0].Code)
 	assert.Equal(t, "E2", result.Errors[1].Code)
@@ -327,7 +327,7 @@ func TestGetSeverityLevel(t *testing.T) {
 		{"unknown", 0},
 		{"", 0},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.severity, func(t *testing.T) {
 			result := GetSeverityLevel(tt.severity)
@@ -342,9 +342,9 @@ func TestNewValidationContext(t *testing.T) {
 		StrictMode:  true,
 		IgnoreRules: []string{"rule1", "rule2"},
 	}
-	
+
 	ctx := NewValidationContext("session123", "/tmp/work", options)
-	
+
 	assert.NotNil(t, ctx)
 	assert.Equal(t, "session123", ctx.SessionID)
 	assert.Equal(t, "/tmp/work", ctx.WorkingDir)
@@ -355,11 +355,11 @@ func TestNewValidationContext(t *testing.T) {
 
 func TestValidationContext_Duration(t *testing.T) {
 	ctx := NewValidationContext("test", "/tmp", ValidationOptions{})
-	
+
 	// Wait a bit and check duration
 	time.Sleep(10 * time.Millisecond)
 	duration := ctx.Duration()
-	
+
 	assert.True(t, duration >= 10*time.Millisecond)
 	assert.True(t, duration < 100*time.Millisecond) // Should be reasonable
 }
@@ -367,9 +367,9 @@ func TestValidationContext_Duration(t *testing.T) {
 func TestNewValidatorChain(t *testing.T) {
 	validator1 := &mockValidator{name: "validator1"}
 	validator2 := &mockValidator{name: "validator2"}
-	
+
 	chain := NewValidatorChain(validator1, validator2)
-	
+
 	assert.NotNil(t, chain)
 	assert.Len(t, chain.validators, 2)
 	assert.Equal(t, validator1, chain.validators[0])
@@ -396,7 +396,7 @@ func TestValidatorChain_ValidateSuccess(t *testing.T) {
 			return result, nil
 		},
 	}
-	
+
 	validator2 := &mockValidator{
 		name: "validator2",
 		validateFunc: func(ctx context.Context, input interface{}, options ValidationOptions) (*ValidationResult, error) {
@@ -413,11 +413,11 @@ func TestValidatorChain_ValidateSuccess(t *testing.T) {
 			return result, nil
 		},
 	}
-	
+
 	chain := NewValidatorChain(validator1, validator2)
-	
+
 	result, err := chain.Validate(context.Background(), "test input", ValidationOptions{})
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.False(t, result.IsValid) // Should be false if any validator returns false
@@ -425,7 +425,7 @@ func TestValidatorChain_ValidateSuccess(t *testing.T) {
 	assert.Len(t, result.Warnings, 1)
 	assert.Equal(t, "result", result.Context["validator1"])
 	assert.Equal(t, "result", result.Context["validator2"])
-	
+
 	// Score should be calculated
 	assert.True(t, result.Score >= 0 && result.Score <= 100)
 }
@@ -437,11 +437,11 @@ func TestValidatorChain_ValidateError(t *testing.T) {
 		shouldError: true,
 		errorResult: errors.New("validation failed"),
 	}
-	
+
 	chain := NewValidatorChain(validator1, validator2)
-	
+
 	result, err := chain.Validate(context.Background(), "test input", ValidationOptions{})
-	
+
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "validator validator2 failed")
@@ -449,9 +449,9 @@ func TestValidatorChain_ValidateError(t *testing.T) {
 
 func TestValidatorChain_EmptyChain(t *testing.T) {
 	chain := NewValidatorChain()
-	
+
 	result, err := chain.Validate(context.Background(), "test input", ValidationOptions{})
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.True(t, result.IsValid)
@@ -462,15 +462,15 @@ func TestValidatorChain_EmptyChain(t *testing.T) {
 
 func TestValidationOptions_Structure(t *testing.T) {
 	options := ValidationOptions{
-		Severity:     "high",
-		IgnoreRules:  []string{"rule1", "rule2"},
-		StrictMode:   true,
+		Severity:    "high",
+		IgnoreRules: []string{"rule1", "rule2"},
+		StrictMode:  true,
 		CustomParams: map[string]interface{}{
 			"param1": "value1",
 			"param2": 42,
 		},
 	}
-	
+
 	assert.Equal(t, "high", options.Severity)
 	assert.Equal(t, []string{"rule1", "rule2"}, options.IgnoreRules)
 	assert.True(t, options.StrictMode)
@@ -485,7 +485,7 @@ func TestValidationError_Structure(t *testing.T) {
 		Column: 10,
 		Path:   "$.field.subfield",
 	}
-	
+
 	err := ValidationError{
 		Code:          "INVALID_FORMAT",
 		Type:          "format",
@@ -495,7 +495,7 @@ func TestValidationError_Structure(t *testing.T) {
 		Fix:           "Use correct format",
 		Documentation: "https://docs.example.com/format",
 	}
-	
+
 	assert.Equal(t, "INVALID_FORMAT", err.Code)
 	assert.Equal(t, "format", err.Type)
 	assert.Equal(t, "Invalid format detected", err.Message)
@@ -511,7 +511,7 @@ func TestValidationWarning_Structure(t *testing.T) {
 		Line: 24,
 		Path: "$.field",
 	}
-	
+
 	warning := ValidationWarning{
 		Code:       "PERFORMANCE_HINT",
 		Type:       "performance",
@@ -520,7 +520,7 @@ func TestValidationWarning_Structure(t *testing.T) {
 		Impact:     "performance",
 		Location:   location,
 	}
-	
+
 	assert.Equal(t, "PERFORMANCE_HINT", warning.Code)
 	assert.Equal(t, "performance", warning.Type)
 	assert.Equal(t, "Consider optimizing this operation", warning.Message)
@@ -536,7 +536,7 @@ func TestValidationMetadata_Structure(t *testing.T) {
 		"strict": true,
 		"level":  "high",
 	}
-	
+
 	metadata := ValidationMetadata{
 		ValidatorName:    "test_validator",
 		ValidatorVersion: "2.1.0",
@@ -544,7 +544,7 @@ func TestValidationMetadata_Structure(t *testing.T) {
 		Timestamp:        timestamp,
 		Parameters:       params,
 	}
-	
+
 	assert.Equal(t, "test_validator", metadata.ValidatorName)
 	assert.Equal(t, "2.1.0", metadata.ValidatorVersion)
 	assert.Equal(t, duration, metadata.Duration)
@@ -556,25 +556,25 @@ func TestValidationResult_ComplexScenario(t *testing.T) {
 	// Test a complex validation scenario with multiple operations
 	validator := NewBaseValidator("complex_validator", "1.0.0")
 	result := validator.CreateResult()
-	
+
 	// Add various types of errors and warnings
 	result.AddError(ValidationError{Code: "E1", Severity: "critical"})
 	result.AddError(ValidationError{Code: "E2", Severity: "high"})
 	result.AddError(ValidationError{Code: "E3", Severity: "medium"})
 	result.AddError(ValidationError{Code: "E4", Severity: "low"})
-	
+
 	result.AddWarning(ValidationWarning{Code: "W1"})
 	result.AddWarning(ValidationWarning{Code: "W2"})
-	
+
 	// Calculate score
 	result.CalculateScore()
-	
+
 	// Expected: 100 - 20 (critical) - 15 (high) - 10 (medium) - 5 (low) - 4 (2 warnings * 2) = 46
 	assert.Equal(t, 46, result.Score)
 	assert.False(t, result.IsValid)
 	assert.Equal(t, 6, result.TotalIssues)
 	assert.Equal(t, 2, result.CriticalIssues) // critical + high
-	
+
 	// Test merging with another result
 	other := &ValidationResult{
 		IsValid: true,
@@ -590,17 +590,17 @@ func TestValidationResult_ComplexScenario(t *testing.T) {
 			"merged": true,
 		},
 	}
-	
+
 	result.Merge(other)
-	
+
 	assert.Len(t, result.Errors, 5)
 	assert.Len(t, result.Warnings, 3)
 	assert.Equal(t, 8, result.TotalIssues)
 	assert.Equal(t, 2, result.CriticalIssues)
 	assert.True(t, result.Context["merged"].(bool))
-	
+
 	// Test filtering
 	result.FilterBySeverity("high")
-	assert.Len(t, result.Errors, 2) // Only critical and high remain
+	assert.Len(t, result.Errors, 2)   // Only critical and high remain
 	assert.Len(t, result.Warnings, 3) // Warnings unchanged
 }

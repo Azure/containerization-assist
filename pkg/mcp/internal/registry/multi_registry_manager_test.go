@@ -173,7 +173,7 @@ func TestMultiRegistryManager_ValidateRegistryAccess(t *testing.T) {
 
 	manager := NewMultiRegistryManager(config, logger)
 	manager.AddProvider(mockProvider)
-	
+
 	// Set up mock command executor for testing
 	mockExecutor := NewMockCommandExecutor()
 	// Mock docker version check
@@ -463,11 +463,11 @@ func NewMockCommandExecutor() *MockCommandExecutor {
 func (m *MockCommandExecutor) ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
 	cmd := name + " " + strings.Join(args, " ")
 	m.executedCommands = append(m.executedCommands, cmd)
-	
+
 	if response, exists := m.responses[cmd]; exists {
 		return response.output, response.err
 	}
-	
+
 	// Default behavior for unknown commands
 	return nil, fmt.Errorf("command not found: %s", cmd)
 }

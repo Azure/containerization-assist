@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/rs/zerolog"
 )
 
@@ -26,66 +27,130 @@ func NewTrivyScanner(logger zerolog.Logger) *TrivyScanner {
 
 // ScanResult represents the result of a Trivy scan
 type ScanResult struct {
-	Success         bool                   `json:"success"`
-	ImageRef        string                 `json:"image_ref"`
-	ScanTime        time.Time              `json:"scan_time"`
-	Duration        time.Duration          `json:"duration"`
-	Vulnerabilities []Vulnerability        `json:"vulnerabilities"`
-	Summary         VulnerabilitySummary   `json:"summary"`
-	Remediation     []RemediationStep      `json:"remediation"`
-	Context         map[string]interface{} `json:"context"`
-}
-
-// Vulnerability represents a single vulnerability finding
-type Vulnerability struct {
-	VulnerabilityID  string   `json:"vulnerability_id"`
-	PkgName          string   `json:"pkg_name"`
-	InstalledVersion string   `json:"installed_version"`
-	FixedVersion     string   `json:"fixed_version"`
-	Severity         string   `json:"severity"` // CRITICAL, HIGH, MEDIUM, LOW, UNKNOWN
-	Title            string   `json:"title"`
-	Description      string   `json:"description"`
-	References       []string `json:"references"`
-	Layer            string   `json:"layer,omitempty"`
-}
-
-// VulnerabilitySummary provides a summary of scan findings
-type VulnerabilitySummary struct {
-	Total    int `json:"total"`
-	Critical int `json:"critical"`
-	High     int `json:"high"`
-	Medium   int `json:"medium"`
-	Low      int `json:"low"`
-	Unknown  int `json:"unknown"`
-	Fixable  int `json:"fixable"`
-}
-
-// RemediationStep provides guidance on fixing vulnerabilities
-type RemediationStep struct {
-	Priority    int    `json:"priority"`
-	Action      string `json:"action"`
-	Description string `json:"description"`
-	Command     string `json:"command,omitempty"`
+	Success         bool                              `json:"success"`
+	ImageRef        string                            `json:"image_ref"`
+	ScanTime        time.Time                         `json:"scan_time"`
+	Duration        time.Duration                     `json:"duration"`
+	Vulnerabilities []coresecurity.Vulnerability      `json:"vulnerabilities"`
+	Summary         coresecurity.VulnerabilitySummary `json:"summary"`
+	Remediation     []coresecurity.RemediationStep    `json:"remediation"`
+	Context         map[string]interface{}            `json:"context"`
 }
 
 // TrivyResult represents the raw JSON output from Trivy
 type TrivyResult struct {
-	Results []struct {
-		Target          string `json:"Target"`
+	SchemaVersion int `json:"SchemaVersion"`
+	Results       []struct {
+		Target   string `json:"Target"`
+		Class    string `json:"Class,omitempty"`
+		Type     string `json:"Type,omitempty"`
+		Packages []struct {
+			ID         string   `json:"ID"`
+			Name       string   `json:"Name"`
+			Version    string   `json:"Version"`
+			Arch       string   `json:"Arch,omitempty"`
+			SrcName    string   `json:"SrcName,omitempty"`
+			SrcVersion string   `json:"SrcVersion,omitempty"`
+			Licenses   []string `json:"Licenses,omitempty"`
+			DependsOn  []string `json:"DependsOn,omitempty"`
+			Layer      struct {
+				Digest string `json:"Digest"`
+				DiffID string `json:"DiffID"`
+			} `json:"Layer,omitempty"`
+			FilePath string `json:"FilePath,omitempty"`
+		} `json:"Packages,omitempty"`
 		Vulnerabilities []struct {
 			VulnerabilityID  string   `json:"VulnerabilityID"`
+			PkgID            string   `json:"PkgID,omitempty"`
 			PkgName          string   `json:"PkgName"`
 			InstalledVersion string   `json:"InstalledVersion"`
 			FixedVersion     string   `json:"FixedVersion,omitempty"`
+			Status           string   `json:"Status,omitempty"`
 			Severity         string   `json:"Severity"`
 			Title            string   `json:"Title"`
 			Description      string   `json:"Description"`
 			References       []string `json:"References,omitempty"`
-			Layer            struct {
+			PublishedDate    string   `json:"PublishedDate,omitempty"`
+			LastModifiedDate string   `json:"LastModifiedDate,omitempty"`
+			CweIDs           []string `json:"CweIDs,omitempty"`
+			CVSS             map[string]struct {
+				V2Vector string  `json:"V2Vector,omitempty"`
+				V3Vector string  `json:"V3Vector,omitempty"`
+				V2Score  float64 `json:"V2Score,omitempty"`
+				V3Score  float64 `json:"V3Score,omitempty"`
+			} `json:"CVSS,omitempty"`
+			VendorSeverity map[string]interface{} `json:"VendorSeverity,omitempty"`
+			CVSSV30        struct {
+				Vector                string  `json:"vectorString,omitempty"`
+				BaseScore             float64 `json:"baseScore,omitempty"`
+				ExploitabilityScore   float64 `json:"exploitabilityScore,omitempty"`
+				ImpactScore           float64 `json:"impactScore,omitempty"`
+				AttackVector          string  `json:"attackVector,omitempty"`
+				AttackComplexity      string  `json:"attackComplexity,omitempty"`
+				PrivilegesRequired    string  `json:"privilegesRequired,omitempty"`
+				UserInteraction       string  `json:"userInteraction,omitempty"`
+				Scope                 string  `json:"scope,omitempty"`
+				ConfidentialityImpact string  `json:"confidentialityImpact,omitempty"`
+				IntegrityImpact       string  `json:"integrityImpact,omitempty"`
+				AvailabilityImpact    string  `json:"availabilityImpact,omitempty"`
+			} `json:"CVSS:3.0,omitempty"`
+			CVSSV31 struct {
+				Vector                string  `json:"vectorString,omitempty"`
+				BaseScore             float64 `json:"baseScore,omitempty"`
+				ExploitabilityScore   float64 `json:"exploitabilityScore,omitempty"`
+				ImpactScore           float64 `json:"impactScore,omitempty"`
+				AttackVector          string  `json:"attackVector,omitempty"`
+				AttackComplexity      string  `json:"attackComplexity,omitempty"`
+				PrivilegesRequired    string  `json:"privilegesRequired,omitempty"`
+				UserInteraction       string  `json:"userInteraction,omitempty"`
+				Scope                 string  `json:"scope,omitempty"`
+				ConfidentialityImpact string  `json:"confidentialityImpact,omitempty"`
+				IntegrityImpact       string  `json:"integrityImpact,omitempty"`
+				AvailabilityImpact    string  `json:"availabilityImpact,omitempty"`
+			} `json:"CVSS:3.1,omitempty"`
+			DataSource struct {
+				ID   string `json:"ID,omitempty"`
+				Name string `json:"Name,omitempty"`
+				URL  string `json:"URL,omitempty"`
+			} `json:"DataSource,omitempty"`
+			Layer struct {
+				Digest string `json:"Digest"`
 				DiffID string `json:"DiffID"`
 			} `json:"Layer,omitempty"`
+			PkgPath    string `json:"PkgPath,omitempty"`
+			PrimaryURL string `json:"PrimaryURL,omitempty"`
 		} `json:"Vulnerabilities"`
 	} `json:"Results"`
+	Metadata struct {
+		OS struct {
+			Family string `json:"Family"`
+			Name   string `json:"Name"`
+		} `json:"OS,omitempty"`
+		ImageID     string   `json:"ImageID,omitempty"`
+		DiffIDs     []string `json:"DiffIDs,omitempty"`
+		RepoTags    []string `json:"RepoTags,omitempty"`
+		RepoDigests []string `json:"RepoDigests,omitempty"`
+		ImageConfig struct {
+			Architecture string `json:"architecture,omitempty"`
+			Created      string `json:"created,omitempty"`
+			History      []struct {
+				Created    string `json:"created,omitempty"`
+				CreatedBy  string `json:"created_by,omitempty"`
+				EmptyLayer bool   `json:"empty_layer,omitempty"`
+			} `json:"history,omitempty"`
+			OS     string `json:"os,omitempty"`
+			RootFS struct {
+				Type    string   `json:"type,omitempty"`
+				DiffIDs []string `json:"diff_ids,omitempty"`
+			} `json:"rootfs,omitempty"`
+			Config struct {
+				Env        []string `json:"Env,omitempty"`
+				Cmd        []string `json:"Cmd,omitempty"`
+				WorkingDir string   `json:"WorkingDir,omitempty"`
+				Entrypoint []string `json:"Entrypoint,omitempty"`
+			} `json:"config,omitempty"`
+		} `json:"ImageConfig,omitempty"`
+	} `json:"Metadata,omitempty"`
 }
 
 // ScanImage scans a Docker image for vulnerabilities using Trivy
@@ -102,9 +167,9 @@ func (ts *TrivyScanner) ScanImage(ctx context.Context, imageRef string, severity
 	result := &ScanResult{
 		ImageRef:        imageRef,
 		ScanTime:        startTime,
-		Vulnerabilities: make([]Vulnerability, 0),
+		Vulnerabilities: make([]coresecurity.Vulnerability, 0),
 		Context:         make(map[string]interface{}),
-		Remediation:     make([]RemediationStep, 0),
+		Remediation:     make([]coresecurity.RemediationStep, 0),
 	}
 
 	ts.logger.Info().
@@ -126,6 +191,7 @@ func (ts *TrivyScanner) ScanImage(ctx context.Context, imageRef string, severity
 		args = append(args, "--severity", severityThreshold)
 	}
 
+	// nolint:gosec // trivy path is validated and args are controlled
 	cmd := exec.CommandContext(ctx, ts.trivyPath, args...)
 	output, err := cmd.Output()
 
@@ -193,6 +259,7 @@ func (ts *TrivyScanner) getTrivyVersion() string {
 		return "unknown"
 	}
 
+	// nolint:gosec // trivy path is validated
 	cmd := exec.Command(ts.trivyPath, "version")
 	output, err := cmd.Output()
 	if err != nil {
@@ -217,22 +284,133 @@ func (ts *TrivyScanner) getTrivyVersion() string {
 func (ts *TrivyScanner) processResults(trivyResult *TrivyResult, scanResult *ScanResult) {
 	summary := &scanResult.Summary
 
+	// Store metadata if available
+	if trivyResult.Metadata.ImageID != "" {
+		scanResult.Context["image_id"] = trivyResult.Metadata.ImageID
+	}
+	if trivyResult.Metadata.OS.Family != "" {
+		scanResult.Context["os_family"] = trivyResult.Metadata.OS.Family
+		scanResult.Context["os_name"] = trivyResult.Metadata.OS.Name
+	}
+	if len(trivyResult.Metadata.RepoTags) > 0 {
+		scanResult.Context["repo_tags"] = trivyResult.Metadata.RepoTags
+	}
+	if trivyResult.SchemaVersion > 0 {
+		scanResult.Context["schema_version"] = trivyResult.SchemaVersion
+	}
+
+	// Create package lookup map for enhanced data
+	packageMap := make(map[string]interface{})
+	for _, result := range trivyResult.Results {
+		for _, pkg := range result.Packages {
+			packageMap[pkg.ID] = pkg
+		}
+	}
+
 	for _, result := range trivyResult.Results {
 		for _, vuln := range result.Vulnerabilities {
-			// Convert to our vulnerability format
-			v := Vulnerability{
+			// Convert to our vulnerability format with enhanced data
+			v := coresecurity.Vulnerability{
 				VulnerabilityID:  vuln.VulnerabilityID,
 				PkgName:          vuln.PkgName,
+				PkgID:            vuln.PkgID,
+				PkgPath:          vuln.PkgPath,
 				InstalledVersion: vuln.InstalledVersion,
 				FixedVersion:     vuln.FixedVersion,
 				Severity:         vuln.Severity,
 				Title:            vuln.Title,
 				Description:      vuln.Description,
 				References:       vuln.References,
+				PublishedDate:    vuln.PublishedDate,
+				LastModifiedDate: vuln.LastModifiedDate,
+				CWE:              vuln.CweIDs,
+				Status:           vuln.Status,
+				PrimaryURL:       vuln.PrimaryURL,
 			}
 
+			// Extract layer information
 			if vuln.Layer.DiffID != "" {
 				v.Layer = vuln.Layer.DiffID
+			}
+
+			// Extract CVSS information
+			if len(vuln.CVSS) > 0 {
+				for vendor, cvssData := range vuln.CVSS {
+					if cvssData.V3Score > 0 {
+						v.CVSS = coresecurity.CVSSInfo{
+							Version: "3.0",
+							Vector:  cvssData.V3Vector,
+							Score:   cvssData.V3Score,
+						}
+						break
+					} else if cvssData.V2Score > 0 {
+						v.CVSS = coresecurity.CVSSInfo{
+							Version: "2.0",
+							Vector:  cvssData.V2Vector,
+							Score:   cvssData.V2Score,
+						}
+					}
+					// Store vendor for reference
+					if v.VendorSeverity == nil {
+						v.VendorSeverity = make(map[string]string)
+					}
+					if severityStr, ok := vuln.VendorSeverity[vendor].(string); ok {
+						v.VendorSeverity[vendor] = severityStr
+					}
+				}
+			}
+
+			// Extract detailed CVSS v3 information (prefer 3.1 over 3.0)
+			if vuln.CVSSV31.BaseScore > 0 {
+				v.CVSSV3 = coresecurity.CVSSV3Info{
+					Vector:                vuln.CVSSV31.Vector,
+					Score:                 vuln.CVSSV31.BaseScore,
+					ExploitabilityScore:   vuln.CVSSV31.ExploitabilityScore,
+					ImpactScore:           vuln.CVSSV31.ImpactScore,
+					AttackVector:          vuln.CVSSV31.AttackVector,
+					AttackComplexity:      vuln.CVSSV31.AttackComplexity,
+					PrivilegesRequired:    vuln.CVSSV31.PrivilegesRequired,
+					UserInteraction:       vuln.CVSSV31.UserInteraction,
+					Scope:                 vuln.CVSSV31.Scope,
+					ConfidentialityImpact: vuln.CVSSV31.ConfidentialityImpact,
+					IntegrityImpact:       vuln.CVSSV31.IntegrityImpact,
+					AvailabilityImpact:    vuln.CVSSV31.AvailabilityImpact,
+				}
+			} else if vuln.CVSSV30.BaseScore > 0 {
+				v.CVSSV3 = coresecurity.CVSSV3Info{
+					Vector:                vuln.CVSSV30.Vector,
+					Score:                 vuln.CVSSV30.BaseScore,
+					ExploitabilityScore:   vuln.CVSSV30.ExploitabilityScore,
+					ImpactScore:           vuln.CVSSV30.ImpactScore,
+					AttackVector:          vuln.CVSSV30.AttackVector,
+					AttackComplexity:      vuln.CVSSV30.AttackComplexity,
+					PrivilegesRequired:    vuln.CVSSV30.PrivilegesRequired,
+					UserInteraction:       vuln.CVSSV30.UserInteraction,
+					Scope:                 vuln.CVSSV30.Scope,
+					ConfidentialityImpact: vuln.CVSSV30.ConfidentialityImpact,
+					IntegrityImpact:       vuln.CVSSV30.IntegrityImpact,
+					AvailabilityImpact:    vuln.CVSSV30.AvailabilityImpact,
+				}
+			}
+
+			// Extract data source information
+			if vuln.DataSource.ID != "" {
+				v.DataSource = coresecurity.VulnDataSource{
+					ID:   vuln.DataSource.ID,
+					Name: vuln.DataSource.Name,
+					URL:  vuln.DataSource.URL,
+				}
+			}
+
+			// Enhanced package information from package map
+			if _, exists := packageMap[vuln.PkgID]; exists {
+				// Use reflection or type assertion to extract package data
+				// For now, store basic package type
+				v.PkgType = result.Type
+				if v.PkgIdentifier.Licenses == nil {
+					v.PkgIdentifier.Licenses = make([]string, 0)
+				}
+				// Additional package metadata can be added here
 			}
 
 			scanResult.Vulnerabilities = append(scanResult.Vulnerabilities, v)
@@ -257,12 +435,16 @@ func (ts *TrivyScanner) processResults(trivyResult *TrivyResult, scanResult *Sca
 			}
 		}
 	}
+
+	// Store enhanced context information
+	scanResult.Context["trivy_schema_version"] = trivyResult.SchemaVersion
+	scanResult.Context["total_results"] = len(trivyResult.Results)
 }
 
 // generateRemediationSteps creates actionable remediation guidance
 func (ts *TrivyScanner) generateRemediationSteps(result *ScanResult) {
 	if result.Summary.Total == 0 {
-		result.Remediation = append(result.Remediation, RemediationStep{
+		result.Remediation = append(result.Remediation, coresecurity.RemediationStep{
 			Priority:    1,
 			Action:      "No action required",
 			Description: "No vulnerabilities found in the image",
@@ -274,7 +456,7 @@ func (ts *TrivyScanner) generateRemediationSteps(result *ScanResult) {
 
 	// Critical and High vulnerabilities
 	if result.Summary.Critical > 0 || result.Summary.High > 0 {
-		result.Remediation = append(result.Remediation, RemediationStep{
+		result.Remediation = append(result.Remediation, coresecurity.RemediationStep{
 			Priority: priority,
 			Action:   "Fix critical vulnerabilities",
 			Description: fmt.Sprintf("Found %d CRITICAL and %d HIGH severity vulnerabilities that must be fixed",
@@ -300,7 +482,7 @@ func (ts *TrivyScanner) generateRemediationSteps(result *ScanResult) {
 		}
 
 		if hasBaseImageVulns {
-			result.Remediation = append(result.Remediation, RemediationStep{
+			result.Remediation = append(result.Remediation, coresecurity.RemediationStep{
 				Priority:    priority,
 				Action:      "Update base image",
 				Description: "Many vulnerabilities come from the base image. Consider updating to the latest version",
@@ -312,7 +494,7 @@ func (ts *TrivyScanner) generateRemediationSteps(result *ScanResult) {
 
 	// Fixable vulnerabilities
 	if result.Summary.Fixable > 0 {
-		result.Remediation = append(result.Remediation, RemediationStep{
+		result.Remediation = append(result.Remediation, coresecurity.RemediationStep{
 			Priority: priority,
 			Action:   "Update packages",
 			Description: fmt.Sprintf("%d vulnerabilities have fixes available. Update packages in your Dockerfile",
@@ -323,7 +505,7 @@ func (ts *TrivyScanner) generateRemediationSteps(result *ScanResult) {
 	}
 
 	// General recommendations
-	result.Remediation = append(result.Remediation, RemediationStep{
+	result.Remediation = append(result.Remediation, coresecurity.RemediationStep{
 		Priority:    priority,
 		Action:      "Regular scanning",
 		Description: "Scan images regularly as new vulnerabilities are discovered daily",

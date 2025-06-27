@@ -10,6 +10,7 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -147,7 +148,7 @@ func (bv *BuildValidatorImpl) initializeScanResult(fullImageRef string, startTim
 		ImageRef: fullImageRef,
 		ScanTime: time.Now(),
 		Duration: time.Since(startTime),
-		Summary: coredocker.VulnerabilitySummary{
+		Summary: coresecurity.VulnerabilitySummary{
 			Total:    0,
 			Critical: 0,
 			High:     0,
@@ -156,8 +157,8 @@ func (bv *BuildValidatorImpl) initializeScanResult(fullImageRef string, startTim
 			Unknown:  0,
 			Fixable:  0,
 		},
-		Vulnerabilities: []coredocker.Vulnerability{},
-		Remediation:     []coredocker.RemediationStep{},
+		Vulnerabilities: []coresecurity.Vulnerability{},
+		Remediation:     []coresecurity.RemediationStep{},
 		Context:         make(map[string]interface{}),
 	}
 }
@@ -189,7 +190,7 @@ func (bv *BuildValidatorImpl) processJSONResults(trivyResult *coredocker.TrivyRe
 	for _, result := range trivyResult.Results {
 		for _, vuln := range result.Vulnerabilities {
 			// Create vulnerability object
-			vulnerability := coredocker.Vulnerability{
+			vulnerability := coresecurity.Vulnerability{
 				VulnerabilityID:  vuln.VulnerabilityID,
 				PkgName:          vuln.PkgName,
 				InstalledVersion: vuln.InstalledVersion,
@@ -235,7 +236,7 @@ func (bv *BuildValidatorImpl) addRemediationSteps(scanResult *coredocker.ScanRes
 		return
 	}
 
-	scanResult.Remediation = append(scanResult.Remediation, coredocker.RemediationStep{
+	scanResult.Remediation = append(scanResult.Remediation, coresecurity.RemediationStep{
 		Priority:    1,
 		Action:      "update_base_image",
 		Description: "Update base image to latest version to fix known vulnerabilities",
@@ -243,7 +244,7 @@ func (bv *BuildValidatorImpl) addRemediationSteps(scanResult *coredocker.ScanRes
 	})
 
 	if scanResult.Summary.Fixable > 0 {
-		scanResult.Remediation = append(scanResult.Remediation, coredocker.RemediationStep{
+		scanResult.Remediation = append(scanResult.Remediation, coresecurity.RemediationStep{
 			Priority:    2,
 			Action:      "update_packages",
 			Description: fmt.Sprintf("Update %d packages with available fixes", scanResult.Summary.Fixable),

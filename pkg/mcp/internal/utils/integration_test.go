@@ -6,6 +6,7 @@ import (
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -283,7 +284,7 @@ func TestUnifiedAIContextIntegration(t *testing.T) {
 			BuildDuration: 1 * time.Minute,
 			SecurityScan: &coredocker.ScanResult{
 				Success: true,
-				Summary: coredocker.VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Critical: 0,
 					High:     0,
 					Total:    0,

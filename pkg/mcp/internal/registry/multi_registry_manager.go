@@ -38,6 +38,7 @@ func (d *DefaultCommandExecutor) CommandExists(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
 }
+
 // MultiRegistryManager coordinates authentication across multiple registries
 type MultiRegistryManager struct {
 	config          *MultiRegistryConfig

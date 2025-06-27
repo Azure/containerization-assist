@@ -200,7 +200,7 @@ jobs:
           interface-metrics.json
           quality-dashboard.html
 
-    # Note: Individual PR comments disabled in favor of consolidated CI status  
+    # Note: Individual PR comments disabled in favor of consolidated CI status
     # The CI Status Consolidator workflow will aggregate all results
 
     # Final step to ensure workflow status reflects gate results
