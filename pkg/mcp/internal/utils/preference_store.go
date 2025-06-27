@@ -113,7 +113,15 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to open preference database: %w", err)
+		return nil, types.NewErrorBuilder("database_open_failed", "Failed to open preference database", "system").
+			WithSeverity("high").
+			WithOperation("initialize_preferences").
+			WithStage("database_connection").
+			WithRootCause(fmt.Sprintf("BoltDB open failed: %v", err)).
+			WithImmediateStep(1, "Check permissions", "Verify write permissions to the data directory").
+			WithImmediateStep(2, "Check disk space", "Ensure sufficient disk space is available").
+			WithImmediateStep(3, "Check file locks", "Verify no other process is using the database file").
+			Build()
 	}
 
 	// Initialize bucket
@@ -126,7 +134,14 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 			// Log the close error but return the original error
 			logger.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
 		}
-		return nil, fmt.Errorf("failed to create preferences bucket: %w", err)
+		return nil, types.NewErrorBuilder("bucket_creation_failed", "Failed to create preferences bucket", "system").
+			WithSeverity("high").
+			WithOperation("initialize_preferences").
+			WithStage("bucket_creation").
+			WithRootCause(fmt.Sprintf("BoltDB bucket creation failed: %v", err)).
+			WithImmediateStep(1, "Check database integrity", "Verify the database file is not corrupted").
+			WithImmediateStep(2, "Restart with clean database", "Delete database file and restart if corruption is suspected").
+			Build()
 	}
 
 	// Derive encryption key from passphrase
@@ -440,7 +455,14 @@ func (ps *PreferenceStore) encrypt(data []byte) ([]byte, error) {
 
 	block, err := aes.NewCipher(ps.encryptionKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
+		return nil, types.NewErrorBuilder("encryption_cipher_failed", "Failed to create encryption cipher", "security").
+			WithSeverity("high").
+			WithOperation("encrypt_preferences").
+			WithStage("cipher_creation").
+			WithRootCause(fmt.Sprintf("AES cipher creation failed: %v", err)).
+			WithImmediateStep(1, "Check encryption key", "Verify encryption key is 32 bytes (256-bit)").
+			WithImmediateStep(2, "Check system crypto", "Ensure system crypto libraries are functional").
+			Build()
 	}
 
 	gcm, err := cipher.NewGCM(block)

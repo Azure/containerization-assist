@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -8,7 +9,7 @@ import (
 
 // BuildArgsMap converts a struct to a map[string]interface{} using reflection
 // It prioritizes JSON tags and converts snake_case to camelCase for consistency
-func BuildArgsMap(args interface{}) (map[string]interface{}, error) {
+func BuildArgsMap(ctx context.Context, args interface{}) (map[string]interface{}, error) {
 	if args == nil {
 		return nil, fmt.Errorf("args cannot be nil")
 	}
