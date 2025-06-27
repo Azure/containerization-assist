@@ -267,6 +267,7 @@ func (s *SBOMGenerator) parsePackageFile(path string, packageType string) ([]Pac
 	var packages []Package
 
 	// Read file content
+	// nolint:gosec // Path is controlled by the function caller
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)

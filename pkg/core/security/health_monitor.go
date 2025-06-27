@@ -15,6 +15,7 @@ import (
 // HealthStatus represents the overall health status
 type HealthStatus string
 
+// Health status constants
 const (
 	HealthStatusHealthy   HealthStatus = "healthy"
 	HealthStatusDegraded  HealthStatus = "degraded"
@@ -407,11 +408,14 @@ func (h *HealthEndpointHandler) HealthzHandler(w http.ResponseWriter, _ *http.Re
 	health := h.monitor.GetHealth()
 
 	// Set status code based on health
-	statusCode := http.StatusOK
-	if health.Status == HealthStatusUnhealthy {
+	var statusCode int
+	switch health.Status {
+	case HealthStatusUnhealthy:
 		statusCode = http.StatusServiceUnavailable
-	} else if health.Status == HealthStatusDegraded {
+	case HealthStatusDegraded:
 		statusCode = http.StatusOK // Still available but degraded
+	default:
+		statusCode = http.StatusOK
 	}
 
 	w.Header().Set("Content-Type", "application/json")

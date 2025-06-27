@@ -329,9 +329,9 @@ func TestEvaluatePolicies(t *testing.T) {
 
 	// Check that critical policies failed
 	var criticalPolicy *PolicyEvaluationResult
-	for _, result := range results {
+	for i, result := range results {
 		if result.PolicyID == "critical-vulns-block" {
-			criticalPolicy = &result
+			criticalPolicy = &results[i]
 			break
 		}
 	}

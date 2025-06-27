@@ -83,7 +83,7 @@ type CVEInfo struct {
 	ImpactSubScore         float64         `json:"impact_subscore,omitempty"`
 	Source                 string          `json:"source"`
 	Type                   string          `json:"type"`
-	AssignerOrgId          string          `json:"assigner_org_id,omitempty"`
+	AssignerOrgID          string          `json:"assigner_org_id,omitempty"`
 	AssignerShortName      string          `json:"assigner_short_name,omitempty"`
 }
 
@@ -137,7 +137,7 @@ type CVEReference struct {
 type CPEMatch struct {
 	Vulnerable            bool   `json:"vulnerable"`
 	Criteria              string `json:"criteria"`
-	MatchCriteriaId       string `json:"match_criteria_id,omitempty"`
+	MatchCriteriaID       string `json:"match_criteria_id,omitempty"`
 	VersionStartIncluding string `json:"version_start_including,omitempty"`
 	VersionStartExcluding string `json:"version_start_excluding,omitempty"`
 	VersionEndIncluding   string `json:"version_end_including,omitempty"`
@@ -502,21 +502,45 @@ func (db *CVEDatabase) GetCVE(ctx context.Context, cveID string) (*CVEInfo, erro
 
 // SearchCVEs searches for CVEs based on the provided criteria
 func (db *CVEDatabase) SearchCVEs(ctx context.Context, options CVESearchOptions) (*CVESearchResult, error) {
-	// Build query parameters
+	params := db.buildSearchParams(options)
+	return db.executeSearch(ctx, params)
+}
+
+// buildSearchParams builds URL parameters from search options
+func (db *CVEDatabase) buildSearchParams(options CVESearchOptions) url.Values {
 	params := url.Values{}
 
-	if options.CVEId != "" {
-		params.Set("cveId", options.CVEId)
+	db.addStringParam(params, "cveId", options.CVEId)
+	db.addStringParam(params, "cpeName", options.CPEName)
+	db.addKeywordParams(params, options)
+	db.addDateParams(params, options)
+	db.addCVSSParams(params, options)
+	db.addStringParam(params, "cweId", options.CWE)
+	db.addBooleanParams(params, options)
+	db.addPaginationParams(params, options)
+
+	return params
+}
+
+// addStringParam adds a string parameter if not empty
+func (db *CVEDatabase) addStringParam(params url.Values, key, value string) {
+	if value != "" {
+		params.Set(key, value)
 	}
-	if options.CPEName != "" {
-		params.Set("cpeName", options.CPEName)
-	}
+}
+
+// addKeywordParams adds keyword search parameters
+func (db *CVEDatabase) addKeywordParams(params url.Values, options CVESearchOptions) {
 	if options.KeywordSearch != "" {
 		params.Set("keywordSearch", options.KeywordSearch)
 		if options.KeywordExactMatch {
 			params.Set("keywordExactMatch", "true")
 		}
 	}
+}
+
+// addDateParams adds date-related parameters
+func (db *CVEDatabase) addDateParams(params url.Values, options CVESearchOptions) {
 	if options.LastModStartDate != nil {
 		params.Set("lastModStartDate", options.LastModStartDate.Format("2006-01-02T15:04:05.000"))
 	}
@@ -529,46 +553,51 @@ func (db *CVEDatabase) SearchCVEs(ctx context.Context, options CVESearchOptions)
 	if options.PubEndDate != nil {
 		params.Set("pubEndDate", options.PubEndDate.Format("2006-01-02T15:04:05.000"))
 	}
-	if options.CVSSV2Severity != "" {
-		params.Set("cvssV2Severity", options.CVSSV2Severity)
-	}
-	if options.CVSSV3Severity != "" {
-		params.Set("cvssV3Severity", options.CVSSV3Severity)
-	}
+}
+
+// addCVSSParams adds CVSS-related parameters
+func (db *CVEDatabase) addCVSSParams(params url.Values, options CVESearchOptions) {
+	db.addStringParam(params, "cvssV2Severity", options.CVSSV2Severity)
+	db.addStringParam(params, "cvssV3Severity", options.CVSSV3Severity)
+
 	if options.CVSSScoreMin != nil {
 		params.Set("cvssV3Metrics", strconv.FormatFloat(*options.CVSSScoreMin, 'f', 1, 64))
 	}
 	if options.CVSSScoreMax != nil {
 		params.Set("cvssV3Metrics", strconv.FormatFloat(*options.CVSSScoreMax, 'f', 1, 64))
 	}
-	if options.CWE != "" {
-		params.Set("cweId", options.CWE)
+}
+
+// addBooleanParams adds boolean flag parameters
+func (db *CVEDatabase) addBooleanParams(params url.Values, options CVESearchOptions) {
+	boolFlags := map[string]bool{
+		"hasCertAlerts": options.HasCertAlerts,
+		"hasCertNotes":  options.HasCertNotes,
+		"hasKev":        options.HasKev,
+		"hasOval":       options.HasOval,
+		"isVulnerable":  options.IsVulnerable,
+		"noRejected":    options.NoRejected,
 	}
-	if options.HasCertAlerts {
-		params.Set("hasCertAlerts", "true")
+
+	for key, value := range boolFlags {
+		if value {
+			params.Set(key, "true")
+		}
 	}
-	if options.HasCertNotes {
-		params.Set("hasCertNotes", "true")
-	}
-	if options.HasKev {
-		params.Set("hasKev", "true")
-	}
-	if options.HasOval {
-		params.Set("hasOval", "true")
-	}
-	if options.IsVulnerable {
-		params.Set("isVulnerable", "true")
-	}
-	if options.NoRejected {
-		params.Set("noRejected", "true")
-	}
+}
+
+// addPaginationParams adds pagination parameters
+func (db *CVEDatabase) addPaginationParams(params url.Values, options CVESearchOptions) {
 	if options.ResultsPerPage > 0 {
 		params.Set("resultsPerPage", strconv.Itoa(options.ResultsPerPage))
 	}
 	if options.StartIndex > 0 {
 		params.Set("startIndex", strconv.Itoa(options.StartIndex))
 	}
+}
 
+// executeSearch performs the actual HTTP request and response processing
+func (db *CVEDatabase) executeSearch(ctx context.Context, params url.Values) (*CVESearchResult, error) {
 	reqURL := fmt.Sprintf("%s?%s", db.baseURL, params.Encode())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
@@ -576,11 +605,7 @@ func (db *CVEDatabase) SearchCVEs(ctx context.Context, options CVESearchOptions)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Add API key if available
-	if db.apiKey != "" {
-		req.Header.Set("apiKey", db.apiKey)
-	}
-	req.Header.Set("User-Agent", "container-kit-security/1.0")
+	db.setRequestHeaders(req)
 
 	resp, err := db.httpClient.Do(req)
 	if err != nil {
@@ -598,6 +623,14 @@ func (db *CVEDatabase) SearchCVEs(ctx context.Context, options CVESearchOptions)
 	}
 
 	return &result, nil
+}
+
+// setRequestHeaders sets common request headers
+func (db *CVEDatabase) setRequestHeaders(req *http.Request) {
+	if db.apiKey != "" {
+		req.Header.Set("apiKey", db.apiKey)
+	}
+	req.Header.Set("User-Agent", "container-kit-security/1.0")
 }
 
 // EnrichVulnerability enriches a vulnerability with additional CVE data

@@ -412,9 +412,10 @@ func (s *SBOMGenerator) ConvertSPDXToCycloneDX(spdx *SPDXDocument) (*CycloneDXBO
 		// Extract package type from external refs
 		var purl, cpe string
 		for _, ref := range spdxPkg.ExternalRefs {
-			if ref.Type == "purl" {
+			switch ref.Type {
+			case "purl":
 				purl = ref.Locator
-			} else if ref.Type == "cpe23Type" {
+			case "cpe23Type":
 				cpe = ref.Locator
 			}
 		}

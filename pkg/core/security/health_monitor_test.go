@@ -200,9 +200,10 @@ func TestHealthMonitor_GetReadiness(t *testing.T) {
 
 	// Check individual readiness checks
 	for _, check := range readiness.Checks {
-		if check.Component == "healthy_checker" {
+		switch check.Component {
+		case "healthy_checker":
 			assert.True(t, check.Ready)
-		} else if check.Component == "unhealthy_checker" {
+		case "unhealthy_checker":
 			assert.False(t, check.Ready)
 		}
 	}

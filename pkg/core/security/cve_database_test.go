@@ -120,6 +120,7 @@ func TestCVEDatabase_GetCVE_NotFound(t *testing.T) {
 	}`
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r // unused in this test
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(mockResponse))
 	}))
@@ -139,6 +140,7 @@ func TestCVEDatabase_GetCVE_Cache(t *testing.T) {
 
 	callCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r // unused in this test
 		callCount++
 		mockResponse := `{
 			"resultsPerPage": 1,
@@ -233,6 +235,7 @@ func TestCVEDatabase_EnrichVulnerability(t *testing.T) {
 	}`
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r // unused in this test
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(mockResponse))
 	}))

@@ -53,16 +53,16 @@ import (
 
 func main() {
     logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-    
+
     // Create unified scanner
     scanner := docker.NewUnifiedSecurityScanner(logger)
-    
+
     // Scan image
     result, err := scanner.ScanImage(context.Background(), "nginx:latest", "HIGH,CRITICAL")
     if err != nil {
         log.Fatal(err)
     }
-    
+
     fmt.Printf("Found %d vulnerabilities\n", result.CombinedSummary.Total)
     fmt.Printf("Scanner agreement: %.1f%%\n", result.ComparisonMetrics.AgreementRate)
 }
@@ -251,11 +251,11 @@ func (w *SecurityWebhook) ValidateImage(ctx context.Context, image string) error
     if err != nil {
         return fmt.Errorf("scan failed: %w", err)
     }
-    
+
     if w.policyEngine.ShouldBlock(result) {
         return fmt.Errorf("image blocked by security policies")
     }
-    
+
     return nil
 }
 ```

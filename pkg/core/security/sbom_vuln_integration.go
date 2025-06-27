@@ -208,13 +208,14 @@ func (s *SBOMVulnerabilityIntegrator) extractFromSPDX(doc *SPDXDocument) []Packa
 
 		// Extract type and PURL from external references
 		for _, ref := range spdxPkg.ExternalRefs {
-			if ref.Type == "purl" {
+			switch ref.Type {
+			case "purl":
 				pkg.PURL = ref.Locator
 				// Extract type from PURL
 				if purl := parsePURL(ref.Locator); purl != nil {
 					pkg.Type = purl.Type
 				}
-			} else if ref.Type == "cpe23Type" {
+			case "cpe23Type":
 				pkg.CPE = ref.Locator
 			}
 		}
@@ -613,6 +614,7 @@ func (s *SBOMVulnerabilityIntegrator) recordMetrics(source string, metrics SBOMS
 
 // WriteEnrichedResult writes enriched SBOM result to JSON
 func (s *SBOMVulnerabilityIntegrator) WriteEnrichedResult(result *EnrichedSBOMResult, filename string) error {
+	// nolint:gosec // Filename is controlled by the function caller
 	file, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)

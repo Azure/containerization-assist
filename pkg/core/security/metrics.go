@@ -504,58 +504,67 @@ func (mc *MetricsCollector) GetHandler() http.Handler {
 	})
 }
 
-// Recording methods for scan metrics
+// RecordScanDuration records the duration of a security scan
 func (mc *MetricsCollector) RecordScanDuration(scanner, image, severityThreshold string, duration time.Duration) {
 	mc.scanDuration.WithLabelValues(scanner, image, severityThreshold).Observe(duration.Seconds())
 }
 
+// RecordScanTotal records the total number of scans performed
 func (mc *MetricsCollector) RecordScanTotal(scanner, status string) {
 	mc.scanTotal.WithLabelValues(scanner, status).Inc()
 }
 
+// RecordScanError records scan errors
 func (mc *MetricsCollector) RecordScanError(scanner, errorType string) {
 	mc.scanErrors.WithLabelValues(scanner, errorType).Inc()
 }
 
+// RecordLastScanTime records the timestamp of the last scan
 func (mc *MetricsCollector) RecordLastScanTime(scanner, image string, timestamp time.Time) {
 	mc.lastScanTime.WithLabelValues(scanner, image).Set(float64(timestamp.Unix()))
 }
 
-// Recording methods for vulnerability metrics
+// RecordVulnerabilities records vulnerability counts by severity
 func (mc *MetricsCollector) RecordVulnerabilities(image, scanner string, total int) {
 	mc.vulnerabilitiesTotal.WithLabelValues(image, scanner).Set(float64(total))
 }
 
+// RecordVulnerabilitiesBySeverity records vulnerabilities grouped by severity level
 func (mc *MetricsCollector) RecordVulnerabilitiesBySeverity(image, severity, scanner string, count int) {
 	mc.vulnerabilitiesBySeverity.WithLabelValues(image, severity, scanner).Set(float64(count))
 }
 
+// RecordVulnerabilitiesFixed records the number of fixed vulnerabilities
 func (mc *MetricsCollector) RecordVulnerabilitiesFixed(image, severity string, count int) {
 	mc.vulnerabilitiesFixed.WithLabelValues(image, severity).Add(float64(count))
 }
 
+// RecordCVSSScore records CVSS scores for vulnerabilities
 func (mc *MetricsCollector) RecordCVSSScore(image, cvssVersion string, score float64) {
 	mc.cvssScores.WithLabelValues(image, cvssVersion).Observe(score)
 }
 
-// Recording methods for policy metrics
+// RecordPolicyEvaluation records the results of policy evaluations
 func (mc *MetricsCollector) RecordPolicyEvaluation(policyID, result string) {
 	mc.policyEvaluations.WithLabelValues(policyID, result).Inc()
 }
 
+// RecordPolicyViolation records policy violations by type and severity
 func (mc *MetricsCollector) RecordPolicyViolation(policyID, severity, ruleType string) {
 	mc.policyViolations.WithLabelValues(policyID, severity, ruleType).Inc()
 }
 
+// RecordBlockedDeployment records deployments blocked by security policies
 func (mc *MetricsCollector) RecordBlockedDeployment(policyID, actionType string) {
 	mc.blockedDeployments.WithLabelValues(policyID, actionType).Inc()
 }
 
+// RecordPolicyExecutionDuration records how long policy evaluations take
 func (mc *MetricsCollector) RecordPolicyExecutionDuration(policyID string, duration time.Duration) {
 	mc.policyExecution.WithLabelValues(policyID).Observe(duration.Seconds())
 }
 
-// Recording methods for secret metrics
+// RecordSecretFound records discovered secrets by type and detection method
 func (mc *MetricsCollector) RecordSecretFound(secretType, detectionMethod string) {
 	mc.secretsFound.WithLabelValues(secretType, detectionMethod).Inc()
 }

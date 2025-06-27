@@ -369,7 +369,7 @@ func (pe *PolicyEngine) EvaluatePolicies(ctx context.Context, scanCtx *SecurityS
 }
 
 // evaluatePolicy evaluates a single policy against the scan context
-func (pe *PolicyEngine) evaluatePolicy(ctx context.Context, policy SecurityPolicy, scanCtx *SecurityScanContext) (*PolicyEvaluationResult, error) {
+func (pe *PolicyEngine) evaluatePolicy(_ context.Context, policy SecurityPolicy, scanCtx *SecurityScanContext) (*PolicyEvaluationResult, error) {
 	result := &PolicyEvaluationResult{
 		PolicyID:    policy.ID,
 		PolicyName:  policy.Name,

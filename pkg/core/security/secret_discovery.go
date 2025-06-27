@@ -103,6 +103,7 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 
 	// Walk through directory
 	var wg sync.WaitGroup
+	var mu sync.Mutex
 	semaphore := make(chan struct{}, options.MaxConcurrency)
 
 	err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
@@ -121,13 +122,18 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			if findings := sd.scanFile(ctx, filePath, options); len(findings) > 0 {
+			findings := sd.scanFile(ctx, filePath, options)
+
+			// Thread-safe updates to result
+			mu.Lock()
+			if len(findings) > 0 {
 				for _, finding := range findings {
 					sd.results.Store(finding.ID, finding)
 					result.Findings = append(result.Findings, finding)
 				}
 			}
 			result.FilesScanned++
+			mu.Unlock()
 		}()
 
 		return nil

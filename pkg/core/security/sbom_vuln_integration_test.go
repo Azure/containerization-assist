@@ -488,6 +488,7 @@ func TestSBOMVulnerabilityIntegrator_WriteEnrichedResult(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify content is valid JSON
+	// nolint:gosec // tmpFile is a controlled test file path
 	content, err := os.ReadFile(tmpFile)
 	require.NoError(t, err)
 

@@ -123,16 +123,16 @@ import (
 
 func main() {
     logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-    
+
     // Create scanner
     scanner := docker.NewTrivyScanner(logger)
-    
+
     // Scan image
     result, err := scanner.ScanImage(context.Background(), "nginx:latest", "HIGH,CRITICAL")
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Display results
     fmt.Println(scanner.FormatScanSummary(result))
 }
@@ -154,16 +154,16 @@ import (
 
 func main() {
     logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-    
+
     // Create unified scanner
     scanner := docker.NewUnifiedSecurityScanner(logger)
-    
+
     // Scan image with both scanners
     result, err := scanner.ScanImage(context.Background(), "nginx:latest", "HIGH,CRITICAL")
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Display unified results
     fmt.Println(scanner.FormatUnifiedScanSummary(result))
     fmt.Printf("Scanner agreement rate: %.1f%%\n", result.ComparisonMetrics.AgreementRate)
@@ -188,21 +188,21 @@ import (
 
 func main() {
     logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-    
+
     // Create policy engine
     policyEngine := security.NewPolicyEngine(logger)
     err := policyEngine.LoadDefaultPolicies()
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Scan image
     scanner := docker.NewUnifiedSecurityScanner(logger)
     scanResult, err := scanner.ScanImage(context.Background(), "nginx:latest", "")
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Create scan context for policy evaluation
     scanCtx := &security.SecurityScanContext{
         ImageRef:        scanResult.ImageRef,
@@ -210,13 +210,13 @@ func main() {
         Vulnerabilities: scanResult.UniqueVulns,
         VulnSummary:     scanResult.CombinedSummary,
     }
-    
+
     // Evaluate policies
     results, err := policyEngine.EvaluatePolicies(context.Background(), scanCtx)
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Check if deployment should be blocked
     if policyEngine.ShouldBlock(results) {
         fmt.Println("❌ Deployment blocked due to policy violations")
@@ -228,7 +228,7 @@ func main() {
     } else {
         fmt.Println("✅ Deployment approved")
     }
-    
+
     // Get violations summary
     summary := policyEngine.GetViolationsSummary(results)
     fmt.Printf("Policy Summary: %d passed, %d failed, %d blocking\n",
@@ -251,24 +251,24 @@ import (
 
 func main() {
     logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-    
+
     // Create secret discovery
     discovery := security.NewSecretDiscovery(logger)
-    
+
     // Scan directory for secrets
     results, err := discovery.ScanDirectory("/path/to/project", nil)
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Display results
     summary := discovery.GenerateSummary(results)
-    fmt.Printf("Found %d secrets (%d false positives)\n", 
+    fmt.Printf("Found %d secrets (%d false positives)\n",
         summary.TotalFindings, summary.FalsePositives)
-    
+
     for _, finding := range results {
         if !finding.FalsePositive {
-            fmt.Printf("Secret found: %s in %s:%d\n", 
+            fmt.Printf("Secret found: %s in %s:%d\n",
                 finding.SecretType, finding.File, finding.Line)
         }
     }
@@ -290,17 +290,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Build Docker image
       run: docker build -t ${{ github.repository }}:${{ github.sha }} .
-    
+
     - name: Install scanners
       run: |
         # Install Trivy
         curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
         # Install Grype
         curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-    
+
     - name: Run security scan
       run: |
         go run ./cmd/security-scanner scan \
@@ -309,13 +309,13 @@ jobs:
           --policy-file .security-policies.yaml \
           --output-format json \
           --output-file scan-results.json
-    
+
     - name: Upload scan results
       uses: actions/upload-artifact@v3
       with:
         name: security-scan-results
         path: scan-results.json
-    
+
     - name: Check scan results
       run: |
         if grep -q '"blocked": true' scan-results.json; then
@@ -337,7 +337,7 @@ func (w *SecurityWebhook) ValidateImage(ctx context.Context, image string) error
     if err != nil {
         return fmt.Errorf("scan failed: %w", err)
     }
-    
+
     // Evaluate policies
     scanCtx := &security.SecurityScanContext{
         ImageRef:        image,
@@ -345,16 +345,16 @@ func (w *SecurityWebhook) ValidateImage(ctx context.Context, image string) error
         Vulnerabilities: result.UniqueVulns,
         VulnSummary:     result.CombinedSummary,
     }
-    
+
     policyResults, err := w.policyEngine.EvaluatePolicies(ctx, scanCtx)
     if err != nil {
         return fmt.Errorf("policy evaluation failed: %w", err)
     }
-    
+
     if w.policyEngine.ShouldBlock(policyResults) {
         return fmt.Errorf("image blocked by security policies")
     }
-    
+
     return nil
 }
 ```
@@ -365,7 +365,7 @@ func (w *SecurityWebhook) ValidateImage(ctx context.Context, image string) error
 // Example registry webhook
 func (r *RegistryWebhook) OnImagePush(ctx context.Context, event *RegistryEvent) error {
     imageRef := fmt.Sprintf("%s/%s:%s", event.Registry, event.Repository, event.Tag)
-    
+
     // Perform security scan
     scanner := docker.NewUnifiedSecurityScanner(r.logger)
     result, err := scanner.ScanImage(ctx, imageRef, "")
@@ -373,7 +373,7 @@ func (r *RegistryWebhook) OnImagePush(ctx context.Context, event *RegistryEvent)
         r.logger.Error().Err(err).Str("image", imageRef).Msg("Security scan failed")
         return err
     }
-    
+
     // Store scan results in metadata
     metadata := map[string]interface{}{
         "security_scan_timestamp": result.ScanTime,
@@ -382,7 +382,7 @@ func (r *RegistryWebhook) OnImagePush(ctx context.Context, event *RegistryEvent)
         "high_vulnerabilities":    result.CombinedSummary.High,
         "scanner_agreement_rate":  result.ComparisonMetrics.AgreementRate,
     }
-    
+
     return r.registryClient.UpdateImageMetadata(imageRef, metadata)
 }
 ```

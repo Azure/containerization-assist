@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Example demonstrates how to set up and use the health monitoring system
+// ExampleHealthMonitor demonstrates how to set up and use the health monitoring system
 func ExampleHealthMonitor() {
 	// Create logger
 	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
@@ -68,8 +68,9 @@ func ExampleHealthMonitor() {
 
 	// Start HTTP server for health endpoints
 	server := &http.Server{
-		Addr:    ":8080",
-		Handler: mux,
+		Addr:              ":8080",
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	logger.Info().Msg("Health monitoring started")
@@ -196,13 +197,14 @@ func ExampleHealthCheckIntegration() {
 	logger.Info().Msg("Application with health monitoring started")
 }
 
-// ExampleCustomHealthChecker demonstrates creating a custom health checker
+// CustomServiceHealthChecker demonstrates creating a custom health checker
 type CustomServiceHealthChecker struct {
 	logger      zerolog.Logger
 	serviceName string
 	serviceURL  string
 }
 
+// NewCustomServiceHealthChecker creates a new custom service health checker
 func NewCustomServiceHealthChecker(logger zerolog.Logger, serviceName, serviceURL string) *CustomServiceHealthChecker {
 	return &CustomServiceHealthChecker{
 		logger:      logger.With().Str("health_checker", "custom_service").Logger(),
@@ -211,14 +213,17 @@ func NewCustomServiceHealthChecker(logger zerolog.Logger, serviceName, serviceUR
 	}
 }
 
+// GetName returns the name of the custom service health checker
 func (c *CustomServiceHealthChecker) GetName() string {
 	return c.serviceName
 }
 
+// GetDependencies returns the dependencies for the custom service
 func (c *CustomServiceHealthChecker) GetDependencies() []string {
 	return []string{"network", "external_service"}
 }
 
+// CheckHealth performs a health check for the custom service
 func (c *CustomServiceHealthChecker) CheckHealth(ctx context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         c.GetName(),
@@ -265,6 +270,7 @@ func (c *CustomServiceHealthChecker) CheckHealth(ctx context.Context) ComponentH
 	return health
 }
 
+// ExampleCustomHealthChecker demonstrates using a custom health checker
 func ExampleCustomHealthChecker() {
 	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 

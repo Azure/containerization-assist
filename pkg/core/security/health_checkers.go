@@ -22,14 +22,17 @@ func NewTrivyScannerHealthChecker(logger zerolog.Logger) *TrivyScannerHealthChec
 	}
 }
 
+// GetName returns the name of the Trivy scanner health checker
 func (t *TrivyScannerHealthChecker) GetName() string {
 	return "trivy_scanner"
 }
 
+// GetDependencies returns the dependencies for the Trivy scanner
 func (t *TrivyScannerHealthChecker) GetDependencies() []string {
 	return []string{"filesystem", "network"}
 }
 
+// CheckHealth performs a health check for the Trivy scanner
 func (t *TrivyScannerHealthChecker) CheckHealth(ctx context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         t.GetName(),
@@ -75,14 +78,17 @@ func NewGrypeScannerHealthChecker(logger zerolog.Logger) *GrypeScannerHealthChec
 	}
 }
 
+// GetName returns the name of the Grype scanner health checker
 func (g *GrypeScannerHealthChecker) GetName() string {
 	return "grype_scanner"
 }
 
+// GetDependencies returns the dependencies for the Grype scanner
 func (g *GrypeScannerHealthChecker) GetDependencies() []string {
 	return []string{"filesystem", "network"}
 }
 
+// CheckHealth performs a health check for the Grype scanner
 func (g *GrypeScannerHealthChecker) CheckHealth(ctx context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         g.GetName(),
@@ -132,14 +138,17 @@ func NewCVEDatabaseHealthChecker(logger zerolog.Logger, cveDB *CVEDatabase) *CVE
 	}
 }
 
+// GetName returns the name of the CVE database health checker
 func (c *CVEDatabaseHealthChecker) GetName() string {
 	return "cve_database"
 }
 
+// GetDependencies returns the dependencies for the CVE database
 func (c *CVEDatabaseHealthChecker) GetDependencies() []string {
 	return []string{"network", "nist_nvd_api"}
 }
 
+// CheckHealth performs a health check for the CVE database
 func (c *CVEDatabaseHealthChecker) CheckHealth(ctx context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         c.GetName(),
@@ -198,14 +207,17 @@ func NewPolicyEngineHealthChecker(logger zerolog.Logger, policyEngine *PolicyEng
 	}
 }
 
+// GetName returns the name of the policy engine health checker
 func (p *PolicyEngineHealthChecker) GetName() string {
 	return "policy_engine"
 }
 
+// GetDependencies returns the dependencies for the policy engine
 func (p *PolicyEngineHealthChecker) GetDependencies() []string {
 	return []string{}
 }
 
+// CheckHealth performs a health check for the policy engine
 func (p *PolicyEngineHealthChecker) CheckHealth(_ context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         p.GetName(),
@@ -272,14 +284,17 @@ func NewSecretDiscoveryHealthChecker(logger zerolog.Logger, secretDiscovery *Sec
 	}
 }
 
+// GetName returns the name of the secret discovery health checker
 func (s *SecretDiscoveryHealthChecker) GetName() string {
 	return "secret_discovery"
 }
 
+// GetDependencies returns the dependencies for the secret discovery engine
 func (s *SecretDiscoveryHealthChecker) GetDependencies() []string {
 	return []string{"filesystem"}
 }
 
+// CheckHealth performs a health check for the secret discovery engine
 func (s *SecretDiscoveryHealthChecker) CheckHealth(_ context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         s.GetName(),
@@ -295,6 +310,7 @@ func (s *SecretDiscoveryHealthChecker) CheckHealth(_ context.Context) ComponentH
 	}
 
 	// Test secret discovery with pattern detector using a more recognizable pattern
+	// nolint:gosec // This is a test constant, not a real AWS key
 	testContent := "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
 	findings := s.secretDiscovery.patternDetector.Scan(testContent, "test.txt", 1)
 
@@ -333,14 +349,17 @@ func NewNetworkConnectivityHealthChecker(logger zerolog.Logger, testURL string) 
 	}
 }
 
+// GetName returns the name of the network connectivity health checker
 func (n *NetworkConnectivityHealthChecker) GetName() string {
 	return "network_connectivity"
 }
 
+// GetDependencies returns the dependencies for the network connectivity checker
 func (n *NetworkConnectivityHealthChecker) GetDependencies() []string {
 	return []string{"network", "dns"}
 }
 
+// CheckHealth performs a health check for network connectivity
 func (n *NetworkConnectivityHealthChecker) CheckHealth(ctx context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         n.GetName(),
@@ -409,14 +428,17 @@ func NewSecurityFrameworkHealthChecker(logger zerolog.Logger, healthMonitor *Hea
 	}
 }
 
+// GetName returns the name of the security framework health checker
 func (s *SecurityFrameworkHealthChecker) GetName() string {
 	return "security_framework"
 }
 
+// GetDependencies returns the dependencies for the security framework
 func (s *SecurityFrameworkHealthChecker) GetDependencies() []string {
 	return s.requiredChecks
 }
 
+// CheckHealth performs a health check for the security framework
 func (s *SecurityFrameworkHealthChecker) CheckHealth(_ context.Context) ComponentHealth {
 	health := ComponentHealth{
 		Name:         s.GetName(),
