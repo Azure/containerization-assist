@@ -44,25 +44,16 @@ function Test-Administrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-# Get the latest release version from GitHub
+# Use latest release redirect URL
 function Get-LatestVersion {
-    Write-Info "Fetching latest release information..."
+    Write-Info "Using latest release..."
 
-    try {
-        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest" -Method Get
-        $latestVersion = $releases.tag_name
+    # GitHub provides a direct redirect to the latest release
+    # We'll use "latest" as the version identifier and let GitHub handle the redirect
+    $latestVersion = "latest"
 
-        if ([string]::IsNullOrEmpty($latestVersion)) {
-            throw "Failed to fetch latest release version"
-        }
-
-        Write-Info "Latest version: $latestVersion"
-        return $latestVersion
-    }
-    catch {
-        Write-Error "Failed to fetch latest release: $_"
-        exit 1
-    }
+    Write-Info "Version: $latestVersion (will redirect to actual latest)"
+    return $latestVersion
 }
 
 # Download the binary
@@ -75,11 +66,18 @@ function Download-Binary {
     # Determine architecture
     $arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
 
-    # Construct download URL
-    $versionTag = if ($Version -match '^v') { $Version } else { "v$Version" }
-    $archiveName = "container-kit_$($versionTag.TrimStart('v'))_windows_$arch.zip"
-    $downloadUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/$versionTag/$archiveName"
-    $checksumUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/$versionTag/checksums.txt"
+    # Construct download URL using latest redirect
+    if ($Version -eq "latest") {
+        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/container-kit_windows_$arch.zip"
+        $checksumUrl = "https://github.com/$RepoOwner/$RepoName/releases/latest/download/checksums.txt"
+        $archiveName = "container-kit_windows_$arch.zip"
+        $versionTag = "latest"
+    } else {
+        $versionTag = if ($Version -match '^v') { $Version } else { "v$Version" }
+        $archiveName = "container-kit_$($versionTag.TrimStart('v'))_windows_$arch.zip"
+        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/$versionTag/$archiveName"
+        $checksumUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/$versionTag/checksums.txt"
+    }
 
     Write-Info "Downloading container-kit $versionTag for Windows ($arch)..."
 

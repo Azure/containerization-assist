@@ -249,6 +249,15 @@ func (m *ErrorHandlingMiddleware) Wrap(next HandlerFunc) HandlerFunc {
 		result, err := next(ctx)
 
 		if err != nil {
+			// If no error service is configured, just pass through the error
+			if m.service == nil {
+				m.logger.Error().
+					Err(err).
+					Str("tool", getToolName(ctx.Tool)).
+					Msg("Error occurred, no error service configured")
+				return result, err
+			}
+
 			// Create error context
 			errorCtx := ErrorContext{
 				Tool:      getToolName(ctx.Tool),

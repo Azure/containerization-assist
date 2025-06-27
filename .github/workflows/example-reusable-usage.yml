@@ -1,12 +1,15 @@
-name: Example - Using Reusable Go Build
+name: Example - Using Reusable Go Build (DISABLED)
 
 on:
-  workflow_dispatch:  # For manual testing
-  push:
-    branches: [ main ]
-    paths:
-      - '.github/workflows/reusable-go-build.yml'
-      - '.github/workflows/example-reusable-usage.yml'
+  # workflow_dispatch:  # For manual testing
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - '.github/workflows/reusable-go-build.yml'
+  #     - '.github/workflows/example-reusable-usage.yml'
+
+# This workflow is disabled as it's just an example/demo
+# Remove this file entirely in future cleanup
 
 jobs:
   # Example 1: Basic MCP build and test

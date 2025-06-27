@@ -800,7 +800,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				deps.Logger.With().Str("tool", "add_session_label").Logger(),
 				sessionLabelManager,
 			)
-			return addLabelTool.ExecuteTyped(context.Background(), *args)
+			return addLabelTool.ExecuteTyped(context.Background(), args)
 		})
 
 	runtime.RegisterSimpleTool(registrar, "remove_session_label",
@@ -810,7 +810,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				deps.Logger.With().Str("tool", "remove_session_label").Logger(),
 				sessionLabelManager,
 			)
-			return removeLabelTool.ExecuteTyped(context.Background(), *args)
+			return removeLabelTool.ExecuteTyped(context.Background(), args)
 		})
 
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "update_session_labels",
@@ -830,7 +830,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				deps.Logger.With().Str("tool", "list_session_labels").Logger(),
 				sessionLabelManager,
 			)
-			return listLabelsTool.ExecuteTyped(context.Background(), *args)
+			return listLabelsTool.ExecuteTyped(context.Background(), args)
 		})
 
 	// Telemetry Resource (if enabled)
