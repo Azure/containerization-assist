@@ -393,7 +393,7 @@ func (mm *ManifestManager) generateFromTemplate(templateName string, options Man
 	manifests := make([]GeneratedManifest, 0)
 
 	// Use the existing K8s package to write manifests from template
-	if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, options.OutputDir); err != nil {
+	if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, options.OutputDir, k8s.DefaultImageAndTag); err != nil {
 		return nil, fmt.Errorf("failed to write manifests from template: %v", err)
 	}
 

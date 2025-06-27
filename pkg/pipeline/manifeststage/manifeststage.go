@@ -178,7 +178,8 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 	if len(k8sObjects) == 0 {
 		logger.Info("No existing Kubernetes manifests found, generating manifests...")
 
-		if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, targetDir); err != nil {
+		imageNameAndTag := fmt.Sprintf("%s:%s", state.ImageName, "latest")
+		if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, targetDir, imageNameAndTag); err != nil {
 			return fmt.Errorf("writing manifests from template: %w", err)
 		}
 
@@ -197,24 +198,8 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 		logger.Infof("Found %d existing Kubernetes manifests in %s", len(k8sObjects), targetDir)
 	}
 
-	for _, obj := range k8sObjects {
-		if obj.IsDeployment() {
-			imageAndTag := fmt.Sprintf("%s/%s:latest", state.RegistryURL, state.ImageName)
-			logger.Infof("Updating image name to %s in deployment manifest: %s", imageAndTag, obj.Metadata.Name)
-			updatedContent := ReplaceDeploymentImageName(obj.Content, imageAndTag)
-			obj.Content = updatedContent
-		}
-	}
-
 	// Initialize manifests in the state
 	return InitializeManifests(state, targetDir)
-}
-
-const defaultImageAndTag = "localhost:5001/app:latest"
-
-func ReplaceDeploymentImageName(rawManifest []byte, imageName string) []byte {
-	updatedManifest := strings.Replace(string(rawManifest), defaultImageAndTag, imageName, -1)
-	return []byte(updatedManifest)
 }
 
 // GetErrors returns a formatted string of all manifest errors

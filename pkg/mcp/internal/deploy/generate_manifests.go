@@ -723,7 +723,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 	}
 
 	// Generate manifests from templates
-	if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, workspaceDir); err != nil {
+	if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, workspaceDir, k8s.DefaultImageAndTag); err != nil {
 		return nil, types.NewRichError("MANIFEST_TEMPLATE_WRITE_FAILED", fmt.Sprintf("failed to write manifests from template: %v", err), types.ErrTypeBuild)
 	}
 
