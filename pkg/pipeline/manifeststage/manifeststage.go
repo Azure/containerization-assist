@@ -178,7 +178,7 @@ func (p *ManifestStage) Generate(ctx context.Context, state *pipeline.PipelineSt
 	if len(k8sObjects) == 0 {
 		logger.Info("No existing Kubernetes manifests found, generating manifests...")
 
-		imageNameAndTag := fmt.Sprintf("%s:%s", state.ImageName, "latest")
+		imageNameAndTag := fmt.Sprintf("localhost:5001/%s:%s", state.ImageName, "latest")
 		if err := k8s.WriteManifestsFromTemplate(k8s.ManifestsBasic, targetDir, imageNameAndTag); err != nil {
 			return fmt.Errorf("writing manifests from template: %w", err)
 		}
