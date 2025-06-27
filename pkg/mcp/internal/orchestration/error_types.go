@@ -98,6 +98,9 @@ type ErrorAction struct {
 	RetryAfter *time.Duration         `json:"retry_after,omitempty"`
 	Message    string                 `json:"message"`
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
+	Success    bool                   `json:"success,omitempty"`
+	Error      string                 `json:"error,omitempty"`
+	Result     interface{}            `json:"result,omitempty"`
 }
 
 // RedirectionPlan contains detailed information about an error redirection

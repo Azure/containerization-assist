@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	utils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
 
 // BuildArgsMap converts a struct to a map[string]interface{} using reflection
@@ -87,32 +89,10 @@ func getKeyName(field reflect.StructField) string {
 	}
 
 	// Convert field name to snake_case
-	return toSnakeCase(field.Name)
+	return utils.ToSnakeCase(field.Name)
 }
 
-// toSnakeCase converts CamelCase to snake_case
-func toSnakeCase(str string) string {
-	var result strings.Builder
-
-	for i, r := range str {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			// Check if the previous character was lowercase or if this is the last uppercase in a sequence
-			prev := rune(str[i-1])
-			if prev >= 'a' && prev <= 'z' {
-				result.WriteByte('_')
-			} else if i < len(str)-1 {
-				// Check if next character is lowercase (end of uppercase sequence)
-				next := rune(str[i+1])
-				if next >= 'a' && next <= 'z' {
-					result.WriteByte('_')
-				}
-			}
-		}
-		result.WriteRune(r)
-	}
-
-	return strings.ToLower(result.String())
-}
+// toSnakeCase function has been moved to utils.ToSnakeCase
 
 // ConvertSliceToInterfaceSlice converts []T to []interface{} for generic use
 func ConvertSliceToInterfaceSlice[T any](slice []T) []interface{} {

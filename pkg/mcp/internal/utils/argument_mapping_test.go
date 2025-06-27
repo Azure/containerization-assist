@@ -3,6 +3,7 @@ package utils
 import (
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -217,7 +218,7 @@ func TestToSnakeCase(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := toSnakeCase(tt.input)
+			result := utils.ToSnakeCase(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

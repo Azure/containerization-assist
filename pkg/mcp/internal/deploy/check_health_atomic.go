@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -153,7 +154,9 @@ type AtomicCheckHealthTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	// errorHandler field removed - using direct error handling
-	logger zerolog.Logger
+	logger      zerolog.Logger
+	analyzer    ToolAnalyzer
+	fixingMixin *build.AtomicToolFixingMixin
 }
 
 // NewAtomicCheckHealthTool creates a new atomic check health tool
@@ -164,6 +167,16 @@ func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManage
 		// errorHandler initialization removed - using direct error handling
 		logger: logger.With().Str("tool", "atomic_check_health").Logger(),
 	}
+}
+
+// SetAnalyzer sets the analyzer for failure analysis
+func (t *AtomicCheckHealthTool) SetAnalyzer(analyzer ToolAnalyzer) {
+	t.analyzer = analyzer
+}
+
+// SetFixingMixin sets the fixing mixin for automatic error recovery
+func (t *AtomicCheckHealthTool) SetFixingMixin(mixin *build.AtomicToolFixingMixin) {
+	t.fixingMixin = mixin
 }
 
 // standardHealthCheckStages provides common stages for health check operations

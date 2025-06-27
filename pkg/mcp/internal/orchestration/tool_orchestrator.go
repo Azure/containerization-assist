@@ -177,17 +177,4 @@ func (o *MCPToolOrchestrator) validateParameterTypes(
 }
 
 // toSnakeCase converts a string to snake_case (kept for compatibility)
-func (o *MCPToolOrchestrator) toSnakeCase(str string) string {
-	var result []byte
-	for i, r := range str {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			result = append(result, '_')
-		}
-		if r >= 'A' && r <= 'Z' {
-			result = append(result, byte(r+32))
-		} else {
-			result = append(result, byte(r))
-		}
-	}
-	return string(result)
-}
+// toSnakeCase function has been moved to utils.ToSnakeCase and is no longer needed here

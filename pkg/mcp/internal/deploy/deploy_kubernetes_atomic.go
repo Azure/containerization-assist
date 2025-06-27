@@ -253,27 +253,127 @@ type AtomicDeployKubernetesTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	fixingMixin     *build.AtomicToolFixingMixin
+	analyzer        mcptypes.AIAnalyzer
+	contextSharer   *build.DefaultContextSharer
+	contextEnhancer *build.AIContextEnhancer
 	logger          zerolog.Logger
 }
 
 // NewAtomicDeployKubernetesTool creates a new atomic deploy Kubernetes tool
 func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
+	toolLogger := logger.With().Str("tool", "atomic_deploy_kubernetes").Logger()
+
+	// Initialize context sharing components
+	contextSharer := build.NewDefaultContextSharer(toolLogger)
+	contextEnhancer := build.NewAIContextEnhancer(contextSharer, toolLogger)
+
 	return &AtomicDeployKubernetesTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
 		fixingMixin:     nil, // Will be set via SetAnalyzer
-		logger:          logger.With().Str("tool", "atomic_deploy_kubernetes").Logger(),
+		analyzer:        nil, // Will be set via SetAnalyzer
+		contextSharer:   contextSharer,
+		contextEnhancer: contextEnhancer,
+		logger:          toolLogger,
 	}
 }
 
 // SetAnalyzer sets the analyzer for the tool
-func (t *AtomicDeployKubernetesTool) SetAnalyzer(_ interface{}) {
-	// Note: This method is required for factory compatibility
-	// The deploy tool doesn't currently use the analyzer directly
+func (t *AtomicDeployKubernetesTool) SetAnalyzer(analyzer interface{}) {
+	if aiAnalyzer, ok := analyzer.(mcptypes.AIAnalyzer); ok {
+		t.analyzer = aiAnalyzer
+		t.fixingMixin = build.NewAtomicToolFixingMixin(aiAnalyzer, "atomic_deploy_kubernetes", t.logger)
+		t.logger.Info().Msg("Deploy tool analyzer and fixing mixin initialized")
+	}
 }
 
-// ExecuteDeployment runs the atomic Kubernetes deployment (legacy method)
-func (t *AtomicDeployKubernetesTool) ExecuteDeployment(ctx context.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
+// ExecuteDeploymentWithFixes runs the atomic Kubernetes deployment with iterative fixing
+func (t *AtomicDeployKubernetesTool) ExecuteDeploymentWithFixes(ctx context.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
+	// If fixing mixin is available, use it for automatic error resolution
+	if t.fixingMixin != nil && !args.DryRun {
+		t.logger.Info().
+			Str("session_id", args.SessionID).
+			Bool("fixing_enabled", true).
+			Msg("Executing deployment with automatic fixing enabled")
+
+		// Create a wrapper operation for the entire deployment process
+		var result *AtomicDeployKubernetesResult
+		operation := NewDeployOperationWrapper(
+			func(ctx context.Context) error {
+				var err error
+				result, err = t.executeDeploymentCore(ctx, args)
+				if err != nil {
+					return err
+				}
+				if !result.Success {
+					// Convert deployment failure to error for fixing
+					if result.FailureAnalysis != nil {
+						return fmt.Errorf("deployment failed: %s", result.FailureAnalysis.FailureType)
+					}
+					return fmt.Errorf("deployment failed")
+				}
+				return nil
+			},
+			func(_ context.Context, err error) (*mcptypes.RichError, error) {
+				// Analyze the deployment failure
+				if result != nil && result.FailureAnalysis != nil {
+					return &mcptypes.RichError{
+						Code:     "DEPLOYMENT_FAILED",
+						Type:     result.FailureAnalysis.FailureType,
+						Severity: result.FailureAnalysis.ImpactSeverity,
+						Message:  fmt.Sprintf("Deployment failed at stage: %s (root_causes: %s)", result.FailureAnalysis.FailureStage, strings.Join(result.FailureAnalysis.RootCauses, "; ")),
+					}, nil
+				}
+				return analyzeDeploymentError(err)
+			},
+			func(_ context.Context, fixAttempt *mcptypes.FixAttempt) error {
+				// Apply fixes based on the fix strategy
+				t.logger.Info().
+					Str("fix_strategy", fixAttempt.FixStrategy.Name).
+					Str("session_id", args.SessionID).
+					Msg("Applying deployment fix")
+
+				// The fix attempt may have modified files or configuration
+				// No specific preparation needed as the next attempt will use updated state
+				return nil
+			},
+			t.logger,
+		)
+
+		// Execute with retry and fixing
+		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
+		if err != nil {
+			if result != nil {
+				result.Success = false
+				// Enhance context with failure information for AI analysis
+				if t.contextEnhancer != nil {
+					_, contextErr := t.contextEnhancer.EnhanceContext(ctx, args.SessionID, "atomic_deploy_kubernetes", "deployment", result, err)
+					if contextErr != nil {
+						t.logger.Warn().Err(contextErr).Msg("Failed to enhance context after deployment failure")
+					}
+				}
+				return result, nil
+			}
+			return nil, err
+		}
+
+		// Enhance context with success information for AI analysis
+		if t.contextEnhancer != nil && result != nil {
+			_, contextErr := t.contextEnhancer.EnhanceContext(ctx, args.SessionID, "atomic_deploy_kubernetes", "deployment", result, nil)
+			if contextErr != nil {
+				t.logger.Warn().Err(contextErr).Msg("Failed to enhance context after deployment success")
+			}
+		}
+
+		return result, nil
+	}
+
+	// Fall back to standard execution without fixing
+	return t.executeDeploymentCore(ctx, args)
+}
+
+// executeDeploymentCore contains the core deployment logic
+func (t *AtomicDeployKubernetesTool) executeDeploymentCore(ctx context.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
 	startTime := time.Now()
 
 	// Create result object early for error handling
@@ -352,7 +452,21 @@ func (t *AtomicDeployKubernetesTool) ExecuteDeployment(ctx context.Context, args
 	result.BaseAIContextResult.Duration = result.TotalDuration
 	result.TotalDuration = time.Since(startTime)
 
+	// Enhance context with deployment completion information
+	if t.contextEnhancer != nil {
+		_, contextErr := t.contextEnhancer.EnhanceContext(ctx, args.SessionID, "atomic_deploy_kubernetes", "deployment_complete", result, nil)
+		if contextErr != nil {
+			t.logger.Warn().Err(contextErr).Msg("Failed to enhance context after deployment completion")
+		}
+	}
+
 	return result, nil
+}
+
+// ExecuteDeployment runs the atomic Kubernetes deployment
+func (t *AtomicDeployKubernetesTool) ExecuteDeployment(ctx context.Context, args AtomicDeployKubernetesArgs) (*AtomicDeployKubernetesResult, error) {
+	// Use the fixing-enabled method
+	return t.ExecuteDeploymentWithFixes(ctx, args)
 }
 
 // ExecuteWithContext executes the tool with GoMCP server context for native progress tracking

@@ -92,6 +92,8 @@ type AtomicTagImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
+	analyzer        ToolAnalyzer
+	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicTagImageTool creates a new atomic tag image tool
@@ -104,8 +106,64 @@ func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager m
 	}
 }
 
+// SetAnalyzer sets the analyzer for failure analysis
+func (t *AtomicTagImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
+	t.analyzer = analyzer
+}
+
+// SetFixingMixin sets the fixing mixin for automatic error recovery
+func (t *AtomicTagImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
+	t.fixingMixin = mixin
+}
+
+// ExecuteWithFixes runs the atomic Docker image tag with automatic fixes
+func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
+	if t.fixingMixin != nil && !args.DryRun {
+		// Create wrapper operation for tag process
+		var result *AtomicTagImageResult
+		operation := NewTagOperationWrapper(
+			func(ctx context.Context) error {
+				var err error
+				result, err = t.executeTagCore(ctx, args)
+				if err != nil {
+					return err
+				}
+				if !result.Success {
+					return fmt.Errorf("tag operation failed")
+				}
+				return nil
+			},
+			func() error {
+				if t.analyzer != nil {
+					return t.analyzer.AnalyzeTagFailure(args.SourceImage, args.TargetImage, args.SessionID)
+				}
+				return nil
+			},
+			func() error {
+				// Prepare workspace for fixes
+				return nil
+			},
+		)
+
+		// Execute with retry and fixing
+		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	// Fallback to standard execution
+	return t.executeTagCore(ctx, args)
+}
+
 // ExecuteTag runs the atomic Docker image tag operation
 func (t *AtomicTagImageTool) ExecuteTag(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
+	return t.executeTagCore(ctx, args)
+}
+
+// executeTagCore contains the core tag logic
+func (t *AtomicTagImageTool) executeTagCore(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	startTime := time.Now()
 
 	// Create result object early for error handling

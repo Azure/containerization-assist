@@ -94,16 +94,17 @@ type WorkflowCheckpoint struct {
 }
 
 type WorkflowError struct {
-	ID        string    `json:"id"`
-	Message   string    `json:"message"`
-	Code      string    `json:"code"`
-	Type      string    `json:"type"`
-	ErrorType string    `json:"error_type"`
-	Severity  string    `json:"severity"`
-	Retryable bool      `json:"retryable"`
-	StageName string    `json:"stage_name"`
-	ToolName  string    `json:"tool_name"`
-	Timestamp time.Time `json:"timestamp"`
+	ID         string    `json:"id"`
+	Message    string    `json:"message"`
+	Code       string    `json:"code"`
+	Type       string    `json:"type"`
+	ErrorType  string    `json:"error_type"`
+	Severity   string    `json:"severity"`
+	Retryable  bool      `json:"retryable"`
+	StageName  string    `json:"stage_name"`
+	ToolName   string    `json:"tool_name"`
+	Timestamp  time.Time `json:"timestamp"`
+	RootCauses []string  `json:"root_causes,omitempty"`
 }
 
 type Engine struct {

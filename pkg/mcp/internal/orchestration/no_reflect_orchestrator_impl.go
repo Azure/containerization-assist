@@ -348,29 +348,25 @@ func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context
 		args.Namespace = namespace
 	}
 
+	// Port is handled via ServicePorts array, not a single Port field
 	if port, ok := getInt(argsMap, "port"); ok {
-		args.Port = port
+		args.ServicePorts = []deploy.ServicePort{{Port: port}}
 	}
 
 	if replicas, ok := getInt(argsMap, "replicas"); ok {
 		args.Replicas = replicas
 	}
 
+	// Handle resource requests through the Resources field
 	if cpuRequest, ok := getString(argsMap, "cpu_request"); ok {
-		args.CPURequest = cpuRequest
+		args.Resources.CPU = cpuRequest
 	}
 
 	if memoryRequest, ok := getString(argsMap, "memory_request"); ok {
-		args.MemoryRequest = memoryRequest
+		args.Resources.Memory = memoryRequest
 	}
 
-	if cpuLimit, ok := getString(argsMap, "cpu_limit"); ok {
-		args.CPULimit = cpuLimit
-	}
-
-	if memoryLimit, ok := getString(argsMap, "memory_limit"); ok {
-		args.MemoryLimit = memoryLimit
-	}
+	// CPU/Memory limits are handled as part of Resources, not separate fields
 
 	if includeIngress, ok := getBool(argsMap, "include_ingress"); ok {
 		args.IncludeIngress = includeIngress
@@ -387,21 +383,12 @@ func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context
 		}
 	}
 
-	if secretHandling, ok := getString(argsMap, "secret_handling"); ok {
-		args.SecretHandling = secretHandling
-	}
-
-	if secretManager, ok := getString(argsMap, "secret_manager"); ok {
-		args.SecretManager = secretManager
-	}
-
+	// These fields don't exist in GenerateManifestsArgs - use available fields instead
 	if generateHelm, ok := getBool(argsMap, "generate_helm"); ok {
-		args.GenerateHelm = generateHelm
+		args.HelmTemplate = generateHelm
 	}
 
-	if gitOpsReady, ok := getBool(argsMap, "gitops_ready"); ok {
-		args.GitOpsReady = gitOpsReady
-	}
+	// Handle secrets through the Secrets or RegistrySecrets arrays
 
 	return tool.Execute(ctx, args)
 }
