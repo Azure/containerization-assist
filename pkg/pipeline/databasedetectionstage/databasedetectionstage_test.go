@@ -27,9 +27,9 @@ func TestDatabaseDetectionStage_Initialize(t *testing.T) {
 // TestDatabaseDetectionStage_Run tests the Run method
 func TestDatabaseDetectionStage_Run(t *testing.T) {
 	type testCase struct {
-		name     string                    // Test case name
-		content  string                    // Input file content
-		expected []DatabaseDetectionResult // Expected detected databases
+		name     string                             // Test case name
+		content  string                             // Input file content
+		expected []pipeline.DatabaseDetectionResult // Expected detected databases
 	}
 
 	tests := []testCase{
@@ -42,7 +42,7 @@ func TestDatabaseDetectionStage_Run(t *testing.T) {
 				redistribution
                 Cassandra version 14.5.6
             `,
-			expected: []DatabaseDetectionResult{
+			expected: []pipeline.DatabaseDetectionResult{
 				{Type: "Cassandra", Version: "14.5.6"},
 				{Type: "MySQL", Version: "8.0.16"},
 				{Type: "PostgreSQL", Version: "15.3"},
@@ -57,7 +57,7 @@ func TestDatabaseDetectionStage_Run(t *testing.T) {
                 Not a database
                 Just some words
             `,
-			expected: []DatabaseDetectionResult{},
+			expected: []pipeline.DatabaseDetectionResult{},
 		},
 	}
 
@@ -83,8 +83,9 @@ func TestDatabaseDetectionStage_Run(t *testing.T) {
 			}
 
 			// Validate detected databases
-			detectedDatabases, ok := state.Metadata["detectedDatabases"].([]DatabaseDetectionResult)
-			if !ok {
+			detectedDatabases := state.DetectedDatabases
+			ok := state.Metadata["detectedDatabaseErrors"]
+			if ok != nil {
 				t.Fatalf("Run did not populate detected databases in metadata")
 			}
 
@@ -166,7 +167,7 @@ func TestDatabaseDetectionStage_DetectDatabases(t *testing.T) {
 	}
 
 	// Validate detected databases
-	expected := []DatabaseDetectionResult{
+	expected := []pipeline.DatabaseDetectionResult{
 		{Type: "MySQL", Version: "8.0.16"},
 		{Type: "PostgreSQL", Version: "15.3"},
 		{Type: "Redis", Version: "7.0.11"},

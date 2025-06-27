@@ -299,6 +299,8 @@ func (ch *ConversationHandler) getToolNameForStage(stage types.ConversationStage
 	switch stage {
 	case types.StageDockerfile, types.StageBuild:
 		return "build_image"
+	case types.StagePush:
+		return "push_image"
 	case types.StageDeployment:
 		return "deploy_kubernetes"
 	case types.StageManifests:
@@ -313,6 +315,8 @@ func (ch *ConversationHandler) classifyError(err error) string {
 	switch {
 	case strings.Contains(errMsg, "build"):
 		return "build_error"
+	case strings.Contains(errMsg, "push"):
+		return "push_error"
 	case strings.Contains(errMsg, "deploy"):
 		return "deployment_error"
 	case strings.Contains(errMsg, "manifest"):
@@ -321,8 +325,10 @@ func (ch *ConversationHandler) classifyError(err error) string {
 		return "dockerfile_error"
 	case strings.Contains(errMsg, "network"):
 		return "network_error"
-	case strings.Contains(errMsg, "auth"):
+	case strings.Contains(errMsg, "auth") || strings.Contains(errMsg, "authentication"):
 		return "authentication_error"
+	case strings.Contains(errMsg, "registry"):
+		return "registry_error"
 	default:
 		return "unknown_error"
 	}

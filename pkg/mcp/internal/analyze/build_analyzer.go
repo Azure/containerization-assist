@@ -314,7 +314,7 @@ func (b *BuildAnalyzer) analyzeContainerizationReadiness(config AnalysisConfig, 
 
 	readinessScore := b.calculateReadinessScore(readinessFactors)
 
-	var severity Severity = SeverityInfo
+	severity := SeverityInfo
 	if readinessScore > 0.8 {
 		severity = SeverityInfo
 	} else if readinessScore > 0.5 {

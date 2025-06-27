@@ -342,7 +342,7 @@ func TestConversationToolResult(t *testing.T) {
 	})
 
 	t.Run("ErrorResult", func(t *testing.T) {
-		testErr := publicutils.NewError("analyze repository", "repository not found")
+		testErr := publicutils.NewError("analyze repository: repository not found", map[string]interface{}{"error": "not found"})
 		result := utils.NewErrorResult("Failed to analyze repository", testErr)
 
 		assert.False(t, result.Success)

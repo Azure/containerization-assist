@@ -104,11 +104,11 @@ release:
 snapshot:
   version_template: "{{ .Tag }}-next"
 
-# Announce releases (moved to top level in v2)
+# Announce releases
 announce:
   skip: true
 
-# Milestone management (moved to top level in v2)
+# Automatically close milestone with matching name
 milestones:
   - close: true
     fail_on_error: false

@@ -8,19 +8,26 @@ import (
 
 // PipelineState holds state across steps and iterations
 type PipelineState struct {
-	IterationCount int
-	RetryCount     int
-	RepoFileTree   string
-	Dockerfile     docker.Dockerfile
-	RegistryURL    string
-	ImageName      string
-	K8sObjects     map[string]*k8s.K8sObject
-	Success        bool
-	TokenUsage     ai.TokenUsage
-	Metadata       map[MetadataKey]any //Flexible storage
-	StageHistory   []StageVisit
-	ExtraContext   string             // Additional context for AI models passed from the CLI
-	LLMCompletions []ai.LLMCompletion `json:"llm_completions,omitempty"`
+	IterationCount    int
+	RetryCount        int
+	RepoFileTree      string
+	Dockerfile        docker.Dockerfile
+	RegistryURL       string
+	ImageName         string
+	K8sObjects        map[string]*k8s.K8sObject
+	Success           bool
+	TokenUsage        ai.TokenUsage
+	Metadata          map[MetadataKey]any //Flexible storage
+	DetectedDatabases []DatabaseDetectionResult
+	StageHistory      []StageVisit
+	ExtraContext      string             // Additional context for AI models passed from the CLI
+	LLMCompletions    []ai.LLMCompletion `json:"llm_completions,omitempty"`
+}
+
+type DatabaseDetectionResult struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
 }
 
 type StageOutcome string

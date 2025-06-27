@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,7 +23,7 @@ func TestTrivyScanner_FormatScanSummary(t *testing.T) {
 				Success:  true,
 				ImageRef: "myapp:latest",
 				Duration: 5 * time.Second,
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:    0,
 					Critical: 0,
 					High:     0,
@@ -30,7 +31,7 @@ func TestTrivyScanner_FormatScanSummary(t *testing.T) {
 					Low:      0,
 					Fixable:  0,
 				},
-				Remediation: []RemediationStep{
+				Remediation: []coresecurity.RemediationStep{
 					{
 						Priority:    1,
 						Action:      "No action required",
@@ -59,7 +60,7 @@ func TestTrivyScanner_FormatScanSummary(t *testing.T) {
 				Success:  false,
 				ImageRef: "vulnerable:v1.0",
 				Duration: 3500 * time.Millisecond,
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:    15,
 					Critical: 3,
 					High:     5,
@@ -67,7 +68,7 @@ func TestTrivyScanner_FormatScanSummary(t *testing.T) {
 					Low:      3,
 					Fixable:  12,
 				},
-				Remediation: []RemediationStep{
+				Remediation: []coresecurity.RemediationStep{
 					{
 						Priority:    1,
 						Action:      "Fix critical vulnerabilities",
@@ -104,7 +105,7 @@ func TestTrivyScanner_FormatScanSummary(t *testing.T) {
 				Success:  true,
 				ImageRef: "myapp:v2.0",
 				Duration: 2 * time.Second,
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:    5,
 					Critical: 0,
 					High:     0,
@@ -112,7 +113,7 @@ func TestTrivyScanner_FormatScanSummary(t *testing.T) {
 					Low:      2,
 					Fixable:  4,
 				},
-				Remediation: []RemediationStep{
+				Remediation: []coresecurity.RemediationStep{
 					{
 						Priority:    1,
 						Action:      "Update packages",
@@ -143,7 +144,7 @@ func TestTrivyScanner_FormatScanSummary(t *testing.T) {
 				Success:  true,
 				ImageRef: "test:unknown",
 				Duration: 1 * time.Second,
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:   3,
 					Unknown: 3,
 					Fixable: 0,
@@ -186,7 +187,7 @@ func TestTrivyScanner_generateRemediationSteps(t *testing.T) {
 		{
 			name: "no vulnerabilities",
 			result: &ScanResult{
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total: 0,
 				},
 			},
@@ -197,13 +198,13 @@ func TestTrivyScanner_generateRemediationSteps(t *testing.T) {
 		{
 			name: "critical and high vulnerabilities",
 			result: &ScanResult{
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:    10,
 					Critical: 2,
 					High:     3,
 					Fixable:  8,
 				},
-				Vulnerabilities: []Vulnerability{
+				Vulnerabilities: []coresecurity.Vulnerability{
 					{Severity: "CRITICAL", PkgName: "openssl"},
 					{Severity: "HIGH", PkgName: "base-files"},
 				},
@@ -218,13 +219,13 @@ func TestTrivyScanner_generateRemediationSteps(t *testing.T) {
 		{
 			name: "base image vulnerabilities",
 			result: &ScanResult{
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:    5,
 					Critical: 1,
 					High:     2,
 					Fixable:  3,
 				},
-				Vulnerabilities: []Vulnerability{
+				Vulnerabilities: []coresecurity.Vulnerability{
 					{Severity: "CRITICAL", PkgName: "base-image"},
 					{Severity: "HIGH", PkgName: "base-libs"},
 				},
@@ -240,7 +241,7 @@ func TestTrivyScanner_generateRemediationSteps(t *testing.T) {
 		{
 			name: "only fixable vulnerabilities",
 			result: &ScanResult{
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:   6,
 					Medium:  4,
 					Low:     2,
@@ -256,7 +257,7 @@ func TestTrivyScanner_generateRemediationSteps(t *testing.T) {
 		{
 			name: "no fixable vulnerabilities",
 			result: &ScanResult{
-				Summary: VulnerabilitySummary{
+				Summary: coresecurity.VulnerabilitySummary{
 					Total:   3,
 					Low:     3,
 					Fixable: 0,

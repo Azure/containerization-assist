@@ -11,10 +11,6 @@ import (
 	"github.com/Azure/container-kit/pkg/logger"
 )
 
-const (
-	dockerPipeline string = "docker"
-)
-
 // NewRunner constructs a Runner. You must pass a non-empty order;
 // All stages' Init are called in order first
 // then all stages' Generate are called in order, and finally
@@ -132,7 +128,7 @@ func (r *Runner) Run(
 				Outcome:    outcome,
 			})
 			if opts.GenerateSnapshot {
-				if err := WriteIterationSnapshot(state, opts.TargetDirectory, stage); err != nil {
+				if err := WriteIterationSnapshot(state, opts.TargetDirectory, opts.SnapshotCompletions, stage); err != nil {
 					return fmt.Errorf("writing iteration snapshot: %w", err)
 				}
 			}

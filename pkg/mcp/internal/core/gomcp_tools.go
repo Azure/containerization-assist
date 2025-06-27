@@ -19,6 +19,7 @@ import (
 	mcpserver "github.com/Azure/container-kit/pkg/mcp/internal/server"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/runner"
 	gomcpserver "github.com/localrivet/gomcp/server"
@@ -105,7 +106,14 @@ type ChatResult struct {
 // RegisterTools registers all available tools with the gomcp server
 func (gm *GomcpManager) RegisterTools(s *Server) error {
 	if !gm.isInitialized {
-		return fmt.Errorf("manager must be initialized before registering tools")
+		return types.NewErrorBuilder("manager_not_initialized", "Manager must be initialized before registering tools", "initialization").
+			WithSeverity("high").
+			WithOperation("register_tools").
+			WithStage("initialization_check").
+			WithRootCause("GomcpManager.Initialize() was not called").
+			WithImmediateStep(1, "Initialize manager", "Call GomcpManager.Initialize() before registering tools").
+			WithImmediateStep(2, "Check setup", "Verify all dependencies are properly configured").
+			Build()
 	}
 
 	// Create dependencies for tools
@@ -131,28 +139,56 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 	// Register core tools
 	deps.Logger.Info().Msg("Registering core tools")
 	if err := gm.registerCoreTools(deps); err != nil {
-		return fmt.Errorf("failed to register core tools: %w", err)
+		return types.NewErrorBuilder("core_tools_registration_failed", "Failed to register core tools", "registration").
+			WithSeverity("high").
+			WithOperation("register_tools").
+			WithStage("core_tools").
+			WithRootCause(fmt.Sprintf("Core tool registration failed: %v", err)).
+			WithImmediateStep(1, "Check dependencies", "Verify all core tool dependencies are available").
+			WithImmediateStep(2, "Check configuration", "Ensure tool configuration is valid").
+			Build()
 	}
 	deps.Logger.Info().Msg("Core tools registered successfully")
 
 	// Register atomic tools
 	deps.Logger.Info().Msg("Registering atomic tools")
 	if err := gm.registerAtomicTools(deps); err != nil {
-		return fmt.Errorf("failed to register atomic tools: %w", err)
+		return types.NewErrorBuilder("atomic_tools_registration_failed", "Failed to register atomic tools", "registration").
+			WithSeverity("high").
+			WithOperation("register_tools").
+			WithStage("atomic_tools").
+			WithRootCause(fmt.Sprintf("Atomic tool registration failed: %v", err)).
+			WithImmediateStep(1, "Check dependencies", "Verify all atomic tool dependencies are available").
+			WithImmediateStep(2, "Check Docker/K8s", "Ensure Docker and Kubernetes clients are functional").
+			Build()
 	}
 	deps.Logger.Info().Msg("Atomic tools registered successfully")
 
 	// Register utility tools
 	deps.Logger.Info().Msg("Registering utility tools")
 	if err := gm.registerUtilityTools(deps); err != nil {
-		return fmt.Errorf("failed to register utility tools: %w", err)
+		return types.NewErrorBuilder("utility_tools_registration_failed", "Failed to register utility tools", "registration").
+			WithSeverity("high").
+			WithOperation("register_tools").
+			WithStage("utility_tools").
+			WithRootCause(fmt.Sprintf("Utility tool registration failed: %v", err)).
+			WithImmediateStep(1, "Check dependencies", "Verify all utility tool dependencies are available").
+			WithImmediateStep(2, "Check configuration", "Ensure utility tool configuration is valid").
+			Build()
 	}
 	deps.Logger.Info().Msg("Utility tools registered successfully")
 
 	// Register conversation tools if enabled
 	if s.IsConversationModeEnabled() {
 		if err := gm.registerConversationTools(deps); err != nil {
-			return fmt.Errorf("failed to register conversation tools: %w", err)
+			return types.NewErrorBuilder("conversation_tools_registration_failed", "Failed to register conversation tools", "registration").
+				WithSeverity("high").
+				WithOperation("register_tools").
+				WithStage("conversation_tools").
+				WithRootCause(fmt.Sprintf("Conversation tool registration failed: %v", err)).
+				WithImmediateStep(1, "Check mode", "Verify conversation mode is properly enabled").
+				WithImmediateStep(2, "Check dependencies", "Ensure conversation tool dependencies are available").
+				Build()
 		}
 	}
 
@@ -298,7 +334,7 @@ func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependenci
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
 		),
-		"generate_dockerfile_atomic": analyze.NewGenerateDockerfileTool(
+		"generate_dockerfile_atomic": analyze.NewAtomicGenerateDockerfileTool(
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "generate_dockerfile_atomic").Logger(),
 		),
@@ -342,6 +378,16 @@ func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependenci
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "push_image_atomic").Logger(),
 		),
+		"validate_deployment_atomic": deploy.NewAtomicValidateDeploymentTool(
+			deps.Logger.With().Str("tool", "validate_deployment_atomic").Logger(),
+			"",  // workspaceBase - will be set from session
+			nil, // jobManager - will be created internally
+			&clients.Clients{
+				Docker: deps.MCPClients.Docker,
+				Kind:   deps.MCPClients.Kind,
+				Kube:   deps.MCPClients.Kube,
+			},
+		),
 	}
 
 	// Register tools with the orchestrator's tool registry
@@ -372,7 +418,14 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 	if sessionID == "" {
 		sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
 		if err != nil {
-			return "", fmt.Errorf("failed to create session: %w", err)
+			return "", types.NewErrorBuilder("session_creation_failed", "Failed to create containerization session", "session").
+				WithOperation("handle_containerize_repository").
+				WithStage("session_creation").
+				WithRootCause(fmt.Sprintf("Session creation failed: %v", err)).
+				WithImmediateStep(1, "Check resources", "Verify system resources are available for new session").
+				WithImmediateStep(2, "Check limits", "Ensure session limits are not exceeded").
+				WithImmediateStep(3, "Retry creation", "Retry session creation after brief delay").
+				Build()
 		}
 		if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
 			deps.Logger.Info().Str("session_id", session.SessionID).Str("tool", toolName).Msg("Created new session")
@@ -393,7 +446,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -406,7 +459,15 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			if analysisResult, ok := result.(*analyze.AtomicAnalysisResult); ok {
 				return analysisResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from analyze_repository_atomic: %T", result)
+			return nil, types.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository_atomic tool", "tool_execution").
+				WithField("expected_type", "*types.AnalyzeRepositoryResult").
+				WithField("actual_type", fmt.Sprintf("%T", result)).
+				WithOperation("handle_analyze_repository").
+				WithStage("result_processing").
+				WithRootCause(fmt.Sprintf("Tool returned unexpected type %T instead of expected result type", result)).
+				WithImmediateStep(1, "Check tool", "Verify analyze_repository_atomic tool implementation").
+				WithImmediateStep(2, "Check version", "Ensure tool version compatibility with expected interface").
+				Build()
 		})
 }
 
@@ -421,20 +482,20 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if dockerfileResult, ok := result.(*analyze.GenerateDockerfileResult); ok {
 				return dockerfileResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from generate_dockerfile: %T", result)
+			return nil, fmt.Errorf("unexpected result type from generate_dockerfile_atomic: %T", result)
 		})
 }
 
@@ -449,7 +510,7 @@ func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegist
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -477,7 +538,7 @@ func (gm *GomcpManager) registerPullImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -505,7 +566,7 @@ func (gm *GomcpManager) registerTagImage(registrar *runtime.StandardToolRegistra
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -533,7 +594,7 @@ func (gm *GomcpManager) registerPushImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -555,23 +616,21 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 
 	runtime.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
-		func(ctx *gomcpserver.Context, args *deploy.AtomicDeployKubernetesArgs) (*deploy.AtomicDeployKubernetesResult, error) {
-			argsMap, err := BuildArgsMap(args)
+		func(ctx *gomcpserver.Context, args *deploy.ValidateDeploymentArgs) (*deploy.ValidateDeploymentResult, error) {
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
-			// Force dry_run to true for validation
-			argsMap["dry_run"] = true
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "deploy_kubernetes_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_deployment_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
-			if deployResult, ok := result.(*deploy.AtomicDeployKubernetesResult); ok {
-				return deployResult, nil
+			if validateResult, ok := result.(*deploy.ValidateDeploymentResult); ok {
+				return validateResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from deploy_kubernetes_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from validate_deployment_atomic: %T", result)
 		})
 	return nil
 }
@@ -598,7 +657,7 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -629,7 +688,7 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -658,7 +717,7 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -687,7 +746,7 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -800,7 +859,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				deps.Logger.With().Str("tool", "add_session_label").Logger(),
 				sessionLabelManager,
 			)
-			return addLabelTool.ExecuteTyped(context.Background(), *args)
+			return addLabelTool.ExecuteTyped(context.Background(), args)
 		})
 
 	runtime.RegisterSimpleTool(registrar, "remove_session_label",
@@ -810,7 +869,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				deps.Logger.With().Str("tool", "remove_session_label").Logger(),
 				sessionLabelManager,
 			)
-			return removeLabelTool.ExecuteTyped(context.Background(), *args)
+			return removeLabelTool.ExecuteTyped(context.Background(), args)
 		})
 
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "update_session_labels",
@@ -830,7 +889,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				deps.Logger.With().Str("tool", "list_session_labels").Logger(),
 				sessionLabelManager,
 			)
-			return listLabelsTool.ExecuteTyped(context.Background(), *args)
+			return listLabelsTool.ExecuteTyped(context.Background(), args)
 		})
 
 	// Telemetry Resource (if enabled)
@@ -942,7 +1001,14 @@ func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.
 
 	session, ok := sessionInterface.(*sessiontypes.SessionState)
 	if !ok {
-		return sessiontypes.SessionLabelData{}, fmt.Errorf("unexpected session type")
+		return sessiontypes.SessionLabelData{}, types.NewErrorBuilder("unexpected_session_type", "Unexpected session type encountered", "session").
+			WithOperation("get_session_label_data").
+			WithStage("type_detection").
+			WithRootCause("Session does not match any known session type patterns").
+			WithImmediateStep(1, "Check session", "Verify session is properly initialized and typed").
+			WithImmediateStep(2, "Check types", "Ensure session implements expected interface").
+			WithImmediateStep(3, "Check version", "Verify session type compatibility with current version").
+			Build()
 	}
 
 	return sessiontypes.SessionLabelData{

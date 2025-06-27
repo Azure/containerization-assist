@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -45,19 +46,40 @@ func (s *ValidationService) RegisterSchema(name string, schema interface{}) {
 // ValidateSessionID validates a session ID
 // ValidateSessionID validates a session ID
 // TODO: Implement without runtime dependency
-func (s *ValidationService) ValidateSessionID(sessionID string) error {
+func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
-		return fmt.Errorf("session ID is required")
+		return types.NewValidationErrorBuilder("Session ID is required", "session_id", sessionID).
+			WithOperation("validate_session").
+			WithStage("input_validation").
+			WithRootCause("Session ID parameter is empty or missing").
+			WithImmediateStep(1, "Provide session ID", "Include a valid session ID in the request").
+			WithImmediateStep(2, "Check format", "Ensure session ID follows alphanumeric format").
+			Build()
 	}
 
 	// Check format (alphanumeric with hyphens)
 	if !regexp.MustCompile(`^[a-zA-Z0-9\-_]+$`).MatchString(sessionID) {
-		return fmt.Errorf("session ID contains invalid characters")
+		return types.NewValidationErrorBuilder("Session ID contains invalid characters", "session_id", sessionID).
+			WithOperation("validate_session").
+			WithStage("format_validation").
+			WithRootCause("Session ID contains characters other than letters, numbers, hyphens, or underscores").
+			WithImmediateStep(1, "Fix format", "Use only letters, numbers, hyphens (-), and underscores (_)").
+			WithImmediateStep(2, "Remove special chars", "Remove spaces, symbols, or other special characters").
+			Build()
 	}
 
 	// Check length
 	if len(sessionID) < 3 || len(sessionID) > 64 {
-		return fmt.Errorf("session ID must be between 3 and 64 characters")
+		return types.NewValidationErrorBuilder("Session ID length is invalid", "session_id", sessionID).
+			WithField("length", len(sessionID)).
+			WithField("min_length", 3).
+			WithField("max_length", 64).
+			WithOperation("validate_session").
+			WithStage("length_validation").
+			WithRootCause(fmt.Sprintf("Session ID length %d is outside valid range 3-64", len(sessionID))).
+			WithImmediateStep(1, "Adjust length", "Use a session ID between 3 and 64 characters").
+			WithImmediateStep(2, "Generate new ID", "Create a new session ID within valid length range").
+			Build()
 	}
 
 	return nil
@@ -66,27 +88,53 @@ func (s *ValidationService) ValidateSessionID(sessionID string) error {
 // ValidateImageReference validates a Docker image reference
 // ValidateImageReference validates a Docker image reference
 // TODO: Implement without runtime dependency
-func (s *ValidationService) ValidateImageReference(imageRef string) error {
+func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef string) error {
 	if imageRef == "" {
-		return fmt.Errorf("image reference is required")
+		return types.NewValidationErrorBuilder("Image reference is required", "image_ref", imageRef).
+			WithOperation("validate_image").
+			WithStage("input_validation").
+			WithRootCause("Image reference parameter is empty or missing").
+			WithImmediateStep(1, "Provide image", "Specify a Docker image reference (e.g., nginx:latest)").
+			WithImmediateStep(2, "Include tag", "Add a tag to the image reference for specificity").
+			Build()
 	}
 
 	// Basic format validation
 	parts := strings.Split(imageRef, ":")
 	if len(parts) > 2 {
-		return fmt.Errorf("invalid image reference format")
+		return types.NewValidationErrorBuilder("Invalid image reference format", "image_ref", imageRef).
+			WithOperation("validate_image").
+			WithStage("format_validation").
+			WithRootCause("Image reference contains more than one colon separator").
+			WithImmediateStep(1, "Fix format", "Use format: [registry/]name[:tag] (e.g., nginx:latest)").
+			WithImmediateStep(2, "Remove extra colons", "Ensure only one colon separates name and tag").
+			Build()
 	}
 
 	// Check for invalid characters
 	if strings.Contains(imageRef, " ") {
-		return fmt.Errorf("image reference cannot contain spaces")
+		return types.NewValidationErrorBuilder("Image reference cannot contain spaces", "image_ref", imageRef).
+			WithOperation("validate_image").
+			WithStage("format_validation").
+			WithRootCause("Docker image references cannot contain whitespace characters").
+			WithImmediateStep(1, "Remove spaces", "Replace spaces with hyphens or underscores").
+			WithImmediateStep(2, "Use valid format", "Follow Docker naming conventions: [a-z0-9.-]").
+			Build()
 	}
 
 	// Check for minimum components
 	if !strings.Contains(imageRef, "/") && !strings.Contains(imageRef, ":") {
 		// Single name images should be official images
 		if len(imageRef) < 2 {
-			return fmt.Errorf("image reference too short")
+			return types.NewValidationErrorBuilder("Image reference too short", "image_ref", imageRef).
+				WithField("length", len(imageRef)).
+				WithField("min_length", 2).
+				WithOperation("validate_image").
+				WithStage("length_validation").
+				WithRootCause("Single-component image reference must be at least 2 characters").
+				WithImmediateStep(1, "Use full name", "Provide full image name (e.g., 'nginx' instead of 'n')").
+				WithImmediateStep(2, "Add registry", "Include registry and tag (e.g., 'docker.io/nginx:latest')").
+				Build()
 		}
 	}
 
@@ -96,20 +144,47 @@ func (s *ValidationService) ValidateImageReference(imageRef string) error {
 // ValidateFilePath validates a file path exists and is accessible
 // ValidateFilePath validates a file path
 // TODO: Implement without runtime dependency
-func (s *ValidationService) ValidateFilePath(path string, mustExist bool) error {
+func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, mustExist bool) error {
 	if path == "" {
-		return fmt.Errorf("file path is required")
+		return types.NewValidationErrorBuilder("File path is required", "path", path).
+			WithOperation("validate_file_path").
+			WithStage("input_validation").
+			WithRootCause("File path parameter is empty or missing").
+			WithImmediateStep(1, "Provide path", "Specify a valid file path").
+			WithImmediateStep(2, "Check parameter", "Ensure file path parameter is correctly passed").
+			Build()
 	}
 
 	// Check for path traversal attempts
 	if strings.Contains(path, "..") {
-		return fmt.Errorf("path traversal is not allowed")
+		return types.NewValidationErrorBuilder("Path traversal is not allowed", "path", path).
+			WithOperation("validate_file_path").
+			WithStage("security_validation").
+			WithRootCause("File path contains directory traversal sequences (..)").
+			WithImmediateStep(1, "Remove traversal", "Remove '..' sequences from the path").
+			WithImmediateStep(2, "Use absolute path", "Use absolute path instead of relative path").
+			WithImmediateStep(3, "Sanitize input", "Validate and sanitize file path input").
+			Build()
+	}
+
+	// Check context cancellation before file operations
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	// Check if file exists if required
 	if mustExist {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return fmt.Errorf("file does not exist: %s", path)
+			return types.NewValidationErrorBuilder("File does not exist", "path", path).
+				WithOperation("validate_file_path").
+				WithStage("existence_check").
+				WithRootCause(fmt.Sprintf("Required file not found at path: %s", path)).
+				WithImmediateStep(1, "Check path", "Verify the file path is correct").
+				WithImmediateStep(2, "Create file", "Create the required file if missing").
+				WithImmediateStep(3, "Check permissions", "Ensure read permissions for the file").
+				Build()
 		}
 	}
 
@@ -119,7 +194,15 @@ func (s *ValidationService) ValidateFilePath(path string, mustExist bool) error 
 		sensitive := []string{"/etc/passwd", "/etc/shadow", "/root"}
 		for _, s := range sensitive {
 			if strings.HasPrefix(path, s) {
-				return fmt.Errorf("access to sensitive path is not allowed")
+				return types.NewValidationErrorBuilder("Access to sensitive path is not allowed", "path", path).
+					WithField("sensitive_prefix", s).
+					WithOperation("validate_file_path").
+					WithStage("security_validation").
+					WithRootCause(fmt.Sprintf("Path %s accesses sensitive system directory %s", path, s)).
+					WithImmediateStep(1, "Use safe path", "Use a path outside sensitive system directories").
+					WithImmediateStep(2, "Check requirements", "Verify if access to this path is actually required").
+					WithImmediateStep(3, "Use relative path", "Use relative paths within allowed directories").
+					Build()
 			}
 		}
 	}
@@ -130,18 +213,38 @@ func (s *ValidationService) ValidateFilePath(path string, mustExist bool) error 
 // ValidateJSON validates JSON content against a schema
 // ValidateJSON validates JSON content
 // TODO: Implement without runtime dependency
-func (s *ValidationService) ValidateJSON(content []byte, schemaName string) error {
+func (s *ValidationService) ValidateJSON(ctx context.Context, content []byte, schemaName string) error {
+	// Check context cancellation before starting
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 
 	// Basic JSON validation
 	var data interface{}
 	if err := json.Unmarshal(content, &data); err != nil {
-		return fmt.Errorf("invalid JSON: %v", err)
+		return types.NewValidationErrorBuilder("Invalid JSON content", "content", string(content)).
+			WithOperation("validate_json").
+			WithStage("json_parsing").
+			WithRootCause(fmt.Sprintf("JSON parsing failed: %v", err)).
+			WithImmediateStep(1, "Check syntax", "Verify JSON syntax is correct").
+			WithImmediateStep(2, "Validate quotes", "Ensure all strings are properly quoted").
+			WithImmediateStep(3, "Check encoding", "Verify file encoding is UTF-8").
+			Build()
 	}
 
 	// Schema validation if schema is registered
 	if schema, exists := s.schemas[schemaName]; exists {
 		if err := s.validateAgainstSchema(data, schema); err != nil {
-			return fmt.Errorf("schema validation failed: %v", err)
+			return types.NewValidationErrorBuilder("JSON schema validation failed", "schema", schemaName).
+				WithOperation("validate_json").
+				WithStage("schema_validation").
+				WithRootCause(fmt.Sprintf("Content does not match schema %s: %v", schemaName, err)).
+				WithImmediateStep(1, "Check schema", "Verify content matches the required schema").
+				WithImmediateStep(2, "Fix structure", "Update JSON structure to match schema requirements").
+				WithImmediateStep(3, "Validate fields", "Ensure all required fields are present and correctly typed").
+				Build()
 		}
 	}
 
@@ -149,7 +252,13 @@ func (s *ValidationService) ValidateJSON(content []byte, schemaName string) erro
 }
 
 // ValidateYAML validates YAML content
-func (s *ValidationService) ValidateYAML(content []byte) error {
+func (s *ValidationService) ValidateYAML(ctx context.Context, content []byte) error {
+	// Check context cancellation before starting
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 
 	var data interface{}
 	if err := yaml.Unmarshal(content, &data); err != nil {
@@ -160,7 +269,7 @@ func (s *ValidationService) ValidateYAML(content []byte) error {
 }
 
 // ValidateResourceLimits validates CPU and memory resource specifications
-func (s *ValidationService) ValidateResourceLimits(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) error {
+func (s *ValidationService) ValidateResourceLimits(ctx context.Context, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) error {
 
 	// Validate CPU request
 	if cpuRequest != "" {
@@ -211,7 +320,7 @@ func (s *ValidationService) ValidateResourceLimits(cpuRequest, memoryRequest, cp
 }
 
 // ValidateNamespace validates a Kubernetes namespace name
-func (s *ValidationService) ValidateNamespace(namespace string) error {
+func (s *ValidationService) ValidateNamespace(ctx context.Context, namespace string) error {
 
 	if namespace == "" {
 		return nil // Empty namespace is allowed (defaults to "default")
@@ -244,7 +353,7 @@ func (s *ValidationService) ValidateNamespace(namespace string) error {
 }
 
 // ValidateEnvironmentVariables validates environment variable names and values
-func (s *ValidationService) ValidateEnvironmentVariables(envVars map[string]string) error {
+func (s *ValidationService) ValidateEnvironmentVariables(ctx context.Context, envVars map[string]string) error {
 
 	for name, value := range envVars {
 		// Validate variable name
@@ -267,7 +376,7 @@ func (s *ValidationService) ValidateEnvironmentVariables(envVars map[string]stri
 }
 
 // ValidatePort validates a port number
-func (s *ValidationService) ValidatePort(port int) error {
+func (s *ValidationService) ValidatePort(ctx context.Context, port int) error {
 
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535")

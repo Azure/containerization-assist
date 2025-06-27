@@ -3,7 +3,6 @@ package build
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
@@ -12,9 +11,6 @@ import (
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
-
-// Import the unified interface types
-// These will be available from "github.com/Azure/container-kit/pkg/mcp" after interface migration
 
 // AtomicBuildImageArgs defines arguments for atomic Docker image building
 type AtomicBuildImageArgs struct {
@@ -268,47 +264,4 @@ func (t *AtomicBuildImageTool) GetCapabilities() types.ToolCapabilities {
 		IsLongRunning:     true,
 		RequiresAuth:      false,
 	}
-}
-
-// Helper methods
-
-func (t *AtomicBuildImageTool) getImageTag(tag string) string {
-	if tag == "" {
-		return "latest"
-	}
-	return tag
-}
-
-func (t *AtomicBuildImageTool) getPlatform(platform string) string {
-	if platform == "" {
-		return "linux/amd64"
-	}
-	return platform
-}
-
-func (t *AtomicBuildImageTool) getBuildContext(context, workspaceDir string) string {
-	if context == "" {
-		// Default to repo directory in workspace
-		return filepath.Join(workspaceDir, "repo")
-	}
-
-	// If relative path, make it relative to workspace
-	if !filepath.IsAbs(context) {
-		return filepath.Join(workspaceDir, context)
-	}
-
-	return context
-}
-
-func (t *AtomicBuildImageTool) getDockerfilePath(dockerfilePath, buildContext string) string {
-	if dockerfilePath == "" {
-		return filepath.Join(buildContext, "Dockerfile")
-	}
-
-	// If relative path, make it relative to build context
-	if !filepath.IsAbs(dockerfilePath) {
-		return filepath.Join(buildContext, dockerfilePath)
-	}
-
-	return dockerfilePath
 }

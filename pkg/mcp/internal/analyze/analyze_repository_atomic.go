@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcperror "github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -248,7 +249,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		// Progress reporting removed
 	} else {
 		// Local path - validate and use directly
-		if err := t.validateLocalPath(args.RepoURL); err != nil {
+		if err := utils.ValidateLocalPath(args.RepoURL); err != nil {
 			t.logger.Error().Err(err).
 				Str("local_path", args.RepoURL).
 				Str("session_id", session.SessionID).
@@ -313,8 +314,8 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 			result.AnalysisDuration = time.Duration(session.ScanSummary.AnalysisDuration * float64(time.Second))
 			result.TotalDuration = time.Since(startTime)
 			result.Success = true
-			result.BaseAIContextResult.IsSuccessful = true
-			result.BaseAIContextResult.Duration = result.TotalDuration
+			result.IsSuccessful = true
+			result.Duration = result.TotalDuration
 
 			t.logger.Info().
 				Str("session_id", session.SessionID).
@@ -412,8 +413,8 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 	result.TotalDuration = time.Since(startTime)
 
 	// Update mcptypes.BaseAIContextResult fields
-	result.BaseAIContextResult.IsSuccessful = true
-	result.BaseAIContextResult.Duration = result.TotalDuration
+	result.IsSuccessful = true
+	result.Duration = result.TotalDuration
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -649,19 +650,7 @@ func (t *AtomicAnalyzeRepositoryTool) generateAnalysisContext(repoPath string, a
 	}
 }
 
-func (t *AtomicAnalyzeRepositoryTool) validateLocalPath(path string) error {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return types.NewRichError("INVALID_PATH", fmt.Sprintf("failed to resolve absolute path for '%s': %v", path, err), types.ErrTypeValidation)
-	}
-
-	// Basic path validation (more could be added)
-	if strings.Contains(absPath, "..") {
-		return types.NewRichError("PATH_TRAVERSAL_DENIED", fmt.Sprintf("path traversal not allowed for '%s' (resolved to: %s)", path, absPath), types.ErrTypeSecurity)
-	}
-
-	return nil
-}
+// validateLocalPath is now replaced by utils.ValidateLocalPath
 
 // Unified AI Context Interface Implementations
 

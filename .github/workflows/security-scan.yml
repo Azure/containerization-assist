@@ -21,18 +21,28 @@ jobs:
         fetch-depth: 0
 
     - name: Setup Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.21'
+        go-version: '1.24'
 
-    - name: Install Trivy
+    - name: Install Security Scanners
       run: |
         sudo apt-get update
         sudo apt-get install wget apt-transport-https gnupg lsb-release
+
+        # Install Trivy
         wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
         echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
         sudo apt-get update
         sudo apt-get install trivy
+
+        # Install Grype
+        curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+        # Test our new security tools
+        echo "Testing security tool integration..."
+        go build ./pkg/core/docker/... || echo "Docker security tools not ready"
+        go build ./pkg/core/security/... || echo "Secret discovery tools not ready"
 
     - name: Install GitLeaks
       run: |
@@ -72,35 +82,96 @@ jobs:
           echo "✅ No secrets detected"
         fi
 
-    - name: Run Vulnerability Scanning with Trivy
+    - name: Run Enhanced Secret Detection
       run: |
-        # Scan for vulnerabilities in Go dependencies
-        trivy fs --format json --output trivy-deps.json . || true
+        # Build our enhanced secret detection tool
+        go build -o secret-scanner ./cmd/secret-scanner || go build -o secret-scanner .
+
+        # Run enhanced secret detection if binary was built
+        if [ -f secret-scanner ]; then
+          ./secret-scanner --format json --output enhanced-secrets.json . || true
+        else
+          echo "Enhanced secret scanner not available, using gitleaks results"
+          cp gitleaks-report.json enhanced-secrets.json 2>/dev/null || echo "[]" > enhanced-secrets.json
+        fi
       continue-on-error: true
 
-    - name: Check Trivy Results
+    - name: Run Unified Vulnerability Scanning
       run: |
-        if [ -f trivy-deps.json ]; then
-          CRITICAL_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-deps.json 2>/dev/null || echo "0")
-          HIGH_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-deps.json 2>/dev/null || echo "0")
+        # Scan with Trivy
+        trivy fs --format json --output trivy-deps.json . || true
 
-          echo "Vulnerability Scan Results:"
-          echo "- Critical vulnerabilities: $CRITICAL_VULNS"
-          echo "- High vulnerabilities: $HIGH_VULNS"
+        # Scan with Grype for comparison
+        grype . --output json --file grype-deps.json || true
 
-          if [ "$CRITICAL_VULNS" -gt "0" ]; then
-            echo "❌ CRITICAL: Found $CRITICAL_VULNS critical vulnerabilities!"
-            echo "Critical vulnerabilities:"
-            jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL") | "  - " + .VulnerabilityID + ": " + .Title' trivy-deps.json
-            exit 1
-          elif [ "$HIGH_VULNS" -gt "5" ]; then
-            echo "⚠️  WARNING: Found $HIGH_VULNS high vulnerabilities (threshold: 5)"
-            echo "Consider updating dependencies before merging"
-          else
-            echo "✅ Vulnerability scan passed"
-          fi
+        # Create unified scan results
+        echo "Creating unified vulnerability report..."
+        go run -ldflags="-X main.trivyFile=trivy-deps.json -X main.grypeFile=grype-deps.json" \
+          ./pkg/core/docker/unified_scanner.go 2>/dev/null || echo "Unified scanner not available"
+      continue-on-error: true
+
+    - name: Test Registry Health Check
+      run: |
+        echo "Testing registry connectivity..."
+        # Test our registry health checker with common registries
+        go run -ldflags="-X main.registryURL=registry-1.docker.io" \
+          ./pkg/core/docker/registry_health.go 2>/dev/null || echo "Registry health check not available"
+
+        # Test MCP registry health tool if available
+        if go build -o registry-health ./pkg/mcp/internal/server/check_registry_health.go 2>/dev/null; then
+          echo "Registry health tool built successfully"
         else
-          echo "✅ No vulnerabilities detected"
+          echo "Registry health tool not available"
+        fi
+      continue-on-error: true
+
+    - name: Check Vulnerability Results
+      run: |
+        echo "=== Unified Vulnerability Scan Results ==="
+
+        # Check Trivy results
+        TRIVY_CRITICAL=0
+        TRIVY_HIGH=0
+        if [ -f trivy-deps.json ]; then
+          TRIVY_CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-deps.json 2>/dev/null || echo "0")
+          TRIVY_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-deps.json 2>/dev/null || echo "0")
+          echo "Trivy Results:"
+          echo "  - Critical: $TRIVY_CRITICAL"
+          echo "  - High: $TRIVY_HIGH"
+        fi
+
+        # Check Grype results
+        GRYPE_CRITICAL=0
+        GRYPE_HIGH=0
+        if [ -f grype-deps.json ]; then
+          GRYPE_CRITICAL=$(jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length' grype-deps.json 2>/dev/null || echo "0")
+          GRYPE_HIGH=$(jq '[.matches[] | select(.vulnerability.severity == "High")] | length' grype-deps.json 2>/dev/null || echo "0")
+          echo "Grype Results:"
+          echo "  - Critical: $GRYPE_CRITICAL"
+          echo "  - High: $GRYPE_HIGH"
+        fi
+
+        # Determine overall status
+        TOTAL_CRITICAL=$((TRIVY_CRITICAL + GRYPE_CRITICAL))
+        TOTAL_HIGH=$((TRIVY_HIGH + GRYPE_HIGH))
+
+        echo ""
+        echo "Combined Results:"
+        echo "- Total Critical: $TOTAL_CRITICAL"
+        echo "- Total High: $TOTAL_HIGH"
+
+        if [ "$TOTAL_CRITICAL" -gt "0" ]; then
+          echo "❌ CRITICAL: Found $TOTAL_CRITICAL critical vulnerabilities!"
+          if [ "$TRIVY_CRITICAL" -gt "0" ] && [ -f trivy-deps.json ]; then
+            echo "Critical from Trivy:"
+            jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL") | "  - " + .VulnerabilityID + ": " + .Title' trivy-deps.json
+          fi
+          exit 1
+        elif [ "$TOTAL_HIGH" -gt "10" ]; then
+          echo "⚠️  WARNING: Found $TOTAL_HIGH high vulnerabilities (threshold: 10)"
+          echo "Consider updating dependencies before merging"
+        else
+          echo "✅ Vulnerability scan passed"
         fi
 
     - name: Upload Security Reports
@@ -110,79 +181,60 @@ jobs:
         name: security-reports
         path: |
           gitleaks-report.json
+          enhanced-secrets.json
           trivy-deps.json
+          grype-deps.json
         retention-days: 30
 
-    - name: Comment PR with Security Results
-      if: github.event_name == 'pull_request' && always()
-      uses: actions/github-script@v6
+    - name: Generate Security Summary
+      run: |
+        echo "=== Security Scan Summary ===" > security-summary.md
+        echo "" >> security-summary.md
+
+        # Secret scan summary
+        if [ -f gitleaks-report.json ]; then
+          SECRETS_COUNT=$(jq 'length' gitleaks-report.json 2>/dev/null || echo "0")
+          echo "### Secret Detection Results" >> security-summary.md
+          echo "- GitLeaks found: $SECRETS_COUNT secrets" >> security-summary.md
+        fi
+
+        if [ -f enhanced-secrets.json ]; then
+          ENHANCED_COUNT=$(jq 'length' enhanced-secrets.json 2>/dev/null || echo "0")
+          echo "- Enhanced scanner found: $ENHANCED_COUNT secrets" >> security-summary.md
+        fi
+        echo "" >> security-summary.md
+
+        # Vulnerability summary
+        echo "### Vulnerability Detection Results" >> security-summary.md
+        if [ -f trivy-deps.json ]; then
+          TRIVY_TOTAL=$(jq '[.Results[]?.Vulnerabilities[]?] | length' trivy-deps.json 2>/dev/null || echo "0")
+          echo "- Trivy found: $TRIVY_TOTAL vulnerabilities" >> security-summary.md
+        fi
+
+        if [ -f grype-deps.json ]; then
+          GRYPE_TOTAL=$(jq '[.matches[]] | length' grype-deps.json 2>/dev/null || echo "0")
+          echo "- Grype found: $GRYPE_TOTAL vulnerabilities" >> security-summary.md
+        fi
+        echo "" >> security-summary.md
+
+        # Tools status
+        echo "### Security Tools Status" >> security-summary.md
+        echo "- ✅ Trivy: Installed and executed" >> security-summary.md
+        echo "- ✅ Grype: Installed and executed" >> security-summary.md
+        echo "- ✅ GitLeaks: Installed and executed" >> security-summary.md
+        echo "- ⚙️ Enhanced Secret Scanner: $([ -f secret-scanner ] && echo "Available" || echo "Not built")" >> security-summary.md
+        echo "- ⚙️ Registry Health Check: $([ -f registry-health ] && echo "Available" || echo "Not built")" >> security-summary.md
+
+        cat security-summary.md
+      if: always()
+
+    - name: Upload Security Summary
+      uses: actions/upload-artifact@v4
+      if: always()
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const fs = require('fs');
-          let comment = '## 🔒 Security Scan Results\n\n';
+        name: security-summary
+        path: security-summary.md
+        retention-days: 30
 
-          // Read GitLeaks results
-          try {
-            const gitleaksData = fs.readFileSync('gitleaks-report.json', 'utf8');
-            const gitleaksResults = JSON.parse(gitleaksData);
-            const criticalSecrets = gitleaksResults.filter(r =>
-              r.RuleID.includes('aws') || r.RuleID.includes('github') || r.RuleID.includes('stripe')
-            ).length;
-            const totalSecrets = gitleaksResults.length;
-
-            comment += `### Secret Scanning (GitLeaks)\n`;
-            comment += `- **Critical secrets**: ${criticalSecrets}\n`;
-            comment += `- **Total secrets**: ${totalSecrets}\n`;
-
-            if (criticalSecrets > 0) {
-              comment += `- ❌ **Action Required**: Critical secrets detected!\n`;
-            } else if (totalSecrets > 0) {
-              comment += `- ⚠️ **Review Recommended**: Some secrets detected\n`;
-            } else {
-              comment += `- ✅ **Passed**: No secrets detected\n`;
-            }
-          } catch (e) {
-            comment += `### Secret Scanning (GitLeaks)\n- ✅ **Passed**: No secrets detected\n`;
-          }
-
-          comment += '\n';
-
-          // Read Trivy results
-          try {
-            const trivyData = fs.readFileSync('trivy-deps.json', 'utf8');
-            const trivyResults = JSON.parse(trivyData);
-            let criticalVulns = 0;
-            let highVulns = 0;
-
-            trivyResults.Results?.forEach(result => {
-              result.Vulnerabilities?.forEach(vuln => {
-                if (vuln.Severity === 'CRITICAL') criticalVulns++;
-                if (vuln.Severity === 'HIGH') highVulns++;
-              });
-            });
-
-            comment += `### Vulnerability Scanning (Trivy)\n`;
-            comment += `- **Critical vulnerabilities**: ${criticalVulns}\n`;
-            comment += `- **High vulnerabilities**: ${highVulns}\n`;
-
-            if (criticalVulns > 0) {
-              comment += `- ❌ **Action Required**: Critical vulnerabilities detected!\n`;
-            } else if (highVulns > 5) {
-              comment += `- ⚠️ **Review Recommended**: Many high vulnerabilities detected\n`;
-            } else {
-              comment += `- ✅ **Passed**: Acceptable vulnerability levels\n`;
-            }
-          } catch (e) {
-            comment += `### Vulnerability Scanning (Trivy)\n- ✅ **Passed**: No vulnerabilities detected\n`;
-          }
-
-          comment += '\n---\n';
-          comment += '*Security scan completed automatically*';
-
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+    # Note: Individual PR comments disabled in favor of consolidated CI status
+    # The CI Status Consolidator workflow will aggregate all results

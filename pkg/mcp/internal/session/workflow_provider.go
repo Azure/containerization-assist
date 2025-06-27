@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/utils"
 )
 
 // WorkflowLabelProvider provides automatic workflow-related labels
@@ -87,13 +89,13 @@ func (w *WorkflowLabelProvider) GetK8sLabels(session *SessionState) (map[string]
 	// Add image info if available
 	if session.ImageRef.String() != "" {
 		// Clean image name for K8s label compliance
-		imageName := w.sanitizeForK8s(session.ImageRef.Repository)
+		imageName := utils.SanitizeForKubernetes(session.ImageRef.Repository)
 		if imageName != "" {
 			k8sLabels["mcp.image.name"] = imageName
 		}
 
 		if session.ImageRef.Tag != "" {
-			imageTag := w.sanitizeForK8s(session.ImageRef.Tag)
+			imageTag := utils.SanitizeForKubernetes(session.ImageRef.Tag)
 			if imageTag != "" {
 				k8sLabels["mcp.image.tag"] = imageTag
 			}
@@ -104,7 +106,7 @@ func (w *WorkflowLabelProvider) GetK8sLabels(session *SessionState) (map[string]
 	if session.RepoURL != "" {
 		repoName := w.extractRepoName(session.RepoURL)
 		if repoName != "" {
-			k8sLabels["mcp.repo.name"] = w.sanitizeForK8s(repoName)
+			k8sLabels["mcp.repo.name"] = utils.SanitizeForKubernetes(repoName)
 		}
 	}
 
@@ -338,24 +340,7 @@ func (w *WorkflowLabelProvider) extractRepoName(repoURL string) string {
 	return ""
 }
 
-// sanitizeForK8s sanitizes a string to be valid for Kubernetes labels
-func (w *WorkflowLabelProvider) sanitizeForK8s(input string) string {
-	// Replace invalid characters with dashes
-	result := strings.ToLower(input)
-	result = strings.ReplaceAll(result, "_", "-")
-	result = strings.ReplaceAll(result, ".", "-")
-	result = strings.ReplaceAll(result, "/", "-")
-
-	// Trim to max length
-	if len(result) > 63 {
-		result = result[:63]
-	}
-
-	// Ensure it starts and ends with alphanumeric
-	result = strings.Trim(result, "-")
-
-	return result
-}
+// sanitizeForK8s is now replaced by utils.SanitizeForKubernetes
 
 // contains checks if a slice contains a string
 func (w *WorkflowLabelProvider) contains(slice []string, item string) bool {

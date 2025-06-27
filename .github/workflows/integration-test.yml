@@ -3,6 +3,12 @@ name: Integration Test
 on:
   workflow_dispatch:
   pull_request:
+    paths-ignore:
+      - 'pkg/mcp/**'
+      - 'cmd/mcp-server/**'
+      - 'scripts/**'
+      - 'docs/**'
+      - '**.md'
 
 # ensure that only one workflow is running at a time per branch/pr by canceling in-progress runs
 concurrency:
@@ -12,6 +18,8 @@ concurrency:
 jobs:
   setup:
     runs-on: ubuntu-latest
+    outputs:
+      should-continue: ${{ steps.canary-result.outputs.success }}
     steps:
       - name: Checkout container-kit
         uses: actions/checkout@v4
@@ -32,9 +40,99 @@ jobs:
           path: container-kit
           retention-days: 1
 
-  test-run:
+  canary-test:
+    name: Canary Integration Test
     needs: setup
     runs-on: ubuntu-latest
+    outputs:
+      canary-success: ${{ steps.canary-run.outputs.success }}
+
+    steps:
+      - name: Download container-kit binary
+        uses: actions/download-artifact@v4
+        with:
+          name: container-kit-binary
+          path: ./
+
+      - name: Make binary executable
+        run: |
+          chmod +x container-kit
+          sudo mv container-kit /usr/local/bin/
+
+      - name: Checkout canary test repo
+        uses: actions/checkout@v4
+        with:
+          repository: chamilad/tomcat-hello-world
+          path: test-repo
+
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Kind
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+
+      - name: Run canary test
+        id: canary-run
+        continue-on-error: true
+        env:
+          AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
+        run: |
+          cd test-repo
+
+          echo "🚀 Running canary integration test..."
+          echo "Repository: chamilad/tomcat-hello-world"
+
+          # Make sure we have a place to store logs
+          mkdir -p artifacts/logs
+
+          # The success message we're looking for
+          SUCCESS_MESSAGE="🎉 All stages completed successfully!"
+
+          # Start with a clean slate
+          rm -f Dockerfile || true
+          rm -rf manifests || true
+          mkdir -p manifests
+
+          # Run the canary test
+          echo "Running container-kit generate for canary test..."
+          container-kit generate . --snapshot > "artifacts/logs/canary-run.log" 2>&1
+
+          # Save artifacts if created
+          if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
+            [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
+            [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
+          fi
+
+          # Check results
+          if grep -q "context deadline exceeded" "artifacts/logs/canary-run.log"; then
+            echo "❌ Canary test: Operation timed out - context deadline exceeded"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 1
+          elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/canary-run.log"; then
+            echo "✅ Canary test PASSED - Found '$SUCCESS_MESSAGE'"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Canary test FAILED - Did not find '$SUCCESS_MESSAGE'"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Upload canary test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: canary-test-artifacts
+          path: test-repo/artifacts/
+          retention-days: 14
+
+  test-run:
+    needs: [setup, canary-test]
+    runs-on: ubuntu-latest
+    if: needs.canary-test.outputs.canary-success == 'true'
     strategy:
       max-parallel: 50
       matrix:
@@ -145,6 +243,17 @@ jobs:
           fi
           echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
 
+      - name: Check Artifact Directory Size
+        run: |
+          max_size_bytes=$((20 * 1024 * 1024))  # 20 MiB in bytes
+          echo "Max Artifact Directory Size: $max_size_bytes bytes"
+          size_in_bytes=$(du -sb test-repo/artifacts/ | cut -f1)
+          echo "Artifact Directory Size in bytes: $size_in_bytes"
+          if [ "$size_in_bytes" -gt "$max_size_bytes" ]; then
+            echo "❌ Artifact Directory Size $size_in_bytes exceeds $max_size_bytes"
+            exit 1
+          fi
+
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -154,9 +263,9 @@ jobs:
           retention-days: 14
 
   aggregate-results:
-    needs: test-run
+    needs: [canary-test, test-run]
     runs-on: ubuntu-latest
-    if: always()
+    if: always() && needs.canary-test.result != 'skipped'
     steps:
       - name: Download all results
         uses: actions/download-artifact@v4
@@ -164,7 +273,7 @@ jobs:
           pattern: cc-run-*
           path: results
 
-      - name: Integreation Test Results Summary
+      - name: Integration Test Results Summary
         id: aggregate_results
         run: |
           tests_per_repo=5

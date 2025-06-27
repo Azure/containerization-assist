@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -19,16 +18,4 @@ func ExtractBaseImage(dockerfileContent string) string {
 	return "unknown"
 }
 
-// FormatBytes formats bytes into human-readable format
-func FormatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
+// FormatBytes function has been moved to string_utils.go - use utils.FormatBytes instead

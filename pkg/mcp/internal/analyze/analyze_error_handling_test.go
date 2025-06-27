@@ -352,7 +352,7 @@ func TestAtomicAnalyzeRepositoryTool_ErrorHandling(t *testing.T) {
 
 func TestGenerateDockerfileTool_ErrorHandling(t *testing.T) {
 	logger := zerolog.Nop()
-	tool := NewGenerateDockerfileTool(nil, logger)
+	tool := NewAtomicGenerateDockerfileTool(nil, logger)
 	ctx := context.Background()
 
 	t.Run("invalid_argument_types", func(t *testing.T) {
@@ -497,7 +497,7 @@ func TestGenerateDockerfileTool_ErrorHandling(t *testing.T) {
 func BenchmarkAnalyzeTools_ErrorHandling(b *testing.B) {
 	logger := zerolog.Nop()
 	analyzeTool := NewAtomicAnalyzeRepositoryTool(nil, nil, logger)
-	dockerfileTool := NewGenerateDockerfileTool(nil, logger)
+	dockerfileTool := NewAtomicGenerateDockerfileTool(nil, logger)
 	ctx := context.Background()
 
 	b.Run("validate_invalid_args", func(b *testing.B) {

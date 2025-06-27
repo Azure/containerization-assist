@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // ProgressStage represents a stage in a multi-stage operation
@@ -71,7 +73,7 @@ func (t *ProgressTracker) StartStage(stageName string) error {
 	}
 
 	if stageIndex == -1 {
-		return fmt.Errorf("stage %s not found", stageName)
+		return errors.Resourcef("runtime/progress", "stage %s not found", stageName)
 	}
 
 	// Update current stage
@@ -147,7 +149,7 @@ func (t *ProgressTracker) SkipStage(stageName string) error {
 		}
 	}
 
-	return fmt.Errorf("stage %s not found", stageName)
+	return errors.Resourcef("runtime/progress", "stage %s not found", stageName)
 }
 
 // GetOverallProgress returns the overall progress (0.0 to 1.0)
