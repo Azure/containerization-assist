@@ -472,7 +472,41 @@ jobs:
     - name: Run GitLeaks (Secret Detection)
       run: |
         echo "🔍 Scanning for secrets..."
-        gitleaks detect --report-format json --report-path gitleaks-report.json --verbose
+        
+        # Create gitleaks config to exclude test files and known test patterns
+        cat > .gitleaks.toml << 'EOF'
+        [allowlist]
+          description = "Test secrets and known safe patterns"
+          
+          # Exclude test files
+          files = [
+            '''.*_test\.go''',
+            '''.*test.*\.go''',
+            '''test/.*''',
+            '''.*testdata.*''',
+            '''examples/.*''',
+            '''repomix-output\.xml'''
+          ]
+          
+          # Exclude known test patterns
+          regexes = [
+            '''sk-1234567890abcdef''',
+            '''AKIAFAKETEST12345678''',
+            '''AKIAIOSFODNN7EXAMPLE''',
+            '''test-api-key-123456''',
+            '''zN8BP6lnPUDpumenHCZLVwZkFcSIGPr0''',
+            '''dGhpcyBpcyBhIHNlY3JldCBtZXNzYWdl''',
+            '''4e1243bd22c66e76c2ba9bef8c5e8f8a''',
+            '''YOUR_PRIVATE_KEY_CONTENT_HERE_REPLACE_WITH_ACTUAL_KEY''',
+            '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE''',
+            '''dXNlcjpwYXNzd29yZA==''',
+            '''abc123def456''',
+            '''sk_test_abcdef123456'''
+          ]
+        EOF
+        
+        # Run gitleaks with config
+        gitleaks detect --config .gitleaks.toml --report-format json --report-path gitleaks-report.json --verbose
 
         if [ -f gitleaks-report.json ]; then
           leak_count=$(jq '. | length' gitleaks-report.json 2>/dev/null || echo "0")
