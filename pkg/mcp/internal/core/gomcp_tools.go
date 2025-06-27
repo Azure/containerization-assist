@@ -436,7 +436,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -472,7 +472,7 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -500,7 +500,7 @@ func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegist
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -528,7 +528,7 @@ func (gm *GomcpManager) registerPullImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -556,7 +556,7 @@ func (gm *GomcpManager) registerTagImage(registrar *runtime.StandardToolRegistra
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -584,7 +584,7 @@ func (gm *GomcpManager) registerPushImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -607,7 +607,7 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 	runtime.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicDeployKubernetesArgs) (*deploy.AtomicDeployKubernetesResult, error) {
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -649,7 +649,7 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -680,7 +680,7 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -709,7 +709,7 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
@@ -738,7 +738,7 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(args)
+			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,7 +21,7 @@ func TestBoltSessionStore(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "test_sessions.db")
 
 	t.Run("NewBoltSessionStore", func(t *testing.T) {
-		store, err := NewBoltSessionStore(dbPath)
+		store, err := NewBoltSessionStore(context.Background(), dbPath)
 		if err != nil {
 			t.Fatalf("Failed to create session store: %v", err)
 		}
@@ -32,7 +33,7 @@ func TestBoltSessionStore(t *testing.T) {
 	})
 
 	t.Run("SaveAndLoad", func(t *testing.T) {
-		store, err := NewBoltSessionStore(dbPath)
+		store, err := NewBoltSessionStore(context.Background(), dbPath)
 		if err != nil {
 			t.Fatalf("Failed to create session store: %v", err)
 		}
@@ -60,13 +61,13 @@ func TestBoltSessionStore(t *testing.T) {
 		}
 
 		// Test Save
-		err = store.Save(sessionID, state)
+		err = store.Save(context.Background(), sessionID, state)
 		if err != nil {
 			t.Fatalf("Failed to save session: %v", err)
 		}
 
 		// Test Load
-		loadedState, err := store.Load(sessionID)
+		loadedState, err := store.Load(context.Background(), sessionID)
 		if err != nil {
 			t.Fatalf("Failed to load session: %v", err)
 		}
@@ -101,7 +102,7 @@ func TestBoltSessionStore(t *testing.T) {
 	})
 
 	t.Run("List", func(t *testing.T) {
-		store, err := NewBoltSessionStore(dbPath)
+		store, err := NewBoltSessionStore(context.Background(), dbPath)
 		if err != nil {
 			t.Fatalf("Failed to create session store: %v", err)
 		}
@@ -116,14 +117,14 @@ func TestBoltSessionStore(t *testing.T) {
 				CreatedAt:    time.Now(),
 				LastAccessed: time.Now(),
 			}
-			err = store.Save(sessionID, state)
+			err = store.Save(context.Background(), sessionID, state)
 			if err != nil {
 				t.Fatalf("Failed to save session %s: %v", sessionID, err)
 			}
 		}
 
 		// Test List
-		sessionList, err := store.List()
+		sessionList, err := store.List(context.Background())
 		if err != nil {
 			t.Fatalf("Failed to list sessions: %v", err)
 		}
@@ -146,7 +147,7 @@ func TestBoltSessionStore(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		store, err := NewBoltSessionStore(dbPath)
+		store, err := NewBoltSessionStore(context.Background(), dbPath)
 		if err != nil {
 			t.Fatalf("Failed to create session store: %v", err)
 		}
@@ -161,51 +162,51 @@ func TestBoltSessionStore(t *testing.T) {
 		}
 
 		// Save session
-		err = store.Save(sessionID, state)
+		err = store.Save(context.Background(), sessionID, state)
 		if err != nil {
 			t.Fatalf("Failed to save session: %v", err)
 		}
 
 		// Verify it exists
-		_, err = store.Load(sessionID)
+		_, err = store.Load(context.Background(), sessionID)
 		if err != nil {
 			t.Fatalf("Session should exist before deletion: %v", err)
 		}
 
 		// Delete session
-		err = store.Delete(sessionID)
+		err = store.Delete(context.Background(), sessionID)
 		if err != nil {
 			t.Fatalf("Failed to delete session: %v", err)
 		}
 
 		// Verify it's gone
-		_, err = store.Load(sessionID)
+		_, err = store.Load(context.Background(), sessionID)
 		if err == nil {
 			t.Error("Session should not exist after deletion")
 		}
 	})
 
 	t.Run("LoadNonExistent", func(t *testing.T) {
-		store, err := NewBoltSessionStore(dbPath)
+		store, err := NewBoltSessionStore(context.Background(), dbPath)
 		if err != nil {
 			t.Fatalf("Failed to create session store: %v", err)
 		}
 		defer store.Close()
 
-		_, err = store.Load("non-existent-session")
+		_, err = store.Load(context.Background(), "non-existent-session")
 		if err == nil {
 			t.Error("Loading non-existent session should return an error")
 		}
 	})
 
 	t.Run("DeleteNonExistent", func(t *testing.T) {
-		store, err := NewBoltSessionStore(dbPath)
+		store, err := NewBoltSessionStore(context.Background(), dbPath)
 		if err != nil {
 			t.Fatalf("Failed to create session store: %v", err)
 		}
 		defer store.Close()
 
-		err = store.Delete("non-existent-session")
+		err = store.Delete(context.Background(), "non-existent-session")
 		// Deleting non-existent session should not error (idempotent)
 		if err != nil {
 			t.Errorf("Deleting non-existent session should not error: %v", err)
@@ -215,7 +216,7 @@ func TestBoltSessionStore(t *testing.T) {
 
 func TestBoltSessionStoreInvalidPath(t *testing.T) {
 	// Test with invalid path
-	_, err := NewBoltSessionStore("/invalid/path/that/does/not/exist/test.db")
+	_, err := NewBoltSessionStore(context.Background(), "/invalid/path/that/does/not/exist/test.db")
 	if err == nil {
 		t.Error("Creating store with invalid path should return an error")
 	}
@@ -230,7 +231,7 @@ func BenchmarkBoltSessionStore_Save(b *testing.B) {
 	defer os.RemoveAll(tempDir)
 
 	dbPath := filepath.Join(tempDir, "bench_sessions.db")
-	store, err := NewBoltSessionStore(dbPath)
+	store, err := NewBoltSessionStore(context.Background(), dbPath)
 	if err != nil {
 		b.Fatalf("Failed to create session store: %v", err)
 	}
@@ -247,7 +248,7 @@ func BenchmarkBoltSessionStore_Save(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		sessionID := "bench-session-" + string(rune(i))
 		state.SessionID = sessionID
-		err := store.Save(sessionID, state)
+		err := store.Save(context.Background(), sessionID, state)
 		if err != nil {
 			b.Fatalf("Failed to save session: %v", err)
 		}
@@ -262,7 +263,7 @@ func BenchmarkBoltSessionStore_Load(b *testing.B) {
 	defer os.RemoveAll(tempDir)
 
 	dbPath := filepath.Join(tempDir, "bench_sessions.db")
-	store, err := NewBoltSessionStore(dbPath)
+	store, err := NewBoltSessionStore(context.Background(), dbPath)
 	if err != nil {
 		b.Fatalf("Failed to create session store: %v", err)
 	}
@@ -276,14 +277,14 @@ func BenchmarkBoltSessionStore_Load(b *testing.B) {
 		CreatedAt:    time.Now(),
 		LastAccessed: time.Now(),
 	}
-	err = store.Save(sessionID, state)
+	err = store.Save(context.Background(), sessionID, state)
 	if err != nil {
 		b.Fatalf("Failed to save test session: %v", err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := store.Load(sessionID)
+		_, err := store.Load(context.Background(), sessionID)
 		if err != nil {
 			b.Fatalf("Failed to load session: %v", err)
 		}

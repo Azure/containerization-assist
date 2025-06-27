@@ -29,7 +29,7 @@ func TestPreFlightAutoRunDecision(t *testing.T) {
 		state := NewConversationState("test-session", "/tmp/workspace")
 		// Simulate returning user with existing context
 		state.Context["previous_session"] = true
-		state.RepoAnalysis = map[string]interface{}{
+		state.SessionState.RepoAnalysis = map[string]interface{}{
 			"language": "go",
 		}
 
@@ -41,7 +41,7 @@ func TestPreFlightAutoRunDecision(t *testing.T) {
 		state := NewConversationState("test-session", "/tmp/workspace")
 		// Simulate first-time user with empty context
 		state.Context = make(map[string]interface{})
-		state.RepoAnalysis = nil
+		state.SessionState.RepoAnalysis = nil
 
 		shouldAutoRun := pm.shouldAutoRunPreFlightChecks(state, "start")
 		assert.False(t, shouldAutoRun, "Should not auto-run for first-time users")
@@ -80,7 +80,7 @@ func TestShouldAutoRunPreFlightChecks(t *testing.T) {
 			name: "returning user with context",
 			setupState: func(state *ConversationState) {
 				state.Context["some_key"] = "some_value"
-				state.RepoAnalysis = map[string]interface{}{"language": "go"}
+				state.SessionState.RepoAnalysis = map[string]interface{}{"language": "go"}
 			},
 			input:       "continue",
 			expectAuto:  true,
@@ -90,7 +90,7 @@ func TestShouldAutoRunPreFlightChecks(t *testing.T) {
 			name: "first time user - empty context",
 			setupState: func(state *ConversationState) {
 				state.Context = make(map[string]interface{})
-				state.RepoAnalysis = nil
+				state.SessionState.RepoAnalysis = nil
 			},
 			input:       "start",
 			expectAuto:  false,
@@ -103,7 +103,7 @@ func TestShouldAutoRunPreFlightChecks(t *testing.T) {
 				// Context is nil by default, so this should be first-time
 				state.Context = nil
 				// Clear the RepoAnalysis to make it truly empty
-				state.RepoAnalysis = make(map[string]interface{})
+				state.SessionState.RepoAnalysis = make(map[string]interface{})
 			},
 			input:       "begin",
 			expectAuto:  false,

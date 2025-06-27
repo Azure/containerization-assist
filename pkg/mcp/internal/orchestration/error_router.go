@@ -27,7 +27,7 @@ func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
 		classifier:         NewErrorClassifier(logger),
 		router:             NewErrorRouter(logger),
 		recoveryManager:    NewRecoveryManager(logger),
-		retryCoordinator:   retry.NewCoordinator(logger),
+		retryCoordinator:   retry.New(),
 		redirectionManager: NewRedirectionManager(logger),
 	}
 
@@ -127,15 +127,18 @@ func (er *DefaultErrorRouter) AddRecoveryStrategy(strategy RecoveryStrategy) {
 
 // SetRetryPolicy sets a retry policy for a specific stage
 func (er *DefaultErrorRouter) SetRetryPolicy(stageName string, policy *RetryPolicy) {
-	// Convert from RetryPolicy to RetryPolicy
-	errorsPolicy := &RetryPolicy{
-		MaxAttempts:  policy.MaxAttempts,
-		BackoffMode:  policy.BackoffMode,
-		InitialDelay: policy.InitialDelay,
-		MaxDelay:     policy.MaxDelay,
-		Multiplier:   policy.Multiplier,
+	// Convert from RetryPolicy to retry.Policy
+	retryPolicy := &retry.Policy{
+		MaxAttempts:     policy.MaxAttempts,
+		InitialDelay:    policy.InitialDelay,
+		MaxDelay:        policy.MaxDelay,
+		BackoffStrategy: retry.BackoffExponential,
+		Multiplier:      policy.Multiplier,
+		Jitter:          true,
+		ErrorPatterns:   []string{"timeout", "connection refused", "temporary failure"},
 	}
-	// Note: Retry policies are now configured in the unified coordinator
+	// Set policy in the unified coordinator
+	er.retryCoordinator.SetPolicy(stageName, retryPolicy)
 	// This method can be deprecated or adapted to configure coordinator policies
 	er.logger.Info().Str("stage", stageName).Msg("Retry policy configuration moved to unified coordinator")
 }
@@ -366,8 +369,19 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			}
 		}
 
+		// Convert to unified retry.Policy for calculation
+		unifiedPolicy := &retry.Policy{
+			MaxAttempts:     retryPolicy.MaxAttempts,
+			InitialDelay:    retryPolicy.InitialDelay,
+			MaxDelay:        retryPolicy.MaxDelay,
+			BackoffStrategy: retry.BackoffExponential,
+			Multiplier:      retryPolicy.Multiplier,
+			Jitter:          true,
+			ErrorPatterns:   []string{"timeout", "connection refused", "temporary failure"},
+		}
+
 		// Use unified retry coordinator to calculate delay
-		retryAfter := er.retryCoordinator.CalculateDelay(retryCount)
+		retryAfter := er.retryCoordinator.CalculateDelay(unifiedPolicy, retryCount)
 		action.RetryAfter = &retryAfter
 
 		er.logger.Info().

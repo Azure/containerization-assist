@@ -35,7 +35,7 @@ const (
 // NewBoltSessionStore creates a new BoltDB-based session store
 func NewBoltSessionStore(ctx context.Context, dbPath string) (*BoltSessionStore, error) {
 	// Use unified retry coordinator for database connection
-	retryCoordinator := retry.NewCoordinator(log.Logger)
+	retryCoordinator := retry.New()
 
 	var db *bolt.DB
 	err := retryCoordinator.Execute(ctx, "database_open", func(ctx context.Context) error {
@@ -140,8 +140,6 @@ func (s *BoltSessionStore) Load(ctx context.Context, sessionID string) (*Session
 		return nil, ctx.Err()
 	default:
 	}
-
-	var state *SessionState
 
 	// Use channel to make database operation cancellable
 	type result struct {

@@ -986,7 +986,7 @@ func (pfc *PreFlightChecker) GetCheckByName(ctx context.Context, name string) (*
 
 // RunSingleCheck runs a specific check
 func (pfc *PreFlightChecker) RunSingleCheck(ctx context.Context, checkName string) (*CheckResult, error) {
-	check, err := pfc.GetCheckByName(checkName)
+	check, err := pfc.GetCheckByName(ctx, checkName)
 	if err != nil {
 		return nil, err
 	}
@@ -1216,7 +1216,7 @@ func (pfc *PreFlightChecker) ValidateMultipleRegistries(ctx context.Context, reg
 	}
 
 	// Parse Docker config once
-	config, err := pfc.parseDockerConfig()
+	config, err := pfc.parseDockerConfig(ctx)
 	if err != nil {
 		pfc.logger.Warn().Err(err).Msg("Failed to parse Docker config, will try environment credentials")
 		// Continue with empty config to try environment variables

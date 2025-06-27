@@ -213,7 +213,7 @@ func TestMultiRegistryManager_ValidateRegistryAccess(t *testing.T) {
 			name:         "unknown_registry",
 			registry:     "unknown.registry.com",
 			expectError:  true,
-			errorMessage: "failed to get credentials",
+			errorMessage: "cannot get credentials",
 		},
 		{
 			name:        "registry_with_normalization",
