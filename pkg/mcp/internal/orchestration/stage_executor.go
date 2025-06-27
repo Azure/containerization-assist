@@ -143,9 +143,9 @@ func (se *DefaultStageExecutor) ExecuteStage(
 }
 
 // ValidateStage validates a workflow stage configuration
-func (se *DefaultStageExecutor) ValidateStage(stage *WorkflowSpecWorkflowStage) error {
+func (se *DefaultStageExecutor) ValidateStage(ctx context.Context, stage *WorkflowSpecWorkflowStage) error {
 	validator := NewStageValidator(se.toolRegistry)
-	return validator.Validate(stage)
+	return validator.Validate(ctx, stage)
 }
 
 // executeTool executes a single tool (internal method)

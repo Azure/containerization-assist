@@ -65,7 +65,7 @@ func (pm *PromptManager) handleBuildStage(ctx context.Context, state *Conversati
 	}
 
 	// Check if we need to gather build preferences
-	if !state.Dockerfile.Built {
+	if !state.SessionState.Dockerfile.Built {
 		// First, offer dry-run
 		if !pm.hasRunBuildDryRun(state) {
 			return pm.offerBuildDryRun(ctx, state)
@@ -79,7 +79,7 @@ func (pm *PromptManager) handleBuildStage(ctx context.Context, state *Conversati
 
 	// Build already complete, determine next action based on user preferences
 	response := &ConversationResponse{
-		Message: fmt.Sprintf("%sImage built successfully: %s", progressPrefix, state.Dockerfile.ImageID),
+		Message: fmt.Sprintf("%sImage built successfully: %s", progressPrefix, state.SessionState.Dockerfile.ImageID),
 		Stage:   types.StageBuild,
 		Status:  ResponseStatusSuccess,
 	}
@@ -121,7 +121,7 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 
 	// Run dry-run build
 	params := map[string]interface{}{
-		"session_id": state.SessionID,
+		"session_id": state.SessionState.SessionID,
 		"dry_run":    true,
 	}
 
@@ -170,7 +170,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 	// Prepare build parameters
 	imageTag := pm.generateImageTag(state)
 	params := map[string]interface{}{
-		"session_id": state.SessionID,
+		"session_id": state.SessionState.SessionID,
 		"image_ref":  imageTag,
 		"platform":   state.Preferences.Platform,
 	}
@@ -223,10 +223,10 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 	details, _ := result.(map[string]interface{})
 
 	// Update state with build results
-	state.Dockerfile.Built = true
-	state.Dockerfile.ImageID = imageTag
+	state.SessionState.Dockerfile.Built = true
+	state.SessionState.Dockerfile.ImageID = imageTag
 	now := time.Now()
-	state.Dockerfile.BuildTime = &now
+	state.SessionState.Dockerfile.BuildTime = &now
 
 	// Add build artifact
 	artifact := Artifact{
@@ -353,12 +353,12 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 
 	// Prepare push parameters
 	registry, _ := state.Context["preferred_registry"].(string) //nolint:errcheck // Already validated above
-	imageRef := fmt.Sprintf("%s/%s", registry, state.Dockerfile.ImageID)
+	imageRef := fmt.Sprintf("%s/%s", registry, state.SessionState.Dockerfile.ImageID)
 
 	params := map[string]interface{}{
-		"session_id": state.SessionID,
+		"session_id": state.SessionState.SessionID,
 		"image_ref":  imageRef,
-		"source_ref": state.Dockerfile.ImageID,
+		"source_ref": state.SessionState.Dockerfile.ImageID,
 	}
 
 	// First try dry-run to check access
@@ -428,9 +428,9 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Update state
-	state.Dockerfile.Pushed = true
-	state.ImageRef.Registry = registry
-	state.ImageRef.Tag = extractTag(imageRef)
+	state.SessionState.Dockerfile.Pushed = true
+	state.SessionState.ImageRef.Registry = registry
+	state.SessionState.ImageRef.Tag = extractTag(imageRef)
 
 	// Success - move to manifests
 	state.SetStage(types.StageManifests)

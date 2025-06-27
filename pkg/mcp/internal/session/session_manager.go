@@ -61,7 +61,7 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 	var err error
 
 	if config.StorePath != "" {
-		store, err = NewBoltSessionStore(config.StorePath)
+		store, err = NewBoltSessionStore(context.Background(), config.StorePath)
 		if err != nil {
 			config.Logger.Error().Err(err).Str("store_path", config.StorePath).Msg("Failed to initialize bolt store")
 			return nil, fmt.Errorf("failed to initialize bolt store at %s: %w", config.StorePath, err)
@@ -102,7 +102,7 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 	}
 
 	// Try to load from persistence
-	if session, err := sm.store.Load(sessionID); err == nil {
+	if session, err := sm.store.Load(context.Background(), sessionID); err == nil {
 		sm.sessions[sessionID] = session
 		session.UpdateLastAccessed()
 		sm.logger.Info().Str("session_id", sessionID).Msg("Loaded session from persistence")
@@ -136,7 +136,7 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 	sm.sessions[sessionID] = session
 
 	// Persist the new session
-	if err := sm.store.Save(sessionID, session); err != nil {
+	if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to persist new session")
 	}
 
@@ -158,7 +158,7 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 	session.UpdateLastAccessed()
 
 	// Persist the changes
-	if err := sm.store.Save(sessionID, session); err != nil {
+	if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to persist session update")
 		return err
 	}
@@ -246,7 +246,7 @@ func (sm *SessionManager) DeleteSession(ctx context.Context, sessionID string) e
 	delete(sm.sessions, sessionID)
 
 	// Remove from persistence
-	if err := sm.store.Delete(sessionID); err != nil {
+	if err := sm.store.Delete(context.Background(), sessionID); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to remove session from persistence")
 		return err
 	}
@@ -350,7 +350,7 @@ func (sm *SessionManager) garbageCollectUnsafe() error {
 
 	// Clean up expired sessions from persistence (only for BoltSessionStore)
 	if boltStore, ok := sm.store.(*BoltSessionStore); ok {
-		if err := boltStore.CleanupExpired(sm.sessionTTL); err != nil {
+		if err := boltStore.CleanupExpired(context.Background(), sm.sessionTTL); err != nil {
 			sm.logger.Warn().Err(err).Msg("Failed to clean up expired sessions from persistence")
 		}
 	}
@@ -617,13 +617,13 @@ func (sm *SessionManager) matchesFilters(session *SessionState, filters SessionF
 }
 
 func (sm *SessionManager) loadExistingSessions() error {
-	sessionIDs, err := sm.store.List()
+	sessionIDs, err := sm.store.List(context.Background())
 	if err != nil {
 		return err
 	}
 
 	for _, sessionID := range sessionIDs {
-		session, err := sm.store.Load(sessionID)
+		session, err := sm.store.Load(context.Background(), sessionID)
 		if err != nil {
 			sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to load session")
 			continue
@@ -651,7 +651,7 @@ func (sm *SessionManager) deleteSessionUnsafe(sessionID string) error {
 	delete(sm.sessions, sessionID)
 
 	// Remove from persistence
-	return sm.store.Delete(sessionID)
+	return sm.store.Delete(context.Background(), sessionID)
 }
 
 func (sm *SessionManager) cleanupOrphanedWorkspaces() error {

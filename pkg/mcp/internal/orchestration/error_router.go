@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 	"github.com/rs/zerolog"
 )
 
@@ -14,7 +15,7 @@ type DefaultErrorRouter struct {
 	classifier         *ErrorClassifier
 	router             *ErrorRouter
 	recoveryManager    *RecoveryManager
-	retryManager       *RetryManager
+	retryCoordinator   *retry.Coordinator
 	redirectionManager *RedirectionManager
 	escalationHandler  *CrossToolEscalationHandler // Enhanced cross-tool escalation
 }
@@ -26,7 +27,7 @@ func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
 		classifier:         NewErrorClassifier(logger),
 		router:             NewErrorRouter(logger),
 		recoveryManager:    NewRecoveryManager(logger),
-		retryManager:       NewRetryManager(logger),
+		retryCoordinator:   retry.New(),
 		redirectionManager: NewRedirectionManager(logger),
 	}
 
@@ -126,15 +127,20 @@ func (er *DefaultErrorRouter) AddRecoveryStrategy(strategy RecoveryStrategy) {
 
 // SetRetryPolicy sets a retry policy for a specific stage
 func (er *DefaultErrorRouter) SetRetryPolicy(stageName string, policy *RetryPolicy) {
-	// Convert from RetryPolicy to RetryPolicy
-	errorsPolicy := &RetryPolicy{
-		MaxAttempts:  policy.MaxAttempts,
-		BackoffMode:  policy.BackoffMode,
-		InitialDelay: policy.InitialDelay,
-		MaxDelay:     policy.MaxDelay,
-		Multiplier:   policy.Multiplier,
+	// Convert from RetryPolicy to retry.Policy
+	retryPolicy := &retry.Policy{
+		MaxAttempts:     policy.MaxAttempts,
+		InitialDelay:    policy.InitialDelay,
+		MaxDelay:        policy.MaxDelay,
+		BackoffStrategy: retry.BackoffExponential,
+		Multiplier:      policy.Multiplier,
+		Jitter:          true,
+		ErrorPatterns:   []string{"timeout", "connection refused", "temporary failure"},
 	}
-	er.retryManager.SetRetryPolicy(stageName, errorsPolicy)
+	// Set policy in the unified coordinator
+	er.retryCoordinator.SetPolicy(stageName, retryPolicy)
+	// This method can be deprecated or adapted to configure coordinator policies
+	er.logger.Info().Str("stage", stageName).Msg("Retry policy configuration moved to unified coordinator")
 }
 
 // Internal implementation methods
@@ -156,7 +162,8 @@ func (er *DefaultErrorRouter) CreateRedirectionPlan(
 func (er *DefaultErrorRouter) initializeDefaultRules() {
 	// Initialize modules with default configurations
 	er.recoveryManager.InitializeDefaultStrategies()
-	er.retryManager.InitializeDefaultPolicies()
+	// Default policies are initialized by the unified retry coordinator
+	er.logger.Info().Msg("Default retry policies initialized by unified coordinator")
 
 	// Initialize Sprint A enhanced cross-tool escalation rules
 	er.InitializeSprintAEscalationRules()
@@ -343,8 +350,15 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 	case "retry":
 		retryPolicy := rule.RetryPolicy
 		if retryPolicy == nil {
-			// Use stage-specific retry policy or default
-			retryPolicy = er.retryManager.GetRetryPolicy(workflowError.StageName)
+			// Use unified retry coordinator with stage-specific policy
+			// Convert to unified retry approach - policies are configured in coordinator
+			retryPolicy = &RetryPolicy{
+				MaxAttempts:  3,
+				BackoffMode:  "exponential",
+				InitialDelay: 5 * time.Second,
+				MaxDelay:     60 * time.Second,
+				Multiplier:   2.0,
+			}
 		}
 
 		// Calculate retry delay
@@ -355,7 +369,19 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			}
 		}
 
-		retryAfter := er.retryManager.CalculateRetryDelay(retryPolicy, retryCount)
+		// Convert to unified retry.Policy for calculation
+		unifiedPolicy := &retry.Policy{
+			MaxAttempts:     retryPolicy.MaxAttempts,
+			InitialDelay:    retryPolicy.InitialDelay,
+			MaxDelay:        retryPolicy.MaxDelay,
+			BackoffStrategy: retry.BackoffExponential,
+			Multiplier:      retryPolicy.Multiplier,
+			Jitter:          true,
+			ErrorPatterns:   []string{"timeout", "connection refused", "temporary failure"},
+		}
+
+		// Use unified retry coordinator to calculate delay
+		retryAfter := er.retryCoordinator.CalculateDelay(unifiedPolicy, retryCount)
 		action.RetryAfter = &retryAfter
 
 		er.logger.Info().

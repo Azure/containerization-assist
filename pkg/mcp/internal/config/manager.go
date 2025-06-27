@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"gopkg.in/yaml.v3"
 )
 
@@ -103,7 +104,15 @@ func (cm *ConfigManager) LoadConfig(configPath string) error {
 	// Load from file if specified and exists
 	if configPath != "" {
 		if err := cm.loadFromFile(configPath); err != nil {
-			return fmt.Errorf("failed to load config file %s: %w", configPath, err)
+			return types.NewErrorBuilder("config_file_load_failed", "Failed to load configuration file", "configuration").
+				WithField("config_path", configPath).
+				WithOperation("load_config").
+				WithStage("file_loading").
+				WithRootCause(fmt.Sprintf("Cannot load config file %s: %v", configPath, err)).
+				WithImmediateStep(1, "Check file", "Verify config file exists and is readable").
+				WithImmediateStep(2, "Check format", "Ensure config file is valid YAML/JSON").
+				WithImmediateStep(3, "Check permissions", "Verify read permissions on config file").
+				Build()
 		}
 	} else {
 		// Try default locations

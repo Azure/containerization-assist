@@ -1,22 +1,25 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog/log"
 	bolt "go.etcd.io/bbolt"
 )
 
 // SessionStore defines the interface for session persistence
 type SessionStore interface {
-	Save(sessionID string, state *SessionState) error
-	Load(sessionID string) (*SessionState, error)
-	Delete(sessionID string) error
-	List() ([]string, error)
+	Save(ctx context.Context, sessionID string, state *SessionState) error
+	Load(ctx context.Context, sessionID string) (*SessionState, error)
+	Delete(ctx context.Context, sessionID string) error
+	List(ctx context.Context) ([]string, error)
 	Close() error
 }
 
@@ -30,50 +33,47 @@ const (
 )
 
 // NewBoltSessionStore creates a new BoltDB-based session store
-func NewBoltSessionStore(dbPath string) (*BoltSessionStore, error) {
-	// Try to open with a longer timeout and retry logic
-	var db *bolt.DB
-	var err error
+func NewBoltSessionStore(ctx context.Context, dbPath string) (*BoltSessionStore, error) {
+	// Use unified retry coordinator for database connection
+	retryCoordinator := retry.New()
 
-	for i := 0; i < 3; i++ {
-		db, err = bolt.Open(dbPath, 0o600, &bolt.Options{
+	var db *bolt.DB
+	err := retryCoordinator.Execute(ctx, "database_open", func(ctx context.Context) error {
+		var openErr error
+		db, openErr = bolt.Open(dbPath, 0o600, &bolt.Options{
 			Timeout:        5 * time.Second,
 			NoGrowSync:     false,
 			NoFreelistSync: false,
 			FreelistType:   bolt.FreelistArrayType,
 		})
-		if err == nil {
-			break
-		}
 
-		// If it's a timeout error and this is our last attempt,
-		// try to move the database file and create a new one
-		if i == 2 && err == bolt.ErrTimeout {
+		// Handle special case for locked database
+		if openErr == bolt.ErrTimeout {
 			backupPath := fmt.Sprintf("%s.locked.%d", dbPath, time.Now().Unix())
 			if renameErr := os.Rename(dbPath, backupPath); renameErr == nil {
-				// Try one more time with the moved file
-				db, err = bolt.Open(dbPath, 0o600, &bolt.Options{
+				log.Warn().Str("backup_path", backupPath).Msg("Moved locked database file")
+				// Try again with the moved file
+				db, openErr = bolt.Open(dbPath, 0o600, &bolt.Options{
 					Timeout:        5 * time.Second,
 					NoGrowSync:     false,
 					NoFreelistSync: false,
 					FreelistType:   bolt.FreelistArrayType,
 				})
-				if err == nil {
-					// Log that we had to move the old database
-					log.Warn().Str("backup_path", backupPath).Msg("Moved locked database file")
-					break
-				}
 			}
 		}
 
-		// If it's a timeout error, wait a bit and retry
-		if i < 2 {
-			time.Sleep(time.Duration(i+1) * time.Second)
-		}
-	}
+		return openErr
+	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to open BoltDB at %s after %d attempts: %w (hint: check if another instance is running)", dbPath, 3, err)
+		return nil, types.NewSessionError("", "open_database").
+			WithField("database_path", dbPath).
+			WithField("attempts", 3).
+			WithRootCause(fmt.Sprintf("BoltDB open failed after 3 attempts: %v", err)).
+			WithImmediateStep(1, "Check lock file", "Verify no other container-kit instance is running").
+			WithImmediateStep(2, "Check permissions", "Ensure write permissions to database directory").
+			WithImmediateStep(3, "Check disk space", "Verify sufficient disk space is available").
+			Build()
 	}
 
 	// Create the sessions bucket if it doesn't exist
@@ -86,67 +86,156 @@ func NewBoltSessionStore(dbPath string) (*BoltSessionStore, error) {
 			// Log the close error but return the original error
 			log.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
 		}
-		return nil, fmt.Errorf("failed to create sessions bucket: %w", err)
+		return nil, types.NewSessionError("", "create_bucket").
+			WithRootCause(fmt.Sprintf("Sessions bucket creation failed: %v", err)).
+			WithImmediateStep(1, "Check database integrity", "Verify database file is not corrupted").
+			WithImmediateStep(2, "Restart with clean database", "Delete database file if corruption suspected").
+			Build()
 	}
 
 	return &BoltSessionStore{db: db}, nil
 }
 
 // Save persists a session state to the database
-func (s *BoltSessionStore) Save(sessionID string, state *SessionState) error {
+func (s *BoltSessionStore) Save(ctx context.Context, sessionID string, state *SessionState) error {
+	// Check context cancellation before starting
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	data, err := json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("failed to marshal session state: %w", err)
 	}
 
-	return s.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(sessionsBucket))
-		return bucket.Put([]byte(sessionID), data)
-	})
+	// Use channel to make database operation cancellable
+	type result struct {
+		err error
+	}
+	resultCh := make(chan result, 1)
+
+	go func() {
+		err := s.db.Update(func(tx *bolt.Tx) error {
+			bucket := tx.Bucket([]byte(sessionsBucket))
+			return bucket.Put([]byte(sessionID), data)
+		})
+		resultCh <- result{err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case res := <-resultCh:
+		return res.err
+	}
 }
 
 // Load retrieves a session state from the database
-func (s *BoltSessionStore) Load(sessionID string) (*SessionState, error) {
-	var state *SessionState
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(sessionsBucket))
-		data := bucket.Get([]byte(sessionID))
-		if data == nil {
-			return fmt.Errorf("session not found: %s", sessionID)
-		}
-
-		state = &SessionState{}
-		return json.Unmarshal(data, state)
-	})
-	if err != nil {
-		return nil, err
+func (s *BoltSessionStore) Load(ctx context.Context, sessionID string) (*SessionState, error) {
+	// Check context cancellation before starting
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
 	}
 
-	return state, nil
+	// Use channel to make database operation cancellable
+	type result struct {
+		state *SessionState
+		err   error
+	}
+	resultCh := make(chan result, 1)
+
+	go func() {
+		var localState *SessionState
+		err := s.db.View(func(tx *bolt.Tx) error {
+			bucket := tx.Bucket([]byte(sessionsBucket))
+			data := bucket.Get([]byte(sessionID))
+			if data == nil {
+				return fmt.Errorf("session not found: %s", sessionID)
+			}
+
+			localState = &SessionState{}
+			return json.Unmarshal(data, localState)
+		})
+		resultCh <- result{state: localState, err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-resultCh:
+		return res.state, res.err
+	}
 }
 
 // Delete removes a session from the database
-func (s *BoltSessionStore) Delete(sessionID string) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(sessionsBucket))
-		return bucket.Delete([]byte(sessionID))
-	})
+func (s *BoltSessionStore) Delete(ctx context.Context, sessionID string) error {
+	// Check context cancellation before starting
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	// Use channel to make database operation cancellable
+	type result struct {
+		err error
+	}
+	resultCh := make(chan result, 1)
+
+	go func() {
+		err := s.db.Update(func(tx *bolt.Tx) error {
+			bucket := tx.Bucket([]byte(sessionsBucket))
+			return bucket.Delete([]byte(sessionID))
+		})
+		resultCh <- result{err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case res := <-resultCh:
+		return res.err
+	}
 }
 
 // List returns all session IDs in the database
-func (s *BoltSessionStore) List() ([]string, error) {
-	var sessionIDs []string
+func (s *BoltSessionStore) List(ctx context.Context) ([]string, error) {
+	// Check context cancellation before starting
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
-	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(sessionsBucket))
-		return bucket.ForEach(func(k, v []byte) error {
-			sessionIDs = append(sessionIDs, string(k))
-			return nil
+	// Use channel to make database operation cancellable
+	type result struct {
+		sessionIDs []string
+		err        error
+	}
+	resultCh := make(chan result, 1)
+
+	go func() {
+		var sessionIDs []string
+		err := s.db.View(func(tx *bolt.Tx) error {
+			bucket := tx.Bucket([]byte(sessionsBucket))
+			return bucket.ForEach(func(k, v []byte) error {
+				sessionIDs = append(sessionIDs, string(k))
+				return nil
+			})
 		})
-	})
+		resultCh <- result{sessionIDs: sessionIDs, err: err}
+	}()
 
-	return sessionIDs, err
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-resultCh:
+		return res.sessionIDs, res.err
+	}
 }
 
 // Close closes the database connection
@@ -155,7 +244,7 @@ func (s *BoltSessionStore) Close() error {
 }
 
 // CleanupExpired removes expired sessions from the database
-func (s *BoltSessionStore) CleanupExpired(ttl time.Duration) error {
+func (s *BoltSessionStore) CleanupExpired(ctx context.Context, ttl time.Duration) error {
 	expiredSessions := make([]string, 0)
 
 	// First, identify expired sessions
@@ -180,7 +269,7 @@ func (s *BoltSessionStore) CleanupExpired(ttl time.Duration) error {
 
 	// Then delete them
 	for _, sessionID := range expiredSessions {
-		if err := s.Delete(sessionID); err != nil {
+		if err := s.Delete(ctx, sessionID); err != nil {
 			return fmt.Errorf("failed to delete expired session %s: %w", sessionID, err)
 		}
 	}
@@ -189,7 +278,7 @@ func (s *BoltSessionStore) CleanupExpired(ttl time.Duration) error {
 }
 
 // GetStats returns statistics about the session store
-func (s *BoltSessionStore) GetStats() (*SessionStoreStats, error) {
+func (s *BoltSessionStore) GetStats(ctx context.Context) (*SessionStoreStats, error) {
 	stats := &SessionStoreStats{}
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -245,7 +334,7 @@ func NewMemorySessionStore() *MemorySessionStore {
 }
 
 // Save stores a session in memory
-func (s *MemorySessionStore) Save(sessionID string, state *SessionState) error {
+func (s *MemorySessionStore) Save(ctx context.Context, sessionID string, state *SessionState) error {
 	// Deep copy to prevent external modifications
 	data, err := json.Marshal(state)
 	if err != nil {
@@ -264,7 +353,7 @@ func (s *MemorySessionStore) Save(sessionID string, state *SessionState) error {
 }
 
 // Load retrieves a session from memory
-func (s *MemorySessionStore) Load(sessionID string) (*SessionState, error) {
+func (s *MemorySessionStore) Load(ctx context.Context, sessionID string) (*SessionState, error) {
 	s.mu.RLock()
 	state, exists := s.sessions[sessionID]
 	s.mu.RUnlock()
@@ -288,7 +377,7 @@ func (s *MemorySessionStore) Load(sessionID string) (*SessionState, error) {
 }
 
 // Delete removes a session from memory
-func (s *MemorySessionStore) Delete(sessionID string) error {
+func (s *MemorySessionStore) Delete(ctx context.Context, sessionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.sessions, sessionID)
@@ -296,7 +385,7 @@ func (s *MemorySessionStore) Delete(sessionID string) error {
 }
 
 // List returns all session IDs in memory
-func (s *MemorySessionStore) List() ([]string, error) {
+func (s *MemorySessionStore) List(ctx context.Context) ([]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

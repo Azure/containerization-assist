@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -151,8 +152,9 @@ type RestartAnalysis struct {
 
 // AtomicCheckHealthTool implements atomic application health checking using core operations
 type AtomicCheckHealthTool struct {
-	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
+	pipelineAdapter  mcptypes.PipelineOperations
+	sessionManager   mcptypes.ToolSessionManager
+	retryCoordinator *retry.Coordinator
 	// errorHandler field removed - using direct error handling
 	logger      zerolog.Logger
 	analyzer    ToolAnalyzer
@@ -161,9 +163,26 @@ type AtomicCheckHealthTool struct {
 
 // NewAtomicCheckHealthTool creates a new atomic check health tool
 func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
+	coordinator := retry.New()
+
+	// Set up health check specific retry policy
+	coordinator.SetPolicy("health_check", &retry.Policy{
+		MaxAttempts:     10, // More attempts for health checks
+		InitialDelay:    5 * time.Second,
+		MaxDelay:        30 * time.Second,
+		BackoffStrategy: retry.BackoffExponential,
+		Multiplier:      1.5, // Gentler escalation for health checks
+		Jitter:          true,
+		ErrorPatterns: []string{
+			"timeout", "connection refused", "network unreachable",
+			"service unavailable", "not ready", "pending",
+		},
+	})
+
 	return &AtomicCheckHealthTool{
-		pipelineAdapter: adapter,
-		sessionManager:  sessionManager,
+		pipelineAdapter:  adapter,
+		sessionManager:   sessionManager,
+		retryCoordinator: coordinator,
 		// errorHandler initialization removed - using direct error handling
 		logger: logger.With().Str("tool", "atomic_check_health").Logger(),
 	}
@@ -464,37 +483,53 @@ func (t *AtomicCheckHealthTool) validateHealthCheckPrerequisites(result *AtomicC
 	return nil
 }
 
-// waitForApplicationReady implements a simple polling wait for application readiness
+// waitForApplicationReady implements waiting for application readiness using unified retry coordinator
 func (t *AtomicCheckHealthTool) waitForApplicationReady(ctx context.Context, sessionID, namespace, labelSelector string, timeout time.Duration) *kubernetes.HealthCheckResult {
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second) // Poll every 10 seconds
-	defer ticker.Stop()
+	var finalResult *kubernetes.HealthCheckResult
 
-	for {
-		select {
-		case <-timeoutCtx.Done():
-			// Timeout reached, return final status
-			result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
-			if err != nil || result == nil {
-				return nil
-			}
-			// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
-			return t.convertHealthCheckResult(result, namespace)
-
-		case <-ticker.C:
-			result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
-			if err != nil || result == nil {
-				continue // Continue polling on error
-			}
-
-			if result.Healthy {
-				// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
-				return t.convertHealthCheckResult(result, namespace) // Application is ready
-			}
+	// Use retry coordinator for structured waiting
+	err := t.retryCoordinator.Execute(timeoutCtx, "health_check", func(ctx context.Context) error {
+		result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
+		if err != nil {
+			t.logger.Debug().Err(err).Msg("Health check attempt failed, will retry")
+			return err
 		}
+
+		if result == nil {
+			return fmt.Errorf("health check returned nil result")
+		}
+
+		// Convert result for return
+		finalResult = t.convertHealthCheckResult(result, namespace)
+
+		if result.Healthy {
+			// Success! Application is ready
+			t.logger.Info().
+				Str("session_id", sessionID).
+				Str("namespace", namespace).
+				Str("label_selector", labelSelector).
+				Msg("Application became ready")
+			return nil
+		}
+
+		// Not ready yet, continue retrying
+		return fmt.Errorf("application not ready: %d/%d pods ready",
+			len(result.PodStatuses), len(result.PodStatuses))
+	})
+
+	if err != nil {
+		t.logger.Warn().Err(err).
+			Str("session_id", sessionID).
+			Str("namespace", namespace).
+			Str("label_selector", labelSelector).
+			Dur("timeout", timeout).
+			Msg("Application did not become ready within timeout")
 	}
+
+	return finalResult
 }
 
 // analyzeApplicationHealth performs detailed analysis of health results

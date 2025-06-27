@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"reflect"
 	"testing"
 )
@@ -31,7 +32,7 @@ func TestBuildArgsMapDebug(t *testing.T) {
 		Tags:      []string{"tag1", "tag2"},
 	}
 
-	result, err := BuildArgsMap(args)
+	result, err := BuildArgsMap(context.Background(), args)
 	if err != nil {
 		t.Fatalf("Error: %v", err)
 	}
@@ -129,7 +130,7 @@ func TestBuildArgsMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := BuildArgsMap(tt.args)
+			result, err := BuildArgsMap(context.Background(), tt.args)
 
 			if tt.wantErr {
 				if err == nil {

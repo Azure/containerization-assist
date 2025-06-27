@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
@@ -81,6 +83,14 @@ type Coordinator struct {
 	fixProviders    map[string]FixProvider
 	errorClassifier *ErrorClassifier
 	circuitBreakers map[string]*CircuitBreakerState
+	// Performance optimizations
+	attemptPool     sync.Pool                // Pool for AttemptResult objects
+	delayCache      map[string]time.Duration // Cache for common delay calculations
+	delayCacheMutex sync.RWMutex
+	errorCache      map[string]string // Cache error classifications
+	errorCacheMutex sync.RWMutex
+	rng             *rand.Rand
+	rngMutex        sync.Mutex
 }
 
 // FixProvider interface for implementing fix strategies
@@ -116,6 +126,15 @@ func New() *Coordinator {
 		fixProviders:    make(map[string]FixProvider),
 		errorClassifier: NewErrorClassifier(),
 		circuitBreakers: make(map[string]*CircuitBreakerState),
+		// Performance optimizations
+		attemptPool: sync.Pool{
+			New: func() interface{} {
+				return &AttemptResult{}
+			},
+		},
+		delayCache: make(map[string]time.Duration),
+		errorCache: make(map[string]string),
+		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -172,9 +191,9 @@ func (rc *Coordinator) executeWithContext(ctx context.Context, retryCtx *Context
 			return errors.Network("retry/coordinator", "circuit breaker is open")
 		}
 
-		// Apply delay for retry attempts
+		// Apply delay for retry attempts using optimized calculation
 		if attempt > 1 {
-			delay := rc.calculateDelay(retryCtx.Policy, attempt-1)
+			delay := rc.getCachedDelay(retryCtx.Policy, attempt-1)
 			select {
 			case <-time.After(delay):
 			case <-ctx.Done():
@@ -182,12 +201,11 @@ func (rc *Coordinator) executeWithContext(ctx context.Context, retryCtx *Context
 			}
 		}
 
-		// Record attempt start
+		// Record attempt start using pooled object
 		startTime := time.Now()
-		result := AttemptResult{
-			Attempt:   attempt,
-			Timestamp: startTime,
-		}
+		result := rc.getOptimizedAttemptResult()
+		result.Attempt = attempt
+		result.Timestamp = startTime
 
 		// Execute the function
 		err := fn(ctx, retryCtx)
@@ -196,14 +214,16 @@ func (rc *Coordinator) executeWithContext(ctx context.Context, retryCtx *Context
 
 		if err == nil {
 			result.Success = true
-			retryCtx.AttemptHistory = append(retryCtx.AttemptHistory, result)
+			retryCtx.AttemptHistory = append(retryCtx.AttemptHistory, *result)
+			rc.putOptimizedAttemptResult(result) // Return to pool
 			rc.recordCircuitSuccess(retryCtx.CircuitBreaker)
 			return nil
 		}
 
 		lastErr = err
 		result.Success = false
-		retryCtx.AttemptHistory = append(retryCtx.AttemptHistory, result)
+		retryCtx.AttemptHistory = append(retryCtx.AttemptHistory, *result)
+		rc.putOptimizedAttemptResult(result) // Return to pool
 		rc.recordCircuitFailure(retryCtx.CircuitBreaker)
 
 		// Check if error is retryable
@@ -311,11 +331,9 @@ func (rc *Coordinator) calculateDelay(policy *Policy, attempt int) time.Duration
 		delay = policy.MaxDelay
 	}
 
-	// Apply jitter if enabled
+	// Apply jitter if enabled using optimized random generator
 	if policy.Jitter {
-		nano := time.Now().UnixNano()
-		jitterFactor := 2.0*math.Abs(float64(nano%1000))/1000.0 - 1.0
-		jitter := time.Duration(float64(delay) * 0.1 * jitterFactor)
+		jitter := rc.getOptimizedJitter(delay)
 		delay += jitter
 	}
 
@@ -334,6 +352,21 @@ func (rc *Coordinator) getCircuitBreaker(operationType string) *CircuitBreakerSt
 	}
 	rc.circuitBreakers[operationType] = cb
 	return cb
+}
+
+// IsRetryable checks if an error should be retried using the error classifier
+func (rc *Coordinator) IsRetryable(err error) bool {
+	return rc.errorClassifier.IsRetryable(err)
+}
+
+// ClassifyError categorizes an error using the error classifier
+func (rc *Coordinator) ClassifyError(err error) string {
+	return rc.errorClassifier.ClassifyError(err)
+}
+
+// CalculateDelay calculates delay for a given policy and attempt (exposed for backward compatibility)
+func (rc *Coordinator) CalculateDelay(policy *Policy, attempt int) time.Duration {
+	return rc.calculateDelay(policy, attempt)
 }
 
 // isCircuitOpen checks if the circuit breaker is open
@@ -382,4 +415,85 @@ func (rc *Coordinator) recordCircuitFailure(cb *CircuitBreakerState) {
 		cb.State = "open"
 		cb.NextAttempt = time.Now().Add(30 * time.Second)
 	}
+}
+
+// Performance optimization methods
+
+// getOptimizedAttemptResult gets an AttemptResult from the pool
+func (rc *Coordinator) getOptimizedAttemptResult() *AttemptResult {
+	result := rc.attemptPool.Get().(*AttemptResult)
+	// Reset fields to ensure clean state
+	*result = AttemptResult{}
+	return result
+}
+
+// putOptimizedAttemptResult returns an AttemptResult to the pool
+func (rc *Coordinator) putOptimizedAttemptResult(result *AttemptResult) {
+	rc.attemptPool.Put(result)
+}
+
+// getCachedDelay gets delay from cache or calculates and caches it
+func (rc *Coordinator) getCachedDelay(policy *Policy, attempt int) time.Duration {
+	// Create cache key based on policy parameters and attempt
+	cacheKey := fmt.Sprintf("%s_%d_%v_%v_%f_%d",
+		policy.BackoffStrategy, attempt, policy.InitialDelay, policy.MaxDelay, policy.Multiplier, policy.MaxAttempts)
+
+	// Check cache first (read lock)
+	rc.delayCacheMutex.RLock()
+	if cached, exists := rc.delayCache[cacheKey]; exists {
+		rc.delayCacheMutex.RUnlock()
+		return cached
+	}
+	rc.delayCacheMutex.RUnlock()
+
+	// Calculate delay
+	delay := rc.calculateDelay(policy, attempt)
+
+	// Cache the result (write lock)
+	rc.delayCacheMutex.Lock()
+	// Prevent cache from growing too large
+	if len(rc.delayCache) > 1000 {
+		// Clear cache when it gets too large
+		rc.delayCache = make(map[string]time.Duration)
+	}
+	rc.delayCache[cacheKey] = delay
+	rc.delayCacheMutex.Unlock()
+
+	return delay
+}
+
+// getCachedErrorClassification gets error classification from cache or calculates and caches it
+func (rc *Coordinator) getCachedErrorClassification(err error) string {
+	errorMsg := err.Error()
+
+	// Check cache first (read lock)
+	rc.errorCacheMutex.RLock()
+	if cached, exists := rc.errorCache[errorMsg]; exists {
+		rc.errorCacheMutex.RUnlock()
+		return cached
+	}
+	rc.errorCacheMutex.RUnlock()
+
+	// Classify error
+	classification := rc.errorClassifier.ClassifyError(err)
+
+	// Cache the result (write lock)
+	rc.errorCacheMutex.Lock()
+	// Prevent cache from growing too large
+	if len(rc.errorCache) > 500 {
+		// Clear cache when it gets too large
+		rc.errorCache = make(map[string]string)
+	}
+	rc.errorCache[errorMsg] = classification
+	rc.errorCacheMutex.Unlock()
+
+	return classification
+}
+
+// getOptimizedJitter generates jitter using a thread-safe random number generator
+func (rc *Coordinator) getOptimizedJitter(delay time.Duration) time.Duration {
+	rc.rngMutex.Lock()
+	jitter := time.Duration(rc.rng.Float64() * float64(delay) * 0.1) // 10% jitter
+	rc.rngMutex.Unlock()
+	return jitter
 }
