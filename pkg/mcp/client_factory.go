@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"sync"
 
 	"github.com/Azure/container-kit/pkg/ai"
 	"github.com/Azure/container-kit/pkg/docker"
@@ -54,6 +55,12 @@ type standardClientFactory struct {
 	k8sClient    k8s.KubeRunner
 	kindClient   kind.KindRunner
 	aiClient     mcptypes.AIAnalyzer
+
+	// Thread-safe initialization using sync.Once
+	dockerOnce sync.Once
+	k8sOnce    sync.Once
+	kindOnce   sync.Once
+	aiOnce     sync.Once
 }
 
 // NewClientFactory creates a new client factory with the given configuration
@@ -66,31 +73,31 @@ func NewClientFactory(config ClientConfiguration) ClientFactory {
 
 // CreateDockerClient creates or returns a cached Docker client
 func (f *standardClientFactory) CreateDockerClient() docker.DockerClient {
-	if f.dockerClient == nil {
+	f.dockerOnce.Do(func() {
 		f.dockerClient = docker.NewDockerCmdRunner(f.commandRunner)
-	}
+	})
 	return f.dockerClient
 }
 
 // CreateK8sClient creates or returns a cached Kubernetes client
 func (f *standardClientFactory) CreateK8sClient() k8s.KubeRunner {
-	if f.k8sClient == nil {
+	f.k8sOnce.Do(func() {
 		f.k8sClient = k8s.NewKubeCmdRunner(f.commandRunner)
-	}
+	})
 	return f.k8sClient
 }
 
 // CreateKindClient creates or returns a cached Kind client
 func (f *standardClientFactory) CreateKindClient() kind.KindRunner {
-	if f.kindClient == nil {
+	f.kindOnce.Do(func() {
 		f.kindClient = kind.NewKindCmdRunner(f.commandRunner)
-	}
+	})
 	return f.kindClient
 }
 
 // CreateAIClient creates or returns a cached AI client
 func (f *standardClientFactory) CreateAIClient() mcptypes.AIAnalyzer {
-	if f.aiClient == nil {
+	f.aiOnce.Do(func() {
 		// Use configuration to create appropriate AI client
 		if f.config.AIEndpoint != "" {
 			// Create Azure OpenAI client with configuration
@@ -109,7 +116,7 @@ func (f *standardClientFactory) CreateAIClient() mcptypes.AIAnalyzer {
 			// No AI configuration provided, use no-op implementation
 			f.aiClient = &noOpAIAnalyzer{}
 		}
-	}
+	})
 	return f.aiClient
 }
 

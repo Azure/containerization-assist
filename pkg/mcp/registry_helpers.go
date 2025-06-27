@@ -5,11 +5,32 @@ import (
 )
 
 // =============================================================================
+// Generic Registry Interface (for type safety)
+// =============================================================================
+
+// GenericRegistry defines the common interface for registries that support generic operations
+type GenericRegistry interface {
+	// Basic registry operations
+	List() []string
+	GetMetadata() map[string]ToolMetadata
+
+	// These methods are implemented by the helper functions below due to Go's generic limitation
+	// registerGeneric[T Tool](name string, factory StronglyTypedToolFactory[T]) error
+	// getGeneric[T Tool](name string) (StronglyTypedToolFactory[T], error)
+}
+
+// =============================================================================
 // Generic Helper Functions (workaround for Go interface limitation)
 // =============================================================================
 
 // RegisterGeneric registers a generic strongly-typed factory with a registry
+// Note: Uses interface{} due to Go's limitation with generic methods in interfaces
 func RegisterGeneric[T Tool](registry interface{}, name string, factory StronglyTypedToolFactory[T]) error {
+	// Ensure the registry implements GenericRegistry for type safety
+	if _, ok := registry.(GenericRegistry); !ok {
+		return fmt.Errorf("registry must implement GenericRegistry interface, got: %T", registry)
+	}
+
 	switch r := registry.(type) {
 	case *StandardToolRegistry:
 		return registerGenericStandard(r, name, factory)
@@ -21,7 +42,13 @@ func RegisterGeneric[T Tool](registry interface{}, name string, factory Strongly
 }
 
 // GetGeneric retrieves a generic strongly-typed factory from a registry
+// Note: Uses interface{} due to Go's limitation with generic methods in interfaces
 func GetGeneric[T Tool](registry interface{}, name string) (StronglyTypedToolFactory[T], error) {
+	// Ensure the registry implements GenericRegistry for type safety
+	if _, ok := registry.(GenericRegistry); !ok {
+		return nil, fmt.Errorf("registry must implement GenericRegistry interface, got: %T", registry)
+	}
+
 	switch r := registry.(type) {
 	case *StandardToolRegistry:
 		return getGenericStandard[T](r, name)
