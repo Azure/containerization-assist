@@ -36,6 +36,16 @@ func (t *AtomicGenerateManifestsTool) Execute(ctx context.Context, args interfac
 	return t.baseTool.Execute(ctx, args)
 }
 
+// GetMetadata delegates to the base tool
+func (t *AtomicGenerateManifestsTool) GetMetadata() mcptypes.ToolMetadata {
+	return t.baseTool.GetMetadata()
+}
+
+// Validate delegates to the base tool
+func (t *AtomicGenerateManifestsTool) Validate(ctx context.Context, args interface{}) error {
+	return t.baseTool.Validate(ctx, args)
+}
+
 // SetAnalyzer is a compatibility method
 func (t *AtomicGenerateManifestsTool) SetAnalyzer(analyzer interface{}) {
 	// No-op for compatibility

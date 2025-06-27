@@ -179,8 +179,85 @@ type ToolRegistry interface {
 	GetMetadata() map[string]ToolMetadata
 }
 
+// StronglyTypedToolRegistry manages strongly-typed tool registration and discovery
+type StronglyTypedToolRegistry interface {
+	RegisterTyped(name string, factory StronglyTypedToolFactory[Tool]) error
+	GetTyped(name string) (StronglyTypedToolFactory[Tool], error)
+	// Note: Generic methods moved to helper functions to work around Go limitation
+	List() []string
+	GetMetadata() map[string]ToolMetadata
+}
+
+// StandardRegistry combines both legacy and typed tool registration with additional features
+type StandardRegistry interface {
+	ToolRegistry
+	StronglyTypedToolRegistry
+
+	// Standard registration methods
+	RegisterStandard(name string, tool Tool) error
+	// Note: RegisterWithBuilder moved to helper function due to Go generic limitation
+
+	// Tool retrieval
+	GetTool(name string) (Tool, error)
+	GetToolInfo(name string) (*StandardToolInfo, error)
+
+	// Registry management
+	IsRegistered(name string) bool
+	Count() int
+	Clear()
+}
+
+// StandardToolInfo provides comprehensive information about a registered tool
+type StandardToolInfo struct {
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	Category     string   `json:"category"`
+	Description  string   `json:"description"`
+	Version      string   `json:"version"`
+	Dependencies []string `json:"dependencies"`
+	Capabilities []string `json:"capabilities"`
+}
+
 // ToolFactory creates new instances of tools
 type ToolFactory func() Tool
+
+// StronglyTypedToolFactory creates new instances of tools with strong typing
+type StronglyTypedToolFactory[T Tool] interface {
+	Create() T
+	GetType() string
+	GetMetadata() ToolMetadata
+}
+
+// TypedFactoryFunc is a strongly-typed factory function
+type TypedFactoryFunc[T Tool] func() T
+
+// NewStronglyTypedFactory creates a new strongly-typed factory
+func NewStronglyTypedFactory[T Tool](factoryFunc TypedFactoryFunc[T], toolType string, metadata ToolMetadata) StronglyTypedToolFactory[T] {
+	return &stronglyTypedFactory[T]{
+		factoryFunc: factoryFunc,
+		toolType:    toolType,
+		metadata:    metadata,
+	}
+}
+
+// stronglyTypedFactory implements StronglyTypedToolFactory
+type stronglyTypedFactory[T Tool] struct {
+	factoryFunc TypedFactoryFunc[T]
+	toolType    string
+	metadata    ToolMetadata
+}
+
+func (f *stronglyTypedFactory[T]) Create() T {
+	return f.factoryFunc()
+}
+
+func (f *stronglyTypedFactory[T]) GetType() string {
+	return f.toolType
+}
+
+func (f *stronglyTypedFactory[T]) GetMetadata() ToolMetadata {
+	return f.metadata
+}
 
 // =============================================================================
 // TOOL ARGUMENT AND RESULT INTERFACES
@@ -334,3 +411,10 @@ type RecentError struct {
 	Severity  string                 `json:"severity"`
 	Context   map[string]interface{} `json:"context,omitempty"`
 }
+
+// Circuit breaker states
+const (
+	CircuitBreakerClosed   = "closed"
+	CircuitBreakerOpen     = "open"
+	CircuitBreakerHalfOpen = "half-open"
+)

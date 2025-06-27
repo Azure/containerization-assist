@@ -13,12 +13,7 @@ type LocalProgressReporter interface {
 	GetCurrentStage() (int, LocalProgressStage)
 }
 
-// LocalProgressStage represents a stage in a multi-step operation (local type to avoid import cycles)
-type LocalProgressStage struct {
-	Name        string  // Human-readable stage name
-	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
-	Description string  // Optional detailed description
-}
+// NOTE: LocalProgressStage is defined in interfaces.go to avoid duplication
 
 // GoMCPProgressAdapter provides a bridge between the existing ProgressReporter interface
 // and GoMCP's native progress tokens. This allows existing tools to use GoMCP progress

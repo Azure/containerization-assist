@@ -9,26 +9,13 @@ import (
 // This package contains only the interface types to avoid circular imports
 
 // =============================================================================
-// CORE INTERFACES (temporarily restored to avoid import cycles)
+// DEPRECATED TYPES - For backward compatibility during migration
 // =============================================================================
+//
+// These types are maintained temporarily for backward compatibility.
+// New code should use the canonical types from pkg/mcp package.
 
-// TODO: Import cycles resolved - interface definitions moved to pkg/mcp/interfaces.go
-
-// NOTE: ToolArgs and ToolResult interfaces are now defined in pkg/mcp/interfaces.go
-
-// Type aliases to avoid breaking existing code during migration
-// These will eventually be removed once all references are updated
-
-// NOTE: These interfaces are temporarily restored to avoid import cycles
-
-// NOTE: ToolArgs, ToolResult, and Tool interfaces are now defined in pkg/mcp/interfaces.go
-// Type aliases maintained for compatibility during migration
-
-// ToolMetadata and ToolExample have been moved to pkg/mcp/interfaces.go
-// to avoid duplication. However, we need to define them here to avoid import cycles
-// when internal packages need to use these types.
-
-// ToolMetadata contains comprehensive information about a tool
+// ToolMetadata contains comprehensive information about a tool (DEPRECATED - use pkg/mcp.ToolMetadata)
 type ToolMetadata struct {
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
@@ -41,7 +28,7 @@ type ToolMetadata struct {
 	Examples     []ToolExample     `json:"examples"`
 }
 
-// ToolExample represents an example usage of a tool
+// ToolExample represents an example usage of a tool (DEPRECATED - use pkg/mcp.ToolExample)
 type ToolExample struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -49,50 +36,32 @@ type ToolExample struct {
 	Output      map[string]interface{} `json:"output"`
 }
 
-// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
-
-// ProgressStage represents a stage in a multi-step operation
+// ProgressStage represents a stage in a multi-step operation (DEPRECATED - use pkg/mcp.ProgressStage)
 type ProgressStage struct {
 	Name        string  // Human-readable stage name
 	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
 	Description string  // Optional detailed description
 }
 
-// NOTE: Session interface is now defined in pkg/mcp/interfaces.go
+// RequestHandler, MCPRequest, MCPResponse, and MCPError are now defined in pkg/mcp/interfaces.go
+// DEPRECATED: These types are maintained for backward compatibility during migration
+// Use pkg/mcp.MCPRequest, pkg/mcp.MCPResponse, pkg/mcp.MCPError for new code
 
-// Transport, RequestHandler, and Tool interfaces have been moved to pkg/mcp/interfaces.go
-// to avoid duplication. Only type definitions remain in this file.
-
-// NOTE: Transport, RequestHandler, ProgressReporter, Tool, and ToolRegistry interfaces
-// are now defined in pkg/mcp/interfaces.go as the canonical source
-
-// NOTE: HealthChecker interface is now defined in pkg/mcp/interfaces.go
-
-// NOTE: These interfaces are now defined in pkg/mcp/interfaces.go
-// Keeping type aliases for compatibility during migration
-
-// NOTE: RequestHandler, Transport, and ToolRegistry interfaces are now defined in pkg/mcp/interfaces.go
-
-// ToolRegistry interface is now defined in pkg/mcp/interfaces.go
-
-// ToolOrchestrator interface has been moved to avoid duplication
-// Use the definition in pkg/mcp/internal/orchestration/interfaces.go for internal use
-
-// Transport interface is now defined in pkg/mcp/interfaces.go
-
-// RequestHandler interface is now defined in pkg/mcp/interfaces.go
+// MCPRequest represents an incoming MCP request (DEPRECATED - use pkg/mcp.MCPRequest)
 type MCPRequest struct {
 	ID     string      `json:"id"`
 	Method string      `json:"method"`
 	Params interface{} `json:"params"`
 }
 
+// MCPResponse represents an MCP response (DEPRECATED - use pkg/mcp.MCPResponse)
 type MCPResponse struct {
 	ID     string      `json:"id"`
 	Result interface{} `json:"result,omitempty"`
 	Error  *MCPError   `json:"error,omitempty"`
 }
 
+// MCPError represents an MCP error response (DEPRECATED - use pkg/mcp.MCPError)
 type MCPError struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
@@ -103,23 +72,18 @@ type MCPError struct {
 // SPECIALIZED TOOL TYPES (non-duplicated from main interfaces)
 // =============================================================================
 
-// ToolFactory creates new instances of tools
-// Returns interface{} to avoid import cycles - actual type is mcp.Tool
+// Legacy ToolFactory type for compatibility (returns interface{} to avoid import cycles)
 type ToolFactory func() interface{}
 
 // ArgConverter converts generic arguments to tool-specific types
-// NOTE: ToolArgs interface is defined in pkg/mcp/interfaces.go
 type ArgConverter func(args map[string]interface{}) (interface{}, error)
 
 // ResultConverter converts tool-specific results to generic types
-// NOTE: ToolResult interface is defined in pkg/mcp/interfaces.go
 type ResultConverter func(result interface{}) (map[string]interface{}, error)
 
 // =============================================================================
-// SESSION TYPES (interface defined in main interfaces file)
+// SESSION TYPES
 // =============================================================================
-
-// NOTE: Session interface is now defined in pkg/mcp/interfaces.go
 
 // SessionState holds the unified session state
 type SessionState struct {
@@ -173,23 +137,16 @@ type SessionMetadata struct {
 }
 
 // =============================================================================
-// TRANSPORT TYPES (interface defined in main interfaces file)
+// TRANSPORT TYPES
 // =============================================================================
 
-// NOTE: Transport interface is now defined above with RequestHandler
-// NOTE: MCP types are also defined above with Transport
-
 // =============================================================================
-// ORCHESTRATOR TYPES (interface defined in main interfaces file)
+// ORCHESTRATOR TYPES
 // =============================================================================
 
-// NOTE: Orchestrator interface is now defined in pkg/mcp/interfaces.go
-
 // =============================================================================
-// SESSION MANAGER TYPES (interface defined in main interfaces file)
+// SESSION MANAGER TYPES
 // =============================================================================
-
-// NOTE: SessionManager interface is now defined in pkg/mcp/interfaces.go
 
 // =============================================================================
 // SUPPORTING TYPES
@@ -252,11 +209,8 @@ type VulnerabilityCount struct {
 }
 
 // =============================================================================
-// FACTORY AND REGISTRY TYPES (interface defined in main interfaces file)
+// FACTORY AND REGISTRY TYPES
 // =============================================================================
-
-// NOTE: ToolRegistry interface is now defined in pkg/mcp/interfaces.go
-// NOTE: ToolFactory is already defined above in SPECIALIZED TOOL TYPES section
 
 // =============================================================================
 // AI CONTEXT INTERFACES
@@ -607,11 +561,10 @@ type TokenUsage struct {
 // HEALTH AND MONITORING TYPES (interface defined in main interfaces file)
 // =============================================================================
 
-// HealthChecker interface is now defined in pkg/mcp/interfaces.go
+// HealthChecker interface and all health monitoring types are now defined in pkg/mcp/interfaces.go
+// DEPRECATED: These types maintained for backward compatibility during migration
 
-// NOTE: HealthChecker interface is now defined above
-
-// SystemResources represents system resource information
+// SystemResources represents system resource information (DEPRECATED - use pkg/mcp.SystemResources)
 type SystemResources struct {
 	CPUUsage    float64   `json:"cpu_usage_percent"`
 	MemoryUsage float64   `json:"memory_usage_percent"`
@@ -622,7 +575,7 @@ type SystemResources struct {
 	LastUpdated time.Time `json:"last_updated"`
 }
 
-// SessionHealthStats represents session-related health statistics
+// SessionHealthStats represents session-related health statistics (DEPRECATED)
 type SessionHealthStats struct {
 	ActiveSessions    int     `json:"active_sessions"`
 	TotalSessions     int     `json:"total_sessions"`
@@ -631,7 +584,7 @@ type SessionHealthStats struct {
 	SessionErrors     int     `json:"session_errors_last_hour"`
 }
 
-// CircuitBreakerStatus represents the status of a circuit breaker
+// CircuitBreakerStatus represents the status of a circuit breaker (DEPRECATED)
 type CircuitBreakerStatus struct {
 	State         string    `json:"state"` // open, closed, half-open
 	FailureCount  int       `json:"failure_count"`
@@ -641,14 +594,7 @@ type CircuitBreakerStatus struct {
 	SuccessCount  int64     `json:"success_count"`
 }
 
-// Circuit breaker states
-const (
-	CircuitBreakerClosed   = "closed"
-	CircuitBreakerOpen     = "open"
-	CircuitBreakerHalfOpen = "half-open"
-)
-
-// ServiceHealth represents the health of an external service
+// ServiceHealth represents the health of an external service (DEPRECATED)
 type ServiceHealth struct {
 	Name         string                 `json:"name"`
 	Status       string                 `json:"status"` // healthy, degraded, unhealthy
@@ -658,7 +604,7 @@ type ServiceHealth struct {
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// JobQueueStats represents job queue statistics
+// JobQueueStats represents job queue statistics (DEPRECATED)
 type JobQueueStats struct {
 	QueuedJobs      int     `json:"queued_jobs"`
 	RunningJobs     int     `json:"running_jobs"`
@@ -667,7 +613,7 @@ type JobQueueStats struct {
 	AverageWaitTime float64 `json:"average_wait_time_seconds"`
 }
 
-// RecentError represents a recent error for debugging
+// RecentError represents a recent error for debugging (DEPRECATED)
 type RecentError struct {
 	Timestamp time.Time              `json:"timestamp"`
 	Message   string                 `json:"message"`
@@ -677,22 +623,25 @@ type RecentError struct {
 }
 
 // =============================================================================
-// PROGRESS TRACKING TYPES (interface defined in main interfaces file)
+// PROGRESS TRACKING TYPES
 // =============================================================================
-
-// NOTE: ProgressReporter interface is now defined in pkg/mcp/interfaces.go
 // ProgressTracker provides centralized progress reporting for tools
 type ProgressTracker interface {
 	// RunWithProgress executes an operation with standardized progress reporting
 	RunWithProgress(
 		ctx context.Context,
 		operation string,
-		stages []ProgressStage,
+		stages []LocalProgressStage,
 		fn func(ctx context.Context, reporter interface{}) error,
 	) error
 }
 
-// NOTE: ProgressStage is defined above with ProgressReporter
+// LocalProgressStage represents a stage in a multi-step operation (local copy to avoid import cycles)
+type LocalProgressStage struct {
+	Name        string  // Human-readable stage name
+	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
+	Description string  // Optional detailed description
+}
 
 // SessionData represents session information for management tools
 type SessionData struct {
@@ -717,12 +666,8 @@ type SessionManagerStats struct {
 }
 
 // =============================================================================
-// BASE TOOL INTERFACES (migrated from tools/base)
+// BASE TOOL INTERFACES
 // =============================================================================
-
-// NOTE: BaseAnalyzer and BaseValidator interfaces are defined in their respective packages:
-// - BaseAnalyzer: pkg/mcp/internal/tools/base/analyzer.go
-// - BaseValidator: pkg/mcp/internal/tools/base/validator.go
 
 // BaseAnalysisOptions provides common options for analysis
 type BaseAnalysisOptions struct {
