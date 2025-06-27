@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/runtime"
 	"github.com/rs/zerolog"
 )
@@ -91,29 +92,18 @@ func (s *ErrorService) HandleError(ctx context.Context, err error, context Error
 
 // enrichError enriches an error with additional context
 func (s *ErrorService) enrichError(err error, context ErrorContext) error {
-	// If it's already a ToolError, add context
-	if toolErr, ok := err.(*runtime.ToolError); ok {
-		toolErr.Context.Tool = context.Tool
-		toolErr.Context.Operation = context.Operation
-		toolErr.Context.Stage = context.Stage
-		toolErr.Context.SessionID = context.SessionID
+	// Try to convert to CoreError first
+	coreErr := errors.WrapError(err, context.Tool, context.Operation)
 
-		// Merge fields
-		for k, v := range context.Fields {
-			toolErr.WithContext(k, v)
-		}
+	// Enrich with context information
+	coreErr = coreErr.WithSession(context.SessionID, context.Tool, context.Stage, "")
 
-		return toolErr
+	// Add custom fields
+	for k, v := range context.Fields {
+		coreErr = coreErr.WithContext(k, v)
 	}
 
-	// Wrap as ToolError
-	return runtime.NewErrorBuilder("WRAPPED_ERROR", err.Error()).
-		WithCause(err).
-		WithTool(context.Tool).
-		WithOperation(context.Operation).
-		WithStage(context.Stage).
-		WithSessionID(context.SessionID).
-		Build()
+	return coreErr
 }
 
 // GetMetrics returns error metrics

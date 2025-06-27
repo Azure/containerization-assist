@@ -97,8 +97,8 @@ type JobManager interface {
 	UpdateJobStatus(jobID, status string, progress float64, result map[string]interface{})
 }
 
-// ValidateDeploymentTool handles Kubernetes deployment validation
-type ValidateDeploymentTool struct {
+// AtomicValidateDeploymentTool handles Kubernetes deployment validation
+type AtomicValidateDeploymentTool struct {
 	logger        zerolog.Logger
 	workspaceBase string
 	clients       *clients.Clients
@@ -106,7 +106,7 @@ type ValidateDeploymentTool struct {
 }
 
 // NewValidateDeploymentTool creates a new validation tool
-func NewValidateDeploymentTool(logger zerolog.Logger, workspaceBase string, jobManager JobManager, clientsObj *clients.Clients) *ValidateDeploymentTool {
+func NewAtomicValidateDeploymentTool(logger zerolog.Logger, workspaceBase string, jobManager JobManager, clientsObj *clients.Clients) *AtomicValidateDeploymentTool {
 	// Ensure Docker client is available
 	if clientsObj != nil && clientsObj.Docker == nil {
 		logger.Warn().Msg("Docker client not available")
@@ -117,7 +117,7 @@ func NewValidateDeploymentTool(logger zerolog.Logger, workspaceBase string, jobM
 		logger.Warn().Msg("Kind client not available")
 	}
 
-	return &ValidateDeploymentTool{
+	return &AtomicValidateDeploymentTool{
 		logger:        logger,
 		workspaceBase: workspaceBase,
 		jobManager:    jobManager,
@@ -126,7 +126,7 @@ func NewValidateDeploymentTool(logger zerolog.Logger, workspaceBase string, jobM
 }
 
 // ExecuteTyped validates deployment to Kind cluster (typed version)
-func (t *ValidateDeploymentTool) ExecuteTyped(ctx context.Context, args ValidateDeploymentArgs) (*ValidateDeploymentResult, error) {
+func (t *AtomicValidateDeploymentTool) ExecuteTyped(ctx context.Context, args ValidateDeploymentArgs) (*ValidateDeploymentResult, error) {
 	// Create base response with versioning
 	response := &ValidateDeploymentResult{
 		BaseToolResponse: types.NewBaseResponse("validate_deployment", args.SessionID, args.DryRun),
@@ -171,7 +171,7 @@ func (t *ValidateDeploymentTool) ExecuteTyped(ctx context.Context, args Validate
 }
 
 // performValidation performs the actual validation
-func (t *ValidateDeploymentTool) performValidation(ctx context.Context, args ValidateDeploymentArgs) (*ValidateDeploymentResult, error) {
+func (t *AtomicValidateDeploymentTool) performValidation(ctx context.Context, args ValidateDeploymentArgs) (*ValidateDeploymentResult, error) {
 	startTime := time.Now()
 	response := &ValidateDeploymentResult{
 		BaseToolResponse: types.NewBaseResponse("validate_deployment", args.SessionID, args.DryRun),
@@ -288,7 +288,7 @@ func (t *ValidateDeploymentTool) performValidation(ctx context.Context, args Val
 }
 
 // ensureKindCluster checks or creates a Kind cluster
-func (t *ValidateDeploymentTool) ensureKindCluster(ctx context.Context, args ValidateDeploymentArgs) (*KindClusterInfo, error) {
+func (t *AtomicValidateDeploymentTool) ensureKindCluster(ctx context.Context, args ValidateDeploymentArgs) (*KindClusterInfo, error) {
 	info := &KindClusterInfo{
 		Name:   args.ClusterName,
 		Status: "unknown",
@@ -337,7 +337,7 @@ func (t *ValidateDeploymentTool) ensureKindCluster(ctx context.Context, args Val
 }
 
 // getKubernetesClient gets a Kubernetes client for the Kind cluster
-func (t *ValidateDeploymentTool) getKubernetesClient(clusterName string) (k8s.KubeRunner, error) {
+func (t *AtomicValidateDeploymentTool) getKubernetesClient(clusterName string) (k8s.KubeRunner, error) {
 	// Use the Kube client from clients
 	if t.clients == nil || t.clients.Kube == nil {
 		return nil, fmt.Errorf("kubernetes client not available")
@@ -353,7 +353,7 @@ func (t *ValidateDeploymentTool) getKubernetesClient(clusterName string) (k8s.Ku
 }
 
 // getPodStatus gets the status of pods in the namespace
-func (t *ValidateDeploymentTool) getPodStatus(ctx context.Context, client k8s.KubeRunner, namespace string) ([]PodStatusInfo, error) {
+func (t *AtomicValidateDeploymentTool) getPodStatus(ctx context.Context, client k8s.KubeRunner, namespace string) ([]PodStatusInfo, error) {
 	// For now, return mock data
 	// In production, would use client.GetPods(ctx, namespace, "")
 	return []PodStatusInfo{
@@ -377,7 +377,7 @@ func (t *ValidateDeploymentTool) getPodStatus(ctx context.Context, client k8s.Ku
 }
 
 // getServiceStatus gets the status of services in the namespace
-func (t *ValidateDeploymentTool) getServiceStatus(ctx context.Context, client k8s.KubeRunner, namespace string) ([]ServiceStatusInfo, error) {
+func (t *AtomicValidateDeploymentTool) getServiceStatus(ctx context.Context, client k8s.KubeRunner, namespace string) ([]ServiceStatusInfo, error) {
 	// For now, return mock data
 	// In production, would parse kubectl get services output
 	return []ServiceStatusInfo{
@@ -393,7 +393,7 @@ func (t *ValidateDeploymentTool) getServiceStatus(ctx context.Context, client k8
 }
 
 // performHealthCheck performs HTTP health check
-func (t *ValidateDeploymentTool) performHealthCheck(ctx context.Context, service ServiceStatusInfo, path string) HealthCheckResult {
+func (t *AtomicValidateDeploymentTool) performHealthCheck(ctx context.Context, service ServiceStatusInfo, path string) HealthCheckResult {
 	result := HealthCheckResult{
 		Checked:  true,
 		Endpoint: fmt.Sprintf("http://%s%s", service.ClusterIP, path),
@@ -408,7 +408,7 @@ func (t *ValidateDeploymentTool) performHealthCheck(ctx context.Context, service
 }
 
 // Execute implements the unified Tool interface
-func (t *ValidateDeploymentTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+func (t *AtomicValidateDeploymentTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	// Convert generic args to typed args
 	var deployArgs ValidateDeploymentArgs
 
@@ -433,7 +433,7 @@ func (t *ValidateDeploymentTool) Execute(ctx context.Context, args interface{}) 
 }
 
 // Validate implements the unified Tool interface
-func (t *ValidateDeploymentTool) Validate(ctx context.Context, args interface{}) error {
+func (t *AtomicValidateDeploymentTool) Validate(ctx context.Context, args interface{}) error {
 	var deployArgs ValidateDeploymentArgs
 
 	switch a := args.(type) {
@@ -461,7 +461,7 @@ func (t *ValidateDeploymentTool) Validate(ctx context.Context, args interface{})
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *ValidateDeploymentTool) GetMetadata() mcptypes.ToolMetadata {
+func (t *AtomicValidateDeploymentTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:         "validate_deployment",
 		Description:  "Validates Kubernetes deployments on Kind clusters with comprehensive health checks",

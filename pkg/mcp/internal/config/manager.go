@@ -47,6 +47,7 @@ type AnalyzerConfig struct {
 	EnableDependencyScanning bool          `yaml:"enable_dependency_scanning" json:"enable_dependency_scanning" env:"MCP_ANALYZER_ENABLE_DEPENDENCY_SCANNING"`
 	CacheResults             bool          `yaml:"cache_results" json:"cache_results" env:"MCP_ANALYZER_CACHE_RESULTS"`
 	CacheTTL                 time.Duration `yaml:"cache_ttl" json:"cache_ttl" env:"MCP_ANALYZER_CACHE_TTL"`
+	UseRefactoredDockerfile  bool          `yaml:"use_refactored_dockerfile" json:"use_refactored_dockerfile" env:"USE_REFACTORED_DOCKERFILE"`
 }
 
 // TransportConfig contains transport-related configuration

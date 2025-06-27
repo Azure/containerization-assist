@@ -12,6 +12,9 @@ import (
 type AnalyzerHelper struct {
 	analyzer              mcptypes.AIAnalyzer
 	enhancedBuildAnalyzer *build.EnhancedBuildAnalyzer
+	repositoryAdapter     *RepositoryAnalyzerAdapter
+	toolFactory           *ToolFactory
+	sessionManager        mcptypes.ToolSessionManager
 	logger                zerolog.Logger
 }
 
@@ -21,6 +24,28 @@ func NewAnalyzerHelper(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *Ana
 		analyzer: analyzer,
 		logger:   logger,
 	}
+}
+
+// NewAnalyzerHelperWithFactory creates a new analyzer helper with tool factory support
+func NewAnalyzerHelperWithFactory(
+	analyzer mcptypes.AIAnalyzer,
+	toolFactory *ToolFactory,
+	sessionManager mcptypes.ToolSessionManager,
+	logger zerolog.Logger,
+) *AnalyzerHelper {
+	helper := &AnalyzerHelper{
+		analyzer:       analyzer,
+		toolFactory:    toolFactory,
+		sessionManager: sessionManager,
+		logger:         logger,
+	}
+
+	// Create the repository analyzer adapter
+	if toolFactory != nil && sessionManager != nil {
+		helper.repositoryAdapter = NewRepositoryAnalyzerAdapter(toolFactory, sessionManager, logger)
+	}
+
+	return helper
 }
 
 // SetupBuildToolAnalyzer sets up analyzer and fixing mixin for build tools
@@ -71,11 +96,16 @@ func (h *AnalyzerHelper) GetEnhancedBuildAnalyzer() *build.EnhancedBuildAnalyzer
 // ensureEnhancedAnalyzer creates the enhanced build analyzer if it doesn't exist
 func (h *AnalyzerHelper) ensureEnhancedAnalyzer() {
 	if h.enhancedBuildAnalyzer == nil && h.analyzer != nil {
-		// Repository analyzer parameter is currently nil as it requires an adapter
-		// to bridge between AtomicAnalyzeRepositoryTool and RepositoryAnalyzerInterface.
-		// This adapter would prevent circular dependencies between analyze and build packages.
-		// See REPOSITORY_ANALYZER_ADAPTER_REQUIREMENTS.md for implementation details.
-		h.enhancedBuildAnalyzer = build.NewEnhancedBuildAnalyzer(h.analyzer, nil, h.logger)
+		// Use the repository analyzer adapter if available, otherwise nil
+		var repositoryAnalyzer build.RepositoryAnalyzerInterface
+		if h.repositoryAdapter != nil {
+			repositoryAnalyzer = h.repositoryAdapter
+			h.logger.Info().Msg("Using RepositoryAnalyzerAdapter for enhanced build analyzer")
+		} else {
+			h.logger.Warn().Msg("No repository adapter available - enhanced build analyzer will have limited functionality")
+		}
+
+		h.enhancedBuildAnalyzer = build.NewEnhancedBuildAnalyzer(h.analyzer, repositoryAnalyzer, h.logger)
 	}
 }
 
