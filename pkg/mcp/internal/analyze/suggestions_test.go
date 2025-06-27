@@ -116,148 +116,98 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 	})
 }
 
+// Helper function to check if suggestions contain expected text
+func assertSuggestionContains(t *testing.T, suggestions []string, expected string) {
+	t.Helper()
+	for _, suggestion := range suggestions {
+		if contains(suggestion, expected) {
+			return
+		}
+	}
+	t.Errorf("Expected suggestion containing '%s'", expected)
+}
+
+// Helper function to check if suggestions do NOT contain expected text
+func assertSuggestionNotContains(t *testing.T, suggestions []string, notExpected string) {
+	t.Helper()
+	for _, suggestion := range suggestions {
+		if contains(suggestion, notExpected) {
+			t.Errorf("Should not have suggestion containing '%s'", notExpected)
+			return
+		}
+	}
+}
+
 // Test generateNextStepSuggestions function
 func TestGenerateNextStepSuggestions(t *testing.T) {
 	logger := zerolog.Nop()
 	analyzer := NewAnalyzer(logger)
 
 	t.Run("no docker or k8s files", func(t *testing.T) {
-		analysisResult := &analysis.AnalysisResult{
-			Language: "go",
-		}
-
-		context := &AnalysisContext{
-			DockerFiles: []string{}, // No docker files
-			K8sFiles:    []string{}, // No k8s files
-		}
-
-		suggestions := analyzer.generateNextStepSuggestions(analysisResult, context)
-
-		if len(suggestions) == 0 {
-			t.Error("Expected at least one suggestion")
-		}
-
-		// Should suggest generating Dockerfile
-		found := false
-		for _, suggestion := range suggestions {
-			if contains(suggestion, "Generate a Dockerfile") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("Expected Dockerfile generation suggestion")
-		}
-
-		// Should suggest building image
-		found = false
-		for _, suggestion := range suggestions {
-			if contains(suggestion, "Build container image") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("Expected build image suggestion")
-		}
-
-		// Should suggest security scanning
-		found = false
-		for _, suggestion := range suggestions {
-			if contains(suggestion, "security vulnerabilities") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("Expected security scanning suggestion")
-		}
-
-		// Should suggest generating K8s manifests
-		found = false
-		for _, suggestion := range suggestions {
-			if contains(suggestion, "Generate Kubernetes manifests") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("Expected Kubernetes manifests generation suggestion")
-		}
-
-		// Should suggest secrets scanning
-		found = false
-		for _, suggestion := range suggestions {
-			if contains(suggestion, "Scan for secrets") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("Expected secrets scanning suggestion")
-		}
+		testGenerateNextStepSuggestionsNoFiles(t, analyzer)
 	})
 
 	t.Run("with existing docker and k8s files", func(t *testing.T) {
-		analysisResult := &analysis.AnalysisResult{
-			Language: "go",
-		}
-
-		context := &AnalysisContext{
-			DockerFiles: []string{"Dockerfile"},      // Has docker file
-			K8sFiles:    []string{"deployment.yaml"}, // Has k8s files
-		}
-
-		suggestions := analyzer.generateNextStepSuggestions(analysisResult, context)
-
-		if len(suggestions) == 0 {
-			t.Error("Expected at least one suggestion")
-		}
-
-		// Should suggest reviewing existing Dockerfile
-		found := false
-		for _, suggestion := range suggestions {
-			if contains(suggestion, "Review and optimize") && contains(suggestion, "Dockerfile") {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("Expected Dockerfile review suggestion")
-		}
-
-		// Should NOT suggest generating K8s manifests (since they exist)
-		found = false
-		for _, suggestion := range suggestions {
-			if contains(suggestion, "Generate Kubernetes manifests") {
-				found = true
-				break
-			}
-		}
-		if found {
-			t.Error("Should not suggest generating K8s manifests when they already exist")
-		}
-
-		// Should still suggest build, security, and secrets scanning
-		expectedSuggestions := []string{
-			"Build container image",
-			"security vulnerabilities",
-			"Scan for secrets",
-		}
-
-		for _, expected := range expectedSuggestions {
-			found = false
-			for _, suggestion := range suggestions {
-				if contains(suggestion, expected) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Expected suggestion containing '%s'", expected)
-			}
-		}
+		testGenerateNextStepSuggestionsWithFiles(t, analyzer)
 	})
+}
+
+func testGenerateNextStepSuggestionsNoFiles(t *testing.T, analyzer *Analyzer) {
+	analysisResult := &analysis.AnalysisResult{Language: "go"}
+	context := &AnalysisContext{
+		DockerFiles: []string{}, // No docker files
+		K8sFiles:    []string{}, // No k8s files
+	}
+
+	suggestions := analyzer.generateNextStepSuggestions(analysisResult, context)
+
+	if len(suggestions) == 0 {
+		t.Error("Expected at least one suggestion")
+	}
+
+	// Check expected suggestions
+	expectedSuggestions := []string{
+		"Generate a Dockerfile",
+		"Build container image",
+		"security vulnerabilities",
+		"Generate Kubernetes manifests",
+		"Scan for secrets",
+	}
+
+	for _, expected := range expectedSuggestions {
+		assertSuggestionContains(t, suggestions, expected)
+	}
+}
+
+func testGenerateNextStepSuggestionsWithFiles(t *testing.T, analyzer *Analyzer) {
+	analysisResult := &analysis.AnalysisResult{Language: "go"}
+	context := &AnalysisContext{
+		DockerFiles: []string{"Dockerfile"},      // Has docker file
+		K8sFiles:    []string{"deployment.yaml"}, // Has k8s files
+	}
+
+	suggestions := analyzer.generateNextStepSuggestions(analysisResult, context)
+
+	if len(suggestions) == 0 {
+		t.Error("Expected at least one suggestion")
+	}
+
+	// Should suggest reviewing existing Dockerfile
+	assertSuggestionContains(t, suggestions, "Review and optimize")
+
+	// Should NOT suggest generating K8s manifests (since they exist)
+	assertSuggestionNotContains(t, suggestions, "Generate Kubernetes manifests")
+
+	// Should still suggest build, security, and secrets scanning
+	stillExpected := []string{
+		"Build container image",
+		"security vulnerabilities",
+		"Scan for secrets",
+	}
+
+	for _, expected := range stillExpected {
+		assertSuggestionContains(t, suggestions, expected)
+	}
 }
 
 // Note: contains function is defined in helper_functions_test.go

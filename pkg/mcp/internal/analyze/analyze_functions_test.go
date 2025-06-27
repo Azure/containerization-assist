@@ -55,12 +55,9 @@ func TestAnalyze_Function(t *testing.T) {
 	}
 }
 
-// Test generateAnalysisContext function
-func TestGenerateAnalysisContext_Function(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-
-	// Create various test files to trigger different code paths
+// Helper function to create test repository structure
+func createTestRepository(t *testing.T, tempDir string) {
+	t.Helper()
 	testFiles := map[string]string{
 		"main.go":                  "package main\n\nfunc main() {}\n",
 		"package.json":             `{"name": "test"}`,
@@ -90,12 +87,14 @@ func TestGenerateAnalysisContext_Function(t *testing.T) {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
 	}
+}
 
+// Helper to run analysis and get context
+func runAnalysisAndGetContext(t *testing.T, tempDir string) *AnalysisContext {
+	t.Helper()
 	logger := zerolog.Nop()
 	analyzer := NewAnalyzer(logger)
 
-	// Use reflection or access the internal method through a test helper
-	// Since generateAnalysisContext is internal, we'll test it through Analyze
 	options := AnalysisOptions{
 		RepoPath:     tempDir,
 		Context:      "containerization",
@@ -106,71 +105,88 @@ func TestGenerateAnalysisContext_Function(t *testing.T) {
 	ctx := context.Background()
 	result, err := analyzer.Analyze(ctx, options)
 	if err != nil {
-		t.Errorf("Analyze should not return error, got: %v", err)
+		t.Fatalf("Analyze should not return error, got: %v", err)
 	}
 
-	context := result.Context
-	if context == nil {
+	if result.Context == nil {
 		t.Fatal("Context should not be nil")
 	}
 
-	// Verify various aspects of the generated context
+	return result.Context
+}
+
+// Test generateAnalysisContext function
+func TestGenerateAnalysisContext_Function(t *testing.T) {
+	tempDir := t.TempDir()
+	createTestRepository(t, tempDir)
+	context := runAnalysisAndGetContext(t, tempDir)
+
+	t.Run("basic file analysis", func(t *testing.T) {
+		testBasicFileAnalysis(t, context)
+	})
+
+	t.Run("file type detection", func(t *testing.T) {
+		testFileTypeDetection(t, context)
+	})
+
+	t.Run("repository insights", func(t *testing.T) {
+		testRepositoryInsights(t, context)
+	})
+
+	t.Run("suggestions generation", func(t *testing.T) {
+		testSuggestionsGeneration(t, context)
+	})
+}
+
+func testBasicFileAnalysis(t *testing.T, context *AnalysisContext) {
 	if context.FilesAnalyzed == 0 {
 		t.Error("Should have analyzed at least some files")
 	}
 
+	if context.RepositorySize == 0 {
+		t.Error("Repository size should be greater than 0")
+	}
+}
+
+func testFileTypeDetection(t *testing.T, context *AnalysisContext) {
 	// Check config files detection
-	foundConfigFiles := false
+	configFound := false
 	for _, file := range context.ConfigFilesFound {
 		if file == "package.json" {
-			foundConfigFiles = true
+			configFound = true
 			break
 		}
 	}
-	if !foundConfigFiles {
+	if !configFound {
 		t.Error("Should have detected package.json as config file")
 	}
 
-	// Check test files detection - may or may not be detected depending on implementation
-	if len(context.TestFilesFound) > 0 {
-		t.Logf("Test files detected: %v", context.TestFilesFound)
-	}
-
 	// Check build files detection
-	foundBuildFiles := false
+	buildFound := false
 	for _, file := range context.BuildFilesFound {
 		if file == "Makefile" {
-			foundBuildFiles = true
+			buildFound = true
 			break
 		}
 	}
-	if !foundBuildFiles {
+	if !buildFound {
 		t.Error("Should have detected Makefile as build file")
 	}
 
 	// Check Docker files detection
-	foundDockerFiles := false
+	dockerFound := false
 	for _, file := range context.DockerFiles {
 		if file == "Dockerfile" || file == "docker-compose.yml" {
-			foundDockerFiles = true
+			dockerFound = true
 			break
 		}
 	}
-	if !foundDockerFiles {
+	if !dockerFound {
 		t.Error("Should have detected Docker files")
 	}
+}
 
-	// Check K8s files detection - may or may not be detected depending on implementation
-	if len(context.K8sFiles) > 0 {
-		t.Logf("K8s files detected: %v", context.K8sFiles)
-	}
-
-	// Check database files detection - may or may not be detected depending on implementation
-	if len(context.DatabaseFiles) > 0 {
-		t.Logf("Database files detected: %v", context.DatabaseFiles)
-	}
-
-	// Check repository insights
+func testRepositoryInsights(t *testing.T, context *AnalysisContext) {
 	if !context.HasGitIgnore {
 		t.Error("Should have detected .gitignore")
 	}
@@ -183,18 +199,14 @@ func TestGenerateAnalysisContext_Function(t *testing.T) {
 	if !context.HasCI {
 		t.Error("Should have detected CI configuration")
 	}
+}
 
-	// Check that suggestions were generated
+func testSuggestionsGeneration(t *testing.T, context *AnalysisContext) {
 	if len(context.ContainerizationSuggestions) == 0 {
 		t.Error("Should have generated containerization suggestions")
 	}
 	if len(context.NextStepSuggestions) == 0 {
 		t.Error("Should have generated next step suggestions")
-	}
-
-	// Check repository size calculation
-	if context.RepositorySize == 0 {
-		t.Error("Repository size should be greater than 0")
 	}
 }
 
