@@ -5,7 +5,7 @@ BASELINE_FILE=".lint-baseline"
 LINT_ARGS="${@:-./pkg/mcp/...}"
 
 # Get current issue count
-CURRENT_COUNT=$(golangci-lint run --out-format json $LINT_ARGS 2>/dev/null | jq '.Issues | length' || echo "999")
+CURRENT_COUNT=$(golangci-lint run $LINT_ARGS 2>&1 | grep -E "^[^:]+:[0-9]+:[0-9]+:" | wc -l || echo "999")
 
 # Get baseline count
 if [ -f "$BASELINE_FILE" ]; then

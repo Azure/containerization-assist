@@ -302,22 +302,245 @@ func (r *MockDeployResult) GetMetadataForAI() map[string]interface{} {
 
 // Test unified AI context integration
 
-func TestUnifiedAIContextIntegration(t *testing.T) {
-	t.Run("Successful Build Tool Context", func(t *testing.T) {
-		testSuccessfulBuildContext(t)
-	})
+func TestSuccessfulBuildToolContext(t *testing.T) {
+	mockBuild := createSuccessfulMockBuild()
 
-	t.Run("Failed Build Tool Context", func(t *testing.T) {
-		testFailedBuildContext(t)
-	})
+	// Test Assessable interface
+	testAssessableInterface(t, mockBuild, 80, types.SeverityLow)
 
-	t.Run("Successful Deploy Tool Context", func(t *testing.T) {
-		testSuccessfulDeployContext(t)
-	})
+	// Test Recommendable interface
+	testRecommendableInterface(t, mockBuild, false)
 
-	t.Run("Failed Deploy Tool Context", func(t *testing.T) {
-		testFailedDeployContext(t)
+	// Test ContextEnriched interface
+	testContextEnrichedInterface(t, mockBuild, "mock_build", true)
+}
+
+func createSuccessfulMockBuild() *MockBuildResult {
+	return &MockBuildResult{
+		Success:       true,
+		SessionID:     "test-session-1",
+		ImageName:     "test-app",
+		ImageTag:      "latest",
+		FullImageRef:  "test-app:latest",
+		BuildDuration: 1 * time.Minute,
+		SecurityScan: &coredocker.ScanResult{
+			Success: true,
+			Summary: coresecurity.VulnerabilitySummary{
+				Critical: 0,
+				High:     0,
+				Total:    0,
+			},
+		},
+	}
+}
+
+func testAssessableInterface(t *testing.T, mockResult interface{}, minScore int, expectedRisk string) {
+	assessable, ok := mockResult.(interface {
+		CalculateScore() int
+		DetermineRiskLevel() string
+		GetStrengths() []string
+		GetChallenges() []string
 	})
+	if !ok {
+		t.Fatal("Mock does not implement Assessable interface")
+	}
+
+	score := assessable.CalculateScore()
+	if score < minScore {
+		t.Errorf("Expected score >= %d, got %d", minScore, score)
+	}
+
+	riskLevel := assessable.DetermineRiskLevel()
+	if riskLevel != expectedRisk {
+		t.Errorf("Expected risk level %s, got %s", expectedRisk, riskLevel)
+	}
+
+	strengths := assessable.GetStrengths()
+	challenges := assessable.GetChallenges()
+
+	if minScore >= 80 && len(strengths) == 0 {
+		t.Error("Expected strengths for high-scoring result")
+	}
+	if minScore < 40 && len(challenges) == 0 {
+		t.Error("Expected challenges for low-scoring result")
+	}
+}
+
+func testRecommendableInterface(t *testing.T, mockResult interface{}, expectMany bool) {
+	recommendable, ok := mockResult.(interface {
+		GenerateRecommendations() []Recommendation
+		CreateRemediationPlan() *RemediationPlan
+	})
+	if !ok {
+		t.Fatal("Mock does not implement Recommendable interface")
+	}
+
+	recommendations := recommendable.GenerateRecommendations()
+	if expectMany && len(recommendations) == 0 {
+		t.Error("Expected recommendations for failed result")
+	}
+	if !expectMany && len(recommendations) > 1 {
+		t.Error("Expected minimal recommendations for successful result")
+	}
+
+	plan := recommendable.CreateRemediationPlan()
+	if plan == nil {
+		t.Error("Expected remediation plan to be created")
+	}
+}
+
+func testContextEnrichedInterface(t *testing.T, mockResult interface{}, expectedTool string, expectSuccess bool) {
+	enriched, ok := mockResult.(interface {
+		GetAIContext() *ToolContext
+		GetMetadataForAI() map[string]interface{}
+	})
+	if !ok {
+		t.Fatal("Mock does not implement ContextEnriched interface")
+	}
+
+	context := enriched.GetAIContext()
+	if context == nil {
+		t.Error("Expected AI context to be created")
+	}
+	if context.ToolName != expectedTool {
+		t.Errorf("Expected tool name '%s', got %s", expectedTool, context.ToolName)
+	}
+
+	metadata := enriched.GetMetadataForAI()
+	if metadata["success"] != expectSuccess {
+		t.Errorf("Expected success=%v in metadata", expectSuccess)
+	}
+}
+
+func TestFailedBuildToolContext(t *testing.T) {
+	mockBuild := createFailedMockBuild()
+
+	// Test Assessable interface
+	testAssessableInterface(t, mockBuild, 0, types.SeverityHigh)
+
+	// Test Recommendable interface with expectation of many recommendations
+	testRecommendableInterface(t, mockBuild, true)
+
+	// Test for critical fix recommendation
+	recommendations := mockBuild.GenerateRecommendations()
+	if !hasCriticalFixRecommendation(recommendations) {
+		t.Error("Expected critical fix recommendation for failed build")
+	}
+}
+
+func createFailedMockBuild() *MockBuildResult {
+	return &MockBuildResult{
+		Success:      false,
+		SessionID:    "test-session-2",
+		ImageName:    "failed-app",
+		ImageTag:     "latest",
+		FullImageRef: "failed-app:latest",
+		Error: &types.RichError{
+			Code:     "BUILD_FAILED",
+			Type:     "build_error",
+			Severity: types.SeverityHigh,
+			Message:  "Docker build failed",
+		},
+	}
+}
+
+func hasCriticalFixRecommendation(recommendations []Recommendation) bool {
+	for _, rec := range recommendations {
+		if rec.Type == "fix" && rec.Priority == types.SeverityCritical {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSuccessfulDeployToolContext(t *testing.T) {
+	mockDeploy := &MockDeployResult{
+		Success:            true,
+		SessionID:          "test-session-3",
+		AppName:            "test-app",
+		Namespace:          "default",
+		ImageRef:           "test-app:latest",
+		Replicas:           3,
+		DeploymentDuration: 45 * time.Second,
+		HealthResult: &kubernetes.HealthCheckResult{
+			Success: true,
+			Summary: kubernetes.HealthSummary{
+				ReadyPods: 3,
+				TotalPods: 3,
+			},
+		},
+	}
+
+	// Test Assessable interface
+	score := mockDeploy.CalculateScore()
+	if score < 85 {
+		t.Errorf("Expected high score for successful deployment, got %d", score)
+	}
+
+	riskLevel := mockDeploy.DetermineRiskLevel()
+	if riskLevel != types.SeverityLow {
+		t.Errorf("Expected low risk for successful deployment, got %s", riskLevel)
+	}
+
+	strengths := mockDeploy.GetStrengths()
+	if len(strengths) == 0 {
+		t.Error("Expected strengths for successful deployment")
+	}
+
+	// Test ContextEnriched interface
+	context := mockDeploy.GetAIContext()
+	if context == nil {
+		t.Error("Expected AI context to be created")
+	}
+	if context.Assessment.ReadinessScore < 80 {
+		t.Errorf("Expected high readiness score, got %d", context.Assessment.ReadinessScore)
+	}
+}
+
+func TestFailedDeployToolContext(t *testing.T) {
+	mockDeploy := &MockDeployResult{
+		Success:   false,
+		SessionID: "test-session-4",
+		AppName:   "failed-app",
+		Namespace: "default",
+		ImageRef:  "failed-app:latest",
+		Replicas:  3,
+		HealthResult: &kubernetes.HealthCheckResult{
+			Success: false,
+			Summary: kubernetes.HealthSummary{
+				ReadyPods: 0,
+				TotalPods: 3,
+			},
+		},
+		Error: &types.RichError{
+			Code:     "DEPLOY_FAILED",
+			Type:     "deployment_error",
+			Severity: types.SeverityHigh,
+			Message:  "Deployment failed",
+		},
+	}
+
+	// Test Assessable interface
+	score := mockDeploy.CalculateScore()
+	if score > 40 {
+		t.Errorf("Expected low score for failed deployment, got %d", score)
+	}
+
+	riskLevel := mockDeploy.DetermineRiskLevel()
+	if riskLevel != types.SeverityHigh {
+		t.Errorf("Expected high risk for failed deployment, got %s", riskLevel)
+	}
+
+	// Test Recommendable interface
+	recommendations := mockDeploy.GenerateRecommendations()
+	if len(recommendations) == 0 {
+		t.Error("Expected recommendations for failed deployment")
+	}
+
+	plan := mockDeploy.CreateRemediationPlan()
+	if plan.Priority != types.SeverityCritical {
+		t.Error("Expected critical priority for failed deployment remediation plan")
+	}
 }
 
 func testSuccessfulBuildContext(t *testing.T) {
@@ -352,41 +575,6 @@ func testFailedDeployContext(t *testing.T) {
 	validateDeployAssessable(t, mockDeploy, 40, string(SeverityHigh))
 	validateDeployRecommendations(t, mockDeploy)
 	validateDeployRemediationPlan(t, mockDeploy)
-}
-
-func createSuccessfulMockBuild() *MockBuildResult {
-	return &MockBuildResult{
-		Success:       true,
-		SessionID:     "test-session-1",
-		ImageName:     "test-app",
-		ImageTag:      "latest",
-		FullImageRef:  "test-app:latest",
-		BuildDuration: 1 * time.Minute,
-		SecurityScan: &coredocker.ScanResult{
-			Success: true,
-			Summary: coresecurity.VulnerabilitySummary{
-				Critical: 0,
-				High:     0,
-				Total:    0,
-			},
-		},
-	}
-}
-
-func createFailedMockBuild() *MockBuildResult {
-	return &MockBuildResult{
-		Success:      false,
-		SessionID:    "test-session-2",
-		ImageName:    "failed-app",
-		ImageTag:     "latest",
-		FullImageRef: "failed-app:latest",
-		Error: &types.RichError{
-			Code:     "BUILD_FAILED",
-			Type:     "build_error",
-			Severity: string(SeverityHigh),
-			Message:  "Docker build failed",
-		},
-	}
 }
 
 func createSuccessfulMockDeploy() *MockDeployResult {

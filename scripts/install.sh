@@ -71,25 +71,15 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Get the latest release version from GitHub
+# Use latest release redirect URL
 get_latest_version() {
-    print_info "Fetching latest release information..."
+    print_info "Using latest release..."
 
-    if command_exists curl; then
-        LATEST_VERSION=$(curl -s "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    elif command_exists wget; then
-        LATEST_VERSION=$(wget -qO- "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    else
-        print_error "Neither curl nor wget found. Please install one of them."
-        exit 1
-    fi
+    # GitHub provides a direct redirect to the latest release
+    # We'll use "latest" as the version identifier and let GitHub handle the redirect
+    LATEST_VERSION="latest"
 
-    if [ -z "$LATEST_VERSION" ]; then
-        print_error "Failed to fetch latest release version"
-        exit 1
-    fi
-
-    print_info "Latest version: $LATEST_VERSION"
+    print_info "Version: $LATEST_VERSION (will redirect to actual latest)"
 }
 
 # Download the binary
@@ -97,10 +87,16 @@ download_binary() {
     local version=$1
     local platform=$2
 
-    # Construct download URL
-    local archive_name="${BINARY_NAME}_${version#v}_${platform}.tar.gz"
-    local download_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$version/$archive_name"
-    local checksum_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$version/checksums.txt"
+    # Construct download URL using latest redirect
+    if [ "$version" = "latest" ]; then
+        local download_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/${BINARY_NAME}_${platform}.tar.gz"
+        local checksum_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/latest/download/checksums.txt"
+        local archive_name="${BINARY_NAME}_${platform}.tar.gz"
+    else
+        local archive_name="${BINARY_NAME}_${version#v}_${platform}.tar.gz"
+        local download_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$version/$archive_name"
+        local checksum_url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$version/checksums.txt"
+    fi
 
     print_info "Downloading $BINARY_NAME $version for $platform..."
 

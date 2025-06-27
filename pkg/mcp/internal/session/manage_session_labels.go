@@ -124,11 +124,11 @@ func (t *AddSessionLabelTool) Execute(ctx context.Context, args interface{}) (in
 		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected AddSessionLabelArgs, got %T", args), "validation_error")
 	}
 
-	return t.ExecuteTyped(ctx, addArgs)
+	return t.ExecuteTyped(ctx, &addArgs)
 }
 
 // ExecuteTyped provides typed execution for backward compatibility
-func (t *AddSessionLabelTool) ExecuteTyped(ctx context.Context, args AddSessionLabelArgs) (*AddSessionLabelResult, error) {
+func (t *AddSessionLabelTool) ExecuteTyped(ctx context.Context, args *AddSessionLabelArgs) (*AddSessionLabelResult, error) {
 	targetSessionID := args.TargetSessionID
 	if targetSessionID == "" {
 		targetSessionID = args.SessionID
@@ -213,11 +213,11 @@ func (t *RemoveSessionLabelTool) Execute(ctx context.Context, args interface{}) 
 		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected RemoveSessionLabelArgs, got %T", args), "validation_error")
 	}
 
-	return t.ExecuteTyped(ctx, removeArgs)
+	return t.ExecuteTyped(ctx, &removeArgs)
 }
 
 // ExecuteTyped provides typed execution for backward compatibility
-func (t *RemoveSessionLabelTool) ExecuteTyped(ctx context.Context, args RemoveSessionLabelArgs) (*RemoveSessionLabelResult, error) {
+func (t *RemoveSessionLabelTool) ExecuteTyped(ctx context.Context, args *RemoveSessionLabelArgs) (*RemoveSessionLabelResult, error) {
 	targetSessionID := args.TargetSessionID
 	if targetSessionID == "" {
 		targetSessionID = args.SessionID
@@ -396,11 +396,11 @@ func (t *ListSessionLabelsTool) Execute(ctx context.Context, args interface{}) (
 		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected ListSessionLabelsArgs, got %T", args), "validation_error")
 	}
 
-	return t.ExecuteTyped(ctx, listArgs)
+	return t.ExecuteTyped(ctx, &listArgs)
 }
 
 // ExecuteTyped provides typed execution for backward compatibility
-func (t *ListSessionLabelsTool) ExecuteTyped(ctx context.Context, args ListSessionLabelsArgs) (*ListSessionLabelsResult, error) {
+func (t *ListSessionLabelsTool) ExecuteTyped(ctx context.Context, args *ListSessionLabelsArgs) (*ListSessionLabelsResult, error) {
 	t.logger.Info().
 		Bool("include_count", args.IncludeCount).
 		Msg("Listing session labels")

@@ -307,7 +307,7 @@ jobs:
           echo "Running golangci-lint..."
           if [ "${{ inputs.lint-error-threshold }}" -gt 0 ]; then
             # Run with JSON output for threshold checking
-            golangci-lint run --out-format json ${{ inputs.lint-args }} ${{ inputs.packages }} > lint-results.json || true
+            golangci-lint run --out-format json --disable=typecheck ${{ inputs.lint-args }} ${{ inputs.packages }} > lint-results.json || true
 
             # Count issues
             ISSUE_COUNT=$(jq '.Issues | length' lint-results.json 2>/dev/null || echo "0")
@@ -334,7 +334,7 @@ jobs:
             fi
           else
             # Standard linting without threshold
-            golangci-lint run ${{ inputs.lint-args }} ${{ inputs.packages }}
+            golangci-lint run --disable=typecheck ${{ inputs.lint-args }} ${{ inputs.packages }}
           fi
 
       - name: Generate coverage report

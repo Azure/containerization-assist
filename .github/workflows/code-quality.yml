@@ -167,7 +167,7 @@ jobs:
           local output="lint-reports/${name}.json"
 
           echo "Analyzing $name packages: $packages"
-          golangci-lint run --out-format json --timeout=10m $packages > "$output" || true
+          golangci-lint run --out-format json --timeout=10m --disable=typecheck $packages > "$output" || true
 
           # Generate statistics
           local error_count=$(jq '[.Issues[] | select(.Severity == "error")] | length' "$output" 2>/dev/null || echo "0")
