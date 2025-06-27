@@ -214,7 +214,7 @@ func (r *MCPToolRegistry) registerAtomicTools() {
 	r.registerTool("analyze_repository_atomic", &analyze.AtomicAnalyzeRepositoryTool{})
 
 	// Docker tools
-	r.registerTool("generate_dockerfile", &analyze.GenerateDockerfileTool{})
+	r.registerTool("generate_dockerfile", &analyze.AtomicGenerateDockerfileTool{})
 	r.registerTool("validate_dockerfile_atomic", &analyze.AtomicValidateDockerfileTool{})
 	r.registerTool("build_image_atomic", &build.AtomicBuildImageTool{})
 	r.registerTool("push_image_atomic", &build.AtomicPushImageTool{})

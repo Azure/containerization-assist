@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/config"
 	"github.com/rs/zerolog"
 )
 
@@ -34,11 +35,16 @@ type ProfiledExecutionResult struct {
 
 // NewProfiledOrchestrator creates a new profiled orchestrator wrapper
 func NewProfiledOrchestrator(orchestrator ToolOrchestrator, logger zerolog.Logger) *ProfiledOrchestrator {
-	// Check if profiling is enabled via environment variable
+	// Check if profiling is enabled via centralized config
 	enabled := true
-	if envVal := os.Getenv("MCP_PROFILING_ENABLED"); envVal != "" {
-		if val, err := strconv.ParseBool(envVal); err == nil {
-			enabled = val
+	if cfg, err := config.GetServer(); err == nil {
+		enabled = cfg.EnableProfiling
+	} else {
+		// Fallback to environment variable if config not available
+		if envVal := os.Getenv("MCP_PROFILING_ENABLED"); envVal != "" {
+			if val, err := strconv.ParseBool(envVal); err == nil {
+				enabled = val
+			}
 		}
 	}
 

@@ -1,0 +1,346 @@
+package utils
+
+import (
+	"regexp"
+	"strings"
+)
+
+// SanitizationUtils provides centralized sanitization functions
+// This consolidates duplicate sanitization functions found across:
+// - pkg/mcp/internal/orchestration/tool_registry.go (sanitizeInvopopSchema)
+// - pkg/mcp/internal/runtime/registry.go (sanitizeInvopopSchema)
+// - pkg/mcp/internal/session/workflow_provider.go (sanitizeForK8s)
+// - pkg/mcp/internal/deploy/secrets_handler.go (sanitizeSecretKey)
+
+// SanitizeForKubernetes sanitizes a string to be valid for Kubernetes resource names
+// Consolidates sanitizeForK8s function from workflow_provider.go
+func SanitizeForKubernetes(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	// Convert to lowercase
+	result := strings.ToLower(input)
+
+	// Replace non-alphanumeric characters with hyphens
+	reg := regexp.MustCompile(`[^a-z0-9]+`)
+	result = reg.ReplaceAllString(result, "-")
+
+	// Remove leading/trailing hyphens
+	result = strings.Trim(result, "-")
+
+	// Ensure it starts with alphanumeric character
+	if len(result) > 0 && !regexp.MustCompile(`^[a-z0-9]`).MatchString(result) {
+		result = "x" + result
+	}
+
+	// Limit length to 63 characters (Kubernetes limit)
+	if len(result) > 63 {
+		result = result[:63]
+	}
+
+	// Ensure it ends with alphanumeric character
+	result = strings.TrimRight(result, "-")
+	if result == "" {
+		result = "default"
+	}
+
+	return result
+}
+
+// SanitizeSecretKey sanitizes environment variable names for secrets
+// Consolidates sanitizeSecretKey function from secrets_handler.go
+func SanitizeSecretKey(envName string) string {
+	if envName == "" {
+		return ""
+	}
+
+	// Convert to uppercase
+	result := strings.ToUpper(envName)
+
+	// Replace non-alphanumeric characters with underscores
+	reg := regexp.MustCompile(`[^A-Z0-9_]+`)
+	result = reg.ReplaceAllString(result, "_")
+
+	// Remove leading/trailing underscores
+	result = strings.Trim(result, "_")
+
+	// Ensure it starts with letter or underscore
+	if len(result) > 0 && !regexp.MustCompile(`^[A-Z_]`).MatchString(result) {
+		result = "ENV_" + result
+	}
+
+	// Limit reasonable length
+	if len(result) > 100 {
+		result = result[:100]
+	}
+
+	if result == "" {
+		result = "DEFAULT_ENV"
+	}
+
+	return result
+}
+
+// SanitizeJSONSchema sanitizes JSON schemas for compatibility
+// Consolidates sanitizeInvopopSchema functions from tool_registry.go and registry.go
+func SanitizeJSONSchema(schema map[string]interface{}) map[string]interface{} {
+	if schema == nil {
+		return make(map[string]interface{})
+	}
+
+	// Create a deep copy to avoid modifying the original
+	result := make(map[string]interface{})
+	for k, v := range schema {
+		result[k] = v
+	}
+
+	// Apply schema fixes
+	sanitizeSchemaRecursive(result)
+
+	return result
+}
+
+// sanitizeSchemaRecursive applies schema sanitization recursively
+func sanitizeSchemaRecursive(schema map[string]interface{}) {
+	if schema == nil {
+		return
+	}
+
+	// Fix array types that need items
+	if schemaType, ok := schema["type"].(string); ok && schemaType == "array" {
+		if _, hasItems := schema["items"]; !hasItems {
+			// Default to string items if not specified
+			schema["items"] = map[string]interface{}{
+				"type": "string",
+			}
+		}
+	}
+
+	// Remove GitHub Copilot incompatible fields (if needed)
+	// Note: This would call the existing RemoveCopilotIncompatible function
+	// from error_sanitizer.go if available
+
+	// Recursively process properties
+	if properties, ok := schema["properties"].(map[string]interface{}); ok {
+		for _, propSchema := range properties {
+			if propMap, ok := propSchema.(map[string]interface{}); ok {
+				sanitizeSchemaRecursive(propMap)
+			}
+		}
+	}
+
+	// Recursively process items (for arrays)
+	if items, ok := schema["items"].(map[string]interface{}); ok {
+		sanitizeSchemaRecursive(items)
+	}
+
+	// Recursively process definitions
+	if definitions, ok := schema["definitions"].(map[string]interface{}); ok {
+		for _, defSchema := range definitions {
+			if defMap, ok := defSchema.(map[string]interface{}); ok {
+				sanitizeSchemaRecursive(defMap)
+			}
+		}
+	}
+}
+
+// SanitizeDockerImageName sanitizes a string to be a valid Docker image name
+func SanitizeDockerImageName(imageName string) string {
+	if imageName == "" {
+		return ""
+	}
+
+	// Convert to lowercase
+	result := strings.ToLower(imageName)
+
+	// Replace invalid characters with hyphens
+	reg := regexp.MustCompile(`[^a-z0-9._/-]+`)
+	result = reg.ReplaceAllString(result, "-")
+
+	// Remove leading/trailing special characters
+	result = strings.Trim(result, "-._/")
+
+	// Ensure it doesn't start with special characters
+	if len(result) > 0 && regexp.MustCompile(`^[._/-]`).MatchString(result) {
+		result = "img-" + result
+	}
+
+	if result == "" {
+		result = "default-image"
+	}
+
+	return result
+}
+
+// SanitizeFilename sanitizes a string to be a valid filename
+func SanitizeFilename(filename string) string {
+	if filename == "" {
+		return ""
+	}
+
+	// Remove or replace invalid filename characters
+	reg := regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f\x7f]+`)
+	result := reg.ReplaceAllString(filename, "_")
+
+	// Trim spaces and dots from beginning and end
+	result = strings.Trim(result, " .")
+
+	// Limit length
+	if len(result) > 255 {
+		result = result[:255]
+	}
+
+	if result == "" {
+		result = "file"
+	}
+
+	return result
+}
+
+// SanitizeIdentifier sanitizes a string to be a valid programming identifier
+func SanitizeIdentifier(identifier string) string {
+	if identifier == "" {
+		return ""
+	}
+
+	// Replace non-alphanumeric characters with underscores
+	reg := regexp.MustCompile(`[^a-zA-Z0-9_]+`)
+	result := reg.ReplaceAllString(identifier, "_")
+
+	// Ensure it starts with letter or underscore
+	if len(result) > 0 && regexp.MustCompile(`^[0-9]`).MatchString(result) {
+		result = "_" + result
+	}
+
+	// Remove leading/trailing underscores
+	result = strings.Trim(result, "_")
+
+	if result == "" {
+		result = "identifier"
+	}
+
+	return result
+}
+
+// SanitizeHTML removes or escapes HTML characters
+func SanitizeHTML(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	// Simple HTML character escaping
+	replacements := map[string]string{
+		"&":  "&amp;",
+		"<":  "&lt;",
+		">":  "&gt;",
+		"\"": "&quot;",
+		"'":  "&#x27;",
+	}
+
+	result := input
+	for char, escape := range replacements {
+		result = strings.ReplaceAll(result, char, escape)
+	}
+
+	return result
+}
+
+// SanitizeSQL removes or escapes SQL injection characters
+func SanitizeSQL(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	// Remove common SQL injection patterns
+	dangerous := []string{
+		"'", "\"", ";", "--", "/*", "*/", "xp_", "sp_",
+		"DROP", "DELETE", "INSERT", "UPDATE", "CREATE", "ALTER",
+		"EXEC", "EXECUTE", "UNION", "SELECT", "FROM", "WHERE",
+	}
+
+	result := input
+	for _, pattern := range dangerous {
+		result = strings.ReplaceAll(result, pattern, "")
+		result = strings.ReplaceAll(result, strings.ToLower(pattern), "")
+		result = strings.ReplaceAll(result, strings.ToUpper(pattern), "")
+	}
+
+	return strings.TrimSpace(result)
+}
+
+// SanitizeLogMessage sanitizes log messages to prevent log injection
+func SanitizeLogMessage(message string) string {
+	if message == "" {
+		return ""
+	}
+
+	// Remove carriage returns and newlines to prevent log injection
+	result := strings.ReplaceAll(message, "\r", "")
+	result = strings.ReplaceAll(result, "\n", " ")
+
+	// Remove null bytes
+	result = strings.ReplaceAll(result, "\x00", "")
+
+	// Limit length to prevent log spam
+	if len(result) > 1000 {
+		result = result[:1000] + "..."
+	}
+
+	return result
+}
+
+// SanitizeJSONValue sanitizes a value before JSON encoding
+func SanitizeJSONValue(value interface{}) interface{} {
+	if value == nil {
+		return nil
+	}
+
+	switch v := value.(type) {
+	case string:
+		return SanitizeLogMessage(v)
+	case map[string]interface{}:
+		sanitized := make(map[string]interface{})
+		for k, val := range v {
+			sanitized[k] = SanitizeJSONValue(val)
+		}
+		return sanitized
+	case []interface{}:
+		sanitized := make([]interface{}, len(v))
+		for i, val := range v {
+			sanitized[i] = SanitizeJSONValue(val)
+		}
+		return sanitized
+	default:
+		return value
+	}
+}
+
+// RemoveSensitiveData removes potentially sensitive data from strings
+func RemoveSensitiveData(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	// Patterns for common sensitive data
+	patterns := []struct {
+		regex       *regexp.Regexp
+		replacement string
+	}{
+		// API keys, tokens
+		{regexp.MustCompile(`(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*["\']?([a-zA-Z0-9]{20,})["\']?`), "$1=***"},
+		// Credit card numbers
+		{regexp.MustCompile(`\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`), "****-****-****-****"},
+		// Email addresses (partial masking)
+		{regexp.MustCompile(`([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})`), "$1@***"},
+		// IP addresses (partial masking)
+		{regexp.MustCompile(`\b(\d{1,3}\.)(\d{1,3}\.)(\d{1,3}\.)(\d{1,3})\b`), "$1$2$3***"},
+	}
+
+	result := input
+	for _, pattern := range patterns {
+		result = pattern.regex.ReplaceAllString(result, pattern.replacement)
+	}
+
+	return result
+}

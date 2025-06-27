@@ -11,6 +11,7 @@ import (
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/config"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	constants "github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -328,7 +329,13 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	// Progress reporting removed
 
 	// Check if we should use refactored modules
-	useRefactoredModules := os.Getenv("USE_REFACTORED_DOCKERFILE") == "true"
+	useRefactoredModules := false
+	if cfg, err := config.GetAnalyzer(); err == nil {
+		useRefactoredModules = cfg.UseRefactoredDockerfile
+	} else {
+		// Fallback to environment variable if config not available
+		useRefactoredModules = os.Getenv("USE_REFACTORED_DOCKERFILE") == "true"
+	}
 	if useRefactoredModules {
 		t.logger.Info().Msg("Using refactored Dockerfile validation modules")
 		// dockerfileAdapter removed - return error for now

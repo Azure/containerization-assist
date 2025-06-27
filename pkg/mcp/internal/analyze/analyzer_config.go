@@ -4,11 +4,13 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/config"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // AnalyzerConfig holds configuration for the analyzer factory
+// Deprecated: Use config.AnalyzerConfig instead
 type AnalyzerConfig struct {
 	// EnableAI determines whether to use CallerAnalyzer (true) or StubAnalyzer (false)
 	EnableAI bool
@@ -27,6 +29,7 @@ type AnalyzerConfig struct {
 }
 
 // DefaultAnalyzerConfig returns the default configuration
+// Deprecated: Use config.GetAnalyzer() instead
 func DefaultAnalyzerConfig() *AnalyzerConfig {
 	return &AnalyzerConfig{
 		EnableAI:        false, // Default to stub for safety
@@ -37,10 +40,39 @@ func DefaultAnalyzerConfig() *AnalyzerConfig {
 	}
 }
 
+// FromCentralConfig creates an AnalyzerConfig from the centralized config
+func FromCentralConfig() *AnalyzerConfig {
+	centralCfg, err := config.GetAnalyzer()
+	if err != nil {
+		// Fallback to default if centralized config not available
+		return DefaultAnalyzerConfig()
+	}
+
+	return &AnalyzerConfig{
+		EnableAI:        centralCfg.EnableAI,
+		LogLevel:        centralCfg.AIAnalyzerLogLevel,
+		MaxPromptLength: 4096, // TODO: Add to central config
+		CacheEnabled:    centralCfg.CacheResults,
+		CacheTTLSeconds: int(centralCfg.CacheTTL.Seconds()),
+	}
+}
+
 // LoadFromEnv loads configuration from environment variables
+// Deprecated: Environment variables are now handled by the centralized config system
 func (c *AnalyzerConfig) LoadFromEnv() {
 	logger := zerolog.New(os.Stderr).With().Str("component", "analyzer_config").Logger()
+	logger.Warn().Msg("LoadFromEnv is deprecated - use centralized config system instead")
 
+	// Try to load from centralized config first
+	if centralCfg, err := config.GetAnalyzer(); err == nil {
+		c.EnableAI = centralCfg.EnableAI
+		c.LogLevel = centralCfg.AIAnalyzerLogLevel
+		c.CacheEnabled = centralCfg.CacheResults
+		c.CacheTTLSeconds = int(centralCfg.CacheTTL.Seconds())
+		return
+	}
+
+	// Fallback to direct env var reading (deprecated path)
 	if val := os.Getenv("MCP_ENABLE_AI_ANALYZER"); val != "" {
 		c.EnableAI = val == "true"
 	}

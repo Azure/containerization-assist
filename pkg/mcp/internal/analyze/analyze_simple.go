@@ -11,7 +11,8 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
-	"github.com/Azure/container-kit/pkg/utils"
+	"github.com/Azure/container-kit/pkg/mcp/utils"
+	utilsfs "github.com/Azure/container-kit/pkg/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -107,7 +108,7 @@ func (t *AnalyzeRepositoryTool) ExecuteTyped(ctx context.Context, args AnalyzeRe
 	}
 
 	// Validate local path
-	if err := validateLocalPath(repoPath); err != nil {
+	if err := utils.ValidateLocalPath(repoPath); err != nil {
 		return nil, types.NewRichError("INVALID_ARGUMENTS", "invalid local path: "+err.Error(), "validation_error")
 	}
 
@@ -288,25 +289,10 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-func validateLocalPath(path string) error {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return types.NewRichError("INTERNAL_SERVER_ERROR", "failed to resolve absolute path: "+err.Error(), "filesystem_error")
-	}
-
-	if _, err := os.Stat(absPath); err != nil {
-		return types.NewRichError("INVALID_ARGUMENTS", "path does not exist: "+absPath, "validation_error")
-	}
-
-	if strings.Contains(absPath, "..") {
-		return types.NewRichError("INVALID_ARGUMENTS", "path traversal not allowed: "+absPath, "security_error")
-	}
-
-	return nil
-}
+// validateLocalPath is now replaced by utils.ValidateLocalPath
 
 func generateFileTree(path string) (string, error) {
-	return utils.GenerateSimpleFileTree(path)
+	return utilsfs.GenerateSimpleFileTree(path)
 }
 
 // Execute implements the unified Tool interface

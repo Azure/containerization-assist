@@ -96,8 +96,8 @@ type SecurityConcern struct {
 	Reference  string `json:"reference,omitempty"`
 }
 
-// GenerateDockerfileTool implements Dockerfile generation functionality
-type GenerateDockerfileTool struct {
+// AtomicGenerateDockerfileTool implements Dockerfile generation functionality
+type AtomicGenerateDockerfileTool struct {
 	logger              zerolog.Logger
 	validator           *coredocker.Validator
 	hadolintValidator   *coredocker.HadolintValidator
@@ -105,9 +105,9 @@ type GenerateDockerfileTool struct {
 	templateIntegration *TemplateIntegration
 }
 
-// NewGenerateDockerfileTool creates a new instance of GenerateDockerfileTool
-func NewGenerateDockerfileTool(sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *GenerateDockerfileTool {
-	return &GenerateDockerfileTool{
+// NewAtomicGenerateDockerfileTool creates a new instance of AtomicGenerateDockerfileTool
+func NewAtomicGenerateDockerfileTool(sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateDockerfileTool {
+	return &AtomicGenerateDockerfileTool{
 		logger:              logger,
 		validator:           coredocker.NewValidator(logger),
 		hadolintValidator:   coredocker.NewHadolintValidator(logger),
@@ -117,7 +117,7 @@ func NewGenerateDockerfileTool(sessionManager mcptypes.ToolSessionManager, logge
 }
 
 // Execute generates a Dockerfile based on repository analysis and user preferences
-func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
+func (t *AtomicGenerateDockerfileTool) ExecuteTyped(ctx context.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
 	// Create base response
 	response := &GenerateDockerfileResult{
 		BaseToolResponse: types.NewBaseResponse("generate_dockerfile", args.SessionID, args.DryRun),
@@ -130,70 +130,113 @@ func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Generate
 		Bool("dry_run", args.DryRun).
 		Msg("Starting Dockerfile generation")
 
-	// Get session to access repository analysis
+	// Get and validate session state
+	session, err := t.getSessionState(args)
+	if err != nil {
+		return nil, err
+	}
+
+	// Select template based on repository analysis or user override
+	templateName := t.selectTemplateFromSession(args, session)
+	t.logger.Info().Str("template", templateName).Msg("Selected Dockerfile template")
+
+	// Handle dry-run mode
+	if args.DryRun {
+		return t.handleDryRun(templateName, args, session, response)
+	}
+
+	// Generate actual Dockerfile content
+	if err := t.generateDockerfileContent(templateName, args, session, response); err != nil {
+		return nil, err
+	}
+
+	// Perform validation
+	t.performValidation(ctx, response.Content, args, response)
+
+	t.logger.Info().
+		Str("session_id", args.SessionID).
+		Str("template", templateName).
+		Str("file_path", response.FilePath).
+		Bool("validation_passed", response.Validation == nil || response.Validation.Valid).
+		Msg("Successfully generated Dockerfile")
+
+	return response, nil
+}
+
+// getSessionState retrieves and validates the session state
+func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileArgs) (*sessiontypes.SessionState, error) {
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		return nil, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session %s: %v", args.SessionID, err), "session_error")
 	}
 
-	// Type assert to concrete session type
 	session, ok := sessionInterface.(*sessiontypes.SessionState)
 	if !ok {
 		return nil, types.NewRichError("INTERNAL_ERROR", "session type assertion failed", "type_error")
 	}
 
-	// Select template based on repository analysis or user override
+	return session, nil
+}
+
+// selectTemplateFromSession determines template name from session analysis or user input
+func (t *AtomicGenerateDockerfileTool) selectTemplateFromSession(args GenerateDockerfileArgs, session *sessiontypes.SessionState) string {
 	templateName := args.Template
+
 	if templateName == "" {
-		// Use repository analysis to auto-select template
-		var repositoryData map[string]interface{}
-		if session.ScanSummary != nil {
-			repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
-		}
-		if repositoryData != nil && len(repositoryData) > 0 {
-			selectedTemplate, err := t.selectTemplate(repositoryData)
-			if err != nil {
-				t.logger.Warn().Err(err).Msg("Failed to auto-select template, using generic dockerfile-python template")
-				templateName = "dockerfile-python" // Generic fallback that exists
-			} else {
-				templateName = selectedTemplate
-			}
-		} else {
-			t.logger.Warn().Msg("No repository analysis found, using generic dockerfile-python template")
-			templateName = "dockerfile-python" // Generic fallback that exists
-		}
+		templateName = t.autoSelectTemplate(session)
 	} else {
-		// If user provided a template name, map common language names to actual template names
 		templateName = t.mapCommonTemplateNames(templateName)
 	}
 
-	t.logger.Info().Str("template", templateName).Msg("Selected Dockerfile template")
+	return templateName
+}
 
-	// Handle dry-run mode
-	if args.DryRun {
-		var repositoryData map[string]interface{}
-		if session.ScanSummary != nil {
-			repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
-		}
-		content, err := t.previewDockerfile(templateName, args, repositoryData)
-		if err != nil {
-			return nil, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to preview Dockerfile: %v", err), "generation_error")
-		}
-
-		response.Content = content
-		response.Template = templateName
-		response.BuildSteps = t.extractBuildSteps(content)
-		response.ExposedPorts = t.extractExposedPorts(content)
-		response.BaseImage = t.extractBaseImage(content)
-
-		return response, nil
+// autoSelectTemplate automatically selects template based on repository analysis
+func (t *AtomicGenerateDockerfileTool) autoSelectTemplate(session *sessiontypes.SessionState) string {
+	var repositoryData map[string]interface{}
+	if session.ScanSummary != nil {
+		repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
 	}
 
-	// For actual generation, we'll need a target directory
-	// For now, use current working directory
+	if len(repositoryData) > 0 {
+		selectedTemplate, err := t.selectTemplate(repositoryData)
+		if err != nil {
+			t.logger.Warn().Err(err).Msg("Failed to auto-select template, using generic dockerfile-python template")
+			return "dockerfile-python"
+		}
+		return selectedTemplate
+	}
+
+	t.logger.Warn().Msg("No repository analysis found, using generic dockerfile-python template")
+	return "dockerfile-python"
+}
+
+// handleDryRun processes dry-run mode and returns the preview response
+func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args GenerateDockerfileArgs, session *sessiontypes.SessionState, response *GenerateDockerfileResult) (*GenerateDockerfileResult, error) {
+	var repositoryData map[string]interface{}
+	if session.ScanSummary != nil {
+		repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
+	}
+
+	content, err := t.previewDockerfile(templateName, args, repositoryData)
+	if err != nil {
+		return nil, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to preview Dockerfile: %v", err), "generation_error")
+	}
+
+	response.Content = content
+	response.Template = templateName
+	response.BuildSteps = t.extractBuildSteps(content)
+	response.ExposedPorts = t.extractExposedPorts(content)
+	response.BaseImage = t.extractBaseImage(content)
+
+	return response, nil
+}
+
+// generateDockerfileContent generates the actual Dockerfile content and metadata
+func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName string, args GenerateDockerfileArgs, session *sessiontypes.SessionState, response *GenerateDockerfileResult) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to get current directory: %v", err), "filesystem_error")
+		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to get current directory: %v", err), "filesystem_error")
 	}
 
 	dockerfilePath := filepath.Join(cwd, "Dockerfile")
@@ -201,12 +244,13 @@ func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Generate
 	if session.ScanSummary != nil {
 		repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
 	}
+
 	content, err := t.generateDockerfile(templateName, dockerfilePath, args, repositoryData)
 	if err != nil {
-		return nil, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to generate Dockerfile: %v", err), "generation_error")
+		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to generate Dockerfile: %v", err), "generation_error")
 	}
 
-	// Populate response
+	// Populate basic response fields
 	response.Content = content
 	response.Template = templateName
 	response.FilePath = dockerfilePath
@@ -218,50 +262,62 @@ func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Generate
 		response.HealthCheck = t.extractHealthCheck(content)
 	}
 
-	// Generate rich context for AI decision making
-	// repositoryData already created above
+	// Generate rich context data
+	t.generateRichContext(repositoryData, content, args, response)
 
-	if repositoryData != nil && len(repositoryData) > 0 {
-		// Extract analysis data for context generation
-		language, _ := repositoryData["language"].(string)   //nolint:errcheck // Used for context
-		framework, _ := repositoryData["framework"].(string) //nolint:errcheck // Used for context
+	return nil
+}
 
-		// Extract dependencies
-		var dependencies []string
-		if deps, ok := repositoryData["dependencies"].([]string); ok {
-			dependencies = deps
-		} else if deps, ok := repositoryData["dependencies"].([]interface{}); ok {
-			for _, dep := range deps {
-				if depStr, ok := dep.(string); ok {
-					dependencies = append(dependencies, depStr)
-				}
-			}
-		}
+// generateRichContext creates additional context information for the response
+func (t *AtomicGenerateDockerfileTool) generateRichContext(repositoryData map[string]interface{}, content string, args GenerateDockerfileArgs, response *GenerateDockerfileResult) {
+	if len(repositoryData) > 0 {
+		language, _ := repositoryData["language"].(string)
+		framework, _ := repositoryData["framework"].(string)
 
-		// Extract config files
-		var configFiles []string
-		if files, ok := repositoryData["files"].([]string); ok {
-			configFiles = files
-		} else if files, ok := repositoryData["files"].([]interface{}); ok {
-			for _, file := range files {
-				if fileStr, ok := file.(string); ok {
-					configFiles = append(configFiles, fileStr)
-				}
-			}
-		}
+		dependencies := t.extractDependencies(repositoryData)
+		configFiles := t.extractConfigFiles(repositoryData)
 
-		// Generate template selection context
 		response.TemplateSelection = t.generateTemplateSelectionContext(language, framework, dependencies, configFiles)
 	}
 
-	// Generate optimization context
 	response.OptimizationHints = t.generateOptimizationContext(content, args)
+}
 
-	// Validate the generated Dockerfile
+// extractDependencies extracts dependency list from repository data
+func (t *AtomicGenerateDockerfileTool) extractDependencies(repositoryData map[string]interface{}) []string {
+	var dependencies []string
+	if deps, ok := repositoryData["dependencies"].([]string); ok {
+		dependencies = deps
+	} else if deps, ok := repositoryData["dependencies"].([]interface{}); ok {
+		for _, dep := range deps {
+			if depStr, ok := dep.(string); ok {
+				dependencies = append(dependencies, depStr)
+			}
+		}
+	}
+	return dependencies
+}
+
+// extractConfigFiles extracts config file list from repository data
+func (t *AtomicGenerateDockerfileTool) extractConfigFiles(repositoryData map[string]interface{}) []string {
+	var configFiles []string
+	if files, ok := repositoryData["files"].([]string); ok {
+		configFiles = files
+	} else if files, ok := repositoryData["files"].([]interface{}); ok {
+		for _, file := range files {
+			if fileStr, ok := file.(string); ok {
+				configFiles = append(configFiles, fileStr)
+			}
+		}
+	}
+	return configFiles
+}
+
+// performValidation validates the generated Dockerfile and updates response
+func (t *AtomicGenerateDockerfileTool) performValidation(ctx context.Context, content string, args GenerateDockerfileArgs, response *GenerateDockerfileResult) {
 	validationResult := t.validateDockerfile(ctx, content)
 	response.Validation = validationResult
 
-	// Check if validation failed with critical errors
 	if validationResult != nil && !validationResult.Valid {
 		criticalErrors := 0
 		for _, err := range validationResult.Errors {
@@ -275,25 +331,15 @@ func (t *GenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Generate
 				Int("critical_errors", criticalErrors).
 				Msg("Dockerfile validation failed with critical errors")
 
-			// Don't fail completely, but add warning to response
 			response.Message = fmt.Sprintf(
 				"Dockerfile generated but has %d critical validation errors. Please review and fix before building.",
 				criticalErrors)
 		}
 	}
-
-	t.logger.Info().
-		Str("session_id", args.SessionID).
-		Str("template", templateName).
-		Str("file_path", dockerfilePath).
-		Bool("validation_passed", validationResult == nil || validationResult.Valid).
-		Msg("Successfully generated Dockerfile")
-
-	return response, nil
 }
 
 // ExecuteWithContext runs the Dockerfile generation with GoMCP progress tracking
-func (t *GenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
+func (t *AtomicGenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args GenerateDockerfileArgs) (*GenerateDockerfileResult, error) {
 	// Create progress adapter for GoMCP using standard generation stages
 	_ = mcptypes.NewGoMCPProgressAdapter(serverCtx, []mcptypes.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Generate", Weight: 0.80, Description: "Generating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
@@ -314,7 +360,7 @@ func (t *GenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, a
 }
 
 // selectTemplate automatically selects the best template based on repository analysis
-func (t *GenerateDockerfileTool) selectTemplate(repoAnalysis map[string]interface{}) (string, error) {
+func (t *AtomicGenerateDockerfileTool) selectTemplate(repoAnalysis map[string]interface{}) (string, error) {
 	// Extract language from analysis
 	language, ok := repoAnalysis["language"].(string)
 	if !ok {
@@ -373,7 +419,7 @@ func (t *GenerateDockerfileTool) selectTemplate(repoAnalysis map[string]interfac
 }
 
 // getRecommendedBaseImage returns the recommended base image for a language/framework combination
-func (t *GenerateDockerfileTool) getRecommendedBaseImage(language, framework string) string {
+func (t *AtomicGenerateDockerfileTool) getRecommendedBaseImage(language, framework string) string {
 	// Base image lookup table with optimized images for each language
 	baseImageMap := map[string]map[string]string{
 		"Go": {
@@ -479,7 +525,7 @@ func (t *GenerateDockerfileTool) getRecommendedBaseImage(language, framework str
 }
 
 // previewDockerfile generates a preview of the Dockerfile without writing to disk
-func (t *GenerateDockerfileTool) previewDockerfile(templateName string, args GenerateDockerfileArgs, repoAnalysis map[string]interface{}) (string, error) {
+func (t *AtomicGenerateDockerfileTool) previewDockerfile(templateName string, args GenerateDockerfileArgs, repoAnalysis map[string]interface{}) (string, error) {
 	// Use the core template engine to generate preview
 	templateEngine := coredocker.NewTemplateEngine(t.logger)
 
@@ -516,7 +562,7 @@ func (t *GenerateDockerfileTool) previewDockerfile(templateName string, args Gen
 }
 
 // generateDockerfile creates the actual Dockerfile
-func (t *GenerateDockerfileTool) generateDockerfile(templateName, dockerfilePath string, args GenerateDockerfileArgs, repoAnalysis map[string]interface{}) (string, error) {
+func (t *AtomicGenerateDockerfileTool) generateDockerfile(templateName, dockerfilePath string, args GenerateDockerfileArgs, repoAnalysis map[string]interface{}) (string, error) {
 	// Use the core template engine for better error handling
 	targetDir := filepath.Dir(dockerfilePath)
 	templateEngine := coredocker.NewTemplateEngine(t.logger)
@@ -554,7 +600,7 @@ func (t *GenerateDockerfileTool) generateDockerfile(templateName, dockerfilePath
 }
 
 // applyCustomizations applies user-specified customizations to the Dockerfile
-func (t *GenerateDockerfileTool) applyCustomizations(content string, args GenerateDockerfileArgs, repoAnalysis map[string]interface{}) string {
+func (t *AtomicGenerateDockerfileTool) applyCustomizations(content string, args GenerateDockerfileArgs, repoAnalysis map[string]interface{}) string {
 	lines := strings.Split(content, "\n")
 	var result []string
 
@@ -614,14 +660,14 @@ func (t *GenerateDockerfileTool) applyCustomizations(content string, args Genera
 }
 
 // generateHealthCheck creates a health check instruction
-func (t *GenerateDockerfileTool) generateHealthCheck() string {
+func (t *AtomicGenerateDockerfileTool) generateHealthCheck() string {
 	// For now, use a simple health check - could be enhanced based on language/framework
 	port := 80 // default port
 	return fmt.Sprintf("HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:%d/health || exit 1", port)
 }
 
 // applySizeOptimizations applies Docker best practices for smaller images
-func (t *GenerateDockerfileTool) applySizeOptimizations(lines []string) []string {
+func (t *AtomicGenerateDockerfileTool) applySizeOptimizations(lines []string) []string {
 	var result []string
 
 	for _, line := range lines {
@@ -646,7 +692,7 @@ func (t *GenerateDockerfileTool) applySizeOptimizations(lines []string) []string
 }
 
 // applySecurityOptimizations applies security best practices
-func (t *GenerateDockerfileTool) applySecurityOptimizations(lines []string) []string {
+func (t *AtomicGenerateDockerfileTool) applySecurityOptimizations(lines []string) []string {
 	var result []string
 	addedUser := false
 
@@ -677,7 +723,7 @@ func (t *GenerateDockerfileTool) applySecurityOptimizations(lines []string) []st
 }
 
 // extractBuildSteps extracts the build steps from Dockerfile content
-func (t *GenerateDockerfileTool) extractBuildSteps(content string) []string {
+func (t *AtomicGenerateDockerfileTool) extractBuildSteps(content string) []string {
 	var steps []string
 	lines := strings.Split(content, "\n")
 
@@ -701,7 +747,7 @@ func (t *GenerateDockerfileTool) extractBuildSteps(content string) []string {
 }
 
 // extractExposedPorts extracts exposed ports from Dockerfile content
-func (t *GenerateDockerfileTool) extractExposedPorts(content string) []int {
+func (t *AtomicGenerateDockerfileTool) extractExposedPorts(content string) []int {
 	var ports []int
 	lines := strings.Split(content, "\n")
 
@@ -723,7 +769,7 @@ func (t *GenerateDockerfileTool) extractExposedPorts(content string) []int {
 }
 
 // extractBaseImage extracts the base image from Dockerfile content
-func (t *GenerateDockerfileTool) extractBaseImage(content string) string {
+func (t *AtomicGenerateDockerfileTool) extractBaseImage(content string) string {
 	lines := strings.Split(content, "\n")
 
 	for _, line := range lines {
@@ -740,7 +786,7 @@ func (t *GenerateDockerfileTool) extractBaseImage(content string) string {
 }
 
 // extractHealthCheck extracts health check instruction from Dockerfile content
-func (t *GenerateDockerfileTool) extractHealthCheck(content string) string {
+func (t *AtomicGenerateDockerfileTool) extractHealthCheck(content string) string {
 	lines := strings.Split(content, "\n")
 
 	for _, line := range lines {
@@ -754,7 +800,7 @@ func (t *GenerateDockerfileTool) extractHealthCheck(content string) string {
 }
 
 // mapCommonTemplateNames maps common language/framework names to actual template directory names
-func (t *GenerateDockerfileTool) mapCommonTemplateNames(name string) string {
+func (t *AtomicGenerateDockerfileTool) mapCommonTemplateNames(name string) string {
 	// Map common names to actual template names
 	templateMap := map[string]string{
 		"java":        "dockerfile-maven",       // Default Java to Maven
@@ -805,7 +851,7 @@ func (t *GenerateDockerfileTool) mapCommonTemplateNames(name string) string {
 }
 
 // validateDockerfile validates the generated Dockerfile content
-func (t *GenerateDockerfileTool) validateDockerfile(ctx context.Context, content string) *coredocker.ValidationResult {
+func (t *AtomicGenerateDockerfileTool) validateDockerfile(ctx context.Context, content string) *coredocker.ValidationResult {
 	// First try Hadolint if available
 	if t.hadolintValidator.CheckHadolintInstalled() {
 		t.logger.Info().Msg("Running Hadolint validation on generated Dockerfile")
@@ -823,7 +869,7 @@ func (t *GenerateDockerfileTool) validateDockerfile(ctx context.Context, content
 }
 
 // generateTemplateSelectionContext creates rich context for AI template selection
-func (t *GenerateDockerfileTool) generateTemplateSelectionContext(language, framework string, dependencies, configFiles []string) *TemplateSelectionContext {
+func (t *AtomicGenerateDockerfileTool) generateTemplateSelectionContext(language, framework string, dependencies, configFiles []string) *TemplateSelectionContext {
 	ctx := &TemplateSelectionContext{
 		DetectedLanguage:   language,
 		DetectedFramework:  framework,
@@ -860,7 +906,7 @@ func (t *GenerateDockerfileTool) generateTemplateSelectionContext(language, fram
 }
 
 // getTemplateOptions returns available templates with metadata
-func (t *GenerateDockerfileTool) getTemplateOptions(language, framework string, dependencies, configFiles []string) []TemplateOption {
+func (t *AtomicGenerateDockerfileTool) getTemplateOptions(language, framework string, dependencies, configFiles []string) []TemplateOption {
 	options := []TemplateOption{
 		// Java templates
 		{
@@ -930,72 +976,10 @@ func (t *GenerateDockerfileTool) getTemplateOptions(language, framework string, 
 }
 
 // calculateMatchScore calculates how well a template matches the project
-func (t *GenerateDockerfileTool) calculateMatchScore(templateType, language, framework string, configFiles []string) int {
-	score := 0
-
-	// Language match
-	switch templateType {
-	case "maven", "gradle", types.AppServerTomcat:
-		if strings.ToLower(language) == "java" {
-			score += 40
-		}
-	case "javascript":
-		if strings.ToLower(language) == "javascript" || strings.ToLower(language) == "typescript" {
-			score += 40
-		}
-	case "python":
-		if strings.ToLower(language) == "python" {
-			score += 40
-		}
-	case "go", "gomodule":
-		if strings.ToLower(language) == "go" {
-			score += 40
-		}
-	}
-
-	// Config file match
-	for _, file := range configFiles {
-		switch templateType {
-		case "maven":
-			if strings.Contains(file, "pom.xml") {
-				score += 40
-			}
-		case "gradle":
-			if strings.Contains(file, "build.gradle") {
-				score += 40
-			}
-		case "tomcat":
-			if strings.Contains(file, "web.xml") || strings.Contains(file, ".jsp") {
-				score += 30
-			}
-		case "javascript":
-			if strings.Contains(file, "package.json") {
-				score += 40
-			}
-		case "python":
-			if strings.Contains(file, "requirements.txt") || strings.Contains(file, "pyproject.toml") {
-				score += 40
-			}
-		case "gomodule":
-			if strings.Contains(file, "go.mod") {
-				score += 40
-			}
-		}
-	}
-
-	// Framework match
-	if framework != "" {
-		switch templateType {
-		case "maven":
-			if strings.Contains(strings.ToLower(framework), "spring") {
-				score += 20
-			}
-		case "tomcat":
-			if strings.Contains(strings.ToLower(framework), "servlet") {
-				score += 20
-			}
-		}
-	}
+func (t *AtomicGenerateDockerfileTool) calculateMatchScore(templateType, language, framework string, configFiles []string) int {
+	score := t.scoreLanguageMatch(templateType, language)
+	score += t.scoreConfigFileMatch(templateType, configFiles)
+	score += t.scoreFrameworkMatch(templateType, framework)
 
 	// Cap at 100
 	if score > 100 {
@@ -1005,8 +989,99 @@ func (t *GenerateDockerfileTool) calculateMatchScore(templateType, language, fra
 	return score
 }
 
+// scoreLanguageMatch calculates score based on language compatibility
+func (t *AtomicGenerateDockerfileTool) scoreLanguageMatch(templateType, language string) int {
+	langLower := strings.ToLower(language)
+
+	switch templateType {
+	case "maven", "gradle", types.AppServerTomcat:
+		if langLower == "java" {
+			return 40
+		}
+	case "javascript":
+		if langLower == "javascript" || langLower == "typescript" {
+			return 40
+		}
+	case "python":
+		if langLower == "python" {
+			return 40
+		}
+	case "go", "gomodule":
+		if langLower == "go" {
+			return 40
+		}
+	}
+
+	return 0
+}
+
+// scoreConfigFileMatch calculates score based on configuration file presence
+func (t *AtomicGenerateDockerfileTool) scoreConfigFileMatch(templateType string, configFiles []string) int {
+	score := 0
+
+	for _, file := range configFiles {
+		score += t.getConfigFileScore(templateType, file)
+	}
+
+	return score
+}
+
+// getConfigFileScore returns score for a specific config file and template type
+func (t *AtomicGenerateDockerfileTool) getConfigFileScore(templateType, file string) int {
+	switch templateType {
+	case "maven":
+		if strings.Contains(file, "pom.xml") {
+			return 40
+		}
+	case "gradle":
+		if strings.Contains(file, "build.gradle") {
+			return 40
+		}
+	case "tomcat":
+		if strings.Contains(file, "web.xml") || strings.Contains(file, ".jsp") {
+			return 30
+		}
+	case "javascript":
+		if strings.Contains(file, "package.json") {
+			return 40
+		}
+	case "python":
+		if strings.Contains(file, "requirements.txt") || strings.Contains(file, "pyproject.toml") {
+			return 40
+		}
+	case "gomodule":
+		if strings.Contains(file, "go.mod") {
+			return 40
+		}
+	}
+
+	return 0
+}
+
+// scoreFrameworkMatch calculates score based on framework compatibility
+func (t *AtomicGenerateDockerfileTool) scoreFrameworkMatch(templateType, framework string) int {
+	if framework == "" {
+		return 0
+	}
+
+	frameworkLower := strings.ToLower(framework)
+
+	switch templateType {
+	case "maven":
+		if strings.Contains(frameworkLower, "spring") {
+			return 20
+		}
+	case "tomcat":
+		if strings.Contains(frameworkLower, "servlet") {
+			return 20
+		}
+	}
+
+	return 0
+}
+
 // getAlternativeTemplates suggests alternatives with trade-offs
-func (t *GenerateDockerfileTool) getAlternativeTemplates(language, framework string, dependencies []string) []AlternativeTemplate {
+func (t *AtomicGenerateDockerfileTool) getAlternativeTemplates(language, framework string, dependencies []string) []AlternativeTemplate {
 	alternatives := make([]AlternativeTemplate, 0)
 
 	if strings.ToLower(language) == "java" {
@@ -1047,7 +1122,7 @@ func (t *GenerateDockerfileTool) getAlternativeTemplates(language, framework str
 }
 
 // generateOptimizationContext creates optimization hints for the AI
-func (t *GenerateDockerfileTool) generateOptimizationContext(content string, args GenerateDockerfileArgs) *OptimizationContext {
+func (t *AtomicGenerateDockerfileTool) generateOptimizationContext(content string, args GenerateDockerfileArgs) *OptimizationContext {
 	ctx := &OptimizationContext{
 		OptimizationGoals: make([]string, 0),
 		SuggestedChanges:  make([]OptimizationChange, 0),
@@ -1156,7 +1231,7 @@ func (t *GenerateDockerfileTool) generateOptimizationContext(content string, arg
 // These methods implement the mcptypes.Tool interface for unified tool handling
 
 // GetMetadata returns comprehensive tool metadata
-func (t *GenerateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
+func (t *AtomicGenerateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:        "generate_dockerfile_atomic",
 		Description: "Generates optimized Dockerfiles based on repository analysis with language-specific templates and best practices",
@@ -1227,7 +1302,7 @@ func (t *GenerateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 }
 
 // Validate validates the tool arguments
-func (t *GenerateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
+func (t *AtomicGenerateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
 	dockerfileArgs, ok := args.(GenerateDockerfileArgs)
 	if !ok {
 		// Try to convert from map if it's not already typed
@@ -1265,7 +1340,7 @@ func (t *GenerateDockerfileTool) Validate(ctx context.Context, args interface{})
 }
 
 // Execute implements the generic Tool interface
-func (t *GenerateDockerfileTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+func (t *AtomicGenerateDockerfileTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	// Handle both typed and untyped arguments
 	var dockerfileArgs GenerateDockerfileArgs
 	var err error

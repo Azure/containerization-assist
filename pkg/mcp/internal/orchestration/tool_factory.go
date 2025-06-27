@@ -28,13 +28,17 @@ func NewToolFactory(
 	analyzer mcptypes.AIAnalyzer,
 	logger zerolog.Logger,
 ) *ToolFactory {
-	return &ToolFactory{
+	factory := &ToolFactory{
 		pipelineOperations: pipelineOperations,
 		sessionManager:     sessionManager,
 		analyzer:           analyzer,
-		analyzerHelper:     NewAnalyzerHelper(analyzer, logger),
 		logger:             logger,
 	}
+
+	// Create analyzer helper with factory support for repository adapter
+	factory.analyzerHelper = NewAnalyzerHelperWithFactory(analyzer, factory, sessionManager, logger)
+
+	return factory
 }
 
 // CreateAnalyzeRepositoryTool creates an instance of AtomicAnalyzeRepositoryTool
@@ -114,9 +118,9 @@ func (f *ToolFactory) CreateCheckHealthTool() *deploy.AtomicCheckHealthTool {
 	return tool
 }
 
-// CreateGenerateDockerfileTool creates an instance of GenerateDockerfileTool
-func (f *ToolFactory) CreateGenerateDockerfileTool() *analyze.GenerateDockerfileTool {
-	return analyze.NewGenerateDockerfileTool(f.sessionManager, f.logger)
+// CreateGenerateDockerfileTool creates an instance of AtomicGenerateDockerfileTool
+func (f *ToolFactory) CreateGenerateDockerfileTool() *analyze.AtomicGenerateDockerfileTool {
+	return analyze.NewAtomicGenerateDockerfileTool(f.sessionManager, f.logger)
 }
 
 // CreateValidateDockerfileTool creates an instance of AtomicValidateDockerfileTool

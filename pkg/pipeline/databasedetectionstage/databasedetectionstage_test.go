@@ -27,8 +27,8 @@ func TestDatabaseDetectionStage_Initialize(t *testing.T) {
 // TestDatabaseDetectionStage_Run tests the Run method
 func TestDatabaseDetectionStage_Run(t *testing.T) {
 	type testCase struct {
-		name     string                    // Test case name
-		content  string                    // Input file content
+		name     string                             // Test case name
+		content  string                             // Input file content
 		expected []pipeline.DatabaseDetectionResult // Expected detected databases
 	}
 
@@ -83,7 +83,7 @@ func TestDatabaseDetectionStage_Run(t *testing.T) {
 			}
 
 			// Validate detected databases
-			detectedDatabases:= state.DetectedDatabases
+			detectedDatabases := state.DetectedDatabases
 			ok := state.Metadata["detectedDatabaseErrors"]
 			if ok != nil {
 				t.Fatalf("Run did not populate detected databases in metadata")

@@ -334,7 +334,7 @@ func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependenci
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
 		),
-		"generate_dockerfile_atomic": analyze.NewGenerateDockerfileTool(
+		"generate_dockerfile_atomic": analyze.NewAtomicGenerateDockerfileTool(
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "generate_dockerfile_atomic").Logger(),
 		),
@@ -377,6 +377,16 @@ func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependenci
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
 			deps.Logger.With().Str("tool", "push_image_atomic").Logger(),
+		),
+		"validate_deployment_atomic": deploy.NewAtomicValidateDeploymentTool(
+			deps.Logger.With().Str("tool", "validate_deployment_atomic").Logger(),
+			"",  // workspaceBase - will be set from session
+			nil, // jobManager - will be created internally
+			&clients.Clients{
+				Docker: deps.MCPClients.Docker,
+				Kind:   deps.MCPClients.Kind,
+				Kube:   deps.MCPClients.Kube,
+			},
 		),
 	}
 
@@ -478,14 +488,14 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if dockerfileResult, ok := result.(*analyze.GenerateDockerfileResult); ok {
 				return dockerfileResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from generate_dockerfile: %T", result)
+			return nil, fmt.Errorf("unexpected result type from generate_dockerfile_atomic: %T", result)
 		})
 }
 
@@ -606,23 +616,21 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 
 	runtime.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
-		func(ctx *gomcpserver.Context, args *deploy.AtomicDeployKubernetesArgs) (*deploy.AtomicDeployKubernetesResult, error) {
+		func(ctx *gomcpserver.Context, args *deploy.ValidateDeploymentArgs) (*deploy.ValidateDeploymentResult, error) {
 			argsMap, err := BuildArgsMap(context.Background(), args)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build arguments map: %w", err)
 			}
-			// Force dry_run to true for validation
-			argsMap["dry_run"] = true
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "deploy_kubernetes_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_deployment_atomic", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
-			if deployResult, ok := result.(*deploy.AtomicDeployKubernetesResult); ok {
-				return deployResult, nil
+			if validateResult, ok := result.(*deploy.ValidateDeploymentResult); ok {
+				return validateResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from deploy_kubernetes_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from validate_deployment_atomic: %T", result)
 		})
 	return nil
 }
