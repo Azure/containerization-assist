@@ -27,7 +27,7 @@ jobs:
     if: github.event_name == 'pull_request'
     name: Format & Code Quality Checks
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -69,14 +69,14 @@ jobs:
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           # Get list of changed Go files
           changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD | grep '\.go$' || true)
-          
+
           if [ -n "$changed_files" ]; then
             # Count technical debt comments in changed files
             debt_count=$(echo "$changed_files" | xargs grep -l 'TODO\|HACK\|FIXME' | wc -l)
             total_debt=$(echo "$changed_files" | xargs grep -c 'TODO\|HACK\|FIXME' | awk '{sum+=$1} END {print sum+0}')
-            
+
             echo "Technical debt in changed files: $total_debt comments in $debt_count files"
-            
+
             if [ "$total_debt" -gt 10 ]; then
               echo "❌ Too many technical debt comments added ($total_debt > 10)"
               echo "::error::Reduce technical debt comments to 10 or fewer"
@@ -94,16 +94,16 @@ jobs:
       run: |
         # Install gocyclo for complexity checking
         go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
-        
+
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           # Get changed Go files
           changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD | grep '\.go$' || true)
-          
+
           if [ -n "$changed_files" ]; then
             # Check complexity of changed files
             high_complexity=$(echo "$changed_files" | xargs gocyclo -over 25 2>/dev/null || true)
             medium_complexity=$(echo "$changed_files" | xargs gocyclo -over 20 2>/dev/null | grep -v "cyclomatic complexity 2[6-9]\|3[0-9]" || true)
-            
+
             if [ -n "$high_complexity" ]; then
               echo "❌ High complexity functions found:"
               echo "$high_complexity"
@@ -123,7 +123,7 @@ jobs:
   lint-comprehensive:
     name: Comprehensive Linting
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -157,7 +157,7 @@ jobs:
     - name: Run comprehensive lint analysis
       run: |
         mkdir -p lint-reports
-        
+
         # Function to analyze package group
         analyze_package() {
           local name=$1
@@ -183,7 +183,7 @@ jobs:
           if [ $error_count -gt $error_threshold ]; then
             status="❌ Over Error Limit"
           elif [ $warning_count -gt $warning_threshold ]; then
-            status="⚠️ Over Warning Limit"  
+            status="⚠️ Over Warning Limit"
           fi
 
           # Generate report section
@@ -245,7 +245,7 @@ jobs:
         script: |
           const fs = require('fs');
           const report = fs.readFileSync('lint-report.md', 'utf8');
-          
+
           // Look for existing lint comments to replace
           const comments = await github.rest.issues.listComments({
             issue_number: context.issue.number,
@@ -254,7 +254,7 @@ jobs:
           });
 
           const existingComment = comments.data.find(comment =>
-            comment.body.includes('# Lint Report') && 
+            comment.body.includes('# Lint Report') &&
             comment.user.type === 'Bot'
           );
 

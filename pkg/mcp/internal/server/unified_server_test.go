@@ -33,7 +33,7 @@ func TestServerCapabilities_Structure(t *testing.T) {
 func TestUnifiedMCPServer_GetCapabilities(t *testing.T) {
 	// Test the capabilities logic with real registries
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
-	
+
 	t.Run("chat mode capabilities", func(t *testing.T) {
 		registry := orchestration.NewMCPToolRegistry(logger)
 		server := &UnifiedMCPServer{
@@ -88,12 +88,12 @@ func TestUnifiedMCPServer_getChatModeTools(t *testing.T) {
 	tools := server.getChatModeTools()
 
 	assert.Len(t, tools, 2)
-	
+
 	var toolNames []string
 	for _, tool := range tools {
 		toolNames = append(toolNames, tool.Name)
 	}
-	
+
 	assert.Contains(t, toolNames, "chat")
 	assert.Contains(t, toolNames, "list_conversation_history")
 
@@ -102,7 +102,7 @@ func TestUnifiedMCPServer_getChatModeTools(t *testing.T) {
 	assert.Equal(t, "chat", chatTool.Name)
 	assert.NotEmpty(t, chatTool.Description)
 	assert.NotNil(t, chatTool.InputSchema)
-	
+
 	// Check input schema structure
 	schema := chatTool.InputSchema
 	assert.Equal(t, "object", schema["type"])
@@ -119,12 +119,12 @@ func TestUnifiedMCPServer_getWorkflowModeTools(t *testing.T) {
 	tools := server.getWorkflowModeTools()
 
 	assert.GreaterOrEqual(t, len(tools), 3) // At least execute_workflow, list_workflows, get_workflow_status
-	
+
 	var toolNames []string
 	for _, tool := range tools {
 		toolNames = append(toolNames, tool.Name)
 	}
-	
+
 	assert.Contains(t, toolNames, "execute_workflow")
 	assert.Contains(t, toolNames, "list_workflows")
 	assert.Contains(t, toolNames, "get_workflow_status")
@@ -140,7 +140,7 @@ func TestUnifiedMCPServer_getWorkflowModeTools(t *testing.T) {
 func TestUnifiedMCPServer_isAtomicTool(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 	registry := orchestration.NewMCPToolRegistry(logger)
-	
+
 	server := &UnifiedMCPServer{
 		toolRegistry: registry,
 	}
@@ -149,7 +149,7 @@ func TestUnifiedMCPServer_isAtomicTool(t *testing.T) {
 	assert.False(t, server.isAtomicTool("any_tool"))
 	assert.False(t, server.isAtomicTool("chat"))
 	assert.False(t, server.isAtomicTool("unknown_tool"))
-	
+
 	// Note: To properly test with registered tools, we'd need to register actual tools
 	// which is complex in this test environment
 }
@@ -197,7 +197,7 @@ func TestUnifiedMCPServer_ExecuteTool_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server.currentMode = tt.mode
 			_, err := server.ExecuteTool(context.Background(), tt.toolName, map[string]interface{}{})
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -326,14 +326,14 @@ func TestConvertToMapStringInterface(t *testing.T) {
 func TestRegistryAdapter_Basic(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 	registry := orchestration.NewMCPToolRegistry(logger)
-	
+
 	adapter := &RegistryAdapter{
 		registry: registry,
 	}
 
 	// Test basic structure
 	assert.NotNil(t, adapter.registry)
-	
+
 	// Test List (should be empty initially)
 	tools := adapter.List()
 	assert.Empty(t, tools) // More flexible than checking specific length
@@ -353,12 +353,12 @@ func TestRegistryAdapter_Basic(t *testing.T) {
 func TestDirectSessionManager_Structure(t *testing.T) {
 	// Create a minimal test to verify the structure exists
 	// without requiring complex session manager setup
-	
+
 	// Test that the types exist and can be created
 	dsm := &directSessionManager{
 		sessionManager: nil, // Would be a real session manager in practice
 	}
-	
+
 	assert.NotNil(t, dsm)
 	// Cannot test methods without real session manager due to complexity
 }
@@ -366,7 +366,7 @@ func TestDirectSessionManager_Structure(t *testing.T) {
 // Test ConversationOrchestratorAdapter structure
 func TestConversationOrchestratorAdapter_Structure(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
-	
+
 	adapter := &ConversationOrchestratorAdapter{
 		toolOrchestrator: nil, // Would be real orchestrator in practice
 		logger:           logger,

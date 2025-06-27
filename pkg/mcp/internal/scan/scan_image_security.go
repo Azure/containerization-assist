@@ -304,15 +304,39 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 	// Stage 2: Pull image if needed
 	// Progress reporting removed
 
-	// Create scanner and validate prerequisites
-	scanner := coredocker.NewTrivyScanner(t.logger)
-	if !scanner.CheckTrivyInstalled() {
-		t.logger.Error().Msg("Trivy scanner not installed")
+	// Create unified scanner with both Trivy and Grype
+	scanner := coredocker.NewUnifiedSecurityScanner(t.logger)
+	availableScanners := scanner.GetAvailableScanners()
+
+	// Check if at least one scanner is available
+	hasScanner := false
+	scannerNames := []string{}
+	for name, available := range availableScanners {
+		if available {
+			hasScanner = true
+			scannerNames = append(scannerNames, name)
+		}
+	}
+
+	if !hasScanner {
+		t.logger.Error().Msg("No vulnerability scanners available (Trivy or Grype)")
 		result.Duration = time.Since(startTime)
+		result.Scanner = "none"
+		result.Recommendations = []SecurityRecommendation{
+			{
+				Priority:    1,
+				Category:    "setup",
+				Title:       "Install Vulnerability Scanner",
+				Description: "No vulnerability scanners are installed. Install Trivy or Grype to enable security scanning.",
+				Action:      "Install Trivy: brew install aquasecurity/trivy/trivy\nInstall Grype: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin",
+				Impact:      "Cannot perform security vulnerability scanning",
+				Effort:      types.SeverityLow,
+			},
+		}
 		return result, nil
 	}
 
-	result.Scanner = "trivy"
+	result.Scanner = fmt.Sprintf("unified (%s)", strings.Join(scannerNames, "+"))
 
 	// Progress reporting removed
 
@@ -336,14 +360,29 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 
 	// Progress reporting removed
 
-	scanResult, err := scanner.ScanImage(ctx, args.ImageName, severityThreshold)
+	unifiedResult, err := scanner.ScanImage(ctx, args.ImageName, severityThreshold)
 	if err != nil {
 		t.logger.Error().Err(err).Str("image_name", args.ImageName).Msg("Security scan failed")
 		result.Duration = time.Since(startTime)
 		return result, nil
 	}
 
-	result.ScanResult = scanResult
+	// Convert unified result to standard ScanResult format
+	// Use the combined summary for the most comprehensive view
+	result.ScanResult = &coredocker.ScanResult{
+		Success:         unifiedResult.Success,
+		ImageRef:        unifiedResult.ImageRef,
+		ScanTime:        unifiedResult.ScanTime,
+		Duration:        unifiedResult.Duration,
+		Vulnerabilities: unifiedResult.UniqueVulns,
+		Summary:         unifiedResult.CombinedSummary,
+		Remediation:     unifiedResult.Remediation,
+		Context:         unifiedResult.Context,
+	}
+
+	// Store detailed unified scan results in context
+	result.ScanContext["unified_scan_result"] = unifiedResult
+	result.ScanContext["scanner_comparison"] = unifiedResult.ComparisonMetrics
 	result.Duration = time.Since(startTime)
 
 	// Progress reporting removed
@@ -352,7 +391,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 	// Progress reporting removed
 
 	// Analyze scan results
-	t.analyzeScanResults(result, scanResult)
+	t.analyzeScanResults(result, result.ScanResult)
 
 	// Progress reporting removed
 

@@ -146,14 +146,14 @@ func TestAtomicScanSecretsTool_GetMetadata(t *testing.T) {
 	assert.Contains(t, metadata.Description, "secret")
 	assert.Equal(t, "1.0.0", metadata.Version)
 	assert.Equal(t, "security", metadata.Category)
-	
+
 	assert.Contains(t, metadata.Capabilities, "secret_detection")
 	assert.Contains(t, metadata.Capabilities, "pattern_matching")
 	assert.Contains(t, metadata.Capabilities, "kubernetes_secret_generation")
-	
+
 	assert.Contains(t, metadata.Requirements, "valid_session_id")
 	assert.Contains(t, metadata.Requirements, "file_system_access")
-	
+
 	assert.Len(t, metadata.Examples, 3)
 }
 
@@ -177,7 +177,7 @@ func TestAtomicScanSecretsTool_GetVersion(t *testing.T) {
 func TestAtomicScanSecretsTool_GetCapabilities(t *testing.T) {
 	tool := &AtomicScanSecretsTool{}
 	capabilities := tool.GetCapabilities()
-	
+
 	assert.True(t, capabilities.SupportsDryRun)
 	assert.True(t, capabilities.SupportsStreaming)
 	assert.True(t, capabilities.IsLongRunning)
@@ -224,7 +224,7 @@ func TestAtomicScanSecretsTool_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tool.Validate(context.Background(), tt.args)
-			
+
 			if tt.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
@@ -273,7 +273,7 @@ func TestAtomicScanSecretsTool_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tool := tt.setupTool()
 			result, err := tool.Execute(context.Background(), tt.args)
-			
+
 			if tt.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
@@ -334,7 +334,7 @@ JWT_SECRET=my-jwt-secret-key
 	}
 
 	result, err := tool.executeWithoutProgress(context.Background(), args, time.Now())
-	
+
 	assert.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, "test-session", result.SessionID)
@@ -349,14 +349,14 @@ JWT_SECRET=my-jwt-secret-key
 
 func TestStandardSecretScanStages(t *testing.T) {
 	stages := standardSecretScanStages()
-	
+
 	assert.Len(t, stages, 5)
 	assert.Equal(t, "Initialize", stages[0].Name)
 	assert.Equal(t, "Analyze", stages[1].Name)
 	assert.Equal(t, "Scan", stages[2].Name)
 	assert.Equal(t, "Process", stages[3].Name)
 	assert.Equal(t, "Finalize", stages[4].Name)
-	
+
 	// Check weights sum to 1.0
 	totalWeight := 0.0
 	for _, stage := range stages {
@@ -374,35 +374,35 @@ func TestAtomicScanSecretsTool_getDefaultFilePatterns(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "scan dockerfiles",
-			args: AtomicScanSecretsArgs{ScanDockerfiles: true},
+			name:     "scan dockerfiles",
+			args:     AtomicScanSecretsArgs{ScanDockerfiles: true},
 			expected: []string{"Dockerfile*", "*.dockerfile"},
 		},
 		{
-			name: "scan manifests",
-			args: AtomicScanSecretsArgs{ScanManifests: true},
+			name:     "scan manifests",
+			args:     AtomicScanSecretsArgs{ScanManifests: true},
 			expected: []string{"*.yaml", "*.yml", "*.json"},
 		},
 		{
-			name: "scan env files",
-			args: AtomicScanSecretsArgs{ScanEnvFiles: true},
+			name:     "scan env files",
+			args:     AtomicScanSecretsArgs{ScanEnvFiles: true},
 			expected: []string{".env*", "*.env"},
 		},
 		{
-			name: "scan source code",
-			args: AtomicScanSecretsArgs{ScanSourceCode: true},
+			name:     "scan source code",
+			args:     AtomicScanSecretsArgs{ScanSourceCode: true},
 			expected: []string{"*.py", "*.js", "*.ts", "*.go", "*.java", "*.cs", "*.php", "*.rb"},
 		},
 		{
-			name: "no specific options - defaults",
-			args: AtomicScanSecretsArgs{},
+			name:     "no specific options - defaults",
+			args:     AtomicScanSecretsArgs{},
 			expected: []string{"*.yaml", "*.yml", "*.json", ".env*", "*.env", "Dockerfile*"},
 		},
 		{
 			name: "multiple options",
 			args: AtomicScanSecretsArgs{
 				ScanDockerfiles: true,
-				ScanEnvFiles:   true,
+				ScanEnvFiles:    true,
 			},
 			expected: []string{"Dockerfile*", "*.dockerfile", ".env*", "*.env"},
 		},
@@ -581,7 +581,7 @@ func TestAtomicScanSecretsTool_determineSeverity(t *testing.T) {
 		value    string
 		expected string
 	}{
-		{"API_KEY", "sk-1234567890abcdef1234567890", "critical"}, // Long key-like value
+		{"API_KEY", "sk-1234567890abcdef1234567890", "critical"},      // Long key-like value
 		{"TOKEN", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "critical"}, // Long token-like value
 		{"PASSWORD", "short", "high"},
 		{"SECRET", "value", "high"},
@@ -753,7 +753,7 @@ func TestAtomicScanSecretsTool_generateRecommendations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recommendations := tool.generateRecommendations(tt.secrets, tt.args)
-			
+
 			for _, expected := range tt.contains {
 				found := false
 				for _, rec := range recommendations {
@@ -783,7 +783,7 @@ func TestAtomicScanSecretsTool_generateRemediationPlan(t *testing.T) {
 	assert.NotEmpty(t, plan.ImmediateActions)
 	assert.NotEmpty(t, plan.MigrationSteps)
 	assert.NotEmpty(t, plan.SecretReferences)
-	
+
 	// Check that immediate actions include critical steps
 	found := false
 	for _, action := range plan.ImmediateActions {

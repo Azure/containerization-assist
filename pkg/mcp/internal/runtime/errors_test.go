@@ -100,7 +100,7 @@ func TestToolError_WithContext(t *testing.T) {
 
 func TestNewErrorBuilder(t *testing.T) {
 	builder := NewErrorBuilder("TEST_CODE", "test message")
-	
+
 	assert.NotNil(t, builder)
 	assert.NotNil(t, builder.err)
 	assert.Equal(t, "TEST_CODE", builder.err.Code)
@@ -112,7 +112,7 @@ func TestNewErrorBuilder(t *testing.T) {
 
 func TestErrorBuilder_FluentInterface(t *testing.T) {
 	underlyingErr := errors.New("underlying error")
-	
+
 	err := NewErrorBuilder("TEST_CODE", "test message").
 		WithType(ErrTypeValidation).
 		WithSeverity(SeverityCritical).
@@ -138,7 +138,7 @@ func TestErrorBuilder_FluentInterface(t *testing.T) {
 
 func TestNewValidationError(t *testing.T) {
 	err := NewValidationError("username", "username is required")
-	
+
 	assert.Equal(t, "VALIDATION_ERROR", err.Code)
 	assert.Equal(t, "username is required", err.Message)
 	assert.Equal(t, ErrTypeValidation, err.Type)
@@ -147,7 +147,7 @@ func TestNewValidationError(t *testing.T) {
 
 func TestNewNotFoundError(t *testing.T) {
 	err := NewNotFoundError("user", "123")
-	
+
 	assert.Equal(t, "NOT_FOUND", err.Code)
 	assert.Equal(t, "user not found: 123", err.Message)
 	assert.Equal(t, ErrTypeNotFound, err.Type)
@@ -158,7 +158,7 @@ func TestNewNotFoundError(t *testing.T) {
 func TestNewSystemError(t *testing.T) {
 	cause := errors.New("disk full")
 	err := NewSystemError("backup", cause)
-	
+
 	assert.Equal(t, "SYSTEM_ERROR", err.Code)
 	assert.Equal(t, "system error during backup", err.Message)
 	assert.Equal(t, ErrTypeSystem, err.Type)
@@ -168,7 +168,7 @@ func TestNewSystemError(t *testing.T) {
 
 func TestNewBuildError(t *testing.T) {
 	err := NewBuildError("compile", "compilation failed")
-	
+
 	assert.Equal(t, "BUILD_ERROR", err.Code)
 	assert.Equal(t, "compilation failed", err.Message)
 	assert.Equal(t, ErrTypeBuild, err.Type)
@@ -177,7 +177,7 @@ func TestNewBuildError(t *testing.T) {
 
 func TestNewValidationErrorSet(t *testing.T) {
 	errorSet := NewValidationErrorSet()
-	
+
 	assert.NotNil(t, errorSet)
 	assert.False(t, errorSet.HasErrors())
 	assert.Equal(t, 0, errorSet.Count())
@@ -187,19 +187,19 @@ func TestNewValidationErrorSet(t *testing.T) {
 
 func TestValidationErrorSet_AddAndCount(t *testing.T) {
 	errorSet := NewValidationErrorSet()
-	
+
 	// Add custom error
 	err1 := NewValidationError("field1", "error1")
 	errorSet.Add(err1)
-	
+
 	assert.True(t, errorSet.HasErrors())
 	assert.Equal(t, 1, errorSet.Count())
 	assert.Len(t, errorSet.Errors(), 1)
 	assert.Equal(t, err1, errorSet.Errors()[0])
-	
+
 	// Add field error
 	errorSet.AddField("field2", "error2")
-	
+
 	assert.Equal(t, 2, errorSet.Count())
 	assert.Len(t, errorSet.Errors(), 2)
 	assert.Equal(t, "field2", errorSet.Errors()[1].Context.Fields["field"])
@@ -207,16 +207,16 @@ func TestValidationErrorSet_AddAndCount(t *testing.T) {
 
 func TestValidationErrorSet_Error(t *testing.T) {
 	errorSet := NewValidationErrorSet()
-	
+
 	// Empty error set
 	assert.Equal(t, "", errorSet.Error())
-	
+
 	// Single error
 	errorSet.AddField("field1", "error1")
 	errorMsg := errorSet.Error()
 	assert.Contains(t, errorMsg, "validation failed with 1 errors")
 	assert.Contains(t, errorMsg, "VALIDATION_ERROR: error1")
-	
+
 	// Multiple errors
 	errorSet.AddField("field2", "error2")
 	errorMsg = errorSet.Error()
@@ -228,18 +228,18 @@ func TestValidationErrorSet_Error(t *testing.T) {
 func TestNewErrorHandler(t *testing.T) {
 	logger := "mock_logger"
 	handler := NewErrorHandler(logger)
-	
+
 	assert.NotNil(t, handler)
 	assert.Equal(t, logger, handler.logger)
 }
 
 func TestErrorHandler_Handle(t *testing.T) {
 	handler := NewErrorHandler(nil)
-	
+
 	// Test nil error
 	result := handler.Handle(nil)
 	assert.Nil(t, result)
-	
+
 	// Test ToolError
 	toolErr := &ToolError{
 		Code:     "TEST_ERROR",
@@ -248,11 +248,11 @@ func TestErrorHandler_Handle(t *testing.T) {
 	}
 	result = handler.Handle(toolErr)
 	assert.Equal(t, toolErr, result)
-	
+
 	// Test unknown error
 	unknownErr := errors.New("unknown error")
 	result = handler.Handle(unknownErr)
-	
+
 	toolResult, ok := result.(*ToolError)
 	require.True(t, ok)
 	assert.Equal(t, "SYSTEM_ERROR", toolResult.Code)
@@ -261,7 +261,7 @@ func TestErrorHandler_Handle(t *testing.T) {
 
 func TestErrorHandler_IsRetryable(t *testing.T) {
 	handler := NewErrorHandler(nil)
-	
+
 	tests := []struct {
 		name      string
 		error     error
@@ -382,25 +382,25 @@ func TestErrorHandler_IsRetryable(t *testing.T) {
 
 func TestErrorHandler_isRetryableCode(t *testing.T) {
 	handler := NewErrorHandler(nil)
-	
+
 	retryableCodes := []string{
 		"TIMEOUT",
-		"CONNECTION_REFUSED", 
+		"CONNECTION_REFUSED",
 		"RESOURCE_BUSY",
 		"RATE_LIMITED",
 	}
-	
+
 	nonRetryableCodes := []string{
 		"INVALID_INPUT",
 		"NOT_FOUND",
 		"VALIDATION_ERROR",
 		"PERMISSION_DENIED",
 	}
-	
+
 	for _, code := range retryableCodes {
 		assert.True(t, handler.isRetryableCode(code), "Expected %s to be retryable", code)
 	}
-	
+
 	for _, code := range nonRetryableCodes {
 		assert.False(t, handler.isRetryableCode(code), "Expected %s to not be retryable", code)
 	}
@@ -416,7 +416,7 @@ func TestErrorContext_Structure(t *testing.T) {
 			"custom": "value",
 		},
 	}
-	
+
 	assert.Equal(t, "test_tool", context.Tool)
 	assert.Equal(t, "test_operation", context.Operation)
 	assert.Equal(t, "test_stage", context.Stage)
@@ -427,7 +427,7 @@ func TestErrorContext_Structure(t *testing.T) {
 func TestToolError_ComplexScenario(t *testing.T) {
 	// Test a complex error scenario with chaining
 	underlyingErr := errors.New("connection timeout")
-	
+
 	toolErr := NewErrorBuilder("NETWORK_TIMEOUT", "failed to connect to database").
 		WithType(ErrTypeNetwork).
 		WithSeverity(SeverityHigh).
@@ -439,16 +439,16 @@ func TestToolError_ComplexScenario(t *testing.T) {
 		WithField("host", "db.example.com").
 		WithField("port", 5432).
 		Build()
-	
+
 	// Test error message
 	errorMsg := toolErr.Error()
 	assert.Contains(t, errorMsg, "NETWORK_TIMEOUT")
 	assert.Contains(t, errorMsg, "failed to connect to database")
 	assert.Contains(t, errorMsg, "connection timeout")
-	
+
 	// Test unwrapping
 	assert.Equal(t, underlyingErr, toolErr.Unwrap())
-	
+
 	// Test context
 	assert.Equal(t, "database_connector", toolErr.Context.Tool)
 	assert.Equal(t, "connect", toolErr.Context.Operation)
@@ -456,7 +456,7 @@ func TestToolError_ComplexScenario(t *testing.T) {
 	assert.Equal(t, "sess_123", toolErr.Context.SessionID)
 	assert.Equal(t, "db.example.com", toolErr.Context.Fields["host"])
 	assert.Equal(t, 5432, toolErr.Context.Fields["port"])
-	
+
 	// Test error handler
 	handler := NewErrorHandler(nil)
 	handled := handler.Handle(toolErr)
@@ -466,18 +466,18 @@ func TestToolError_ComplexScenario(t *testing.T) {
 
 func TestValidationErrorSet_LargeSet(t *testing.T) {
 	errorSet := NewValidationErrorSet()
-	
+
 	// Add many errors
 	for i := 0; i < 100; i++ {
 		errorSet.AddField(fmt.Sprintf("field_%d", i), fmt.Sprintf("error_%d", i))
 	}
-	
+
 	assert.Equal(t, 100, errorSet.Count())
 	assert.True(t, errorSet.HasErrors())
-	
+
 	errorMsg := errorSet.Error()
 	assert.Contains(t, errorMsg, "validation failed with 100 errors")
-	
+
 	// Check that all errors are included in the message
 	for i := 0; i < 10; i++ { // Check first 10
 		assert.Contains(t, errorMsg, fmt.Sprintf("error_%d", i))

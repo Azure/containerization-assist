@@ -214,7 +214,7 @@ To reduce PR comment noise, we use a consolidated CI status approach:
 
 ### Individual Workflows
 - **security-scan.yml** - Runs security scans, uploads artifacts
-- **quality-gates.yml** - Runs quality checks, uploads artifacts  
+- **quality-gates.yml** - Runs quality checks, uploads artifacts
 - **core-coverage-enforcement.yml** - Runs coverage checks, posts coverage comment (kept separate due to detailed reporting needs)
 - **lint-dashboard.yml** - Runs lint checks, uploads artifacts
 

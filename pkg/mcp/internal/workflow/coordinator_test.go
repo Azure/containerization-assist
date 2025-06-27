@@ -45,7 +45,7 @@ func (m *mockExecutor) ExecuteStageGroup(ctx context.Context, stages []WorkflowS
 	if m.executeError != nil {
 		return nil, m.executeError
 	}
-	
+
 	if m.stageResults != nil {
 		return m.stageResults, nil
 	}
@@ -75,7 +75,7 @@ func (m *mockWorkflowSessionManager) CreateSession(spec *WorkflowSpec) (*Workflo
 	if m.createError != nil {
 		return nil, m.createError
 	}
-	
+
 	session := &WorkflowSession{
 		ID:               "test-session-id",
 		WorkflowID:       "test-workflow-id",
@@ -94,12 +94,12 @@ func (m *mockWorkflowSessionManager) CreateSession(spec *WorkflowSpec) (*Workflo
 		UpdatedAt:        time.Now(),
 		Checkpoints:      []WorkflowCheckpoint{},
 	}
-	
+
 	if m.sessions == nil {
 		m.sessions = make(map[string]*WorkflowSession)
 	}
 	m.sessions[session.ID] = session
-	
+
 	return session, nil
 }
 
@@ -107,16 +107,16 @@ func (m *mockWorkflowSessionManager) GetSession(sessionID string) (*WorkflowSess
 	if m.getError != nil {
 		return nil, m.getError
 	}
-	
+
 	if m.sessions == nil {
 		return nil, errors.New("session not found")
 	}
-	
+
 	session, exists := m.sessions[sessionID]
 	if !exists {
 		return nil, errors.New("session not found")
 	}
-	
+
 	return session, nil
 }
 
@@ -124,12 +124,12 @@ func (m *mockWorkflowSessionManager) UpdateSession(session *WorkflowSession) err
 	if m.updateError != nil {
 		return m.updateError
 	}
-	
+
 	if m.sessions == nil {
 		m.sessions = make(map[string]*WorkflowSession)
 	}
 	m.sessions[session.ID] = session
-	
+
 	return nil
 }
 
@@ -142,11 +142,11 @@ func (m *mockDependencyResolver) ResolveDependencies(stages []WorkflowStage) ([]
 	if m.resolveError != nil {
 		return nil, m.resolveError
 	}
-	
+
 	if m.groups != nil {
 		return m.groups, nil
 	}
-	
+
 	// Default: each stage in its own group
 	groups := make([][]WorkflowStage, len(stages))
 	for i, stage := range stages {
@@ -167,17 +167,17 @@ func (m *mockCheckpointManager) CreateCheckpoint(session *WorkflowSession, stage
 	if m.createError != nil {
 		return nil, m.createError
 	}
-	
+
 	checkpoint := &WorkflowCheckpoint{
 		ID:      "checkpoint-" + stageID,
 		StageID: stageID,
 		Created: time.Now(),
 	}
-	
+
 	if m.checkpoint != nil {
 		return m.checkpoint, nil
 	}
-	
+
 	return checkpoint, nil
 }
 
@@ -185,7 +185,7 @@ func (m *mockCheckpointManager) RestoreFromCheckpoint(sessionID string, checkpoi
 	if m.restoreError != nil {
 		return nil, m.restoreError
 	}
-	
+
 	session := &WorkflowSession{
 		ID:           sessionID,
 		Status:       WorkflowStatusPaused,
@@ -193,7 +193,7 @@ func (m *mockCheckpointManager) RestoreFromCheckpoint(sessionID string, checkpoi
 		UpdatedAt:    time.Now(),
 		LastActivity: time.Now(),
 	}
-	
+
 	return session, nil
 }
 
@@ -201,11 +201,11 @@ func (m *mockCheckpointManager) ListCheckpoints(sessionID string) ([]*WorkflowCh
 	if m.listError != nil {
 		return nil, m.listError
 	}
-	
+
 	if m.checkpoints != nil {
 		return m.checkpoints, nil
 	}
-	
+
 	return []*WorkflowCheckpoint{}, nil
 }
 
@@ -603,7 +603,7 @@ func TestCoordinator_GetCheckpointHistory(t *testing.T) {
 	executor := &mockExecutor{}
 	sessionManager := &mockWorkflowSessionManager{}
 	depResolver := &mockDependencyResolver{}
-	
+
 	expectedCheckpoints := []*WorkflowCheckpoint{
 		{
 			ID:      "checkpoint-1",
@@ -616,7 +616,7 @@ func TestCoordinator_GetCheckpointHistory(t *testing.T) {
 			Created: time.Now(),
 		},
 	}
-	
+
 	checkpointManager := &mockCheckpointManager{
 		checkpoints: expectedCheckpoints,
 	}

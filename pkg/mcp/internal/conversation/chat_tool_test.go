@@ -178,20 +178,20 @@ func TestChatTool_GetMetadata(t *testing.T) {
 	assert.Equal(t, "Interactive chat tool for conversation mode with AI assistance", metadata.Description)
 	assert.Equal(t, "1.0.0", metadata.Version)
 	assert.Equal(t, "Communication", metadata.Category)
-	
+
 	assert.Contains(t, metadata.Dependencies, "AI Handler")
 	assert.Contains(t, metadata.Dependencies, "Session Management")
-	
+
 	assert.Contains(t, metadata.Capabilities, "Interactive conversation")
 	assert.Contains(t, metadata.Capabilities, "Session continuity")
 	assert.Contains(t, metadata.Capabilities, "Multi-turn dialogue")
-	
+
 	assert.Contains(t, metadata.Requirements, "Valid message content")
 	assert.Contains(t, metadata.Requirements, "AI handler function")
-	
+
 	assert.Equal(t, "Required: Your message to the assistant", metadata.Parameters["message"])
 	assert.Equal(t, "Optional: Session ID for continuing a conversation", metadata.Parameters["session_id"])
-	
+
 	assert.Len(t, metadata.Examples, 2)
 	assert.Equal(t, "Start new conversation", metadata.Examples[0].Name)
 	assert.Equal(t, "Continue conversation", metadata.Examples[1].Name)
