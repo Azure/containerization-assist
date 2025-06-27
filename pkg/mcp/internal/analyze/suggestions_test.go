@@ -26,7 +26,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 		}
 
 		suggestions := analyzer.generateContainerizationSuggestions(analysisResult)
-		
+
 		if len(suggestions) == 0 {
 			t.Error("Expected at least one suggestion")
 		}
@@ -89,7 +89,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 		}
 
 		suggestions := analyzer.generateContainerizationSuggestions(analysisResult)
-		
+
 		// Should have no suggestions for empty analysis
 		if len(suggestions) != 0 {
 			t.Errorf("Expected no suggestions for minimal analysis, got %d", len(suggestions))
@@ -105,7 +105,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 		}
 
 		suggestions := analyzer.generateContainerizationSuggestions(analysisResult)
-		
+
 		if len(suggestions) != 1 {
 			t.Errorf("Expected 1 suggestion for language-only analysis, got %d", len(suggestions))
 		}
@@ -132,7 +132,7 @@ func TestGenerateNextStepSuggestions(t *testing.T) {
 		}
 
 		suggestions := analyzer.generateNextStepSuggestions(analysisResult, context)
-		
+
 		if len(suggestions) == 0 {
 			t.Error("Expected at least one suggestion")
 		}
@@ -204,12 +204,12 @@ func TestGenerateNextStepSuggestions(t *testing.T) {
 		}
 
 		context := &AnalysisContext{
-			DockerFiles: []string{"Dockerfile"}, // Has docker file
+			DockerFiles: []string{"Dockerfile"},      // Has docker file
 			K8sFiles:    []string{"deployment.yaml"}, // Has k8s files
 		}
 
 		suggestions := analyzer.generateNextStepSuggestions(analysisResult, context)
-		
+
 		if len(suggestions) == 0 {
 			t.Error("Expected at least one suggestion")
 		}
@@ -241,7 +241,7 @@ func TestGenerateNextStepSuggestions(t *testing.T) {
 		// Should still suggest build, security, and secrets scanning
 		expectedSuggestions := []string{
 			"Build container image",
-			"security vulnerabilities", 
+			"security vulnerabilities",
 			"Scan for secrets",
 		}
 

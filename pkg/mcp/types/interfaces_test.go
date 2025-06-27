@@ -9,7 +9,7 @@ import (
 // Test interface conformance by implementing mock types
 
 // MockAIAnalyzer implements AIAnalyzer interface
-type MockAIAnalyzer struct{
+type MockAIAnalyzer struct {
 	tokenUsage TokenUsage
 }
 
@@ -61,7 +61,7 @@ func (m *MockAIAnalyzer) ResetTokenUsage() {
 func TestInterfaceConformance(t *testing.T) {
 	// Test AIAnalyzer interface
 	var aiAnalyzer AIAnalyzer = &MockAIAnalyzer{}
-	
+
 	// Test initial state
 	initialUsage := aiAnalyzer.GetTokenUsage()
 	if initialUsage.TotalTokens != 0 {

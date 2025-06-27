@@ -9,7 +9,7 @@ func TestDefaultToolAnalyzer(t *testing.T) {
 	// Test constructor
 	toolName := "test-tool"
 	analyzer := NewDefaultToolAnalyzer(toolName)
-	
+
 	if analyzer == nil {
 		t.Error("NewDefaultToolAnalyzer should not return nil")
 	}
@@ -58,7 +58,7 @@ func TestAnalyzeValidationFailure(t *testing.T) {
 // Test ToolAnalyzer interface compliance
 func TestToolAnalyzerInterface(t *testing.T) {
 	var analyzer ToolAnalyzer = NewDefaultToolAnalyzer("interface-test")
-	
+
 	// Verify it implements the interface correctly
 	err := analyzer.AnalyzeValidationFailure("/test/path", "test-session")
 	if err != nil {
@@ -70,7 +70,7 @@ func TestToolAnalyzerInterface(t *testing.T) {
 func TestToolAnalyzerVariousNames(t *testing.T) {
 	testCases := []string{
 		"build-tool",
-		"deploy-tool", 
+		"deploy-tool",
 		"analyze-tool",
 		"test_tool_with_underscores",
 		"tool-with-123-numbers",

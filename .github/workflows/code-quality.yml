@@ -135,7 +135,7 @@ jobs:
 
     - name: Install golangci-lint
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
         sudo apt-get update && sudo apt-get install -y jq bc
 
     - name: Load thresholds
@@ -167,7 +167,7 @@ jobs:
           local output="lint-reports/${name}.json"
 
           echo "Analyzing $name packages: $packages"
-          golangci-lint run --out-format json --timeout=10m --disable=typecheck $packages > "$output" || true
+          golangci-lint run --out-format json --timeout=10m $packages > "$output" || true
 
           # Generate statistics
           local error_count=$(jq '[.Issues[] | select(.Severity == "error")] | length' "$output" 2>/dev/null || echo "0")

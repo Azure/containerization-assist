@@ -7,7 +7,7 @@ import (
 // Test standardTagStages function
 func TestStandardTagStages(t *testing.T) {
 	stages := standardTagStages()
-	
+
 	if len(stages) == 0 {
 		t.Error("standardTagStages should return at least one stage")
 	}

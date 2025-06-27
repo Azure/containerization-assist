@@ -88,7 +88,7 @@ func TestConfigurationAnalyzerIsApplicable(t *testing.T) {
 			{Path: "main.go", Content: "package main", Size: 200},
 		},
 		Languages: map[string]float64{
-			"Go": 80.5,
+			"Go":   80.5,
 			"YAML": 19.5,
 		},
 		Structure: map[string]interface{}{
@@ -156,9 +156,9 @@ func TestRepoDataTypes(t *testing.T) {
 			"Go":   33.3,
 		},
 		Structure: map[string]interface{}{
-			"type":        "application",
-			"has_config":  true,
-			"file_count":  2,
+			"type":       "application",
+			"has_config": true,
+			"file_count": 2,
 		},
 	}
 

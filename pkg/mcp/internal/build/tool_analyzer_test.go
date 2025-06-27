@@ -8,7 +8,7 @@ import (
 func TestNewDefaultToolAnalyzer(t *testing.T) {
 	toolName := "build-tool"
 	analyzer := NewDefaultToolAnalyzer(toolName)
-	
+
 	if analyzer == nil {
 		t.Error("NewDefaultToolAnalyzer should not return nil")
 	}
@@ -125,7 +125,7 @@ func TestAnalyzeTagFailure(t *testing.T) {
 // Test ToolAnalyzer interface compliance
 func TestToolAnalyzerInterface(t *testing.T) {
 	var analyzer ToolAnalyzer = NewDefaultToolAnalyzer("interface-test")
-	
+
 	// Verify it implements the interface correctly
 	err := analyzer.AnalyzeBuildFailure("test-session", "test-image")
 	if err != nil {

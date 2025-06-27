@@ -135,7 +135,7 @@ func TestMCPClientsStructure(t *testing.T) {
 		t.Error("Docker field should be accessible")
 	}
 	if &clients.Kind == nil {
-		t.Error("Kind field should be accessible") 
+		t.Error("Kind field should be accessible")
 	}
 	if &clients.Kube == nil {
 		t.Error("Kube field should be accessible")

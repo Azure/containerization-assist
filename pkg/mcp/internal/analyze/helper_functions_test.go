@@ -233,7 +233,7 @@ func TestValidateAnalysisOptions(t *testing.T) {
 	})
 }
 
-// Test additional file helper functions  
+// Test additional file helper functions
 func TestAdditionalFileHelpers(t *testing.T) {
 	logger := zerolog.Nop()
 	analyzer := NewAnalyzer(logger)
@@ -247,10 +247,10 @@ func TestAdditionalFileHelpers(t *testing.T) {
 
 	// Create test files
 	testFiles := map[string]string{
-		"README.md":     "# Test Repository",
-		"readme.txt":    "Test readme",
-		"LICENSE":       "MIT License",
-		"license.txt":   "License content",
+		"README.md":                "# Test Repository",
+		"readme.txt":               "Test readme",
+		"LICENSE":                  "MIT License",
+		"license.txt":              "License content",
 		".github/workflows/ci.yml": "name: CI",
 		".gitlab-ci.yml":           "stages: [test]",
 		"jenkins.file":             "pipeline {}",
@@ -315,9 +315,9 @@ func TestCalculateDirectorySize(t *testing.T) {
 
 	// Create test files with known sizes
 	testFiles := map[string]string{
-		"file1.txt": "Hello World", // 11 bytes
-		"file2.txt": "Test",        // 4 bytes
-		"dir1/file3.txt": "Content", // 7 bytes
+		"file1.txt":      "Hello World", // 11 bytes
+		"file2.txt":      "Test",        // 4 bytes
+		"dir1/file3.txt": "Content",     // 7 bytes
 	}
 
 	expectedSize := int64(0)
@@ -371,7 +371,7 @@ func TestAnalyzeRepositoryRedirectTool(t *testing.T) {
 
 	// Create an atomic tool instance (can be nil for metadata test)
 	var atomicTool *AtomicAnalyzeRepositoryTool
-	
+
 	// Test constructor
 	tool := NewAnalyzeRepositoryRedirectTool(atomicTool, logger)
 	if tool == nil {
@@ -405,7 +405,7 @@ func TestAnalyzeRepositoryRedirectTool(t *testing.T) {
 	// Test specific capabilities
 	expectedCapabilities := []string{
 		"language_detection",
-		"framework_analysis", 
+		"framework_analysis",
 		"dependency_scanning",
 		"structure_analysis",
 		"containerization_assessment",

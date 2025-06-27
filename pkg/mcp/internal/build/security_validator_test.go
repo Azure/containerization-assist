@@ -9,7 +9,7 @@ import (
 // Test compileSecretPatterns function
 func TestCompileSecretPatterns(t *testing.T) {
 	patterns := compileSecretPatterns()
-	
+
 	if len(patterns) == 0 {
 		t.Error("compileSecretPatterns should return at least one pattern")
 	}
@@ -72,7 +72,7 @@ func TestNewSecurityValidator(t *testing.T) {
 	trustedRegistries := []string{"docker.io", "gcr.io", "quay.io"}
 
 	validator := NewSecurityValidator(logger, trustedRegistries)
-	
+
 	if validator == nil {
 		t.Error("NewSecurityValidator should not return nil")
 	}

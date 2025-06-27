@@ -313,8 +313,8 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 			result.AnalysisDuration = time.Duration(session.ScanSummary.AnalysisDuration * float64(time.Second))
 			result.TotalDuration = time.Since(startTime)
 			result.Success = true
-			result.BaseAIContextResult.IsSuccessful = true
-			result.BaseAIContextResult.Duration = result.TotalDuration
+			result.IsSuccessful = true
+			result.Duration = result.TotalDuration
 
 			t.logger.Info().
 				Str("session_id", session.SessionID).
@@ -412,8 +412,8 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 	result.TotalDuration = time.Since(startTime)
 
 	// Update mcptypes.BaseAIContextResult fields
-	result.BaseAIContextResult.IsSuccessful = true
-	result.BaseAIContextResult.Duration = result.TotalDuration
+	result.IsSuccessful = true
+	result.Duration = result.TotalDuration
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
