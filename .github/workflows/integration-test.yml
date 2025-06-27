@@ -3,6 +3,10 @@ name: Integration Test
 on:
   workflow_dispatch:
   pull_request:
+    paths-ignore: # don't run if the only paths are in mcp server
+      - 'pkg/mcp/**'
+      - 'pkg/core/**'
+      - 'test/integration/**'
 
 # ensure that only one workflow is running at a time per branch/pr by canceling in-progress runs
 concurrency:
@@ -115,7 +119,14 @@ jobs:
           echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
 
           echo "Running container-kit generate for test $RUN_NAME ..."
-          container-kit generate . --snapshot > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
+          LOG_FILE="artifacts/logs/run-${RUN_NAME}.log"
+          container-kit generate . --snapshot > "$LOG_FILE" 2>&1
+
+          # Check for rate limiting
+          if grep -q "429 Too Many Requests" "$LOG_FILE"; then
+            echo "❌ Test Run $RUN_NAME: LLM Endpoint Rate limit exceeded"
+            exit 1
+          fi
 
           # Save the files it created for successful tests
           if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
