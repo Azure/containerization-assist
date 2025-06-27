@@ -2,7 +2,7 @@ name: MCP Integration Tests
 
 on:
   push:
-    branches: [ main, gambtho/mcp ]
+    branches: [ main ]
     paths:
       - 'pkg/mcp/**'
       - 'pkg/core/**'
