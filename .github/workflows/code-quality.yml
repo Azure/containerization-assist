@@ -22,11 +22,142 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Canary phase - quick validation before running expensive jobs
+  canary:
+    name: Canary Validation
+    runs-on: ubuntu-latest
+    outputs:
+      should-continue: ${{ steps.canary-check.outputs.success }}
+      test-mcp: ${{ steps.detect-paths.outputs.test_mcp }}
+      test-core: ${{ steps.detect-paths.outputs.test_core }}
+      test-cli: ${{ steps.detect-paths.outputs.test_cli }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.1.6
+
+    - name: Detect changed paths
+      id: detect-paths
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # Get changed files
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
+          echo "Changed files:"
+          echo "$changed_files"
+
+          # Check for MCP changes
+          mcp_changes=$(echo "$changed_files" | grep -E "^(pkg/mcp|cmd/mcp-server)" || true)
+
+          # Check for Core changes
+          core_changes=$(echo "$changed_files" | grep -E "^(pkg/core|pkg/utils)" || true)
+
+          # Check for CLI changes
+          cli_changes=$(echo "$changed_files" | grep -E "^(pkg/ai|pkg/pipeline|cmd/)" || true)
+
+          # Set outputs
+          echo "test_mcp=$([ -n "$mcp_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "test_core=$([ -n "$core_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "test_cli=$([ -n "$cli_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+
+          echo "MCP changes: $([ -n "$mcp_changes" ] && echo "yes" || echo "no")"
+          echo "Core changes: $([ -n "$core_changes" ] && echo "yes" || echo "no")"
+          echo "CLI changes: $([ -n "$cli_changes" ] && echo "yes" || echo "no")"
+        else
+          # For non-PR events, test everything
+          echo "test_mcp=true" >> $GITHUB_OUTPUT
+          echo "test_core=true" >> $GITHUB_OUTPUT
+          echo "test_cli=true" >> $GITHUB_OUTPUT
+          echo "Non-PR event: testing all packages"
+        fi
+
+    - name: Canary validation
+      id: canary-check
+      run: |
+        echo "🚀 Running canary validation..."
+
+        # Test 1: Go mod tidy check
+        echo "📝 Testing go mod tidy..."
+        cp go.mod go.mod.bak
+        cp go.sum go.sum.bak
+        go mod tidy
+        if ! diff -q go.mod go.mod.bak >/dev/null || ! diff -q go.sum go.sum.bak >/dev/null; then
+          echo "❌ go mod tidy would make changes - dependencies are not tidy"
+          echo "Run 'go mod tidy' locally and commit the changes"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ Go mod tidy passed"
+
+        # Test 2: Format check
+        echo "🎨 Testing gofmt..."
+        unformatted=$(gofmt -s -l .)
+        if [ -n "$unformatted" ]; then
+          echo "❌ Code formatting issues found:"
+          echo "$unformatted"
+          echo "Run 'gofmt -s -w .' to fix formatting"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ Code formatting passed"
+
+        # Test 3: Import formatting check
+        echo "📋 Testing goimports..."
+        go install golang.org/x/tools/cmd/goimports@latest
+        goimports_output=$(goimports -l .)
+        if [ -n "$goimports_output" ]; then
+          echo "❌ Import formatting issues found:"
+          echo "$goimports_output"
+          echo "Run 'goimports -w .' to fix import formatting"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ Import formatting passed"
+
+        # Test 4: Build check
+        echo "📦 Testing build..."
+        if ! go build ./...; then
+          echo "❌ Build failed"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ Build passed"
+
+        # Test 5: Basic lint check
+        echo "🔍 Testing lint..."
+        if ! golangci-lint run --timeout=5m ./...; then
+          echo "❌ Lint failed"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ Lint passed"
+
+        # Test 6: Short tests
+        echo "🧪 Testing short tests..."
+        if ! go test -short ./...; then
+          echo "❌ Short tests failed"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ Short tests passed"
+
+        echo "🎉 All canary checks passed!"
+        echo "success=true" >> $GITHUB_OUTPUT
+
   # Quick format and quality checks for PRs
   format-and-quality:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && needs.canary.outputs.should-continue == 'true'
     name: Format & Code Quality Checks
     runs-on: ubuntu-latest
+    needs: canary
 
     steps:
     - uses: actions/checkout@v4
@@ -123,6 +254,8 @@ jobs:
   lint-comprehensive:
     name: Comprehensive Linting
     runs-on: ubuntu-latest
+    needs: canary
+    if: needs.canary.outputs.should-continue == 'true'
 
     steps:
     - uses: actions/checkout@v4
@@ -135,7 +268,7 @@ jobs:
 
     - name: Install golangci-lint
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.1.6
         sudo apt-get update && sudo apt-get install -y jq bc
 
     - name: Load thresholds
@@ -167,7 +300,7 @@ jobs:
           local output="lint-reports/${name}.json"
 
           echo "Analyzing $name packages: $packages"
-          golangci-lint run --out-format json --timeout=10m --disable=typecheck $packages > "$output" || true
+          golangci-lint run --output.json.path="$output" --timeout=10m $packages || true
 
           # Generate statistics
           local error_count=$(jq '[.Issues[] | select(.Severity == "error")] | length' "$output" 2>/dev/null || echo "0")
@@ -202,10 +335,36 @@ jobs:
         echo "# Lint Report - $(date +%Y-%m-%d)" > lint-report.md
         echo "" >> lint-report.md
 
-        # Run analysis for each package group
-        analyze_package "MCP" "./pkg/mcp/..." ${{ steps.thresholds.outputs.mcp_error }} ${{ steps.thresholds.outputs.mcp_warning }}
-        analyze_package "Core" "./pkg/core/... ./pkg/pipeline/... ./pkg/utils/..." ${{ steps.thresholds.outputs.core_error }} ${{ steps.thresholds.outputs.core_warning }}
-        analyze_package "CLI" "./pkg/ai/... ./cmd/..." 50 30
+        # Run analysis for each package group (conditionally based on changes)
+        if [ "${{ needs.canary.outputs.test-mcp }}" = "true" ]; then
+          echo "🔍 Analyzing MCP packages (changes detected)"
+          analyze_package "MCP" "./pkg/mcp/..." ${{ steps.thresholds.outputs.mcp_error }} ${{ steps.thresholds.outputs.mcp_warning }}
+        else
+          echo "⏭️ Skipping MCP package analysis (no changes detected)"
+          echo "MCP_errors=0" >> lint-stats.txt
+          echo "MCP_warnings=0" >> lint-stats.txt
+          echo "MCP_total=0" >> lint-stats.txt
+        fi
+
+        if [ "${{ needs.canary.outputs.test-core }}" = "true" ]; then
+          echo "🔍 Analyzing Core packages (changes detected)"
+          analyze_package "Core" "./pkg/core/... ./pkg/utils/..." ${{ steps.thresholds.outputs.core_error }} ${{ steps.thresholds.outputs.core_warning }}
+        else
+          echo "⏭️ Skipping Core package analysis (no changes detected)"
+          echo "Core_errors=0" >> lint-stats.txt
+          echo "Core_warnings=0" >> lint-stats.txt
+          echo "Core_total=0" >> lint-stats.txt
+        fi
+
+        if [ "${{ needs.canary.outputs.test-cli }}" = "true" ]; then
+          echo "🔍 Analyzing CLI packages (changes detected)"
+          analyze_package "CLI" "./pkg/ai/... ./pkg/pipeline/... ./cmd/..." 50 30
+        else
+          echo "⏭️ Skipping CLI package analysis (no changes detected)"
+          echo "CLI_errors=0" >> lint-stats.txt
+          echo "CLI_warnings=0" >> lint-stats.txt
+          echo "CLI_total=0" >> lint-stats.txt
+        fi
 
         # Load statistics for summary
         source lint-stats.txt
@@ -221,7 +380,50 @@ jobs:
 
         echo "budget_violations=$BUDGET_VIOLATIONS" >> $GITHUB_OUTPUT
 
-        # Add summary
+        # Create CI Status Summary
+        echo "## 🚀 CI Status Summary" > ci-status.md
+        echo "" >> ci-status.md
+        echo "### Canary Validation" >> ci-status.md
+        echo "✅ **go mod tidy** • ✅ **gofmt** • ✅ **goimports** • ✅ **build** • ✅ **lint** • ✅ **test -short**" >> ci-status.md
+        echo "" >> ci-status.md
+
+        echo "### Lint Analysis" >> ci-status.md
+        echo "| Package Group | Errors | Warnings | Status |" >> ci-status.md
+        echo "|---------------|--------|----------|--------|" >> ci-status.md
+
+        # MCP row
+        if [ "${{ needs.canary.outputs.test-mcp }}" = "true" ]; then
+          echo "| MCP | $MCP_errors | $MCP_warnings | $([ $MCP_errors -gt ${{ steps.thresholds.outputs.mcp_error }} ] && echo "❌ Over Error" || echo "✅ OK") |" >> ci-status.md
+        else
+          echo "| MCP | - | - | ⏭️ Skipped (no changes) |" >> ci-status.md
+        fi
+
+        # Core row
+        if [ "${{ needs.canary.outputs.test-core }}" = "true" ]; then
+          echo "| Core | $Core_errors | $Core_warnings | $([ $Core_errors -gt ${{ steps.thresholds.outputs.core_error }} ] && echo "❌ Over Error" || echo "✅ OK") |" >> ci-status.md
+        else
+          echo "| Core | - | - | ⏭️ Skipped (no changes) |" >> ci-status.md
+        fi
+
+        # CLI row
+        if [ "${{ needs.canary.outputs.test-cli }}" = "true" ]; then
+          echo "| CLI | $CLI_errors | $CLI_warnings | $([ $CLI_errors -gt 50 ] && echo "❌ Over Error" || echo "✅ OK") |" >> ci-status.md
+        else
+          echo "| CLI | - | - | ⏭️ Skipped (no changes) |" >> ci-status.md
+        fi
+        echo "" >> ci-status.md
+
+        # Overall status
+        overall_status="✅ All checks passed"
+        if [ -n "$BUDGET_VIOLATIONS" ] && [ "$BUDGET_VIOLATIONS" != "" ]; then
+          overall_status="❌ Error budget violations found"
+        fi
+        echo "### Overall Status: $overall_status" >> ci-status.md
+
+        # Store results for PR comment
+        echo "ci_status_file=ci-status.md" >> $GITHUB_OUTPUT
+
+        # Legacy lint report for artifact upload
         echo "## Summary" >> lint-report.md
         echo "" >> lint-report.md
         echo "| Package Group | Errors | Warnings | Status |" >> lint-report.md
@@ -244,9 +446,9 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const report = fs.readFileSync('lint-report.md', 'utf8');
+          const ciStatus = fs.readFileSync('ci-status.md', 'utf8');
 
-          // Look for existing lint comments to replace
+          // Look for existing CI status comments to replace
           const comments = await github.rest.issues.listComments({
             issue_number: context.issue.number,
             owner: context.repo.owner,
@@ -254,11 +456,11 @@ jobs:
           });
 
           const existingComment = comments.data.find(comment =>
-            comment.body.includes('# Lint Report') &&
+            comment.body.includes('🚀 CI Status Summary') &&
             comment.user.type === 'Bot'
           );
 
-          const commentBody = `${report}\n\n---\n*Updated automatically by Code Quality workflow*`;
+          const commentBody = `${ciStatus}\n\n---\n*Updated automatically by Code Quality workflow*`;
 
           if (existingComment) {
             await github.rest.issues.updateComment({

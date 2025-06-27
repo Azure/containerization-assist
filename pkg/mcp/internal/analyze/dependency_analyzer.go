@@ -159,7 +159,7 @@ func (d *DependencyAnalyzer) analyzeJavaScriptDependencies(repoData *RepoData, r
 			finding := Finding{
 				Type:        FindingTypeDependency,
 				Category:    "critical_dependency",
-				Title:       fmt.Sprintf("%s Dependency", strings.Title(dep)),
+				Title:       fmt.Sprintf("%s Dependency", strings.ToTitle(dep[:1])+dep[1:]),
 				Description: fmt.Sprintf("Critical %s dependency detected", dep),
 				Confidence:  0.9,
 				Severity:    SeverityInfo,
@@ -195,7 +195,7 @@ func (d *DependencyAnalyzer) analyzePythonDependencies(repoData *RepoData, resul
 			finding := Finding{
 				Type:        FindingTypeDependency,
 				Category:    "critical_dependency",
-				Title:       fmt.Sprintf("%s Dependency", strings.Title(dep)),
+				Title:       fmt.Sprintf("%s Dependency", strings.ToTitle(dep[:1])+dep[1:]),
 				Description: fmt.Sprintf("Critical %s dependency detected", dep),
 				Confidence:  0.9,
 				Severity:    SeverityInfo,

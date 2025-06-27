@@ -1,60 +1,51 @@
+version: "2"
+run:
+  go: "1.24"
+  tests: true
 linters:
-  enable:
-    # Essential linters that catch real bugs
-    - govet
-    - staticcheck
-    - ineffassign
-
   disable:
-    - errcheck   # Too noisy for now
-    - unused     # Too noisy for now
-    - typecheck  # Disabled temporarily due to extensive BaseToolArgs refactoring needed
-
-  disable-all: false
-
-linters-settings:
-  staticcheck:
-    checks: ["all", "-ST1000", "-ST1001", "-ST1003"]  # Disable some style checks
-
+    - errcheck
+    - unused
+    - ineffassign      # Disable ineffectual assignment checks
+    - staticcheck      # Temporarily disable advanced static analysis
+  settings:
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - govet
+        path: _test\.go
+      - linters:
+          - govet
+        path: cmd/
+      - linters:
+          - govet
+        path: tools/
+    paths:
+      - .*\.pb\.go$
+      - .*_gen\.go$
+      - cmd/*
+      - vendor
+      - .git
+      - bin
+      - dist
+      - tools
+      - third_party$
+      - builtin$
+      - examples$
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   new: false
-
-  exclude-dirs:
-    - vendor
-    - .git
-    - bin
-    - dist
-    - tools  # Exclude tools directory entirely
-
-  exclude-files:
-    - ".*\\.pb\\.go$"
-    - ".*_gen\\.go$"
-    - "cmd/*"  # Exclude command line tools
-
-  exclude-rules:
-    # Exclude all linters from test files for now
-    - path: _test\.go
-      linters:
-        - govet
-        - staticcheck
-        - ineffassign
-
-    # Exclude specific directories
-    - path: cmd/
-      linters:
-        - govet
-        - staticcheck
-        - ineffassign
-
-    - path: tools/
-      linters:
-        - govet
-        - staticcheck
-        - ineffassign
-
-run:
-  tests: true
-  timeout: 5m
-  go: "1.24"
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

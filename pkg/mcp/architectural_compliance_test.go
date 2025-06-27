@@ -43,7 +43,7 @@ func checkFileForAzureImports(t *testing.T, path string) error {
 	}
 
 	// Skip this test file itself
-	if strings.Contains(path, "no_external_ai_test.go") {
+	if strings.Contains(path, "architectural_compliance_test.go") {
 		return nil
 	}
 
@@ -87,7 +87,7 @@ func filterSelfReferences(output string) []string {
 	lines := strings.Split(output, "\n")
 	filteredLines := []string{}
 	for _, line := range lines {
-		if !strings.Contains(line, "no_external_ai_test.go") && strings.TrimSpace(line) != "" {
+		if !strings.Contains(line, "architectural_compliance_test.go") && strings.TrimSpace(line) != "" {
 			filteredLines = append(filteredLines, line)
 		}
 	}

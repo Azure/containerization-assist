@@ -1,0 +1,331 @@
+package server
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/rs/zerolog"
+)
+
+// MockLogProvider for testing
+type MockLogProvider struct {
+	logs       []utils.LogEntry
+	totalCount int
+}
+
+func (m *MockLogProvider) GetLogs(level string, since time.Time, pattern string, limit int) ([]utils.LogEntry, error) {
+	// Simple filtering for testing - return all logs for simplicity
+	filtered := m.logs
+
+	if limit > 0 && len(filtered) > limit {
+		filtered = filtered[len(filtered)-limit:]
+	}
+
+	return filtered, nil
+}
+
+func (m *MockLogProvider) GetTotalLogCount() int {
+	return m.totalCount
+}
+
+// Test GetLogsArgs type
+func TestGetLogsArgs(t *testing.T) {
+	args := GetLogsArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: "session-123",
+			DryRun:    false,
+		},
+		Level:          "info",
+		TimeRange:      "1h",
+		Pattern:        "error",
+		Limit:          50,
+		Format:         "json",
+		IncludeCallers: true,
+	}
+
+	if args.SessionID != "session-123" {
+		t.Errorf("Expected SessionID to be 'session-123', got '%s'", args.SessionID)
+	}
+	if args.Level != "info" {
+		t.Errorf("Expected Level to be 'info', got '%s'", args.Level)
+	}
+	if args.TimeRange != "1h" {
+		t.Errorf("Expected TimeRange to be '1h', got '%s'", args.TimeRange)
+	}
+	if args.Pattern != "error" {
+		t.Errorf("Expected Pattern to be 'error', got '%s'", args.Pattern)
+	}
+	if args.Limit != 50 {
+		t.Errorf("Expected Limit to be 50, got %d", args.Limit)
+	}
+	if args.Format != "json" {
+		t.Errorf("Expected Format to be 'json', got '%s'", args.Format)
+	}
+	if !args.IncludeCallers {
+		t.Error("Expected IncludeCallers to be true")
+	}
+}
+
+// Test GetLogsResult type
+func TestGetLogsResult(t *testing.T) {
+	oldestTime := time.Now().Add(-1 * time.Hour)
+	newestTime := time.Now()
+
+	result := GetLogsResult{
+		BaseToolResponse: types.BaseToolResponse{
+			SessionID: "session-456",
+			Tool:      "get_logs",
+		},
+		Logs: []utils.LogEntry{
+			{Level: "info", Message: "Test log entry"},
+		},
+		TotalCount:    100,
+		FilteredCount: 10,
+		TimeRange:     "1h",
+		OldestEntry:   &oldestTime,
+		NewestEntry:   &newestTime,
+		Format:        "json",
+		LogText:       "test log text",
+	}
+
+	if result.SessionID != "session-456" {
+		t.Errorf("Expected SessionID to be 'session-456', got '%s'", result.SessionID)
+	}
+	if result.Tool != "get_logs" {
+		t.Errorf("Expected Tool to be 'get_logs', got '%s'", result.Tool)
+	}
+	if len(result.Logs) != 1 {
+		t.Errorf("Expected 1 log entry, got %d", len(result.Logs))
+	}
+	if result.TotalCount != 100 {
+		t.Errorf("Expected TotalCount to be 100, got %d", result.TotalCount)
+	}
+	if result.FilteredCount != 10 {
+		t.Errorf("Expected FilteredCount to be 10, got %d", result.FilteredCount)
+	}
+	if result.TimeRange != "1h" {
+		t.Errorf("Expected TimeRange to be '1h', got '%s'", result.TimeRange)
+	}
+	if result.Format != "json" {
+		t.Errorf("Expected Format to be 'json', got '%s'", result.Format)
+	}
+	if result.LogText != "test log text" {
+		t.Errorf("Expected LogText to be 'test log text', got '%s'", result.LogText)
+	}
+}
+
+// Test MockLogProvider
+func TestMockLogProvider_GetLogs(t *testing.T) {
+	logs := []utils.LogEntry{
+		{Level: "info", Message: "Info message"},
+		{Level: "warn", Message: "Warning message"},
+		{Level: "error", Message: "Error message"},
+	}
+
+	provider := &MockLogProvider{
+		logs:       logs,
+		totalCount: 3,
+	}
+
+	entries, err := provider.GetLogs("info", time.Now().Add(-1*time.Hour), "", 0)
+	if err != nil {
+		t.Errorf("GetLogs should not return error, got %v", err)
+	}
+	if len(entries) != 3 {
+		t.Errorf("Expected 3 log entries, got %d", len(entries))
+	}
+}
+
+// Test MockLogProvider with limit
+func TestMockLogProvider_GetLogsWithLimit(t *testing.T) {
+	logs := []utils.LogEntry{
+		{Level: "info", Message: "Info 1"},
+		{Level: "info", Message: "Info 2"},
+		{Level: "info", Message: "Info 3"},
+		{Level: "info", Message: "Info 4"},
+		{Level: "info", Message: "Info 5"},
+	}
+
+	provider := &MockLogProvider{
+		logs:       logs,
+		totalCount: 5,
+	}
+
+	// Test with limit
+	entries, err := provider.GetLogs("info", time.Now().Add(-1*time.Hour), "", 3)
+	if err != nil {
+		t.Errorf("GetLogs should not return error, got %v", err)
+	}
+	if len(entries) != 3 {
+		t.Errorf("Expected 3 log entries due to limit, got %d", len(entries))
+	}
+}
+
+// Test MockLogProvider GetTotalLogCount
+func TestMockLogProvider_GetTotalLogCount(t *testing.T) {
+	provider := &MockLogProvider{
+		logs:       make([]utils.LogEntry, 0),
+		totalCount: 42,
+	}
+
+	count := provider.GetTotalLogCount()
+	if count != 42 {
+		t.Errorf("Expected total count to be 42, got %d", count)
+	}
+}
+
+// Test NewRingBufferLogProvider constructor
+func TestNewRingBufferLogProvider(t *testing.T) {
+	buffer := &utils.RingBuffer{} // Assume this exists
+	provider := NewRingBufferLogProvider(buffer)
+
+	if provider == nil {
+		t.Error("NewRingBufferLogProvider should not return nil")
+		return
+	}
+	if provider.buffer != buffer {
+		t.Error("Expected buffer to be set correctly")
+	}
+}
+
+// Test NewGetLogsTool constructor
+func TestNewGetLogsTool(t *testing.T) {
+	logger := zerolog.Nop()
+	provider := &MockLogProvider{}
+
+	tool := NewGetLogsTool(logger, provider)
+
+	if tool == nil {
+		t.Error("NewGetLogsTool should not return nil")
+		return
+	}
+	if tool.logProvider != provider {
+		t.Error("Expected logProvider to be set correctly")
+	}
+}
+
+// Test GetLogsTool Execute with valid args
+func TestGetLogsTool_Execute_ValidArgs(t *testing.T) {
+	logger := zerolog.Nop()
+	provider := &MockLogProvider{
+		logs: []utils.LogEntry{
+			{Level: "info", Message: "Test message"},
+		},
+		totalCount: 1,
+	}
+
+	tool := NewGetLogsTool(logger, provider)
+
+	args := GetLogsArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: "test-session",
+		},
+		Level:  "info",
+		Format: "json",
+	}
+
+	result, err := tool.Execute(context.Background(), args)
+	if err != nil {
+		t.Errorf("Execute should not return error, got %v", err)
+	}
+	if result == nil {
+		t.Error("Execute should return result")
+	}
+}
+
+// Test GetLogsTool Execute with invalid args
+func TestGetLogsTool_Execute_InvalidArgs(t *testing.T) {
+	logger := zerolog.Nop()
+	provider := &MockLogProvider{}
+
+	tool := NewGetLogsTool(logger, provider)
+
+	// Invalid args type
+	result, err := tool.Execute(context.Background(), "invalid")
+	if err == nil {
+		t.Error("Execute should return error for invalid args type")
+	}
+	if result != nil {
+		t.Error("Execute should not return result for invalid args")
+	}
+}
+
+// Test GetLogsArgs variations
+func TestGetLogsArgsVariations(t *testing.T) {
+	// Test minimal args
+	minimalArgs := GetLogsArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: "minimal-session",
+		},
+	}
+
+	if minimalArgs.SessionID != "minimal-session" {
+		t.Errorf("Expected SessionID to be 'minimal-session', got '%s'", minimalArgs.SessionID)
+	}
+	if minimalArgs.Level != "" {
+		t.Errorf("Expected Level to be empty by default, got '%s'", minimalArgs.Level)
+	}
+	if minimalArgs.Limit != 0 {
+		t.Errorf("Expected Limit to be 0 by default, got %d", minimalArgs.Limit)
+	}
+
+	// Test full args
+	fullArgs := GetLogsArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: "full-session",
+			DryRun:    true,
+		},
+		Level:          "debug",
+		TimeRange:      "24h",
+		Pattern:        "critical",
+		Limit:          200,
+		Format:         "text",
+		IncludeCallers: false,
+	}
+
+	if fullArgs.SessionID != "full-session" {
+		t.Errorf("Expected SessionID to be 'full-session', got '%s'", fullArgs.SessionID)
+	}
+	if !fullArgs.DryRun {
+		t.Error("Expected DryRun to be true")
+	}
+	if fullArgs.Level != "debug" {
+		t.Errorf("Expected Level to be 'debug', got '%s'", fullArgs.Level)
+	}
+	if fullArgs.TimeRange != "24h" {
+		t.Errorf("Expected TimeRange to be '24h', got '%s'", fullArgs.TimeRange)
+	}
+	if fullArgs.Pattern != "critical" {
+		t.Errorf("Expected Pattern to be 'critical', got '%s'", fullArgs.Pattern)
+	}
+	if fullArgs.Limit != 200 {
+		t.Errorf("Expected Limit to be 200, got %d", fullArgs.Limit)
+	}
+	if fullArgs.Format != "text" {
+		t.Errorf("Expected Format to be 'text', got '%s'", fullArgs.Format)
+	}
+	if fullArgs.IncludeCallers {
+		t.Error("Expected IncludeCallers to be false")
+	}
+}
+
+// Test GetLogsTool struct initialization
+func TestGetLogsToolStruct(t *testing.T) {
+	logger := zerolog.Nop()
+	provider := &MockLogProvider{totalCount: 5}
+
+	tool := GetLogsTool{
+		logger:      logger,
+		logProvider: provider,
+	}
+
+	if tool.logProvider == nil {
+		t.Error("Expected logProvider to be set")
+	}
+	if tool.logProvider.GetTotalLogCount() != 5 {
+		t.Errorf("Expected total log count to be 5, got %d", tool.logProvider.GetTotalLogCount())
+	}
+}

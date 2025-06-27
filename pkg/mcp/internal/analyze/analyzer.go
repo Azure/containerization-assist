@@ -57,8 +57,9 @@ func NewCallerAnalyzer(transport LLMTransport, opts CallerAnalyzerOpts) *CallerA
 
 // Analyze implements ai.Analyzer interface by sending prompt back to hosting LLM
 func (c *CallerAnalyzer) Analyze(ctx context.Context, prompt string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	ctx = timeoutCtx
 
 	// Hash prompt for privacy-safe logging
 	promptHash := fmt.Sprintf("%x", sha256.Sum256([]byte(prompt)))

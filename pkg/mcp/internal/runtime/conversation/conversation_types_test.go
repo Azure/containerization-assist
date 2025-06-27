@@ -1,21 +1,20 @@
-package mcp
+package conversation
 
 import (
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 func TestConversationResponseAutoAdvance(t *testing.T) {
 	t.Run("WithAutoAdvance", func(t *testing.T) {
-		response := &conversation.ConversationResponse{
+		response := &ConversationResponse{
 			Message: "Build complete",
 			Stage:   types.StageBuild,
-			Status:  conversation.ResponseStatusSuccess,
+			Status:  ResponseStatusSuccess,
 		}
 
-		config := conversation.AutoAdvanceConfig{
+		config := AutoAdvanceConfig{
 			DelaySeconds:  2,
 			Confidence:    0.9,
 			Reason:        "High confidence next step",
@@ -39,10 +38,10 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	})
 
 	t.Run("WithUserInput", func(t *testing.T) {
-		response := &conversation.ConversationResponse{
+		response := &ConversationResponse{
 			Message: "Choose an option",
 			Stage:   types.StageBuild,
-			Status:  conversation.ResponseStatusSuccess,
+			Status:  ResponseStatusSuccess,
 		}
 
 		response.WithUserInput()
@@ -61,13 +60,13 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	})
 
 	t.Run("ShouldAutoAdvance", func(t *testing.T) {
-		response := &conversation.ConversationResponse{
+		response := &ConversationResponse{
 			Message: "Build complete",
 			Stage:   types.StageBuild,
-			Status:  conversation.ResponseStatusSuccess,
+			Status:  ResponseStatusSuccess,
 		}
 
-		config := conversation.AutoAdvanceConfig{
+		config := AutoAdvanceConfig{
 			Confidence: 0.9,
 		}
 
@@ -93,14 +92,14 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	})
 
 	t.Run("ConfidenceThreshold", func(t *testing.T) {
-		response := &conversation.ConversationResponse{
+		response := &ConversationResponse{
 			Message: "Build complete",
 			Stage:   types.StageBuild,
-			Status:  conversation.ResponseStatusSuccess,
+			Status:  ResponseStatusSuccess,
 		}
 
 		// Low confidence should not auto-advance
-		lowConfidenceConfig := conversation.AutoAdvanceConfig{
+		lowConfidenceConfig := AutoAdvanceConfig{
 			Confidence: 0.5,
 		}
 
@@ -115,7 +114,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		}
 
 		// High confidence should auto-advance
-		highConfidenceConfig := conversation.AutoAdvanceConfig{
+		highConfidenceConfig := AutoAdvanceConfig{
 			Confidence: 0.9,
 		}
 
@@ -127,13 +126,13 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	})
 
 	t.Run("AutoAdvanceMessage", func(t *testing.T) {
-		response := &conversation.ConversationResponse{
+		response := &ConversationResponse{
 			Message: "Build complete",
 			Stage:   types.StageBuild,
-			Status:  conversation.ResponseStatusSuccess,
+			Status:  ResponseStatusSuccess,
 		}
 
-		config := conversation.AutoAdvanceConfig{
+		config := AutoAdvanceConfig{
 			DelaySeconds: 3,
 			Reason:       "Test auto-advance",
 			CanCancel:    true,
