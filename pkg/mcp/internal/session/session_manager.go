@@ -703,6 +703,7 @@ func generateSessionID() string {
 }
 
 // cleanupOldestSession removes the oldest session to make room for a new one
+// IMPORTANT: This method must be called with sm.mutex already held
 func (sm *SessionManager) cleanupOldestSession() error {
 	if len(sm.sessions) == 0 {
 		return nil
@@ -732,7 +733,14 @@ func (sm *SessionManager) cleanupOldestSession() error {
 }
 
 // deleteSessionInternal removes a session without acquiring the mutex (for internal use)
+// IMPORTANT: This method must be called with sm.mutex already held
 func (sm *SessionManager) deleteSessionInternal(sessionID string) error {
+	return sm.deleteSessionInternalWithContext(context.Background(), sessionID)
+}
+
+// deleteSessionInternalWithContext removes a session with context support
+// IMPORTANT: This method must be called with sm.mutex already held
+func (sm *SessionManager) deleteSessionInternalWithContext(ctx context.Context, sessionID string) error {
 	session, exists := sm.sessions[sessionID]
 	if !exists {
 		return fmt.Errorf("session not found: %s", sessionID)
@@ -747,7 +755,7 @@ func (sm *SessionManager) deleteSessionInternal(sessionID string) error {
 	}
 
 	// Remove from persistent store
-	if err := sm.store.Delete(context.Background(), sessionID); err != nil {
+	if err := sm.store.Delete(ctx, sessionID); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to remove session from persistent store")
 	}
 

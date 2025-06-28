@@ -979,15 +979,8 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 			Build()
 	}
 
-	// Auto-default to session workspace Dockerfile if neither path nor content provided
-	if validateArgs.DockerfilePath == "" && validateArgs.DockerfileContent == "" {
-		// Set default path to session workspace Dockerfile
-		validateArgs.DockerfilePath = "Dockerfile"
-		t.logger.Debug().
-			Str("session_id", validateArgs.SessionID).
-			Str("default_path", validateArgs.DockerfilePath).
-			Msg("Auto-defaulting to session workspace Dockerfile")
-	}
+	// Note: DockerfilePath will be resolved to session workspace in Execute if empty
+	// We don't set a default here to allow proper workspace resolution
 
 	if validateArgs.Severity != "" {
 		validSeverities := map[string]bool{

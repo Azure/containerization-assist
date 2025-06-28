@@ -403,7 +403,13 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 		sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
 		if err != nil {
 			deps.Logger.Error().Err(err).Str("tool", toolName).Msg("Session creation failed")
-			return "", fmt.Errorf("session creation failed: %v", err)
+			return "", types.NewErrorBuilder("session_creation_failed", "Session creation failed", "session").
+				WithOperation("ensure_session_id").
+				WithStage("creation").
+				WithRootCause(err.Error()).
+				WithImmediateStep(1, "Check session manager", "Ensure SessionManager is properly initialized").
+				WithImmediateStep(2, "Check server logs", "Review server logs for additional details").
+				Build()
 		}
 		if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
 			deps.Logger.Info().Str("session_id", session.SessionID).Str("tool", toolName).Msg("Created new session")

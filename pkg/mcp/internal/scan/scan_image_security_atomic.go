@@ -201,14 +201,15 @@ func (t *AtomicScanImageSecurityTool) performImageScan(ctx context.Context, imag
 
 // performBasicSecurityAssessment provides a basic security assessment when Trivy is not available
 func (t *AtomicScanImageSecurityTool) performBasicSecurityAssessment(ctx context.Context, imageName string, args AtomicScanImageSecurityArgs) (*coredocker.ScanResult, error) {
+	startTime := time.Now()
 	t.logger.Info().Str("image", imageName).Msg("Performing basic security assessment (Trivy not available)")
 
 	// Create a basic scan result with general security recommendations
 	result := &coredocker.ScanResult{
 		Success:         true,
 		ImageRef:        imageName,
-		ScanTime:        time.Now(),
-		Duration:        time.Since(time.Now()), // Will be very short
+		ScanTime:        startTime,
+		Duration:        time.Since(startTime),
 		Vulnerabilities: []coresecurity.Vulnerability{},
 		Summary: coresecurity.VulnerabilitySummary{
 			Total:    0,
