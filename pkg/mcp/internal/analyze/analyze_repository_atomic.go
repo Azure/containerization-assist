@@ -10,10 +10,13 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/core/git"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+
 	mcperror "github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	"github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"

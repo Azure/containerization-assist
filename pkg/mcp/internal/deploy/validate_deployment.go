@@ -9,7 +9,10 @@ import (
 
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/k8s"
+
+	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )

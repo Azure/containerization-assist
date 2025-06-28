@@ -6,9 +6,13 @@ import (
 	"strings"
 	"time"
 
+	// mcp import removed - using mcptypes
+
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"

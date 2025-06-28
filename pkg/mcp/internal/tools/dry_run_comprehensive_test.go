@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	mcp "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

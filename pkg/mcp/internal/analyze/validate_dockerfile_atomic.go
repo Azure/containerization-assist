@@ -9,12 +9,15 @@ import (
 	"strings"
 	"time"
 
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/config"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+
 	constants "github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )

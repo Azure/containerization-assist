@@ -7,9 +7,12 @@ import (
 	"strings"
 	"time"
 
+	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/prometheus/client_golang/prometheus"
+
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/rs/zerolog"

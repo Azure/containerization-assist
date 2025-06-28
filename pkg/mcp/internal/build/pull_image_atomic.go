@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
+	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"sync"
 
+	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"

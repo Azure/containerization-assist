@@ -3,6 +3,8 @@ package deploy
 import (
 	"context"
 
+	// mcp import removed - using mcptypes
+
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )

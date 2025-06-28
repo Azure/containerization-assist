@@ -3,10 +3,12 @@ package runtime
 import (
 	"fmt"
 
+	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
+
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
