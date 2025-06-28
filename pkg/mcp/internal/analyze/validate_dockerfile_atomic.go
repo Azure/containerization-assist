@@ -880,7 +880,6 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 		},
 		Requirements: []string{
 			"valid_session_id",
-			"dockerfile_content_or_path",
 		},
 		Parameters: map[string]string{
 			"session_id":           "string - Session ID for session context",
@@ -980,12 +979,8 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 			Build()
 	}
 
-	if validateArgs.DockerfilePath == "" && validateArgs.DockerfileContent == "" {
-		return types.NewValidationErrorBuilder("Either dockerfile_path or dockerfile_content must be provided", "dockerfile", "").
-			WithField("dockerfile_path", validateArgs.DockerfilePath).
-			WithField("has_content", validateArgs.DockerfileContent != "").
-			Build()
-	}
+	// Note: DockerfilePath will be resolved to session workspace in Execute if empty
+	// We don't set a default here to allow proper workspace resolution
 
 	if validateArgs.Severity != "" {
 		validSeverities := map[string]bool{

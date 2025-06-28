@@ -63,7 +63,7 @@ func DefaultServerConfig() ServerConfig {
 
 	return ServerConfig{
 		WorkspaceDir:      workspaceDir,
-		MaxSessions:       10,
+		MaxSessions:       50,
 		SessionTTL:        24 * time.Hour,
 		MaxDiskPerSession: 1024 * 1024 * 1024,      // 1GB
 		TotalDiskLimit:    10 * 1024 * 1024 * 1024, // 10GB

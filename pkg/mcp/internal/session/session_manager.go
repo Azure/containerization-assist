@@ -105,7 +105,10 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 	}
 
 	if len(sm.sessions) >= sm.maxSessions {
-		return nil, fmt.Errorf("maximum number of sessions (%d) reached", sm.maxSessions)
+		// Automatically clean up the oldest session to make room
+		if err := sm.cleanupOldestSession(); err != nil {
+			return nil, fmt.Errorf("maximum number of sessions (%d) reached and failed to cleanup oldest session: %w", sm.maxSessions, err)
+		}
 	}
 
 	if err := sm.checkGlobalDiskQuota(); err != nil {
@@ -354,16 +357,19 @@ func (sm *SessionManager) CheckDiskQuota(sessionID string, additionalBytes int64
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	if session.DiskUsage+additionalBytes > session.MaxDiskUsage {
+	// Check per-session quota only if a limit is set
+	if session.MaxDiskUsage > 0 && session.DiskUsage+additionalBytes > session.MaxDiskUsage {
 		return fmt.Errorf("session disk quota exceeded: %d + %d > %d",
 			session.DiskUsage, additionalBytes, session.MaxDiskUsage)
 	}
 
-	// Check global quota
-	totalUsage := sm.getTotalDiskUsage()
-	if totalUsage+additionalBytes > sm.totalDiskLimit {
-		return fmt.Errorf("global disk quota exceeded: %d + %d > %d",
-			totalUsage, additionalBytes, sm.totalDiskLimit)
+	// Check global quota only if a limit is set
+	if sm.totalDiskLimit > 0 {
+		totalUsage := sm.getTotalDiskUsage()
+		if totalUsage+additionalBytes > sm.totalDiskLimit {
+			return fmt.Errorf("global disk quota exceeded: %d + %d > %d",
+				totalUsage, additionalBytes, sm.totalDiskLimit)
+		}
 	}
 
 	return nil
@@ -674,6 +680,11 @@ func (sm *SessionManager) getTotalDiskUsage() int64 {
 }
 
 func (sm *SessionManager) checkGlobalDiskQuota() error {
+	// If totalDiskLimit is 0, it means no limit is set
+	if sm.totalDiskLimit <= 0 {
+		return nil
+	}
+
 	totalUsage := sm.getTotalDiskUsage()
 	if totalUsage >= sm.totalDiskLimit {
 		return fmt.Errorf("global disk quota exceeded: %d >= %d", totalUsage, sm.totalDiskLimit)
@@ -689,6 +700,67 @@ func generateSessionID() string {
 		return fmt.Sprintf("session-%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(bytes)
+}
+
+// cleanupOldestSession removes the oldest session to make room for a new one
+// IMPORTANT: This method must be called with sm.mutex already held
+func (sm *SessionManager) cleanupOldestSession() error {
+	if len(sm.sessions) == 0 {
+		return nil
+	}
+
+	// Find the session with the oldest LastAccessed time
+	var oldestSessionID string
+	var oldestTime time.Time = time.Now()
+
+	for sessionID, session := range sm.sessions {
+		if session.LastAccessed.Before(oldestTime) {
+			oldestTime = session.LastAccessed
+			oldestSessionID = sessionID
+		}
+	}
+
+	if oldestSessionID != "" {
+		sm.logger.Info().
+			Str("session_id", oldestSessionID).
+			Time("last_accessed", oldestTime).
+			Msg("Automatically cleaning up oldest session to make room for new session")
+
+		return sm.deleteSessionInternal(oldestSessionID)
+	}
+
+	return nil
+}
+
+// deleteSessionInternal removes a session without acquiring the mutex (for internal use)
+// IMPORTANT: This method must be called with sm.mutex already held
+func (sm *SessionManager) deleteSessionInternal(sessionID string) error {
+	return sm.deleteSessionInternalWithContext(context.Background(), sessionID)
+}
+
+// deleteSessionInternalWithContext removes a session with context support
+// IMPORTANT: This method must be called with sm.mutex already held
+func (sm *SessionManager) deleteSessionInternalWithContext(ctx context.Context, sessionID string) error {
+	session, exists := sm.sessions[sessionID]
+	if !exists {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	// Remove from memory
+	delete(sm.sessions, sessionID)
+
+	// Clean up workspace directory
+	if err := os.RemoveAll(session.WorkspaceDir); err != nil {
+		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to clean up session workspace")
+	}
+
+	// Remove from persistent store
+	if err := sm.store.Delete(ctx, sessionID); err != nil {
+		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to remove session from persistent store")
+	}
+
+	sm.logger.Info().Str("session_id", sessionID).Msg("Session cleaned up successfully")
+	return nil
 }
 
 // SessionFromContext extracts session ID from context
