@@ -11,21 +11,18 @@ import (
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
-// ContextEnricher provides utilities to enrich tool responses with unified AI context
 type ContextEnricher struct {
 	calculator mcptypes.ScoreCalculator
 	analyzer   mcptypes.TradeoffAnalyzer
 }
 
-// NewContextEnricher creates a new context enricher with default implementations
 func NewContextEnricher() *ContextEnricher {
 	return &ContextEnricher{
 		calculator: &DefaultScoreCalculator{},
-		analyzer:   nil, // TODO: Implement proper analyzer when mcptypes are fully defined
+		analyzer:   nil,
 	}
 }
 
-// EnrichToolResponse enriches any tool response with unified AI context
 func (e *ContextEnricher) EnrichToolResponse(response interface{}, toolName string) (*ToolContext, error) {
 	context := &ToolContext{
 		ToolName:         toolName,
@@ -38,36 +35,27 @@ func (e *ContextEnricher) EnrichToolResponse(response interface{}, toolName stri
 		Metadata:         make(map[string]interface{}),
 	}
 
-	// Extract assessment if response implements AIContext
 	if _, ok := response.(mcptypes.AIContext); ok {
-		// Type conversion is needed as these are placeholder types
-		// TODO: Implement proper type conversion when mcptypes are fully defined
 		context.Assessment = e.generateAssessment(response, toolName)
 		context.Recommendations = e.generateRecommendations(response, toolName)
 	} else {
-		// Generate assessment and recommendations from response data
 		context.Assessment = e.generateAssessment(response, toolName)
 		context.Recommendations = e.generateRecommendations(response, toolName)
 	}
 
-	// Generate decision points and trade-offs
 	context.DecisionPoints = e.extractDecisionPoints(response)
 	context.TradeOffs = e.generateTradeoffs(response)
 
-	// Generate insights
 	context.Insights = e.generateInsights(response, toolName)
 
-	// Extract performance data
 	context.PerformanceData = e.extractPerformanceData(response)
 	context.QualityMetrics = e.extractQualityMetrics(response)
 
-	// Build reasoning context
 	context.ReasoningContext = e.buildReasoningContext(response, toolName)
 
 	return context, nil
 }
 
-// generateAssessment creates a unified assessment from response data
 func (e *ContextEnricher) generateAssessment(response interface{}, toolName string) *UnifiedAssessment {
 	assessment := &UnifiedAssessment{
 		StrengthAreas:     make([]AssessmentArea, 0),
@@ -78,7 +66,6 @@ func (e *ContextEnricher) generateAssessment(response interface{}, toolName stri
 		QualityIndicators: make(map[string]interface{}),
 	}
 
-	// Extract success indicators
 	successFound := e.extractBooleanField(response, "success", "Success")
 	if successFound {
 		if success, _ := e.getBooleanField(response, "success", "Success"); success {
@@ -93,14 +80,12 @@ func (e *ContextEnricher) generateAssessment(response interface{}, toolName stri
 			assessment.ConfidenceLevel = 70
 		}
 	} else {
-		// Default moderate assessment
 		assessment.ReadinessScore = 60
 		assessment.RiskLevel = types.SeverityMedium
 		assessment.OverallHealth = "fair"
 		assessment.ConfidenceLevel = 75
 	}
 
-	// Extract error information to build challenge areas
 	if errorField := e.getErrorField(response); errorField != nil {
 		assessment.ChallengeAreas = append(assessment.ChallengeAreas, AssessmentArea{
 			Area:        "error_handling",
@@ -112,17 +97,14 @@ func (e *ContextEnricher) generateAssessment(response interface{}, toolName stri
 		})
 	}
 
-	// Build evidence from response fields
 	assessment.AssessmentBasis = e.buildEvidence(response, toolName)
 
 	return assessment
 }
 
-// generateRecommendations creates recommendations from response data
 func (e *ContextEnricher) generateRecommendations(response interface{}, toolName string) []Recommendation {
 	recommendations := make([]Recommendation, 0)
 
-	// Check for errors and generate fix recommendations
 	if errorField := e.getErrorField(response); errorField != nil {
 		rec := Recommendation{
 			RecommendationID: fmt.Sprintf("%s-error-fix-%d", toolName, time.Now().Unix()),
@@ -141,7 +123,6 @@ func (e *ContextEnricher) generateRecommendations(response interface{}, toolName
 			Confidence:       85,
 		}
 
-		// Add basic remediation plan
 		rec.Implementation = RemediationPlan{
 			PlanID:      fmt.Sprintf("%s-fix-plan-%d", toolName, time.Now().Unix()),
 			Title:       "Fix Operation Error",
@@ -173,7 +154,6 @@ func (e *ContextEnricher) generateRecommendations(response interface{}, toolName
 		recommendations = append(recommendations, rec)
 	}
 
-	// Generate optimization recommendations for successful operations
 	if success, found := e.getBooleanField(response, "success", "Success"); found && success {
 		rec := Recommendation{
 			RecommendationID: fmt.Sprintf("%s-optimize-%d", toolName, time.Now().Unix()),
@@ -196,11 +176,9 @@ func (e *ContextEnricher) generateRecommendations(response interface{}, toolName
 	return recommendations
 }
 
-// extractDecisionPoints identifies decision points from response data
 func (e *ContextEnricher) extractDecisionPoints(response interface{}) []DecisionPoint {
 	decisions := make([]DecisionPoint, 0)
 
-	// Look for configuration choices in response
 	v := reflect.ValueOf(response)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -211,7 +189,6 @@ func (e *ContextEnricher) extractDecisionPoints(response interface{}) []Decision
 			field := v.Type().Field(i)
 			value := v.Field(i)
 
-			// Look for fields that represent choices
 			if strings.Contains(strings.ToLower(field.Name), "config") ||
 				strings.Contains(strings.ToLower(field.Name), "option") ||
 				strings.Contains(strings.ToLower(field.Name), "strategy") {
@@ -234,18 +211,14 @@ func (e *ContextEnricher) extractDecisionPoints(response interface{}) []Decision
 	return decisions
 }
 
-// generateTradeoffs creates trade-off analysis from response data
 func (e *ContextEnricher) generateTradeoffs(response interface{}) []TradeoffAnalysis {
-	// Use local analyzer that returns local types
 	localAnalyzer := &DefaultTradeoffAnalyzer{}
 	return localAnalyzer.AnalyzeTradeoffs([]string{"current_approach"}, e.extractTradeoffContext(response))
 }
 
-// generateInsights creates contextual insights from response data
 func (e *ContextEnricher) generateInsights(response interface{}, toolName string) []ContextualInsight {
 	insights := make([]ContextualInsight, 0)
 
-	// Performance insight
 	if duration := e.extractDurationField(response); duration > 0 {
 		insight := ContextualInsight{
 			InsightID:   fmt.Sprintf("%s-performance-%d", toolName, time.Now().Unix()),
@@ -268,7 +241,6 @@ func (e *ContextEnricher) generateInsights(response interface{}, toolName string
 		insights = append(insights, insight)
 	}
 
-	// Success pattern insight
 	if success, found := e.getBooleanField(response, "success", "Success"); found {
 		insight := ContextualInsight{
 			InsightID:   fmt.Sprintf("%s-success-pattern-%d", toolName, time.Now().Unix()),
@@ -293,8 +265,6 @@ func (e *ContextEnricher) generateInsights(response interface{}, toolName string
 
 	return insights
 }
-
-// Helper methods for extracting data from responses
 
 func (e *ContextEnricher) extractBooleanField(response interface{}, fieldNames ...string) bool {
 	_, found := e.getBooleanField(response, fieldNames...)
@@ -329,7 +299,6 @@ func (e *ContextEnricher) getErrorField(response interface{}) error {
 		return nil
 	}
 
-	// Look for Error or Err fields
 	if field := v.FieldByName("Error"); field.IsValid() && !field.IsNil() {
 		if err, ok := field.Interface().(error); ok {
 			return err
@@ -355,7 +324,6 @@ func (e *ContextEnricher) extractDurationField(response interface{}) time.Durati
 		return 0
 	}
 
-	// Look for duration fields
 	durationFields := []string{"Duration", "TotalDuration", "ExecutionTime", "BuildDuration"}
 	for _, fieldName := range durationFields {
 		if field := v.FieldByName(fieldName); field.IsValid() {
@@ -371,20 +339,17 @@ func (e *ContextEnricher) extractDurationField(response interface{}) time.Durati
 func (e *ContextEnricher) extractPerformanceData(response interface{}) map[string]interface{} {
 	data := make(map[string]interface{})
 
-	// Extract timing information
 	if duration := e.extractDurationField(response); duration > 0 {
 		data["total_duration"] = duration
 		data["duration_seconds"] = duration.Seconds()
 	}
 
-	// Extract resource usage if available
 	v := reflect.ValueOf(response)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
 	if v.Kind() == reflect.Struct {
-		// Look for size/count fields
 		sizeFields := []string{"Size", "Count", "Lines", "Files"}
 		for _, fieldName := range sizeFields {
 			if field := v.FieldByName(fieldName); field.IsValid() && field.CanInterface() {
@@ -399,7 +364,6 @@ func (e *ContextEnricher) extractPerformanceData(response interface{}) map[strin
 func (e *ContextEnricher) extractQualityMetrics(response interface{}) map[string]interface{} {
 	metrics := make(map[string]interface{})
 
-	// Extract success rate
 	if success, found := e.getBooleanField(response, "success", "Success"); found {
 		if success {
 			metrics["success_rate"] = 1.0
@@ -408,7 +372,6 @@ func (e *ContextEnricher) extractQualityMetrics(response interface{}) map[string
 		}
 	}
 
-	// Extract error information
 	if errorField := e.getErrorField(response); errorField != nil {
 		metrics["error_count"] = 1
 		metrics["error_present"] = true
@@ -423,7 +386,6 @@ func (e *ContextEnricher) extractQualityMetrics(response interface{}) map[string
 func (e *ContextEnricher) buildEvidence(response interface{}, toolName string) []EvidenceItem {
 	evidence := make([]EvidenceItem, 0)
 
-	// Add operation evidence
 	evidence = append(evidence, EvidenceItem{
 		Type:        "operation",
 		Source:      toolName,
@@ -435,7 +397,6 @@ func (e *ContextEnricher) buildEvidence(response interface{}, toolName string) [
 		},
 	})
 
-	// Add success/failure evidence
 	if success, found := e.getBooleanField(response, "success", "Success"); found {
 		evidence = append(evidence, EvidenceItem{
 			Type:        "result",
@@ -458,13 +419,11 @@ func (e *ContextEnricher) buildReasoningContext(response interface{}, toolName s
 	context["operation_timestamp"] = time.Now()
 	context["response_type"] = reflect.TypeOf(response).String()
 
-	// Add response summary
 	if data, err := json.Marshal(response); err == nil {
 		context["response_size"] = len(data)
 		context["has_structured_data"] = true
 	}
 
-	// Add success context
 	if success, found := e.getBooleanField(response, "success", "Success"); found {
 		context["operation_successful"] = success
 		if success {
@@ -480,7 +439,6 @@ func (e *ContextEnricher) buildReasoningContext(response interface{}, toolName s
 func (e *ContextEnricher) extractTradeoffContext(response interface{}) map[string]interface{} {
 	context := make(map[string]interface{})
 
-	// Extract basic context from response structure
 	v := reflect.ValueOf(response)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -494,18 +452,13 @@ func (e *ContextEnricher) extractTradeoffContext(response interface{}) map[strin
 	return context
 }
 
-// generateOperationID creates a unique operation ID
 func generateOperationID() string {
 	return fmt.Sprintf("op-%d", time.Now().UnixNano())
 }
 
-// Default implementations
-
-// DefaultScoreCalculator provides basic scoring functionality
 type DefaultScoreCalculator struct{}
 
 func (c *DefaultScoreCalculator) CalculateScore(data interface{}) int {
-	// Basic scoring based on success status
 	v := reflect.ValueOf(data)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -514,13 +467,13 @@ func (c *DefaultScoreCalculator) CalculateScore(data interface{}) int {
 	if v.Kind() == reflect.Struct {
 		if field := v.FieldByName("Success"); field.IsValid() && field.Kind() == reflect.Bool {
 			if field.Bool() {
-				return 85 // Good score for success
+				return 85
 			}
-			return 30 // Poor score for failure
+			return 30
 		}
 	}
 
-	return 60 // Default neutral score
+	return 60
 }
 
 func (c *DefaultScoreCalculator) DetermineRiskLevel(score int, factors map[string]interface{}) string {
@@ -535,7 +488,6 @@ func (c *DefaultScoreCalculator) DetermineRiskLevel(score int, factors map[strin
 }
 
 func (c *DefaultScoreCalculator) CalculateConfidence(evidence []string) int {
-	// More evidence = higher confidence
 	confidence := 50 + len(evidence)*10
 	if confidence > 100 {
 		confidence = 100
@@ -543,7 +495,6 @@ func (c *DefaultScoreCalculator) CalculateConfidence(evidence []string) int {
 	return confidence
 }
 
-// DefaultTradeoffAnalyzer provides basic trade-off analysis
 type DefaultTradeoffAnalyzer struct{}
 
 func (a *DefaultTradeoffAnalyzer) AnalyzeTradeoffs(options []string, context map[string]interface{}) []TradeoffAnalysis {

@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// DefaultErrorRouter implements ErrorRouter for workflow error handling and recovery
 type DefaultErrorRouter struct {
 	logger             zerolog.Logger
 	classifier         *ErrorClassifier
@@ -17,10 +16,9 @@ type DefaultErrorRouter struct {
 	recoveryManager    *RecoveryManager
 	retryCoordinator   *retry.Coordinator
 	redirectionManager *RedirectionManager
-	escalationHandler  *CrossToolEscalationHandler // Enhanced cross-tool escalation
+	escalationHandler  *CrossToolEscalationHandler
 }
 
-// NewDefaultErrorRouter creates a new error router with default rules
 func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
 	router := &DefaultErrorRouter{
 		logger:             logger.With().Str("component", "error_router").Logger(),
@@ -31,21 +29,16 @@ func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
 		redirectionManager: NewRedirectionManager(logger),
 	}
 
-	// Initialize with default routing rules
 	router.initializeDefaultRules()
 
 	return router
 }
 
-// SetEscalationHandler sets the cross-tool escalation handler
 func (er *DefaultErrorRouter) SetEscalationHandler(handler *CrossToolEscalationHandler) {
 	er.escalationHandler = handler
 	er.logger.Info().Msg("Cross-tool escalation handler configured")
 }
 
-// Type aliases removed - types are now directly available in the orchestration package
-
-// RouteError routes an error and determines the appropriate action
 func (er *DefaultErrorRouter) RouteError(
 	ctx context.Context,
 	workflowError *WorkflowError,
@@ -58,7 +51,6 @@ func (er *DefaultErrorRouter) RouteError(
 		Str("error_type", workflowError.ErrorType).
 		Msg("Routing workflow error")
 
-	// Find the best matching rule
 	bestRule := er.router.FindMatchingRule(workflowError)
 	if bestRule == nil {
 		er.logger.Debug().
@@ -76,19 +68,15 @@ func (er *DefaultErrorRouter) RouteError(
 		Str("action", bestRule.Action).
 		Msg("Found matching error routing rule")
 
-	// Execute the routing action
 	return er.executeRoutingAction(ctx, bestRule, workflowError, session)
 }
 
-// IsFatalError determines if an error should be considered fatal and cause immediate workflow failure
 func (er *DefaultErrorRouter) IsFatalError(workflowError *WorkflowError) bool {
 	return er.classifier.IsFatalError(workflowError)
 }
 
-// CanRecover determines if an error can be recovered from
 func (er *DefaultErrorRouter) CanRecover(workflowError *WorkflowError) bool {
 	recoveryStrategies := make(map[string]RecoveryStrategy)
-	// Get all recovery strategies from recovery manager
 	for _, id := range []string{"network_recovery", "resource_recovery"} {
 		if strategy, exists := er.recoveryManager.GetRecoveryStrategy(id); exists {
 			recoveryStrategies[id] = strategy
@@ -97,9 +85,7 @@ func (er *DefaultErrorRouter) CanRecover(workflowError *WorkflowError) bool {
 	return er.classifier.CanRecover(workflowError, recoveryStrategies)
 }
 
-// GetRecoveryOptions returns available recovery options for an error
 func (er *DefaultErrorRouter) GetRecoveryOptions(workflowError *WorkflowError) []RecoveryOption {
-	// Convert from errors.RecoveryOption to RecoveryOption
 	options := er.recoveryManager.GetRecoveryOptions(workflowError, er.classifier)
 	result := make([]RecoveryOption, len(options))
 	for i, opt := range options {
@@ -115,19 +101,15 @@ func (er *DefaultErrorRouter) GetRecoveryOptions(workflowError *WorkflowError) [
 	return result
 }
 
-// AddRoutingRule adds a custom routing rule
 func (er *DefaultErrorRouter) AddRoutingRule(stageName string, rule ErrorRoutingRule) {
 	er.router.AddRoutingRule(stageName, rule)
 }
 
-// AddRecoveryStrategy adds a custom recovery strategy
 func (er *DefaultErrorRouter) AddRecoveryStrategy(strategy RecoveryStrategy) {
 	er.recoveryManager.AddRecoveryStrategy(strategy)
 }
 
-// SetRetryPolicy sets a retry policy for a specific stage
 func (er *DefaultErrorRouter) SetRetryPolicy(stageName string, policy *RetryPolicy) {
-	// Convert from RetryPolicy to retry.Policy
 	retryPolicy := &retry.Policy{
 		MaxAttempts:     policy.MaxAttempts,
 		InitialDelay:    policy.InitialDelay,
@@ -137,20 +119,14 @@ func (er *DefaultErrorRouter) SetRetryPolicy(stageName string, policy *RetryPoli
 		Jitter:          true,
 		ErrorPatterns:   []string{"timeout", "connection refused", "temporary failure"},
 	}
-	// Set policy in the unified coordinator
 	er.retryCoordinator.SetPolicy(stageName, retryPolicy)
-	// This method can be deprecated or adapted to configure coordinator policies
 	er.logger.Info().Str("stage", stageName).Msg("Retry policy configuration moved to unified coordinator")
 }
 
-// Internal implementation methods
-
-// ValidateRedirectTarget validates that a redirect target is valid and available
 func (er *DefaultErrorRouter) ValidateRedirectTarget(redirectTo string, workflowError *WorkflowError) error {
 	return er.redirectionManager.ValidateRedirectTarget(redirectTo, workflowError)
 }
 
-// CreateRedirectionPlan creates a detailed plan for error redirection
 func (er *DefaultErrorRouter) CreateRedirectionPlan(
 	redirectTo string,
 	workflowError *WorkflowError,
@@ -160,17 +136,11 @@ func (er *DefaultErrorRouter) CreateRedirectionPlan(
 }
 
 func (er *DefaultErrorRouter) initializeDefaultRules() {
-	// Initialize modules with default configurations
 	er.recoveryManager.InitializeDefaultStrategies()
-	// Default policies are initialized by the unified retry coordinator
 	er.logger.Info().Msg("Default retry policies initialized by unified coordinator")
 
-	// Initialize Sprint A enhanced cross-tool escalation rules
 	er.InitializeSprintAEscalationRules()
 
-	// Default rules for common error types
-
-	// Fatal errors - immediate failure with no retry
 	er.addDefaultRule("*", ErrorRoutingRule{
 		ID:          "fatal_error_fail",
 		Name:        "Fatal Error Immediate Failure",
@@ -179,11 +149,10 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 			{Field: "severity", Operator: "equals", Value: "critical"},
 		},
 		Action:   "fail",
-		Priority: 200, // Highest priority
+		Priority: 200,
 		Enabled:  true,
 	})
 
-	// Authentication errors - redirect to retry authentication
 	er.addDefaultRule("*", ErrorRoutingRule{
 		ID:          "auth_error_redirect",
 		Name:        "Authentication Error Redirect",
@@ -204,7 +173,6 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 		Enabled:  true,
 	})
 
-	// Network errors - retry with backoff
 	er.addDefaultRule("*", ErrorRoutingRule{
 		ID:          "network_error_retry",
 		Name:        "Network Error Retry",
@@ -224,7 +192,6 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 		Enabled:  true,
 	})
 
-	// Timeout errors - retry with longer timeout
 	er.addDefaultRule("*", ErrorRoutingRule{
 		ID:          "timeout_error_retry",
 		Name:        "Timeout Error Retry",
@@ -246,7 +213,6 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 		Enabled:  true,
 	})
 
-	// Resource unavailable - wait and retry
 	er.addDefaultRule("*", ErrorRoutingRule{
 		ID:          "resource_unavailable_retry",
 		Name:        "Resource Unavailable Retry",
@@ -266,7 +232,6 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 		Enabled:  true,
 	})
 
-	// Authentication errors - fail fast (usually need manual intervention)
 	er.addDefaultRule("*", ErrorRoutingRule{
 		ID:          "auth_error_fail",
 		Name:        "Authentication Error Fail",
@@ -280,7 +245,6 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 		Enabled:  true,
 	})
 
-	// Build errors in Dockerfile generation - redirect to manual validation
 	er.addDefaultRule("build_image", ErrorRoutingRule{
 		ID:          "build_error_redirect",
 		Name:        "Build Error Redirect",
@@ -298,7 +262,6 @@ func (er *DefaultErrorRouter) initializeDefaultRules() {
 		Enabled:  true,
 	})
 
-	// Security scan failures - continue with warnings for non-critical
 	er.addDefaultRule("scan_image_security", ErrorRoutingRule{
 		ID:          "security_scan_warning",
 		Name:        "Security Scan Warning",
@@ -324,7 +287,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 	workflowError *WorkflowError,
 	session *WorkflowSession,
 ) (*ErrorAction, error) {
-	// Convert ErrorRoutingParameters to map[string]interface{}
 	parameters := make(map[string]interface{})
 	if rule.Parameters != nil {
 		parameters["increase_timeout"] = rule.Parameters.IncreaseTimeout
@@ -350,8 +312,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 	case "retry":
 		retryPolicy := rule.RetryPolicy
 		if retryPolicy == nil {
-			// Use unified retry coordinator with stage-specific policy
-			// Convert to unified retry approach - policies are configured in coordinator
 			retryPolicy = &RetryPolicy{
 				MaxAttempts:  3,
 				BackoffMode:  "exponential",
@@ -361,7 +321,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			}
 		}
 
-		// Calculate retry delay
 		retryCount := 0
 		if session.ErrorContext != nil {
 			if count, ok := session.ErrorContext["retry_count"].(int); ok {
@@ -369,7 +328,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			}
 		}
 
-		// Convert to unified retry.Policy for calculation
 		unifiedPolicy := &retry.Policy{
 			MaxAttempts:     retryPolicy.MaxAttempts,
 			InitialDelay:    retryPolicy.InitialDelay,
@@ -380,7 +338,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			ErrorPatterns:   []string{"timeout", "connection refused", "temporary failure"},
 		}
 
-		// Use unified retry coordinator to calculate delay
 		retryAfter := er.retryCoordinator.CalculateDelay(unifiedPolicy, retryCount)
 		action.RetryAfter = &retryAfter
 
@@ -391,7 +348,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			Msg("Scheduling retry for stage")
 
 	case "redirect":
-		// Validate redirect target
 		if err := er.ValidateRedirectTarget(rule.RedirectTo, workflowError); err != nil {
 			er.logger.Error().
 				Err(err).
@@ -403,7 +359,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			break
 		}
 
-		// Create detailed redirection plan
 		redirectPlan, err := er.CreateRedirectionPlan(rule.RedirectTo, workflowError, session)
 		if err != nil {
 			er.logger.Error().
@@ -417,7 +372,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 
 		action.RedirectTo = rule.RedirectTo
 
-		// Add redirection plan details to parameters
 		if action.Parameters == nil {
 			action.Parameters = make(map[string]interface{})
 		}
@@ -426,7 +380,6 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 		action.Parameters["context_preservation"] = redirectPlan.ContextPreservation
 		action.Parameters["intervention_required"] = redirectPlan.InterventionRequired
 
-		// Check for missing context and warn
 		if len(redirectPlan.MissingContext) > 0 {
 			er.logger.Warn().
 				Strs("missing_context", redirectPlan.MissingContext).
@@ -435,14 +388,12 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			action.Parameters["missing_context"] = redirectPlan.MissingContext
 		}
 
-		// Use escalation handler for enhanced cross-tool context sharing
 		if er.escalationHandler != nil && er.IsEscalatedOperation(parameters) {
 			er.logger.Info().
 				Str("source_tool", workflowError.ToolName).
 				Str("target_tool", rule.RedirectTo).
 				Msg("Using enhanced cross-tool escalation handler")
 
-			// Add escalation-specific parameters
 			action.Parameters["escalation_enhanced"] = true
 			action.Parameters["escalation_source"] = er.GetEscalationSource(parameters)
 		}

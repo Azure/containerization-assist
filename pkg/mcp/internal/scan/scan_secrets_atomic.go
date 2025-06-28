@@ -18,80 +18,66 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// AtomicScanSecretsArgs defines arguments for atomic secret scanning
 type AtomicScanSecretsArgs struct {
 	types.BaseToolArgs
 
-	// Scan targets
 	ScanPath        string   `json:"scan_path,omitempty" description:"Path to scan (default: session workspace)"`
 	FilePatterns    []string `json:"file_patterns,omitempty" description:"File patterns to include in scan (e.g., '*.py', '*.js')"`
 	ExcludePatterns []string `json:"exclude_patterns,omitempty" description:"File patterns to exclude from scan"`
 
-	// Scan options
 	ScanDockerfiles bool `json:"scan_dockerfiles,omitempty" description:"Include Dockerfiles in scan"`
 	ScanManifests   bool `json:"scan_manifests,omitempty" description:"Include Kubernetes manifests in scan"`
 	ScanSourceCode  bool `json:"scan_source_code,omitempty" description:"Include source code files in scan"`
 	ScanEnvFiles    bool `json:"scan_env_files,omitempty" description:"Include .env files in scan"`
 
-	// Analysis options
 	SuggestRemediation bool `json:"suggest_remediation,omitempty" description:"Provide remediation suggestions"`
 	GenerateSecrets    bool `json:"generate_secrets,omitempty" description:"Generate Kubernetes Secret manifests"`
 }
 
-// AtomicScanSecretsResult represents the result of atomic secret scanning
 type AtomicScanSecretsResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult // Embed AI context methods
+	internal.BaseAIContextResult
 
-	// Scan metadata
 	SessionID    string        `json:"session_id"`
 	ScanPath     string        `json:"scan_path"`
 	FilesScanned int           `json:"files_scanned"`
 	Duration     time.Duration `json:"duration"`
 
-	// Detection results
 	SecretsFound      int             `json:"secrets_found"`
 	DetectedSecrets   []ScannedSecret `json:"detected_secrets"`
 	SeverityBreakdown map[string]int  `json:"severity_breakdown"`
 
-	// File-specific results
 	FileResults []FileSecretScanResult `json:"file_results"`
 
-	// Remediation
 	RemediationPlan  *SecretRemediationPlan    `json:"remediation_plan,omitempty"`
 	GeneratedSecrets []GeneratedSecretManifest `json:"generated_secrets,omitempty"`
 
-	// Security insights
-	SecurityScore   int      `json:"security_score"` // 0-100
-	RiskLevel       string   `json:"risk_level"`     // low, medium, high, critical
+	SecurityScore   int      `json:"security_score"`
+	RiskLevel       string   `json:"risk_level"`
 	Recommendations []string `json:"recommendations"`
 
-	// Context and debugging
 	ScanContext map[string]interface{} `json:"scan_context"`
 }
 
-// ScannedSecret represents a found secret with context
 type ScannedSecret struct {
 	File       string `json:"file"`
 	Line       int    `json:"line"`
-	Type       string `json:"type"`       // password, api_key, token, etc.
-	Pattern    string `json:"pattern"`    // what pattern matched
-	Value      string `json:"value"`      // redacted value
-	Severity   string `json:"severity"`   // low, medium, high, critical
-	Context    string `json:"context"`    // surrounding context
-	Confidence int    `json:"confidence"` // 0-100
+	Type       string `json:"type"`
+	Pattern    string `json:"pattern"`
+	Value      string `json:"value"`
+	Severity   string `json:"severity"`
+	Context    string `json:"context"`
+	Confidence int    `json:"confidence"`
 }
 
-// FileSecretScanResult represents scan results for a single file
 type FileSecretScanResult struct {
 	FilePath     string          `json:"file_path"`
 	FileType     string          `json:"file_type"`
 	SecretsFound int             `json:"secrets_found"`
 	Secrets      []ScannedSecret `json:"secrets"`
-	CleanStatus  string          `json:"clean_status"` // clean, issues, critical
+	CleanStatus  string          `json:"clean_status"`
 }
 
-// SecretRemediationPlan provides recommendations for fixing detected secrets
 type SecretRemediationPlan struct {
 	ImmediateActions []string          `json:"immediate_actions"`
 	SecretReferences []SecretReference `json:"secret_references"`
@@ -100,7 +86,6 @@ type SecretRemediationPlan struct {
 	MigrationSteps   []string          `json:"migration_steps"`
 }
 
-// SecretReference represents how a secret should be referenced
 type SecretReference struct {
 	SecretName     string `json:"secret_name"`
 	SecretKey      string `json:"secret_key"`
@@ -108,7 +93,6 @@ type SecretReference struct {
 	KubernetesRef  string `json:"kubernetes_ref"`
 }
 
-// GeneratedSecretManifest represents a generated Kubernetes Secret
 type GeneratedSecretManifest struct {
 	Name     string   `json:"name"`
 	Content  string   `json:"content"`
@@ -116,7 +100,6 @@ type GeneratedSecretManifest struct {
 	Keys     []string `json:"keys"`
 }
 
-// standardSecretScanStages provides common stages for secret scanning operations
 func standardSecretScanStages() []mcptypes.ProgressStage {
 	return []mcptypes.ProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating scan path"},
@@ -127,14 +110,12 @@ func standardSecretScanStages() []mcptypes.ProgressStage {
 	}
 }
 
-// AtomicScanSecretsTool implements atomic secret scanning
 type AtomicScanSecretsTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
 }
 
-// NewAtomicScanSecretsTool creates a new atomic secret scanning tool
 func NewAtomicScanSecretsTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicScanSecretsTool {
 	return &AtomicScanSecretsTool{
 		pipelineAdapter: adapter,
@@ -143,34 +124,27 @@ func NewAtomicScanSecretsTool(adapter mcptypes.PipelineOperations, sessionManage
 	}
 }
 
-// ExecuteScanSecrets runs the atomic secret scanning
 func (t *AtomicScanSecretsTool) ExecuteScanSecrets(ctx context.Context, args AtomicScanSecretsArgs) (*AtomicScanSecretsResult, error) {
 	startTime := time.Now()
 
-	// Direct execution without progress tracking
 	return t.executeWithoutProgress(ctx, args, startTime)
 }
 
-// ExecuteWithContext runs the atomic secrets scan with GoMCP progress tracking
 func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, args AtomicScanSecretsArgs) (*AtomicScanSecretsResult, error) {
 	startTime := time.Now()
 
-	// Create progress adapter for GoMCP using standard scan stages
 	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session"},
 		{Name: "Scan", Weight: 0.80, Description: "Scanning"},
 		{Name: "Finalize", Weight: 0.10, Description: "Updating state"},
 	})
 
-	// Execute with progress tracking
 	ctx := context.Background()
 	result, err := t.executeWithProgress(ctx, args, startTime, nil)
 
-	// Complete progress tracking
 	if err != nil {
 		t.logger.Info().Msg("Secrets scan failed")
 		if result == nil {
-			// Create a minimal result if something went wrong
 			result = &AtomicScanSecretsResult{
 				BaseToolResponse: types.NewBaseResponse("atomic_scan_secrets", args.SessionID, args.DryRun),
 				SessionID:        args.SessionID,
@@ -178,7 +152,7 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 				RiskLevel:        "unknown",
 			}
 		}
-		return result, nil // Return result with error info, not the error itself
+		return result, nil
 	} else {
 		t.logger.Info().Msg("Secrets scan completed successfully")
 	}
@@ -186,12 +160,9 @@ func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, ar
 	return result, nil
 }
 
-// executeWithProgress handles the main execution with progress reporting
 func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time, reporter interface{}) (*AtomicScanSecretsResult, error) {
-	// Stage 1: Initialize - Loading session and validating scan path
 	t.logger.Info().Msg("Loading session")
 
-	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicScanSecretsResult{
@@ -211,10 +182,9 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		Str("scan_path", args.ScanPath).
 		Msg("Starting atomic secret scanning")
 
-	// Create base result
 	result := &AtomicScanSecretsResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_scan_secrets", session.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("scan", false, 0), // Duration and success will be updated later
+		BaseAIContextResult: internal.NewBaseAIContextResult("scan", false, 0),
 		SessionID:           session.SessionID,
 		ScanContext:         make(map[string]interface{}),
 		SeverityBreakdown:   make(map[string]int),
@@ -222,14 +192,12 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 
 	t.logger.Info().Msg("Session loaded")
 
-	// Determine scan path
 	scanPath := args.ScanPath
 	if scanPath == "" {
 		scanPath = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 	}
 	result.ScanPath = scanPath
 
-	// Validate scan path exists
 	if _, err := os.Stat(scanPath); os.IsNotExist(err) {
 		t.logger.Error().Str("scan_path", scanPath).Msg("Scan path does not exist")
 		result.Duration = time.Since(startTime)
@@ -238,10 +206,8 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 
 	t.logger.Info().Msg("Initialization complete")
 
-	// Stage 2: Analyze - Analyzing file patterns and scan configuration
 	t.logger.Info().Msg("Analyzing scan configuration")
 
-	// Use provided file patterns or defaults
 	filePatterns := args.FilePatterns
 	if len(filePatterns) == 0 {
 		filePatterns = t.getDefaultFilePatterns(args)
@@ -249,16 +215,13 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 
 	excludePatterns := args.ExcludePatterns
 	if len(excludePatterns) == 0 {
-		// Use default exclusions
 		excludePatterns = []string{"*.git/*", "node_modules/*", "vendor/*", "*.log"}
 	}
 
 	t.logger.Info().Msg("Scan configuration analyzed")
 
-	// Stage 3: Scan - Scanning files for secrets
 	t.logger.Info().Msg("Scanning files for secrets")
 
-	// Perform the actual secret scan
 	allSecrets, fileResults, filesScanned, err := t.performSecretScan(scanPath, filePatterns, excludePatterns, reporter)
 	if err != nil {
 		t.logger.Error().Err(err).Str("scan_path", scanPath).Msg("Failed to scan directory")
@@ -266,7 +229,6 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		return result, types.NewRichError("SCAN_DIRECTORY_FAILED", fmt.Sprintf("failed to scan directory: %v", err), types.ErrTypeSystem)
 	}
 
-	// Update result with scan data
 	result.FilesScanned = filesScanned
 	result.SecretsFound = len(allSecrets)
 	result.DetectedSecrets = allSecrets
@@ -274,7 +236,6 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 
 	t.logger.Info().Msg(fmt.Sprintf("Scanned %d files, found %d secrets", filesScanned, len(allSecrets)))
 
-	// Stage 4: Process - Processing results and generating recommendations
 	t.logger.Info().Msg("Processing scan results")
 
 	result.SeverityBreakdown = t.calculateSeverityBreakdown(allSecrets)
@@ -284,7 +245,6 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 
 	t.logger.Info().Msg("Generated security analysis")
 
-	// Generate remediation plan if requested
 	if args.SuggestRemediation && len(allSecrets) > 0 {
 		result.RemediationPlan = t.generateRemediationPlan(allSecrets)
 		t.logger.Info().Msg("Generated remediation plan")
@@ -292,10 +252,8 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 
 	t.logger.Info().Msg("Result processing complete")
 
-	// Stage 5: Finalize - Generating reports and remediation plans
 	t.logger.Info().Msg("Finalizing results")
 
-	// Generate Kubernetes secrets if requested
 	if args.GenerateSecrets && len(allSecrets) > 0 {
 		generatedSecrets, err := t.generateKubernetesSecrets(allSecrets, session.SessionID)
 		if err != nil {
@@ -308,7 +266,6 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 
 	result.Duration = time.Since(startTime)
 
-	// Log results
 	t.logger.Info().
 		Str("session_id", session.SessionID).
 		Int("files_scanned", result.FilesScanned).
@@ -323,9 +280,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 	return result, nil
 }
 
-// executeWithoutProgress handles the main execution without progress reporting
 func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args AtomicScanSecretsArgs, startTime time.Time) (*AtomicScanSecretsResult, error) {
-	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicScanSecretsResult{
@@ -345,30 +300,26 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 		Str("scan_path", args.ScanPath).
 		Msg("Starting atomic secret scanning")
 
-	// Create base result
 	result := &AtomicScanSecretsResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_scan_secrets", session.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("scan", false, 0), // Duration and success will be updated later
+		BaseAIContextResult: internal.NewBaseAIContextResult("scan", false, 0),
 		SessionID:           session.SessionID,
 		ScanContext:         make(map[string]interface{}),
 		SeverityBreakdown:   make(map[string]int),
 	}
 
-	// Determine scan path
 	scanPath := args.ScanPath
 	if scanPath == "" {
 		scanPath = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 	}
 	result.ScanPath = scanPath
 
-	// Validate scan path exists
 	if _, err := os.Stat(scanPath); os.IsNotExist(err) {
 		t.logger.Error().Str("scan_path", scanPath).Msg("Scan path does not exist")
 		result.Duration = time.Since(startTime)
 		return result, types.NewRichError("SCAN_PATH_NOT_FOUND", fmt.Sprintf("scan path does not exist: %s", scanPath), types.ErrTypeSystem)
 	}
 
-	// Use provided file patterns or defaults
 	filePatterns := args.FilePatterns
 	if len(filePatterns) == 0 {
 		filePatterns = t.getDefaultFilePatterns(args)
@@ -376,11 +327,9 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 
 	excludePatterns := args.ExcludePatterns
 	if len(excludePatterns) == 0 {
-		// Use default exclusions
 		excludePatterns = []string{"*.git/*", "node_modules/*", "vendor/*", "*.log"}
 	}
 
-	// Perform the actual secret scan
 	allSecrets, fileResults, filesScanned, err := t.performSecretScan(scanPath, filePatterns, excludePatterns, nil)
 	if err != nil {
 		t.logger.Error().Err(err).Str("scan_path", scanPath).Msg("Failed to scan directory")
@@ -388,26 +337,21 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 		return result, types.NewRichError("SCAN_DIRECTORY_FAILED", fmt.Sprintf("failed to scan directory: %v", err), types.ErrTypeSystem)
 	}
 
-	// Process results
 	result.FilesScanned = filesScanned
 	result.SecretsFound = len(allSecrets)
 	result.DetectedSecrets = allSecrets
 	result.FileResults = fileResults
 	result.SeverityBreakdown = t.calculateSeverityBreakdown(allSecrets)
 
-	// Calculate security score and risk level
 	result.SecurityScore = t.calculateSecurityScore(allSecrets)
 	result.RiskLevel = t.determineRiskLevel(result.SecurityScore, allSecrets)
 
-	// Generate recommendations
 	result.Recommendations = t.generateRecommendations(allSecrets, args)
 
-	// Generate remediation plan if requested
 	if args.SuggestRemediation && len(allSecrets) > 0 {
 		result.RemediationPlan = t.generateRemediationPlan(allSecrets)
 	}
 
-	// Generate Kubernetes secrets if requested
 	if args.GenerateSecrets && len(allSecrets) > 0 {
 		generatedSecrets, err := t.generateKubernetesSecrets(allSecrets, session.SessionID)
 		if err != nil {
@@ -419,13 +363,11 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 
 	result.Duration = time.Since(startTime)
 
-	// Update BaseAIContextResult fields
 	result.BaseAIContextResult.Duration = result.Duration
 	result.BaseAIContextResult.IsSuccessful = true // Scan completed successfully
 	result.BaseAIContextResult.ErrorCount = result.SecretsFound
 	result.BaseAIContextResult.WarningCount = len(result.Recommendations)
 
-	// Log results
 	t.logger.Info().
 		Str("session_id", session.SessionID).
 		Int("files_scanned", result.FilesScanned).
@@ -438,16 +380,13 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 	return result, nil
 }
 
-// performSecretScan performs the actual file scanning for secrets
 func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter interface{}) ([]ScannedSecret, []FileSecretScanResult, int, error) {
 	scanner := utils.NewSecretScanner()
 	var allSecrets []ScannedSecret
 	var fileResults []FileSecretScanResult
 	filesScanned := 0
 
-	// Count total files first for progress reporting
 	totalFiles := 0
-	// Progress reporting removed
 	err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -466,17 +405,14 @@ func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns,
 			return err
 		}
 
-		// Skip directories
 		if info.IsDir() {
 			return nil
 		}
 
-		// Check if file matches patterns
 		if !t.shouldScanFile(path, filePatterns, excludePatterns) {
 			return nil
 		}
 
-		// Scan file for secrets
 		fileSecrets, err := t.scanFileForSecrets(path, scanner)
 		if err != nil {
 			t.logger.Warn().Err(err).Str("file", path).Msg("Failed to scan file")
@@ -485,7 +421,6 @@ func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns,
 
 		filesScanned++
 
-		// Report progress if available
 		if reporter != nil && totalFiles > 0 {
 			progress := float64(filesScanned) / float64(totalFiles)
 			if progressReporter, ok := reporter.(interface {
@@ -495,7 +430,6 @@ func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns,
 			}
 		}
 
-		// Create file result
 		fileResult := FileSecretScanResult{
 			FilePath:     path,
 			FileType:     t.getFileType(path),
@@ -512,8 +446,6 @@ func (t *AtomicScanSecretsTool) performSecretScan(scanPath string, filePatterns,
 
 	return allSecrets, fileResults, filesScanned, err
 }
-
-// Helper methods
 
 func (t *AtomicScanSecretsTool) getDefaultFilePatterns(args AtomicScanSecretsArgs) []string {
 	var patterns []string
@@ -534,7 +466,6 @@ func (t *AtomicScanSecretsTool) getDefaultFilePatterns(args AtomicScanSecretsArg
 		patterns = append(patterns, "*.py", "*.js", "*.ts", "*.go", "*.java", "*.cs", "*.php", "*.rb")
 	}
 
-	// If no specific options, scan common config files
 	if len(patterns) == 0 {
 		patterns = []string{"*.yaml", "*.yml", "*.json", ".env*", "*.env", "Dockerfile*"}
 	}
@@ -545,11 +476,9 @@ func (t *AtomicScanSecretsTool) getDefaultFilePatterns(args AtomicScanSecretsArg
 func (t *AtomicScanSecretsTool) shouldScanFile(path string, includePatterns, excludePatterns []string) bool {
 	filename := filepath.Base(path)
 
-	// Check exclude patterns first
 	for _, pattern := range excludePatterns {
 		matched, err := filepath.Match(pattern, filename)
 		if err != nil {
-			// Skip invalid patterns
 			continue
 		}
 		if matched {
@@ -557,11 +486,9 @@ func (t *AtomicScanSecretsTool) shouldScanFile(path string, includePatterns, exc
 		}
 	}
 
-	// Check include patterns
 	for _, pattern := range includePatterns {
 		matched, err := filepath.Match(pattern, filename)
 		if err != nil {
-			// Skip invalid patterns
 			continue
 		}
 		if matched {
@@ -578,7 +505,6 @@ func (t *AtomicScanSecretsTool) scanFileForSecrets(filePath string, scanner *uti
 		return nil, err
 	}
 
-	// Use the existing secret scanner
 	sensitiveVars := scanner.ScanContent(string(content))
 
 	var secrets []ScannedSecret
@@ -661,22 +587,18 @@ func (t *AtomicScanSecretsTool) classifySecretType(pattern string) string {
 func (t *AtomicScanSecretsTool) determineSeverity(pattern, value string) string {
 	pattern = strings.ToLower(pattern)
 
-	// Critical: actual secrets that look like real values
 	if len(value) > 20 && (strings.Contains(pattern, "key") || strings.Contains(pattern, "token")) {
 		return "critical"
 	}
 
-	// High: passwords and secrets
 	if strings.Contains(pattern, "password") || strings.Contains(pattern, "secret") {
 		return "high"
 	}
 
-	// Medium: other sensitive data
 	return "medium"
 }
 
 func (t *AtomicScanSecretsTool) calculateConfidence(pattern string) int {
-	// Simple confidence calculation based on pattern specificity
 	if strings.Contains(strings.ToLower(pattern), "password") {
 		return 90
 	}
@@ -756,7 +678,6 @@ func (t *AtomicScanSecretsTool) generateRecommendations(secrets []ScannedSecret,
 		"Use environment variables with external configuration for non-secret configuration",
 	)
 
-	// Add specific recommendations based on found secrets
 	hasCritical := false
 	hasPasswords := false
 
@@ -807,7 +728,6 @@ func (t *AtomicScanSecretsTool) generateRemediationPlan(secrets []ScannedSecret)
 		"Implement proper secret rotation procedures",
 	}
 
-	// Generate secret references
 	secretMap := make(map[string][]ScannedSecret)
 	for _, scannedSecret := range secrets {
 		key := scannedSecret.Type
@@ -835,7 +755,6 @@ func (t *AtomicScanSecretsTool) generateRemediationPlan(secrets []ScannedSecret)
 }
 
 func (t *AtomicScanSecretsTool) generateKubernetesSecrets(secrets []ScannedSecret, sessionID string) ([]GeneratedSecretManifest, error) {
-	// Generate actual Kubernetes Secret YAML manifests with proper structure
 	t.logger.Info().
 		Int("secret_count", len(secrets)).
 		Str("session_id", sessionID).
@@ -848,25 +767,21 @@ func (t *AtomicScanSecretsTool) generateKubernetesSecrets(secrets []ScannedSecre
 
 	var manifests []GeneratedSecretManifest
 
-	// Group secrets by type and create meaningful secret names
 	secretsByType := make(map[string][]ScannedSecret)
 	for _, secret := range secrets {
 		secretType := t.normalizeSecretType(secret.Type)
 		secretsByType[secretType] = append(secretsByType[secretType], secret)
 	}
 
-	// Generate a manifest for each secret type
 	for secretType, typeSecrets := range secretsByType {
 		secretName := t.generateSecretName(secretType)
 
-		// Create keys and data for each secret
 		secretData := make(map[string]string)
 		var keys []string
 
 		for i, secret := range typeSecrets {
 			key := t.generateSecretKey(secret, i)
 			keys = append(keys, key)
-			// Create placeholder value for the secret (base64 encoded placeholder)
 			placeholderValue := t.generatePlaceholderValue(secret)
 			secretData[key] = placeholderValue
 		}
@@ -891,7 +806,6 @@ func (t *AtomicScanSecretsTool) generateKubernetesSecrets(secrets []ScannedSecre
 }
 
 func (t *AtomicScanSecretsTool) generateSecretYAML(name string, secretData map[string]string, detectedSecrets []ScannedSecret) string {
-	// Generate a complete Kubernetes Secret YAML with actual data structure
 	yamlContent := fmt.Sprintf(`apiVersion: v1
 kind: Secret
 metadata:
@@ -908,12 +822,10 @@ type: Opaque
 data:
 `, name, t.extractAppName(name), t.extractSecretType(name), len(detectedSecrets), time.Now().UTC().Format(time.RFC3339))
 
-	// Add each secret as a data entry
 	for key, value := range secretData {
 		yamlContent += fmt.Sprintf("  %s: %s\n", key, value)
 	}
 
-	// Add comments section with guidance
 	yamlContent += `
 # Instructions:
 # 1. Replace the placeholder values above with your actual base64-encoded secrets
@@ -930,7 +842,6 @@ data:
 # Detected secrets that should be stored here:
 `
 
-	// Add details about each detected secret as comments
 	for i, secret := range detectedSecrets {
 		yamlContent += fmt.Sprintf("# %d. Found in %s:%d - Type: %s (Severity: %s)\n",
 			i+1, secret.File, secret.Line, secret.Type, secret.Severity)
@@ -939,9 +850,6 @@ data:
 	return yamlContent
 }
 
-// Helper methods for Kubernetes secret generation
-
-// normalizeSecretType converts detected secret types to Kubernetes-friendly names
 func (t *AtomicScanSecretsTool) normalizeSecretType(secretType string) string {
 	switch strings.ToLower(secretType) {
 	case "api_key", "apikey", "api-key":
@@ -957,7 +865,6 @@ func (t *AtomicScanSecretsTool) normalizeSecretType(secretType string) string {
 	case "webhook_url", "webhook":
 		return "webhooks"
 	default:
-		// Clean up the type name for Kubernetes compatibility
 		normalized := strings.ToLower(secretType)
 		normalized = strings.ReplaceAll(normalized, "_", "-")
 		normalized = strings.ReplaceAll(normalized, " ", "-")
@@ -965,27 +872,21 @@ func (t *AtomicScanSecretsTool) normalizeSecretType(secretType string) string {
 	}
 }
 
-// generateSecretName creates a Kubernetes-compatible secret name
 func (t *AtomicScanSecretsTool) generateSecretName(secretType string) string {
-	// Ensure the name follows Kubernetes naming conventions
 	name := fmt.Sprintf("app-%s", secretType)
 	name = strings.ToLower(name)
 	name = strings.ReplaceAll(name, "_", "-")
 	name = strings.ReplaceAll(name, " ", "-")
-	// Ensure it ends with a valid character
 	name = strings.TrimSuffix(name, "-")
 	return name
 }
 
-// generateSecretKey creates a meaningful key name for a detected secret
 func (t *AtomicScanSecretsTool) generateSecretKey(secret ScannedSecret, index int) string {
 	var keyName string
 
-	// Try to extract a meaningful name from the file or context
 	fileName := filepath.Base(secret.File)
 	fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
-	// Create a descriptive key based on secret type and location
 	switch strings.ToLower(secret.Type) {
 	case "api_key", "apikey", "api-key":
 		keyName = fmt.Sprintf("%s-api-key", fileName)
@@ -1001,13 +902,11 @@ func (t *AtomicScanSecretsTool) generateSecretKey(secret ScannedSecret, index in
 		keyName = fmt.Sprintf("%s-%s", fileName, strings.ToLower(secret.Type))
 	}
 
-	// Ensure Kubernetes compatibility
 	keyName = strings.ToLower(keyName)
 	keyName = strings.ReplaceAll(keyName, "_", "-")
 	keyName = strings.ReplaceAll(keyName, " ", "-")
 	keyName = strings.ReplaceAll(keyName, ".", "-")
 
-	// Add index if needed to ensure uniqueness
 	if index > 0 {
 		keyName = fmt.Sprintf("%s-%d", keyName, index+1)
 	}
@@ -1015,11 +914,9 @@ func (t *AtomicScanSecretsTool) generateSecretKey(secret ScannedSecret, index in
 	return keyName
 }
 
-// generatePlaceholderValue creates a secure base64-encoded placeholder value for a secret
 func (t *AtomicScanSecretsTool) generatePlaceholderValue(secret ScannedSecret) string {
 	var placeholderText string
 
-	// Generate more descriptive placeholders with security guidance
 	secretTypeLower := strings.ToLower(secret.Type)
 	switch secretTypeLower {
 	case "api_key", "apikey", "api-key":
@@ -1043,14 +940,11 @@ func (t *AtomicScanSecretsTool) generatePlaceholderValue(secret ScannedSecret) s
 	case "oauth_secret", "client_secret":
 		placeholderText = "YOUR_OAUTH_CLIENT_SECRET_FROM_PROVIDER_CONSOLE"
 	default:
-		// Provide more descriptive default with context from the pattern or context
 		contextInfo := ""
 		if secret.Pattern != "" {
-			// Use pattern name as additional context
 			patternName := strings.ToUpper(strings.ReplaceAll(secret.Pattern, "-", "_"))
 			contextInfo = fmt.Sprintf("_FOR_%s", patternName)
 		} else if secret.Context != "" {
-			// Extract meaningful context if available
 			contextWords := strings.Fields(secret.Context)
 			if len(contextWords) > 0 {
 				contextInfo = fmt.Sprintf("_FROM_%s", strings.ToUpper(contextWords[0]))
@@ -1062,14 +956,11 @@ func (t *AtomicScanSecretsTool) generatePlaceholderValue(secret ScannedSecret) s
 			contextInfo)
 	}
 
-	// Add security metadata as comment in the placeholder for validation
 	placeholderWithMetadata := fmt.Sprintf("%s\n# Secret Type: %s\n# Original Location: %s:%d\n# SECURITY: Replace this placeholder with actual secret value",
 		placeholderText, secret.Type, secret.File, secret.Line)
 
-	// Base64 encode the enhanced placeholder
 	encoded := base64.StdEncoding.EncodeToString([]byte(placeholderWithMetadata))
 
-	// Log the placeholder generation for audit purposes
 	t.logger.Debug().
 		Str("secret_type", secret.Type).
 		Str("secret_file", secret.File).
@@ -1080,19 +971,15 @@ func (t *AtomicScanSecretsTool) generatePlaceholderValue(secret ScannedSecret) s
 	return encoded
 }
 
-// extractAppName extracts app name from secret name for labels
 func (t *AtomicScanSecretsTool) extractAppName(secretName string) string {
-	// Remove common prefixes to get app name
 	appName := strings.TrimPrefix(secretName, "app-")
 	parts := strings.Split(appName, "-")
 	if len(parts) > 1 {
-		// Remove the secret type suffix to get app name
 		return strings.Join(parts[:len(parts)-1], "-")
 	}
 	return "my-app"
 }
 
-// extractSecretType extracts secret type from secret name for labels
 func (t *AtomicScanSecretsTool) extractSecretType(secretName string) string {
 	parts := strings.Split(secretName, "-")
 	if len(parts) > 1 {
@@ -1101,26 +988,18 @@ func (t *AtomicScanSecretsTool) extractSecretType(secretName string) string {
 	return "general"
 }
 
-// AI Context Interface Implementations for AtomicScanSecretsResult
-
-// SimpleTool interface implementation
-
-// GetName returns the tool name
 func (t *AtomicScanSecretsTool) GetName() string {
 	return "atomic_scan_secrets"
 }
 
-// GetDescription returns the tool description
 func (t *AtomicScanSecretsTool) GetDescription() string {
 	return "Scans files for hardcoded secrets, credentials, and sensitive data with automatic remediation suggestions"
 }
 
-// GetVersion returns the tool version
 func (t *AtomicScanSecretsTool) GetVersion() string {
 	return "1.0.0"
 }
 
-// GetCapabilities returns the tool capabilities
 func (t *AtomicScanSecretsTool) GetCapabilities() types.ToolCapabilities {
 	return types.ToolCapabilities{
 		SupportsDryRun:    true,
@@ -1130,7 +1009,6 @@ func (t *AtomicScanSecretsTool) GetCapabilities() types.ToolCapabilities {
 	}
 }
 
-// GetMetadata returns comprehensive metadata about the tool
 func (t *AtomicScanSecretsTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:        "atomic_scan_secrets",
@@ -1237,7 +1115,6 @@ func (t *AtomicScanSecretsTool) GetMetadata() mcptypes.ToolMetadata {
 	}
 }
 
-// Validate validates the tool arguments
 func (t *AtomicScanSecretsTool) Validate(ctx context.Context, args interface{}) error {
 	scanArgs, ok := args.(AtomicScanSecretsArgs)
 	if !ok {
@@ -1253,7 +1130,6 @@ func (t *AtomicScanSecretsTool) Validate(ctx context.Context, args interface{}) 
 			Build()
 	}
 
-	// Validate file patterns if provided
 	for _, pattern := range scanArgs.FilePatterns {
 		if _, err := filepath.Match(pattern, "test"); err != nil {
 			return types.NewValidationErrorBuilder("Invalid file pattern", "file_pattern", pattern).
@@ -1265,7 +1141,6 @@ func (t *AtomicScanSecretsTool) Validate(ctx context.Context, args interface{}) 
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
 func (t *AtomicScanSecretsTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	scanArgs, ok := args.(AtomicScanSecretsArgs)
 	if !ok {
@@ -1275,13 +1150,9 @@ func (t *AtomicScanSecretsTool) Execute(ctx context.Context, args interface{}) (
 			Build()
 	}
 
-	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, scanArgs)
 }
 
-// ExecuteTyped provides the original typed execute method
 func (t *AtomicScanSecretsTool) ExecuteTyped(ctx context.Context, args AtomicScanSecretsArgs) (*AtomicScanSecretsResult, error) {
 	return t.ExecuteScanSecrets(ctx, args)
 }
-
-// AI Context methods are now provided by embedded BaseAIContextResult

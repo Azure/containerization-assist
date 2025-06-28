@@ -6,21 +6,16 @@ import (
 	"time"
 )
 
-// Unified MCP Interfaces - Single Source of Truth
-// This file consolidates all MCP interfaces as specified in REORG.md
+// Package mcp defines core interfaces for the Model Context Protocol
 
-// =============================================================================
-// CORE TOOL INTERFACE
-// =============================================================================
-
-// Tool represents the unified interface for all MCP tools
+// Tool represents the interface for MCP tools
 type Tool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
 	GetMetadata() ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
 }
 
-// ToolMetadata contains comprehensive information about a tool
+// ToolMetadata represents tool metadata
 type ToolMetadata struct {
 	Name         string            `json:"name"`
 	Description  string            `json:"description"`
@@ -33,7 +28,7 @@ type ToolMetadata struct {
 	Examples     []ToolExample     `json:"examples"`
 }
 
-// ToolExample represents an example usage of a tool
+// ToolExample represents tool usage example
 type ToolExample struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
@@ -41,13 +36,9 @@ type ToolExample struct {
 	Output      map[string]interface{} `json:"output"`
 }
 
-// =============================================================================
-// SESSION INTERFACE
-// =============================================================================
-
-// Session represents the unified interface for session management
+// Session represents session management interface
 type Session interface {
-	// ID returns the unique session identifier
+	// ID returns session identifier
 	ID() string
 
 	// GetWorkspace returns the workspace directory path
@@ -57,45 +48,39 @@ type Session interface {
 	UpdateState(func(*SessionState))
 }
 
-// SessionState represents the current state of a session
+// SessionState represents session state
 type SessionState struct {
 	SessionID string
 	UserID    string
 	CreatedAt time.Time
 	ExpiresAt time.Time
 
-	// Workspace
 	WorkspaceDir string
 
-	// Repository state
 	RepositoryAnalyzed bool
 	RepositoryInfo     *RepositoryInfo
 	RepoURL            string
 
-	// Build state
 	DockerfileGenerated bool
 	DockerfilePath      string
 	ImageBuilt          bool
 	ImageRef            string
 	ImagePushed         bool
 
-	// Deployment state
 	ManifestsGenerated  bool
 	ManifestPaths       []string
 	DeploymentValidated bool
 
-	// Progress tracking
 	CurrentStage string
 	Status       string
 	Stage        string
 	Errors       []string
 	Metadata     map[string]interface{}
 
-	// Security
 	SecurityScan *SecurityScanResult
 }
 
-// RepositoryInfo contains repository analysis information
+// RepositoryInfo represents repository information
 type RepositoryInfo struct {
 	Language     string                 `json:"language"`
 	Framework    string                 `json:"framework"`
@@ -105,7 +90,7 @@ type RepositoryInfo struct {
 	Metadata     map[string]interface{} `json:"metadata"`
 }
 
-// SecurityScanResult contains security scan information
+// SecurityScanResult represents security scan results
 type SecurityScanResult struct {
 	HasVulnerabilities bool      `json:"has_vulnerabilities"`
 	CriticalCount      int       `json:"critical_count"`
@@ -116,62 +101,54 @@ type SecurityScanResult struct {
 	ScanTime           time.Time `json:"scan_time"`
 }
 
-// =============================================================================
-// TRANSPORT INTERFACE
-// =============================================================================
-
-// Transport represents the unified interface for MCP transport mechanisms
+// Transport represents MCP transport interface
 type Transport interface {
-	// Serve starts the transport and serves requests
+	// Serve starts transport
 	Serve(ctx context.Context) error
 
-	// Stop gracefully stops the transport
+	// Stop stops transport
 	Stop() error
 
-	// Name returns the transport name
+	// Name returns transport name
 	Name() string
 
-	// SetHandler sets the request handler
+	// SetHandler sets request handler
 	SetHandler(handler RequestHandler)
 }
 
-// RequestHandler processes MCP requests
+// RequestHandler handles MCP requests
 type RequestHandler interface {
 	HandleRequest(ctx context.Context, req *MCPRequest) (*MCPResponse, error)
 }
 
-// MCPRequest represents an incoming MCP request
+// MCPRequest represents MCP request
 type MCPRequest struct {
 	ID     string      `json:"id"`
 	Method string      `json:"method"`
 	Params interface{} `json:"params"`
 }
 
-// MCPResponse represents an MCP response
+// MCPResponse represents MCP response
 type MCPResponse struct {
 	ID     string      `json:"id"`
 	Result interface{} `json:"result,omitempty"`
 	Error  *MCPError   `json:"error,omitempty"`
 }
 
-// MCPError represents an MCP error response
+// MCPError represents MCP error
 type MCPError struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// =============================================================================
-// ORCHESTRATOR INTERFACE
-// =============================================================================
-
-// Orchestrator defines the unified interface for tool orchestration
+// Orchestrator represents tool orchestration interface
 type Orchestrator interface {
 	ExecuteTool(ctx context.Context, name string, args interface{}) (interface{}, error)
 	RegisterTool(name string, tool Tool) error
 }
 
-// ToolRegistry manages tool registration and discovery
+// ToolRegistry manages tool registration
 type ToolRegistry interface {
 	Register(name string, factory ToolFactory) error
 	Get(name string) (ToolFactory, error)
@@ -179,35 +156,30 @@ type ToolRegistry interface {
 	GetMetadata() map[string]ToolMetadata
 }
 
-// StronglyTypedToolRegistry manages strongly-typed tool registration and discovery
+// StronglyTypedToolRegistry manages typed tool registration
 type StronglyTypedToolRegistry interface {
 	RegisterTyped(name string, factory StronglyTypedToolFactory[Tool]) error
 	GetTyped(name string) (StronglyTypedToolFactory[Tool], error)
-	// Note: Generic methods moved to helper functions to work around Go limitation
 	List() []string
 	GetMetadata() map[string]ToolMetadata
 }
 
-// StandardRegistry combines both legacy and typed tool registration with additional features
+// StandardRegistry combines tool registration approaches
 type StandardRegistry interface {
 	ToolRegistry
 	StronglyTypedToolRegistry
 
-	// Standard registration methods
 	RegisterStandard(name string, tool Tool) error
-	// Note: RegisterWithBuilder moved to helper function due to Go generic limitation
 
-	// Tool retrieval
 	GetTool(name string) (Tool, error)
 	GetToolInfo(name string) (*StandardToolInfo, error)
 
-	// Registry management
 	IsRegistered(name string) bool
 	Count() int
 	Clear()
 }
 
-// StandardToolInfo provides comprehensive information about a registered tool
+// StandardToolInfo represents tool information
 type StandardToolInfo struct {
 	Name         string   `json:"name"`
 	Type         string   `json:"type"`
@@ -218,20 +190,20 @@ type StandardToolInfo struct {
 	Capabilities []string `json:"capabilities"`
 }
 
-// ToolFactory creates new instances of tools
+// ToolFactory creates tool instances
 type ToolFactory func() Tool
 
-// StronglyTypedToolFactory creates new instances of tools with strong typing
+// StronglyTypedToolFactory creates typed tool instances
 type StronglyTypedToolFactory[T Tool] interface {
 	Create() T
 	GetType() string
 	GetMetadata() ToolMetadata
 }
 
-// TypedFactoryFunc is a strongly-typed factory function
+// TypedFactoryFunc represents typed factory function
 type TypedFactoryFunc[T Tool] func() T
 
-// NewStronglyTypedFactory creates a new strongly-typed factory
+// NewStronglyTypedFactory creates typed factory
 func NewStronglyTypedFactory[T Tool](factoryFunc TypedFactoryFunc[T], toolType string, metadata ToolMetadata) StronglyTypedToolFactory[T] {
 	return &stronglyTypedFactory[T]{
 		factoryFunc: factoryFunc,
@@ -259,15 +231,11 @@ func (f *stronglyTypedFactory[T]) GetMetadata() ToolMetadata {
 	return f.metadata
 }
 
-// =============================================================================
-// TOOL ARGUMENT AND RESULT INTERFACES
-// =============================================================================
-
-// ToolArgs is a marker interface for tool-specific argument types
+// ToolArgs represents tool arguments
 type ToolArgs interface {
-	// GetSessionID returns the session ID for this tool execution
+	// GetSessionID returns session ID
 	GetSessionID() string
-	// Validate validates the arguments
+	// Validate validates arguments
 	Validate() error
 }
 

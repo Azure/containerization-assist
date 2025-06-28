@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// EnhancedBuildAnalyzer implements UnifiedAnalyzer with comprehensive build intelligence
 type EnhancedBuildAnalyzer struct {
 	aiAnalyzer         mcptypes.AIAnalyzer
 	repositoryAnalyzer RepositoryAnalyzerInterface
@@ -19,17 +18,14 @@ type EnhancedBuildAnalyzer struct {
 	strategizer        *BuildStrategizer
 	logger             zerolog.Logger
 
-	// Capabilities
 	capabilities *AnalyzerCapabilities
 }
 
-// RepositoryAnalyzerInterface defines interface for repository analysis to avoid import cycles
 type RepositoryAnalyzerInterface interface {
 	AnalyzeRepository(ctx context.Context, repoPath string) (*RepositoryInfo, error)
 	GetProjectMetadata(ctx context.Context, repoPath string) (*ProjectMetadata, error)
 }
 
-// RepositoryInfo represents repository analysis results
 type RepositoryInfo struct {
 	Language     string                 `json:"language"`
 	Framework    string                 `json:"framework"`
@@ -40,7 +36,6 @@ type RepositoryInfo struct {
 	Metadata     map[string]interface{} `json:"metadata"`
 }
 
-// NewEnhancedBuildAnalyzer creates a new unified analyzer with full capabilities
 func NewEnhancedBuildAnalyzer(
 	aiAnalyzer mcptypes.AIAnalyzer,
 	repositoryAnalyzer RepositoryAnalyzerInterface,
@@ -75,7 +70,6 @@ func NewEnhancedBuildAnalyzer(
 	return analyzer
 }
 
-// Implement AIAnalyzer interface by delegating to underlying AI analyzer
 func (e *EnhancedBuildAnalyzer) Analyze(ctx context.Context, prompt string) (string, error) {
 	return e.aiAnalyzer.Analyze(ctx, prompt)
 }
@@ -96,9 +90,6 @@ func (e *EnhancedBuildAnalyzer) ResetTokenUsage() {
 	e.aiAnalyzer.ResetTokenUsage()
 }
 
-// Enhanced analysis capabilities
-
-// AnalyzeFailure provides comprehensive failure analysis
 func (e *EnhancedBuildAnalyzer) AnalyzeFailure(ctx context.Context, failure *AnalysisRequest) (*AnalysisResult, error) {
 	startTime := time.Now()
 
@@ -108,34 +99,27 @@ func (e *EnhancedBuildAnalyzer) AnalyzeFailure(ctx context.Context, failure *Ana
 		Str("operation_type", failure.OperationType).
 		Msg("Starting comprehensive failure analysis")
 
-	// Get historical context from knowledge base
 	relatedFailures, err := e.knowledgeBase.GetRelatedFailures(ctx, failure)
 	if err != nil {
 		e.logger.Warn().Err(err).Msg("Failed to get related failures")
 		relatedFailures = []*RelatedFailure{}
 	}
 
-	// Categorize the failure
 	failureType := e.categorizeFailure(failure.Error)
 
-	// Assess severity and impact
 	severity := e.assessSeverity(failure.Error, failure.Context)
 	impactAssessment := e.assessImpact(ctx, failure, severity)
 
-	// Generate fix strategies using AI
 	fixStrategies, err := e.generateFixStrategies(ctx, failure, failureType, relatedFailures)
 	if err != nil {
 		e.logger.Error().Err(err).Msg("Failed to generate fix strategies")
 		fixStrategies = []*FixStrategy{}
 	}
 
-	// Determine if retry is worthwhile
 	isRetryable := e.isRetryable(failure.Error, len(relatedFailures))
 
-	// Generate recommendations
 	recommendations := e.generateRecommendations(failure, fixStrategies, relatedFailures)
 
-	// Calculate confidence score
 	confidenceScore := e.calculateConfidenceScore(fixStrategies, relatedFailures, impactAssessment)
 
 	result := &AnalysisResult{
@@ -156,50 +140,41 @@ func (e *EnhancedBuildAnalyzer) AnalyzeFailure(ctx context.Context, failure *Ana
 		ConfidenceScore:  confidenceScore,
 	}
 
-	// Share insights for future analysis
 	go e.shareFailureInsights(ctx, failure, result)
 
 	return result, nil
 }
 
-// GetCapabilities returns analyzer capabilities
 func (e *EnhancedBuildAnalyzer) GetCapabilities() *AnalyzerCapabilities {
 	return e.capabilities
 }
 
-// AnalyzeWithRepository provides repository-aware analysis
 func (e *EnhancedBuildAnalyzer) AnalyzeWithRepository(ctx context.Context, request *RepositoryAnalysisRequest) (*RepositoryAwareAnalysis, error) {
 	e.logger.Info().
 		Str("session_id", request.SessionID).
 		Msg("Starting repository-aware analysis")
 
-	// Perform basic failure analysis
 	baseAnalysis, err := e.AnalyzeFailure(ctx, &request.AnalysisRequest)
 	if err != nil {
 		return nil, fmt.Errorf("base analysis failed: %w", err)
 	}
 
-	// Repository-specific insights
 	projectInsights, err := e.analyzeProjectInsights(ctx, request.RepositoryInfo, request.ProjectMetadata)
 	if err != nil {
 		e.logger.Warn().Err(err).Msg("Failed to analyze project insights")
 		projectInsights = &ProjectInsights{}
 	}
 
-	// Language-specific recommendations
 	languageRecommendations := e.generateLanguageRecommendations(request.ProjectMetadata, baseAnalysis)
 
-	// Framework optimizations
 	frameworkOptimizations := e.generateFrameworkOptimizations(request.ProjectMetadata, request.BuildHistory)
 
-	// Dependency analysis
 	dependencyAnalysis, err := e.analyzeDependencies(ctx, request.RepositoryInfo)
 	if err != nil {
 		e.logger.Warn().Err(err).Msg("Failed to analyze dependencies")
 		dependencyAnalysis = &DependencyAnalysis{}
 	}
 
-	// Security implications
 	securityAnalysis := e.analyzeSecurityImplications(request.RepositoryInfo, baseAnalysis)
 
 	return &RepositoryAwareAnalysis{
@@ -212,27 +187,21 @@ func (e *EnhancedBuildAnalyzer) AnalyzeWithRepository(ctx context.Context, reque
 	}, nil
 }
 
-// ShareInsights shares tool insights with the knowledge base
 func (e *EnhancedBuildAnalyzer) ShareInsights(ctx context.Context, insights *ToolInsights) error {
 	return e.knowledgeBase.StoreInsights(ctx, insights)
 }
 
-// GetSharedKnowledge retrieves accumulated knowledge for a domain
 func (e *EnhancedBuildAnalyzer) GetSharedKnowledge(ctx context.Context, domain string) (*SharedKnowledge, error) {
 	return e.knowledgeBase.GetKnowledge(ctx, domain)
 }
 
-// OptimizeBuildStrategy optimizes build strategy based on context
 func (e *EnhancedBuildAnalyzer) OptimizeBuildStrategy(ctx context.Context, request *BuildOptimizationRequest) (*OptimizedBuildStrategy, error) {
 	return e.strategizer.OptimizeStrategy(ctx, request)
 }
 
-// PredictFailures predicts potential build failures
 func (e *EnhancedBuildAnalyzer) PredictFailures(ctx context.Context, buildContext *AnalysisBuildContext) (*FailurePrediction, error) {
 	return e.failurePredictor.PredictFailures(ctx, buildContext)
 }
-
-// Private helper methods
 
 func (e *EnhancedBuildAnalyzer) categorizeFailure(err error) string {
 	errStr := strings.ToLower(err.Error())
@@ -262,19 +231,16 @@ func (e *EnhancedBuildAnalyzer) categorizeFailure(err error) string {
 func (e *EnhancedBuildAnalyzer) assessSeverity(err error, context map[string]interface{}) string {
 	errStr := strings.ToLower(err.Error())
 
-	// Critical severity indicators
 	if strings.Contains(errStr, "fatal") || strings.Contains(errStr, "critical") ||
 		strings.Contains(errStr, "segmentation fault") || strings.Contains(errStr, "out of memory") {
 		return "critical"
 	}
 
-	// High severity indicators
 	if strings.Contains(errStr, "error") || strings.Contains(errStr, "failed") ||
 		strings.Contains(errStr, "exception") {
 		return "high"
 	}
 
-	// Medium severity indicators
 	if strings.Contains(errStr, "warning") || strings.Contains(errStr, "deprecated") {
 		return "medium"
 	}
@@ -283,7 +249,6 @@ func (e *EnhancedBuildAnalyzer) assessSeverity(err error, context map[string]int
 }
 
 func (e *EnhancedBuildAnalyzer) assessImpact(ctx context.Context, failure *AnalysisRequest, severity string) *ImpactAssessment {
-	// Simple impact assessment - could be enhanced with more sophisticated analysis
 	var businessImpact, technicalImpact, userImpact string
 	var recoveryTime time.Duration
 	var costEstimate float64
@@ -333,7 +298,6 @@ func (e *EnhancedBuildAnalyzer) assessImpact(ctx context.Context, failure *Analy
 func (e *EnhancedBuildAnalyzer) generateFixStrategies(ctx context.Context, failure *AnalysisRequest, failureType string, relatedFailures []*RelatedFailure) ([]*FixStrategy, error) {
 	strategies := []*FixStrategy{}
 
-	// Generate AI-enhanced fix strategies
 	prompt := fmt.Sprintf(`
 Analyze this %s failure and provide detailed fix strategies:
 
@@ -360,8 +324,6 @@ Format as structured recommendations.
 		return e.getFallbackStrategies(failureType), nil
 	}
 
-	// Parse AI response and create strategies
-	// For now, create some example strategies based on the response
 	strategies = append(strategies, &FixStrategy{
 		Name:          "AI-Suggested Primary Fix",
 		Description:   "AI-generated fix based on error analysis",
@@ -377,7 +339,6 @@ Format as structured recommendations.
 		},
 	})
 
-	// Add strategies based on related failures
 	for _, related := range relatedFailures {
 		if related.Similarity > 0.7 {
 			strategies = append(strategies, &FixStrategy{
@@ -402,7 +363,6 @@ Format as structured recommendations.
 }
 
 func (e *EnhancedBuildAnalyzer) getFallbackStrategies(failureType string) []*FixStrategy {
-	// Provide basic fallback strategies when AI analysis fails
 	switch failureType {
 	case "dockerfile_error":
 		return []*FixStrategy{
@@ -441,7 +401,6 @@ func (e *EnhancedBuildAnalyzer) getFallbackStrategies(failureType string) []*Fix
 }
 
 func (e *EnhancedBuildAnalyzer) identifyRootCause(err error, context map[string]interface{}) string {
-	// Simple root cause identification - could be enhanced with more sophisticated analysis
 	errStr := strings.ToLower(err.Error())
 
 	if strings.Contains(errStr, "permission denied") {
@@ -463,13 +422,11 @@ func (e *EnhancedBuildAnalyzer) identifyRootCause(err error, context map[string]
 func (e *EnhancedBuildAnalyzer) isRetryable(err error, relatedFailureCount int) bool {
 	errStr := strings.ToLower(err.Error())
 
-	// Non-retryable errors
 	if strings.Contains(errStr, "syntax") || strings.Contains(errStr, "invalid") ||
 		strings.Contains(errStr, "permission denied") {
 		return false
 	}
 
-	// Retryable errors
 	if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "network") ||
 		strings.Contains(errStr, "temporary") || relatedFailureCount > 0 {
 		return true
@@ -499,7 +456,6 @@ func (e *EnhancedBuildAnalyzer) generateRecommendations(failure *AnalysisRequest
 func (e *EnhancedBuildAnalyzer) calculateConfidenceScore(strategies []*FixStrategy, relatedFailures []*RelatedFailure, impact *ImpactAssessment) float64 {
 	score := 0.5 // Base confidence
 
-	// Boost confidence based on available strategies
 	if len(strategies) > 0 {
 		avgSuccessRate := 0.0
 		for _, strategy := range strategies {
@@ -509,15 +465,12 @@ func (e *EnhancedBuildAnalyzer) calculateConfidenceScore(strategies []*FixStrate
 		score += avgSuccessRate * 0.3
 	}
 
-	// Boost confidence based on historical data
 	if len(relatedFailures) > 0 {
 		score += 0.2
 	}
 
-	// Adjust based on impact urgency
 	score += impact.UrgencyScore * 0.1
 
-	// Cap at 1.0
 	if score > 1.0 {
 		score = 1.0
 	}
@@ -526,7 +479,6 @@ func (e *EnhancedBuildAnalyzer) calculateConfidenceScore(strategies []*FixStrate
 }
 
 func (e *EnhancedBuildAnalyzer) shareFailureInsights(ctx context.Context, failure *AnalysisRequest, result *AnalysisResult) {
-	// Share insights asynchronously to avoid blocking main analysis
 	insights := &ToolInsights{
 		ToolName:      failure.ToolName,
 		OperationType: failure.OperationType,
@@ -562,9 +514,7 @@ func (e *EnhancedBuildAnalyzer) extractSolutionNames(strategies []*FixStrategy) 
 	return solutions
 }
 
-// Placeholder implementations for repository-aware analysis
 func (e *EnhancedBuildAnalyzer) analyzeProjectInsights(ctx context.Context, repoInfo *RepositoryInfo, projectMeta *ProjectMetadata) (*ProjectInsights, error) {
-	// Placeholder - would analyze code quality, architecture, etc.
 	return &ProjectInsights{
 		CodeQuality: &QualityMetrics{
 			OverallScore:    0.8,
@@ -612,7 +562,6 @@ func (e *EnhancedBuildAnalyzer) generateFrameworkOptimizations(projectMeta *Proj
 }
 
 func (e *EnhancedBuildAnalyzer) analyzeDependencies(ctx context.Context, repoInfo *RepositoryInfo) (*DependencyAnalysis, error) {
-	// Placeholder - would analyze actual dependencies
 	return &DependencyAnalysis{
 		OutdatedDeps:   []string{},
 		SecurityIssues: []string{},
@@ -628,7 +577,6 @@ func (e *EnhancedBuildAnalyzer) analyzeDependencies(ctx context.Context, repoInf
 }
 
 func (e *EnhancedBuildAnalyzer) analyzeSecurityImplications(repoInfo *RepositoryInfo, analysis *AnalysisResult) *GeneralSecurityAnalysis {
-	// Placeholder - would analyze actual security implications
 	return &GeneralSecurityAnalysis{
 		VulnerabilityCount: 0,
 		RiskLevel:          "low",

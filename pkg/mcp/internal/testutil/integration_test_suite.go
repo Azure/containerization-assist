@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// IntegrationTestSuite provides a comprehensive test suite for integration testing
+// IntegrationTestSuite provides integration testing capabilities
 type IntegrationTestSuite struct {
 	t                   *testing.T
 	logger              zerolog.Logger
@@ -27,7 +27,7 @@ type IntegrationTestSuite struct {
 	mu                  sync.RWMutex
 }
 
-// NewIntegrationTestSuite creates a comprehensive integration test suite
+// NewIntegrationTestSuite creates a new IntegrationTestSuite
 func NewIntegrationTestSuite(t *testing.T, logger zerolog.Logger) *IntegrationTestSuite {
 	testLogger := logger.With().
 		Str("test", t.Name()).
@@ -47,40 +47,36 @@ func NewIntegrationTestSuite(t *testing.T, logger zerolog.Logger) *IntegrationTe
 	}
 }
 
-// GetSessionManager returns the test session manager
+// GetSessionManager returns session manager
 func (its *IntegrationTestSuite) GetSessionManager() *TestSessionManager {
 	return its.sessionManager
 }
 
-// GetPipelineAdapter returns the mock pipeline adapter
+// GetPipelineAdapter returns pipeline adapter
 func (its *IntegrationTestSuite) GetPipelineAdapter() *MockPipelineAdapter {
 	return its.mockPipelineAdapter
 }
 
-// GetClients returns the test client sets
+// GetClients returns client sets
 func (its *IntegrationTestSuite) GetClients() *mcptypes.MCPClients {
 	return its.mockClients
 }
 
-// GetExecutionCapture returns the orchestrator execution capture
+// GetExecutionCapture returns execution capture
 func (its *IntegrationTestSuite) GetExecutionCapture() *orchestrationtestutil.ExecutionCapture {
 	return its.orchestratorCapture
 }
 
-// GetProfilingTestSuite returns the profiling test suite
+// GetProfilingTestSuite returns profiling test suite
 func (its *IntegrationTestSuite) GetProfilingTestSuite() *profilingtestutil.ProfiledTestSuite {
 	return its.profilingTestSuite
 }
 
-// CreateTestOrchestrator creates a test orchestrator with all necessary dependencies
+// CreateTestOrchestrator creates test orchestrator
 func (its *IntegrationTestSuite) CreateTestOrchestrator() *orchestrationtestutil.MockToolOrchestrator {
-	// For integration testing, use a mock orchestrator instead of the real one
-	// This avoids complex dependency setup and focuses on integration logic
 	mockOrchestrator := orchestrationtestutil.NewMockToolOrchestrator()
 
-	// Configure mock with realistic behavior
 	mockOrchestrator.ExecuteFunc = func(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
-		// Delegate to the mock pipeline adapter for realistic responses
 		switch toolName {
 		case "analyze_repository_atomic":
 			if argsMap, ok := args.(map[string]interface{}); ok {
@@ -96,7 +92,6 @@ func (its *IntegrationTestSuite) CreateTestOrchestrator() *orchestrationtestutil
 			}
 		}
 
-		// Default mock response
 		return map[string]interface{}{
 			"tool":     toolName,
 			"success":  true,
@@ -105,7 +100,6 @@ func (its *IntegrationTestSuite) CreateTestOrchestrator() *orchestrationtestutil
 		}, nil
 	}
 
-	// Add cleanup for orchestrator
 	its.AddCleanup(func() {
 		mockOrchestrator.Clear()
 	})
@@ -113,14 +107,11 @@ func (its *IntegrationTestSuite) CreateTestOrchestrator() *orchestrationtestutil
 	return mockOrchestrator
 }
 
-// CreateProfiledOrchestrator creates a profiled orchestrator for performance testing
+// CreateProfiledOrchestrator creates profiled orchestrator
 func (its *IntegrationTestSuite) CreateProfiledOrchestrator() *profilingtestutil.MockProfiler {
-	// For integration testing, use a mock profiler
 	mockProfiler := profilingtestutil.NewMockProfiler()
 
-	// Add cleanup for profiled orchestrator
 	its.AddCleanup(func() {
-		// Log mock profiling results
 		its.logger.Info().
 			Int("total_executions", len(mockProfiler.GetExecutionsForTool(""))).
 			Msg("Mock profiling completed for test")
@@ -129,13 +120,11 @@ func (its *IntegrationTestSuite) CreateProfiledOrchestrator() *profilingtestutil
 	return mockProfiler
 }
 
-// SetupFullWorkflow configures the test suite for end-to-end workflow testing
+// SetupFullWorkflow sets up workflow testing
 func (its *IntegrationTestSuite) SetupFullWorkflow() *WorkflowTestContext {
-	// Create all necessary components
 	orchestrator := its.CreateTestOrchestrator()
 	profiler := its.CreateProfiledOrchestrator()
 
-	// Setup workflow context
 	context := &WorkflowTestContext{
 		suite:             its,
 		orchestrator:      orchestrator,
@@ -144,13 +133,11 @@ func (its *IntegrationTestSuite) SetupFullWorkflow() *WorkflowTestContext {
 		workflowStartTime: time.Now(),
 	}
 
-	// Create a test session
 	its.sessionManager.CreateTestSession(context.sessionID, map[string]interface{}{
 		"workflow_test": true,
 		"created_at":    context.workflowStartTime,
 	})
 
-	// Add cleanup for workflow
 	its.AddCleanup(func() {
 		// Cleanup test session - simplified for mock
 	})
@@ -158,21 +145,20 @@ func (its *IntegrationTestSuite) SetupFullWorkflow() *WorkflowTestContext {
 	return context
 }
 
-// AddCleanup adds a cleanup function to be called at test end
+// AddCleanup adds cleanup function
 func (its *IntegrationTestSuite) AddCleanup(cleanup func()) {
 	its.mu.Lock()
 	defer its.mu.Unlock()
 	its.cleanupFunctions = append(its.cleanupFunctions, cleanup)
 }
 
-// Cleanup runs all registered cleanup functions
+// Cleanup runs cleanup functions
 func (its *IntegrationTestSuite) Cleanup() {
 	its.mu.RLock()
 	cleanupFuncs := make([]func(), len(its.cleanupFunctions))
 	copy(cleanupFuncs, its.cleanupFunctions)
 	its.mu.RUnlock()
 
-	// Run cleanup functions in reverse order
 	for i := len(cleanupFuncs) - 1; i >= 0; i-- {
 		func() {
 			defer func() {
@@ -187,7 +173,7 @@ func (its *IntegrationTestSuite) Cleanup() {
 	}
 }
 
-// WorkflowTestContext provides context for end-to-end workflow testing
+// WorkflowTestContext provides workflow test context
 type WorkflowTestContext struct {
 	suite             *IntegrationTestSuite
 	orchestrator      *orchestrationtestutil.MockToolOrchestrator
@@ -197,7 +183,7 @@ type WorkflowTestContext struct {
 	currentStage      string
 }
 
-// ExecuteTool executes a tool through the orchestrator with capture
+// ExecuteTool executes tool with capture
 func (ctx *WorkflowTestContext) ExecuteTool(toolName string, args interface{}) (interface{}, error) {
 	ctx.currentStage = toolName
 

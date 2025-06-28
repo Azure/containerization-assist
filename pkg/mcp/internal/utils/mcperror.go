@@ -7,29 +7,24 @@ import (
 	v20250326 "github.com/localrivet/gomcp/mcp/v20250326"
 )
 
-// MCPError represents an error with MCP error code and structured data
 type MCPError struct {
 	Code    v20250326.ErrorCode `json:"code"`
 	Message string              `json:"message"`
 	Data    interface{}         `json:"data,omitempty"`
 }
 
-// Error implements the error interface
 func (e *MCPError) Error() string {
 	return e.Message
 }
 
-// GetCode returns the MCP error code
 func (e *MCPError) GetCode() v20250326.ErrorCode {
 	return e.Code
 }
 
-// GetData returns the error data
 func (e *MCPError) GetData() interface{} {
 	return e.Data
 }
 
-// New creates a new MCP error with the specified code and message
 func New(code v20250326.ErrorCode, message string) *MCPError {
 	return &MCPError{
 		Code:    code,
@@ -37,7 +32,6 @@ func New(code v20250326.ErrorCode, message string) *MCPError {
 	}
 }
 
-// NewWithData creates a new MCP error with code, message, and additional data
 func NewWithData(code v20250326.ErrorCode, message string, data interface{}) *MCPError {
 	return &MCPError{
 		Code:    code,
@@ -46,7 +40,6 @@ func NewWithData(code v20250326.ErrorCode, message string, data interface{}) *MC
 	}
 }
 
-// Wrap creates a new MCP error by wrapping an existing error
 func Wrap(code v20250326.ErrorCode, message string, err error) *MCPError {
 	var data interface{}
 	if err != nil {
@@ -67,62 +60,51 @@ func Wrap(code v20250326.ErrorCode, message string, err error) *MCPError {
 	}
 }
 
-// MCP error codes mapped to common application scenarios
-// These map our custom error types to standardized MCP error codes
-
-// Session-related errors
 var (
-	CodeSessionNotFound        = v20250326.ErrorCodeInvalidRequest      // Session doesn't exist
-	CodeSessionExpired         = v20250326.ErrorCodeInvalidRequest      // Session has expired
-	CodeSessionExists          = v20250326.ErrorCodeInvalidArguments    // Session already exists
-	CodeWorkspaceQuotaExceeded = v20250326.ErrorCodeInternalServerError // Workspace quota exceeded
-	CodeMaxSessionsReached     = v20250326.ErrorCodeInternalServerError // Max sessions reached
-	CodeSessionCorrupted       = v20250326.ErrorCodeInternalServerError // Session data corrupted
+	CodeSessionNotFound        = v20250326.ErrorCodeInvalidRequest
+	CodeSessionExpired         = v20250326.ErrorCodeInvalidRequest
+	CodeSessionExists          = v20250326.ErrorCodeInvalidArguments
+	CodeWorkspaceQuotaExceeded = v20250326.ErrorCodeInternalServerError
+	CodeMaxSessionsReached     = v20250326.ErrorCodeInternalServerError
+	CodeSessionCorrupted       = v20250326.ErrorCodeInternalServerError
 )
 
-// Workflow/State errors
 var (
-	CodeAnalysisRequired   = v20250326.ErrorCodeInvalidRequest // Repository analysis required
-	CodeDockerfileRequired = v20250326.ErrorCodeInvalidRequest // Dockerfile required
-	CodeBuildRequired      = v20250326.ErrorCodeInvalidRequest // Successful build required
-	CodeImageRequired      = v20250326.ErrorCodeInvalidRequest // Built image required
-	CodeManifestsRequired  = v20250326.ErrorCodeInvalidRequest // K8s manifests required
-	CodeStageNotReady      = v20250326.ErrorCodeInvalidRequest // Stage prerequisites not met
+	CodeAnalysisRequired   = v20250326.ErrorCodeInvalidRequest
+	CodeDockerfileRequired = v20250326.ErrorCodeInvalidRequest
+	CodeBuildRequired      = v20250326.ErrorCodeInvalidRequest
+	CodeImageRequired      = v20250326.ErrorCodeInvalidRequest
+	CodeManifestsRequired  = v20250326.ErrorCodeInvalidRequest
+	CodeStageNotReady      = v20250326.ErrorCodeInvalidRequest
 )
 
-// Validation errors
 var (
-	CodeRequiredFieldMissing = v20250326.ErrorCodeInvalidArguments // Required field missing
-	CodeInvalidFormat        = v20250326.ErrorCodeInvalidArguments // Invalid format
-	CodeInvalidPath          = v20250326.ErrorCodeInvalidArguments // Invalid path
-	CodeInvalidImageName     = v20250326.ErrorCodeInvalidArguments // Invalid image name
-	CodeInvalidNamespace     = v20250326.ErrorCodeInvalidArguments // Invalid namespace
-	CodeUnsupportedOperation = v20250326.ErrorCodeInvalidRequest   // Unsupported operation
+	CodeRequiredFieldMissing = v20250326.ErrorCodeInvalidArguments
+	CodeInvalidFormat        = v20250326.ErrorCodeInvalidArguments
+	CodeInvalidPath          = v20250326.ErrorCodeInvalidArguments
+	CodeInvalidImageName     = v20250326.ErrorCodeInvalidArguments
+	CodeInvalidNamespace     = v20250326.ErrorCodeInvalidArguments
+	CodeUnsupportedOperation = v20250326.ErrorCodeInvalidRequest
 )
 
-// Infrastructure errors
 var (
-	CodeServiceUnavailable = v20250326.ErrorCodeInternalServerError // Service unavailable
-	CodeTimeoutError       = v20250326.ErrorCodeInternalServerError // Operation timeout
-	CodePermissionDenied   = v20250326.ErrorCodeInvalidRequest      // Permission denied
-	CodeNetworkError       = v20250326.ErrorCodeInternalServerError // Network error
-	CodeDiskFull           = v20250326.ErrorCodeInternalServerError // Disk full
-	CodeQuotaExceeded      = v20250326.ErrorCodeInternalServerError // Quota exceeded
+	CodeServiceUnavailable = v20250326.ErrorCodeInternalServerError
+	CodeTimeoutError       = v20250326.ErrorCodeInternalServerError
+	CodePermissionDenied   = v20250326.ErrorCodeInvalidRequest
+	CodeNetworkError       = v20250326.ErrorCodeInternalServerError
+	CodeDiskFull           = v20250326.ErrorCodeInternalServerError
+	CodeQuotaExceeded      = v20250326.ErrorCodeInternalServerError
 )
 
-// Build/Deploy specific errors
 var (
-	CodeDockerfileInvalid = v20250326.ErrorCodeInvalidArguments    // Dockerfile invalid
-	CodeBuildFailed       = v20250326.ErrorCodeInternalServerError // Build failed
-	CodeImagePushFailed   = v20250326.ErrorCodeInternalServerError // Image push failed
-	CodeManifestInvalid   = v20250326.ErrorCodeInvalidArguments    // Manifest invalid
-	CodeDeploymentFailed  = v20250326.ErrorCodeInternalServerError // Deployment failed
-	CodeHealthCheckFailed = v20250326.ErrorCodeInternalServerError // Health check failed
+	CodeDockerfileInvalid = v20250326.ErrorCodeInvalidArguments
+	CodeBuildFailed       = v20250326.ErrorCodeInternalServerError
+	CodeImagePushFailed   = v20250326.ErrorCodeInternalServerError
+	CodeManifestInvalid   = v20250326.ErrorCodeInvalidArguments
+	CodeDeploymentFailed  = v20250326.ErrorCodeInternalServerError
+	CodeHealthCheckFailed = v20250326.ErrorCodeInternalServerError
 )
 
-// Helper functions for creating wrapped errors with context
-
-// WrapSessionError wraps session-related errors with additional context
 func WrapSessionError(err error, sessionID string) *MCPError {
 	if err == nil {
 		return nil
@@ -140,7 +122,6 @@ func WrapSessionError(err error, sessionID string) *MCPError {
 	}
 }
 
-// WrapValidationError wraps validation errors with field information
 func WrapValidationError(err error, field string) *MCPError {
 	if err == nil {
 		return nil
@@ -158,7 +139,6 @@ func WrapValidationError(err error, field string) *MCPError {
 	}
 }
 
-// WrapWorkflowError wraps workflow errors with stage information
 func WrapWorkflowError(err error, stage string) *MCPError {
 	if err == nil {
 		return nil
@@ -176,7 +156,6 @@ func WrapWorkflowError(err error, stage string) *MCPError {
 	}
 }
 
-// WrapInfrastructureError wraps infrastructure errors with service information
 func WrapInfrastructureError(err error, service string) *MCPError {
 	if err == nil {
 		return nil
@@ -194,60 +173,48 @@ func WrapInfrastructureError(err error, service string) *MCPError {
 	}
 }
 
-// Common error creation functions
-
-// NewSessionNotFound creates a session not found error
 func NewSessionNotFound(sessionID string) *MCPError {
 	return NewWithData(CodeSessionNotFound, "session not found", map[string]interface{}{
 		"session_id": sessionID,
 	})
 }
 
-// NewSessionExpired creates a session expired error
 func NewSessionExpired(sessionID string) *MCPError {
 	return NewWithData(CodeSessionExpired, "session expired", map[string]interface{}{
 		"session_id": sessionID,
 	})
 }
 
-// NewBuildFailed creates a build failed error
 func NewBuildFailed(message string) *MCPError {
 	return New(CodeBuildFailed, fmt.Sprintf("docker build failed: %s", message))
 }
 
-// NewDockerfileInvalid creates a dockerfile invalid error
 func NewDockerfileInvalid(message string) *MCPError {
 	return New(CodeDockerfileInvalid, fmt.Sprintf("dockerfile invalid: %s", message))
 }
 
-// NewDeploymentFailed creates a deployment failed error
 func NewDeploymentFailed(message string) *MCPError {
 	return New(CodeDeploymentFailed, fmt.Sprintf("deployment failed: %s", message))
 }
 
-// NewRequiredFieldMissing creates a required field missing error
 func NewRequiredFieldMissing(field string) *MCPError {
 	return NewWithData(CodeRequiredFieldMissing, "required field missing", map[string]interface{}{
 		"field": field,
 	})
 }
 
-// IsSessionError checks if an error is session-related by examining the error data
 func IsSessionError(err error) bool {
 	if mcpErr, ok := err.(*MCPError); ok {
-		// Check if this error has session-related data
 		if data, ok := mcpErr.Data.(map[string]interface{}); ok {
 			if _, hasSessionID := data["session_id"]; hasSessionID {
 				return true
 			}
 		}
-		// Also check error message for session-related content
 		return strings.Contains(strings.ToLower(mcpErr.Message), "session")
 	}
 	return false
 }
 
-// IsWorkflowError checks if an error is workflow/state-related
 func IsWorkflowError(err error) bool {
 	if mcpErr, ok := err.(*MCPError); ok {
 		return mcpErr.Code == CodeAnalysisRequired ||
@@ -260,7 +227,6 @@ func IsWorkflowError(err error) bool {
 	return false
 }
 
-// IsValidationError checks if an error is validation-related
 func IsValidationError(err error) bool {
 	if mcpErr, ok := err.(*MCPError); ok {
 		return mcpErr.Code == CodeRequiredFieldMissing ||
@@ -273,7 +239,6 @@ func IsValidationError(err error) bool {
 	return false
 }
 
-// IsInfrastructureError checks if an error is infrastructure-related
 func IsInfrastructureError(err error) bool {
 	if mcpErr, ok := err.(*MCPError); ok {
 		return mcpErr.Code == CodeServiceUnavailable ||
@@ -286,7 +251,6 @@ func IsInfrastructureError(err error) bool {
 	return false
 }
 
-// IsBuildError checks if an error is build/deploy-related
 func IsBuildError(err error) bool {
 	if mcpErr, ok := err.(*MCPError); ok {
 		return mcpErr.Code == CodeDockerfileInvalid ||
@@ -299,7 +263,6 @@ func IsBuildError(err error) bool {
 	return false
 }
 
-// ToMCPErrorResponse converts an MCPError to a JSON-RPC error response
 func (e *MCPError) ToMCPErrorResponse(id interface{}) *v20250326.ErrorResponse {
 	return &v20250326.ErrorResponse{
 		Code:    e.Code,
@@ -307,7 +270,6 @@ func (e *MCPError) ToMCPErrorResponse(id interface{}) *v20250326.ErrorResponse {
 	}
 }
 
-// FromError creates an MCPError from a standard Go error, trying to map it to appropriate MCP codes
 func FromError(err error) *MCPError {
 	if err == nil {
 		return nil
@@ -317,7 +279,6 @@ func FromError(err error) *MCPError {
 		return mcpErr
 	}
 
-	// Try to map common error patterns to MCP codes
 	errStr := strings.ToLower(err.Error())
 
 	switch {
@@ -347,7 +308,6 @@ func FromError(err error) *MCPError {
 	}
 }
 
-// ErrorCategory represents a category of errors with common handling
 type ErrorCategory struct {
 	Code           string
 	Name           string
@@ -358,7 +318,6 @@ type ErrorCategory struct {
 	RecoverySteps  []string
 }
 
-// GetErrorCategory returns error category information for an MCP error code
 func GetErrorCategory(code v20250326.ErrorCode) (*ErrorCategory, bool) {
 	category, exists := errorCategoryMapping[string(code)]
 	if exists {
@@ -367,9 +326,7 @@ func GetErrorCategory(code v20250326.ErrorCode) (*ErrorCategory, bool) {
 	return nil, false
 }
 
-// errorCategoryMapping provides centralized error code to category mapping using MCP error codes
 var errorCategoryMapping = map[string]ErrorCategory{
-	// Invalid arguments errors (Dockerfile invalid, manifest invalid, etc.)
 	string(v20250326.ErrorCodeInvalidArguments): {
 		Code:           string(v20250326.ErrorCodeInvalidArguments),
 		Name:           "Invalid Arguments",
@@ -385,7 +342,6 @@ var errorCategoryMapping = map[string]ErrorCategory{
 		},
 	},
 
-	// Internal server errors (build failed, deploy failed, etc.)
 	string(v20250326.ErrorCodeInternalServerError): {
 		Code:           string(v20250326.ErrorCodeInternalServerError),
 		Name:           "Internal Server Error",
@@ -402,7 +358,6 @@ var errorCategoryMapping = map[string]ErrorCategory{
 		},
 	},
 
-	// Invalid request errors (session not found, permission denied, etc.)
 	string(v20250326.ErrorCodeInvalidRequest): {
 		Code:           string(v20250326.ErrorCodeInvalidRequest),
 		Name:           "Invalid Request",
@@ -418,7 +373,6 @@ var errorCategoryMapping = map[string]ErrorCategory{
 		},
 	},
 
-	// Resource not found errors
 	string(v20250326.ErrorCodeResourceNotFound): {
 		Code:           string(v20250326.ErrorCodeResourceNotFound),
 		Name:           "Resource Not Found",
@@ -435,7 +389,6 @@ var errorCategoryMapping = map[string]ErrorCategory{
 	},
 }
 
-// GetUserFriendlyMessage returns a user-friendly message for an MCP error
 func GetUserFriendlyMessage(mcpErr *MCPError) string {
 	if category, ok := GetErrorCategory(mcpErr.Code); ok {
 		return category.DefaultMessage
@@ -443,7 +396,6 @@ func GetUserFriendlyMessage(mcpErr *MCPError) string {
 	return mcpErr.Message
 }
 
-// ShouldRetry determines if an MCP error is retryable
 func ShouldRetry(mcpErr *MCPError) bool {
 	if category, ok := GetErrorCategory(mcpErr.Code); ok {
 		return category.Retryable
@@ -451,7 +403,6 @@ func ShouldRetry(mcpErr *MCPError) bool {
 	return false
 }
 
-// GetRecoverySteps returns recovery steps for an MCP error
 func GetRecoverySteps(mcpErr *MCPError) []string {
 	if category, ok := GetErrorCategory(mcpErr.Code); ok {
 		return category.RecoverySteps

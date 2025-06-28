@@ -15,7 +15,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// standardPullStages provides common stages for pull operations
+// standardPullStages returns pull operation stages
 func standardPullStages() []mcptypes.LocalProgressStage {
 	return []mcptypes.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
@@ -26,72 +26,59 @@ func standardPullStages() []mcptypes.LocalProgressStage {
 	}
 }
 
-// AtomicPullImageArgs defines arguments for atomic Docker image pull
+// AtomicPullImageArgs represents image pull arguments
 type AtomicPullImageArgs struct {
 	types.BaseToolArgs
 
-	// Image information
 	ImageRef string `json:"image_ref" jsonschema:"required,pattern=^[a-zA-Z0-9][a-zA-Z0-9._/-]*(:([a-zA-Z0-9][a-zA-Z0-9._-]*|latest))?$" description:"The full image reference to pull (e.g. nginx:latest, myregistry.com/app:v1.0.0)"`
 
-	// Pull configuration
 	Timeout    int  `json:"timeout,omitempty" jsonschema:"minimum=30,maximum=3600" description:"Pull timeout in seconds (default: 600)"`
 	RetryCount int  `json:"retry_count,omitempty" jsonschema:"minimum=0,maximum=10" description:"Number of retry attempts (default: 3)"`
 	Force      bool `json:"force,omitempty" description:"Force pull even if image already exists locally"`
 }
 
-// AtomicPullImageResult defines the response from atomic Docker image pull
+// AtomicPullImageResult represents image pull results
 type AtomicPullImageResult struct {
 	types.BaseToolResponse
-	mcptypes.BaseAIContextResult      // Embedded for AI context methods
-	Success                      bool `json:"success"`
+	mcptypes.BaseAIContextResult
+	Success bool `json:"success"`
 
-	// Session context
 	SessionID    string `json:"session_id"`
 	WorkspaceDir string `json:"workspace_dir"`
 
-	// Pull configuration
 	ImageRef string `json:"image_ref"`
 	Registry string `json:"registry"`
 
-	// Pull results from core operations
 	PullResult *docker.PullResult `json:"pull_result,omitempty"`
 
-	// Timing information
 	PullDuration  time.Duration `json:"pull_duration"`
 	TotalDuration time.Duration `json:"total_duration"`
 
-	// Rich context for Claude reasoning
 	PullContext *PullContext `json:"pull_context"`
-
-	// Rich error information if operation failed
 }
 
-// PullContext provides rich context for Claude to reason about
+// PullContext represents pull operation context
 type PullContext struct {
-	// Pull analysis
 	PullStatus    string  `json:"pull_status"`
 	LayersPulled  int     `json:"layers_pulled"`
 	LayersCached  int     `json:"layers_cached"`
 	PullSizeMB    float64 `json:"pull_size_mb"`
 	CacheHitRatio float64 `json:"cache_hit_ratio"`
 
-	// Registry information
 	RegistryType     string `json:"registry_type"`
 	RegistryEndpoint string `json:"registry_endpoint"`
 	AuthMethod       string `json:"auth_method,omitempty"`
 
-	// Error analysis
 	ErrorType     string `json:"error_type,omitempty"`
 	ErrorCategory string `json:"error_category,omitempty"`
 	IsRetryable   bool   `json:"is_retryable"`
 
-	// Next step suggestions
 	NextStepSuggestions []string `json:"next_step_suggestions"`
 	TroubleshootingTips []string `json:"troubleshooting_tips,omitempty"`
 	AuthenticationGuide []string `json:"authentication_guide,omitempty"`
 }
 
-// AtomicPullImageTool implements atomic Docker image pull using core operations
+// AtomicPullImageTool implements image pull operations
 type AtomicPullImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
@@ -100,7 +87,7 @@ type AtomicPullImageTool struct {
 	fixingMixin     *AtomicToolFixingMixin
 }
 
-// NewAtomicPullImageTool creates a new atomic pull image tool
+// NewAtomicPullImageTool creates a new AtomicPullImageTool
 func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicPullImageTool {
 	return &AtomicPullImageTool{
 		pipelineAdapter: adapter,
@@ -109,20 +96,19 @@ func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager 
 	}
 }
 
-// SetAnalyzer sets the analyzer for failure analysis
+// SetAnalyzer sets the analyzer
 func (t *AtomicPullImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
 	t.analyzer = analyzer
 }
 
-// SetFixingMixin sets the fixing mixin for automatic error recovery
+// SetFixingMixin sets the fixing mixin
 func (t *AtomicPullImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
 	t.fixingMixin = mixin
 }
 
-// ExecuteWithFixes runs the atomic Docker image pull with automatic fixes
+// ExecuteWithFixes executes pull with automatic fixes
 func (t *AtomicPullImageTool) ExecuteWithFixes(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
 	if t.fixingMixin != nil && !args.DryRun {
-		// Create wrapper operation for pull process
 		var result *AtomicPullImageResult
 		operation := NewPullOperationWrapper(
 			func(ctx context.Context) error {
@@ -143,12 +129,10 @@ func (t *AtomicPullImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 				return nil
 			},
 			func() error {
-				// Prepare workspace for fixes
 				return nil
 			},
 		)
 
-		// Execute with retry and fixing
 		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
 		if err != nil {
 			return nil, err
@@ -156,7 +140,6 @@ func (t *AtomicPullImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 		return result, nil
 	}
 
-	// Fallback to standard execution
 	return t.executePullCore(ctx, args)
 }
 
@@ -192,9 +175,6 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 		ImageRef:            args.ImageRef,
 		PullContext:         &PullContext{},
 	}
-
-	// Create progress adapter for GoMCP using standard pull stages
-	// _ = nil // TODO: Progress adapter removed to break import cycles
 
 	// Execute with progress tracking
 	ctx := context.Background()

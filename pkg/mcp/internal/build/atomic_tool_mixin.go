@@ -227,29 +227,3 @@ func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt 
 
 // Usage example pattern for integrating with existing atomic tools:
 //
-// func (t *AtomicBuildImageTool) ExecuteWithFixes(ctx context.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
-//     // Create fixing mixin
-//     fixingMixin := fixing.NewAtomicToolFixingMixin(t.analyzer, "atomic_build_image", t.logger)
-//
-//     // Wrap the core operation
-//     operation := fixing.NewBuildOperationWrapper(
-//         func(ctx context.Context) error {
-//             return t.executeCoreOperation(ctx, args)
-//         },
-//         func(ctx context.Context, err error) (*types.RichError, error) {
-//             return t.analyzeFailure(ctx, err, args)
-//         },
-//         func(ctx context.Context, fixAttempt *fixing.mcptypes.FixAttempt) error {
-//             return t.applyFix(ctx, fixAttempt, args)
-//         },
-//         t.logger,
-//     )
-//
-//     // Execute with retry
-//     err := fixingMixin.ExecuteWithRetry(ctx, args.SessionID, args.BuildContext, operation)
-//     if err != nil {
-//         return nil, err
-//     }
-//
-//     return t.buildSuccessResult(ctx, args)
-// }

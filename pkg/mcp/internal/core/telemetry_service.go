@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TelemetryService provides centralized telemetry and metrics collection
 type TelemetryService struct {
 	logger     zerolog.Logger
 	collectors []MetricsCollector
@@ -18,7 +17,6 @@ type TelemetryService struct {
 	metrics    *SystemMetrics
 }
 
-// NewTelemetryService creates a new telemetry service
 func NewTelemetryService(logger zerolog.Logger) *TelemetryService {
 	service := &TelemetryService{
 		logger:     logger.With().Str("service", "telemetry").Logger(),
@@ -28,13 +26,11 @@ func NewTelemetryService(logger zerolog.Logger) *TelemetryService {
 		metrics:    NewSystemMetrics(),
 	}
 
-	// Start event processor
 	go service.processEvents()
 
 	return service
 }
 
-// RegisterCollector registers a metrics collector
 func (s *TelemetryService) RegisterCollector(collector MetricsCollector) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -43,11 +39,9 @@ func (s *TelemetryService) RegisterCollector(collector MetricsCollector) {
 	s.logger.Debug().Str("collector", collector.GetName()).Msg("Metrics collector registered")
 }
 
-// TrackToolExecution tracks the execution of a tool
 func (s *TelemetryService) TrackToolExecution(ctx context.Context, execution ToolExecution) {
 	s.metrics.RecordToolExecution(execution)
 
-	// Send event
 	event := Event{
 		Type:      EventTypeToolExecution,
 		Timestamp: time.Now(),
@@ -61,7 +55,6 @@ func (s *TelemetryService) TrackToolExecution(ctx context.Context, execution Too
 	}
 }
 
-// TrackPerformance tracks performance metrics
 func (s *TelemetryService) TrackPerformance(ctx context.Context, metric PerformanceMetric) {
 	s.metrics.RecordPerformance(metric)
 
@@ -78,7 +71,6 @@ func (s *TelemetryService) TrackPerformance(ctx context.Context, metric Performa
 	}
 }
 
-// TrackEvent tracks a custom event
 func (s *TelemetryService) TrackEvent(ctx context.Context, eventType string, data interface{}) {
 	event := Event{
 		Type:      eventType,
@@ -93,21 +85,17 @@ func (s *TelemetryService) TrackEvent(ctx context.Context, eventType string, dat
 	}
 }
 
-// GetMetrics returns current system metrics
 func (s *TelemetryService) GetMetrics() *SystemMetrics {
 	return s.metrics
 }
 
-// CreatePerformanceTracker creates a new performance tracker
 func (s *TelemetryService) CreatePerformanceTracker(tool, operation string) *PerformanceTracker {
 	return NewPerformanceTracker(tool, operation, s)
 }
 
-// Shutdown gracefully shuts down the telemetry service
 func (s *TelemetryService) Shutdown(ctx context.Context) error {
 	close(s.stopCh)
 
-	// Wait for event processor to finish or timeout
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -116,14 +104,12 @@ func (s *TelemetryService) Shutdown(ctx context.Context) error {
 	}
 }
 
-// processEvents processes events from the queue
 func (s *TelemetryService) processEvents() {
 	for {
 		select {
 		case event := <-s.events:
 			s.processEvent(event)
 		case <-s.stopCh:
-			// Process remaining events
 			for len(s.events) > 0 {
 				event := <-s.events
 				s.processEvent(event)
@@ -133,14 +119,12 @@ func (s *TelemetryService) processEvents() {
 	}
 }
 
-// processEvent processes a single event
 func (s *TelemetryService) processEvent(event Event) {
 	s.mu.RLock()
 	collectors := make([]MetricsCollector, len(s.collectors))
 	copy(collectors, s.collectors)
 	s.mu.RUnlock()
 
-	// Send to all collectors
 	for _, collector := range collectors {
 		if err := collector.Collect(event); err != nil {
 			s.logger.Error().Err(err).Str("collector", collector.GetName()).Msg("Failed to collect event")
@@ -148,14 +132,12 @@ func (s *TelemetryService) processEvent(event Event) {
 	}
 }
 
-// Event represents a telemetry event
 type Event struct {
 	Type      string
 	Timestamp time.Time
 	Data      interface{}
 }
 
-// Event types
 const (
 	EventTypeToolExecution = "tool_execution"
 	EventTypePerformance   = "performance"
@@ -163,7 +145,6 @@ const (
 	EventTypeCustom        = "custom"
 )
 
-// ToolExecution represents a tool execution
 type ToolExecution struct {
 	Tool      string
 	Operation string
@@ -176,7 +157,6 @@ type ToolExecution struct {
 	Metadata  map[string]interface{}
 }
 
-// PerformanceMetric represents a performance measurement
 type PerformanceMetric struct {
 	Tool      string
 	Operation string
@@ -187,20 +167,17 @@ type PerformanceMetric struct {
 	Tags      map[string]string
 }
 
-// MetricsCollector defines the interface for metrics collectors
 type MetricsCollector interface {
 	GetName() string
 	Collect(event Event) error
 }
 
-// SystemMetrics tracks system-wide metrics
 type SystemMetrics struct {
 	ToolExecutions map[string]*ToolMetrics
 	Performance    map[string]*PerformanceStats
 	mu             sync.RWMutex
 }
 
-// NewSystemMetrics creates new system metrics
 func NewSystemMetrics() *SystemMetrics {
 	return &SystemMetrics{
 		ToolExecutions: make(map[string]*ToolMetrics),
@@ -208,7 +185,6 @@ func NewSystemMetrics() *SystemMetrics {
 	}
 }
 
-// RecordToolExecution records a tool execution
 func (m *SystemMetrics) RecordToolExecution(execution ToolExecution) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -221,7 +197,6 @@ func (m *SystemMetrics) RecordToolExecution(execution ToolExecution) {
 	}
 }
 
-// RecordPerformance records a performance metric
 func (m *SystemMetrics) RecordPerformance(metric PerformanceMetric) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -234,7 +209,6 @@ func (m *SystemMetrics) RecordPerformance(metric PerformanceMetric) {
 	}
 }
 
-// GetToolMetrics returns metrics for a specific tool
 func (m *SystemMetrics) GetToolMetrics(tool string) *ToolMetrics {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -245,7 +219,6 @@ func (m *SystemMetrics) GetToolMetrics(tool string) *ToolMetrics {
 	return nil
 }
 
-// ToolMetrics tracks metrics for a specific tool
 type ToolMetrics struct {
 	Tool            string
 	TotalExecs      int64
@@ -258,7 +231,6 @@ type ToolMetrics struct {
 	LastExecution   time.Time
 }
 
-// NewToolMetrics creates new tool metrics
 func NewToolMetrics(execution ToolExecution) *ToolMetrics {
 	metrics := &ToolMetrics{
 		Tool:          execution.Tool,
@@ -279,7 +251,6 @@ func NewToolMetrics(execution ToolExecution) *ToolMetrics {
 	return metrics
 }
 
-// Update updates the metrics with a new execution
 func (m *ToolMetrics) Update(execution ToolExecution) {
 	m.TotalExecs++
 	m.TotalDuration += execution.Duration
@@ -303,7 +274,6 @@ func (m *ToolMetrics) Update(execution ToolExecution) {
 	}
 }
 
-// Copy returns a copy of the metrics
 func (m *ToolMetrics) Copy() *ToolMetrics {
 	return &ToolMetrics{
 		Tool:            m.Tool,
@@ -318,7 +288,6 @@ func (m *ToolMetrics) Copy() *ToolMetrics {
 	}
 }
 
-// PerformanceStats tracks performance statistics
 type PerformanceStats struct {
 	Count   int64
 	Sum     float64
@@ -327,7 +296,6 @@ type PerformanceStats struct {
 	Average float64
 }
 
-// NewPerformanceStats creates new performance stats
 func NewPerformanceStats(initialValue float64) *PerformanceStats {
 	return &PerformanceStats{
 		Count:   1,
@@ -338,7 +306,6 @@ func NewPerformanceStats(initialValue float64) *PerformanceStats {
 	}
 }
 
-// Update updates the stats with a new value
 func (s *PerformanceStats) Update(value float64) {
 	s.Count++
 	s.Sum += value
@@ -352,7 +319,6 @@ func (s *PerformanceStats) Update(value float64) {
 	}
 }
 
-// PerformanceTracker tracks performance for a specific operation
 type PerformanceTracker struct {
 	tool         string
 	operation    string
@@ -361,7 +327,6 @@ type PerformanceTracker struct {
 	measurements map[string]float64
 }
 
-// NewPerformanceTracker creates a new performance tracker
 func NewPerformanceTracker(tool, operation string, service *TelemetryService) *PerformanceTracker {
 	return &PerformanceTracker{
 		tool:         tool,
@@ -372,12 +337,10 @@ func NewPerformanceTracker(tool, operation string, service *TelemetryService) *P
 	}
 }
 
-// Start starts timing an operation
 func (t *PerformanceTracker) Start() {
 	t.startTime = time.Now()
 }
 
-// Record records a measurement
 func (t *PerformanceTracker) Record(metric string, value float64, unit string) {
 	t.measurements[metric] = value
 
@@ -393,7 +356,6 @@ func (t *PerformanceTracker) Record(metric string, value float64, unit string) {
 	t.service.TrackPerformance(context.Background(), perfMetric)
 }
 
-// Finish finishes the tracking and records duration
 func (t *PerformanceTracker) Finish() time.Duration {
 	duration := time.Since(t.startTime)
 
@@ -402,24 +364,20 @@ func (t *PerformanceTracker) Finish() time.Duration {
 	return duration
 }
 
-// LoggingCollector logs events to the configured logger
 type LoggingCollector struct {
 	logger zerolog.Logger
 }
 
-// NewLoggingCollector creates a new logging collector
 func NewLoggingCollector(logger zerolog.Logger) *LoggingCollector {
 	return &LoggingCollector{
 		logger: logger.With().Str("collector", "logging").Logger(),
 	}
 }
 
-// GetName returns the collector name
 func (c *LoggingCollector) GetName() string {
 	return "logging"
 }
 
-// Collect logs the event
 func (c *LoggingCollector) Collect(event Event) error {
 	switch event.Type {
 	case EventTypeToolExecution:
@@ -453,28 +411,23 @@ func (c *LoggingCollector) Collect(event Event) error {
 	return nil
 }
 
-// MetricsCollectorChain chains multiple collectors
 type MetricsCollectorChain struct {
 	collectors []MetricsCollector
 }
 
-// NewMetricsCollectorChain creates a new collector chain
 func NewMetricsCollectorChain(collectors ...MetricsCollector) *MetricsCollectorChain {
 	return &MetricsCollectorChain{
 		collectors: collectors,
 	}
 }
 
-// GetName returns the chain name
 func (c *MetricsCollectorChain) GetName() string {
 	return "chain"
 }
 
-// Collect sends the event to all collectors in the chain
 func (c *MetricsCollectorChain) Collect(event Event) error {
 	for _, collector := range c.collectors {
 		if err := collector.Collect(event); err != nil {
-			// Continue with other collectors even if one fails
 			continue
 		}
 	}

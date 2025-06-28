@@ -16,7 +16,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// ProductionSecretScanner implements production-ready secret scanning with GitLeaks integration
 type ProductionSecretScanner struct {
 	logger            zerolog.Logger
 	gitleaksAvailable bool
@@ -25,7 +24,6 @@ type ProductionSecretScanner struct {
 	minSecretLength   int
 }
 
-// SecretPattern represents a secret detection pattern
 type SecretPattern struct {
 	ID          string
 	Description string
@@ -36,7 +34,6 @@ type SecretPattern struct {
 	Confidence  int
 }
 
-// DetectedSecret represents a found secret with enhanced metadata
 type DetectedSecret struct {
 	Type        string  `json:"type"`
 	Value       string  `json:"value"`
@@ -53,7 +50,6 @@ type DetectedSecret struct {
 	IsVerified  bool    `json:"is_verified"`
 }
 
-// GitLeaksResult represents the result from GitLeaks scan
 type GitLeaksResult struct {
 	Description string   `json:"Description"`
 	StartLine   int      `json:"StartLine"`
@@ -75,7 +71,6 @@ type GitLeaksResult struct {
 	Fingerprint string   `json:"Fingerprint"`
 }
 
-// NewProductionSecretScanner creates a new production-ready secret scanner
 func NewProductionSecretScanner(logger zerolog.Logger) *ProductionSecretScanner {
 	scanner := &ProductionSecretScanner{
 		logger:           logger.With().Str("component", "production_secret_scanner").Logger(),
@@ -83,16 +78,13 @@ func NewProductionSecretScanner(logger zerolog.Logger) *ProductionSecretScanner 
 		minSecretLength:  8,
 	}
 
-	// Check if GitLeaks is available
 	scanner.gitleaksAvailable = scanner.checkGitleaksAvailability()
 
-	// Initialize custom patterns based on GitLeaks rules
 	scanner.customPatterns = scanner.initializeCustomPatterns()
 
 	return scanner
 }
 
-// ScanWithGitleaks performs secret scanning using GitLeaks
 func (pss *ProductionSecretScanner) ScanWithGitleaks(ctx context.Context, path string) ([]DetectedSecret, error) {
 	if !pss.gitleaksAvailable {
 		pss.logger.Debug().Msg("GitLeaks not available, falling back to custom patterns")
@@ -101,24 +93,20 @@ func (pss *ProductionSecretScanner) ScanWithGitleaks(ctx context.Context, path s
 
 	pss.logger.Info().Str("path", path).Msg("Running GitLeaks scan")
 
-	// Run GitLeaks with JSON output
 	cmd := exec.CommandContext(ctx, "gitleaks", "detect", "--source", path, "--format", "json", "--no-git")
 	output, err := cmd.Output()
 	if err != nil {
-		// GitLeaks returns non-zero exit code when secrets are found
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			output = exitErr.Stderr
 		}
 	}
 
-	// Parse GitLeaks output
 	var gitleaksResults []GitLeaksResult
 	if err := json.Unmarshal(output, &gitleaksResults); err != nil {
 		pss.logger.Warn().Err(err).Msg("Failed to parse GitLeaks output, using custom patterns")
 		return pss.ScanWithCustomPatterns(path)
 	}
 
-	// Convert GitLeaks results to our format
 	var secrets []DetectedSecret
 	for _, result := range gitleaksResults {
 		secret := DetectedSecret{
@@ -134,7 +122,7 @@ func (pss *ProductionSecretScanner) ScanWithGitleaks(ctx context.Context, path s
 			Entropy:     result.Entropy,
 			Context:     result.Match,
 			Fingerprint: result.Fingerprint,
-			IsVerified:  false, // Could be enhanced with verification
+			IsVerified:  false,
 		}
 		secrets = append(secrets, secret)
 	}
@@ -143,29 +131,24 @@ func (pss *ProductionSecretScanner) ScanWithGitleaks(ctx context.Context, path s
 	return secrets, nil
 }
 
-// ScanWithCustomPatterns performs secret scanning using custom patterns
 func (pss *ProductionSecretScanner) ScanWithCustomPatterns(path string) ([]DetectedSecret, error) {
 	pss.logger.Info().Str("path", path).Msg("Running custom pattern scan")
 
 	var secrets []DetectedSecret
 
-	// Traverse the file system and scan files for secrets using custom patterns
 	err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			pss.logger.Warn().Err(err).Str("file", filePath).Msg("Error accessing file")
-			return nil // Continue scanning other files
+			return nil
 		}
-		// Skip directories
 		if info.IsDir() {
 			return nil
 		}
-		// Read file contents
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			pss.logger.Warn().Err(err).Str("file", filePath).Msg("Error reading file")
-			return nil // Continue scanning other files
+			return nil
 		}
-		// Apply custom patterns
 		for _, pattern := range pss.customPatterns {
 			pss.logger.Debug().Str("pattern", pattern.ID).Str("file", filePath).Msg("Checking pattern")
 			if pattern.Regex == nil {
@@ -180,8 +163,8 @@ func (pss *ProductionSecretScanner) ScanWithCustomPatterns(path string) ([]Detec
 					Redacted:   pss.redactSecret(match),
 					Pattern:    pattern.Regex.String(),
 					File:       filePath,
-					Line:       -1, // Line number extraction could be added later
-					Column:     -1, // Column extraction could be added later
+					Line:       -1,
+					Column:     -1,
 					Confidence: pattern.Confidence,
 					IsVerified: false,
 				}
@@ -199,9 +182,7 @@ func (pss *ProductionSecretScanner) ScanWithCustomPatterns(path string) ([]Detec
 	return secrets, nil
 }
 
-// VerifySecret attempts to verify if a detected secret is valid
 func (pss *ProductionSecretScanner) VerifySecret(ctx context.Context, secret DetectedSecret) bool {
-	// Implement secret verification logic
 	switch secret.Type {
 	case "github-pat", "github-fine-grained-pat":
 		return pss.verifyGitHubToken(ctx, secret.Value)
@@ -214,19 +195,16 @@ func (pss *ProductionSecretScanner) VerifySecret(ctx context.Context, secret Det
 	}
 }
 
-// calculateEntropy calculates Shannon entropy of a string
 func (pss *ProductionSecretScanner) calculateEntropy(data string) float64 {
 	if len(data) == 0 {
 		return 0
 	}
 
-	// Count character frequencies
 	freq := make(map[rune]int)
 	for _, char := range data {
 		freq[char]++
 	}
 
-	// Calculate entropy
 	entropy := 0.0
 	length := float64(len(data))
 	for _, count := range freq {
@@ -239,7 +217,6 @@ func (pss *ProductionSecretScanner) calculateEntropy(data string) float64 {
 	return entropy
 }
 
-// checkGitleaksAvailability checks if GitLeaks is available
 func (pss *ProductionSecretScanner) checkGitleaksAvailability() bool {
 	cmd := exec.Command("gitleaks", "version")
 	err := cmd.Run()
@@ -248,7 +225,6 @@ func (pss *ProductionSecretScanner) checkGitleaksAvailability() bool {
 	return available
 }
 
-// initializeCustomPatterns creates custom secret detection patterns
 func (pss *ProductionSecretScanner) initializeCustomPatterns() []*SecretPattern {
 	patterns := []*SecretPattern{
 		{
@@ -347,16 +323,13 @@ func (pss *ProductionSecretScanner) initializeCustomPatterns() []*SecretPattern 
 	return patterns
 }
 
-// classifySeverity determines the severity of a detected secret
 func (pss *ProductionSecretScanner) classifySeverity(ruleID, secret string) string {
-	// Find pattern by ID
 	for _, pattern := range pss.customPatterns {
 		if pattern.ID == ruleID {
 			return pattern.Severity
 		}
 	}
 
-	// Fallback severity classification
 	secretLower := strings.ToLower(secret)
 	switch {
 	case strings.Contains(secretLower, "aws") || strings.Contains(secretLower, "stripe"):
@@ -370,11 +343,9 @@ func (pss *ProductionSecretScanner) classifySeverity(ruleID, secret string) stri
 	}
 }
 
-// calculateConfidence calculates confidence score for a detection
 func (pss *ProductionSecretScanner) calculateConfidence(ruleID, secret string, entropy float64) int {
 	baseConfidence := 50
 
-	// Find pattern by ID
 	for _, pattern := range pss.customPatterns {
 		if pattern.ID == ruleID {
 			baseConfidence = pattern.Confidence
@@ -382,17 +353,14 @@ func (pss *ProductionSecretScanner) calculateConfidence(ruleID, secret string, e
 		}
 	}
 
-	// Adjust based on entropy
 	if entropy >= pss.entropyThreshold {
 		baseConfidence += 20
 	}
 
-	// Adjust based on length
 	if len(secret) >= 32 {
 		baseConfidence += 10
 	}
 
-	// Cap at 100
 	if baseConfidence > 100 {
 		baseConfidence = 100
 	}
@@ -400,7 +368,6 @@ func (pss *ProductionSecretScanner) calculateConfidence(ruleID, secret string, e
 	return baseConfidence
 }
 
-// redactSecret safely redacts a secret for logging
 func (pss *ProductionSecretScanner) redactSecret(secret string) string {
 	if len(secret) <= 6 {
 		return "***"
@@ -408,38 +375,27 @@ func (pss *ProductionSecretScanner) redactSecret(secret string) string {
 	return secret[:3] + "***" + secret[len(secret)-3:]
 }
 
-// verifyGitHubToken verifies if a GitHub token is valid
 func (pss *ProductionSecretScanner) verifyGitHubToken(_ context.Context, _ string) bool {
-	// This would make an API call to GitHub to verify the token
-	// For safety, we're not implementing actual verification in this example
 	pss.logger.Debug().Msg("GitHub token verification not implemented for security")
 	return false
 }
 
-// verifyAWSKey verifies if an AWS key is valid
 func (pss *ProductionSecretScanner) verifyAWSKey(_ context.Context, _ string) bool {
-	// This would make an API call to AWS to verify the key
-	// For safety, we're not implementing actual verification in this example
 	pss.logger.Debug().Msg("AWS key verification not implemented for security")
 	return false
 }
 
-// verifyGoogleAPIKey verifies if a Google API key is valid
 func (pss *ProductionSecretScanner) verifyGoogleAPIKey(_ context.Context, _ string) bool {
-	// This would make an API call to Google to verify the key
-	// For safety, we're not implementing actual verification in this example
 	pss.logger.Debug().Msg("Google API key verification not implemented for security")
 	return false
 }
 
-// GenerateFingerprint creates a unique fingerprint for a secret
 func (pss *ProductionSecretScanner) GenerateFingerprint(secret, file string, line int) string {
 	data := fmt.Sprintf("%s:%s:%d", secret, file, line)
 	hash := sha256.Sum256([]byte(data))
-	return hex.EncodeToString(hash[:8]) // Use first 8 bytes for shorter fingerprint
+	return hex.EncodeToString(hash[:8])
 }
 
-// IsHighEntropyString checks if a string has high entropy
 func (pss *ProductionSecretScanner) IsHighEntropyString(data string) bool {
 	if len(data) < pss.minSecretLength {
 		return false
@@ -449,7 +405,6 @@ func (pss *ProductionSecretScanner) IsHighEntropyString(data string) bool {
 	return entropy >= pss.entropyThreshold
 }
 
-// FilterFalsePositives removes likely false positives
 func (pss *ProductionSecretScanner) FilterFalsePositives(secrets []DetectedSecret) []DetectedSecret {
 	var filtered []DetectedSecret
 
@@ -465,12 +420,10 @@ func (pss *ProductionSecretScanner) FilterFalsePositives(secrets []DetectedSecre
 	return filtered
 }
 
-// isLikelyFalsePositive checks if a detection is likely a false positive
 func (pss *ProductionSecretScanner) isLikelyFalsePositive(secret DetectedSecret) bool {
 	valueLower := strings.ToLower(secret.Value)
 	contextLower := strings.ToLower(secret.Context)
 
-	// Common false positive patterns
 	falsePositives := []string{
 		"test", "example", "dummy", "fake", "sample", "placeholder",
 		"xxx", "yyy", "zzz", "000", "123", "abc",
@@ -484,7 +437,6 @@ func (pss *ProductionSecretScanner) isLikelyFalsePositive(secret DetectedSecret)
 		}
 	}
 
-	// Check for common test file patterns
 	if strings.Contains(secret.File, "test") ||
 		strings.Contains(secret.File, "spec") ||
 		strings.Contains(secret.File, "mock") {

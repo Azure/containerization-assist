@@ -7,26 +7,21 @@ import (
 )
 
 // MockToolOrchestrator provides a controllable mock for testing tool execution
-// Note: The name is kept as MockToolOrchestrator for backward compatibility with existing tests
 type MockToolOrchestrator struct {
-	mu sync.RWMutex
-
-	// Configuration
+	mu             sync.RWMutex
 	ExecuteFunc    func(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
 	ValidateFunc   func(toolName string, args interface{}) error
 	ExecutionDelay time.Duration
 	ShouldFail     bool
 	FailureError   error
 
-	// Execution tracking
 	ExecutionHistory []ExecutionRecord
 	ValidationCalls  []ValidationRecord
 
-	// State tracking
 	PipelineAdapter interface{}
 }
 
-// ExecutionRecord tracks a tool execution call
+// ExecutionRecord tracks tool execution
 type ExecutionRecord struct {
 	ToolName  string
 	Args      interface{}
@@ -37,7 +32,7 @@ type ExecutionRecord struct {
 	Duration  time.Duration
 }
 
-// ValidationRecord tracks a validation call
+// ValidationRecord tracks validation
 type ValidationRecord struct {
 	ToolName  string
 	Args      interface{}
@@ -53,14 +48,13 @@ func NewMockToolOrchestrator() *MockToolOrchestrator {
 	}
 }
 
-// ExecuteTool implements the InternalToolOrchestrator interface
+// ExecuteTool implements tool execution
 func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	startTime := time.Now()
 
-	// Apply execution delay if configured
 	if m.ExecutionDelay > 0 {
 		time.Sleep(m.ExecutionDelay)
 	}
@@ -68,18 +62,15 @@ func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string,
 	var result interface{}
 	var err error
 
-	// Use custom execution function if provided
 	if m.ExecuteFunc != nil {
 		result, err = m.ExecuteFunc(ctx, toolName, args, session)
 	} else if m.ShouldFail {
-		// Return configured failure
 		if m.FailureError != nil {
 			err = m.FailureError
 		} else {
 			err = NewMockError("mock execution failed")
 		}
 	} else {
-		// Default successful execution
 		result = map[string]interface{}{
 			"tool":     toolName,
 			"success":  true,
@@ -88,7 +79,6 @@ func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string,
 		}
 	}
 
-	// Record execution
 	record := ExecutionRecord{
 		ToolName:  toolName,
 		Args:      args,
@@ -103,20 +93,17 @@ func (m *MockToolOrchestrator) ExecuteTool(ctx context.Context, toolName string,
 	return result, err
 }
 
-// ValidateToolArgs implements the InternalToolOrchestrator interface
+// ValidateToolArgs implements tool validation
 func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var err error
 
-	// Use custom validation function if provided
 	if m.ValidateFunc != nil {
 		err = m.ValidateFunc(toolName, args)
 	}
-	// Otherwise, validation succeeds by default
 
-	// Record validation call
 	record := ValidationRecord{
 		ToolName:  toolName,
 		Args:      args,
@@ -127,8 +114,6 @@ func (m *MockToolOrchestrator) ValidateToolArgs(toolName string, args interface{
 
 	return err
 }
-
-// Test utility methods
 
 // GetExecutionCount returns the number of tool executions
 func (m *MockToolOrchestrator) GetExecutionCount() int {
@@ -187,22 +172,18 @@ func (m *MockToolOrchestrator) Clear() {
 }
 
 // MockToolRegistry provides a controllable mock for testing tool registration
-// Note: The name is kept as MockToolRegistry for backward compatibility with existing tests
 type MockToolRegistry struct {
-	mu sync.RWMutex
-
-	// Configuration
+	mu            sync.RWMutex
 	RegisterFunc  func(name string, tool interface{}) error
 	GetToolFunc   func(name string) (interface{}, bool)
 	ShouldFailReg bool
 	FailureError  error
 
-	// State tracking
 	RegisteredTools   map[string]interface{}
 	RegistrationCalls []RegistrationRecord
 }
 
-// RegistrationRecord tracks a tool registration call
+// RegistrationRecord tracks tool registration
 type RegistrationRecord struct {
 	ToolName  string
 	Tool      interface{}
@@ -218,29 +199,25 @@ func NewMockToolRegistry() *MockToolRegistry {
 	}
 }
 
-// RegisterTool implements the tool registry interface
+// RegisterTool implements tool registration
 func (m *MockToolRegistry) RegisterTool(name string, tool interface{}) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var err error
 
-	// Use custom registration function if provided
 	if m.RegisterFunc != nil {
 		err = m.RegisterFunc(name, tool)
 	} else if m.ShouldFailReg {
-		// Return configured failure
 		if m.FailureError != nil {
 			err = m.FailureError
 		} else {
 			err = NewMockError("mock registration failed")
 		}
 	} else {
-		// Default successful registration
 		m.RegisteredTools[name] = tool
 	}
 
-	// Record registration call
 	record := RegistrationRecord{
 		ToolName:  name,
 		Tool:      tool,
@@ -252,22 +229,18 @@ func (m *MockToolRegistry) RegisterTool(name string, tool interface{}) error {
 	return err
 }
 
-// GetTool implements the tool registry interface
+// GetTool implements tool retrieval
 func (m *MockToolRegistry) GetTool(name string) (interface{}, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Use custom get function if provided
 	if m.GetToolFunc != nil {
 		return m.GetToolFunc(name)
 	}
 
-	// Default behavior
 	tool, exists := m.RegisteredTools[name]
 	return tool, exists
 }
-
-// Test utility methods for registry
 
 // GetRegistrationCount returns the number of tool registrations
 func (m *MockToolRegistry) GetRegistrationCount() int {
@@ -307,19 +280,16 @@ func (m *MockToolRegistry) Clear() {
 
 // MockToolFactory provides a controllable mock for testing tool creation
 type MockToolFactory struct {
-	mu sync.RWMutex
-
-	// Configuration
+	mu           sync.RWMutex
 	CreateFunc   func(toolName string) (interface{}, error)
 	ShouldFail   bool
 	FailureError error
 
-	// State tracking
 	CreationCalls []CreationRecord
 	CreatedTools  map[string]interface{}
 }
 
-// CreationRecord tracks a tool creation call
+// CreationRecord tracks tool creation
 type CreationRecord struct {
 	ToolName  string
 	Timestamp time.Time
@@ -335,7 +305,7 @@ func NewMockToolFactory() *MockToolFactory {
 	}
 }
 
-// CreateTool implements the factory interface
+// CreateTool implements tool creation
 func (m *MockToolFactory) CreateTool(toolName string) (interface{}, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -343,18 +313,15 @@ func (m *MockToolFactory) CreateTool(toolName string) (interface{}, error) {
 	var tool interface{}
 	var err error
 
-	// Use custom creation function if provided
 	if m.CreateFunc != nil {
 		tool, err = m.CreateFunc(toolName)
 	} else if m.ShouldFail {
-		// Return configured failure
 		if m.FailureError != nil {
 			err = m.FailureError
 		} else {
 			err = NewMockError("mock tool creation failed")
 		}
 	} else {
-		// Default successful creation
 		tool = &MockTool{
 			Name:    toolName,
 			Created: time.Now(),
@@ -362,7 +329,6 @@ func (m *MockToolFactory) CreateTool(toolName string) (interface{}, error) {
 		m.CreatedTools[toolName] = tool
 	}
 
-	// Record creation call
 	record := CreationRecord{
 		ToolName:  toolName,
 		Timestamp: time.Now(),
@@ -373,8 +339,6 @@ func (m *MockToolFactory) CreateTool(toolName string) (interface{}, error) {
 
 	return tool, err
 }
-
-// Test utility methods for factory
 
 // GetCreationCount returns the number of tool creations
 func (m *MockToolFactory) GetCreationCount() int {
@@ -479,7 +443,7 @@ type TestExecution struct {
 	Duration  time.Duration
 }
 
-// Execute implements the tool execution interface
+// Execute implements tool execution
 func (t *TestTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -491,7 +455,6 @@ func (t *TestTool) Execute(ctx context.Context, args interface{}) (interface{}, 
 	if t.executeFunc != nil {
 		result, err = t.executeFunc(ctx, args)
 	} else {
-		// Default execution
 		result = map[string]interface{}{
 			"tool":      t.name,
 			"executed":  true,
@@ -499,7 +462,6 @@ func (t *TestTool) Execute(ctx context.Context, args interface{}) (interface{}, 
 		}
 	}
 
-	// Record execution
 	execution := TestExecution{
 		Args:      args,
 		Result:    result,
@@ -512,12 +474,12 @@ func (t *TestTool) Execute(ctx context.Context, args interface{}) (interface{}, 
 	return result, err
 }
 
-// Validate implements the tool validation interface
+// Validate implements validation
 func (t *TestTool) Validate(args interface{}) error {
 	if t.validateFunc != nil {
 		return t.validateFunc(args)
 	}
-	return nil // Default validation succeeds
+	return nil
 }
 
 // GetExecutionCount returns the number of executions

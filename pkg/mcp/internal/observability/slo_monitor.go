@@ -13,39 +13,32 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// SLOMonitor monitors Service Level Objectives and tracks error budget
 type SLOMonitor struct {
 	logger zerolog.Logger
 	config *types.ObservabilityConfig
 	meter  metric.Meter
 	mu     sync.RWMutex
 
-	// SLO tracking
 	sloWindows map[string]*SLOWindow
 
-	// Metrics
 	errorBudgetRemaining metric.Float64Gauge
 	sloCompliance        metric.Float64Gauge
 	alertsTriggered      metric.Int64Counter
 
-	// Alert state
 	alertStates map[string]*AlertState
 }
 
-// SLOWindow tracks metrics within a time window for SLO calculation
 type SLOWindow struct {
 	Name       string
 	WindowSize time.Duration
 	Target     float64
 
-	// Tracking data
 	TotalRequests  int64
 	SuccessfulReqs int64
 	LatencyP95     float64
 	LatencyP99     float64
 	ErrorRate      float64
 
-	// Time-based tracking
 	WindowStart time.Time
 	LastReset   time.Time
 	DataPoints  []DataPoint
@@ -53,7 +46,6 @@ type SLOWindow struct {
 	mu sync.RWMutex
 }
 
-// DataPoint represents a single measurement point
 type DataPoint struct {
 	Timestamp time.Time
 	Success   bool
@@ -61,7 +53,6 @@ type DataPoint struct {
 	ErrorCode string
 }
 
-// AlertState tracks the state of an alert
 type AlertState struct {
 	Name      string
 	Active    bool
@@ -71,7 +62,6 @@ type AlertState struct {
 	Condition string
 }
 
-// NewSLOMonitor creates a new SLO monitor
 func NewSLOMonitor(logger zerolog.Logger, config *types.ObservabilityConfig) (*SLOMonitor, error) {
 	meter := otel.Meter("container-kit-mcp-slo")
 
@@ -91,13 +81,11 @@ func NewSLOMonitor(logger zerolog.Logger, config *types.ObservabilityConfig) (*S
 		return nil, fmt.Errorf("failed to initialize SLO windows: %w", err)
 	}
 
-	// Start background monitoring
 	go monitor.monitorLoop()
 
 	return monitor, nil
 }
 
-// initializeMetrics creates SLO-specific metrics
 func (sm *SLOMonitor) initializeMetrics() error {
 	var err error
 
@@ -131,13 +119,11 @@ func (sm *SLOMonitor) initializeMetrics() error {
 	return nil
 }
 
-// initializeSLOWindows creates SLO tracking windows from configuration
 func (sm *SLOMonitor) initializeSLOWindows() error {
 	if !sm.config.SLO.Enabled {
 		return nil
 	}
 
-	// Tool execution SLOs
 	if err := sm.createSLOWindow("tool_execution_availability",
 		sm.config.SLO.ToolExecution.Availability.Window,
 		sm.config.SLO.ToolExecution.Availability.Target); err != nil {
@@ -160,7 +146,6 @@ func (sm *SLOMonitor) initializeSLOWindows() error {
 		}
 	}
 
-	// Session management SLOs
 	if err := sm.createSLOWindow("session_availability",
 		sm.config.SLO.SessionManagement.Availability.Window,
 		sm.config.SLO.SessionManagement.Availability.Target); err != nil {
@@ -178,11 +163,9 @@ func (sm *SLOMonitor) initializeSLOWindows() error {
 	return nil
 }
 
-// createSLOWindow creates a new SLO tracking window
 func (sm *SLOMonitor) createSLOWindow(name, windowStr string, target float64) error {
 	windowDuration, err := time.ParseDuration(windowStr)
 	if err != nil {
-		// Try parsing as time with units (e.g., "30d", "24h")
 		windowDuration, err = parseTimeWindow(windowStr)
 		if err != nil {
 			return fmt.Errorf("invalid window duration %s: %w", windowStr, err)
@@ -208,7 +191,6 @@ func (sm *SLOMonitor) createSLOWindow(name, windowStr string, target float64) er
 	return nil
 }
 
-// RecordDataPoint records a new data point for SLO tracking
 func (sm *SLOMonitor) RecordDataPoint(ctx context.Context, sloName string, success bool, duration time.Duration, errorCode string) {
 	sm.mu.RLock()
 	window, exists := sm.sloWindows[sloName]
@@ -228,18 +210,15 @@ func (sm *SLOMonitor) RecordDataPoint(ctx context.Context, sloName string, succe
 	window.mu.Lock()
 	defer window.mu.Unlock()
 
-	// Add data point
 	window.DataPoints = append(window.DataPoints, dataPoint)
 	window.TotalRequests++
 	if success {
 		window.SuccessfulReqs++
 	}
 
-	// Clean old data points outside the window
 	now := time.Now()
 	cutoff := now.Add(-window.WindowSize)
 
-	// Remove old points
 	validPoints := make([]DataPoint, 0, len(window.DataPoints))
 	totalInWindow := int64(0)
 	successInWindow := int64(0)
@@ -260,11 +239,9 @@ func (sm *SLOMonitor) RecordDataPoint(ctx context.Context, sloName string, succe
 	window.TotalRequests = totalInWindow
 	window.SuccessfulReqs = successInWindow
 
-	// Calculate metrics
 	if totalInWindow > 0 {
 		window.ErrorRate = float64(totalInWindow-successInWindow) / float64(totalInWindow)
 
-		// Calculate percentiles
 		if len(durations) > 0 {
 			window.LatencyP95 = calculatePercentile(durations, 0.95)
 			window.LatencyP99 = calculatePercentile(durations, 0.99)
@@ -272,20 +249,16 @@ func (sm *SLOMonitor) RecordDataPoint(ctx context.Context, sloName string, succe
 	}
 }
 
-// calculatePercentile calculates the nth percentile of a slice of durations
 func calculatePercentile(durations []float64, percentile float64) float64 {
 	if len(durations) == 0 {
 		return 0
 	}
 
-	// Simple percentile calculation (for production, use a proper library)
 	index := int(float64(len(durations)) * percentile)
 	if index >= len(durations) {
 		index = len(durations) - 1
 	}
 
-	// Sort would be needed for accurate percentile calculation
-	// For simplicity, return max for now
 	max := durations[0]
 	for _, d := range durations {
 		if d > max {
@@ -295,7 +268,6 @@ func calculatePercentile(durations []float64, percentile float64) float64 {
 	return max
 }
 
-// GetSLOCompliance returns the current SLO compliance for a given SLO
 func (sm *SLOMonitor) GetSLOCompliance(sloName string) float64 {
 	sm.mu.RLock()
 	window, exists := sm.sloWindows[sloName]
@@ -309,7 +281,7 @@ func (sm *SLOMonitor) GetSLOCompliance(sloName string) float64 {
 	defer window.mu.RUnlock()
 
 	if window.TotalRequests == 0 {
-		return 1.0 // No data means compliant
+		return 1.0
 	}
 
 	switch sloName {
@@ -318,14 +290,12 @@ func (sm *SLOMonitor) GetSLOCompliance(sloName string) float64 {
 		return successRate
 
 	case "tool_execution_error_rate":
-		// For error rate SLO, compliance means error rate is below target
 		if window.ErrorRate <= window.Target/100.0 {
 			return 1.0
 		}
 		return 1.0 - (window.ErrorRate / (window.Target / 100.0))
 
 	case "tool_execution_latency", "session_response_time":
-		// Check if latency percentile meets target
 		targetSeconds, _ := time.ParseDuration(sm.config.SLO.ToolExecution.Latency.Threshold)
 		if window.LatencyP95 <= targetSeconds.Seconds() {
 			return 1.0
@@ -337,7 +307,6 @@ func (sm *SLOMonitor) GetSLOCompliance(sloName string) float64 {
 	}
 }
 
-// GetErrorBudgetRemaining returns the remaining error budget as a ratio
 func (sm *SLOMonitor) GetErrorBudgetRemaining(sloName string) float64 {
 	compliance := sm.GetSLOCompliance(sloName)
 
@@ -349,18 +318,16 @@ func (sm *SLOMonitor) GetErrorBudgetRemaining(sloName string) float64 {
 		return 0
 	}
 
-	target := window.Target / 100.0 // Convert percentage to ratio
+	target := window.Target / 100.0
 	if compliance >= target {
-		return 1.0 // Full budget remaining
+		return 1.0
 	}
 
-	// Calculate remaining budget
 	return (compliance / target)
 }
 
-// monitorLoop runs the continuous monitoring and alerting
 func (sm *SLOMonitor) monitorLoop() {
-	ticker := time.NewTicker(1 * time.Minute) // Check every minute
+	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -372,7 +339,6 @@ func (sm *SLOMonitor) monitorLoop() {
 	}
 }
 
-// updateMetrics updates all SLO metrics
 func (sm *SLOMonitor) updateMetrics() {
 	ctx := context.Background()
 
@@ -389,7 +355,6 @@ func (sm *SLOMonitor) updateMetrics() {
 	}
 }
 
-// checkAlerts evaluates alert conditions and triggers alerts
 func (sm *SLOMonitor) checkAlerts() {
 	ctx := context.Background()
 
@@ -410,7 +375,6 @@ func (sm *SLOMonitor) checkAlerts() {
 		}
 
 		if shouldAlert && !alertState.Active {
-			// Trigger alert
 			alertState.Active = true
 			alertState.Triggered = time.Now()
 			alertState.Count++
@@ -426,11 +390,9 @@ func (sm *SLOMonitor) checkAlerts() {
 				Str("severity", rule.Severity).
 				Msg("SLO alert triggered")
 
-			// Send alert notifications (implementation would depend on channels)
 			sm.sendAlert(rule, alertState)
 
 		} else if !shouldAlert && alertState.Active {
-			// Clear alert
 			alertState.Active = false
 
 			sm.logger.Info().
@@ -440,10 +402,7 @@ func (sm *SLOMonitor) checkAlerts() {
 	}
 }
 
-// evaluateAlertCondition evaluates an alert condition
 func (sm *SLOMonitor) evaluateAlertCondition(condition string) bool {
-	// Simple condition evaluation
-	// In production, use a proper expression evaluator
 	switch condition {
 	case "slo_error_budget_remaining < 0.1":
 		for sloName := range sm.sloWindows {
@@ -454,7 +413,6 @@ func (sm *SLOMonitor) evaluateAlertCondition(condition string) bool {
 		return false
 
 	case "rate(tool_execution_errors_total[5m]) > 0.05":
-		// Check if error rate in last 5 minutes exceeds 5%
 		window := sm.sloWindows["tool_execution_error_rate"]
 		if window != nil {
 			window.mu.RLock()
@@ -469,10 +427,7 @@ func (sm *SLOMonitor) evaluateAlertCondition(condition string) bool {
 	}
 }
 
-// sendAlert sends alert notifications
 func (sm *SLOMonitor) sendAlert(rule types.AlertRule, state *AlertState) {
-	// Implementation would send to configured channels
-	// For now, just log
 	sm.logger.Error().
 		Str("alert", rule.Name).
 		Str("description", rule.Description).
@@ -481,7 +436,6 @@ func (sm *SLOMonitor) sendAlert(rule types.AlertRule, state *AlertState) {
 		Msg("Sending SLO alert")
 }
 
-// parseTimeWindow parses time windows like "30d", "24h", etc.
 func parseTimeWindow(window string) (time.Duration, error) {
 	switch {
 	case len(window) > 1 && window[len(window)-1:] == "d":
