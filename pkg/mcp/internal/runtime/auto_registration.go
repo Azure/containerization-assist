@@ -16,7 +16,7 @@ import (
 )
 
 // Auto-generated tool registry
-// Uses interface{} to avoid import cycles - the actual tools implement mcp.Tool
+// Uses interface{} to avoid import cycles - the actual tools implement mcptypes.Tool
 var generatedToolRegistry = map[string]func() interface{}{
 	"build_image":                 func() interface{} { return &build.BuildImageTool{} },
 	"atomic_build_image":          func() interface{} { return &build.AtomicBuildImageTool{} },

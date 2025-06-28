@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -48,7 +48,7 @@ func (s *ValidationService) RegisterSchema(name string, schema interface{}) {
 // TODO: Implement without runtime dependency
 func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
-		return types.NewValidationErrorBuilder("Session ID is required", "session_id", sessionID).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Session ID is required", "validation_error").
 			WithOperation("validate_session").
 			WithStage("input_validation").
 			WithRootCause("Session ID parameter is empty or missing").
@@ -56,10 +56,9 @@ func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID str
 			WithImmediateStep(2, "Check format", "Ensure session ID follows alphanumeric format").
 			Build()
 	}
-
 	// Check format (alphanumeric with hyphens)
 	if !regexp.MustCompile(`^[a-zA-Z0-9\-_]+$`).MatchString(sessionID) {
-		return types.NewValidationErrorBuilder("Session ID contains invalid characters", "session_id", sessionID).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Session ID contains invalid characters", "validation_error").
 			WithOperation("validate_session").
 			WithStage("format_validation").
 			WithRootCause("Session ID contains characters other than letters, numbers, hyphens, or underscores").
@@ -67,10 +66,9 @@ func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID str
 			WithImmediateStep(2, "Remove special chars", "Remove spaces, symbols, or other special characters").
 			Build()
 	}
-
 	// Check length
 	if len(sessionID) < 3 || len(sessionID) > 64 {
-		return types.NewValidationErrorBuilder("Session ID length is invalid", "session_id", sessionID).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Session ID length is invalid", "validation_error").
 			WithField("length", len(sessionID)).
 			WithField("min_length", 3).
 			WithField("max_length", 64).
@@ -81,7 +79,6 @@ func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID str
 			WithImmediateStep(2, "Generate new ID", "Create a new session ID within valid length range").
 			Build()
 	}
-
 	return nil
 }
 
@@ -90,7 +87,7 @@ func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID str
 // TODO: Implement without runtime dependency
 func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef string) error {
 	if imageRef == "" {
-		return types.NewValidationErrorBuilder("Image reference is required", "image_ref", imageRef).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Image reference is required", "validation_error").
 			WithOperation("validate_image").
 			WithStage("input_validation").
 			WithRootCause("Image reference parameter is empty or missing").
@@ -98,11 +95,10 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 			WithImmediateStep(2, "Include tag", "Add a tag to the image reference for specificity").
 			Build()
 	}
-
 	// Basic format validation
 	parts := strings.Split(imageRef, ":")
 	if len(parts) > 2 {
-		return types.NewValidationErrorBuilder("Invalid image reference format", "image_ref", imageRef).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid image reference format", "validation_error").
 			WithOperation("validate_image").
 			WithStage("format_validation").
 			WithRootCause("Image reference contains more than one colon separator").
@@ -110,10 +106,9 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 			WithImmediateStep(2, "Remove extra colons", "Ensure only one colon separates name and tag").
 			Build()
 	}
-
 	// Check for invalid characters
 	if strings.Contains(imageRef, " ") {
-		return types.NewValidationErrorBuilder("Image reference cannot contain spaces", "image_ref", imageRef).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Image reference cannot contain spaces", "validation_error").
 			WithOperation("validate_image").
 			WithStage("format_validation").
 			WithRootCause("Docker image references cannot contain whitespace characters").
@@ -121,12 +116,11 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 			WithImmediateStep(2, "Use valid format", "Follow Docker naming conventions: [a-z0-9.-]").
 			Build()
 	}
-
 	// Check for minimum components
 	if !strings.Contains(imageRef, "/") && !strings.Contains(imageRef, ":") {
 		// Single name images should be official images
 		if len(imageRef) < 2 {
-			return types.NewValidationErrorBuilder("Image reference too short", "image_ref", imageRef).
+			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Image reference too short", "validation_error").
 				WithField("length", len(imageRef)).
 				WithField("min_length", 2).
 				WithOperation("validate_image").
@@ -137,7 +131,6 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 				Build()
 		}
 	}
-
 	return nil
 }
 
@@ -146,7 +139,7 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 // TODO: Implement without runtime dependency
 func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, mustExist bool) error {
 	if path == "" {
-		return types.NewValidationErrorBuilder("File path is required", "path", path).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "File path is required", "validation_error").
 			WithOperation("validate_file_path").
 			WithStage("input_validation").
 			WithRootCause("File path parameter is empty or missing").
@@ -154,10 +147,9 @@ func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, m
 			WithImmediateStep(2, "Check parameter", "Ensure file path parameter is correctly passed").
 			Build()
 	}
-
 	// Check for path traversal attempts
 	if strings.Contains(path, "..") {
-		return types.NewValidationErrorBuilder("Path traversal is not allowed", "path", path).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Path traversal is not allowed", "validation_error").
 			WithOperation("validate_file_path").
 			WithStage("security_validation").
 			WithRootCause("File path contains directory traversal sequences (..)").
@@ -166,18 +158,16 @@ func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, m
 			WithImmediateStep(3, "Sanitize input", "Validate and sanitize file path input").
 			Build()
 	}
-
 	// Check context cancellation before file operations
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
 	}
-
 	// Check if file exists if required
 	if mustExist {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return types.NewValidationErrorBuilder("File does not exist", "path", path).
+			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "File does not exist", "validation_error").
 				WithOperation("validate_file_path").
 				WithStage("existence_check").
 				WithRootCause(fmt.Sprintf("Required file not found at path: %s", path)).
@@ -187,14 +177,13 @@ func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, m
 				Build()
 		}
 	}
-
 	// Check if path is absolute when expected
 	if filepath.IsAbs(path) {
 		// Validate absolute paths don't access sensitive areas
 		sensitive := []string{"/etc/passwd", "/etc/shadow", "/root"}
 		for _, s := range sensitive {
 			if strings.HasPrefix(path, s) {
-				return types.NewValidationErrorBuilder("Access to sensitive path is not allowed", "path", path).
+				return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Access to sensitive path is not allowed", "validation_error").
 					WithField("sensitive_prefix", s).
 					WithOperation("validate_file_path").
 					WithStage("security_validation").
@@ -206,7 +195,6 @@ func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, m
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -220,11 +208,10 @@ func (s *ValidationService) ValidateJSON(ctx context.Context, content []byte, sc
 		return ctx.Err()
 	default:
 	}
-
 	// Basic JSON validation
 	var data interface{}
 	if err := json.Unmarshal(content, &data); err != nil {
-		return types.NewValidationErrorBuilder("Invalid JSON content", "content", string(content)).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid JSON content", "validation_error").
 			WithOperation("validate_json").
 			WithStage("json_parsing").
 			WithRootCause(fmt.Sprintf("JSON parsing failed: %v", err)).
@@ -233,11 +220,10 @@ func (s *ValidationService) ValidateJSON(ctx context.Context, content []byte, sc
 			WithImmediateStep(3, "Check encoding", "Verify file encoding is UTF-8").
 			Build()
 	}
-
 	// Schema validation if schema is registered
 	if schema, exists := s.schemas[schemaName]; exists {
 		if err := s.validateAgainstSchema(data, schema); err != nil {
-			return types.NewValidationErrorBuilder("JSON schema validation failed", "schema", schemaName).
+			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "JSON schema validation failed", "validation_error").
 				WithOperation("validate_json").
 				WithStage("schema_validation").
 				WithRootCause(fmt.Sprintf("Content does not match schema %s: %v", schemaName, err)).
@@ -247,7 +233,6 @@ func (s *ValidationService) ValidateJSON(ctx context.Context, content []byte, sc
 				Build()
 		}
 	}
-
 	return nil
 }
 
@@ -259,46 +244,39 @@ func (s *ValidationService) ValidateYAML(ctx context.Context, content []byte) er
 		return ctx.Err()
 	default:
 	}
-
 	var data interface{}
 	if err := yaml.Unmarshal(content, &data); err != nil {
 		return fmt.Errorf("invalid YAML: %v", err)
 	}
-
 	return nil
 }
 
 // ValidateResourceLimits validates CPU and memory resource specifications
 func (s *ValidationService) ValidateResourceLimits(ctx context.Context, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) error {
-
 	// Validate CPU request
 	if cpuRequest != "" {
 		if err := s.validateCPUValue(cpuRequest); err != nil {
 			return fmt.Errorf("invalid CPU request: %v", err)
 		}
 	}
-
 	// Validate memory request
 	if memoryRequest != "" {
 		if err := s.validateMemoryValue(memoryRequest); err != nil {
 			return fmt.Errorf("invalid memory request: %v", err)
 		}
 	}
-
 	// Validate CPU limit
 	if cpuLimit != "" {
 		if err := s.validateCPUValue(cpuLimit); err != nil {
 			return fmt.Errorf("invalid CPU limit: %v", err)
 		}
 	}
-
 	// Validate memory limit
 	if memoryLimit != "" {
 		if err := s.validateMemoryValue(memoryLimit); err != nil {
 			return fmt.Errorf("invalid memory limit: %v", err)
 		}
 	}
-
 	// Cross-validation: limits should be >= requests
 	if cpuRequest != "" && cpuLimit != "" {
 		requestVal, _ := s.parseCPUValue(cpuRequest)
@@ -307,7 +285,6 @@ func (s *ValidationService) ValidateResourceLimits(ctx context.Context, cpuReque
 			return fmt.Errorf("CPU limit must be greater than or equal to CPU request")
 		}
 	}
-
 	if memoryRequest != "" && memoryLimit != "" {
 		requestBytes, _ := s.parseMemoryValue(memoryRequest)
 		limitBytes, _ := s.parseMemoryValue(memoryLimit)
@@ -315,32 +292,26 @@ func (s *ValidationService) ValidateResourceLimits(ctx context.Context, cpuReque
 			return fmt.Errorf("memory limit must be greater than or equal to memory request")
 		}
 	}
-
 	return nil
 }
 
 // ValidateNamespace validates a Kubernetes namespace name
 func (s *ValidationService) ValidateNamespace(ctx context.Context, namespace string) error {
-
 	if namespace == "" {
 		return nil // Empty namespace is allowed (defaults to "default")
 	}
-
 	// Kubernetes namespace naming rules
 	if len(namespace) > 63 {
 		return fmt.Errorf("namespace name must be 63 characters or less")
 	}
-
 	// Must be lowercase alphanumeric with hyphens
 	if !regexp.MustCompile(`^[a-z0-9\-]+$`).MatchString(namespace) {
 		return fmt.Errorf("namespace name must be lowercase alphanumeric with hyphens")
 	}
-
 	// Cannot start or end with hyphen
 	if strings.HasPrefix(namespace, "-") || strings.HasSuffix(namespace, "-") {
 		return fmt.Errorf("namespace name cannot start or end with hyphen")
 	}
-
 	// Reserved namespaces
 	reserved := []string{"kube-system", "kube-public", "kube-node-lease"}
 	for _, r := range reserved {
@@ -348,46 +319,38 @@ func (s *ValidationService) ValidateNamespace(ctx context.Context, namespace str
 			return fmt.Errorf("namespace '%s' is reserved", namespace)
 		}
 	}
-
 	return nil
 }
 
 // ValidateEnvironmentVariables validates environment variable names and values
 func (s *ValidationService) ValidateEnvironmentVariables(ctx context.Context, envVars map[string]string) error {
-
 	for name, value := range envVars {
 		// Validate variable name
 		if !regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`).MatchString(name) {
 			return fmt.Errorf("environment variable '%s': name must be uppercase letters, digits, and underscores", name)
 		}
-
 		// Check for potentially sensitive values
 		if s.containsSensitiveData(value) {
 			return fmt.Errorf("environment variable '%s': appears to contain sensitive data", name)
 		}
-
 		// Check value length
 		if len(value) > 1024 {
 			return fmt.Errorf("environment variable '%s': value too long (max 1024 characters)", name)
 		}
 	}
-
 	return nil
 }
 
 // ValidatePort validates a port number
 func (s *ValidationService) ValidatePort(ctx context.Context, port int) error {
-
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535")
 	}
-
 	// Check for privileged ports
 	if port < 1024 {
 		// Just log a warning, don't return error for privileged ports
 		s.logger.Warn().Int("port", port).Msg("Port is in privileged range (< 1024)")
 	}
-
 	return nil
 }
 
@@ -398,46 +361,38 @@ func (s *ValidationService) BatchValidate(ctx context.Context, items []Validatio
 		Results:    make(map[string]*ValidationResult),
 		StartTime:  time.Now(),
 	}
-
 	for _, item := range items {
 		validatorInterface, exists := s.validators[item.ValidatorName]
 		if !exists {
 			s.logger.Warn().Str("validator", item.ValidatorName).Msg("Validator not found")
 			continue
 		}
-
 		// TODO: Implement validator interface without runtime dependency
 		// For now, skip validation
 		_ = validatorInterface
-
 		// Placeholder validation result
 		result.Results[item.ID] = &ValidationResult{
 			Valid: true,
 		}
 		result.ValidItems++
 	}
-
 	result.Duration = time.Since(result.StartTime)
 	return result
 }
 
 // Helper methods
-
 func (s *ValidationService) validateAgainstSchema(data, schema interface{}) error {
 	// Simple schema validation - in practice would use a proper JSON schema library
 	return nil
 }
-
 func (s *ValidationService) validateCPUValue(cpu string) error {
 	// Validate CPU format (e.g., "100m", "0.1", "1")
 	if cpu == "" {
 		return fmt.Errorf("CPU value cannot be empty")
 	}
-
 	_, err := s.parseCPUValue(cpu)
 	return err
 }
-
 func (s *ValidationService) parseCPUValue(cpu string) (float64, error) {
 	// Simple CPU parsing - would use proper Kubernetes quantity parsing
 	if strings.HasSuffix(cpu, "m") {
@@ -446,16 +401,13 @@ func (s *ValidationService) parseCPUValue(cpu string) (float64, error) {
 	}
 	return 1.0, nil
 }
-
 func (s *ValidationService) validateMemoryValue(memory string) error {
 	if memory == "" {
 		return fmt.Errorf("memory value cannot be empty")
 	}
-
 	_, err := s.parseMemoryValue(memory)
 	return err
 }
-
 func (s *ValidationService) parseMemoryValue(memory string) (int64, error) {
 	// Simple memory parsing - would use proper Kubernetes quantity parsing
 	if strings.HasSuffix(memory, "Mi") {
@@ -466,26 +418,22 @@ func (s *ValidationService) parseMemoryValue(memory string) (int64, error) {
 	}
 	return 1024, nil
 }
-
 func (s *ValidationService) containsSensitiveData(value string) bool {
 	// Check for patterns that might indicate sensitive data
 	sensitivePatterns := []string{
 		"password", "secret", "key", "token", "credential",
 		"-----BEGIN", "sk-", "ey_", "ghp_", "glpat-",
 	}
-
 	lower := strings.ToLower(value)
 	for _, pattern := range sensitivePatterns {
 		if strings.Contains(lower, pattern) {
 			return true
 		}
 	}
-
 	// Check for long base64-like strings
 	if len(value) > 20 && regexp.MustCompile(`^[A-Za-z0-9+/=]+$`).MatchString(value) {
 		return true
 	}
-
 	return false
 }
 

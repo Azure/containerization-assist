@@ -12,7 +12,6 @@ import (
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/config"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	constants "github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
@@ -229,7 +228,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, nil
 	}
-	session := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionInterface.(*mcptypes.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -275,7 +274,8 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	}
 	if useRefactoredModules {
 		t.logger.Info().Msg("Using refactored Dockerfile validation modules")
-		return nil, types.NewRichError("FEATURE_NOT_IMPLEMENTED", "refactored Dockerfile validation not implemented without adapter", types.ErrTypeSystem)
+		// dockerfileAdapter removed - return error for now
+		return nil, mcptypes.NewRichError("FEATURE_NOT_IMPLEMENTED", "refactored Dockerfile validation not implemented without adapter", "system_error")
 	}
 
 	var validationResult *coredocker.ValidationResult
@@ -967,27 +967,32 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
-		return types.NewValidationErrorBuilder("Invalid argument type for atomic_validate_dockerfile", "args", args).
+		return mcptypes.NewErrorBuilder("INVALID_ARGUMENTS_TYPE", "Invalid argument type for atomic_validate_dockerfile", "validation_error").
 			WithField("expected", "AtomicValidateDockerfileArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
 
 	if validateArgs.SessionID == "" {
-		return types.NewValidationErrorBuilder("SessionID is required", "session_id", validateArgs.SessionID).
+		return mcptypes.NewErrorBuilder("SESSION_ID_REQUIRED", "SessionID is required", "validation_error").
 			WithField("field", "session_id").
 			Build()
 	}
 
-	// Note: DockerfilePath will be resolved to session workspace in Execute if empty
-	// We don't set a default here to allow proper workspace resolution
+	// Must provide either path or content
+	if validateArgs.DockerfilePath == "" && validateArgs.DockerfileContent == "" {
+		return mcptypes.NewErrorBuilder("DOCKERFILE_REQUIRED", "Either dockerfile_path or dockerfile_content must be provided", "validation_error").
+			WithField("dockerfile_path", validateArgs.DockerfilePath).
+			WithField("has_content", validateArgs.DockerfileContent != "").
+			Build()
+	}
 
 	if validateArgs.Severity != "" {
 		validSeverities := map[string]bool{
 			"info": true, "warning": true, "error": true,
 		}
 		if !validSeverities[strings.ToLower(validateArgs.Severity)] {
-			return types.NewValidationErrorBuilder("Invalid severity level", "severity", validateArgs.Severity).
+			return mcptypes.NewErrorBuilder("INVALID_SEVERITY", "Invalid severity level", "validation_error").
 				WithField("valid_values", "info, warning, error").
 				Build()
 		}
@@ -999,7 +1004,7 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 func (t *AtomicValidateDockerfileTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
-		return nil, types.NewValidationErrorBuilder("Invalid argument type for atomic_validate_dockerfile", "args", args).
+		return nil, mcptypes.NewErrorBuilder("INVALID_ARGUMENTS_TYPE", "Invalid argument type for atomic_validate_dockerfile", "validation_error").
 			WithField("expected", "AtomicValidateDockerfileArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()

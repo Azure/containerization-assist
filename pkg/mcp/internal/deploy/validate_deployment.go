@@ -151,7 +151,7 @@ func (t *AtomicValidateDeploymentTool) ExecuteTyped(ctx context.Context, args Va
 	timeout, err := time.ParseDuration(args.Timeout)
 	if err != nil {
 		t.logger.Error().Err(err).Str("timeout", args.Timeout).Msg("Invalid timeout format")
-		return response, types.NewRichError("INVALID_TIMEOUT", fmt.Sprintf("invalid timeout format: %s", args.Timeout), "validation_error")
+		return response, mcptypes.NewRichError("INVALID_TIMEOUT", fmt.Sprintf("invalid timeout format: %s", args.Timeout), "validation_error")
 	}
 
 	// Create context with timeout
@@ -419,13 +419,13 @@ func (t *AtomicValidateDeploymentTool) Execute(ctx context.Context, args interfa
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
 		}
 	default:
-		return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
 	}
 
 	// Call the typed execute method
@@ -443,18 +443,18 @@ func (t *AtomicValidateDeploymentTool) Validate(ctx context.Context, args interf
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
 		}
 	default:
-		return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
 	}
 
 	// Validate required fields
 	if deployArgs.SessionID == "" {
-		return types.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
 	}
 
 	return nil

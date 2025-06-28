@@ -44,7 +44,6 @@ func (w *TagOperationWrapper) GetFailureAnalysis(ctx context.Context, err error)
 			return nil, analyzerErr
 		}
 	}
-
 	// Create a simple RichError for now - this would be enhanced with proper analysis
 	return &mcptypes.RichError{
 		Message: fmt.Sprintf("Tag operation failed: %v", err),
@@ -65,7 +64,6 @@ func (w *TagOperationWrapper) CanRetry() bool {
 	if w.lastError == nil {
 		return false
 	}
-
 	errStr := strings.ToLower(w.lastError.Error())
 	// Docker daemon connectivity issues are retryable
 	if strings.Contains(errStr, "connection refused") ||

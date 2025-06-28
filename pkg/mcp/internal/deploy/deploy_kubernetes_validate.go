@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // performHealthCheck verifies deployment health
-func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
+func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *mcptypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
 	// Progress reporting removed
 
 	healthStart := time.Now()
@@ -85,7 +84,7 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 			readyPods = result.HealthResult.Summary.ReadyPods
 			totalPods = result.HealthResult.Summary.TotalPods
 		}
-		healthErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment health check failed: %d/%d pods ready", readyPods, totalPods), "health_check_error")
+		healthErr := mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment health check failed: %d/%d pods ready", readyPods, totalPods), "health_check_error")
 		_ = t.handleHealthCheckError(ctx, healthErr, result.HealthResult, result)
 		return healthErr
 	}
@@ -103,11 +102,11 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 
 // handleHealthCheckError creates an error for health check failures
 func (t *AtomicDeployKubernetesTool) handleHealthCheckError(_ context.Context, err error, _ *kubernetes.HealthCheckResult, _ *AtomicDeployKubernetesResult) error {
-	return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("health check failed: %v", err), "health_check_error")
+	return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("health check failed: %v", err), "health_check_error")
 }
 
 // updateSessionState updates session with deployment results
-func (t *AtomicDeployKubernetesTool) updateSessionState(session *sessiontypes.SessionState, result *AtomicDeployKubernetesResult) error {
+func (t *AtomicDeployKubernetesTool) updateSessionState(session *mcptypes.SessionState, result *AtomicDeployKubernetesResult) error {
 	// Update session with deployment results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -141,10 +140,10 @@ func (t *AtomicDeployKubernetesTool) updateSessionState(session *sessiontypes.Se
 		}
 	}
 
-	session.UpdateLastAccessed()
+	session.UpdatedAt = time.Now()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*sessiontypes.SessionState); ok {
+		if sess, ok := s.(*mcptypes.SessionState); ok {
 			*sess = *session
 		}
 	})

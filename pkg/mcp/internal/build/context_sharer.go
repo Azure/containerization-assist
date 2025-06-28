@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -49,10 +49,8 @@ func NewDefaultContextSharer(logger zerolog.Logger) *DefaultContextSharer {
 		logger:       logger.With().Str("component", "context_sharer").Logger(),
 		defaultTTL:   time.Hour, // Default 1-hour TTL for shared context
 	}
-
 	// Start cleanup goroutine
 	go sharer.cleanupExpiredContext()
-
 	return sharer
 }
 
@@ -60,11 +58,9 @@ func NewDefaultContextSharer(logger zerolog.Logger) *DefaultContextSharer {
 func (c *DefaultContextSharer) ShareContext(ctx context.Context, sessionID string, contextType string, data interface{}) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
 	if c.contextStore[sessionID] == nil {
 		c.contextStore[sessionID] = make(map[string]*SharedContext)
 	}
-
 	sharedCtx := &SharedContext{
 		SessionID:     sessionID,
 		ContextType:   contextType,
@@ -74,15 +70,12 @@ func (c *DefaultContextSharer) ShareContext(ctx context.Context, sessionID strin
 		ExpiresAt:     time.Now().Add(c.defaultTTL),
 		Metadata:      make(map[string]interface{}),
 	}
-
 	c.contextStore[sessionID][contextType] = sharedCtx
-
 	c.logger.Debug().
 		Str("session_id", sessionID).
 		Str("context_type", contextType).
 		Str("created_by", sharedCtx.CreatedByTool).
 		Msg("Shared context saved")
-
 	return nil
 }
 
@@ -90,79 +83,65 @@ func (c *DefaultContextSharer) ShareContext(ctx context.Context, sessionID strin
 func (c *DefaultContextSharer) GetSharedContext(ctx context.Context, sessionID string, contextType string) (interface{}, error) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-
 	sessionStore := c.contextStore[sessionID]
 	if sessionStore == nil {
 		return nil, fmt.Errorf("no shared context found for session %s", sessionID)
 	}
-
 	sharedCtx := sessionStore[contextType]
 	if sharedCtx == nil {
 		return nil, fmt.Errorf("no shared context of type %s found for session %s", contextType, sessionID)
 	}
-
 	// Check if context has expired
 	if time.Now().After(sharedCtx.ExpiresAt) {
 		delete(sessionStore, contextType)
 		return nil, fmt.Errorf("shared context of type %s has expired for session %s", contextType, sessionID)
 	}
-
 	c.logger.Debug().
 		Str("session_id", sessionID).
 		Str("context_type", contextType).
 		Str("created_by", sharedCtx.CreatedByTool).
 		Msg("Retrieved shared context")
-
 	return sharedCtx.Data, nil
 }
 
 // GetFailureRouting determines which tool should handle a specific failure
-func (c *DefaultContextSharer) GetFailureRouting(ctx context.Context, sessionID string, failure *types.RichError) (string, error) {
+func (c *DefaultContextSharer) GetFailureRouting(ctx context.Context, sessionID string, failure *mcptypes.RichError) (string, error) {
 	currentTool := getToolFromContext(ctx)
-
 	c.logger.Debug().
 		Str("session_id", sessionID).
 		Str("current_tool", currentTool).
 		Str("error_code", failure.Code).
 		Str("error_type", failure.Type).
 		Msg("Determining failure routing")
-
 	// Find matching routing rules
 	var bestMatch *FailureRoutingRule
 	bestPriority := 999
-
 	for _, rule := range c.routingRules {
 		if rule.FromTool != currentTool {
 			continue
 		}
-
 		// Check error type match
 		if len(rule.ErrorTypes) > 0 && !contains(rule.ErrorTypes, failure.Type) {
 			continue
 		}
-
 		// Check error code match
 		if len(rule.ErrorCodes) > 0 && !contains(rule.ErrorCodes, failure.Code) {
 			continue
 		}
-
 		// Check additional conditions
 		if !c.matchesConditions(ctx, sessionID, failure, rule.Conditions) {
 			continue
 		}
-
 		// Select rule with highest priority (lowest number)
 		if rule.Priority < bestPriority {
 			bestPriority = rule.Priority
 			bestMatch = &rule
 		}
 	}
-
 	if bestMatch == nil {
 		return "", fmt.Errorf("no routing rule found for error type %s code %s from tool %s",
 			failure.Type, failure.Code, currentTool)
 	}
-
 	c.logger.Info().
 		Str("session_id", sessionID).
 		Str("from_tool", currentTool).
@@ -170,23 +149,20 @@ func (c *DefaultContextSharer) GetFailureRouting(ctx context.Context, sessionID 
 		Str("rule_description", bestMatch.Description).
 		Int("priority", bestMatch.Priority).
 		Msg("Found failure routing")
-
 	return bestMatch.ToTool, nil
 }
 
 // matchesConditions checks if additional routing conditions are met
-func (c *DefaultContextSharer) matchesConditions(ctx context.Context, sessionID string, failure *types.RichError, conditions map[string]interface{}) bool {
+func (c *DefaultContextSharer) matchesConditions(ctx context.Context, sessionID string, failure *mcptypes.RichError, conditions map[string]interface{}) bool {
 	if len(conditions) == 0 {
 		return true
 	}
-
 	// Check severity condition
 	if requiredSeverity, ok := conditions["min_severity"]; ok {
 		if !c.severityMeetsThreshold(failure.Severity, requiredSeverity.(string)) {
 			return false
 		}
 	}
-
 	// Check if specific shared context is available
 	if requiredContext, ok := conditions["requires_context"]; ok {
 		_, err := c.GetSharedContext(ctx, sessionID, requiredContext.(string))
@@ -194,7 +170,6 @@ func (c *DefaultContextSharer) matchesConditions(ctx context.Context, sessionID 
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -206,10 +181,8 @@ func (c *DefaultContextSharer) severityMeetsThreshold(severity, threshold string
 		"Medium":   2,
 		"Low":      1,
 	}
-
 	currentLevel := severityLevels[severity]
 	thresholdLevel := severityLevels[threshold]
-
 	return currentLevel >= thresholdLevel
 }
 
@@ -217,11 +190,9 @@ func (c *DefaultContextSharer) severityMeetsThreshold(severity, threshold string
 func (c *DefaultContextSharer) cleanupExpiredContext() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-
 	for range ticker.C {
 		c.mutex.Lock()
 		now := time.Now()
-
 		for sessionID, sessionStore := range c.contextStore {
 			for contextType, sharedCtx := range sessionStore {
 				if now.After(sharedCtx.ExpiresAt) {
@@ -232,13 +203,11 @@ func (c *DefaultContextSharer) cleanupExpiredContext() {
 						Msg("Cleaned up expired shared context")
 				}
 			}
-
 			// Remove empty session stores
 			if len(sessionStore) == 0 {
 				delete(c.contextStore, sessionID)
 			}
 		}
-
 		c.mutex.Unlock()
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -51,7 +51,7 @@ func TestAnalyzeRepositoryRedirectTool_Execute_InvalidArgType_Simple(t *testing.
 	}
 
 	// Check that it's a RichError with correct type
-	if richErr, ok := err.(*types.RichError); ok {
+	if richErr, ok := err.(*mcptypes.RichError); ok {
 		if richErr.Code != "INVALID_ARGUMENTS" {
 			t.Errorf("Expected error code 'INVALID_ARGUMENTS', got '%s'", richErr.Code)
 		}
@@ -88,7 +88,7 @@ func TestAnalyzeRepositoryRedirectTool_Execute_MissingPath_Simple(t *testing.T) 
 	}
 
 	// Check that it's a RichError with correct message
-	if richErr, ok := err.(*types.RichError); ok {
+	if richErr, ok := err.(*mcptypes.RichError); ok {
 		if richErr.Code != "INVALID_ARGUMENTS" {
 			t.Errorf("Expected error code 'INVALID_ARGUMENTS', got '%s'", richErr.Code)
 		}
@@ -168,7 +168,7 @@ func TestAnalyzeRepositoryRedirectTool_ArgumentProcessing(t *testing.T) {
 					t.Errorf("Expected no result for error case '%s', but got result", tc.name)
 				}
 
-				if richErr, ok := err.(*types.RichError); ok {
+				if richErr, ok := err.(*mcptypes.RichError); ok {
 					if richErr.Code != tc.errorCode {
 						t.Errorf("Expected error code '%s' for test case '%s', got '%s'", tc.errorCode, tc.name, richErr.Code)
 					}

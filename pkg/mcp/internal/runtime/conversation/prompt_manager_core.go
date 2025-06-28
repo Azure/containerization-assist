@@ -7,7 +7,6 @@ import (
 	obs "github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
@@ -66,7 +65,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Type assert to concrete session type
-	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	session, ok := sessionInterface.(*mcptypes.SessionState)
 	if !ok {
 		return nil, fmt.Errorf("session type assertion failed")
 	}
@@ -87,9 +86,11 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Restore context from session if available
-	if session.RepoAnalysis != nil {
-		if ctx, ok := session.RepoAnalysis["_context"].(map[string]interface{}); ok {
-			convState.Context = ctx
+	if session.Metadata != nil {
+		if repoAnalysis, ok := session.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			if ctx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
+				convState.Context = ctx
+			}
 		}
 	}
 

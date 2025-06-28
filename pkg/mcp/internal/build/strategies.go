@@ -24,12 +24,10 @@ func NewStrategyManager(logger zerolog.Logger) *StrategyManager {
 		strategies: make(map[string]BuildStrategy),
 		logger:     logger.With().Str("component", "strategy_manager").Logger(),
 	}
-
 	// Register default strategies
 	sm.RegisterStrategy(NewDockerBuildStrategy(logger))
 	sm.RegisterStrategy(NewBuildKitStrategy(logger))
 	sm.RegisterStrategy(NewLegacyBuildStrategy(logger))
-
 	return sm
 }
 
@@ -44,7 +42,6 @@ func (sm *StrategyManager) SelectStrategy(ctx BuildContext) (BuildStrategy, erro
 		Str("dockerfile", ctx.DockerfilePath).
 		Bool("buildkit_available", sm.isBuildKitAvailable()).
 		Msg("Selecting build strategy")
-
 	// Check if BuildKit is requested and available
 	if sm.isBuildKitAvailable() && sm.shouldUseBuildKit(ctx) {
 		if strategy, exists := sm.strategies["buildkit"]; exists {
@@ -54,7 +51,6 @@ func (sm *StrategyManager) SelectStrategy(ctx BuildContext) (BuildStrategy, erro
 			}
 		}
 	}
-
 	// Default to standard Docker build
 	if strategy, exists := sm.strategies["docker"]; exists {
 		if err := strategy.Validate(ctx); err == nil {
@@ -62,13 +58,11 @@ func (sm *StrategyManager) SelectStrategy(ctx BuildContext) (BuildStrategy, erro
 			return strategy, nil
 		}
 	}
-
 	// Fallback to legacy build
 	if strategy, exists := sm.strategies["legacy"]; exists {
 		sm.logger.Info().Str("strategy", "legacy").Msg("Selected legacy strategy")
 		return strategy, nil
 	}
-
 	return nil, fmt.Errorf("no suitable build strategy found")
 }
 
@@ -100,14 +94,11 @@ func (sm *StrategyManager) shouldUseBuildKit(ctx BuildContext) bool {
 	if dockerfilePath == "" {
 		return false
 	}
-
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
 		return false
 	}
-
 	dockerfileContent := string(content)
-
 	// Check for BuildKit-specific syntax
 	buildKitFeatures := []string{
 		"# syntax=",
@@ -117,13 +108,11 @@ func (sm *StrategyManager) shouldUseBuildKit(ctx BuildContext) bool {
 		"--platform=",
 		"--ssh",
 	}
-
 	for _, feature := range buildKitFeatures {
 		if strings.Contains(dockerfileContent, feature) {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -158,21 +147,17 @@ func (s *DockerBuildStrategy) Description() string {
 // Build executes the Docker build
 func (s *DockerBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 	startTime := time.Now()
-
 	s.logger.Info().
 		Str("image", ctx.ImageName).
 		Str("tag", ctx.ImageTag).
 		Str("dockerfile", ctx.DockerfilePath).
 		Msg("Starting Docker build")
-
 	// Validate prerequisites
 	if err := s.validatePrerequisites(ctx); err != nil {
 		return nil, err
 	}
-
 	// Prepare build command
 	fullImageRef := fmt.Sprintf("%s:%s", ctx.ImageName, ctx.ImageTag)
-
 	// In a real implementation, this would call the Docker API
 	// For now, return a placeholder result
 	result := &BuildResult{
@@ -184,12 +169,10 @@ func (s *DockerBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 		CacheHits:      5,
 		CacheMisses:    5,
 	}
-
 	s.logger.Info().
 		Dur("duration", result.Duration).
 		Str("image", fullImageRef).
 		Msg("Docker build completed")
-
 	return result, nil
 }
 
@@ -203,7 +186,6 @@ func (s *DockerBuildStrategy) SupportsFeature(feature string) bool {
 		FeatureProvenance:   false,
 		FeatureCrossCompile: true,
 	}
-
 	return supportedFeatures[feature]
 }
 
@@ -213,20 +195,16 @@ func (s *DockerBuildStrategy) Validate(ctx BuildContext) error {
 	if ctx.DockerfilePath == "" {
 		return fmt.Errorf("Dockerfile path is required")
 	}
-
 	if _, err := os.Stat(ctx.DockerfilePath); os.IsNotExist(err) {
 		return fmt.Errorf("Dockerfile not found at %s", ctx.DockerfilePath)
 	}
-
 	// Check if build context exists
 	if ctx.BuildPath == "" {
 		return fmt.Errorf("build context path is required")
 	}
-
 	if _, err := os.Stat(ctx.BuildPath); os.IsNotExist(err) {
 		return fmt.Errorf("build context not found at %s", ctx.BuildPath)
 	}
-
 	return nil
 }
 
@@ -261,16 +239,13 @@ func (s *BuildKitStrategy) Description() string {
 // Build executes the BuildKit build
 func (s *BuildKitStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 	startTime := time.Now()
-
 	s.logger.Info().
 		Str("image", ctx.ImageName).
 		Str("tag", ctx.ImageTag).
 		Bool("buildkit", true).
 		Msg("Starting BuildKit build")
-
 	// BuildKit-specific implementation
 	fullImageRef := fmt.Sprintf("%s:%s", ctx.ImageName, ctx.ImageTag)
-
 	// In a real implementation, this would use BuildKit features
 	result := &BuildResult{
 		Success:        true,
@@ -281,12 +256,10 @@ func (s *BuildKitStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 		CacheHits:      7,
 		CacheMisses:    3,
 	}
-
 	s.logger.Info().
 		Dur("duration", result.Duration).
 		Str("image", fullImageRef).
 		Msg("BuildKit build completed")
-
 	return result, nil
 }
 
@@ -302,16 +275,13 @@ func (s *BuildKitStrategy) Validate(ctx BuildContext) error {
 	if os.Getenv("DOCKER_BUILDKIT") != "1" {
 		return fmt.Errorf("BuildKit is not enabled (set DOCKER_BUILDKIT=1)")
 	}
-
 	// Validate Dockerfile exists
 	if ctx.DockerfilePath == "" {
 		return fmt.Errorf("Dockerfile path is required")
 	}
-
 	if _, err := os.Stat(ctx.DockerfilePath); os.IsNotExist(err) {
 		return fmt.Errorf("Dockerfile not found at %s", ctx.DockerfilePath)
 	}
-
 	return nil
 }
 
@@ -340,10 +310,8 @@ func (s *LegacyBuildStrategy) Description() string {
 // Build executes the legacy build
 func (s *LegacyBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 	s.logger.Warn().Msg("Using legacy build strategy - consider upgrading Docker")
-
 	// Legacy implementation
 	fullImageRef := fmt.Sprintf("%s:%s", ctx.ImageName, ctx.ImageTag)
-
 	result := &BuildResult{
 		Success:        true,
 		FullImageRef:   fullImageRef,
@@ -353,7 +321,6 @@ func (s *LegacyBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 		CacheHits:      3,
 		CacheMisses:    12,
 	}
-
 	return result, nil
 }
 
@@ -368,7 +335,6 @@ func (s *LegacyBuildStrategy) SupportsFeature(feature string) bool {
 		FeatureProvenance:   false,
 		FeatureCrossCompile: false,
 	}
-
 	return supportedFeatures[feature]
 }
 
@@ -379,6 +345,5 @@ func (s *LegacyBuildStrategy) Validate(ctx BuildContext) error {
 		// Legacy builds can use default Dockerfile
 		ctx.DockerfilePath = filepath.Join(ctx.BuildPath, "Dockerfile")
 	}
-
 	return nil
 }

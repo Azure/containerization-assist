@@ -8,7 +8,92 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
+
+// Helper functions for accessing metadata fields
+
+// getK8sManifestsFromMetadata checks if k8s manifests exist in metadata
+func getK8sManifestsFromMetadata(sessionState *mcptypes.SessionState) map[string]interface{} {
+	if sessionState.Metadata == nil {
+		return nil
+	}
+	if manifests, ok := sessionState.Metadata["k8s_manifests"].(map[string]interface{}); ok {
+		return manifests
+	}
+	return nil
+}
+
+// getDockerfilePushed checks if dockerfile has been pushed from metadata
+func getDockerfilePushed(sessionState *mcptypes.SessionState) bool {
+	if sessionState.Metadata == nil {
+		return false
+	}
+	if pushed, ok := sessionState.Metadata["dockerfile_pushed"].(bool); ok {
+		return pushed
+	}
+	return false
+}
+
+// getImageRef constructs the appropriate image reference based on push status
+func getImageRef(sessionState *mcptypes.SessionState) string {
+	imageID := getDockerfileImageID(sessionState)
+	if getDockerfilePushed(sessionState) {
+		registry := getImageRefRegistry(sessionState)
+		if registry != "" {
+			return fmt.Sprintf("%s/%s", registry, imageID)
+		}
+	}
+	return imageID
+}
+
+// setK8sManifest stores a manifest in metadata
+func setK8sManifest(sessionState *mcptypes.SessionState, name string, manifest types.K8sManifest) {
+	if sessionState.Metadata == nil {
+		sessionState.Metadata = make(map[string]interface{})
+	}
+	if sessionState.Metadata["k8s_manifests"] == nil {
+		sessionState.Metadata["k8s_manifests"] = make(map[string]interface{})
+	}
+	k8sManifests := sessionState.Metadata["k8s_manifests"].(map[string]interface{})
+	k8sManifests[name] = map[string]interface{}{
+		"content": manifest.Content,
+		"kind":    manifest.Kind,
+		"applied": manifest.Applied,
+		"status":  manifest.Status,
+	}
+}
+
+// getK8sManifestsAsTypes converts metadata manifests to types.K8sManifest format
+func getK8sManifestsAsTypes(sessionState *mcptypes.SessionState) map[string]types.K8sManifest {
+	result := make(map[string]types.K8sManifest)
+	manifestsData := getK8sManifestsFromMetadata(sessionState)
+	if manifestsData == nil {
+		return result
+	}
+
+	for name, manifestData := range manifestsData {
+		if manifestMap, ok := manifestData.(map[string]interface{}); ok {
+			manifest := types.K8sManifest{}
+			if content, ok := manifestMap["content"].(string); ok {
+				manifest.Content = content
+			}
+			if kind, ok := manifestMap["kind"].(string); ok {
+				manifest.Kind = kind
+			}
+			if applied, ok := manifestMap["applied"].(bool); ok {
+				manifest.Applied = applied
+			}
+			if status, ok := manifestMap["status"].(string); ok {
+				manifest.Status = status
+			}
+			if manifest.Content != "" || manifest.Kind != "" {
+				result[name] = manifest
+			}
+		}
+	}
+	return result
+}
 
 // handleManifestsStage handles Kubernetes manifest generation
 func (pm *PromptManager) handleManifestsStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
@@ -24,7 +109,8 @@ func (pm *PromptManager) handleManifestsStage(ctx context.Context, state *Conver
 	}
 
 	// Check if manifests already generated
-	if len(state.K8sManifests) > 0 {
+	k8sManifests := getK8sManifestsFromMetadata(state.SessionState)
+	if len(k8sManifests) > 0 {
 		response := pm.reviewManifests(ctx, state, input)
 		response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 		return response
@@ -88,10 +174,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	}
 
 	// Determine image reference
-	imageRef := state.Dockerfile.ImageID
-	if state.Dockerfile.Pushed {
-		imageRef = fmt.Sprintf("%s/%s", state.ImageRef.Registry, state.Dockerfile.ImageID)
-	}
+	imageRef := getImageRef(state.SessionState)
 
 	params := map[string]interface{}{
 		"session_id":    state.SessionID,
@@ -174,7 +257,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 					Content: contentStr,
 					Kind:    extractKind(contentStr),
 				}
-				state.K8sManifests[name] = manifest
+				setK8sManifest(state.SessionState, name, manifest)
 
 				// Add as artifact
 				artifact := Artifact{
@@ -190,7 +273,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 
 	// Format response with manifest summary
 	response.Status = ResponseStatusSuccess
-	response.Message = pm.formatManifestSummary(state.K8sManifests)
+	response.Message = pm.formatManifestSummary(getK8sManifestsAsTypes(state.SessionState))
 	response.Options = []Option{
 		{ID: "deploy", Label: "Deploy to Kubernetes", Recommended: true},
 		{ID: "review", Label: "Show full manifests"},
@@ -242,10 +325,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 	}
 
 	// Determine image reference
-	imageRef := state.Dockerfile.ImageID
-	if state.Dockerfile.Pushed {
-		imageRef = fmt.Sprintf("%s/%s", state.ImageRef.Registry, state.Dockerfile.ImageID)
-	}
+	imageRef := getImageRef(state.SessionState)
 
 	params := map[string]interface{}{
 		"session_id": state.SessionID,
@@ -297,10 +377,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	}
 
 	// Determine image reference
-	imageRef := state.Dockerfile.ImageID
-	if state.Dockerfile.Pushed {
-		imageRef = fmt.Sprintf("%s/%s", state.ImageRef.Registry, state.Dockerfile.ImageID)
-	}
+	imageRef := getImageRef(state.SessionState)
 
 	params := map[string]interface{}{
 		"session_id":     state.SessionID,
@@ -339,7 +416,13 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 
 		// Fallback to original behavior if auto-fix is not available
 		// Check if rollback is available
-		if state.LastKnownGood != nil && state.Preferences.AutoRollback {
+		hasLastKnownGood := false
+		if state.SessionState.Metadata != nil {
+			if _, ok := state.SessionState.Metadata["last_known_good"]; ok {
+				hasLastKnownGood = true
+			}
+		}
+		if hasLastKnownGood && state.Preferences.AutoRollback {
 			response.Message = fmt.Sprintf(
 				"Deployment failed: %v\n\n"+
 					"Auto-rollback is available. What would you like to do?",
@@ -365,10 +448,11 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Mark manifests as deployed
-	for name, manifest := range state.K8sManifests {
+	manifests := getK8sManifestsAsTypes(state.SessionState)
+	for name, manifest := range manifests {
 		manifest.Applied = true
 		manifest.Status = "deployed"
-		state.K8sManifests[name] = manifest
+		setK8sManifest(state.SessionState, name, manifest)
 	}
 
 	// Check health if requested

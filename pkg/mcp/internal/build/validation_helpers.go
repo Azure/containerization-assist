@@ -1,8 +1,8 @@
 package build
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -13,15 +13,13 @@ func ValidateSessionID(sessionID string, toolName string, logger zerolog.Logger)
 		struct{ SessionID string }{SessionID: sessionID},
 		[]string{"SessionID"},
 	)
-
 	if result.HasErrors() {
-		return types.NewRichError(
+		return mcptypes.NewRichError(
 			"INVALID_ARGUMENTS",
 			"session_id is required and cannot be empty",
 			"validation_error",
 		)
 	}
-
 	return nil
 }
 
@@ -29,15 +27,13 @@ func ValidateSessionID(sessionID string, toolName string, logger zerolog.Logger)
 func ValidateImageReference(imageRef, fieldName string, logger zerolog.Logger) error {
 	mixin := utils.NewStandardizedValidationMixin(logger)
 	result := mixin.StandardValidateImageRef(imageRef, fieldName)
-
 	if result.HasErrors() {
 		firstError := result.GetFirstError()
-		return types.NewRichError(
+		return mcptypes.NewRichError(
 			firstError.Code,
 			firstError.Message,
 			"validation_error",
 		)
 	}
-
 	return nil
 }

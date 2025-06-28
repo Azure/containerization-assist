@@ -92,37 +92,37 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 	// Get the args map
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", "arguments must be a map[string]interface{}", "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", "arguments must be a map[string]interface{}", "validation_error")
 	}
 
 	// Type-safe dispatch based on tool name
 	switch toolName {
-	case "analyze_repository":
+	case "analyze_repository_atomic":
 		return o.executeAnalyzeRepository(ctx, argsMap)
-	case "build_image":
+	case "build_image_atomic":
 		return o.executeBuildImage(ctx, argsMap)
-	case "push_image":
+	case "push_image_atomic":
 		return o.executePushImage(ctx, argsMap)
-	case "pull_image":
+	case "pull_image_atomic":
 		return o.executePullImage(ctx, argsMap)
-	case "tag_image":
+	case "tag_image_atomic":
 		return o.executeTagImage(ctx, argsMap)
-	case "scan_image_security":
+	case "scan_image_security_atomic":
 		return o.executeScanImageSecurity(ctx, argsMap)
-	case "scan_secrets":
+	case "scan_secrets_atomic":
 		return o.executeScanSecrets(ctx, argsMap)
-	case "generate_manifests":
+	case "generate_manifests_atomic":
 		return o.executeGenerateManifests(ctx, argsMap)
-	case "deploy_kubernetes":
+	case "deploy_kubernetes_atomic":
 		return o.executeDeployKubernetes(ctx, argsMap)
-	case "check_health":
+	case "check_health_atomic":
 		return o.executeCheckHealth(ctx, argsMap)
 	case "generate_dockerfile":
 		return o.executeGenerateDockerfile(ctx, argsMap)
-	case "validate_dockerfile":
+	case "validate_dockerfile_atomic":
 		return o.executeValidateDockerfile(ctx, argsMap)
 	default:
-		return nil, types.NewRichError("UNKNOWN_TOOL", fmt.Sprintf("unknown tool: %s", toolName), "tool_error")
+		return nil, mcptypes.NewRichError("UNKNOWN_TOOL", fmt.Sprintf("unknown tool: %s", toolName), "tool_error")
 	}
 }
 
@@ -133,50 +133,50 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 		return fmt.Errorf("arguments must be a map[string]interface{}")
 	}
 
-	// Check for session_id (required for all tools for continuity)
+	// Check for session_id (required for all tools)
 	if _, exists := argsMap["session_id"]; !exists {
-		return types.NewRichError("SESSION_ID_REQUIRED", fmt.Sprintf("session_id is required for tool %s", toolName), "validation_error")
+		return mcptypes.NewRichError("SESSION_ID_REQUIRED", fmt.Sprintf("session_id is required for tool %s", toolName), "validation_error")
 	}
 
 	// Tool-specific validation
 	switch toolName {
-	case "analyze_repository":
+	case "analyze_repository_atomic":
 		if _, exists := argsMap["repo_url"]; !exists {
-			return types.NewRichError("REPO_URL_REQUIRED", "repo_url is required for analyze_repository", "validation_error")
+			return mcptypes.NewRichError("REPO_URL_REQUIRED", "repo_url is required for analyze_repository_atomic", "validation_error")
 		}
-	case "build_image":
+	case "build_image_atomic":
 		if _, exists := argsMap["image_name"]; !exists {
-			return types.NewRichError("IMAGE_NAME_REQUIRED", "image_name is required for build_image", "validation_error")
+			return mcptypes.NewRichError("IMAGE_NAME_REQUIRED", "image_name is required for build_image_atomic", "validation_error")
 		}
-	case "push_image":
+	case "push_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for push_image", "validation_error")
+			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for push_image_atomic", "validation_error")
 		}
-	case "pull_image":
+	case "pull_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for pull_image", "validation_error")
+			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for pull_image_atomic", "validation_error")
 		}
-	case "tag_image":
+	case "tag_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for tag_image", "validation_error")
+			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for tag_image_atomic", "validation_error")
 		}
 		if _, exists := argsMap["new_tag"]; !exists {
-			return types.NewRichError("NEW_TAG_REQUIRED", "new_tag is required for tag_image", "validation_error")
+			return mcptypes.NewRichError("NEW_TAG_REQUIRED", "new_tag is required for tag_image_atomic", "validation_error")
 		}
-	case "scan_image_security":
+	case "scan_image_security_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for scan_image_security", "validation_error")
+			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for scan_image_security_atomic", "validation_error")
 		}
-	case "generate_manifests":
+	case "generate_manifests_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return types.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for generate_manifests", "validation_error")
+			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for generate_manifests_atomic", "validation_error")
 		}
 		if _, exists := argsMap["app_name"]; !exists {
-			return types.NewRichError("APP_NAME_REQUIRED", "app_name is required for generate_manifests", "validation_error")
+			return mcptypes.NewRichError("APP_NAME_REQUIRED", "app_name is required for generate_manifests_atomic", "validation_error")
 		}
-	case "deploy_kubernetes":
+	case "deploy_kubernetes_atomic":
 		if _, exists := argsMap["manifest_path"]; !exists {
-			return types.NewRichError("MANIFEST_PATH_REQUIRED", "manifest_path is required for deploy_kubernetes", "validation_error")
+			return mcptypes.NewRichError("MANIFEST_PATH_REQUIRED", "manifest_path is required for deploy_kubernetes_atomic", "validation_error")
 		}
 	}
 
@@ -187,7 +187,7 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 
 func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, types.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, mcptypes.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
 	}
 
 	// Convert args to typed struct

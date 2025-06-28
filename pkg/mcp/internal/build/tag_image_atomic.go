@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
-// standardTagStages returns tag operation stages
+// standardTagStages provides common stages for tag operations
 func standardTagStages() []mcptypes.LocalProgressStage {
 	return []mcptypes.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
@@ -25,56 +24,58 @@ func standardTagStages() []mcptypes.LocalProgressStage {
 	}
 }
 
-// AtomicTagImageArgs represents image tagging arguments
+// AtomicTagImageArgs defines arguments for atomic Docker image tagging
 type AtomicTagImageArgs struct {
 	types.BaseToolArgs
-
+	// Image information
 	SourceImage string `json:"source_image" jsonschema:"required,pattern=^[a-zA-Z0-9][a-zA-Z0-9._/-]*(:([a-zA-Z0-9][a-zA-Z0-9._-]*|latest))?$" description:"The source image to tag (e.g. nginx:latest, myapp:v1.0.0)"`
 	TargetImage string `json:"target_image" jsonschema:"required,pattern=^[a-zA-Z0-9][a-zA-Z0-9._/-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$" description:"The target image name and tag (e.g. myregistry.com/nginx:production)"`
-
+	// Tag configuration
 	Force bool `json:"force,omitempty" description:"Force tag even if target tag already exists"`
 }
 
-// AtomicTagImageResult represents image tagging results
+// AtomicTagImageResult defines the response from atomic Docker image tagging
 type AtomicTagImageResult struct {
 	types.BaseToolResponse
-	mcptypes.BaseAIContextResult
-	Success bool `json:"success"`
-
+	mcptypes.BaseAIContextResult      // Embedded for AI context methods
+	Success                      bool `json:"success"`
+	// Session context
 	SessionID    string `json:"session_id"`
 	WorkspaceDir string `json:"workspace_dir"`
-
+	// Tag configuration
 	SourceImage string `json:"source_image"`
 	TargetImage string `json:"target_image"`
-
+	// Tag results from core operations
 	TagResult *docker.TagResult `json:"tag_result,omitempty"`
-
+	// Timing information
 	TagDuration   time.Duration `json:"tag_duration"`
 	TotalDuration time.Duration `json:"total_duration"`
-
+	// Rich context for Claude reasoning
 	TagContext *TagContext `json:"tag_context"`
+	// Rich error information if operation failed
 }
 
-// TagContext represents tag operation context
+// TagContext provides rich context for Claude to reason about
 type TagContext struct {
+	// Tag analysis
 	TagStatus         string `json:"tag_status"`
 	SourceImageExists bool   `json:"source_image_exists"`
 	TargetImageExists bool   `json:"target_image_exists"`
 	TagOverwrite      bool   `json:"tag_overwrite"`
-
+	// Registry information
 	SourceRegistry string `json:"source_registry"`
 	TargetRegistry string `json:"target_registry"`
 	SameRegistry   bool   `json:"same_registry"`
-
+	// Error analysis
 	ErrorType     string `json:"error_type,omitempty"`
 	ErrorCategory string `json:"error_category,omitempty"`
 	IsRetryable   bool   `json:"is_retryable"`
-
+	// Next step suggestions
 	NextStepSuggestions []string `json:"next_step_suggestions"`
 	TroubleshootingTips []string `json:"troubleshooting_tips,omitempty"`
 }
 
-// AtomicTagImageTool implements image tagging operations
+// AtomicTagImageTool implements atomic Docker image tagging using core operations
 type AtomicTagImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
@@ -83,7 +84,7 @@ type AtomicTagImageTool struct {
 	fixingMixin     *AtomicToolFixingMixin
 }
 
-// NewAtomicTagImageTool creates a new AtomicTagImageTool
+// NewAtomicTagImageTool creates a new atomic tag image tool
 func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_tag_image").Logger()
 	return &AtomicTagImageTool{
@@ -93,19 +94,20 @@ func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager m
 	}
 }
 
-// SetAnalyzer sets the analyzer
+// SetAnalyzer sets the analyzer for failure analysis
 func (t *AtomicTagImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
 	t.analyzer = analyzer
 }
 
-// SetFixingMixin sets the fixing mixin
+// SetFixingMixin sets the fixing mixin for automatic error recovery
 func (t *AtomicTagImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
 	t.fixingMixin = mixin
 }
 
-// ExecuteWithFixes executes tag with automatic fixes
+// ExecuteWithFixes runs the atomic Docker image tag with automatic fixes
 func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	if t.fixingMixin != nil && !args.DryRun {
+		// Create wrapper operation for tag process
 		var result *AtomicTagImageResult
 		operation := NewTagOperationWrapper(
 			func(ctx context.Context) error {
@@ -126,72 +128,70 @@ func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTa
 				return nil
 			},
 			func() error {
+				// Prepare workspace for fixes
 				return nil
 			},
 		)
-
+		// Execute with retry and fixing
 		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
 		if err != nil {
 			return nil, err
 		}
 		return result, nil
 	}
-
+	// Fallback to standard execution
 	return t.executeTagCore(ctx, args)
 }
 
-// ExecuteTag runs image tag operation
+// ExecuteTag runs the atomic Docker image tag operation
 func (t *AtomicTagImageTool) ExecuteTag(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	return t.executeTagCore(ctx, args)
 }
 
-// executeTagCore executes tag logic
+// executeTagCore contains the core tag logic
 func (t *AtomicTagImageTool) executeTagCore(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	startTime := time.Now()
-
+	// Create result object early for error handling
 	result := &AtomicTagImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0),
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0), // Will be updated later
 		SessionID:           args.SessionID,
 		SourceImage:         args.SourceImage,
 		TargetImage:         args.TargetImage,
 		TagContext:          &TagContext{},
 	}
-
+	// Direct execution without progress tracking
 	err := t.executeWithoutProgress(ctx, args, result, startTime)
 	result.TotalDuration = time.Since(startTime)
-
+	// Update AI context with final result
 	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
-
 	if err != nil {
 		result.Success = false
 	}
-
 	return result, nil
 }
 
-// ExecuteWithContext executes tag with progress tracking
+// ExecuteWithContext runs the atomic Docker image tag with GoMCP progress tracking
 func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	startTime := time.Now()
-
+	// Create result object early for error handling
 	result := &AtomicTagImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0),
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0), // Will be updated later
 		SessionID:           args.SessionID,
 		SourceImage:         args.SourceImage,
 		TargetImage:         args.TargetImage,
 		TagContext:          &TagContext{},
 	}
-
+	// Create progress adapter for GoMCP using standard tag stages
+	// _ = nil // TODO: Progress adapter removed to break import cycles
 	// Execute with progress tracking
 	ctx := context.Background()
 	err := t.executeWithProgress(ctx, args, result, startTime, nil)
-
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
-
+	// Update AI context with final result
 	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
-
 	// Complete progress tracking
 	if err != nil {
 		t.logger.Info().Msg("Tag failed")
@@ -200,7 +200,6 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 	} else {
 		t.logger.Info().Msg("Tag completed successfully")
 	}
-
 	return result, nil
 }
 
@@ -213,7 +212,6 @@ func (t *AtomicTagImageTool) executeWithProgress(ctx context.Context, args Atomi
 func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args AtomicTagImageArgs, result *AtomicTagImageResult, startTime time.Time) error {
 	// Stage 1: Initialize - Loading session and validating inputs
 	t.logger.Info().Msg("Starting tag operation without progress tracking")
-
 	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
@@ -229,18 +227,15 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*sessiontypes.SessionState)
-
+	session := sessionInterface.(*mcptypes.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID // Use compatibility method
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-
 	t.logger.Info().
 		Str("session_id", session.SessionID).
 		Str("source_image", args.SourceImage).
 		Str("target_image", args.TargetImage).
 		Msg("Starting atomic Docker tag")
-
 	// Handle dry-run
 	if args.DryRun {
 		result.Success = true
@@ -253,7 +248,6 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 		result.TotalDuration = time.Since(startTime)
 		return nil
 	}
-
 	// Validate prerequisites
 	if err := t.validateTagPrerequisites(result, args); err != nil {
 		t.logger.Error().Err(err).
@@ -265,11 +259,9 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 		result.TotalDuration = time.Since(startTime)
 		return err // Already a RichError from validateTagPrerequisites
 	}
-
 	// Perform the tag without progress reporting
 	err = t.performTag(ctx, session, args, result, nil)
 	result.TotalDuration = time.Since(startTime)
-
 	if err != nil {
 		result.Success = false
 		return types.NewBuildError("Docker tag operation failed", args.SessionID, args.TargetImage).
@@ -283,19 +275,18 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 			WithCommand(3, "Test Docker connection", "Check basic Docker functionality", "docker version", "Docker version information displayed").
 			Build()
 	}
-
 	result.Success = true
 	return nil
 }
 
 // performTag executes the actual Docker tag operation
-func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontypes.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter interface{}) error {
+func (t *AtomicTagImageTool) performTag(ctx context.Context, session *mcptypes.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter interface{}) error {
 	// Get session if not provided
 	if session == nil {
 		var err error
 		sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 		if err == nil {
-			session = sessionInterface.(*sessiontypes.SessionState)
+			session = sessionInterface.(*mcptypes.SessionState)
 		}
 		if err != nil {
 			t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
@@ -307,36 +298,27 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 				Build()
 		}
 	}
-
 	// Stage 1: Initialize
 	// Progress reporting removed
-
 	// Set session details
 	result.SessionID = session.SessionID // Use compatibility method
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-
 	t.logger.Info().
 		Str("session_id", session.SessionID).
 		Str("source_image", args.SourceImage).
 		Str("target_image", args.TargetImage).
 		Msg("Starting atomic Docker tag")
-
 	// Stage 2: Check source image
 	// Progress reporting removed
-
 	// Extract registry information for context
 	result.TagContext.SourceRegistry = t.extractRegistryURL(args.SourceImage)
 	result.TagContext.TargetRegistry = t.extractRegistryURL(args.TargetImage)
 	result.TagContext.SameRegistry = result.TagContext.SourceRegistry == result.TagContext.TargetRegistry
-
 	// Stage 3: Tag Docker image using pipeline adapter
 	// Progress reporting removed
-
 	tagStartTime := time.Now()
-
 	err := t.pipelineAdapter.TagDockerImage(session.SessionID, args.SourceImage, args.TargetImage)
 	result.TagDuration = time.Since(tagStartTime)
-
 	if err != nil {
 		result.Success = false
 		t.logger.Error().Err(err).
@@ -345,7 +327,6 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 			Msg("Failed to tag image")
 		return err
 	}
-
 	// Update result with tag operation details
 	result.Success = true
 	result.TagResult = &docker.TagResult{
@@ -353,17 +334,14 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 		SourceImage: args.SourceImage,
 		TargetImage: args.TargetImage,
 	}
-
 	result.TagContext.TagStatus = "successful"
 	result.TagContext.NextStepSuggestions = []string{
 		fmt.Sprintf("Image %s successfully tagged as %s", args.SourceImage, args.TargetImage),
 		"You can now use the new tag for deployment or pushing",
 		fmt.Sprintf("New tag available: %s", args.TargetImage),
 	}
-
 	// Stage 4: Verify operation
 	// Progress reporting removed
-
 	t.logger.Info().
 		Str("session_id", session.SessionID).
 		Str("source_image", result.SourceImage).
@@ -371,16 +349,13 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 		Dur("tag_duration", result.TagDuration).
 		Bool("success", result.Success).
 		Msg("Completed atomic Docker tag")
-
 	// Stage 5: Finalize
 	// Progress reporting removed
-
 	// Update session state
-	session.UpdateLastAccessed()
-
+	session.UpdatedAt = time.Now()
 	// Save session state
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*sessiontypes.SessionState); ok {
+		if sess, ok := s.(*mcptypes.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -390,23 +365,22 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *sessiontyp
 func (t *AtomicTagImageTool) validateTagPrerequisites(result *AtomicTagImageResult, args AtomicTagImageArgs) error {
 	// Basic input validation using RichError
 	if args.SourceImage == "" {
-		return types.NewValidationErrorBuilder("Source image reference is required", "source_image", args.SourceImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Source image reference is required", "validation_error").
 			WithOperation("tag_image").
 			WithStage("input_validation").
 			WithImmediateStep(1, "Provide source image", "Specify a valid Docker image reference like 'nginx:latest'").
 			Build()
 	}
 	if args.TargetImage == "" {
-		return types.NewValidationErrorBuilder("Target image reference is required", "target_image", args.TargetImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Target image reference is required", "validation_error").
 			WithOperation("tag_image").
 			WithStage("input_validation").
 			WithImmediateStep(1, "Provide target image", "Specify a target image name with tag like 'myregistry.com/nginx:production'").
 			Build()
 	}
-
 	// Validate image name formats using RichError
 	if !t.isValidImageReference(args.SourceImage) {
-		return types.NewValidationErrorBuilder("Invalid source image reference format", "source_image", args.SourceImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid source image reference format", "validation_error").
 			WithOperation("tag_image").
 			WithStage("format_validation").
 			WithRootCause("Image reference does not match required Docker naming conventions").
@@ -414,14 +388,13 @@ func (t *AtomicTagImageTool) validateTagPrerequisites(result *AtomicTagImageResu
 			Build()
 	}
 	if !t.isValidImageReference(args.TargetImage) {
-		return types.NewValidationErrorBuilder("Invalid target image reference format", "target_image", args.TargetImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid target image reference format", "validation_error").
 			WithOperation("tag_image").
 			WithStage("format_validation").
 			WithRootCause("Image reference does not match required Docker naming conventions").
 			WithImmediateStep(1, "Fix image format", "Use format: [registry/]name:tag (e.g., myregistry.com/nginx:production)").
 			Build()
 	}
-
 	return nil
 }
 
@@ -431,17 +404,14 @@ func (t *AtomicTagImageTool) isValidImageReference(imageRef string) bool {
 	if imageRef == "" {
 		return false
 	}
-
 	// Should not contain spaces
 	if strings.Contains(imageRef, " ") {
 		return false
 	}
-
 	// Should not start or end with special characters
 	if strings.HasPrefix(imageRef, "-") || strings.HasSuffix(imageRef, "-") {
 		return false
 	}
-
 	return true
 }
 
@@ -459,43 +429,37 @@ func (t *AtomicTagImageTool) extractRegistryURL(imageRef string) string {
 func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) error {
 	tagArgs, ok := args.(AtomicTagImageArgs)
 	if !ok {
-		return types.NewValidationErrorBuilder("Invalid argument type for atomic_tag_image", "args", args).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_tag_image", "validation_error").
 			WithField("expected", "AtomicTagImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
-
 	if tagArgs.SourceImage == "" {
-		return types.NewValidationErrorBuilder("SourceImage is required", "source_image", tagArgs.SourceImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "SourceImage is required", "validation_error").
 			WithField("field", "source_image").
 			Build()
 	}
-
 	if tagArgs.TargetImage == "" {
-		return types.NewValidationErrorBuilder("TargetImage is required", "target_image", tagArgs.TargetImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "TargetImage is required", "validation_error").
 			WithField("field", "target_image").
 			Build()
 	}
-
 	if tagArgs.SessionID == "" {
-		return types.NewValidationErrorBuilder("SessionID is required", "session_id", tagArgs.SessionID).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "SessionID is required", "validation_error").
 			WithField("field", "session_id").
 			Build()
 	}
-
 	// Validate image reference formats
 	if !t.isValidImageReference(tagArgs.SourceImage) {
-		return types.NewValidationErrorBuilder("Invalid source image reference", "source_image", tagArgs.SourceImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid source image reference", "validation_error").
 			WithField("field", "source_image").
 			Build()
 	}
-
 	if !t.isValidImageReference(tagArgs.TargetImage) {
-		return types.NewValidationErrorBuilder("Invalid target image reference", "target_image", tagArgs.TargetImage).
+		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid target image reference", "validation_error").
 			WithField("field", "target_image").
 			Build()
 	}
-
 	return nil
 }
 
@@ -503,18 +467,16 @@ func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) err
 func (t *AtomicTagImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	tagArgs, ok := args.(AtomicTagImageArgs)
 	if !ok {
-		return nil, types.NewValidationErrorBuilder("Invalid argument type for atomic_tag_image", "args", args).
+		return nil, mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_tag_image", "validation_error").
 			WithField("expected", "AtomicTagImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
-
 	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, tagArgs)
 }
 
 // Tool interface implementation (unified interface)
-
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicTagImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
@@ -552,7 +514,6 @@ func (t *AtomicTagImageTool) GetMetadata() mcptypes.ToolMetadata {
 }
 
 // Legacy interface methods for backward compatibility
-
 // GetName returns the tool name (legacy SimpleTool compatibility)
 func (t *AtomicTagImageTool) GetName() string {
 	return t.GetMetadata().Name

@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	runtimeconv "github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
@@ -150,7 +149,7 @@ func TestConversationState(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		session, ok := sessionInterface.(*mcptypes.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
 		// Create conversation state
@@ -174,7 +173,7 @@ func TestConversationState(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		session, ok := sessionInterface.(*mcptypes.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
 		state := &runtimeconv.ConversationState{

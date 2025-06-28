@@ -3,7 +3,7 @@ package internal
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -124,7 +124,7 @@ func ExecuteToolWithGoMCPProgress[TArgs any, TResult any](
 		result, err = fallbackFn(ctx, args)
 	} else {
 		var zero TResult
-		return zero, types.NewRichError("INVALID_ARGUMENTS", "no execution function provided", "validation_error")
+		return zero, mcptypes.NewRichError("INVALID_ARGUMENTS", "no execution function provided", "validation_error")
 	}
 
 	// Complete progress tracking

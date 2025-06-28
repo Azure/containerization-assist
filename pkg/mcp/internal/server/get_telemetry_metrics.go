@@ -89,7 +89,7 @@ func (t *GetTelemetryMetricsTool) ExecuteTyped(ctx context.Context, args GetTele
 	}
 
 	if args.Format != "prometheus" && args.Format != "json" {
-		return nil, types.NewRichError(
+		return nil, mcptypes.NewRichError(
 			"INVALID_ARGUMENTS",
 			fmt.Sprintf("unsupported format: %s (supported: prometheus, json)", args.Format),
 			"validation_error",
@@ -286,7 +286,7 @@ func (t *GetTelemetryMetricsTool) parseTimeRange(timeRange string) (time.Time, e
 		return time.Now().Add(-duration), nil
 	}
 
-	return time.Time{}, types.NewRichError(
+	return time.Time{}, mcptypes.NewRichError(
 		"INVALID_ARGUMENTS",
 		"time range must be either a duration (e.g., '1h', '24h') or RFC3339 timestamp",
 		"validation_error",

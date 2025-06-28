@@ -44,7 +44,6 @@ func (w *PullOperationWrapper) GetFailureAnalysis(ctx context.Context, err error
 			return nil, analyzerErr
 		}
 	}
-
 	// Create a simple RichError for now - this would be enhanced with proper analysis
 	return &mcptypes.RichError{
 		Message: fmt.Sprintf("Pull operation failed: %v", err),
@@ -65,7 +64,6 @@ func (w *PullOperationWrapper) CanRetry() bool {
 	if w.lastError == nil {
 		return false
 	}
-
 	errStr := strings.ToLower(w.lastError.Error())
 	// Network connectivity issues are retryable
 	if strings.Contains(errStr, "connection refused") ||

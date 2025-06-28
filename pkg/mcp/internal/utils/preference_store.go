@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	bolt "go.etcd.io/bbolt"
 )
@@ -99,7 +100,7 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 	}
 
 	if err != nil {
-		return nil, types.NewErrorBuilder("database_open_failed", "Failed to open preference database", "system").
+		return nil, mcptypes.NewErrorBuilder("database_open_failed", "Failed to open preference database", "system").
 			WithSeverity("high").
 			WithOperation("initialize_preferences").
 			WithStage("database_connection").
@@ -118,7 +119,7 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 		if closeErr := db.Close(); closeErr != nil {
 			logger.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
 		}
-		return nil, types.NewErrorBuilder("bucket_creation_failed", "Failed to create preferences bucket", "system").
+		return nil, mcptypes.NewErrorBuilder("bucket_creation_failed", "Failed to create preferences bucket", "system").
 			WithSeverity("high").
 			WithOperation("initialize_preferences").
 			WithStage("bucket_creation").
@@ -409,7 +410,7 @@ func (ps *PreferenceStore) encrypt(data []byte) ([]byte, error) {
 
 	block, err := aes.NewCipher(ps.encryptionKey)
 	if err != nil {
-		return nil, types.NewErrorBuilder("encryption_cipher_failed", "Failed to create encryption cipher", "security").
+		return nil, mcptypes.NewErrorBuilder("encryption_cipher_failed", "Failed to create encryption cipher", "security").
 			WithSeverity("high").
 			WithOperation("encrypt_preferences").
 			WithStage("cipher_creation").

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -40,7 +41,7 @@ func (h *StdioErrorHandler) HandleToolError(ctx context.Context, toolName string
 	switch typedErr := err.(type) {
 	case *errors.CoreError:
 		return h.handleCoreError(typedErr, toolName), nil
-	case *types.RichError:
+	case *mcptypes.RichError:
 		// Migrate RichError to CoreError
 		coreErr := errors.MigrateRichError(typedErr)
 		return h.handleCoreError(coreErr, toolName), nil
@@ -140,7 +141,7 @@ func (h *StdioErrorHandler) handleCoreError(coreErr *errors.CoreError, toolName 
 }
 
 // handleRichError creates a comprehensive error response from RichError (legacy support)
-func (h *StdioErrorHandler) handleRichError(richErr *types.RichError, toolName string) interface{} {
+func (h *StdioErrorHandler) handleRichError(richErr *mcptypes.RichError, toolName string) interface{} {
 	// Create MCP-compatible error response
 	response := map[string]interface{}{
 		"content": []map[string]interface{}{
@@ -202,7 +203,7 @@ func (h *StdioErrorHandler) handleRichError(richErr *types.RichError, toolName s
 	if richErr.Resolution.RetryStrategy.Recommended {
 		response["retry_strategy"] = map[string]interface{}{
 			"recommended":      richErr.Resolution.RetryStrategy.Recommended,
-			"wait_time":        richErr.Resolution.RetryStrategy.WaitTime.String(),
+			"wait_time":        richErr.Resolution.RetryStrategy.WaitTime,
 			"max_attempts":     richErr.Resolution.RetryStrategy.MaxAttempts,
 			"backoff_strategy": richErr.Resolution.RetryStrategy.BackoffStrategy,
 			"conditions":       richErr.Resolution.RetryStrategy.Conditions,
@@ -299,7 +300,7 @@ func (h *StdioErrorHandler) createInvalidParametersError(message string) error {
 }
 
 // formatRichErrorMessage creates a user-friendly error message from RichError
-func (h *StdioErrorHandler) formatRichErrorMessage(richErr *types.RichError) string {
+func (h *StdioErrorHandler) formatRichErrorMessage(richErr *mcptypes.RichError) string {
 	var msg strings.Builder
 
 	// Start with the basic error

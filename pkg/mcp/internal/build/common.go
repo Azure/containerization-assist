@@ -9,16 +9,12 @@ import (
 type BuildStrategy interface {
 	// Name returns the strategy name
 	Name() string
-
 	// Description returns a human-readable description
 	Description() string
-
 	// Build executes the build using this strategy
 	Build(ctx BuildContext) (*BuildResult, error)
-
 	// SupportsFeature checks if the strategy supports a specific feature
 	SupportsFeature(feature string) bool
-
 	// Validate checks if the strategy can be used with the given context
 	Validate(ctx BuildContext) error
 }
@@ -54,10 +50,8 @@ type BuildResult struct {
 type BuildValidator interface {
 	// ValidateDockerfile checks if the Dockerfile is valid
 	ValidateDockerfile(dockerfilePath string) (*ValidationResult, error)
-
 	// ValidateBuildContext checks if the build context is valid
 	ValidateBuildContext(ctx BuildContext) (*ValidationResult, error)
-
 	// ValidateSecurityRequirements checks for security issues
 	ValidateSecurityRequirements(dockerfilePath string) (*SecurityValidationResult, error)
 }
@@ -118,13 +112,10 @@ type ComplianceViolation struct {
 type BuildExecutor interface {
 	// Execute runs the build with the selected strategy
 	Execute(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy) (*ExecutionResult, error)
-
 	// ExecuteWithProgress runs the build with progress reporting
 	ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter ExtendedBuildReporter) (*ExecutionResult, error)
-
 	// Monitor monitors a running build
 	Monitor(buildID string) (*BuildStatus, error)
-
 	// Cancel cancels a running build
 	Cancel(buildID string) error
 }

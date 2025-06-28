@@ -50,7 +50,7 @@ func (t *GetJobStatusTool) Execute(ctx context.Context, args interface{}) (inter
 	// Type assertion to get proper args
 	jobArgs, ok := args.(GetJobStatusArgs)
 	if !ok {
-		return nil, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetJobStatusArgs, got %T", args), "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetJobStatusArgs, got %T", args), "validation_error")
 	}
 
 	return t.ExecuteTyped(ctx, jobArgs)
@@ -70,7 +70,7 @@ func (t *GetJobStatusTool) ExecuteTyped(ctx context.Context, args GetJobStatusAr
 		Msg("Getting job status")
 
 	if args.JobID == "" {
-		return nil, types.NewRichError("INVALID_ARGUMENTS", "job_id is required", "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "job_id is required", "validation_error")
 	}
 
 	// Handle dry-run mode
@@ -91,7 +91,7 @@ func (t *GetJobStatusTool) ExecuteTyped(ctx context.Context, args GetJobStatusAr
 	// Get job from job manager
 	job, err := t.getJobFunc(args.JobID)
 	if err != nil {
-		return nil, types.NewRichError("INTERNAL_SERVER_ERROR", "failed to get job: "+err.Error(), "execution_error")
+		return nil, mcptypes.NewRichError("INTERNAL_SERVER_ERROR", "failed to get job: "+err.Error(), "execution_error")
 	}
 
 	// Job is already in the correct format
@@ -213,22 +213,22 @@ func (t *GetJobStatusTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *GetJobStatusTool) Validate(ctx context.Context, args interface{}) error {
 	jobArgs, ok := args.(GetJobStatusArgs)
 	if !ok {
-		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetJobStatusArgs, got %T", args), "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("Invalid arguments type: expected GetJobStatusArgs, got %T", args), "validation_error")
 	}
 
 	// Validate required fields
 	if jobArgs.JobID == "" {
-		return types.NewRichError("INVALID_ARGUMENTS", "job_id is required and cannot be empty", "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "job_id is required and cannot be empty", "validation_error")
 	}
 
 	// Validate job ID format
 	if len(jobArgs.JobID) < 3 || len(jobArgs.JobID) > 100 {
-		return types.NewRichError("INVALID_ARGUMENTS", "job_id must be between 3 and 100 characters", "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "job_id must be between 3 and 100 characters", "validation_error")
 	}
 
 	// Validate job function is available
 	if t.getJobFunc == nil {
-		return types.NewRichError("CONFIG_ERROR", "Job retrieval function is not configured", "config_error")
+		return mcptypes.NewRichError("CONFIG_ERROR", "Job retrieval function is not configured", "config_error")
 	}
 
 	return nil

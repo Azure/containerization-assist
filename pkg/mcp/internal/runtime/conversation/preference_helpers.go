@@ -140,18 +140,19 @@ func (pm *PromptManager) generateSummary(ctx context.Context, state *Conversatio
 
 	// Docker details
 	summary.WriteString("**Docker Image**\n")
-	if state.Dockerfile.Pushed {
-		summary.WriteString(fmt.Sprintf("- Registry: %s\n", state.ImageRef.Registry))
-		summary.WriteString(fmt.Sprintf("- Tag: %s\n", state.ImageRef.Tag))
+	if getDockerfilePushed(state.SessionState) {
+		summary.WriteString(fmt.Sprintf("- Registry: %s\n", getImageRefRegistry(state.SessionState)))
+		summary.WriteString(fmt.Sprintf("- Tag: %s\n", getImageRefTag(state.SessionState)))
 	} else {
-		summary.WriteString(fmt.Sprintf("- Local image: %s\n", state.Dockerfile.ImageID))
+		summary.WriteString(fmt.Sprintf("- Local image: %s\n", getDockerfileImageID(state.SessionState)))
 	}
 	summary.WriteString(fmt.Sprintf("- Optimization: %s\n", state.Preferences.Optimization))
 	summary.WriteString(fmt.Sprintf("- Health check: %v\n\n", state.Preferences.IncludeHealthCheck))
 
 	// Kubernetes resources
 	summary.WriteString("**Kubernetes Resources**\n")
-	for name, manifest := range state.K8sManifests {
+	manifests := getK8sManifestsAsTypes(state.SessionState)
+	for name, manifest := range manifests {
 		summary.WriteString(fmt.Sprintf("- %s (%s)\n", name, manifest.Kind))
 	}
 

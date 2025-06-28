@@ -7,11 +7,9 @@ import (
 // Test standardTagStages function
 func TestStandardTagStages(t *testing.T) {
 	stages := standardTagStages()
-
 	if len(stages) == 0 {
 		t.Error("standardTagStages should return at least one stage")
 	}
-
 	expectedStages := []struct {
 		name        string
 		weight      float64
@@ -23,17 +21,14 @@ func TestStandardTagStages(t *testing.T) {
 		{"Verify", 0.15, "Verifying tag operation"},
 		{"Finalize", 0.05, "Updating session state"},
 	}
-
 	if len(stages) != len(expectedStages) {
 		t.Errorf("Expected %d stages, got %d", len(expectedStages), len(stages))
 	}
-
 	for i, expected := range expectedStages {
 		if i >= len(stages) {
 			t.Errorf("Missing stage %d", i)
 			continue
 		}
-
 		stage := stages[i]
 		if stage.Name != expected.name {
 			t.Errorf("Stage %d: expected name '%s', got '%s'", i, expected.name, stage.Name)
@@ -45,7 +40,6 @@ func TestStandardTagStages(t *testing.T) {
 			t.Errorf("Stage %d: expected description '%s', got '%s'", i, expected.description, stage.Description)
 		}
 	}
-
 	// Test that weights sum up to approximately 1.0
 	totalWeight := 0.0
 	for _, stage := range stages {
@@ -63,7 +57,6 @@ func TestAtomicTagImageArgs(t *testing.T) {
 		TargetImage: "myregistry.com/nginx:production",
 		Force:       true,
 	}
-
 	if args.SourceImage != "nginx:latest" {
 		t.Errorf("Expected SourceImage to be 'nginx:latest', got '%s'", args.SourceImage)
 	}
@@ -73,13 +66,11 @@ func TestAtomicTagImageArgs(t *testing.T) {
 	if !args.Force {
 		t.Error("Expected Force to be true")
 	}
-
 	// Test with minimal args
 	minimalArgs := AtomicTagImageArgs{
 		SourceImage: "alpine:3.14",
 		TargetImage: "myapp:latest",
 	}
-
 	if minimalArgs.SourceImage != "alpine:3.14" {
 		t.Errorf("Expected SourceImage to be 'alpine:3.14', got '%s'", minimalArgs.SourceImage)
 	}
@@ -98,7 +89,6 @@ func TestAtomicTagImageResult(t *testing.T) {
 		SessionID:    "session-123",
 		WorkspaceDir: "/tmp/workspace",
 	}
-
 	if !result.Success {
 		t.Error("Expected Success to be true")
 	}
@@ -108,14 +98,12 @@ func TestAtomicTagImageResult(t *testing.T) {
 	if result.WorkspaceDir != "/tmp/workspace" {
 		t.Errorf("Expected WorkspaceDir to be '/tmp/workspace', got '%s'", result.WorkspaceDir)
 	}
-
 	// Test with failure result
 	failureResult := AtomicTagImageResult{
 		Success:      false,
 		SessionID:    "session-456",
 		WorkspaceDir: "",
 	}
-
 	if failureResult.Success {
 		t.Error("Expected Success to be false")
 	}

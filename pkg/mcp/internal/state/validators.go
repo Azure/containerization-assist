@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // SessionStateValidator validates session state
@@ -21,7 +21,7 @@ func NewSessionStateValidator() StateValidator {
 func (v *SessionStateValidator) ValidateState(_ context.Context, stateType StateType, state interface{}) error {
 	sessionState, ok := state.(*session.SessionState)
 	if !ok {
-		return types.NewValidationErrorBuilder("Invalid state type for session validation", "state", state).
+		return mcptypes.NewErrorBuilder("INVALID_STATE_TYPE", "Invalid state type for session validation", "validation_error").
 			WithField("expected_type", "*session.SessionState").
 			WithField("actual_type", fmt.Sprintf("%T", state)).
 			WithOperation("validate_session_state").
@@ -34,7 +34,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 
 	// Validate required fields
 	if sessionState.SessionID == "" {
-		return types.NewValidationErrorBuilder("Session ID is required", "session_id", sessionState.SessionID).
+		return mcptypes.NewErrorBuilder("SESSION_ID_REQUIRED", "Session ID is required", "validation_error").
 			WithOperation("validate_session_state").
 			WithStage("required_fields").
 			WithRootCause("SessionID field is empty").
@@ -44,7 +44,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 	}
 
 	if sessionState.CreatedAt.IsZero() {
-		return types.NewValidationErrorBuilder("Session creation time is required", "created_at", sessionState.CreatedAt).
+		return mcptypes.NewErrorBuilder("CREATED_AT_REQUIRED", "Session creation time is required", "validation_error").
 			WithOperation("validate_session_state").
 			WithStage("required_fields").
 			WithRootCause("CreatedAt timestamp is zero").
@@ -55,7 +55,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 
 	// Validate disk usage
 	if sessionState.DiskUsage < 0 {
-		return types.NewValidationErrorBuilder("Disk usage cannot be negative", "disk_usage", sessionState.DiskUsage).
+		return mcptypes.NewErrorBuilder("NEGATIVE_DISK_USAGE", "Disk usage cannot be negative", "validation_error").
 			WithOperation("validate_session_state").
 			WithStage("resource_validation").
 			WithRootCause("DiskUsage value is negative").
@@ -65,7 +65,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 	}
 
 	if sessionState.MaxDiskUsage > 0 && sessionState.DiskUsage > sessionState.MaxDiskUsage {
-		return types.NewValidationErrorBuilder("Disk usage exceeds maximum allowed", "disk_usage", sessionState.DiskUsage).
+		return mcptypes.NewErrorBuilder("DISK_USAGE_EXCEEDED", "Disk usage exceeds maximum allowed", "validation_error").
 			WithField("max_disk_usage", sessionState.MaxDiskUsage).
 			WithOperation("validate_session_state").
 			WithStage("resource_validation").
@@ -91,7 +91,7 @@ func NewConversationStateValidator() StateValidator {
 func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateType, state interface{}) error {
 	conversationState, ok := state.(*BasicConversationState)
 	if !ok {
-		return types.NewValidationErrorBuilder("Invalid state type for conversation validation", "state", state).
+		return mcptypes.NewErrorBuilder("INVALID_CONVERSATION_STATE_TYPE", "Invalid state type for conversation validation", "validation_error").
 			WithField("expected_type", "*BasicConversationState").
 			WithField("actual_type", fmt.Sprintf("%T", state)).
 			WithOperation("validate_conversation_state").
@@ -105,7 +105,7 @@ func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateT
 	// Validate session state (embedded)
 	sessionValidator := NewSessionStateValidator()
 	if err := sessionValidator.ValidateState(ctx, StateTypeSession, &conversationState.SessionState); err != nil {
-		return types.NewValidationErrorBuilder("Invalid embedded session state", "session_state", conversationState.SessionState).
+		return mcptypes.NewErrorBuilder("INVALID_EMBEDDED_SESSION_STATE", "Invalid embedded session state", "validation_error").
 			WithOperation("validate_conversation_state").
 			WithStage("embedded_validation").
 			WithRootCause(fmt.Sprintf("Embedded session state validation failed: %v", err)).
@@ -116,7 +116,7 @@ func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateT
 
 	// Validate conversation-specific fields
 	if conversationState.ConversationID == "" {
-		return types.NewValidationErrorBuilder("Conversation ID is required", "conversation_id", conversationState.ConversationID).
+		return mcptypes.NewErrorBuilder("CONVERSATION_ID_REQUIRED", "Conversation ID is required", "validation_error").
 			WithOperation("validate_conversation_state").
 			WithStage("required_fields").
 			WithRootCause("ConversationID field is empty").

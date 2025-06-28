@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
@@ -150,11 +149,13 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 		sessionInterface, err := ch.sessionManager.GetSession(sessionID)
 		if err == nil && sessionInterface != nil {
 			// Type assert to concrete session type
-			if session, ok := sessionInterface.(*sessiontypes.SessionState); ok && session.RepoAnalysis != nil {
-				if sessionCtx, ok := session.RepoAnalysis["_context"].(map[string]interface{}); ok {
-					if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
-						// Override user preferences when autopilot is explicitly enabled
-						userPrefs.SkipConfirmations = true
+			if session, ok := sessionInterface.(*mcptypes.SessionState); ok && session.Metadata != nil {
+				if repoAnalysis, ok := session.Metadata["repo_analysis"].(map[string]interface{}); ok {
+					if sessionCtx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
+						if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
+							// Override user preferences when autopilot is explicitly enabled
+							userPrefs.SkipConfirmations = true
+						}
 					}
 				}
 			}

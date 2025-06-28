@@ -51,7 +51,12 @@ func (pm *PromptManager) shouldAutoRunPreFlightChecks(state *ConversationState, 
 	// Auto-run by default unless this is the very first interaction
 	// (indicated by empty/nil context and empty repo analysis)
 	contextEmpty := state.Context == nil || len(state.Context) == 0
-	repoAnalysisEmpty := state.RepoAnalysis == nil || len(state.RepoAnalysis) == 0
+	repoAnalysisEmpty := true
+	if state.SessionState.Metadata != nil {
+		if repoAnalysis, ok := state.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			repoAnalysisEmpty = len(repoAnalysis) == 0
+		}
+	}
 	isFirstTime := contextEmpty && repoAnalysisEmpty
 
 	// For first-time users, require more explicit confirmation
@@ -150,10 +155,17 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 		state.Context["preflight_passed"] = true
 
 		// Save context to session state
-		if state.RepoAnalysis == nil {
-			state.RepoAnalysis = make(map[string]interface{})
+		if state.SessionState.Metadata == nil {
+			state.SessionState.Metadata = make(map[string]interface{})
 		}
-		state.RepoAnalysis["_context"] = state.Context
+		var repoAnalysis map[string]interface{}
+		if existing, ok := state.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			repoAnalysis = existing
+		} else {
+			repoAnalysis = make(map[string]interface{})
+			state.SessionState.Metadata["repo_analysis"] = repoAnalysis
+		}
+		repoAnalysis["_context"] = state.Context
 
 		// Save session to persist the context
 		if err := pm.sessionManager.UpdateSession(state.SessionID, func(s interface{}) {

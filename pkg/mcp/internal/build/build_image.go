@@ -39,7 +39,6 @@ type BuildImageResult struct {
 	Duration      time.Duration       `json:"duration"`
 	CacheHitRatio float64             `json:"cache_hit_ratio"`
 	Error         *mcptypes.ToolError `json:"error,omitempty"`
-
 	// Enhanced context for the external AI
 	DockerfileUsed string                   `json:"dockerfile_used,omitempty"`
 	BuildStrategy  string                   `json:"build_strategy,omitempty"`
@@ -120,14 +119,12 @@ func NewBuildImageTool(
 // ExecuteTyped builds a Docker image using the existing pipeline logic
 func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) (*BuildImageResult, error) {
 	startTime := time.Now()
-
 	// Create base response
 	response := &BuildImageResult{
 		BaseToolResponse: mcptypes.NewBaseResponse("build_image", args.SessionID, args.DryRun),
 		ImageRef:         t.normalizeImageRef(args),
 		Logs:             make([]string, 0),
 	}
-
 	// Handle dry-run
 	if args.DryRun {
 		response.Success = true
@@ -135,18 +132,14 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 		response.Logs = append(response.Logs, fmt.Sprintf("DRY-RUN: Image reference: %s", response.ImageRef))
 		response.Logs = append(response.Logs, "DRY-RUN: Would check for Dockerfile in workspace")
 		response.Logs = append(response.Logs, "DRY-RUN: Would validate build context")
-
 		if args.AsyncBuild {
 			response.JobID = fmt.Sprintf("build_job_%d", time.Now().UnixNano())
 			response.Logs = append(response.Logs, fmt.Sprintf("DRY-RUN: Would create async job: %s", response.JobID))
 		}
-
 		response.Duration = time.Since(startTime)
 		return response, nil
 	}
-
 	t.logger.Info().Str("session_id", args.SessionID).Str("image_name", args.ImageName).Msg("Starting Docker build")
-
 	// Convert MCP arguments to pipeline state
 	pipelineState, err := t.pipelineAdapter.ConvertToDockerState(args.SessionID, args.ImageName, args.Registry)
 	if err != nil {
@@ -159,7 +152,6 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 		response.Duration = time.Since(startTime)
 		return response, nil
 	}
-
 	// Check if Dockerfile exists in session state
 	if pipelineState.Dockerfile.Content == "" {
 		response.Error = &mcptypes.ToolError{
@@ -170,7 +162,6 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 		response.Duration = time.Since(startTime)
 		return response, nil
 	}
-
 	response.DockerfileUsed = pipelineState.Dockerfile.Content
 	// Get repository info from metadata if available
 	if repoAnalysis, ok := pipelineState.Metadata[pipeline.RepoAnalysisResultKey]; ok {
@@ -180,10 +171,8 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 	}
 	response.Logs = append(response.Logs, "Found Dockerfile in session context")
 	response.Logs = append(response.Logs, fmt.Sprintf("Building image: %s", response.ImageRef))
-
 	// Get workspace directory for this session
 	workspaceDir := t.pipelineAdapter.GetSessionWorkspace(args.SessionID)
-
 	// Set build options on pipeline state
 	if pipelineState.Metadata == nil {
 		pipelineState.Metadata = make(map[pipeline.MetadataKey]any)
@@ -191,7 +180,6 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 	pipelineState.Metadata[pipeline.MetadataKey("no_cache")] = args.NoCache
 	pipelineState.Metadata[pipeline.MetadataKey("platform")] = args.Platform
 	pipelineState.Metadata[pipeline.MetadataKey("build_args")] = args.BuildArgs
-
 	// Create Docker stage with nil AI client (MCP mode doesn't use external AI)
 	// The hosting LLM provides all reasoning; pipeline should work without AI client
 	dockerStage := &dockerstage.DockerStage{
@@ -199,25 +187,21 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 		UseDraftTemplate: true,
 		Parser:           &pipeline.DefaultParser{},
 	}
-
 	// Set up runner options for the pipeline stage
 	runnerOptions := pipeline.RunnerOptions{
 		TargetDirectory: workspaceDir,
 	}
-
 	// Check if this should be async based on timeout
 	buildTimeout := args.BuildTimeout
 	if buildTimeout == 0 {
 		buildTimeout = 10 * time.Minute
 	}
-
 	if args.AsyncBuild || buildTimeout > 2*time.Minute {
 		// Start async build
 		jobID := fmt.Sprintf("build_job_%d", time.Now().UnixNano())
 		response.JobID = jobID
 		response.Success = true
 		response.Logs = append(response.Logs, fmt.Sprintf("Starting async build with job ID: %s", jobID))
-
 		// Start async build in goroutine
 		go func() {
 			t.logger.Info().Str("job_id", jobID).Msg("Starting async build process")
@@ -228,40 +212,31 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 				t.logger.Info().Str("job_id", jobID).Msg("Async build completed successfully")
 			}
 		}()
-
 		response.Duration = time.Since(startTime)
 		return response, nil
 	}
-
 	response.Logs = append(response.Logs, "Starting Docker build using existing pipeline...")
-
 	// Execute the Docker stage using existing pipeline logic
 	err = dockerStage.Run(ctx, pipelineState, t.clients, runnerOptions)
 	if err != nil {
 		t.logger.Error().Err(err).Msg("Docker stage execution failed")
-
 		// Extract error details for the external AI to reason about
 		buildErrors := dockerStage.GetErrors(pipelineState)
-
 		response.Success = false
 		response.BuildErrors = buildErrors
 		response.Logs = append(response.Logs, "Build failed with errors:")
 		response.Logs = append(response.Logs, buildErrors)
-
 		response.Error = &mcptypes.ToolError{
 			Type:    "execution_error",
 			Message: fmt.Sprintf("Docker build failed: %v", err),
 		}
-
 		// Still update session with partial results for next attempt
 		if updateErr := t.pipelineAdapter.UpdateSessionFromDockerResults(args.SessionID, pipelineState); updateErr != nil {
 			t.logger.Warn().Err(updateErr).Msg("Failed to update session with partial results")
 		}
-
 		response.Duration = time.Since(startTime)
 		return response, nil
 	}
-
 	// Build succeeded!
 	response.Success = true
 	response.ImageID = pipelineState.ImageName // The pipeline sets this to the actual image ID
@@ -269,7 +244,6 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 	response.BuildStrategy = "AI-powered iterative build with error fixing"
 	response.Logs = append(response.Logs, "Docker build completed successfully")
 	response.Logs = append(response.Logs, fmt.Sprintf("Image ID: %s", response.ImageID))
-
 	// Update session with successful build results
 	if err := t.pipelineAdapter.UpdateSessionFromDockerResults(args.SessionID, pipelineState); err != nil {
 		t.logger.Error().Err(err).Msg("Failed to update session with build results")
@@ -281,15 +255,12 @@ func (t *BuildImageTool) ExecuteTyped(ctx context.Context, args BuildImageArgs) 
 		response.Duration = time.Since(startTime)
 		return response, nil
 	}
-
 	response.Duration = time.Since(startTime)
-
 	t.logger.Info().
 		Str("session_id", args.SessionID).
 		Str("image_ref", response.ImageRef).
 		Dur("duration", response.Duration).
 		Msg("Docker build completed successfully")
-
 	return response, nil
 }
 
@@ -299,34 +270,28 @@ func (t *BuildImageTool) normalizeImageRef(args BuildImageArgs) string {
 	if imageName == "" {
 		imageName = "my-app"
 	}
-
 	registry := args.Registry
 	if registry == "" {
 		// Use local registry or default
 		return fmt.Sprintf("%s:latest", imageName)
 	}
-
 	return fmt.Sprintf("%s/%s:latest", registry, imageName)
 }
 
 // executeAsyncBuild runs the build process asynchronously
 func (t *BuildImageTool) executeAsyncBuild(ctx context.Context, args BuildImageArgs, pipelineState *pipeline.PipelineState, dockerStage *dockerstage.DockerStage, runnerOptions pipeline.RunnerOptions, jobID string) error {
-
 	// Create a new context with timeout for the async build
 	buildTimeout := args.BuildTimeout
 	if buildTimeout == 0 {
 		buildTimeout = 10 * time.Minute
 	}
-
 	asyncCtx, cancel := context.WithTimeout(context.Background(), buildTimeout)
 	defer cancel()
-
 	t.logger.Info().
 		Str("job_id", jobID).
 		Str("session_id", args.SessionID).
 		Dur("timeout", buildTimeout).
 		Msg("Executing async Docker build")
-
 	// Execute the Docker stage using existing pipeline logic
 	err := dockerStage.Run(asyncCtx, pipelineState, t.clients, runnerOptions)
 	if err != nil {
@@ -334,21 +299,17 @@ func (t *BuildImageTool) executeAsyncBuild(ctx context.Context, args BuildImageA
 			Err(err).
 			Str("job_id", jobID).
 			Msg("Async Docker stage execution failed")
-
 		// Store build failure in session for later retrieval
 		if updateErr := t.pipelineAdapter.UpdateSessionFromDockerResults(args.SessionID, pipelineState); updateErr != nil {
 			t.logger.Warn().Err(updateErr).Str("job_id", jobID).Msg("Failed to update session with async build failure")
 		}
-
 		return err
 	}
-
 	// Build succeeded - update session with results
 	t.logger.Info().
 		Str("job_id", jobID).
 		Str("image_id", pipelineState.ImageName).
 		Msg("Async build completed successfully")
-
 	if err := t.pipelineAdapter.UpdateSessionFromDockerResults(args.SessionID, pipelineState); err != nil {
 		t.logger.Error().
 			Err(err).
@@ -356,7 +317,6 @@ func (t *BuildImageTool) executeAsyncBuild(ctx context.Context, args BuildImageA
 			Msg("Failed to update session with async build results")
 		return err
 	}
-
 	return nil
 }
 
@@ -364,7 +324,6 @@ func (t *BuildImageTool) executeAsyncBuild(ctx context.Context, args BuildImageA
 func (t *BuildImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	// Convert generic args to typed args
 	var buildArgs BuildImageArgs
-
 	switch a := args.(type) {
 	case BuildImageArgs:
 		buildArgs = a
@@ -380,7 +339,6 @@ func (t *BuildImageTool) Execute(ctx context.Context, args interface{}) (interfa
 	default:
 		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
 	}
-
 	// Call the typed execute method
 	return t.ExecuteTyped(ctx, buildArgs)
 }
@@ -388,7 +346,6 @@ func (t *BuildImageTool) Execute(ctx context.Context, args interface{}) (interfa
 // Validate implements the unified Tool interface
 func (t *BuildImageTool) Validate(ctx context.Context, args interface{}) error {
 	var buildArgs BuildImageArgs
-
 	switch a := args.(type) {
 	case BuildImageArgs:
 		buildArgs = a
@@ -404,12 +361,10 @@ func (t *BuildImageTool) Validate(ctx context.Context, args interface{}) error {
 	default:
 		return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
 	}
-
 	// Validate required fields
 	if buildArgs.SessionID == "" {
 		return mcptypes.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
 	}
-
 	return nil
 }
 

@@ -181,19 +181,24 @@ func TestConversationStateDecisionHandling(t *testing.T) {
 func TestConversationStateErrorTracking(t *testing.T) {
 	state := NewConversationState("test-session", "/tmp/workspace")
 
-	// Initially no errors
-	assert.Nil(t, state.LastError)
-
-	// Set an error
-	testError := &types.ToolError{
-		Type:      "test_error",
-		Message:   "Something went wrong",
-		Retryable: true,
+	// Test error tracking through conversation history
+	turn := ConversationTurn{
+		ID:        "turn-1",
 		Timestamp: time.Now(),
+		UserInput: "test input",
+		Stage:     types.StageBuild,
+		Error: &types.ToolError{
+			Type:      "test_error",
+			Message:   "Something went wrong",
+			Retryable: true,
+			Timestamp: time.Now(),
+		},
 	}
-	state.SetError(testError)
-	assert.NotNil(t, state.LastError)
-	assert.Equal(t, "Something went wrong", state.LastError.Message)
+
+	state.History = append(state.History, turn)
+	assert.Len(t, state.History, 1)
+	assert.NotNil(t, state.History[0].Error)
+	assert.Equal(t, "Something went wrong", state.History[0].Error.Message)
 }
 
 func TestConversationStateStageTransitions(t *testing.T) {

@@ -9,7 +9,6 @@ import (
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/internal"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
@@ -100,7 +99,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 		return response, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	session, ok := sessionInterface.(*mcptypes.SessionState)
 	if !ok {
 		return response, fmt.Errorf("invalid session type")
 	}
@@ -301,7 +300,7 @@ func (t *AtomicScanImageSecurityTool) generateSecurityReport(result *AtomicScanI
 	return "Security scan report placeholder" // Placeholder
 }
 
-func (t *AtomicScanImageSecurityTool) updateSessionState(session *sessiontypes.SessionState, result *AtomicScanImageSecurityResult) error {
+func (t *AtomicScanImageSecurityTool) updateSessionState(session *mcptypes.SessionState, result *AtomicScanImageSecurityResult) error {
 	// Update session with scan results
 	// Placeholder implementation
 	return nil

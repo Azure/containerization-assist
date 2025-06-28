@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -228,22 +228,22 @@ func (m *UnifiedStateManager) DeleteState(ctx context.Context, stateType StateTy
 }
 
 // GetSessionState gets session state with type safety
-func (m *UnifiedStateManager) GetSessionState(_ context.Context, sessionID string) (*sessiontypes.SessionState, error) {
+func (m *UnifiedStateManager) GetSessionState(_ context.Context, sessionID string) (*mcptypes.SessionState, error) {
 	state, err := m.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	if sessionState, ok := state.(*sessiontypes.SessionState); ok {
+	if sessionState, ok := state.(*mcptypes.SessionState); ok {
 		return sessionState, nil
 	}
 	return nil, fmt.Errorf("state is not of type *SessionState")
 }
 
 // UpdateSessionState updates session state with validation
-func (m *UnifiedStateManager) UpdateSessionState(_ context.Context, sessionID string, updates func(*sessiontypes.SessionState) error) error {
+func (m *UnifiedStateManager) UpdateSessionState(_ context.Context, sessionID string, updates func(*mcptypes.SessionState) error) error {
 	// Use the session manager's UpdateSession method
 	return m.sessionManager.UpdateSession(sessionID, func(current interface{}) {
-		if sessionState, ok := current.(*sessiontypes.SessionState); ok {
+		if sessionState, ok := current.(*mcptypes.SessionState); ok {
 			// Apply updates - ignore error for now as the interface doesn't support returning errors
 			_ = updates(sessionState)
 		}

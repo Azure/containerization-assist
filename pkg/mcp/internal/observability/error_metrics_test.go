@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,24 +21,20 @@ func TestErrorMetrics_RecordError(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a test error
-	richErr := &types.RichError{
-		Code:      "TEST_ERROR",
-		Message:   "Test error message",
-		Type:      "test_error",
-		Severity:  "medium",
-		Timestamp: time.Now(),
-		Context: types.ErrorContext{
-			Operation: "test_operation",
-			Component: "test_component",
-			Metadata:  types.NewErrorMetadata("session123", "test_tool", "test_op"),
-		},
-		Diagnostics: types.ErrorDiagnostics{
-			RootCause:    "test root cause",
-			ErrorPattern: "test pattern",
-			Symptoms:     []string{"symptom1", "symptom2"},
-		},
-		AttemptNumber: 2,
+	richErr := mcptypes.NewRichError("TEST_ERROR", "Test error message", "test_error")
+	richErr.Severity = "medium"
+	richErr.Context.Operation = "test_operation"
+	richErr.Context.Component = "test_component"
+	// Note: mcptypes.RichError uses a different Context structure
+	richErr.Context.Metadata = map[string]interface{}{
+		"session_id": "session123",
+		"tool_name":  "test_tool",
+		"operation":  "test_op",
 	}
+	richErr.Diagnostics.RootCause = "test root cause"
+	richErr.Diagnostics.ErrorPattern = "test pattern"
+	richErr.Diagnostics.Symptoms = []string{"symptom1", "symptom2"}
+	richErr.AttemptNumber = 2
 
 	// Record the error
 	em.RecordError(ctx, richErr)
@@ -58,12 +54,8 @@ func TestErrorMetrics_RecordResolution(t *testing.T) {
 	ctx := context.Background()
 
 	// Create and record an error
-	richErr := &types.RichError{
-		Code:     "RESOLVE_TEST",
-		Message:  "Error to be resolved",
-		Type:     "resolvable_error",
-		Severity: "high",
-	}
+	richErr := mcptypes.NewRichError("RESOLVE_TEST", "Error to be resolved", "resolvable_error")
+	richErr.Severity = "high"
 
 	em.RecordError(ctx, richErr)
 
@@ -82,19 +74,19 @@ func TestErrorMetrics_EnrichContext(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "correlation_id", "test-correlation-123")
 
 	// Create error with metadata
-	richErr := &types.RichError{
-		Code: "ENRICHED_ERROR",
-		Context: types.ErrorContext{
-			Metadata: types.NewErrorMetadata("session456", "enrich_tool", "enrich_op"),
-		},
+	richErr := mcptypes.NewRichError("ENRICHED_ERROR", "", "")
+	richErr.Context.Metadata = map[string]interface{}{
+		"session_id": "session456",
+		"tool_name":  "enrich_tool",
+		"operation":  "enrich_op",
 	}
 
 	// Enrich the context
 	em.EnrichContext(ctx, richErr)
 
 	// Verify correlation ID was added
-	if richErr.Context.Metadata != nil && richErr.Context.Metadata.Custom != nil {
-		assert.Equal(t, "test-correlation-123", richErr.Context.Metadata.Custom["correlation_id"])
+	if richErr.Context.Metadata != nil {
+		assert.Equal(t, "test-correlation-123", richErr.Context.Metadata["correlation_id"])
 	}
 }
 
@@ -108,10 +100,11 @@ func TestErrorMetrics_GetRecentErrors(t *testing.T) {
 	// Record multiple errors
 	testErrors := 5
 	for i := 0; i < testErrors; i++ {
-		err := &types.RichError{
-			Code:    "ERROR_" + string(rune('A'+i)),
-			Message: "Test error " + string(rune('A'+i)),
-		}
+		err := mcptypes.NewRichError(
+			"ERROR_"+string(rune('A'+i)),
+			"Test error "+string(rune('A'+i)),
+			"",
+		)
 		em.RecordError(ctx, err)
 	}
 
@@ -147,10 +140,7 @@ func TestErrorMetrics_ErrorPatterns(t *testing.T) {
 
 	for _, e := range errors {
 		for i := 0; i < e.count; i++ {
-			err := &types.RichError{
-				Code: e.code,
-				Type: e.errType,
-			}
+			err := mcptypes.NewRichError(e.code, "", e.errType)
 			em.RecordError(ctx, err)
 		}
 	}
@@ -172,7 +162,7 @@ func TestErrorMetricsMiddleware(t *testing.T) {
 	middleware := ErrorMetricsMiddleware(em)
 
 	// Create handler that resolves errors
-	handler := middleware(func(ctx context.Context, err *types.RichError) error {
+	handler := middleware(func(ctx context.Context, err *mcptypes.RichError) error {
 		handlerCalled = true
 		if err.Code == "RESOLVABLE" {
 			errorResolved = true
@@ -184,10 +174,7 @@ func TestErrorMetricsMiddleware(t *testing.T) {
 	ctx := context.Background()
 
 	// Test with resolvable error
-	resolvableErr := &types.RichError{
-		Code:    "RESOLVABLE",
-		Message: "This error will be resolved",
-	}
+	resolvableErr := mcptypes.NewRichError("RESOLVABLE", "This error will be resolved", "")
 
 	result := handler(ctx, resolvableErr)
 	assert.Nil(t, result)

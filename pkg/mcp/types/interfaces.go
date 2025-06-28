@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -229,15 +230,88 @@ type FixableOperation interface {
 	GetLastError() error
 }
 
+// RichError provides detailed error information (DEPRECATED - use pkg/mcp.RichError)
 type RichError struct {
-	Code     string `json:"code"`
-	Type     string `json:"type"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
+	Code      string    `json:"code"`
+	Message   string    `json:"message"`
+	Type      string    `json:"type"`
+	Severity  string    `json:"severity"`
+	Timestamp time.Time `json:"timestamp"`
+	Tool      string    `json:"tool"`
+
+	// Context for compatibility with migration.go
+	Context struct {
+		Input struct {
+			Args interface{} `json:"args"`
+		} `json:"input"`
+		Operation   string                 `json:"operation"`
+		Stage       string                 `json:"stage"`
+		Component   string                 `json:"component"`
+		Metadata    map[string]interface{} `json:"metadata"`
+		SystemState struct {
+			DockerAvailable bool `json:"docker_available"`
+			K8sConnected    bool `json:"k8s_connected"`
+			DiskSpaceMB     int  `json:"disk_space_mb"`
+			WorkspaceQuota  int  `json:"workspace_quota"`
+		} `json:"system_state"`
+		ResourceUsage struct {
+			CPUPercent  float64 `json:"cpu_percent"`
+			MemoryMB    int     `json:"memory_mb"`
+			DiskUsageMB int     `json:"disk_usage_mb"`
+		} `json:"resource_usage"`
+		Logs         []interface{} `json:"logs"`
+		RelatedFiles []string      `json:"related_files"`
+	} `json:"context"`
+
+	// Diagnostics for compatibility
+	Diagnostics struct {
+		RootCause     string        `json:"root_cause"`
+		ErrorPattern  string        `json:"error_pattern"`
+		Symptoms      []string      `json:"symptoms"`
+		Category      string        `json:"category"`
+		Checks        []interface{} `json:"checks"`
+		SimilarErrors []interface{} `json:"similar_errors"`
+	} `json:"diagnostics"`
+
+	// Resolution for compatibility
+	Resolution struct {
+		RetryStrategy struct {
+			Recommended     bool     `json:"recommended"`
+			WaitTime        int      `json:"wait_time"`
+			MaxAttempts     int      `json:"max_attempts"`
+			BackoffStrategy string   `json:"backoff_strategy"`
+			Conditions      []string `json:"conditions"`
+		} `json:"retry_strategy"`
+		ImmediateSteps []struct {
+			Order       int    `json:"order"`
+			Action      string `json:"action"`
+			Description string `json:"description"`
+			Command     string `json:"command"`
+			Expected    string `json:"expected"`
+		} `json:"immediate_steps"`
+		Alternatives []struct {
+			Name        string   `json:"name"`
+			Description string   `json:"description"`
+			Steps       []string `json:"steps"`
+			Confidence  float64  `json:"confidence"`
+		} `json:"alternatives"`
+		Prevention  string   `json:"prevention"`
+		ManualSteps []string `json:"manual_steps"`
+	} `json:"resolution"`
+
+	// Session state for compatibility
+	SessionState *struct {
+		ID           string `json:"id"`
+		CurrentStage string `json:"current_stage"`
+	} `json:"session_state,omitempty"`
+
+	// Additional compatibility fields
+	AttemptNumber  int      `json:"attempt_number,omitempty"`
+	PreviousErrors []string `json:"previous_errors,omitempty"`
 }
 
 func (e *RichError) Error() string {
-	return e.Message
+	return fmt.Sprintf("[%s] %s: %s", e.Code, e.Type, e.Message)
 }
 
 type FixAttempt struct {
@@ -610,4 +684,70 @@ type BaseValidationMetadata struct {
 	Duration         time.Duration
 	Timestamp        time.Time
 	Parameters       map[string]interface{}
+}
+
+// =============================================================================
+// ERROR HANDLING COMPATIBILITY TYPES
+// =============================================================================
+
+// RichError is defined above for compatibility with internal packages
+
+// NewRichError creates a new RichError with basic information
+func NewRichError(code, message, errorType string) *RichError {
+	return &RichError{
+		Code:      code,
+		Message:   message,
+		Type:      errorType,
+		Severity:  "medium",
+		Timestamp: time.Now(),
+	}
+}
+
+// ErrorBuilder provides simplified error building for internal packages
+type ErrorBuilder struct {
+	error *RichError
+}
+
+// NewErrorBuilder creates a new error builder
+func NewErrorBuilder(code, message, errorType string) *ErrorBuilder {
+	return &ErrorBuilder{
+		error: NewRichError(code, message, errorType),
+	}
+}
+
+// WithField adds a field (simplified implementation)
+func (eb *ErrorBuilder) WithField(key string, value interface{}) *ErrorBuilder {
+	// For now, just return the builder without storing the field
+	return eb
+}
+
+// WithOperation sets operation (simplified implementation)
+func (eb *ErrorBuilder) WithOperation(operation string) *ErrorBuilder {
+	return eb
+}
+
+// WithStage sets stage (simplified implementation)
+func (eb *ErrorBuilder) WithStage(stage string) *ErrorBuilder {
+	return eb
+}
+
+// WithSeverity sets severity (simplified implementation)
+func (eb *ErrorBuilder) WithSeverity(severity string) *ErrorBuilder {
+	eb.error.Severity = severity
+	return eb
+}
+
+// WithRootCause sets root cause (simplified implementation)
+func (eb *ErrorBuilder) WithRootCause(cause string) *ErrorBuilder {
+	return eb
+}
+
+// WithImmediateStep adds immediate step (simplified implementation)
+func (eb *ErrorBuilder) WithImmediateStep(order int, action, description string) *ErrorBuilder {
+	return eb
+}
+
+// Build returns the constructed error
+func (eb *ErrorBuilder) Build() *RichError {
+	return eb.error
 }

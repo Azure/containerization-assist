@@ -39,7 +39,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 
 	params := map[string]interface{}{
 		"session_id": state.SessionID,
-		"image_ref":  state.Dockerfile.ImageID,
+		"image_ref":  getDockerfileImageID(state.SessionState),
 	}
 
 	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "scan_image_security", params, state.SessionState.SessionID)
@@ -81,8 +81,16 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 	if strings.Contains(strings.ToLower(input), "show") || strings.Contains(strings.ToLower(input), "full") {
 		// Show full manifests
 		var manifestsText strings.Builder
-		for name, manifest := range state.K8sManifests {
-			manifestsText.WriteString(fmt.Sprintf("# %s\n---\n%s\n\n", name, manifest.Content))
+		if state.SessionState.Metadata != nil {
+			if k8sManifests, ok := state.SessionState.Metadata["k8s_manifests"].(map[string]interface{}); ok {
+				for name, manifestData := range k8sManifests {
+					if manifestMap, ok := manifestData.(map[string]interface{}); ok {
+						if content, ok := manifestMap["content"].(string); ok {
+							manifestsText.WriteString(fmt.Sprintf("# %s\n---\n%s\n\n", name, content))
+						}
+					}
+				}
+			}
 		}
 
 		return &ConversationResponse{
@@ -125,8 +133,12 @@ func (pm *PromptManager) suggestAppName(state *ConversationState) string {
 	}
 
 	// Try to extract from repo analysis
-	if projectName, ok := state.RepoAnalysis["project_name"].(string); ok {
-		return strings.ToLower(strings.ReplaceAll(projectName, "_", "-"))
+	if state.SessionState.Metadata != nil {
+		if repoAnalysis, ok := state.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			if projectName, ok := repoAnalysis["project_name"].(string); ok {
+				return strings.ToLower(strings.ReplaceAll(projectName, "_", "-"))
+			}
+		}
 	}
 
 	return "my-app"
@@ -160,8 +172,16 @@ func (pm *PromptManager) formatDeploymentSuccess(state *ConversationState, durat
 	sb.WriteString(fmt.Sprintf("Deployment time: %s\n", duration.Round(time.Second)))
 	sb.WriteString("\nResources created:\n")
 
-	for name, manifest := range state.K8sManifests {
-		sb.WriteString(fmt.Sprintf("- %s (%s)\n", name, manifest.Kind))
+	if state.SessionState.Metadata != nil {
+		if k8sManifests, ok := state.SessionState.Metadata["k8s_manifests"].(map[string]interface{}); ok {
+			for name, manifestData := range k8sManifests {
+				if manifestMap, ok := manifestData.(map[string]interface{}); ok {
+					if kind, ok := manifestMap["kind"].(string); ok {
+						sb.WriteString(fmt.Sprintf("- %s (%s)\n", name, kind))
+					}
+				}
+			}
+		}
 	}
 
 	sb.WriteString("\nTo access your application:\n")

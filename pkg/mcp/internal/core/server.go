@@ -14,9 +14,9 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -32,21 +32,21 @@ func (s *sessionManagerAdapterImpl) GetSession(sessionID string) (interface{}, e
 func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 	// Convert interface{} back to the concrete session type and update
 	switch sess := session.(type) {
-	case *sessiontypes.SessionState:
+	case *mcptypes.SessionState:
 		if sess.SessionID == "" {
 			return errors.Validation("core/server", "session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
+			if existingState, ok := existing.(*mcptypes.SessionState); ok {
 				*existingState = *sess
 			}
 		})
-	case sessiontypes.SessionState:
+	case mcptypes.SessionState:
 		if sess.SessionID == "" {
 			return errors.Validation("core/server", "session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
+			if existingState, ok := existing.(*mcptypes.SessionState); ok {
 				*existingState = sess
 			}
 		})

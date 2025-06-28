@@ -31,11 +31,9 @@ type AtomicBuildImageResult struct {
 	types.BaseToolResponse
 	mcptypes.BaseAIContextResult      // Embedded for AI context methods
 	Success                      bool `json:"success"`
-
 	// Session context
 	SessionID    string `json:"session_id"`
 	WorkspaceDir string `json:"workspace_dir"`
-
 	// Build configuration
 	ImageName      string `json:"image_name"`
 	ImageTag       string `json:"image_tag"`
@@ -43,21 +41,17 @@ type AtomicBuildImageResult struct {
 	DockerfilePath string `json:"dockerfile_path"`
 	BuildContext   string `json:"build_context"`
 	Platform       string `json:"platform"`
-
 	// Build results from core operations
 	BuildResult  *coredocker.BuildResult        `json:"build_result"`
 	PushResult   *coredocker.RegistryPushResult `json:"push_result,omitempty"`
 	SecurityScan *coredocker.ScanResult         `json:"security_scan,omitempty"`
-
 	// Timing information
 	BuildDuration time.Duration `json:"build_duration"`
 	PushDuration  time.Duration `json:"push_duration,omitempty"`
 	ScanDuration  time.Duration `json:"scan_duration,omitempty"`
 	TotalDuration time.Duration `json:"total_duration"`
-
 	// Rich context for Claude reasoning
 	BuildContext_Info *BuildContextInfo `json:"build_context_info"`
-
 	// AI context for decision-making
 	BuildFailureAnalysis *BuildFailureAnalysis `json:"build_failure_analysis,omitempty"`
 }
@@ -67,7 +61,6 @@ type AtomicBuildImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
 	logger          zerolog.Logger
-
 	// Module components
 	contextAnalyzer *BuildContextAnalyzer
 	validator       *BuildValidatorImpl
@@ -78,12 +71,10 @@ type AtomicBuildImageTool struct {
 // NewAtomicBuildImageTool creates a new atomic build image tool
 func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_build_image").Logger()
-
 	// Initialize all modules
 	contextAnalyzer := NewBuildContextAnalyzer(toolLogger)
 	validator := NewBuildValidator(toolLogger)
 	executor := NewBuildExecutor(adapter, sessionManager, toolLogger)
-
 	return &AtomicBuildImageTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -114,7 +105,6 @@ func (t *AtomicBuildImageTool) ExecuteWithFixes(ctx context.Context, args Atomic
 // ExecuteWithContext executes the tool with GoMCP server context for native progress tracking
 func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
 	startTime := time.Now()
-
 	// Create result object early for error handling
 	result := &AtomicBuildImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
@@ -125,14 +115,19 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 		Platform:            t.getPlatform(args.Platform),
 		BuildContext_Info:   &BuildContextInfo{},
 	}
-
+	// Use centralized build stages for progress tracking
+	// TODO: Progress adapter removed to break import cycles
+	// _ = nil // was: internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
+	//	{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
+	//	{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
+	//	{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},
+	//	{Name: "Finalize", Weight: 0.05, Description: "Updating session state"},
+	// })
 	// Delegate to executor with progress tracking
 	ctx := context.Background()
 	err := t.executor.executeWithProgress(ctx, args, result, startTime, nil)
-
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
-
 	// Complete progress tracking
 	if err != nil {
 		t.logger.Info().Msg("Build failed")
@@ -141,12 +136,10 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 	} else {
 		t.logger.Info().Msg("Build completed successfully")
 	}
-
 	return result, nil
 }
 
 // Tool interface implementation (unified MCP interface)
-
 // GetMetadata returns comprehensive tool metadata
 func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
@@ -195,24 +188,21 @@ func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) error {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
-		return types.NewValidationErrorBuilder("Invalid argument type for atomic_build_image", "args", args).
+		return mcptypes.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
 			WithField("expected", "AtomicBuildImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
-
 	if buildArgs.ImageName == "" {
-		return types.NewValidationErrorBuilder("ImageName is required", "image_name", buildArgs.ImageName).
+		return mcptypes.NewErrorBuilder("IMAGE_NAME_REQUIRED", "ImageName is required", "validation_error").
 			WithField("field", "image_name").
 			Build()
 	}
-
 	if buildArgs.SessionID == "" {
-		return types.NewValidationErrorBuilder("SessionID is required", "session_id", buildArgs.SessionID).
+		return mcptypes.NewErrorBuilder("SESSION_ID_REQUIRED", "SessionID is required", "validation_error").
 			WithField("field", "session_id").
 			Build()
 	}
-
 	return nil
 }
 
@@ -220,18 +210,16 @@ func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) e
 func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
-		return nil, types.NewValidationErrorBuilder("Invalid argument type for atomic_build_image", "args", args).
+		return nil, mcptypes.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
 			WithField("expected", "AtomicBuildImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
-
 	// Execute with nil server context (no progress tracking)
 	return t.ExecuteWithContext(nil, buildArgs)
 }
 
 // Legacy interface methods for backward compatibility
-
 // GetName returns the tool name (legacy SimpleTool compatibility)
 func (t *AtomicBuildImageTool) GetName() string {
 	return t.GetMetadata().Name

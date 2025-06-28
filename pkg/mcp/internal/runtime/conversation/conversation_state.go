@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // RetryState tracks retry attempts for a specific operation
@@ -17,7 +17,7 @@ type RetryState struct {
 
 // ConversationState extends SessionState with conversation-specific fields
 type ConversationState struct {
-	*sessiontypes.SessionState
+	*mcptypes.SessionState
 
 	// Conversation flow
 	CurrentStage    types.ConversationStage `json:"current_stage"`
@@ -102,7 +102,13 @@ type Artifact struct {
 // NewConversationState creates a new conversation state
 func NewConversationState(sessionID, workspaceDir string) *ConversationState {
 	return &ConversationState{
-		SessionState: sessiontypes.NewSessionState(sessionID, workspaceDir),
+		SessionState: &mcptypes.SessionState{
+			SessionID:    sessionID,
+			WorkspaceDir: workspaceDir,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+			Metadata:     make(map[string]interface{}),
+		},
 		CurrentStage: types.StageWelcome,
 		History:      make([]ConversationTurn, 0),
 		Preferences: types.UserPreferences{
@@ -121,19 +127,19 @@ func (cs *ConversationState) AddConversationTurn(turn ConversationTurn) {
 	turn.ID = generateTurnID()
 	turn.Timestamp = time.Now()
 	cs.History = append(cs.History, turn)
-	cs.UpdateLastAccessed()
+	cs.SessionState.UpdatedAt = time.Now()
 }
 
 // SetStage updates the current conversation stage
 func (cs *ConversationState) SetStage(stage types.ConversationStage) {
 	cs.CurrentStage = stage
-	cs.UpdateLastAccessed()
+	cs.SessionState.UpdatedAt = time.Now()
 }
 
 // SetPendingDecision sets a decision point that needs user input
 func (cs *ConversationState) SetPendingDecision(decision *DecisionPoint) {
 	cs.PendingDecision = decision
-	cs.UpdateLastAccessed()
+	cs.SessionState.UpdatedAt = time.Now()
 }
 
 // ResolvePendingDecision resolves a pending decision with user's choice
@@ -145,7 +151,7 @@ func (cs *ConversationState) ResolvePendingDecision(decision Decision) {
 			cs.History[len(cs.History)-1].Decision = &decision
 		}
 	}
-	cs.UpdateLastAccessed()
+	cs.SessionState.UpdatedAt = time.Now()
 }
 
 // AddArtifact adds a generated artifact to the state
@@ -154,7 +160,7 @@ func (cs *ConversationState) AddArtifact(artifact Artifact) {
 	artifact.CreatedAt = time.Now()
 	artifact.UpdatedAt = time.Now()
 	cs.Artifacts[artifact.ID] = artifact
-	cs.UpdateLastAccessed()
+	cs.SessionState.UpdatedAt = time.Now()
 }
 
 // UpdateArtifact updates an existing artifact
@@ -163,7 +169,7 @@ func (cs *ConversationState) UpdateArtifact(artifactID, content string) {
 		artifact.Content = content
 		artifact.UpdatedAt = time.Now()
 		cs.Artifacts[artifactID] = artifact
-		cs.UpdateLastAccessed()
+		cs.SessionState.UpdatedAt = time.Now()
 	}
 }
 
@@ -193,13 +199,37 @@ func (cs *ConversationState) CanProceedToStage(stage types.ConversationStage) bo
 	case types.StageInit:
 		return cs.CurrentStage == types.StageWelcome
 	case types.StageAnalysis:
-		return cs.CurrentStage == types.StageInit && cs.RepoURL != ""
+		repoURL := ""
+		if cs.SessionState.Metadata != nil {
+			if url, ok := cs.SessionState.Metadata["repo_url"].(string); ok {
+				repoURL = url
+			}
+		}
+		return cs.CurrentStage == types.StageInit && repoURL != ""
 	case types.StageDockerfile:
-		return cs.CurrentStage == types.StageAnalysis && len(cs.RepoAnalysis) > 0
+		repoAnalysisExists := false
+		if cs.SessionState.Metadata != nil {
+			if repoAnalysis, ok := cs.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
+				repoAnalysisExists = len(repoAnalysis) > 0
+			}
+		}
+		return cs.CurrentStage == types.StageAnalysis && repoAnalysisExists
 	case types.StageManifests:
-		return cs.CurrentStage == types.StageDockerfile && cs.Dockerfile.Content != ""
+		dockerfileContent := ""
+		if cs.SessionState.Metadata != nil {
+			if content, ok := cs.SessionState.Metadata["dockerfile_content"].(string); ok {
+				dockerfileContent = content
+			}
+		}
+		return cs.CurrentStage == types.StageDockerfile && dockerfileContent != ""
 	case types.StageDeployment:
-		return cs.CurrentStage == types.StageManifests && len(cs.K8sManifests) > 0
+		k8sManifestsExist := false
+		if cs.SessionState.Metadata != nil {
+			if manifests, ok := cs.SessionState.Metadata["k8s_manifests"].(map[string]interface{}); ok {
+				k8sManifestsExist = len(manifests) > 0
+			}
+		}
+		return cs.CurrentStage == types.StageManifests && k8sManifestsExist
 	case types.StageCompleted:
 		return cs.CurrentStage == types.StageDeployment
 	default:

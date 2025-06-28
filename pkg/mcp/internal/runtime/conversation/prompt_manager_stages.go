@@ -8,10 +8,14 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
+// handleWelcomeStage handles the welcome stage where users choose their workflow mode
 func (pm *PromptManager) handleWelcomeStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+	// Add progress indicator and stage intro
 	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageWelcome), getStageIntro(types.StageWelcome))
 
+	// Check if this is the first interaction
 	if input == "" {
+		// Present welcome message with mode selection
 		return &ConversationResponse{
 			Message: fmt.Sprintf(`%s🎉 Welcome to Container Kit! I'm here to help you containerize your application.
 
@@ -41,9 +45,11 @@ How would you like to proceed?`, progressPrefix),
 		}
 	}
 
+	// Process mode selection
 	lowerInput := strings.ToLower(strings.TrimSpace(input))
 
 	if strings.Contains(lowerInput, "interactive") || strings.Contains(lowerInput, "guide") || input == "1" {
+		// Interactive mode - default behavior
 		state.SetStage(types.StageInit)
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sGreat! I'll guide you through each step. Let's start by analyzing your repository.\n\nCould you provide the repository URL or local path?", progressPrefix),
@@ -65,6 +71,7 @@ How would you like to proceed?`, progressPrefix),
 	}
 
 	if strings.Contains(lowerInput, "autopilot") || strings.Contains(lowerInput, "automate") || input == "2" {
+		// Enable autopilot mode
 		pm.enableAutopilot(state)
 		state.Context["skip_confirmations"] = true
 		state.SetStage(types.StageInit)
@@ -82,6 +89,7 @@ Now, please provide your repository URL or local path:`, progressPrefix),
 		}
 	}
 
+	// If input doesn't match expected options, re-prompt
 	return &ConversationResponse{
 		Message: fmt.Sprintf("%sPlease choose how you'd like to proceed:", progressPrefix),
 		Stage:   types.StageWelcome,
@@ -100,12 +108,16 @@ Now, please provide your repository URL or local path:`, progressPrefix),
 	}
 }
 
+// handleInitStage handles the initial stage of the conversation
 func (pm *PromptManager) handleInitStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+	// Add progress indicator and stage intro
 	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageInit), getStageIntro(types.StageInit))
 
+	// Check if input contains a repository reference
 	repoRef := pm.extractRepositoryReference(input)
 
 	if repoRef == "" {
+		// Ask for repository
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sI'll help you containerize your application. Could you provide the repository URL or local path?", progressPrefix),
 			Stage:   types.StageInit,
@@ -125,34 +137,58 @@ func (pm *PromptManager) handleInitStage(ctx context.Context, state *Conversatio
 		}
 	}
 
+	// We have a repository, move to analysis
 	state.RepoURL = repoRef
 	state.SetStage(types.StageAnalysis)
 
+	// Enable autopilot mode when URL is provided directly
+	// This allows the conversation to automatically proceed through all stages
 	state.Context["autopilot_enabled"] = true
 
+	// Start analysis
 	return pm.startAnalysis(ctx, state, repoRef)
 }
 
+// handleAnalysisStage handles the repository analysis stage
 func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+	// Add progress indicator and stage intro
 	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageAnalysis), getStageIntro(types.StageAnalysis))
 
-	if len(state.RepoAnalysis) == 0 && state.RepoURL != "" {
+	// Check if we need to gather analysis preferences using structured form
+	repoAnalysisEmpty := true
+	repoURL := ""
+	if state.SessionState.Metadata != nil {
+		if repoAnalysis, ok := state.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			repoAnalysisEmpty = len(repoAnalysis) == 0
+		}
+		if url, ok := state.SessionState.Metadata["repo_url"].(string); ok {
+			repoURL = url
+		}
+	}
+	if repoAnalysisEmpty && repoURL != "" {
+		// Check if we already have analysis config completed
 		if completed, ok := state.Context["repository_analysis_completed"].(bool); ok && completed {
-			return pm.startAnalysis(ctx, state, state.RepoURL)
+			// Start analysis with gathered preferences
+			return pm.startAnalysis(ctx, state, repoURL)
 		}
 
+		// Check if user provided form response
 		if input != "" && !pm.isFirstAnalysisPrompt(state) {
 			if formResponse, err := ParseFormResponse(input, "repository_analysis"); err == nil {
 				form := NewRepositoryAnalysisForm()
 				if err := form.ApplyFormResponse(formResponse, state); err == nil {
+					// Form processed successfully, proceed with analysis
 					return pm.startAnalysisWithFormData(ctx, state)
 				}
 			}
 
+			// Try to extract preferences from natural language input
 			pm.extractAnalysisPreferences(state, input)
 		}
 
+		// Check for autopilot mode
 		if pm.hasAutopilotEnabled(state) {
+			// Auto-fill with smart defaults
 			smartDefaults := &FormResponse{
 				FormID: "repository_analysis",
 				Values: map[string]interface{}{
@@ -168,9 +204,10 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 				pm.logger.Warn().Err(err).Msg("Failed to apply smart defaults for repository analysis")
 			}
 
-			return pm.startAnalysis(ctx, state, state.RepoURL)
+			return pm.startAnalysis(ctx, state, repoURL)
 		}
 
+		// Manual mode: present form to user
 		if !pm.hasAnalysisFormPresented(state) {
 			state.Context["analysis_form_presented"] = true
 			form := NewRepositoryAnalysisForm()
@@ -186,10 +223,18 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 		}
 	}
 
-	if len(state.RepoAnalysis) > 0 {
+	// If analysis is complete, ask about moving to Dockerfile
+	repoAnalysisExists := false
+	if state.SessionState.Metadata != nil {
+		if repoAnalysis, ok := state.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			repoAnalysisExists = len(repoAnalysis) > 0
+		}
+	}
+	if repoAnalysisExists {
 		state.SetStage(types.StageDockerfile)
 
 		if pm.hasAutopilotEnabled(state) {
+			// Auto-advance to Dockerfile stage
 			response := &ConversationResponse{
 				Message: fmt.Sprintf("%sRepository analysis complete. Proceeding to Dockerfile generation...", progressPrefix),
 				Stage:   types.StageAnalysis,
@@ -223,42 +268,61 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 		}
 	}
 
+	// Start or retry analysis
 	return pm.startAnalysis(ctx, state, state.RepoURL)
 }
 
+// handleDockerfileStage handles Dockerfile generation
 func (pm *PromptManager) handleDockerfileStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+	// Add progress indicator and stage intro
 	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageDockerfile), getStageIntro(types.StageDockerfile))
 
-	if state.PendingDecision == nil && state.Dockerfile.Content == "" {
+	// Check if we need to gather preferences using structured form
+	dockerfileContent := ""
+	if state.SessionState.Metadata != nil {
+		if content, ok := state.SessionState.Metadata["dockerfile_content"].(string); ok {
+			dockerfileContent = content
+		}
+	}
+	if state.PendingDecision == nil && dockerfileContent == "" {
 
+		// Check if we already have Dockerfile config completed
 		if completed, ok := state.Context["dockerfile_config_completed"].(bool); ok && completed {
+			// Generate Dockerfile with gathered preferences
 			return pm.generateDockerfile(ctx, state)
 		}
 
+		// Check if user provided form response
 		if input != "" && !pm.isFirstDockerfilePrompt(state) {
 			if formResponse, err := ParseFormResponse(input, "dockerfile_config"); err == nil {
 				form := NewDockerfileConfigForm()
 				if err := form.ApplyFormResponse(formResponse, state); err == nil {
+					// Form processed successfully, proceed with generation
 					return pm.generateDockerfileWithFormData(ctx, state)
 				}
 			}
 
+			// Try to extract preferences from natural language input
 			pm.extractDockerfilePreferences(state, input)
 
+			// If we got some preferences, proceed
 			if pm.hasDockerfilePreferences(state) {
 				return pm.generateDockerfile(ctx, state)
 			}
 		}
 
+		// Present structured form for Dockerfile configuration
 		form := NewDockerfileConfigForm()
 
+		// Check if user has autopilot enabled for smart defaults
 		if pm.hasAutopilotEnabled(state) {
+			// Auto-fill form with smart defaults and proceed
 			smartDefaults := &FormResponse{
 				FormID: "dockerfile_config",
 				Values: map[string]interface{}{
 					"optimization":         "size",
 					"include_health_check": true,
-					"platform":             "",
+					"platform":             "", // auto-detect
 				},
 				Skipped: false,
 			}
@@ -282,6 +346,7 @@ func (pm *PromptManager) handleDockerfileStage(ctx context.Context, state *Conve
 			})
 		}
 
+		// Manual mode: present form to user
 		state.Context["dockerfile_form_presented"] = true
 
 		response := &ConversationResponse{
@@ -294,10 +359,13 @@ func (pm *PromptManager) handleDockerfileStage(ctx context.Context, state *Conve
 		return response
 	}
 
+	// Generate Dockerfile
 	return pm.generateDockerfile(ctx, state)
 }
 
+// handleCompletedStage handles the completed stage
 func (pm *PromptManager) handleCompletedStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+	// Check for follow-up actions
 	lowerInput := strings.ToLower(strings.TrimSpace(input))
 
 	if strings.Contains(lowerInput, "summary") {
@@ -332,6 +400,7 @@ What else would you like to know?`,
 		}
 	}
 
+	// Default completed message
 	return &ConversationResponse{
 		Message: "Your containerization journey is complete! 🎉\n\nType 'help' for next steps or 'summary' for a deployment overview.",
 		Stage:   types.StageCompleted,

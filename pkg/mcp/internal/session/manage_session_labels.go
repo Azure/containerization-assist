@@ -120,7 +120,7 @@ func (t *AddSessionLabelTool) Execute(ctx context.Context, args interface{}) (in
 	// Type assertion to get proper args
 	addArgs, ok := args.(AddSessionLabelArgs)
 	if !ok {
-		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected AddSessionLabelArgs, got %T", args), "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected AddSessionLabelArgs, got %T", args), "validation_error")
 	}
 
 	return t.ExecuteTyped(ctx, &addArgs)
@@ -134,11 +134,11 @@ func (t *AddSessionLabelTool) ExecuteTyped(ctx context.Context, args *AddSession
 	}
 
 	if targetSessionID == "" {
-		return nil, types.NewRichError("SESSION_ID_REQUIRED", "session ID is required", types.ErrTypeValidation)
+		return nil, mcptypes.NewRichError("SESSION_ID_REQUIRED", "session ID is required", types.ErrTypeValidation)
 	}
 
 	if strings.TrimSpace(args.Label) == "" {
-		return nil, types.NewRichError("LABEL_EMPTY", "label cannot be empty", types.ErrTypeValidation)
+		return nil, mcptypes.NewRichError("LABEL_EMPTY", "label cannot be empty", types.ErrTypeValidation)
 	}
 
 	label := strings.TrimSpace(args.Label)
@@ -220,7 +220,7 @@ func (t *RemoveSessionLabelTool) Execute(ctx context.Context, args interface{}) 
 	// Type assertion to get proper args
 	removeArgs, ok := args.(RemoveSessionLabelArgs)
 	if !ok {
-		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected RemoveSessionLabelArgs, got %T", args), "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected RemoveSessionLabelArgs, got %T", args), "validation_error")
 	}
 
 	return t.ExecuteTyped(ctx, &removeArgs)
@@ -234,11 +234,11 @@ func (t *RemoveSessionLabelTool) ExecuteTyped(ctx context.Context, args *RemoveS
 	}
 
 	if targetSessionID == "" {
-		return nil, types.NewRichError("SESSION_ID_REQUIRED", "session ID is required", types.ErrTypeValidation)
+		return nil, mcptypes.NewRichError("SESSION_ID_REQUIRED", "session ID is required", types.ErrTypeValidation)
 	}
 
 	if strings.TrimSpace(args.Label) == "" {
-		return nil, types.NewRichError("LABEL_EMPTY", "label cannot be empty", types.ErrTypeValidation)
+		return nil, mcptypes.NewRichError("LABEL_EMPTY", "label cannot be empty", types.ErrTypeValidation)
 	}
 
 	label := strings.TrimSpace(args.Label)
@@ -320,7 +320,7 @@ func (t *UpdateSessionLabelsTool) Execute(ctx context.Context, args interface{})
 	// Type assertion to get proper args
 	updateArgs, ok := args.(UpdateSessionLabelsArgs)
 	if !ok {
-		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected UpdateSessionLabelsArgs, got %T", args), "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected UpdateSessionLabelsArgs, got %T", args), "validation_error")
 	}
 
 	return t.ExecuteTyped(ctx, updateArgs)
@@ -334,7 +334,7 @@ func (t *UpdateSessionLabelsTool) ExecuteTyped(ctx context.Context, args UpdateS
 	}
 
 	if targetSessionID == "" {
-		return nil, types.NewRichError("SESSION_ID_REQUIRED", "session ID is required", types.ErrTypeValidation)
+		return nil, mcptypes.NewRichError("SESSION_ID_REQUIRED", "session ID is required", types.ErrTypeValidation)
 	}
 
 	// Clean up labels (trim whitespace and remove empty strings)
@@ -424,7 +424,7 @@ func (t *ListSessionLabelsTool) Execute(ctx context.Context, args interface{}) (
 	// Type assertion to get proper args
 	listArgs, ok := args.(ListSessionLabelsArgs)
 	if !ok {
-		return nil, types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected ListSessionLabelsArgs, got %T", args), "validation_error")
+		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected ListSessionLabelsArgs, got %T", args), "validation_error")
 	}
 
 	return t.ExecuteTyped(ctx, &listArgs)
@@ -533,21 +533,21 @@ func (t *AddSessionLabelTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AddSessionLabelTool) Validate(ctx context.Context, args interface{}) error {
 	addArgs, ok := args.(AddSessionLabelArgs)
 	if !ok {
-		return types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected AddSessionLabelArgs, got %T", args), "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected AddSessionLabelArgs, got %T", args), "validation_error")
 	}
 
 	// Validate label
 	if strings.TrimSpace(addArgs.Label) == "" {
-		return types.NewRichError("LABEL_REQUIRED", "label is required and cannot be empty", "validation_error")
+		return mcptypes.NewRichError("LABEL_REQUIRED", "label is required and cannot be empty", "validation_error")
 	}
 
 	if len(addArgs.Label) > 100 {
-		return types.NewRichError("LABEL_TOO_LONG", "label is too long (max 100 characters)", "validation_error")
+		return mcptypes.NewRichError("LABEL_TOO_LONG", "label is too long (max 100 characters)", "validation_error")
 	}
 
 	// Validate session manager is available
 	if t.sessionManager == nil {
-		return types.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
+		return mcptypes.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
 	}
 
 	return nil
@@ -601,17 +601,17 @@ func (t *RemoveSessionLabelTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *RemoveSessionLabelTool) Validate(ctx context.Context, args interface{}) error {
 	removeArgs, ok := args.(RemoveSessionLabelArgs)
 	if !ok {
-		return types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected RemoveSessionLabelArgs, got %T", args), "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected RemoveSessionLabelArgs, got %T", args), "validation_error")
 	}
 
 	// Validate label
 	if strings.TrimSpace(removeArgs.Label) == "" {
-		return types.NewRichError("LABEL_REQUIRED", "label is required and cannot be empty", "validation_error")
+		return mcptypes.NewRichError("LABEL_REQUIRED", "label is required and cannot be empty", "validation_error")
 	}
 
 	// Validate session manager is available
 	if t.sessionManager == nil {
-		return types.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
+		return mcptypes.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
 	}
 
 	return nil
@@ -667,26 +667,26 @@ func (t *UpdateSessionLabelsTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *UpdateSessionLabelsTool) Validate(ctx context.Context, args interface{}) error {
 	updateArgs, ok := args.(UpdateSessionLabelsArgs)
 	if !ok {
-		return types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected UpdateSessionLabelsArgs, got %T", args), "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected UpdateSessionLabelsArgs, got %T", args), "validation_error")
 	}
 
 	// Validate labels array
 	if len(updateArgs.Labels) > 50 {
-		return types.NewRichError("TOO_MANY_LABELS", "too many labels (max 50)", "validation_error")
+		return mcptypes.NewRichError("TOO_MANY_LABELS", "too many labels (max 50)", "validation_error")
 	}
 
 	for _, label := range updateArgs.Labels {
 		if strings.TrimSpace(label) == "" {
-			return types.NewRichError("EMPTY_LABEL_IN_LIST", "labels cannot contain empty strings", "validation_error")
+			return mcptypes.NewRichError("EMPTY_LABEL_IN_LIST", "labels cannot contain empty strings", "validation_error")
 		}
 		if len(label) > 100 {
-			return types.NewRichError("LABEL_TOO_LONG", fmt.Sprintf("label '%s' is too long (max 100 characters)", label), "validation_error")
+			return mcptypes.NewRichError("LABEL_TOO_LONG", fmt.Sprintf("label '%s' is too long (max 100 characters)", label), "validation_error")
 		}
 	}
 
 	// Validate session manager is available
 	if t.sessionManager == nil {
-		return types.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
+		return mcptypes.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
 	}
 
 	return nil
@@ -747,12 +747,12 @@ func (t *ListSessionLabelsTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *ListSessionLabelsTool) Validate(ctx context.Context, args interface{}) error {
 	_, ok := args.(ListSessionLabelsArgs)
 	if !ok {
-		return types.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected ListSessionLabelsArgs, got %T", args), "validation_error")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", fmt.Sprintf("invalid arguments type: expected ListSessionLabelsArgs, got %T", args), "validation_error")
 	}
 
 	// Validate session manager is available
 	if t.sessionManager == nil {
-		return types.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
+		return mcptypes.NewRichError("SESSION_MANAGER_NOT_CONFIGURED", "session manager is not configured", "configuration_error")
 	}
 
 	return nil

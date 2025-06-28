@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
@@ -173,9 +172,9 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 			RiskLevel:           "unknown",
 		}
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		return result, types.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
+		return result, mcptypes.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
 	}
-	session := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionInterface.(*mcptypes.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -201,7 +200,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 	if _, err := os.Stat(scanPath); os.IsNotExist(err) {
 		t.logger.Error().Str("scan_path", scanPath).Msg("Scan path does not exist")
 		result.Duration = time.Since(startTime)
-		return result, types.NewRichError("SCAN_PATH_NOT_FOUND", fmt.Sprintf("scan path does not exist: %s", scanPath), types.ErrTypeSystem)
+		return result, mcptypes.NewRichError("SCAN_PATH_NOT_FOUND", fmt.Sprintf("scan path does not exist: %s", scanPath), types.ErrTypeSystem)
 	}
 
 	t.logger.Info().Msg("Initialization complete")
@@ -226,7 +225,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 	if err != nil {
 		t.logger.Error().Err(err).Str("scan_path", scanPath).Msg("Failed to scan directory")
 		result.Duration = time.Since(startTime)
-		return result, types.NewRichError("SCAN_DIRECTORY_FAILED", fmt.Sprintf("failed to scan directory: %v", err), types.ErrTypeSystem)
+		return result, mcptypes.NewRichError("SCAN_DIRECTORY_FAILED", fmt.Sprintf("failed to scan directory: %v", err), types.ErrTypeSystem)
 	}
 
 	result.FilesScanned = filesScanned
@@ -291,9 +290,9 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 			RiskLevel:           "unknown",
 		}
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		return result, types.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
+		return result, mcptypes.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
 	}
-	session := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionInterface.(*mcptypes.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -317,7 +316,7 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 	if _, err := os.Stat(scanPath); os.IsNotExist(err) {
 		t.logger.Error().Str("scan_path", scanPath).Msg("Scan path does not exist")
 		result.Duration = time.Since(startTime)
-		return result, types.NewRichError("SCAN_PATH_NOT_FOUND", fmt.Sprintf("scan path does not exist: %s", scanPath), types.ErrTypeSystem)
+		return result, mcptypes.NewRichError("SCAN_PATH_NOT_FOUND", fmt.Sprintf("scan path does not exist: %s", scanPath), types.ErrTypeSystem)
 	}
 
 	filePatterns := args.FilePatterns
@@ -334,7 +333,7 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 	if err != nil {
 		t.logger.Error().Err(err).Str("scan_path", scanPath).Msg("Failed to scan directory")
 		result.Duration = time.Since(startTime)
-		return result, types.NewRichError("SCAN_DIRECTORY_FAILED", fmt.Sprintf("failed to scan directory: %v", err), types.ErrTypeSystem)
+		return result, mcptypes.NewRichError("SCAN_DIRECTORY_FAILED", fmt.Sprintf("failed to scan directory: %v", err), types.ErrTypeSystem)
 	}
 
 	result.FilesScanned = filesScanned
@@ -1118,21 +1117,21 @@ func (t *AtomicScanSecretsTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicScanSecretsTool) Validate(ctx context.Context, args interface{}) error {
 	scanArgs, ok := args.(AtomicScanSecretsArgs)
 	if !ok {
-		return types.NewValidationErrorBuilder("Invalid argument type for atomic_scan_secrets", "args", args).
+		return mcptypes.NewErrorBuilder("INVALID_ARGUMENTS_TYPE", "Invalid argument type for atomic_scan_secrets", "validation_error").
 			WithField("expected", "AtomicScanSecretsArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
 
 	if scanArgs.SessionID == "" {
-		return types.NewValidationErrorBuilder("SessionID is required", "session_id", scanArgs.SessionID).
+		return mcptypes.NewErrorBuilder("SessionID is required", "session_id", scanArgs.SessionID).
 			WithField("field", "session_id").
 			Build()
 	}
 
 	for _, pattern := range scanArgs.FilePatterns {
 		if _, err := filepath.Match(pattern, "test"); err != nil {
-			return types.NewValidationErrorBuilder("Invalid file pattern", "file_pattern", pattern).
+			return mcptypes.NewErrorBuilder("Invalid file pattern", "file_pattern", pattern).
 				WithField("error", err.Error()).
 				Build()
 		}
@@ -1144,7 +1143,7 @@ func (t *AtomicScanSecretsTool) Validate(ctx context.Context, args interface{}) 
 func (t *AtomicScanSecretsTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	scanArgs, ok := args.(AtomicScanSecretsArgs)
 	if !ok {
-		return nil, types.NewValidationErrorBuilder("Invalid argument type for atomic_scan_secrets", "args", args).
+		return nil, mcptypes.NewErrorBuilder("INVALID_ARGUMENTS_TYPE", "Invalid argument type for atomic_scan_secrets", "validation_error").
 			WithField("expected", "AtomicScanSecretsArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()

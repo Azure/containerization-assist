@@ -32,18 +32,14 @@ func (v *SecurityValidator) Validate(content string, options ValidationOptions) 
 		v.logger.Debug().Msg("Security validation disabled")
 		return &ValidationResult{Valid: true}, nil
 	}
-
 	v.logger.Info().Msg("Starting Dockerfile security validation")
-
 	result := &ValidationResult{
 		Valid:    true,
 		Errors:   make([]ValidationError, 0),
 		Warnings: make([]ValidationWarning, 0),
 		Info:     make([]string, 0),
 	}
-
 	lines := strings.Split(content, "\n")
-
 	// Perform various security checks
 	v.checkForRootUser(lines, result)
 	v.checkForSecrets(lines, result)
@@ -52,12 +48,10 @@ func (v *SecurityValidator) Validate(content string, options ValidationOptions) 
 	v.checkForSUIDBindaries(lines, result)
 	v.checkBaseImageSecurity(lines, result)
 	v.checkForInsecureDownloads(lines, result)
-
 	// Update validation state
 	if len(result.Errors) > 0 {
 		result.Valid = false
 	}
-
 	return result, nil
 }
 
@@ -65,11 +59,9 @@ func (v *SecurityValidator) Validate(content string, options ValidationOptions) 
 func (v *SecurityValidator) checkForRootUser(lines []string, result *ValidationResult) {
 	hasUser := false
 	lastUserIsRoot := false
-
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
-
 		if strings.HasPrefix(upper, "USER") {
 			hasUser = true
 			parts := strings.Fields(trimmed)
@@ -89,7 +81,6 @@ func (v *SecurityValidator) checkForRootUser(lines []string, result *ValidationR
 			}
 		}
 	}
-
 	if !hasUser || lastUserIsRoot {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    0,
@@ -104,12 +95,10 @@ func (v *SecurityValidator) checkForRootUser(lines []string, result *ValidationR
 func (v *SecurityValidator) checkForSecrets(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Skip comments
 		if strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-
 		// Check for secret patterns
 		for _, pattern := range v.secretPatterns {
 			if pattern.MatchString(line) {
@@ -122,7 +111,6 @@ func (v *SecurityValidator) checkForSecrets(lines []string, result *ValidationRe
 				break
 			}
 		}
-
 		// Check for common secret keywords
 		upper := strings.ToUpper(line)
 		if strings.Contains(upper, "PASSWORD=") ||
@@ -151,11 +139,9 @@ func (v *SecurityValidator) checkForSensitivePorts(lines []string, result *Valid
 		6379:  "Redis",
 		27017: "MongoDB",
 	}
-
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
-
 		if strings.HasPrefix(upper, "EXPOSE") {
 			ports := extractPorts(trimmed)
 			for _, port := range ports {
@@ -176,7 +162,6 @@ func (v *SecurityValidator) checkForSensitivePorts(lines []string, result *Valid
 func (v *SecurityValidator) checkPackagePinning(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Check apt-get install without version pinning
 		if strings.Contains(trimmed, "apt-get install") &&
 			!strings.Contains(trimmed, "apt-get update") {
@@ -186,7 +171,6 @@ func (v *SecurityValidator) checkPackagePinning(lines []string, result *Validati
 				// Simple check for version pinning
 				hasVersionPin = true
 			}
-
 			if !hasVersionPin && !strings.Contains(trimmed, "-y") {
 				result.Errors = append(result.Errors, ValidationError{
 					Line:    i + 1,
@@ -196,7 +180,6 @@ func (v *SecurityValidator) checkPackagePinning(lines []string, result *Validati
 				})
 			}
 		}
-
 		// Check pip install without version pinning
 		if strings.Contains(trimmed, "pip install") &&
 			!strings.Contains(trimmed, "requirements") {
@@ -216,7 +199,6 @@ func (v *SecurityValidator) checkPackagePinning(lines []string, result *Validati
 func (v *SecurityValidator) checkForSUIDBindaries(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Check for chmod with SUID/SGID bits
 		if strings.Contains(trimmed, "chmod") {
 			if strings.Contains(trimmed, "+s") ||
@@ -239,12 +221,10 @@ func (v *SecurityValidator) checkBaseImageSecurity(lines []string, result *Valid
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
-
 		if strings.HasPrefix(upper, "FROM") {
 			parts := strings.Fields(trimmed)
 			if len(parts) >= 2 {
 				image := parts[1]
-
 				// Check for latest tag
 				if strings.Contains(image, ":latest") || !strings.Contains(image, ":") {
 					result.Errors = append(result.Errors, ValidationError{
@@ -254,7 +234,6 @@ func (v *SecurityValidator) checkBaseImageSecurity(lines []string, result *Valid
 						Rule:    "unpinned_base_image",
 					})
 				}
-
 				// Check trusted registries
 				if len(v.trustedRegistries) > 0 && !v.isFromTrustedRegistry(image) {
 					result.Errors = append(result.Errors, ValidationError{
@@ -273,7 +252,6 @@ func (v *SecurityValidator) checkBaseImageSecurity(lines []string, result *Valid
 func (v *SecurityValidator) checkForInsecureDownloads(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Check for wget/curl with http://
 		if (strings.Contains(trimmed, "wget") || strings.Contains(trimmed, "curl")) &&
 			strings.Contains(trimmed, "http://") &&
@@ -286,7 +264,6 @@ func (v *SecurityValidator) checkForInsecureDownloads(lines []string, result *Va
 				Rule:    "insecure_download",
 			})
 		}
-
 		// Check for ADD with remote URL
 		upper := strings.ToUpper(trimmed)
 		if strings.HasPrefix(upper, "ADD") && strings.Contains(trimmed, "http") {
@@ -301,7 +278,6 @@ func (v *SecurityValidator) checkForInsecureDownloads(lines []string, result *Va
 }
 
 // Helper functions
-
 func (v *SecurityValidator) containsSecret(line string) bool {
 	for _, pattern := range v.secretPatterns {
 		if pattern.MatchString(line) {
@@ -310,38 +286,30 @@ func (v *SecurityValidator) containsSecret(line string) bool {
 	}
 	return false
 }
-
 func (v *SecurityValidator) isFromTrustedRegistry(image string) bool {
 	for _, trusted := range v.trustedRegistries {
 		if strings.HasPrefix(image, trusted) {
 			return true
 		}
 	}
-
 	// Check if it's an official image (no registry prefix)
 	if !strings.Contains(image, "/") || strings.Count(image, "/") == 1 {
 		return true
 	}
-
 	return false
 }
-
 func extractPorts(exposeLine string) []int {
 	ports := make([]int, 0)
 	parts := strings.Fields(exposeLine)
-
 	for i := 1; i < len(parts); i++ {
 		portStr := strings.TrimSuffix(parts[i], "/tcp")
 		portStr = strings.TrimSuffix(portStr, "/udp")
-
 		if port, err := strconv.Atoi(portStr); err == nil {
 			ports = append(ports, port)
 		}
 	}
-
 	return ports
 }
-
 func compileSecretPatterns() []*regexp.Regexp {
 	patterns := []string{
 		`(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]\S+['"]`,
@@ -351,13 +319,11 @@ func compileSecretPatterns() []*regexp.Regexp {
 		`[a-zA-Z0-9]{32,}`, // Long random strings
 		`-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----`,
 	}
-
 	compiled := make([]*regexp.Regexp, 0, len(patterns))
 	for _, pattern := range patterns {
 		if re, err := regexp.Compile(pattern); err == nil {
 			compiled = append(compiled, re)
 		}
 	}
-
 	return compiled
 }

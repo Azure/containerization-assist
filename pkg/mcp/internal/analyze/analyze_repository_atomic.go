@@ -217,65 +217,80 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 
 	}
 
-	if session.ScanSummary != nil && session.ScanSummary.RepoPath == result.CloneDir {
-		if time.Since(session.ScanSummary.CachedAt) < time.Hour {
-			t.logger.Info().
-				Str("session_id", session.SessionID).
-				Str("repo_path", result.CloneDir).
-				Time("cached_at", session.ScanSummary.CachedAt).
-				Msg("Using cached repository analysis results")
+	// Stage 3: Analyze repository
+	// Check for cached analysis results in session metadata
+	if session.Metadata != nil {
+		if scanSummaryData, exists := session.Metadata["scan_summary"]; exists {
+			scanSummary := scanSummaryData.(map[string]interface{})
+			if repoPath, ok := scanSummary["repo_path"].(string); ok && repoPath == result.CloneDir {
+				// Check if cache is still valid (less than 1 hour old)
+				if cachedAtStr, ok := scanSummary["cached_at"].(string); ok {
+					if cachedAt, err := time.Parse(time.RFC3339, cachedAtStr); err == nil && time.Since(cachedAt) < time.Hour {
+						t.logger.Info().
+							Str("session_id", session.SessionID).
+							Str("repo_path", result.CloneDir).
+							Time("cached_at", cachedAt).
+							Msg("Using cached repository analysis results")
 
-			result.Analysis = &analysis.AnalysisResult{
-				Language:     session.ScanSummary.Language,
-				Framework:    session.ScanSummary.Framework,
-				Port:         session.ScanSummary.Port,
-				Dependencies: make([]analysis.Dependency, len(session.ScanSummary.Dependencies)),
+						// Build analysis result from cache
+						result.Analysis = &analysis.AnalysisResult{
+							Language:     scanSummary["language"].(string),
+							Framework:    scanSummary["framework"].(string),
+							Port:         int(scanSummary["port"].(float64)),
+							Dependencies: []analysis.Dependency{},
+						}
+
+						// Convert dependencies back
+						if deps, ok := scanSummary["dependencies"].([]interface{}); ok {
+							for _, dep := range deps {
+								result.Analysis.Dependencies = append(result.Analysis.Dependencies, analysis.Dependency{Name: dep.(string)})
+							}
+						}
+
+						// Populate analysis context from cache
+						result.AnalysisContext = &AnalysisContext{
+							FilesAnalyzed:               getIntFromSummary(scanSummary, "files_analyzed"),
+							ConfigFilesFound:            getStringSliceFromSummary(scanSummary, "config_files_found"),
+							EntryPointsFound:            getStringSliceFromSummary(scanSummary, "entry_points_found"),
+							TestFilesFound:              getStringSliceFromSummary(scanSummary, "test_files_found"),
+							BuildFilesFound:             getIntFromSummary(scanSummary, "build_files_found"),
+							PackageManagers:             getStringSliceFromSummary(scanSummary, "package_managers"),
+							DatabaseFiles:               getStringSliceFromSummary(scanSummary, "database_files"),
+							DockerFiles:                 getStringSliceFromSummary(scanSummary, "docker_files"),
+							K8sFiles:                    getStringSliceFromSummary(scanSummary, "k8s_files"),
+							HasGitIgnore:                getBoolFromSummary(scanSummary, "has_git_ignore"),
+							HasReadme:                   getBoolFromSummary(scanSummary, "has_readme"),
+							HasLicense:                  getBoolFromSummary(scanSummary, "has_license"),
+							HasCI:                       getBoolFromSummary(scanSummary, "has_ci"),
+							RepositorySize:              getInt64FromSummary(scanSummary, "repository_size"),
+							ContainerizationSuggestions: getStringSliceFromSummary(scanSummary, "containerization_suggestions"),
+							NextStepSuggestions:         getStringSliceFromSummary(scanSummary, "next_step_suggestions"),
+						}
+
+						result.AnalysisDuration = time.Duration(getFloat64FromSummary(scanSummary, "analysis_duration") * float64(time.Second))
+						result.TotalDuration = time.Since(startTime)
+						result.Success = true
+						result.IsSuccessful = true
+						result.Duration = result.TotalDuration
+
+						t.logger.Info().
+							Str("session_id", session.SessionID).
+							Str("language", result.Analysis.Language).
+							Str("framework", result.Analysis.Framework).
+							Dur("cached_analysis_duration", result.AnalysisDuration).
+							Dur("total_duration", result.TotalDuration).
+							Msg("Repository analysis completed using cached results")
+
+						return result, nil
+					} else {
+						t.logger.Info().
+							Str("session_id", session.SessionID).
+							Time("cached_at", cachedAt).
+							Dur("cache_age", time.Since(cachedAt)).
+							Msg("Cached analysis results are stale, performing fresh analysis")
+					}
+				}
 			}
-
-			for i, dep := range session.ScanSummary.Dependencies {
-				result.Analysis.Dependencies[i] = analysis.Dependency{Name: dep}
-			}
-
-			result.AnalysisContext = &AnalysisContext{
-				FilesAnalyzed:               session.ScanSummary.FilesAnalyzed,
-				ConfigFilesFound:            session.ScanSummary.ConfigFilesFound,
-				EntryPointsFound:            session.ScanSummary.EntryPointsFound,
-				TestFilesFound:              session.ScanSummary.TestFilesFound,
-				BuildFilesFound:             session.ScanSummary.BuildFilesFound,
-				PackageManagers:             session.ScanSummary.PackageManagers,
-				DatabaseFiles:               session.ScanSummary.DatabaseFiles,
-				DockerFiles:                 session.ScanSummary.DockerFiles,
-				K8sFiles:                    session.ScanSummary.K8sFiles,
-				HasGitIgnore:                session.ScanSummary.HasGitIgnore,
-				HasReadme:                   session.ScanSummary.HasReadme,
-				HasLicense:                  session.ScanSummary.HasLicense,
-				HasCI:                       session.ScanSummary.HasCI,
-				RepositorySize:              session.ScanSummary.RepositorySize,
-				ContainerizationSuggestions: session.ScanSummary.ContainerizationSuggestions,
-				NextStepSuggestions:         session.ScanSummary.NextStepSuggestions,
-			}
-
-			result.AnalysisDuration = time.Duration(session.ScanSummary.AnalysisDuration * float64(time.Second))
-			result.TotalDuration = time.Since(startTime)
-			result.Success = true
-			result.IsSuccessful = true
-			result.Duration = result.TotalDuration
-
-			t.logger.Info().
-				Str("session_id", session.SessionID).
-				Str("language", result.Analysis.Language).
-				Str("framework", result.Analysis.Framework).
-				Dur("cached_analysis_duration", result.AnalysisDuration).
-				Dur("total_duration", result.TotalDuration).
-				Msg("Repository analysis completed using cached results")
-
-			return result, nil
-		} else {
-			t.logger.Info().
-				Str("session_id", session.SessionID).
-				Time("cached_at", session.ScanSummary.CachedAt).
-				Dur("cache_age", time.Since(session.ScanSummary.CachedAt)).
-				Msg("Cached analysis results are stale, performing fresh analysis")
 		}
 	}
 
@@ -346,11 +361,13 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 	return result, nil
 }
 
-func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*sessiontypes.SessionState, error) {
+// getOrCreateSession gets existing session or creates a new one
+func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*mcptypes.SessionState, error) {
 	if sessionID != "" {
 		sessionInterface, err := t.sessionManager.GetSession(sessionID)
 		if err == nil {
-			session := sessionInterface.(*sessiontypes.SessionState)
+			session := sessionInterface.(*mcptypes.SessionState)
+			// Check if session is expired
 			if time.Now().After(session.ExpiresAt) {
 				t.logger.Info().
 					Str("session_id", sessionID).
@@ -359,22 +376,24 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 				oldSessionInfo := map[string]interface{}{
 					"old_session_id": sessionID,
 					"expired_at":     session.ExpiresAt,
-					"had_analysis":   session.ScanSummary != nil && session.ScanSummary.FilesAnalyzed > 0,
+					"had_analysis":   false, // TODO: Check metadata for previous analysis
 				}
-				if session.ScanSummary != nil && session.ScanSummary.RepoURL != "" {
-					oldSessionInfo["last_repo_url"] = session.ScanSummary.RepoURL
+				if session.Metadata != nil {
+					if repoURL, ok := session.Metadata["repo_url"].(string); ok && repoURL != "" {
+						oldSessionInfo["last_repo_url"] = repoURL
+					}
 				}
 				newSessionInterface, err := t.sessionManager.GetOrCreateSession("")
 				if err != nil {
 					return nil, mcperror.NewSessionNotFound("replacement_session")
 				}
-				newSession := newSessionInterface.(*sessiontypes.SessionState)
+				newSession := newSessionInterface.(*mcptypes.SessionState)
 				if newSession.Metadata == nil {
 					newSession.Metadata = make(map[string]interface{})
 				}
 				newSession.Metadata["resumed_from"] = oldSessionInfo
 				if err := t.sessionManager.UpdateSession(newSession.SessionID, func(s interface{}) {
-					if sess, ok := s.(*sessiontypes.SessionState); ok {
+					if sess, ok := s.(*mcptypes.SessionState); ok {
 						*sess = *newSession
 					}
 				}); err != nil {
@@ -396,7 +415,7 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 	if err != nil {
 		return nil, mcperror.NewSessionNotFound("new_session")
 	}
-	session := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionInterface.(*mcptypes.SessionState)
 
 	t.logger.Info().Str("session_id", session.SessionID).Msg("Created new session for repository analysis")
 	return session, nil
@@ -407,7 +426,7 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 	if err != nil {
 		return nil, err
 	}
-	session := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionInterface.(*mcptypes.SessionState)
 
 	cloneOpts := CloneOptions{
 		RepoURL:   args.RepoURL,
@@ -428,19 +447,28 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 		return nil, err
 	}
 
-	session.RepoPath = result.RepoPath
-	session.RepoURL = args.RepoURL
+	// Update session with clone info
+	if session.Metadata == nil {
+		session.Metadata = make(map[string]interface{})
+	}
+	session.Metadata["repo_path"] = result.RepoPath
+	session.Metadata["repo_url"] = args.RepoURL
 	t.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if sess, ok := s.(*sessiontypes.SessionState); ok {
-			sess.RepoPath = result.RepoPath
-			sess.RepoURL = args.RepoURL
+		if sess, ok := s.(*mcptypes.SessionState); ok {
+			if sess.Metadata == nil {
+				sess.Metadata = make(map[string]interface{})
+			}
+			sess.Metadata["repo_path"] = result.RepoPath
+			sess.Metadata["repo_url"] = args.RepoURL
 		}
 	})
 
 	return result, nil
 }
 
-func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.SessionState, result *AtomicAnalysisResult) error {
+// updateSessionState updates the session with analysis results
+func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *mcptypes.SessionState, result *AtomicAnalysisResult) error {
+	// Update session with repository analysis results
 	analysis := result.Analysis
 	dependencyNames := make([]string, len(analysis.Dependencies))
 	for i, dep := range analysis.Dependencies {
@@ -458,40 +486,54 @@ func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.S
 		DryRun:     false,
 		TokensUsed: 0, // Could be tracked if needed
 	}
-	session.AddToolExecution(execution)
+	// Store tool execution in metadata
+	if session.Metadata == nil {
+		session.Metadata = make(map[string]interface{})
+	}
+	session.Metadata["last_tool_execution"] = execution
 
-	session.UpdateLastAccessed()
+	session.UpdatedAt = time.Now()
 
-	session.ScanSummary = &types.RepositoryScanSummary{
-		Language:     analysis.Language,
-		Framework:    analysis.Framework,
-		Port:         analysis.Port,
-		Dependencies: dependencyNames,
+	// Store structured scan summary for caching in metadata
+	if session.Metadata == nil {
+		session.Metadata = make(map[string]interface{})
+	}
+	session.Metadata["scan_summary"] = map[string]interface{}{
+		// Core analysis results
+		"language":     analysis.Language,
+		"framework":    analysis.Framework,
+		"port":         analysis.Port,
+		"dependencies": dependencyNames,
 
-		FilesAnalyzed:    result.AnalysisContext.FilesAnalyzed,
-		ConfigFilesFound: result.AnalysisContext.ConfigFilesFound,
-		EntryPointsFound: result.AnalysisContext.EntryPointsFound,
-		TestFilesFound:   result.AnalysisContext.TestFilesFound,
-		BuildFilesFound:  result.AnalysisContext.BuildFilesFound,
+		// File structure insights
+		"files_analyzed":     result.AnalysisContext.FilesAnalyzed,
+		"config_files_found": result.AnalysisContext.ConfigFilesFound,
+		"entry_points_found": result.AnalysisContext.EntryPointsFound,
+		"test_files_found":   result.AnalysisContext.TestFilesFound,
+		"build_files_found":  result.AnalysisContext.BuildFilesFound,
 
-		PackageManagers: result.AnalysisContext.PackageManagers,
-		DatabaseFiles:   result.AnalysisContext.DatabaseFiles,
-		DockerFiles:     result.AnalysisContext.DockerFiles,
-		K8sFiles:        result.AnalysisContext.K8sFiles,
+		// Ecosystem insights
+		"package_managers": result.AnalysisContext.PackageManagers,
+		"database_files":   result.AnalysisContext.DatabaseFiles,
+		"docker_files":     result.AnalysisContext.DockerFiles,
+		"k8s_files":        result.AnalysisContext.K8sFiles,
 
-		HasGitIgnore:   result.AnalysisContext.HasGitIgnore,
-		HasReadme:      result.AnalysisContext.HasReadme,
-		HasLicense:     result.AnalysisContext.HasLicense,
-		HasCI:          result.AnalysisContext.HasCI,
-		RepositorySize: result.AnalysisContext.RepositorySize,
+		// Repository metadata
+		"has_git_ignore":  result.AnalysisContext.HasGitIgnore,
+		"has_readme":      result.AnalysisContext.HasReadme,
+		"has_license":     result.AnalysisContext.HasLicense,
+		"has_ci":          result.AnalysisContext.HasCI,
+		"repository_size": result.AnalysisContext.RepositorySize,
 
-		CachedAt:         time.Now(),
-		AnalysisDuration: result.AnalysisDuration.Seconds(),
-		RepoPath:         result.CloneDir,
-		RepoURL:          result.RepoURL,
+		// Cache metadata
+		"cached_at":         time.Now().Format(time.RFC3339),
+		"analysis_duration": result.AnalysisDuration.Seconds(),
+		"repo_path":         result.CloneDir,
+		"repo_url":          result.RepoURL,
 
-		ContainerizationSuggestions: result.AnalysisContext.ContainerizationSuggestions,
-		NextStepSuggestions:         result.AnalysisContext.NextStepSuggestions,
+		// Suggestions for reuse
+		"containerization_suggestions": result.AnalysisContext.ContainerizationSuggestions,
+		"next_step_suggestions":        result.AnalysisContext.NextStepSuggestions,
 	}
 
 	if session.Metadata == nil {
@@ -506,7 +548,7 @@ func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.S
 	session.Metadata["analysis_duration"] = result.AnalysisDuration.Seconds()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*sessiontypes.SessionState); ok {
+		if sess, ok := s.(*mcptypes.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -694,4 +736,56 @@ func (t *AtomicAnalyzeRepositoryTool) GetCapabilities() ToolCapabilities {
 
 func (t *AtomicAnalyzeRepositoryTool) ExecuteTyped(ctx context.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
 	return t.executeWithoutProgress(ctx, args)
+}
+
+// Helper functions for extracting values from scan summary metadata
+func getIntFromSummary(summary map[string]interface{}, key string) int {
+	if val, ok := summary[key]; ok {
+		if intVal, ok := val.(float64); ok {
+			return int(intVal)
+		}
+	}
+	return 0
+}
+
+func getInt64FromSummary(summary map[string]interface{}, key string) int64 {
+	if val, ok := summary[key]; ok {
+		if intVal, ok := val.(float64); ok {
+			return int64(intVal)
+		}
+	}
+	return 0
+}
+
+func getFloat64FromSummary(summary map[string]interface{}, key string) float64 {
+	if val, ok := summary[key]; ok {
+		if floatVal, ok := val.(float64); ok {
+			return floatVal
+		}
+	}
+	return 0.0
+}
+
+func getBoolFromSummary(summary map[string]interface{}, key string) bool {
+	if val, ok := summary[key]; ok {
+		if boolVal, ok := val.(bool); ok {
+			return boolVal
+		}
+	}
+	return false
+}
+
+func getStringSliceFromSummary(summary map[string]interface{}, key string) []string {
+	if val, ok := summary[key]; ok {
+		if slice, ok := val.([]interface{}); ok {
+			result := make([]string, len(slice))
+			for i, item := range slice {
+				if str, ok := item.(string); ok {
+					result[i] = str
+				}
+			}
+			return result
+		}
+	}
+	return []string{}
 }

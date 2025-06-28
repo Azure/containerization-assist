@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -292,7 +291,7 @@ func TestToolRegistry_ExecuteTool_PreValidationError(t *testing.T) {
 		name: "validation_tool",
 		preValidateFunc: func(ctx context.Context, args TestArgs) error {
 			if args.Message == "" {
-				return types.NewRichError("VALIDATION_ERROR", "message cannot be empty", "validation_error")
+				return mcptypes.NewRichError("VALIDATION_ERROR", "message cannot be empty", "validation_error")
 			}
 			return nil
 		},
@@ -317,7 +316,7 @@ func TestToolRegistry_ExecuteTool_ExecutionError(t *testing.T) {
 	tool := &mockTool{
 		name: "error_tool",
 		executeFunc: func(ctx context.Context, args interface{}) (interface{}, error) {
-			return nil, types.NewRichError("EXECUTION_ERROR", "tool execution failed", "runtime_error")
+			return nil, mcptypes.NewRichError("EXECUTION_ERROR", "tool execution failed", "runtime_error")
 		},
 	}
 

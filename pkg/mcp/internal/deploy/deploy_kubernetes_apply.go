@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
+
 	"github.com/Azure/container-kit/pkg/mcp/internal"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // performDeployment deploys manifests to Kubernetes cluster
-func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
+func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, session *mcptypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
 	// Progress reporting removed
 
 	deploymentStart := time.Now()
@@ -70,7 +70,7 @@ func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, sess
 	}
 
 	if deployResult != nil && !deployResult.Success {
-		deploymentErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment failed: %s", deployResult.Error.Message), "deployment_error")
+		deploymentErr := mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment failed: %s", deployResult.Error.Message), "deployment_error")
 		_ = t.handleDeploymentError(ctx, deploymentErr, result.DeploymentResult, result)
 		return deploymentErr
 	}
@@ -176,11 +176,11 @@ func (t *AtomicDeployKubernetesTool) handleDeploymentError(_ context.Context, er
 		}
 	}
 
-	return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("kubernetes deployment failed: %v", err), "deployment_error")
+	return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("kubernetes deployment failed: %v", err), "deployment_error")
 }
 
 // buildSuccessResult creates a success result after fixing operations complete
-func (t *AtomicDeployKubernetesTool) buildSuccessResult(_ context.Context, args AtomicDeployKubernetesArgs, _ *sessiontypes.SessionState) (*AtomicDeployKubernetesResult, error) {
+func (t *AtomicDeployKubernetesTool) buildSuccessResult(_ context.Context, args AtomicDeployKubernetesArgs, _ *mcptypes.SessionState) (*AtomicDeployKubernetesResult, error) {
 	result := &AtomicDeployKubernetesResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_deploy_kubernetes", args.SessionID, args.DryRun),
 		BaseAIContextResult: internal.NewBaseAIContextResult("deploy", true, 0),
@@ -199,7 +199,7 @@ func (t *AtomicDeployKubernetesTool) buildSuccessResult(_ context.Context, args 
 type KubernetesDeployOperation struct {
 	tool         *AtomicDeployKubernetesTool
 	args         AtomicDeployKubernetesArgs
-	session      *sessiontypes.SessionState
+	session      *mcptypes.SessionState
 	workspaceDir string
 	namespace    string
 	manifests    []string
@@ -229,7 +229,7 @@ func (op *KubernetesDeployOperation) ExecuteOnce(_ context.Context) error {
 		if deployResult != nil && deployResult.Error != nil {
 			errorMsg = deployResult.Error.Message
 		}
-		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("kubernetes deployment failed: %s", errorMsg), "deployment_error")
+		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("kubernetes deployment failed: %s", errorMsg), "deployment_error")
 	}
 
 	op.logger.Info().
@@ -244,7 +244,7 @@ func (op *KubernetesDeployOperation) GetFailureAnalysis(_ context.Context, err e
 	op.logger.Debug().Err(err).Msg("Analyzing Kubernetes deployment failure")
 
 	// Convert error to RichError if it's not already one
-	if richError, ok := err.(*types.RichError); ok {
+	if richError, ok := err.(*mcptypes.RichError); ok {
 		return &mcptypes.RichError{
 			Code:     richError.Code,
 			Type:     richError.Type,
@@ -305,7 +305,7 @@ func (op *KubernetesDeployOperation) GetLastError() error {
 // applyManifestFix applies fixes to Kubernetes manifests
 func (op *KubernetesDeployOperation) applyManifestFix(_ context.Context, fixAttempt *mcptypes.FixAttempt) error {
 	if fixAttempt.FixedContent == "" {
-		return types.NewRichError("INVALID_ARGUMENTS", "no fixed manifest content provided", "missing_content")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", "no fixed manifest content provided", "missing_content")
 	}
 
 	op.logger.Info().
@@ -324,7 +324,7 @@ func (op *KubernetesDeployOperation) applyManifestFix(_ context.Context, fixAtte
 	// Ensure the directory exists
 	dir := filepath.Dir(manifestPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create manifest directory: %v", err), "filesystem_error")
+		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create manifest directory: %v", err), "filesystem_error")
 	}
 
 	// Create backup of existing manifest if it exists
@@ -340,7 +340,7 @@ func (op *KubernetesDeployOperation) applyManifestFix(_ context.Context, fixAtte
 
 	// Write the fixed manifest content
 	if err := os.WriteFile(manifestPath, []byte(fixAttempt.FixedContent), 0600); err != nil {
-		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to write fixed manifest: %v", err), "file_error")
+		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to write fixed manifest: %v", err), "file_error")
 	}
 
 	op.logger.Info().
@@ -360,7 +360,7 @@ func (op *KubernetesDeployOperation) applyDependencyFix(ctx context.Context, fix
 	// Apply file changes for dependency fixes (e.g., updated image references)
 	for _, change := range fixAttempt.FixStrategy.FileChanges {
 		if err := op.applyFileChange(change); err != nil {
-			return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply dependency fix to %s: %v", change.FilePath, err), "file_error")
+			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply dependency fix to %s: %v", change.FilePath, err), "file_error")
 		}
 
 		op.logger.Info().
@@ -396,7 +396,7 @@ func (op *KubernetesDeployOperation) applyResourceFix(ctx context.Context, fixAt
 	// Apply file changes for resource fixes (e.g., adjusted resource limits)
 	for _, change := range fixAttempt.FixStrategy.FileChanges {
 		if err := op.applyFileChange(change); err != nil {
-			return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply resource fix to %s: %v", change.FilePath, err), "file_error")
+			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply resource fix to %s: %v", change.FilePath, err), "file_error")
 		}
 
 		op.logger.Info().
@@ -443,12 +443,12 @@ func (op *KubernetesDeployOperation) applyFileChange(change mcptypes.FileChange)
 		// Create directory if needed
 		dir := filepath.Dir(filePath)
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create directory %s: %v", dir, err), "filesystem_error")
+			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create directory %s: %v", dir, err), "filesystem_error")
 		}
 
 		// Write the new file
 		if err := os.WriteFile(filePath, []byte(change.NewContent), 0600); err != nil {
-			return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create file %s: %v", filePath, err), "file_error")
+			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create file %s: %v", filePath, err), "file_error")
 		}
 
 	case "update", "replace":
@@ -462,7 +462,7 @@ func (op *KubernetesDeployOperation) applyFileChange(change mcptypes.FileChange)
 
 		// Write the updated content
 		if err := os.WriteFile(filePath, []byte(change.NewContent), 0600); err != nil {
-			return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to update file %s: %v", filePath, err), "file_error")
+			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to update file %s: %v", filePath, err), "file_error")
 		}
 
 	case "delete":
@@ -476,11 +476,11 @@ func (op *KubernetesDeployOperation) applyFileChange(change mcptypes.FileChange)
 
 		// Remove the file
 		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
-			return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to delete file %s: %v", filePath, err), "file_error")
+			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to delete file %s: %v", filePath, err), "file_error")
 		}
 
 	default:
-		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("unknown file operation: %s", change.Operation), "invalid_operation")
+		return mcptypes.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("unknown file operation: %s", change.Operation), "invalid_operation")
 	}
 
 	op.logger.Info().

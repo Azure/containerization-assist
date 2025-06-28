@@ -13,33 +13,39 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/registry"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
+// DockerConfig represents the structure of Docker's config.json file
 type DockerConfig struct {
-	Auths             map[string]DockerAuth `json:"auths"`
-	CredHelpers       map[string]string     `json:"credHelpers,omitempty"`
-	CredsStore        string                `json:"credsStore,omitempty"`
-	CredentialHelpers map[string]string     `json:"credentialHelpers,omitempty"`
+	Auths map[string]DockerAuth `json:"auths"`
+	// CredHelpers and other fields can be added later for extended support
+	CredHelpers       map[string]string `json:"credHelpers,omitempty"`
+	CredsStore        string            `json:"credsStore,omitempty"`
+	CredentialHelpers map[string]string `json:"credentialHelpers,omitempty"`
 }
 
+// DockerAuth represents authentication information for a registry
 type DockerAuth struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
 	Email    string `json:"email,omitempty"`
-	Auth     string `json:"auth,omitempty"`
+	Auth     string `json:"auth,omitempty"` // base64 encoded username:password
+	// ServerURL is typically the key in the auths map
 }
 
+// RegistryAuthInfo contains parsed authentication information for a registry
 type RegistryAuthInfo struct {
 	Registry string
 	Username string
 	HasAuth  bool
-	AuthType string
-	Helper   string
+	AuthType string // "basic", "helper", "store"
+	Helper   string // credential helper name if applicable
 }
 
+// RegistryAuthSummary contains authentication status for all configured registries
 type RegistryAuthSummary struct {
 	ConfigPath    string
 	Registries    []RegistryAuthInfo
@@ -47,21 +53,25 @@ type RegistryAuthSummary struct {
 	HasStore      bool
 }
 
+// PreFlightChecker validates system requirements before starting workflow
 type PreFlightChecker struct {
 	logger            zerolog.Logger
 	timeout           time.Duration
+	registryMgr       *registry.MultiRegistryManager
 	registryValidator *registry.RegistryValidator
 }
 
+// PreFlightCheck represents a single validation check
 type PreFlightCheck struct {
 	Name          string `json:"name"`
 	Description   string `json:"description"`
 	CheckFunc     func(context.Context) error
 	ErrorRecovery string `json:"error_recovery"`
 	Optional      bool   `json:"optional"`
-	Category      string `json:"category"`
+	Category      string `json:"category"` // docker, kubernetes, registry, system
 }
 
+// PreFlightResult contains the results of all pre-flight checks
 type PreFlightResult struct {
 	Passed      bool              `json:"passed"`
 	Timestamp   time.Time         `json:"timestamp"`
@@ -71,6 +81,7 @@ type PreFlightResult struct {
 	CanProceed  bool              `json:"can_proceed"`
 }
 
+// CheckResult represents the result of a single check
 type CheckResult struct {
 	Name           string        `json:"name"`
 	Category       string        `json:"category"`
@@ -81,6 +92,7 @@ type CheckResult struct {
 	RecoveryAction string        `json:"recovery_action,omitempty"`
 }
 
+// CheckStatus represents the status of a check
 type CheckStatus string
 
 const (
@@ -90,15 +102,36 @@ const (
 	CheckStatusSkipped CheckStatus = "skipped"
 )
 
+// NewPreFlightChecker creates a new pre-flight checker
 func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
+	// Create multi-registry configuration with defaults
+	config := &registry.MultiRegistryConfig{
+		Registries:   make(map[string]registry.RegistryConfig),
+		CacheTimeout: 15 * time.Minute,
+		MaxRetries:   3,
+	}
+
+	// Initialize multi-registry manager
+	registryMgr := registry.NewMultiRegistryManager(config, logger)
+
+	// Register credential providers
+	registryMgr.RegisterProvider(registry.NewDockerConfigProvider(logger))
+	registryMgr.RegisterProvider(registry.NewAzureCLIProvider(logger))
+	registryMgr.RegisterProvider(registry.NewAWSECRProvider(logger))
+
+	// Initialize registry validator
+	validator := registry.NewRegistryValidator(logger)
+
 	return &PreFlightChecker{
 		logger:            logger,
 		timeout:           10 * time.Second,
-		registryValidator: registry.NewRegistryValidator(logger),
+		registryMgr:       registryMgr,
+		registryValidator: validator,
 	}
 }
 
-func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage types.ConversationStage, state *sessiontypes.SessionState) (*PreFlightResult, error) {
+// RunStageChecks executes pre-flight checks for a specific stage
+func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage types.ConversationStage, state *mcptypes.SessionState) (*PreFlightResult, error) {
 	checks := pfc.getChecksForStage(stage, state)
 	if len(checks) == 0 {
 		return &PreFlightResult{
@@ -111,7 +144,8 @@ func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage types.Con
 	return pfc.runChecks(ctx, checks)
 }
 
-func (pfc *PreFlightChecker) getChecksForStage(stage types.ConversationStage, state *sessiontypes.SessionState) []PreFlightCheck {
+// getChecksForStage returns checks specific to a stage
+func (pfc *PreFlightChecker) getChecksForStage(stage types.ConversationStage, state *mcptypes.SessionState) []PreFlightCheck {
 	switch stage {
 	case types.StageBuild:
 		return pfc.getBuildChecks(state)
@@ -126,15 +160,16 @@ func (pfc *PreFlightChecker) getChecksForStage(stage types.ConversationStage, st
 	}
 }
 
-func (pfc *PreFlightChecker) getBuildChecks(state *sessiontypes.SessionState) []PreFlightCheck {
+// getBuildChecks returns pre-flight checks for the build stage
+func (pfc *PreFlightChecker) getBuildChecks(state *mcptypes.SessionState) []PreFlightCheck {
 	checks := []PreFlightCheck{
 		{
 			Name:        "Dockerfile exists",
 			Description: "Verify Dockerfile has been generated",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if state.Dockerfile.Content == "" {
-					return types.NewRichError("DOCKERFILE_NOT_GENERATED", "Dockerfile not generated yet", "validation_error")
+				if state.DockerfilePath == "" {
+					return mcptypes.NewRichError("DOCKERFILE_NOT_GENERATED", "Dockerfile not generated yet", "validation_error")
 				}
 				return nil
 			},
@@ -159,18 +194,20 @@ func (pfc *PreFlightChecker) getBuildChecks(state *sessiontypes.SessionState) []
 		},
 	}
 
-	if state.Dockerfile.ValidationResult != nil {
+	// Add Dockerfile validation check if Dockerfile was generated
+	if state.DockerfileGenerated && state.DockerfilePath != "" {
 		checks = append(checks, PreFlightCheck{
 			Name:        "Dockerfile validation",
-			Description: "Ensure Dockerfile has no critical errors",
+			Description: "Ensure Dockerfile exists and is accessible",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if !state.Dockerfile.ValidationResult.Valid && state.Dockerfile.ValidationResult.ErrorCount > 0 {
-					return types.NewRichError("DOCKERFILE_VALIDATION_FAILED", fmt.Sprintf("Dockerfile has %d critical validation errors", state.Dockerfile.ValidationResult.ErrorCount), "validation_error")
+				if state.DockerfilePath == "" {
+					return mcptypes.NewRichError("DOCKERFILE_VALIDATION_FAILED", "Dockerfile path is empty", "validation_error")
 				}
+				// Could add file existence check here if needed
 				return nil
 			},
-			ErrorRecovery: "Fix critical Dockerfile errors before building",
+			ErrorRecovery: "Regenerate Dockerfile before building",
 			Optional:      false,
 		})
 	}
@@ -178,15 +215,16 @@ func (pfc *PreFlightChecker) getBuildChecks(state *sessiontypes.SessionState) []
 	return checks
 }
 
-func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []PreFlightCheck {
+// getPushChecks returns pre-flight checks for the push stage
+func (pfc *PreFlightChecker) getPushChecks(state *mcptypes.SessionState) []PreFlightCheck {
 	checks := []PreFlightCheck{
 		{
 			Name:        "Image built",
 			Description: "Verify Docker image has been built",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if !state.Dockerfile.Built || state.Dockerfile.ImageID == "" {
-					return types.NewRichError("IMAGE_NOT_BUILT", "Docker image not built yet", "validation_error")
+				if !state.ImageBuilt || state.ImageRef == "" {
+					return mcptypes.NewRichError("IMAGE_NOT_BUILT", "Docker image not built yet", "validation_error")
 				}
 				return nil
 			},
@@ -198,20 +236,25 @@ func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []P
 			Description: "Check if registry is accessible",
 			Category:    "registry",
 			CheckFunc: func(ctx context.Context) error {
-				if state.ImageRef.Registry == "" {
-					return types.NewRichError("NO_REGISTRY_SPECIFIED", "no registry specified", "configuration_error")
+				// Extract registry from image reference
+				registry := extractRegistry(state.ImageRef)
+				if registry == "" {
+					return mcptypes.NewRichError("NO_REGISTRY_SPECIFIED", "no registry specified", "configuration_error")
 				}
 
+				// Try to ping the registry using docker
 				ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 				defer cancel()
 
-				testImage := fmt.Sprintf("%s/library/hello-world:latest", state.ImageRef.Registry)
+				// Use docker manifest inspect to check connectivity
+				testImage := fmt.Sprintf("%s/library/hello-world:latest", registry)
 				cmd := exec.CommandContext(ctx, "docker", "manifest", "inspect", testImage)
 				if err := cmd.Run(); err != nil {
-					testImage = fmt.Sprintf("%s/hello-world:latest", state.ImageRef.Registry)
+					// Try without library prefix
+					testImage = fmt.Sprintf("%s/hello-world:latest", registry)
 					cmd = exec.CommandContext(ctx, "docker", "manifest", "inspect", testImage)
 					if err := cmd.Run(); err != nil {
-						return types.NewRichError("REGISTRY_CONNECTION_FAILED", fmt.Sprintf("cannot connect to registry %s: %v", state.ImageRef.Registry, err), "network_error")
+						return mcptypes.NewRichError("REGISTRY_CONNECTION_FAILED", fmt.Sprintf("cannot connect to registry %s: %v", registry, err), "network_error")
 					}
 				}
 
@@ -230,17 +273,18 @@ func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []P
 		},
 	}
 
+	// Add security scan check if scan results are available
 	if state.SecurityScan != nil {
 		checks = append(checks, PreFlightCheck{
 			Name:        "Security vulnerabilities",
 			Description: "Ensure image has no critical vulnerabilities",
 			Category:    "security",
 			CheckFunc: func(ctx context.Context) error {
-				if state.SecurityScan.Summary.Critical > 0 {
-					return types.NewRichError("CRITICAL_VULNERABILITIES", fmt.Sprintf("image has %d CRITICAL vulnerabilities", state.SecurityScan.Summary.Critical), "security_error")
+				if state.SecurityScan.Vulnerabilities.Critical > 0 {
+					return mcptypes.NewRichError("CRITICAL_VULNERABILITIES", fmt.Sprintf("image has %d CRITICAL vulnerabilities", state.SecurityScan.Vulnerabilities.Critical), "security_error")
 				}
-				if state.SecurityScan.Summary.High > 3 {
-					return types.NewRichError("HIGH_VULNERABILITIES", fmt.Sprintf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.Summary.High), "security_error")
+				if state.SecurityScan.Vulnerabilities.High > 3 {
+					return mcptypes.NewRichError("HIGH_VULNERABILITIES", fmt.Sprintf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.Vulnerabilities.High), "security_error")
 				}
 				return nil
 			},
@@ -252,15 +296,16 @@ func (pfc *PreFlightChecker) getPushChecks(state *sessiontypes.SessionState) []P
 	return checks
 }
 
-func (pfc *PreFlightChecker) getManifestChecks(state *sessiontypes.SessionState) []PreFlightCheck {
+// getManifestChecks returns pre-flight checks for manifest generation
+func (pfc *PreFlightChecker) getManifestChecks(state *mcptypes.SessionState) []PreFlightCheck {
 	return []PreFlightCheck{
 		{
 			Name:        "Image reference available",
 			Description: "Verify image has been built or pushed",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if state.ImageRef.Repository == "" {
-					return types.NewRichError("NO_IMAGE_REFERENCE", "no image reference available", "validation_error")
+				if state.ImageRef == "" {
+					return mcptypes.NewRichError("NO_IMAGE_REFERENCE", "no image reference available", "validation_error")
 				}
 				return nil
 			},
@@ -270,7 +315,8 @@ func (pfc *PreFlightChecker) getManifestChecks(state *sessiontypes.SessionState)
 	}
 }
 
-func (pfc *PreFlightChecker) getDeploymentChecks(state *sessiontypes.SessionState) []PreFlightCheck {
+// getDeploymentChecks returns pre-flight checks for deployment
+func (pfc *PreFlightChecker) getDeploymentChecks(state *mcptypes.SessionState) []PreFlightCheck {
 	return []PreFlightCheck{
 		{
 			Name:          "Kubernetes connectivity",
@@ -285,8 +331,8 @@ func (pfc *PreFlightChecker) getDeploymentChecks(state *sessiontypes.SessionStat
 			Description: "Verify Kubernetes manifests exist",
 			Category:    "kubernetes",
 			CheckFunc: func(ctx context.Context) error {
-				if len(state.K8sManifests) == 0 {
-					return types.NewRichError("NO_K8S_MANIFESTS", "no Kubernetes manifests generated", "validation_error")
+				if len(state.ManifestPaths) == 0 {
+					return mcptypes.NewRichError("NO_K8S_MANIFESTS", "no Kubernetes manifests generated", "validation_error")
 				}
 				return nil
 			},
@@ -296,11 +342,13 @@ func (pfc *PreFlightChecker) getDeploymentChecks(state *sessiontypes.SessionStat
 	}
 }
 
+// RunChecks executes all pre-flight checks
 func (pfc *PreFlightChecker) RunChecks(ctx context.Context) (*PreFlightResult, error) {
 	checks := pfc.getChecks()
 	return pfc.runChecks(ctx, checks)
 }
 
+// runChecks executes a list of checks and returns results
 func (pfc *PreFlightChecker) runChecks(ctx context.Context, checks []PreFlightCheck) (*PreFlightResult, error) {
 	start := time.Now()
 	results := make([]CheckResult, 0, len(checks))
@@ -312,6 +360,7 @@ func (pfc *PreFlightChecker) runChecks(ctx context.Context, checks []PreFlightCh
 	for _, check := range checks {
 		checkStart := time.Now()
 
+		// Create context with timeout for individual check
 		checkCtx, cancel := context.WithTimeout(ctx, pfc.timeout)
 		defer cancel()
 
@@ -321,6 +370,7 @@ func (pfc *PreFlightChecker) runChecks(ctx context.Context, checks []PreFlightCh
 			Status:   CheckStatusPass,
 		}
 
+		// Run the check
 		err := check.CheckFunc(checkCtx)
 		result.Duration = time.Since(checkStart)
 
@@ -360,6 +410,7 @@ func (pfc *PreFlightChecker) runChecks(ctx context.Context, checks []PreFlightCh
 	}, nil
 }
 
+// getChecks returns all pre-flight checks
 func (pfc *PreFlightChecker) getChecks() []PreFlightCheck {
 	return []PreFlightCheck{
 		{
@@ -421,16 +472,18 @@ func (pfc *PreFlightChecker) getChecks() []PreFlightCheck {
 	}
 }
 
+// Check implementations
+
 func (pfc *PreFlightChecker) checkDockerDaemon(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "version", "--format", "{{.Server.Version}}")
 	output, err := cmd.Output()
 	if err != nil {
-		return types.NewRichError("DOCKER_DAEMON_NOT_ACCESSIBLE", fmt.Sprintf("Docker daemon not accessible: %v", err), "system_error")
+		return mcptypes.NewRichError("DOCKER_DAEMON_NOT_ACCESSIBLE", fmt.Sprintf("Docker daemon not accessible: %v", err), "system_error")
 	}
 
 	version := strings.TrimSpace(string(output))
 	if version == "" {
-		return types.NewRichError("DOCKER_DAEMON_NOT_RUNNING", "Docker daemon not running", "system_error")
+		return mcptypes.NewRichError("DOCKER_DAEMON_NOT_RUNNING", "Docker daemon not running", "system_error")
 	}
 
 	pfc.logger.Debug().Str("docker_version", version).Msg("Docker daemon check passed")
@@ -438,10 +491,11 @@ func (pfc *PreFlightChecker) checkDockerDaemon(ctx context.Context) error {
 }
 
 func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
+	// Get Docker root directory
 	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.DockerRootDir}}")
 	output, err := cmd.Output()
 	if err != nil {
-		return types.NewRichError("DOCKER_ROOT_DIR_FAILED", fmt.Sprintf("failed to get Docker root directory: %v", err), "system_error")
+		return mcptypes.NewRichError("DOCKER_ROOT_DIR_FAILED", fmt.Sprintf("failed to get Docker root directory: %v", err), "system_error")
 	}
 
 	dockerRoot := strings.TrimSpace(string(output))
@@ -449,13 +503,15 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 		dockerRoot = "/var/lib/docker" // Default location
 	}
 
+	// Check disk space using df
 	cmd = exec.CommandContext(ctx, "df", "-BG", dockerRoot)
 	output, err = cmd.Output()
 	if err != nil {
+		// Fallback to checking root filesystem
 		cmd = exec.CommandContext(ctx, "df", "-BG", "/")
 		output, err = cmd.Output()
 		if err != nil {
-			return types.NewErrorBuilder("disk_space_check_failed", "Failed to check disk space", "system").
+			return mcptypes.NewErrorBuilder("disk_space_check_failed", "Failed to check disk space", "system").
 				WithSeverity("high").
 				WithOperation("preflight_check").
 				WithStage("disk_space_validation").
@@ -467,9 +523,10 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 		}
 	}
 
+	// Parse df output
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 2 {
-		return types.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
+		return mcptypes.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
 			WithSeverity("medium").
 			WithOperation("preflight_check").
 			WithStage("output_parsing").
@@ -480,9 +537,10 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 			Build()
 	}
 
+	// Parse available space from second line
 	fields := strings.Fields(lines[1])
 	if len(fields) < 4 {
-		return types.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
+		return mcptypes.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
 			WithSeverity("medium").
 			WithOperation("preflight_check").
 			WithStage("output_parsing").
@@ -494,10 +552,11 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 			Build()
 	}
 
+	// Extract number from "123G" format
 	availStr := strings.TrimSuffix(fields[3], "G")
 	availGB, err := strconv.Atoi(availStr)
 	if err != nil {
-		return types.NewErrorBuilder("disk_space_parse_failed", "Failed to parse available disk space", "system").
+		return mcptypes.NewErrorBuilder("disk_space_parse_failed", "Failed to parse available disk space", "system").
 			WithSeverity("medium").
 			WithOperation("preflight_check").
 			WithStage("space_calculation").
@@ -511,7 +570,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 
 	const minSpaceGB = 5
 	if availGB < minSpaceGB {
-		return types.NewErrorBuilder("insufficient_disk_space", "Insufficient disk space for container operations", "resource").
+		return mcptypes.NewErrorBuilder("insufficient_disk_space", "Insufficient disk space for container operations", "resource").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("space_validation").
@@ -529,10 +588,12 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 }
 
 func (pfc *PreFlightChecker) checkRegistryAuth(ctx context.Context) error {
+	// Use both legacy and new registry authentication systems
 	summary, err := pfc.parseRegistryAuth(ctx)
 	if err != nil {
 		pfc.logger.Debug().Err(err).Msg("Legacy registry auth parsing failed, using enhanced system")
 	} else {
+		// Log legacy registry authentication information
 		pfc.logger.Info().
 			Str("config_path", summary.ConfigPath).
 			Int("registry_count", len(summary.Registries)).
@@ -541,12 +602,15 @@ func (pfc *PreFlightChecker) checkRegistryAuth(ctx context.Context) error {
 			Msg("Legacy registry authentication status")
 	}
 
+	// Test enhanced registry authentication system
 	return pfc.checkEnhancedRegistryAuth(ctx)
 }
 
+// checkEnhancedRegistryAuth validates registry authentication using the new multi-registry system
 func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) error {
 	pfc.logger.Info().Msg("Validating enhanced registry authentication")
 
+	// Test common registries
 	testRegistries := []string{
 		"docker.io",
 		"index.docker.io",
@@ -560,18 +624,29 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 			Str("registry", registryURL).
 			Msg("Testing registry authentication")
 
-		// Simplified auth check - just test basic connectivity
-		result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, nil)
+		// Try to get credentials
+		creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
 		if err != nil {
-			authResults[registryURL] = fmt.Sprintf("Validation failed: %v", err)
-		} else if result != nil && result.Accessible {
-			authResults[registryURL] = "Basic connectivity verified"
+			authResults[registryURL] = fmt.Sprintf("No credentials: %v", err)
+			continue
+		}
+
+		if creds != nil {
 			hasAnyAuth = true
+			authResults[registryURL] = fmt.Sprintf("Authenticated via %s (%s)", creds.Source, creds.AuthMethod)
+
+			// Validate registry access
+			if err := pfc.registryMgr.ValidateRegistryAccess(ctx, registryURL); err != nil {
+				authResults[registryURL] += fmt.Sprintf(" - Validation failed: %v", err)
+			} else {
+				authResults[registryURL] += " - Access validated"
+			}
 		} else {
-			authResults[registryURL] = "Registry not reachable"
+			authResults[registryURL] = "No credentials available"
 		}
 	}
 
+	// Log results
 	for registry, result := range authResults {
 		pfc.logger.Info().
 			Str("registry", registry).
@@ -579,7 +654,9 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 			Msg("Registry authentication test result")
 	}
 
+	// Check if we have at least some authentication capability
 	if !hasAnyAuth {
+		// Don't fail completely - warn but allow proceeding
 		pfc.logger.Warn().Msg("No registry authentication found - some operations may fail")
 		return nil
 	}
@@ -588,20 +665,37 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 	return nil
 }
 
+// GetRegistryManager returns the multi-registry manager
+func (pfc *PreFlightChecker) GetRegistryManager() *registry.MultiRegistryManager {
+	return pfc.registryMgr
+}
+
 // GetRegistryValidator returns the registry validator
 func (pfc *PreFlightChecker) GetRegistryValidator() *registry.RegistryValidator {
 	return pfc.registryValidator
 }
 
+// ValidateSpecificRegistry validates authentication and connectivity for a specific registry
 func (pfc *PreFlightChecker) ValidateSpecificRegistry(ctx context.Context, registryURL string) (*registry.ValidationResult, error) {
 	pfc.logger.Info().
 		Str("registry", registryURL).
 		Msg("Validating specific registry")
 
-	// Validate the registry with simplified approach
-	result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, nil)
+	// Get credentials for the registry
+	creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
 	if err != nil {
-		return nil, types.NewErrorBuilder("registry_validation_failed", "Registry validation failed during preflight check", "validation").
+		pfc.logger.Debug().
+			Str("registry", registryURL).
+			Err(err).
+			Msg("No credentials available for registry")
+		// Continue validation without credentials
+		creds = nil
+	}
+
+	// Validate the registry
+	result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, creds)
+	if err != nil {
+		return nil, mcptypes.NewErrorBuilder("registry_validation_failed", "Registry validation failed during preflight check", "validation").
 			WithSeverity("high").
 			WithField("registry", registryURL).
 			WithOperation("validate_registry_connection").
@@ -616,10 +710,11 @@ func (pfc *PreFlightChecker) ValidateSpecificRegistry(ctx context.Context, regis
 	return result, nil
 }
 
+// parseRegistryAuth parses the Docker config file and extracts authentication information
 func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAuthSummary, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, types.NewErrorBuilder("home_directory_access_failed", "Failed to get user home directory", "system").
+		return nil, mcptypes.NewErrorBuilder("home_directory_access_failed", "Failed to get user home directory", "system").
 			WithSeverity("high").
 			WithOperation("parse_registry_auth").
 			WithStage("directory_access").
@@ -632,7 +727,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 
 	dockerConfigPath := filepath.Join(homeDir, ".docker", "config.json")
 	if _, err := os.Stat(dockerConfigPath); os.IsNotExist(err) {
-		return nil, types.NewErrorBuilder("docker_config_missing", "Docker configuration not found", "configuration").
+		return nil, mcptypes.NewErrorBuilder("docker_config_missing", "Docker configuration not found", "configuration").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("docker_auth_validation").
@@ -644,9 +739,10 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 			Build()
 	}
 
+	// Parse Docker config to check authentication details
 	configData, err := os.ReadFile(dockerConfigPath)
 	if err != nil {
-		return nil, types.NewErrorBuilder("docker_config_read_failed", "Failed to read Docker configuration", "configuration").
+		return nil, mcptypes.NewErrorBuilder("docker_config_read_failed", "Failed to read Docker configuration", "configuration").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("docker_auth_validation").
@@ -659,7 +755,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 
 	var config DockerConfig
 	if err := json.Unmarshal(configData, &config); err != nil {
-		return nil, types.NewErrorBuilder("docker_config_parse_failed", "Failed to parse Docker configuration", "configuration").
+		return nil, mcptypes.NewErrorBuilder("docker_config_parse_failed", "Failed to parse Docker configuration", "configuration").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("docker_auth_validation").
@@ -671,6 +767,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 			Build()
 	}
 
+	// Build RegistryAuthSummary
 	summary := &RegistryAuthSummary{
 		ConfigPath:    dockerConfigPath,
 		Registries:    []RegistryAuthInfo{},
@@ -678,6 +775,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 		HasStore:      config.CredsStore != "",
 	}
 
+	// Process registry authentication entries
 	for registryURL, authEntry := range config.Auths {
 		regInfo := RegistryAuthInfo{
 			Registry: registryURL,
@@ -686,6 +784,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 		}
 
 		if authEntry.Auth != "" {
+			// Extract username from auth string (basic auth is base64 encoded username:password)
 			if decoded, err := base64.StdEncoding.DecodeString(authEntry.Auth); err == nil {
 				parts := strings.SplitN(string(decoded), ":", 2)
 				if len(parts) > 0 {
@@ -697,7 +796,9 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 		summary.Registries = append(summary.Registries, regInfo)
 	}
 
+	// Process credential helpers
 	for registry, helper := range config.CredHelpers {
+		// Check if this registry already exists in our list
 		found := false
 		for i, reg := range summary.Registries {
 			if reg.Registry == registry {
@@ -720,7 +821,9 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 		}
 	}
 
+	// Process credential store fallback
 	if config.CredsStore != "" {
+		// Add global credential store support
 		if err := pfc.validateCredentialStore(ctx, config.CredsStore); err != nil {
 			pfc.logger.Warn().
 				Str("credential_store", config.CredsStore).
@@ -733,13 +836,15 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 }
 
 func (pfc *PreFlightChecker) checkDiskSpace(ctx context.Context) error {
+	// Check available disk space
 	cmd := exec.CommandContext(ctx, "df", "-h", "/var/lib/docker")
 	output, err := cmd.Output()
 	if err != nil {
+		// Try alternative location
 		cmd = exec.CommandContext(ctx, "df", "-h", "/")
 		output, err = cmd.Output()
 		if err != nil {
-			return types.NewErrorBuilder("disk_space_check_failed", "Failed to check available disk space", "system").
+			return mcptypes.NewErrorBuilder("disk_space_check_failed", "Failed to check available disk space", "system").
 				WithSeverity("medium").
 				WithOperation("check_disk_space").
 				WithStage("disk_space_analysis").
@@ -751,9 +856,10 @@ func (pfc *PreFlightChecker) checkDiskSpace(ctx context.Context) error {
 		}
 	}
 
+	// Parse output to check available space
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 2 {
-		return types.NewErrorBuilder("unexpected_df_format", "Unexpected disk usage command output format", "system").
+		return mcptypes.NewErrorBuilder("unexpected_df_format", "Unexpected disk usage command output format", "system").
 			WithSeverity("medium").
 			WithOperation("check_disk_space").
 			WithStage("output_parsing").
@@ -765,9 +871,11 @@ func (pfc *PreFlightChecker) checkDiskSpace(ctx context.Context) error {
 			Build()
 	}
 
+	// Basic check - just ensure we're not critically low
+	// In production, would parse the actual values
 	outputStr := string(output)
 	if strings.Contains(outputStr, "100%") || strings.Contains(outputStr, "99%") || strings.Contains(outputStr, "98%") {
-		return types.NewErrorBuilder("disk_space_critical", "Disk space critically low", "resource").
+		return mcptypes.NewErrorBuilder("disk_space_critical", "Disk space critically low", "resource").
 			WithSeverity("critical").
 			WithOperation("check_disk_space").
 			WithStage("space_validation").
@@ -786,7 +894,7 @@ func (pfc *PreFlightChecker) checkKubernetesContext(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "kubectl", "config", "current-context")
 	output, err := cmd.Output()
 	if err != nil {
-		return types.NewErrorBuilder("kubernetes_context_missing", "No Kubernetes context configured", "configuration").
+		return mcptypes.NewErrorBuilder("kubernetes_context_missing", "No Kubernetes context configured", "configuration").
 			WithSeverity("high").
 			WithOperation("check_kubernetes_context").
 			WithStage("context_check").
@@ -799,7 +907,7 @@ func (pfc *PreFlightChecker) checkKubernetesContext(ctx context.Context) error {
 
 	context := strings.TrimSpace(string(output))
 	if context == "" {
-		return types.NewErrorBuilder("kubernetes_context_empty", "No current Kubernetes context set", "configuration").
+		return mcptypes.NewErrorBuilder("kubernetes_context_empty", "No current Kubernetes context set", "configuration").
 			WithSeverity("high").
 			WithOperation("check_kubernetes_context").
 			WithStage("context_validation").
@@ -815,15 +923,18 @@ func (pfc *PreFlightChecker) checkKubernetesContext(ctx context.Context) error {
 }
 
 func (pfc *PreFlightChecker) checkKubernetesConnectivity(ctx context.Context) error {
+	// Try to get server version
 	cmd := exec.CommandContext(ctx, "kubectl", "version", "--short", "--output=json")
 	output, err := cmd.Output()
 	if err != nil {
+		// Check if it's just a warning about version skew
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			stderr := string(exitErr.Stderr)
 			if strings.Contains(stderr, "connection refused") || strings.Contains(stderr, "no such host") {
 				return fmt.Errorf("cannot connect to Kubernetes cluster: %s", stderr)
 			}
 		}
+		// Might be version skew warning, try simpler check
 		cmd = exec.CommandContext(ctx, "kubectl", "get", "nodes", "--no-headers")
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("cannot connect to Kubernetes cluster: %w", err)
@@ -865,6 +976,7 @@ func (pfc *PreFlightChecker) checkGitInstalled(ctx context.Context) error {
 	return nil
 }
 
+// GetCheckByName returns a specific check by name
 func (pfc *PreFlightChecker) GetCheckByName(ctx context.Context, name string) (*PreFlightCheck, error) {
 	for _, check := range pfc.getChecks() {
 		if check.Name == name {
@@ -874,6 +986,7 @@ func (pfc *PreFlightChecker) GetCheckByName(ctx context.Context, name string) (*
 	return nil, fmt.Errorf("check not found: %s", name)
 }
 
+// RunSingleCheck runs a specific check
 func (pfc *PreFlightChecker) RunSingleCheck(ctx context.Context, checkName string) (*CheckResult, error) {
 	check, err := pfc.GetCheckByName(ctx, checkName)
 	if err != nil {
@@ -905,6 +1018,7 @@ func (pfc *PreFlightChecker) RunSingleCheck(ctx context.Context, checkName strin
 	return result, nil
 }
 
+// FormatResults formats the pre-flight results for display
 func (pfc *PreFlightChecker) FormatResults(ctx context.Context, results *PreFlightResult) string {
 	var sb strings.Builder
 
@@ -912,11 +1026,13 @@ func (pfc *PreFlightChecker) FormatResults(ctx context.Context, results *PreFlig
 	sb.WriteString(fmt.Sprintf("Overall Status: %s\n", pfc.getOverallStatus(results)))
 	sb.WriteString(fmt.Sprintf("Duration: %v\n\n", results.Duration.Round(time.Millisecond)))
 
+	// Group by category
 	byCategory := make(map[string][]CheckResult)
 	for _, check := range results.Checks {
 		byCategory[check.Category] = append(byCategory[check.Category], check)
 	}
 
+	// Display results by category
 	for category, checks := range byCategory {
 		sb.WriteString(fmt.Sprintf("%s Checks:\n", strings.Title(category)))
 		for _, check := range checks {
@@ -936,19 +1052,23 @@ func (pfc *PreFlightChecker) FormatResults(ctx context.Context, results *PreFlig
 	return sb.String()
 }
 
+// validateCredentialStore validates that a credential store helper is available and functional
 func (pfc *PreFlightChecker) validateCredentialStore(ctx context.Context, credStore string) error {
 	if credStore == "" {
 		return fmt.Errorf("no credential store specified")
 	}
 
+	// Try to execute the credential helper to see if it's available
 	helperName := fmt.Sprintf("docker-credential-%s", credStore)
 
 	cmd := exec.CommandContext(ctx, helperName, "version")
 	if err := cmd.Run(); err != nil {
+		// If version command fails, try to check if the helper exists in PATH
 		if _, pathErr := exec.LookPath(helperName); pathErr != nil {
 			return fmt.Errorf("credential store helper '%s' not found in PATH", helperName)
 		}
 
+		// If helper exists but version fails, it might still work for get/store operations
 		pfc.logger.Debug().
 			Str("helper", helperName).
 			Msg("Credential store helper exists but version check failed")
@@ -962,16 +1082,19 @@ func (pfc *PreFlightChecker) validateCredentialStore(ctx context.Context, credSt
 	return nil
 }
 
+// getCredentialWithFallback attempts to get credentials using multiple fallback methods
 func (pfc *PreFlightChecker) getCredentialWithFallback(ctx context.Context, registry string, config *DockerConfig) (*RegistryAuthInfo, error) {
 	authInfo := &RegistryAuthInfo{
 		Registry: registry,
 		HasAuth:  false,
 	}
 
+	// 1. Try direct auth from config
 	if auth, exists := config.Auths[registry]; exists && auth.Auth != "" {
 		authInfo.HasAuth = true
 		authInfo.AuthType = "basic"
 
+		// Extract username from auth string
 		if decoded, err := base64.StdEncoding.DecodeString(auth.Auth); err == nil {
 			parts := strings.SplitN(string(decoded), ":", 2)
 			if len(parts) > 0 {
@@ -981,6 +1104,7 @@ func (pfc *PreFlightChecker) getCredentialWithFallback(ctx context.Context, regi
 		return authInfo, nil
 	}
 
+	// 2. Try registry-specific credential helper
 	if helper, exists := config.CredHelpers[registry]; exists {
 		if err := pfc.tryCredentialHelper(ctx, registry, helper, authInfo); err == nil {
 			return authInfo, nil
@@ -993,6 +1117,7 @@ func (pfc *PreFlightChecker) getCredentialWithFallback(ctx context.Context, regi
 		}
 	}
 
+	// 3. Try global credential store
 	if config.CredsStore != "" {
 		if err := pfc.tryCredentialHelper(ctx, registry, config.CredsStore, authInfo); err == nil {
 			return authInfo, nil
@@ -1005,6 +1130,7 @@ func (pfc *PreFlightChecker) getCredentialWithFallback(ctx context.Context, regi
 		}
 	}
 
+	// 4. Try environment variables for common registries
 	if err := pfc.tryEnvironmentCredentials(registry, authInfo); err == nil {
 		return authInfo, nil
 	}
@@ -1012,6 +1138,7 @@ func (pfc *PreFlightChecker) getCredentialWithFallback(ctx context.Context, regi
 	return authInfo, fmt.Errorf("no credentials found for registry %s", registry)
 }
 
+// tryCredentialHelper attempts to get credentials using a specific credential helper
 func (pfc *PreFlightChecker) tryCredentialHelper(ctx context.Context, registry, helper string, authInfo *RegistryAuthInfo) error {
 	helperName := fmt.Sprintf("docker-credential-%s", helper)
 
@@ -1023,6 +1150,7 @@ func (pfc *PreFlightChecker) tryCredentialHelper(ctx context.Context, registry, 
 		return fmt.Errorf("credential helper failed: %w", err)
 	}
 
+	// Parse credential helper response
 	var cred struct {
 		Username string `json:"Username"`
 		Secret   string `json:"Secret"`
@@ -1043,7 +1171,9 @@ func (pfc *PreFlightChecker) tryCredentialHelper(ctx context.Context, registry, 
 	return fmt.Errorf("credential helper returned empty credentials")
 }
 
+// tryEnvironmentCredentials attempts to get credentials from environment variables
 func (pfc *PreFlightChecker) tryEnvironmentCredentials(registry string, authInfo *RegistryAuthInfo) error {
+	// Check for common registry environment variable patterns
 	var userEnv, passEnv string
 
 	switch {
@@ -1060,6 +1190,7 @@ func (pfc *PreFlightChecker) tryEnvironmentCredentials(registry string, authInfo
 		userEnv = "GCR_USERNAME"
 		passEnv = "GCR_PASSWORD"
 	default:
+		// Try generic patterns
 		registryName := strings.Split(registry, ".")[0]
 		registryName = strings.ToUpper(strings.ReplaceAll(registryName, "-", "_"))
 		userEnv = fmt.Sprintf("%s_USERNAME", registryName)
@@ -1079,15 +1210,18 @@ func (pfc *PreFlightChecker) tryEnvironmentCredentials(registry string, authInfo
 	return fmt.Errorf("no environment credentials found for registry %s", registry)
 }
 
+// ValidateMultipleRegistries validates authentication and connectivity for multiple registries
 func (pfc *PreFlightChecker) ValidateMultipleRegistries(ctx context.Context, registries []string) (*MultiRegistryValidationResult, error) {
 	result := &MultiRegistryValidationResult{
 		Timestamp: time.Now(),
 		Results:   make(map[string]*RegistryValidationResult),
 	}
 
+	// Parse Docker config once
 	config, err := pfc.parseDockerConfig(ctx)
 	if err != nil {
 		pfc.logger.Warn().Err(err).Msg("Failed to parse Docker config, will try environment credentials")
+		// Continue with empty config to try environment variables
 		config = &DockerConfig{
 			Auths:       make(map[string]DockerAuth),
 			CredHelpers: make(map[string]string),
@@ -1100,6 +1234,7 @@ func (pfc *PreFlightChecker) ValidateMultipleRegistries(ctx context.Context, reg
 			Timestamp: time.Now(),
 		}
 
+		// Test authentication
 		authInfo, err := pfc.getCredentialWithFallback(ctx, registry, config)
 		if err != nil {
 			registryResult.AuthenticationStatus = "failed"
@@ -1110,6 +1245,7 @@ func (pfc *PreFlightChecker) ValidateMultipleRegistries(ctx context.Context, reg
 			registryResult.Username = authInfo.Username
 		}
 
+		// Test connectivity
 		if err := pfc.testRegistryConnectivity(ctx, registry); err != nil {
 			registryResult.ConnectivityStatus = "failed"
 			registryResult.ConnectivityError = err.Error()
@@ -1117,6 +1253,7 @@ func (pfc *PreFlightChecker) ValidateMultipleRegistries(ctx context.Context, reg
 			registryResult.ConnectivityStatus = "success"
 		}
 
+		// Overall status
 		registryResult.OverallStatus = "success"
 		if registryResult.AuthenticationStatus == "failed" || registryResult.ConnectivityStatus == "failed" {
 			registryResult.OverallStatus = "failed"
@@ -1130,6 +1267,7 @@ func (pfc *PreFlightChecker) ValidateMultipleRegistries(ctx context.Context, reg
 	return result, nil
 }
 
+// parseDockerConfig parses Docker configuration and returns it
 func (pfc *PreFlightChecker) parseDockerConfig(ctx context.Context) (*DockerConfig, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -1154,10 +1292,13 @@ func (pfc *PreFlightChecker) parseDockerConfig(ctx context.Context) (*DockerConf
 	return &config, nil
 }
 
+// testRegistryConnectivity tests connectivity to a registry
 func (pfc *PreFlightChecker) testRegistryConnectivity(ctx context.Context, registry string) error {
+	// Use docker manifest inspect to test connectivity with a well-known image
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
+	// Try common test images based on registry
 	testImages := pfc.getTestImagesForRegistry(registry)
 
 	for _, testImage := range testImages {
@@ -1174,6 +1315,7 @@ func (pfc *PreFlightChecker) testRegistryConnectivity(ctx context.Context, regis
 	return fmt.Errorf("failed to connect to registry %s with any test image", registry)
 }
 
+// getTestImagesForRegistry returns appropriate test images for different registries
 func (pfc *PreFlightChecker) getTestImagesForRegistry(registry string) []string {
 	switch {
 	case strings.Contains(registry, "docker.io") || strings.Contains(registry, "index.docker.io"):
@@ -1187,6 +1329,7 @@ func (pfc *PreFlightChecker) getTestImagesForRegistry(registry string) []string 
 	case strings.Contains(registry, "mcr.microsoft.com"):
 		return []string{"mcr.microsoft.com/hello-world:latest"}
 	default:
+		// For unknown registries, try a generic approach
 		return []string{
 			fmt.Sprintf("%s/hello-world:latest", registry),
 			fmt.Sprintf("%s/library/hello-world:latest", registry),
@@ -1194,6 +1337,7 @@ func (pfc *PreFlightChecker) getTestImagesForRegistry(registry string) []string 
 	}
 }
 
+// MultiRegistryValidationResult represents validation results for multiple registries
 type MultiRegistryValidationResult struct {
 	Timestamp   time.Time                            `json:"timestamp"`
 	Duration    time.Duration                        `json:"duration"`
@@ -1201,6 +1345,7 @@ type MultiRegistryValidationResult struct {
 	HasFailures bool                                 `json:"has_failures"`
 }
 
+// RegistryValidationResult represents validation result for a single registry
 type RegistryValidationResult struct {
 	Registry             string    `json:"registry"`
 	Timestamp            time.Time `json:"timestamp"`
@@ -1236,4 +1381,28 @@ func (pfc *PreFlightChecker) getStatusIcon(status CheckStatus) string {
 	default:
 		return "?"
 	}
+}
+
+// extractRegistry extracts the registry hostname from an image reference
+func extractRegistry(imageRef string) string {
+	if imageRef == "" {
+		return ""
+	}
+
+	// Handle docker.io special case
+	if !strings.Contains(imageRef, "/") || (!strings.Contains(imageRef, ".") && !strings.Contains(imageRef, ":")) {
+		return "docker.io"
+	}
+
+	parts := strings.Split(imageRef, "/")
+	if len(parts) > 0 {
+		firstPart := parts[0]
+		// If first part contains a dot or colon, it's likely a registry
+		if strings.Contains(firstPart, ".") || strings.Contains(firstPart, ":") {
+			return firstPart
+		}
+	}
+
+	// Default to docker.io for simple image names
+	return "docker.io"
 }

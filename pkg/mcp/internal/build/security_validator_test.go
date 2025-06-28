@@ -9,18 +9,15 @@ import (
 // Test compileSecretPatterns function
 func TestCompileSecretPatterns(t *testing.T) {
 	patterns := compileSecretPatterns()
-
 	if len(patterns) == 0 {
 		t.Error("compileSecretPatterns should return at least one pattern")
 	}
-
 	// Test that all patterns are valid regex
 	for i, pattern := range patterns {
 		if pattern == nil {
 			t.Errorf("Pattern %d should not be nil", i)
 		}
 	}
-
 	// Test that patterns can detect common secret patterns
 	testCases := []string{
 		`API_KEY="abc123def456"`,
@@ -31,7 +28,6 @@ func TestCompileSecretPatterns(t *testing.T) {
 		`-----BEGIN RSA PRIVATE KEY-----`,
 		`-----BEGIN PRIVATE KEY-----`,
 	}
-
 	for _, testCase := range testCases {
 		found := false
 		for _, pattern := range patterns {
@@ -44,7 +40,6 @@ func TestCompileSecretPatterns(t *testing.T) {
 			t.Errorf("No pattern matched secret case: %s", testCase)
 		}
 	}
-
 	// Test that patterns don't match non-secrets
 	nonSecrets := []string{
 		`APP_NAME="myapp"`,
@@ -52,7 +47,6 @@ func TestCompileSecretPatterns(t *testing.T) {
 		`short_string="test"`,
 		`normal text content`,
 	}
-
 	for _, nonSecret := range nonSecrets {
 		matched := false
 		for _, pattern := range patterns {
@@ -70,9 +64,7 @@ func TestCompileSecretPatterns(t *testing.T) {
 func TestNewSecurityValidator(t *testing.T) {
 	logger := zerolog.Nop()
 	trustedRegistries := []string{"docker.io", "gcr.io", "quay.io"}
-
 	validator := NewSecurityValidator(logger, trustedRegistries)
-
 	if validator == nil {
 		t.Error("NewSecurityValidator should not return nil")
 	}
@@ -87,7 +79,6 @@ func TestNewSecurityValidator(t *testing.T) {
 	if len(validator.secretPatterns) == 0 {
 		t.Error("Expected secret patterns to be compiled")
 	}
-
 	// Test with empty trusted registries
 	emptyValidator := NewSecurityValidator(logger, []string{})
 	if emptyValidator == nil {
@@ -96,7 +87,6 @@ func TestNewSecurityValidator(t *testing.T) {
 	if len(emptyValidator.trustedRegistries) != 0 {
 		t.Errorf("Expected 0 trusted registries, got %d", len(emptyValidator.trustedRegistries))
 	}
-
 	// Test with nil trusted registries
 	nilValidator := NewSecurityValidator(logger, nil)
 	if nilValidator == nil {
@@ -108,15 +98,12 @@ func TestNewSecurityValidator(t *testing.T) {
 func TestSecurityValidatorValidateDisabled(t *testing.T) {
 	logger := zerolog.Nop()
 	validator := NewSecurityValidator(logger, []string{"docker.io"})
-
 	options := ValidationOptions{
 		CheckSecurity: false,
 	}
-
 	content := `FROM ubuntu:20.04
 USER root
 ENV API_KEY="secret123"`
-
 	result, err := validator.Validate(content, options)
 	if err != nil {
 		t.Errorf("Validate should not return error when security is disabled: %v", err)
@@ -143,7 +130,6 @@ func TestValidationOptions(t *testing.T) {
 		CheckOptimization:  false,
 		CheckBestPractices: true,
 	}
-
 	if !options.UseHadolint {
 		t.Error("Expected UseHadolint to be true")
 	}
@@ -176,14 +162,12 @@ func TestValidationContext(t *testing.T) {
 		CheckSecurity: true,
 		Severity:      "warning",
 	}
-
 	context := ValidationContext{
 		DockerfilePath:    "/path/to/Dockerfile",
 		DockerfileContent: "FROM alpine:latest",
 		SessionID:         "session-123",
 		Options:           options,
 	}
-
 	if context.DockerfilePath != "/path/to/Dockerfile" {
 		t.Errorf("Expected DockerfilePath to be '/path/to/Dockerfile', got '%s'", context.DockerfilePath)
 	}

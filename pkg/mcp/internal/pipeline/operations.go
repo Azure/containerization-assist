@@ -9,8 +9,6 @@ import (
 	_ "github.com/Azure/container-kit/pkg/docker" // init docker client
 	_ "github.com/Azure/container-kit/pkg/k8s"    // init k8s client
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -49,7 +47,7 @@ func (o *Operations) GetSessionWorkspace(sessionID string) string {
 	}
 
 	// Type assert to get the SessionState
-	if sessionState, ok := session.(*sessiontypes.SessionState); ok {
+	if sessionState, ok := session.(*mcptypes.SessionState); ok {
 		return sessionState.WorkspaceDir
 	}
 	o.logger.Error().Str("session_id", sessionID).Msg("Session type assertion failed")
@@ -62,7 +60,7 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 	}
 
 	return o.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		sess, ok := s.(*sessiontypes.SessionState)
+		sess, ok := s.(*mcptypes.SessionState)
 		if !ok {
 			return
 		}
@@ -70,18 +68,14 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 		switch r := result.(type) {
 		case *mcptypes.BuildResult:
 			if r.Success {
-				// Update image reference
-				sess.ImageRef = types.ImageReference{
-					Registry:   "",
-					Repository: r.ImageRef,
-					Tag:        "latest",
-				}
+				// Update image reference (ImageRef is a string field)
+				sess.ImageRef = r.ImageRef
 			}
 		default:
 			o.logger.Warn().Str("type", fmt.Sprintf("%T", result)).Msg("Unknown result type for session update")
 		}
 
-		sess.LastAccessed = time.Now()
+		sess.UpdatedAt = time.Now()
 	})
 }
 

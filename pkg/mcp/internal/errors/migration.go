@@ -6,6 +6,7 @@ import (
 
 	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // MigrateMCPError converts an MCPError to CoreError
@@ -36,7 +37,7 @@ func MigrateMCPError(mcpErr *mcperrors.MCPError) *CoreError {
 }
 
 // MigrateRichError converts a RichError to CoreError
-func MigrateRichError(richErr *types.RichError) *CoreError {
+func MigrateRichError(richErr *mcptypes.RichError) *CoreError {
 	if richErr == nil {
 		return nil
 	}
@@ -48,71 +49,59 @@ func MigrateRichError(richErr *types.RichError) *CoreError {
 		Code:        richErr.Code,
 		Severity:    mapRichErrorSeverity(richErr.Severity),
 		Timestamp:   richErr.Timestamp,
-		Context:     richErr.Context.Input,
 		Tool:        richErr.Tool,
 		Retryable:   richErr.Resolution.RetryStrategy.Recommended,
 		Recoverable: true, // Default to recoverable
 	}
 
-	// Map diagnostics
+	// Basic diagnostics mapping
 	if richErr.Diagnostics.RootCause != "" {
 		coreErr.Diagnostics = &ErrorDiagnostics{
-			RootCause:     richErr.Diagnostics.RootCause,
-			ErrorPattern:  richErr.Diagnostics.ErrorPattern,
-			Symptoms:      richErr.Diagnostics.Symptoms,
-			Checks:        mapDiagnosticChecks(richErr.Diagnostics.Checks),
-			SimilarErrors: mapSimilarErrors(richErr.Diagnostics.SimilarErrors),
+			RootCause:    richErr.Diagnostics.RootCause,
+			ErrorPattern: richErr.Diagnostics.ErrorPattern,
+			Symptoms:     richErr.Diagnostics.Symptoms,
 		}
 	}
 
-	// Map resolution
-	if len(richErr.Resolution.ImmediateSteps) > 0 {
-		coreErr.Resolution = &ErrorResolution{
-			ImmediateSteps: mapResolutionSteps(richErr.Resolution.ImmediateSteps),
-			Alternatives:   mapAlternatives(richErr.Resolution.Alternatives),
-			Prevention:     richErr.Resolution.Prevention,
-			RetryStrategy:  mapRetryStrategy(richErr.Resolution.RetryStrategy),
-			ManualSteps:    richErr.Resolution.ManualSteps,
-		}
+	// Basic resolution mapping
+	coreErr.Resolution = &ErrorResolution{
+		Prevention:    []string{richErr.Resolution.Prevention},
+		ManualSteps:   richErr.Resolution.ManualSteps,
+		RetryStrategy: mapRetryStrategy(richErr.Resolution.RetryStrategy),
 	}
 
-	// Map system state
+	// Basic system state mapping
 	if richErr.Context.SystemState.DockerAvailable || richErr.Context.SystemState.K8sConnected {
 		coreErr.SystemState = &SystemState{
 			DockerAvailable: richErr.Context.SystemState.DockerAvailable,
 			K8sConnected:    richErr.Context.SystemState.K8sConnected,
-			DiskSpaceMB:     richErr.Context.SystemState.DiskSpaceMB,
-			MemoryMB:        richErr.Context.SystemState.WorkspaceQuota,
+			DiskSpaceMB:     int64(richErr.Context.SystemState.DiskSpaceMB),
+			MemoryMB:        int64(richErr.Context.SystemState.WorkspaceQuota),
 			LoadAverage:     0, // Not available in RichError
 		}
 	}
 
-	// Map resource usage
+	// Basic resource usage mapping
 	if richErr.Context.ResourceUsage.CPUPercent > 0 {
 		coreErr.ResourceUsage = &ResourceUsage{
 			CPUPercent:  richErr.Context.ResourceUsage.CPUPercent,
-			MemoryMB:    richErr.Context.ResourceUsage.MemoryMB,
-			DiskUsageMB: richErr.Context.ResourceUsage.DiskUsageMB,
+			MemoryMB:    int64(richErr.Context.ResourceUsage.MemoryMB),
+			DiskUsageMB: int64(richErr.Context.ResourceUsage.DiskUsageMB),
 		}
 	}
 
-	// Map log entries
-	if len(richErr.Context.Logs) > 0 {
-		coreErr.LogEntries = mapLogEntries(richErr.Context.Logs)
-	}
-
-	// Map related files
+	// Basic file mapping
 	if len(richErr.Context.RelatedFiles) > 0 {
 		coreErr.RelatedFiles = richErr.Context.RelatedFiles
 	}
 
-	// Map session information
+	// Session information mapping
 	if richErr.SessionState != nil {
 		coreErr.SessionID = richErr.SessionState.ID
 		coreErr.Stage = richErr.SessionState.CurrentStage
 	}
 
-	// Map attempt information
+	// Attempt information mapping
 	coreErr.AttemptNumber = richErr.AttemptNumber
 	coreErr.PreviousErrors = richErr.PreviousErrors
 
@@ -244,7 +233,13 @@ func mapAlternatives(alternatives []types.Alternative) []Alternative {
 	return result
 }
 
-func mapRetryStrategy(strategy types.RetryStrategy) *RetryStrategy {
+func mapRetryStrategy(strategy struct {
+	Recommended     bool     `json:"recommended"`
+	WaitTime        int      `json:"wait_time"`
+	MaxAttempts     int      `json:"max_attempts"`
+	BackoffStrategy string   `json:"backoff_strategy"`
+	Conditions      []string `json:"conditions"`
+}) *RetryStrategy {
 	if !strategy.Recommended {
 		return nil
 	}
@@ -252,8 +247,8 @@ func mapRetryStrategy(strategy types.RetryStrategy) *RetryStrategy {
 	return &RetryStrategy{
 		Retryable:     strategy.Recommended,
 		MaxAttempts:   strategy.MaxAttempts,
-		BackoffMs:     int(strategy.WaitTime.Milliseconds()),
-		ExponentialMs: 0, // Not available in RichError
+		BackoffMs:     strategy.WaitTime,
+		ExponentialMs: 0, // Not available in simplified RichError
 		Conditions:    strategy.Conditions,
 	}
 }
@@ -290,7 +285,7 @@ func WrapError(err error, module, operation string) *CoreError {
 	}
 
 	// Check if it's a RichError
-	if richErr, ok := err.(*types.RichError); ok {
+	if richErr, ok := err.(*mcptypes.RichError); ok {
 		return MigrateRichError(richErr)
 	}
 
@@ -306,7 +301,7 @@ func IsRetryable(err error) bool {
 	if mcpErr, ok := err.(*mcperrors.MCPError); ok {
 		return mcpErr.Retryable
 	}
-	if richErr, ok := err.(*types.RichError); ok {
+	if richErr, ok := err.(*mcptypes.RichError); ok {
 		return richErr.Resolution.RetryStrategy.Recommended
 	}
 	return false
@@ -332,7 +327,7 @@ func GetErrorCategory(err error) ErrorCategory {
 	if mcpErr, ok := err.(*mcperrors.MCPError); ok {
 		return mapMCPCategory(mcpErr.Category)
 	}
-	if richErr, ok := err.(*types.RichError); ok {
+	if richErr, ok := err.(*mcptypes.RichError); ok {
 		return mapRichErrorCategory(richErr.Type)
 	}
 	return CategoryInternal
@@ -343,7 +338,7 @@ func GetErrorSeverity(err error) Severity {
 	if coreErr, ok := err.(*CoreError); ok {
 		return coreErr.Severity
 	}
-	if richErr, ok := err.(*types.RichError); ok {
+	if richErr, ok := err.(*mcptypes.RichError); ok {
 		return mapRichErrorSeverity(richErr.Severity)
 	}
 	return SeverityMedium
@@ -357,7 +352,7 @@ func FormatError(err error) string {
 	if mcpErr, ok := err.(*mcperrors.MCPError); ok {
 		return mcpErr.Error()
 	}
-	if richErr, ok := err.(*types.RichError); ok {
+	if richErr, ok := err.(*mcptypes.RichError); ok {
 		return richErr.Error()
 	}
 	return fmt.Sprintf("mcp: %v", err)

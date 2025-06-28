@@ -19,7 +19,6 @@ import (
 	mcpserver "github.com/Azure/container-kit/pkg/mcp/internal/server"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/runner"
 	gomcpserver "github.com/localrivet/gomcp/server"
@@ -102,7 +101,7 @@ type ChatResult struct {
 // RegisterTools registers tools with the server
 func (gm *GomcpManager) RegisterTools(s *Server) error {
 	if !gm.isInitialized {
-		return types.NewErrorBuilder("manager_not_initialized", "Manager must be initialized before registering tools", "initialization").
+		return mcptypes.NewErrorBuilder("manager_not_initialized", "Manager must be initialized before registering tools", "initialization").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("initialization_check").
@@ -129,7 +128,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	deps.Logger.Info().Msg("Registering core tools")
 	if err := gm.registerCoreTools(deps); err != nil {
-		return types.NewErrorBuilder("core_tools_registration_failed", "Failed to register core tools", "registration").
+		return mcptypes.NewErrorBuilder("core_tools_registration_failed", "Failed to register core tools", "registration").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("core_tools").
@@ -142,7 +141,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	deps.Logger.Info().Msg("Registering atomic tools")
 	if err := gm.registerAtomicTools(deps); err != nil {
-		return types.NewErrorBuilder("atomic_tools_registration_failed", "Failed to register atomic tools", "registration").
+		return mcptypes.NewErrorBuilder("atomic_tools_registration_failed", "Failed to register atomic tools", "registration").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("atomic_tools").
@@ -155,7 +154,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	deps.Logger.Info().Msg("Registering utility tools")
 	if err := gm.registerUtilityTools(deps); err != nil {
-		return types.NewErrorBuilder("utility_tools_registration_failed", "Failed to register utility tools", "registration").
+		return mcptypes.NewErrorBuilder("utility_tools_registration_failed", "Failed to register utility tools", "registration").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("utility_tools").
@@ -168,7 +167,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	if s.IsConversationModeEnabled() {
 		if err := gm.registerConversationTools(deps); err != nil {
-			return types.NewErrorBuilder("conversation_tools_registration_failed", "Failed to register conversation tools", "registration").
+			return mcptypes.NewErrorBuilder("conversation_tools_registration_failed", "Failed to register conversation tools", "registration").
 				WithSeverity("high").
 				WithOperation("register_tools").
 				WithStage("conversation_tools").
@@ -402,16 +401,16 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 		deps.Logger.Debug().Str("tool", toolName).Msg("Creating new session")
 		sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
 		if err != nil {
-			deps.Logger.Error().Err(err).Str("tool", toolName).Msg("Session creation failed")
-			return "", types.NewErrorBuilder("session_creation_failed", "Session creation failed", "session").
+			return "", mcptypes.NewErrorBuilder("session_creation_failed", "Failed to create containerization session", "session").
 				WithOperation("ensure_session_id").
-				WithStage("creation").
-				WithRootCause(err.Error()).
-				WithImmediateStep(1, "Check session manager", "Ensure SessionManager is properly initialized").
-				WithImmediateStep(2, "Check server logs", "Review server logs for additional details").
+				WithStage("session_creation").
+				WithRootCause(fmt.Sprintf("Session creation failed: %v", err)).
+				WithImmediateStep(1, "Check resources", "Verify system resources are available for new session").
+				WithImmediateStep(2, "Check limits", "Ensure session limits are not exceeded").
+				WithImmediateStep(3, "Retry creation", "Retry session creation after brief delay").
 				Build()
 		}
-		if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
+		if session, ok := sessionInterface.(*mcptypes.SessionState); ok {
 			deps.Logger.Info().Str("session_id", session.SessionID).Str("tool", toolName).Msg("Created new session")
 			return session.SessionID, nil
 		}
@@ -448,7 +447,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			if analysisResult, ok := result.(*analyze.AtomicAnalysisResult); ok {
 				return analysisResult, nil
 			}
-			return nil, types.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository tool", "tool_execution").
+			return nil, mcptypes.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository tool", "tool_execution").
 				WithField("expected_type", "*types.AnalyzeRepositoryResult").
 				WithField("actual_type", fmt.Sprintf("%T", result)).
 				WithOperation("handle_analyze_repository").
@@ -952,6 +951,77 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 		})
 
 	return nil
+}
+
+<<<<<<< HEAD
+=======
+// sessionLabelManagerWrapper adapts session.SessionManager to runtime.SessionLabelManager interface
+type sessionLabelManagerWrapper struct {
+	sm *session.SessionManager
+}
+
+func (w *sessionLabelManagerWrapper) AddSessionLabel(sessionID, label string) error {
+	return w.sm.AddSessionLabel(sessionID, label)
+}
+
+func (w *sessionLabelManagerWrapper) RemoveSessionLabel(sessionID, label string) error {
+	return w.sm.RemoveSessionLabel(sessionID, label)
+}
+
+func (w *sessionLabelManagerWrapper) SetSessionLabels(sessionID string, labels []string) error {
+	return w.sm.SetSessionLabels(sessionID, labels)
+}
+
+func (w *sessionLabelManagerWrapper) GetAllLabels() []string {
+	return w.sm.GetAllLabels()
+}
+
+func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.SessionLabelData, error) {
+	sessionInterface, err := w.sm.GetSession(sessionID)
+	if err != nil {
+		return sessiontypes.SessionLabelData{}, err
+	}
+
+	session, ok := sessionInterface.(*mcptypes.SessionState)
+	if !ok {
+		return sessiontypes.SessionLabelData{}, mcptypes.NewErrorBuilder("unexpected_session_type", "Unexpected session type encountered", "session").
+			WithOperation("get_session_label_data").
+			WithStage("type_detection").
+			WithRootCause("Session does not match any known session type patterns").
+			WithImmediateStep(1, "Check session", "Verify session is properly initialized and typed").
+			WithImmediateStep(2, "Check types", "Ensure session implements expected interface").
+			WithImmediateStep(3, "Check version", "Verify session type compatibility with current version").
+			Build()
+	}
+
+	var labels []string
+	if session.Metadata != nil {
+		if labelsData, ok := session.Metadata["labels"].([]string); ok {
+			labels = labelsData
+		} else if labelMap, ok := session.Metadata["labels"].(map[string]string); ok {
+			// Convert map to slice of "key=value" strings
+			for key, value := range labelMap {
+				labels = append(labels, key+"="+value)
+			}
+		}
+	}
+
+	return sessiontypes.SessionLabelData{
+		SessionID: session.SessionID,
+		Labels:    labels,
+	}, nil
+}
+
+func (w *sessionLabelManagerWrapper) ListSessions() []sessiontypes.SessionLabelData {
+	summaries := w.sm.ListSessionSummaries()
+	result := make([]sessiontypes.SessionLabelData, len(summaries))
+	for i, summary := range summaries {
+		result[i] = sessiontypes.SessionLabelData{
+			SessionID: summary.SessionID,
+			Labels:    summary.Labels,
+		}
+	}
+	return result
 }
 
 // registerOrchestratorTool creates a GoMCP handler that delegates to the orchestrator

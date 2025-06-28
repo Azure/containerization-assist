@@ -11,9 +11,7 @@ import (
 func TestNewAIContextEnhancer(t *testing.T) {
 	logger := zerolog.Nop()
 	contextSharer := &DefaultContextSharer{}
-
 	enhancer := NewAIContextEnhancer(contextSharer, logger)
-
 	if enhancer == nil {
 		t.Error("NewAIContextEnhancer should not return nil")
 	}
@@ -26,7 +24,6 @@ func TestNewAIContextEnhancer(t *testing.T) {
 func TestAIToolContext(t *testing.T) {
 	startTime := time.Now()
 	duration := time.Second * 5
-
 	context := AIToolContext{
 		ToolName:      "test_tool",
 		OperationType: "build",
@@ -34,7 +31,6 @@ func TestAIToolContext(t *testing.T) {
 		Duration:      duration,
 		Success:       true,
 	}
-
 	if context.ToolName != "test_tool" {
 		t.Errorf("Expected ToolName to be 'test_tool', got '%s'", context.ToolName)
 	}
@@ -62,7 +58,6 @@ func TestInputAnalysis(t *testing.T) {
 		RiskFactors:       []string{"privilege_escalation"},
 		InputMetadata:     map[string]interface{}{"size": 1024},
 	}
-
 	if analysis.InputComplexity != "medium" {
 		t.Errorf("Expected InputComplexity to be 'medium', got '%s'", analysis.InputComplexity)
 	}
@@ -96,7 +91,6 @@ func TestOutputAnalysis(t *testing.T) {
 		ImprovementAreas: []string{"optimization"},
 		OutputMetadata:   map[string]interface{}{"size": 2048},
 	}
-
 	if analysis.OutputQuality != "excellent" {
 		t.Errorf("Expected OutputQuality to be 'excellent', got '%s'", analysis.OutputQuality)
 	}
@@ -127,7 +121,6 @@ func TestAIQualityMetric(t *testing.T) {
 		Value: 45.5,
 		Unit:  "seconds",
 	}
-
 	if metric.Name != "build_time" {
 		t.Errorf("Expected Name to be 'build_time', got '%s'", metric.Name)
 	}
@@ -142,14 +135,12 @@ func TestAIQualityMetric(t *testing.T) {
 // Test AISimilarError type
 func TestAISimilarError(t *testing.T) {
 	timestamp := time.Now()
-
 	error := AISimilarError{
 		ErrorMessage: "Build failed",
 		Resolution:   "Retry with clean cache",
 		Success:      true,
 		Timestamp:    timestamp,
 	}
-
 	if error.ErrorMessage != "Build failed" {
 		t.Errorf("Expected ErrorMessage to be 'Build failed', got '%s'", error.ErrorMessage)
 	}
@@ -172,7 +163,6 @@ func TestAIPerformanceIssue(t *testing.T) {
 		Description: "High memory usage detected",
 		Suggestion:  "Optimize memory allocation",
 	}
-
 	if issue.Type != "memory" {
 		t.Errorf("Expected Type to be 'memory', got '%s'", issue.Type)
 	}
@@ -194,7 +184,6 @@ func TestAIFileChange(t *testing.T) {
 		Operation: "create",
 		Size:      1024,
 	}
-
 	if change.Path != "/path/to/file.txt" {
 		t.Errorf("Expected Path to be '/path/to/file.txt', got '%s'", change.Path)
 	}
@@ -213,7 +202,6 @@ func TestAIEnvChange(t *testing.T) {
 		OldValue: "/usr/bin",
 		NewValue: "/usr/bin:/usr/local/bin",
 	}
-
 	if change.Variable != "PATH" {
 		t.Errorf("Expected Variable to be 'PATH', got '%s'", change.Variable)
 	}
@@ -233,7 +221,6 @@ func TestAIActionRecommendation(t *testing.T) {
 		Reasoning:  "Build time is above threshold",
 		Priority:   1,
 	}
-
 	if recommendation.Action != "optimize_build" {
 		t.Errorf("Expected Action to be 'optimize_build', got '%s'", recommendation.Action)
 	}
@@ -255,7 +242,6 @@ func TestAIOptimizationTip(t *testing.T) {
 		Suggestion:  "Use multi-stage builds",
 		ImpactLevel: "high",
 	}
-
 	if tip.Area != "build_performance" {
 		t.Errorf("Expected Area to be 'build_performance', got '%s'", tip.Area)
 	}
@@ -272,9 +258,7 @@ func TestGatherPerformanceMetrics(t *testing.T) {
 	logger := zerolog.Nop()
 	contextSharer := &DefaultContextSharer{}
 	enhancer := NewAIContextEnhancer(contextSharer, logger)
-
 	metrics := enhancer.gatherPerformanceMetrics("test-session")
-
 	if metrics == nil {
 		t.Error("gatherPerformanceMetrics should not return nil")
 	}
@@ -297,9 +281,7 @@ func TestGatherResourceUsage(t *testing.T) {
 	logger := zerolog.Nop()
 	contextSharer := &DefaultContextSharer{}
 	enhancer := NewAIContextEnhancer(contextSharer, logger)
-
 	usage := enhancer.gatherResourceUsage()
-
 	if usage == nil {
 		t.Error("gatherResourceUsage should not return nil")
 	}
@@ -325,7 +307,6 @@ func TestAIValidationResult(t *testing.T) {
 		Status:  "valid",
 		Message: "Image reference is valid",
 	}
-
 	if result.Field != "source_image" {
 		t.Errorf("Expected Field to be 'source_image', got '%s'", result.Field)
 	}
@@ -344,7 +325,6 @@ func TestAIPatternMatch(t *testing.T) {
 		Confidence:  0.95,
 		Description: "Multi-stage build pattern detected",
 	}
-
 	if match.Pattern != "dockerfile_best_practice" {
 		t.Errorf("Expected Pattern to be 'dockerfile_best_practice', got '%s'", match.Pattern)
 	}

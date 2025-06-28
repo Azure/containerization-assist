@@ -9,13 +9,10 @@ import (
 // Test NewContextValidator constructor
 func TestNewContextValidator(t *testing.T) {
 	logger := zerolog.Nop()
-
 	validator := NewContextValidator(logger)
-
 	if validator == nil {
 		t.Error("NewContextValidator should not return nil")
 	}
-
 	// Test that the validator has been created with proper logger
 	// We can't easily test the logger field since it's private,
 	// but we can test that the validator is functional
@@ -31,7 +28,6 @@ func TestContextValidatorStruct(t *testing.T) {
 	validator := ContextValidator{
 		logger: logger,
 	}
-
 	// Test that we can create the struct directly
 	if validator.logger.GetLevel() < 0 {
 		// Just checking the logger is set

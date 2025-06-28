@@ -72,7 +72,10 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 	// Parse analysis results
 	if result != nil {
 		if analysis, ok := result.(map[string]interface{}); ok {
-			state.RepoAnalysis = analysis
+			if state.SessionState.Metadata == nil {
+				state.SessionState.Metadata = make(map[string]interface{})
+			}
+			state.SessionState.Metadata["repo_analysis"] = analysis
 
 			// Extract key information
 			language := genericutils.MapGetWithDefault[string](analysis, "language", "")
@@ -162,12 +165,15 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 		if dockerResult, ok := result.(map[string]interface{}); ok {
 			content := genericutils.MapGetWithDefault[string](dockerResult, "content", "")
 			if content != "" {
-				state.Dockerfile.Content = content
+				if state.SessionState.Metadata == nil {
+					state.SessionState.Metadata = make(map[string]interface{})
+				}
+				state.SessionState.Metadata["dockerfile_content"] = content
 				path := genericutils.MapGetWithDefault[string](dockerResult, "file_path", "")
 				if path == "" {
 					path = "Dockerfile"
 				}
-				state.Dockerfile.Path = path
+				state.SessionState.Metadata["dockerfile_path"] = path
 
 				// Check for validation results
 				if validationData, ok := dockerResult["validation"].(map[string]interface{}); ok {
@@ -202,7 +208,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 						}
 					}
 
-					state.Dockerfile.ValidationResult = validation
+					state.SessionState.Metadata["dockerfile_validation_result"] = validation
 				}
 
 				// Add Dockerfile artifact

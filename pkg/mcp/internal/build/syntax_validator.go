@@ -30,10 +30,8 @@ func (v *SyntaxValidator) Validate(content string, options ValidationOptions) (*
 		Bool("use_hadolint", options.UseHadolint).
 		Str("severity", options.Severity).
 		Msg("Starting Dockerfile syntax validation")
-
 	var coreResult *docker.ValidationResult
 	var err error
-
 	if options.UseHadolint {
 		// Try Hadolint validation first
 		coreResult, err = v.hadolint.ValidateWithHadolint(nil, content)
@@ -45,23 +43,18 @@ func (v *SyntaxValidator) Validate(content string, options ValidationOptions) (*
 		// Use basic validation
 		coreResult = v.basic.ValidateDockerfile(content)
 	}
-
 	// Convert core result to our result type
 	result := ConvertCoreResult(coreResult)
-
 	// Apply severity filtering if specified
 	if options.Severity != "" {
 		v.filterBySeverity(result, options.Severity)
 	}
-
 	// Apply rule filtering if specified
 	if len(options.IgnoreRules) > 0 {
 		v.filterByRules(result, options.IgnoreRules)
 	}
-
 	// Add syntax-specific checks
 	v.performSyntaxChecks(content, result)
-
 	return result, nil
 }
 
@@ -73,24 +66,19 @@ func (v *SyntaxValidator) Analyze(lines []string, context ValidationContext) int
 		DeprecatedUsage:     make([]string, 0),
 		MultiStageInfo:      MultiStageInfo{Stages: make([]StageInfo, 0)},
 	}
-
 	currentStage := -1
 	instructionCount := make(map[string]int)
-
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-
 		upper := strings.ToUpper(trimmed)
 		instruction := strings.Fields(upper)[0]
-
 		// Track valid instructions
 		if isValidInstruction(instruction) {
 			analysis.ValidInstructions++
 			instructionCount[instruction]++
-
 			// Track multi-stage builds
 			if strings.HasPrefix(upper, "FROM") {
 				currentStage++
@@ -107,17 +95,14 @@ func (v *SyntaxValidator) Analyze(lines []string, context ValidationContext) int
 		} else {
 			analysis.InvalidInstructions++
 		}
-
 		// Check for deprecated usage
 		if deprecated := checkDeprecatedSyntax(trimmed); deprecated != "" {
 			analysis.DeprecatedUsage = append(analysis.DeprecatedUsage,
 				fmt.Sprintf("Line %d: %s", i+1, deprecated))
 		}
 	}
-
 	analysis.MultiStageInfo.TotalStages = len(analysis.MultiStageInfo.Stages)
 	analysis.InstructionUsage = instructionCount
-
 	return analysis
 }
 
@@ -146,7 +131,6 @@ type StageInfo struct {
 // performSyntaxChecks performs additional syntax validation
 func (v *SyntaxValidator) performSyntaxChecks(content string, result *ValidationResult) {
 	lines := strings.Split(content, "\n")
-
 	// Check for missing FROM instruction
 	hasFrom := false
 	for _, line := range lines {
@@ -155,7 +139,6 @@ func (v *SyntaxValidator) performSyntaxChecks(content string, result *Validation
 			break
 		}
 	}
-
 	if !hasFrom {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    1,
@@ -164,10 +147,8 @@ func (v *SyntaxValidator) performSyntaxChecks(content string, result *Validation
 			Rule:    "syntax",
 		})
 	}
-
 	// Check for instruction case consistency
 	v.checkInstructionCase(lines, result)
-
 	// Check for line continuation issues
 	v.checkLineContinuation(lines, result)
 }
@@ -190,7 +171,6 @@ func (v *SyntaxValidator) filterByRules(result *ValidationResult, ignoreRules []
 	for _, rule := range ignoreRules {
 		ignoreMap[rule] = true
 	}
-
 	// Filter errors
 	filteredErrors := make([]ValidationError, 0)
 	for _, err := range result.Errors {
@@ -199,7 +179,6 @@ func (v *SyntaxValidator) filterByRules(result *ValidationResult, ignoreRules []
 		}
 	}
 	result.Errors = filteredErrors
-
 	// Filter warnings
 	filteredWarnings := make([]ValidationWarning, 0)
 	for _, warn := range result.Warnings {
@@ -208,7 +187,6 @@ func (v *SyntaxValidator) filterByRules(result *ValidationResult, ignoreRules []
 		}
 	}
 	result.Warnings = filteredWarnings
-
 	// Update counts (TotalIssues field no longer exists, but we can log the count)
 	v.logger.Debug().
 		Int("total_issues", len(result.Errors)+len(result.Warnings)).
@@ -219,13 +197,11 @@ func (v *SyntaxValidator) filterByRules(result *ValidationResult, ignoreRules []
 func (v *SyntaxValidator) checkInstructionCase(lines []string, result *ValidationResult) {
 	upperCount := 0
 	lowerCount := 0
-
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-
 		parts := strings.Fields(trimmed)
 		if len(parts) > 0 {
 			instruction := parts[0]
@@ -238,7 +214,6 @@ func (v *SyntaxValidator) checkInstructionCase(lines []string, result *Validatio
 			}
 		}
 	}
-
 	if upperCount > 0 && lowerCount > 0 {
 		result.Warnings = append(result.Warnings, ValidationWarning{
 			Line:    0,
@@ -253,7 +228,6 @@ func (v *SyntaxValidator) checkInstructionCase(lines []string, result *Validatio
 func (v *SyntaxValidator) checkLineContinuation(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Check for backslash not at end of line
 		if strings.Contains(trimmed, "\\") && !strings.HasSuffix(trimmed, "\\") {
 			result.Warnings = append(result.Warnings, ValidationWarning{
@@ -263,7 +237,6 @@ func (v *SyntaxValidator) checkLineContinuation(lines []string, result *Validati
 				Rule:    "syntax",
 			})
 		}
-
 		// Check for trailing whitespace after backslash
 		if strings.HasSuffix(line, "\\ ") || strings.HasSuffix(line, "\\\t") {
 			result.Errors = append(result.Errors, ValidationError{
@@ -277,7 +250,6 @@ func (v *SyntaxValidator) checkLineContinuation(lines []string, result *Validati
 }
 
 // Helper functions
-
 func getSeverityLevel(severity string) int {
 	switch strings.ToLower(severity) {
 	case "info":
@@ -292,7 +264,6 @@ func getSeverityLevel(severity string) int {
 		return 0
 	}
 }
-
 func isValidInstruction(instruction string) bool {
 	validInstructions := []string{
 		"FROM", "RUN", "CMD", "LABEL", "MAINTAINER", "EXPOSE",
@@ -300,7 +271,6 @@ func isValidInstruction(instruction string) bool {
 		"WORKDIR", "ARG", "ONBUILD", "STOPSIGNAL", "HEALTHCHECK",
 		"SHELL",
 	}
-
 	for _, valid := range validInstructions {
 		if instruction == valid {
 			return true
@@ -308,7 +278,6 @@ func isValidInstruction(instruction string) bool {
 	}
 	return false
 }
-
 func extractStageName(fromLine string) string {
 	parts := strings.Fields(fromLine)
 	for i, part := range parts {
@@ -318,7 +287,6 @@ func extractStageName(fromLine string) string {
 	}
 	return ""
 }
-
 func extractBaseImage(fromLine string) string {
 	parts := strings.Fields(fromLine)
 	if len(parts) >= 2 {
@@ -326,16 +294,12 @@ func extractBaseImage(fromLine string) string {
 	}
 	return ""
 }
-
 func checkDeprecatedSyntax(line string) string {
 	trimmed := strings.TrimSpace(line)
 	upper := strings.ToUpper(trimmed)
-
 	if strings.HasPrefix(upper, "MAINTAINER") {
 		return "MAINTAINER is deprecated, use LABEL maintainer=\"...\" instead"
 	}
-
 	// Add more deprecated syntax checks as needed
-
 	return ""
 }

@@ -35,31 +35,26 @@ func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCt
 		AllAttempts:   []mcptypes.FixAttempt{},
 		TotalAttempts: 0,
 	}
-
 	f.logger.Info().
 		Str("session_id", fixingCtx.SessionID).
 		Str("tool", fixingCtx.ToolName).
 		Str("operation", fixingCtx.OperationType).
 		Msg("Starting iterative fixing process")
-
 	for attempt := 1; attempt <= fixingCtx.MaxAttempts; attempt++ {
 		f.logger.Debug().
 			Int("attempt", attempt).
 			Int("max_attempts", fixingCtx.MaxAttempts).
 			Msg("Starting fix attempt")
-
 		// Get fix strategies for this attempt
 		strategies, err := f.getFixStrategiesForContext(ctx, fixingCtx)
 		if err != nil {
 			f.logger.Error().Err(err).Int("attempt", attempt).Msg("Failed to get fix strategies")
 			continue
 		}
-
 		if len(strategies) == 0 {
 			f.logger.Warn().Int("attempt", attempt).Msg("No fix strategies available")
 			break
 		}
-
 		// Try the highest priority strategy
 		strategy := strategies[0]
 		fixAttempt, err := f.ApplyFix(ctx, fixingCtx, strategy)
@@ -67,11 +62,9 @@ func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCt
 			f.logger.Error().Err(err).Int("attempt", attempt).Msg("Failed to apply fix")
 			continue
 		}
-
 		result.AllAttempts = append(result.AllAttempts, *fixAttempt)
 		result.TotalAttempts = attempt
 		result.FinalAttempt = fixAttempt
-
 		// Check if fix was successful
 		if fixAttempt.Success {
 			result.Success = true
@@ -82,24 +75,19 @@ func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCt
 				Msg("Fix attempt succeeded")
 			return result, nil
 		}
-
 		// Add this attempt to the context for the next iteration
 		fixingCtx.AttemptHistory = append(fixingCtx.AttemptHistory, *fixAttempt)
-
 		f.logger.Debug().
 			Int("attempt", attempt).
 			Str("strategy", strategy.Name).
 			Msg("Fix attempt failed, preparing for next attempt")
 	}
-
 	result.TotalDuration = time.Since(startTime)
 	result.Error = fmt.Errorf("failed to fix after %d attempts", fixingCtx.MaxAttempts)
-
 	f.logger.Error().
 		Int("total_attempts", result.TotalAttempts).
 		Dur("total_duration", result.TotalDuration).
 		Msg("All fix attempts failed")
-
 	return result, result.Error
 }
 
@@ -107,29 +95,24 @@ func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCt
 func (f *DefaultIterativeFixer) getFixStrategiesForContext(ctx context.Context, fixingCtx *FixingContext) ([]mcptypes.FixStrategy, error) {
 	// Build comprehensive prompt for AI analysis
 	prompt := f.buildAnalysisPrompt(fixingCtx)
-
 	f.logger.Debug().
 		Str("session_id", fixingCtx.SessionID).
 		Int("prompt_length", len(prompt)).
 		Msg("Requesting fix strategies from AI")
-
 	// Use analyzer with file tools for comprehensive analysis
 	analysisResult, err := f.analyzer.AnalyzeWithFileTools(ctx, prompt, fixingCtx.BaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze error for fix strategies: %w", err)
 	}
-
 	// Parse the analysis result into fix strategies
 	strategies, err := f.parseFixStrategies(analysisResult)
 	if err != nil {
 		f.logger.Error().Err(err).Msg("Failed to parse fix strategies from AI response")
 		return nil, fmt.Errorf("failed to parse fix strategies: %w", err)
 	}
-
 	f.logger.Info().
 		Int("strategies_count", len(strategies)).
 		Msg("Generated fix strategies")
-
 	return strategies, nil
 }
 
@@ -141,12 +124,10 @@ func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingC
 		StartTime:     startTime,
 		FixStrategy:   strategy,
 	}
-
 	f.logger.Info().
 		Str("strategy", strategy.Name).
 		Int("priority", strategy.Priority).
 		Msg("Applying fix strategy")
-
 	// Generate specific fix content using AI
 	fixPrompt := f.buildFixApplicationPrompt(fixingCtx, strategy)
 	fixResult, err := f.analyzer.AnalyzeWithFileTools(ctx, fixPrompt, fixingCtx.BaseDir)
@@ -156,17 +137,14 @@ func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingC
 		attempt.Error = fmt.Errorf("failed to generate fix content: %w", err)
 		return attempt, err
 	}
-
 	attempt.AnalysisPrompt = fixPrompt
 	attempt.AnalysisResult = fixResult
 	attempt.FixedContent = f.extractFixedContent(fixResult)
-
 	// Validate the fix
 	success, err := f.ValidateFix(ctx, fixingCtx, attempt)
 	attempt.Success = success
 	attempt.EndTime = time.Now()
 	attempt.Duration = time.Since(startTime)
-
 	if err != nil {
 		attempt.Error = err
 		f.logger.Error().Err(err).Str("strategy", strategy.Name).Msg("Fix validation failed")
@@ -176,7 +154,6 @@ func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingC
 			Dur("duration", attempt.Duration).
 			Msg("Fix applied successfully")
 	}
-
 	return attempt, nil
 }
 
@@ -185,39 +162,31 @@ func (f *DefaultIterativeFixer) ValidateFix(ctx context.Context, fixingCtx *Fixi
 	// This is a simplified validation - in a real implementation,
 	// this would trigger the actual operation (build, deploy, etc.)
 	// to verify the fix worked
-
 	if attempt.FixedContent == "" {
 		return false, fmt.Errorf("no fixed content generated")
 	}
-
 	// For now, we'll consider the fix successful if we got content
 	// Real implementation would integrate with the actual operation
 	f.logger.Debug().
 		Int("attempt", attempt.AttemptNumber).
 		Msg("Fix validation passed (simplified)")
-
 	return true, nil
 }
 
 // buildAnalysisPrompt creates a comprehensive prompt for AI analysis
 func (f *DefaultIterativeFixer) buildAnalysisPrompt(fixingCtx *FixingContext) string {
 	var prompt strings.Builder
-
 	prompt.WriteString(fmt.Sprintf(`You are an expert containerization troubleshooter helping to fix a %s operation failure.
-
 ## Context
 - Session ID: %s
 - Tool: %s
 - Operation: %s
 - Workspace: %s
-
 ## Error Details
 `, fixingCtx.OperationType, fixingCtx.SessionID, fixingCtx.ToolName, fixingCtx.OperationType, fixingCtx.WorkspaceDir))
-
 	if fixingCtx.OriginalError != nil {
 		prompt.WriteString(fmt.Sprintf("Original Error: %s\n", fixingCtx.OriginalError.Error()))
 	}
-
 	if fixingCtx.ErrorDetails != nil {
 		prompt.WriteString(fmt.Sprintf(`
 Rich Error Details:
@@ -228,7 +197,6 @@ Rich Error Details:
 `, fixingCtx.ErrorDetails["code"], fixingCtx.ErrorDetails["type"],
 			fixingCtx.ErrorDetails["severity"], fixingCtx.ErrorDetails["message"]))
 	}
-
 	// Add previous attempt history for context
 	if len(fixingCtx.AttemptHistory) > 0 {
 		prompt.WriteString("\n## Previous Fix Attempts\n")
@@ -244,11 +212,9 @@ Attempt %d:
 			}
 		}
 	}
-
 	prompt.WriteString(`
 ## Task
 Analyze this failure and provide 1-3 specific fix strategies in order of priority.
-
 For each strategy, provide:
 1. Name: Brief descriptive name
 2. Description: What this fix does
@@ -258,12 +224,9 @@ For each strategy, provide:
 6. FileChanges: Files to modify with old/new content
 7. Validation: How to verify the fix worked
 8. EstimatedTime: Rough time estimate
-
 Examine the workspace files using file reading tools to understand the current state.
 Focus on practical, actionable fixes that address the root cause.
-
 Return your response in this exact format:
-
 STRATEGY 1:
 Name: [strategy name]
 Description: [description]
@@ -273,68 +236,53 @@ Commands: [command1], [command2], ...
 FileChanges: [file1:operation:reason], [file2:operation:reason], ...
 Validation: [validation steps]
 EstimatedTime: [time estimate]
-
 STRATEGY 2:
 [repeat format]
 `)
-
 	return prompt.String()
 }
 
 // buildFixApplicationPrompt creates a prompt for applying a specific fix
 func (f *DefaultIterativeFixer) buildFixApplicationPrompt(fixingCtx *FixingContext, strategy mcptypes.FixStrategy) string {
 	var prompt strings.Builder
-
 	prompt.WriteString(fmt.Sprintf(`You are applying a specific fix strategy for a %s operation failure.
-
 ## Fix Strategy to Apply
 Name: %s
 Description: %s
 Type: %s
-
 ## Context
 - Session ID: %s
 - Workspace: %s
 - Base Directory: %s
-
 ## Previous Attempts
 `, fixingCtx.OperationType, strategy.Name, strategy.Description, strategy.Type,
 		fixingCtx.SessionID, fixingCtx.WorkspaceDir, fixingCtx.BaseDir))
-
 	for i, attempt := range fixingCtx.AttemptHistory {
 		prompt.WriteString(fmt.Sprintf("Attempt %d (%s): %t\n", i+1, attempt.FixStrategy.Name, attempt.Success))
 	}
-
 	prompt.WriteString(fmt.Sprintf(`
 ## Task
 Apply the "%s" fix strategy by:
-
 1. Examining current files using file reading tools
 2. Generating the exact fixed content
 3. Providing specific file modifications needed
-
 Focus on the %s type fix. Return the fixed content between:
 <FIXED_CONTENT>
 [your fixed content here]
 </FIXED_CONTENT>
-
 Be precise and ensure the fix addresses the specific error while maintaining functionality.
 `, strategy.Name, strategy.Type))
-
 	return prompt.String()
 }
 
 // parseFixStrategies parses AI response into structured fix strategies
 func (f *DefaultIterativeFixer) parseFixStrategies(response string) ([]mcptypes.FixStrategy, error) {
 	var strategies []mcptypes.FixStrategy
-
 	// Simple parsing - in production this would be more robust
 	lines := strings.Split(response, "\n")
 	var currentStrategy *mcptypes.FixStrategy
-
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-
 		if strings.HasPrefix(line, "STRATEGY ") {
 			if currentStrategy != nil {
 				strategies = append(strategies, *currentStrategy)
@@ -360,11 +308,9 @@ func (f *DefaultIterativeFixer) parseFixStrategies(response string) ([]mcptypes.
 			}
 		}
 	}
-
 	if currentStrategy != nil {
 		strategies = append(strategies, *currentStrategy)
 	}
-
 	return strategies, nil
 }
 
@@ -372,18 +318,15 @@ func (f *DefaultIterativeFixer) parseFixStrategies(response string) ([]mcptypes.
 func (f *DefaultIterativeFixer) extractFixedContent(response string) string {
 	startTag := "<FIXED_CONTENT>"
 	endTag := "</FIXED_CONTENT>"
-
 	start := strings.Index(response, startTag)
 	if start == -1 {
 		return ""
 	}
 	start += len(startTag)
-
 	end := strings.Index(response[start:], endTag)
 	if end == -1 {
 		return ""
 	}
-
 	return strings.TrimSpace(response[start : start+end])
 }
 
@@ -395,20 +338,16 @@ func (f *DefaultIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mc
 		// Try to create a basic FixingContext from the issue
 		return nil, fmt.Errorf("issue must be of type *FixingContext")
 	}
-
 	// Ensure maxAttempts is set
 	if fixingCtx.MaxAttempts == 0 {
 		fixingCtx.MaxAttempts = f.maxAttempts
 	}
-
 	// Call the internal attempt fix method
 	result, err := f.attemptFixInternal(ctx, fixingCtx)
-
 	// Update fix history
 	if result != nil && len(result.AllAttempts) > 0 {
 		f.fixHistory = append(f.fixHistory, result.AllAttempts...)
 	}
-
 	return result, err
 }
 
@@ -419,10 +358,8 @@ func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, issue interface{
 	if !ok {
 		return nil, fmt.Errorf("issue must be of type *FixingContext")
 	}
-
 	// Set the specific attempt number
 	fixingCtx.MaxAttempts = attempt
-
 	// Call the main Fix method
 	return f.Fix(ctx, fixingCtx)
 }

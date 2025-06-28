@@ -25,7 +25,6 @@ type ValidationOptions struct {
 
 // Note: ValidationResult, ValidationError, ValidationWarning, and SecurityIssue
 // are defined in common.go to avoid duplication
-
 // OptimizationTip represents an optimization suggestion
 type OptimizationTip struct {
 	Type             string
@@ -104,7 +103,6 @@ func ConvertCoreResult(coreResult *docker.ValidationResult) *ValidationResult {
 		Errors:   make([]ValidationError, 0),
 		Warnings: make([]ValidationWarning, 0),
 	}
-
 	// Convert errors
 	for _, err := range coreResult.Errors {
 		result.Errors = append(result.Errors, ValidationError{
@@ -115,7 +113,6 @@ func ConvertCoreResult(coreResult *docker.ValidationResult) *ValidationResult {
 		})
 		// Note: CriticalIssues field removed from ValidationResult
 	}
-
 	// Convert warnings
 	for _, warn := range coreResult.Warnings {
 		result.Warnings = append(result.Warnings, ValidationWarning{
@@ -125,14 +122,10 @@ func ConvertCoreResult(coreResult *docker.ValidationResult) *ValidationResult {
 			Rule:    warn.Type,
 		})
 	}
-
 	// Note: Context field removed from ValidationResult
-
 	// Note: TotalIssues field removed from ValidationResult
-
 	return result
 }
-
 func determineImpact(warningType string) string {
 	switch warningType {
 	case "security":

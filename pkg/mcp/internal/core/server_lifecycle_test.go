@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -404,13 +404,13 @@ func TestServerResourceLimits(t *testing.T) {
 	// Create sessions up to the limit
 	session1Interface, err := server.sessionManager.GetOrCreateSession("")
 	assert.NoError(t, err)
-	session1, ok := session1Interface.(*sessiontypes.SessionState)
+	session1, ok := session1Interface.(*mcptypes.SessionState)
 	require.True(t, ok, "session1 should be of correct type")
 	assert.NotEmpty(t, session1.SessionID)
 
 	session2Interface, err := server.sessionManager.GetOrCreateSession("")
 	assert.NoError(t, err)
-	session2, ok := session2Interface.(*sessiontypes.SessionState)
+	session2, ok := session2Interface.(*mcptypes.SessionState)
 	require.True(t, ok, "session2 should be of correct type")
 	assert.NotEmpty(t, session2.SessionID)
 

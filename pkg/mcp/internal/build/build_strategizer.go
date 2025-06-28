@@ -32,44 +32,35 @@ func (bs *BuildStrategizer) OptimizeStrategy(ctx context.Context, request *Build
 		Str("project_type", request.ProjectType).
 		Str("primary_goal", request.Goals.PrimarGoal).
 		Msg("Starting build strategy optimization")
-
 	// Get base strategies for the project type
 	baseStrategies := bs.strategyDatabase.GetStrategiesForProjectType(request.ProjectType)
-
 	// Filter strategies based on constraints
 	viableStrategies := bs.filterByConstraints(baseStrategies, request.Constraints)
-
 	// Optimize strategies based on goals
 	optimizedStrategies := bs.optimizer.OptimizeStrategies(viableStrategies, request.Goals)
-
 	// Select the best strategy
 	bestStrategy, err := bs.selectBestStrategy(optimizedStrategies, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select best strategy: %w", err)
 	}
-
 	// Enhance strategy with context-specific optimizations
 	enhancedStrategy := bs.enhanceWithContext(bestStrategy, request.Context)
-
 	bs.logger.Info().
 		Str("strategy_name", enhancedStrategy.Name).
 		Dur("expected_duration", enhancedStrategy.ExpectedDuration).
 		Str("risk_level", enhancedStrategy.RiskAssessment.OverallRisk).
 		Msg("Build strategy optimization completed")
-
 	return enhancedStrategy, nil
 }
 
 // filterByConstraints filters strategies that meet the given constraints
 func (bs *BuildStrategizer) filterByConstraints(strategies []*OptimizedBuildStrategy, constraints *BuildConstraints) []*OptimizedBuildStrategy {
 	filtered := []*OptimizedBuildStrategy{}
-
 	for _, strategy := range strategies {
 		if bs.meetsConstraints(strategy, constraints) {
 			filtered = append(filtered, strategy)
 		}
 	}
-
 	// If no strategies meet constraints, relax them and try again
 	if len(filtered) == 0 {
 		bs.logger.Warn().Msg("No strategies meet constraints, relaxing constraints")
@@ -80,26 +71,21 @@ func (bs *BuildStrategizer) filterByConstraints(strategies []*OptimizedBuildStra
 			}
 		}
 	}
-
 	return filtered
 }
-
 func (bs *BuildStrategizer) meetsConstraints(strategy *OptimizedBuildStrategy, constraints *BuildConstraints) bool {
 	// Check duration constraint
 	if constraints.MaxDuration > 0 && strategy.ExpectedDuration > constraints.MaxDuration {
 		return false
 	}
-
 	// Check memory constraint
 	if constraints.MaxMemory > 0 && strategy.ResourceUsage.Memory > constraints.MaxMemory {
 		return false
 	}
-
 	// Check CPU constraint
 	if constraints.MaxCPU > 0 && strategy.ResourceUsage.CPU > constraints.MaxCPU {
 		return false
 	}
-
 	// Check allowed tools
 	if len(constraints.AllowedTools) > 0 {
 		for _, step := range strategy.Steps {
@@ -115,17 +101,14 @@ func (bs *BuildStrategizer) meetsConstraints(strategy *OptimizedBuildStrategy, c
 			}
 		}
 	}
-
 	// Check security level
 	if constraints.SecurityLevel != "" {
 		if !bs.meetsSecurityLevel(strategy, constraints.SecurityLevel) {
 			return false
 		}
 	}
-
 	return true
 }
-
 func (bs *BuildStrategizer) meetsSecurityLevel(strategy *OptimizedBuildStrategy, requiredLevel string) bool {
 	// Simple security level check - could be enhanced
 	switch requiredLevel {
@@ -139,7 +122,6 @@ func (bs *BuildStrategizer) meetsSecurityLevel(strategy *OptimizedBuildStrategy,
 		return true
 	}
 }
-
 func (bs *BuildStrategizer) relaxConstraints(constraints *BuildConstraints) *BuildConstraints {
 	relaxed := &BuildConstraints{
 		MaxDuration:   constraints.MaxDuration + time.Minute*10, // Add 10 minutes
@@ -148,24 +130,19 @@ func (bs *BuildStrategizer) relaxConstraints(constraints *BuildConstraints) *Bui
 		AllowedTools:  constraints.AllowedTools,                 // Keep tool restrictions
 		SecurityLevel: constraints.SecurityLevel,                // Keep security level
 	}
-
 	// If duration was 0 (no limit), set a reasonable default
 	if constraints.MaxDuration == 0 {
 		relaxed.MaxDuration = time.Hour
 	}
-
 	return relaxed
 }
-
 func (bs *BuildStrategizer) selectBestStrategy(strategies []*OptimizedBuildStrategy, request *BuildOptimizationRequest) (*OptimizedBuildStrategy, error) {
 	if len(strategies) == 0 {
 		return nil, fmt.Errorf("no viable strategies available")
 	}
-
 	// Score each strategy based on goals
 	bestStrategy := strategies[0]
 	bestScore := bs.scoreStrategy(bestStrategy, request.Goals)
-
 	for _, strategy := range strategies[1:] {
 		score := bs.scoreStrategy(strategy, request.Goals)
 		if score > bestScore {
@@ -173,28 +150,20 @@ func (bs *BuildStrategizer) selectBestStrategy(strategies []*OptimizedBuildStrat
 			bestScore = score
 		}
 	}
-
 	return bestStrategy, nil
 }
-
 func (bs *BuildStrategizer) scoreStrategy(strategy *OptimizedBuildStrategy, goals *OptimizationGoals) float64 {
 	score := 0.0
-
 	// Score based on primary goal
 	score += bs.scorePrimaryGoal(strategy, goals.PrimarGoal)
-
 	// Adjust for risk tolerance
 	score += bs.scoreRiskTolerance(strategy, goals.AcceptableRisk)
-
 	// Adjust for time constraints
 	score += bs.scoreTimeConstraints(strategy, goals.TimeConstraints)
-
 	// Adjust for quality level
 	score += bs.scoreQualityLevel(strategy, goals.QualityLevel)
-
 	return score
 }
-
 func (bs *BuildStrategizer) scorePrimaryGoal(strategy *OptimizedBuildStrategy, primaryGoal string) float64 {
 	switch primaryGoal {
 	case "speed":
@@ -209,7 +178,6 @@ func (bs *BuildStrategizer) scorePrimaryGoal(strategy *OptimizedBuildStrategy, p
 		return 0
 	}
 }
-
 func (bs *BuildStrategizer) scoreSpeed(duration time.Duration) float64 {
 	if duration < time.Minute*5 {
 		return 40
@@ -220,7 +188,6 @@ func (bs *BuildStrategizer) scoreSpeed(duration time.Duration) float64 {
 	}
 	return 10
 }
-
 func (bs *BuildStrategizer) scoreSize(diskUsage int64) float64 {
 	if diskUsage < 100*1024*1024 { // Less than 100MB
 		return 40
@@ -229,7 +196,6 @@ func (bs *BuildStrategizer) scoreSize(diskUsage int64) float64 {
 	}
 	return 10
 }
-
 func (bs *BuildStrategizer) scoreSecurity(overallRisk string) float64 {
 	switch overallRisk {
 	case "low":
@@ -242,7 +208,6 @@ func (bs *BuildStrategizer) scoreSecurity(overallRisk string) float64 {
 		return 0
 	}
 }
-
 func (bs *BuildStrategizer) scoreReliability(failurePointCount int) float64 {
 	if failurePointCount == 0 {
 		return 40
@@ -251,7 +216,6 @@ func (bs *BuildStrategizer) scoreReliability(failurePointCount int) float64 {
 	}
 	return 15
 }
-
 func (bs *BuildStrategizer) scoreRiskTolerance(strategy *OptimizedBuildStrategy, acceptableRisk string) float64 {
 	if strategy.RiskAssessment.OverallRisk == "high" {
 		switch acceptableRisk {
@@ -263,14 +227,12 @@ func (bs *BuildStrategizer) scoreRiskTolerance(strategy *OptimizedBuildStrategy,
 	}
 	return 0
 }
-
 func (bs *BuildStrategizer) scoreTimeConstraints(strategy *OptimizedBuildStrategy, timeConstraints time.Duration) float64 {
 	if timeConstraints > 0 && strategy.ExpectedDuration > timeConstraints {
 		return -30 // Heavy penalty for exceeding time constraints
 	}
 	return 0
 }
-
 func (bs *BuildStrategizer) scoreQualityLevel(strategy *OptimizedBuildStrategy, qualityLevel string) float64 {
 	stepCount := len(strategy.Steps)
 	switch qualityLevel {
@@ -289,7 +251,6 @@ func (bs *BuildStrategizer) scoreQualityLevel(strategy *OptimizedBuildStrategy, 
 	}
 	return 0
 }
-
 func (bs *BuildStrategizer) enhanceWithContext(strategy *OptimizedBuildStrategy, context map[string]interface{}) *OptimizedBuildStrategy {
 	enhanced := &OptimizedBuildStrategy{
 		Name:             strategy.Name,
@@ -302,37 +263,30 @@ func (bs *BuildStrategizer) enhanceWithContext(strategy *OptimizedBuildStrategy,
 		Disadvantages:    strategy.Disadvantages,
 		Metadata:         make(map[string]interface{}),
 	}
-
 	// Copy steps
 	copy(enhanced.Steps, strategy.Steps)
-
 	// Copy metadata
 	for k, v := range strategy.Metadata {
 		enhanced.Metadata[k] = v
 	}
-
 	// Add context-specific enhancements
 	if parallelism, exists := context["max_parallelism"]; exists {
 		if parallel, ok := parallelism.(int); ok && parallel > 1 {
 			enhanced = bs.addParallelizationOptimizations(enhanced, parallel)
 		}
 	}
-
 	if cacheDir, exists := context["cache_directory"]; exists {
 		if cache, ok := cacheDir.(string); ok && cache != "" {
 			enhanced = bs.addCacheOptimizations(enhanced, cache)
 		}
 	}
-
 	if registry, exists := context["container_registry"]; exists {
 		if reg, ok := registry.(string); ok && reg != "" {
 			enhanced = bs.addRegistryOptimizations(enhanced, reg)
 		}
 	}
-
 	return enhanced
 }
-
 func (bs *BuildStrategizer) addParallelizationOptimizations(strategy *OptimizedBuildStrategy, maxParallel int) *OptimizedBuildStrategy {
 	// Mark parallelizable steps
 	for _, step := range strategy.Steps {
@@ -341,17 +295,13 @@ func (bs *BuildStrategizer) addParallelizationOptimizations(strategy *OptimizedB
 			step.Environment["PARALLEL_JOBS"] = fmt.Sprintf("%d", maxParallel)
 		}
 	}
-
 	// Adjust expected duration for parallelization
 	strategy.ExpectedDuration = time.Duration(float64(strategy.ExpectedDuration) * 0.7) // 30% improvement estimate
-
 	strategy.Advantages = append(strategy.Advantages, "Parallelized execution for faster builds")
 	strategy.Metadata["parallelization_enabled"] = true
 	strategy.Metadata["max_parallel_jobs"] = maxParallel
-
 	return strategy
 }
-
 func (bs *BuildStrategizer) addCacheOptimizations(strategy *OptimizedBuildStrategy, cacheDir string) *OptimizedBuildStrategy {
 	// Add cache configuration to relevant steps
 	for _, step := range strategy.Steps {
@@ -363,17 +313,13 @@ func (bs *BuildStrategizer) addCacheOptimizations(strategy *OptimizedBuildStrate
 			step.Environment["ENABLE_CACHE"] = "true"
 		}
 	}
-
 	// Adjust expected duration for caching
 	strategy.ExpectedDuration = time.Duration(float64(strategy.ExpectedDuration) * 0.8) // 20% improvement estimate
-
 	strategy.Advantages = append(strategy.Advantages, "Build caching for faster subsequent builds")
 	strategy.Metadata["cache_enabled"] = true
 	strategy.Metadata["cache_directory"] = cacheDir
-
 	return strategy
 }
-
 func (bs *BuildStrategizer) addRegistryOptimizations(strategy *OptimizedBuildStrategy, registry string) *OptimizedBuildStrategy {
 	// Configure registry for container-related steps
 	for _, step := range strategy.Steps {
@@ -385,13 +331,10 @@ func (bs *BuildStrategizer) addRegistryOptimizations(strategy *OptimizedBuildStr
 			step.Environment["REGISTRY_OPTIMIZATION"] = "true"
 		}
 	}
-
 	strategy.Advantages = append(strategy.Advantages, "Optimized container registry usage")
 	strategy.Metadata["container_registry"] = registry
-
 	return strategy
 }
-
 func (bs *BuildStrategizer) isParallelizable(step *BuildStep) bool {
 	parallelizableCommands := []string{"make", "npm", "go build", "mvn", "gradle"}
 	for _, cmd := range parallelizableCommands {
@@ -401,7 +344,6 @@ func (bs *BuildStrategizer) isParallelizable(step *BuildStep) bool {
 	}
 	return false
 }
-
 func (bs *BuildStrategizer) benefitsFromCache(step *BuildStep) bool {
 	cacheableCommands := []string{"npm", "go build", "mvn", "gradle", "pip", "cargo"}
 	for _, cmd := range cacheableCommands {
@@ -411,7 +353,6 @@ func (bs *BuildStrategizer) benefitsFromCache(step *BuildStep) bool {
 	}
 	return false
 }
-
 func (bs *BuildStrategizer) isContainerRelated(step *BuildStep) bool {
 	containerCommands := []string{"docker", "podman", "buildah", "skopeo"}
 	for _, cmd := range containerCommands {
@@ -435,7 +376,6 @@ func NewStrategyDatabase() *StrategyDatabase {
 	db.loadPredefinedStrategies()
 	return db
 }
-
 func (db *StrategyDatabase) loadPredefinedStrategies() {
 	// Go strategies
 	db.strategies["go"] = []*OptimizedBuildStrategy{
@@ -469,7 +409,6 @@ func (db *StrategyDatabase) loadPredefinedStrategies() {
 			Disadvantages:    []string{"Slower", "More resource intensive"},
 		},
 	}
-
 	// Python strategies
 	db.strategies["python"] = []*OptimizedBuildStrategy{
 		{
@@ -486,7 +425,6 @@ func (db *StrategyDatabase) loadPredefinedStrategies() {
 			Disadvantages:    []string{"No validation", "Potential dependency issues"},
 		},
 	}
-
 	// JavaScript/Node.js strategies
 	db.strategies["javascript"] = []*OptimizedBuildStrategy{
 		{
@@ -503,7 +441,6 @@ func (db *StrategyDatabase) loadPredefinedStrategies() {
 			Disadvantages:    []string{"Large node_modules", "Potential security issues"},
 		},
 	}
-
 	// Generic/unknown project type strategies
 	db.strategies["generic"] = []*OptimizedBuildStrategy{
 		{
@@ -521,14 +458,12 @@ func (db *StrategyDatabase) loadPredefinedStrategies() {
 		},
 	}
 }
-
 func (db *StrategyDatabase) GetStrategiesForProjectType(projectType string) []*OptimizedBuildStrategy {
 	strategies, exists := db.strategies[strings.ToLower(projectType)]
 	if !exists {
 		// Return generic strategies for unknown project types
 		return db.strategies["generic"]
 	}
-
 	// Return a copy to avoid mutation
 	result := make([]*OptimizedBuildStrategy, len(strategies))
 	copy(result, strategies)
@@ -545,17 +480,13 @@ func NewStrategyOptimizer(logger zerolog.Logger) *StrategyOptimizer {
 		logger: logger.With().Str("component", "strategy_optimizer").Logger(),
 	}
 }
-
 func (so *StrategyOptimizer) OptimizeStrategies(strategies []*OptimizedBuildStrategy, goals *OptimizationGoals) []*OptimizedBuildStrategy {
 	optimized := make([]*OptimizedBuildStrategy, len(strategies))
-
 	for i, strategy := range strategies {
 		optimized[i] = so.optimizeStrategy(strategy, goals)
 	}
-
 	return optimized
 }
-
 func (so *StrategyOptimizer) optimizeStrategy(strategy *OptimizedBuildStrategy, goals *OptimizationGoals) *OptimizedBuildStrategy {
 	// Create a copy to avoid modifying the original
 	optimized := &OptimizedBuildStrategy{
@@ -569,7 +500,6 @@ func (so *StrategyOptimizer) optimizeStrategy(strategy *OptimizedBuildStrategy, 
 		Disadvantages:    append([]string{}, strategy.Disadvantages...),
 		Metadata:         make(map[string]interface{}),
 	}
-
 	// Copy steps
 	for i, step := range strategy.Steps {
 		optimized.Steps[i] = &BuildStep{
@@ -587,12 +517,10 @@ func (so *StrategyOptimizer) optimizeStrategy(strategy *OptimizedBuildStrategy, 
 			optimized.Steps[i].Environment[k] = v
 		}
 	}
-
 	// Copy metadata
 	for k, v := range strategy.Metadata {
 		optimized.Metadata[k] = v
 	}
-
 	// Apply goal-specific optimizations
 	switch goals.PrimarGoal {
 	case "speed":
@@ -604,10 +532,8 @@ func (so *StrategyOptimizer) optimizeStrategy(strategy *OptimizedBuildStrategy, 
 	case "reliability":
 		optimized = so.optimizeForReliability(optimized)
 	}
-
 	return optimized
 }
-
 func (so *StrategyOptimizer) optimizeForSpeed(strategy *OptimizedBuildStrategy) *OptimizedBuildStrategy {
 	// Remove non-essential steps for speed
 	essentialSteps := []*BuildStep{}
@@ -617,7 +543,6 @@ func (so *StrategyOptimizer) optimizeForSpeed(strategy *OptimizedBuildStrategy) 
 		}
 	}
 	strategy.Steps = essentialSteps
-
 	// Enable parallelization where possible
 	for _, step := range strategy.Steps {
 		if so.canParallelize(step) {
@@ -628,16 +553,12 @@ func (so *StrategyOptimizer) optimizeForSpeed(strategy *OptimizedBuildStrategy) 
 			step.Environment["PARALLEL"] = "true"
 		}
 	}
-
 	// Adjust expected duration
 	strategy.ExpectedDuration = time.Duration(float64(strategy.ExpectedDuration) * 0.7)
-
 	strategy.Advantages = append(strategy.Advantages, "Optimized for speed")
 	strategy.Metadata["optimization"] = "speed"
-
 	return strategy
 }
-
 func (so *StrategyOptimizer) optimizeForSize(strategy *OptimizedBuildStrategy) *OptimizedBuildStrategy {
 	// Add size optimization flags
 	for _, step := range strategy.Steps {
@@ -649,13 +570,10 @@ func (so *StrategyOptimizer) optimizeForSize(strategy *OptimizedBuildStrategy) *
 			step.Environment["OPTIMIZE_SIZE"] = "true"
 		}
 	}
-
 	strategy.Advantages = append(strategy.Advantages, "Optimized for size")
 	strategy.Metadata["optimization"] = "size"
-
 	return strategy
 }
-
 func (so *StrategyOptimizer) optimizeForSecurity(strategy *OptimizedBuildStrategy) *OptimizedBuildStrategy {
 	// Add security scanning steps
 	securityStep := &BuildStep{
@@ -666,17 +584,13 @@ func (so *StrategyOptimizer) optimizeForSecurity(strategy *OptimizedBuildStrateg
 		CriticalPath: true,
 	}
 	strategy.Steps = append(strategy.Steps, securityStep)
-
 	// Update duration
 	strategy.ExpectedDuration += securityStep.ExpectedTime
-
 	strategy.Advantages = append(strategy.Advantages, "Enhanced security validation")
 	strategy.RiskAssessment.OverallRisk = "low"
 	strategy.Metadata["optimization"] = "security"
-
 	return strategy
 }
-
 func (so *StrategyOptimizer) optimizeForReliability(strategy *OptimizedBuildStrategy) *OptimizedBuildStrategy {
 	// Add validation steps
 	validationStep := &BuildStep{
@@ -687,7 +601,6 @@ func (so *StrategyOptimizer) optimizeForReliability(strategy *OptimizedBuildStra
 		CriticalPath: true,
 	}
 	strategy.Steps = append(strategy.Steps, validationStep)
-
 	// Add retry logic to critical steps
 	for _, step := range strategy.Steps {
 		if step.CriticalPath {
@@ -697,17 +610,13 @@ func (so *StrategyOptimizer) optimizeForReliability(strategy *OptimizedBuildStra
 			step.Environment["RETRY_COUNT"] = "3"
 		}
 	}
-
 	// Update duration
 	strategy.ExpectedDuration += validationStep.ExpectedTime
-
 	strategy.Advantages = append(strategy.Advantages, "Enhanced reliability and validation")
 	strategy.RiskAssessment.OverallRisk = "low"
 	strategy.Metadata["optimization"] = "reliability"
-
 	return strategy
 }
-
 func (so *StrategyOptimizer) isEssentialForBuild(step *BuildStep) bool {
 	essential := []string{"build", "compile", "package", "install"}
 	stepName := strings.ToLower(step.Name)
@@ -718,7 +627,6 @@ func (so *StrategyOptimizer) isEssentialForBuild(step *BuildStep) bool {
 	}
 	return false
 }
-
 func (so *StrategyOptimizer) canParallelize(step *BuildStep) bool {
 	parallelizable := []string{"test", "lint", "scan", "analyze"}
 	stepName := strings.ToLower(step.Name)
@@ -729,7 +637,6 @@ func (so *StrategyOptimizer) canParallelize(step *BuildStep) bool {
 	}
 	return false
 }
-
 func (so *StrategyOptimizer) supportsSizeOptimization(step *BuildStep) bool {
 	return strings.Contains(step.Command, "go") && strings.Contains(step.Name, "Build")
 }
