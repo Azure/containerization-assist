@@ -880,7 +880,6 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 		},
 		Requirements: []string{
 			"valid_session_id",
-			"dockerfile_content_or_path",
 		},
 		Parameters: map[string]string{
 			"session_id":           "string - Session ID for session context",
@@ -980,11 +979,14 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 			Build()
 	}
 
+	// Auto-default to session workspace Dockerfile if neither path nor content provided
 	if validateArgs.DockerfilePath == "" && validateArgs.DockerfileContent == "" {
-		return types.NewValidationErrorBuilder("Either dockerfile_path or dockerfile_content must be provided", "dockerfile", "").
-			WithField("dockerfile_path", validateArgs.DockerfilePath).
-			WithField("has_content", validateArgs.DockerfileContent != "").
-			Build()
+		// Set default path to session workspace Dockerfile
+		validateArgs.DockerfilePath = "Dockerfile"
+		t.logger.Debug().
+			Str("session_id", validateArgs.SessionID).
+			Str("default_path", validateArgs.DockerfilePath).
+			Msg("Auto-defaulting to session workspace Dockerfile")
 	}
 
 	if validateArgs.Severity != "" {

@@ -212,12 +212,8 @@ func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args Ge
 }
 
 func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName string, args GenerateDockerfileArgs, session *sessiontypes.SessionState, response *GenerateDockerfileResult) error {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to get current directory: %v", err), "filesystem_error")
-	}
-
-	dockerfilePath := filepath.Join(cwd, "Dockerfile")
+	// Write Dockerfile to session workspace directory
+	dockerfilePath := filepath.Join(session.WorkspaceDir, "Dockerfile")
 	repositoryData := make(map[string]interface{})
 	if session.ScanSummary != nil {
 		repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)

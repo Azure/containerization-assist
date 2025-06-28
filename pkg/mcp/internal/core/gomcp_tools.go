@@ -296,62 +296,62 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 // registerAtomicToolsWithOrchestrator creates and registers atomic tools with the orchestrator
 func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependencies) error {
 	atomicTools := map[string]interface{}{
-		"analyze_repository_atomic": analyze.NewAtomicAnalyzeRepositoryTool(
+		"analyze_repository": analyze.NewAtomicAnalyzeRepositoryTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "analyze_repository_atomic").Logger(),
+			deps.Logger.With().Str("tool", "analyze_repository").Logger(),
 		),
-		"build_image_atomic": build.NewAtomicBuildImageTool(
+		"build_image": build.NewAtomicBuildImageTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
+			deps.Logger.With().Str("tool", "build_image").Logger(),
 		),
-		"generate_dockerfile_atomic": analyze.NewAtomicGenerateDockerfileTool(
+		"generate_dockerfile": analyze.NewAtomicGenerateDockerfileTool(
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "generate_dockerfile_atomic").Logger(),
+			deps.Logger.With().Str("tool", "generate_dockerfile").Logger(),
 		),
-		"deploy_kubernetes_atomic": deploy.NewAtomicDeployKubernetesTool(
+		"deploy_kubernetes": deploy.NewAtomicDeployKubernetesTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "deploy_kubernetes_atomic").Logger(),
+			deps.Logger.With().Str("tool", "deploy_kubernetes").Logger(),
 		),
-		"validate_dockerfile_atomic": analyze.NewAtomicValidateDockerfileTool(
+		"validate_dockerfile": analyze.NewAtomicValidateDockerfileTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "validate_dockerfile_atomic").Logger(),
+			deps.Logger.With().Str("tool", "validate_dockerfile").Logger(),
 		),
-		"pull_image_atomic": build.NewAtomicPullImageTool(
+		"pull_image": build.NewAtomicPullImageTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "pull_image_atomic").Logger(),
+			deps.Logger.With().Str("tool", "pull_image").Logger(),
 		),
-		"tag_image_atomic": build.NewAtomicTagImageTool(
+		"tag_image": build.NewAtomicTagImageTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "tag_image_atomic").Logger(),
+			deps.Logger.With().Str("tool", "tag_image").Logger(),
 		),
-		"scan_image_security_atomic": scan.NewAtomicScanImageSecurityTool(
+		"scan_image_security": scan.NewAtomicScanImageSecurityTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "scan_image_security_atomic").Logger(),
+			deps.Logger.With().Str("tool", "scan_image_security").Logger(),
 		),
-		"scan_secrets_atomic": scan.NewAtomicScanSecretsTool(
+		"scan_secrets": scan.NewAtomicScanSecretsTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "scan_secrets_atomic").Logger(),
+			deps.Logger.With().Str("tool", "scan_secrets").Logger(),
 		),
-		"generate_manifests_atomic": deploy.NewAtomicGenerateManifestsTool(
+		"generate_manifests": deploy.NewAtomicGenerateManifestsTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "generate_manifests_atomic").Logger(),
+			deps.Logger.With().Str("tool", "generate_manifests").Logger(),
 		),
-		"push_image_atomic": build.NewAtomicPushImageTool(
+		"push_image": build.NewAtomicPushImageTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "push_image_atomic").Logger(),
+			deps.Logger.With().Str("tool", "push_image").Logger(),
 		),
-		"validate_deployment_atomic": deploy.NewAtomicValidateDeploymentTool(
-			deps.Logger.With().Str("tool", "validate_deployment_atomic").Logger(),
+		"validate_deployment": deploy.NewAtomicValidateDeploymentTool(
+			deps.Logger.With().Str("tool", "validate_deployment").Logger(),
 			"",  // workspaceBase - will be set from session
 			nil, // jobManager - will be created internally
 			&clients.Clients{
@@ -388,21 +388,32 @@ func (gm *GomcpManager) registerBasicTools(registrar *runtime.StandardToolRegist
 // ensureSessionID ensures args have a valid session ID, creating one if needed
 func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies, toolName string) (string, error) {
 	if sessionID == "" {
+		// Check if SessionManager is initialized
+		if deps == nil || deps.SessionManager == nil {
+			return "", types.NewErrorBuilder("session_manager_not_initialized", "Session manager not initialized", "session").
+				WithOperation("ensure_session_id").
+				WithStage("initialization").
+				WithRootCause("SessionManager is nil - server may not be fully initialized").
+				WithImmediateStep(1, "Check server", "Verify server is fully initialized").
+				WithImmediateStep(2, "Check deps", "Ensure tool dependencies are properly created").
+				Build()
+		}
+
+		deps.Logger.Debug().Str("tool", toolName).Msg("Creating new session")
 		sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
 		if err != nil {
-			return "", types.NewErrorBuilder("session_creation_failed", "Failed to create containerization session", "session").
-				WithOperation("handle_containerize_repository").
-				WithStage("session_creation").
-				WithRootCause(fmt.Sprintf("Session creation failed: %v", err)).
-				WithImmediateStep(1, "Check resources", "Verify system resources are available for new session").
-				WithImmediateStep(2, "Check limits", "Ensure session limits are not exceeded").
-				WithImmediateStep(3, "Retry creation", "Retry session creation after brief delay").
-				Build()
+			deps.Logger.Error().Err(err).Str("tool", toolName).Msg("Session creation failed")
+			return "", fmt.Errorf("session creation failed: %v", err)
 		}
 		if session, ok := sessionInterface.(*sessiontypes.SessionState); ok {
 			deps.Logger.Info().Str("session_id", session.SessionID).Str("tool", toolName).Msg("Created new session")
 			return session.SessionID, nil
 		}
+		return "", types.NewErrorBuilder("session_type_assertion_failed", "Failed to assert session type", "session").
+			WithOperation("ensure_session_id").
+			WithStage("type_assertion").
+			WithRootCause(fmt.Sprintf("Expected *sessiontypes.SessionState, got %T", sessionInterface)).
+			Build()
 	}
 	return sessionID, nil
 }
@@ -424,20 +435,20 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "analyze_repository_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "analyze_repository", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if analysisResult, ok := result.(*analyze.AtomicAnalysisResult); ok {
 				return analysisResult, nil
 			}
-			return nil, types.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository_atomic tool", "tool_execution").
+			return nil, types.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository tool", "tool_execution").
 				WithField("expected_type", "*types.AnalyzeRepositoryResult").
 				WithField("actual_type", fmt.Sprintf("%T", result)).
 				WithOperation("handle_analyze_repository").
 				WithStage("result_processing").
 				WithRootCause(fmt.Sprintf("Tool returned unexpected type %T instead of expected result type", result)).
-				WithImmediateStep(1, "Check tool", "Verify analyze_repository_atomic tool implementation").
+				WithImmediateStep(1, "Check tool", "Verify analyze_repository tool implementation").
 				WithImmediateStep(2, "Check version", "Ensure tool version compatibility with expected interface").
 				Build()
 		})
@@ -460,14 +471,14 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if dockerfileResult, ok := result.(*analyze.GenerateDockerfileResult); ok {
 				return dockerfileResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from generate_dockerfile_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from generate_dockerfile: %T", result)
 		})
 }
 
@@ -488,14 +499,14 @@ func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegist
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "build_image_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "build_image", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if buildResult, ok := result.(*build.AtomicBuildImageResult); ok {
 				return buildResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from build_image_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from build_image: %T", result)
 		})
 }
 
@@ -516,14 +527,14 @@ func (gm *GomcpManager) registerPullImage(registrar *runtime.StandardToolRegistr
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "pull_image_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "pull_image", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if pullResult, ok := result.(*build.AtomicPullImageResult); ok {
 				return pullResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from pull_image_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from pull_image: %T", result)
 		})
 }
 
@@ -544,14 +555,14 @@ func (gm *GomcpManager) registerTagImage(registrar *runtime.StandardToolRegistra
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "tag_image_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "tag_image", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if tagResult, ok := result.(*build.AtomicTagImageResult); ok {
 				return tagResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from tag_image_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from tag_image: %T", result)
 		})
 }
 
@@ -572,14 +583,14 @@ func (gm *GomcpManager) registerPushImage(registrar *runtime.StandardToolRegistr
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "push_image_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "push_image", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if pushResult, ok := result.(*build.AtomicPushImageResult); ok {
 				return pushResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from push_image_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from push_image: %T", result)
 		})
 }
 
@@ -595,14 +606,14 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_deployment_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_deployment", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if validateResult, ok := result.(*deploy.ValidateDeploymentResult); ok {
 				return validateResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from validate_deployment_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from validate_deployment: %T", result)
 		})
 	return nil
 }
@@ -622,7 +633,6 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "generate_manifests",
 		"Generate Kubernetes manifests for the containerized application",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicGenerateManifestsArgs) (*deploy.AtomicGenerateManifestsResult, error) {
-			// Ensure session ID is set
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "generate_manifests")
 			if err != nil {
 				return nil, err
@@ -637,14 +647,14 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 			argsMap["image_ref"] = args.ImageRef.Repository
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if manifestsResult, ok := result.(*deploy.AtomicGenerateManifestsResult); ok {
 				return manifestsResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from generate_manifests_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from generate_manifests: %T", result)
 		})
 }
 
@@ -653,7 +663,6 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "validate_dockerfile",
 		"Validate a Dockerfile for best practices and potential issues",
 		func(ctx *gomcpserver.Context, args *analyze.AtomicValidateDockerfileArgs) (*analyze.AtomicValidateDockerfileResult, error) {
-			// Ensure session ID is set
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "validate_dockerfile")
 			if err != nil {
 				return nil, err
@@ -666,14 +675,14 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if validateResult, ok := result.(*analyze.AtomicValidateDockerfileResult); ok {
 				return validateResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from validate_dockerfile_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from validate_dockerfile: %T", result)
 		})
 }
 
@@ -682,7 +691,6 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_image_security",
 		"Scan Docker images for security vulnerabilities using Trivy",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
-			// Ensure session ID is set
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_image_security")
 			if err != nil {
 				return nil, err
@@ -695,14 +703,14 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if scanResult, ok := result.(*scan.AtomicScanImageSecurityResult); ok {
 				return scanResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from scan_image_security_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from scan_image_security: %T", result)
 		})
 }
 
@@ -711,7 +719,6 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_secrets",
 		"Scan source code and configuration files for exposed secrets",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanSecretsArgs) (*scan.AtomicScanSecretsResult, error) {
-			// Ensure session ID is set
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_secrets")
 			if err != nil {
 				return nil, err
@@ -724,14 +731,14 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets_atomic", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets", argsMap, nil)
 			if err != nil {
 				return nil, err
 			}
 			if scanResult, ok := result.(*scan.AtomicScanSecretsResult); ok {
 				return scanResult, nil
 			}
-			return nil, fmt.Errorf("unexpected result type from scan_secrets_atomic: %T", result)
+			return nil, fmt.Errorf("unexpected result type from scan_secrets: %T", result)
 		})
 }
 
