@@ -363,6 +363,14 @@ jobs:
           flags: ${{ inputs.coverage-flags }}
           fail_ci_if_error: false
 
+      - name: Upload coverage artifact
+        if: ${{ inputs.coverage }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: coverage.out
+          retention-days: 1
+
       - name: Upload binary artifact
         if: ${{ inputs.build-binary && inputs.binary-output != '' }}
         uses: actions/upload-artifact@v4

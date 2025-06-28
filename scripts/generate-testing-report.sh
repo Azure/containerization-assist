@@ -366,6 +366,13 @@ update_pr_comment() {
     local report_file=$1
     local pr_number=${GITHUB_PR_NUMBER:-""}
 
+    # Skip PR comment if SKIP_PR_COMMENT is set
+    if [[ "${SKIP_PR_COMMENT:-}" == "true" ]]; then
+        log "SKIP_PR_COMMENT is set, skipping PR comment creation"
+        cat "$report_file"
+        return
+    fi
+
     if [[ -z "$pr_number" ]]; then
         log "No PR number found, outputting report to stdout"
         cat "$report_file"

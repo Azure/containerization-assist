@@ -475,3 +475,8 @@ quality-metrics.json
 performance_baseline.json
 interface_metrics.json
 coverage-baseline-report.md
+baseline-lint-report.txt
+
+coverage-baseline.md
+coverage_final.out
+coverage_new.out
