@@ -715,6 +715,7 @@ jobs:
       run: chmod +x scripts/generate-testing-report.sh
 
     - name: Generate testing dashboard
+      timeout-minutes: 5
       env:
         CI: true
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -729,8 +730,12 @@ jobs:
           sudo apt install gh
         fi
 
-        # Run the consolidated testing dashboard generator
-        ./scripts/generate-testing-report.sh
+        # Run the consolidated testing dashboard generator (skip PR comments to avoid redundancy)
+        SKIP_PR_COMMENT=true timeout 3m ./scripts/generate-testing-report.sh || {
+          echo "⚠️ Testing dashboard generation failed or timed out, continuing anyway"
+          echo "# Testing Dashboard Generation Failed" > /tmp/testing-report.md
+          echo "The testing dashboard script encountered an error or timeout. Check the logs for details." >> /tmp/testing-report.md
+        }
 
     - name: Upload test coverage reports
       uses: actions/upload-artifact@v4
