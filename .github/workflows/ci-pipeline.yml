@@ -923,3 +923,78 @@ jobs:
         else
           echo "### Overall Result: ❌ Pipeline Failed at Canary Stage" >> $GITHUB_STEP_SUMMARY
         fi
+
+  # Status Check - Single job to use as required check in branch protection
+  # This job will only pass if ALL required jobs pass
+  ci-status-check:
+    name: CI Status Check
+    runs-on: ubuntu-latest
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, testing-dashboard]
+    if: always()
+    steps:
+      - name: Check all required jobs
+        run: |
+          echo "Checking status of all required jobs..."
+          
+          # Check each job result
+          FAILED_JOBS=""
+          
+          # Canary must always pass
+          if [ "${{ needs.canary.result }}" != "success" ]; then
+            FAILED_JOBS="${FAILED_JOBS}canary "
+          fi
+          
+          # Build jobs must pass
+          if [ "${{ needs.build-cli.result }}" != "success" ]; then
+            FAILED_JOBS="${FAILED_JOBS}build-cli "
+          fi
+          if [ "${{ needs.build-mcp.result }}" != "success" ]; then
+            FAILED_JOBS="${FAILED_JOBS}build-mcp "
+          fi
+          
+          # Unit tests must pass if they ran (not skipped)
+          if [ "${{ needs.unit-test-core.result }}" != "success" ] && [ "${{ needs.unit-test-core.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}unit-test-core "
+          fi
+          if [ "${{ needs.unit-test-mcp.result }}" != "success" ] && [ "${{ needs.unit-test-mcp.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}unit-test-mcp "
+          fi
+          if [ "${{ needs.unit-test-cli.result }}" != "success" ] && [ "${{ needs.unit-test-cli.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}unit-test-cli "
+          fi
+          
+          # Coverage must pass if it ran
+          if [ "${{ needs.coverage-enforcement.result }}" != "success" ] && [ "${{ needs.coverage-enforcement.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}coverage-enforcement "
+          fi
+          
+          # Security scan must pass if it ran
+          if [ "${{ needs.security-scan.result }}" != "success" ] && [ "${{ needs.security-scan.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}security-scan "
+          fi
+          
+          # Quality gates must pass if it ran
+          if [ "${{ needs.quality-gates.result }}" != "success" ] && [ "${{ needs.quality-gates.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}quality-gates "
+          fi
+          
+          # Integration tests must pass if they ran
+          if [ "${{ needs.integration-tests.result }}" != "success" ] && [ "${{ needs.integration-tests.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}integration-tests "
+          fi
+          if [ "${{ needs.mcp-integration-tests.result }}" != "success" ] && [ "${{ needs.mcp-integration-tests.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}mcp-integration-tests "
+          fi
+          
+          # Testing dashboard must pass if it ran
+          if [ "${{ needs.testing-dashboard.result }}" != "success" ] && [ "${{ needs.testing-dashboard.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}testing-dashboard "
+          fi
+          
+          # Fail if any required jobs failed
+          if [ -n "$FAILED_JOBS" ]; then
+            echo "❌ The following required jobs failed: $FAILED_JOBS"
+            exit 1
+          else
+            echo "✅ All required CI checks passed!"
+          fi
