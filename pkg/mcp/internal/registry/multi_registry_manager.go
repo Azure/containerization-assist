@@ -13,28 +13,23 @@ import (
 )
 
 const (
-	// DefaultRegistryTimeout is the default timeout for registry connectivity tests
 	DefaultRegistryTimeout = 15 * time.Second
 )
 
 // CommandExecutor interface abstracts command execution for better testability
 type CommandExecutor interface {
-	// ExecuteCommand runs a command with the given context and returns output and error
 	ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error)
-	// CommandExists checks if a command exists in PATH
 	CommandExists(name string) bool
 }
 
 // DefaultCommandExecutor implements CommandExecutor using os/exec
 type DefaultCommandExecutor struct{}
 
-// ExecuteCommand runs a command using os/exec
 func (d *DefaultCommandExecutor) ExecuteCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	return cmd.Output()
 }
 
-// CommandExists checks if a command exists in PATH
 func (d *DefaultCommandExecutor) CommandExists(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
@@ -62,7 +57,7 @@ type MultiRegistryConfig struct {
 // RegistryConfig contains configuration for a single registry
 type RegistryConfig struct {
 	URL              string            `json:"url"`
-	AuthMethod       string            `json:"auth_method"` // "basic", "oauth", "helper", "keychain"
+	AuthMethod       string            `json:"auth_method"`
 	Username         string            `json:"username,omitempty"`
 	Password         string            `json:"password,omitempty"`
 	Token            string            `json:"token,omitempty"`
@@ -91,7 +86,7 @@ type RegistryCredentials struct {
 	ExpiresAt  *time.Time
 	Registry   string
 	AuthMethod string
-	Source     string // Which provider returned these credentials
+	Source     string
 }
 
 // CachedCredentials wraps credentials with cache metadata
@@ -101,7 +96,6 @@ type CachedCredentials struct {
 	ExpiresAt   time.Time
 }
 
-// NewMultiRegistryManager creates a new multi-registry manager
 func NewMultiRegistryManager(config *MultiRegistryConfig, logger zerolog.Logger) *MultiRegistryManager {
 	if config.CacheTimeout == 0 {
 		config.CacheTimeout = 15 * time.Minute
@@ -119,16 +113,13 @@ func NewMultiRegistryManager(config *MultiRegistryConfig, logger zerolog.Logger)
 	}
 }
 
-// SetCommandExecutor sets a custom command executor (primarily for testing)
 func (mrm *MultiRegistryManager) SetCommandExecutor(executor CommandExecutor) {
 	mrm.cmdExecutor = executor
 }
 
-// RegisterProvider adds a credential provider to the manager
 func (mrm *MultiRegistryManager) RegisterProvider(provider CredentialProvider) {
 	mrm.providers = append(mrm.providers, provider)
 
-	// Sort providers by priority (higher priority first)
 	for i := len(mrm.providers) - 1; i > 0; i-- {
 		if mrm.providers[i].GetPriority() > mrm.providers[i-1].GetPriority() {
 			mrm.providers[i], mrm.providers[i-1] = mrm.providers[i-1], mrm.providers[i]
@@ -142,12 +133,9 @@ func (mrm *MultiRegistryManager) RegisterProvider(provider CredentialProvider) {
 		Msg("Registered credential provider")
 }
 
-// GetCredentials retrieves credentials for a specific registry
 func (mrm *MultiRegistryManager) GetCredentials(ctx context.Context, registry string) (*RegistryCredentials, error) {
-	// Normalize registry URL
 	normalizedRegistry := mrm.normalizeRegistry(registry)
 
-	// Check cache first
 	if cached := mrm.getCachedCredentials(normalizedRegistry); cached != nil {
 		mrm.logger.Debug().
 			Str("registry", normalizedRegistry).
@@ -156,10 +144,8 @@ func (mrm *MultiRegistryManager) GetCredentials(ctx context.Context, registry st
 		return cached, nil
 	}
 
-	// Try to get credentials from providers
 	creds, err := mrm.getCredentialsFromProviders(ctx, normalizedRegistry)
 	if err != nil {
-		// Try fallback registries if configured
 		if fallbackCreds := mrm.tryFallbackRegistries(ctx, normalizedRegistry); fallbackCreds != nil {
 			return fallbackCreds, nil
 		}
@@ -174,15 +160,12 @@ func (mrm *MultiRegistryManager) GetCredentials(ctx context.Context, registry st
 			Build()
 	}
 
-	// Cache the credentials
 	mrm.cacheCredentials(normalizedRegistry, creds)
 
 	return creds, nil
 }
 
-// DetectRegistry automatically detects the registry from an image reference
 func (mrm *MultiRegistryManager) DetectRegistry(imageRef string) string {
-	// Handle docker.io special case
 	if !strings.Contains(imageRef, "/") || (!strings.Contains(imageRef, ".") && !strings.Contains(imageRef, ":")) {
 		return "docker.io"
 	}
@@ -190,17 +173,14 @@ func (mrm *MultiRegistryManager) DetectRegistry(imageRef string) string {
 	parts := strings.Split(imageRef, "/")
 	if len(parts) > 0 {
 		firstPart := parts[0]
-		// If first part contains a dot or colon, it's likely a registry
 		if strings.Contains(firstPart, ".") || strings.Contains(firstPart, ":") {
 			return firstPart
 		}
 	}
 
-	// Default to docker.io for simple image names
 	return "docker.io"
 }
 
-// ValidateRegistryAccess tests connectivity and authentication with a registry
 func (mrm *MultiRegistryManager) ValidateRegistryAccess(ctx context.Context, registry string) error {
 	normalizedRegistry := mrm.normalizeRegistry(registry)
 
@@ -208,7 +188,6 @@ func (mrm *MultiRegistryManager) ValidateRegistryAccess(ctx context.Context, reg
 		Str("registry", normalizedRegistry).
 		Msg("Validating registry access")
 
-	// Get credentials
 	creds, err := mrm.GetCredentials(ctx, normalizedRegistry)
 	if err != nil {
 		return types.NewErrorBuilder("registry_validation_failed", "Registry validation failed - cannot get credentials", "authentication").
@@ -221,7 +200,6 @@ func (mrm *MultiRegistryManager) ValidateRegistryAccess(ctx context.Context, reg
 			Build()
 	}
 
-	// Implement actual registry connectivity test
 	if err := mrm.testRegistryConnectivity(ctx, normalizedRegistry, creds); err != nil {
 		return types.NewErrorBuilder("registry_connectivity_failed", "Registry connectivity test failed", "network").
 			WithField("registry", normalizedRegistry).
@@ -255,16 +233,13 @@ func (mrm *MultiRegistryManager) ValidateRegistryAccess(ctx context.Context, reg
 	return nil
 }
 
-// GetRegistryConfig returns the configuration for a specific registry
 func (mrm *MultiRegistryManager) GetRegistryConfig(registry string) (*RegistryConfig, bool) {
 	normalizedRegistry := mrm.normalizeRegistry(registry)
 
-	// Check for exact match
 	if config, exists := mrm.config.Registries[normalizedRegistry]; exists {
 		return &config, true
 	}
 
-	// Check for wildcard matches (e.g., "*.dkr.ecr.*.amazonaws.com")
 	for pattern, config := range mrm.config.Registries {
 		if mrm.matchesPattern(normalizedRegistry, pattern) {
 			configCopy := config
@@ -275,7 +250,6 @@ func (mrm *MultiRegistryManager) GetRegistryConfig(registry string) (*RegistryCo
 	return nil, false
 }
 
-// ClearCache clears the credential cache
 func (mrm *MultiRegistryManager) ClearCache() {
 	mrm.cacheMutex.Lock()
 	defer mrm.cacheMutex.Unlock()
@@ -284,7 +258,6 @@ func (mrm *MultiRegistryManager) ClearCache() {
 	mrm.logger.Info().Msg("Credential cache cleared")
 }
 
-// GetCacheStats returns statistics about the credential cache
 func (mrm *MultiRegistryManager) GetCacheStats() map[string]interface{} {
 	mrm.cacheMutex.RLock()
 	defer mrm.cacheMutex.RUnlock()
@@ -308,14 +281,10 @@ func (mrm *MultiRegistryManager) GetCacheStats() map[string]interface{} {
 	return stats
 }
 
-// Private helper methods
-
 func (mrm *MultiRegistryManager) normalizeRegistry(registry string) string {
-	// Remove protocol if present
 	registry = strings.TrimPrefix(registry, "https://")
 	registry = strings.TrimPrefix(registry, "http://")
 
-	// Handle docker.io special case
 	if registry == "docker.io" || registry == "index.docker.io" {
 		return "https://index.docker.io/v1/"
 	}
@@ -332,14 +301,11 @@ func (mrm *MultiRegistryManager) getCachedCredentials(registry string) *Registry
 		return nil
 	}
 
-	// Check if cache has expired
 	if time.Now().After(cached.ExpiresAt) {
-		// Remove expired entry
 		delete(mrm.credentialCache, registry)
 		return nil
 	}
 
-	// Check credential-specific expiration
 	if cached.Credentials.ExpiresAt != nil && time.Now().After(*cached.Credentials.ExpiresAt) {
 		delete(mrm.credentialCache, registry)
 		return nil
@@ -354,7 +320,6 @@ func (mrm *MultiRegistryManager) cacheCredentials(registry string, creds *Regist
 
 	expiresAt := time.Now().Add(mrm.config.CacheTimeout)
 
-	// Use credential expiration if it's sooner
 	if creds.ExpiresAt != nil && creds.ExpiresAt.Before(expiresAt) {
 		expiresAt = *creds.ExpiresAt
 	}
@@ -423,20 +388,15 @@ func (mrm *MultiRegistryManager) getCredentialsFromProviders(ctx context.Context
 }
 
 func (mrm *MultiRegistryManager) tryFallbackRegistries(ctx context.Context, registry string) *RegistryCredentials {
-	// Check if this registry has configured fallbacks
 	if config, exists := mrm.GetRegistryConfig(registry); exists && len(config.FallbackMethods) > 0 {
 		for _, fallback := range config.FallbackMethods {
 			mrm.logger.Debug().
 				Str("registry", registry).
 				Str("fallback", fallback).
 				Msg("Trying fallback authentication method")
-
-			// Try fallback - this is a simplified implementation
-			// In a real implementation, you'd try different auth methods
 		}
 	}
 
-	// Try global fallback registries
 	for _, fallbackRegistry := range mrm.config.Fallbacks {
 		mrm.logger.Debug().
 			Str("original_registry", registry).
@@ -444,7 +404,6 @@ func (mrm *MultiRegistryManager) tryFallbackRegistries(ctx context.Context, regi
 			Msg("Trying fallback registry")
 
 		if creds, err := mrm.getCredentialsFromProviders(ctx, fallbackRegistry); err == nil && creds != nil {
-			// Modify credentials to point to original registry
 			creds.Registry = registry
 			return creds
 		}
@@ -454,24 +413,19 @@ func (mrm *MultiRegistryManager) tryFallbackRegistries(ctx context.Context, regi
 }
 
 func (mrm *MultiRegistryManager) matchesPattern(registry, pattern string) bool {
-	// Simple wildcard matching - could be enhanced with proper regex
 	if !strings.Contains(pattern, "*") {
 		return registry == pattern
 	}
 
-	// This is a simplified implementation - in production, use proper regex
 	return strings.Contains(registry, strings.ReplaceAll(pattern, "*", ""))
 }
 
-// testRegistryConnectivity tests connectivity to a registry using Docker API
 func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, registry string, _ *RegistryCredentials) error {
-	// Get timeout from config or use default
 	timeout := DefaultRegistryTimeout
 	if config, exists := mrm.GetRegistryConfig(registry); exists && config.Timeout > 0 {
 		timeout = config.Timeout
 	}
 
-	// Create context with timeout for the connectivity test
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -480,7 +434,6 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 		Dur("timeout", timeout).
 		Msg("Testing registry connectivity")
 
-	// Check if docker command is available
 	if err := mrm.checkDockerAvailability(ctx); err != nil {
 		return types.NewErrorBuilder("docker_unavailable", "Docker command not available for registry connectivity test", "system").
 			WithOperation("test_registry_connectivity").
@@ -492,11 +445,9 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 			Build()
 	}
 
-	// Get appropriate test images for the registry
 	testImages := mrm.getTestImagesForRegistry(registry)
 
 	var lastErr error
-	// Try to connect to the registry using docker manifest inspect
 	for _, testImage := range testImages {
 		_, err := mrm.cmdExecutor.ExecuteCommand(ctx, "docker", "manifest", "inspect", testImage)
 		if err == nil {
@@ -514,7 +465,6 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 			Err(err).
 			Msg("Test image failed, trying next")
 
-		// Check for timeout or network-specific errors
 		if ctx.Err() == context.DeadlineExceeded {
 			return types.NewErrorBuilder("registry_timeout", "Registry connectivity test timed out", "network").
 				WithField("registry", registry).
@@ -529,7 +479,6 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 		}
 	}
 
-	// Classify the error for better reporting
 	if lastErr != nil {
 		errStr := lastErr.Error()
 		switch {
@@ -596,7 +545,6 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 		}
 	}
 
-	// If all test images failed without a specific error, return generic error
 	return types.NewErrorBuilder("no_test_images", "Failed to connect to registry - no test images accessible", "registry").
 		WithField("registry", registry).
 		WithOperation("test_registry_connectivity").
@@ -608,7 +556,6 @@ func (mrm *MultiRegistryManager) testRegistryConnectivity(ctx context.Context, r
 		Build()
 }
 
-// getTestImagesForRegistry returns appropriate test images for different registries
 func (mrm *MultiRegistryManager) getTestImagesForRegistry(registry string) []string {
 	switch {
 	case strings.Contains(registry, "docker.io") || strings.Contains(registry, "index.docker.io"):
@@ -622,19 +569,16 @@ func (mrm *MultiRegistryManager) getTestImagesForRegistry(registry string) []str
 	case strings.Contains(registry, "mcr.microsoft.com"):
 		return []string{"mcr.microsoft.com/hello-world:latest"}
 	case strings.Contains(registry, "amazonaws.com"):
-		// For AWS ECR, try common base images
 		return []string{
 			fmt.Sprintf("%s/amazonlinux:latest", registry),
 			fmt.Sprintf("%s/alpine:latest", registry),
 		}
 	case strings.Contains(registry, "azurecr.io"):
-		// For Azure Container Registry, try common base images
 		return []string{
 			fmt.Sprintf("%s/hello-world:latest", registry),
 			fmt.Sprintf("%s/alpine:latest", registry),
 		}
 	default:
-		// For unknown registries, try generic approaches
 		return []string{
 			fmt.Sprintf("%s/hello-world:latest", registry),
 			fmt.Sprintf("%s/library/hello-world:latest", registry),
@@ -643,9 +587,7 @@ func (mrm *MultiRegistryManager) getTestImagesForRegistry(registry string) []str
 	}
 }
 
-// checkDockerAvailability verifies that the docker command is available and accessible
 func (mrm *MultiRegistryManager) checkDockerAvailability(ctx context.Context) error {
-	// First check if docker command exists in PATH
 	if !mrm.cmdExecutor.CommandExists("docker") {
 		return types.NewErrorBuilder("docker_not_found", "Docker command not found in PATH", "system").
 			WithOperation("check_docker_availability").
@@ -657,7 +599,6 @@ func (mrm *MultiRegistryManager) checkDockerAvailability(ctx context.Context) er
 			Build()
 	}
 
-	// Check if docker command is accessible
 	output, err := mrm.cmdExecutor.ExecuteCommand(ctx, "docker", "--version")
 	if err != nil {
 		return types.NewErrorBuilder("docker_not_accessible", "Docker command exists but not accessible", "system").
@@ -670,15 +611,12 @@ func (mrm *MultiRegistryManager) checkDockerAvailability(ctx context.Context) er
 			Build()
 	}
 
-	// Log docker version for debugging
 	version := strings.TrimSpace(string(output))
 	mrm.logger.Debug().Str("docker_version", version).Msg("Docker command availability verified")
 
-	// Optionally check if docker daemon is running (quick check)
 	_, err = mrm.cmdExecutor.ExecuteCommand(ctx, "docker", "info", "--format", "{{.ServerVersion}}")
 	if err != nil {
 		mrm.logger.Warn().Err(err).Msg("Docker daemon may not be running - registry connectivity tests may fail")
-		// Don't fail here as docker manifest inspect might still work in some scenarios
 	}
 
 	return nil

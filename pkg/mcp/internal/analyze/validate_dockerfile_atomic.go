@@ -20,68 +20,55 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// AtomicValidateDockerfileArgs defines arguments for atomic Dockerfile validation
 type AtomicValidateDockerfileArgs struct {
 	types.BaseToolArgs
 
-	// Validation targets
 	DockerfilePath    string `json:"dockerfile_path,omitempty" description:"Path to Dockerfile (default: session workspace/Dockerfile)"`
 	DockerfileContent string `json:"dockerfile_content,omitempty" description:"Dockerfile content to validate (alternative to path)"`
 
-	// Validation options
 	UseHadolint       bool     `json:"use_hadolint,omitempty" description:"Use Hadolint for advanced validation"`
 	Severity          string   `json:"severity,omitempty" description:"Minimum severity to report (info, warning, error)"`
 	IgnoreRules       []string `json:"ignore_rules,omitempty" description:"Hadolint rules to ignore (e.g., DL3008, DL3009)"`
 	TrustedRegistries []string `json:"trusted_registries,omitempty" description:"List of trusted registries for base image validation"`
 
-	// Analysis options
 	CheckSecurity      bool `json:"check_security,omitempty" description:"Perform security-focused checks"`
 	CheckOptimization  bool `json:"check_optimization,omitempty" description:"Check for image size optimization opportunities"`
 	CheckBestPractices bool `json:"check_best_practices,omitempty" description:"Validate against Docker best practices"`
 
-	// Output options
 	IncludeSuggestions bool `json:"include_suggestions,omitempty" description:"Include remediation suggestions"`
 	GenerateFixes      bool `json:"generate_fixes,omitempty" description:"Generate corrected Dockerfile"`
 }
 
-// AtomicValidateDockerfileResult represents the result of atomic Dockerfile validation
 type AtomicValidateDockerfileResult struct {
 	types.BaseToolResponse
-	mcptypes.BaseAIContextResult // Embedded for AI context methods
+	mcptypes.BaseAIContextResult
 
-	// Validation metadata
 	SessionID      string        `json:"session_id"`
 	DockerfilePath string        `json:"dockerfile_path"`
 	Duration       time.Duration `json:"duration"`
 	ValidatorUsed  string        `json:"validator_used"` // hadolint, basic, hybrid
 
-	// Validation results
 	IsValid         bool `json:"is_valid"`
 	ValidationScore int  `json:"validation_score"` // 0-100
 	TotalIssues     int  `json:"total_issues"`
 	CriticalIssues  int  `json:"critical_issues"`
 
-	// Issue breakdown
 	Errors           []DockerfileValidationError   `json:"errors"`
 	Warnings         []DockerfileValidationWarning `json:"warnings"`
 	SecurityIssues   []DockerfileSecurityIssue     `json:"security_issues"`
 	OptimizationTips []OptimizationTip             `json:"optimization_tips"`
 
-	// Analysis results
 	BaseImageAnalysis BaseImageAnalysis `json:"base_image_analysis"`
 	LayerAnalysis     LayerAnalysis     `json:"layer_analysis"`
 	SecurityAnalysis  SecurityAnalysis  `json:"security_analysis"`
 
-	// Remediation
 	Suggestions         []string `json:"suggestions"`
 	CorrectedDockerfile string   `json:"corrected_dockerfile,omitempty"`
 	FixesApplied        []string `json:"fixes_applied,omitempty"`
 
-	// Context and debugging
 	ValidationContext map[string]interface{} `json:"validation_context"`
 }
 
-// Recommendation represents a single recommendation
 type Recommendation struct {
 	RecommendationID string   `json:"recommendation_id"`
 	Title            string   `json:"title"`
@@ -99,7 +86,6 @@ type Recommendation struct {
 	Urgency          string   `json:"urgency"`
 }
 
-// DockerfileValidationError represents a validation error with enhanced context
 type DockerfileValidationError struct {
 	Type          string `json:"type"` // syntax, instruction, security, best_practice
 	Line          int    `json:"line"`
@@ -112,7 +98,6 @@ type DockerfileValidationError struct {
 	Documentation string `json:"documentation,omitempty"`
 }
 
-// DockerfileValidationWarning represents a validation warning
 type DockerfileValidationWarning struct {
 	Type       string `json:"type"`
 	Line       int    `json:"line"`
@@ -122,7 +107,6 @@ type DockerfileValidationWarning struct {
 	Impact     string `json:"impact,omitempty"` // performance, security, maintainability
 }
 
-// DockerfileSecurityIssue represents a security-related issue in the Dockerfile
 type DockerfileSecurityIssue struct {
 	Type          string   `json:"type"` // exposed_port, root_user, secrets, etc.
 	Line          int      `json:"line"`
@@ -132,7 +116,6 @@ type DockerfileSecurityIssue struct {
 	CVEReferences []string `json:"cve_references,omitempty"`
 }
 
-// OptimizationTip represents an optimization suggestion
 type OptimizationTip struct {
 	Type             string `json:"type"` // layer_consolidation, cache_optimization, etc.
 	Line             int    `json:"line,omitempty"`
@@ -142,7 +125,6 @@ type OptimizationTip struct {
 	EstimatedSavings string `json:"estimated_savings,omitempty"` // e.g., "50MB", "30% faster"
 }
 
-// BaseImageAnalysis provides analysis of the base image
 type BaseImageAnalysis struct {
 	Image           string   `json:"image"`
 	Registry        string   `json:"registry"`
@@ -153,7 +135,6 @@ type BaseImageAnalysis struct {
 	Recommendations []string `json:"recommendations"`
 }
 
-// LayerAnalysis provides analysis of Dockerfile layers
 type LayerAnalysis struct {
 	TotalLayers      int                 `json:"total_layers"`
 	CacheableSteps   int                 `json:"cacheable_steps"`
@@ -161,7 +142,6 @@ type LayerAnalysis struct {
 	Optimizations    []LayerOptimization `json:"optimizations"`
 }
 
-// ProblematicStep represents a step that could cause issues
 type ProblematicStep struct {
 	Line        int    `json:"line"`
 	Instruction string `json:"instruction"`
@@ -169,7 +149,6 @@ type ProblematicStep struct {
 	Impact      string `json:"impact"`
 }
 
-// LayerOptimization represents a layer optimization opportunity
 type LayerOptimization struct {
 	Type        string `json:"type"`
 	Description string `json:"description"`
@@ -178,7 +157,6 @@ type LayerOptimization struct {
 	Benefit     string `json:"benefit"`
 }
 
-// SecurityAnalysis provides comprehensive security analysis
 type SecurityAnalysis struct {
 	RunsAsRoot      bool     `json:"runs_as_root"`
 	ExposedPorts    []int    `json:"exposed_ports"`
@@ -188,58 +166,44 @@ type SecurityAnalysis struct {
 	Recommendations []string `json:"recommendations"`
 }
 
-// AtomicValidateDockerfileTool implements atomic Dockerfile validation
 type AtomicValidateDockerfileTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
-	// fixingMixin removed - functionality integrated directly
-	// dockerfileAdapter removed - functionality integrated directly
-	logger      zerolog.Logger
-	analyzer    ToolAnalyzer
-	fixingMixin *build.AtomicToolFixingMixin
+	logger          zerolog.Logger
+	analyzer        ToolAnalyzer
+	fixingMixin     *build.AtomicToolFixingMixin
 }
 
-// NewAtomicValidateDockerfileTool creates a new atomic Dockerfile validation tool
 func NewAtomicValidateDockerfileTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
 	toolLogger := logger.With().Str("tool", "atomic_validate_dockerfile").Logger()
 	return &AtomicValidateDockerfileTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
-		// fixingMixin removed - functionality integrated directly
-		// dockerfileAdapter removed - functionality integrated directly
-		logger: toolLogger,
+		logger:          toolLogger,
 	}
 }
 
-// SetAnalyzer sets the analyzer for failure analysis
 func (t *AtomicValidateDockerfileTool) SetAnalyzer(analyzer ToolAnalyzer) {
 	t.analyzer = analyzer
 }
 
-// SetFixingMixin sets the fixing mixin for automatic error recovery
 func (t *AtomicValidateDockerfileTool) SetFixingMixin(mixin *build.AtomicToolFixingMixin) {
 	t.fixingMixin = mixin
 }
 
-// ExecuteValidation runs the atomic Dockerfile validation
 func (t *AtomicValidateDockerfileTool) ExecuteValidation(ctx context.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
-	// Direct execution without progress tracking
 	return t.executeWithoutProgress(ctx, args)
 }
 
-// ExecuteWithContext runs the atomic Dockerfile validation with GoMCP progress tracking
 func (t *AtomicValidateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
-	// Create progress adapter for GoMCP using standard validation stages
 	_ = mcptypes.NewGoMCPProgressAdapter(serverCtx, []mcptypes.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Validate", Weight: 0.80, Description: "Validating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
-	// Execute with progress tracking
 	ctx := context.Background()
 	result, err := t.performValidation(ctx, args, nil)
 
-	// Complete progress tracking
 	if err != nil {
 		t.logger.Info().Msg("Validation failed")
-		return result, nil // Return result with error info, not the error itself
+		return result, nil
 	} else {
 		t.logger.Info().Msg("Validation completed successfully")
 	}
@@ -247,19 +211,13 @@ func (t *AtomicValidateDockerfileTool) ExecuteWithContext(serverCtx *server.Cont
 	return result, nil
 }
 
-// executeWithoutProgress executes without progress tracking
 func (t *AtomicValidateDockerfileTool) executeWithoutProgress(ctx context.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	return t.performValidation(ctx, args, nil)
 }
 
-// performValidation performs the actual Dockerfile validation
 func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, args AtomicValidateDockerfileArgs, reporter interface{}) (*AtomicValidateDockerfileResult, error) {
 	startTime := time.Now()
 
-	// Stage 1: Initialize
-	// Progress reporting removed
-
-	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		result := &AtomicValidateDockerfileResult{
@@ -273,45 +231,31 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
-	// Progress reporting removed
-
 	t.logger.Info().
 		Str("session_id", session.SessionID).
 		Str("dockerfile_path", args.DockerfilePath).
 		Bool("use_hadolint", args.UseHadolint).
 		Msg("Starting atomic Dockerfile validation")
 
-	// Create base result
 	result := &AtomicValidateDockerfileResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_validate_dockerfile", session.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("validate", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("validate", false, 0),
 		ValidationContext:   make(map[string]interface{}),
 	}
-
-	// Stage 2: Read Dockerfile
-	// Progress reporting removed
-
-	// Determine Dockerfile path and content
 	var dockerfilePath string
 	var dockerfileContent string
 
 	if args.DockerfileContent != "" {
-		// Use provided content
 		dockerfileContent = args.DockerfileContent
 		dockerfilePath = types.ValidationModeInline
 	} else {
-		// Determine Dockerfile path
 		if args.DockerfilePath != "" {
 			dockerfilePath = args.DockerfilePath
 		} else {
-			// Default to session workspace
 			workspaceDir := t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 			dockerfilePath = filepath.Join(workspaceDir, "Dockerfile")
 		}
 
-		// Progress reporting removed
-
-		// Read Dockerfile content
 		content, err := os.ReadFile(dockerfilePath)
 		if err != nil {
 			t.logger.Error().Err(err).Str("dockerfile_path", result.DockerfilePath).Msg("Failed to read Dockerfile")
@@ -323,33 +267,22 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 	result.DockerfilePath = dockerfilePath
 
-	// Progress reporting removed
-
-	// Stage 3: Validate Dockerfile
-	// Progress reporting removed
-
-	// Check if we should use refactored modules
 	useRefactoredModules := false
 	if cfg, err := config.GetAnalyzer(); err == nil {
 		useRefactoredModules = cfg.UseRefactoredDockerfile
 	} else {
-		// Fallback to environment variable if config not available
 		useRefactoredModules = os.Getenv("USE_REFACTORED_DOCKERFILE") == "true"
 	}
 	if useRefactoredModules {
 		t.logger.Info().Msg("Using refactored Dockerfile validation modules")
-		// dockerfileAdapter removed - return error for now
 		return nil, types.NewRichError("FEATURE_NOT_IMPLEMENTED", "refactored Dockerfile validation not implemented without adapter", types.ErrTypeSystem)
 	}
 
-	// Perform validation using legacy code
 	var validationResult *coredocker.ValidationResult
 	var validatorUsed string
 
 	if args.UseHadolint {
-		// Progress reporting removed
 
-		// Try Hadolint validation first
 		hadolintValidator := coredocker.NewHadolintValidator(t.logger)
 		validationResult, err = hadolintValidator.ValidateWithHadolint(ctx, dockerfileContent)
 		if err != nil {
@@ -360,9 +293,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 		}
 	}
 
-	// Fall back to basic validation if Hadolint failed or wasn't requested
 	if validationResult == nil {
-		// Progress reporting removed
 
 		basicValidator := coredocker.NewValidator(t.logger)
 		validationResult = basicValidator.ValidateDockerfile(dockerfileContent)
@@ -374,48 +305,29 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	result.ValidatorUsed = validatorUsed
 	result.IsValid = validationResult.Valid
 
-	// Progress reporting removed
-
-	// Process validation results
 	t.processValidationResults(result, validationResult, args)
 
-	// Progress reporting removed
-
-	// Stage 4: Analyze (additional checks)
 	if args.CheckSecurity || args.CheckOptimization || args.CheckBestPractices {
-		// Progress reporting removed
 
 		t.performAdditionalAnalysis(result, dockerfileContent, args)
 
-		// Progress reporting removed
 	}
 
-	// Stage 5: Generate fixes and suggestions
 	if args.GenerateFixes && !result.IsValid {
-		// Progress reporting removed
 
 		correctedDockerfile, fixes := t.generateCorrectedDockerfile(dockerfileContent, validationResult)
 		result.CorrectedDockerfile = correctedDockerfile
 		result.FixesApplied = fixes
 
-		// Progress reporting removed
 	}
 
-	// Stage 6: Finalize
-	// Progress reporting removed
-
-	// Calculate validation score
 	result.ValidationScore = t.calculateValidationScore(result)
 
 	result.Duration = time.Since(startTime)
 
-	// Update mcptypes.BaseAIContextResult with final values
 	result.BaseAIContextResult.IsSuccessful = result.IsValid
 	result.BaseAIContextResult.Duration = result.Duration
 
-	// Progress reporting removed
-
-	// Log results
 	t.logger.Info().
 		Str("session_id", session.SessionID).
 		Str("validator", validatorUsed).
@@ -428,15 +340,9 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	return result, nil
 }
 
-// AI Context Interface Implementations
-
-// AI Context methods are now provided by embedded mcptypes.BaseAIContextResult
-
-// GenerateRecommendations creates recommendations for Dockerfile improvements
 func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []Recommendation {
 	recommendations := make([]Recommendation, 0)
 
-	// Security recommendations
 	if len(r.SecurityIssues) > 0 {
 		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("security-fixes-%s", r.SessionID),
@@ -456,7 +362,6 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []Recommendat
 		})
 	}
 
-	// Error recommendations
 	if len(r.Errors) > 0 {
 		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("validation-errors-%s", r.SessionID),
@@ -476,7 +381,6 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []Recommendat
 		})
 	}
 
-	// Warning recommendations
 	if len(r.Warnings) > 5 {
 		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("best-practices-%s", r.SessionID),
@@ -496,7 +400,6 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []Recommendat
 		})
 	}
 
-	// Optimization recommendations
 	if len(r.OptimizationTips) > 0 {
 		recommendations = append(recommendations, Recommendation{
 			RecommendationID: fmt.Sprintf("optimizations-%s", r.SessionID),
@@ -519,9 +422,7 @@ func (r *AtomicValidateDockerfileResult) GenerateRecommendations() []Recommendat
 	return recommendations
 }
 
-// CreateRemediationPlan creates a remediation plan for validation issues
 func (r *AtomicValidateDockerfileResult) CreateRemediationPlan() interface{} {
-	// Simplified implementation - AI context integration removed
 	return map[string]interface{}{
 		"plan_id":     fmt.Sprintf("dockerfile-validation-%s", r.SessionID),
 		"title":       "Dockerfile Validation Plan",
@@ -530,7 +431,6 @@ func (r *AtomicValidateDockerfileResult) CreateRemediationPlan() interface{} {
 	}
 }
 
-// Additional AI context methods simplified for compilation
 func (r *AtomicValidateDockerfileResult) GetAlternativeStrategies() interface{} {
 	return []map[string]interface{}{
 		{
@@ -539,8 +439,6 @@ func (r *AtomicValidateDockerfileResult) GetAlternativeStrategies() interface{} 
 		},
 	}
 }
-
-// Helper methods for validation processing
 
 func (r *AtomicValidateDockerfileResult) getRecommendedApproach() string {
 	if len(r.Errors) > 0 {
@@ -570,9 +468,7 @@ func (r *AtomicValidateDockerfileResult) getConsiderationsNote() string {
 	return "Dockerfile validation completed - review recommendations"
 }
 
-// processValidationResults processes the validation results from the core validator
 func (t *AtomicValidateDockerfileTool) processValidationResults(result *AtomicValidateDockerfileResult, validationResult *coredocker.ValidationResult, args AtomicValidateDockerfileArgs) {
-	// Process errors
 	for _, err := range validationResult.Errors {
 		dockerfileErr := DockerfileValidationError{
 			Type:        err.Type,
@@ -584,7 +480,6 @@ func (t *AtomicValidateDockerfileTool) processValidationResults(result *AtomicVa
 			Severity:    err.Severity,
 		}
 
-		// Check if this is a security issue
 		if err.Type == "security" || strings.Contains(strings.ToLower(err.Message), "security") {
 			result.SecurityIssues = append(result.SecurityIssues, DockerfileSecurityIssue{
 				Type:        err.Type,
@@ -602,7 +497,6 @@ func (t *AtomicValidateDockerfileTool) processValidationResults(result *AtomicVa
 		}
 	}
 
-	// Process warnings
 	for _, warn := range validationResult.Warnings {
 		result.Warnings = append(result.Warnings, DockerfileValidationWarning{
 			Type:       warn.Type,
@@ -614,13 +508,10 @@ func (t *AtomicValidateDockerfileTool) processValidationResults(result *AtomicVa
 		})
 	}
 
-	// Add suggestions
 	result.Suggestions = validationResult.Suggestions
 
-	// Set total issues
 	result.TotalIssues = len(result.Errors) + len(result.Warnings) + len(result.SecurityIssues)
 
-	// Add validation context
 	if validationResult.Context != nil {
 		for k, v := range validationResult.Context {
 			result.ValidationContext[k] = v
@@ -628,59 +519,48 @@ func (t *AtomicValidateDockerfileTool) processValidationResults(result *AtomicVa
 	}
 }
 
-// performAdditionalAnalysis performs additional security, optimization, and best practice checks
 func (t *AtomicValidateDockerfileTool) performAdditionalAnalysis(result *AtomicValidateDockerfileResult, dockerfileContent string, args AtomicValidateDockerfileArgs) {
 	lines := strings.Split(dockerfileContent, "\n")
 
-	// Base image analysis
 	result.BaseImageAnalysis = t.analyzeBaseImage(lines)
 
-	// Layer analysis
 	result.LayerAnalysis = t.analyzeDockerfileLayers(lines)
 
-	// Security analysis
 	if args.CheckSecurity {
 		result.SecurityAnalysis = t.performSecurityAnalysis(lines)
 	}
 
-	// Optimization tips
 	if args.CheckOptimization {
 		result.OptimizationTips = t.generateOptimizationTips(lines, result.LayerAnalysis)
 	}
 }
 
-// generateCorrectedDockerfile generates a corrected version of the Dockerfile
 func (t *AtomicValidateDockerfileTool) generateCorrectedDockerfile(dockerfileContent string, validationResult *coredocker.ValidationResult) (string, []string) {
 	fixes := make([]string, 0)
 	lines := strings.Split(dockerfileContent, "\n")
 	corrected := make([]string, len(lines))
 	copy(corrected, lines)
 
-	// Apply automatic fixes for common issues
 	for i, line := range corrected {
 		lineNum := i + 1
 		trimmed := strings.TrimSpace(line)
 
-		// Fix missing FROM instruction
 		if i == 0 && !strings.HasPrefix(strings.ToUpper(trimmed), "FROM") {
 			corrected = append([]string{"FROM alpine:latest"}, corrected...)
 			fixes = append(fixes, "Added missing FROM instruction")
 			continue
 		}
 
-		// Fix apt-get without update
 		if strings.Contains(line, "apt-get install") && !strings.Contains(line, "apt-get update") {
 			corrected[i] = strings.Replace(line, "apt-get install", "apt-get update && apt-get install", 1)
 			fixes = append(fixes, fmt.Sprintf("Line %d: Added apt-get update before install", lineNum))
 		}
 
-		// Fix missing cache cleanup for apt
 		if strings.Contains(line, "apt-get install") && !strings.Contains(line, "rm -rf /var/lib/apt/lists/*") {
 			corrected[i] = line + " && rm -rf /var/lib/apt/lists/*"
 			fixes = append(fixes, fmt.Sprintf("Line %d: Added apt cache cleanup", lineNum))
 		}
 
-		// Fix running as root (add non-root user at the end if missing)
 		if i == len(lines)-1 && !containsUserInstruction(corrected) {
 			corrected = append(corrected, "", "# Create non-root user", "RUN adduser -D appuser", "USER appuser")
 			fixes = append(fixes, "Added non-root user for security")
@@ -690,21 +570,16 @@ func (t *AtomicValidateDockerfileTool) generateCorrectedDockerfile(dockerfileCon
 	return strings.Join(corrected, "\n"), fixes
 }
 
-// calculateValidationScore calculates a validation score based on various factors
 func (t *AtomicValidateDockerfileTool) calculateValidationScore(result *AtomicValidateDockerfileResult) int {
 	score := 100
 
-	// Deduct points for errors
 	score -= len(result.Errors) * 10
 	score -= result.CriticalIssues * 15
 
-	// Deduct points for security issues
 	score -= len(result.SecurityIssues) * 15
 
-	// Deduct points for warnings (less severe)
 	score -= len(result.Warnings) * 3
 
-	// Bonus points for following best practices
 	if result.SecurityAnalysis.UsesPackagePin {
 		score += 5
 	}
@@ -715,7 +590,6 @@ func (t *AtomicValidateDockerfileTool) calculateValidationScore(result *AtomicVa
 		score += 5
 	}
 
-	// Ensure score is within bounds
 	if score < 0 {
 		score = 0
 	}
@@ -725,8 +599,6 @@ func (t *AtomicValidateDockerfileTool) calculateValidationScore(result *AtomicVa
 
 	return score
 }
-
-// Helper functions for additional analysis
 
 func (t *AtomicValidateDockerfileTool) analyzeBaseImage(lines []string) BaseImageAnalysis {
 	analysis := BaseImageAnalysis{
@@ -741,7 +613,6 @@ func (t *AtomicValidateDockerfileTool) analyzeBaseImage(lines []string) BaseImag
 			if len(parts) >= 2 {
 				analysis.Image = parts[1]
 
-				// Parse registry and check if trusted
 				if strings.Contains(analysis.Image, "/") {
 					analysis.Registry = strings.Split(analysis.Image, "/")[0]
 					analysis.IsTrusted = isTrustedRegistry(analysis.Registry)
@@ -750,16 +621,13 @@ func (t *AtomicValidateDockerfileTool) analyzeBaseImage(lines []string) BaseImag
 					analysis.IsTrusted = true
 				}
 
-				// Check if official image
 				analysis.IsOfficial = isOfficialImage(analysis.Image)
 
-				// Check for latest tag
 				if strings.Contains(analysis.Image, ":latest") || !strings.Contains(analysis.Image, ":") {
 					analysis.Recommendations = append(analysis.Recommendations, "Use specific version tags instead of 'latest'")
 					analysis.HasKnownVulns = true // Assume latest might have vulns
 				}
 
-				// Suggest alternatives for common images
 				analysis.Alternatives = suggestAlternativeImages(analysis.Image)
 			}
 			break
@@ -784,12 +652,10 @@ func (t *AtomicValidateDockerfileTool) analyzeDockerfileLayers(lines []string) L
 			runCommands++
 			analysis.TotalLayers++
 
-			// Check for cache-breaking commands
 			if !strings.Contains(trimmed, "apt-get update") && !strings.Contains(trimmed, "npm install") {
 				cacheableSteps++
 			}
 
-			// Check for problematic patterns
 			if strings.Count(trimmed, "&&") == 0 && runCommands > 1 {
 				analysis.ProblematicSteps = append(analysis.ProblematicSteps, ProblematicStep{
 					Line:        i + 1,
@@ -806,7 +672,6 @@ func (t *AtomicValidateDockerfileTool) analyzeDockerfileLayers(lines []string) L
 
 	analysis.CacheableSteps = cacheableSteps
 
-	// Suggest layer optimizations
 	if runCommands > 3 {
 		analysis.Optimizations = append(analysis.Optimizations, LayerOptimization{
 			Type:        "layer_consolidation",
@@ -834,12 +699,10 @@ func (t *AtomicValidateDockerfileTool) performSecurityAnalysis(lines []string) S
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
 
-		// Check for USER instruction
 		if strings.HasPrefix(upper, "USER") && !strings.Contains(trimmed, "root") {
 			hasUser = true
 		}
 
-		// Check for exposed ports
 		if strings.HasPrefix(upper, "EXPOSE") {
 			parts := strings.Fields(trimmed)
 			for _, part := range parts[1:] {
@@ -849,14 +712,12 @@ func (t *AtomicValidateDockerfileTool) performSecurityAnalysis(lines []string) S
 			}
 		}
 
-		// Check for secrets
 		if strings.Contains(upper, "PASSWORD") || strings.Contains(upper, "SECRET") || strings.Contains(upper, "KEY") {
 			analysis.HasSecrets = true
 			analysis.Recommendations = append(analysis.Recommendations, "Avoid hardcoding secrets in Dockerfile")
 			securityScore -= 30
 		}
 
-		// Check for package pinning
 		if strings.Contains(trimmed, "apt-get install") && !strings.Contains(trimmed, "=") {
 			analysis.UsesPackagePin = false
 			securityScore -= 10
@@ -880,7 +741,6 @@ func (t *AtomicValidateDockerfileTool) performSecurityAnalysis(lines []string) S
 func (t *AtomicValidateDockerfileTool) generateOptimizationTips(lines []string, layerAnalysis LayerAnalysis) []OptimizationTip {
 	tips := make([]OptimizationTip, 0)
 
-	// Check for layer optimization opportunities
 	if layerAnalysis.TotalLayers > 10 {
 		tips = append(tips, OptimizationTip{
 			Type:             "layer_consolidation",
@@ -891,7 +751,6 @@ func (t *AtomicValidateDockerfileTool) generateOptimizationTips(lines []string, 
 		})
 	}
 
-	// Check for cache optimization
 	copyBeforeRun := false
 	lastCopyLine := -1
 	lastRunLine := -1
@@ -921,8 +780,6 @@ func (t *AtomicValidateDockerfileTool) generateOptimizationTips(lines []string, 
 	return tips
 }
 
-// Helper utility functions
-
 func determineImpact(warningType string) string {
 	switch warningType {
 	case "security":
@@ -946,7 +803,6 @@ func isTrustedRegistry(registry string) bool {
 }
 
 func isOfficialImage(image string) bool {
-	// Official images don't have a username/organization prefix
 	parts := strings.Split(image, "/")
 	return len(parts) == 1 || (len(parts) == 2 && parts[0] == "library")
 }
@@ -978,24 +834,18 @@ func containsUserInstruction(lines []string) bool {
 	return false
 }
 
-// SimpleTool interface implementation
-
-// GetName returns the tool name
 func (t *AtomicValidateDockerfileTool) GetName() string {
 	return "atomic_validate_dockerfile"
 }
 
-// GetDescription returns the tool description
 func (t *AtomicValidateDockerfileTool) GetDescription() string {
 	return "Validates Dockerfiles against best practices, security standards, and optimization guidelines"
 }
 
-// GetVersion returns the tool version
 func (t *AtomicValidateDockerfileTool) GetVersion() string {
 	return constants.AtomicToolVersion
 }
 
-// GetCapabilities returns the tool capabilities
 func (t *AtomicValidateDockerfileTool) GetCapabilities() types.ToolCapabilities {
 	return types.ToolCapabilities{
 		SupportsDryRun:    true,
@@ -1005,7 +855,6 @@ func (t *AtomicValidateDockerfileTool) GetCapabilities() types.ToolCapabilities 
 	}
 }
 
-// GetMetadata returns comprehensive metadata about the tool
 func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:        "atomic_validate_dockerfile",
@@ -1116,7 +965,6 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 	}
 }
 
-// Validate validates the tool arguments
 func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
@@ -1132,7 +980,6 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 			Build()
 	}
 
-	// Must provide either path or content
 	if validateArgs.DockerfilePath == "" && validateArgs.DockerfileContent == "" {
 		return types.NewValidationErrorBuilder("Either dockerfile_path or dockerfile_content must be provided", "dockerfile", "").
 			WithField("dockerfile_path", validateArgs.DockerfilePath).
@@ -1140,7 +987,6 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 			Build()
 	}
 
-	// Validate severity if provided
 	if validateArgs.Severity != "" {
 		validSeverities := map[string]bool{
 			"info": true, "warning": true, "error": true,
@@ -1155,7 +1001,6 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
 func (t *AtomicValidateDockerfileTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
@@ -1165,11 +1010,9 @@ func (t *AtomicValidateDockerfileTool) Execute(ctx context.Context, args interfa
 			Build()
 	}
 
-	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, validateArgs)
 }
 
-// ExecuteTyped provides the original typed execute method
 func (t *AtomicValidateDockerfileTool) ExecuteTyped(ctx context.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
 	return t.ExecuteValidation(ctx, args)
 }

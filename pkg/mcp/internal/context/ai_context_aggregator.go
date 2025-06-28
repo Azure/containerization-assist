@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// AIContextAggregator aggregates context from all tools for AI analysis
+// AIContextAggregator aggregates context from tools
 type AIContextAggregator struct {
 	stateManager     *state.UnifiedStateManager
 	sessionManager   *session.SessionManager
@@ -23,19 +23,19 @@ type AIContextAggregator struct {
 	logger           zerolog.Logger
 }
 
-// ContextProvider provides context from a specific tool or system
+// ContextProvider provides tool context
 type ContextProvider interface {
 	GetContextData(ctx context.Context, request *ContextRequest) (*ContextData, error)
 	GetCapabilities() *ContextProviderCapabilities
 }
 
-// ContextEnricher enriches context with additional information
+// ContextEnricher enriches context
 type ContextEnricher interface {
 	EnrichContext(ctx context.Context, data *ComprehensiveContext) error
 	Name() string
 }
 
-// ContextRequest defines what context is needed
+// ContextRequest represents context request
 type ContextRequest struct {
 	SessionID      string
 	ToolName       string
@@ -46,7 +46,7 @@ type ContextRequest struct {
 	Filters        map[string]interface{}
 }
 
-// ContextType defines types of context
+// ContextType represents context type
 type ContextType string
 
 const (
@@ -59,24 +59,24 @@ const (
 	ContextTypeAll         ContextType = "all"
 )
 
-// TimeRange defines a time range for context
+// TimeRange represents time range
 type TimeRange struct {
 	Start time.Time
 	End   time.Time
 }
 
-// ContextData represents context data from a provider
+// ContextData represents provider context data
 type ContextData struct {
 	Provider   string                 `json:"provider"`
 	Type       ContextType            `json:"type"`
 	Timestamp  time.Time              `json:"timestamp"`
 	Data       map[string]interface{} `json:"data"`
 	Metadata   map[string]interface{} `json:"metadata"`
-	Relevance  float64                `json:"relevance"`  // 0.0 to 1.0
-	Confidence float64                `json:"confidence"` // 0.0 to 1.0
+	Relevance  float64                `json:"relevance"`
+	Confidence float64                `json:"confidence"`
 }
 
-// ContextProviderCapabilities describes what a provider can do
+// ContextProviderCapabilities represents provider capabilities
 type ContextProviderCapabilities struct {
 	SupportedTypes  []ContextType
 	SupportsHistory bool
@@ -84,7 +84,7 @@ type ContextProviderCapabilities struct {
 	RealTimeUpdates bool
 }
 
-// ComprehensiveContext represents aggregated context for AI
+// ComprehensiveContext represents aggregated context
 type ComprehensiveContext struct {
 	SessionID        string                  `json:"session_id"`
 	Timestamp        time.Time               `json:"timestamp"`
@@ -98,7 +98,7 @@ type ComprehensiveContext struct {
 	Metadata         map[string]interface{}  `json:"metadata"`
 }
 
-// StateSnapshot represents current state across all tools
+// StateSnapshot represents system state
 type StateSnapshot struct {
 	SessionState   interface{}            `json:"session_state"`
 	WorkflowStates map[string]interface{} `json:"workflow_states"`
@@ -107,7 +107,7 @@ type StateSnapshot struct {
 	Timestamp      time.Time              `json:"timestamp"`
 }
 
-// Event represents a recent system event
+// Event represents system event
 type Event struct {
 	ID        string                 `json:"id"`
 	Type      string                 `json:"type"`
@@ -115,19 +115,19 @@ type Event struct {
 	Timestamp time.Time              `json:"timestamp"`
 	Data      map[string]interface{} `json:"data"`
 	Severity  string                 `json:"severity"`
-	Impact    float64                `json:"impact"` // 0.0 to 1.0
+	Impact    float64                `json:"impact"`
 }
 
-// ContextRelationship describes relationships between context elements
+// ContextRelationship represents context relationships
 type ContextRelationship struct {
 	Source      string  `json:"source"`
 	Target      string  `json:"target"`
 	Type        string  `json:"type"`
-	Strength    float64 `json:"strength"` // 0.0 to 1.0
+	Strength    float64 `json:"strength"`
 	Description string  `json:"description"`
 }
 
-// Recommendation represents an AI-generated recommendation
+// Recommendation represents system recommendation
 type Recommendation struct {
 	ID          string                 `json:"id"`
 	Type        string                 `json:"type"`
@@ -139,7 +139,7 @@ type Recommendation struct {
 	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-// AnalysisInsights contains insights from analysis
+// AnalysisInsights represents analysis insights
 type AnalysisInsights struct {
 	Patterns        []*Pattern        `json:"patterns"`
 	Anomalies       []*Anomaly        `json:"anomalies"`
@@ -148,7 +148,7 @@ type AnalysisInsights struct {
 	PredictedIssues []*PredictedIssue `json:"predicted_issues"`
 }
 
-// Pattern represents a detected pattern
+// Pattern represents detected pattern
 type Pattern struct {
 	ID          string    `json:"id"`
 	Type        string    `json:"type"`
@@ -159,7 +159,7 @@ type Pattern struct {
 	Confidence  float64   `json:"confidence"`
 }
 
-// Anomaly represents a detected anomaly
+// Anomaly represents detected anomaly
 type Anomaly struct {
 	ID          string                 `json:"id"`
 	Type        string                 `json:"type"`
@@ -170,25 +170,25 @@ type Anomaly struct {
 	Confidence  float64                `json:"confidence"`
 }
 
-// Trend represents a detected trend
+// Trend represents detected trend
 type Trend struct {
 	ID         string    `json:"id"`
 	Metric     string    `json:"metric"`
-	Direction  string    `json:"direction"` // up, down, stable
+	Direction  string    `json:"direction"`
 	Rate       float64   `json:"rate"`
 	StartTime  time.Time `json:"start_time"`
 	Confidence float64   `json:"confidence"`
 }
 
-// Correlation represents a correlation between metrics
+// Correlation represents metric correlation
 type Correlation struct {
 	Metric1     string  `json:"metric1"`
 	Metric2     string  `json:"metric2"`
-	Coefficient float64 `json:"coefficient"` // -1.0 to 1.0
+	Coefficient float64 `json:"coefficient"`
 	Confidence  float64 `json:"confidence"`
 }
 
-// PredictedIssue represents a predicted future issue
+// PredictedIssue represents predicted issue
 type PredictedIssue struct {
 	ID            string    `json:"id"`
 	Type          string    `json:"type"`

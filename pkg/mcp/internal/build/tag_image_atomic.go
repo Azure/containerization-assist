@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// standardTagStages provides common stages for tag operations
+// standardTagStages returns tag operation stages
 func standardTagStages() []mcptypes.LocalProgressStage {
 	return []mcptypes.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
@@ -25,69 +25,56 @@ func standardTagStages() []mcptypes.LocalProgressStage {
 	}
 }
 
-// AtomicTagImageArgs defines arguments for atomic Docker image tagging
+// AtomicTagImageArgs represents image tagging arguments
 type AtomicTagImageArgs struct {
 	types.BaseToolArgs
 
-	// Image information
 	SourceImage string `json:"source_image" jsonschema:"required,pattern=^[a-zA-Z0-9][a-zA-Z0-9._/-]*(:([a-zA-Z0-9][a-zA-Z0-9._-]*|latest))?$" description:"The source image to tag (e.g. nginx:latest, myapp:v1.0.0)"`
 	TargetImage string `json:"target_image" jsonschema:"required,pattern=^[a-zA-Z0-9][a-zA-Z0-9._/-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$" description:"The target image name and tag (e.g. myregistry.com/nginx:production)"`
 
-	// Tag configuration
 	Force bool `json:"force,omitempty" description:"Force tag even if target tag already exists"`
 }
 
-// AtomicTagImageResult defines the response from atomic Docker image tagging
+// AtomicTagImageResult represents image tagging results
 type AtomicTagImageResult struct {
 	types.BaseToolResponse
-	mcptypes.BaseAIContextResult      // Embedded for AI context methods
-	Success                      bool `json:"success"`
+	mcptypes.BaseAIContextResult
+	Success bool `json:"success"`
 
-	// Session context
 	SessionID    string `json:"session_id"`
 	WorkspaceDir string `json:"workspace_dir"`
 
-	// Tag configuration
 	SourceImage string `json:"source_image"`
 	TargetImage string `json:"target_image"`
 
-	// Tag results from core operations
 	TagResult *docker.TagResult `json:"tag_result,omitempty"`
 
-	// Timing information
 	TagDuration   time.Duration `json:"tag_duration"`
 	TotalDuration time.Duration `json:"total_duration"`
 
-	// Rich context for Claude reasoning
 	TagContext *TagContext `json:"tag_context"`
-
-	// Rich error information if operation failed
 }
 
-// TagContext provides rich context for Claude to reason about
+// TagContext represents tag operation context
 type TagContext struct {
-	// Tag analysis
 	TagStatus         string `json:"tag_status"`
 	SourceImageExists bool   `json:"source_image_exists"`
 	TargetImageExists bool   `json:"target_image_exists"`
 	TagOverwrite      bool   `json:"tag_overwrite"`
 
-	// Registry information
 	SourceRegistry string `json:"source_registry"`
 	TargetRegistry string `json:"target_registry"`
 	SameRegistry   bool   `json:"same_registry"`
 
-	// Error analysis
 	ErrorType     string `json:"error_type,omitempty"`
 	ErrorCategory string `json:"error_category,omitempty"`
 	IsRetryable   bool   `json:"is_retryable"`
 
-	// Next step suggestions
 	NextStepSuggestions []string `json:"next_step_suggestions"`
 	TroubleshootingTips []string `json:"troubleshooting_tips,omitempty"`
 }
 
-// AtomicTagImageTool implements atomic Docker image tagging using core operations
+// AtomicTagImageTool implements image tagging operations
 type AtomicTagImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  mcptypes.ToolSessionManager
@@ -96,7 +83,7 @@ type AtomicTagImageTool struct {
 	fixingMixin     *AtomicToolFixingMixin
 }
 
-// NewAtomicTagImageTool creates a new atomic tag image tool
+// NewAtomicTagImageTool creates a new AtomicTagImageTool
 func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_tag_image").Logger()
 	return &AtomicTagImageTool{
@@ -106,20 +93,19 @@ func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager m
 	}
 }
 
-// SetAnalyzer sets the analyzer for failure analysis
+// SetAnalyzer sets the analyzer
 func (t *AtomicTagImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
 	t.analyzer = analyzer
 }
 
-// SetFixingMixin sets the fixing mixin for automatic error recovery
+// SetFixingMixin sets the fixing mixin
 func (t *AtomicTagImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
 	t.fixingMixin = mixin
 }
 
-// ExecuteWithFixes runs the atomic Docker image tag with automatic fixes
+// ExecuteWithFixes executes tag with automatic fixes
 func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	if t.fixingMixin != nil && !args.DryRun {
-		// Create wrapper operation for tag process
 		var result *AtomicTagImageResult
 		operation := NewTagOperationWrapper(
 			func(ctx context.Context) error {
@@ -140,12 +126,10 @@ func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTa
 				return nil
 			},
 			func() error {
-				// Prepare workspace for fixes
 				return nil
 			},
 		)
 
-		// Execute with retry and fixing
 		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
 		if err != nil {
 			return nil, err
@@ -153,34 +137,30 @@ func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTa
 		return result, nil
 	}
 
-	// Fallback to standard execution
 	return t.executeTagCore(ctx, args)
 }
 
-// ExecuteTag runs the atomic Docker image tag operation
+// ExecuteTag runs image tag operation
 func (t *AtomicTagImageTool) ExecuteTag(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	return t.executeTagCore(ctx, args)
 }
 
-// executeTagCore contains the core tag logic
+// executeTagCore executes tag logic
 func (t *AtomicTagImageTool) executeTagCore(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	startTime := time.Now()
 
-	// Create result object early for error handling
 	result := &AtomicTagImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0),
 		SessionID:           args.SessionID,
 		SourceImage:         args.SourceImage,
 		TargetImage:         args.TargetImage,
 		TagContext:          &TagContext{},
 	}
 
-	// Direct execution without progress tracking
 	err := t.executeWithoutProgress(ctx, args, result, startTime)
 	result.TotalDuration = time.Since(startTime)
 
-	// Update AI context with final result
 	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
 
 	if err != nil {
@@ -190,22 +170,18 @@ func (t *AtomicTagImageTool) executeTagCore(ctx context.Context, args AtomicTagI
 	return result, nil
 }
 
-// ExecuteWithContext runs the atomic Docker image tag with GoMCP progress tracking
+// ExecuteWithContext executes tag with progress tracking
 func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	startTime := time.Now()
 
-	// Create result object early for error handling
 	result := &AtomicTagImageResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0), // Will be updated later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0),
 		SessionID:           args.SessionID,
 		SourceImage:         args.SourceImage,
 		TargetImage:         args.TargetImage,
 		TagContext:          &TagContext{},
 	}
-
-	// Create progress adapter for GoMCP using standard tag stages
-	// _ = nil // TODO: Progress adapter removed to break import cycles
 
 	// Execute with progress tracking
 	ctx := context.Background()
@@ -214,7 +190,6 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 
-	// Update AI context with final result
 	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
 
 	// Complete progress tracking

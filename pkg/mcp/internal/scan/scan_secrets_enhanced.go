@@ -15,57 +15,47 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// AtomicScanSecretsEnhancedArgs defines arguments for enhanced secret scanning
 type AtomicScanSecretsEnhancedArgs struct {
 	types.BaseToolArgs
 
-	// Target specification
 	TargetPath string   `json:"target_path" description:"Path to scan (file or directory)"`
 	Recursive  bool     `json:"recursive,omitempty" description:"Recursively scan directories"`
 	FileTypes  []string `json:"file_types,omitempty" description:"File types to scan (e.g., .env, .yaml)"`
 
-	// Scanning options
 	EnableEntropyDetection bool     `json:"enable_entropy_detection,omitempty" description:"Enable entropy-based detection"`
 	MinConfidence          float64  `json:"min_confidence,omitempty" description:"Minimum confidence threshold (0.0-1.0)"`
 	CustomPatterns         []string `json:"custom_patterns,omitempty" description:"Additional regex patterns to search for"`
 	MaxFileSize            int64    `json:"max_file_size,omitempty" description:"Maximum file size to scan in bytes"`
 
-	// Output options
 	VerifyFindings        bool   `json:"verify_findings,omitempty" description:"Attempt to verify if findings are real secrets"`
 	ExcludeFalsePositives bool   `json:"exclude_false_positives,omitempty" description:"Exclude likely false positives from results"`
 	GenerateReport        bool   `json:"generate_report,omitempty" description:"Generate detailed security report"`
 	OutputFormat          string `json:"output_format,omitempty" description:"Output format (json, sarif, markdown)"`
 }
 
-// AtomicScanSecretsEnhancedResult represents enhanced secret scan results
 type AtomicScanSecretsEnhancedResult struct {
 	types.BaseToolResponse
 	internal.BaseAIContextResult
 
-	// Scan metadata
 	SessionID  string        `json:"session_id"`
 	TargetPath string        `json:"target_path"`
 	ScanTime   time.Time     `json:"scan_time"`
 	Duration   time.Duration `json:"duration"`
 
-	// Results
 	Success      bool                    `json:"success"`
 	FilesScanned int                     `json:"files_scanned"`
 	Findings     []EnhancedSecretFinding `json:"findings"`
 	Summary      SecretScanSummary       `json:"summary"`
 	RiskScore    int                     `json:"risk_score"`
 
-	// Analysis
 	SecurityAnalysis SecurityAnalysis                 `json:"security_analysis"`
 	Recommendations  []EnhancedSecurityRecommendation `json:"recommendations"`
 	RemediationPlan  *EnhancedSecretRemediationPlan   `json:"remediation_plan,omitempty"`
 
-	// Reports
 	GeneratedReport string      `json:"generated_report,omitempty"`
 	SARIFReport     interface{} `json:"sarif_report,omitempty"`
 }
 
-// EnhancedSecretFinding represents a discovered secret with enhanced metadata
 type EnhancedSecretFinding struct {
 	coresecurity.SecretFinding
 	RemediationSteps []string       `json:"remediation_steps"`
@@ -73,7 +63,6 @@ type EnhancedSecretFinding struct {
 	RiskAssessment   RiskAssessment `json:"risk_assessment"`
 }
 
-// SecretScanSummary provides comprehensive scan summary
 type SecretScanSummary struct {
 	TotalFindings    int            `json:"total_findings"`
 	UniqueSecrets    int            `json:"unique_secrets"`
@@ -85,7 +74,6 @@ type SecretScanSummary struct {
 	TopRiskFiles     []FileRisk     `json:"top_risk_files"`
 }
 
-// FileRisk represents risk assessment for a file
 type FileRisk struct {
 	FilePath    string `json:"file_path"`
 	RiskScore   int    `json:"risk_score"`
@@ -93,7 +81,6 @@ type FileRisk struct {
 	HighestRisk string `json:"highest_risk"`
 }
 
-// RiskAssessment provides risk analysis for a finding
 type RiskAssessment struct {
 	Score      int      `json:"score"`
 	Level      string   `json:"level"`
@@ -102,7 +89,6 @@ type RiskAssessment struct {
 	Likelihood string   `json:"likelihood"`
 }
 
-// SecurityAnalysis provides overall security analysis
 type SecurityAnalysis struct {
 	OverallRisk      string            `json:"overall_risk"`
 	CriticalFindings int               `json:"critical_findings"`
@@ -111,7 +97,6 @@ type SecurityAnalysis struct {
 	SecurityPosture  string            `json:"security_posture"`
 }
 
-// ComplianceIssue represents a compliance violation
 type ComplianceIssue struct {
 	Standard    string `json:"standard"`
 	Requirement string `json:"requirement"`
@@ -119,18 +104,16 @@ type ComplianceIssue struct {
 	Severity    string `json:"severity"`
 }
 
-// EnhancedSecurityRecommendation represents a security recommendation
 type EnhancedSecurityRecommendation struct {
-	Priority    int    `json:"priority"` // 1-5 (1 highest)
-	Category    string `json:"category"` // patterns, entropy, verification, remediation
+	Priority    int    `json:"priority"`
+	Category    string `json:"category"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Action      string `json:"action"`
 	Impact      string `json:"impact"`
-	Effort      string `json:"effort"` // low, medium, high
+	Effort      string `json:"effort"`
 }
 
-// EnhancedSecretRemediationPlan provides a plan to fix discovered secrets
 type EnhancedSecretRemediationPlan struct {
 	Priority           string              `json:"priority"`
 	EstimatedEffort    string              `json:"estimated_effort"`
@@ -139,7 +122,6 @@ type EnhancedSecretRemediationPlan struct {
 	PreventionMeasures []string            `json:"prevention_measures"`
 }
 
-// RemediationStep represents a step in the remediation plan
 type RemediationStep struct {
 	Order       int      `json:"order"`
 	Action      string   `json:"action"`
@@ -148,21 +130,18 @@ type RemediationStep struct {
 	Resources   []string `json:"resources,omitempty"`
 }
 
-// ToolingSuggestion suggests tools to help with remediation
 type ToolingSuggestion struct {
 	Tool        string `json:"tool"`
 	Purpose     string `json:"purpose"`
 	Integration string `json:"integration"`
 }
 
-// AtomicScanSecretsEnhancedTool implements enhanced secret scanning
 type AtomicScanSecretsEnhancedTool struct {
 	logger         zerolog.Logger
 	sessionManager mcptypes.ToolSessionManager
 	scanner        *coresecurity.SecretDiscovery
 }
 
-// NewAtomicScanSecretsEnhancedTool creates a new enhanced secret scanning tool
 func NewAtomicScanSecretsEnhancedTool(
 	sessionManager mcptypes.ToolSessionManager,
 	logger zerolog.Logger,
@@ -174,17 +153,14 @@ func NewAtomicScanSecretsEnhancedTool(
 	}
 }
 
-// GetName returns the tool name
 func (t *AtomicScanSecretsEnhancedTool) GetName() string {
 	return "atomic_scan_secrets_enhanced"
 }
 
-// GetDescription returns the tool description
 func (t *AtomicScanSecretsEnhancedTool) GetDescription() string {
 	return "Enhanced secret scanning with pattern and entropy detection"
 }
 
-// GetMetadata returns comprehensive tool metadata (implements unified Tool interface)
 func (t *AtomicScanSecretsEnhancedTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:        "scan_secrets_enhanced",
@@ -258,9 +234,7 @@ func (t *AtomicScanSecretsEnhancedTool) GetMetadata() mcptypes.ToolMetadata {
 	}
 }
 
-// Validate validates the tool arguments (implements unified Tool interface)
 func (t *AtomicScanSecretsEnhancedTool) Validate(ctx context.Context, args interface{}) error {
-	// Handle both pointer and value types
 	var scanArgs AtomicScanSecretsEnhancedArgs
 	switch v := args.(type) {
 	case AtomicScanSecretsEnhancedArgs:
@@ -271,7 +245,6 @@ func (t *AtomicScanSecretsEnhancedTool) Validate(ctx context.Context, args inter
 		return fmt.Errorf("invalid argument type for scan_secrets_enhanced: expected AtomicScanSecretsEnhancedArgs, got %T", args)
 	}
 
-	// Validate required fields
 	if scanArgs.SessionID == "" {
 		return fmt.Errorf("session_id is required")
 	}
@@ -280,17 +253,14 @@ func (t *AtomicScanSecretsEnhancedTool) Validate(ctx context.Context, args inter
 		return fmt.Errorf("target_path is required")
 	}
 
-	// Validate confidence threshold
 	if scanArgs.MinConfidence < 0.0 || scanArgs.MinConfidence > 1.0 {
 		return fmt.Errorf("min_confidence must be between 0.0 and 1.0, got %f", scanArgs.MinConfidence)
 	}
 
-	// Validate file size limit
 	if scanArgs.MaxFileSize < 0 {
 		return fmt.Errorf("max_file_size must be non-negative, got %d", scanArgs.MaxFileSize)
 	}
 
-	// Validate output format
 	if scanArgs.OutputFormat != "" {
 		validFormats := map[string]bool{
 			"json":     true,
@@ -302,7 +272,6 @@ func (t *AtomicScanSecretsEnhancedTool) Validate(ctx context.Context, args inter
 		}
 	}
 
-	// Validate custom patterns
 	for i, pattern := range scanArgs.CustomPatterns {
 		if strings.TrimSpace(pattern) == "" {
 			return fmt.Errorf("custom_patterns[%d] cannot be empty", i)
@@ -312,7 +281,6 @@ func (t *AtomicScanSecretsEnhancedTool) Validate(ctx context.Context, args inter
 	return nil
 }
 
-// Execute performs enhanced secret scanning
 func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	typedArgs, ok := args.(AtomicScanSecretsEnhancedArgs)
 	if !ok {
@@ -327,14 +295,12 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 
 	startTime := time.Now()
 
-	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(typedArgs.SessionID)
 	if err != nil {
 		return t.createErrorResult(typedArgs, startTime, fmt.Errorf("failed to get session: %w", err)), nil
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
-	// Create base result
 	result := &AtomicScanSecretsEnhancedResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_scan_secrets_enhanced", session.SessionID, typedArgs.DryRun),
 		BaseAIContextResult: internal.NewBaseAIContextResult("scan", false, 0),
@@ -350,10 +316,8 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 		Recommendations: make([]EnhancedSecurityRecommendation, 0),
 	}
 
-	// Resolve target path
 	targetPath := typedArgs.TargetPath
 	if targetPath == "" {
-		// Default to repository root from session
 		if repoPath, ok := session.Metadata["repository_path"].(string); ok {
 			targetPath = repoPath
 		} else {
@@ -361,7 +325,6 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 		}
 	}
 
-	// Make path absolute
 	if !filepath.IsAbs(targetPath) {
 		if repoPath, ok := session.Metadata["repository_path"].(string); ok {
 			targetPath = filepath.Join(repoPath, targetPath)
@@ -370,7 +333,6 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 
 	result.TargetPath = targetPath
 
-	// Handle dry-run
 	if typedArgs.DryRun {
 		result.Duration = time.Since(startTime)
 		result.Success = true
@@ -386,7 +348,6 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 		return result, nil
 	}
 
-	// Configure scan options
 	scanOptions := coresecurity.ScanOptions{
 		Recursive:              typedArgs.Recursive,
 		FileTypes:              typedArgs.FileTypes,
@@ -399,14 +360,12 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 		CustomPatterns:         typedArgs.CustomPatterns,
 	}
 
-	// Set defaults
 	if scanOptions.MaxFileSize == 0 {
 		scanOptions.MaxFileSize = 10 * 1024 * 1024 // 10MB
 	}
 	if scanOptions.MinConfidence == 0 {
 		scanOptions.MinConfidence = 0.7
 	}
-	// Enable defaults if not explicitly disabled
 	if typedArgs.EnableEntropyDetection {
 		scanOptions.EnableEntropyDetection = true
 	}
@@ -414,7 +373,6 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 		scanOptions.VerifyFindings = true
 	}
 
-	// Perform scan
 	scanResult, err := t.scanner.ScanDirectory(ctx, targetPath, scanOptions)
 	if err != nil {
 		t.logger.Error().Err(err).Msg("Secret scan failed")
@@ -422,40 +380,31 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 		return result, nil
 	}
 
-	// Process results
 	result.FilesScanned = scanResult.FilesScanned
 	result.RiskScore = scanResult.RiskScore
 	result.Duration = scanResult.Duration
 
-	// Convert findings to enhanced format
 	t.processFindings(scanResult, result)
 
-	// Perform security analysis
 	t.analyzeSecurityPosture(result)
 
-	// Generate recommendations
 	t.generateRecommendations(result)
 
-	// Create remediation plan if needed
 	if len(result.Findings) > 0 {
 		result.RemediationPlan = t.createRemediationPlan(result)
 	}
 
-	// Generate report if requested
 	if typedArgs.GenerateReport {
 		result.GeneratedReport = t.generateReport(result, typedArgs.OutputFormat)
 	}
 
-	// Determine success
 	result.Success = result.RiskScore < 50 && result.Summary.BySeverity["critical"] == 0
 	result.IsSuccessful = result.Success
 	result.BaseAIContextResult.Duration = result.Duration
 
-	// Set error/warning counts
 	result.ErrorCount = result.Summary.BySeverity["critical"] + result.Summary.BySeverity["high"]
 	result.WarningCount = result.Summary.BySeverity["medium"] + result.Summary.BySeverity["low"]
 
-	// Update session metadata
 	session.Metadata["last_secret_scan"] = map[string]interface{}{
 		"timestamp":     result.ScanTime,
 		"files_scanned": result.FilesScanned,
@@ -474,9 +423,7 @@ func (t *AtomicScanSecretsEnhancedTool) Execute(ctx context.Context, args interf
 	return result, nil
 }
 
-// processFindings converts and enhances findings
 func (t *AtomicScanSecretsEnhancedTool) processFindings(scanResult *coresecurity.DiscoveryResult, result *AtomicScanSecretsEnhancedResult) {
-	// Copy summary
 	result.Summary.TotalFindings = scanResult.Summary.TotalFindings
 	result.Summary.UniqueSecrets = scanResult.Summary.UniqueSecrets
 	result.Summary.BySeverity = scanResult.Summary.BySeverity
@@ -485,7 +432,6 @@ func (t *AtomicScanSecretsEnhancedTool) processFindings(scanResult *coresecurity
 	result.Summary.VerifiedFindings = scanResult.Summary.VerifiedFindings
 	result.Summary.FalsePositives = scanResult.Summary.FalsePositives
 
-	// Convert findings
 	for _, finding := range scanResult.Findings {
 		enhanced := EnhancedSecretFinding{
 			SecretFinding:    finding,
@@ -493,13 +439,11 @@ func (t *AtomicScanSecretsEnhancedTool) processFindings(scanResult *coresecurity
 			RiskAssessment:   t.assessRisk(finding),
 		}
 
-		// Find related findings
 		enhanced.RelatedFindings = t.findRelatedFindings(finding, scanResult.Findings)
 
 		result.Findings = append(result.Findings, enhanced)
 	}
 
-	// Calculate top risk files
 	fileRisks := make(map[string]*FileRisk)
 	for _, finding := range result.Findings {
 		if _, exists := fileRisks[finding.FilePath]; !exists {
@@ -517,20 +461,16 @@ func (t *AtomicScanSecretsEnhancedTool) processFindings(scanResult *coresecurity
 		}
 	}
 
-	// Get top 5 risk files
 	for _, risk := range fileRisks {
 		result.Summary.TopRiskFiles = append(result.Summary.TopRiskFiles, *risk)
 	}
 }
 
-// getRemediationSteps provides specific remediation steps for a finding
 func (t *AtomicScanSecretsEnhancedTool) getRemediationSteps(finding coresecurity.SecretFinding) []string {
 	steps := []string{}
 
-	// Common first step
 	steps = append(steps, fmt.Sprintf("Remove the secret from %s", finding.FilePath))
 
-	// Type-specific steps
 	switch finding.SecretType {
 	case "aws_access_key", "aws_secret_key":
 		steps = append(steps,
@@ -568,19 +508,16 @@ func (t *AtomicScanSecretsEnhancedTool) getRemediationSteps(finding coresecurity
 		)
 	}
 
-	// Add git cleanup step if in git repo
 	steps = append(steps, "If committed to git, use 'git filter-branch' or BFG Repo-Cleaner to remove from history")
 
 	return steps
 }
 
-// assessRisk calculates risk assessment for a finding
 func (t *AtomicScanSecretsEnhancedTool) assessRisk(finding coresecurity.SecretFinding) RiskAssessment {
 	assessment := RiskAssessment{
 		Factors: []string{},
 	}
 
-	// Base score on severity
 	switch finding.Severity {
 	case "critical":
 		assessment.Score = 90
@@ -599,7 +536,6 @@ func (t *AtomicScanSecretsEnhancedTool) assessRisk(finding coresecurity.SecretFi
 		assessment.Level = "info"
 	}
 
-	// Adjust based on verification
 	if finding.Verified {
 		assessment.Score += 10
 		assessment.Factors = append(assessment.Factors, "Verified as real secret")
@@ -612,7 +548,6 @@ func (t *AtomicScanSecretsEnhancedTool) assessRisk(finding coresecurity.SecretFi
 		assessment.Likelihood = "probable"
 	}
 
-	// Adjust based on secret type
 	switch finding.SecretType {
 	case "private_key", "aws_secret_key":
 		assessment.Score += 10
@@ -626,12 +561,10 @@ func (t *AtomicScanSecretsEnhancedTool) assessRisk(finding coresecurity.SecretFi
 		assessment.Impact = "medium"
 	}
 
-	// Consider entropy
 	if finding.Entropy > 5.0 {
 		assessment.Factors = append(assessment.Factors, fmt.Sprintf("High entropy: %.2f", finding.Entropy))
 	}
 
-	// Cap score
 	if assessment.Score > 100 {
 		assessment.Score = 100
 	}
@@ -642,23 +575,19 @@ func (t *AtomicScanSecretsEnhancedTool) assessRisk(finding coresecurity.SecretFi
 	return assessment
 }
 
-// findRelatedFindings finds other findings that might be related
 func (t *AtomicScanSecretsEnhancedTool) findRelatedFindings(finding coresecurity.SecretFinding, allFindings []coresecurity.SecretFinding) []string {
 	related := []string{}
 
-	// Look for findings in the same file
 	for _, other := range allFindings {
 		if other.ID == finding.ID {
 			continue
 		}
 
-		// Same file
 		if other.FilePath == finding.FilePath {
 			related = append(related, other.ID)
 			continue
 		}
 
-		// Same secret value (indicates reuse)
 		if other.Match == finding.Match {
 			related = append(related, other.ID)
 		}
@@ -667,14 +596,11 @@ func (t *AtomicScanSecretsEnhancedTool) findRelatedFindings(finding coresecurity
 	return related
 }
 
-// analyzeSecurityPosture performs overall security analysis
 func (t *AtomicScanSecretsEnhancedTool) analyzeSecurityPosture(result *AtomicScanSecretsEnhancedResult) {
 	analysis := &result.SecurityAnalysis
 
-	// Count critical findings
 	analysis.CriticalFindings = result.Summary.BySeverity["critical"]
 
-	// Determine overall risk
 	if analysis.CriticalFindings > 0 || result.RiskScore > 80 {
 		analysis.OverallRisk = "critical"
 		analysis.SecurityPosture = "poor"
@@ -692,7 +618,6 @@ func (t *AtomicScanSecretsEnhancedTool) analyzeSecurityPosture(result *AtomicSca
 		analysis.SecurityPosture = "excellent"
 	}
 
-	// Identify exposure vectors
 	exposureVectors := make(map[string]bool)
 	for _, finding := range result.Findings {
 		switch finding.SecretType {
@@ -708,7 +633,6 @@ func (t *AtomicScanSecretsEnhancedTool) analyzeSecurityPosture(result *AtomicSca
 			exposureVectors["SSH/TLS Infrastructure"] = true
 		}
 
-		// Check file types for exposure vectors
 		if strings.HasSuffix(finding.FilePath, ".env") {
 			exposureVectors["Environment Configuration"] = true
 		}
@@ -721,7 +645,6 @@ func (t *AtomicScanSecretsEnhancedTool) analyzeSecurityPosture(result *AtomicSca
 		analysis.ExposureVectors = append(analysis.ExposureVectors, vector)
 	}
 
-	// Check compliance issues
 	if result.Summary.TotalFindings > 0 {
 		analysis.ComplianceIssues = append(analysis.ComplianceIssues, ComplianceIssue{
 			Standard:    "PCI-DSS",
@@ -741,9 +664,7 @@ func (t *AtomicScanSecretsEnhancedTool) analyzeSecurityPosture(result *AtomicSca
 	}
 }
 
-// generateRecommendations creates security recommendations
 func (t *AtomicScanSecretsEnhancedTool) generateRecommendations(result *AtomicScanSecretsEnhancedResult) {
-	// High priority recommendations based on findings
 	if result.Summary.BySeverity["critical"] > 0 {
 		result.Recommendations = append(result.Recommendations, EnhancedSecurityRecommendation{
 			Priority:    1,
@@ -756,7 +677,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateRecommendations(result *AtomicSc
 		})
 	}
 
-	// Secret management recommendations
 	if result.Summary.TotalFindings > 5 {
 		result.Recommendations = append(result.Recommendations, EnhancedSecurityRecommendation{
 			Priority:    2,
@@ -769,7 +689,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateRecommendations(result *AtomicSc
 		})
 	}
 
-	// Git history cleanup
 	if result.Summary.TotalFindings > 0 {
 		result.Recommendations = append(result.Recommendations, EnhancedSecurityRecommendation{
 			Priority:    3,
@@ -782,7 +701,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateRecommendations(result *AtomicSc
 		})
 	}
 
-	// Prevention recommendations
 	result.Recommendations = append(result.Recommendations, EnhancedSecurityRecommendation{
 		Priority:    4,
 		Category:    "prevention",
@@ -793,7 +711,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateRecommendations(result *AtomicSc
 		Effort:      types.SeverityLow,
 	})
 
-	// CI/CD integration
 	result.Recommendations = append(result.Recommendations, EnhancedSecurityRecommendation{
 		Priority:    5,
 		Category:    "ci_cd",
@@ -805,7 +722,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateRecommendations(result *AtomicSc
 	})
 }
 
-// createRemediationPlan creates a comprehensive remediation plan
 func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScanSecretsEnhancedResult) *EnhancedSecretRemediationPlan {
 	plan := &EnhancedSecretRemediationPlan{
 		Steps:              []RemediationStep{},
@@ -813,7 +729,6 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 		PreventionMeasures: []string{},
 	}
 
-	// Determine priority and effort
 	if result.Summary.BySeverity["critical"] > 0 {
 		plan.Priority = "critical"
 		plan.EstimatedEffort = "1-2 days"
@@ -825,10 +740,8 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 		plan.EstimatedEffort = "3-5 days"
 	}
 
-	// Create remediation steps
 	stepOrder := 1
 
-	// Step 1: Immediate actions
 	if result.Summary.BySeverity["critical"] > 0 || result.Summary.BySeverity["high"] > 0 {
 		plan.Steps = append(plan.Steps, RemediationStep{
 			Order:       stepOrder,
@@ -847,7 +760,6 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 		stepOrder++
 	}
 
-	// Step 2: Remove secrets from code
 	plan.Steps = append(plan.Steps, RemediationStep{
 		Order:       stepOrder,
 		Action:      "Remove Secrets from Source Code",
@@ -860,7 +772,6 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 	})
 	stepOrder++
 
-	// Step 3: Clean git history
 	if result.Summary.TotalFindings > 0 {
 		plan.Steps = append(plan.Steps, RemediationStep{
 			Order:       stepOrder,
@@ -879,7 +790,6 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 		stepOrder++
 	}
 
-	// Step 4: Implement secret management
 	plan.Steps = append(plan.Steps, RemediationStep{
 		Order:       stepOrder,
 		Action:      "Implement Secret Management Solution",
@@ -893,7 +803,6 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 	})
 	stepOrder++
 
-	// Step 5: Set up prevention
 	plan.Steps = append(plan.Steps, RemediationStep{
 		Order:       stepOrder,
 		Action:      "Set Up Prevention Mechanisms",
@@ -906,7 +815,6 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 		},
 	})
 
-	// Tooling suggestions
 	plan.ToolingSuggestions = []ToolingSuggestion{
 		{
 			Tool:        "HashiCorp Vault",
@@ -930,7 +838,6 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 		},
 	}
 
-	// Prevention measures
 	plan.PreventionMeasures = []string{
 		"Implement mandatory code review for all changes",
 		"Use environment variables for all configuration",
@@ -945,20 +852,17 @@ func (t *AtomicScanSecretsEnhancedTool) createRemediationPlan(result *AtomicScan
 	return plan
 }
 
-// generateReport generates a formatted report
 func (t *AtomicScanSecretsEnhancedTool) generateReport(result *AtomicScanSecretsEnhancedResult, format string) string {
 	switch format {
 	case "markdown":
 		return t.generateMarkdownReport(result)
 	case "sarif":
-		// SARIF format would be generated here
 		return "SARIF report generation not implemented"
 	default:
 		return t.generateMarkdownReport(result)
 	}
 }
 
-// generateMarkdownReport creates a markdown formatted report
 func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicScanSecretsEnhancedResult) string {
 	var sb strings.Builder
 
@@ -968,7 +872,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicSca
 	sb.WriteString(fmt.Sprintf("**Files Scanned:** %d\n", result.FilesScanned))
 	sb.WriteString(fmt.Sprintf("**Duration:** %v\n\n", result.Duration))
 
-	// Executive Summary
 	sb.WriteString("## Executive Summary\n\n")
 	sb.WriteString(fmt.Sprintf("- **Risk Score:** %d/100\n", result.RiskScore))
 	sb.WriteString(fmt.Sprintf("- **Overall Risk:** %s\n", result.SecurityAnalysis.OverallRisk))
@@ -977,7 +880,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicSca
 	sb.WriteString(fmt.Sprintf("- **Critical Findings:** %d\n", result.Summary.BySeverity["critical"]))
 	sb.WriteString(fmt.Sprintf("- **Verified Secrets:** %d\n\n", result.Summary.VerifiedFindings))
 
-	// Findings by Severity
 	sb.WriteString("## Findings by Severity\n\n")
 	sb.WriteString("| Severity | Count |\n")
 	sb.WriteString("|----------|-------|\n")
@@ -988,7 +890,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicSca
 	}
 	sb.WriteString("\n")
 
-	// Top Risk Files
 	if len(result.Summary.TopRiskFiles) > 0 {
 		sb.WriteString("## High Risk Files\n\n")
 		sb.WriteString("| File | Secrets | Risk Score |\n")
@@ -999,11 +900,9 @@ func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicSca
 		sb.WriteString("\n")
 	}
 
-	// Detailed Findings
 	if len(result.Findings) > 0 {
 		sb.WriteString("## Detailed Findings\n\n")
 
-		// Group by severity
 		for _, severity := range []string{"critical", "high", "medium", "low"} {
 			findings := t.filterFindingsBySeverity(result.Findings, severity)
 			if len(findings) == 0 {
@@ -1030,7 +929,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicSca
 		}
 	}
 
-	// Recommendations
 	if len(result.Recommendations) > 0 {
 		sb.WriteString("## Recommendations\n\n")
 		for _, rec := range result.Recommendations {
@@ -1042,7 +940,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicSca
 		}
 	}
 
-	// Remediation Plan
 	if result.RemediationPlan != nil {
 		sb.WriteString("## Remediation Plan\n\n")
 		sb.WriteString(fmt.Sprintf("**Priority:** %s\n", result.RemediationPlan.Priority))
@@ -1066,7 +963,6 @@ func (t *AtomicScanSecretsEnhancedTool) generateMarkdownReport(result *AtomicSca
 	return sb.String()
 }
 
-// filterFindingsBySeverity filters findings by severity level
 func (t *AtomicScanSecretsEnhancedTool) filterFindingsBySeverity(findings []EnhancedSecretFinding, severity string) []EnhancedSecretFinding {
 	filtered := []EnhancedSecretFinding{}
 	for _, finding := range findings {
@@ -1077,7 +973,6 @@ func (t *AtomicScanSecretsEnhancedTool) filterFindingsBySeverity(findings []Enha
 	return filtered
 }
 
-// createErrorResult creates an error result
 func (t *AtomicScanSecretsEnhancedTool) createErrorResult(args AtomicScanSecretsEnhancedArgs, startTime time.Time, err error) *AtomicScanSecretsEnhancedResult {
 	return &AtomicScanSecretsEnhancedResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_scan_secrets_enhanced", args.SessionID, args.DryRun),
@@ -1101,8 +996,6 @@ func (t *AtomicScanSecretsEnhancedTool) createErrorResult(args AtomicScanSecrets
 	}
 }
 
-// DisableDefaultOptions is a helper method for the args
 func (args *AtomicScanSecretsEnhancedArgs) DisableDefaultOptions() bool {
-	// Allow disabling defaults if explicitly set to false
 	return !args.EnableEntropyDetection && !args.VerifyFindings
 }

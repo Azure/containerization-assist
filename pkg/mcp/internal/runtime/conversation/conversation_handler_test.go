@@ -17,8 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Mock implementations for testing
-
 // testSessionManagerAdapter implements orchestration.SessionManager interface
 type testSessionManagerAdapter struct {
 	mgr *session.SessionManager
@@ -29,7 +27,6 @@ func (a *testSessionManagerAdapter) GetSession(sessionID string) (interface{}, e
 }
 
 func (a *testSessionManagerAdapter) UpdateSession(session interface{}) error {
-	// Type assert and update through the real session manager
 	s, ok := session.(*sessiontypes.SessionState)
 	if !ok {
 		return fmt.Errorf("invalid session type: expected *sessiontypes.SessionState, got %T", session)
@@ -67,12 +64,10 @@ func (m *mockOrchestrator) ExecuteTool(ctx context.Context, toolName string, par
 	return map[string]interface{}{"result": "success"}, nil
 }
 
-// Test ConversationHandler creation
 func TestNewConversationHandler(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 
 	t.Run("successful creation", func(t *testing.T) {
-		// Setup
 		sessionMgr := createTestSessionManager(t)
 		prefStore := createTestPreferenceStore(t)
 
@@ -83,10 +78,8 @@ func TestNewConversationHandler(t *testing.T) {
 			Logger:           logger,
 		}
 
-		// Create handler
 		handler, err := NewConversationHandler(config)
 
-		// Verify
 		require.NoError(t, err)
 		assert.NotNil(t, handler)
 		assert.NotNil(t, handler.promptManager)
@@ -96,30 +89,24 @@ func TestNewConversationHandler(t *testing.T) {
 	})
 
 	t.Run("fails without orchestrator", func(t *testing.T) {
-		// Setup
 		config := ConversationHandlerConfig{
 			SessionManager:  createTestSessionManager(t),
 			PreferenceStore: createTestPreferenceStore(t),
 			Logger:          logger,
-			// No ToolOrchestrator
 		}
 
-		// Create handler
 		handler, err := NewConversationHandler(config)
 
-		// Verify
 		assert.Error(t, err)
 		assert.Nil(t, handler)
 		assert.Contains(t, err.Error(), "tool orchestrator is required")
 	})
 }
 
-// Test basic conversation handling
 func TestHandleConversation(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 
 	t.Run("validates message parameter", func(t *testing.T) {
-		// Setup
 		handler := createTestHandler(t, logger)
 
 		args := conversation.ChatToolArgs{
@@ -127,51 +114,40 @@ func TestHandleConversation(t *testing.T) {
 			SessionID: "test-session-123",
 		}
 
-		// Execute
 		ctx := context.Background()
 		result, err := handler.HandleConversation(ctx, args)
 
-		// Verify - we expect it to process but may not succeed without full setup
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		// Don't check Success as it depends on prompt manager setup
 	})
 
 	t.Run("empty message error", func(t *testing.T) {
-		// Setup
 		handler := createTestHandler(t, logger)
 
 		args := conversation.ChatToolArgs{
-			Message:   "", // Empty message
+			Message:   "",
 			SessionID: "test-session-123",
 		}
 
-		// Execute
 		ctx := context.Background()
 		result, err := handler.HandleConversation(ctx, args)
 
-		// Verify
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "message parameter is required")
 		assert.Nil(t, result)
 	})
 
 	t.Run("handles normal conversation flow", func(t *testing.T) {
-		// Since the original test expected an error that doesn't occur in normal flow,
-		// let's test that the normal flow works correctly instead
 		handler := createTestHandler(t, logger)
 
-		// Use a normal message
 		args := conversation.ChatToolArgs{
 			Message:   "hello",
 			SessionID: "test-session-123",
 		}
 
-		// Execute
 		ctx := context.Background()
 		result, err := handler.HandleConversation(ctx, args)
 
-		// Verify normal success flow
 		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.True(t, result.Success)
@@ -179,20 +155,16 @@ func TestHandleConversation(t *testing.T) {
 	})
 }
 
-// Test auto-advance functionality
 func TestHandleAutoAdvance(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 
 	t.Run("auto-advance with autopilot enabled", func(t *testing.T) {
-		// Setup
 		handler := createTestHandler(t, logger)
 		sessionMgr := handler.sessionManager
 
-		// Create session with autopilot enabled
 		_, err := sessionMgr.GetOrCreateSession("auto-advance-test")
 		require.NoError(t, err)
 
-		// Update session to enable autopilot
 		err = sessionMgr.UpdateSession("auto-advance-test", func(s interface{}) {
 			if state, ok := s.(*sessiontypes.SessionState); ok {
 				state.RepoAnalysis = map[string]interface{}{
@@ -204,7 +176,6 @@ func TestHandleAutoAdvance(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Create response that supports auto-advance
 		response := &ConversationResponse{
 			SessionID: "auto-advance-test",
 			Stage:     types.StageAnalysis,
@@ -213,46 +184,37 @@ func TestHandleAutoAdvance(t *testing.T) {
 			AutoAdvance: &AutoAdvanceConfig{
 				DefaultAction: "continue",
 			},
-			RequiresInput: false, // Can auto-advance
+			RequiresInput: false,
 		}
 
-		// Execute
 		ctx := context.Background()
 		finalResponse, err := handler.handleAutoAdvance(ctx, response)
 
-		// Verify
 		require.NoError(t, err)
 		assert.NotNil(t, finalResponse)
-		// The response should have advanced (in real implementation)
 	})
 
 	t.Run("no auto-advance without autopilot", func(t *testing.T) {
-		// Setup
 		handler := createTestHandler(t, logger)
 
-		// Create response without auto-advance
 		response := &ConversationResponse{
 			SessionID:     "no-auto-advance",
 			Stage:         types.StageWelcome,
 			Status:        ResponseStatusWaitingInput,
 			Message:       "Welcome",
-			RequiresInput: true, // Cannot auto-advance
+			RequiresInput: true,
 		}
 
-		// Execute
 		ctx := context.Background()
 		finalResponse, err := handler.handleAutoAdvance(ctx, response)
 
-		// Verify
 		require.NoError(t, err)
-		assert.Equal(t, response, finalResponse) // Should return same response
+		assert.Equal(t, response, finalResponse)
 	})
 
 	t.Run("respects max advance steps", func(t *testing.T) {
-		// This test verifies that auto-advance won't loop infinitely
 		handler := createTestHandler(t, logger)
 
-		// Create response that always wants to auto-advance
 		response := &ConversationResponse{
 			SessionID: "infinite-loop-test",
 			Stage:     types.StageAnalysis,
@@ -263,42 +225,33 @@ func TestHandleAutoAdvance(t *testing.T) {
 			RequiresInput: false,
 		}
 
-		// Mock prompt manager to always return auto-advance response
-		// (In real test, we'd need to mock the prompt manager)
-
 		ctx := context.Background()
 		finalResponse, err := handler.handleAutoAdvance(ctx, response)
 
-		// Verify it doesn't error even with "infinite" auto-advance
 		require.NoError(t, err)
 		assert.NotNil(t, finalResponse)
 	})
 }
 
-// Test session management integration
 func TestSessionManagement(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 
 	t.Run("handles empty session ID", func(t *testing.T) {
-		// Setup
 		handler := createTestHandler(t, logger)
 
 		args := conversation.ChatToolArgs{
 			Message:   "Create new session",
-			SessionID: "", // No session ID provided
+			SessionID: "",
 		}
 
-		// Execute
 		ctx := context.Background()
 		result, err := handler.HandleConversation(ctx, args)
 
-		// Verify - conversation should process even without session ID
 		require.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
 	t.Run("uses existing session", func(t *testing.T) {
-		// Setup
 		handler := createTestHandler(t, logger)
 		sessionMgr := handler.sessionManager
 
@@ -311,23 +264,19 @@ func TestSessionManagement(t *testing.T) {
 			SessionID: "existing-session",
 		}
 
-		// Execute
 		ctx := context.Background()
 		result, err := handler.HandleConversation(ctx, args)
 
-		// Verify
 		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "existing-session", result.SessionID)
 	})
 }
 
-// Test preference integration
 func TestPreferenceIntegration(t *testing.T) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 
 	t.Run("handles preferences store", func(t *testing.T) {
-		// Setup
 		handler := createTestHandler(t, logger)
 
 		// Create session
@@ -340,27 +289,20 @@ func TestPreferenceIntegration(t *testing.T) {
 			SessionID: "pref-test",
 		}
 
-		// Execute
 		ctx := context.Background()
 		result, err := handler.HandleConversation(ctx, args)
 
-		// Verify
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		// Basic test that preferences don't break conversation
 	})
 }
-
-// Helper functions
 
 func createTestHandler(t *testing.T, logger zerolog.Logger) *ConversationHandler {
 	sessionMgr := createTestSessionManager(t)
 	prefStore := createTestPreferenceStore(t)
 
-	// Create a session manager adapter that implements orchestration.SessionManager
 	sessionAdapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
-	// Create a minimal orchestrator for testing
 	registry := orchestration.NewMCPToolRegistry(logger)
 	orchestrator := orchestration.NewMCPToolOrchestrator(
 		registry,
@@ -388,9 +330,9 @@ func createTestSessionManager(t *testing.T) *session.SessionManager {
 		WorkspaceDir:      tempDir,
 		StorePath:         tempDir + "/sessions.db",
 		SessionTTL:        24 * time.Hour,
-		MaxSessions:       10,                 // Allow multiple sessions for tests
-		MaxDiskPerSession: 100 * 1024 * 1024,  // 100MB per session
-		TotalDiskLimit:    1024 * 1024 * 1024, // 1GB total
+		MaxSessions:       10,
+		MaxDiskPerSession: 100 * 1024 * 1024,
+		TotalDiskLimit:    1024 * 1024 * 1024,
 		Logger:            logger,
 	})
 	require.NoError(t, err)
@@ -409,7 +351,7 @@ func createTestPreferenceStore(t *testing.T) *utils.PreferenceStore {
 	store, err := utils.NewPreferenceStore(
 		tempDir+"/preferences.db",
 		logger,
-		"", // No encryption for tests
+		"",
 	)
 	require.NoError(t, err)
 
@@ -420,20 +362,14 @@ func createTestPreferenceStore(t *testing.T) *utils.PreferenceStore {
 	return store
 }
 
-// Test removed - modernOrchestratorAdapter is no longer used after adapter deletion
-
-// Test testSessionManagerAdapter
 func TestSessionManagerAdapter(t *testing.T) {
 	t.Run("successful session update", func(t *testing.T) {
-		// Setup
 		sessionMgr := createTestSessionManager(t)
 		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
-		// Create a session first
 		_, err := sessionMgr.GetOrCreateSession("update-test")
 		require.NoError(t, err)
 
-		// Update the session
 		updatedSession := &sessiontypes.SessionState{
 			SessionID: "update-test",
 			ImageRef: types.ImageReference{
@@ -444,50 +380,41 @@ func TestSessionManagerAdapter(t *testing.T) {
 
 		err = adapter.UpdateSession(updatedSession)
 
-		// Verify
 		require.NoError(t, err)
 
-		// Check that the update was applied
 		retrievedInterface, err := sessionMgr.GetSession("update-test")
 		require.NoError(t, err)
 		retrieved, ok := retrievedInterface.(*sessiontypes.SessionState)
-		require.True(t, ok, "session should be of correct type")
+		require.True(t, ok)
 		assert.Equal(t, "test/repo", retrieved.ImageRef.Repository)
 		assert.Equal(t, "updated", retrieved.ImageRef.Tag)
 	})
 
 	t.Run("error on invalid type", func(t *testing.T) {
-		// Setup
 		sessionMgr := createTestSessionManager(t)
 		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
-		// Try to update with wrong type
 		err := adapter.UpdateSession("not a session")
 
-		// Verify
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid session type")
 	})
 
 	t.Run("error on missing session ID", func(t *testing.T) {
-		// Setup
 		sessionMgr := createTestSessionManager(t)
 		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
-		// Try to update without session ID
 		session := &sessiontypes.SessionState{
-			SessionID: "", // Empty
+			SessionID: "",
 		}
 
 		err := adapter.UpdateSession(session)
 
-		// Verify
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "session ID is required")
 	})
 }
 
-// Benchmark tests
 func BenchmarkHandleConversation(b *testing.B) {
 	logger := zerolog.New(nil).Level(zerolog.Disabled)
 	handler := createTestHandler(&testing.T{}, logger)

@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// SessionManager manages MCP sessions with persistence and quotas
+// SessionManager manages MCP sessions
 type SessionManager struct {
 	sessions     map[string]*SessionState
 	mutex        sync.RWMutex
@@ -21,23 +21,19 @@ type SessionManager struct {
 	maxSessions  int
 	sessionTTL   time.Duration
 
-	// Persistence layer
 	store SessionStore
 
-	// Resource quotas
 	maxDiskPerSession int64
 	totalDiskLimit    int64
 
-	// Logger
 	logger zerolog.Logger
 
-	// Cleanup
 	cleanupTicker *time.Ticker
 	cleanupDone   chan bool
-	stopped       bool // Track if already stopped to prevent double-close
+	stopped       bool
 }
 
-// SessionManagerConfig holds configuration for the session manager
+// SessionManagerConfig represents session manager configuration
 type SessionManagerConfig struct {
 	WorkspaceDir      string
 	MaxSessions       int
@@ -48,15 +44,13 @@ type SessionManagerConfig struct {
 	Logger            zerolog.Logger
 }
 
-// NewSessionManager creates a new session manager with persistence
+// NewSessionManager creates a new SessionManager
 func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
-	// Create workspace directory if it doesn't exist
 	if err := os.MkdirAll(config.WorkspaceDir, 0o750); err != nil {
 		config.Logger.Error().Err(err).Str("path", config.WorkspaceDir).Msg("Failed to create workspace directory")
 		return nil, fmt.Errorf("failed to create workspace directory %s: %w", config.WorkspaceDir, err)
 	}
 
-	// Initialize persistence store
 	var store SessionStore
 	var err error
 
@@ -82,7 +76,6 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 		cleanupDone:       make(chan bool),
 	}
 
-	// Load existing sessions from persistence
 	if err := sm.loadExistingSessions(); err != nil {
 		sm.logger.Warn().Err(err).Msg("Failed to load existing sessions")
 	}
@@ -90,18 +83,16 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 	return sm, nil
 }
 
-// getOrCreateSessionConcrete retrieves an existing session or creates a new one
+// getOrCreateSessionConcrete retrieves or creates session
 func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*SessionState, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	// Check if session exists in memory
 	if session, exists := sm.sessions[sessionID]; exists {
 		session.UpdateLastAccessed()
 		return session, nil
 	}
 
-	// Try to load from persistence
 	if session, err := sm.store.Load(context.Background(), sessionID); err == nil {
 		sm.sessions[sessionID] = session
 		session.UpdateLastAccessed()
@@ -109,22 +100,18 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 		return session, nil
 	}
 
-	// Create new session if it doesn't exist
 	if sessionID == "" {
 		sessionID = generateSessionID()
 	}
 
-	// Check session limit
 	if len(sm.sessions) >= sm.maxSessions {
 		return nil, fmt.Errorf("maximum number of sessions (%d) reached", sm.maxSessions)
 	}
 
-	// Check total disk usage
 	if err := sm.checkGlobalDiskQuota(); err != nil {
 		return nil, err
 	}
 
-	// Create workspace for the session
 	workspaceDir := filepath.Join(sm.workspaceDir, sessionID)
 	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create session workspace: %w", err)
@@ -135,7 +122,6 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 
 	sm.sessions[sessionID] = session
 
-	// Persist the new session
 	if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to persist new session")
 	}
@@ -144,7 +130,7 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 	return session, nil
 }
 
-// UpdateSession updates a session and persists the changes (interface-compliant version)
+// UpdateSession updates and persists session
 func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
@@ -157,7 +143,6 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 	updater(session)
 	session.UpdateLastAccessed()
 
-	// Persist the changes
 	if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to persist session update")
 		return err
@@ -166,7 +151,7 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 	return nil
 }
 
-// UpdateSessionTyped updates a session with a typed function (for backward compatibility)
+// UpdateSessionTyped updates session with typed function
 func (sm *SessionManager) UpdateSessionTyped(sessionID string, updater func(*SessionState)) error {
 	return sm.UpdateSession(sessionID, func(s interface{}) {
 		if session, ok := s.(*SessionState); ok {
@@ -175,7 +160,7 @@ func (sm *SessionManager) UpdateSessionTyped(sessionID string, updater func(*Ses
 	})
 }
 
-// GetSessionConcrete retrieves a session by ID with concrete return type
+// GetSessionConcrete retrieves session by ID
 func (sm *SessionManager) GetSessionConcrete(sessionID string) (*SessionState, error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
@@ -187,7 +172,7 @@ func (sm *SessionManager) GetSessionConcrete(sessionID string) (*SessionState, e
 	return nil, fmt.Errorf("session not found: %s", sessionID)
 }
 
-// GetSessionInterface (interface compatible) for ToolSessionManager interface
+// GetSessionInterface implements ToolSessionManager interface
 func (sm *SessionManager) GetSessionInterface(sessionID string) (interface{}, error) {
 	session, err := sm.GetSessionConcrete(sessionID)
 	if err != nil {
@@ -196,7 +181,7 @@ func (sm *SessionManager) GetSessionInterface(sessionID string) (interface{}, er
 	return session, nil
 }
 
-// GetSession (interface override) for ToolSessionManager interface compatibility
+// GetSession implements ToolSessionManager interface
 func (sm *SessionManager) GetSession(sessionID string) (interface{}, error) {
 	session, err := sm.GetSessionConcrete(sessionID)
 	if err != nil {
@@ -205,7 +190,7 @@ func (sm *SessionManager) GetSession(sessionID string) (interface{}, error) {
 	return session, nil
 }
 
-// GetOrCreateSession (interface override) for ToolSessionManager interface compatibility
+// GetOrCreateSession implements ToolSessionManager interface
 func (sm *SessionManager) GetOrCreateSession(sessionID string) (interface{}, error) {
 	session, err := sm.getOrCreateSessionConcrete(sessionID)
 	if err != nil {

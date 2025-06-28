@@ -299,30 +299,6 @@ func (wm *WorkspaceManager) EnforceGlobalQuota() error {
 	return nil
 }
 
-// Sandboxing methods
-
-// SandboxedAnalysis runs repository analysis in a sandboxed environment
-func (wm *WorkspaceManager) SandboxedAnalysis(ctx context.Context, sessionID, repoPath string, options interface{}) (interface{}, error) {
-	if !wm.sandboxEnabled {
-		return nil, types.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
-	}
-
-	// Sandboxed execution not implemented
-	// Would require Docker-in-Docker or similar technology
-	return nil, types.NewRichError("SANDBOXED_ANALYSIS_NOT_IMPLEMENTED", "sandboxed analysis not implemented", "feature_error")
-}
-
-// SandboxedBuild runs Docker build in a sandboxed environment
-func (wm *WorkspaceManager) SandboxedBuild(ctx context.Context, sessionID, dockerfilePath string, options interface{}) (interface{}, error) {
-	if !wm.sandboxEnabled {
-		return nil, types.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
-	}
-
-	// Sandboxed execution not implemented
-	// Would require Docker-in-Docker or similar technology
-	return nil, types.NewRichError("SANDBOXED_BUILD_NOT_IMPLEMENTED", "sandboxed build not implemented", "feature_error")
-}
-
 // Helper methods
 
 func (wm *WorkspaceManager) refreshDiskUsage(ctx context.Context) error {

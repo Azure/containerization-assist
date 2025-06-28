@@ -16,7 +16,6 @@ type TemplateIntegration struct {
 	logger               zerolog.Logger
 }
 
-// NewTemplateIntegration creates a new template integration
 func NewTemplateIntegration(logger zerolog.Logger) *TemplateIntegration {
 	return &TemplateIntegration{
 		dockerTemplateEngine: coredocker.NewTemplateEngine(logger),
@@ -26,27 +25,22 @@ func NewTemplateIntegration(logger zerolog.Logger) *TemplateIntegration {
 
 // DockerfileTemplateContext provides enhanced template context for Dockerfile generation
 type DockerfileTemplateContext struct {
-	// Template selection
 	SelectedTemplate    string                   `json:"selected_template"`
 	TemplateInfo        *coredocker.TemplateInfo `json:"template_info"`
-	SelectionMethod     string                   `json:"selection_method"` // "auto", "user", "fallback"
+	SelectionMethod     string                   `json:"selection_method"`
 	SelectionConfidence float64                  `json:"selection_confidence"`
 
-	// Available options
 	AvailableTemplates []TemplateOptionInternal    `json:"available_templates"`
 	AlternativeOptions []AlternativeTemplateOption `json:"alternative_options"`
 
-	// Language/Framework detection
 	DetectedLanguage     string   `json:"detected_language"`
 	DetectedFramework    string   `json:"detected_framework"`
 	DetectedDependencies []string `json:"detected_dependencies"`
 	DetectedConfigFiles  []string `json:"detected_config_files"`
 
-	// Template customization
 	CustomizationOptions  map[string]interface{} `json:"customization_options"`
 	AppliedCustomizations []string               `json:"applied_customizations"`
 
-	// Reasoning
 	SelectionReasoning []string `json:"selection_reasoning"`
 	TradeOffs          []string `json:"trade_offs"`
 }
@@ -57,7 +51,7 @@ type TemplateOptionInternal struct {
 	Language    string   `json:"language"`
 	Framework   string   `json:"framework,omitempty"`
 	Description string   `json:"description"`
-	MatchScore  float64  `json:"match_score"` // 0.0-1.0
+	MatchScore  float64  `json:"match_score"`
 	Strengths   []string `json:"strengths"`
 	Limitations []string `json:"limitations"`
 	BestFor     []string `json:"best_for"`
@@ -69,30 +63,25 @@ type AlternativeTemplateOption struct {
 	Reason     string   `json:"reason"`
 	TradeOffs  []string `json:"trade_offs"`
 	UseCases   []string `json:"use_cases"`
-	Complexity string   `json:"complexity"` // "simple", "moderate", "complex"
+	Complexity string   `json:"complexity"`
 	MatchScore float64  `json:"match_score"`
 }
 
 // ManifestTemplateContext provides enhanced template context for manifest generation
 type ManifestTemplateContext struct {
-	// Template selection
 	SelectedTemplate string `json:"selected_template"`
-	TemplateType     string `json:"template_type"` // "basic", "advanced", "gitops", "helm"
+	TemplateType     string `json:"template_type"`
 	SelectionMethod  string `json:"selection_method"`
 
-	// Available options
 	AvailableTemplates []ManifestTemplateOption `json:"available_templates"`
 
-	// Application context
 	ApplicationType    string `json:"application_type"`
 	DeploymentStrategy string `json:"deployment_strategy"`
 	ResourceProfile    string `json:"resource_profile"`
 
-	// Customization
 	CustomizationOptions map[string]interface{} `json:"customization_options"`
 	GeneratedFiles       []string               `json:"generated_files"`
 
-	// Reasoning
 	SelectionReasoning []string `json:"selection_reasoning"`
 	BestPractices      []string `json:"best_practices"`
 }
@@ -102,13 +91,12 @@ type ManifestTemplateOption struct {
 	Name         string   `json:"name"`
 	Type         string   `json:"type"`
 	Description  string   `json:"description"`
-	Components   []string `json:"components"` // deployment, service, configmap, etc.
-	Features     []string `json:"features"`   // autoscaling, monitoring, etc.
+	Components   []string `json:"components"`
+	Features     []string `json:"features"`
 	Complexity   string   `json:"complexity"`
 	Requirements []string `json:"requirements"`
 }
 
-// SelectDockerfileTemplate selects the best Dockerfile template based on repository analysis
 func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]interface{}, userTemplate string) (*DockerfileTemplateContext, error) {
 	context := &DockerfileTemplateContext{
 		SelectionMethod:      "auto",
@@ -116,11 +104,9 @@ func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]inte
 		SelectionReasoning:   make([]string, 0),
 	}
 
-	// Extract repository information
 	language, _ := repoInfo["language"].(string)
 	framework, _ := repoInfo["framework"].(string)
 
-	// Extract dependencies
 	var dependencies []string
 	if deps, ok := repoInfo["dependencies"].([]interface{}); ok {
 		for _, dep := range deps {
@@ -135,7 +121,6 @@ func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]inte
 		}
 	}
 
-	// Extract config files
 	var configFiles []string
 	if files, ok := repoInfo["files"].([]interface{}); ok {
 		for _, file := range files {
@@ -145,13 +130,11 @@ func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]inte
 		}
 	}
 
-	// Set detection results
 	context.DetectedLanguage = language
 	context.DetectedFramework = framework
 	context.DetectedDependencies = dependencies
 	context.DetectedConfigFiles = configFiles
 
-	// Handle user-specified template
 	if userTemplate != "" {
 		context.SelectionMethod = "user"
 		context.SelectedTemplate = ti.mapCommonTemplateNames(userTemplate)
@@ -159,7 +142,6 @@ func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]inte
 		context.SelectionReasoning = append(context.SelectionReasoning,
 			fmt.Sprintf("User explicitly requested template: %s", userTemplate))
 	} else {
-		// Auto-select template
 		selectedTemplate, reasons, err := ti.dockerTemplateEngine.SuggestTemplate(
 			language, framework, dependencies, configFiles)
 		if err != nil {
@@ -171,7 +153,7 @@ func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]inte
 				"Failed to auto-select template, using Python as fallback")
 		} else {
 			context.SelectedTemplate = selectedTemplate
-			context.SelectionConfidence = 0.8 // Default high confidence for auto-selection
+			context.SelectionConfidence = 0.8
 			if len(reasons) > 0 {
 				context.SelectionReasoning = reasons
 			} else {
@@ -181,7 +163,6 @@ func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]inte
 		}
 	}
 
-	// Get template info by listing available templates
 	availableTemplates, err := ti.dockerTemplateEngine.ListAvailableTemplates()
 	if err == nil {
 		for _, tmpl := range availableTemplates {
@@ -192,24 +173,19 @@ func (ti *TemplateIntegration) SelectDockerfileTemplate(repoInfo map[string]inte
 		}
 	}
 
-	// Get available templates with scoring
 	context.AvailableTemplates = ti.getAvailableDockerfileTemplates(language, framework, dependencies)
 
-	// Generate alternative options
 	context.AlternativeOptions = ti.generateAlternativeDockerfileOptions(
 		context.SelectedTemplate, language, framework, dependencies)
 
-	// Add trade-offs
 	context.TradeOffs = ti.generateDockerfileTradeOffs(context.SelectedTemplate, language, framework)
 
-	// Add customization options based on template
 	context.CustomizationOptions = ti.generateDockerfileCustomizationOptions(
 		context.SelectedTemplate, language, framework, dependencies)
 
 	return context, nil
 }
 
-// SelectManifestTemplate selects the best manifest template based on application requirements
 func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo map[string]interface{}) (*ManifestTemplateContext, error) {
 	context := &ManifestTemplateContext{
 		SelectionMethod:      "auto",
@@ -218,7 +194,6 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 		BestPractices:        make([]string, 0),
 	}
 
-	// Handle different argument types
 	var port int
 	var namespace string
 	var replicas int
@@ -233,7 +208,6 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 	var deploymentStrategy string
 	var envVars map[string]string
 
-	// Use reflection to extract fields from any struct
 	v := reflect.ValueOf(args)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -246,7 +220,6 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 		)
 	}
 
-	// Helper function to safely get field values
 	getFieldValue := func(fieldName string, defaultVal interface{}) interface{} {
 		field := v.FieldByName(fieldName)
 		if !field.IsValid() || !field.CanInterface() {
@@ -255,7 +228,6 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 		return field.Interface()
 	}
 
-	// Extract values with fallbacks
 	if portVal := getFieldValue("Port", 8080); portVal != nil {
 		if p, ok := portVal.(int); ok {
 			port = p
@@ -281,7 +253,6 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 			generateHelm = gh
 		}
 	}
-	// Also try HelmTemplate field for compatibility
 	if htVal := getFieldValue("HelmTemplate", false); htVal != nil {
 		if ht, ok := htVal.(bool); ok {
 			generateHelm = generateHelm || ht
@@ -298,7 +269,6 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 		}
 	}
 
-	// Set defaults for missing fields
 	resourceProfile = ""
 	enableHPA = false
 	enableProbes = false
@@ -306,7 +276,6 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 	labels = nil
 	deploymentStrategy = ""
 
-	// Create a simplified args structure for the helper methods
 	manifestArgs := &manifestTemplateArgs{
 		Namespace:          namespace,
 		Replicas:           replicas,
@@ -319,12 +288,10 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 		EnvVars:            envVars,
 	}
 
-	// Determine application type
 	context.ApplicationType = ti.determineApplicationType(repoInfo, port)
 	context.DeploymentStrategy = ti.determineDeploymentStrategy(manifestArgs)
 	context.ResourceProfile = resourceProfile
 
-	// Select template type based on requirements
 	if generateHelm {
 		context.SelectedTemplate = "helm-chart"
 		context.TemplateType = "helm"
@@ -342,10 +309,8 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 			"Using basic manifests for straightforward deployment")
 	}
 
-	// Get available templates
 	context.AvailableTemplates = ti.getAvailableManifestTemplates()
 
-	// Add customization options
 	context.CustomizationOptions = map[string]interface{}{
 		"namespace":        namespace,
 		"replicas":         replicas,
@@ -358,10 +323,8 @@ func (ti *TemplateIntegration) SelectManifestTemplate(args interface{}, repoInfo
 		"labels":           labels,
 	}
 
-	// Add best practices
 	context.BestPractices = ti.generateManifestBestPractices(context.TemplateType, manifestArgs)
 
-	// List files that will be generated
 	context.GeneratedFiles = ti.listGeneratedManifestFiles(context.TemplateType, manifestArgs)
 
 	return context, nil
@@ -380,10 +343,7 @@ type manifestTemplateArgs struct {
 	EnvVars            map[string]string
 }
 
-// Helper methods
-
 func (ti *TemplateIntegration) mapCommonTemplateNames(template string) string {
-	// Map common language names to actual template names
 	mappings := map[string]string{
 		"python":     "dockerfile-python",
 		"go":         "dockerfile-go",
@@ -408,12 +368,10 @@ func (ti *TemplateIntegration) mapCommonTemplateNames(template string) string {
 		return mapped
 	}
 
-	// If it already starts with "dockerfile-", return as-is
 	if strings.HasPrefix(template, "dockerfile-") {
 		return template
 	}
 
-	// Otherwise, prepend "dockerfile-"
 	return "dockerfile-" + template
 }
 
@@ -436,7 +394,6 @@ func (ti *TemplateIntegration) generateSelectionReasoning(language, framework st
 }
 
 func (ti *TemplateIntegration) getAvailableDockerfileTemplates(language, framework string, dependencies []string) []TemplateOptionInternal {
-	// Get all available templates
 	templates, err := ti.dockerTemplateEngine.ListAvailableTemplates()
 	if err != nil {
 		ti.logger.Error().Err(err).Msg("Failed to list dockerfile templates")
@@ -464,29 +421,25 @@ func (ti *TemplateIntegration) getAvailableDockerfileTemplates(language, framewo
 func (ti *TemplateIntegration) calculateTemplateMatchScore(templateName, language, framework string, dependencies []string) float64 {
 	score := 0.0
 
-	// Extract template language from name
 	templateLang := strings.TrimPrefix(templateName, "dockerfile-")
 
-	// Language match
 	if strings.ToLower(language) == templateLang {
 		score += 0.6
 	} else if ti.areLanguagesRelated(language, templateLang) {
 		score += 0.3
 	}
 
-	// Framework match
 	if framework != "" && strings.Contains(templateName, strings.ToLower(framework)) {
 		score += 0.3
 	}
 
-	// Dependency match
 	depScore := 0.0
 	for _, dep := range dependencies {
 		if ti.isTemplateCompatibleWithDependency(templateName, dep) {
 			depScore += 0.1
 		}
 	}
-	score += minFloat64(depScore, 0.1) // Cap dependency score
+	score += minFloat64(depScore, 0.1)
 
 	return minFloat64(score, 1.0)
 }
@@ -513,7 +466,6 @@ func (ti *TemplateIntegration) areLanguagesRelated(lang1, lang2 string) bool {
 }
 
 func (ti *TemplateIntegration) isTemplateCompatibleWithDependency(templateName, dependency string) bool {
-	// Check if template is designed for specific dependencies
 	compatMap := map[string][]string{
 		"dockerfile-maven":    {"maven", "junit", "spring"},
 		"dockerfile-gradle":   {"gradle", "spring", "junit"},
@@ -624,7 +576,6 @@ func (ti *TemplateIntegration) getTemplateBestFor(templateName string) []string 
 func (ti *TemplateIntegration) generateAlternativeDockerfileOptions(selectedTemplate, language, framework string, dependencies []string) []AlternativeTemplateOption {
 	alternatives := []AlternativeTemplateOption{}
 
-	// Suggest multi-stage optimization
 	if !strings.Contains(selectedTemplate, "multi") {
 		alternatives = append(alternatives, AlternativeTemplateOption{
 			Template:   "custom-multistage",
@@ -636,7 +587,6 @@ func (ti *TemplateIntegration) generateAlternativeDockerfileOptions(selectedTemp
 		})
 	}
 
-	// Suggest distroless for supported languages
 	if language == "Go" || language == "Java" || language == "Python" {
 		alternatives = append(alternatives, AlternativeTemplateOption{
 			Template:   "custom-distroless",
@@ -648,7 +598,6 @@ func (ti *TemplateIntegration) generateAlternativeDockerfileOptions(selectedTemp
 		})
 	}
 
-	// Suggest Alpine variants
 	if !strings.Contains(selectedTemplate, "alpine") {
 		alternatives = append(alternatives, AlternativeTemplateOption{
 			Template:   selectedTemplate + "-alpine",
@@ -666,10 +615,8 @@ func (ti *TemplateIntegration) generateAlternativeDockerfileOptions(selectedTemp
 func (ti *TemplateIntegration) generateDockerfileTradeOffs(template, language, framework string) []string {
 	tradeOffs := []string{}
 
-	// General trade-offs
 	tradeOffs = append(tradeOffs, "Template provides standardized approach vs custom optimization")
 
-	// Language-specific trade-offs
 	switch strings.ToLower(language) {
 	case "python":
 		tradeOffs = append(tradeOffs,
@@ -704,7 +651,6 @@ func (ti *TemplateIntegration) generateDockerfileCustomizationOptions(template, 
 		},
 	}
 
-	// Language-specific options
 	switch strings.ToLower(language) {
 	case "python":
 		options["python_options"] = map[string]interface{}{
@@ -755,12 +701,10 @@ func (ti *TemplateIntegration) getBaseImageVariants(language string) []string {
 }
 
 func (ti *TemplateIntegration) determineApplicationType(repoInfo map[string]interface{}, port int) string {
-	// Check for web application indicators
 	if port > 0 && port != 22 && port != 3306 && port != 5432 {
 		return "web"
 	}
 
-	// Check framework
 	if framework, ok := repoInfo["framework"].(string); ok {
 		switch strings.ToLower(framework) {
 		case "express", "django", "flask", "spring", "rails", "laravel":
@@ -770,7 +714,6 @@ func (ti *TemplateIntegration) determineApplicationType(repoInfo map[string]inte
 		}
 	}
 
-	// Check for API indicators
 	if deps, ok := repoInfo["dependencies"].([]interface{}); ok {
 		for _, dep := range deps {
 			depStr := fmt.Sprintf("%v", dep)
@@ -780,7 +723,6 @@ func (ti *TemplateIntegration) determineApplicationType(repoInfo map[string]inte
 		}
 	}
 
-	// Default to service
 	return "service"
 }
 
@@ -789,7 +731,6 @@ func (ti *TemplateIntegration) determineDeploymentStrategy(args *manifestTemplat
 		return args.DeploymentStrategy
 	}
 
-	// Determine based on configuration
 	if args.EnableHPA {
 		return "scalable"
 	}
@@ -851,7 +792,6 @@ func (ti *TemplateIntegration) generateManifestBestPractices(templateType string
 		"Set security context to run as non-root user",
 	}
 
-	// Template-specific practices
 	switch templateType {
 	case "basic":
 		practices = append(practices,
@@ -873,7 +813,6 @@ func (ti *TemplateIntegration) generateManifestBestPractices(templateType string
 			"Implement chart tests for validation")
 	}
 
-	// Conditional practices
 	if args.ServiceType == "LoadBalancer" {
 		practices = append(practices, "Consider using Ingress instead of LoadBalancer for cost efficiency")
 	}

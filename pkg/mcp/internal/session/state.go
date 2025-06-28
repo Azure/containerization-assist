@@ -9,61 +9,45 @@ import (
 
 // SessionState represents the complete state of an MCP session
 type SessionState struct {
-	// Versioning for schema evolution
-	Version string `json:"version"` // e.g., "v1.0.0"
+	Version string `json:"version"`
 
-	// Session identification
 	SessionID    string    `json:"session_id"`
 	WorkspaceDir string    `json:"workspace_dir"`
 	CreatedAt    time.Time `json:"created_at"`
 	LastAccessed time.Time `json:"last_accessed"`
 	ExpiresAt    time.Time `json:"expires_at"`
 
-	// Repository context
 	RepoPath     string `json:"repo_path"`
 	RepoURL      string `json:"repo_url,omitempty"`
 	RepoFileTree string `json:"repo_file_tree"`
 
-	// Analysis results
 	RepoAnalysis map[string]interface{}       `json:"repo_analysis"`
 	ScanSummary  *types.RepositoryScanSummary `json:"scan_summary,omitempty"`
 
-	// Normalized image reference
 	ImageRef types.ImageReference `json:"image_ref"`
 
-	// Dockerfile state
 	Dockerfile DockerfileState `json:"dockerfile"`
 
-	// Security scan results
 	SecurityScan *SecurityScanSummary `json:"security_scan,omitempty"`
 
-	// Kubernetes manifests
 	K8sManifests map[string]types.K8sManifest `json:"k8s_manifests"`
 
-	// General purpose metadata (kept for flexibility)
 	Metadata map[string]interface{} `json:"metadata"`
 
-	// Build and deployment state
 	BuildLogs  []string `json:"build_logs"`
 	DeployLogs []string `json:"deploy_logs"`
 
-	// Async job tracking
 	ActiveJobs map[string]JobInfo `json:"active_jobs"`
 
-	// Error tracking (moved from top-level)
 	LastError *types.ToolError `json:"last_error,omitempty"`
 
-	// Resource quotas and usage
 	DiskUsage    int64 `json:"disk_usage_bytes"`
 	MaxDiskUsage int64 `json:"max_disk_usage_bytes"`
 
-	// Labels for session organization and filtering
 	Labels []string `json:"labels"`
 
-	// Kubernetes labels to be applied to generated manifests
 	K8sLabels map[string]string `json:"k8s_labels"`
 
-	// Metadata
 	TokenUsage    int                    `json:"token_usage"`
 	LastKnownGood *types.SessionSnapshot `json:"last_known_good,omitempty"`
 	StageHistory  []ToolExecution        `json:"stage_history"`
@@ -92,7 +76,7 @@ type ValidationResult struct {
 	Errors       []string  `json:"errors,omitempty"`
 	Warnings     []string  `json:"warnings,omitempty"`
 	ValidatedAt  time.Time `json:"validated_at"`
-	ValidatedBy  string    `json:"validated_by"` // "hadolint" or "basic"
+	ValidatedBy  string    `json:"validated_by"`
 }
 
 // SecurityScanSummary represents simplified security scan results stored in session
@@ -102,7 +86,7 @@ type SecurityScanSummary struct {
 	ImageRef  string               `json:"image_ref"`
 	Summary   VulnerabilitySummary `json:"summary"`
 	Fixable   int                  `json:"fixable"`
-	Scanner   string               `json:"scanner"` // "trivy" or other
+	Scanner   string               `json:"scanner"`
 }
 
 // VulnerabilitySummary provides a summary of scan findings
@@ -168,14 +152,14 @@ func NewSessionState(sessionID, workspaceDir string) *SessionState {
 		WorkspaceDir: workspaceDir,
 		CreatedAt:    now,
 		LastAccessed: now,
-		ExpiresAt:    now.Add(24 * time.Hour), // Default 24 hour TTL
+		ExpiresAt:    now.Add(24 * time.Hour),
 		RepoAnalysis: make(map[string]interface{}),
 		K8sManifests: make(map[string]types.K8sManifest),
 		ActiveJobs:   make(map[string]JobInfo),
 		BuildLogs:    make([]string, 0),
 		DeployLogs:   make([]string, 0),
 		StageHistory: make([]ToolExecution, 0),
-		MaxDiskUsage: 1024 * 1024 * 1024, // 1GB default
+		MaxDiskUsage: 1024 * 1024 * 1024,
 		Metadata:     make(map[string]interface{}),
 		Labels:       make([]string, 0),
 		K8sLabels:    make(map[string]string),
@@ -371,11 +355,6 @@ type SessionSummary struct {
 	Labels       []string  `json:"labels"`
 }
 
-// =============================================================================
-// SESSION STATE ACCESSORS
-// Modern methods for accessing session state information
-// =============================================================================
-
 // DeriveNextStage maps completed tools to their next logical stage
 func DeriveNextStage(completedTool string) string {
 	stageMap := map[string]string{
@@ -392,11 +371,6 @@ func DeriveNextStage(completedTool string) string {
 	return "unknown"
 }
 
-// =============================================================================
-// REPOSITORYINFO CONVERSION UTILITIES
-// These utilities help migrate from RepositoryInfo map to structured ScanSummary
-// =============================================================================
-
 // ConvertRepositoryInfoToScanSummary converts legacy RepositoryInfo map to structured ScanSummary
 func ConvertRepositoryInfoToScanSummary(info map[string]interface{}) *types.RepositoryScanSummary {
 	if info == nil {
@@ -407,7 +381,6 @@ func ConvertRepositoryInfoToScanSummary(info map[string]interface{}) *types.Repo
 		CachedAt: time.Now(),
 	}
 
-	// Core analysis results
 	if language, ok := info["language"].(string); ok {
 		summary.Language = language
 	}
@@ -421,7 +394,6 @@ func ConvertRepositoryInfoToScanSummary(info map[string]interface{}) *types.Repo
 		summary.Port = int(portFloat)
 	}
 
-	// Dependencies
 	if deps, ok := info["dependencies"].([]string); ok {
 		summary.Dependencies = deps
 	} else if depsInterface, ok := info["dependencies"].([]interface{}); ok {
@@ -432,7 +404,6 @@ func ConvertRepositoryInfoToScanSummary(info map[string]interface{}) *types.Repo
 		}
 	}
 
-	// File information
 	if files, ok := info["files"].([]string); ok {
 		summary.ConfigFilesFound = files
 	} else if filesInterface, ok := info["files"].([]interface{}); ok {
@@ -443,7 +414,6 @@ func ConvertRepositoryInfoToScanSummary(info map[string]interface{}) *types.Repo
 		}
 	}
 
-	// Repository metadata
 	if repoURL, ok := info["repo_url"].(string); ok {
 		summary.RepoURL = repoURL
 	}
@@ -460,7 +430,6 @@ func ConvertRepositoryInfoToScanSummary(info map[string]interface{}) *types.Repo
 		summary.RepositorySize = int64(sizeBytesFloat)
 	}
 
-	// Boolean flags
 	if hasDockerfile, ok := info["has_dockerfile"].(bool); ok && hasDockerfile {
 		summary.DockerFiles = []string{"Dockerfile"}
 	}
@@ -476,7 +445,6 @@ func ConvertScanSummaryToRepositoryInfo(summary *types.RepositoryScanSummary) ma
 
 	info := make(map[string]interface{})
 
-	// Core analysis results
 	if summary.Language != "" {
 		info["language"] = summary.Language
 	}
@@ -490,7 +458,6 @@ func ConvertScanSummaryToRepositoryInfo(summary *types.RepositoryScanSummary) ma
 		info["dependencies"] = summary.Dependencies
 	}
 
-	// File information
 	if len(summary.ConfigFilesFound) > 0 {
 		info["files"] = summary.ConfigFilesFound
 	}
@@ -498,7 +465,6 @@ func ConvertScanSummaryToRepositoryInfo(summary *types.RepositoryScanSummary) ma
 		info["file_count"] = summary.FilesAnalyzed
 	}
 
-	// Repository metadata
 	if summary.RepoURL != "" {
 		info["repo_url"] = summary.RepoURL
 	}
@@ -506,7 +472,6 @@ func ConvertScanSummaryToRepositoryInfo(summary *types.RepositoryScanSummary) ma
 		info["size_bytes"] = summary.RepositorySize
 	}
 
-	// Ecosystem detection
 	if len(summary.PackageManagers) > 0 {
 		info["package_managers"] = summary.PackageManagers
 	}
@@ -524,7 +489,6 @@ func ConvertScanSummaryToRepositoryInfo(summary *types.RepositoryScanSummary) ma
 func extractDatabaseTypes(databaseFiles []string) []string {
 	var types []string
 	for _, file := range databaseFiles {
-		// Simple heuristics to determine database type from filename
 		switch {
 		case contains(file, "postgres") || contains(file, "postgresql"):
 			types = append(types, "postgresql")
@@ -541,7 +505,7 @@ func extractDatabaseTypes(databaseFiles []string) []string {
 	return types
 }
 
-// contains checks if a string contains a substring (case-insensitive)
+// contains checks if string contains substring (case-insensitive)
 func contains(s, substr string) bool {
 	s = strings.ToLower(s)
 	substr = strings.ToLower(substr)

@@ -26,14 +26,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// contextKey is used as a key for context values to avoid collisions
+// contextKey represents context key type
 type contextKey string
 
 const mcpContextKey contextKey = "mcp_context"
 
-// Typed args and result structs for GoMCP tools
-
-// ServerStatusArgs defines arguments for server status tool
+// ServerStatusArgs represents server status arguments
 type ServerStatusArgs struct {
 	SessionID        string `json:"session_id,omitempty" description:"Session ID for detailed analysis"`
 	IncludeDetails   bool   `json:"include_details,omitempty" description:"Include detailed server information"`
@@ -41,7 +39,7 @@ type ServerStatusArgs struct {
 	DryRun           bool   `json:"dry_run,omitempty" description:"Perform dry run without side effects"`
 }
 
-// ServerStatusResult defines result for server status tool
+// ServerStatusResult represents server status result
 type ServerStatusResult struct {
 	Healthy   bool                   `json:"healthy"`
 	Status    string                 `json:"status"`
@@ -52,58 +50,56 @@ type ServerStatusResult struct {
 	Error     string                 `json:"error,omitempty"`
 }
 
-// SessionListArgs defines arguments for list sessions tool
+// SessionListArgs represents session list arguments
 type SessionListArgs struct {
 	IncludeInactive bool `json:"include_inactive,omitempty" description:"Include inactive sessions in results"`
 	Limit           int  `json:"limit,omitempty" description:"Maximum number of sessions to return"`
 }
 
-// SessionListResult defines result for list sessions tool
+// SessionListResult represents session list result
 type SessionListResult struct {
 	Sessions []map[string]interface{} `json:"sessions"`
 	Total    int                      `json:"total"`
 }
 
-// SessionDeleteArgs defines arguments for delete session tool
+// SessionDeleteArgs represents session delete arguments
 type SessionDeleteArgs struct {
 	SessionID string `json:"session_id" description:"Session ID to delete"`
 	Force     bool   `json:"force,omitempty" description:"Force deletion even if session is active"`
 }
 
-// SessionDeleteResult defines result for delete session tool
+// SessionDeleteResult represents session delete result
 type SessionDeleteResult struct {
 	Success   bool   `json:"success"`
 	SessionID string `json:"session_id"`
 	Message   string `json:"message"`
 }
 
-// JobStatusArgs defines arguments for job status tool
+// JobStatusArgs represents job status arguments
 type JobStatusArgs struct {
 	JobID string `json:"job_id" description:"Job ID to check status for"`
 }
 
-// JobStatusResult defines result for job status tool
+// JobStatusResult represents job status result
 type JobStatusResult struct {
 	JobID   string                 `json:"job_id"`
 	Status  string                 `json:"status"`
 	Details map[string]interface{} `json:"details,omitempty"`
 }
 
-// ChatArgs defines arguments for chat tool
+// ChatArgs represents chat arguments
 type ChatArgs struct {
 	Message   string `json:"message" description:"Message to send to the AI assistant"`
 	SessionID string `json:"session_id,omitempty" description:"Session ID for conversation context"`
 }
 
-// ChatResult defines result for chat tool
+// ChatResult represents chat result
 type ChatResult struct {
 	Response  string `json:"response"`
 	SessionID string `json:"session_id,omitempty"`
 }
 
-// Tool registration methods
-
-// RegisterTools registers all available tools with the gomcp server
+// RegisterTools registers tools with the server
 func (gm *GomcpManager) RegisterTools(s *Server) error {
 	if !gm.isInitialized {
 		return types.NewErrorBuilder("manager_not_initialized", "Manager must be initialized before registering tools", "initialization").
@@ -116,18 +112,13 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 			Build()
 	}
 
-	// Create dependencies for tools
 	deps := gm.createToolDependencies(s)
 
-	// Set pipeline operations on the orchestrator for type-safe dispatch
 	if deps.ToolOrchestrator != nil && deps.PipelineOperations != nil && deps.AtomicSessionMgr != nil {
 		deps.ToolOrchestrator.SetPipelineOperations(deps.PipelineOperations)
 
-		// Create and set the tool factory with concrete types
 		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, deps.MCPClients.Analyzer, deps.Logger)
 
-		// Get the no-reflect dispatcher from the orchestrator and set the factory
-		// This is a workaround for the interface/concrete type mismatch
 		if dispatcher := getNoReflectDispatcher(deps.ToolOrchestrator); dispatcher != nil {
 			dispatcher.SetToolFactory(toolFactory)
 			deps.Logger.Info().Msg("Tool factory set on no-reflect dispatcher")
@@ -136,7 +127,6 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 		deps.Logger.Info().Msg("Pipeline operations set on tool orchestrator")
 	}
 
-	// Register core tools
 	deps.Logger.Info().Msg("Registering core tools")
 	if err := gm.registerCoreTools(deps); err != nil {
 		return types.NewErrorBuilder("core_tools_registration_failed", "Failed to register core tools", "registration").
@@ -150,7 +140,6 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 	}
 	deps.Logger.Info().Msg("Core tools registered successfully")
 
-	// Register atomic tools
 	deps.Logger.Info().Msg("Registering atomic tools")
 	if err := gm.registerAtomicTools(deps); err != nil {
 		return types.NewErrorBuilder("atomic_tools_registration_failed", "Failed to register atomic tools", "registration").
@@ -164,7 +153,6 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 	}
 	deps.Logger.Info().Msg("Atomic tools registered successfully")
 
-	// Register utility tools
 	deps.Logger.Info().Msg("Registering utility tools")
 	if err := gm.registerUtilityTools(deps); err != nil {
 		return types.NewErrorBuilder("utility_tools_registration_failed", "Failed to register utility tools", "registration").
@@ -178,7 +166,6 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 	}
 	deps.Logger.Info().Msg("Utility tools registered successfully")
 
-	// Register conversation tools if enabled
 	if s.IsConversationModeEnabled() {
 		if err := gm.registerConversationTools(deps); err != nil {
 			return types.NewErrorBuilder("conversation_tools_registration_failed", "Failed to register conversation tools", "registration").
@@ -192,34 +179,31 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 		}
 	}
 
-	// All tools are now registered using standardized patterns
 	deps.Logger.Info().Msg("All tools registered successfully with standardized patterns")
 
 	return nil
 }
 
-// ToolDependencies holds shared dependencies for tool creation
+// ToolDependencies holds tool dependencies
 type ToolDependencies struct {
 	Server             *Server
 	SessionManager     *session.SessionManager
 	ToolOrchestrator   *orchestration.MCPToolOrchestrator
 	ToolRegistry       *orchestration.MCPToolRegistry
-	PipelineOperations mcptypes.PipelineOperations // Direct pipeline operations without adapter
+	PipelineOperations mcptypes.PipelineOperations
 	AtomicSessionMgr   *session.SessionManager
 	MCPClients         *mcptypes.MCPClients
 	RegistryManager    *coredocker.RegistryManager
 	Logger             zerolog.Logger
 }
 
-// getNoReflectDispatcher extracts the no-reflect dispatcher from the orchestrator
+// getNoReflectDispatcher extracts no-reflect dispatcher
 func getNoReflectDispatcher(orchestrator *orchestration.MCPToolOrchestrator) *orchestration.NoReflectToolOrchestrator {
-	// Use the proper getter method to access the dispatcher
 	return orchestrator.GetDispatcher()
 }
 
-// createToolDependencies creates shared dependencies for tools
+// createToolDependencies creates tool dependencies
 func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
-	// Create clients for atomic tools
 	cmdRunner := &runner.DefaultCommandRunner{}
 	mcpClients := mcptypes.NewMCPClients(
 		docker.NewDockerCmdRunner(cmdRunner),
@@ -227,31 +211,25 @@ func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 		k8s.NewKubeCmdRunner(cmdRunner),
 	)
 
-	// Validate analyzer configuration for production use
 	if err := mcpClients.ValidateAnalyzerForProduction(s.logger); err != nil {
-		// Log critical error but don't fail startup - let it continue with warning
 		s.logger.Error().Err(err).Msg("Analyzer validation failed")
 	}
 
-	// Create pipeline operations (no adapter needed)
 	pipelineOps := pipeline.NewOperations(
 		s.sessionManager,
 		mcpClients,
 		s.logger,
 	)
 
-	// Use session manager directly - no adapter needed
 	atomicSessionMgr := s.sessionManager
 
-	// Create legacy clients for registry manager (which still uses old interface)
 	legacyClients := &clients.Clients{
-		AzOpenAIClient: nil, // No AI for atomic tools
+		AzOpenAIClient: nil,
 		Docker:         docker.NewDockerCmdRunner(cmdRunner),
 		Kind:           kind.NewKindCmdRunner(cmdRunner),
 		Kube:           k8s.NewKubeCmdRunner(cmdRunner),
 	}
 
-	// Create registry manager
 	registryManager := coredocker.NewRegistryManager(legacyClients, s.logger)
 
 	return &ToolDependencies{
@@ -267,19 +245,16 @@ func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 	}
 }
 
-// registerCoreTools registers essential core tools using standardized patterns
+// registerCoreTools registers core tools
 func (gm *GomcpManager) registerCoreTools(deps *ToolDependencies) error {
-	// Create registrar for this function
 	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
-	// Server health/status tool
 	runtime.RegisterSimpleTool(registrar, "server_status",
 		"[Advanced] Diagnostic tool for debugging server issues - not needed for normal operations",
 		func(ctx *gomcpserver.Context, args *ServerStatusArgs) (*ServerStatusResult, error) {
 			return gm.handleServerStatus(deps, args)
 		})
 
-	// Session management tools
 	runtime.RegisterSimpleTool(registrar, "list_sessions",
 		"List all active containerization sessions with their metadata and status",
 		func(ctx *gomcpserver.Context, args *SessionListArgs) (*SessionListResult, error) {
@@ -295,17 +270,14 @@ func (gm *GomcpManager) registerCoreTools(deps *ToolDependencies) error {
 	return nil
 }
 
-// registerAtomicTools registers containerization workflow tools via auto-registration
+// registerAtomicTools registers atomic tools
 func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
-	// Create registrar for this function
 	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
-	// Register atomic tools with orchestrator
 	if err := gm.registerAtomicToolsWithOrchestrator(deps); err != nil {
 		return err
 	}
 
-	// Register GoMCP handlers
 	if err := gm.registerBasicTools(registrar, deps); err != nil {
 		return err
 	}
@@ -765,7 +737,6 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 
 // registerUtilityTools registers utility and management tools using standardized patterns
 func (gm *GomcpManager) registerUtilityTools(deps *ToolDependencies) error {
-	// Create registrar for this function
 	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
 	// Job management
@@ -960,7 +931,6 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 		return nil
 	}
 
-	// Create registrar for this function
 	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
 	runtime.RegisterSimpleTool(registrar, "chat",
