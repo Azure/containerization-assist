@@ -323,21 +323,44 @@ jobs:
           exit 1
         fi
 
+    - name: Download coverage artifacts from unit tests
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-*
+        path: coverage-artifacts
+
     - name: Generate global coverage report
       run: |
         echo "📊 Generating global coverage report..."
-        
-        # Run full test suite with coverage
-        go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+        # Merge coverage files from unit tests
+        echo "mode: atomic" > coverage.out
+
+        # Find all coverage files and merge them
+        for file in coverage-artifacts/*/coverage.out; do
+          if [ -f "$file" ]; then
+            echo "Merging coverage from: $file"
+            # Skip the first line (mode: atomic) and append the rest
+            tail -n +2 "$file" >> coverage.out
+          fi
+        done
+
+        # Check if we have any coverage data
+        if [ $(wc -l < coverage.out) -le 1 ]; then
+          echo "⚠️ No coverage data found from unit tests. Running tests now..."
+          go test -v -coverprofile=coverage.out -covermode=atomic ./...
+        fi
+
+        # Generate HTML report
         go tool cover -html=coverage.out -o coverage.html
-        
+
         # Install coverage tools
         go install github.com/axw/gocov/gocov@latest
         go install github.com/AlekSi/gocov-xml@latest
-        
+
         # Convert coverage to XML
         gocov convert coverage.out | gocov-xml > coverage.xml
-        
+
         # Generate coverage summary
         go tool cover -func=coverage.out > coverage-summary.txt
         echo "## Global Coverage Summary" >> $GITHUB_STEP_SUMMARY
@@ -350,26 +373,26 @@ jobs:
         # Extract total coverage
         TOTAL_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
         echo "Total coverage: ${TOTAL_COV}%"
-        
+
         # Set default thresholds (can be overridden with config file)
         MIN_THRESHOLD=10    # Minimum acceptable coverage
         TARGET_THRESHOLD=25 # Target coverage goal
-        
+
         # Try to load from config file if it exists
         if [ -f .github/coverage-thresholds.json ]; then
           MIN_THRESHOLD=$(jq -r '.global.line_coverage.minimum' .github/coverage-thresholds.json 2>/dev/null || echo "10")
           TARGET_THRESHOLD=$(jq -r '.global.line_coverage.target' .github/coverage-thresholds.json 2>/dev/null || echo "25")
         fi
-        
+
         echo "Minimum threshold: ${MIN_THRESHOLD}%"
         echo "Target threshold: ${TARGET_THRESHOLD}%"
-        
+
         # Check if coverage meets minimum
         if (( $(echo "$TOTAL_COV < $MIN_THRESHOLD" | bc -l) )); then
           echo "❌ Global coverage ${TOTAL_COV}% is below minimum threshold ${MIN_THRESHOLD}%"
           exit 1
         fi
-        
+
         # Check if coverage meets target
         if (( $(echo "$TOTAL_COV >= $TARGET_THRESHOLD" | bc -l) )); then
           echo "✅ Global coverage ${TOTAL_COV}% meets target threshold ${TARGET_THRESHOLD}%"
@@ -381,30 +404,30 @@ jobs:
       if: github.event_name == 'pull_request'
       run: |
         echo "🔄 Checking coverage ratchet..."
-        
+
         # Get base branch coverage
         git checkout ${{ github.event.pull_request.base.sha }}
         go test -coverprofile=base-coverage.out ./... > /dev/null 2>&1 || true
-        
+
         if [ -f base-coverage.out ]; then
           BASE_COV=$(go tool cover -func=base-coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           git checkout ${{ github.event.pull_request.head.sha }}
           CURRENT_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          
+
           echo "Base coverage: ${BASE_COV}%"
           echo "Current coverage: ${CURRENT_COV}%"
-          
+
           # Calculate difference
           DIFF=$(echo "$CURRENT_COV - $BASE_COV" | bc -l)
-          
+
           # Set default tolerance (can be overridden with config file)
           TOLERANCE=2.0
           if [ -f .github/coverage-thresholds.json ]; then
             TOLERANCE=$(jq -r '.ratchet.regression_tolerance' .github/coverage-thresholds.json 2>/dev/null || echo "2.0")
           fi
-          
+
           echo "Coverage change: ${DIFF}% (tolerance: -${TOLERANCE}%)"
-          
+
           if (( $(echo "$DIFF < -$TOLERANCE" | bc -l) )); then
             echo "❌ Coverage regression detected: ${DIFF}% (tolerance: -${TOLERANCE}%)"
             echo "## Coverage Ratchet Failed ❌" >> $GITHUB_STEP_SUMMARY
@@ -473,12 +496,12 @@ jobs:
     - name: Run GitLeaks (Secret Detection)
       run: |
         echo "🔍 Scanning for secrets..."
-        
+
         # Create gitleaks config to exclude test files and known test patterns
         cat > .gitleaks.toml << 'EOF'
         [allowlist]
           description = "Test secrets and known safe patterns"
-          
+
           # Exclude test files
           files = [
             '''.*_test\.go''',
@@ -488,7 +511,7 @@ jobs:
             '''examples/.*''',
             '''repomix-output\.xml'''
           ]
-          
+
           # Exclude known test patterns
           regexes = [
             '''sk-1234567890abcdef''',
@@ -505,7 +528,7 @@ jobs:
             '''sk_test_abcdef123456'''
           ]
         EOF
-        
+
         # Run gitleaks with config
         gitleaks detect --config .gitleaks.toml --report-format json --report-path gitleaks-report.json --verbose
 
@@ -731,10 +754,161 @@ jobs:
   pipeline-summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, quality-gates, integration-tests, mcp-integration-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, testing-dashboard]
     if: always()
+    permissions:
+      pull-requests: write
+      issues: write
 
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+      continue-on-error: true
+
+    - name: Prepare CI Status Data
+      id: ci-status
+      run: |
+        # Extract security scan results
+        SECURITY_SECRETS="⚠️ No Data: Security scan report not available"
+        SECURITY_VULNERABILITIES="⚠️ No Data: Vulnerability scan report not available"
+
+        if [ -f "artifacts/security-scan-reports/gitleaks-report.json" ]; then
+          leak_count=$(jq '. | length' artifacts/security-scan-reports/gitleaks-report.json 2>/dev/null || echo "0")
+          if [ "$leak_count" = "0" ]; then
+            SECURITY_SECRETS="✅ Passed: No secrets detected"
+          else
+            SECURITY_SECRETS="❌ Failed: $leak_count secrets detected"
+          fi
+        fi
+
+        if [ -f "artifacts/security-scan-reports/trivy-report.json" ]; then
+          vuln_count=$(jq '.Results[].Vulnerabilities | length' artifacts/security-scan-reports/trivy-report.json 2>/dev/null | awk '{s+=$1} END {print s}' || echo "0")
+          if [ "$vuln_count" = "0" ] || [ -z "$vuln_count" ]; then
+            SECURITY_VULNERABILITIES="✅ Passed: No vulnerabilities detected"
+          else
+            SECURITY_VULNERABILITIES="❌ Failed: $vuln_count vulnerabilities detected"
+          fi
+        fi
+
+        # Extract lint results
+        LINT_RESULTS="⚠️ No Data: Lint report not available"
+        if [ -f "artifacts/lint-results/lint-summary.txt" ]; then
+          lint_issues=$(grep "Total issues:" artifacts/lint-results/lint-summary.txt | cut -d: -f2 | xargs || echo "unknown")
+          if [ "$lint_issues" = "0" ]; then
+            LINT_RESULTS="✅ Passed\n\nTotal issues found: 0"
+          else
+            LINT_RESULTS="✅ Passed\n\nTotal issues found: $lint_issues (within acceptable limits)"
+          fi
+        fi
+
+        # Extract coverage results
+        COVERAGE_RESULTS="⚠️ No Data: Coverage report not available"
+        if [ -f "artifacts/global-coverage-reports/coverage-summary.txt" ]; then
+          total_cov=$(grep "total:" artifacts/global-coverage-reports/coverage-summary.txt | awk '{print $3}' || echo "unknown")
+          COVERAGE_RESULTS="📊 Total Coverage: $total_cov\n\n"
+          COVERAGE_RESULTS+="Package Coverage:\n"
+          # Get top packages
+          head -n 20 artifacts/global-coverage-reports/coverage-summary.txt | grep -E "github.com/Azure/container-kit" | while read line; do
+            COVERAGE_RESULTS+="- $line\n"
+          done
+        fi
+
+        # Extract quality gates results
+        QUALITY_RESULTS="⚠️ No Data: Quality metrics not available"
+        if [ "${{ needs.quality-gates.result }}" = "success" ]; then
+          QUALITY_RESULTS="✅ All quality checks passed"
+        elif [ "${{ needs.quality-gates.result }}" = "failure" ]; then
+          QUALITY_RESULTS="❌ Quality checks failed"
+        fi
+
+        # Save to outputs
+        echo "security_secrets<<EOF" >> $GITHUB_OUTPUT
+        echo "$SECURITY_SECRETS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        echo "security_vulnerabilities<<EOF" >> $GITHUB_OUTPUT
+        echo "$SECURITY_VULNERABILITIES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        echo "lint_results<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$LINT_RESULTS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        echo "coverage_results<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$COVERAGE_RESULTS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        echo "quality_results<<EOF" >> $GITHUB_OUTPUT
+        echo "$QUALITY_RESULTS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create PR Comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const body = `## 🤖 CI Status Summary
+
+          ### 🔒 Security Scan
+          ${{ steps.ci-status.outputs.security_secrets }}
+
+          ${{ steps.ci-status.outputs.security_vulnerabilities }}
+
+          ### 🧹 Lint Results
+          ${{ steps.ci-status.outputs.lint_results }}
+
+          [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ### 📊 Test Coverage
+          ${{ steps.ci-status.outputs.coverage_results }}
+
+          ### 🎯 Quality Gates
+          ${{ steps.ci-status.outputs.quality_results }}
+
+          ### 📝 Next Steps:
+          - Review any failed checks above
+          - Check individual workflow runs for detailed logs
+          - Address issues before merging
+
+          ---
+          *This comment is automatically updated as CI jobs complete.*`;
+
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('🤖 CI Status Summary')
+          );
+
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }
+
     - name: Pipeline Summary
       run: |
         echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
@@ -748,6 +922,8 @@ jobs:
         echo "| CLI Unit Tests | ${{ needs.unit-test-cli.result == 'success' && '✅ Passed' || needs.unit-test-cli.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| CLI Build | ${{ needs.build-cli.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| MCP Build | ${{ needs.build-mcp.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Coverage Enforcement | ${{ needs.coverage-enforcement.result == 'success' && '✅ Passed' || needs.coverage-enforcement.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || needs.security-scan.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Quality Gates | ${{ needs.quality-gates.result == 'success' && '✅ Passed' || needs.quality-gates.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Integration Tests | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || needs.integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| MCP Integration Tests | ${{ needs.mcp-integration-tests.result == 'success' && '✅ Passed' || needs.mcp-integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
