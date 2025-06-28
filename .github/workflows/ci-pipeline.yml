@@ -7,16 +7,16 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   issues: write
   pull-requests: write
   statuses: write
-
-# Ensure only one pipeline runs at a time per branch/PR
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   # Phase 1: Canary Validation - Fast checks that gate everything else
