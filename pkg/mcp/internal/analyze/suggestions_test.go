@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
@@ -34,7 +35,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 		// Check for language-specific suggestion
 		found := false
 		for _, suggestion := range suggestions {
-			if contains(suggestion, "go") && contains(suggestion, "base image") {
+			if strings.Contains(suggestion, "go") && strings.Contains(suggestion, "base image") {
 				found = true
 				break
 			}
@@ -46,7 +47,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 		// Check for framework suggestion
 		found = false
 		for _, suggestion := range suggestions {
-			if contains(suggestion, "gin") && contains(suggestion, "framework") {
+			if strings.Contains(suggestion, "gin") && strings.Contains(suggestion, "framework") {
 				found = true
 				break
 			}
@@ -58,7 +59,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 		// Check for dependencies suggestion
 		found = false
 		for _, suggestion := range suggestions {
-			if contains(suggestion, "Dependencies") && contains(suggestion, "installed") {
+			if strings.Contains(suggestion, "Dependencies") && strings.Contains(suggestion, "installed") {
 				found = true
 				break
 			}
@@ -70,7 +71,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 		// Check for config files suggestion
 		found = false
 		for _, suggestion := range suggestions {
-			if contains(suggestion, "Configuration") && contains(suggestion, "environment variables") {
+			if strings.Contains(suggestion, "Configuration") && strings.Contains(suggestion, "environment variables") {
 				found = true
 				break
 			}
@@ -110,7 +111,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 			t.Errorf("Expected 1 suggestion for language-only analysis, got %d", len(suggestions))
 		}
 
-		if !contains(suggestions[0], "python") {
+		if !strings.Contains(suggestions[0], "python") {
 			t.Errorf("Expected python-specific suggestion, got: %s", suggestions[0])
 		}
 	})
@@ -120,7 +121,7 @@ func TestGenerateContainerizationSuggestions(t *testing.T) {
 func assertSuggestionContains(t *testing.T, suggestions []string, expected string) {
 	t.Helper()
 	for _, suggestion := range suggestions {
-		if contains(suggestion, expected) {
+		if strings.Contains(suggestion, expected) {
 			return
 		}
 	}
@@ -131,7 +132,7 @@ func assertSuggestionContains(t *testing.T, suggestions []string, expected strin
 func assertSuggestionNotContains(t *testing.T, suggestions []string, notExpected string) {
 	t.Helper()
 	for _, suggestion := range suggestions {
-		if contains(suggestion, notExpected) {
+		if strings.Contains(suggestion, notExpected) {
 			t.Errorf("Should not have suggestion containing '%s'", notExpected)
 			return
 		}

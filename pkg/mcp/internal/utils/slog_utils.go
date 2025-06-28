@@ -86,55 +86,30 @@ func NewLogCaptureWriterSlog(buffer *RingBuffer, writer io.Writer) *LogCaptureWr
 
 // Write implements io.Writer and captures log entries
 func (w *LogCaptureWriterSlog) Write(p []byte) (n int, err error) {
-	// Parse the slog output and capture to buffer
+	// Simplified log capture - just store the text with minimal parsing
 	logText := string(p)
+
+	// Simple level detection
+	level := "info"
+	if strings.Contains(logText, "level=ERROR") {
+		level = "error"
+	} else if strings.Contains(logText, "level=WARN") {
+		level = "warn"
+	} else if strings.Contains(logText, "level=DEBUG") {
+		level = "debug"
+	}
+
 	entry := LogEntry{
-		Timestamp: time.Now(), // parseTimestampFromSlog returns interface{}, use current time
-		Level:     parseLevelFromSlog(logText),
-		Message:   parseMessageFromSlog(logText),
-		Fields:    parseFieldsFromSlog(logText),
+		Timestamp: time.Now(),
+		Level:     level,
+		Message:   logText,
+		Fields:    make(map[string]interface{}),
 	}
 
 	w.buffer.Add(entry)
 
 	// Also write to the original writer
 	return w.writer.Write(p)
-}
-
-// Helper functions to parse slog text format
-func parseTimestampFromSlog(logText string) interface{} {
-	// Simple parsing - in practice you'd want more robust parsing
-	return "now" // Simplified
-}
-
-func parseLevelFromSlog(logText string) string {
-	if contains(logText, "level=ERROR") {
-		return "error"
-	}
-	if contains(logText, "level=WARN") {
-		return "warn"
-	}
-	if contains(logText, "level=INFO") {
-		return "info"
-	}
-	if contains(logText, "level=DEBUG") {
-		return "debug"
-	}
-	return "info"
-}
-
-func parseMessageFromSlog(logText string) string {
-	// Extract message from slog text format - simplified implementation
-	return logText
-}
-
-func parseFieldsFromSlog(logText string) map[string]interface{} {
-	// Parse structured fields from slog text format - simplified implementation
-	return make(map[string]interface{})
-}
-
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
 }
 
 // Convenience functions for MCP logging

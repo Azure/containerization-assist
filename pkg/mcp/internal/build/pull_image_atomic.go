@@ -477,7 +477,7 @@ func (r *AtomicPullImageResult) GenerateRecommendations() []mcptypes.Recommendat
 
 // CreateRemediationPlan implements ai_context.Recommendable
 // TODO: Implement when AI context types are fully defined in mcptypes
-func (r *AtomicPullImageResult) CreateRemediationPlan() *utils.RemediationPlan {
+func (r *AtomicPullImageResult) CreateRemediationPlan() interface{} {
 	return nil
 }
 

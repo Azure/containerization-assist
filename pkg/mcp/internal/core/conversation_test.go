@@ -14,7 +14,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
-	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -321,54 +320,6 @@ func TestConversationOptions(t *testing.T) {
 		assert.Len(t, response.Options, 2)
 		assert.True(t, response.Options[0].Recommended)
 		assert.False(t, response.Options[1].Recommended)
-	})
-}
-
-// TestConversationToolResult tests the standardized tool result format
-func TestConversationToolResult(t *testing.T) {
-	t.Run("SuccessResult", func(t *testing.T) {
-		data := map[string]interface{}{
-			"language":  "Go",
-			"framework": "gin",
-		}
-
-		result := utils.NewSuccessResult("Repository analyzed successfully", data)
-
-		assert.True(t, result.Success)
-		assert.Equal(t, "Repository analyzed successfully", result.Message)
-		assert.Equal(t, "Go", result.Data["language"])
-		assert.Equal(t, "gin", result.Data["framework"])
-		assert.Empty(t, result.Error)
-	})
-
-	t.Run("ErrorResult", func(t *testing.T) {
-		testErr := publicutils.NewError("analyze repository: repository not found", map[string]interface{}{"error": "not found"})
-		result := utils.NewErrorResult("Failed to analyze repository", testErr)
-
-		assert.False(t, result.Success)
-		assert.Equal(t, "Failed to analyze repository", result.Message)
-		assert.NotEmpty(t, result.Error)
-		assert.Contains(t, result.Error, "repository not found")
-	})
-
-	t.Run("ResultWithDuration", func(t *testing.T) {
-		result := utils.NewSuccessResult("Operation completed", nil)
-		result.WithDuration(2 * time.Second)
-
-		assert.Equal(t, 2*time.Second, result.Duration)
-	})
-
-	t.Run("ResultToMap", func(t *testing.T) {
-		data := map[string]interface{}{"test": "value"}
-		result := utils.NewSuccessResult("Test message", data)
-		result.WithDuration(1 * time.Second)
-
-		resultMap := result.ToMap()
-
-		assert.True(t, resultMap["success"].(bool))
-		assert.Equal(t, "Test message", resultMap["message"])
-		assert.Equal(t, "value", resultMap["test"])
-		assert.Equal(t, 1.0, resultMap["duration"])
 	})
 }
 

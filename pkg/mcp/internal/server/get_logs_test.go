@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,27 +10,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
-
-// MockLogProvider for testing
-type MockLogProvider struct {
-	logs       []utils.LogEntry
-	totalCount int
-}
-
-func (m *MockLogProvider) GetLogs(level string, since time.Time, pattern string, limit int) ([]utils.LogEntry, error) {
-	// Simple filtering for testing - return all logs for simplicity
-	filtered := m.logs
-
-	if limit > 0 && len(filtered) > limit {
-		filtered = filtered[len(filtered)-limit:]
-	}
-
-	return filtered, nil
-}
-
-func (m *MockLogProvider) GetTotalLogCount() int {
-	return m.totalCount
-}
 
 // Test GetLogsArgs type
 func TestGetLogsArgs(t *testing.T) {
@@ -117,18 +97,19 @@ func TestGetLogsResult(t *testing.T) {
 	}
 }
 
-// Test MockLogProvider
-func TestMockLogProvider_GetLogs(t *testing.T) {
+// Test RingBufferLogProvider
+func TestRingBufferLogProvider_GetLogs(t *testing.T) {
 	logs := []utils.LogEntry{
-		{Level: "info", Message: "Info message"},
-		{Level: "warn", Message: "Warning message"},
-		{Level: "error", Message: "Error message"},
+		{Level: "info", Message: "Info message", Timestamp: time.Now()},
+		{Level: "warn", Message: "Warning message", Timestamp: time.Now()},
+		{Level: "error", Message: "Error message", Timestamp: time.Now()},
 	}
 
-	provider := &MockLogProvider{
-		logs:       logs,
-		totalCount: 3,
+	buffer := utils.NewRingBuffer(10)
+	for _, log := range logs {
+		buffer.Add(log)
 	}
+	provider := NewRingBufferLogProvider(buffer)
 
 	entries, err := provider.GetLogs("info", time.Now().Add(-1*time.Hour), "", 0)
 	if err != nil {
@@ -139,20 +120,21 @@ func TestMockLogProvider_GetLogs(t *testing.T) {
 	}
 }
 
-// Test MockLogProvider with limit
-func TestMockLogProvider_GetLogsWithLimit(t *testing.T) {
+// Test RingBufferLogProvider with limit
+func TestRingBufferLogProvider_GetLogsWithLimit(t *testing.T) {
 	logs := []utils.LogEntry{
-		{Level: "info", Message: "Info 1"},
-		{Level: "info", Message: "Info 2"},
-		{Level: "info", Message: "Info 3"},
-		{Level: "info", Message: "Info 4"},
-		{Level: "info", Message: "Info 5"},
+		{Level: "info", Message: "Info 1", Timestamp: time.Now()},
+		{Level: "info", Message: "Info 2", Timestamp: time.Now()},
+		{Level: "info", Message: "Info 3", Timestamp: time.Now()},
+		{Level: "info", Message: "Info 4", Timestamp: time.Now()},
+		{Level: "info", Message: "Info 5", Timestamp: time.Now()},
 	}
 
-	provider := &MockLogProvider{
-		logs:       logs,
-		totalCount: 5,
+	buffer := utils.NewRingBuffer(10)
+	for _, log := range logs {
+		buffer.Add(log)
 	}
+	provider := NewRingBufferLogProvider(buffer)
 
 	// Test with limit
 	entries, err := provider.GetLogs("info", time.Now().Add(-1*time.Hour), "", 3)
@@ -164,12 +146,14 @@ func TestMockLogProvider_GetLogsWithLimit(t *testing.T) {
 	}
 }
 
-// Test MockLogProvider GetTotalLogCount
-func TestMockLogProvider_GetTotalLogCount(t *testing.T) {
-	provider := &MockLogProvider{
-		logs:       make([]utils.LogEntry, 0),
-		totalCount: 42,
+// Test RingBufferLogProvider GetTotalLogCount
+func TestRingBufferLogProvider_GetTotalLogCount(t *testing.T) {
+	buffer := utils.NewRingBuffer(50)
+	// Add 42 entries to match expected count
+	for i := 0; i < 42; i++ {
+		buffer.Add(utils.LogEntry{Level: "info", Message: fmt.Sprintf("Entry %d", i), Timestamp: time.Now()})
 	}
+	provider := NewRingBufferLogProvider(buffer)
 
 	count := provider.GetTotalLogCount()
 	if count != 42 {
@@ -194,7 +178,8 @@ func TestNewRingBufferLogProvider(t *testing.T) {
 // Test NewGetLogsTool constructor
 func TestNewGetLogsTool(t *testing.T) {
 	logger := zerolog.Nop()
-	provider := &MockLogProvider{}
+	buffer := utils.NewRingBuffer(10)
+	provider := NewRingBufferLogProvider(buffer)
 
 	tool := NewGetLogsTool(logger, provider)
 
@@ -210,12 +195,10 @@ func TestNewGetLogsTool(t *testing.T) {
 // Test GetLogsTool Execute with valid args
 func TestGetLogsTool_Execute_ValidArgs(t *testing.T) {
 	logger := zerolog.Nop()
-	provider := &MockLogProvider{
-		logs: []utils.LogEntry{
-			{Level: "info", Message: "Test message"},
-		},
-		totalCount: 1,
-	}
+	buffer := utils.NewRingBuffer(10)
+	// Add test log entry
+	buffer.Add(utils.LogEntry{Level: "info", Message: "Test message", Timestamp: time.Now()})
+	provider := NewRingBufferLogProvider(buffer)
 
 	tool := NewGetLogsTool(logger, provider)
 
@@ -239,7 +222,8 @@ func TestGetLogsTool_Execute_ValidArgs(t *testing.T) {
 // Test GetLogsTool Execute with invalid args
 func TestGetLogsTool_Execute_InvalidArgs(t *testing.T) {
 	logger := zerolog.Nop()
-	provider := &MockLogProvider{}
+	buffer := utils.NewRingBuffer(10)
+	provider := NewRingBufferLogProvider(buffer)
 
 	tool := NewGetLogsTool(logger, provider)
 
@@ -315,7 +299,12 @@ func TestGetLogsArgsVariations(t *testing.T) {
 // Test GetLogsTool struct initialization
 func TestGetLogsToolStruct(t *testing.T) {
 	logger := zerolog.Nop()
-	provider := &MockLogProvider{totalCount: 5}
+	buffer := utils.NewRingBuffer(10)
+	// Add 5 test entries to match expected count
+	for i := 0; i < 5; i++ {
+		buffer.Add(utils.LogEntry{Level: "info", Message: fmt.Sprintf("Test message %d", i), Timestamp: time.Now()})
+	}
+	provider := NewRingBufferLogProvider(buffer)
 
 	tool := GetLogsTool{
 		logger:      logger,

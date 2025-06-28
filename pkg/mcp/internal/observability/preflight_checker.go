@@ -50,7 +50,6 @@ type RegistryAuthSummary struct {
 type PreFlightChecker struct {
 	logger            zerolog.Logger
 	timeout           time.Duration
-	registryMgr       *registry.MultiRegistryManager
 	registryValidator *registry.RegistryValidator
 }
 
@@ -92,25 +91,10 @@ const (
 )
 
 func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
-	config := &registry.MultiRegistryConfig{
-		Registries:   make(map[string]registry.RegistryConfig),
-		CacheTimeout: 15 * time.Minute,
-		MaxRetries:   3,
-	}
-
-	registryMgr := registry.NewMultiRegistryManager(config, logger)
-
-	registryMgr.RegisterProvider(registry.NewDockerConfigProvider(logger))
-	registryMgr.RegisterProvider(registry.NewAzureCLIProvider(logger))
-	registryMgr.RegisterProvider(registry.NewAWSECRProvider(logger))
-
-	validator := registry.NewRegistryValidator(logger)
-
 	return &PreFlightChecker{
 		logger:            logger,
 		timeout:           10 * time.Second,
-		registryMgr:       registryMgr,
-		registryValidator: validator,
+		registryValidator: registry.NewRegistryValidator(logger),
 	}
 }
 
@@ -576,23 +560,15 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 			Str("registry", registryURL).
 			Msg("Testing registry authentication")
 
-		creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
+		// Simplified auth check - just test basic connectivity
+		result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, nil)
 		if err != nil {
-			authResults[registryURL] = fmt.Sprintf("No credentials: %v", err)
-			continue
-		}
-
-		if creds != nil {
+			authResults[registryURL] = fmt.Sprintf("Validation failed: %v", err)
+		} else if result != nil && result.Accessible {
+			authResults[registryURL] = "Basic connectivity verified"
 			hasAnyAuth = true
-			authResults[registryURL] = fmt.Sprintf("Authenticated via %s (%s)", creds.Source, creds.AuthMethod)
-
-			if err := pfc.registryMgr.ValidateRegistryAccess(ctx, registryURL); err != nil {
-				authResults[registryURL] += fmt.Sprintf(" - Validation failed: %v", err)
-			} else {
-				authResults[registryURL] += " - Access validated"
-			}
 		} else {
-			authResults[registryURL] = "No credentials available"
+			authResults[registryURL] = "Registry not reachable"
 		}
 	}
 
@@ -612,10 +588,7 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 	return nil
 }
 
-func (pfc *PreFlightChecker) GetRegistryManager() *registry.MultiRegistryManager {
-	return pfc.registryMgr
-}
-
+// GetRegistryValidator returns the registry validator
 func (pfc *PreFlightChecker) GetRegistryValidator() *registry.RegistryValidator {
 	return pfc.registryValidator
 }
@@ -625,16 +598,8 @@ func (pfc *PreFlightChecker) ValidateSpecificRegistry(ctx context.Context, regis
 		Str("registry", registryURL).
 		Msg("Validating specific registry")
 
-	creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
-	if err != nil {
-		pfc.logger.Debug().
-			Str("registry", registryURL).
-			Err(err).
-			Msg("No credentials available for registry")
-		creds = nil
-	}
-
-	result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, creds)
+	// Validate the registry with simplified approach
+	result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, nil)
 	if err != nil {
 		return nil, types.NewErrorBuilder("registry_validation_failed", "Registry validation failed during preflight check", "validation").
 			WithSeverity("high").

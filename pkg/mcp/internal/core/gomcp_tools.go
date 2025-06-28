@@ -820,7 +820,6 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 		})
 
 	// Session label management tools - using standardized utility registration
-	sessionLabelManager := &sessionLabelManagerWrapper{sm: deps.SessionManager}
 
 	// Register session label tools using utility pattern
 	runtime.RegisterSimpleTool(registrar, "add_session_label",
@@ -828,7 +827,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 		func(ctx *gomcpserver.Context, args *sessiontypes.AddSessionLabelArgs) (*sessiontypes.AddSessionLabelResult, error) {
 			addLabelTool := sessiontypes.NewAddSessionLabelTool(
 				deps.Logger.With().Str("tool", "add_session_label").Logger(),
-				sessionLabelManager,
+				deps.SessionManager,
 			)
 			return addLabelTool.ExecuteTyped(context.Background(), args)
 		})
@@ -838,7 +837,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 		func(ctx *gomcpserver.Context, args *sessiontypes.RemoveSessionLabelArgs) (*sessiontypes.RemoveSessionLabelResult, error) {
 			removeLabelTool := sessiontypes.NewRemoveSessionLabelTool(
 				deps.Logger.With().Str("tool", "remove_session_label").Logger(),
-				sessionLabelManager,
+				deps.SessionManager,
 			)
 			return removeLabelTool.ExecuteTyped(context.Background(), args)
 		})
@@ -848,7 +847,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 		func(ctx *gomcpserver.Context, args *sessiontypes.UpdateSessionLabelsArgs) (*sessiontypes.UpdateSessionLabelsResult, error) {
 			updateLabelsTool := sessiontypes.NewUpdateSessionLabelsTool(
 				deps.Logger.With().Str("tool", "update_session_labels").Logger(),
-				sessionLabelManager,
+				deps.SessionManager,
 			)
 			return updateLabelsTool.ExecuteTyped(context.Background(), *args)
 		})
@@ -858,7 +857,7 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 		func(ctx *gomcpserver.Context, args *sessiontypes.ListSessionLabelsArgs) (*sessiontypes.ListSessionLabelsResult, error) {
 			listLabelsTool := sessiontypes.NewListSessionLabelsTool(
 				deps.Logger.With().Str("tool", "list_session_labels").Logger(),
-				sessionLabelManager,
+				deps.SessionManager,
 			)
 			return listLabelsTool.ExecuteTyped(context.Background(), args)
 		})
@@ -940,63 +939,6 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 		})
 
 	return nil
-}
-
-// sessionLabelManagerWrapper adapts session.SessionManager to runtime.SessionLabelManager interface
-type sessionLabelManagerWrapper struct {
-	sm *session.SessionManager
-}
-
-func (w *sessionLabelManagerWrapper) AddSessionLabel(sessionID, label string) error {
-	return w.sm.AddSessionLabel(sessionID, label)
-}
-
-func (w *sessionLabelManagerWrapper) RemoveSessionLabel(sessionID, label string) error {
-	return w.sm.RemoveSessionLabel(sessionID, label)
-}
-
-func (w *sessionLabelManagerWrapper) SetSessionLabels(sessionID string, labels []string) error {
-	return w.sm.SetSessionLabels(sessionID, labels)
-}
-
-func (w *sessionLabelManagerWrapper) GetAllLabels() []string {
-	return w.sm.GetAllLabels()
-}
-
-func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.SessionLabelData, error) {
-	sessionInterface, err := w.sm.GetSession(sessionID)
-	if err != nil {
-		return sessiontypes.SessionLabelData{}, err
-	}
-
-	session, ok := sessionInterface.(*sessiontypes.SessionState)
-	if !ok {
-		return sessiontypes.SessionLabelData{}, types.NewErrorBuilder("unexpected_session_type", "Unexpected session type encountered", "session").
-			WithOperation("get_session_label_data").
-			WithStage("type_detection").
-			WithRootCause("Session does not match any known session type patterns").
-			WithImmediateStep(1, "Check session", "Verify session is properly initialized and typed").
-			WithImmediateStep(2, "Check types", "Ensure session implements expected interface").
-			WithImmediateStep(3, "Check version", "Verify session type compatibility with current version").
-			Build()
-	}
-
-	return sessiontypes.SessionLabelData{
-		SessionID: session.SessionID,
-		Labels:    session.Labels,
-	}, nil
-}
-
-func (w *sessionLabelManagerWrapper) ListSessions() []sessiontypes.SessionLabelData {
-	summaries := w.sm.ListSessionSummaries()
-	result := make([]sessiontypes.SessionLabelData, len(summaries))
-	for i, summary := range summaries {
-		result[i] = sessiontypes.SessionLabelData{
-			SessionID: summary.SessionID,
-			Labels:    summary.Labels,
-		}
-	}
-	return result
 }
 
 // registerOrchestratorTool creates a GoMCP handler that delegates to the orchestrator

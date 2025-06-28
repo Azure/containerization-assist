@@ -25,9 +25,6 @@ const (
 
 // Docker constants
 const (
-	// DefaultDockerRegistry is the default Docker registry
-	DefaultDockerRegistry = "docker.io"
-
 	// DefaultImageTag is the default Docker image tag
 	DefaultImageTag = "latest"
 
@@ -44,12 +41,6 @@ const (
 	DefaultApplicationPort = 8080
 )
 
-// Security constants
-const (
-	// DefaultSeverityThreshold is the default minimum severity for security scans
-	DefaultSeverityThreshold = "HIGH,CRITICAL"
-)
-
 // Registry detection patterns
 var (
 	// KnownRegistries contains patterns for identifying container registries
@@ -60,15 +51,5 @@ var (
 		"quay.io",
 		"mcr.microsoft.com",
 		"public.ecr.aws",
-	}
-
-	// DefaultSecretScanExclusions contains default file patterns to exclude from secret scanning
-	DefaultSecretScanExclusions = []string{
-		"*.git/*",
-		"node_modules/*",
-		"vendor/*",
-		"*.log",
-		"*.tmp",
-		"*.cache",
 	}
 )

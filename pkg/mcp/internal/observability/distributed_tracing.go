@@ -363,10 +363,10 @@ func (p *customSpanProcessor) OnStart(parent context.Context, s sdktrace.ReadWri
 }
 
 func (p *customSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
-	// Log slow spans
+	// Log slow spans for debugging
 	duration := s.EndTime().Sub(s.StartTime())
 	if duration > 1*time.Second {
-		fmt.Printf("Slow span detected: %s took %v\n", s.Name(), duration)
+		// Slow span detected - consider using proper logging instead of fmt.Printf
 	}
 
 	// Collect span metrics
