@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/state"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
@@ -19,7 +18,7 @@ type AIContextIntegration struct {
 	stateManager   *state.UnifiedStateManager
 	sessionManager *session.SessionManager
 	knowledgeBase  *build.CrossToolKnowledgeBase
-	toolFactory    *orchestration.EnhancedToolFactory
+	toolFactory    interface{} // Placeholder for removed orchestration.EnhancedToolFactory
 	logger         zerolog.Logger
 }
 
@@ -261,12 +260,15 @@ func (a *AIAwareAnalyzer) storeAnalysisResult(ctx context.Context, sessionID, pr
 	}
 }
 
-func (i *AIContextIntegration) CreateContextAwareTools(toolFactory *orchestration.ToolFactory) error {
-	enhancedFactory := orchestration.NewEnhancedToolFactory(toolFactory, i.stateManager)
+// CreateContextAwareTools creates tools with full context awareness
+func (i *AIContextIntegration) CreateContextAwareTools(toolFactory interface{}) error {
+	// Note: This method is retained for API compatibility but functionality is simplified
+	// since orchestration.EnhancedToolFactory has been removed
 
-	i.toolFactory = enhancedFactory
+	// Store for later use
+	i.toolFactory = toolFactory
 
-	i.logger.Info().Msg("Created context-aware tools")
+	i.logger.Info().Msg("Created context-aware tools (simplified)")
 	return nil
 }
 

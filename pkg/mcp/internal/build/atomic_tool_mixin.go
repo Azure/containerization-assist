@@ -226,4 +226,4 @@ func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt 
 }
 
 // Usage example pattern for integrating with existing atomic tools:
-//
+// See documentation for complete integration examples.

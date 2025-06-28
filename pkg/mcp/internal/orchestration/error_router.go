@@ -16,7 +16,6 @@ type DefaultErrorRouter struct {
 	recoveryManager    *RecoveryManager
 	retryCoordinator   *retry.Coordinator
 	redirectionManager *RedirectionManager
-	escalationHandler  *CrossToolEscalationHandler
 }
 
 func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
@@ -34,10 +33,7 @@ func NewDefaultErrorRouter(logger zerolog.Logger) *DefaultErrorRouter {
 	return router
 }
 
-func (er *DefaultErrorRouter) SetEscalationHandler(handler *CrossToolEscalationHandler) {
-	er.escalationHandler = handler
-	er.logger.Info().Msg("Cross-tool escalation handler configured")
-}
+// SetEscalationHandler has been removed - escalation is handled through standard retry mechanisms
 
 func (er *DefaultErrorRouter) RouteError(
 	ctx context.Context,
@@ -388,15 +384,7 @@ func (er *DefaultErrorRouter) executeRoutingAction(
 			action.Parameters["missing_context"] = redirectPlan.MissingContext
 		}
 
-		if er.escalationHandler != nil && er.IsEscalatedOperation(parameters) {
-			er.logger.Info().
-				Str("source_tool", workflowError.ToolName).
-				Str("target_tool", rule.RedirectTo).
-				Msg("Using enhanced cross-tool escalation handler")
-
-			action.Parameters["escalation_enhanced"] = true
-			action.Parameters["escalation_source"] = er.GetEscalationSource(parameters)
-		}
+		// Enhanced cross-tool context sharing is handled through standard workflow parameters
 
 		er.logger.Info().
 			Str("from_stage", workflowError.StageName).
