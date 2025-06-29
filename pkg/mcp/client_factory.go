@@ -110,7 +110,7 @@ func (f *standardClientFactory) CreateAIClient() mcptypes.AIAnalyzer {
 				f.config.Logger.Error().Err(err).Msg("Failed to create Azure OpenAI client, falling back to no-op")
 				f.aiClient = &noOpAIAnalyzer{}
 			} else {
-				f.aiClient = &aiAnalyzerAdapter{client: azClient}
+				f.aiClient = NewAIAnalyzerFromLLMClient(azClient)
 			}
 		} else {
 			// No AI configuration provided, use no-op implementation
@@ -131,30 +131,35 @@ func (f *standardClientFactory) CreateMCPClients() *mcptypes.MCPClients {
 }
 
 // =============================================================================
-// AI Client Adapter (converts between interfaces)
+// AI Analyzer Factory (converts between interfaces)
 // =============================================================================
 
-// aiAnalyzerAdapter adapts the ai.LLMClient to mcptypes.AIAnalyzer interface
-type aiAnalyzerAdapter struct {
+// llmClientAnalyzer wraps an LLMClient to implement mcptypes.AIAnalyzer
+type llmClientAnalyzer struct {
 	client ai.LLMClient
 }
 
-func (a *aiAnalyzerAdapter) Analyze(ctx context.Context, prompt string) (string, error) {
+// NewAIAnalyzerFromLLMClient creates an AIAnalyzer from an LLMClient
+func NewAIAnalyzerFromLLMClient(client ai.LLMClient) mcptypes.AIAnalyzer {
+	return &llmClientAnalyzer{client: client}
+}
+
+func (a *llmClientAnalyzer) Analyze(ctx context.Context, prompt string) (string, error) {
 	response, _, err := a.client.GetChatCompletion(ctx, prompt)
 	return response, err
 }
 
-func (a *aiAnalyzerAdapter) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+func (a *llmClientAnalyzer) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
 	response, _, err := a.client.GetChatCompletionWithFileTools(ctx, prompt, baseDir)
 	return response, err
 }
 
-func (a *aiAnalyzerAdapter) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
+func (a *llmClientAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
 	response, _, err := a.client.GetChatCompletionWithFormat(ctx, promptTemplate, args...)
 	return response, err
 }
 
-func (a *aiAnalyzerAdapter) GetTokenUsage() mcptypes.TokenUsage {
+func (a *llmClientAnalyzer) GetTokenUsage() mcptypes.TokenUsage {
 	usage := a.client.GetTokenUsage()
 	return mcptypes.TokenUsage{
 		CompletionTokens: usage.CompletionTokens,
@@ -163,7 +168,7 @@ func (a *aiAnalyzerAdapter) GetTokenUsage() mcptypes.TokenUsage {
 	}
 }
 
-func (a *aiAnalyzerAdapter) ResetTokenUsage() {
+func (a *llmClientAnalyzer) ResetTokenUsage() {
 	// No-op for now - can be enhanced if the underlying client supports it
 }
 

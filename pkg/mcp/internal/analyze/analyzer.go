@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -160,32 +159,6 @@ func (s *StubAnalyzer) ResetTokenUsage() {
 	// No-op for stub
 }
 
-// CallerAnalyzerAdapter adapts CallerAnalyzer to types.AIAnalyzer interface
-type CallerAnalyzerAdapter struct {
-	*CallerAnalyzer
-}
-
-// NewCallerAnalyzerAdapter creates an adapter that implements types.AIAnalyzer
-func NewCallerAnalyzerAdapter(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzerAdapter {
-	return &CallerAnalyzerAdapter{
-		CallerAnalyzer: NewCallerAnalyzer(transport, opts),
-	}
-}
-
-// GetTokenUsage implements types.AIAnalyzer interface
-func (a *CallerAnalyzerAdapter) GetTokenUsage() types.TokenUsage {
-	coreUsage := a.CallerAnalyzer.GetTokenUsage()
-	return types.TokenUsage{
-		CompletionTokens: coreUsage.CompletionTokens,
-		PromptTokens:     coreUsage.PromptTokens,
-		TotalTokens:      coreUsage.TotalTokens,
-	}
-}
-
-// GetCoreAnalyzer returns the underlying core.AIAnalyzer
-func (a *CallerAnalyzerAdapter) GetCoreAnalyzer() core.AIAnalyzer {
-	return a.CallerAnalyzer
-}
 
 // AnalyzerFactory creates the appropriate analyzer based on configuration
 type AnalyzerFactory struct {

@@ -52,6 +52,46 @@ func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
 	return "", nil
 }
 
+// analyzerTypeWrapper adapts core.AIAnalyzer to mcptypes.AIAnalyzer
+type analyzerTypeWrapper struct {
+	analyzer coreinterfaces.AIAnalyzer
+}
+
+// Analyze implements mcptypes.AIAnalyzer
+func (w *analyzerTypeWrapper) Analyze(ctx context.Context, prompt string) (string, error) {
+	return w.analyzer.Analyze(ctx, prompt)
+}
+
+// AnalyzeWithFileTools implements mcptypes.AIAnalyzer
+func (w *analyzerTypeWrapper) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+	return w.analyzer.AnalyzeWithFileTools(ctx, prompt, baseDir)
+}
+
+// AnalyzeWithFormat implements mcptypes.AIAnalyzer
+func (w *analyzerTypeWrapper) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
+	return w.analyzer.AnalyzeWithFormat(ctx, promptTemplate, args...)
+}
+
+// GetTokenUsage implements mcptypes.AIAnalyzer
+func (w *analyzerTypeWrapper) GetTokenUsage() mcptypes.TokenUsage {
+	usage := w.analyzer.GetTokenUsage()
+	return mcptypes.TokenUsage{
+		CompletionTokens: usage.CompletionTokens,
+		PromptTokens:     usage.PromptTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+// ResetTokenUsage implements mcptypes.AIAnalyzer
+func (w *analyzerTypeWrapper) ResetTokenUsage() {
+	w.analyzer.ResetTokenUsage()
+}
+
+// GetCoreAnalyzer returns the underlying core.AIAnalyzer
+func (w *analyzerTypeWrapper) GetCoreAnalyzer() coreinterfaces.AIAnalyzer {
+	return w.analyzer
+}
+
 // Use ConversationConfig from core package to avoid type mismatch
 
 // ConversationComponents holds the conversation mode components
@@ -160,20 +200,15 @@ func (s *Server) EnableConversationMode(config coreinterfaces.ConversationConfig
 		// Create adapter to bridge types.LLMTransport to analyze.LLMTransport
 		adapter := &llmTransportAdapter{transport: transport}
 
-		// Create core analyzer for orchestrator
+		// Create core analyzer for orchestrator and MCPClients
 		coreAnalyzer := analyze.NewCallerAnalyzer(adapter, analyze.CallerAnalyzerOpts{
 			ToolName:       "chat",
 			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
 			PerCallTimeout: 60 * time.Second,
 		})
 
-		// Create adapter for types interface
-		callerAnalyzer := analyze.NewCallerAnalyzerAdapter(adapter, analyze.CallerAnalyzerOpts{
-			ToolName:       "chat",
-			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
-			PerCallTimeout: 60 * time.Second,
-		})
-		mcpClients.Analyzer = callerAnalyzer
+		// Create wrapper to handle type conversion between core.AIAnalyzer and types.AIAnalyzer
+		mcpClients.Analyzer = &analyzerTypeWrapper{analyzer: coreAnalyzer}
 
 		// Also set the analyzer on the tool orchestrator for fixing capabilities
 		if s.toolOrchestrator != nil {

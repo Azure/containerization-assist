@@ -113,9 +113,9 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 		var analyzer core.AIAnalyzer
 		if deps.MCPClients.Analyzer != nil {
-			// Check if it's a CallerAnalyzerAdapter with access to core analyzer
-			if analyzerAdapter, ok := deps.MCPClients.Analyzer.(interface{ GetCoreAnalyzer() core.AIAnalyzer }); ok {
-				analyzer = analyzerAdapter.GetCoreAnalyzer()
+			// Check if it's an analyzerTypeWrapper with access to core analyzer
+			if analyzerWrapper, ok := deps.MCPClients.Analyzer.(interface{ GetCoreAnalyzer() core.AIAnalyzer }); ok {
+				analyzer = analyzerWrapper.GetCoreAnalyzer()
 			}
 			// Note: Direct cast to core.AIAnalyzer is not possible due to conflicting interfaces
 		}
