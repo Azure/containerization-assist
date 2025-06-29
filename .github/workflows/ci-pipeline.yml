@@ -257,10 +257,10 @@ jobs:
     - name: Merge coverage reports
       run: |
         echo "📊 Merging coverage reports from unit tests..."
-        
+
         # Install gocovmerge if not available
         go install github.com/wadey/gocovmerge@latest
-        
+
         # Check if coverage-artifacts directory exists
         if [ -d "coverage-artifacts" ]; then
           # Find all coverage files and merge them
@@ -297,7 +297,7 @@ jobs:
         # Coverage thresholds (minimum required coverage percentages)
         # Load from configuration file if available, otherwise use defaults
         declare -A COVERAGE_THRESHOLDS
-        
+
         if [ -f .github/coverage-thresholds.json ]; then
           echo "Loading coverage thresholds from configuration file..."
           # Parse JSON and populate the array
@@ -1011,15 +1011,15 @@ jobs:
       - name: Check all required jobs
         run: |
           echo "Checking status of all required jobs..."
-          
+
           # Check each job result
           FAILED_JOBS=""
-          
+
           # Canary must always pass
           if [ "${{ needs.canary.result }}" != "success" ]; then
             FAILED_JOBS="${FAILED_JOBS}canary "
           fi
-          
+
           # Build jobs must pass
           if [ "${{ needs.build-cli.result }}" != "success" ]; then
             FAILED_JOBS="${FAILED_JOBS}build-cli "
@@ -1027,7 +1027,7 @@ jobs:
           if [ "${{ needs.build-mcp.result }}" != "success" ]; then
             FAILED_JOBS="${FAILED_JOBS}build-mcp "
           fi
-          
+
           # Unit tests must pass if they ran (not skipped)
           if [ "${{ needs.unit-test-core.result }}" != "success" ] && [ "${{ needs.unit-test-core.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}unit-test-core "
@@ -1038,22 +1038,22 @@ jobs:
           if [ "${{ needs.unit-test-cli.result }}" != "success" ] && [ "${{ needs.unit-test-cli.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}unit-test-cli "
           fi
-          
+
           # Coverage must pass if it ran
           if [ "${{ needs.coverage-enforcement.result }}" != "success" ] && [ "${{ needs.coverage-enforcement.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}coverage-enforcement "
           fi
-          
+
           # Security scan must pass if it ran
           if [ "${{ needs.security-scan.result }}" != "success" ] && [ "${{ needs.security-scan.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}security-scan "
           fi
-          
+
           # Quality gates must pass if it ran
           if [ "${{ needs.quality-gates.result }}" != "success" ] && [ "${{ needs.quality-gates.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}quality-gates "
           fi
-          
+
           # Integration tests must pass if they ran
           if [ "${{ needs.integration-tests.result }}" != "success" ] && [ "${{ needs.integration-tests.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}integration-tests "
@@ -1061,12 +1061,12 @@ jobs:
           if [ "${{ needs.mcp-integration-tests.result }}" != "success" ] && [ "${{ needs.mcp-integration-tests.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}mcp-integration-tests "
           fi
-          
+
           # Testing dashboard must pass if it ran
           if [ "${{ needs.testing-dashboard.result }}" != "success" ] && [ "${{ needs.testing-dashboard.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}testing-dashboard "
           fi
-          
+
           # Fail if any required jobs failed
           if [ -n "$FAILED_JOBS" ]; then
             echo "❌ The following required jobs failed: $FAILED_JOBS"
