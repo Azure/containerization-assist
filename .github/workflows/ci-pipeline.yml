@@ -146,6 +146,28 @@ jobs:
         fi
         echo "✅ Tests compile successfully"
 
+        # Test 7: Adapter elimination check
+        echo "🔍 Verifying adapter elimination..."
+        ADAPTER_COUNT=$(find pkg/mcp -name "*adapter*.go" 2>/dev/null | wc -l || echo "0")
+        if [ $ADAPTER_COUNT -ne 0 ]; then
+          echo "❌ Found $ADAPTER_COUNT adapter files - adapters should be eliminated"
+          find pkg/mcp -name "*adapter*.go" 2>/dev/null || true
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ No adapter files found"
+
+        # Test 8: Wrapper consolidation check
+        echo "🔍 Verifying wrapper consolidation..."
+        WRAPPER_COUNT=$(find pkg/mcp -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l || echo "0")
+        if [ $WRAPPER_COUNT -ne 0 ]; then
+          echo "❌ Found $WRAPPER_COUNT wrapper files - wrappers should be consolidated"
+          find pkg/mcp -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation || true
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ No unconsolidated wrapper files found"
+
         echo "🎉 All canary checks passed!"
         echo "success=true" >> $GITHUB_OUTPUT
 

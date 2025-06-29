@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/stretchr/testify/assert"
@@ -129,7 +128,8 @@ func TestServerShutdownComponents(t *testing.T) {
 	// Create a session
 	sessionInterface, err := server.sessionManager.GetOrCreateSession("")
 	require.NoError(t, err)
-	session, ok := sessionInterface.(*mcp.SessionState)
+	// Try sessiontypes.SessionState instead of mcp.SessionState
+	session, ok := sessionInterface.(*sessiontypes.SessionState)
 	require.True(t, ok, "session should be of correct type")
 	assert.NotEmpty(t, session.SessionID)
 

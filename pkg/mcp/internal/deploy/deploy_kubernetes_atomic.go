@@ -268,42 +268,49 @@ func (t *AtomicDeployKubernetesTool) ExecuteDeploymentWithFixes(ctx context.Cont
 			Msg("Executing deployment with automatic fixing enabled")
 
 		var result *AtomicDeployKubernetesResult
-		operation := NewDeployOperationWrapper(
-			func(ctx context.Context) error {
-				var err error
-				result, err = t.executeDeploymentCore(ctx, args)
-				if err != nil {
-					return err
+		operation := NewOperation(OperationConfig{
+			Type:          OperationDeploy,
+			Name:          "deploy_kubernetes",
+			RetryAttempts: 3,
+			Timeout:       5 * time.Minute,
+			Logger:        t.logger,
+		})
+		
+		operation.ExecuteFunc = func(ctx context.Context) error {
+			var err error
+			result, err = t.executeDeploymentCore(ctx, args)
+			if err != nil {
+				return err
+			}
+			if !result.Success {
+				if result.FailureAnalysis != nil {
+					return fmt.Errorf("deployment failed: %s", result.FailureAnalysis.FailureType)
 				}
-				if !result.Success {
-					if result.FailureAnalysis != nil {
-						return fmt.Errorf("deployment failed: %s", result.FailureAnalysis.FailureType)
-					}
-					return fmt.Errorf("deployment failed")
-				}
-				return nil
-			},
-			func(_ context.Context, err error) (*mcp.RichError, error) {
-				if result != nil && result.FailureAnalysis != nil {
-					return &mcp.RichError{
-						Code:     "DEPLOYMENT_FAILED",
-						Type:     result.FailureAnalysis.FailureType,
-						Severity: result.FailureAnalysis.ImpactSeverity,
-						Message:  fmt.Sprintf("Deployment failed at stage: %s (root_causes: %s)", result.FailureAnalysis.FailureStage, strings.Join(result.FailureAnalysis.RootCauses, "; ")),
-					}, nil
-				}
-				return analyzeDeploymentError(err)
-			},
-			func(_ context.Context, fixAttempt *mcp.FixAttempt) error {
-				t.logger.Info().
-					Str("fix_strategy", fixAttempt.FixStrategy.Name).
-					Str("session_id", args.SessionID).
-					Msg("Applying deployment fix")
+				return fmt.Errorf("deployment failed")
+			}
+			return nil
+		}
+		
+		operation.AnalyzeFunc = func(_ context.Context, err error) (*mcp.RichError, error) {
+			if result != nil && result.FailureAnalysis != nil {
+				return &mcp.RichError{
+					Code:     "DEPLOYMENT_FAILED",
+					Type:     result.FailureAnalysis.FailureType,
+					Severity: result.FailureAnalysis.ImpactSeverity,
+					Message:  fmt.Sprintf("Deployment failed at stage: %s (root_causes: %s)", result.FailureAnalysis.FailureStage, strings.Join(result.FailureAnalysis.RootCauses, "; ")),
+				}, nil
+			}
+			return analyzeDeploymentError(err)
+		}
+		
+		operation.PrepareFunc = func(_ context.Context, fixAttempt *mcp.FixAttempt) error {
+			t.logger.Info().
+				Str("fix_strategy", fixAttempt.FixStrategy.Name).
+				Str("session_id", args.SessionID).
+				Msg("Applying deployment fix")
 
-				return nil
-			},
-			t.logger,
-		)
+			return nil
+		}
 
 		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
 		if err != nil {
