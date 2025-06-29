@@ -956,67 +956,6 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 	return nil
 }
 
-// sessionLabelManagerWrapper adapts session.SessionManager to runtime.SessionLabelManager interface
-type sessionLabelManagerWrapper struct {
-	sm *session.SessionManager
-}
-
-func (w *sessionLabelManagerWrapper) AddSessionLabel(sessionID, label string) error {
-	return w.sm.AddSessionLabel(sessionID, label)
-}
-
-func (w *sessionLabelManagerWrapper) RemoveSessionLabel(sessionID, label string) error {
-	return w.sm.RemoveSessionLabel(sessionID, label)
-}
-
-func (w *sessionLabelManagerWrapper) SetSessionLabels(sessionID string, labels []string) error {
-	return w.sm.SetSessionLabels(sessionID, labels)
-}
-
-func (w *sessionLabelManagerWrapper) GetAllLabels() []string {
-	return w.sm.GetAllLabels()
-}
-
-func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.SessionLabelData, error) {
-	sessionInterface, err := w.sm.GetSession(sessionID)
-	if err != nil {
-		return sessiontypes.SessionLabelData{}, err
-	}
-
-	session, ok := sessionInterface.(*session.SessionState)
-	if !ok {
-		return sessiontypes.SessionLabelData{}, fmt.Errorf("error")
-	}
-
-	var labels []string
-	if session.Metadata != nil {
-		if labelsData, ok := session.Metadata["labels"].([]string); ok {
-			labels = labelsData
-		} else if labelMap, ok := session.Metadata["labels"].(map[string]string); ok {
-			// Convert map to slice of "key=value" strings
-			for key, value := range labelMap {
-				labels = append(labels, key+"="+value)
-			}
-		}
-	}
-
-	return sessiontypes.SessionLabelData{
-		SessionID: session.SessionID,
-		Labels:    labels,
-	}, nil
-}
-
-func (w *sessionLabelManagerWrapper) ListSessions() []sessiontypes.SessionLabelData {
-	summaries := w.sm.ListSessionSummaries()
-	result := make([]sessiontypes.SessionLabelData, len(summaries))
-	for i, summary := range summaries {
-		result[i] = sessiontypes.SessionLabelData{
-			SessionID: summary.SessionID,
-			Labels:    summary.Labels,
-		}
-	}
-	return result
-}
 
 // registerOrchestratorTool creates a GoMCP handler that delegates to the orchestrator
 func (gm *GomcpManager) registerOrchestratorTool(registrar *runtime.StandardToolRegistrar, toolName, atomicToolName, description string, deps *ToolDependencies) {
