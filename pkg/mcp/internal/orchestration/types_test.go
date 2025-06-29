@@ -14,7 +14,7 @@ func TestToolMetadata(t *testing.T) {
 		Dependencies: []string{"docker", "kubernetes"},
 		Capabilities: []string{"build", "deploy"},
 		Requirements: []string{"docker_daemon"},
-		Parameters:   map[string]interface{}{"image": "string", "tag": "string"},
+		Parameters:   map[string]string{"image": "string", "tag": "string"},
 		OutputSchema: map[string]interface{}{"result": "boolean"},
 		Examples:     []ToolExample{{Name: "basic", Description: "Basic usage"}},
 	}

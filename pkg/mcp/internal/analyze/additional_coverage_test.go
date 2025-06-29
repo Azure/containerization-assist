@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/config"
 	"github.com/rs/zerolog"
 )
 
@@ -99,19 +100,19 @@ func TestCreateAnalyzerFromConfig(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		config   *AnalyzerConfig
+		config   *config.AnalyzerConfig
 		wantType string
 	}{
 		{
 			name: "AI disabled config",
-			config: &AnalyzerConfig{
+			config: &config.AnalyzerConfig{
 				EnableAI: false,
 			},
 			wantType: "StubAnalyzer",
 		},
 		{
 			name: "AI enabled config (falls back to stub)",
-			config: &AnalyzerConfig{
+			config: &config.AnalyzerConfig{
 				EnableAI: true,
 			},
 			wantType: "StubAnalyzer",
