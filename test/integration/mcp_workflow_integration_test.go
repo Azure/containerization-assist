@@ -279,6 +279,11 @@ Thumbs.db
 	gitConfig2.Dir = repoDir
 	require.NoError(suite.T(), gitConfig2.Run())
 	
+	// Disable commit signing for tests
+	gitConfig3 := exec.Command("git", "config", "commit.gpgsign", "false")
+	gitConfig3.Dir = repoDir
+	require.NoError(suite.T(), gitConfig3.Run())
+	
 	gitAdd := exec.Command("git", "add", ".")
 	gitAdd.Dir = repoDir
 	if output, err := gitAdd.CombinedOutput(); err != nil {
