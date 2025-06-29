@@ -5,13 +5,13 @@ package factory
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/core"
 )
 
 // NewServer creates a new MCP server using the internal core implementation
-func NewServer(ctx context.Context, config mcp.ServerConfig) (mcp.Server, error) {
-	// Convert mcp.ServerConfig to core.ServerConfig
+func NewServer(ctx context.Context, config core.ServerConfig) (core.Server, error) {
+	// Convert core.ServerConfig to core.ServerConfig
 	coreConfig := core.ServerConfig{
 		WorkspaceDir:      config.WorkspaceDir,
 		MaxSessions:       config.MaxSessions,
@@ -48,7 +48,7 @@ func NewServer(ctx context.Context, config mcp.ServerConfig) (mcp.Server, error)
 	return &serverAdapter{coreServer: coreServer}, nil
 }
 
-// serverAdapter adapts the internal core.Server to implement mcp.Server
+// serverAdapter adapts the internal core.Server to implement core.Server
 type serverAdapter struct {
 	coreServer *core.Server
 }
@@ -65,8 +65,8 @@ func (s *serverAdapter) Shutdown(ctx context.Context) error {
 	return s.coreServer.Shutdown(ctx)
 }
 
-func (s *serverAdapter) EnableConversationMode(config mcp.ConversationConfig) error {
-	// Convert mcp.ConversationConfig to core.ConversationConfig
+func (s *serverAdapter) EnableConversationMode(config core.ConversationConfig) error {
+	// Convert core.ConversationConfig to core.ConversationConfig
 	coreConfig := core.ConversationConfig{
 		EnableTelemetry:   config.EnableTelemetry,
 		TelemetryPort:     config.TelemetryPort,
@@ -82,17 +82,17 @@ func (s *serverAdapter) EnableConversationMode(config mcp.ConversationConfig) er
 	return s.coreServer.EnableConversationMode(coreConfig)
 }
 
-func (s *serverAdapter) GetStats() *mcp.ServerStats {
+func (s *serverAdapter) GetStats() *core.ServerStats {
 	// Convert core stats to mcp stats
 	coreStats := s.coreServer.GetStats()
 	if coreStats == nil {
-		return &mcp.ServerStats{}
+		return &core.ServerStats{}
 	}
 
 	// Get the start time from the server
 	startTime := s.coreServer.GetStartTime()
 
-	return &mcp.ServerStats{
+	return &core.ServerStats{
 		Transport: coreStats.Transport,
 		Sessions:  s.GetSessionManagerStats(),
 		Workspace: s.GetWorkspaceStats(),
@@ -101,16 +101,16 @@ func (s *serverAdapter) GetStats() *mcp.ServerStats {
 	}
 }
 
-func (s *serverAdapter) GetSessionManagerStats() *mcp.SessionManagerStats {
+func (s *serverAdapter) GetSessionManagerStats() *core.SessionManagerStats {
 	// Get stats from core server and convert
 	// For now, return empty stats
-	return &mcp.SessionManagerStats{}
+	return &core.SessionManagerStats{}
 }
 
-func (s *serverAdapter) GetWorkspaceStats() *mcp.WorkspaceStats {
+func (s *serverAdapter) GetWorkspaceStats() *core.WorkspaceStats {
 	// Get stats from core server and convert
 	// For now, return empty stats
-	return &mcp.WorkspaceStats{}
+	return &core.WorkspaceStats{}
 }
 
 func (s *serverAdapter) GetLogger() interface{} {

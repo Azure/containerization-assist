@@ -10,18 +10,20 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // Note: NewServer has been moved to the factory package to avoid import cycles
 // Use github.com/Azure/container-kit/pkg/mcp/factory.NewServer instead
 
 // DefaultServerConfig returns the default server configuration
-func DefaultServerConfig() ServerConfig {
+func DefaultServerConfig() core.ServerConfig {
 	homeDir, _ := os.UserHomeDir()
 	defaultWorkspace := filepath.Join(homeDir, ".container-kit", "workspace")
 	defaultStore := filepath.Join(homeDir, ".container-kit", "sessions.db")
 
-	return ServerConfig{
+	return core.ServerConfig{
 		// Session management
 		WorkspaceDir:      defaultWorkspace,
 		MaxSessions:       100,

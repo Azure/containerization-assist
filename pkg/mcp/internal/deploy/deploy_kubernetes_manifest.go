@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // performManifestGeneration generates Kubernetes manifests
-func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Context, session *mcp.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
+func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Context, session *core.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
 	// Progress reporting removed
 
 	generationStart := time.Now()

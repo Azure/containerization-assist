@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
 // performDeployment deploys manifests to Kubernetes cluster
-func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, session *mcp.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
+func (t *AtomicDeployKubernetesTool) performDeployment(ctx context.Context, session *core.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
 	// Progress reporting removed
 
 	deploymentStart := time.Now()
@@ -181,7 +181,7 @@ func (t *AtomicDeployKubernetesTool) handleDeploymentError(_ context.Context, er
 }
 
 // buildSuccessResult creates a success result after fixing operations complete
-func (t *AtomicDeployKubernetesTool) buildSuccessResult(_ context.Context, args AtomicDeployKubernetesArgs, _ *mcp.SessionState) (*AtomicDeployKubernetesResult, error) {
+func (t *AtomicDeployKubernetesTool) buildSuccessResult(_ context.Context, args AtomicDeployKubernetesArgs, _ *core.SessionState) (*AtomicDeployKubernetesResult, error) {
 	result := &AtomicDeployKubernetesResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_deploy_kubernetes", args.SessionID, args.DryRun),
 		BaseAIContextResult: internal.NewBaseAIContextResult("deploy", true, 0),
@@ -200,7 +200,7 @@ func (t *AtomicDeployKubernetesTool) buildSuccessResult(_ context.Context, args 
 type KubernetesDeployOperation struct {
 	tool         *AtomicDeployKubernetesTool
 	args         AtomicDeployKubernetesArgs
-	session      *mcp.SessionState
+	session      *core.SessionState
 	workspaceDir string
 	namespace    string
 	manifests    []string

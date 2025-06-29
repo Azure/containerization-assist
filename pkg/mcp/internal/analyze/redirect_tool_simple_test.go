@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 

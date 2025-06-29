@@ -8,8 +8,8 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/localrivet/gomcp/server"
@@ -19,7 +19,7 @@ import (
 // BuildExecutorService handles the execution of Docker builds with progress reporting
 type BuildExecutorService struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        *BuildAnalyzer
 	troubleshooter  *BuildTroubleshooter
@@ -27,7 +27,7 @@ type BuildExecutorService struct {
 }
 
 // NewBuildExecutor creates a new build executor
-func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *BuildExecutorService {
+func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *BuildExecutorService {
 	executorLogger := logger.With().Str("component", "build_executor").Logger()
 	return &BuildExecutorService{
 		pipelineAdapter: adapter,
@@ -83,7 +83,7 @@ func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args Atomic
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	workspaceDir := e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 	buildContext := e.getBuildContext(args.BuildContext, workspaceDir)
 	dockerfilePath := e.getDockerfilePath(args.DockerfilePath, buildContext)
@@ -160,7 +160,7 @@ func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args Ato
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -324,7 +324,7 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -443,7 +443,7 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 }
 
 // updateSessionState updates the session with build results
-func (e *BuildExecutorService) updateSessionState(session *mcp.SessionState, result *AtomicBuildImageResult) error {
+func (e *BuildExecutorService) updateSessionState(session *core.SessionState, result *AtomicBuildImageResult) error {
 	// Update session with build results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -482,7 +482,7 @@ func (e *BuildExecutorService) updateSessionState(session *mcp.SessionState, res
 	// Update session timestamp
 	session.UpdatedAt = time.Now()
 	return e.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			*sess = *session
 		}
 	})

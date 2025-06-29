@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp"
+	mcp "github.com/Azure/container-kit/pkg/mcp/core"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
@@ -169,13 +169,13 @@ type SecurityAnalysis struct {
 
 type AtomicValidateDockerfileTool struct {
 	pipelineAdapter mcp.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        ToolAnalyzer
 	fixingMixin     *build.AtomicToolFixingMixin
 }
 
-func NewAtomicValidateDockerfileTool(adapter mcp.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
+func NewAtomicValidateDockerfileTool(adapter mcp.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
 	toolLogger := logger.With().Str("tool", "atomic_validate_dockerfile").Logger()
 	return &AtomicValidateDockerfileTool{
 		pipelineAdapter: adapter,
@@ -230,7 +230,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, nil
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -846,8 +846,8 @@ func (t *AtomicValidateDockerfileTool) GetCapabilities() types.ToolCapabilities 
 	}
 }
 
-func (t *AtomicValidateDockerfileTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicValidateDockerfileTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "atomic_validate_dockerfile",
 		Description: "Validates Dockerfiles against best practices, security standards, and optimization guidelines with automatic fix generation",
 		Version:     "1.0.0",
@@ -887,7 +887,7 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() mcp.ToolMetadata {
 			"generate_fixes":       "bool - Generate corrected Dockerfile",
 			"dry_run":              "bool - Validate without making changes",
 		},
-		Examples: []mcp.ToolExample{
+		Examples: []core.ToolExample{
 			{
 				Name:        "Basic Dockerfile Validation",
 				Description: "Validate a Dockerfile for syntax and basic issues",

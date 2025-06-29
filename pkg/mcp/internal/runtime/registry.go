@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"
@@ -22,7 +22,7 @@ import (
 // UnifiedTool represents the unified interface for all MCP tools (matches mcptypes.Tool)
 type UnifiedTool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
-	GetMetadata() mcp.ToolMetadata
+	GetMetadata() core.ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
 }
 

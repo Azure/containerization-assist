@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,8 +56,8 @@ func (m *mockTool) Validate(ctx context.Context, args interface{}) error {
 	return nil
 }
 
-func (m *mockTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (m *mockTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        m.name,
 		Description: "Mock tool for testing",
 		Version:     "1.0.0",

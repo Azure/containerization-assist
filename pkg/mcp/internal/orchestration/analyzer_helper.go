@@ -1,7 +1,7 @@
 package orchestration
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
@@ -15,7 +15,7 @@ type AnalyzerHelper struct {
 	enhancedBuildAnalyzer *build.EnhancedBuildAnalyzer
 	repositoryAnalyzer    core.RepositoryAnalyzer // Use core interface directly
 	toolFactory           *ToolFactory
-	sessionManager        mcp.ToolSessionManager
+	sessionManager        core.ToolSessionManager
 	logger                zerolog.Logger
 }
 
@@ -31,7 +31,7 @@ func NewAnalyzerHelper(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *Analyzer
 func NewAnalyzerHelperWithFactory(
 	analyzer mcp.AIAnalyzer,
 	toolFactory *ToolFactory,
-	sessionManager mcp.ToolSessionManager,
+	sessionManager core.ToolSessionManager,
 	logger zerolog.Logger,
 ) *AnalyzerHelper {
 	helper := &AnalyzerHelper{

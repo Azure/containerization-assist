@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -114,7 +114,7 @@ func (pm *PromptManager) handlePendingDecision(ctx context.Context, state *Conve
 
 	// Continue with the stage
 	// Check if current stage maps to dockerfile generation
-	if state.CurrentStage == mcp.ConversationStageBuild {
+	if state.CurrentStage == core.ConversationStageBuild {
 		// Check detailed stage from context
 		if detailedStage, ok := state.Context["detailed_stage"].(string); ok &&
 			types.ConversationStage(detailedStage) == types.StageDockerfile {

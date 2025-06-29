@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
@@ -105,7 +105,7 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 	assert.NotEmpty(t, response.Message)
 }
 
-// MockToolExecutor implements mcp.ToolOrchestrationExecutor interface for testing
+// MockToolExecutor implements core.ToolOrchestrationExecutor interface for testing
 type MockToolExecutor struct{}
 
 func (m *MockToolExecutor) ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error) {
@@ -117,7 +117,7 @@ func (m *MockToolExecutor) ExecuteTool(ctx context.Context, toolName string, arg
 	}, nil
 }
 
-func (m *MockToolExecutor) RegisterTool(name string, tool mcp.Tool) error {
+func (m *MockToolExecutor) RegisterTool(name string, tool core.Tool) error {
 	return nil
 }
 
@@ -125,8 +125,8 @@ func (m *MockToolExecutor) ValidateToolArgs(toolName string, args interface{}) e
 	return nil
 }
 
-func (m *MockToolExecutor) GetToolMetadata(toolName string) (*mcp.ToolMetadata, error) {
-	return &mcp.ToolMetadata{
+func (m *MockToolExecutor) GetToolMetadata(toolName string) (*core.ToolMetadata, error) {
+	return &core.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",
 		Version:     "1.0.0",
@@ -134,7 +134,7 @@ func (m *MockToolExecutor) GetToolMetadata(toolName string) (*mcp.ToolMetadata, 
 	}, nil
 }
 
-func (m *MockToolExecutor) GetDispatcher() mcp.ToolDispatcher {
+func (m *MockToolExecutor) GetDispatcher() core.ToolDispatcher {
 	return nil // Mock implementation
 }
 

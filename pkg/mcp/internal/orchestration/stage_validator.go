@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // StageValidator handles validation of workflow stages
 type StageValidator struct {
-	toolRegistry mcp.ToolRegistry
+	toolRegistry core.ToolRegistry
 }
 
 // NewStageValidator creates a new stage validator
-func NewStageValidator(toolRegistry mcp.ToolRegistry) *StageValidator {
+func NewStageValidator(toolRegistry core.ToolRegistry) *StageValidator {
 	return &StageValidator{
 		toolRegistry: toolRegistry,
 	}

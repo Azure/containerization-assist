@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp"
+	mcp "github.com/Azure/container-kit/pkg/mcp/core"
 	obs "github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -72,7 +72,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	// Create conversation state from internal session state (no conversion needed)
 	convState := &ConversationState{
 		SessionState: internalSession,
-		CurrentStage: mcp.ConversationStagePreFlight,
+		CurrentStage: core.ConversationStagePreFlight,
 		History:      make([]ConversationTurn, 0),
 		Preferences: types.UserPreferences{
 			Namespace:          "default",
@@ -102,7 +102,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Check if pre-flight checks are needed
-	if convState.CurrentStage == mcp.ConversationStagePreFlight && !pm.hasPassedPreFlightChecks(convState) {
+	if convState.CurrentStage == core.ConversationStagePreFlight && !pm.hasPassedPreFlightChecks(convState) {
 		response := pm.handlePreFlightChecks(ctx, convState, userInput)
 		return response, nil
 	}
@@ -131,7 +131,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	// Route based on current stage and input
 	var response *ConversationResponse
 
-	// Convert mcp.ConversationStage to types.ConversationStage for internal use
+	// Convert core.ConversationStage to types.ConversationStage for internal use
 	internalStage := mapMCPStageToDetailedStage(convState.CurrentStage, convState.Context)
 
 	switch internalStage {
@@ -173,7 +173,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 
 	// Update session
 	err = pm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			sess.CurrentStage = string(response.Stage)
 			sess.Status = string(response.Status)
 		}

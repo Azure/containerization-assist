@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -83,14 +83,14 @@ type TagContext struct {
 // AtomicTagImageTool implements atomic Docker image tagging using core operations
 type AtomicTagImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        ToolAnalyzer
 	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicTagImageTool creates a new atomic tag image tool
-func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
+func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_tag_image").Logger()
 	return &AtomicTagImageTool{
 		pipelineAdapter: adapter,
@@ -238,7 +238,7 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID // Use compatibility method
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -291,13 +291,13 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 }
 
 // performTag executes the actual Docker tag operation
-func (t *AtomicTagImageTool) performTag(ctx context.Context, session *mcp.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter interface{}) error {
+func (t *AtomicTagImageTool) performTag(ctx context.Context, session *core.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter interface{}) error {
 	// Get session if not provided
 	if session == nil {
 		var err error
 		sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 		if err == nil {
-			session = sessionInterface.(*mcp.SessionState)
+			session = sessionInterface.(*core.SessionState)
 		}
 		if err != nil {
 			t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
@@ -366,7 +366,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *mcp.Sessio
 	session.UpdatedAt = time.Now()
 	// Save session state
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -489,8 +489,8 @@ func (t *AtomicTagImageTool) Execute(ctx context.Context, args interface{}) (int
 
 // Tool interface implementation (unified interface)
 // GetMetadata returns comprehensive tool metadata
-func (t *AtomicTagImageTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicTagImageTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "atomic_tag_image",
 		Description:  "Tags Docker images with new names for versioning, environment promotion, or registry organization",
 		Version:      "1.0.0",

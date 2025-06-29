@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -12,7 +12,7 @@ import (
 type ConversationResponse struct {
 	SessionID string                `json:"session_id"`
 	Message   string                `json:"message"`
-	Stage     mcp.ConversationStage `json:"stage"`
+	Stage     core.ConversationStage `json:"stage"`
 	Status    ResponseStatus        `json:"status"`
 	Options   []Option              `json:"options,omitempty"`
 	Artifacts []ArtifactSummary     `json:"artifacts,omitempty"`
@@ -22,7 +22,7 @@ type ConversationResponse struct {
 
 	// Auto-advance support
 	RequiresInput bool                   `json:"requires_input"`         // If false, can auto-advance
-	NextStage     *mcp.ConversationStage `json:"next_stage,omitempty"`   // Stage to advance to
+	NextStage     *core.ConversationStage `json:"next_stage,omitempty"`   // Stage to advance to
 	AutoAdvance   *AutoAdvanceConfig     `json:"auto_advance,omitempty"` // Auto-advance configuration
 
 	// Structured forms support
@@ -65,7 +65,7 @@ type ArtifactSummary struct {
 // Auto-advance helper methods
 
 // WithAutoAdvance configures the response for automatic progression to the next stage
-func (r *ConversationResponse) WithAutoAdvance(nextStage mcp.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
+func (r *ConversationResponse) WithAutoAdvance(nextStage core.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
 	r.RequiresInput = false
 	r.NextStage = &nextStage
 	r.AutoAdvance = &config

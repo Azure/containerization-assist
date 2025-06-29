@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
-	"github.com/Azure/container-kit/pkg/mcp"
-	types "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	types "github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/pipeline"
 	"github.com/Azure/container-kit/pkg/pipeline/dockerstage"
@@ -370,8 +370,8 @@ func (t *BuildImageTool) Validate(ctx context.Context, args interface{}) error {
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *BuildImageTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *BuildImageTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "build_image",
 		Description:  "Builds Docker images with AI-powered error fixing and iterative optimization",
 		Version:      "1.0.0",

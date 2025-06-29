@@ -3,7 +3,7 @@ package state
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 
 	crypto_rand "crypto/rand"
 	"encoding/binary"
@@ -230,22 +230,22 @@ func (m *UnifiedStateManager) DeleteState(ctx context.Context, stateType StateTy
 }
 
 // GetSessionState gets session state with type safety
-func (m *UnifiedStateManager) GetSessionState(_ context.Context, sessionID string) (*mcp.SessionState, error) {
+func (m *UnifiedStateManager) GetSessionState(_ context.Context, sessionID string) (*core.SessionState, error) {
 	state, err := m.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	if sessionState, ok := state.(*mcp.SessionState); ok {
+	if sessionState, ok := state.(*core.SessionState); ok {
 		return sessionState, nil
 	}
 	return nil, fmt.Errorf("state is not of type *SessionState")
 }
 
 // UpdateSessionState updates session state with validation
-func (m *UnifiedStateManager) UpdateSessionState(_ context.Context, sessionID string, updates func(*mcp.SessionState) error) error {
+func (m *UnifiedStateManager) UpdateSessionState(_ context.Context, sessionID string, updates func(*core.SessionState) error) error {
 	// Use the session manager's UpdateSession method
 	return m.sessionManager.UpdateSession(sessionID, func(current interface{}) {
-		if sessionState, ok := current.(*mcp.SessionState); ok {
+		if sessionState, ok := current.(*core.SessionState); ok {
 			// Apply updates - ignore error for now as the interface doesn't support returning errors
 			_ = updates(sessionState)
 		}

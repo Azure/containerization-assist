@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp"
+	mcp "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
@@ -33,7 +33,7 @@ type ConversationHandlerConfig struct {
 	PreferenceStore    *utils.PreferenceStore
 	PipelineOperations mcp.PipelineOperations             // Using interface instead of concrete adapter
 	ToolOrchestrator   *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
-	Transport          interface{}                        // Accept both mcp.Transport and internal transport.Transport
+	Transport          interface{}                        // Accept both core.Transport and internal transport.Transport
 	Logger             zerolog.Logger
 	Telemetry          *observability.TelemetryManager
 }
@@ -149,7 +149,7 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 		sessionInterface, err := ch.sessionManager.GetSession(sessionID)
 		if err == nil && sessionInterface != nil {
 			// Type assert to concrete session type
-			if session, ok := sessionInterface.(*mcp.SessionState); ok && session.Metadata != nil {
+			if session, ok := sessionInterface.(*core.SessionState); ok && session.Metadata != nil {
 				if repoAnalysis, ok := session.Metadata["repo_analysis"].(map[string]interface{}); ok {
 					if sessionCtx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
 						if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {

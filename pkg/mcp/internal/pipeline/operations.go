@@ -8,8 +8,8 @@ import (
 
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
@@ -48,7 +48,7 @@ func (o *Operations) GetSessionWorkspace(sessionID string) string {
 	}
 
 	// Type assert to get the SessionState
-	if sessionState, ok := session.(*mcp.SessionState); ok {
+	if sessionState, ok := session.(*core.SessionState); ok {
 		return sessionState.WorkspaceDir
 	}
 	o.logger.Error().Str("session_id", sessionID).Msg("Session type assertion failed")
@@ -61,7 +61,7 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 	}
 
 	return o.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		sess, ok := s.(*mcp.SessionState)
+		sess, ok := s.(*core.SessionState)
 		if !ok {
 			return
 		}

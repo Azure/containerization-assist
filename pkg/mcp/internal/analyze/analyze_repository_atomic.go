@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/core/git"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -59,7 +59,7 @@ type AtomicAnalysisResult struct {
 
 type AtomicAnalyzeRepositoryTool struct {
 	pipelineAdapter  mcp.PipelineOperations
-	sessionManager   mcp.ToolSessionManager
+	sessionManager   core.ToolSessionManager
 	logger           zerolog.Logger
 	gitManager       *git.Manager
 	repoAnalyzer     *analysis.RepositoryAnalyzer
@@ -67,7 +67,7 @@ type AtomicAnalyzeRepositoryTool struct {
 	contextGenerator *ContextGenerator
 }
 
-func NewAtomicAnalyzeRepositoryTool(adapter mcp.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicAnalyzeRepositoryTool {
+func NewAtomicAnalyzeRepositoryTool(adapter mcp.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicAnalyzeRepositoryTool {
 	return &AtomicAnalyzeRepositoryTool{
 		pipelineAdapter:  adapter,
 		sessionManager:   sessionManager,
@@ -364,11 +364,11 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 }
 
 // getOrCreateSession gets existing session or creates a new one
-func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*mcp.SessionState, error) {
+func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*core.SessionState, error) {
 	if sessionID != "" {
 		sessionInterface, err := t.sessionManager.GetSession(sessionID)
 		if err == nil {
-			session := sessionInterface.(*mcp.SessionState)
+			session := sessionInterface.(*core.SessionState)
 			// Check if session is expired
 			if time.Now().After(session.ExpiresAt) {
 				t.logger.Info().
@@ -389,13 +389,13 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*mcp
 				if err != nil {
 					return nil, mcperror.NewSessionNotFound("replacement_session")
 				}
-				newSession := newSessionInterface.(*mcp.SessionState)
+				newSession := newSessionInterface.(*core.SessionState)
 				if newSession.Metadata == nil {
 					newSession.Metadata = make(map[string]interface{})
 				}
 				newSession.Metadata["resumed_from"] = oldSessionInfo
 				if err := t.sessionManager.UpdateSession(newSession.SessionID, func(s interface{}) {
-					if sess, ok := s.(*mcp.SessionState); ok {
+					if sess, ok := s.(*core.SessionState); ok {
 						*sess = *newSession
 					}
 				}); err != nil {
@@ -417,7 +417,7 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*mcp
 	if err != nil {
 		return nil, mcperror.NewSessionNotFound("new_session")
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 
 	t.logger.Info().Str("session_id", session.SessionID).Msg("Created new session for repository analysis")
 	return session, nil
@@ -428,7 +428,7 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 	if err != nil {
 		return nil, err
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 
 	cloneOpts := CloneOptions{
 		RepoURL:   args.RepoURL,
@@ -456,7 +456,7 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 	session.Metadata["repo_path"] = result.RepoPath
 	session.Metadata["repo_url"] = args.RepoURL
 	t.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			if sess.Metadata == nil {
 				sess.Metadata = make(map[string]interface{})
 			}
@@ -469,7 +469,7 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 }
 
 // updateSessionState updates the session with analysis results
-func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *mcp.SessionState, result *AtomicAnalysisResult) error {
+func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *core.SessionState, result *AtomicAnalysisResult) error {
 	// Update session with repository analysis results
 	analysis := result.Analysis
 	dependencyNames := make([]string, len(analysis.Dependencies))
@@ -550,7 +550,7 @@ func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *mcp.SessionSta
 	session.Metadata["analysis_duration"] = result.AnalysisDuration.Seconds()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -584,8 +584,8 @@ func (t *AtomicAnalyzeRepositoryTool) generateAnalysisContext(repoPath string, a
 	}
 }
 
-func (t *AtomicAnalyzeRepositoryTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicAnalyzeRepositoryTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "atomic_analyze_repository",
 		Description:  "Analyzes repository structure, detects programming language, framework, and generates containerization recommendations",
 		Version:      "1.0.0",
@@ -603,7 +603,7 @@ func (t *AtomicAnalyzeRepositoryTool) GetMetadata() mcp.ToolMetadata {
 			"language_hint": "optional - Programming language hint",
 			"shallow":       "optional - Perform shallow clone",
 		},
-		Examples: []mcp.ToolExample{
+		Examples: []core.ToolExample{
 			{
 				Name:        "analyze_repo",
 				Description: "Analyze a Git repository structure",

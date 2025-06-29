@@ -10,11 +10,11 @@ import (
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -22,13 +22,13 @@ import (
 // AtomicScanImageSecurityTool implements atomic security scanning
 type AtomicScanImageSecurityTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	// fixingMixin removed - functionality will be integrated directly
 	logger zerolog.Logger
 }
 
 // NewAtomicScanImageSecurityTool creates a new atomic security scanning tool
-func NewAtomicScanImageSecurityTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicScanImageSecurityTool {
+func NewAtomicScanImageSecurityTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicScanImageSecurityTool {
 	return &AtomicScanImageSecurityTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -99,7 +99,7 @@ func (t *AtomicScanImageSecurityTool) performSecurityScan(ctx context.Context, a
 		return response, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	session, ok := sessionInterface.(*mcp.SessionState)
+	session, ok := sessionInterface.(*core.SessionState)
 	if !ok {
 		return response, fmt.Errorf("invalid session type")
 	}
@@ -246,8 +246,8 @@ func (t *AtomicScanImageSecurityTool) Execute(ctx context.Context, args interfac
 }
 
 // GetMetadata returns tool metadata
-func (t *AtomicScanImageSecurityTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicScanImageSecurityTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "atomic_scan_image_security",
 		Description: "Perform comprehensive security scanning of Docker images",
 		Version:     "1.0.0",
@@ -300,7 +300,7 @@ func (t *AtomicScanImageSecurityTool) generateSecurityReport(result *AtomicScanI
 	return "Security scan report placeholder" // Placeholder
 }
 
-func (t *AtomicScanImageSecurityTool) updateSessionState(session *mcp.SessionState, result *AtomicScanImageSecurityResult) error {
+func (t *AtomicScanImageSecurityTool) updateSessionState(session *core.SessionState, result *AtomicScanImageSecurityResult) error {
 	// Update session with scan results
 	// Placeholder implementation
 	return nil

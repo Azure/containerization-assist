@@ -7,8 +7,8 @@ import (
 
 	// mcp import removed - using mcptypes
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -91,10 +91,10 @@ func (o *MCPToolOrchestrator) ExecuteTool(
 }
 
 // RegisterTool registers a tool with the orchestrator (required by mcp.Orchestrator interface)
-func (o *MCPToolOrchestrator) RegisterTool(name string, tool mcp.Tool) error {
+func (o *MCPToolOrchestrator) RegisterTool(name string, tool core.Tool) error {
 	// This is part of the simplified interface - delegate to tool registry if needed
 	if o.toolRegistry != nil {
-		// Convert the mcp.Tool to the orchestration.Tool format if needed
+		// Convert the core.Tool to the orchestration.Tool format if needed
 		// For now, just log the registration
 		o.logger.Info().
 			Str("tool_name", name).
@@ -110,14 +110,14 @@ func (o *MCPToolOrchestrator) ValidateToolArgs(toolName string, args interface{}
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*mcp.ToolMetadata, error) {
+func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*core.ToolMetadata, error) {
 	localMetadata, err := o.toolRegistry.GetToolMetadata(toolName)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert from orchestration.ToolMetadata to mcp.ToolMetadata
-	converted := &mcp.ToolMetadata{
+	// Convert from orchestration.ToolMetadata to core.ToolMetadata
+	converted := &core.ToolMetadata{
 		Name:         localMetadata.Name,
 		Description:  localMetadata.Description,
 		Version:      localMetadata.Version,

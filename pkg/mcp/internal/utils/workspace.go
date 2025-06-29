@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/utils"
 	"github.com/rs/zerolog"
 )

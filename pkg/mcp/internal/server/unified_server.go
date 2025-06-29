@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -547,14 +547,14 @@ func (adapter *RegistryAdapter) List() []string {
 	return adapter.registry.ListTools()
 }
 
-func (adapter *RegistryAdapter) GetMetadata() map[string]mcp.ToolMetadata {
+func (adapter *RegistryAdapter) GetMetadata() map[string]core.ToolMetadata {
 	toolNames := adapter.registry.ListTools()
-	metadata := make(map[string]mcp.ToolMetadata)
+	metadata := make(map[string]core.ToolMetadata)
 
 	for _, name := range toolNames {
 		if meta, err := adapter.registry.GetToolMetadata(name); err == nil {
-			// Convert from orchestration.ToolMetadata to mcp.ToolMetadata
-			metadata[name] = mcp.ToolMetadata{
+			// Convert from orchestration.ToolMetadata to core.ToolMetadata
+			metadata[name] = core.ToolMetadata{
 				Name:         meta.Name,
 				Description:  meta.Description,
 				Version:      meta.Version,

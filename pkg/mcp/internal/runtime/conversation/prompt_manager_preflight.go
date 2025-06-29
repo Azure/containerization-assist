@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
@@ -24,13 +24,13 @@ func (pm *PromptManager) hasPassedPreFlightChecks(state *ConversationState) bool
 	return false
 }
 
-func (pm *PromptManager) hasPassedStagePreFlightChecks(state *ConversationState, stage mcp.ConversationStage) bool {
+func (pm *PromptManager) hasPassedStagePreFlightChecks(state *ConversationState, stage core.ConversationStage) bool {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	_, passed := state.Context[key]
 	return passed
 }
 
-func (pm *PromptManager) markStagePreFlightPassed(state *ConversationState, stage mcp.ConversationStage) {
+func (pm *PromptManager) markStagePreFlightPassed(state *ConversationState, stage core.ConversationStage) {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	state.Context[key] = true
 }
@@ -64,7 +64,7 @@ func (pm *PromptManager) shouldAutoRunPreFlightChecks(state *ConversationState, 
 	return !isFirstTime
 }
 
-func (pm *PromptManager) handleFailedPreFlightChecks(ctx context.Context, state *ConversationState, result *observability.PreFlightResult, stage mcp.ConversationStage) *ConversationResponse {
+func (pm *PromptManager) handleFailedPreFlightChecks(ctx context.Context, state *ConversationState, result *observability.PreFlightResult, stage core.ConversationStage) *ConversationResponse {
 	var failedChecks []string
 	var suggestions []string
 
@@ -169,7 +169,7 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 
 		// Save session to persist the context
 		if err := pm.sessionManager.UpdateSession(state.SessionID, func(s interface{}) {
-			if sess, ok := s.(*mcp.SessionState); ok {
+			if sess, ok := s.(*core.SessionState); ok {
 				sess.CurrentStage = string(response.Stage)
 				sess.Status = string(response.Status)
 			}

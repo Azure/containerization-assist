@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +33,7 @@ func TestConversationStateAddToHistory(t *testing.T) {
 	turns := []struct {
 		input    string
 		response string
-		stage    mcp.ConversationStage
+		stage    core.ConversationStage
 	}{
 		{"hello", "Welcome!", convertFromTypesStage(types.StageWelcome)},
 		{"analyze", "Starting analysis...", convertFromTypesStage(types.StageAnalysis)},
@@ -206,7 +206,7 @@ func TestConversationStateStageTransitions(t *testing.T) {
 	state := NewConversationState("test-session", "/tmp/workspace")
 
 	// Track stage transitions
-	stages := []mcp.ConversationStage{
+	stages := []core.ConversationStage{
 		convertFromTypesStage(types.StageWelcome),
 		convertFromTypesStage(types.StagePreFlight),
 		convertFromTypesStage(types.StageInit),

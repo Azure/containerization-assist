@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -128,7 +128,7 @@ func (svm *StandardizedValidationMixin) StandardValidateSession(
 		workspaceDir = sessionWithWorkspace.GetWorkspaceDir()
 	} else {
 		// Fallback: try reflection to extract SessionID field for workspace calculation
-		if sessionStruct, ok := session.(*mcp.SessionState); ok {
+		if sessionStruct, ok := session.(*core.SessionState); ok {
 			workspaceDir = filepath.Join("/tmp", "sessions", sessionStruct.SessionID)
 		}
 	}

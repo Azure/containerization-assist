@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal"
@@ -15,7 +15,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -226,7 +226,7 @@ type DeploymentContext struct {
 // AtomicDeployKubernetesTool implements atomic Kubernetes deployment using core operations
 type AtomicDeployKubernetesTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	fixingMixin     *build.AtomicToolFixingMixin
 	analyzer        mcp.AIAnalyzer
 	contextSharer   *build.DefaultContextSharer
@@ -235,7 +235,7 @@ type AtomicDeployKubernetesTool struct {
 }
 
 // NewAtomicDeployKubernetesTool creates a new atomic deploy Kubernetes tool
-func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
+func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
 	toolLogger := logger.With().Str("tool", "atomic_deploy_kubernetes").Logger()
 
 	contextSharer := build.NewDefaultContextSharer(toolLogger)
@@ -362,7 +362,7 @@ func (t *AtomicDeployKubernetesTool) executeDeploymentCore(ctx context.Context, 
 		result.Success = false
 		return result, fmt.Errorf("failed to get session: %w", err)
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 
 	if result.AppName == "" {
@@ -441,8 +441,8 @@ func extractAppNameFromImage(imageRef string) string {
 	return "unknown-app"
 }
 
-func (t *AtomicDeployKubernetesTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicDeployKubernetesTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "atomic_deploy_kubernetes",
 		Description:  "Deploys containerized applications to Kubernetes with manifest generation, health checks, and rollback support",
 		Version:      "1.0.0",

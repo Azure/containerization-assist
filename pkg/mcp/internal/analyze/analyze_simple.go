@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	"github.com/Azure/container-kit/pkg/mcp/utils"
@@ -355,8 +355,8 @@ func (t *AnalyzeRepositoryTool) Validate(ctx context.Context, args interface{}) 
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *AnalyzeRepositoryTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AnalyzeRepositoryTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "analyze_repository",
 		Description:  "Analyzes a repository to determine language, framework, dependencies and configuration",
 		Version:      "1.0.0",

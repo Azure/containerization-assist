@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	orchestrationtestutil "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/testutil"
 	profilingtestutil "github.com/Azure/container-kit/pkg/mcp/internal/profiling/testutil"

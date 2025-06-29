@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // getStageProgress returns a formatted progress indicator for the current stage
-func getStageProgress(currentStage mcp.ConversationStage) string {
+func getStageProgress(currentStage core.ConversationStage) string {
 	// Map the simplified mcp stages to detailed progress
-	progressMap := map[mcp.ConversationStage]int{
-		mcp.ConversationStageAnalyze: 4, // Maps to analysis stage
-		mcp.ConversationStageBuild:   6, // Maps to build stage
-		mcp.ConversationStageDeploy:  8, // Maps to deployment stage
-		mcp.ConversationStageScan:    9, // Maps to scan stage
+	progressMap := map[core.ConversationStage]int{
+		core.ConversationStageAnalyze: 4, // Maps to analysis stage
+		core.ConversationStageBuild:   6, // Maps to build stage
+		core.ConversationStageDeploy:  8, // Maps to deployment stage
+		core.ConversationStageScan:    9, // Maps to scan stage
 	}
 
 	currentStep := 1
@@ -28,12 +28,12 @@ func getStageProgress(currentStage mcp.ConversationStage) string {
 }
 
 // getStageIntro returns a short introductory message for each stage
-func getStageIntro(stage mcp.ConversationStage) string {
-	intros := map[mcp.ConversationStage]string{
-		mcp.ConversationStageAnalyze: "Analyzing your repository to understand the project structure.",
-		mcp.ConversationStageBuild:   "Building your Docker image with the generated Dockerfile.",
-		mcp.ConversationStageDeploy:  "Deploying your application to the Kubernetes cluster.",
-		mcp.ConversationStageScan:    "Running security scans on your container image.",
+func getStageIntro(stage core.ConversationStage) string {
+	intros := map[core.ConversationStage]string{
+		core.ConversationStageAnalyze: "Analyzing your repository to understand the project structure.",
+		core.ConversationStageBuild:   "Building your Docker image with the generated Dockerfile.",
+		core.ConversationStageDeploy:  "Deploying your application to the Kubernetes cluster.",
+		core.ConversationStageScan:    "Running security scans on your container image.",
 	}
 
 	if intro, exists := intros[stage]; exists {

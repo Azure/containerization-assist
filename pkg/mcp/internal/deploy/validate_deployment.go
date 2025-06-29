@@ -9,12 +9,12 @@ import (
 
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/k8s"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -465,8 +465,8 @@ func (t *AtomicValidateDeploymentTool) Validate(ctx context.Context, args interf
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *AtomicValidateDeploymentTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicValidateDeploymentTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "validate_deployment",
 		Description:  "Validates Kubernetes deployments on Kind clusters with comprehensive health checks",
 		Version:      "1.0.0",

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/registry"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
@@ -118,7 +118,7 @@ func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
 }
 
 // RunStageChecks executes pre-flight checks for a specific stage
-func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage mcp.ConversationStage, state *session.SessionState) (*PreFlightResult, error) {
+func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage core.ConversationStage, state *session.SessionState) (*PreFlightResult, error) {
 	checks := pfc.getChecksForStage(stage, state)
 	if len(checks) == 0 {
 		return &PreFlightResult{
@@ -132,15 +132,15 @@ func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage mcp.Conve
 }
 
 // getChecksForStage returns checks specific to a stage
-func (pfc *PreFlightChecker) getChecksForStage(stage mcp.ConversationStage, state *session.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getChecksForStage(stage core.ConversationStage, state *session.SessionState) []PreFlightCheck {
 	switch stage {
-	case mcp.ConversationStageBuild:
+	case core.ConversationStageBuild:
 		return pfc.getBuildChecks(state)
 	case "push":
 		return pfc.getPushChecks(state)
 	case "manifests":
 		return pfc.getManifestChecks(state)
-	case mcp.ConversationStageDeploy:
+	case core.ConversationStageDeploy:
 		return pfc.getDeploymentChecks(state)
 	default:
 		return []PreFlightCheck{}

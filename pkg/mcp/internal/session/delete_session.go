@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -179,8 +179,8 @@ func (t *DeleteSessionTool) ExecuteTyped(ctx context.Context, args DeleteSession
 }
 
 // GetMetadata returns comprehensive metadata about the delete session tool
-func (t *DeleteSessionTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *DeleteSessionTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "delete_session",
 		Description: "Delete a session and optionally its workspace with safety checks",
 		Version:     "1.0.0",
@@ -208,7 +208,7 @@ func (t *DeleteSessionTool) GetMetadata() mcp.ToolMetadata {
 			"force":            "Optional: Force deletion even if jobs are running",
 			"delete_workspace": "Optional: Also delete the workspace directory",
 		},
-		Examples: []mcp.ToolExample{
+		Examples: []core.ToolExample{
 			{
 				Name:        "Delete inactive session",
 				Description: "Delete a session with no active jobs",

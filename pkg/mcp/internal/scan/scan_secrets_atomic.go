@@ -10,13 +10,13 @@ import (
 	"time"
 
 	// mcp import removed - using mcptypes
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -103,8 +103,8 @@ type GeneratedSecretManifest struct {
 	Keys     []string `json:"keys"`
 }
 
-func standardSecretScanStages() []mcp.ProgressStage {
-	return []mcp.ProgressStage{
+func standardSecretScanStages() []core.ProgressStage {
+	return []core.ProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating scan path"},
 		{Name: "Analyze", Weight: 0.15, Description: "Analyzing file patterns and scan configuration"},
 		{Name: "Scan", Weight: 0.50, Description: "Scanning files for secrets"},
@@ -115,11 +115,11 @@ func standardSecretScanStages() []mcp.ProgressStage {
 
 type AtomicScanSecretsTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 }
 
-func NewAtomicScanSecretsTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicScanSecretsTool {
+func NewAtomicScanSecretsTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicScanSecretsTool {
 	return &AtomicScanSecretsTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -174,7 +174,7 @@ func (t *AtomicScanSecretsTool) executeWithProgress(ctx context.Context, args At
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, mcp.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -292,7 +292,7 @@ func (t *AtomicScanSecretsTool) executeWithoutProgress(ctx context.Context, args
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, mcp.NewRichError("SESSION_ACCESS_FAILED", fmt.Sprintf("failed to get session: %v", err), types.ErrTypeSession)
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -1008,8 +1008,8 @@ func (t *AtomicScanSecretsTool) GetCapabilities() types.ToolCapabilities {
 	}
 }
 
-func (t *AtomicScanSecretsTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicScanSecretsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "atomic_scan_secrets",
 		Description: "Scans files for hardcoded secrets, credentials, and sensitive data with automatic remediation suggestions and Kubernetes Secret generation",
 		Version:     "1.0.0",

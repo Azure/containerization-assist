@@ -9,8 +9,8 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -459,7 +459,7 @@ func createBuildErrorContext(operation, stage, component string, args interface{
 type AtomicDockerBuildOperation struct {
 	tool           *AtomicBuildImageTool
 	args           AtomicBuildImageArgs
-	session        *mcp.SessionState
+	session        *core.SessionState
 	workspaceDir   string
 	buildContext   string
 	dockerfilePath string

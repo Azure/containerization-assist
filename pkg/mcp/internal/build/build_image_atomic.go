@@ -8,11 +8,11 @@ import (
 	// mcp import removed - using mcptypes
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -64,7 +64,7 @@ type AtomicBuildImageResult struct {
 // AtomicBuildImageTool is the main tool for atomic Docker image building
 type AtomicBuildImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	// Module components
 	contextAnalyzer *BuildContextAnalyzer
@@ -74,7 +74,7 @@ type AtomicBuildImageTool struct {
 }
 
 // NewAtomicBuildImageTool creates a new atomic build image tool
-func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
+func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_build_image").Logger()
 	// Initialize all modules
 	contextAnalyzer := NewBuildContextAnalyzer(toolLogger)
@@ -141,8 +141,8 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 
 // Tool interface implementation (unified MCP interface)
 // GetMetadata returns comprehensive tool metadata
-func (t *AtomicBuildImageTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicBuildImageTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "atomic_build_image",
 		Description:  "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
 		Version:      "1.0.0",

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,7 +22,7 @@ import (
 
 // LocalRequestHandler processes MCP requests
 type LocalRequestHandler interface {
-	HandleRequest(ctx context.Context, req *mcp.MCPRequest) (*mcp.MCPResponse, error)
+	HandleRequest(ctx context.Context, req *core.MCPRequest) (*core.MCPResponse, error)
 }
 
 // HTTPTransport implements core.Transport for HTTP communication

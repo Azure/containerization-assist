@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -344,7 +344,7 @@ func TestRegistryAdapter_Basic(t *testing.T) {
 	// Test GetMetadata
 	metadata := adapter.GetMetadata()
 	assert.NotNil(t, metadata)
-	assert.IsType(t, map[string]mcp.ToolMetadata{}, metadata)
+	assert.IsType(t, map[string]core.ToolMetadata{}, metadata)
 }
 
 // Note: Mock registries removed as they were incompatible with the concrete types expected

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp"
+	mcp "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,8 +59,8 @@ func (m *MockTool) Execute(ctx context.Context, args interface{}) (interface{}, 
 	return m.actualOp(ctx, args)
 }
 
-func (m *MockTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (m *MockTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        m.name,
 		Description: fmt.Sprintf("Mock tool for testing: %s", m.name),
 		Version:     "1.0.0",
@@ -104,7 +104,7 @@ type MockToolResponse struct {
 func TestDryRunSupport(t *testing.T) {
 	tests := []struct {
 		name                string
-		tool                mcp.Tool
+		tool                core.Tool
 		args                *MockToolArgs
 		expectDryRunMessage string
 		expectActualMessage string

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
@@ -15,7 +15,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -155,7 +155,7 @@ type RestartAnalysis struct {
 // AtomicCheckHealthTool implements atomic application health checking using core operations
 type AtomicCheckHealthTool struct {
 	pipelineAdapter  mcptypes.PipelineOperations
-	sessionManager   mcp.ToolSessionManager
+	sessionManager   core.ToolSessionManager
 	retryCoordinator *retry.Coordinator
 	// errorHandler field removed - using direct error handling
 	logger      zerolog.Logger
@@ -164,7 +164,7 @@ type AtomicCheckHealthTool struct {
 }
 
 // NewAtomicCheckHealthTool creates a new atomic check health tool
-func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
+func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
 	coordinator := retry.New()
 
 	// Set up health check specific retry policy
@@ -266,7 +266,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		// Session retrieval error is returned directly
 		return result, nil
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 
 	// Build label selector
 	labelSelector := t.buildLabelSelector(args, session)
@@ -783,7 +783,7 @@ func (t *AtomicCheckHealthTool) addTroubleshootingTips(result *AtomicCheckHealth
 }
 
 // updateSessionState updates the session with health check results
-func (t *AtomicCheckHealthTool) updateSessionState(session *mcp.SessionState, result *AtomicCheckHealthResult) error {
+func (t *AtomicCheckHealthTool) updateSessionState(session *core.SessionState, result *AtomicCheckHealthResult) error {
 	// Update session with health check results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -805,7 +805,7 @@ func (t *AtomicCheckHealthTool) updateSessionState(session *mcp.SessionState, re
 	session.UpdatedAt = time.Now()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -813,7 +813,7 @@ func (t *AtomicCheckHealthTool) updateSessionState(session *mcp.SessionState, re
 
 // Helper methods
 
-func (t *AtomicCheckHealthTool) buildLabelSelector(args AtomicCheckHealthArgs, session *mcp.SessionState) string {
+func (t *AtomicCheckHealthTool) buildLabelSelector(args AtomicCheckHealthArgs, session *core.SessionState) string {
 	if args.LabelSelector != "" {
 		return args.LabelSelector
 	}
@@ -888,8 +888,8 @@ func (t *AtomicCheckHealthTool) GetCapabilities() types.ToolCapabilities {
 }
 
 // GetMetadata returns comprehensive metadata about the tool
-func (t *AtomicCheckHealthTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicCheckHealthTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "atomic_check_health",
 		Description: "Performs comprehensive health checks on Kubernetes applications including pod status, service availability, and resource utilization",
 		Version:     "1.0.0",

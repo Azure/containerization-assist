@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp"
+	mcp "github.com/Azure/container-kit/pkg/mcp/core"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -92,11 +92,11 @@ type AtomicGenerateDockerfileTool struct {
 	logger              zerolog.Logger
 	validator           *coredocker.Validator
 	hadolintValidator   *coredocker.HadolintValidator
-	sessionManager      mcp.ToolSessionManager
+	sessionManager      core.ToolSessionManager
 	templateIntegration *TemplateIntegration
 }
 
-func NewAtomicGenerateDockerfileTool(sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateDockerfileTool {
+func NewAtomicGenerateDockerfileTool(sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateDockerfileTool {
 	return &AtomicGenerateDockerfileTool{
 		logger:              logger,
 		validator:           coredocker.NewValidator(logger),
@@ -147,13 +147,13 @@ func (t *AtomicGenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Ge
 }
 
 // getSessionState retrieves and validates the session state
-func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileArgs) (*mcp.SessionState, error) {
+func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileArgs) (*core.SessionState, error) {
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		return nil, mcp.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session %s: %v", args.SessionID, err), "session_error")
 	}
 
-	session, ok := sessionInterface.(*mcp.SessionState)
+	session, ok := sessionInterface.(*core.SessionState)
 	if !ok {
 		return nil, mcp.NewRichError("INTERNAL_ERROR", "session type assertion failed", "type_error")
 	}
@@ -162,7 +162,7 @@ func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileAr
 }
 
 // selectTemplateFromSession determines template name from session analysis or user input
-func (t *AtomicGenerateDockerfileTool) selectTemplateFromSession(args GenerateDockerfileArgs, session *mcp.SessionState) string {
+func (t *AtomicGenerateDockerfileTool) selectTemplateFromSession(args GenerateDockerfileArgs, session *core.SessionState) string {
 	templateName := args.Template
 
 	if templateName == "" {
@@ -175,7 +175,7 @@ func (t *AtomicGenerateDockerfileTool) selectTemplateFromSession(args GenerateDo
 }
 
 // autoSelectTemplate automatically selects template based on repository analysis
-func (t *AtomicGenerateDockerfileTool) autoSelectTemplate(session *mcp.SessionState) string {
+func (t *AtomicGenerateDockerfileTool) autoSelectTemplate(session *core.SessionState) string {
 	var repositoryData map[string]interface{}
 	if session.Metadata != nil {
 		if scanSummary, exists := session.Metadata["scan_summary"].(map[string]interface{}); exists {
@@ -197,7 +197,7 @@ func (t *AtomicGenerateDockerfileTool) autoSelectTemplate(session *mcp.SessionSt
 }
 
 // handleDryRun processes dry-run mode and returns the preview response
-func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args GenerateDockerfileArgs, session *mcp.SessionState, response *GenerateDockerfileResult) (*GenerateDockerfileResult, error) {
+func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args GenerateDockerfileArgs, session *core.SessionState, response *GenerateDockerfileResult) (*GenerateDockerfileResult, error) {
 	var repositoryData map[string]interface{}
 	if session.Metadata != nil {
 		if scanSummary, exists := session.Metadata["scan_summary"].(map[string]interface{}); exists {
@@ -220,7 +220,7 @@ func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args Ge
 }
 
 // generateDockerfileContent generates the actual Dockerfile content and metadata
-func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName string, args GenerateDockerfileArgs, session *mcp.SessionState, response *GenerateDockerfileResult) error {
+func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName string, args GenerateDockerfileArgs, session *core.SessionState, response *GenerateDockerfileResult) error {
 	// Use session workspace directory for Dockerfile
 	dockerfilePath := filepath.Join(session.WorkspaceDir, "Dockerfile")
 	repositoryData := make(map[string]interface{})
@@ -1124,8 +1124,8 @@ func (t *AtomicGenerateDockerfileTool) generateOptimizationContext(content strin
 	return ctx
 }
 
-func (t *AtomicGenerateDockerfileTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicGenerateDockerfileTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "generate_dockerfile_atomic",
 		Description: "Generates optimized Dockerfiles based on repository analysis with language-specific templates and best practices",
 		Version:     "1.0.0",
@@ -1156,7 +1156,7 @@ func (t *AtomicGenerateDockerfileTool) GetMetadata() mcp.ToolMetadata {
 			"port":           "int - Application port (default: language-specific)",
 			"dry_run":        "bool - Generate preview without creating files",
 		},
-		Examples: []mcp.ToolExample{
+		Examples: []core.ToolExample{
 			{
 				Name:        "Auto-detected Node.js Application",
 				Description: "Generate Dockerfile for a Node.js application with auto-detection",

@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 )
 
 // performHealthCheck verifies deployment health
-func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *mcp.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
+func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *core.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
 	// Progress reporting removed
 
 	healthStart := time.Now()
@@ -106,7 +106,7 @@ func (t *AtomicDeployKubernetesTool) handleHealthCheckError(_ context.Context, e
 }
 
 // updateSessionState updates session with deployment results
-func (t *AtomicDeployKubernetesTool) updateSessionState(session *mcp.SessionState, result *AtomicDeployKubernetesResult) error {
+func (t *AtomicDeployKubernetesTool) updateSessionState(session *core.SessionState, result *AtomicDeployKubernetesResult) error {
 	// Update session with deployment results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -143,7 +143,7 @@ func (t *AtomicDeployKubernetesTool) updateSessionState(session *mcp.SessionStat
 	session.UpdatedAt = time.Now()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			*sess = *session
 		}
 	})

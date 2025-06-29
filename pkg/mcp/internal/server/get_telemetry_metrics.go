@@ -8,10 +8,10 @@ import (
 	"time"
 
 	// mcp import removed - using mcptypes
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/prometheus/client_golang/prometheus"
 
 	dto "github.com/prometheus/client_model/go"
@@ -395,8 +395,8 @@ func (t *GetTelemetryMetricsTool) countMetricFamilies(families []*dto.MetricFami
 	return count
 }
 
-func (t *GetTelemetryMetricsTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *GetTelemetryMetricsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "get_telemetry_metrics",
 		Description: "Export telemetry metrics in Prometheus format with filtering and analysis",
 		Version:     "1.0.0",

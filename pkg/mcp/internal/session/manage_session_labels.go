@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	// mcp import removed - using mcptypes
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -488,8 +488,8 @@ func (t *ListSessionLabelsTool) ExecuteTyped(ctx context.Context, args *ListSess
 }
 
 // GetMetadata returns comprehensive metadata about the add session label tool
-func (t *AddSessionLabelTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AddSessionLabelTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "add_session_label",
 		Description: "Add a label to a session for categorization and filtering",
 		Version:     "1.0.0",
@@ -557,8 +557,8 @@ func (t *AddSessionLabelTool) Validate(ctx context.Context, args interface{}) er
 }
 
 // GetMetadata returns comprehensive metadata about the remove session label tool
-func (t *RemoveSessionLabelTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *RemoveSessionLabelTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "remove_session_label",
 		Description: "Remove a label from a session",
 		Version:     "1.0.0",
@@ -621,8 +621,8 @@ func (t *RemoveSessionLabelTool) Validate(ctx context.Context, args interface{})
 }
 
 // GetMetadata returns comprehensive metadata about the update session labels tool
-func (t *UpdateSessionLabelsTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *UpdateSessionLabelsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "update_session_labels",
 		Description: "Update all labels on a session with a complete new set",
 		Version:     "1.0.0",
@@ -696,8 +696,8 @@ func (t *UpdateSessionLabelsTool) Validate(ctx context.Context, args interface{}
 }
 
 // GetMetadata returns comprehensive metadata about the list session labels tool
-func (t *ListSessionLabelsTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *ListSessionLabelsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "list_session_labels",
 		Description: "List all labels across sessions with usage statistics",
 		Version:     "1.0.0",

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -210,7 +210,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		// Create response that supports auto-advance
 		response := &ConversationResponse{
 			SessionID: "auto-advance-test",
-			Stage:     mcp.ConversationStageAnalyze,
+			Stage:     core.ConversationStageAnalyze,
 			Status:    ResponseStatusSuccess,
 			Message:   "Ready to proceed",
 			AutoAdvance: &AutoAdvanceConfig{
@@ -236,7 +236,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		// Create response without auto-advance
 		response := &ConversationResponse{
 			SessionID:     "no-auto-advance",
-			Stage:         mcp.ConversationStagePreFlight,
+			Stage:         core.ConversationStagePreFlight,
 			Status:        ResponseStatusWaitingInput,
 			Message:       "Welcome",
 			RequiresInput: true, // Cannot auto-advance
@@ -258,7 +258,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		// Create response that always wants to auto-advance
 		response := &ConversationResponse{
 			SessionID: "infinite-loop-test",
-			Stage:     mcp.ConversationStageAnalyze,
+			Stage:     core.ConversationStageAnalyze,
 			Status:    ResponseStatusSuccess,
 			AutoAdvance: &AutoAdvanceConfig{
 				DefaultAction: "continue",

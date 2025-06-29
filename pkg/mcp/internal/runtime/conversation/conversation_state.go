@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
@@ -21,7 +21,7 @@ type ConversationState struct {
 	*session.SessionState
 
 	// Conversation flow
-	CurrentStage    mcp.ConversationStage `json:"current_stage"`
+	CurrentStage    core.ConversationStage `json:"current_stage"`
 	History         []ConversationTurn    `json:"conversation_history"`
 	Preferences     types.UserPreferences `json:"user_preferences"`
 	PendingDecision *DecisionPoint        `json:"pending_decision,omitempty"`
@@ -44,7 +44,7 @@ type ConversationTurn struct {
 	Timestamp time.Time             `json:"timestamp"`
 	UserInput string                `json:"user_input"`
 	Assistant string                `json:"assistant_response"`
-	Stage     mcp.ConversationStage `json:"stage"`
+	Stage     core.ConversationStage `json:"stage"`
 	ToolCalls []ToolCall            `json:"tool_calls,omitempty"`
 	Decision  *Decision             `json:"decision,omitempty"`
 	Error     *types.ToolError      `json:"error,omitempty"`
@@ -62,7 +62,7 @@ type ToolCall struct {
 // DecisionPoint represents a point where user input is needed
 type DecisionPoint struct {
 	ID       string                 `json:"id"`
-	Stage    mcp.ConversationStage  `json:"stage"`
+	Stage    core.ConversationStage  `json:"stage"`
 	Question string                 `json:"question"`
 	Options  []Option               `json:"options"`
 	Default  string                 `json:"default,omitempty"`
@@ -96,7 +96,7 @@ type Artifact struct {
 	Path      string                 `json:"path,omitempty"`
 	CreatedAt time.Time              `json:"created_at"`
 	UpdatedAt time.Time              `json:"updated_at"`
-	Stage     mcp.ConversationStage  `json:"stage"`
+	Stage     core.ConversationStage  `json:"stage"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -132,7 +132,7 @@ func (cs *ConversationState) AddConversationTurn(turn ConversationTurn) {
 }
 
 // SetStage updates the current conversation stage
-func (cs *ConversationState) SetStage(stage mcp.ConversationStage) {
+func (cs *ConversationState) SetStage(stage core.ConversationStage) {
 	cs.CurrentStage = stage
 	cs.SessionState.LastAccessed = time.Now()
 }
@@ -194,10 +194,10 @@ func (cs *ConversationState) GetLatestTurn() *ConversationTurn {
 }
 
 // CanProceedToStage checks if the conversation can proceed to a given stage
-func (cs *ConversationState) CanProceedToStage(stage mcp.ConversationStage) bool {
-	// For mcp.ConversationStage, we'll check based on simplified workflow
+func (cs *ConversationState) CanProceedToStage(stage core.ConversationStage) bool {
+	// For core.ConversationStage, we'll check based on simplified workflow
 	switch stage {
-	case mcp.ConversationStageAnalyze:
+	case core.ConversationStageAnalyze:
 		// Can proceed to analyze if we have a repo URL
 		repoURL := ""
 		if cs.SessionState.Metadata != nil {
@@ -207,7 +207,7 @@ func (cs *ConversationState) CanProceedToStage(stage mcp.ConversationStage) bool
 		}
 		return repoURL != ""
 
-	case mcp.ConversationStageBuild:
+	case core.ConversationStageBuild:
 		// Can proceed to build if we have repo analysis
 		repoAnalysisExists := false
 		if cs.SessionState.Metadata != nil {
@@ -217,7 +217,7 @@ func (cs *ConversationState) CanProceedToStage(stage mcp.ConversationStage) bool
 		}
 		return repoAnalysisExists
 
-	case mcp.ConversationStageDeploy:
+	case core.ConversationStageDeploy:
 		// Can proceed to deploy if we have built image
 		imageBuilt := false
 		if cs.SessionState.Metadata != nil {
@@ -227,7 +227,7 @@ func (cs *ConversationState) CanProceedToStage(stage mcp.ConversationStage) bool
 		}
 		return imageBuilt
 
-	case mcp.ConversationStageScan:
+	case core.ConversationStageScan:
 		// Can proceed to scan if we have an image
 		imageRef := ""
 		if cs.SessionState.Metadata != nil {
@@ -244,13 +244,13 @@ func (cs *ConversationState) CanProceedToStage(stage mcp.ConversationStage) bool
 
 // GetStageProgress returns the progress through the workflow
 func (cs *ConversationState) GetStageProgress() StageProgress {
-	// Define simplified stages for mcp.ConversationStage
-	stages := []mcp.ConversationStage{
-		mcp.ConversationStagePreFlight,
-		mcp.ConversationStageAnalyze,
-		mcp.ConversationStageBuild,
-		mcp.ConversationStageDeploy,
-		mcp.ConversationStageScan,
+	// Define simplified stages for core.ConversationStage
+	stages := []core.ConversationStage{
+		core.ConversationStagePreFlight,
+		core.ConversationStageAnalyze,
+		core.ConversationStageBuild,
+		core.ConversationStageDeploy,
+		core.ConversationStageScan,
 	}
 
 	currentIndex := 0
@@ -273,12 +273,12 @@ func (cs *ConversationState) GetStageProgress() StageProgress {
 
 // StageProgress represents progress through the workflow
 type StageProgress struct {
-	CurrentStage    mcp.ConversationStage   `json:"current_stage"`
+	CurrentStage    core.ConversationStage   `json:"current_stage"`
 	CurrentStep     int                     `json:"current_step"`
 	TotalSteps      int                     `json:"total_steps"`
 	Percentage      int                     `json:"percentage"`
-	CompletedStages []mcp.ConversationStage `json:"completed_stages"`
-	RemainingStages []mcp.ConversationStage `json:"remaining_stages"`
+	CompletedStages []core.ConversationStage `json:"completed_stages"`
+	RemainingStages []core.ConversationStage `json:"remaining_stages"`
 }
 
 // Helper functions

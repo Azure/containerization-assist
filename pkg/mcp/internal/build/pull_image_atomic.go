@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -87,14 +87,14 @@ type PullContext struct {
 // AtomicPullImageTool implements atomic Docker image pull using core operations
 type AtomicPullImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        ToolAnalyzer
 	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicPullImageTool creates a new atomic pull image tool
-func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicPullImageTool {
+func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicPullImageTool {
 	return &AtomicPullImageTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -214,7 +214,7 @@ func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args Atom
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return utils.NewSessionNotFound(args.SessionID)
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -266,7 +266,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 		result.TotalDuration = time.Since(startTime)
 		return result, utils.NewSessionNotFound(args.SessionID)
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -315,7 +315,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 }
 
 // performPull contains the actual pull logic that can be used with or without progress reporting
-func (t *AtomicPullImageTool) performPull(ctx context.Context, session *mcp.SessionState, args AtomicPullImageArgs, result *AtomicPullImageResult, reporter interface{}) error {
+func (t *AtomicPullImageTool) performPull(ctx context.Context, session *core.SessionState, args AtomicPullImageArgs, result *AtomicPullImageResult, reporter interface{}) error {
 	// Report progress if reporter is available
 	// Progress reporting removed
 	// Extract registry from image reference
@@ -412,7 +412,7 @@ func (t *AtomicPullImageTool) generatePullContext(result *AtomicPullImageResult,
 		}
 	}
 }
-func (t *AtomicPullImageTool) updateSessionState(session *mcp.SessionState, result *AtomicPullImageResult) error {
+func (t *AtomicPullImageTool) updateSessionState(session *core.SessionState, result *AtomicPullImageResult) error {
 	// Update session with pull results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -429,7 +429,7 @@ func (t *AtomicPullImageTool) updateSessionState(session *mcp.SessionState, resu
 	}
 	session.UpdatedAt = time.Now()
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -455,8 +455,8 @@ func (r *AtomicPullImageResult) GetAlternativeStrategies() []mcptypes.Alternativ
 
 // Tool interface implementation (unified interface)
 // GetMetadata returns comprehensive tool metadata
-func (t *AtomicPullImageTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicPullImageTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "atomic_pull_image",
 		Description:  "Pulls Docker images from container registries with authentication support and detailed progress tracking",
 		Version:      "1.0.0",

@@ -9,11 +9,11 @@ import (
 	// mcp import removed - using mcptypes
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 
 	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
@@ -78,14 +78,14 @@ type PushContext struct {
 // AtomicPushImageTool implements atomic Docker image push using core operations
 type AtomicPushImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcp.ToolSessionManager
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        ToolAnalyzer
 	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicPushImageTool creates a new atomic push image tool
-func NewAtomicPushImageTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicPushImageTool {
+func NewAtomicPushImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicPushImageTool {
 	return &AtomicPushImageTool{
 		pipelineAdapter: adapter,
 		sessionManager:  sessionManager,
@@ -208,7 +208,7 @@ func (t *AtomicPushImageTool) executeWithProgress(ctx context.Context, args Atom
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("session not found: %s", args.SessionID), types.ErrTypeSession)
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -254,7 +254,7 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 		result.TotalDuration = time.Since(startTime)
 		return result, mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("session not found: %s", args.SessionID), types.ErrTypeSession)
 	}
-	session := sessionInterface.(*mcp.SessionState)
+	session := sessionInterface.(*core.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -295,7 +295,7 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 }
 
 // performPush contains the actual push logic that can be used with or without progress reporting
-func (t *AtomicPushImageTool) performPush(ctx context.Context, session *mcp.SessionState, args AtomicPushImageArgs, result *AtomicPushImageResult, reporter interface{}) error {
+func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.SessionState, args AtomicPushImageArgs, result *AtomicPushImageResult, reporter interface{}) error {
 	// Report progress if reporter is available
 	// Progress reporting removed
 	// Push Docker image using core operations
@@ -643,7 +643,7 @@ func (t *AtomicPushImageTool) addTroubleshootingTips(result *AtomicPushImageResu
 			"Ensure your account has the required roles")
 	}
 }
-func (t *AtomicPushImageTool) updateSessionState(session *mcp.SessionState, result *AtomicPushImageResult) error {
+func (t *AtomicPushImageTool) updateSessionState(session *core.SessionState, result *AtomicPushImageResult) error {
 	// Update session with push results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -675,7 +675,7 @@ func (t *AtomicPushImageTool) updateSessionState(session *mcp.SessionState, resu
 	session.UpdatedAt = time.Now()
 	// UpdateSession expects interface{} function for updateFunc
 	updateFunc := func(s interface{}) {
-		if sess, ok := s.(*mcp.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			*sess = *session
 		}
 	}
@@ -786,8 +786,8 @@ func (t *AtomicPushImageTool) validateImageReference(imageRef string) error {
 
 // Tool interface implementation (unified interface)
 // GetMetadata returns comprehensive tool metadata
-func (t *AtomicPushImageTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AtomicPushImageTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "atomic_push_image",
 		Description:  "Pushes Docker images to container registries with authentication support, retry logic, and progress tracking",
 		Version:      "1.0.0",

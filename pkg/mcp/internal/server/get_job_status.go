@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	// mcp import removed - using mcptypes
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -136,8 +136,8 @@ func CreateMockJobStatusTool(logger zerolog.Logger) *GetJobStatusTool {
 }
 
 // GetMetadata returns comprehensive metadata about the get job status tool
-func (t *GetJobStatusTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *GetJobStatusTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "get_job_status",
 		Description: "Retrieve detailed status information for a specific job",
 		Version:     "1.0.0",

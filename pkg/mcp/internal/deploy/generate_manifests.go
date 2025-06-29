@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -362,8 +362,8 @@ func (t *GenerateManifestsTool) Validate(ctx context.Context, args interface{}) 
 }
 
 // GetMetadata returns tool metadata
-func (t *GenerateManifestsTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *GenerateManifestsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         t.GetName(),
 		Description:  t.GetDescription(),
 		Version:      t.GetVersion(),

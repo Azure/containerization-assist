@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	types "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	types "github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -415,8 +415,8 @@ func (t *PushImageTool) Validate(ctx context.Context, args interface{}) error {
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *PushImageTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *PushImageTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "push_image",
 		Description:  "Pushes Docker images to container registries with retry and authentication support",
 		Version:      "1.0.0",

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -111,8 +111,8 @@ func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args inter
 }
 
 // GetMetadata returns the tool metadata
-func (t *AnalyzeRepositoryRedirectTool) GetMetadata() mcp.ToolMetadata {
-	return mcp.ToolMetadata{
+func (t *AnalyzeRepositoryRedirectTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "analyze_repository",
 		Description:  "Analyzes a repository to determine language, framework, dependencies, and containerization requirements",
 		Version:      "1.0.0",

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -127,10 +127,10 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 }
 
 // RegisterTool registers a tool with the orchestrator (required by mcp.Orchestrator interface)
-func (o *NoReflectToolOrchestrator) RegisterTool(name string, tool mcp.Tool) error {
+func (o *NoReflectToolOrchestrator) RegisterTool(name string, tool core.Tool) error {
 	// This is part of the simplified interface - delegate to tool registry if needed
 	if o.toolRegistry != nil {
-		// Convert the mcp.Tool to the orchestration.Tool format if needed
+		// Convert the core.Tool to the orchestration.Tool format if needed
 		// For now, just log the registration
 		o.logger.Info().
 			Str("tool_name", name).

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -24,7 +24,7 @@ func NewBuildSecurityScanner(logger zerolog.Logger) *BuildSecurityScanner {
 }
 
 // RunSecurityScan performs security scanning on the built image
-func (s *BuildSecurityScanner) RunSecurityScan(ctx context.Context, session *mcp.SessionState, result *AtomicBuildImageResult) error {
+func (s *BuildSecurityScanner) RunSecurityScan(ctx context.Context, session *core.SessionState, result *AtomicBuildImageResult) error {
 	// Create Trivy scanner
 	scanner := coredocker.NewTrivyScanner(s.logger)
 	// Check if Trivy is installed
