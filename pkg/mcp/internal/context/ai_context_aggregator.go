@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/state"
 	"github.com/rs/zerolog"
@@ -512,79 +511,16 @@ func (a *AIContextAggregator) GetAIContext(ctx context.Context, sessionID string
 		return nil, err
 	}
 
-	adapter := &AIContextAdapter{
-		comprehensiveContext: compContext,
-	}
-	return adapter.GetContextData(), nil
-}
-
-type AIContextAdapter struct {
-	comprehensiveContext *ComprehensiveContext
-}
-
-func (a *AIContextAdapter) GetContextData() map[string]interface{} {
 	return map[string]interface{}{
-		"session_id":        a.comprehensiveContext.SessionID,
-		"timestamp":         a.comprehensiveContext.Timestamp,
-		"tool_contexts":     a.comprehensiveContext.ToolContexts,
-		"state_snapshot":    a.comprehensiveContext.StateSnapshot,
-		"recent_events":     a.comprehensiveContext.RecentEvents,
-		"relationships":     a.comprehensiveContext.Relationships,
-		"recommendations":   a.comprehensiveContext.Recommendations,
-		"analysis_insights": a.comprehensiveContext.AnalysisInsights,
-		"metadata":          a.comprehensiveContext.Metadata,
-	}
+		"session_id":        compContext.SessionID,
+		"timestamp":         compContext.Timestamp,
+		"tool_contexts":     compContext.ToolContexts,
+		"state_snapshot":    compContext.StateSnapshot,
+		"recent_events":     compContext.RecentEvents,
+		"relationships":     compContext.Relationships,
+		"recommendations":   compContext.Recommendations,
+		"analysis_insights": compContext.AnalysisInsights,
+		"metadata":          compContext.Metadata,
+	}, nil
 }
 
-func (a *AIContextAdapter) GetRelevance() float64 {
-	if len(a.comprehensiveContext.ToolContexts) == 0 {
-		return 0.0
-	}
-
-	total := 0.0
-	for _, ctx := range a.comprehensiveContext.ToolContexts {
-		total += ctx.Relevance
-	}
-
-	return total / float64(len(a.comprehensiveContext.ToolContexts))
-}
-
-func (a *AIContextAdapter) GetConfidence() float64 {
-	if len(a.comprehensiveContext.ToolContexts) == 0 {
-		return 0.0
-	}
-
-	total := 0.0
-	for _, ctx := range a.comprehensiveContext.ToolContexts {
-		total += ctx.Confidence
-	}
-
-	return total / float64(len(a.comprehensiveContext.ToolContexts))
-}
-
-func (a *AIContextAdapter) GenerateRecommendations() []mcptypes.Recommendation {
-	recommendations := make([]mcptypes.Recommendation, 0)
-
-	if a.comprehensiveContext.Recommendations != nil {
-		for range a.comprehensiveContext.Recommendations {
-			recommendations = append(recommendations, mcptypes.Recommendation{})
-		}
-	}
-
-	return recommendations
-}
-
-func (a *AIContextAdapter) GetAssessment() map[string]interface{} {
-	return map[string]interface{}{}
-}
-
-func (a *AIContextAdapter) GetToolContext() map[string]interface{} {
-	return map[string]interface{}{}
-}
-
-func (a *AIContextAdapter) GetMetadata() map[string]interface{} {
-	if a.comprehensiveContext.Metadata != nil {
-		return a.comprehensiveContext.Metadata
-	}
-	return make(map[string]interface{})
-}
