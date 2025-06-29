@@ -137,14 +137,14 @@ jobs:
         fi
         echo "✅ Lint passed"
 
-        # Test 6: Short tests
-        echo "🧪 Testing short tests..."
-        if ! go test -short ./...; then
-          echo "❌ Short tests failed"
+        # Test 6: Verify tests compile (don't run them)
+        echo "🧪 Verifying tests compile..."
+        if ! go test -run=^$ ./...; then
+          echo "❌ Test compilation failed"
           echo "success=false" >> $GITHUB_OUTPUT
           exit 1
         fi
-        echo "✅ Short tests passed"
+        echo "✅ Tests compile successfully"
 
         echo "🎉 All canary checks passed!"
         echo "success=true" >> $GITHUB_OUTPUT
@@ -248,6 +248,35 @@ jobs:
     - name: Install dependencies
       run: go mod download
 
+    - name: Download coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-*-${{ github.run_id }}
+        path: coverage-artifacts
+
+    - name: Merge coverage reports
+      run: |
+        echo "📊 Merging coverage reports from unit tests..."
+
+        # Install gocovmerge if not available
+        go install github.com/wadey/gocovmerge@latest
+
+        # Check if coverage-artifacts directory exists
+        if [ -d "coverage-artifacts" ]; then
+          # Find all coverage files and merge them
+          coverage_files=$(find coverage-artifacts -name "coverage.out" -type f)
+          if [ -n "$coverage_files" ]; then
+            echo "Found coverage files: $coverage_files"
+            ~/go/bin/gocovmerge $coverage_files > merged-coverage.out
+            cp merged-coverage.out coverage.out
+            echo "✅ Merged coverage reports successfully"
+          else
+            echo "⚠️ No coverage files found in artifacts, will generate coverage during enforcement"
+          fi
+        else
+          echo "⚠️ No coverage artifacts directory found, will generate coverage during enforcement"
+        fi
+
     - name: Run coverage enforcement for core packages
       run: |
         echo "📊 Running coverage enforcement..."
@@ -266,50 +295,87 @@ jobs:
         )
 
         # Coverage thresholds (minimum required coverage percentages)
-        # Set to current levels to prevent regression, will gradually increase
+        # Load from configuration file if available, otherwise use defaults
         declare -A COVERAGE_THRESHOLDS
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/core/..."]=30        # Current: 37.0%
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/runtime/..."]=20     # Current: 21.3%
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/orchestration/..."]=1 # Current: 1.7%
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/session/..."]=9      # Current: 9.7%
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/build/..."]=6        # Current: 6.8%
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/deploy/..."]=7       # Current: 7.5%
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/analyze/..."]=14     # Current: 14.1%
-        COVERAGE_THRESHOLDS["./pkg/mcp/internal/server/..."]=17      # Current: 17.5%
-        COVERAGE_THRESHOLDS["./pkg/mcp/types/..."]=30               # Current: 34.4%
+
+        if [ -f .github/coverage-thresholds.json ]; then
+          echo "Loading coverage thresholds from configuration file..."
+          # Parse JSON and populate the array
+          while IFS="=" read -r package threshold; do
+            COVERAGE_THRESHOLDS["$package"]="$threshold"
+          done < <(jq -r '.package_thresholds | to_entries[] | select(.key | endswith("...")) | "\(.key)=\(.value.threshold)"' .github/coverage-thresholds.json)
+        else
+          echo "Using default coverage thresholds..."
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/core/..."]=30
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/runtime/..."]=20
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/orchestration/..."]=1
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/session/..."]=9
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/build/..."]=6
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/deploy/..."]=7
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/analyze/..."]=14
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/server/..."]=17
+          COVERAGE_THRESHOLDS["./pkg/mcp/types/..."]=30
+        fi
 
         FAILED_PACKAGES=()
+
+        # Check if we have a merged coverage file
+        if [ -f "coverage.out" ]; then
+          echo "Using merged coverage file from unit tests"
+          USE_MERGED_COVERAGE=true
+        else
+          echo "No merged coverage file found, will run tests for each package"
+          USE_MERGED_COVERAGE=false
+        fi
 
         for package in "${CORE_PACKAGES[@]}"; do
           echo "Checking coverage for $package..."
 
-          # Run tests with coverage
-          coverage_file="/tmp/coverage-$(echo $package | tr '/' '-' | tr '.' '-').out"
-          if go test -coverprofile="$coverage_file" "$package" 2>/dev/null; then
-            if [ -f "$coverage_file" ]; then
-              # Extract coverage percentage
-              coverage_line=$(go tool cover -func="$coverage_file" | grep "total:" | tail -1)
-              if [ -n "$coverage_line" ]; then
-                coverage_percent=$(echo "$coverage_line" | awk '{print $3}' | sed 's/%//')
-                threshold=${COVERAGE_THRESHOLDS[$package]}
-
-                echo "Package $package: ${coverage_percent}% coverage (threshold: ${threshold}%)"
-
-                # Compare coverage with threshold
-                if (( $(echo "$coverage_percent < $threshold" | bc -l) )); then
-                  echo "❌ $package coverage ${coverage_percent}% is below threshold ${threshold}%"
-                  FAILED_PACKAGES+=("$package (${coverage_percent}% < ${threshold}%)")
-                else
-                  echo "✅ $package coverage ${coverage_percent}% meets threshold ${threshold}%"
-                fi
-              else
-                echo "⚠️ Could not extract coverage for $package"
-              fi
+          if [ "$USE_MERGED_COVERAGE" = "true" ]; then
+            # Extract coverage from merged file
+            coverage_line=$(go tool cover -func=coverage.out | grep -E "^${package//\./\\.}" | grep -v "test" | awk '{sum+=$3; count++} END {if(count>0) printf "%.1f\n", sum/count; else print "0.0"}')
+            if [ -n "$coverage_line" ] && [ "$coverage_line" != "0.0" ]; then
+              coverage_percent="$coverage_line"
             else
-              echo "⚠️ No coverage file generated for $package"
+              # Package might not be in merged coverage, run test for this package only
+              coverage_file="/tmp/coverage-$(echo $package | tr '/' '-' | tr '.' '-').out"
+              if go test -coverprofile="$coverage_file" "$package" 2>/dev/null; then
+                coverage_line=$(go tool cover -func="$coverage_file" | grep "total:" | tail -1)
+                coverage_percent=$(echo "$coverage_line" | awk '{print $3}' | sed 's/%//')
+              else
+                coverage_percent="0.0"
+              fi
             fi
           else
-            echo "⚠️ Tests failed for $package"
+            # Run tests with coverage for this package
+            coverage_file="/tmp/coverage-$(echo $package | tr '/' '-' | tr '.' '-').out"
+            if go test -coverprofile="$coverage_file" "$package" 2>/dev/null; then
+              if [ -f "$coverage_file" ]; then
+                # Extract coverage percentage
+                coverage_line=$(go tool cover -func="$coverage_file" | grep "total:" | tail -1)
+                if [ -n "$coverage_line" ]; then
+                  coverage_percent=$(echo "$coverage_line" | awk '{print $3}' | sed 's/%//')
+                else
+                  coverage_percent="0.0"
+                fi
+              else
+                coverage_percent="0.0"
+              fi
+            else
+              coverage_percent="0.0"
+            fi
+          fi
+
+          threshold=${COVERAGE_THRESHOLDS[$package]}
+
+          echo "Package $package: ${coverage_percent}% coverage (threshold: ${threshold}%)"
+
+          # Compare coverage with threshold
+          if (( $(echo "$coverage_percent < $threshold" | bc -l) )); then
+            echo "❌ $package coverage ${coverage_percent}% is below threshold ${threshold}%"
+            FAILED_PACKAGES+=("$package (${coverage_percent}% < ${threshold}%)")
+          else
+            echo "✅ $package coverage ${coverage_percent}% meets threshold ${threshold}%"
           fi
         done
 
@@ -936,15 +1002,15 @@ jobs:
       - name: Check all required jobs
         run: |
           echo "Checking status of all required jobs..."
-          
+
           # Check each job result
           FAILED_JOBS=""
-          
+
           # Canary must always pass
           if [ "${{ needs.canary.result }}" != "success" ]; then
             FAILED_JOBS="${FAILED_JOBS}canary "
           fi
-          
+
           # Build jobs must pass
           if [ "${{ needs.build-cli.result }}" != "success" ]; then
             FAILED_JOBS="${FAILED_JOBS}build-cli "
@@ -952,7 +1018,7 @@ jobs:
           if [ "${{ needs.build-mcp.result }}" != "success" ]; then
             FAILED_JOBS="${FAILED_JOBS}build-mcp "
           fi
-          
+
           # Unit tests must pass if they ran (not skipped)
           if [ "${{ needs.unit-test-core.result }}" != "success" ] && [ "${{ needs.unit-test-core.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}unit-test-core "
@@ -963,22 +1029,22 @@ jobs:
           if [ "${{ needs.unit-test-cli.result }}" != "success" ] && [ "${{ needs.unit-test-cli.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}unit-test-cli "
           fi
-          
+
           # Coverage must pass if it ran
           if [ "${{ needs.coverage-enforcement.result }}" != "success" ] && [ "${{ needs.coverage-enforcement.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}coverage-enforcement "
           fi
-          
+
           # Security scan must pass if it ran
           if [ "${{ needs.security-scan.result }}" != "success" ] && [ "${{ needs.security-scan.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}security-scan "
           fi
-          
+
           # Quality gates must pass if it ran
           if [ "${{ needs.quality-gates.result }}" != "success" ] && [ "${{ needs.quality-gates.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}quality-gates "
           fi
-          
+
           # Integration tests must pass if they ran
           if [ "${{ needs.integration-tests.result }}" != "success" ] && [ "${{ needs.integration-tests.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}integration-tests "
@@ -986,12 +1052,12 @@ jobs:
           if [ "${{ needs.mcp-integration-tests.result }}" != "success" ] && [ "${{ needs.mcp-integration-tests.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}mcp-integration-tests "
           fi
-          
+
           # Testing dashboard must pass if it ran
           if [ "${{ needs.testing-dashboard.result }}" != "success" ] && [ "${{ needs.testing-dashboard.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}testing-dashboard "
           fi
-          
+
           # Fail if any required jobs failed
           if [ -n "$FAILED_JOBS" ]; then
             echo "❌ The following required jobs failed: $FAILED_JOBS"

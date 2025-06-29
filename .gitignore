@@ -195,6 +195,7 @@ nunit-*.xml
 
 # Coverage
 coverage*.json
+!.github/coverage-thresholds.json
 coverage*.xml
 coverage*.info
 *.coverage
