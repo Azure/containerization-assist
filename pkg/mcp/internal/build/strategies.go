@@ -22,7 +22,6 @@ func NewStrategyManager(logger zerolog.Logger) *StrategyManager {
 	// TODO: Fix method calls - strategy constructors not found
 	// sm.RegisterStrategy(NewDockerBuildStrategy(logger))
 	// sm.RegisterStrategy(NewBuildKitStrategy(logger))
-	// sm.RegisterStrategy(NewLegacyBuildStrategy(logger))
 	return sm
 }
 
@@ -52,11 +51,6 @@ func (sm *StrategyManager) SelectStrategy(ctx BuildContext) (BuildStrategy, erro
 			sm.logger.Info().Str("strategy", "docker").Msg("Selected Docker strategy")
 			return strategy, nil
 		}
-	}
-	// Fallback to legacy build
-	if strategy, exists := sm.strategies["legacy"]; exists {
-		sm.logger.Info().Str("strategy", "legacy").Msg("Selected legacy strategy")
-		return strategy, nil
 	}
 
 	return nil, fmt.Errorf("no suitable build strategy found")

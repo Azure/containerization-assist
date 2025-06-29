@@ -411,31 +411,6 @@ func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (in
 	return t.ExecuteTyped(ctx, pullArgs)
 }
 
-// Legacy interface methods for backward compatibility
-// GetName returns the tool name (legacy SimpleTool compatibility)
-func (t *AtomicPullImageTool) GetName() string {
-	return t.GetMetadata().Name
-}
-
-// GetDescription returns the tool description (legacy SimpleTool compatibility)
-func (t *AtomicPullImageTool) GetDescription() string {
-	return t.GetMetadata().Description
-}
-
-// GetVersion returns the tool version (legacy SimpleTool compatibility)
-func (t *AtomicPullImageTool) GetVersion() string {
-	return t.GetMetadata().Version
-}
-
-// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicPullImageTool) GetCapabilities() types.ToolCapabilities {
-	return types.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      false,
-	}
-}
 
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicPullImageTool) ExecuteTyped(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {

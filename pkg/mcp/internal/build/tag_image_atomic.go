@@ -261,31 +261,6 @@ func (t *AtomicTagImageTool) GetMetadata() core.ToolMetadata {
 	}
 }
 
-// Legacy interface methods for backward compatibility
-// GetName returns the tool name (legacy SimpleTool compatibility)
-func (t *AtomicTagImageTool) GetName() string {
-	return t.GetMetadata().Name
-}
-
-// GetDescription returns the tool description (legacy SimpleTool compatibility)
-func (t *AtomicTagImageTool) GetDescription() string {
-	return t.GetMetadata().Description
-}
-
-// GetVersion returns the tool version (legacy SimpleTool compatibility)
-func (t *AtomicTagImageTool) GetVersion() string {
-	return t.GetMetadata().Version
-}
-
-// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicTagImageTool) GetCapabilities() types.ToolCapabilities {
-	return types.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     false,
-		RequiresAuth:      false,
-	}
-}
 
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicTagImageTool) ExecuteTyped(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
