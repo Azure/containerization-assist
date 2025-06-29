@@ -15,7 +15,7 @@ Workstream A (Interfaces): MONITORING
 - Test impact: 2 Tool interfaces found (target: 1)
 - Performance: Baseline established
 
-Workstream B (Adapters): MONITORING  
+Workstream B (Adapters): MONITORING
 - Build status: PASS
 - Test impact: 12 adapter files found (target: 0)
 - Performance: Baseline established

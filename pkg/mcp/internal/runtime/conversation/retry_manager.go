@@ -39,7 +39,6 @@ func NewSimpleRetryManager(logger zerolog.Logger) *SimpleRetryManager {
 	}
 }
 
-
 // ExecuteWithRetry executes a function with unified retry coordination
 func (rm *SimpleRetryManager) ExecuteWithRetry(ctx context.Context, operationType string, fn retry.RetryableFunc) error {
 	return rm.retryCoordinator.Execute(ctx, operationType, fn)

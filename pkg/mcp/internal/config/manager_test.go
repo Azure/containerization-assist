@@ -140,4 +140,3 @@ func TestGlobalConfig(t *testing.T) {
 		t.Errorf("Expected default host 'localhost', got '%s'", serverCfg.Host)
 	}
 }
-

@@ -411,7 +411,6 @@ func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (in
 	return t.ExecuteTyped(ctx, pullArgs)
 }
 
-
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicPullImageTool) ExecuteTyped(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
 	startTime := time.Now()

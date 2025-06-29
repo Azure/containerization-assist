@@ -248,12 +248,12 @@ func (t *AtomicScanImageSecurityTool) Validate(ctx context.Context, args interfa
 	if !ok {
 		return fmt.Errorf("invalid arguments type: expected AtomicScanImageSecurityArgs, got %T", args)
 	}
-	
+
 	// Validate required fields
 	if scanArgs.ImageName == "" {
 		return fmt.Errorf("image_name is required")
 	}
-	
+
 	// Validate severity threshold if provided
 	if scanArgs.SeverityThreshold != "" {
 		validSeverities := map[string]bool{
@@ -266,12 +266,12 @@ func (t *AtomicScanImageSecurityTool) Validate(ctx context.Context, args interfa
 			return fmt.Errorf("invalid severity_threshold: %s, must be one of LOW, MEDIUM, HIGH, CRITICAL", scanArgs.SeverityThreshold)
 		}
 	}
-	
+
 	// Validate max results if provided
 	if scanArgs.MaxResults < 0 {
 		return fmt.Errorf("max_results cannot be negative")
 	}
-	
+
 	return nil
 }
 

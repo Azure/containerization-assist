@@ -159,7 +159,6 @@ func (s *StubAnalyzer) ResetTokenUsage() {
 	// No-op for stub
 }
 
-
 // AnalyzerFactory creates the appropriate analyzer based on configuration
 type AnalyzerFactory struct {
 	logger       zerolog.Logger

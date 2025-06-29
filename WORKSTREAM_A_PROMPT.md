@@ -14,13 +14,13 @@ You are the **Lead Developer for Workstream A** in a critical architecture clean
 
 ### Must-Do Items
 1. **Interface Unification**: Reduce from 8+ duplicate interfaces to 1 canonical definition
-2. **Type System Cleanup**: Remove `map[string]interface{}` conversion patterns 
+2. **Type System Cleanup**: Remove `map[string]interface{}` conversion patterns
 3. **Import Consolidation**: All interface imports point to single source
 4. **Validation**: Zero import cycles, all tests pass
 
 ### Must-Not-Do Items
 - ❌ **Do NOT modify legacy CLI code** (only `pkg/mcp/` directory)
-- ❌ **Do NOT break existing functionality** 
+- ❌ **Do NOT break existing functionality**
 - ❌ **Do NOT work on adapter files** (that's Workstream B)
 - ❌ **Do NOT remove legacy methods** (that's Workstream C)
 
@@ -29,7 +29,7 @@ You are the **Lead Developer for Workstream A** in a critical architecture clean
 ### Primary Targets
 ```
 pkg/mcp/core/interfaces.go                          # Keep as canonical
-pkg/mcp/internal/core/tool_middleware.go            # DELETE interface duplicate  
+pkg/mcp/internal/core/tool_middleware.go            # DELETE interface duplicate
 pkg/mcp/internal/runtime/registry.go                # Remove UnifiedTool interface
 pkg/mcp/internal/orchestration/types.go             # Fix ToolMetadata field types
 pkg/mcp/internal/orchestration/no_reflect_orchestrator*.go  # Remove conversions
@@ -40,7 +40,7 @@ pkg/mcp/internal/pipeline/helpers.go                # Remove conversion utilitie
 ### Do NOT Touch (Other Workstreams)
 ```
 pkg/mcp/client_factory.go                           # Workstream B (adapters)
-pkg/mcp/internal/analyze/analyzer.go                # Workstream B (adapters)  
+pkg/mcp/internal/analyze/analyzer.go                # Workstream B (adapters)
 pkg/mcp/internal/core/gomcp_tools.go                # Workstream B (session wrapper)
 pkg/mcp/internal/state/migrators.go                 # Workstream C (legacy)
 pkg/mcp/internal/config/migration.go                # Workstream C (legacy)
@@ -62,7 +62,7 @@ rg "type.*Tool.*interface" pkg/mcp/ -A 3 >> interface_audit.txt
 rg "UnifiedTool" pkg/mcp/ >> interface_audit.txt
 echo "📊 Found interface definitions - review interface_audit.txt"
 
-# 3. Map ToolMetadata duplicates  
+# 3. Map ToolMetadata duplicates
 rg "type ToolMetadata struct" pkg/mcp/ -A 10 > metadata_audit.txt
 echo "📊 Found ToolMetadata definitions - review metadata_audit.txt"
 ```
@@ -79,7 +79,7 @@ rm pkg/mcp/internal/core/tool_middleware.go
 
 # 4. Fix ToolMetadata field type inconsistency
 # Edit pkg/mcp/internal/orchestration/types.go line ~19
-# Change: Parameters map[string]interface{} 
+# Change: Parameters map[string]interface{}
 # To:     Parameters map[string]string
 ```
 
@@ -104,7 +104,7 @@ if [ $? -eq 0 ]; then echo "✅ No import cycles"; else echo "❌ Import cycles 
 # 1. Begin removing map[string]interface{} conversions in orchestration
 # Focus on pkg/mcp/internal/orchestration/no_reflect_orchestrator_impl.go
 # Remove or simplify BuildArgs conversion patterns (lines ~50-100)
-# Remove or simplify Environment conversion patterns 
+# Remove or simplify Environment conversion patterns
 # Document changes in conversion_changes.txt
 ```
 
@@ -122,7 +122,7 @@ if [ $? -eq 0 ]; then echo "✅ No import cycles"; else echo "❌ Import cycles 
 # Remove unnecessary conversion helpers
 
 # 3. Clean up pipeline helpers
-# Edit pkg/mcp/internal/pipeline/helpers.go  
+# Edit pkg/mcp/internal/pipeline/helpers.go
 # Remove or simplify MetadataManager conversion utilities
 ```
 
@@ -168,7 +168,7 @@ EOF
 **Steps**:
 1. **Identify duplicates**: Use `rg "type Tool interface" pkg/mcp/` to find all Tool interface definitions
 2. **Keep canonical**: Preserve `pkg/mcp/core/interfaces.go:19-23` as the only Tool interface
-3. **Remove duplicates**: 
+3. **Remove duplicates**:
    - Delete `pkg/mcp/internal/core/tool_middleware.go` (lines 14-16)
    - Delete UnifiedTool interface from `pkg/mcp/internal/runtime/registry.go` (lines 23-27)
 4. **Validate**: Ensure `rg "type Tool interface" pkg/mcp/ | wc -l` returns 1
@@ -177,7 +177,7 @@ EOF
 
 **Objective**: Consistent ToolMetadata.Parameters field type
 
-**Issue**: 
+**Issue**:
 - `pkg/mcp/core/interfaces.go`: `Parameters map[string]string`
 - `pkg/mcp/internal/orchestration/types.go`: `Parameters map[string]interface{}`
 
@@ -192,7 +192,7 @@ EOF
 # Replace UnifiedTool with Tool
 find pkg/mcp -name "*.go" -exec sed -i 's/UnifiedTool/Tool/g' {} \;
 
-# Remove tool_middleware imports  
+# Remove tool_middleware imports
 find pkg/mcp -name "*.go" -exec sed -i '/tool_middleware/d' {} \;
 
 # Update import paths to core
@@ -205,7 +205,7 @@ find pkg/mcp -name "*.go" -exec sed -i 's|internal/runtime\..*Tool|core.Tool|g' 
 
 **Focus Files**:
 - `pkg/mcp/internal/orchestration/no_reflect_orchestrator_impl.go`
-- `pkg/mcp/internal/utils/schema_utils.go`  
+- `pkg/mcp/internal/utils/schema_utils.go`
 - `pkg/mcp/internal/pipeline/helpers.go`
 
 **Patterns to Remove**:
@@ -218,7 +218,7 @@ if buildArgs, ok := argsMap["build_args"].(map[string]interface{}); ok {
     }
 }
 
-// REMOVE: Slice conversion patterns  
+// REMOVE: Slice conversion patterns
 if vulnTypes, ok := argsMap["vuln_types"].([]interface{}); ok {
     args.VulnTypes = make([]string, len(vulnTypes))
     for i, v := range vulnTypes {
@@ -240,7 +240,7 @@ metadata_inconsistent=$(rg "Parameters.*map\[string\]interface" pkg/mcp/)
 [ -z "$metadata_inconsistent" ] && echo "✅ ToolMetadata consistent" || echo "❌ Type inconsistency remains"
 ```
 
-### After Day 2  
+### After Day 2
 ```bash
 # Import validation
 import_cycles=$(go build -tags mcp ./pkg/mcp/... 2>&1 | grep -c "import cycle")
@@ -268,12 +268,12 @@ golangci-lint run ./pkg/mcp/... && echo "✅ Lint clean" || echo "❌ Lint issue
 **Problem**: Removing interfaces can create new import cycles
 **Solution**: Always test with `go build -tags mcp ./pkg/mcp/...` after changes
 
-### Pitfall 2: Type Assertion Failures  
+### Pitfall 2: Type Assertion Failures
 **Problem**: Changing interface types breaks existing code
 **Solution**: Update all interface usage when consolidating
 
 ### Pitfall 3: Test Failures
-**Problem**: Tests expect old interface structure  
+**Problem**: Tests expect old interface structure
 **Solution**: Let Workstream D handle test updates, focus on core functionality
 
 ### Pitfall 4: Conflicting with Other Workstreams
@@ -329,7 +329,7 @@ echo "✅ Day X work complete - ready for external merge"
 - **Conversion Patterns**: ~50 patterns → <5 (reduce by 90%)
 - **Import Cycle Errors**: 0 (maintain clean imports)
 
-### Qualitative Goals  
+### Qualitative Goals
 - **Foundation Complete**: Other workstreams can build on unified interfaces
 - **Type Safety**: Direct typed interfaces replace interface{} patterns
 - **Maintainability**: Single source of truth for all interfaces

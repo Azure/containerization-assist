@@ -68,12 +68,12 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 	if s.gomcpManager == nil {
 		return fmt.Errorf("stdio transport: gomcp manager not initialized")
 	}
-	
+
 	mgr, ok := s.gomcpManager.(interface{ StartServer() error })
 	if !ok {
 		return fmt.Errorf("stdio transport: gomcp manager does not implement StartServer")
 	}
-	
+
 	runFunc := mgr.StartServer
 
 	// Run the server in a goroutine
@@ -137,12 +137,12 @@ func (s *StdioTransport) Close() error {
 	if s.gomcpManager == nil {
 		return fmt.Errorf("stdio transport: gomcp manager not initialized")
 	}
-	
+
 	mgr, ok := s.gomcpManager.(interface{ Shutdown(context.Context) error })
 	if !ok {
 		return fmt.Errorf("stdio transport: gomcp manager does not implement Shutdown")
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := mgr.Shutdown(ctx); err != nil {

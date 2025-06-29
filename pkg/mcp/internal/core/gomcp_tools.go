@@ -956,7 +956,6 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 	return nil
 }
 
-
 // registerOrchestratorTool creates a GoMCP handler that delegates to the orchestrator
 func (gm *GomcpManager) registerOrchestratorTool(registrar *runtime.StandardToolRegistrar, toolName, atomicToolName, description string, deps *ToolDependencies) {
 	deps.Logger.Debug().
