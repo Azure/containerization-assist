@@ -129,15 +129,8 @@ func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*core.ToolMetada
 		Examples:     convertExamples(localMetadata.Examples),
 	}
 
-	// Convert Parameters from map[string]interface{} to map[string]string
-	for key, value := range localMetadata.Parameters {
-		if strValue, ok := value.(string); ok {
-			converted.Parameters[key] = strValue
-		} else {
-			// Convert non-string values to string representation
-			converted.Parameters[key] = fmt.Sprintf("%v", value)
-		}
-	}
+	// Parameters are already map[string]string, no conversion needed
+	converted.Parameters = localMetadata.Parameters
 
 	return converted, nil
 }

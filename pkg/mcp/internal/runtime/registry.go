@@ -19,15 +19,9 @@ import (
 // Contracts
 ///////////////////////////////////////////////////////////////////////////////
 
-// UnifiedTool represents the unified interface for all MCP tools (matches mcptypes.Tool)
-type UnifiedTool interface {
-	Execute(ctx context.Context, args interface{}) (interface{}, error)
-	GetMetadata() core.ToolMetadata
-	Validate(ctx context.Context, args interface{}) error
-}
 
 type ExecutableTool[TArgs, TResult any] interface {
-	UnifiedTool
+	core.Tool
 	PreValidate(ctx context.Context, args TArgs) error
 }
 
@@ -36,7 +30,7 @@ type ExecutableTool[TArgs, TResult any] interface {
 ///////////////////////////////////////////////////////////////////////////////
 
 type ToolRegistration struct {
-	Tool         UnifiedTool
+	Tool         core.Tool
 	InputSchema  map[string]any
 	OutputSchema map[string]any
 	Handler      func(ctx context.Context, args json.RawMessage) (interface{}, error)

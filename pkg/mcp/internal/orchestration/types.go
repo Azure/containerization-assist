@@ -18,7 +18,7 @@ type ToolMetadata struct {
 	Dependencies []string               `json:"dependencies"`
 	Capabilities []string               `json:"capabilities"`
 	Requirements []string               `json:"requirements"`
-	Parameters   map[string]interface{} `json:"parameters"`
+	Parameters   map[string]string `json:"parameters"`
 	OutputSchema map[string]interface{} `json:"output_schema"`
 	Examples     []ToolExample          `json:"examples"`
 }

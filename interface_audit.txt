@@ -1,0 +1,121 @@
+pkg/mcp/core/interfaces.go:type Tool interface {
+pkg/mcp/core/interfaces.go-	Execute(ctx context.Context, args interface{}) (interface{}, error)
+pkg/mcp/core/interfaces.go-	GetMetadata() ToolMetadata
+pkg/mcp/core/interfaces.go-	Validate(ctx context.Context, args interface{}) error
+pkg/mcp/core/interfaces.go-}
+pkg/mcp/core/interfaces.go-
+--
+pkg/mcp/internal/core/tool_middleware.go:type Tool interface {
+pkg/mcp/internal/core/tool_middleware.go-	Execute(ctx context.Context, args interface{}) (interface{}, error)
+pkg/mcp/internal/core/tool_middleware.go-}
+pkg/mcp/internal/core/tool_middleware.go-
+pkg/mcp/internal/core/tool_middleware.go-// ToolWithMetadata interface for tools that provide metadata
+pkg/mcp/internal/core/tool_middleware.go-type ToolWithMetadata interface {
+pkg/mcp/core/interfaces.go:type Tool interface {
+pkg/mcp/core/interfaces.go-	Execute(ctx context.Context, args interface{}) (interface{}, error)
+pkg/mcp/core/interfaces.go-	GetMetadata() ToolMetadata
+pkg/mcp/core/interfaces.go-	Validate(ctx context.Context, args interface{}) error
+--
+pkg/mcp/core/interfaces.go:type ToolRegistry interface {
+pkg/mcp/core/interfaces.go-	Register(tool Tool)
+pkg/mcp/core/interfaces.go-	Get(name string) (Tool, bool)
+pkg/mcp/core/interfaces.go-	GetTool(name string) (Tool, error) // Legacy compatibility method
+--
+pkg/mcp/core/interfaces.go:type ToolSessionManager interface {
+pkg/mcp/core/interfaces.go-	// Session retrieval and creation
+pkg/mcp/core/interfaces.go-	GetSession(sessionID string) (interface{}, error)
+pkg/mcp/core/interfaces.go-	GetOrCreateSession(sessionID string) (interface{}, error)
+--
+pkg/mcp/factory_utils.go:type StronglyTypedToolFactory[T core.Tool] interface {
+pkg/mcp/factory_utils.go-	Create() T
+pkg/mcp/factory_utils.go-	GetType() string
+pkg/mcp/factory_utils.go-	GetMetadata() core.ToolMetadata
+--
+pkg/mcp/internal/core/tool_middleware.go:type Tool interface {
+pkg/mcp/internal/core/tool_middleware.go-	Execute(ctx context.Context, args interface{}) (interface{}, error)
+pkg/mcp/internal/core/tool_middleware.go-}
+pkg/mcp/internal/core/tool_middleware.go-
+--
+pkg/mcp/internal/core/tool_middleware.go:type ToolWithMetadata interface {
+pkg/mcp/internal/core/tool_middleware.go-	Tool
+pkg/mcp/internal/core/tool_middleware.go-	GetMetadata() (*core.ToolMetadata, error)
+pkg/mcp/internal/core/tool_middleware.go-}
+--
+pkg/mcp/internal/core/tool_middleware.go:type ToolWithValidation interface {
+pkg/mcp/internal/core/tool_middleware.go-	Tool
+pkg/mcp/internal/core/tool_middleware.go-	Validate(args interface{}) error
+pkg/mcp/internal/core/tool_middleware.go-}
+--
+pkg/mcp/internal/server/unified_server.go:// RegistryAdapter adapts MCPToolRegistry to the types.ToolRegistry interface
+pkg/mcp/internal/server/unified_server.go-type RegistryAdapter struct {
+pkg/mcp/internal/server/unified_server.go-	registry *orchestration.MCPToolRegistry
+pkg/mcp/internal/server/unified_server.go-}
+--
+pkg/mcp/internal/deploy/tool_analyzer.go:type ToolAnalyzer interface {
+pkg/mcp/internal/deploy/tool_analyzer.go-	// AnalyzeDeploymentFailure analyzes deployment operation failures
+pkg/mcp/internal/deploy/tool_analyzer.go-	AnalyzeDeploymentFailure(namespace, sessionID string) error
+pkg/mcp/internal/deploy/tool_analyzer.go-
+--
+pkg/mcp/internal/runtime/registry.go:type UnifiedTool interface {
+pkg/mcp/internal/runtime/registry.go-	Execute(ctx context.Context, args interface{}) (interface{}, error)
+pkg/mcp/internal/runtime/registry.go-	GetMetadata() core.ToolMetadata
+pkg/mcp/internal/runtime/registry.go-	Validate(ctx context.Context, args interface{}) error
+--
+pkg/mcp/internal/runtime/registry.go:type ExecutableTool[TArgs, TResult any] interface {
+pkg/mcp/internal/runtime/registry.go-	UnifiedTool
+pkg/mcp/internal/runtime/registry.go-	PreValidate(ctx context.Context, args TArgs) error
+pkg/mcp/internal/runtime/registry.go-}
+--
+pkg/mcp/internal/runtime/registry.go:type LongRunningTool interface {
+pkg/mcp/internal/runtime/registry.go-	ExecuteWithProgress(ctx context.Context, args interface{},
+pkg/mcp/internal/runtime/registry.go-		cb ProgressCallback) (interface{}, error)
+pkg/mcp/internal/runtime/registry.go-}
+--
+pkg/mcp/internal/transport/http.go:type ToolHandler func(ctx context.Context, args interface{}) (interface{}, error)
+pkg/mcp/internal/transport/http.go-
+pkg/mcp/internal/transport/http.go-// rateLimiter tracks request rates
+pkg/mcp/internal/transport/http.go-type rateLimiter struct {
+--
+pkg/mcp/internal/observability/integration.go:type ToolOrchestrator interface {
+pkg/mcp/internal/observability/integration.go-	ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error)
+pkg/mcp/internal/observability/integration.go-}
+pkg/mcp/internal/observability/integration.go-
+--
+pkg/mcp/internal/observability/integration.go:// NOTE: Using internal mcptypes.ToolOrchestrator interface to avoid import cycles
+pkg/mcp/internal/observability/integration.go-
+pkg/mcp/internal/observability/integration.go-// ProfiledExecutionResult wraps the execution result with profiling data
+pkg/mcp/internal/observability/integration.go-type ProfiledExecutionResult struct {
+--
+pkg/mcp/internal/transport/stdio_error_handler.go:func (h *StdioErrorHandler) handleToolError(toolErr *types.ToolError, toolName string) interface{} {
+pkg/mcp/internal/transport/stdio_error_handler.go-	return map[string]interface{}{
+pkg/mcp/internal/transport/stdio_error_handler.go-		"content": []map[string]interface{}{
+pkg/mcp/internal/transport/stdio_error_handler.go-			{
+--
+pkg/mcp/internal/analyze/tool_analyzer.go:type ToolAnalyzer interface {
+pkg/mcp/internal/analyze/tool_analyzer.go-	// AnalyzeValidationFailure analyzes validation operation failures
+pkg/mcp/internal/analyze/tool_analyzer.go-	AnalyzeValidationFailure(dockerfilePath, sessionID string) error
+pkg/mcp/internal/analyze/tool_analyzer.go-}
+--
+pkg/mcp/internal/build/tool_analyzer.go:type ToolAnalyzer interface {
+pkg/mcp/internal/build/tool_analyzer.go-	// AnalyzeBuildFailure analyzes build operation failures
+pkg/mcp/internal/build/tool_analyzer.go-	AnalyzeBuildFailure(sessionID, imageName string) error
+pkg/mcp/internal/build/tool_analyzer.go-	// AnalyzePushFailure analyzes push operation failures
+--
+pkg/mcp/internal/runtime/registration_helper.go:type AtomicTool[TArgs, TResult any] interface {
+pkg/mcp/internal/runtime/registration_helper.go-	ExecuteWithContext(ctx *server.Context, args TArgs) (*TResult, error)
+pkg/mcp/internal/runtime/registration_helper.go-}
+pkg/mcp/internal/runtime/registration_helper.go-
+--
+pkg/mcp/internal/runtime/registration_helper.go:type UtilityToolFunc[TArgs, TResult any] func(deps interface{}) (func(ctx *server.Context, args *TArgs) (*TResult, error), error)
+pkg/mcp/internal/runtime/registration_helper.go-
+pkg/mcp/internal/runtime/registration_helper.go-// RegisterUtilityTool registers a utility tool with dependency injection
+pkg/mcp/internal/runtime/registration_helper.go-func RegisterUtilityTool[TArgs, TResult any](
+--
+pkg/mcp/internal/orchestration/tool_types.go:type ToolExecutor interface {
+pkg/mcp/internal/orchestration/tool_types.go-	// ExecuteTool executes a tool with the given input
+pkg/mcp/internal/orchestration/tool_types.go-	ExecuteTool(ctx context.Context, input ToolInput) (interface{}, error)
+pkg/mcp/internal/orchestration/tool_types.go-}
+pkg/mcp/internal/runtime/registry.go:// UnifiedTool represents the unified interface for all MCP tools (matches mcptypes.Tool)
+pkg/mcp/internal/runtime/registry.go:type UnifiedTool interface {
+pkg/mcp/internal/runtime/registry.go:	UnifiedTool
+pkg/mcp/internal/runtime/registry.go:	Tool         UnifiedTool

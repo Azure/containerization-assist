@@ -465,10 +465,14 @@ func (s *UnifiedMCPServer) buildInputSchema(metadata *orchestration.ToolMetadata
 	}
 
 	// Add tool-specific properties from metadata
-	if params, ok := metadata.Parameters["fields"].(map[string]interface{}); ok {
-		properties := schema["properties"].(map[string]interface{})
-		for fieldName, fieldInfo := range params {
-			properties[fieldName] = fieldInfo
+	// Since Parameters is now map[string]string, we need to handle it differently
+	if fieldsJSON, ok := metadata.Parameters["fields"]; ok {
+		var fields map[string]interface{}
+		if err := json.Unmarshal([]byte(fieldsJSON), &fields); err == nil {
+			properties := schema["properties"].(map[string]interface{})
+			for fieldName, fieldInfo := range fields {
+				properties[fieldName] = fieldInfo
+			}
 		}
 	}
 
@@ -560,7 +564,7 @@ func (adapter *RegistryAdapter) GetMetadata() map[string]core.ToolMetadata {
 				Dependencies: meta.Dependencies,
 				Capabilities: meta.Capabilities,
 				Requirements: meta.Requirements,
-				Parameters:   convertParametersMapToString(meta.Parameters),
+				Parameters:   meta.Parameters,
 				Examples:     convertExamplesToTypes(meta.Examples),
 			}
 		}

@@ -374,7 +374,7 @@ func (r *MCPToolRegistry) inferRequirements(name string) []string {
 	return []string{}
 }
 
-func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface{} {
+func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]string {
 	// Use reflection to infer parameters from the tool's Execute method
 	toolValue := reflect.ValueOf(tool)
 	toolType := toolValue.Type()
@@ -392,7 +392,7 @@ func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface
 	}
 
 	if !found {
-		return map[string]interface{}{}
+		return map[string]string{}
 	}
 
 	// Analyze method parameters
@@ -414,22 +414,37 @@ func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface
 		schemaJSON, err := json.Marshal(schema)
 		if err != nil {
 			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to marshal schema")
-			return map[string]interface{}{}
+			return map[string]string{}
 		}
 
 		var schemaMap map[string]interface{}
 		if err := json.Unmarshal(schemaJSON, &schemaMap); err != nil {
 			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to unmarshal schema")
-			return map[string]interface{}{}
+			return map[string]string{}
 		}
 
 		// Sanitize the schema to ensure array types have items
 		r.sanitizeInvopopSchema(schemaMap)
 
-		return schemaMap
+		// Convert to map[string]string
+		result := make(map[string]string)
+		if properties, ok := schemaMap["properties"].(map[string]interface{}); ok {
+			for k, v := range properties {
+				if prop, ok := v.(map[string]interface{}); ok {
+					if desc, ok := prop["description"]; ok {
+						result[k] = fmt.Sprintf("%v", desc)
+					} else if typ, ok := prop["type"]; ok {
+						result[k] = fmt.Sprintf("%v", typ)
+					} else {
+						result[k] = "parameter"
+					}
+				}
+			}
+		}
+		return result
 	}
 
-	return map[string]interface{}{}
+	return map[string]string{}
 }
 
 func (r *MCPToolRegistry) inferOutputSchema(tool interface{}) map[string]interface{} {
