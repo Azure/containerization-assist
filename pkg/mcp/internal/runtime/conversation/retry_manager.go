@@ -39,31 +39,6 @@ func NewSimpleRetryManager(logger zerolog.Logger) *SimpleRetryManager {
 	}
 }
 
-// ShouldRetry determines if an operation should be retried based on the error
-// Deprecated: Use ExecuteWithRetry for new code
-func (rm *SimpleRetryManager) ShouldRetry(err error, attempt int) bool {
-	if err == nil {
-		return false
-	}
-
-	// Use the unified coordinator's error classifier
-	return rm.retryCoordinator.IsRetryable(err) && attempt < 3
-}
-
-// GetBackoff returns the backoff duration for a given attempt
-// Deprecated: Use ExecuteWithRetry for new code
-func (rm *SimpleRetryManager) GetBackoff(attempt int) time.Duration {
-	// For backward compatibility, delegate to the coordinator's calculation
-	policy := &retry.Policy{
-		InitialDelay:    1 * time.Second,
-		MaxDelay:        10 * time.Second,
-		BackoffStrategy: retry.BackoffExponential,
-		Multiplier:      2.0,
-		Jitter:          false, // No jitter for backward compatibility
-	}
-
-	return rm.retryCoordinator.CalculateDelay(policy, attempt)
-}
 
 // ExecuteWithRetry executes a function with unified retry coordination
 func (rm *SimpleRetryManager) ExecuteWithRetry(ctx context.Context, operationType string, fn retry.RetryableFunc) error {
