@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -113,8 +114,13 @@ func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTa
 	if t.fixingMixin != nil && !args.DryRun {
 		// Create wrapper operation for tag process
 		var result *AtomicTagImageResult
-		operation := NewTagOperationWrapper(
-			func(ctx context.Context) error {
+		progress := observability.NewUnifiedProgressReporter(nil) // No server context in ExecuteWithFixes
+		operation := NewDockerOperation(DockerOperationConfig{
+			Type:          OperationTag,
+			Name:          fmt.Sprintf("%s->%s", args.SourceImage, args.TargetImage),
+			RetryAttempts: 3,
+			Timeout:       2 * time.Minute, // Tag operations are typically fast
+			ExecuteFunc: func(ctx context.Context) error {
 				var err error
 				result, err = t.executeTagCore(ctx, args)
 				if err != nil {
@@ -125,17 +131,17 @@ func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTa
 				}
 				return nil
 			},
-			func() error {
+			AnalyzeFunc: func() error {
 				if t.analyzer != nil {
 					return t.analyzer.AnalyzeTagFailure(args.SourceImage, args.TargetImage, args.SessionID)
 				}
 				return nil
 			},
-			func() error {
+			PrepareFunc: func() error {
 				// Prepare workspace for fixes
 				return nil
 			},
-		)
+		}, progress)
 		// Execute with retry and fixing
 		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
 		if err != nil {
@@ -191,7 +197,8 @@ func (t *AtomicTagImageTool) ExecuteWithContext(serverCtx *server.Context, args 
 	// _ = nil // TODO: Progress adapter removed to break import cycles
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, nil)
+	progress := observability.NewUnifiedProgressReporter(serverCtx)
+	err := t.executeWithProgress(ctx, args, result, startTime, progress)
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 	// Update AI context with final result

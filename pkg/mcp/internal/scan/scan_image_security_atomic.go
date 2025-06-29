@@ -11,7 +11,7 @@ import (
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp"
-	"github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp"
@@ -46,15 +46,11 @@ func (t *AtomicScanImageSecurityTool) ExecuteScan(ctx context.Context, args Atom
 // ExecuteWithContext runs the atomic security scan with GoMCP progress tracking
 func (t *AtomicScanImageSecurityTool) ExecuteWithContext(serverCtx *server.Context, args AtomicScanImageSecurityArgs) (*AtomicScanImageSecurityResult, error) {
 	// Create progress adapter for GoMCP using standard scan stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
-		{Name: "Initialize", Weight: 0.10, Description: "Loading session"},
-		{Name: "Scan", Weight: 0.80, Description: "Scanning"},
-		{Name: "Finalize", Weight: 0.10, Description: "Updating state"},
-	})
+	progress := observability.NewUnifiedProgressReporter(serverCtx)
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	result, err := t.performSecurityScan(ctx, args, nil)
+	result, err := t.performSecurityScan(ctx, args, progress)
 
 	// Complete progress tracking
 	if err != nil {

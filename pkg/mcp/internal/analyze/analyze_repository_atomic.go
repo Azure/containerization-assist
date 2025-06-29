@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/core/git"
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -83,10 +84,10 @@ func (t *AtomicAnalyzeRepositoryTool) ExecuteRepositoryAnalysis(ctx context.Cont
 }
 
 func (t *AtomicAnalyzeRepositoryTool) ExecuteWithContext(serverCtx *server.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
-	_ = mcp.NewGoMCPProgressAdapter(serverCtx, []mcp.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Analyze", Weight: 0.80, Description: "Analyzing"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	progress := observability.NewUnifiedProgressReporter(serverCtx)
 
 	ctx := context.Background()
-	result, err := t.performAnalysis(ctx, args, nil)
+	result, err := t.performAnalysis(ctx, args, progress)
 
 	if err != nil {
 		t.logger.Info().Msg("Analysis failed")

@@ -10,6 +10,7 @@ import (
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp"
@@ -107,8 +108,13 @@ func (t *AtomicPushImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 	if t.fixingMixin != nil && !args.DryRun {
 		// Create wrapper operation for push process
 		var result *AtomicPushImageResult
-		operation := NewPushOperationWrapper(
-			func(ctx context.Context) error {
+		progress := observability.NewUnifiedProgressReporter(nil) // No server context in ExecuteWithFixes
+		operation := NewDockerOperation(DockerOperationConfig{
+			Type:          OperationPush,
+			Name:          args.ImageRef,
+			RetryAttempts: 3,
+			Timeout:       10 * time.Minute, // Push operations typically take longer
+			ExecuteFunc: func(ctx context.Context) error {
 				var err error
 				result, err = t.executePushCore(ctx, args)
 				if err != nil {
@@ -119,17 +125,17 @@ func (t *AtomicPushImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 				}
 				return nil
 			},
-			func() error {
+			AnalyzeFunc: func() error {
 				if t.analyzer != nil {
 					return t.analyzer.AnalyzePushFailure(args.ImageRef, args.SessionID)
 				}
 				return nil
 			},
-			func() error {
+			PrepareFunc: func() error {
 				// Prepare workspace for fixes
 				return nil
 			},
-		)
+		}, progress)
 		// Execute with retry and fixing
 		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
 		if err != nil {
@@ -178,7 +184,8 @@ func (t *AtomicPushImageTool) ExecuteWithContext(serverCtx *server.Context, args
 	// _ = nil // TODO: Progress adapter removed to break import cycles
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, nil)
+	progress := observability.NewUnifiedProgressReporter(serverCtx)
+	err := t.executeWithProgress(ctx, args, result, startTime, progress)
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 	// Complete progress tracking

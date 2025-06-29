@@ -10,8 +10,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp"
 
 	// mcp import removed - using mcptypes
-	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
@@ -44,7 +44,7 @@ type AtomicCheckHealthArgs struct {
 // AtomicCheckHealthResult defines the response from atomic health checking
 type AtomicCheckHealthResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult      // Embed AI context methods
+	mcptypes.BaseAIContextResult      // Embed AI context methods
 	Success                      bool `json:"success"`
 
 	// Session context
@@ -159,7 +159,7 @@ type AtomicCheckHealthTool struct {
 	retryCoordinator *retry.Coordinator
 	// errorHandler field removed - using direct error handling
 	logger      zerolog.Logger
-	analyzer    ToolAnalyzer
+	analyzer    build.ToolAnalyzer
 	fixingMixin *build.AtomicToolFixingMixin
 }
 
@@ -191,7 +191,7 @@ func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManage
 }
 
 // SetAnalyzer sets the analyzer for failure analysis
-func (t *AtomicCheckHealthTool) SetAnalyzer(analyzer ToolAnalyzer) {
+func (t *AtomicCheckHealthTool) SetAnalyzer(analyzer build.ToolAnalyzer) {
 	t.analyzer = analyzer
 }
 
@@ -201,15 +201,16 @@ func (t *AtomicCheckHealthTool) SetFixingMixin(mixin *build.AtomicToolFixingMixi
 }
 
 // standardHealthCheckStages provides common stages for health check operations
-func standardHealthCheckStages() []internal.LocalProgressStage {
-	return []internal.LocalProgressStage{
-		{Name: "Initialize", Weight: 0.10, Description: "Loading session and namespace"},
-		{Name: "Query", Weight: 0.30, Description: "Querying Kubernetes resources"},
-		{Name: "Analyze", Weight: 0.30, Description: "Analyzing pod and service health"},
-		{Name: "Wait", Weight: 0.20, Description: "Waiting for ready state (if requested)"},
-		{Name: "Report", Weight: 0.10, Description: "Generating health report"},
-	}
-}
+// standardHealthCheckStages is no longer used with unified progress implementation
+// func standardHealthCheckStages() []internal.LocalProgressStage {
+// 	return []internal.LocalProgressStage{
+// 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and namespace"},
+// 		{Name: "Query", Weight: 0.30, Description: "Querying Kubernetes resources"},
+// 		{Name: "Analyze", Weight: 0.30, Description: "Analyzing pod and service health"},
+// 		{Name: "Wait", Weight: 0.20, Description: "Waiting for ready state (if requested)"},
+// 		{Name: "Report", Weight: 0.10, Description: "Generating health report"},
+// 	}
+// }
 
 // ExecuteHealthCheck runs the atomic application health check
 func (t *AtomicCheckHealthTool) ExecuteHealthCheck(ctx context.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
@@ -220,11 +221,11 @@ func (t *AtomicCheckHealthTool) ExecuteHealthCheck(ctx context.Context, args Ato
 // ExecuteWithContext runs the atomic health check with GoMCP progress tracking
 func (t *AtomicCheckHealthTool) ExecuteWithContext(serverCtx *server.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
 	// Create progress adapter for GoMCP using centralized health stages
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Health", Weight: 0.80, Description: "Checking health"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	progress := observability.NewUnifiedProgressReporter(serverCtx)
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	result, err := t.performHealthCheck(ctx, args, nil)
+	result, err := t.performHealthCheck(ctx, args, progress)
 
 	// Complete progress tracking
 	if err != nil {
@@ -251,7 +252,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		// Create result with error for session failure
 		result := &AtomicCheckHealthResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_check_health", args.SessionID, args.DryRun),
-			BaseAIContextResult: internal.NewBaseAIContextResult("health", false, time.Since(startTime)),
+			BaseAIContextResult: mcptypes.NewBaseAIContextResult("health", false, time.Since(startTime)),
 			SessionID:           args.SessionID,
 			Namespace:           t.getNamespace(args.Namespace),
 			TotalDuration:       time.Since(startTime),
@@ -284,7 +285,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 	// Create base response
 	result := &AtomicCheckHealthResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_check_health", session.SessionID, args.DryRun),
-		BaseAIContextResult: internal.NewBaseAIContextResult("health", true, 0), // Duration will be set later
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("health", true, 0), // Duration will be set later
 		SessionID:           session.SessionID,
 		Namespace:           namespace,
 		LabelSelector:       labelSelector,
@@ -448,13 +449,9 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 	// Progress reporting removed
 
 	result.TotalDuration = time.Since(startTime)
-	// Update internal.BaseAIContextResult fields
+	// Update BaseAIContextResult fields
 	result.BaseAIContextResult.Duration = result.TotalDuration
 	result.BaseAIContextResult.IsSuccessful = result.Success
-	if result.HealthContext != nil {
-		result.BaseAIContextResult.ErrorCount = len(result.HealthContext.PodIssues) + len(result.HealthContext.ContainerIssues)
-		result.BaseAIContextResult.WarningCount = len(result.HealthContext.ServiceIssues) + len(result.HealthContext.PerformanceIssues)
-	}
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
