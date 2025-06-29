@@ -4,8 +4,8 @@
 
 **Objective**: Eliminate the 4 highest-impact adapter files (646 lines total) that provide the most architectural value when removed.
 
-**Duration**: 4 days (can start immediately after Workstream A Day 1)  
-**Team Size**: 2 developers  
+**Duration**: 4 days (can start immediately after Workstream A Day 1)
+**Team Size**: 2 developers
 **Expected Reduction**: -646 lines, -4 adapter files
 
 ## Target Adapters (Priority Order)
@@ -28,7 +28,7 @@
 **Step 1.1: Current State Analysis**
 ```bash
 # Analyze current adapter usage
-grep -r "RepositoryAnalyzerAdapter" pkg/mcp/internal/ 
+grep -r "RepositoryAnalyzerAdapter" pkg/mcp/internal/
 grep -r "repositoryAnalyzerAdapter" pkg/mcp/internal/
 
 # Expected usage:
@@ -40,7 +40,7 @@ grep -r "repositoryAnalyzerAdapter" pkg/mcp/internal/
 ```bash
 # Current problematic pattern:
 # pkg/mcp/internal/analyze ↔ pkg/mcp/internal/build
-# 
+#
 # Adapter exists because:
 # - analyze package can't import build (circular)
 # - build package needs repository analysis
@@ -93,7 +93,7 @@ func (eba *EnhancedBuildAnalyzer) AnalyzeForBuild(ctx context.Context, repoPath 
     if err != nil {
         return nil, err
     }
-    
+
     // Use core.RepositoryInfo directly
     return &BuildAnalysisResult{
         RepositoryInfo: repoInfo, // Already core.RepositoryInfo type
@@ -267,7 +267,7 @@ type Registry struct {
 func (r *Registry) Register(tool core.Tool) {
     r.mutex.Lock()
     defer r.mutex.Unlock()
-    
+
     metadata := tool.GetMetadata()
     r.tools[metadata.Name] = tool
 }
@@ -275,7 +275,7 @@ func (r *Registry) Register(tool core.Tool) {
 func (r *Registry) Get(name string) (core.Tool, bool) {
     r.mutex.RLock()
     defer r.mutex.RUnlock()
-    
+
     tool, exists := r.tools[name]
     return tool, exists
 }
@@ -352,7 +352,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 }
 
 func (s *StdioTransport) Stop(ctx context.Context) error {
-    // Implementation  
+    // Implementation
     return nil
 }
 
@@ -488,7 +488,7 @@ grep -r "adapter" pkg/mcp/internal/ | grep -E "(repository_analyzer|auto_registr
 
 # Count total lines eliminated
 echo "Repository Analyzer: -357 lines"
-echo "Auto Registration: -176 lines"  
+echo "Auto Registration: -176 lines"
 echo "Transport: -73 lines"
 echo "Dockerfile: -40 lines"
 echo "Total: -646 lines eliminated"
@@ -556,7 +556,7 @@ echo "Total: -646 lines eliminated"
 find pkg/mcp -name "*adapter*.go" | grep -E "(repository_analyzer|auto_registration|transport|dockerfile)" | wc -l
 # Result: 0
 
-# Line count reduction verification  
+# Line count reduction verification
 echo "Total lines eliminated: 646"
 echo "Percentage of total adapters: 44% (646/1474)"
 

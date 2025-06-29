@@ -746,13 +746,94 @@ jobs:
         export CONTAINER_KIT_TEST_WORKSPACE="/tmp/container-kit-test"
         export CONTAINER_KIT_LOG_LEVEL="debug"
         mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
+
+        echo "🧪 Running MCP workflow integration tests..."
+        # Run the comprehensive MCP workflow integration test
+        go test -v ./test/integration/mcp_workflow_integration_test.go -timeout=10m
+
+        # Run other integration tests
         go test -v ./test/integration/...
+
+  # MCP Workflow Integration Tests - Dedicated job for comprehensive workflow testing
+  mcp-workflow-tests:
+    name: MCP Workflow Integration Tests
+    needs: [canary, unit-test-mcp, build-mcp]
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-mcp == 'true'
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        test-scenario: ["simple-go-service", "all-workflows"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Setup test environment
+      run: |
+        # Install required tools
+        sudo apt-get update
+        sudo apt-get install -y jq bc
+
+        # Create test workspace
+        export CONTAINER_KIT_TEST_WORKSPACE="/tmp/container-kit-test-${{ matrix.test-scenario }}"
+        mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
+        echo "CONTAINER_KIT_TEST_WORKSPACE=$CONTAINER_KIT_TEST_WORKSPACE" >> $GITHUB_ENV
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build MCP server (if not failing due to compilation)
+      run: |
+        echo "🔨 Attempting to build MCP server..."
+        if go build -o container-kit-mcp ./cmd/mcp-server; then
+          echo "✅ MCP server built successfully"
+          echo "MCP_SERVER_BUILT=true" >> $GITHUB_ENV
+        else
+          echo "⚠️ MCP server build failed - will run tests without binary"
+          echo "MCP_SERVER_BUILT=false" >> $GITHUB_ENV
+        fi
+
+    - name: Run MCP workflow integration test - ${{ matrix.test-scenario }}
+      run: |
+        export CONTAINER_KIT_LOG_LEVEL="debug"
+
+        echo "🧪 Running MCP workflow integration test for: ${{ matrix.test-scenario }}"
+
+        if [ "${{ matrix.test-scenario }}" = "simple-go-service" ]; then
+          # Run just the simple Go service test
+          go test -v -run TestMCPWorkflowIntegrationSuite/TestMCPWorkflowIntegration/Workflow_simple-go-service ./test/integration/mcp_workflow_integration_test.go -timeout=10m
+        elif [ "${{ matrix.test-scenario }}" = "all-workflows" ]; then
+          # Run all workflow tests
+          go test -v -run TestMCPWorkflowIntegrationSuite ./test/integration/mcp_workflow_integration_test.go -timeout=15m
+        fi
+
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mcp-workflow-test-artifacts-${{ matrix.test-scenario }}-${{ github.run_id }}
+        path: |
+          ${{ env.CONTAINER_KIT_TEST_WORKSPACE }}/**/*
+          /tmp/mcp-workflow-test-*/**/*
+        retention-days: 7
 
   # Phase 7: Testing Dashboard (after all tests complete)
   testing-dashboard:
     name: Testing Dashboard
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, coverage-enforcement, security-scan, quality-gates]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, coverage-enforcement, security-scan, quality-gates, mcp-workflow-tests]
     if: always() && needs.canary.outputs.should-continue == 'true'
 
     steps:
@@ -776,6 +857,7 @@ jobs:
         | Coverage Enforcement | ${{ needs.coverage-enforcement.result == 'success' && '✅ Passed' || needs.coverage-enforcement.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |
         | Security Scanning | ${{ needs.security-scan.result == 'success' && '✅ Passed' || needs.security-scan.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |
         | Quality Gates | ${{ needs.quality-gates.result == 'success' && '✅ Passed' || needs.quality-gates.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |
+        | MCP Workflow Tests | ${{ needs.mcp-workflow-tests.result == 'success' && '✅ Passed' || needs.mcp-workflow-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |
 
         ## 📋 Quick Stats
         - **Workflow**: CI Pipeline
@@ -817,7 +899,7 @@ jobs:
   pipeline-summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
     if: always()
     permissions:
       pull-requests: write
@@ -981,6 +1063,7 @@ jobs:
         echo "| Quality Gates | ${{ needs.quality-gates.result == 'success' && '✅ Passed' || needs.quality-gates.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Integration Tests | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || needs.integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| MCP Integration Tests | ${{ needs.mcp-integration-tests.result == 'success' && '✅ Passed' || needs.mcp-integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| MCP Workflow Tests | ${{ needs.mcp-workflow-tests.result == 'success' && '✅ Passed' || needs.mcp-workflow-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Testing Dashboard | ${{ needs.testing-dashboard.result == 'success' && '✅ Passed' || needs.testing-dashboard.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -996,7 +1079,7 @@ jobs:
   ci-status-check:
     name: CI Status Check
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
     if: always()
     steps:
       - name: Check all required jobs
@@ -1051,6 +1134,9 @@ jobs:
           fi
           if [ "${{ needs.mcp-integration-tests.result }}" != "success" ] && [ "${{ needs.mcp-integration-tests.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}mcp-integration-tests "
+          fi
+          if [ "${{ needs.mcp-workflow-tests.result }}" != "success" ] && [ "${{ needs.mcp-workflow-tests.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}mcp-workflow-tests "
           fi
 
           # Testing dashboard must pass if it ran
