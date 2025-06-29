@@ -1,0 +1,195 @@
+pkg/mcp/client_factory.go:type aiAnalyzerAdapter struct {
+pkg/mcp/client_factory.go-	client ai.LLMClient
+pkg/mcp/client_factory.go-}
+pkg/mcp/client_factory.go-
+pkg/mcp/client_factory.go-func (a *aiAnalyzerAdapter) Analyze(ctx context.Context, prompt string) (string, error) {
+pkg/mcp/client_factory.go-	response, _, err := a.client.GetChatCompletion(ctx, prompt)
+pkg/mcp/client_factory.go-	return response, err
+pkg/mcp/client_factory.go-}
+pkg/mcp/client_factory.go-
+pkg/mcp/client_factory.go-func (a *aiAnalyzerAdapter) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+pkg/mcp/client_factory.go-	response, _, err := a.client.GetChatCompletionWithFileTools(ctx, prompt, baseDir)
+--
+pkg/mcp/internal/context/ai_context_aggregator.go:type AIContextAdapter struct {
+pkg/mcp/internal/context/ai_context_aggregator.go-	comprehensiveContext *ComprehensiveContext
+pkg/mcp/internal/context/ai_context_aggregator.go-}
+pkg/mcp/internal/context/ai_context_aggregator.go-
+pkg/mcp/internal/context/ai_context_aggregator.go-func (a *AIContextAdapter) GetContextData() map[string]interface{} {
+pkg/mcp/internal/context/ai_context_aggregator.go-	return map[string]interface{}{
+pkg/mcp/internal/context/ai_context_aggregator.go-		"session_id":        a.comprehensiveContext.SessionID,
+pkg/mcp/internal/context/ai_context_aggregator.go-		"timestamp":         a.comprehensiveContext.Timestamp,
+pkg/mcp/internal/context/ai_context_aggregator.go-		"tool_contexts":     a.comprehensiveContext.ToolContexts,
+pkg/mcp/internal/context/ai_context_aggregator.go-		"state_snapshot":    a.comprehensiveContext.StateSnapshot,
+pkg/mcp/internal/context/ai_context_aggregator.go-		"recent_events":     a.comprehensiveContext.RecentEvents,
+--
+pkg/mcp/internal/server/unified_server.go:type RegistryAdapter struct {
+pkg/mcp/internal/server/unified_server.go-	registry *orchestration.MCPToolRegistry
+pkg/mcp/internal/server/unified_server.go-}
+pkg/mcp/internal/server/unified_server.go-
+pkg/mcp/internal/server/unified_server.go-func (adapter *RegistryAdapter) Register(name string, factory func() interface{}) error {
+pkg/mcp/internal/server/unified_server.go-	// Create tool instance from factory and register it
+pkg/mcp/internal/server/unified_server.go-	tool := factory()
+pkg/mcp/internal/server/unified_server.go-	return adapter.registry.RegisterTool(name, tool)
+pkg/mcp/internal/server/unified_server.go-}
+pkg/mcp/internal/server/unified_server.go-
+pkg/mcp/internal/server/unified_server.go-func (adapter *RegistryAdapter) Get(name string) (func() interface{}, error) {
+--
+pkg/mcp/internal/core/server_conversation.go:type llmTransportAdapter struct {
+pkg/mcp/internal/core/server_conversation.go-	transport types.LLMTransport
+pkg/mcp/internal/core/server_conversation.go-}
+pkg/mcp/internal/core/server_conversation.go-
+pkg/mcp/internal/core/server_conversation.go-// SendPrompt implements analyze.LLMTransport by converting to InvokeTool call
+pkg/mcp/internal/core/server_conversation.go-func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
+pkg/mcp/internal/core/server_conversation.go-	ctx := context.Background()
+pkg/mcp/internal/core/server_conversation.go-	payload := map[string]any{
+pkg/mcp/internal/core/server_conversation.go-		"prompt": prompt,
+pkg/mcp/internal/core/server_conversation.go-	}
+pkg/mcp/internal/core/server_conversation.go-
+--
+pkg/mcp/internal/deploy/base.go:type K8sDeployerAdapter interface {
+pkg/mcp/internal/deploy/base.go-	// Deploy performs the actual deployment
+pkg/mcp/internal/deploy/base.go-	Deploy(config kubernetes.DeploymentConfig) (*kubernetes.DeploymentResult, error)
+pkg/mcp/internal/deploy/base.go-
+pkg/mcp/internal/deploy/base.go-	// CheckApplicationHealth checks the health of a deployment
+pkg/mcp/internal/deploy/base.go-	CheckApplicationHealth(ctx context.Context, options kubernetes.HealthCheckOptions) (*kubernetes.HealthCheckResult, error)
+pkg/mcp/internal/deploy/base.go-
+pkg/mcp/internal/deploy/base.go-	// WaitForRollout waits for a rollout to complete
+pkg/mcp/internal/deploy/base.go-	WaitForRollout(ctx context.Context, config kubernetes.RolloutConfig) error
+pkg/mcp/internal/deploy/base.go-
+pkg/mcp/internal/deploy/base.go-	// GetRolloutHistory gets the rollout history for a deployment
+--
+pkg/mcp/internal/deploy/k8s_generator.go:type PipelineAdapter interface {
+pkg/mcp/internal/deploy/k8s_generator.go-	GenerateKubernetesManifests(sessionID, imageRef, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*kubernetes.ManifestGenerationResult, error)
+pkg/mcp/internal/deploy/k8s_generator.go-}
+pkg/mcp/internal/deploy/k8s_generator.go-
+pkg/mcp/internal/deploy/k8s_generator.go-// NewK8sManifestGenerator creates a new K8s manifest generator
+pkg/mcp/internal/deploy/k8s_generator.go-func NewK8sManifestGenerator(adapter PipelineAdapter, logger zerolog.Logger) *K8sManifestGenerator {
+pkg/mcp/internal/deploy/k8s_generator.go-	return &K8sManifestGenerator{
+pkg/mcp/internal/deploy/k8s_generator.go-		pipelineAdapter: adapter,
+pkg/mcp/internal/deploy/k8s_generator.go-		logger:          logger.With().Str("component", "k8s_generator").Logger(),
+pkg/mcp/internal/deploy/k8s_generator.go-	}
+pkg/mcp/internal/deploy/k8s_generator.go-}
+--
+pkg/mcp/internal/analyze/analyzer.go:type CallerAnalyzerAdapter struct {
+pkg/mcp/internal/analyze/analyzer.go-	*CallerAnalyzer
+pkg/mcp/internal/analyze/analyzer.go-}
+pkg/mcp/internal/analyze/analyzer.go-
+pkg/mcp/internal/analyze/analyzer.go-// NewCallerAnalyzerAdapter creates an adapter that implements types.AIAnalyzer
+pkg/mcp/internal/analyze/analyzer.go-func NewCallerAnalyzerAdapter(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzerAdapter {
+pkg/mcp/internal/analyze/analyzer.go-	return &CallerAnalyzerAdapter{
+pkg/mcp/internal/analyze/analyzer.go-		CallerAnalyzer: NewCallerAnalyzer(transport, opts),
+pkg/mcp/internal/analyze/analyzer.go-	}
+pkg/mcp/internal/analyze/analyzer.go-}
+pkg/mcp/internal/analyze/analyzer.go-
+--
+pkg/mcp/internal/build/build_image.go:type BuildImagePipelineAdapter interface {
+pkg/mcp/internal/build/build_image.go-	ConvertToDockerState(sessionID, imageName, registryURL string) (*pipeline.PipelineState, error)
+pkg/mcp/internal/build/build_image.go-	UpdateSessionFromDockerResults(sessionID string, pipelineState *pipeline.PipelineState) error
+pkg/mcp/internal/build/build_image.go-	GetSessionWorkspace(sessionID string) string
+pkg/mcp/internal/build/build_image.go-}
+pkg/mcp/internal/build/build_image.go-
+pkg/mcp/internal/build/build_image.go-// BuildImageSession represents the current session state
+pkg/mcp/internal/build/build_image.go-type BuildImageSession struct {
+pkg/mcp/internal/build/build_image.go-	ID        string                  `json:"id"`
+pkg/mcp/internal/build/build_image.go-	State     *BuildImageSessionState `json:"state"`
+pkg/mcp/internal/build/build_image.go-	CreatedAt time.Time               `json:"created_at"`
+--
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go:type testSessionManagerAdapter struct {
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-	mgr *session.SessionManager
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-}
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-func (a *testSessionManagerAdapter) GetSession(sessionID string) (interface{}, error) {
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-	return a.mgr.GetSession(sessionID)
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-}
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-func (a *testSessionManagerAdapter) UpdateSession(sessionID string, updater func(interface{})) error {
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-	return a.mgr.UpdateSession(sessionID, updater)
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go-}
+--
+pkg/mcp/internal/testutil/integration_test_suite.go:type MockPipelineAdapter struct {
+pkg/mcp/internal/testutil/integration_test_suite.go-	mu                    sync.RWMutex
+pkg/mcp/internal/testutil/integration_test_suite.go-	logger                zerolog.Logger
+pkg/mcp/internal/testutil/integration_test_suite.go-	analyzeRepositoryFunc func(sessionID, repoPath string) (interface{}, error)
+pkg/mcp/internal/testutil/integration_test_suite.go-	buildImageFunc        func(sessionID, imageName, dockerfilePath string) (interface{}, error)
+pkg/mcp/internal/testutil/integration_test_suite.go-	generateManifestsFunc func(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (interface{}, error)
+pkg/mcp/internal/testutil/integration_test_suite.go-	operations            []MockOperation
+pkg/mcp/internal/testutil/integration_test_suite.go-}
+pkg/mcp/internal/testutil/integration_test_suite.go-
+pkg/mcp/internal/testutil/integration_test_suite.go-// MockOperation represents a captured operation
+pkg/mcp/internal/testutil/integration_test_suite.go-type MockOperation struct {
+pkg/mcp/internal/core/graceful_shutdown.go:type ServiceWrapper struct {
+pkg/mcp/internal/core/graceful_shutdown.go-	name     string
+pkg/mcp/internal/core/graceful_shutdown.go-	shutdown func(context.Context) error
+pkg/mcp/internal/core/graceful_shutdown.go-}
+pkg/mcp/internal/core/graceful_shutdown.go-
+pkg/mcp/internal/core/graceful_shutdown.go-// NewServiceWrapper creates a ShutdownService from a function
+pkg/mcp/internal/core/graceful_shutdown.go-func NewServiceWrapper(name string, shutdownFunc func(context.Context) error) ShutdownService {
+pkg/mcp/internal/core/graceful_shutdown.go-	return &ServiceWrapper{
+pkg/mcp/internal/core/graceful_shutdown.go-		name:     name,
+pkg/mcp/internal/core/graceful_shutdown.go-		shutdown: shutdownFunc,
+pkg/mcp/internal/core/graceful_shutdown.go-	}
+--
+pkg/mcp/internal/core/gomcp_tools.go:type sessionLabelManagerWrapper struct {
+pkg/mcp/internal/core/gomcp_tools.go-	sm *session.SessionManager
+pkg/mcp/internal/core/gomcp_tools.go-}
+pkg/mcp/internal/core/gomcp_tools.go-
+pkg/mcp/internal/core/gomcp_tools.go-func (w *sessionLabelManagerWrapper) AddSessionLabel(sessionID, label string) error {
+pkg/mcp/internal/core/gomcp_tools.go-	return w.sm.AddSessionLabel(sessionID, label)
+pkg/mcp/internal/core/gomcp_tools.go-}
+pkg/mcp/internal/core/gomcp_tools.go-
+pkg/mcp/internal/core/gomcp_tools.go-func (w *sessionLabelManagerWrapper) RemoveSessionLabel(sessionID, label string) error {
+pkg/mcp/internal/core/gomcp_tools.go-	return w.sm.RemoveSessionLabel(sessionID, label)
+pkg/mcp/internal/core/gomcp_tools.go-}
+pkg/mcp/client_factory.go:func (a *aiAnalyzerAdapter) Analyze(ctx context.Context, prompt string) (string, error) {
+pkg/mcp/client_factory.go:func (a *aiAnalyzerAdapter) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+pkg/mcp/client_factory.go:func (a *aiAnalyzerAdapter) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
+pkg/mcp/client_factory.go:func (a *aiAnalyzerAdapter) GetTokenUsage() mcptypes.TokenUsage {
+pkg/mcp/client_factory.go:func (a *aiAnalyzerAdapter) ResetTokenUsage() {
+pkg/mcp/internal/context/ai_context_aggregator.go:func (a *AIContextAdapter) GetContextData() map[string]interface{} {
+pkg/mcp/internal/context/ai_context_aggregator.go:func (a *AIContextAdapter) GetRelevance() float64 {
+pkg/mcp/internal/context/ai_context_aggregator.go:func (a *AIContextAdapter) GetConfidence() float64 {
+pkg/mcp/internal/context/ai_context_aggregator.go:func (a *AIContextAdapter) GenerateRecommendations() []mcptypes.Recommendation {
+pkg/mcp/internal/context/ai_context_aggregator.go:func (a *AIContextAdapter) GetAssessment() map[string]interface{} {
+pkg/mcp/internal/context/ai_context_aggregator.go:func (a *AIContextAdapter) GetToolContext() map[string]interface{} {
+pkg/mcp/internal/context/ai_context_aggregator.go:func (a *AIContextAdapter) GetMetadata() map[string]interface{} {
+pkg/mcp/internal/core/server_stats.go:func (s *Server) GetConversationAdapter() interface{} {
+pkg/mcp/internal/core/server_conversation.go:func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
+pkg/mcp/internal/runtime/atomic_tool_base.go:func (base *AtomicToolBase) GetPipelineAdapter() mcptypes.PipelineOperations {
+pkg/mcp/internal/server/unified_server_test.go:func TestRegistryAdapter_Basic(t *testing.T) {
+pkg/mcp/internal/server/unified_server.go:func (adapter *RegistryAdapter) Register(name string, factory func() interface{}) error {
+pkg/mcp/internal/server/unified_server.go:func (adapter *RegistryAdapter) Get(name string) (func() interface{}, error) {
+pkg/mcp/internal/server/unified_server.go:func (adapter *RegistryAdapter) Create(name string) (interface{}, error) {
+pkg/mcp/internal/server/unified_server.go:func (adapter *RegistryAdapter) GetTool(name string) (interface{}, error) {
+pkg/mcp/internal/server/unified_server.go:func (adapter *RegistryAdapter) Exists(name string) bool {
+pkg/mcp/internal/server/unified_server.go:func (adapter *RegistryAdapter) List() []string {
+pkg/mcp/internal/server/unified_server.go:func (adapter *RegistryAdapter) GetMetadata() map[string]core.ToolMetadata {
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go:func (a *testSessionManagerAdapter) GetSession(sessionID string) (interface{}, error) {
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go:func (a *testSessionManagerAdapter) UpdateSession(sessionID string, updater func(interface{})) error {
+pkg/mcp/internal/runtime/conversation/conversation_handler_test.go:func TestSessionManagerAdapter(t *testing.T) {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (its *IntegrationTestSuite) GetPipelineAdapter() *MockPipelineAdapter {
+pkg/mcp/internal/testutil/integration_test_suite.go:func NewMockPipelineAdapter(logger zerolog.Logger) *MockPipelineAdapter {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) AnalyzeRepository(sessionID, repoPath string) (interface{}, error) {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) BuildDockerImage(sessionID, imageName, dockerfilePath string) (interface{}, error) {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) GenerateKubernetesManifests(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (interface{}, error) {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) SetAnalyzeRepositoryFunc(fn func(sessionID, repoPath string) (interface{}, error)) {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) SetBuildImageFunc(fn func(sessionID, imageName, dockerfilePath string) (interface{}, error)) {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) SetGenerateManifestsFunc(fn func(sessionID, imageName, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (interface{}, error)) {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) GetOperations() []MockOperation {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) GetOperationsForSession(sessionID string) []MockOperation {
+pkg/mcp/internal/testutil/integration_test_suite.go:func (mpa *MockPipelineAdapter) Clear() {
+pkg/mcp/internal/build/build_image_atomic.go:func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
+pkg/mcp/internal/build/tag_image_atomic.go:func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
+pkg/mcp/internal/build/pull_image_atomic.go:func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicPullImageTool {
+pkg/mcp/internal/build/push_image_atomic.go:func NewAtomicPushImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicPushImageTool {
+pkg/mcp/internal/build/build_executor.go:func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *BuildExecutorService {
+pkg/mcp/internal/deploy/check_health_atomic.go:func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
+pkg/mcp/internal/deploy/deploy_kubernetes_atomic.go:func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
+pkg/mcp/internal/deploy/generate_manifests_atomic.go:func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateManifestsTool {
+pkg/mcp/internal/deploy/k8s_generator.go:func NewK8sManifestGenerator(adapter PipelineAdapter, logger zerolog.Logger) *K8sManifestGenerator {
+pkg/mcp/internal/scan/scan_secrets_atomic.go:func NewAtomicScanSecretsTool(adapter interface{}, sessionManager interface{}, logger zerolog.Logger) *AtomicScanSecretsTool {
+pkg/mcp/internal/scan/scan_image_security_atomic.go:func NewAtomicScanImageSecurityTool(adapter interface{}, sessionManager interface{}, logger zerolog.Logger) *AtomicScanImageSecurityTool {
+pkg/mcp/internal/analyze/analyze_repository_atomic.go:func NewAtomicAnalyzeRepositoryTool(adapter core.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicAnalyzeRepositoryTool {
+pkg/mcp/internal/analyze/analyzer.go:func NewCallerAnalyzerAdapter(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzerAdapter {
+pkg/mcp/internal/analyze/analyzer.go:func (a *CallerAnalyzerAdapter) GetTokenUsage() types.TokenUsage {
+pkg/mcp/internal/analyze/analyzer.go:func (a *CallerAnalyzerAdapter) GetCoreAnalyzer() core.AIAnalyzer {
+pkg/mcp/internal/analyze/validate_dockerfile_atomic.go:func NewAtomicValidateDockerfileTool(adapter core.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
