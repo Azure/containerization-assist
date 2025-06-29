@@ -256,7 +256,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 							ConfigFilesFound:            getStringSliceFromSummary(scanSummary, "config_files_found"),
 							EntryPointsFound:            getStringSliceFromSummary(scanSummary, "entry_points_found"),
 							TestFilesFound:              getStringSliceFromSummary(scanSummary, "test_files_found"),
-							BuildFilesFound:             getIntFromSummary(scanSummary, "build_files_found"),
+							BuildFilesFound:             getStringSliceFromSummary(scanSummary, "build_files_found"),
 							PackageManagers:             getStringSliceFromSummary(scanSummary, "package_managers"),
 							DatabaseFiles:               getStringSliceFromSummary(scanSummary, "database_files"),
 							DockerFiles:                 getStringSliceFromSummary(scanSummary, "docker_files"),

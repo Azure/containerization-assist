@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
-	"github.com/Azure/container-kit/pkg/mcp"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
@@ -45,12 +44,7 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 	}
 
 	startTime := time.Now()
-	req := mcp.ToolExecutionRequest{
-		ToolName: "analyze_repository",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "analyze_repository", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -72,12 +66,12 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 		return response
 	}
 
-	toolCall.Result = resultStruct.Result
+	toolCall.Result = resultStruct
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse analysis results
-	if resultStruct.Result != nil {
-		if analysis, ok := resultStruct.Result.(map[string]interface{}); ok {
+	if resultStruct != nil {
+		if analysis, ok := resultStruct.(map[string]interface{}); ok {
 			if state.SessionState.Metadata == nil {
 				state.SessionState.Metadata = make(map[string]interface{})
 			}
@@ -141,12 +135,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 	}
 
 	startTime := time.Now()
-	req := mcp.ToolExecutionRequest{
-		ToolName: "generate_dockerfile",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "generate_dockerfile", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -168,12 +157,12 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 		return response
 	}
 
-	toolCall.Result = resultStruct.Result
+	toolCall.Result = resultStruct
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse Dockerfile result
-	if resultStruct.Result != nil {
-		if dockerResult, ok := resultStruct.Result.(map[string]interface{}); ok {
+	if resultStruct != nil {
+		if dockerResult, ok := resultStruct.(map[string]interface{}); ok {
 			content := genericutils.MapGetWithDefault[string](dockerResult, "content", "")
 			if content != "" {
 				if state.SessionState.Metadata == nil {

@@ -443,7 +443,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "analyze_repository", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "analyze_repository", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -479,7 +479,7 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_dockerfile", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -507,7 +507,7 @@ func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegist
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "build_image", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "build_image", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -535,7 +535,7 @@ func (gm *GomcpManager) registerPullImage(registrar *runtime.StandardToolRegistr
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "pull_image", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "pull_image", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -563,7 +563,7 @@ func (gm *GomcpManager) registerTagImage(registrar *runtime.StandardToolRegistra
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "tag_image", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "tag_image", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -591,7 +591,7 @@ func (gm *GomcpManager) registerPushImage(registrar *runtime.StandardToolRegistr
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "push_image", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "push_image", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -614,7 +614,7 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_deployment", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_deployment", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -655,7 +655,7 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 			argsMap["image_ref"] = args.ImageRef.Repository
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "generate_manifests", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -683,7 +683,7 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "validate_dockerfile", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -711,7 +711,7 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -739,7 +739,7 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets", argsMap, nil)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_secrets", argsMap)
 			if err != nil {
 				return nil, err
 			}
@@ -956,8 +956,6 @@ func (gm *GomcpManager) registerConversationTools(deps *ToolDependencies) error 
 	return nil
 }
 
-<<<<<<< HEAD
-=======
 // sessionLabelManagerWrapper adapts session.SessionManager to runtime.SessionLabelManager interface
 type sessionLabelManagerWrapper struct {
 	sm *session.SessionManager
@@ -1037,7 +1035,7 @@ func (gm *GomcpManager) registerOrchestratorTool(registrar *runtime.StandardTool
 	gm.server.Tool(toolName, description, func(ctx *gomcpserver.Context, args interface{}) (interface{}, error) {
 		// Execute through the canonical orchestrator - create proper context
 		goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
-		result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, atomicToolName, args, nil)
+		result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, atomicToolName, args)
 		if err != nil {
 			deps.Logger.Error().
 				Err(err).

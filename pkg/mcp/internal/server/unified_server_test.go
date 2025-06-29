@@ -363,15 +363,4 @@ func TestDirectSessionManager_Structure(t *testing.T) {
 	// Cannot test methods without real session manager due to complexity
 }
 
-// Test ConversationOrchestratorAdapter structure
-func TestConversationOrchestratorAdapter_Structure(t *testing.T) {
-	logger := zerolog.New(nil).Level(zerolog.Disabled)
-
-	adapter := &ConversationOrchestratorAdapter{
-		toolOrchestrator: nil, // Would be real orchestrator in practice
-		logger:           logger,
-	}
-
-	assert.NotNil(t, adapter)
-	assert.NotNil(t, adapter.logger)
-}
+// ConversationOrchestratorAdapter test removed - adapter eliminated in interface simplification

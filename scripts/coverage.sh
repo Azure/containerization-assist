@@ -14,18 +14,18 @@ NC='\033[0m' # No Color
 # Function to check if required tools are available
 check_dependencies() {
     echo -e "${BLUE}🔍 Checking dependencies...${NC}"
-    
+
     if ! command -v bc &> /dev/null; then
         echo -e "${RED}❌ ERROR: 'bc' calculator not found${NC}"
         echo -e "${YELLOW}💡 Install with: sudo apt-get install -y bc${NC}"
         exit 1
     fi
-    
+
     if ! command -v go &> /dev/null; then
         echo -e "${RED}❌ ERROR: 'go' not found${NC}"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ All dependencies available${NC}"
 }
 
@@ -111,14 +111,14 @@ while IFS= read -r line; do
         fi
 
         echo -e "${BLUE}  🔍 Checking $PACKAGE: ${COVERAGE}% vs ${THRESHOLD}%${NC}"
-        
+
         # Validate numeric values
         if ! [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
             echo -e "${RED}    ❌ Invalid coverage value: '$COVERAGE'${NC}"
             FAILED_PACKAGES+=("$PACKAGE (invalid coverage)")
             continue
         fi
-        
+
         if ! [[ "$THRESHOLD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
             echo -e "${RED}    ❌ Invalid threshold value: '$THRESHOLD'${NC}"
             FAILED_PACKAGES+=("$PACKAGE (invalid threshold)")

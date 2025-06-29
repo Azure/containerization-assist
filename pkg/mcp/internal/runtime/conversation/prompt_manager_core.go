@@ -4,19 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	mcp "github.com/Azure/container-kit/pkg/mcp"
 	obs "github.com/Azure/container-kit/pkg/mcp/internal/observability"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // PromptManager manages conversation flow and tool orchestration
 type PromptManager struct {
 	sessionManager      *session.SessionManager
-	toolOrchestrator    orchestration.InternalToolOrchestrator
+	toolOrchestrator    mcp.Orchestrator
 	preFlightChecker    *obs.PreFlightChecker
 	preferenceStore     *utils.PreferenceStore
 	retryManager        *SimpleRetryManager
@@ -27,7 +26,7 @@ type PromptManager struct {
 // PromptManagerConfig holds configuration for the prompt manager
 type PromptManagerConfig struct {
 	SessionManager   *session.SessionManager
-	ToolOrchestrator orchestration.InternalToolOrchestrator
+	ToolOrchestrator mcp.Orchestrator
 	PreferenceStore  *utils.PreferenceStore
 	Logger           zerolog.Logger
 }
@@ -64,16 +63,16 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	// Type assert to concrete session type
-	session, ok := sessionInterface.(*mcptypes.SessionState)
+	// Type assert to internal session type and work with it directly
+	internalSession, ok := sessionInterface.(*session.SessionState)
 	if !ok {
-		return nil, fmt.Errorf("session type assertion failed")
+		return nil, fmt.Errorf("session type assertion failed: expected *session.SessionState, got %T", sessionInterface)
 	}
 
-	// Create conversation state from session state
+	// Create conversation state from internal session state (no conversion needed)
 	convState := &ConversationState{
-		SessionState: session,
-		CurrentStage: types.StageInit,
+		SessionState: internalSession,
+		CurrentStage: mcp.ConversationStagePreFlight,
 		History:      make([]ConversationTurn, 0),
 		Preferences: types.UserPreferences{
 			Namespace:          "default",
@@ -103,7 +102,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Check if pre-flight checks are needed
-	if convState.CurrentStage == types.StageInit && !pm.hasPassedPreFlightChecks(convState) {
+	if convState.CurrentStage == mcp.ConversationStagePreFlight && !pm.hasPassedPreFlightChecks(convState) {
 		response := pm.handlePreFlightChecks(ctx, convState, userInput)
 		return response, nil
 	}
@@ -132,7 +131,10 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	// Route based on current stage and input
 	var response *ConversationResponse
 
-	switch convState.CurrentStage {
+	// Convert mcp.ConversationStage to types.ConversationStage for internal use
+	internalStage := mapMCPStageToDetailedStage(convState.CurrentStage, convState.Context)
+
+	switch internalStage {
 	case types.StageWelcome:
 		response = pm.handleWelcomeStage(ctx, convState, userInput)
 	case types.StageInit:
@@ -154,10 +156,10 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	default:
 		response = &ConversationResponse{
 			Message: "I'm not sure what stage we're in. Let's start over. What would you like to containerize?",
-			Stage:   types.StageInit,
+			Stage:   convertFromTypesStage(types.StageInit),
 			Status:  ResponseStatusError,
 		}
-		convState.SetStage(types.StageInit)
+		convState.SetStage(convertFromTypesStage(types.StageInit))
 	}
 
 	// Add tool calls to turn if any were made
@@ -171,7 +173,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 
 	// Update session
 	err = pm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if sess, ok := s.(*mcptypes.SessionState); ok {
+		if sess, ok := s.(*mcp.SessionState); ok {
 			sess.CurrentStage = string(response.Stage)
 			sess.Status = string(response.Status)
 		}

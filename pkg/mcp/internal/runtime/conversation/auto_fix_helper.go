@@ -28,7 +28,7 @@ func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *Conversati
 		return false
 	}
 
-	autoFixResult, autoFixErr := h.conversationHandler.attemptAutoFix(ctx, response.SessionID, stage, err, state)
+	autoFixResult, autoFixErr := h.conversationHandler.attemptAutoFix(ctx, response.SessionID, types.ConversationStage(stage), err, state)
 	if autoFixErr != nil || autoFixResult == nil {
 		return false
 	}

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -43,12 +42,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 		"image_ref":  getDockerfileImageID(state.SessionState),
 	}
 
-	req := mcp.ToolExecutionRequest{
-		ToolName: "scan_image_security",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "scan_image_security", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Security scan failed: %v\n\nContinue anyway?", err)
@@ -60,7 +54,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 	}
 
 	// Format scan results
-	if scanResult, ok := resultStruct.Result.(map[string]interface{}); ok {
+	if scanResult, ok := resultStruct.(map[string]interface{}); ok {
 		vulnerabilities := extractVulnerabilities(scanResult)
 		if len(vulnerabilities) > 0 {
 			response.Status = ResponseStatusWarning
@@ -215,12 +209,7 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 		"log_lines":    100,
 	}
 
-	req := mcp.ToolExecutionRequest{
-		ToolName: "check_health",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Failed to fetch logs: %v", err)
@@ -228,7 +217,7 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 	}
 
 	// Extract logs from result
-	if healthResult, ok := resultStruct.Result.(map[string]interface{}); ok {
+	if healthResult, ok := resultStruct.(map[string]interface{}); ok {
 		if logs, ok := healthResult["logs"].(string); ok && logs != "" {
 			response.Status = ResponseStatusSuccess
 			response.Message = fmt.Sprintf("Pod logs:\n\n```\n%s\n```\n\nBased on these logs, what would you like to do?", logs)

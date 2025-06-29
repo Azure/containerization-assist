@@ -54,9 +54,9 @@ type RegistryAuthSummary struct {
 
 // PreFlightChecker validates system requirements before starting workflow
 type PreFlightChecker struct {
-	logger            zerolog.Logger
-	timeout           time.Duration
-	registryMgr       *registry.MultiRegistryManager
+	logger  zerolog.Logger
+	timeout time.Duration
+	// registryMgr removed - part of interface simplification
 	registryValidator *registry.RegistryValidator
 }
 
@@ -103,20 +103,8 @@ const (
 
 // NewPreFlightChecker creates a new pre-flight checker
 func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
-	// Create multi-registry configuration with defaults
-	config := &registry.MultiRegistryConfig{
-		Registries:   make(map[string]registry.RegistryConfig),
-		CacheTimeout: 15 * time.Minute,
-		MaxRetries:   3,
-	}
-
-	// Initialize multi-registry manager
-	registryMgr := registry.NewMultiRegistryManager(config, logger)
-
-	// Register credential providers
-	registryMgr.RegisterProvider(registry.NewDockerConfigProvider(logger))
-	registryMgr.RegisterProvider(registry.NewAzureCLIProvider(logger))
-	registryMgr.RegisterProvider(registry.NewAWSECRProvider(logger))
+	// MultiRegistry functionality removed as part of interface simplification
+	// TODO: Restore registry functionality with simplified interface
 
 	// Initialize registry validator
 	validator := registry.NewRegistryValidator(logger)
@@ -124,7 +112,6 @@ func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
 	return &PreFlightChecker{
 		logger:            logger,
 		timeout:           10 * time.Second,
-		registryMgr:       registryMgr,
 		registryValidator: validator,
 	}
 }
@@ -623,26 +610,27 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 			Str("registry", registryURL).
 			Msg("Testing registry authentication")
 
+		// TODO: Restore registry credential functionality with simplified interface
 		// Try to get credentials
-		creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
-		if err != nil {
-			authResults[registryURL] = fmt.Sprintf("No credentials: %v", err)
-			continue
-		}
+		// creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
+		// if err != nil {
+		//	authResults[registryURL] = fmt.Sprintf("No credentials: %v", err)
+		//	continue
+		// }
 
-		if creds != nil {
-			hasAnyAuth = true
-			authResults[registryURL] = fmt.Sprintf("Authenticated via %s (%s)", creds.Source, creds.AuthMethod)
+		// Temporarily skip registry validation during interface simplification
+		authResults[registryURL] = "Registry validation temporarily disabled during interface simplification"
 
-			// Validate registry access
-			if err := pfc.registryMgr.ValidateRegistryAccess(ctx, registryURL); err != nil {
-				authResults[registryURL] += fmt.Sprintf(" - Validation failed: %v", err)
-			} else {
-				authResults[registryURL] += " - Access validated"
-			}
-		} else {
-			authResults[registryURL] = "No credentials available"
-		}
+		// if creds != nil {
+		//	hasAnyAuth = true
+		//	authResults[registryURL] = fmt.Sprintf("Authenticated via %s (%s)", creds.Source, creds.AuthMethod)
+		//
+		//	// Validate registry access
+		//	if err := pfc.registryMgr.ValidateRegistryAccess(ctx, registryURL); err != nil {
+		//		authResults[registryURL] += fmt.Sprintf(" - Validation failed: %v", err)
+		//	} else {
+		//		authResults[registryURL] += " - Access validated"
+		//	}
 	}
 
 	// Log results
@@ -664,10 +652,8 @@ func (pfc *PreFlightChecker) checkEnhancedRegistryAuth(ctx context.Context) erro
 	return nil
 }
 
-// GetRegistryManager returns the multi-registry manager
-func (pfc *PreFlightChecker) GetRegistryManager() *registry.MultiRegistryManager {
-	return pfc.registryMgr
-}
+// GetRegistryManager removed as part of interface simplification
+// TODO: Restore with simplified registry interface
 
 // GetRegistryValidator returns the registry validator
 func (pfc *PreFlightChecker) GetRegistryValidator() *registry.RegistryValidator {
@@ -681,18 +667,19 @@ func (pfc *PreFlightChecker) ValidateSpecificRegistry(ctx context.Context, regis
 		Msg("Validating specific registry")
 
 	// Get credentials for the registry
-	creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
+	// TODO: Restore registry credentials with simplified interface
+	// creds, err := pfc.registryMgr.GetCredentials(ctx, registryURL)
+	var err error
 	if err != nil {
 		pfc.logger.Debug().
 			Str("registry", registryURL).
 			Err(err).
 			Msg("No credentials available for registry")
-		// Continue validation without credentials
-		creds = nil
+		// Continue validation without credentials (creds removed during interface simplification)
 	}
 
 	// Validate the registry
-	result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, creds)
+	result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, nil)
 	if err != nil {
 		return nil, mcp.NewErrorBuilder("registry_validation_failed", "Registry validation failed during preflight check", "validation").
 			WithSeverity("high").

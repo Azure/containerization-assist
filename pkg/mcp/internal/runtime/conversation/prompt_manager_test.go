@@ -108,17 +108,17 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 // MockToolExecutor implements mcp.ToolOrchestrationExecutor interface for testing
 type MockToolExecutor struct{}
 
-func (m *MockToolExecutor) ExecuteTool(ctx context.Context, request mcp.ToolExecutionRequest) (*mcp.ToolExecutionResult, error) {
-	return &mcp.ToolExecutionResult{
-		Result: map[string]interface{}{
-			"tool":     request.ToolName,
-			"success":  true,
-			"mock":     true,
-			"executed": true,
-		},
-		Error:    nil,
-		Metadata: request.Metadata,
+func (m *MockToolExecutor) ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error) {
+	return map[string]interface{}{
+		"tool":     toolName,
+		"success":  true,
+		"mock":     true,
+		"executed": true,
 	}, nil
+}
+
+func (m *MockToolExecutor) RegisterTool(name string, tool mcp.Tool) error {
+	return nil
 }
 
 func (m *MockToolExecutor) ValidateToolArgs(toolName string, args interface{}) error {

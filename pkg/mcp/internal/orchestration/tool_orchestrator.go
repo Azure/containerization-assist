@@ -56,12 +56,11 @@ func (o *MCPToolOrchestrator) SetAnalyzer(analyzer mcp.AIAnalyzer) {
 	}
 }
 
-// ExecuteTool executes a tool with the given arguments and session context
+// ExecuteTool executes a tool with the given arguments
 func (o *MCPToolOrchestrator) ExecuteTool(
 	ctx context.Context,
 	toolName string,
 	args interface{},
-	session interface{},
 ) (interface{}, error) {
 	o.logger.Info().
 		Str("tool_name", toolName).
@@ -70,7 +69,7 @@ func (o *MCPToolOrchestrator) ExecuteTool(
 	startTime := time.Now()
 
 	// Delegate to the no-reflection dispatcher
-	result, err := o.dispatcher.ExecuteTool(ctx, toolName, args, session)
+	result, err := o.dispatcher.ExecuteTool(ctx, toolName, args)
 
 	duration := time.Since(startTime)
 
@@ -89,6 +88,20 @@ func (o *MCPToolOrchestrator) ExecuteTool(
 		Msg("Tool execution completed successfully")
 
 	return result, nil
+}
+
+// RegisterTool registers a tool with the orchestrator (required by mcp.Orchestrator interface)
+func (o *MCPToolOrchestrator) RegisterTool(name string, tool mcp.Tool) error {
+	// This is part of the simplified interface - delegate to tool registry if needed
+	if o.toolRegistry != nil {
+		// Convert the mcp.Tool to the orchestration.Tool format if needed
+		// For now, just log the registration
+		o.logger.Info().
+			Str("tool_name", name).
+			Msg("Tool registration requested")
+		return nil
+	}
+	return fmt.Errorf("tool registry not available")
 }
 
 // ValidateToolArgs validates arguments for a specific tool

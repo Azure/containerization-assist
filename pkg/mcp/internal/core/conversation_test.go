@@ -14,8 +14,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
-	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
+	mcp "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -152,20 +151,20 @@ func TestConversationState(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*mcptypes.SessionState)
+		session, ok := sessionInterface.(*mcp.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
 		// Create conversation state
 		state := &runtimeconv.ConversationState{
 			SessionState: session,
-			CurrentStage: types.StageInit,
+			CurrentStage: mcp.ConversationStagePreFlight, // types.StageInit maps to PreFlight
 			History:      []runtimeconv.ConversationTurn{},
 			Preferences:  types.UserPreferences{},
 			Context:      make(map[string]interface{}),
 			Artifacts:    make(map[string]runtimeconv.Artifact),
 		}
 
-		assert.Equal(t, types.StageInit, state.CurrentStage)
+		assert.Equal(t, mcp.ConversationStagePreFlight, state.CurrentStage)
 		assert.Empty(t, state.History)
 		assert.NotNil(t, state.Context)
 		assert.NotNil(t, state.Artifacts)
@@ -176,12 +175,12 @@ func TestConversationState(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*mcptypes.SessionState)
+		session, ok := sessionInterface.(*mcp.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
 		state := &runtimeconv.ConversationState{
 			SessionState: session,
-			CurrentStage: types.StageInit,
+			CurrentStage: mcp.ConversationStagePreFlight,
 			History:      []runtimeconv.ConversationTurn{},
 		}
 
@@ -189,14 +188,14 @@ func TestConversationState(t *testing.T) {
 		turn1 := runtimeconv.ConversationTurn{
 			UserInput: "Hello",
 			Assistant: "Hi! I'll help you containerize your application.",
-			Stage:     types.StageInit,
+			Stage:     mcp.ConversationStagePreFlight,
 			Timestamp: time.Now(),
 		}
 
 		turn2 := runtimeconv.ConversationTurn{
 			UserInput: "Analyze my Go application",
 			Assistant: "I'll analyze your Go application. Please provide the repository URL.",
-			Stage:     types.StageAnalysis,
+			Stage:     mcp.ConversationStageAnalyze,
 			Timestamp: time.Now(),
 		}
 
@@ -204,7 +203,7 @@ func TestConversationState(t *testing.T) {
 
 		assert.Len(t, state.History, 2)
 		assert.Equal(t, "Hello", state.History[0].UserInput)
-		assert.Equal(t, types.StageAnalysis, state.History[1].Stage)
+		assert.Equal(t, mcp.ConversationStageAnalyze, state.History[1].Stage)
 	})
 }
 
@@ -263,7 +262,7 @@ func TestConversationStages(t *testing.T) {
 
 		assert.NotNil(t, response)
 		assert.NotEmpty(t, response.Message)
-		assert.Equal(t, types.StagePreFlight, response.Stage)
+		assert.Equal(t, mcp.ConversationStagePreFlight, response.Stage)
 	})
 
 	t.Run("StageTransition", func(t *testing.T) {
@@ -274,14 +273,14 @@ func TestConversationStages(t *testing.T) {
 		// Start with init
 		response1, err := promptManager.ProcessPrompt(ctx, sessionID, "Help me containerize my app")
 		require.NoError(t, err)
-		assert.Equal(t, types.StagePreFlight, response1.Stage)
+		assert.Equal(t, mcp.ConversationStagePreFlight, response1.Stage)
 
 		// Continue to next stage
 		response2, err := promptManager.ProcessPrompt(ctx, sessionID, "Yes, run pre-flight checks")
 		require.NoError(t, err)
 
 		// Should progress from preflight
-		assert.NotEqual(t, types.StagePreFlight, response2.Stage)
+		assert.NotEqual(t, mcp.ConversationStagePreFlight, response2.Stage)
 	})
 }
 
@@ -303,7 +302,7 @@ func TestConversationOptions(t *testing.T) {
 	t.Run("ConversationResponseWithOptions", func(t *testing.T) {
 		response := &runtimeconv.ConversationResponse{
 			Message: "What would you like to do next?",
-			Stage:   types.StageAnalysis,
+			Stage:   mcp.ConversationStageAnalyze,
 			Status:  runtimeconv.ResponseStatusSuccess,
 			Options: []runtimeconv.Option{
 				{
@@ -328,7 +327,7 @@ func TestConversationOptions(t *testing.T) {
 // MockConversationOrchestrator implements conversation.ToolOrchestrator for testing
 type MockConversationOrchestrator struct{}
 
-func (m *MockConversationOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
+func (m *MockConversationOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error) {
 	return map[string]interface{}{
 		"tool":     toolName,
 		"success":  true,
@@ -337,12 +336,16 @@ func (m *MockConversationOrchestrator) ExecuteTool(ctx context.Context, toolName
 	}, nil
 }
 
+func (m *MockConversationOrchestrator) RegisterTool(name string, tool mcp.Tool) error {
+	return nil
+}
+
 func (m *MockConversationOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
 	return nil
 }
 
-func (m *MockConversationOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
-	return &mcptypes.ToolMetadata{
+func (m *MockConversationOrchestrator) GetToolMetadata(toolName string) (*mcp.ToolMetadata, error) {
+	return &mcp.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",
 		Version:     "1.0.0",

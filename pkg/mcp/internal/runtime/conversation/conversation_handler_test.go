@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,15 +29,15 @@ func (a *testSessionManagerAdapter) GetSession(sessionID string) (interface{}, e
 
 func (a *testSessionManagerAdapter) UpdateSession(session interface{}) error {
 	// Type assert and update through the real session manager
-	s, ok := session.(*mcptypes.SessionState)
+	s, ok := session.(*mcp.SessionState)
 	if !ok {
-		return fmt.Errorf("invalid session type: expected *mcptypes.SessionState, got %T", session)
+		return fmt.Errorf("invalid session type: expected *mcp.SessionState, got %T", session)
 	}
 	if s.SessionID == "" {
 		return fmt.Errorf("session ID is required")
 	}
 	return a.mgr.UpdateSession(s.SessionID, func(existing interface{}) {
-		if state, ok := existing.(*mcptypes.SessionState); ok {
+		if state, ok := existing.(*mcp.SessionState); ok {
 			*state = *s
 		}
 	})
@@ -194,7 +193,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 
 		// Update session to enable autopilot
 		err = sessionMgr.UpdateSession("auto-advance-test", func(s interface{}) {
-			if state, ok := s.(*mcptypes.SessionState); ok {
+			if state, ok := s.(*mcp.SessionState); ok {
 				if state.Metadata == nil {
 					state.Metadata = make(map[string]interface{})
 				}
@@ -210,7 +209,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		// Create response that supports auto-advance
 		response := &ConversationResponse{
 			SessionID: "auto-advance-test",
-			Stage:     types.StageAnalysis,
+			Stage:     mcp.ConversationStageAnalyze,
 			Status:    ResponseStatusSuccess,
 			Message:   "Ready to proceed",
 			AutoAdvance: &AutoAdvanceConfig{
@@ -236,7 +235,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		// Create response without auto-advance
 		response := &ConversationResponse{
 			SessionID:     "no-auto-advance",
-			Stage:         types.StageWelcome,
+			Stage:         mcp.ConversationStagePreFlight,
 			Status:        ResponseStatusWaitingInput,
 			Message:       "Welcome",
 			RequiresInput: true, // Cannot auto-advance
@@ -258,7 +257,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		// Create response that always wants to auto-advance
 		response := &ConversationResponse{
 			SessionID: "infinite-loop-test",
-			Stage:     types.StageAnalysis,
+			Stage:     mcp.ConversationStageAnalyze,
 			Status:    ResponseStatusSuccess,
 			AutoAdvance: &AutoAdvanceConfig{
 				DefaultAction: "continue",
@@ -437,7 +436,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update the session
-		updatedSession := &mcptypes.SessionState{
+		updatedSession := &mcp.SessionState{
 			SessionID: "update-test",
 			ImageRef:  "test/repo:updated",
 		}
@@ -450,7 +449,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 		// Check that the update was applied
 		retrievedInterface, err := sessionMgr.GetSession("update-test")
 		require.NoError(t, err)
-		retrieved, ok := retrievedInterface.(*mcptypes.SessionState)
+		retrieved, ok := retrievedInterface.(*mcp.SessionState)
 		require.True(t, ok, "session should be of correct type")
 		assert.Equal(t, "test/repo:updated", retrieved.ImageRef)
 	})
@@ -474,7 +473,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
 		// Try to update without session ID
-		session := &mcptypes.SessionState{
+		session := &mcp.SessionState{
 			SessionID: "", // Empty
 		}
 

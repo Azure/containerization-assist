@@ -94,15 +94,10 @@ func NewUnifiedMCPServer(
 			return nil, fmt.Errorf("failed to create preference store: %w", err)
 		}
 
-		// Create conversation adapter for MCP tool orchestrator
-		conversationOrchestrator := &ConversationOrchestratorAdapter{
-			toolOrchestrator: toolOrchestrator,
-			logger:           logger,
-		}
-
+		// Use the tool orchestrator directly (no adapter needed with simplified interface)
 		server.promptManager = conversation.NewPromptManager(conversation.PromptManagerConfig{
 			SessionManager:   sessionManager,
-			ToolOrchestrator: conversationOrchestrator,
+			ToolOrchestrator: toolOrchestrator, // Direct use - implements mcp.Orchestrator
 			PreferenceStore:  preferenceStore,
 			Logger:           logger,
 		})
@@ -205,7 +200,7 @@ func (s *UnifiedMCPServer) ExecuteTool(
 
 	case s.isAtomicTool(toolName):
 		// Atomic tools are available in all modes
-		return s.toolOrchestrator.ExecuteTool(ctx, toolName, args, nil)
+		return s.toolOrchestrator.ExecuteTool(ctx, toolName, args)
 
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
@@ -503,49 +498,7 @@ func (dsm *directSessionManager) UpdateSession(session interface{}) error {
 	return nil
 }
 
-// ConversationOrchestratorAdapter adapts MCPToolOrchestrator to conversation.ToolOrchestrator interface
-type ConversationOrchestratorAdapter struct {
-	toolOrchestrator *orchestration.MCPToolOrchestrator
-	logger           zerolog.Logger
-}
-
-func (adapter *ConversationOrchestratorAdapter) ExecuteTool(ctx context.Context, request mcp.ToolExecutionRequest) (*mcp.ToolExecutionResult, error) {
-	// Extract session from metadata or args
-	var session interface{}
-	if request.Metadata != nil {
-		if sid, ok := request.Metadata["session_id"]; ok {
-			session = sid
-		}
-	}
-	if session == nil && request.Args != nil {
-		if sid, ok := request.Args["session_id"]; ok {
-			session = sid
-		}
-	}
-
-	// Execute tool using MCP orchestrator
-	result, err := adapter.toolOrchestrator.ExecuteTool(ctx, request.ToolName, request.Args, session)
-
-	// Return wrapped result
-	return &mcp.ToolExecutionResult{
-		Result:   result,
-		Error:    err,
-		Metadata: make(map[string]interface{}),
-	}, err
-}
-
-func (adapter *ConversationOrchestratorAdapter) ValidateToolArgs(toolName string, args interface{}) error {
-	return adapter.toolOrchestrator.ValidateToolArgs(toolName, args)
-}
-
-func (adapter *ConversationOrchestratorAdapter) GetDispatcher() mcp.ToolDispatcher {
-	// Return nil for now - this might need implementation based on actual needs
-	return nil
-}
-
-func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*mcp.ToolMetadata, error) {
-	return adapter.toolOrchestrator.GetToolMetadata(toolName)
-}
+// ConversationOrchestratorAdapter removed - no longer needed with simplified interface
 
 // RegistryAdapter adapts MCPToolRegistry to the types.ToolRegistry interface
 type RegistryAdapter struct {

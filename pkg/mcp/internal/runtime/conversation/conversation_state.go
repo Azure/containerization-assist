@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -17,7 +18,7 @@ type RetryState struct {
 
 // ConversationState extends SessionState with conversation-specific fields
 type ConversationState struct {
-	*mcp.SessionState
+	*session.SessionState
 
 	// Conversation flow
 	CurrentStage    mcp.ConversationStage `json:"current_stage"`

@@ -206,12 +206,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	}
 
 	startTime := time.Now()
-	req := mcp.ToolExecutionRequest{
-		ToolName: "generate_manifests",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "generate_manifests", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -246,11 +241,11 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 		return response
 	}
 
-	toolCall.Result = resultStruct.Result
+	toolCall.Result = resultStruct
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse manifests from result
-	if resultData, ok := resultStruct.Result.(map[string]interface{}); ok {
+	if resultData, ok := resultStruct.(map[string]interface{}); ok {
 		if manifests, ok := resultData["manifests"].(map[string]interface{}); ok {
 			for name, content := range manifests {
 				contentStr, ok := content.(string)
@@ -340,12 +335,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 		"dry_run":    true,
 	}
 
-	req := mcp.ToolExecutionRequest{
-		ToolName: "deploy_kubernetes",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Dry-run failed: %v", err)
@@ -353,7 +343,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 	}
 
 	// Extract the dry-run preview from the result
-	if toolResult, ok := resultStruct.Result.(map[string]interface{}); ok {
+	if toolResult, ok := resultStruct.(map[string]interface{}); ok {
 		dryRunPreview := genericutils.MapGetWithDefault[string](toolResult, "dry_run_preview", "")
 		if dryRunPreview == "" {
 			dryRunPreview = "No changes detected - resources are already up to date"
@@ -399,12 +389,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	}
 
 	startTime := time.Now()
-	req := mcp.ToolExecutionRequest{
-		ToolName: "deploy_kubernetes",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -459,7 +444,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 		return response
 	}
 
-	toolCall.Result = resultStruct.Result
+	toolCall.Result = resultStruct
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Mark manifests as deployed
@@ -473,7 +458,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	// Check health if requested
 	waitForReady, _ := state.Context["wait_for_ready"].(bool)   //nolint:errcheck // Defaults to true
 	if waitForReady || state.Context["wait_for_ready"] == nil { // Default to true
-		return pm.checkDeploymentHealth(ctx, state, resultStruct.Result)
+		return pm.checkDeploymentHealth(ctx, state, resultStruct)
 	}
 
 	// Success - move to completed
@@ -499,12 +484,7 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 		"timeout":    60, // 1 minute for health check
 	}
 
-	req := mcp.ToolExecutionRequest{
-		ToolName: "check_health",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	_, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	_, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params)
 	if err != nil {
 		response.Status = ResponseStatusWarning
 		response.Message = fmt.Sprintf(
