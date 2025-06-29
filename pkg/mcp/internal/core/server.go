@@ -20,41 +20,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// sessionManagerAdapterImpl adapts the core session manager to orchestration.SessionManager interface
-type sessionManagerAdapterImpl struct {
-	sessionManager *session.SessionManager
-}
-
-func (s *sessionManagerAdapterImpl) GetSession(sessionID string) (interface{}, error) {
-	return s.sessionManager.GetSession(sessionID)
-}
-
-func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
-	// Convert interface{} back to the concrete session type and update
-	switch sess := session.(type) {
-	case *mcp.SessionState:
-		if sess.SessionID == "" {
-			return errors.Validation("core/server", "session ID is required for updates")
-		}
-		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*mcp.SessionState); ok {
-				*existingState = *sess
-			}
-		})
-	case mcp.SessionState:
-		if sess.SessionID == "" {
-			return errors.Validation("core/server", "session ID is required for updates")
-		}
-		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*mcp.SessionState); ok {
-				*existingState = sess
-			}
-		})
-	default:
-		// If we can't convert, just succeed silently to maintain compatibility
-		return nil
-	}
-}
 
 // Server represents the MCP server
 type Server struct {
@@ -241,12 +206,10 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	// Initialize canonical tool orchestrator
 	toolRegistry := orchestration.NewMCPToolRegistry(logger.With().Str("component", "tool_registry").Logger())
 
-	// Create session manager adapter for orchestrator
-	sessionManagerAdapter := &sessionManagerAdapterImpl{sessionManager: sessionManager}
-
+	// Use session manager directly with orchestrator
 	toolOrchestrator := orchestration.NewMCPToolOrchestrator(
 		toolRegistry,
-		sessionManagerAdapter,
+		sessionManager,
 		logger.With().Str("component", "tool_orchestrator").Logger(),
 	)
 
