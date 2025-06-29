@@ -54,7 +54,6 @@ const (
 	StateEventCreated   StateEventType = "created"
 	StateEventUpdated   StateEventType = "updated"
 	StateEventDeleted   StateEventType = "deleted"
-	StateEventMigrated  StateEventType = "migrated"
 	StateEventSynced    StateEventType = "synced"
 	StateEventValidated StateEventType = "validated"
 )
@@ -69,10 +68,6 @@ type StateValidator interface {
 	ValidateState(ctx context.Context, stateType StateType, state interface{}) error
 }
 
-// StateMigrator handles state migrations
-type StateMigrator interface {
-	MigrateState(ctx context.Context, stateType StateType, fromVersion, toVersion string, state interface{}) (interface{}, error)
-}
 
 // UnifiedStateManager manages all state in the system
 type UnifiedStateManager struct {
@@ -80,7 +75,6 @@ type UnifiedStateManager struct {
 	stateProviders  map[StateType]StateProvider
 	observers       []StateObserver
 	validators      map[StateType]StateValidator
-	migrators       map[StateType]StateMigrator
 	eventStore      *StateEventStore
 	syncCoordinator *StateSyncCoordinator
 	mu              sync.RWMutex
@@ -101,7 +95,6 @@ func NewUnifiedStateManager(sessionManager *session.SessionManager, logger zerol
 		sessionManager:  sessionManager,
 		stateProviders:  make(map[StateType]StateProvider),
 		validators:      make(map[StateType]StateValidator),
-		migrators:       make(map[StateType]StateMigrator),
 		eventStore:      NewStateEventStore(logger),
 		syncCoordinator: NewStateSyncCoordinator(logger),
 		logger:          logger.With().Str("component", "unified_state_manager").Logger(),
@@ -132,13 +125,6 @@ func (m *UnifiedStateManager) RegisterValidator(stateType StateType, validator S
 	m.logger.Info().Str("state_type", string(stateType)).Msg("Registered state validator")
 }
 
-// RegisterMigrator registers a state migrator
-func (m *UnifiedStateManager) RegisterMigrator(stateType StateType, migrator StateMigrator) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.migrators[stateType] = migrator
-	m.logger.Info().Str("state_type", string(stateType)).Msg("Registered state migrator")
-}
 
 // GetState retrieves state of a specific type
 func (m *UnifiedStateManager) GetState(ctx context.Context, stateType StateType, id string) (interface{}, error) {
@@ -271,58 +257,6 @@ func (m *UnifiedStateManager) GetStateHistory(_ context.Context, stateType State
 	return m.eventStore.GetEvents(stateType, stateID, limit)
 }
 
-// MigrateState migrates state to a new version
-func (m *UnifiedStateManager) MigrateState(ctx context.Context, stateType StateType, id string, fromVersion, toVersion string) error {
-	m.mu.RLock()
-	provider := m.stateProviders[stateType]
-	migrator := m.migrators[stateType]
-	m.mu.RUnlock()
-
-	if provider == nil {
-		return fmt.Errorf("no provider registered for state type: %s", stateType)
-	}
-
-	if migrator == nil {
-		return fmt.Errorf("no migrator registered for state type: %s", stateType)
-	}
-
-	// Get current state
-	currentState, err := provider.GetState(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	// Migrate state
-	migratedState, err := migrator.MigrateState(ctx, stateType, fromVersion, toVersion, currentState)
-	if err != nil {
-		return fmt.Errorf("migration failed: %w", err)
-	}
-
-	// Save migrated state
-	if err := provider.SetState(ctx, id, migratedState); err != nil {
-		return err
-	}
-
-	// Notify observers
-	event := &StateEvent{
-		ID:        generateEventID(),
-		Type:      StateEventMigrated,
-		StateType: stateType,
-		StateID:   id,
-		OldValue:  currentState,
-		NewValue:  migratedState,
-		Metadata: map[string]interface{}{
-			"from_version": fromVersion,
-			"to_version":   toVersion,
-		},
-		Timestamp: time.Now(),
-	}
-
-	m.notifyObservers(event)
-	m.eventStore.StoreEvent(event)
-
-	return nil
-}
 
 // notifyObservers notifies all registered observers of a state change
 func (m *UnifiedStateManager) notifyObservers(event *StateEvent) {

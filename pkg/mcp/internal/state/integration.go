@@ -38,9 +38,6 @@ func NewStateManagementIntegration(
 	manager.RegisterValidator(StateTypeConversation, NewConversationStateValidator())
 	manager.RegisterValidator(StateTypeWorkflow, NewWorkflowStateValidator())
 
-	// Register migrators
-	manager.RegisterMigrator(StateTypeSession, NewSessionStateMigrator())
-	manager.RegisterMigrator(StateTypeWorkflow, NewWorkflowStateMigrator())
 
 	// Create observers
 	loggingObserver := NewLoggingObserver(logger)
@@ -180,49 +177,6 @@ func (i *StateManagementIntegration) RegisterStateChangeAlert(name string, handl
 	i.manager.RegisterObserver(alertingObserver)
 }
 
-// MigrateAllStates migrates all states of a given type to a new version
-func (i *StateManagementIntegration) MigrateAllStates(ctx context.Context, stateType StateType, fromVersion, toVersion string) error {
-	provider, exists := i.manager.stateProviders[stateType]
-	if !exists {
-		return fmt.Errorf("no provider for state type: %s", stateType)
-	}
-
-	// List all states
-	stateIDs, err := provider.ListStates(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Migrate each state
-	successCount := 0
-	errorCount := 0
-	for _, id := range stateIDs {
-		if err := i.manager.MigrateState(ctx, stateType, id, fromVersion, toVersion); err != nil {
-			i.logger.Error().
-				Err(err).
-				Str("state_type", string(stateType)).
-				Str("state_id", id).
-				Msg("State migration failed")
-			errorCount++
-		} else {
-			successCount++
-		}
-	}
-
-	i.logger.Info().
-		Str("state_type", string(stateType)).
-		Str("from_version", fromVersion).
-		Str("to_version", toVersion).
-		Int("success_count", successCount).
-		Int("error_count", errorCount).
-		Msg("Bulk state migration completed")
-
-	if errorCount > 0 {
-		return fmt.Errorf("migration completed with %d errors", errorCount)
-	}
-
-	return nil
-}
 
 // EnableStateReplication enables state replication to a remote system
 func (i *StateManagementIntegration) EnableStateReplication(ctx context.Context, config ReplicationConfig) error {

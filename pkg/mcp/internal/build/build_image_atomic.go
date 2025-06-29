@@ -209,28 +209,3 @@ func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (i
 	return t.ExecuteWithContext(nil, buildArgs)
 }
 
-// Legacy interface methods for backward compatibility
-// GetName returns the tool name (legacy SimpleTool compatibility)
-func (t *AtomicBuildImageTool) GetName() string {
-	return t.GetMetadata().Name
-}
-
-// GetDescription returns the tool description (legacy SimpleTool compatibility)
-func (t *AtomicBuildImageTool) GetDescription() string {
-	return t.GetMetadata().Description
-}
-
-// GetVersion returns the tool version (legacy SimpleTool compatibility)
-func (t *AtomicBuildImageTool) GetVersion() string {
-	return t.GetMetadata().Version
-}
-
-// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
-func (t *AtomicBuildImageTool) GetCapabilities() types.ToolCapabilities {
-	return types.ToolCapabilities{
-		SupportsDryRun:    true,
-		SupportsStreaming: true,
-		IsLongRunning:     true,
-		RequiresAuth:      false,
-	}
-}

@@ -1,0 +1,221 @@
+pkg/mcp/core/interfaces.go:	GetTool(name string) (Tool, error) // Legacy compatibility method
+pkg/mcp/utils/common.go:	// For now, ignore context - this maintains backward compatibility
+pkg/mcp/cmd/mcp-server/main.go:		"migration_complete": true,
+pkg/mcp/internal/core/gomcp_tools.go:	legacyClients := &clients.Clients{
+pkg/mcp/internal/core/gomcp_tools.go:	registryManager := coredocker.NewRegistryManager(legacyClients, s.logger)
+pkg/mcp/internal/state/integration.go:	// Register migrators
+pkg/mcp/internal/state/integration.go:	manager.RegisterMigrator(StateTypeSession, NewSessionStateMigrator())
+pkg/mcp/internal/state/integration.go:	manager.RegisterMigrator(StateTypeWorkflow, NewWorkflowStateMigrator())
+pkg/mcp/internal/state/integration.go:// MigrateAllStates migrates all states of a given type to a new version
+pkg/mcp/internal/state/integration.go:func (i *StateManagementIntegration) MigrateAllStates(ctx context.Context, stateType StateType, fromVersion, toVersion string) error {
+pkg/mcp/internal/state/integration.go:	// Migrate each state
+pkg/mcp/internal/state/integration.go:		if err := i.manager.MigrateState(ctx, stateType, id, fromVersion, toVersion); err != nil {
+pkg/mcp/internal/state/integration.go:				Msg("State migration failed")
+pkg/mcp/internal/state/integration.go:		Msg("Bulk state migration completed")
+pkg/mcp/internal/state/integration.go:		return fmt.Errorf("migration completed with %d errors", errorCount)
+pkg/mcp/internal/transport/llm_llm_mock.go:// MockLLMTransport implements both types.LLMTransport and legacy SendPrompt for testing
+pkg/mcp/internal/transport/llm_llm_mock.go:// SendPrompt implements the legacy prompt-based interface for compatibility
+pkg/mcp/internal/state/migrators.go:// SessionStateMigrator handles session state migrations
+pkg/mcp/internal/state/migrators.go:type SessionStateMigrator struct {
+pkg/mcp/internal/state/migrators.go:	migrations map[string]func(interface{}) (interface{}, error)
+pkg/mcp/internal/state/migrators.go:// NewSessionStateMigrator creates a new session state migrator
+pkg/mcp/internal/state/migrators.go:func NewSessionStateMigrator() StateMigrator {
+pkg/mcp/internal/state/migrators.go:	m := &SessionStateMigrator{
+pkg/mcp/internal/state/migrators.go:		migrations: make(map[string]func(interface{}) (interface{}, error)),
+pkg/mcp/internal/state/migrators.go:	// Register migrations
+pkg/mcp/internal/state/migrators.go:	m.migrations["v1_to_v2"] = m.migrateV1ToV2
+pkg/mcp/internal/state/migrators.go:	m.migrations["v2_to_v3"] = m.migrateV2ToV3
+pkg/mcp/internal/state/migrators.go:// MigrateState migrates session state between versions
+pkg/mcp/internal/state/migrators.go:func (m *SessionStateMigrator) MigrateState(ctx context.Context, stateType StateType, fromVersion, toVersion string, state interface{}) (interface{}, error) {
+pkg/mcp/internal/state/migrators.go:	migrationKey := fmt.Sprintf("%s_to_%s", fromVersion, toVersion)
+pkg/mcp/internal/state/migrators.go:	migrationFunc, exists := m.migrations[migrationKey]
+pkg/mcp/internal/state/migrators.go:		return nil, fmt.Errorf("no migration path from %s to %s", fromVersion, toVersion)
+pkg/mcp/internal/state/migrators.go:	return migrationFunc(state)
+pkg/mcp/internal/state/migrators.go:// migrateV1ToV2 migrates session state from v1 to v2
+pkg/mcp/internal/state/migrators.go:func (m *SessionStateMigrator) migrateV1ToV2(state interface{}) (interface{}, error) {
+pkg/mcp/internal/state/migrators.go:	// Example migration: Add new fields with defaults
+pkg/mcp/internal/state/migrators.go:// migrateV2ToV3 migrates session state from v2 to v3
+pkg/mcp/internal/state/migrators.go:func (m *SessionStateMigrator) migrateV2ToV3(state interface{}) (interface{}, error) {
+pkg/mcp/internal/state/migrators.go:	// Example migration: Restructure data
+pkg/mcp/internal/state/migrators.go:// GenericStateMigrator provides generic state migration capabilities
+pkg/mcp/internal/state/migrators.go:type GenericStateMigrator struct {
+pkg/mcp/internal/state/migrators.go:// NewGenericStateMigrator creates a new generic state migrator
+pkg/mcp/internal/state/migrators.go:func NewGenericStateMigrator() *GenericStateMigrator {
+pkg/mcp/internal/state/migrators.go:	return &GenericStateMigrator{
+pkg/mcp/internal/state/migrators.go:func (m *GenericStateMigrator) RegisterTransformer(transformer StateTransformer) {
+pkg/mcp/internal/state/migrators.go:// MigrateState migrates state using registered transformers
+pkg/mcp/internal/state/migrators.go:func (m *GenericStateMigrator) MigrateState(ctx context.Context, stateType StateType, fromVersion, toVersion string, state interface{}) (interface{}, error) {
+pkg/mcp/internal/state/migrators.go:	// Find migration path
+pkg/mcp/internal/state/migrators.go:	path := m.findMigrationPath(fromVersion, toVersion)
+pkg/mcp/internal/state/migrators.go:		return nil, fmt.Errorf("no migration path from %s to %s", fromVersion, toVersion)
+pkg/mcp/internal/state/migrators.go:// findMigrationPath finds a path of transformers from source to target version
+pkg/mcp/internal/state/migrators.go:func (m *GenericStateMigrator) findMigrationPath(fromVersion, toVersion string) []StateTransformer {
+pkg/mcp/internal/state/migrators.go:	// TODO: Implement path finding for multi-step migrations
+pkg/mcp/internal/state/migrators.go:// WorkflowStateMigrator handles workflow state migrations
+pkg/mcp/internal/state/migrators.go:type WorkflowStateMigrator struct {
+pkg/mcp/internal/state/migrators.go:// NewWorkflowStateMigrator creates a new workflow state migrator
+pkg/mcp/internal/state/migrators.go:func NewWorkflowStateMigrator() StateMigrator {
+pkg/mcp/internal/state/migrators.go:	m := &WorkflowStateMigrator{
+pkg/mcp/internal/state/migrators.go:// MigrateState migrates workflow state
+pkg/mcp/internal/state/migrators.go:func (m *WorkflowStateMigrator) MigrateState(ctx context.Context, stateType StateType, fromVersion, toVersion string, state interface{}) (interface{}, error) {
+pkg/mcp/internal/analyze/analyze.go:		".sql", "migration", "schema", "database", ".db", ".sqlite",
+pkg/mcp/internal/state/unified_state_manager.go:	StateEventMigrated  StateEventType = "migrated"
+pkg/mcp/internal/state/unified_state_manager.go:// StateMigrator handles state migrations
+pkg/mcp/internal/state/unified_state_manager.go:type StateMigrator interface {
+pkg/mcp/internal/state/unified_state_manager.go:	MigrateState(ctx context.Context, stateType StateType, fromVersion, toVersion string, state interface{}) (interface{}, error)
+pkg/mcp/internal/state/unified_state_manager.go:	migrators       map[StateType]StateMigrator
+pkg/mcp/internal/state/unified_state_manager.go:		migrators:       make(map[StateType]StateMigrator),
+pkg/mcp/internal/state/unified_state_manager.go:// RegisterMigrator registers a state migrator
+pkg/mcp/internal/state/unified_state_manager.go:func (m *UnifiedStateManager) RegisterMigrator(stateType StateType, migrator StateMigrator) {
+pkg/mcp/internal/state/unified_state_manager.go:	m.migrators[stateType] = migrator
+pkg/mcp/internal/state/unified_state_manager.go:	m.logger.Info().Str("state_type", string(stateType)).Msg("Registered state migrator")
+pkg/mcp/internal/state/unified_state_manager.go:// MigrateState migrates state to a new version
+pkg/mcp/internal/state/unified_state_manager.go:func (m *UnifiedStateManager) MigrateState(ctx context.Context, stateType StateType, id string, fromVersion, toVersion string) error {
+pkg/mcp/internal/state/unified_state_manager.go:	migrator := m.migrators[stateType]
+pkg/mcp/internal/state/unified_state_manager.go:	if migrator == nil {
+pkg/mcp/internal/state/unified_state_manager.go:		return fmt.Errorf("no migrator registered for state type: %s", stateType)
+pkg/mcp/internal/state/unified_state_manager.go:	// Migrate state
+pkg/mcp/internal/state/unified_state_manager.go:	migratedState, err := migrator.MigrateState(ctx, stateType, fromVersion, toVersion, currentState)
+pkg/mcp/internal/state/unified_state_manager.go:		return fmt.Errorf("migration failed: %w", err)
+pkg/mcp/internal/state/unified_state_manager.go:	// Save migrated state
+pkg/mcp/internal/state/unified_state_manager.go:	if err := provider.SetState(ctx, id, migratedState); err != nil {
+pkg/mcp/internal/state/unified_state_manager.go:		Type:      StateEventMigrated,
+pkg/mcp/internal/state/unified_state_manager.go:		NewValue:  migratedState,
+pkg/mcp/internal/analyze/dependency_analyzer.go:		"request":    "Deprecated package, use axios or fetch",
+pkg/mcp/internal/testutil/orchestration_mocks.go:// Note: The name is kept as MockToolOrchestrator for backward compatibility with existing tests
+pkg/mcp/internal/testutil/orchestration_mocks.go:// Note: The name is kept as MockToolRegistry for backward compatibility with existing tests
+pkg/mcp/internal/analyze/analyze_repository.go:	// Convert result to legacy format if needed
+pkg/mcp/internal/analyze/analyze_repository.go:		// Return error in legacy format
+pkg/mcp/internal/deploy/deploy_kubernetes_validate.go:	// Update metadata for backward compatibility and additional details
+pkg/mcp/internal/analyze/final_coverage_test.go:		"migrations/001_init.sql":  "CREATE DATABASE test;\n",
+pkg/mcp/internal/analyze/generate_dockerfile.go:			Limitations: []string{"No module support", "Deprecated approach"},
+pkg/mcp/internal/analyze/build_analyzer_test.go:		DatabaseFiles:    []string{"schema.sql", "migrations/"},
+pkg/mcp/internal/analyze/final_small_test.go:		{"migrations/001_initial.sql", "CREATE DATABASE app_db;\nUSE app_db;\nCREATE TABLE migrations (version INT PRIMARY KEY);\n"},
+pkg/mcp/internal/analyze/analyzer_config.go:// Deprecated: Use config.AnalyzerConfig instead
+pkg/mcp/internal/analyze/analyzer_config.go:// Deprecated: Use config.GetAnalyzer() instead
+pkg/mcp/internal/analyze/analyzer_config.go:// Deprecated: Environment variables are now handled by the centralized config system
+pkg/mcp/internal/analyze/analyzer_config.go:	logger.Warn().Msg("LoadFromEnv is deprecated - use centralized config system instead")
+pkg/mcp/internal/analyze/analyzer_config.go:	// Fallback to direct env var reading (deprecated path)
+pkg/mcp/internal/runtime/registration_helper.go:// UtilityToolFunc represents a utility tool that creates tools inline (legacy pattern)
+pkg/mcp/internal/server/get_logs.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/server/get_job_status.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/deploy/generate_manifests_atomic.go:// Type aliases for atomic manifest generation to maintain backward compatibility
+pkg/mcp/internal/deploy/generate_manifests_atomic.go:// AtomicGenerateManifestsTool is a simple stub for backward compatibility
+pkg/mcp/internal/server/README.md:    // Create legacy orchestrator (from existing MCP system)
+pkg/mcp/internal/server/README.md:    legacyOrchestrator := createLegacyOrchestrator()
+pkg/mcp/internal/server/README.md:        legacyOrchestrator,
+pkg/mcp/internal/server/README.md:### 2. Progressive Migration
+pkg/mcp/internal/server/README.md:Organizations can migrate gradually:
+pkg/mcp/internal/runtime/conversation/retry_manager.go:// Deprecated: Use ExecuteWithRetry for new code
+pkg/mcp/internal/runtime/conversation/retry_manager.go:// Deprecated: Use ExecuteWithRetry for new code
+pkg/mcp/internal/runtime/conversation/retry_manager.go:	// For backward compatibility, delegate to the coordinator's calculation
+pkg/mcp/internal/runtime/conversation/retry_manager.go:		Jitter:          false, // No jitter for backward compatibility
+pkg/mcp/internal/orchestration/tool_orchestrator.go:// The following methods maintain backward compatibility but delegate to the new implementation
+pkg/mcp/internal/orchestration/tool_orchestrator.go:	// This method is kept for backward compatibility
+pkg/mcp/internal/runtime/conversation/auto_fix_helper.go:// This function is deprecated - use convertFromTypesStage instead
+pkg/mcp/internal/orchestration/execution_types_test.go:		ID:               "legacy-id",
+pkg/mcp/internal/orchestration/execution_types_test.go:	if session.ID != "legacy-id" {
+pkg/mcp/internal/orchestration/execution_types_test.go:		t.Errorf("Expected ID to be 'legacy-id', got '%s'", session.ID)
+pkg/mcp/internal/orchestration/tool_registry.go:	// Create internal metadata structure (using reflection for legacy compatibility)
+pkg/mcp/internal/observability/factory.go:// Helper functions for backward compatibility
+pkg/mcp/internal/orchestration/sprint_a_escalation_rules.go:// This implements the cross-tool error escalation equivalent to legacy OnFailGoto
+pkg/mcp/internal/types/errors.go:// Helper methods for ErrorContext to ease migration
+pkg/mcp/internal/types/errors.go:// SetMetadata sets metadata from components (migration helper)
+pkg/mcp/internal/types/errors.go:// AddCustomMetadata adds a custom metadata field (for backward compatibility)
+pkg/mcp/internal/types/errors.go:// Migration helpers for legacy map[string]interface{} usage
+pkg/mcp/internal/types/errors.go:// Legacy metadata migration functions have been removed as part of
+pkg/mcp/internal/types/errors.go:// All error metadata now uses structured types directly - no migration needed.
+pkg/mcp/internal/scan/scan_secrets_atomic.go:	MigrationSteps   []string          `json:"migration_steps"`
+pkg/mcp/internal/scan/scan_secrets_atomic.go:	plan.MigrationSteps = []string{
+pkg/mcp/internal/observability/telemetry_token_internal_test.go:			// Check legacy total tokens counter
+pkg/mcp/internal/observability/telemetry_manager.go:	// Token usage counter (legacy - kept for backward compatibility)
+pkg/mcp/internal/observability/telemetry_manager.go:	// Also update the legacy total token counter for backward compatibility
+pkg/mcp/internal/orchestration/execution_types.go:	ID               string                 `json:"id"` // Legacy field for compatibility
+pkg/mcp/internal/orchestration/execution_types.go:// Legacy workflow types for backward compatibility
+pkg/mcp/internal/orchestration/execution_types.go:// Additional legacy types
+pkg/mcp/internal/orchestration/execution_types.go:// ResolveVariables is an alias for Expand for backward compatibility
+pkg/mcp/internal/orchestration/checkpoint_manager.go:			// Legacy format - direct unmarshal
+pkg/mcp/internal/orchestration/checkpoint_manager.go:				Msg("Loading checkpoint in legacy format")
+pkg/mcp/internal/observability/preflight_checker.go:	// Use both legacy and new registry authentication systems
+pkg/mcp/internal/observability/preflight_checker.go:		pfc.logger.Debug().Err(err).Msg("Legacy registry auth parsing failed, using enhanced system")
+pkg/mcp/internal/observability/preflight_checker.go:		// Log legacy registry authentication information
+pkg/mcp/internal/observability/preflight_checker.go:			Msg("Legacy registry authentication status")
+pkg/mcp/internal/config/migration.go:// MigrationHelper provides utilities to help migrate from old configuration patterns
+pkg/mcp/internal/config/migration.go:type MigrationHelper struct {
+pkg/mcp/internal/config/migration.go:// NewMigrationHelper creates a new migration helper
+pkg/mcp/internal/config/migration.go:func NewMigrationHelper(logger zerolog.Logger) *MigrationHelper {
+pkg/mcp/internal/config/migration.go:	return &MigrationHelper{
+pkg/mcp/internal/config/migration.go:		logger: logger.With().Str("component", "config_migration").Logger(),
+pkg/mcp/internal/config/migration.go:// MigrateAnalyzerConfig helps migrate from the old AnalyzerConfig pattern
+pkg/mcp/internal/config/migration.go:func (m *MigrationHelper) MigrateAnalyzerConfig() (*AnalyzerConfig, error) {
+pkg/mcp/internal/config/migration.go:	m.logger.Info().Msg("Migrating analyzer configuration from environment variables")
+pkg/mcp/internal/config/migration.go:	// Load environment variables using the old pattern for backward compatibility
+pkg/mcp/internal/config/migration.go:	// Log migration status
+pkg/mcp/internal/config/migration.go:		Msg("Analyzer configuration migrated")
+pkg/mcp/internal/config/migration.go:// MigrateServerConfigFromLegacy helps migrate from scattered server configuration
+pkg/mcp/internal/config/migration.go:func (m *MigrationHelper) MigrateServerConfigFromLegacy() (*ServerConfig, error) {
+pkg/mcp/internal/config/migration.go:	m.logger.Info().Msg("Migrating server configuration from legacy patterns")
+pkg/mcp/internal/config/migration.go:	// Log migration status
+pkg/mcp/internal/config/migration.go:		Msg("Server configuration migrated")
+pkg/mcp/internal/config/migration.go:// ValidateMigration validates that the migrated configuration is correct
+pkg/mcp/internal/config/migration.go:func (m *MigrationHelper) ValidateMigration(cfg *ConfigManager) error {
+pkg/mcp/internal/config/migration.go:	m.logger.Info().Msg("Validating migrated configuration")
+pkg/mcp/internal/config/migration.go:		return fmt.Errorf("migration validation failed: %w", err)
+pkg/mcp/internal/config/migration.go:	m.logger.Info().Msg("Configuration migration validation successful")
+pkg/mcp/internal/config/migration.go:func (m *MigrationHelper) CreateExampleConfig(path string) error {
+pkg/mcp/internal/config/migration.go:// BackwardCompatibilityWarnings checks for old environment variables and warns about deprecation
+pkg/mcp/internal/config/migration.go:func (m *MigrationHelper) BackwardCompatibilityWarnings() {
+pkg/mcp/internal/config/migration.go:	m.logger.Info().Msg("Checking for deprecated configuration patterns")
+pkg/mcp/internal/config/migration.go:	// Check for old environment variable patterns that should be migrated
+pkg/mcp/internal/config/migration.go:				Msg("Deprecated environment variable found - please migrate to new format")
+pkg/mcp/internal/config/manager_test.go:func TestMigrationHelper(t *testing.T) {
+pkg/mcp/internal/config/manager_test.go:	// For now, we'll skip the actual migration test since it requires zerolog
+pkg/mcp/internal/config/manager_test.go:	// In a real implementation, you would test the migration helper here
+pkg/mcp/internal/config/manager_test.go:	t.Log("Migration helper test placeholder - implement when logger is available")
+pkg/mcp/internal/retry/coordinator.go:// CalculateDelay calculates delay for a given policy and attempt (exposed for backward compatibility)
+pkg/mcp/internal/build/syntax_validator.go:		DeprecatedUsage:     make([]string, 0),
+pkg/mcp/internal/build/syntax_validator.go:		// Check for deprecated usage
+pkg/mcp/internal/build/syntax_validator.go:		if deprecated := checkDeprecatedSyntax(trimmed); deprecated != "" {
+pkg/mcp/internal/build/syntax_validator.go:			analysis.DeprecatedUsage = append(analysis.DeprecatedUsage,
+pkg/mcp/internal/build/syntax_validator.go:				fmt.Sprintf("Line %d: %s", i+1, deprecated))
+pkg/mcp/internal/build/syntax_validator.go:	DeprecatedUsage     []string
+pkg/mcp/internal/build/syntax_validator.go:func checkDeprecatedSyntax(line string) string {
+pkg/mcp/internal/build/syntax_validator.go:		return "MAINTAINER is deprecated, use LABEL maintainer=\"...\" instead"
+pkg/mcp/internal/build/syntax_validator.go:	// Add more deprecated syntax checks as needed
+pkg/mcp/internal/build/image_validator.go:	// Check for deprecated images
+pkg/mcp/internal/build/image_validator.go:	if deprecated, suggestion := v.isDeprecatedImage(img.Image); deprecated {
+pkg/mcp/internal/build/image_validator.go:			Message: fmt.Sprintf("Base image '%s' is deprecated. %s", img.Image, suggestion),
+pkg/mcp/internal/build/image_validator.go:			Rule:    "deprecated_image",
+pkg/mcp/internal/build/image_validator.go:func (v *ImageValidator) isDeprecatedImage(image string) (bool, string) {
+pkg/mcp/internal/build/image_validator.go:	deprecatedImages := map[string]string{
+pkg/mcp/internal/build/image_validator.go:	for deprecated, suggestion := range deprecatedImages {
+pkg/mcp/internal/build/image_validator.go:		if strings.Contains(image, deprecated) {
+pkg/mcp/internal/build/build_image_atomic.go:// Legacy interface methods for backward compatibility
+pkg/mcp/internal/build/build_image_atomic.go:// GetName returns the tool name (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/build_image_atomic.go:// GetDescription returns the tool description (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/build_image_atomic.go:// GetVersion returns the tool version (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/build_image_atomic.go:// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/build_troubleshooting.go:	} else if strings.Contains(errLower, "warning") || strings.Contains(errLower, "deprecated") {
+pkg/mcp/internal/build/tag_image_atomic.go:// Legacy interface methods for backward compatibility
+pkg/mcp/internal/build/tag_image_atomic.go:// GetName returns the tool name (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/tag_image_atomic.go:// GetDescription returns the tool description (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/tag_image_atomic.go:// GetVersion returns the tool version (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/tag_image_atomic.go:// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/pull_image_atomic.go:// Legacy interface methods for backward compatibility
+pkg/mcp/internal/build/pull_image_atomic.go:// GetName returns the tool name (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/pull_image_atomic.go:// GetDescription returns the tool description (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/pull_image_atomic.go:// GetVersion returns the tool version (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/pull_image_atomic.go:// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
+pkg/mcp/internal/build/enhanced_build_analyzer.go:		"warning", "deprecated", "outdated", "missing",
+pkg/mcp/internal/build/strategies.go:	// sm.RegisterStrategy(NewLegacyBuildStrategy(logger))
+pkg/mcp/internal/build/strategies.go:	// Fallback to legacy build
+pkg/mcp/internal/build/strategies.go:	if strategy, exists := sm.strategies["legacy"]; exists {
+pkg/mcp/internal/build/strategies.go:		sm.logger.Info().Str("strategy", "legacy").Msg("Selected legacy strategy")
+pkg/mcp/internal/session/manage_session_labels.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/session/manage_session_labels.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/session/manage_session_labels.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/session/manage_session_labels.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/session/delete_session.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/session/list_sessions.go:// ExecuteTyped provides typed execution for backward compatibility
+pkg/mcp/internal/session/state.go:// ConvertRepositoryInfoToScanSummary converts legacy RepositoryInfo map to structured ScanSummary
+pkg/mcp/internal/session/state.go:// ConvertScanSummaryToRepositoryInfo converts structured ScanSummary to legacy RepositoryInfo map

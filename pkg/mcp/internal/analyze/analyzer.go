@@ -228,10 +228,13 @@ func (f *AnalyzerFactory) CreateAnalyzer() core.AIAnalyzer {
 // CreateAnalyzerFromEnv creates an analyzer based on environment configuration
 // Note: This returns a stub analyzer since we don't have transport available here
 func CreateAnalyzerFromEnv(logger zerolog.Logger) core.AIAnalyzer {
-	// Use centralized configuration logic
-	config := DefaultAnalyzerConfig()
-	config.LoadFromEnv()
+	// Always return stub analyzer for now
+	return NewStubAnalyzer()
+}
 
-	// Delegate to the config-based creator
-	return CreateAnalyzerFromConfig(config, logger)
+// CreateAnalyzerFromConfig creates an analyzer from configuration
+// Note: This always returns a stub analyzer now that config is centralized
+func CreateAnalyzerFromConfig(config interface{}, logger zerolog.Logger) core.AIAnalyzer {
+	// Always return stub analyzer for now
+	return NewStubAnalyzer()
 }
