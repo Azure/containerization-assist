@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -156,6 +157,18 @@ type ToolRegistry interface {
 	GetTool(name string) (Tool, error) // Legacy compatibility method
 	List() []string
 	GetMetadata(name string) (ToolMetadata, bool)
+}
+
+// ============================================================================
+// Tool Orchestration Interface
+// ============================================================================
+
+// Orchestrator provides tool orchestration functionality
+type Orchestrator interface {
+	ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error)
+	RegisterTool(name string, tool Tool) error
+	ValidateToolArgs(toolName string, args interface{}) error
+	GetToolMetadata(toolName string) (*ToolMetadata, error)
 }
 
 // ============================================================================
@@ -395,11 +408,15 @@ type ServerStats struct {
 
 // SessionManagerStats represents session management statistics
 type SessionManagerStats struct {
-	ActiveSessions    int     `json:"active_sessions"`
-	TotalSessions     int     `json:"total_sessions"`
-	FailedSessions    int     `json:"failed_sessions"`
-	AverageSessionAge float64 `json:"average_session_age_minutes"`
-	SessionErrors     int     `json:"session_errors_last_hour"`
+	ActiveSessions    int       `json:"active_sessions"`
+	TotalSessions     int       `json:"total_sessions"`
+	FailedSessions    int       `json:"failed_sessions"`
+	ExpiredSessions   int       `json:"expired_sessions"`
+	SessionsWithJobs  int       `json:"sessions_with_jobs"`
+	AverageSessionAge float64   `json:"average_session_age_minutes"`
+	SessionErrors     int       `json:"session_errors_last_hour"`
+	TotalDiskUsage    int64     `json:"total_disk_usage_bytes"`
+	ServerStartTime   time.Time `json:"server_start_time"`
 }
 
 // WorkspaceStats represents workspace statistics
@@ -425,3 +442,184 @@ const (
 	ConversationStageCompleted  ConversationStage = "completed"
 	ConversationStageError      ConversationStage = "error"
 )
+
+// ============================================================================
+// AI and Fixing Interfaces
+// ============================================================================
+
+// AIAnalyzer provides AI analysis functionality
+type AIAnalyzer interface {
+	Analyze(ctx context.Context, prompt string) (string, error)
+	AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error)
+	AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error)
+	GetTokenUsage() TokenUsage
+	ResetTokenUsage()
+}
+
+// TokenUsage represents token usage tracking
+type TokenUsage struct {
+	CompletionTokens int `json:"completion_tokens"`
+	PromptTokens     int `json:"prompt_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+// IterativeFixer provides iterative fixing functionality
+type IterativeFixer interface {
+	// AttemptFix performs iterative fixing with retry logic
+	AttemptFix(ctx context.Context, sessionID string, toolName string, operationType string, err error, maxAttempts int, baseDir string) (*FixingResult, error)
+}
+
+// FixingResult represents the result of a fixing operation
+type FixingResult struct {
+	Success         bool          `json:"success"`
+	AttemptsUsed    int           `json:"attempts_used"`
+	OriginalError   error         `json:"original_error,omitempty"`
+	FinalError      error         `json:"final_error,omitempty"`
+	FixApplied      bool          `json:"fix_applied"`
+	FixDescription  string        `json:"fix_description,omitempty"`
+	AllAttempts     []interface{} `json:"all_attempts"`
+	TotalAttempts   int           `json:"total_attempts"`
+	Duration        time.Duration `json:"duration"`
+	LastAttemptTime time.Time     `json:"last_attempt_time"`
+}
+
+// ContextSharer provides context sharing functionality between tools
+type ContextSharer interface {
+	// ShareContext shares context between tools or operations
+	ShareContext(ctx context.Context, sessionID string, contextType string, data interface{}) error
+	// GetSharedContext retrieves shared context
+	GetSharedContext(ctx context.Context, sessionID string, contextType string) (interface{}, error)
+	// ClearContext clears shared context for a session
+	ClearContext(ctx context.Context, sessionID string) error
+}
+
+// BaseAIContextResult provides AI context result information
+type BaseAIContextResult struct {
+	AIContextType     string        `json:"ai_context_type"`
+	IsSuccessful      bool          `json:"is_successful"`
+	Duration          time.Duration `json:"duration"`
+	TokensUsed        int           `json:"tokens_used,omitempty"`
+	ContextEnhanced   bool          `json:"context_enhanced"`
+	EnhancementErrors []string      `json:"enhancement_errors,omitempty"`
+}
+
+// NewBaseAIContextResult creates a new BaseAIContextResult
+func NewBaseAIContextResult(contextType string, successful bool, duration time.Duration) BaseAIContextResult {
+	return BaseAIContextResult{
+		AIContextType:     contextType,
+		IsSuccessful:      successful,
+		Duration:          duration,
+		ContextEnhanced:   false,
+		EnhancementErrors: []string{},
+	}
+}
+
+// ============================================================================
+// Pipeline and Session Management Interfaces
+// ============================================================================
+
+// PipelineOperations provides pipeline operation functionality
+type PipelineOperations interface {
+	// Session operations
+	GetSessionWorkspace(sessionID string) string
+	UpdateSessionState(sessionID string, updateFunc func(*SessionState)) error
+
+	// Docker operations
+	BuildImage(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+	PushImage(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+	PullImage(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+	TagImage(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+
+	// Kubernetes operations
+	GenerateManifests(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+	DeployKubernetes(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+	CheckHealth(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+
+	// Analysis operations
+	AnalyzeRepository(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+	ValidateDockerfile(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+
+	// Security operations
+	ScanSecurity(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+	ScanSecrets(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
+}
+
+// ToolSessionManager provides session management functionality for tools
+type ToolSessionManager interface {
+	// Session retrieval and creation
+	GetSession(sessionID string) (interface{}, error)
+	GetOrCreateSession(sessionID string) (interface{}, error)
+	CreateSession(userID string) (interface{}, error)
+
+	// Session lifecycle
+	DeleteSession(ctx context.Context, sessionID string) error
+	ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error)
+
+	// Statistics
+	GetStats() *SessionManagerStats
+}
+
+// ============================================================================
+// Additional Operation Types
+// ============================================================================
+
+// FixableOperation represents an operation that can be fixed when it fails
+type FixableOperation interface {
+	// Execute performs the operation
+	Execute(ctx context.Context) error
+	// ExecuteOnce runs the operation once
+	ExecuteOnce(ctx context.Context) error
+	// CanRetry determines if the operation can be retried after failure
+	CanRetry(err error) bool
+	// GetFailureAnalysis analyzes the failure for potential fixes
+	GetFailureAnalysis(ctx context.Context, err error) (*FailureAnalysis, error)
+	// PrepareForRetry prepares the operation for retry (e.g., cleanup, state reset)
+	PrepareForRetry(ctx context.Context, fixAttempt interface{}) error
+}
+
+// FailureAnalysis represents analysis of an operation failure
+type FailureAnalysis struct {
+	FailureType    string   `json:"failure_type"`
+	IsCritical     bool     `json:"is_critical"`
+	IsRetryable    bool     `json:"is_retryable"`
+	RootCauses     []string `json:"root_causes"`
+	SuggestedFixes []string `json:"suggested_fixes"`
+	ErrorContext   string   `json:"error_context"`
+}
+
+// Error implements the error interface for FailureAnalysis
+func (fa *FailureAnalysis) Error() string {
+	if fa == nil {
+		return "failure analysis: <nil>"
+	}
+	return fmt.Sprintf("failure analysis: %s (%s)", fa.FailureType, fa.ErrorContext)
+}
+
+// ErrorContext provides contextual information about errors
+type ErrorContext struct {
+	SessionID     string                 `json:"session_id"`
+	OperationType string                 `json:"operation_type"`
+	Phase         string                 `json:"phase"`
+	ErrorCode     string                 `json:"error_code"`
+	Metadata      map[string]interface{} `json:"metadata"`
+	Timestamp     time.Time              `json:"timestamp"`
+}
+
+// LocalProgressStage represents a local progress stage
+type LocalProgressStage struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Progress    int     `json:"progress"`
+	Status      string  `json:"status"`
+	Weight      float64 `json:"weight"`
+}
+
+// Recommendation represents an AI recommendation
+type Recommendation struct {
+	Type        string                 `json:"type"`
+	Priority    int                    `json:"priority"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Action      string                 `json:"action"`
+	Metadata    map[string]interface{} `json:"metadata"`
+}

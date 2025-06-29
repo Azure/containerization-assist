@@ -70,7 +70,7 @@ ok  	github.com/Azure/container-kit/pkg/mcp/internal/conversation	(cached)
 {"level":"info","time":"2025-06-29T08:13:08-04:00","message":"Session manager stopped"}
 --- FAIL: TestConversationStages (0.32s)
     --- FAIL: TestConversationStages/StageTransition (0.16s)
-        conversation_test.go:283: 
+        conversation_test.go:283:
             	Error Trace:	/home/tng/workspace/container-kit/pkg/mcp/internal/core/conversation_test.go:283
             	Error:      	Should not be: "preflight"
             	Test:       	TestConversationStages/StageTransition

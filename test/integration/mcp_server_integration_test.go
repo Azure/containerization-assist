@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
-	"github.com/Azure/container-kit/pkg/mcp/factory"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,12 +73,12 @@ func testServerLifecycle(t *testing.T, workspaceDir, storeDir string) {
 	config.TransportType = "stdio" // Use stdio for testing
 
 	// Create server
-	server, err := factory.NewServer(ctx, config)
+	mcpServer, err := server.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create MCP server")
-	require.NotNil(t, server, "Server should not be nil")
+	require.NotNil(t, mcpServer, "Server should not be nil")
 
 	// Test server statistics (basic functionality test)
-	stats := server.GetStats()
+	stats := mcpServer.GetStats()
 	assert.NotNil(t, stats, "Server stats should be available")
 	assert.Equal(t, "stdio", stats.Transport, "Transport type should match config")
 	assert.NotNil(t, stats.Sessions, "Session stats should be available")
@@ -87,7 +88,7 @@ func testServerLifecycle(t *testing.T, workspaceDir, storeDir string) {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
-	err = server.Shutdown(shutdownCtx)
+	err = mcpServer.Shutdown(shutdownCtx)
 	assert.NoError(t, err, "Server shutdown should succeed")
 }
 
@@ -97,12 +98,12 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 
 	tests := []struct {
 		name           string
-		configModifier func(*mcp.ServerConfig)
+		configModifier func(*core.ServerConfig)
 		expectError    bool
 	}{
 		{
 			name: "default_config",
-			configModifier: func(config *mcp.ServerConfig) {
+			configModifier: func(config *core.ServerConfig) {
 				config.WorkspaceDir = workspaceDir
 				config.StorePath = filepath.Join(storeDir, "sessions.db")
 			},
@@ -110,7 +111,7 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 		},
 		{
 			name: "sandbox_enabled",
-			configModifier: func(config *mcp.ServerConfig) {
+			configModifier: func(config *core.ServerConfig) {
 				config.WorkspaceDir = workspaceDir
 				config.StorePath = filepath.Join(storeDir, "sessions.db")
 				config.SandboxEnabled = true
@@ -119,7 +120,7 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 		},
 		{
 			name: "invalid_workspace_dir",
-			configModifier: func(config *mcp.ServerConfig) {
+			configModifier: func(config *core.ServerConfig) {
 				config.WorkspaceDir = "/nonexistent/invalid/path"
 				config.StorePath = filepath.Join(storeDir, "sessions.db")
 			},
@@ -132,19 +133,19 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 			config := mcp.DefaultServerConfig()
 			tt.configModifier(&config)
 
-			server, err := factory.NewServer(ctx, config)
+			mcpServer, err := server.NewServer(ctx, config)
 
 			if tt.expectError {
 				assert.Error(t, err, "Expected error for invalid configuration")
-				assert.Nil(t, server, "Server should be nil on error")
+				assert.Nil(t, mcpServer, "Server should be nil on error")
 			} else {
 				assert.NoError(t, err, "Expected no error for valid configuration")
-				assert.NotNil(t, server, "Server should not be nil")
+				assert.NotNil(t, mcpServer, "Server should not be nil")
 
 				// Clean up
-				if server != nil {
+				if mcpServer != nil {
 					shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-					_ = server.Shutdown(shutdownCtx)
+					_ = mcpServer.Shutdown(shutdownCtx)
 					cancel()
 				}
 			}
@@ -160,11 +161,12 @@ func testWorkspaceManagement(t *testing.T, workspaceDir, storeDir string) {
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
-	server, err := factory.NewServer(ctx, config)
+	mcpServer, err := server.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
+	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		_ = server.Shutdown(shutdownCtx)
+		_ = mcpServer.Shutdown(shutdownCtx)
 		cancel()
 	}()
 
@@ -196,11 +198,12 @@ func testSessionHandling(t *testing.T, workspaceDir, storeDir string) {
 	config.MaxSessions = 5
 	config.SessionTTL = 10 * time.Minute
 
-	server, err := factory.NewServer(ctx, config)
+	mcpServer, err := server.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
+	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		_ = server.Shutdown(shutdownCtx)
+		_ = mcpServer.Shutdown(shutdownCtx)
 		cancel()
 	}()
 
@@ -208,11 +211,11 @@ func testSessionHandling(t *testing.T, workspaceDir, storeDir string) {
 	assert.DirExists(t, storeDir, "Session store directory should exist")
 
 	// Test session configuration limits via stats
-	sessionStats := server.GetSessionManagerStats()
+	sessionStats := mcpServer.GetSessionManagerStats()
 	assert.NotNil(t, sessionStats, "Session stats should be available")
 
 	// Test workspace stats
-	workspaceStats := server.GetWorkspaceStats()
+	workspaceStats := mcpServer.GetWorkspaceStats()
 	assert.NotNil(t, workspaceStats, "Workspace stats should be available")
 
 	// Test session store accessibility
@@ -250,29 +253,30 @@ func testToolRegistration(t *testing.T, workspaceDir, storeDir string) {
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
-	server, err := factory.NewServer(ctx, config)
+	mcpServer, err := server.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
+	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		_ = server.Shutdown(shutdownCtx)
+		_ = mcpServer.Shutdown(shutdownCtx)
 		cancel()
 	}()
 
 	// Test that server has basic functionality available
 	// Test stats access (which doesn't require starting the server)
-	stats := server.GetStats()
+	stats := mcpServer.GetStats()
 	assert.NotNil(t, stats, "Server stats should be available")
 	assert.Equal(t, "stdio", stats.Transport, "Transport should be configured")
 
 	// Test session and workspace managers are accessible
-	sessionStats := server.GetSessionManagerStats()
+	sessionStats := mcpServer.GetSessionManagerStats()
 	assert.NotNil(t, sessionStats, "Session manager should be initialized")
 
-	workspaceStats := server.GetWorkspaceStats()
+	workspaceStats := mcpServer.GetWorkspaceStats()
 	assert.NotNil(t, workspaceStats, "Workspace manager should be initialized")
 
 	// Test that server logger is available
-	logger := server.GetLogger()
+	logger := mcpServer.GetLogger()
 	assert.NotNil(t, logger, "Server logger should be available")
 
 	t.Log("Server components are properly initialized and accessible")
@@ -298,17 +302,18 @@ func TestMCPServerStressTest(t *testing.T) {
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 	config.MaxSessions = 100
 
-	server, err := factory.NewServer(ctx, config)
+	mcpServer, err := server.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
+	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		_ = server.Shutdown(shutdownCtx)
+		_ = mcpServer.Shutdown(shutdownCtx)
 		cancel()
 	}()
 
 	// Test rapid server stats requests
 	for i := 0; i < 1000; i++ {
-		stats := server.GetStats()
+		stats := mcpServer.GetStats()
 		assert.NotNil(t, stats, "Server stats should always be available")
 
 		if i%100 == 0 {
@@ -323,7 +328,7 @@ func TestMCPServerStressTest(t *testing.T) {
 			defer func() { done <- true }()
 
 			for j := 0; j < 100; j++ {
-				stats := server.GetStats()
+				stats := mcpServer.GetStats()
 				assert.NotNil(t, stats, "Stats should be available in worker %d", workerID)
 			}
 		}(i)

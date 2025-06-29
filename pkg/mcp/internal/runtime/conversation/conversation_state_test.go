@@ -16,12 +16,12 @@ func TestNewConversationState(t *testing.T) {
 	state := NewConversationState(sessionID, workspaceDir)
 
 	assert.NotNil(t, state)
-	assert.Equal(t, sessionID, state.SessionID)
+	assert.Equal(t, sessionID, state.SessionState.SessionID)
 	assert.Equal(t, convertFromTypesStage(types.StageWelcome), state.CurrentStage)
 	assert.NotNil(t, state.Context)
 	assert.NotNil(t, state.History)
 	assert.Empty(t, state.History)
-	assert.False(t, state.CreatedAt.IsZero())
+	assert.False(t, state.SessionState.CreatedAt.IsZero())
 	assert.NotNil(t, state.Artifacts)
 	assert.Empty(t, state.Artifacts)
 }
@@ -57,7 +57,7 @@ func TestConversationStateAddToHistory(t *testing.T) {
 		assert.Equal(t, turns[i].input, turn.UserInput)
 		assert.Equal(t, turns[i].response, turn.Assistant)
 		assert.False(t, turn.Timestamp.IsZero())
-		assert.True(t, turn.Timestamp.After(state.CreatedAt) || turn.Timestamp.Equal(state.CreatedAt))
+		assert.True(t, turn.Timestamp.After(state.SessionState.CreatedAt) || turn.Timestamp.Equal(state.SessionState.CreatedAt))
 	}
 }
 
@@ -67,7 +67,7 @@ func TestConversationStateGetDuration(t *testing.T) {
 	// Wait a bit
 	time.Sleep(100 * time.Millisecond)
 
-	duration := time.Since(state.CreatedAt)
+	duration := time.Since(state.SessionState.CreatedAt)
 	assert.Greater(t, duration.Milliseconds(), int64(90))
 }
 
@@ -101,8 +101,8 @@ func TestConversationStateIsTimeout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := NewConversationState("test-session", "/tmp/workspace")
-			state.CreatedAt = tt.startTime
-			isTimedOut := time.Since(state.CreatedAt) > tt.timeout
+			state.SessionState.CreatedAt = tt.startTime
+			isTimedOut := time.Since(state.SessionState.CreatedAt) > tt.timeout
 			assert.Equal(t, tt.expected, isTimedOut)
 		})
 	}

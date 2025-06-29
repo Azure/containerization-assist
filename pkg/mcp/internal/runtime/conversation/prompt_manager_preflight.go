@@ -168,7 +168,7 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 		repoAnalysis["_context"] = state.Context
 
 		// Save session to persist the context
-		if err := pm.sessionManager.UpdateSession(state.SessionID, func(s interface{}) {
+		if err := pm.sessionManager.UpdateSession(state.SessionState.SessionID, func(s interface{}) {
 			if sess, ok := s.(*core.SessionState); ok {
 				sess.CurrentStage = string(response.Stage)
 				sess.Status = string(response.Status)

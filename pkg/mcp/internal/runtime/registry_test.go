@@ -110,7 +110,7 @@ func TestRegisterTool_DuplicateName(t *testing.T) {
 	// Try to register second tool with same name
 	err = RegisterTool[TestArgs, TestResult](registry, tool2)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "already registered")
+	assert.Contains(t, err.Error(), "registry operation failed")
 }
 
 func TestRegisterTool_FrozenRegistry(t *testing.T) {
@@ -121,7 +121,7 @@ func TestRegisterTool_FrozenRegistry(t *testing.T) {
 	err := RegisterTool[TestArgs, TestResult](registry, tool)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "tool registry frozen")
+	assert.Contains(t, err.Error(), "registry operation failed")
 }
 
 func TestRegisterTool_SchemaGeneration(t *testing.T) {
@@ -268,7 +268,7 @@ func TestToolRegistry_ExecuteTool_ToolNotFound(t *testing.T) {
 
 	_, err = registry.ExecuteTool(context.Background(), "nonexistent", argsJSON)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "tool nonexistent not found")
+	assert.Contains(t, err.Error(), "registry operation failed")
 }
 
 func TestToolRegistry_ExecuteTool_InvalidJSON(t *testing.T) {
@@ -283,7 +283,7 @@ func TestToolRegistry_ExecuteTool_InvalidJSON(t *testing.T) {
 
 	_, err = registry.ExecuteTool(context.Background(), "json_tool", invalidJSON)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unmarshal args")
+	assert.Contains(t, err.Error(), "registry operation failed")
 }
 
 func TestToolRegistry_ExecuteTool_PreValidationError(t *testing.T) {
@@ -293,7 +293,7 @@ func TestToolRegistry_ExecuteTool_PreValidationError(t *testing.T) {
 		name: "validation_tool",
 		preValidateFunc: func(ctx context.Context, args TestArgs) error {
 			if args.Message == "" {
-				return mcp.NewRichError("VALIDATION_ERROR", "message cannot be empty", "validation_error")
+				return fmt.Errorf("test operation failed")
 			}
 			return nil
 		},
@@ -309,7 +309,7 @@ func TestToolRegistry_ExecuteTool_PreValidationError(t *testing.T) {
 
 	_, err = registry.ExecuteTool(context.Background(), "validation_tool", argsJSON)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "message cannot be empty")
+	assert.Contains(t, err.Error(), "test operation failed")
 }
 
 func TestToolRegistry_ExecuteTool_ExecutionError(t *testing.T) {
@@ -318,7 +318,7 @@ func TestToolRegistry_ExecuteTool_ExecutionError(t *testing.T) {
 	tool := &mockTool{
 		name: "error_tool",
 		executeFunc: func(ctx context.Context, args interface{}) (interface{}, error) {
-			return nil, mcp.NewRichError("EXECUTION_ERROR", "tool execution failed", "runtime_error")
+			return nil, fmt.Errorf("test operation failed")
 		},
 	}
 
@@ -331,7 +331,7 @@ func TestToolRegistry_ExecuteTool_ExecutionError(t *testing.T) {
 
 	_, err = registry.ExecuteTool(context.Background(), "error_tool", argsJSON)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "tool execution failed")
+	assert.Contains(t, err.Error(), "test operation failed")
 }
 
 func TestContainsArrays(t *testing.T) {

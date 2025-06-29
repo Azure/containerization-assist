@@ -92,7 +92,7 @@ func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager
 }
 
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
-func (t *AtomicBuildImageTool) SetAnalyzer(analyzer mcp.AIAnalyzer) {
+func (t *AtomicBuildImageTool) SetAnalyzer(analyzer core.AIAnalyzer) {
 	if analyzer != nil {
 		t.fixingMixin = NewAtomicToolFixingMixin(analyzer, "atomic_build_image", t.logger)
 	}
@@ -188,20 +188,13 @@ func (t *AtomicBuildImageTool) GetMetadata() core.ToolMetadata {
 func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) error {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
-		return mcp.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
-			WithField("expected", "AtomicBuildImageArgs").
-			WithField("received", fmt.Sprintf("%T", args)).
-			Build()
+		return fmt.Errorf("invalid argument type for atomic_build_image: expected AtomicBuildImageArgs, got %T", args)
 	}
 	if buildArgs.ImageName == "" {
-		return mcp.NewErrorBuilder("IMAGE_NAME_REQUIRED", "ImageName is required", "validation_error").
-			WithField("field", "image_name").
-			Build()
+		return fmt.Errorf("validation error")
 	}
 	if buildArgs.SessionID == "" {
-		return mcp.NewErrorBuilder("SESSION_ID_REQUIRED", "SessionID is required", "validation_error").
-			WithField("field", "session_id").
-			Build()
+		return fmt.Errorf("validation error")
 	}
 	return nil
 }
@@ -210,10 +203,7 @@ func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) e
 func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
-		return nil, mcp.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
-			WithField("expected", "AtomicBuildImageArgs").
-			WithField("received", fmt.Sprintf("%T", args)).
-			Build()
+		return nil, fmt.Errorf("invalid argument type for atomic_build_image: expected AtomicBuildImageArgs, got %T", args)
 	}
 	// Execute with nil server context (no progress tracking)
 	return t.ExecuteWithContext(nil, buildArgs)

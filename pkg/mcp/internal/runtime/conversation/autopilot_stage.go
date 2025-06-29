@@ -62,13 +62,13 @@ func (pm *PromptManager) hasAutopilotEnabled(state *ConversationState) bool {
 // enableAutopilot enables autopilot mode for the conversation
 func (pm *PromptManager) enableAutopilot(state *ConversationState) {
 	state.Context["autopilot_enabled"] = true
-	pm.logger.Info().Str("session_id", state.SessionID).Msg("Autopilot mode enabled")
+	pm.logger.Info().Str("session_id", state.SessionState.SessionID).Msg("Autopilot mode enabled")
 }
 
 // disableAutopilot disables autopilot mode for the conversation
 func (pm *PromptManager) disableAutopilot(state *ConversationState) {
 	state.Context["autopilot_enabled"] = false
-	pm.logger.Info().Str("session_id", state.SessionID).Msg("Autopilot mode disabled")
+	pm.logger.Info().Str("session_id", state.SessionState.SessionID).Msg("Autopilot mode disabled")
 }
 
 // handleAutopilotCommands checks for autopilot control commands in user input

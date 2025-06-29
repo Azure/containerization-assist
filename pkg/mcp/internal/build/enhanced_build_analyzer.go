@@ -8,13 +8,12 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
 // EnhancedBuildAnalyzer implements UnifiedAnalyzer with comprehensive build intelligence
 type EnhancedBuildAnalyzer struct {
-	aiAnalyzer         mcp.AIAnalyzer
+	aiAnalyzer         core.AIAnalyzer
 	repositoryAnalyzer core.RepositoryAnalyzer // Use core interface directly
 	knowledgeBase      *CrossToolKnowledgeBase
 	failurePredictor   *FailurePredictor
@@ -26,7 +25,7 @@ type EnhancedBuildAnalyzer struct {
 
 // NewEnhancedBuildAnalyzer creates a new unified analyzer with full capabilities
 func NewEnhancedBuildAnalyzer(
-	aiAnalyzer mcp.AIAnalyzer,
+	aiAnalyzer core.AIAnalyzer,
 	repositoryAnalyzer core.RepositoryAnalyzer, // Use core interface directly
 	logger zerolog.Logger,
 ) *EnhancedBuildAnalyzer {
@@ -137,29 +136,52 @@ func (e *EnhancedBuildAnalyzer) AnalyzeWithRepository(ctx context.Context, reque
 	e.logger.Info().
 		Str("session_id", request.SessionID).
 		Msg("Starting repository-aware analysis")
+
 	// Perform basic failure analysis
 	baseAnalysis, err := e.AnalyzeFailure(ctx, &request.AnalysisRequest)
 	if err != nil {
 		return nil, fmt.Errorf("base analysis failed: %w", err)
 	}
-	// Repository-specific insights
-	projectInsights, err := e.analyzeProjectInsights(ctx, request.RepositoryInfo, request.ProjectMetadata)
+
+	// Use repository information if available
+	var repoInfo *core.RepositoryInfo
+	if request.RepositoryInfo != nil {
+		repoInfo = request.RepositoryInfo
+	}
+
+	// Create project metadata
+	projectMeta := &ProjectMetadata{
+		Language:  "",
+		Framework: "",
+	}
+	if repoInfo != nil {
+		projectMeta.Language = repoInfo.Language
+		projectMeta.Framework = repoInfo.Framework
+	}
+
+	// Generate project insights
+	projectInsights, err := e.analyzeProjectInsights(ctx, repoInfo, projectMeta)
 	if err != nil {
 		e.logger.Warn().Err(err).Msg("Failed to analyze project insights")
-		projectInsights = &ProjectInsights{}
+		projectInsights = &ProjectInsights{} // Use empty insights
 	}
-	// Language-specific recommendations
-	languageRecommendations := e.generateLanguageRecommendations(request.ProjectMetadata, baseAnalysis)
-	// Framework optimizations
-	frameworkOptimizations := e.generateFrameworkOptimizations(request.ProjectMetadata, request.BuildHistory)
-	// Dependency analysis
-	dependencyAnalysis, err := e.analyzeDependencies(ctx, request.RepositoryInfo)
+
+	// Generate language-specific recommendations
+	languageRecommendations := e.generateLanguageRecommendations(projectMeta, baseAnalysis)
+
+	// Generate framework optimizations
+	frameworkOptimizations := e.generateFrameworkOptimizations(projectMeta, []*BuildHistoryEntry{})
+
+	// Analyze dependencies
+	dependencyAnalysis, err := e.analyzeDependencies(ctx, repoInfo)
 	if err != nil {
 		e.logger.Warn().Err(err).Msg("Failed to analyze dependencies")
-		dependencyAnalysis = &DependencyAnalysis{}
+		dependencyAnalysis = &DependencyAnalysis{} // Use empty analysis
 	}
-	// Security implications
-	securityAnalysis := e.analyzeSecurityImplications(request.RepositoryInfo, baseAnalysis)
+
+	// Analyze security implications
+	securityAnalysis := e.analyzeSecurityImplications(repoInfo, baseAnalysis)
+
 	return &RepositoryAwareAnalysis{
 		AnalysisResult:          baseAnalysis,
 		ProjectSpecificInsights: projectInsights,
@@ -168,175 +190,6 @@ func (e *EnhancedBuildAnalyzer) AnalyzeWithRepository(ctx context.Context, reque
 		DependencyAnalysis:      dependencyAnalysis,
 		SecurityImplications:    securityAnalysis,
 	}, nil
-}
-
-// ShareInsights shares tool insights with the knowledge base
-func (e *EnhancedBuildAnalyzer) ShareInsights(ctx context.Context, insights *ToolInsights) error {
-	return e.knowledgeBase.StoreInsights(ctx, insights)
-}
-
-// GetSharedKnowledge retrieves accumulated knowledge for a domain
-func (e *EnhancedBuildAnalyzer) GetSharedKnowledge(ctx context.Context, domain string) (*SharedKnowledge, error) {
-	return e.knowledgeBase.GetKnowledge(ctx, domain)
-}
-
-// OptimizeBuildStrategy optimizes build strategy based on context
-func (e *EnhancedBuildAnalyzer) OptimizeBuildStrategy(ctx context.Context, request *BuildOptimizationRequest) (*OptimizedBuildStrategy, error) {
-	return e.strategizer.OptimizeStrategy(ctx, request)
-}
-
-// PredictFailures predicts potential build failures
-func (e *EnhancedBuildAnalyzer) PredictFailures(ctx context.Context, buildContext *AnalysisBuildContext) (*FailurePrediction, error) {
-	return e.failurePredictor.PredictFailures(ctx, buildContext)
-}
-
-// Private helper methods
-func (e *EnhancedBuildAnalyzer) categorizeFailure(err error) string {
-	errStr := strings.ToLower(err.Error())
-	switch {
-	case strings.Contains(errStr, "dockerfile"):
-		return "dockerfile_error"
-	case strings.Contains(errStr, "dependency") || strings.Contains(errStr, "package") || strings.Contains(errStr, "module"):
-		return "dependency_error"
-	case strings.Contains(errStr, "build") || strings.Contains(errStr, "compile"):
-		return "build_error"
-	case strings.Contains(errStr, "test"):
-		return "test_failure"
-	case strings.Contains(errStr, "deploy") || strings.Contains(errStr, "manifest"):
-		return "deployment_error"
-	case strings.Contains(errStr, "security") || strings.Contains(errStr, "vulnerability"):
-		return "security_issue"
-	case strings.Contains(errStr, "memory") || strings.Contains(errStr, "cpu") || strings.Contains(errStr, "resource"):
-		return "resource_exhaustion"
-	case strings.Contains(errStr, "timeout") || strings.Contains(errStr, "slow"):
-		return "performance_issue"
-	default:
-		return "unknown_error"
-	}
-}
-func (e *EnhancedBuildAnalyzer) assessSeverity(err error, context map[string]interface{}) string {
-	errStr := strings.ToLower(err.Error())
-	// Critical severity indicators
-	if strings.Contains(errStr, "fatal") || strings.Contains(errStr, "critical") ||
-		strings.Contains(errStr, "segmentation fault") || strings.Contains(errStr, "out of memory") {
-		return "critical"
-	}
-	// High severity indicators
-	if strings.Contains(errStr, "error") || strings.Contains(errStr, "failed") ||
-		strings.Contains(errStr, "exception") {
-		return "high"
-	}
-	// Medium severity indicators
-	if strings.Contains(errStr, "warning") || strings.Contains(errStr, "deprecated") {
-		return "medium"
-	}
-	return "low"
-}
-func (e *EnhancedBuildAnalyzer) assessImpact(ctx context.Context, failure *AnalysisRequest, severity string) *ImpactAssessment {
-	// Simple impact assessment - could be enhanced with more sophisticated analysis
-	var businessImpact, technicalImpact, userImpact string
-	var recoveryTime time.Duration
-	var costEstimate float64
-	var urgencyScore float64
-	switch severity {
-	case "critical":
-		businessImpact = "High - blocks all development"
-		technicalImpact = "Severe - system unusable"
-		userImpact = "Major - complete service disruption"
-		recoveryTime = time.Hour * 4
-		costEstimate = 1000.0
-		urgencyScore = 0.9
-	case "high":
-		businessImpact = "Medium - affects productivity"
-		technicalImpact = "Major - feature broken"
-		userImpact = "Moderate - degraded experience"
-		recoveryTime = time.Hour * 2
-		costEstimate = 500.0
-		urgencyScore = 0.7
-	case "medium":
-		businessImpact = "Low - minor delays"
-		technicalImpact = "Minor - workaround available"
-		userImpact = "Low - minimal impact"
-		recoveryTime = time.Hour
-		costEstimate = 100.0
-		urgencyScore = 0.5
-	default:
-		businessImpact = "Minimal"
-		technicalImpact = "Negligible"
-		userImpact = "None"
-		recoveryTime = time.Minute * 30
-		costEstimate = 50.0
-		urgencyScore = 0.3
-	}
-	return &ImpactAssessment{
-		BusinessImpact:  businessImpact,
-		TechnicalImpact: technicalImpact,
-		UserImpact:      userImpact,
-		RecoveryTime:    recoveryTime,
-		CostEstimate:    costEstimate,
-		UrgencyScore:    urgencyScore,
-	}
-}
-func (e *EnhancedBuildAnalyzer) generateFixStrategies(ctx context.Context, failure *AnalysisRequest, failureType string, relatedFailures []*RelatedFailure) ([]*FixStrategy, error) {
-	strategies := []*FixStrategy{}
-	// Generate AI-enhanced fix strategies
-	prompt := fmt.Sprintf(`
-Analyze this %s failure and provide detailed fix strategies:
-Error: %s
-Tool: %s
-Operation: %s
-Context: %v
-Similar past failures: %d found
-Provide 3-5 concrete fix strategies with:
-1. Step-by-step instructions
-2. Estimated time to implement
-3. Success probability
-4. Risk assessment
-5. Prerequisites
-Format as structured recommendations.
-`, failureType, failure.Error.Error(), failure.ToolName, failure.OperationType, failure.Context, len(relatedFailures))
-	aiResponse, err := e.aiAnalyzer.Analyze(ctx, prompt)
-	if err != nil {
-		e.logger.Warn().Err(err).Msg("AI analysis failed, using fallback strategies")
-		return e.getFallbackStrategies(failureType), nil
-	}
-	// Parse AI response and create strategies
-	// For now, create some example strategies based on the response
-	strategies = append(strategies, &FixStrategy{
-		Name:          "AI-Suggested Primary Fix",
-		Description:   "AI-generated fix based on error analysis",
-		Steps:         []string{"Analyze error context", "Apply AI-suggested fix", "Verify resolution"},
-		EstimatedTime: time.Minute * 10,
-		SuccessRate:   0.8,
-		RiskLevel:     "low",
-		Prerequisites: []string{"Workspace access", "Build tools available"},
-		Metadata: map[string]interface{}{
-			"ai_generated": true,
-			"source":       "enhanced_build_analyzer",
-			"response":     aiResponse,
-		},
-	})
-	// Add strategies based on related failures
-	for _, related := range relatedFailures {
-		if related.Similarity > 0.7 {
-			strategies = append(strategies, &FixStrategy{
-				Name:          fmt.Sprintf("Historical Fix: %s", related.Resolution),
-				Description:   fmt.Sprintf("Previously successful fix for similar %s", related.FailureType),
-				Steps:         []string{related.Resolution},
-				EstimatedTime: time.Minute * 5,
-				SuccessRate:   related.Similarity,
-				RiskLevel:     "low",
-				Prerequisites: []string{"Similar context to previous failure"},
-				Metadata: map[string]interface{}{
-					"historical": true,
-					"last_used":  related.LastOccurred,
-					"frequency":  related.Frequency,
-					"similarity": related.Similarity,
-				},
-			})
-		}
-	}
-	return strategies, nil
 }
 func (e *EnhancedBuildAnalyzer) getFallbackStrategies(failureType string) []*FixStrategy {
 	// Provide basic fallback strategies when AI analysis fails
@@ -476,6 +329,283 @@ func (e *EnhancedBuildAnalyzer) extractSolutionNames(strategies []*FixStrategy) 
 		solutions[i] = strategy.Name
 	}
 	return solutions
+}
+
+// categorizeFailure categorizes the type of failure based on the error
+func (e *EnhancedBuildAnalyzer) categorizeFailure(err error) string {
+	if err == nil {
+		return "unknown"
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	// Dockerfile-related errors
+	if strings.Contains(errStr, "dockerfile") || strings.Contains(errStr, "parse error") ||
+		strings.Contains(errStr, "unknown instruction") {
+		return "dockerfile_error"
+	}
+
+	// Dependency-related errors
+	if strings.Contains(errStr, "dependency") || strings.Contains(errStr, "package") ||
+		strings.Contains(errStr, "module") || strings.Contains(errStr, "import") {
+		return "dependency_error"
+	}
+
+	// Build-related errors
+	if strings.Contains(errStr, "build") || strings.Contains(errStr, "compile") ||
+		strings.Contains(errStr, "make") {
+		return "build_error"
+	}
+
+	// Test-related errors
+	if strings.Contains(errStr, "test") || strings.Contains(errStr, "spec") {
+		return "test_failure"
+	}
+
+	// Deployment-related errors
+	if strings.Contains(errStr, "deploy") || strings.Contains(errStr, "kubernetes") ||
+		strings.Contains(errStr, "kubectl") {
+		return "deployment_error"
+	}
+
+	// Security-related errors
+	if strings.Contains(errStr, "security") || strings.Contains(errStr, "vulnerability") ||
+		strings.Contains(errStr, "cve") {
+		return "security_issue"
+	}
+
+	// Performance-related errors
+	if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "memory") ||
+		strings.Contains(errStr, "cpu") || strings.Contains(errStr, "resource") {
+		return "performance_issue"
+	}
+
+	// Resource exhaustion
+	if strings.Contains(errStr, "out of") || strings.Contains(errStr, "limit") ||
+		strings.Contains(errStr, "quota") {
+		return "resource_exhaustion"
+	}
+
+	return "unknown"
+}
+
+// assessSeverity determines the severity level of the failure
+func (e *EnhancedBuildAnalyzer) assessSeverity(err error, context map[string]interface{}) string {
+	if err == nil {
+		return "low"
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	// Critical severity indicators
+	criticalKeywords := []string{
+		"panic", "fatal", "critical", "emergency", "abort",
+		"security", "vulnerability", "cve", "exploit",
+		"permission denied", "access denied", "unauthorized",
+	}
+
+	for _, keyword := range criticalKeywords {
+		if strings.Contains(errStr, keyword) {
+			return "critical"
+		}
+	}
+
+	// High severity indicators
+	highKeywords := []string{
+		"error", "failed", "exception", "crash",
+		"timeout", "resource", "memory", "disk",
+		"network", "connection", "unreachable",
+	}
+
+	for _, keyword := range highKeywords {
+		if strings.Contains(errStr, keyword) {
+			return "high"
+		}
+	}
+
+	// Medium severity indicators
+	mediumKeywords := []string{
+		"warning", "deprecated", "outdated", "missing",
+		"not found", "invalid", "malformed",
+	}
+
+	for _, keyword := range mediumKeywords {
+		if strings.Contains(errStr, keyword) {
+			return "medium"
+		}
+	}
+
+	return "low"
+}
+
+// assessImpact analyzes the impact of the failure
+func (e *EnhancedBuildAnalyzer) assessImpact(ctx context.Context, failure *AnalysisRequest, severity string) *ImpactAssessment {
+	urgencyScore := 0.5 // Default urgency
+
+	// Adjust urgency based on severity
+	switch severity {
+	case "critical":
+		urgencyScore = 1.0
+	case "high":
+		urgencyScore = 0.8
+	case "medium":
+		urgencyScore = 0.6
+	case "low":
+		urgencyScore = 0.3
+	}
+
+	// Determine affected systems
+	affectedSystems := []string{}
+	if failure.OperationType == "build" {
+		affectedSystems = append(affectedSystems, "build_pipeline", "development_workflow")
+	}
+	if failure.OperationType == "deploy" {
+		affectedSystems = append(affectedSystems, "deployment_pipeline", "production_environment")
+	}
+	if failure.OperationType == "scan" {
+		affectedSystems = append(affectedSystems, "security_pipeline", "compliance")
+	}
+
+	// Estimate downtime based on failure type and tool (used for documentation)
+	_ = time.Minute * 5 // Default downtime estimate
+
+	return &ImpactAssessment{
+		UrgencyScore:    urgencyScore,
+		BusinessImpact:  e.assessBusinessImpact(failure, severity),
+		TechnicalImpact: "medium", // Default technical impact
+		UserImpact:      "low",    // Default user impact
+		RecoveryTime:    e.estimateRecoveryTime(failure, severity),
+		CostEstimate:    0.0, // Default cost estimate
+	}
+}
+
+// generateFixStrategies generates potential fix strategies for the failure
+func (e *EnhancedBuildAnalyzer) generateFixStrategies(ctx context.Context, failure *AnalysisRequest, failureType string, relatedFailures []*RelatedFailure) ([]*FixStrategy, error) {
+	strategies := []*FixStrategy{}
+
+	// Generate AI-powered strategies if possible
+	if e.aiAnalyzer != nil {
+		aiStrategies, err := e.generateAIStrategies(ctx, failure, failureType)
+		if err != nil {
+			e.logger.Warn().Err(err).Msg("Failed to generate AI strategies, falling back to rule-based")
+		} else {
+			strategies = append(strategies, aiStrategies...)
+		}
+	}
+
+	// Add strategies based on related failures
+	for _, related := range relatedFailures {
+		if related.Similarity > 0.7 {
+			strategies = append(strategies, &FixStrategy{
+				Name:          fmt.Sprintf("Historical Fix: %s", related.Resolution),
+				Description:   fmt.Sprintf("Previously successful fix for similar %s", related.FailureType),
+				Steps:         []string{related.Resolution},
+				EstimatedTime: time.Minute * 5,
+				SuccessRate:   related.Similarity,
+				RiskLevel:     "low",
+				Prerequisites: []string{"Similar context to previous failure"},
+				Metadata: map[string]interface{}{
+					"historical": true,
+					"last_used":  related.LastOccurred,
+					"frequency":  related.Frequency,
+					"similarity": related.Similarity,
+				},
+			})
+		}
+	}
+
+	// Add fallback strategies
+	fallbackStrategies := e.getFallbackStrategies(failureType)
+	strategies = append(strategies, fallbackStrategies...)
+
+	return strategies, nil
+}
+
+// generateAIStrategies uses AI to generate fix strategies
+func (e *EnhancedBuildAnalyzer) generateAIStrategies(ctx context.Context, failure *AnalysisRequest, failureType string) ([]*FixStrategy, error) {
+	prompt := fmt.Sprintf(`
+Analyze this %s failure and provide fix strategies:
+
+Error: %s
+Tool: %s
+Operation: %s
+Failure Type: %s
+
+Context: %v
+
+Provide 2-3 specific fix strategies with:
+1. Strategy name
+2. Description
+3. Step-by-step instructions
+4. Estimated time to fix
+5. Success rate estimate (0.0-1.0)
+6. Risk level (low/medium/high)
+
+Format as structured text.`,
+		failureType, failure.Error.Error(), failure.ToolName, failure.OperationType, failureType, failure.Context)
+
+	response, err := e.aiAnalyzer.Analyze(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("AI analysis failed: %w", err)
+	}
+
+	// Parse AI response into strategies (simplified parsing)
+	strategy := &FixStrategy{
+		Name:          fmt.Sprintf("AI-Generated Fix for %s", failureType),
+		Description:   "AI-analyzed solution based on error patterns",
+		Steps:         []string{"Apply AI-recommended fix", response},
+		EstimatedTime: time.Minute * 10,
+		SuccessRate:   0.7, // Default AI confidence
+		RiskLevel:     "medium",
+		Prerequisites: []string{"Review AI suggestions before applying"},
+		Metadata: map[string]interface{}{
+			"ai_generated": true,
+			"ai_response":  response,
+			"timestamp":    time.Now(),
+		},
+	}
+
+	return []*FixStrategy{strategy}, nil
+}
+
+// Helper methods for impact assessment
+func (e *EnhancedBuildAnalyzer) assessBusinessImpact(failure *AnalysisRequest, severity string) string {
+	switch severity {
+	case "critical":
+		return "high"
+	case "high":
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func (e *EnhancedBuildAnalyzer) estimateRecoveryTime(failure *AnalysisRequest, severity string) time.Duration {
+	switch severity {
+	case "critical":
+		return time.Hour * 2
+	case "high":
+		return time.Hour
+	case "medium":
+		return time.Minute * 30
+	default:
+		return time.Minute * 15
+	}
+}
+
+func (e *EnhancedBuildAnalyzer) generateMitigationOptions(failure *AnalysisRequest, severity string) []string {
+	options := []string{
+		"Implement monitoring for this failure type",
+		"Add automated recovery procedures",
+		"Document resolution steps",
+	}
+
+	if severity == "critical" || severity == "high" {
+		options = append(options, "Set up alerting for similar failures")
+		options = append(options, "Consider implementing circuit breaker pattern")
+	}
+
+	return options
 }
 
 // Placeholder implementations for repository-aware analysis

@@ -3,7 +3,7 @@ package orchestration
 // SessionManager interface for MCP session management
 type SessionManager interface {
 	GetSession(sessionID string) (interface{}, error)
-	UpdateSession(session interface{}) error
+	UpdateSession(sessionID string, updater func(interface{})) error
 }
 
 // NOTE: InternalToolRegistry and InternalToolOrchestrator interfaces are now defined in interfaces.go

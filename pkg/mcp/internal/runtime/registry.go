@@ -65,11 +65,11 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	defer reg.mu.Unlock()
 
 	if reg.frozen {
-		return mcp.NewRichError("INVALID_REQUEST", "tool registry frozen", "system_error")
+		return fmt.Errorf("registry operation failed")
 	}
 	metadata := t.GetMetadata()
 	if _, dup := reg.tools[metadata.Name]; dup {
-		return mcp.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
+		return fmt.Errorf("registry operation failed")
 	}
 
 	// Use invopop/jsonschema which properly handles array items
@@ -107,7 +107,7 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 		Handler: func(ctx context.Context, raw json.RawMessage) (interface{}, error) {
 			var args TArgs
 			if err := json.Unmarshal(raw, &args); err != nil {
-				return nil, mcp.NewRichError("INVALID_ARGUMENTS", "unmarshal args: "+err.Error(), "validation_error")
+				return nil, fmt.Errorf("registry operation failed")
 			}
 			if err := t.PreValidate(ctx, args); err != nil {
 				return nil, err
@@ -197,7 +197,7 @@ type LongRunningTool interface {
 func (r *ToolRegistry) ExecuteTool(ctx context.Context, name string, raw json.RawMessage) (interface{}, error) {
 	reg, ok := r.GetTool(name)
 	if !ok {
-		return nil, mcp.NewRichError("INVALID_REQUEST", fmt.Sprintf("tool %s not found", name), "validation_error")
+		return nil, fmt.Errorf("registry operation failed")
 	}
 
 	r.logger.Debug().Str("tool", name).Msg("executing tool")

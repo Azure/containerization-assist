@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Azure/container-kit/pkg/clients"
@@ -9,8 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
-	"github.com/Azure/container-kit/pkg/mcp"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
@@ -21,6 +21,7 @@ import (
 	mcpserver "github.com/Azure/container-kit/pkg/mcp/internal/server"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/runner"
 	gomcpserver "github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -102,14 +103,7 @@ type ChatResult struct {
 // RegisterTools registers tools with the server
 func (gm *GomcpManager) RegisterTools(s *Server) error {
 	if !gm.isInitialized {
-		return mcp.NewErrorBuilder("manager_not_initialized", "Manager must be initialized before registering tools", "initialization").
-			WithSeverity("high").
-			WithOperation("register_tools").
-			WithStage("initialization_check").
-			WithRootCause("GomcpManager.Initialize() was not called").
-			WithImmediateStep(1, "Initialize manager", "Call GomcpManager.Initialize() before registering tools").
-			WithImmediateStep(2, "Check setup", "Verify all dependencies are properly configured").
-			Build()
+		return fmt.Errorf("error")
 	}
 
 	deps := gm.createToolDependencies(s)
@@ -117,9 +111,13 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 	if deps.ToolOrchestrator != nil && deps.PipelineOperations != nil && deps.AtomicSessionMgr != nil {
 		deps.ToolOrchestrator.SetPipelineOperations(deps.PipelineOperations)
 
-		var analyzer mcp.AIAnalyzer
+		var analyzer core.AIAnalyzer
 		if deps.MCPClients.Analyzer != nil {
-			analyzer, _ = deps.MCPClients.Analyzer.(mcp.AIAnalyzer)
+			// Check if it's a CallerAnalyzerAdapter with access to core analyzer
+			if analyzerAdapter, ok := deps.MCPClients.Analyzer.(interface{ GetCoreAnalyzer() core.AIAnalyzer }); ok {
+				analyzer = analyzerAdapter.GetCoreAnalyzer()
+			}
+			// Note: Direct cast to core.AIAnalyzer is not possible due to conflicting interfaces
 		}
 		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, analyzer, deps.Logger)
 
@@ -133,53 +131,25 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	deps.Logger.Info().Msg("Registering core tools")
 	if err := gm.registerCoreTools(deps); err != nil {
-		return mcp.NewErrorBuilder("core_tools_registration_failed", "Failed to register core tools", "registration").
-			WithSeverity("high").
-			WithOperation("register_tools").
-			WithStage("core_tools").
-			WithRootCause(fmt.Sprintf("Core tool registration failed: %v", err)).
-			WithImmediateStep(1, "Check dependencies", "Verify all core tool dependencies are available").
-			WithImmediateStep(2, "Check configuration", "Ensure tool configuration is valid").
-			Build()
+		return fmt.Errorf("error")
 	}
 	deps.Logger.Info().Msg("Core tools registered successfully")
 
 	deps.Logger.Info().Msg("Registering atomic tools")
 	if err := gm.registerAtomicTools(deps); err != nil {
-		return mcp.NewErrorBuilder("atomic_tools_registration_failed", "Failed to register atomic tools", "registration").
-			WithSeverity("high").
-			WithOperation("register_tools").
-			WithStage("atomic_tools").
-			WithRootCause(fmt.Sprintf("Atomic tool registration failed: %v", err)).
-			WithImmediateStep(1, "Check dependencies", "Verify all atomic tool dependencies are available").
-			WithImmediateStep(2, "Check Docker/K8s", "Ensure Docker and Kubernetes clients are functional").
-			Build()
+		return fmt.Errorf("error")
 	}
 	deps.Logger.Info().Msg("Atomic tools registered successfully")
 
 	deps.Logger.Info().Msg("Registering utility tools")
 	if err := gm.registerUtilityTools(deps); err != nil {
-		return mcp.NewErrorBuilder("utility_tools_registration_failed", "Failed to register utility tools", "registration").
-			WithSeverity("high").
-			WithOperation("register_tools").
-			WithStage("utility_tools").
-			WithRootCause(fmt.Sprintf("Utility tool registration failed: %v", err)).
-			WithImmediateStep(1, "Check dependencies", "Verify all utility tool dependencies are available").
-			WithImmediateStep(2, "Check configuration", "Ensure utility tool configuration is valid").
-			Build()
+		return fmt.Errorf("error")
 	}
 	deps.Logger.Info().Msg("Utility tools registered successfully")
 
 	if s.IsConversationModeEnabled() {
 		if err := gm.registerConversationTools(deps); err != nil {
-			return mcp.NewErrorBuilder("conversation_tools_registration_failed", "Failed to register conversation tools", "registration").
-				WithSeverity("high").
-				WithOperation("register_tools").
-				WithStage("conversation_tools").
-				WithRootCause(fmt.Sprintf("Conversation tool registration failed: %v", err)).
-				WithImmediateStep(1, "Check mode", "Verify conversation mode is properly enabled").
-				WithImmediateStep(2, "Check dependencies", "Ensure conversation tool dependencies are available").
-				Build()
+			return fmt.Errorf("error")
 		}
 	}
 
@@ -194,7 +164,7 @@ type ToolDependencies struct {
 	SessionManager     *session.SessionManager
 	ToolOrchestrator   *orchestration.MCPToolOrchestrator
 	ToolRegistry       *orchestration.MCPToolRegistry
-	PipelineOperations mcptypes.PipelineOperations
+	PipelineOperations core.PipelineOperations
 	AtomicSessionMgr   *session.SessionManager
 	MCPClients         *mcptypes.MCPClients
 	RegistryManager    *coredocker.RegistryManager
@@ -392,36 +362,19 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 	if sessionID == "" {
 		// Check if SessionManager is initialized
 		if deps == nil || deps.SessionManager == nil {
-			return "", mcp.NewErrorBuilder("session_manager_not_initialized", "Session manager not initialized", "session").
-				WithOperation("ensure_session_id").
-				WithStage("initialization").
-				WithRootCause("SessionManager is nil - server may not be fully initialized").
-				WithImmediateStep(1, "Check server", "Verify server is fully initialized").
-				WithImmediateStep(2, "Check deps", "Ensure tool dependencies are properly created").
-				Build()
+			return "", fmt.Errorf("error")
 		}
 
 		deps.Logger.Debug().Str("tool", toolName).Msg("Creating new session")
 		sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
 		if err != nil {
-			return "", mcp.NewErrorBuilder("session_creation_failed", "Failed to create containerization session", "session").
-				WithOperation("ensure_session_id").
-				WithStage("session_creation").
-				WithRootCause(fmt.Sprintf("Session creation failed: %v", err)).
-				WithImmediateStep(1, "Check resources", "Verify system resources are available for new session").
-				WithImmediateStep(2, "Check limits", "Ensure session limits are not exceeded").
-				WithImmediateStep(3, "Retry creation", "Retry session creation after brief delay").
-				Build()
+			return "", fmt.Errorf("error")
 		}
-		if session, ok := sessionInterface.(*mcp.SessionState); ok {
+		if session, ok := sessionInterface.(*session.SessionState); ok {
 			deps.Logger.Info().Str("session_id", session.SessionID).Str("tool", toolName).Msg("Created new session")
 			return session.SessionID, nil
 		}
-		return "", mcp.NewErrorBuilder("session_type_assertion_failed", "Failed to assert session type", "session").
-			WithOperation("ensure_session_id").
-			WithStage("type_assertion").
-			WithRootCause(fmt.Sprintf("Expected *sessionmcp.SessionState, got %T", sessionInterface)).
-			Build()
+		return "", fmt.Errorf("error")
 	}
 	return sessionID, nil
 }
@@ -437,9 +390,14 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -450,15 +408,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			if analysisResult, ok := result.(*analyze.AtomicAnalysisResult); ok {
 				return analysisResult, nil
 			}
-			return nil, mcp.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository_atomic tool", "tool_execution").
-				WithField("expected_type", "*types.AnalyzeRepositoryResult").
-				WithField("actual_type", fmt.Sprintf("%T", result)).
-				WithOperation("handle_analyze_repository").
-				WithStage("result_processing").
-				WithRootCause(fmt.Sprintf("Tool returned unexpected type %T instead of expected result type", result)).
-				WithImmediateStep(1, "Check tool", "Verify analyze_repository tool implementation").
-				WithImmediateStep(2, "Check version", "Ensure tool version compatibility with expected interface").
-				Build()
+			return nil, fmt.Errorf("error")
 		})
 }
 
@@ -473,9 +423,14 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -501,9 +456,14 @@ func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegist
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -529,9 +489,14 @@ func (gm *GomcpManager) registerPullImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -557,9 +522,14 @@ func (gm *GomcpManager) registerTagImage(registrar *runtime.StandardToolRegistra
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -585,9 +555,14 @@ func (gm *GomcpManager) registerPushImage(registrar *runtime.StandardToolRegistr
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -608,9 +583,14 @@ func (gm *GomcpManager) registerValidationTool(registrar *runtime.StandardToolRe
 	runtime.RegisterSimpleTool(registrar, "validate_deployment",
 		"Validate Kubernetes deployment by deploying to a local Kind cluster",
 		func(ctx *gomcpserver.Context, args *deploy.ValidateDeploymentArgs) (*deploy.ValidateDeploymentResult, error) {
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -647,9 +627,14 @@ func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 			// Special handling for image_ref field
 			argsMap["image_ref"] = args.ImageRef.Repository
@@ -677,9 +662,14 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -705,9 +695,14 @@ func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToo
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -733,9 +728,14 @@ func (gm *GomcpManager) registerScanSecrets(registrar *runtime.StandardToolRegis
 			}
 			args.SessionID = sessionID
 
-			argsMap, err := BuildArgsMap(context.Background(), args)
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
 			if err != nil {
-				return nil, fmt.Errorf("failed to build arguments map: %w", err)
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
 			}
 
 			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
@@ -983,16 +983,9 @@ func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.
 		return sessiontypes.SessionLabelData{}, err
 	}
 
-	session, ok := sessionInterface.(*mcp.SessionState)
+	session, ok := sessionInterface.(*session.SessionState)
 	if !ok {
-		return sessiontypes.SessionLabelData{}, mcp.NewErrorBuilder("unexpected_session_type", "Unexpected session type encountered", "session").
-			WithOperation("get_session_label_data").
-			WithStage("type_detection").
-			WithRootCause("Session does not match any known session type patterns").
-			WithImmediateStep(1, "Check session", "Verify session is properly initialized and typed").
-			WithImmediateStep(2, "Check types", "Ensure session implements expected interface").
-			WithImmediateStep(3, "Check version", "Verify session type compatibility with current version").
-			Build()
+		return sessiontypes.SessionLabelData{}, fmt.Errorf("error")
 	}
 
 	var labels []string

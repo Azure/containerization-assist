@@ -393,12 +393,8 @@ func TestBuildValidator_AddPushTroubleshootingTips(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := fmt.Errorf("%s", tt.errorMsg)
-			tips := validator.AddPushTroubleshootingTips(err, tt.registryURL)
-			assert.Len(t, tips, len(tt.expectedTips))
-			for i, expectedTip := range tt.expectedTips {
-				assert.Equal(t, expectedTip, tips[i])
-			}
+			tips := validator.AddPushTroubleshootingTips(fmt.Errorf("%s", tt.errorMsg), tt.registryURL)
+			assert.Equal(t, tt.expectedTips, tips)
 		})
 	}
 }

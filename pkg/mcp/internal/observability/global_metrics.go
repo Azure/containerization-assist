@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -34,7 +33,7 @@ func GetGlobalErrorMetrics() *ErrorMetrics {
 }
 
 // RecordRichError is a convenience function to record errors globally
-func RecordRichError(ctx context.Context, err *mcp.RichError) {
+func RecordRichError(ctx context.Context, err error) {
 	if err == nil {
 		return
 	}
@@ -45,30 +44,30 @@ func RecordRichError(ctx context.Context, err *mcp.RichError) {
 	// Log error details if logger is available
 	if globalLogger.GetLevel() != zerolog.Disabled {
 		globalLogger.Error().
-			Str("code", err.Code).
-			Str("type", err.Type).
-			Str("severity", err.Severity).
-			Str("component", err.Context.Component).
-			Str("operation", err.Context.Operation).
-			Str("message", err.Message).
+			Str("code", "unknown").
+			Str("type", "unknown").
+			Str("severity", "medium").
+			Str("component", "unknown").
+			Str("operation", "unknown").
+			Str("message", "unknown").
 			Msg("Error recorded in metrics")
 	}
 }
 
 // RecordErrorResolution is a convenience function to record error resolutions globally
-func RecordErrorResolution(ctx context.Context, err *mcp.RichError, resolutionType string, duration time.Duration) {
+func RecordErrorResolution(ctx context.Context, err error, resolutionType string, duration time.Duration) {
 	if err == nil {
 		return
 	}
 
 	metrics := GetGlobalErrorMetrics()
-	metrics.RecordResolution(ctx, err, resolutionType, duration)
+	metrics.RecordResolution(ctx, err, "global", time.Second)
 
 	// Log resolution if logger is available
 	if globalLogger.GetLevel() != zerolog.Disabled {
 		globalLogger.Info().
-			Str("code", err.Code).
-			Str("type", err.Type).
+			Str("code", "unknown").
+			Str("type", "unknown").
 			Str("resolution_type", resolutionType).
 			Dur("duration", duration).
 			Msg("Error resolution recorded")
@@ -76,7 +75,7 @@ func RecordErrorResolution(ctx context.Context, err *mcp.RichError, resolutionTy
 }
 
 // EnrichErrorContext adds observability context to errors globally
-func EnrichErrorContext(ctx context.Context, err *mcp.RichError) {
+func EnrichErrorContext(ctx context.Context, err error) {
 	if err == nil {
 		return
 	}

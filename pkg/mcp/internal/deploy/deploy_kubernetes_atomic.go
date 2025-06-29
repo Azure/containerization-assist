@@ -228,7 +228,7 @@ type AtomicDeployKubernetesTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  core.ToolSessionManager
 	fixingMixin     *build.AtomicToolFixingMixin
-	analyzer        mcp.AIAnalyzer
+	analyzer        core.AIAnalyzer
 	contextSharer   *build.DefaultContextSharer
 	contextEnhancer *build.AIContextEnhancer
 	logger          zerolog.Logger
@@ -253,7 +253,7 @@ func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionM
 }
 
 func (t *AtomicDeployKubernetesTool) SetAnalyzer(analyzer interface{}) {
-	if aiAnalyzer, ok := analyzer.(mcp.AIAnalyzer); ok {
+	if aiAnalyzer, ok := analyzer.(core.AIAnalyzer); ok {
 		t.analyzer = aiAnalyzer
 		t.fixingMixin = build.NewAtomicToolFixingMixin(aiAnalyzer, "atomic_deploy_kubernetes", t.logger)
 		t.logger.Info().Msg("Deploy tool analyzer and fixing mixin initialized")
@@ -275,7 +275,7 @@ func (t *AtomicDeployKubernetesTool) ExecuteDeploymentWithFixes(ctx context.Cont
 			Timeout:       5 * time.Minute,
 			Logger:        t.logger,
 		})
-		
+
 		operation.ExecuteFunc = func(ctx context.Context) error {
 			var err error
 			result, err = t.executeDeploymentCore(ctx, args)
@@ -290,22 +290,16 @@ func (t *AtomicDeployKubernetesTool) ExecuteDeploymentWithFixes(ctx context.Cont
 			}
 			return nil
 		}
-		
-		operation.AnalyzeFunc = func(_ context.Context, err error) (*mcp.RichError, error) {
+
+		operation.AnalyzeFunc = func(_ context.Context, err error) (error, error) {
 			if result != nil && result.FailureAnalysis != nil {
-				return &mcp.RichError{
-					Code:     "DEPLOYMENT_FAILED",
-					Type:     result.FailureAnalysis.FailureType,
-					Severity: result.FailureAnalysis.ImpactSeverity,
-					Message:  fmt.Sprintf("Deployment failed at stage: %s (root_causes: %s)", result.FailureAnalysis.FailureStage, strings.Join(result.FailureAnalysis.RootCauses, "; ")),
-				}, nil
+				return fmt.Errorf("deployment failed at stage: %s", result.FailureAnalysis.FailureStage), nil
 			}
-			return analyzeDeploymentError(err)
+			return err, nil
 		}
-		
-		operation.PrepareFunc = func(_ context.Context, fixAttempt *mcp.FixAttempt) error {
+
+		operation.PrepareFunc = func(_ context.Context, fixAttempt interface{}) error {
 			t.logger.Info().
-				Str("fix_strategy", fixAttempt.FixStrategy.Name).
 				Str("session_id", args.SessionID).
 				Msg("Applying deployment fix")
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/stretchr/testify/assert"
@@ -166,7 +167,7 @@ func TestServerGracefulDegradation(t *testing.T) {
 
 	t.Run("conversation mode fails to enable", func(t *testing.T) {
 		// Try to enable conversation mode with invalid config
-		conversationConfig := ConversationConfig{
+		conversationConfig := core.ConversationConfig{
 			EnableTelemetry:   true,
 			TelemetryPort:     -1, // Invalid port
 			PreferencesDBPath: "/invalid/path/prefs.db",

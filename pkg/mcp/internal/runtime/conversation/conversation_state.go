@@ -22,9 +22,9 @@ type ConversationState struct {
 
 	// Conversation flow
 	CurrentStage    core.ConversationStage `json:"current_stage"`
-	History         []ConversationTurn    `json:"conversation_history"`
-	Preferences     types.UserPreferences `json:"user_preferences"`
-	PendingDecision *DecisionPoint        `json:"pending_decision,omitempty"`
+	History         []ConversationTurn     `json:"conversation_history"`
+	Preferences     types.UserPreferences  `json:"user_preferences"`
+	PendingDecision *DecisionPoint         `json:"pending_decision,omitempty"`
 
 	// Conversation context
 	Context   map[string]interface{} `json:"conversation_context"`
@@ -40,14 +40,14 @@ type ConversationState struct {
 
 // ConversationTurn represents a single turn in the conversation
 type ConversationTurn struct {
-	ID        string                `json:"id"`
-	Timestamp time.Time             `json:"timestamp"`
-	UserInput string                `json:"user_input"`
-	Assistant string                `json:"assistant_response"`
+	ID        string                 `json:"id"`
+	Timestamp time.Time              `json:"timestamp"`
+	UserInput string                 `json:"user_input"`
+	Assistant string                 `json:"assistant_response"`
 	Stage     core.ConversationStage `json:"stage"`
-	ToolCalls []ToolCall            `json:"tool_calls,omitempty"`
-	Decision  *Decision             `json:"decision,omitempty"`
-	Error     *types.ToolError      `json:"error,omitempty"`
+	ToolCalls []ToolCall             `json:"tool_calls,omitempty"`
+	Decision  *Decision              `json:"decision,omitempty"`
+	Error     *types.ToolError       `json:"error,omitempty"`
 }
 
 // ToolCall represents a tool invocation within a conversation turn
@@ -62,7 +62,7 @@ type ToolCall struct {
 // DecisionPoint represents a point where user input is needed
 type DecisionPoint struct {
 	ID       string                 `json:"id"`
-	Stage    core.ConversationStage  `json:"stage"`
+	Stage    core.ConversationStage `json:"stage"`
 	Question string                 `json:"question"`
 	Options  []Option               `json:"options"`
 	Default  string                 `json:"default,omitempty"`
@@ -96,7 +96,7 @@ type Artifact struct {
 	Path      string                 `json:"path,omitempty"`
 	CreatedAt time.Time              `json:"created_at"`
 	UpdatedAt time.Time              `json:"updated_at"`
-	Stage     core.ConversationStage  `json:"stage"`
+	Stage     core.ConversationStage `json:"stage"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -274,9 +274,9 @@ func (cs *ConversationState) GetStageProgress() StageProgress {
 // StageProgress represents progress through the workflow
 type StageProgress struct {
 	CurrentStage    core.ConversationStage   `json:"current_stage"`
-	CurrentStep     int                     `json:"current_step"`
-	TotalSteps      int                     `json:"total_steps"`
-	Percentage      int                     `json:"percentage"`
+	CurrentStep     int                      `json:"current_step"`
+	TotalSteps      int                      `json:"total_steps"`
+	Percentage      int                      `json:"percentage"`
 	CompletedStages []core.ConversationStage `json:"completed_stages"`
 	RemainingStages []core.ConversationStage `json:"remaining_stages"`
 }

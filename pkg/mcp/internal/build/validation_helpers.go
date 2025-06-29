@@ -1,7 +1,8 @@
 package build
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp/core"
+	"fmt"
+
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
@@ -14,11 +15,7 @@ func ValidateSessionID(sessionID string, toolName string, logger zerolog.Logger)
 		[]string{"SessionID"},
 	)
 	if result.HasErrors() {
-		return mcp.NewRichError(
-			"INVALID_ARGUMENTS",
-			"session_id is required and cannot be empty",
-			"validation_error",
-		)
+		return fmt.Errorf("session_id is required and cannot be empty for tool %s", toolName)
 	}
 	return nil
 }
@@ -29,11 +26,7 @@ func ValidateImageReference(imageRef, fieldName string, logger zerolog.Logger) e
 	result := mixin.StandardValidateImageRef(imageRef, fieldName)
 	if result.HasErrors() {
 		firstError := result.GetFirstError()
-		return mcp.NewRichError(
-			firstError.Code,
-			firstError.Message,
-			"validation_error",
-		)
+		return fmt.Errorf("invalid image reference for field %s: %s", fieldName, firstError.Message)
 	}
 	return nil
 }

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 )
 
@@ -63,12 +63,12 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // HandleRequest implements the LocalRequestHandler interface
-func (s *Server) HandleRequest(ctx context.Context, req *mcp.MCPRequest) (*mcp.MCPResponse, error) {
+func (s *Server) HandleRequest(ctx context.Context, req *core.MCPRequest) (*core.MCPResponse, error) {
 	// This is handled by the underlying MCP library for stdio transport
 	// For HTTP transport, we would implement custom request routing here
-	return &mcp.MCPResponse{
+	return &core.MCPResponse{
 		ID: req.ID,
-		Error: &mcp.MCPError{
+		Error: &core.MCPError{
 			Code:    -32601,
 			Message: "direct request handling not implemented",
 		},

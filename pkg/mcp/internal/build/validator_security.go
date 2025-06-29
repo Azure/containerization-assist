@@ -25,6 +25,7 @@ func (v *BuildValidatorImpl) validateUserInstruction(parts []string, lineNum int
 		})
 	}
 }
+
 func (v *BuildValidatorImpl) validateExposeInstruction(parts []string, lineNum int, result *ValidationResult) {
 	if len(parts) < 2 {
 		result.Errors = append(result.Errors, ValidationError{
@@ -45,6 +46,7 @@ func (v *BuildValidatorImpl) validateExposeInstruction(parts []string, lineNum i
 		result.Info = append(result.Info, fmt.Sprintf("Exposing port: %s", parts[i]))
 	}
 }
+
 func (v *BuildValidatorImpl) validateEnvArgInstruction(parts []string, lineNum int, result *ValidationResult, instruction string) {
 	if len(parts) < 2 {
 		result.Errors = append(result.Errors, ValidationError{

@@ -7,7 +7,7 @@ echo "=== Adapter Elimination Validation ==="
 ADAPTER_COUNT=$(find pkg/mcp -name "*adapter*.go" | wc -l)
 echo "Adapter files remaining: $ADAPTER_COUNT"
 
-# Check wrappers consolidated  
+# Check wrappers consolidated
 WRAPPER_COUNT=$(find pkg/mcp -name "*wrapper*.go" | grep -v docker_operation | wc -l)
 echo "Wrapper files remaining: $WRAPPER_COUNT"
 

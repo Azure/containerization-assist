@@ -93,20 +93,20 @@ type ImageInfo struct {
 }
 
 // extractBaseImages extracts all FROM instructions
-func (v *ImageValidator) extractBaseImages(lines []string) []ImageInfo {
-	images := make([]ImageInfo, 0)
+func (v *ImageValidator) extractBaseImages(lines []string) []*ImageInfo {
+	images := make([]*ImageInfo, 0)
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
 		if strings.HasPrefix(upper, "FROM") {
 			parts := strings.Fields(trimmed)
 			if len(parts) >= 2 {
-				imgInfo := ImageInfo{
+				imgInfo := &ImageInfo{
 					Line:  i + 1,
 					Image: parts[1],
 				}
 				// Parse registry and tag
-				v.parseImageReference(&imgInfo)
+				v.parseImageReference(imgInfo)
 				// Extract stage name if present
 				for j, part := range parts {
 					if strings.ToUpper(part) == "AS" && j+1 < len(parts) {
@@ -143,7 +143,7 @@ func (v *ImageValidator) parseImageReference(img *ImageInfo) {
 }
 
 // validateImage validates a single base image
-func (v *ImageValidator) validateImage(img ImageInfo, result *ValidationResult) {
+func (v *ImageValidator) validateImage(img *ImageInfo, result *ValidationResult) {
 	// Check for missing tag
 	if img.Tag == "" || img.Tag == "latest" {
 		result.Warnings = append(result.Warnings, ValidationWarning{
@@ -179,7 +179,7 @@ func (v *ImageValidator) validateImage(img ImageInfo, result *ValidationResult) 
 }
 
 // validateMultiStageImages validates multi-stage build practices
-func (v *ImageValidator) validateMultiStageImages(images []ImageInfo, result *ValidationResult) {
+func (v *ImageValidator) validateMultiStageImages(images []*ImageInfo, result *ValidationResult) {
 	// Check for unnamed stages
 	for i, img := range images {
 		if img.StageName == "" && i < len(images)-1 {
@@ -204,7 +204,7 @@ func (v *ImageValidator) validateMultiStageImages(images []ImageInfo, result *Va
 }
 
 // analyzeBaseImage analyzes a base image
-func (v *ImageValidator) analyzeBaseImage(img ImageInfo) BaseImageAnalysis {
+func (v *ImageValidator) analyzeBaseImage(img *ImageInfo) *BaseImageAnalysis {
 	analysis := BaseImageAnalysis{
 		Image:           img.Image,
 		Registry:        img.Registry,
@@ -227,7 +227,7 @@ func (v *ImageValidator) analyzeBaseImage(img ImageInfo) BaseImageAnalysis {
 		analysis.Recommendations = append(analysis.Recommendations,
 			"Consider using a smaller base image like Alpine or distroless")
 	}
-	return analysis
+	return &analysis
 }
 
 // Helper functions
@@ -337,7 +337,7 @@ func (v *ImageValidator) suggestAlternatives(image string) []string {
 	}
 	return alternatives
 }
-func (v *ImageValidator) findStageReferences(images []ImageInfo) map[string]bool {
+func (v *ImageValidator) findStageReferences(images []*ImageInfo) map[string]bool {
 	references := make(map[string]bool)
 	// Parse COPY --from instructions to accurately detect stage references
 	// Extract content from the original lines that contained the images

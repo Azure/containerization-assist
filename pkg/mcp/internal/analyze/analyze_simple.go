@@ -107,17 +107,17 @@ func (t *AnalyzeRepositoryTool) ExecuteTyped(ctx context.Context, args AnalyzeRe
 	// Validate path
 	repoPath := args.Path
 	if isURL(args.Path) {
-		return nil, mcp.NewRichError("NOT_IMPLEMENTED", "URL-based repositories not yet supported in simplified version", "feature_limitation")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Validate local path
 	if err := utils.ValidateLocalPath(repoPath); err != nil {
-		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "invalid local path: "+err.Error(), "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Perform analysis
 	if err := t.analyzeRepository(repoPath, response, args); err != nil {
-		return nil, mcp.NewRichError("INTERNAL_SERVER_ERROR", "analysis failed: "+err.Error(), "execution_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	response.AnalysisDuration = time.Since(startTime)
@@ -310,13 +310,13 @@ func (t *AnalyzeRepositoryTool) Execute(ctx context.Context, args interface{}) (
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return nil, fmt.Errorf("error")
 		}
 		if err = json.Unmarshal(jsonData, &analyzeArgs); err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for analyze_repository", "validation_error")
+			return nil, fmt.Errorf("error")
 		}
 	default:
-		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for analyze_repository", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Call the typed execute method
@@ -334,21 +334,21 @@ func (t *AnalyzeRepositoryTool) Validate(ctx context.Context, args interface{}) 
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return fmt.Errorf("error")
 		}
 		if err = json.Unmarshal(jsonData, &analyzeArgs); err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for analyze_repository", "validation_error")
+			return fmt.Errorf("error")
 		}
 	default:
-		return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for analyze_repository", "validation_error")
+		return fmt.Errorf("error")
 	}
 
 	// Validate required fields
 	if analyzeArgs.SessionID == "" {
-		return mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return fmt.Errorf("error")
 	}
 	if analyzeArgs.Path == "" {
-		return mcp.NewRichError("INVALID_ARGUMENTS", "path is required", "validation_error")
+		return fmt.Errorf("error")
 	}
 
 	return nil

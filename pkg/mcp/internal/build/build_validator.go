@@ -2,14 +2,13 @@ package build
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 
@@ -33,7 +32,7 @@ func NewBuildValidator(logger zerolog.Logger) *BuildValidatorImpl {
 func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, buildContext string) error {
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		return mcp.NewErrorBuilder("invalid_arguments",
+		return types.NewErrorBuilder("invalid_arguments",
 			fmt.Sprintf("Dockerfile not found at %s", dockerfilePath), "validation").
 			WithSeverity("high").
 			WithOperation("ValidateBuildPrerequisites").
@@ -42,7 +41,7 @@ func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, 
 	}
 	// Check if build context exists
 	if _, err := os.Stat(buildContext); os.IsNotExist(err) {
-		return mcp.NewErrorBuilder("invalid_arguments",
+		return types.NewErrorBuilder("invalid_arguments",
 			fmt.Sprintf("Build context directory not found at %s", buildContext), "validation").
 			WithSeverity("high").
 			WithOperation("ValidateBuildPrerequisites").
@@ -52,54 +51,9 @@ func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, 
 	// Check if Docker is available
 	cmd := exec.Command("docker", "version")
 	if err := cmd.Run(); err != nil {
-		return mcp.NewErrorBuilder("internal_server_error",
-			"Docker is not available. Please ensure Docker is installed and running", "execution").
-			WithSeverity("critical").
-			WithOperation("ValidateBuildPrerequisites").
-			WithRootCause("Docker daemon not running").
-			Build()
+		return fmt.Errorf("Docker is not available. Please ensure Docker is installed and running")
 	}
 	return nil
-}
-
-// RunSecurityScan runs a security scan on the built image using Trivy
-func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName string, imageTag string) (*coredocker.ScanResult, time.Duration, error) {
-	startTime := time.Now()
-	// Check if Trivy is installed
-	if !bv.isTrivyInstalled() {
-		bv.logger.Warn().Msg("Trivy not found, skipping security scan")
-		return nil, 0, nil
-	}
-	fullImageRef := fmt.Sprintf("%s:%s", imageName, imageTag)
-	bv.logger.Info().Str("image", fullImageRef).Msg("Running security scan with Trivy")
-	// Run Trivy scan
-	output, err := bv.executeTrivyScan(ctx, fullImageRef)
-	if err != nil {
-		return nil, time.Since(startTime), bv.createScanError(fullImageRef)
-	}
-	// Initialize scan result
-	scanResult := bv.initializeScanResult(fullImageRef, startTime)
-	// Parse Trivy JSON output
-	var trivyResult coredocker.TrivyResult
-	if err := json.Unmarshal(output, &trivyResult); err != nil {
-		bv.logger.Warn().
-			Err(err).
-			Str("output", string(output)).
-			Msg("Failed to parse Trivy JSON output, falling back to string matching")
-		// Fallback to string matching if JSON parsing fails
-		bv.countVulnerabilitiesFromString(string(output), scanResult)
-	} else {
-		// Process properly parsed JSON results
-		bv.processJSONResults(&trivyResult, scanResult)
-		// Add remediation recommendations
-		bv.addRemediationSteps(scanResult)
-	}
-	duration := time.Since(startTime)
-	bv.logger.Info().
-		Dur("duration", duration).
-		Interface("summary", scanResult.Summary).
-		Msg("Security scan completed")
-	return scanResult, duration, nil
 }
 
 // Helper method to check if Trivy is installed
@@ -123,12 +77,7 @@ func (bv *BuildValidatorImpl) executeTrivyScan(ctx context.Context, fullImageRef
 
 // Helper method to create scan error
 func (bv *BuildValidatorImpl) createScanError(fullImageRef string) error {
-	return mcp.NewErrorBuilder("internal_server_error",
-		"Security scan failed", "execution").
-		WithSeverity("medium").
-		WithOperation("RunSecurityScan").
-		WithField("image", fullImageRef).
-		Build()
+	return fmt.Errorf("security scan failed for image %s", fullImageRef)
 }
 
 // Helper method to initialize scan result
@@ -314,10 +263,7 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 	// Validate image name
 	if args.ImageName == "" {
-		return mcp.NewErrorBuilder("invalid_arguments", "image_name is required", "validation").
-			WithSeverity("high").
-			WithOperation("ValidateArgs").
-			Build()
+		return fmt.Errorf("image name is required")
 	}
 	// Validate platform if specified
 	if args.Platform != "" {
@@ -330,7 +276,7 @@ func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 			}
 		}
 		if !valid {
-			return mcp.NewErrorBuilder("invalid_arguments",
+			return types.NewErrorBuilder("invalid_arguments",
 				fmt.Sprintf("invalid platform %s, must be one of: %v", args.Platform, validPlatforms), "validation").
 				WithSeverity("high").
 				WithOperation("ValidateArgs").
@@ -340,12 +286,7 @@ func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 	}
 	// Validate registry URL if push is requested
 	if args.PushAfterBuild && args.RegistryURL == "" {
-		return mcp.NewErrorBuilder("invalid_arguments",
-			"registry_url is required when push_after_build is true", "validation").
-			WithSeverity("high").
-			WithOperation("ValidateArgs").
-			WithField("push_after_build", args.PushAfterBuild).
-			Build()
+		return fmt.Errorf("registry URL is required when push_after_build is true")
 	}
 	return nil
 }

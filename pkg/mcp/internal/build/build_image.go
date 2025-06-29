@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	types "github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/pipeline"
 	"github.com/Azure/container-kit/pkg/pipeline/dockerstage"
@@ -332,105 +330,13 @@ func (t *BuildImageTool) Execute(ctx context.Context, args interface{}) (interfa
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return AtomicBuildImageArgs{}, fmt.Errorf("failed to marshal arguments: %w", err)
 		}
-		if err = json.Unmarshal(jsonData, &buildArgs); err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for build_image", "validation_error")
-		}
-	default:
-		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
-	}
-	// Call the typed execute method
-	return t.ExecuteTyped(ctx, buildArgs)
-}
-
-// Validate implements the unified Tool interface
-func (t *BuildImageTool) Validate(ctx context.Context, args interface{}) error {
-	var buildArgs BuildImageArgs
-	switch a := args.(type) {
-	case BuildImageArgs:
-		buildArgs = a
-	case map[string]interface{}:
-		// Convert from map to struct using JSON marshaling
-		jsonData, err := json.Marshal(a)
-		if err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
-		}
-		if err = json.Unmarshal(jsonData, &buildArgs); err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for build_image", "validation_error")
+		if err := json.Unmarshal(jsonData, &buildArgs); err != nil {
+			return AtomicBuildImageArgs{}, fmt.Errorf("failed to unmarshal arguments: %w", err)
 		}
 	default:
-		return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
+		return AtomicBuildImageArgs{}, fmt.Errorf("unsupported argument type: %T", args)
 	}
-	// Validate required fields
-	if buildArgs.SessionID == "" {
-		return mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
-	}
-	return nil
-}
-
-// GetMetadata implements the unified Tool interface
-func (t *BuildImageTool) GetMetadata() core.ToolMetadata {
-	return core.ToolMetadata{
-		Name:         "build_image",
-		Description:  "Builds Docker images with AI-powered error fixing and iterative optimization",
-		Version:      "1.0.0",
-		Category:     "build",
-		Dependencies: []string{"generate_dockerfile"},
-		Capabilities: []string{
-			"docker_build",
-			"ai_error_fixing",
-			"iterative_optimization",
-			"multi_platform_support",
-			"build_caching",
-			"async_builds",
-			"build_args_support",
-		},
-		Requirements: []string{
-			"docker_daemon",
-			"dockerfile_exists",
-			"session_workspace",
-		},
-		Parameters: map[string]string{
-			"session_id":    "Required session identifier",
-			"image_name":    "Image name (optional, defaults to 'my-app')",
-			"registry":      "Registry URL (optional)",
-			"build_args":    "Docker build arguments (optional)",
-			"no_cache":      "Build without cache (optional)",
-			"platform":      "Target platform (e.g., linux/amd64) (optional)",
-			"build_timeout": "Build timeout (default: 10m) (optional)",
-			"async_build":   "Run build asynchronously (optional)",
-		},
-		Examples: []types.ToolExample{
-			{
-				Name:        "Basic Build",
-				Description: "Build a Docker image from session workspace",
-				Input: map[string]interface{}{
-					"session_id": "build-session",
-					"image_name": "my-app",
-				},
-				Output: map[string]interface{}{
-					"success":   true,
-					"image_ref": "my-app:latest",
-					"image_id":  "sha256:abc123...",
-				},
-			},
-			{
-				Name:        "Build with Registry",
-				Description: "Build and tag for specific registry",
-				Input: map[string]interface{}{
-					"session_id": "build-session",
-					"image_name": "my-app",
-					"registry":   "myregistry.azurecr.io",
-					"build_args": map[string]string{
-						"NODE_VERSION": "18",
-					},
-				},
-				Output: map[string]interface{}{
-					"success":   true,
-					"image_ref": "myregistry.azurecr.io/my-app:latest",
-				},
-			},
-		},
-	}
+	return buildArgs, nil
 }

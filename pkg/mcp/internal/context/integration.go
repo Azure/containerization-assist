@@ -61,7 +61,7 @@ func (i *AIContextIntegration) GetAggregator() *AIContextAggregator {
 	return i.aggregator
 }
 
-func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer mcp.AIAnalyzer) mcp.AIAnalyzer {
+func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer core.AIAnalyzer) core.AIAnalyzer {
 	return &AIAwareAnalyzer{
 		baseAnalyzer: baseAnalyzer,
 		integration:  i,
@@ -70,7 +70,7 @@ func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer mcp.AIAnalyzer
 }
 
 type AIAwareAnalyzer struct {
-	baseAnalyzer mcp.AIAnalyzer
+	baseAnalyzer core.AIAnalyzer
 	integration  *AIContextIntegration
 	logger       zerolog.Logger
 }

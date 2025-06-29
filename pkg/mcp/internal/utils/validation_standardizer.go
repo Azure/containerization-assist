@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -340,11 +339,11 @@ func (svm *StandardizedValidationMixin) StandardValidateImageRef(
 	return result
 }
 
-// ConvertValidationToRichError converts a ValidationResult to a RichError
-func (svm *StandardizedValidationMixin) ConvertValidationToRichError(
+// ConvertValidationToError converts a ValidationResult to a simple error
+func (svm *StandardizedValidationMixin) ConvertValidationToError(
 	result *ValidationResult,
 	operation, stage string,
-) *mcp.RichError {
+) error {
 	if result.Valid {
 		return nil
 	}
@@ -354,53 +353,13 @@ func (svm *StandardizedValidationMixin) ConvertValidationToRichError(
 		return nil
 	}
 
-	// Create a RichError using the types package instead of the errors package
-	builtError := mcp.NewRichError(firstError.Code, firstError.Message, types.ErrTypeValidation)
-
-	// Manually add context information
-	builtError.Context.Operation = operation
-	builtError.Context.Stage = stage
-
-	// Add diagnostics for all errors
-	for i, validationError := range result.Errors {
-		if builtError.Context.Metadata == nil {
-			builtError.Context.Metadata = mcp.NewErrorMetadata("", "", operation)
-		}
-		builtError.Context.Metadata.AddCustom(fmt.Sprintf("validation_error_%d", i), fmt.Sprintf("Field: %s, Error: %s", validationError.Field, validationError.Message))
+	// Create a simple error message combining all validation errors
+	var errorMsgs []string
+	for _, validationError := range result.Errors {
+		errorMsgs = append(errorMsgs, fmt.Sprintf("Field '%s': %s", validationError.Field, validationError.Message))
 	}
 
-	// Add resolution steps
-	if len(result.Errors) > 0 {
-		builtError.Resolution.ImmediateSteps = append(builtError.Resolution.ImmediateSteps,
-			mcp.ResolutionStep{
-				Order:       1,
-				Action:      "Check input parameters",
-				Description: "Check input parameters for correctness",
-				Command:     "",
-				Expected:    "All parameters should be valid",
-			},
-			mcp.ResolutionStep{
-				Order:       2,
-				Action:      "Provide required fields",
-				Description: "Ensure all required fields are provided",
-				Command:     "",
-				Expected:    "All required fields should have valid values",
-			},
-		)
-		if len(result.Errors) > 1 {
-			builtError.Resolution.ImmediateSteps = append(builtError.Resolution.ImmediateSteps,
-				mcp.ResolutionStep{
-					Order:       3,
-					Action:      "Fix validation errors",
-					Description: fmt.Sprintf("Fix all %d validation errors", len(result.Errors)),
-					Command:     "",
-					Expected:    "All validation errors should be resolved",
-				},
-			)
-		}
-	}
-
-	return builtError
+	return fmt.Errorf("validation failed for %s/%s: %s", operation, stage, strings.Join(errorMsgs, "; "))
 }
 
 // Helper methods

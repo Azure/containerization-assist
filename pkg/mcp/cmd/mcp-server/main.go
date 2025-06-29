@@ -13,8 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/factory"
+	"github.com/Azure/container-kit/pkg/mcp/server"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -175,10 +176,10 @@ func main() {
 		Str("workspace_dir", config.WorkspaceDir).
 		Msg("Starting Container Kit MCP Server")
 
-	// Create server using the factory
-	server, err := factory.NewServer(context.Background(), config)
+	// Create mcpServer using bridge package
+	mcpServer, err := server.NewServer(context.Background(), config)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create server")
+		log.Error().Err(err).Msg("Failed to create mcpServer")
 		os.Exit(1)
 	}
 
@@ -253,7 +254,7 @@ func main() {
 			TraceSampleRate: *traceSampleRate,
 		}
 
-		if err := server.EnableConversationMode(conversationConfig); err != nil {
+		if err := mcpServer.EnableConversationMode(conversationConfig); err != nil {
 			log.Error().Err(err).Msg("Failed to enable conversation mode")
 			os.Exit(1)
 		}
@@ -275,14 +276,14 @@ func main() {
 		return
 	}
 
-	// Create context for server operation
+	// Create context for mcpServer operation
 	ctx := context.Background()
 
-	// Start server in a goroutine so we can handle shutdown
-	serverErr := make(chan error, 1)
+	// Start mcpServer in a goroutine so we can handle shutdown
+	mcpServerErr := make(chan error, 1)
 	go func() {
-		if err := server.Start(ctx); err != nil {
-			serverErr <- err
+		if err := mcpServer.Start(ctx); err != nil {
+			mcpServerErr <- err
 		}
 	}()
 
@@ -290,27 +291,27 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	// Wait for shutdown signal or server error
+	// Wait for shutdown signal or mcpServer error
 	select {
 	case sig := <-sigChan:
 		log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
 
-		// Gracefully shutdown the server
-		if err := server.Stop(); err != nil {
-			log.Error().Err(err).Msg("Error during server shutdown")
+		// Gracefully shutdown the mcpServer
+		if err := mcpServer.Stop(); err != nil {
+			log.Error().Err(err).Msg("Error during mcpServer shutdown")
 		}
 
 		// Wait a moment for final logs to be written
 		time.Sleep(100 * time.Millisecond)
 
-	case err := <-serverErr:
+	case err := <-mcpServerErr:
 		log.Error().Err(err).Msg("Server failed")
 		os.Exit(1)
 
 	case <-ctx.Done():
 		log.Info().Msg("Context cancelled, shutting down")
-		if err := server.Stop(); err != nil {
-			log.Error().Err(err).Msg("Error during server shutdown")
+		if err := mcpServer.Stop(); err != nil {
+			log.Error().Err(err).Msg("Error during mcpServer shutdown")
 		}
 	}
 }
@@ -475,37 +476,37 @@ func getVersion() string {
 }
 
 // runDemo runs the specified demo mode
-func runDemo(ctx context.Context, server core.Server, demoMode string) error {
+func runDemo(ctx context.Context, mcpServer core.Server, demoMode string) error {
 	log.Warn().Str("mode", demoMode).Msg("Demo mode temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runAllDemos runs all demonstration scenarios
-func runAllDemos(ctx context.Context, server core.Server) error {
+func runAllDemos(ctx context.Context, mcpServer core.Server) error {
 	log.Warn().Msg("All demos temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runBasicWorkflowDemo demonstrates standard containerization workflow
-func runBasicWorkflowDemo(ctx context.Context, server core.Server) error {
+func runBasicWorkflowDemo(ctx context.Context, mcpServer core.Server) error {
 	log.Warn().Msg("Basic workflow demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runErrorHandlingDemo demonstrates error handling and recovery
-func runErrorHandlingDemo(ctx context.Context, server core.Server) error {
+func runErrorHandlingDemo(ctx context.Context, mcpServer core.Server) error {
 	log.Warn().Msg("Error handling demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runSessionManagementDemo demonstrates session lifecycle
-func runSessionManagementDemo(ctx context.Context, server core.Server) error {
+func runSessionManagementDemo(ctx context.Context, mcpServer core.Server) error {
 	log.Warn().Msg("Session management demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runPerformanceDemo demonstrates performance monitoring
-func runPerformanceDemo(ctx context.Context, server core.Server) error {
+func runPerformanceDemo(ctx context.Context, mcpServer core.Server) error {
 	log.Warn().Msg("Performance demo temporarily disabled due to API restructuring")
 	return nil
 }
@@ -516,7 +517,7 @@ func exportToolSchemas(outputPath string) error {
 	availableTools := []map[string]string{
 		// Core Tools
 		{"name": "chat", "category": "Core", "description": "Conversational interface for guided containerization workflow"},
-		{"name": "server_status", "category": "Core", "description": "[Advanced] Diagnostic tool for debugging server issues"},
+		{"name": "mcpServer_status", "category": "Core", "description": "[Advanced] Diagnostic tool for debugging mcpServer issues"},
 		{"name": "list_sessions", "category": "Core", "description": "List all active containerization sessions with their metadata and status"},
 		{"name": "delete_session", "category": "Core", "description": "Delete a containerization session and clean up its resources"},
 
@@ -583,7 +584,7 @@ func exportToolSchemas(outputPath string) error {
 			"note": "All resources registered with GoMCP automatically have schemas generated",
 			"available_resources": []string{
 				"logs/{level} - Server logs filtered by level (debug, info, warn, error)",
-				"logs - All server logs with default filtering",
+				"logs - All mcpServer logs with default filtering",
 				"telemetry/metrics - Prometheus metrics endpoint",
 				"telemetry/metrics/{name} - Specific metrics by name",
 				"sessions - Active containerization sessions",

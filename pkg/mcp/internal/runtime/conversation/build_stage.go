@@ -127,7 +127,7 @@ func (pm *PromptManager) handleBuildStage(ctx context.Context, state *Conversati
 
 	// Run pre-flight checks for build stage
 	if !pm.hasPassedStagePreFlightChecks(state, convertFromTypesStage(types.StageBuild)) {
-		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, convertFromTypesStage(types.StageBuild), state.SessionState)
+		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, string(convertFromTypesStage(types.StageBuild)), state.SessionState)
 		if err != nil {
 			return &ConversationResponse{
 				Message: fmt.Sprintf("%sFailed to run pre-flight checks: %v", progressPrefix, err),
@@ -390,7 +390,7 @@ func (pm *PromptManager) handlePushStage(ctx context.Context, state *Conversatio
 
 	// Run pre-flight checks for push stage
 	if !pm.hasPassedStagePreFlightChecks(state, convertFromTypesStage(types.StagePush)) {
-		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, convertFromTypesStage(types.StagePush), state.SessionState)
+		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, string(convertFromTypesStage(types.StagePush)), state.SessionState)
 		if err != nil {
 			return &ConversationResponse{
 				Message: fmt.Sprintf("%sFailed to run pre-flight checks: %v", progressPrefix, err),

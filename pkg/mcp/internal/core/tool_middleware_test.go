@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ import (
 // MockTool for testing
 type MockTool struct {
 	mock.Mock
-	metadata *mcp.ToolMetadata
+	metadata *core.ToolMetadata
 }
 
 func (m *MockTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
@@ -24,11 +24,11 @@ func (m *MockTool) Execute(ctx context.Context, args interface{}) (interface{}, 
 	return called.Get(0), called.Error(1)
 }
 
-func (m *MockTool) GetMetadata() (*mcp.ToolMetadata, error) {
+func (m *MockTool) GetMetadata() (*core.ToolMetadata, error) {
 	if m.metadata != nil {
 		return m.metadata, nil
 	}
-	return &mcp.ToolMetadata{Name: "mock_tool", Version: "1.0.0"}, nil
+	return &core.ToolMetadata{Name: "mock_tool", Version: "1.0.0"}, nil
 }
 
 func (m *MockTool) Validate(args interface{}) error {
@@ -427,7 +427,7 @@ func TestContextMiddleware(t *testing.T) {
 	contextMiddleware := NewContextMiddleware(logger)
 
 	mockTool := &MockTool{
-		metadata: &mcp.ToolMetadata{
+		metadata: &core.ToolMetadata{
 			Name:    "test_tool",
 			Version: "1.2.3",
 		},
@@ -526,7 +526,7 @@ func TestGetToolName(t *testing.T) {
 	// Test with tool that has metadata
 	t.Run("WithMetadata", func(t *testing.T) {
 		mockTool := &MockTool{
-			metadata: &mcp.ToolMetadata{Name: "test_tool"},
+			metadata: &core.ToolMetadata{Name: "test_tool"},
 		}
 
 		name := getToolName(mockTool)
@@ -545,7 +545,7 @@ func TestGetToolName(t *testing.T) {
 func TestGetToolMetadata(t *testing.T) {
 	// Test with tool that has metadata
 	t.Run("WithMetadata", func(t *testing.T) {
-		expectedMetadata := &mcp.ToolMetadata{
+		expectedMetadata := &core.ToolMetadata{
 			Name:    "test_tool",
 			Version: "1.0.0",
 		}

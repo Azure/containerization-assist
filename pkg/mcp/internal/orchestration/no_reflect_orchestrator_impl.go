@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
@@ -16,7 +15,7 @@ import (
 
 func (o *NoReflectToolOrchestrator) executeBuildImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Create tool instance
@@ -29,13 +28,13 @@ func (o *NoReflectToolOrchestrator) executeBuildImage(ctx context.Context, argsM
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if imageName, ok := getString(argsMap, "image_name"); ok {
 		args.ImageName = imageName
 	} else {
-		return nil, mcp.NewRichError("IMAGE_NAME_REQUIRED", "image_name is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Extract optional fields
@@ -80,7 +79,7 @@ func (o *NoReflectToolOrchestrator) executeBuildImage(ctx context.Context, argsM
 
 func (o *NoReflectToolOrchestrator) executePushImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreatePushImageTool()
@@ -90,13 +89,13 @@ func (o *NoReflectToolOrchestrator) executePushImage(ctx context.Context, argsMa
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if imageRef, ok := getString(argsMap, "image_ref"); ok {
 		args.ImageRef = imageRef
 	} else {
-		return nil, mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -116,12 +115,12 @@ func (o *NoReflectToolOrchestrator) executePushImage(ctx context.Context, argsMa
 		args.Force = force
 	}
 
-	return tool.ExecutePush(ctx, args)
+	return tool.ExecuteWithFixes(ctx, args)
 }
 
 func (o *NoReflectToolOrchestrator) executePullImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreatePullImageTool()
@@ -131,13 +130,13 @@ func (o *NoReflectToolOrchestrator) executePullImage(ctx context.Context, argsMa
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if imageRef, ok := getString(argsMap, "image_ref"); ok {
 		args.ImageRef = imageRef
 	} else {
-		return nil, mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -158,7 +157,7 @@ func (o *NoReflectToolOrchestrator) executePullImage(ctx context.Context, argsMa
 
 func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateTagImageTool()
@@ -168,7 +167,7 @@ func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if sourceImage, ok := getString(argsMap, "source_image"); ok {
@@ -177,7 +176,7 @@ func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap
 		// Support old field name for compatibility
 		args.SourceImage = imageRef
 	} else {
-		return nil, mcp.NewRichError("SOURCE_IMAGE_REQUIRED", "source_image is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if targetImage, ok := getString(argsMap, "target_image"); ok {
@@ -186,7 +185,7 @@ func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap
 		// Support old field name for compatibility
 		args.TargetImage = args.SourceImage + ":" + newTag
 	} else {
-		return nil, mcp.NewRichError("TARGET_IMAGE_REQUIRED", "target_image is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -199,7 +198,7 @@ func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap
 
 func (o *NoReflectToolOrchestrator) executeScanImageSecurity(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateScanImageSecurityTool()
@@ -209,7 +208,7 @@ func (o *NoReflectToolOrchestrator) executeScanImageSecurity(ctx context.Context
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if imageName, ok := getString(argsMap, "image_name"); ok {
@@ -218,7 +217,7 @@ func (o *NoReflectToolOrchestrator) executeScanImageSecurity(ctx context.Context
 		// Support old field name for compatibility
 		args.ImageName = imageRef
 	} else {
-		return nil, mcp.NewRichError("IMAGE_NAME_REQUIRED", "image_name is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -258,7 +257,7 @@ func (o *NoReflectToolOrchestrator) executeScanImageSecurity(ctx context.Context
 
 func (o *NoReflectToolOrchestrator) executeScanSecrets(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateScanSecretsTool()
@@ -268,7 +267,7 @@ func (o *NoReflectToolOrchestrator) executeScanSecrets(ctx context.Context, args
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -319,7 +318,7 @@ func (o *NoReflectToolOrchestrator) executeScanSecrets(ctx context.Context, args
 
 func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateGenerateManifestsTool()
@@ -329,19 +328,19 @@ func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if imageRef, ok := getString(argsMap, "image_ref"); ok {
 		args.ImageRef = types.ImageReference{Repository: imageRef}
 	} else {
-		return nil, mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if appName, ok := getString(argsMap, "app_name"); ok {
 		args.AppName = appName
 	} else {
-		return nil, mcp.NewRichError("APP_NAME_REQUIRED", "app_name is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -396,7 +395,7 @@ func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context
 
 func (o *NoReflectToolOrchestrator) executeDeployKubernetes(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateDeployKubernetesTool()
@@ -406,13 +405,13 @@ func (o *NoReflectToolOrchestrator) executeDeployKubernetes(ctx context.Context,
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	if imageRef, ok := getString(argsMap, "image_ref"); ok {
 		args.ImageRef = imageRef
 	} else {
-		return nil, mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -484,7 +483,7 @@ func (o *NoReflectToolOrchestrator) executeDeployKubernetes(ctx context.Context,
 
 func (o *NoReflectToolOrchestrator) executeCheckHealth(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateCheckHealthTool()
@@ -494,7 +493,7 @@ func (o *NoReflectToolOrchestrator) executeCheckHealth(ctx context.Context, args
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -543,7 +542,7 @@ func (o *NoReflectToolOrchestrator) executeCheckHealth(ctx context.Context, args
 
 func (o *NoReflectToolOrchestrator) executeGenerateDockerfile(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateGenerateDockerfileTool()
@@ -553,7 +552,7 @@ func (o *NoReflectToolOrchestrator) executeGenerateDockerfile(ctx context.Contex
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields
@@ -589,7 +588,7 @@ func (o *NoReflectToolOrchestrator) executeGenerateDockerfile(ctx context.Contex
 
 func (o *NoReflectToolOrchestrator) executeValidateDockerfile(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	tool := o.toolFactory.CreateValidateDockerfileTool()
@@ -599,7 +598,7 @@ func (o *NoReflectToolOrchestrator) executeValidateDockerfile(ctx context.Contex
 	if sessionID, ok := getString(argsMap, "session_id"); ok {
 		args.SessionID = sessionID
 	} else {
-		return nil, mcp.NewRichError("SESSION_ID_REQUIRED", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("error")
 	}
 
 	// Optional fields

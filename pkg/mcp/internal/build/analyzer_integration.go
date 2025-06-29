@@ -20,7 +20,7 @@ type FixingContext struct {
 	BaseDir         string
 	WorkspaceDir    string
 	ErrorDetails    map[string]interface{}
-	AttemptHistory  []mcp.FixAttempt
+	AttemptHistory  []interface{}
 	EnvironmentInfo map[string]interface{}
 	SessionMetadata map[string]interface{}
 }
@@ -28,13 +28,13 @@ type FixingContext struct {
 // AnalyzerIntegratedFixer combines IterativeFixer with CallerAnalyzer
 type AnalyzerIntegratedFixer struct {
 	fixer        mcptypes.IterativeFixer
-	analyzer     mcp.AIAnalyzer
+	analyzer     core.AIAnalyzer
 	contextShare mcptypes.ContextSharer
 	logger       zerolog.Logger
 }
 
 // NewAnalyzerIntegratedFixer creates a fixer that integrates with CallerAnalyzer
-func NewAnalyzerIntegratedFixer(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
+func NewAnalyzerIntegratedFixer(analyzer core.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
 	// Use real DefaultIterativeFixer implementation instead of mock
 	fixer := NewDefaultIterativeFixer(analyzer, logger)
 	contextSharer := &realContextSharer{context: make(map[string]interface{})}
@@ -57,24 +57,18 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, sessionID
 		MaxAttempts:     maxAttempts,
 		BaseDir:         baseDir,
 		ErrorDetails:    make(map[string]interface{}),
-		AttemptHistory:  []mcp.FixAttempt{},
+		AttemptHistory:  []interface{}{},
 		EnvironmentInfo: make(map[string]interface{}),
 		SessionMetadata: make(map[string]interface{}),
 	}
-	// Get workspace directory from session context
-	workspaceDir, err := a.getWorkspaceDir(ctx, sessionID)
-	if err != nil {
-		a.logger.Warn().Err(err).Msg("Could not get workspace directory, using base dir")
-		fixingCtx.WorkspaceDir = baseDir
-	} else {
-		fixingCtx.WorkspaceDir = workspaceDir
-	}
+	// Use baseDir as workspace directory (simplified)
+	fixingCtx.WorkspaceDir = baseDir
 	// Enhance error with rich details if possible
-	if richError, ok := err.(*mcp.RichError); ok {
-		fixingCtx.ErrorDetails["code"] = richError.Code
-		fixingCtx.ErrorDetails["type"] = richError.Type
-		fixingCtx.ErrorDetails["severity"] = richError.Severity
-		fixingCtx.ErrorDetails["message"] = richError.Message
+	if err != nil {
+		fixingCtx.ErrorDetails["code"] = err.Error()
+		fixingCtx.ErrorDetails["type"] = "unknown"
+		fixingCtx.ErrorDetails["severity"] = "medium"
+		fixingCtx.ErrorDetails["message"] = err.Error()
 	} else {
 		// Convert simple error to rich error for better analysis
 		fixingCtx.ErrorDetails["code"] = "UNKNOWN_ERROR"
@@ -84,127 +78,32 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, sessionID
 	}
 	// Share initial context for cross-tool coordination
 	if a.contextShare != nil {
-		err = a.contextShare.ShareContext(ctx, fmt.Sprintf("%s:failure_context", sessionID), map[string]interface{}{
+		shareErr := a.contextShare.ShareContext(ctx, sessionID, "failure_context", map[string]interface{}{
 			"tool":          toolName,
 			"operation":     operationType,
 			"error":         err.Error(),
 			"base_dir":      baseDir,
 			"workspace_dir": fixingCtx.WorkspaceDir,
 		})
-	}
-	if err != nil {
-		a.logger.Warn().Err(err).Msg("Failed to share failure context")
+		if shareErr != nil {
+			a.logger.Warn().Err(shareErr).Msg("Failed to share failure context")
+		}
 	}
 	// Attempt the fix
 	var result *mcptypes.FixingResult
 	var fixErr error
 	if a.fixer != nil {
-		result, fixErr = a.fixer.Fix(ctx, fixingCtx)
+		result, fixErr = a.fixer.AttemptFix(ctx, sessionID, toolName, operationType, err, maxAttempts, baseDir)
 	} else {
 		result = &mcptypes.FixingResult{
 			Success: false,
-			Error:   fmt.Errorf("fixer not initialized"),
-		}
-		fixErr = result.Error
-	}
-	if fixErr != nil {
-		// Check if we should route this failure to another tool
-		routing := a.fixer.GetFailureRouting()
-		errorType := "unknown_error"
-		if richError, ok := fixingCtx.OriginalError.(*mcp.RichError); ok {
-			errorType = richError.Type
-		}
-		targetTool, hasRouting := routing[errorType]
-		var routingErr error
-		if !hasRouting {
-			routingErr = fmt.Errorf("no routing for error type: %s", errorType)
-		}
-		if routingErr == nil && targetTool != toolName {
-			a.logger.Info().
-				Str("current_tool", toolName).
-				Str("target_tool", targetTool).
-				Msg("Routing failure to different tool")
-			// Share context for the target tool
-			routingContext := map[string]interface{}{
-				"routed_from":        toolName,
-				"original_error":     err.Error(),
-				"fix_attempts":       result.AllAttempts,
-				"recommended_action": fmt.Sprintf("Continue fixing in %s", targetTool),
-			}
-			// TODO: Fix ShareContext signature
-			var shareErr error
-			if a.contextShare != nil {
-				shareErr = a.contextShare.ShareContext(ctx, fmt.Sprintf("%s:routing_context", sessionID), routingContext)
-			}
-			if shareErr != nil {
-				a.logger.Error().Err(shareErr).Msg("Failed to share routing context")
-			}
-			// Add routing recommendation to result
-			result.RecommendedNext = append(result.RecommendedNext,
-				fmt.Sprintf("Route to %s tool for specialized fixing", targetTool))
-		}
-		return result, fixErr
-	}
-	// Share successful fix context for other tools to learn from
-	if result.Success {
-		successContext := map[string]interface{}{
-			"tool":            toolName,
-			"operation":       operationType,
-			"fix_strategy":    result.FinalAttempt.FixStrategy.Name,
-			"fix_duration":    result.TotalDuration,
-			"attempts_needed": result.TotalAttempts,
-		}
-		if a.contextShare != nil {
-			err = a.contextShare.ShareContext(ctx, fmt.Sprintf("%s:success_context", sessionID), successContext)
-		}
-		if err != nil {
-			a.logger.Warn().Err(err).Msg("Failed to share success context")
 		}
 	}
-	return result, nil
-}
-
-// getWorkspaceDir retrieves the workspace directory for a session
-func (a *AnalyzerIntegratedFixer) getWorkspaceDir(ctx context.Context, sessionID string) (string, error) {
-	// TODO: Implement proper workspace directory retrieval
-	return "", fmt.Errorf("not implemented")
-}
-
-// GetFixingRecommendations provides fixing recommendations without attempting fixes
-func (a *AnalyzerIntegratedFixer) GetFixingRecommendations(ctx context.Context, sessionID string, toolName string, err error, baseDir string) ([]mcptypes.FixStrategy, error) {
-	fixingCtx := &FixingContext{
-		SessionID:     sessionID,
-		ToolName:      toolName,
-		OriginalError: err,
-		BaseDir:       baseDir,
-		ErrorDetails:  make(map[string]interface{}),
-		MaxAttempts:   1, // We're just analyzing, not fixing
+	// Handle the fix result
+	if result != nil && result.Success {
+		a.logger.Info().Msg("Fix applied successfully")
 	}
-	// Enhance error details
-	if richError, ok := err.(*mcp.RichError); ok {
-		fixingCtx.ErrorDetails["code"] = richError.Code
-		fixingCtx.ErrorDetails["type"] = richError.Type
-		fixingCtx.ErrorDetails["severity"] = richError.Severity
-		fixingCtx.ErrorDetails["message"] = richError.Message
-	} else {
-		fixingCtx.ErrorDetails["code"] = "UNKNOWN_ERROR"
-		fixingCtx.ErrorDetails["type"] = "operation_failure"
-		fixingCtx.ErrorDetails["severity"] = "Medium"
-		fixingCtx.ErrorDetails["message"] = err.Error()
-	}
-	// Get available fix strategies from the fixer
-	strategyNames := a.fixer.GetFixStrategies()
-	strategies := make([]mcptypes.FixStrategy, 0, len(strategyNames))
-	// Convert strategy names to FixStrategy objects
-	for i, name := range strategyNames {
-		strategies = append(strategies, mcptypes.FixStrategy{
-			Name:        name,
-			Description: fmt.Sprintf("Apply %s strategy", name),
-			Type:        getStrategyType(name),
-			Priority:    i + 1, // Lower index = higher priority
-		})
-	}
-	return strategies, nil
+	return result, fixErr
 }
 
 // AnalyzeErrorWithContext provides enhanced error analysis using shared context
@@ -213,7 +112,7 @@ func (a *AnalyzerIntegratedFixer) AnalyzeErrorWithContext(ctx context.Context, s
 	var contextInfo []string
 	// Try to get failure context
 	if a.contextShare != nil {
-		if failureCtx, ok := a.contextShare.GetSharedContext(ctx, fmt.Sprintf("%s:failure_context", sessionID)); ok {
+		if failureCtx, err := a.contextShare.GetSharedContext(ctx, sessionID, "failure_context"); err == nil {
 			if failureMap, ok := failureCtx.(map[string]interface{}); ok {
 				contextInfo = append(contextInfo, fmt.Sprintf("Previous failure context: %+v", failureMap))
 			}
@@ -221,7 +120,7 @@ func (a *AnalyzerIntegratedFixer) AnalyzeErrorWithContext(ctx context.Context, s
 	}
 	// Try to get success context for learning
 	if a.contextShare != nil {
-		if successCtx, ok := a.contextShare.GetSharedContext(ctx, fmt.Sprintf("%s:success_context", sessionID)); ok {
+		if successCtx, err := a.contextShare.GetSharedContext(ctx, sessionID, "success_context"); err == nil {
 			if successMap, ok := successCtx.(map[string]interface{}); ok {
 				contextInfo = append(contextInfo, fmt.Sprintf("Previous success context: %+v", successMap))
 			}
@@ -302,8 +201,8 @@ func GetEnhancedConfiguration(toolName string) *EnhancedFixingConfiguration {
 // mockIterativeFixer provides a minimal implementation for testing
 type mockIterativeFixer struct {
 	maxAttempts int
-	history     []mcp.FixAttempt
-	analyzer    mcp.AIAnalyzer
+	history     []interface{}
+	analyzer    core.AIAnalyzer
 }
 
 func (m *mockIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mcptypes.FixingResult, error) {
@@ -312,43 +211,43 @@ func (m *mockIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mcpty
 		_, err := m.analyzer.AnalyzeWithFileTools(ctx, "Fix this Docker build error", "/tmp")
 		if err != nil {
 			return &mcptypes.FixingResult{
-				Success: false,
-				Error:   err,
+				Success:    false,
+				FinalError: err,
 			}, err
 		}
 	}
 	// For testing, simulate a successful fix with working Dockerfile content
-	attempt := mcp.FixAttempt{
-		AttemptNumber: len(m.history) + 1,
-		Success:       true,
-		Error:         nil,
-		Strategy:      "dockerfile",
-		FixStrategy: mcptypes.FixStrategy{
-			Name:        "Fix Dockerfile base image",
-			Priority:    5,
-			Type:        "dockerfile",
-			Description: "Update the base image to a valid one",
+	attempt := map[string]interface{}{
+		"AttemptNumber": len(m.history) + 1,
+		"Success":       true,
+		"Error":         nil,
+		"Strategy":      "dockerfile",
+		"FixStrategy": map[string]interface{}{
+			"Name":        "Fix Dockerfile base image",
+			"Priority":    5,
+			"Type":        "dockerfile",
+			"Description": "Update the base image to a valid one",
 		},
-		FixedContent: `FROM node:18-alpine
+		"FixedContent": `FROM node:18-alpine
 WORKDIR /app
 COPY . .
 CMD ["echo", "hello"]`,
 	}
 	m.history = append(m.history, attempt)
+	attemptNum := len(m.history)
 	return &mcptypes.FixingResult{
-		Success:       true,
-		Error:         nil,
-		FixApplied:    "Fixed Dockerfile base image",
-		Attempts:      attempt.AttemptNumber,
-		TotalAttempts: attempt.AttemptNumber,
-		FixHistory:    []mcp.FixAttempt{attempt},
-		FinalAttempt:  &attempt,
+		Success:        true,
+		FixApplied:     true,
+		FixDescription: "Fixed Dockerfile base image",
+		AttemptsUsed:   attemptNum,
+		TotalAttempts:  attemptNum,
+		AllAttempts:    []interface{}{attempt},
 	}, nil
 }
 func (m *mockIterativeFixer) SetMaxAttempts(max int) {
 	m.maxAttempts = max
 }
-func (m *mockIterativeFixer) GetFixHistory() []mcp.FixAttempt {
+func (m *mockIterativeFixer) GetFixHistory() []interface{} {
 	return m.history
 }
 func (m *mockIterativeFixer) AttemptFix(ctx context.Context, issue interface{}, attempt int) (*mcptypes.FixingResult, error) {
@@ -374,19 +273,38 @@ type realContextSharer struct {
 	context map[string]interface{}
 }
 
-func (r *realContextSharer) ShareContext(ctx context.Context, key string, value interface{}) error {
+func (r *realContextSharer) ShareContext(ctx context.Context, sessionID string, contextType string, data interface{}) error {
 	if r.context == nil {
 		r.context = make(map[string]interface{})
 	}
-	r.context[key] = value
+	key := sessionID + ":" + contextType
+	r.context[key] = data
 	return nil
 }
-func (r *realContextSharer) GetSharedContext(ctx context.Context, key string) (interface{}, bool) {
+
+func (r *realContextSharer) GetSharedContext(ctx context.Context, sessionID string, contextType string) (interface{}, error) {
 	if r.context == nil {
-		return nil, false
+		return nil, fmt.Errorf("no context found")
 	}
+	key := sessionID + ":" + contextType
 	value, exists := r.context[key]
-	return value, exists
+	if !exists {
+		return nil, fmt.Errorf("context not found for %s", key)
+	}
+	return value, nil
+}
+
+func (r *realContextSharer) ClearContext(ctx context.Context, sessionID string) error {
+	if r.context == nil {
+		return nil
+	}
+	// Clear all contexts for the session
+	for key := range r.context {
+		if strings.HasPrefix(key, sessionID+":") {
+			delete(r.context, key)
+		}
+	}
+	return nil
 }
 
 // getStrategyType infers the strategy type from its name

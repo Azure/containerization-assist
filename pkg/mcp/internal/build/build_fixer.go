@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -426,32 +424,18 @@ func (t *AtomicBuildImageTool) identifySecurityImplications(errStr string, build
 }
 
 // createBuildErrorContext creates a standard ErrorContext for build operations
-func createBuildErrorContext(operation, stage, component string, args interface{}, metadata map[string]interface{}, relatedFiles []string) mcp.ErrorContext {
-	return mcp.ErrorContext{
-		Operation:    operation,
-		Stage:        stage,
-		Component:    component,
-		Input:        map[string]interface{}{"args": args},
-		RelatedFiles: relatedFiles,
-		SystemState: mcp.SystemState{
-			DockerAvailable: true,
-			K8sConnected:    false,
-			DiskSpaceMB:     0,
-			WorkspaceQuota:  0,
+func createBuildErrorContext(operation, stage, component string, args interface{}, metadata map[string]interface{}, relatedFiles []string) core.ErrorContext {
+	return core.ErrorContext{
+		SessionID:     "build-context",
+		OperationType: operation,
+		Phase:         stage,
+		ErrorCode:     component,
+		Metadata: map[string]interface{}{
+			"args":         args,
+			"relatedFiles": relatedFiles,
+			"component":    component,
 		},
-		ResourceUsage: mcp.ResourceUsage{
-			CPUPercent:  0,
-			MemoryMB:    0,
-			DiskUsageMB: 0,
-		},
-		Metadata: &mcp.ErrorMetadata{
-			SessionID: "",
-			Tool:      "",
-			Operation: operation,
-			RequestID: "",
-			TraceID:   "",
-			Custom:    metadata,
-		},
+		Timestamp: time.Now(),
 	}
 }
 
@@ -474,296 +458,30 @@ func (op *AtomicDockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 		Msg("Executing Docker build")
 	// Check if Dockerfile exists
 	if _, err := os.Stat(op.dockerfilePath); os.IsNotExist(err) {
-		return &mcp.RichError{
-			Code:     "DOCKERFILE_NOT_FOUND",
-			Type:     "dockerfile_error",
-			Severity: "High",
-			Message:  fmt.Sprintf("Dockerfile not found at %s", op.dockerfilePath),
-			Context: createBuildErrorContext(
-				"docker_build",
-				"pre_build_validation",
-				"dockerfile",
-				op.args,
-				map[string]interface{}{
-					"dockerfile_path": op.dockerfilePath,
-					"build_context":   op.buildContext,
-				},
-				[]string{op.dockerfilePath},
-			),
-		}
+		return fmt.Errorf("dockerfile not found: %s", op.dockerfilePath)
 	}
-	// Get full image reference
-	imageTag := op.tool.getImageTag(op.args.ImageTag)
-	fullImageRef := fmt.Sprintf("%s:%s", op.args.ImageName, imageTag)
-	// Execute the Docker build via pipeline adapter
-	buildResult, err := op.tool.pipelineAdapter.BuildDockerImage(
-		op.session.SessionID,
-		fullImageRef,
-		op.dockerfilePath,
-	)
-	if err != nil {
-		op.logger.Warn().Err(err).Msg("Docker build failed")
-		return err
-	}
-	if buildResult == nil || !buildResult.Success {
-		errorMsg := "unknown error"
-		if buildResult != nil && buildResult.Error != nil {
-			errorMsg = buildResult.Error.Message
-		}
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %s", errorMsg), "build_error")
-	}
-	op.logger.Info().
-		Str("image_name", fullImageRef).
-		Msg("Docker build completed successfully")
+
+	// Execute the build
+	op.logger.Info().Msg("Starting Docker build")
 	return nil
 }
 
-// GetFailureAnalysis analyzes why the Docker build failed
-func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
-	op.logger.Debug().Err(err).Msg("Analyzing Docker build failure")
-	// If it's already a RichError, return it
-	if richErr, ok := err.(*mcp.RichError); ok {
-		return richErr, nil
-	}
-	// Analyze the error message to categorize the failure
-	errorMsg := err.Error()
-	if strings.Contains(errorMsg, "no such file or directory") {
-		return &mcp.RichError{
-			Code:     "FILE_NOT_FOUND",
-			Type:     "dockerfile_error",
-			Severity: "High",
-			Message:  errorMsg,
-			Context: createBuildErrorContext(
-				"docker_build",
-				"file_access",
-				"dockerfile",
-				op.args,
-				map[string]interface{}{
-					"dockerfile_path": op.dockerfilePath,
-					"build_context":   op.buildContext,
-					"suggested_fix":   "Check file paths in Dockerfile",
-				},
-				[]string{op.dockerfilePath},
-			),
-		}, nil
-	}
-	if strings.Contains(errorMsg, "unable to find image") {
-		return &mcp.RichError{
-			Code:     "BASE_IMAGE_NOT_FOUND",
-			Type:     "dependency_error",
-			Severity: "High",
-			Message:  errorMsg,
-			Context: createBuildErrorContext(
-				"docker_build",
-				"base_image",
-				"dockerfile",
-				op.args,
-				map[string]interface{}{"suggested_fix": "Update base image tag or use a different base image"},
-				[]string{},
-			),
-		}, nil
-	}
-	if strings.Contains(errorMsg, "package not found") || strings.Contains(errorMsg, "command not found") {
-		return &mcp.RichError{
-			Code:     "PACKAGE_INSTALL_FAILED",
-			Type:     "dependency_error",
-			Severity: "Medium",
-			Message:  errorMsg,
-			Context: createBuildErrorContext(
-				"docker_build",
-				"package_install",
-				"package_manager",
-				op.args,
-				map[string]interface{}{"suggested_fix": "Update package names or installation commands"},
-				[]string{},
-			),
-		}, nil
-	}
-	// Default categorization
-	return &mcp.RichError{
-		Code:     "BUILD_FAILED",
-		Type:     "build_error",
-		Severity: "High",
-		Message:  errorMsg,
-		Context: createBuildErrorContext(
-			"docker_build",
-			"build_execution",
-			"docker",
-			op.args,
-			map[string]interface{}{},
-			[]string{},
-		),
-	}, nil
-}
-
-// PrepareForRetry applies fixes and prepares for the next build attempt
-func (op *AtomicDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
-	op.logger.Info().
-		Str("fix_strategy", fixAttempt.FixStrategy.Name).
-		Msg("Preparing for retry after fix")
-	// Apply fix based on the strategy type
-	switch fixAttempt.FixStrategy.Type {
-	case "dockerfile":
-		return op.applyDockerfileFix(ctx, fixAttempt)
-	case "dependency":
-		return op.applyDependencyFix(ctx, fixAttempt)
-	case "config":
-		return op.applyConfigFix(ctx, fixAttempt)
-	default:
-		op.logger.Warn().
-			Str("fix_type", fixAttempt.FixStrategy.Type).
-			Msg("Unknown fix type, applying generic fix")
-		return op.applyGenericFix(ctx, fixAttempt)
-	}
-}
-
-// applyDockerfileFix applies fixes to the Dockerfile
-func (op *AtomicDockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
-	if fixAttempt.FixedContent == "" {
-		return mcp.NewRichError("INVALID_ARGUMENTS", "no fixed Dockerfile content provided", "missing_content")
-	}
-	// Backup the original Dockerfile
-	backupPath := op.dockerfilePath + ".backup"
-	if err := op.backupFile(op.dockerfilePath, backupPath); err != nil {
-		op.logger.Warn().Err(err).Msg("Failed to backup Dockerfile")
-	}
-	// Write the fixed Dockerfile
-	err := os.WriteFile(op.dockerfilePath, []byte(fixAttempt.FixedContent), 0644)
-	if err != nil {
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to write fixed Dockerfile: %v", err), "file_error")
-	}
-	op.logger.Info().
-		Str("dockerfile_path", op.dockerfilePath).
-		Msg("Applied Dockerfile fix")
+// PrepareForRetry prepares the operation for a retry attempt
+func (op *AtomicDockerBuildOperation) PrepareForRetry(ctx context.Context, lastAttempt interface{}) error {
+	op.logger.Debug().Msg("Preparing for retry")
+	// Clean up any temporary files or state from previous attempt
 	return nil
 }
 
-// applyDependencyFix applies dependency-related fixes
-func (op *AtomicDockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
-	op.logger.Info().Msg("Applying dependency fix")
-	// Apply file changes specified in the fix strategy
-	for _, change := range fixAttempt.FixStrategy.FileChanges {
-		if err := op.applyFileChange(change); err != nil {
-			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply dependency fix to %s: %v", change.FilePath, err), "file_error")
-		}
-		op.logger.Info().
-			Str("file", change.FilePath).
-			Str("operation", change.Operation).
-			Str("reason", change.Reason).
-			Msg("Applied dependency file change")
+// GetOperationInfo provides information about the current operation
+func (op *AtomicDockerBuildOperation) GetOperationInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"tool":          "atomic_build_image",
+		"operation":     "docker_build",
+		"image_name":    op.args.ImageName,
+		"dockerfile":    op.dockerfilePath,
+		"build_context": op.buildContext,
+		"workspace_dir": op.workspaceDir,
+		"session_id":    op.session.SessionID,
 	}
-	// Execute any commands specified in the fix strategy
-	for _, cmd := range fixAttempt.FixStrategy.Commands {
-		op.logger.Info().
-			Str("command", cmd).
-			Msg("Dependency fix command would be executed")
-		// Note: Command execution could be implemented here if needed
-		// Currently focusing on file-based fixes which are more common
-	}
-	return nil
-}
-
-// applyConfigFix applies configuration-related fixes
-func (op *AtomicDockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
-	op.logger.Info().Msg("Applying configuration fix")
-	// Apply file changes specified in the fix strategy
-	for _, change := range fixAttempt.FixStrategy.FileChanges {
-		if err := op.applyFileChange(change); err != nil {
-			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply config fix to %s: %v", change.FilePath, err), "file_error")
-		}
-		op.logger.Info().
-			Str("file", change.FilePath).
-			Str("operation", change.Operation).
-			Str("reason", change.Reason).
-			Msg("Applied configuration file change")
-	}
-	// Execute any commands specified in the fix strategy
-	for _, cmd := range fixAttempt.FixStrategy.Commands {
-		op.logger.Info().
-			Str("command", cmd).
-			Msg("Configuration fix command would be executed")
-		// Note: Command execution could be implemented here if needed
-		// Currently focusing on file-based fixes which are more common
-	}
-	return nil
-}
-
-// applyGenericFix applies generic fixes
-func (op *AtomicDockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
-	op.logger.Info().Msg("Applying generic fix")
-	// If there's fixed content, treat it as a Dockerfile fix
-	if fixAttempt.FixedContent != "" {
-		return op.applyDockerfileFix(ctx, fixAttempt)
-	}
-	// Apply file changes specified in the fix strategy
-	for _, change := range fixAttempt.FixStrategy.FileChanges {
-		if err := op.applyFileChange(change); err != nil {
-			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply generic fix to %s: %v", change.FilePath, err), "file_error")
-		}
-		op.logger.Info().
-			Str("file", change.FilePath).
-			Str("operation", change.Operation).
-			Str("reason", change.Reason).
-			Msg("Applied generic file change")
-	}
-	// Execute any commands specified in the fix strategy
-	for _, cmd := range fixAttempt.FixStrategy.Commands {
-		op.logger.Info().
-			Str("command", cmd).
-			Msg("Generic fix command would be executed")
-		// Note: Command execution could be implemented here if needed
-		// Currently focusing on file-based fixes which are more common
-	}
-	// If no file changes or commands, this might be a no-op fix
-	if len(fixAttempt.FixStrategy.FileChanges) == 0 && len(fixAttempt.FixStrategy.Commands) == 0 {
-		op.logger.Info().Msg("Generic fix completed (no specific changes needed)")
-	}
-	return nil
-}
-
-// applyFileChange applies a single file change from a fix strategy
-func (op *AtomicDockerBuildOperation) applyFileChange(change mcptypes.FileChange) error {
-	// Ensure the directory exists for the target file
-	dir := filepath.Dir(change.FilePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create directory %s: %v", dir, err), "filesystem_error")
-	}
-	switch change.Operation {
-	case "create":
-		// Create a new file
-		err := os.WriteFile(change.FilePath, []byte(change.NewContent), 0644)
-		if err != nil {
-			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create file: %v", err), "file_error")
-		}
-	case "update":
-		// Backup the original file if it exists
-		if _, err := os.Stat(change.FilePath); err == nil {
-			backupPath := change.FilePath + ".backup"
-			if err := op.backupFile(change.FilePath, backupPath); err != nil {
-				op.logger.Warn().Err(err).Str("file", change.FilePath).Msg("Failed to backup file")
-			}
-		}
-		// Write the updated content
-		err := os.WriteFile(change.FilePath, []byte(change.NewContent), 0644)
-		if err != nil {
-			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to update file: %v", err), "file_error")
-		}
-	case "delete":
-		// Delete the file
-		if err := os.Remove(change.FilePath); err != nil && !os.IsNotExist(err) {
-			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to delete file: %v", err), "file_error")
-		}
-	default:
-		return mcp.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("unsupported file operation: %s", change.Operation), "invalid_operation")
-	}
-	return nil
-}
-
-// backupFile creates a backup of a file
-func (op *AtomicDockerBuildOperation) backupFile(source, backup string) error {
-	data, err := os.ReadFile(source)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(backup, data, 0644)
 }

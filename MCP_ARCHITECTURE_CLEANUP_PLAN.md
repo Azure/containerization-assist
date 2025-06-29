@@ -29,7 +29,7 @@ This plan addresses the remaining architectural issues in the pkg/mcp modules, f
 
 #### Task 1.2: Remove Interface Re-exports (3 hours)
 1. Delete the entire BACKWARD COMPATIBILITY section from `pkg/mcp/interfaces.go`
-2. Delete the entire LEGACY TYPES section from `pkg/mcp/interfaces.go`  
+2. Delete the entire LEGACY TYPES section from `pkg/mcp/interfaces.go`
 3. Update all imports to use `pkg/mcp/core` directly
 
 #### Task 1.3: Remove sessionManagerAdapter (2 hours)

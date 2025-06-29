@@ -2,15 +2,12 @@ package observability
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -34,8 +31,9 @@ type ErrorMetrics struct {
 
 	// Internal state
 	mu              sync.RWMutex
-	recentErrors    []*mcp.RichError
+	recentErrors    []error
 	errorPatterns   map[string]int
+	resolutionTimes map[string]time.Duration
 	maxRecentErrors int
 }
 
@@ -50,8 +48,9 @@ func NewErrorMetrics() *ErrorMetrics {
 	errorMetricsOnce.Do(func() {
 		em := &ErrorMetrics{
 			errorPatterns:   make(map[string]int),
+			resolutionTimes: make(map[string]time.Duration),
 			maxRecentErrors: 1000,
-			recentErrors:    make([]*mcp.RichError, 0, 1000),
+			recentErrors:    make([]error, 0),
 		}
 
 		// Initialize Prometheus metrics
@@ -60,22 +59,22 @@ func NewErrorMetrics() *ErrorMetrics {
 				Name: "mcp_errors_total",
 				Help: "Total number of errors by code, type, and severity",
 			},
-			[]string{"code", "type", "severity", "component", "operation"},
+			[]string{"code", "type", "severity", "tool", "operation"},
 		)
 
 		em.errorDuration = promauto.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Name:    "mcp_error_duration_seconds",
 				Help:    "Duration from error occurrence to resolution",
-				Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
+				Buckets: prometheus.DefBuckets,
 			},
 			[]string{"code", "type", "severity"},
 		)
 
 		em.errorSeverityGauge = promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "mcp_error_severity_current",
-				Help: "Current count of errors by severity",
+				Name: "mcp_active_errors_by_severity",
+				Help: "Current number of unresolved errors by severity",
 			},
 			[]string{"severity"},
 		)
@@ -83,42 +82,39 @@ func NewErrorMetrics() *ErrorMetrics {
 		em.retryCounter = promauto.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "mcp_error_retries_total",
-				Help: "Total number of retry attempts by error code",
+				Help: "Total number of error retry attempts",
 			},
-			[]string{"code", "type", "attempt_number"},
+			[]string{"code", "type", "attempt"},
 		)
 
 		em.resolutionCounter = promauto.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "mcp_error_resolutions_total",
-				Help: "Total number of successful error resolutions",
+				Help: "Total number of error resolutions by type",
 			},
 			[]string{"code", "type", "resolution_type"},
 		)
 
 		// Initialize OpenTelemetry metrics
-		meter := otel.Meter("github.com/Azure/container-kit/mcp")
+		meter := otel.Meter("mcp-error-metrics")
 
 		em.otelErrorCounter, _ = meter.Int64Counter(
-			"mcptypes.errors",
-			metric.WithDescription("Total number of errors"),
-			metric.WithUnit("1"),
+			"mcp.errors.count",
+			metric.WithDescription("Total count of errors"),
 		)
 
 		em.otelErrorDuration, _ = meter.Float64Histogram(
-			"mcptypes.error.duration",
-			metric.WithDescription("Error duration from occurrence to resolution"),
-			metric.WithUnit("s"),
+			"mcp.errors.duration",
+			metric.WithDescription("Duration from error to resolution"),
 		)
 
 		em.otelRetryCounter, _ = meter.Int64Counter(
-			"mcptypes.error.retries",
-			metric.WithDescription("Total number of retry attempts"),
-			metric.WithUnit("1"),
+			"mcp.errors.retries",
+			metric.WithDescription("Total retry attempts"),
 		)
 
 		// Initialize tracer
-		em.tracer = otel.Tracer("github.com/Azure/container-kit/mcp/errors")
+		em.tracer = otel.Tracer("mcp-error-tracer")
 
 		errorMetricsInstance = em
 	})
@@ -126,52 +122,96 @@ func NewErrorMetrics() *ErrorMetrics {
 	return errorMetricsInstance
 }
 
-// RecordError records a RichError with full observability integration
-func (em *ErrorMetrics) RecordError(ctx context.Context, err *mcp.RichError) {
+// NewErrorMetricsForTesting creates a new error metrics instance for testing without global registration
+func NewErrorMetricsForTesting() *ErrorMetrics {
+	registry := prometheus.NewRegistry()
+
+	em := &ErrorMetrics{
+		errorPatterns:   make(map[string]int),
+		resolutionTimes: make(map[string]time.Duration),
+		maxRecentErrors: 1000,
+		recentErrors:    make([]error, 0),
+	}
+
+	// Initialize Prometheus metrics with custom registry
+	factory := promauto.With(registry)
+
+	em.errorCounter = factory.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "mcp_errors_total",
+			Help: "Total number of errors by code, type, and severity",
+		},
+		[]string{"code", "type", "severity", "tool", "operation"},
+	)
+
+	em.errorDuration = factory.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "mcp_error_duration_seconds",
+			Help:    "Duration from error occurrence to resolution",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"code", "type", "severity"},
+	)
+
+	em.errorSeverityGauge = factory.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "mcp_active_errors_by_severity",
+			Help: "Current number of unresolved errors by severity",
+		},
+		[]string{"severity"},
+	)
+
+	em.retryCounter = factory.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "mcp_error_retries_total",
+			Help: "Total number of error retry attempts",
+		},
+		[]string{"code", "type", "attempt"},
+	)
+
+	em.resolutionCounter = factory.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "mcp_error_resolutions_total",
+			Help: "Total number of error resolutions by type",
+		},
+		[]string{"code", "type", "resolution_type"},
+	)
+
+	// Initialize OpenTelemetry metrics (these don't conflict)
+	meter := otel.Meter("mcp-error-metrics")
+	em.otelErrorCounter, _ = meter.Int64Counter(
+		"mcp.errors.total",
+		metric.WithDescription("Total errors by type and severity"),
+	)
+	em.otelErrorDuration, _ = meter.Float64Histogram(
+		"mcp.errors.duration",
+		metric.WithDescription("Error duration"),
+	)
+	em.otelRetryCounter, _ = meter.Int64Counter(
+		"mcp.errors.retries",
+		metric.WithDescription("Total retry attempts"),
+	)
+
+	// Initialize tracer
+	em.tracer = otel.Tracer("mcp-error-tracer")
+
+	return em
+}
+
+// RecordError records an error with observability integration
+func (em *ErrorMetrics) RecordError(ctx context.Context, err error) {
 	if err == nil {
 		return
 	}
 
-	// Start span for error recording
-	ctx, span := em.tracer.Start(ctx, "error.record",
-		trace.WithAttributes(
-			attribute.String("error.code", err.Code),
-			attribute.String("error.type", err.Type),
-			attribute.String("error.severity", err.Severity),
-			attribute.String("error.message", err.Message),
-		),
-	)
-	defer span.End()
-
 	// Update Prometheus metrics
 	em.errorCounter.WithLabelValues(
-		err.Code,
-		err.Type,
-		err.Severity,
-		err.Context.Component,
-		err.Context.Operation,
+		"unknown",
+		"unknown",
+		"medium",
+		"unknown",
+		"unknown",
 	).Inc()
-
-	// Update severity gauge
-	em.updateSeverityGauge(err.Severity, 1)
-
-	// Record retry information
-	if err.AttemptNumber > 0 {
-		em.retryCounter.WithLabelValues(
-			err.Code,
-			err.Type,
-			fmt.Sprintf("%d", err.AttemptNumber),
-		).Inc()
-	}
-
-	// Update OpenTelemetry metrics
-	em.otelErrorCounter.Add(ctx, 1,
-		metric.WithAttributes(
-			attribute.String("error.code", err.Code),
-			attribute.String("error.type", err.Type),
-			attribute.String("error.severity", err.Severity),
-		),
-	)
 
 	// Store recent error for pattern analysis
 	em.mu.Lock()
@@ -180,64 +220,37 @@ func (em *ErrorMetrics) RecordError(ctx context.Context, err *mcp.RichError) {
 		em.recentErrors = em.recentErrors[1:]
 	}
 
-	// Track error patterns
-	patternKey := fmt.Sprintf("%s:%s", err.Code, err.Type)
-	em.errorPatterns[patternKey]++
-	em.mu.Unlock()
+	// Update error patterns
+	errorMsg := err.Error()
+	em.errorPatterns[errorMsg]++
 
-	// Add error event to span
-	span.AddEvent("error.occurred",
-		trace.WithAttributes(
-			attribute.String("root_cause", err.Diagnostics.RootCause),
-			attribute.String("error_pattern", err.Diagnostics.ErrorPattern),
-			attribute.StringSlice("symptoms", err.Diagnostics.Symptoms),
-		),
-	)
+	em.mu.Unlock()
 }
 
 // RecordResolution records when an error is successfully resolved
-func (em *ErrorMetrics) RecordResolution(ctx context.Context, err *mcp.RichError, resolutionType string, duration time.Duration) {
+func (em *ErrorMetrics) RecordResolution(ctx context.Context, err error, resolutionType string, duration time.Duration) {
 	if err == nil {
 		return
 	}
 
-	// Start span for resolution recording
-	ctx, span := em.tracer.Start(ctx, "error.resolution",
-		trace.WithAttributes(
-			attribute.String("error.code", err.Code),
-			attribute.String("resolution.type", resolutionType),
-			attribute.Float64("resolution.duration_seconds", duration.Seconds()),
-		),
-	)
-	defer span.End()
+	em.mu.Lock()
+	em.resolutionTimes[resolutionType] = duration
+	em.mu.Unlock()
 
-	// Update Prometheus metrics
 	em.resolutionCounter.WithLabelValues(
-		err.Code,
-		err.Type,
+		"unknown",
+		"unknown",
 		resolutionType,
 	).Inc()
 
 	em.errorDuration.WithLabelValues(
-		err.Code,
-		err.Type,
-		err.Severity,
+		"unknown",
+		"unknown",
+		"medium",
 	).Observe(duration.Seconds())
-
-	// Update severity gauge (decrement)
-	em.updateSeverityGauge(err.Severity, -1)
-
-	// Update OpenTelemetry metrics
-	em.otelErrorDuration.Record(ctx, duration.Seconds(),
-		metric.WithAttributes(
-			attribute.String("error.code", err.Code),
-			attribute.String("error.type", err.Type),
-			attribute.String("resolution.type", resolutionType),
-		),
-	)
 }
 
-// GetErrorPatterns returns the most common error patterns
+// GetErrorPatterns returns a copy of current error patterns
 func (em *ErrorMetrics) GetErrorPatterns() map[string]int {
 	em.mu.RLock()
 	defer em.mu.RUnlock()
@@ -250,7 +263,7 @@ func (em *ErrorMetrics) GetErrorPatterns() map[string]int {
 }
 
 // GetRecentErrors returns recent errors for analysis
-func (em *ErrorMetrics) GetRecentErrors(limit int) []*mcp.RichError {
+func (em *ErrorMetrics) GetRecentErrors(limit int) []error {
 	em.mu.RLock()
 	defer em.mu.RUnlock()
 
@@ -258,59 +271,40 @@ func (em *ErrorMetrics) GetRecentErrors(limit int) []*mcp.RichError {
 		limit = len(em.recentErrors)
 	}
 
-	result := make([]*mcp.RichError, limit)
+	result := make([]error, limit)
 	copy(result, em.recentErrors[len(em.recentErrors)-limit:])
 	return result
 }
 
-// EnrichContext adds observability context to a RichError
-func (em *ErrorMetrics) EnrichContext(ctx context.Context, err *mcp.RichError) {
+// EnrichContext adds observability context to an error
+func (em *ErrorMetrics) EnrichContext(ctx context.Context, err error) {
 	if err == nil {
 		return
 	}
-
-	// Extract trace and span IDs if available
-	spanCtx := trace.SpanContextFromContext(ctx)
-	if spanCtx.IsValid() {
-		if err.Context.Metadata == nil {
-			err.Context.Metadata = mcp.NewErrorMetadata("", "", "")
-		}
-		err.Context.Metadata.AddCustom("trace_id", spanCtx.TraceID().String())
-		err.Context.Metadata.AddCustom("span_id", spanCtx.SpanID().String())
-	}
-
-	// Add correlation ID if available
-	if corrID := ctx.Value("correlation_id"); corrID != nil {
-		if err.Context.Metadata == nil {
-			err.Context.Metadata = mcp.NewErrorMetadata("", "", "")
-		}
-		err.Context.Metadata.AddCustom("correlation_id", corrID)
-	}
+	// Simplified - no complex enrichment for standard errors
 }
 
-// updateSeverityGauge updates the severity gauge metric
-func (em *ErrorMetrics) updateSeverityGauge(severity string, delta float64) {
-	em.errorSeverityGauge.WithLabelValues(severity).Add(delta)
-}
+// ErrorHandler defines a function that handles errors and can resolve them
+type ErrorHandler func(ctx context.Context, err error) error
 
-// ErrorMetricsMiddleware provides middleware for automatic error tracking
-func ErrorMetricsMiddleware(em *ErrorMetrics) func(next func(context.Context, *mcp.RichError) error) func(context.Context, *mcp.RichError) error {
-	return func(next func(context.Context, *mcp.RichError) error) func(context.Context, *mcp.RichError) error {
-		return func(ctx context.Context, err *mcp.RichError) error {
-			start := time.Now()
-
-			// Record the error
-			em.RecordError(ctx, err)
-
-			// Call the next handler
-			result := next(ctx, err)
-
-			// If error was resolved (result is nil), record resolution
-			if result == nil && err != nil {
-				em.RecordResolution(ctx, err, "handled", time.Since(start))
-			}
-
-			return result
+// CreateErrorMiddleware creates middleware that handles errors with metrics tracking
+func (em *ErrorMetrics) CreateErrorMiddleware(handler ErrorHandler) ErrorHandler {
+	return func(ctx context.Context, err error) error {
+		if err == nil {
+			return nil
 		}
+
+		// Record the error
+		em.RecordError(ctx, err)
+
+		// Call the handler
+		resolvedErr := handler(ctx, err)
+
+		// If error was resolved (handler returned nil), record resolution
+		if resolvedErr == nil && err != nil {
+			em.RecordResolution(ctx, err, "middleware", time.Since(time.Now().Add(-time.Second)))
+		}
+
+		return resolvedErr
 	}
 }

@@ -14,8 +14,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
-// Note: NewServer has been moved to the factory package to avoid import cycles
-// Use github.com/Azure/container-kit/pkg/mcp/factory.NewServer instead
+// Note: With unified interfaces, import cycles have been resolved.
+// Use github.com/Azure/container-kit/pkg/mcp/internal/core.NewServer for server creation.
 
 // DefaultServerConfig returns the default server configuration
 func DefaultServerConfig() core.ServerConfig {

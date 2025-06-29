@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 )
 
@@ -21,59 +20,25 @@ func NewSessionStateValidator() StateValidator {
 func (v *SessionStateValidator) ValidateState(_ context.Context, stateType StateType, state interface{}) error {
 	sessionState, ok := state.(*session.SessionState)
 	if !ok {
-		return mcp.NewErrorBuilder("INVALID_STATE_TYPE", "Invalid state type for session validation", "validation_error").
-			WithField("expected_type", "*session.SessionState").
-			WithField("actual_type", fmt.Sprintf("%T", state)).
-			WithOperation("validate_session_state").
-			WithStage("type_validation").
-			WithRootCause("State object is not a SessionState pointer").
-			WithImmediateStep(1, "Check state type", "Ensure state is *session.SessionState").
-			WithImmediateStep(2, "Fix casting", "Use proper type assertion or conversion").
-			Build()
+		return fmt.Errorf("invalid state type: expected *session.SessionState, got %T", state)
 	}
 
 	// Validate required fields
 	if sessionState.SessionID == "" {
-		return mcp.NewErrorBuilder("SESSION_ID_REQUIRED", "Session ID is required", "validation_error").
-			WithOperation("validate_session_state").
-			WithStage("required_fields").
-			WithRootCause("SessionID field is empty").
-			WithImmediateStep(1, "Set session ID", "Provide a valid session identifier").
-			WithImmediateStep(2, "Check generation", "Verify session ID generation logic").
-			Build()
+		return fmt.Errorf("session ID is required")
 	}
 
 	if sessionState.CreatedAt.IsZero() {
-		return mcp.NewErrorBuilder("CREATED_AT_REQUIRED", "Session creation time is required", "validation_error").
-			WithOperation("validate_session_state").
-			WithStage("required_fields").
-			WithRootCause("CreatedAt timestamp is zero").
-			WithImmediateStep(1, "Set timestamp", "Initialize CreatedAt with current time").
-			WithImmediateStep(2, "Check serialization", "Verify timestamp serialization/deserialization").
-			Build()
+		return fmt.Errorf("session creation time is required")
 	}
 
 	// Validate disk usage
 	if sessionState.DiskUsage < 0 {
-		return mcp.NewErrorBuilder("NEGATIVE_DISK_USAGE", "Disk usage cannot be negative", "validation_error").
-			WithOperation("validate_session_state").
-			WithStage("resource_validation").
-			WithRootCause("DiskUsage value is negative").
-			WithImmediateStep(1, "Fix calculation", "Ensure disk usage calculation returns non-negative values").
-			WithImmediateStep(2, "Reset value", "Set disk usage to 0 if calculation errors occur").
-			Build()
+		return fmt.Errorf("disk usage cannot be negative")
 	}
 
 	if sessionState.MaxDiskUsage > 0 && sessionState.DiskUsage > sessionState.MaxDiskUsage {
-		return mcp.NewErrorBuilder("DISK_USAGE_EXCEEDED", "Disk usage exceeds maximum allowed", "validation_error").
-			WithField("max_disk_usage", sessionState.MaxDiskUsage).
-			WithOperation("validate_session_state").
-			WithStage("resource_validation").
-			WithRootCause(fmt.Sprintf("Disk usage %d exceeds limit %d", sessionState.DiskUsage, sessionState.MaxDiskUsage)).
-			WithImmediateStep(1, "Clean up files", "Remove unnecessary files to reduce disk usage").
-			WithImmediateStep(2, "Increase limit", "Consider increasing MaxDiskUsage if appropriate").
-			WithImmediateStep(3, "Archive data", "Move old session data to archive storage").
-			Build()
+		return fmt.Errorf("disk usage %d exceeds maximum allowed %d", sessionState.DiskUsage, sessionState.MaxDiskUsage)
 	}
 
 	return nil
@@ -91,38 +56,18 @@ func NewConversationStateValidator() StateValidator {
 func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateType, state interface{}) error {
 	conversationState, ok := state.(*BasicConversationState)
 	if !ok {
-		return mcp.NewErrorBuilder("INVALID_CONVERSATION_STATE_TYPE", "Invalid state type for conversation validation", "validation_error").
-			WithField("expected_type", "*BasicConversationState").
-			WithField("actual_type", fmt.Sprintf("%T", state)).
-			WithOperation("validate_conversation_state").
-			WithStage("type_validation").
-			WithRootCause("State object is not a BasicConversationState pointer").
-			WithImmediateStep(1, "Check state type", "Ensure state is *BasicConversationState").
-			WithImmediateStep(2, "Fix casting", "Use proper type assertion or conversion").
-			Build()
+		return fmt.Errorf("invalid state type: expected *BasicConversationState, got %T", state)
 	}
 
 	// Validate session state (embedded)
 	sessionValidator := NewSessionStateValidator()
 	if err := sessionValidator.ValidateState(ctx, StateTypeSession, &conversationState.SessionState); err != nil {
-		return mcp.NewErrorBuilder("INVALID_EMBEDDED_SESSION_STATE", "Invalid embedded session state", "validation_error").
-			WithOperation("validate_conversation_state").
-			WithStage("embedded_validation").
-			WithRootCause(fmt.Sprintf("Embedded session state validation failed: %v", err)).
-			WithImmediateStep(1, "Fix session state", "Resolve the embedded session state validation issues").
-			WithImmediateStep(2, "Check inheritance", "Verify conversation state properly inherits session state").
-			Build()
+		return fmt.Errorf("embedded session state validation failed: %v", err)
 	}
 
 	// Validate conversation-specific fields
 	if conversationState.ConversationID == "" {
-		return mcp.NewErrorBuilder("CONVERSATION_ID_REQUIRED", "Conversation ID is required", "validation_error").
-			WithOperation("validate_conversation_state").
-			WithStage("required_fields").
-			WithRootCause("ConversationID field is empty").
-			WithImmediateStep(1, "Set conversation ID", "Provide a valid conversation identifier").
-			WithImmediateStep(2, "Check generation", "Verify conversation ID generation logic").
-			Build()
+		return fmt.Errorf("conversation ID is required")
 	}
 
 	// Validate current stage

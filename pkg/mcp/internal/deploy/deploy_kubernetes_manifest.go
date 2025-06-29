@@ -20,50 +20,73 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 	if port == 0 {
 		port = 80 // Default port
 	}
-	manifestResult, err := t.pipelineAdapter.GenerateKubernetesManifests(
-		session.SessionID,
-		args.ImageRef,
-		args.AppName,
-		port,
-		"", // cpuRequest - not specified for deploy tool
-		"", // memoryRequest - not specified for deploy tool
-		"", // cpuLimit - not specified for deploy tool
-		"", // memoryLimit - not specified for deploy tool
-	)
+	// Use the correct interface method with map args
+	manifestArgs := map[string]interface{}{
+		"image_ref": args.ImageRef,
+		"app_name":  args.AppName,
+		"port":      port,
+		"namespace": args.Namespace,
+	}
+	manifestResult, err := t.pipelineAdapter.GenerateManifests(ctx, session.SessionID, manifestArgs)
 	result.GenerationDuration = time.Since(generationStart)
 
-	// Convert from mcptypes.KubernetesManifestResult to kubernetes.ManifestGenerationResult
+	// Convert from interface{} to kubernetes.ManifestGenerationResult
 	if manifestResult != nil {
-		result.ManifestResult = &kubernetes.ManifestGenerationResult{
-			Success:   manifestResult.Success,
-			OutputDir: result.WorkspaceDir,
-		}
-		if manifestResult.Error != nil {
-			result.ManifestResult.Error = &kubernetes.ManifestError{
-				Type:    manifestResult.Error.Type,
-				Message: manifestResult.Error.Message,
+		// Convert interface{} to expected structure
+		if manifestMap, ok := manifestResult.(map[string]interface{}); ok {
+			result.ManifestResult = &kubernetes.ManifestGenerationResult{
+				Success:   getBoolFromMap(manifestMap, "success", false),
+				OutputDir: result.WorkspaceDir,
 			}
-		}
-		// Convert manifests
-		for _, manifest := range manifestResult.Manifests {
-			result.ManifestResult.Manifests = append(result.ManifestResult.Manifests, kubernetes.GeneratedManifest{
-				Kind:    manifest.Kind,
-				Name:    manifest.Name,
-				Path:    manifest.Path,
-				Content: manifest.Content,
-			})
+
+			// Handle error if present
+			if errorData, exists := manifestMap["error"]; exists && errorData != nil {
+				if errorMap, ok := errorData.(map[string]interface{}); ok {
+					result.ManifestResult.Error = &kubernetes.ManifestError{
+						Type:    getStringFromMap(errorMap, "type", "unknown"),
+						Message: getStringFromMap(errorMap, "message", "unknown error"),
+					}
+				}
+			}
+
+			// Convert manifests if present
+			if manifestsData, exists := manifestMap["manifests"]; exists {
+				if manifests, ok := manifestsData.([]interface{}); ok {
+					for _, manifest := range manifests {
+						if manifestMap, ok := manifest.(map[string]interface{}); ok {
+							result.ManifestResult.Manifests = append(result.ManifestResult.Manifests, kubernetes.GeneratedManifest{
+								Kind:    getStringFromMap(manifestMap, "kind", "unknown"),
+								Name:    getStringFromMap(manifestMap, "name", "unknown"),
+								Path:    getStringFromMap(manifestMap, "path", ""),
+								Content: getStringFromMap(manifestMap, "content", ""),
+							})
+						}
+					}
+				}
+			}
+		} else {
+			// Fallback for unexpected result type
+			result.ManifestResult = &kubernetes.ManifestGenerationResult{
+				Success:   false,
+				OutputDir: result.WorkspaceDir,
+			}
 		}
 	}
 
 	if err != nil {
 		_ = t.handleGenerationError(ctx, err, result.ManifestResult, result)
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", err), "generation_error")
+		return fmt.Errorf("error")
 	}
 
-	if manifestResult != nil && !manifestResult.Success {
-		generationErr := mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %s", manifestResult.Error.Message), "generation_error")
-		_ = t.handleGenerationError(ctx, generationErr, result.ManifestResult, result)
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", generationErr), "generation_error")
+	// Check manifest generation success through type assertion
+	if manifestResult != nil {
+		if manifestMap, ok := manifestResult.(map[string]interface{}); ok {
+			if !getBoolFromMap(manifestMap, "success", false) {
+				generationErr := fmt.Errorf("manifest generation failed")
+				_ = t.handleGenerationError(ctx, generationErr, result.ManifestResult, result)
+				return generationErr
+			}
+		}
 	}
 
 	t.logger.Info().
@@ -79,5 +102,5 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 
 // handleGenerationError creates an error for manifest generation failures
 func (t *AtomicDeployKubernetesTool) handleGenerationError(_ context.Context, err error, _ *kubernetes.ManifestGenerationResult, _ *AtomicDeployKubernetesResult) error {
-	return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", err), "generation_error")
+	return fmt.Errorf("error")
 }

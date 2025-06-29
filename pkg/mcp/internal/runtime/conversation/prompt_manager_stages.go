@@ -138,7 +138,7 @@ func (pm *PromptManager) handleInitStage(ctx context.Context, state *Conversatio
 	}
 
 	// We have a repository, move to analysis
-	state.RepoURL = repoRef
+	state.SessionState.RepoURL = repoRef
 	state.SetStage(convertFromTypesStage(types.StageAnalysis))
 
 	// Enable autopilot mode when URL is provided directly
@@ -269,7 +269,7 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 	}
 
 	// Start or retry analysis
-	return pm.startAnalysis(ctx, state, state.RepoURL)
+	return pm.startAnalysis(ctx, state, state.SessionState.RepoURL)
 }
 
 // handleDockerfileStage handles Dockerfile generation

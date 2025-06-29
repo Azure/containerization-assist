@@ -81,13 +81,13 @@ func (t *DeleteSessionTool) ExecuteTyped(ctx context.Context, args DeleteSession
 
 	// Validate session ID
 	if args.SessionID == "" {
-		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return nil, fmt.Errorf("session_id is required")
 	}
 
 	// Check if session exists
 	session, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
-		return nil, mcp.NewRichError("INTERNAL_SERVER_ERROR", "failed to get session: "+err.Error(), "execution_error")
+		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 	if session == nil {
 		return &DeleteSessionResult{
@@ -142,7 +142,7 @@ func (t *DeleteSessionTool) ExecuteTyped(ctx context.Context, args DeleteSession
 
 	// Delete the session from persistence
 	if err := t.sessionManager.DeleteSession(args.SessionID); err != nil {
-		return nil, mcp.NewRichError("INTERNAL_SERVER_ERROR", "failed to delete session: "+err.Error(), "execution_error")
+		return nil, fmt.Errorf("failed to delete session: %w", err)
 	}
 
 	// Delete workspace if requested

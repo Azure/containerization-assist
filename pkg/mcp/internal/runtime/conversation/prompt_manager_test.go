@@ -134,10 +134,6 @@ func (m *MockToolExecutor) GetToolMetadata(toolName string) (*core.ToolMetadata,
 	}, nil
 }
 
-func (m *MockToolExecutor) GetDispatcher() core.ToolDispatcher {
-	return nil // Mock implementation
-}
-
 func TestPromptManagerErrorHandling(t *testing.T) {
 	logger := zerolog.Nop()
 

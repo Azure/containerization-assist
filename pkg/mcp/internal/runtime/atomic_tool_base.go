@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
@@ -58,21 +57,21 @@ func (base *AtomicToolBase) ValidateAndPrepareExecution(
 		validationResult := base.validationMixin.StandardValidateRequiredFields(args, requiredFields)
 		if validationResult.HasErrors() {
 			base.logger.Error().Interface("validation_errors", validationResult.Errors).Msg("Input validation failed")
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("input validation failed for %s: %v", base.name, validationResult.Errors), "validation_error")
+			return nil, fmt.Errorf("atomic tool operation failed")
 		}
 	}
 
 	// Validate session ID
 	if strings.TrimSpace(sessionID) == "" {
 		base.logger.Error().Msg("Session ID is required and cannot be empty")
-		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required and cannot be empty", "validation_error")
+		return nil, fmt.Errorf("atomic tool operation failed")
 	}
 
 	// Get session using our *session.SessionManager interface
 	session, err := base.sessionManager.GetSession(sessionID)
 	if err != nil {
 		base.logger.Error().Err(err).Str("session_id", sessionID).Msg("Failed to get session")
-		return nil, mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to get session %s: %s", sessionID, err.Error()), "execution_error")
+		return nil, fmt.Errorf("atomic tool operation failed")
 	}
 
 	// Get workspace directory - use pipeline adapter method

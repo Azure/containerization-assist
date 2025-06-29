@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -68,7 +69,7 @@ func TestMCPServerBasics(t *testing.T) {
 		defer server.Stop()
 
 		// Enable conversation mode
-		convConfig := ConversationConfig{
+		convConfig := core.ConversationConfig{
 			EnableTelemetry:   false, // Disable for tests
 			PreferencesDBPath: filepath.Join(tmpDir, "preferences.db"),
 		}
@@ -90,7 +91,7 @@ func TestMCPServerBasics(t *testing.T) {
 		defer server.Stop()
 
 		// Enable conversation mode with telemetry
-		convConfig := ConversationConfig{
+		convConfig := core.ConversationConfig{
 			EnableTelemetry:   true,
 			TelemetryPort:     0, // Use random port for testing
 			PreferencesDBPath: filepath.Join(tmpDir, "preferences_telemetry.db"),
@@ -390,6 +391,11 @@ func (m *MockSessionManager) GetSession(sessionID string) (interface{}, error) {
 	}, nil
 }
 
-func (m *MockSessionManager) UpdateSession(session interface{}) error {
+func (m *MockSessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
+	// Mock implementation - just call the updater with a mock session
+	session := &session.SessionState{
+		SessionID: sessionID,
+	}
+	updater(session)
 	return nil
 }

@@ -2,7 +2,6 @@ package orchestration
 
 import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
@@ -11,7 +10,7 @@ import (
 
 // AnalyzerHelper provides common analyzer initialization patterns
 type AnalyzerHelper struct {
-	analyzer              mcp.AIAnalyzer
+	analyzer              core.AIAnalyzer
 	enhancedBuildAnalyzer *build.EnhancedBuildAnalyzer
 	repositoryAnalyzer    core.RepositoryAnalyzer // Use core interface directly
 	toolFactory           *ToolFactory
@@ -20,7 +19,7 @@ type AnalyzerHelper struct {
 }
 
 // NewAnalyzerHelper creates a new analyzer helper
-func NewAnalyzerHelper(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *AnalyzerHelper {
+func NewAnalyzerHelper(analyzer core.AIAnalyzer, logger zerolog.Logger) *AnalyzerHelper {
 	return &AnalyzerHelper{
 		analyzer: analyzer,
 		logger:   logger,
@@ -29,7 +28,7 @@ func NewAnalyzerHelper(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *Analyzer
 
 // NewAnalyzerHelperWithFactory creates a new analyzer helper with tool factory support
 func NewAnalyzerHelperWithFactory(
-	analyzer mcp.AIAnalyzer,
+	analyzer core.AIAnalyzer,
 	toolFactory *ToolFactory,
 	sessionManager core.ToolSessionManager,
 	logger zerolog.Logger,

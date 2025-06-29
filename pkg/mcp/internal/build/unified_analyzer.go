@@ -5,13 +5,12 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // UnifiedAnalyzer combines AI and tool-specific analysis capabilities
 type UnifiedAnalyzer interface {
 	// Core AI capabilities from AIAnalyzer interface
-	mcp.AIAnalyzer
+	core.AIAnalyzer
 	// Enhanced analysis capabilities
 	AnalyzeFailure(ctx context.Context, failure *AnalysisRequest) (*AnalysisResult, error)
 	GetCapabilities() *AnalyzerCapabilities
@@ -233,41 +232,6 @@ type AggregatedMetrics struct {
 	AverageTime      time.Duration `json:"average_time"`
 	ImprovementTrend float64       `json:"improvement_trend"`
 	CommonIssueTypes []string      `json:"common_issue_types"`
-}
-type BuildConstraints struct {
-	MaxDuration   time.Duration `json:"max_duration"`
-	MaxMemory     int64         `json:"max_memory"`
-	MaxCPU        float64       `json:"max_cpu"`
-	AllowedTools  []string      `json:"allowed_tools"`
-	SecurityLevel string        `json:"security_level"`
-}
-type OptimizationGoals struct {
-	PrimarGoal      string        `json:"primary_goal"` // speed, size, security, reliability
-	AcceptableRisk  string        `json:"acceptable_risk"`
-	TimeConstraints time.Duration `json:"time_constraints"`
-	QualityLevel    string        `json:"quality_level"`
-}
-type BuildStep struct {
-	Name         string            `json:"name"`
-	Command      string            `json:"command"`
-	Args         []string          `json:"args"`
-	WorkingDir   string            `json:"working_dir"`
-	Environment  map[string]string `json:"environment"`
-	ExpectedTime time.Duration     `json:"expected_time"`
-	CriticalPath bool              `json:"critical_path"`
-	Parallel     bool              `json:"parallel"`
-}
-type ResourceEstimate struct {
-	CPU     float64 `json:"cpu"`
-	Memory  int64   `json:"memory"`
-	Disk    int64   `json:"disk"`
-	Network int64   `json:"network"`
-}
-type RiskAssessment struct {
-	OverallRisk   string   `json:"overall_risk"`
-	RiskFactors   []string `json:"risk_factors"`
-	Mitigations   []string `json:"mitigations"`
-	FailurePoints []string `json:"failure_points"`
 }
 type PredictedFailure struct {
 	FailureType       string   `json:"failure_type"`

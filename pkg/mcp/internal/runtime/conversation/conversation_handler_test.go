@@ -2,7 +2,6 @@ package conversation
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -28,20 +27,8 @@ func (a *testSessionManagerAdapter) GetSession(sessionID string) (interface{}, e
 	return a.mgr.GetSession(sessionID)
 }
 
-func (a *testSessionManagerAdapter) UpdateSession(sessionData interface{}) error {
-	// Type assert and update through the real session manager
-	s, ok := sessionData.(*session.SessionState)
-	if !ok {
-		return fmt.Errorf("invalid session type: expected *session.SessionState, got %T", sessionData)
-	}
-	if s.SessionID == "" {
-		return fmt.Errorf("session ID is required")
-	}
-	return a.mgr.UpdateSession(s.SessionID, func(existing interface{}) {
-		if state, ok := existing.(*session.SessionState); ok {
-			*state = *s
-		}
-	})
+func (a *testSessionManagerAdapter) UpdateSession(sessionID string, updater func(interface{})) error {
+	return a.mgr.UpdateSession(sessionID, updater)
 }
 
 type mockOrchestrator struct {
@@ -445,7 +432,11 @@ func TestSessionManagerAdapter(t *testing.T) {
 			},
 		}
 
-		err = adapter.UpdateSession(updatedSession)
+		err = adapter.UpdateSession(updatedSession.SessionID, func(s interface{}) {
+			if state, ok := s.(*session.SessionState); ok {
+				*state = *updatedSession
+			}
+		})
 
 		// Verify
 		require.NoError(t, err)
@@ -464,12 +455,14 @@ func TestSessionManagerAdapter(t *testing.T) {
 		sessionMgr := createTestSessionManager(t)
 		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
-		// Try to update with wrong type
-		err := adapter.UpdateSession("not a session")
+		// Try to update with empty session ID
+		err := adapter.UpdateSession("", func(s interface{}) {
+			// This should fail due to empty session ID
+		})
 
 		// Verify
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid session type")
+		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("error on missing session ID", func(t *testing.T) {
@@ -477,16 +470,14 @@ func TestSessionManagerAdapter(t *testing.T) {
 		sessionMgr := createTestSessionManager(t)
 		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
-		// Try to update without session ID
-		sessionData := &session.SessionState{
-			SessionID: "", // Empty
-		}
-
-		err := adapter.UpdateSession(sessionData)
+		// Try to update with invalid session ID
+		err := adapter.UpdateSession("nonexistent-session-id", func(s interface{}) {
+			// This should fail because session doesn't exist
+		})
 
 		// Verify
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "session ID is required")
+		assert.Contains(t, err.Error(), "not found")
 	})
 }
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	obs "github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -15,7 +15,7 @@ import (
 // PromptManager manages conversation flow and tool orchestration
 type PromptManager struct {
 	sessionManager      *session.SessionManager
-	toolOrchestrator    mcp.Orchestrator
+	toolOrchestrator    core.Orchestrator
 	preFlightChecker    *obs.PreFlightChecker
 	preferenceStore     *utils.PreferenceStore
 	retryManager        *SimpleRetryManager
@@ -26,7 +26,7 @@ type PromptManager struct {
 // PromptManagerConfig holds configuration for the prompt manager
 type PromptManagerConfig struct {
 	SessionManager   *session.SessionManager
-	ToolOrchestrator mcp.Orchestrator
+	ToolOrchestrator core.Orchestrator
 	PreferenceStore  *utils.PreferenceStore
 	Logger           zerolog.Logger
 }
@@ -51,7 +51,7 @@ func (pm *PromptManager) SetConversationHandler(handler *ConversationHandler) {
 // newResponse creates a new ConversationResponse with the session ID set
 func (pm *PromptManager) newResponse(state *ConversationState) *ConversationResponse {
 	return &ConversationResponse{
-		SessionID: state.SessionID,
+		SessionID: state.SessionState.SessionID,
 	}
 }
 
@@ -183,7 +183,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Ensure response has the session ID
-	response.SessionID = convState.SessionID
+	response.SessionID = convState.SessionState.SessionID
 
 	return response, nil
 }

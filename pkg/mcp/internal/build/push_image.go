@@ -2,15 +2,12 @@ package build
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	types "github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -232,26 +229,17 @@ func (t *PushImageTool) extractRegistry(imageRef string) string {
 // validateImageRef validates an image reference format
 func (t *PushImageTool) validateImageRef(imageRef string) error {
 	if imageRef == "" {
-		return mcp.NewRichError(
-			"INVALID_ARGUMENTS",
-			"image reference cannot be empty",
-			"validation_error",
-		)
+		return fmt.Errorf(
+			"invalid arguments: image reference cannot be empty")
 	}
 	if !strings.Contains(imageRef, ":") {
-		return mcp.NewRichError(
-			"INVALID_ARGUMENTS",
-			"image reference missing tag",
-			"validation_error",
-		)
+		return fmt.Errorf(
+			"invalid arguments: image reference missing tag")
 	}
 	// Basic validation - in real implementation, this would be more thorough
 	if strings.Contains(imageRef, " ") {
-		return mcp.NewRichError(
-			"INVALID_ARGUMENTS",
-			"image reference cannot contain spaces",
-			"validation_error",
-		)
+		return fmt.Errorf(
+			"invalid arguments: image reference cannot contain spaces")
 	}
 	return nil
 }
@@ -319,170 +307,14 @@ func (t *PushImageTool) checkDockerLogin(registry string) error {
 	// Check Docker config file
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to get user home directory: %w", err)
 	}
+
 	configPath := filepath.Join(homeDir, ".docker", "config.json")
-	if _, err := os.Stat(configPath); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("Docker config not found at %s. Please run 'docker login %s' first", configPath, registry)
-		}
-		return fmt.Errorf("error accessing Docker config: %w", err)
-	}
-	// Read and parse config
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read Docker config: %w", err)
-	}
-	var config struct {
-		Auths map[string]struct {
-			Auth string `json:"auth"`
-		} `json:"auths"`
-		CredsStore string `json:"credsStore"`
-	}
-	if err := json.Unmarshal(configData, &config); err != nil {
-		return fmt.Errorf("failed to parse Docker config: %w", err)
-	}
-	// Check if registry has auth
-	if auth, ok := config.Auths[registry]; ok && auth.Auth != "" {
-		t.logger.Debug().Msg("Found registry authentication in Docker config")
+	if _, err := os.Stat(configPath); err == nil {
+		t.logger.Debug().Str("config_path", configPath).Msg("Found Docker config file")
 		return nil
 	}
-	// Check for credential helper
-	if config.CredsStore != "" {
-		t.logger.Debug().Str("credsStore", config.CredsStore).Msg("Docker credential helper configured")
-		return nil
-	}
-	return fmt.Errorf("no Docker credentials found for registry %s. Please run 'docker login %s' first", registry, registry)
-}
 
-// validateImageExists checks if image exists locally before pushing
-func (t *PushImageTool) validateImageExists(imageRef string) error {
-	// In real implementation, this would call:
-	// docker inspect <imageRef>
-	t.logger.Debug().Str("image_ref", imageRef).Msg("Validating image exists locally")
-	return nil
-}
-
-// Execute implements the unified Tool interface
-func (t *PushImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-	// Convert generic args to typed args
-	var pushArgs PushImageArgs
-	switch a := args.(type) {
-	case PushImageArgs:
-		pushArgs = a
-	case map[string]interface{}:
-		// Convert from map to struct using JSON marshaling
-		jsonData, err := json.Marshal(a)
-		if err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
-		}
-		if err = json.Unmarshal(jsonData, &pushArgs); err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
-		}
-	default:
-		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
-	}
-	// Call the typed execute method
-	return t.ExecuteTyped(ctx, pushArgs)
-}
-
-// Validate implements the unified Tool interface
-func (t *PushImageTool) Validate(ctx context.Context, args interface{}) error {
-	var pushArgs PushImageArgs
-	switch a := args.(type) {
-	case PushImageArgs:
-		pushArgs = a
-	case map[string]interface{}:
-		// Convert from map to struct using JSON marshaling
-		jsonData, err := json.Marshal(a)
-		if err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
-		}
-		if err = json.Unmarshal(jsonData, &pushArgs); err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
-		}
-	default:
-		return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
-	}
-	// Validate required fields
-	if pushArgs.SessionID == "" {
-		return mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
-	}
-	if pushArgs.ImageRef.Repository == "" {
-		return mcp.NewRichError("INVALID_ARGUMENTS", "image_ref.repository is required", "validation_error")
-	}
-	return nil
-}
-
-// GetMetadata implements the unified Tool interface
-func (t *PushImageTool) GetMetadata() core.ToolMetadata {
-	return core.ToolMetadata{
-		Name:         "push_image",
-		Description:  "Pushes Docker images to container registries with retry and authentication support",
-		Version:      "1.0.0",
-		Category:     "registry",
-		Dependencies: []string{"build_image"},
-		Capabilities: []string{
-			"registry_push",
-			"authentication_handling",
-			"retry_logic",
-			"async_push",
-			"layer_caching",
-			"progress_tracking",
-			"multi_registry_support",
-		},
-		Requirements: []string{
-			"docker_daemon",
-			"image_exists_locally",
-			"registry_credentials",
-		},
-		Parameters: map[string]string{
-			"session_id":   "Required session identifier",
-			"image_ref":    "Image reference to push (required)",
-			"push_timeout": "Push timeout (default: 10m) (optional)",
-			"retry_count":  "Number of retry attempts (default: 3) (optional)",
-			"async_push":   "Run push asynchronously (optional)",
-		},
-		Examples: []types.ToolExample{
-			{
-				Name:        "Push to Registry",
-				Description: "Push an image to a container registry",
-				Input: map[string]interface{}{
-					"session_id": "push-session",
-					"image_ref": map[string]interface{}{
-						"registry":   "myregistry.azurecr.io",
-						"repository": "my-app",
-						"tag":        "v1.0.0",
-					},
-				},
-				Output: map[string]interface{}{
-					"success":   true,
-					"image_ref": "myregistry.azurecr.io/my-app:v1.0.0",
-					"registry":  "myregistry.azurecr.io",
-				},
-			},
-			{
-				Name:        "Push with Retry",
-				Description: "Push with custom retry configuration",
-				Input: map[string]interface{}{
-					"session_id": "push-session",
-					"image_ref": map[string]interface{}{
-						"registry":   "docker.io",
-						"repository": "username/my-app",
-						"tag":        "latest",
-					},
-					"retry_count":  5,
-					"push_timeout": "15m",
-				},
-				Output: map[string]interface{}{
-					"success": true,
-					"layers_info": map[string]interface{}{
-						"total_layers":  10,
-						"pushed_layers": 3,
-						"cached_layers": 7,
-					},
-				},
-			},
-		},
-	}
+	return fmt.Errorf("no Docker credentials found for registry %s", registry)
 }

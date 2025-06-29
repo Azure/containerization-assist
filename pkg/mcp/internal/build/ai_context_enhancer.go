@@ -3,9 +3,9 @@ package build
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -333,16 +333,8 @@ func (e *AIContextEnhancer) analyzeError(err error, _ string) *ErrorContextInfo 
 		ErrorMetadata:     make(map[string]interface{}),
 	}
 	// Analyze error type and severity
-	if richErr, ok := err.(*mcp.RichError); ok {
-		errorInfo.ErrorType = richErr.Type
-		errorInfo.ErrorSeverity = richErr.Severity
-	} else if mcpRichErr, ok := err.(*mcp.RichError); ok {
-		errorInfo.ErrorType = mcpRichErr.Type
-		errorInfo.ErrorSeverity = mcpRichErr.Severity
-	} else {
-		errorInfo.ErrorType = "unknown_error"
-		errorInfo.ErrorSeverity = "medium"
-	}
+	errorInfo.ErrorType = "build_error"
+	errorInfo.ErrorSeverity = "medium"
 	// Determine fix probability based on error type
 	switch errorInfo.ErrorType {
 	case "network_error", "timeout_error":
@@ -378,7 +370,7 @@ func (e *AIContextEnhancer) performRootCauseAnalysis(errorMsg string) []string {
 		"resource quota":     "resource_limits_exceeded",
 	}
 	for pattern, cause := range patterns {
-		if contains([]string{errorMsg}, pattern) {
+		if strings.Contains(errorMsg, pattern) {
 			causes = append(causes, cause)
 		}
 	}
@@ -515,5 +507,5 @@ func (e *AIContextEnhancer) GetEnhancedContext(ctx context.Context, sessionID, t
 	if aiContext, ok := data.(*AIToolContext); ok {
 		return aiContext, nil
 	}
-	return nil, fmt.Errorf("invalid AI context type for tool %s", toolName)
+	return nil, fmt.Errorf("invalid context type")
 }

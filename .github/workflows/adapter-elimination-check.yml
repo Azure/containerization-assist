@@ -11,44 +11,44 @@ jobs:
   adapter-check:
     name: Verify Adapter Elimination
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
-        
+
     - name: Verify No Adapter Files
       run: |
         echo "🔍 Checking for adapter files..."
         ADAPTER_COUNT=$(find pkg/mcp -name "*adapter*.go" | wc -l)
-        
+
         if [ $ADAPTER_COUNT -ne 0 ]; then
           echo "❌ Error: Found $ADAPTER_COUNT adapter files!"
           echo "Adapter files found:"
           find pkg/mcp -name "*adapter*.go"
           exit 1
         fi
-        
+
         echo "✅ No adapter files found"
-        
+
     - name: Verify No Wrapper Files
       run: |
         echo "🔍 Checking for wrapper files (excluding docker_operation)..."
         WRAPPER_COUNT=$(find pkg/mcp -name "*wrapper*.go" | grep -v docker_operation | wc -l)
-        
+
         if [ $WRAPPER_COUNT -ne 0 ]; then
           echo "❌ Error: Found $WRAPPER_COUNT wrapper files!"
           echo "Wrapper files found:"
           find pkg/mcp -name "*wrapper*.go" | grep -v docker_operation
           exit 1
         fi
-        
+
         echo "✅ No wrapper files found"
-        
+
     - name: Check Import Cycles
       run: |
         echo "🔍 Checking for import cycles..."
@@ -59,22 +59,22 @@ jobs:
           go build -tags mcp ./pkg/mcp/... 2>&1 | grep "import cycle"
           exit 1
         fi
-        
+
     - name: Verify Interface Unification Progress
       run: |
         echo "📊 Checking interface unification status..."
         INTERFACE_COUNT=$(grep -r "type.*Tool.*interface" pkg/mcp/ | grep -v "//\|test" | wc -l)
-        
+
         echo "Current Tool interface definitions: $INTERFACE_COUNT"
         echo "Target: 1 (complete unification)"
-        
+
         if [ $INTERFACE_COUNT -eq 1 ]; then
           echo "✅ Interface unification complete!"
         else
           echo "⚠️ Interface unification in progress ($INTERFACE_COUNT interfaces remaining)"
           echo "This is a known item for future work"
         fi
-        
+
     - name: Architecture Validation Summary
       run: |
         echo "=== 🏗️ Architecture Validation Summary ==="

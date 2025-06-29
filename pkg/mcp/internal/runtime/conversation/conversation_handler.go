@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	mcp "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
@@ -21,7 +21,7 @@ import (
 type ConversationHandler struct {
 	promptManager    *PromptManager
 	sessionManager   *session.SessionManager
-	toolOrchestrator mcp.Orchestrator
+	toolOrchestrator core.Orchestrator
 	preferenceStore  *utils.PreferenceStore
 	logger           zerolog.Logger
 }
@@ -31,7 +31,7 @@ type ConversationHandlerConfig struct {
 	SessionManager     *session.SessionManager
 	SessionAdapter     *session.SessionManager // Pre-created session adapter for tools
 	PreferenceStore    *utils.PreferenceStore
-	PipelineOperations mcp.PipelineOperations             // Using interface instead of concrete adapter
+	PipelineOperations core.PipelineOperations            // Using interface instead of concrete adapter
 	ToolOrchestrator   *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
 	Transport          interface{}                        // Accept both core.Transport and internal transport.Transport
 	Logger             zerolog.Logger
@@ -41,7 +41,7 @@ type ConversationHandlerConfig struct {
 // NewConversationHandler creates a new concrete conversation handler
 func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHandler, error) {
 	// Use provided orchestrator or create adapter
-	var toolOrchestrator mcp.Orchestrator
+	var toolOrchestrator core.Orchestrator
 	if config.ToolOrchestrator != nil {
 		// Use the provided canonical orchestrator directly
 		toolOrchestrator = config.ToolOrchestrator

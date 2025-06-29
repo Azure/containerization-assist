@@ -14,7 +14,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
-	"github.com/Azure/container-kit/pkg/mcp/factory"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/server"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -175,13 +176,13 @@ func main() {
 		Str("workspace_dir", config.WorkspaceDir).
 		Msg("Starting Container Kit MCP Server")
 
-	// Create server using the factory
-	server, err := factory.NewServer(context.Background(), config)
+	// Create server using bridge package
+	mcpServer, err := server.NewServer(context.Background(), config)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create server")
 		os.Exit(1)
 	}
-	if server == nil {
+	if mcpServer == nil {
 		log.Error().Msg("Server is nil despite no error")
 		os.Exit(1)
 	}
@@ -242,7 +243,7 @@ func main() {
 			svcVersion = Version
 		}
 
-		conversationConfig := mcp.ConversationConfig{
+		conversationConfig := core.ConversationConfig{
 			EnableTelemetry:   *telemetryEnabled,
 			TelemetryPort:     *telemetryPort,
 			PreferencesDBPath: "", // Will use default workspace path
@@ -257,7 +258,7 @@ func main() {
 			TraceSampleRate: *traceSampleRate,
 		}
 
-		if err := server.EnableConversationMode(conversationConfig); err != nil {
+		if err := mcpServer.EnableConversationMode(conversationConfig); err != nil {
 			log.Error().Err(err).Msg("Failed to enable conversation mode")
 			os.Exit(1)
 		}
@@ -285,7 +286,7 @@ func main() {
 	// Start server in a goroutine so we can handle shutdown
 	serverErr := make(chan error, 1)
 	go func() {
-		if err := server.Start(ctx); err != nil {
+		if err := mcpServer.Start(ctx); err != nil {
 			serverErr <- err
 		}
 	}()
@@ -300,7 +301,7 @@ func main() {
 		log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
 
 		// Gracefully shutdown the server
-		if err := server.Stop(); err != nil {
+		if err := mcpServer.Stop(); err != nil {
 			log.Error().Err(err).Msg("Error during server shutdown")
 		}
 
@@ -313,14 +314,14 @@ func main() {
 
 	case <-ctx.Done():
 		log.Info().Msg("Context cancelled, shutting down")
-		if err := server.Stop(); err != nil {
+		if err := mcpServer.Stop(); err != nil {
 			log.Error().Err(err).Msg("Error during server shutdown")
 		}
 	}
 }
 
 // loadConfig loads configuration from environment variables and config file
-func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (mcp.ServerConfig, error) {
+func loadConfig(configFile string, telemetryEnabled *bool, telemetryPort *int) (core.ServerConfig, error) {
 	// Start with defaults
 	config := mcp.DefaultServerConfig()
 
@@ -479,37 +480,37 @@ func getVersion() string {
 }
 
 // runDemo runs the specified demo mode
-func runDemo(ctx context.Context, server mcp.Server, demoMode string) error {
+func runDemo(ctx context.Context, server core.Server, demoMode string) error {
 	log.Warn().Str("mode", demoMode).Msg("Demo mode temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runAllDemos runs all demonstration scenarios
-func runAllDemos(ctx context.Context, server mcp.Server) error {
+func runAllDemos(ctx context.Context, server core.Server) error {
 	log.Warn().Msg("All demos temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runBasicWorkflowDemo demonstrates standard containerization workflow
-func runBasicWorkflowDemo(ctx context.Context, server mcp.Server) error {
+func runBasicWorkflowDemo(ctx context.Context, server core.Server) error {
 	log.Warn().Msg("Basic workflow demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runErrorHandlingDemo demonstrates error handling and recovery
-func runErrorHandlingDemo(ctx context.Context, server mcp.Server) error {
+func runErrorHandlingDemo(ctx context.Context, server core.Server) error {
 	log.Warn().Msg("Error handling demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runSessionManagementDemo demonstrates session lifecycle
-func runSessionManagementDemo(ctx context.Context, server mcp.Server) error {
+func runSessionManagementDemo(ctx context.Context, server core.Server) error {
 	log.Warn().Msg("Session management demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runPerformanceDemo demonstrates performance monitoring
-func runPerformanceDemo(ctx context.Context, server mcp.Server) error {
+func runPerformanceDemo(ctx context.Context, server core.Server) error {
 	log.Warn().Msg("Performance demo temporarily disabled due to API restructuring")
 	return nil
 }

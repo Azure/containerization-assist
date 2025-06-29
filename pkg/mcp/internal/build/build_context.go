@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -208,23 +207,7 @@ func GetBuildContext(buildContext string, workspaceDir string) (string, error) {
 	}
 	// Validate the path exists
 	if _, err := os.Stat(buildContext); err != nil {
-		return "", mcp.NewErrorBuilder("invalid_arguments", "build context directory does not exist", "validation").
-			WithSeverity("high").
-			WithOperation("GetBuildContext").
-			WithField("buildContext", buildContext).
-			Build()
+		return "", fmt.Errorf("build context path does not exist: %s", buildContext)
 	}
 	return buildContext, nil
-}
-
-// GetDockerfilePath returns the Dockerfile path with validation
-func GetDockerfilePath(dockerfilePath string, buildContext string) (string, error) {
-	if dockerfilePath == "" {
-		dockerfilePath = filepath.Join(buildContext, "Dockerfile")
-	}
-	// Ensure absolute path
-	if !filepath.IsAbs(dockerfilePath) {
-		dockerfilePath = filepath.Join(buildContext, dockerfilePath)
-	}
-	return dockerfilePath, nil
 }

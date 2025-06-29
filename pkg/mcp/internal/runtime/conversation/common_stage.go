@@ -38,7 +38,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 	}
 
 	params := map[string]interface{}{
-		"session_id": state.SessionID,
+		"session_id": state.SessionState.SessionID,
 		"image_ref":  getDockerfileImageID(state.SessionState),
 	}
 
@@ -121,8 +121,8 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 // suggestAppName suggests an application name based on repository info
 func (pm *PromptManager) suggestAppName(state *ConversationState) string {
 	// Try to extract from repo URL
-	if state.RepoURL != "" {
-		parts := strings.Split(state.RepoURL, "/")
+	if state.SessionState.RepoURL != "" {
+		parts := strings.Split(state.SessionState.RepoURL, "/")
 		if len(parts) > 0 {
 			name := parts[len(parts)-1]
 			name = strings.TrimSuffix(name, ".git")
@@ -202,7 +202,7 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 	}
 
 	params := map[string]interface{}{
-		"session_id":   state.SessionID,
+		"session_id":   state.SessionState.SessionID,
 		"app_name":     state.Context["app_name"],
 		"namespace":    state.Preferences.Namespace,
 		"include_logs": true,

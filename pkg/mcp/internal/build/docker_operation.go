@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 )
 
@@ -92,233 +91,145 @@ func (op *DockerOperation) ExecuteOnce(ctx context.Context) error {
 
 	// Execute the operation
 	if op.ExecuteFunc == nil {
-		op.lastError = fmt.Errorf("no execute function configured for %s operation", op.Type)
-		return op.lastError
+		return fmt.Errorf("execute function not defined")
 	}
-
-	err := op.ExecuteFunc(timeoutCtx)
-	op.lastError = err
-	return err
+	return op.ExecuteFunc(timeoutCtx)
 }
 
-// Execute runs the Docker operation with full retry logic and progress reporting
+// Execute runs the Docker operation with retry logic
 func (op *DockerOperation) Execute(ctx context.Context) error {
-	// Start progress tracking
-	token := op.Progress.StartStage(fmt.Sprintf("%s_%s", op.Type, op.Name))
-
-	// Pre-operation steps
-	if err := op.runPreOperation(ctx, token); err != nil {
-		op.Progress.CompleteStage(token, false, err.Error())
-		return err
-	}
-
-	// Main operation with retry logic
-	var lastError error
-	for op.attempt = 1; op.attempt <= op.RetryAttempts; op.attempt++ {
-		op.Progress.UpdateProgress(token,
-			fmt.Sprintf("Attempt %d/%d: %s", op.attempt, op.RetryAttempts, op.Name),
-			30+(60*op.attempt/op.RetryAttempts))
-
-		if err := op.ExecuteOnce(ctx); err == nil {
-			op.Progress.CompleteStage(token, true, "Operation completed successfully")
+	var lastErr error
+	for attempt := 1; attempt <= op.RetryAttempts; attempt++ {
+		op.attempt = attempt
+		err := op.ExecuteOnce(ctx)
+		if err == nil {
 			return nil
-		} else {
-			lastError = err
-			op.lastError = err
+		}
 
-			if op.attempt < op.RetryAttempts && op.shouldRetry(err) {
-				// Exponential backoff
-				waitTime := time.Duration(op.attempt) * time.Second
-				op.Progress.UpdateProgress(token,
-					fmt.Sprintf("Attempt %d failed, retrying in %v", op.attempt, waitTime),
-					30+(50*op.attempt/op.RetryAttempts))
-				time.Sleep(waitTime)
-			}
+		op.lastError = err
+
+		// Check if we can retry
+		if !op.CanRetry(err) {
+			return fmt.Errorf("operation failed and cannot be retried: %w", err)
+		}
+
+		lastErr = err
+
+		// Don't sleep after the last attempt
+		if attempt < op.RetryAttempts {
+			time.Sleep(time.Duration(attempt) * time.Second)
 		}
 	}
 
-	op.Progress.CompleteStage(token, false, fmt.Sprintf("Operation failed after %d attempts: %v", op.RetryAttempts, lastError))
-	return fmt.Errorf("operation failed after %d attempts: %w", op.RetryAttempts, lastError)
+	return fmt.Errorf("operation failed after %d attempts: %w", op.RetryAttempts, lastErr)
 }
 
-// runPreOperation executes pre-operation steps (validation, analysis, preparation)
-func (op *DockerOperation) runPreOperation(ctx context.Context, token mcptypes.ProgressToken) error {
-	if op.ValidateFunc != nil {
-		op.Progress.UpdateProgress(token, "Validating operation", 10)
-		if err := op.ValidateFunc(); err != nil {
-			return fmt.Errorf("validation failed: %w", err)
-		}
-	}
-
-	if op.AnalyzeFunc != nil {
-		op.Progress.UpdateProgress(token, "Analyzing operation", 20)
-		if err := op.AnalyzeFunc(); err != nil {
-			return fmt.Errorf("analysis failed: %w", err)
-		}
-	}
-
-	if op.PrepareFunc != nil {
-		op.Progress.UpdateProgress(token, "Preparing operation", 25)
-		if err := op.PrepareFunc(); err != nil {
-			return fmt.Errorf("preparation failed: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// shouldRetry determines if the operation should be retried based on the error and operation type
-func (op *DockerOperation) shouldRetry(err error) bool {
+// CanRetry determines if the operation can be retried after failure
+func (op *DockerOperation) CanRetry(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	errStr := strings.ToLower(err.Error())
+	errStr := strings.ToLower(fmt.Sprintf("%v", err))
 
-	// Common retryable errors for all operation types
-	commonRetryablePatterns := []string{
-		"connection refused",
-		"timeout",
-		"network",
-		"dial",
-		"rate limit",
-		"too many requests",
-		"temporary failure",
-		"service unavailable",
+	// Non-retryable errors
+	nonRetryableErrors := []string{
+		"permission denied",
+		"authentication required",
+		"invalid",
+		"syntax error",
+		"malformed",
+		"not found",
 	}
 
-	for _, pattern := range commonRetryablePatterns {
-		if strings.Contains(errStr, pattern) {
-			return true
-		}
-	}
-
-	// Operation-specific retry logic
-	switch op.Type {
-	case OperationPull:
-		return op.shouldRetryPull(errStr)
-	case OperationPush:
-		return op.shouldRetryPush(errStr)
-	case OperationTag:
-		return op.shouldRetryTag(errStr)
-	default:
-		return false
-	}
-}
-
-// shouldRetryPull determines retry logic specific to pull operations
-func (op *DockerOperation) shouldRetryPull(errStr string) bool {
-	// Authentication issues might be fixable
-	authPatterns := []string{"unauthorized", "authentication", "login"}
-	for _, pattern := range authPatterns {
-		if strings.Contains(errStr, pattern) {
-			return true
-		}
-	}
-
-	// Manifest not found is usually permanent
-	if strings.Contains(errStr, "manifest unknown") || strings.Contains(errStr, "not found") {
-		return false
-	}
-
-	return false
-}
-
-// shouldRetryPush determines retry logic specific to push operations
-func (op *DockerOperation) shouldRetryPush(errStr string) bool {
-	// Authentication issues might be fixable
-	authPatterns := []string{"unauthorized", "authentication", "login"}
-	for _, pattern := range authPatterns {
-		if strings.Contains(errStr, pattern) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// shouldRetryTag determines retry logic specific to tag operations
-func (op *DockerOperation) shouldRetryTag(errStr string) bool {
-	// Docker daemon connectivity issues are retryable
-	if strings.Contains(errStr, "daemon") {
-		return true
-	}
-
-	// Source image not found is usually not retryable
-	if strings.Contains(errStr, "no such image") || strings.Contains(errStr, "not found") {
-		return false
-	}
-
-	// Permission issues might be fixable
-	permissionPatterns := []string{"permission denied", "unauthorized"}
-	for _, pattern := range permissionPatterns {
-		if strings.Contains(errStr, pattern) {
-			return true
-		}
-	}
-
-	// Tag format issues are usually not retryable
-	formatPatterns := []string{"invalid tag", "invalid reference"}
-	for _, pattern := range formatPatterns {
-		if strings.Contains(errStr, pattern) {
+	for _, nonRetryable := range nonRetryableErrors {
+		if contains(errStr, nonRetryable) {
 			return false
 		}
 	}
 
-	return false
-}
+	// Retryable errors
+	retryableErrors := []string{
+		"timeout",
+		"network",
+		"connection refused",
+		"temporary failure",
+		"rate limit",
+		"too many requests",
+		"service unavailable",
+	}
 
-// GetFailureAnalysis analyzes failures for categorization (implements FixableOperation)
-func (op *DockerOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
-	if op.AnalyzeFunc != nil {
-		if analyzerErr := op.AnalyzeFunc(); analyzerErr != nil {
-			return nil, analyzerErr
+	for _, retryable := range retryableErrors {
+		if contains(errStr, retryable) {
+			return true
 		}
 	}
 
-	// Create operation-specific error codes
-	var errorCode string
-	switch op.Type {
-	case OperationPull:
-		errorCode = "PULL_FAILED"
-	case OperationPush:
-		errorCode = "PUSH_FAILED"
-	case OperationTag:
-		errorCode = "TAG_FAILED"
-	default:
-		errorCode = "DOCKER_OPERATION_FAILED"
+	// Default to retryable for unknown errors, but limit by attempt count
+	return op.attempt < op.RetryAttempts
+}
+
+// GetFailureAnalysis analyzes the failure for potential fixes
+func (op *DockerOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.FailureAnalysis, error) {
+	if err == nil {
+		return nil, fmt.Errorf("no error to analyze")
 	}
 
-	return &mcp.RichError{
-		Message: fmt.Sprintf("%s operation failed: %v", op.Type, err),
-		Code:    errorCode,
+	errStr := strings.ToLower(fmt.Sprintf("%v", err))
+	failureType := "unknown"
+	isCritical := false
+	isRetryable := op.CanRetry(err)
+	rootCauses := []string{}
+	suggestedFixes := []string{}
+
+	// Analyze different error types
+	if contains(errStr, "timeout") {
+		failureType = "timeout"
+		rootCauses = []string{"Network timeout", "Operation took too long"}
+		suggestedFixes = []string{"Increase timeout duration", "Check network connectivity", "Retry with backoff"}
+	} else if contains(errStr, "permission denied") {
+		failureType = "permission_error"
+		isCritical = true
+		rootCauses = []string{"Insufficient permissions"}
+		suggestedFixes = []string{"Check Docker daemon permissions", "Run with appropriate privileges", "Check file permissions"}
+	} else if contains(errStr, "not found") {
+		failureType = "resource_not_found"
+		rootCauses = []string{"Missing resource or dependency"}
+		suggestedFixes = []string{"Verify resource exists", "Check spelling and path", "Ensure prerequisites are met"}
+	} else if contains(errStr, "network") || contains(errStr, "connection") {
+		failureType = "network_error"
+		rootCauses = []string{"Network connectivity issues"}
+		suggestedFixes = []string{"Check network connection", "Verify proxy settings", "Retry after network stabilizes"}
+	} else {
+		failureType = "unknown"
+		rootCauses = []string{"Unrecognized error pattern"}
+		suggestedFixes = []string{"Check logs for more details", "Retry operation", "Contact support if issue persists"}
+	}
+
+	return &mcptypes.FailureAnalysis{
+		FailureType:    failureType,
+		IsCritical:     isCritical,
+		IsRetryable:    isRetryable,
+		RootCauses:     rootCauses,
+		SuggestedFixes: suggestedFixes,
+		ErrorContext:   fmt.Sprintf("Docker %s operation failed after %d attempts", op.Type, op.attempt),
 	}, nil
 }
 
-// PrepareForRetry prepares the environment for retry (implements FixableOperation)
-func (op *DockerOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
+// PrepareForRetry prepares the operation for retry (e.g., cleanup, state reset)
+func (op *DockerOperation) PrepareForRetry(ctx context.Context, fixAttempt interface{}) error {
+	// Reset operation state
+	op.lastError = nil
+
+	// Call prepare function if available
 	if op.PrepareFunc != nil {
 		return op.PrepareFunc()
 	}
+
 	return nil
 }
 
-// CanRetry determines if the operation can be retried (implements FixableOperation)
-func (op *DockerOperation) CanRetry() bool {
-	return op.shouldRetry(op.lastError)
-}
-
-// GetLastError returns the last error encountered (implements FixableOperation)
-func (op *DockerOperation) GetLastError() error {
-	return op.lastError
-}
-
-// GetOperationType returns the operation type for inspection
-func (op *DockerOperation) GetOperationType() OperationType {
-	return op.Type
-}
-
-// GetAttemptCount returns the current attempt number
-func (op *DockerOperation) GetAttemptCount() int {
-	return op.attempt
+// Helper function to check if string contains substring (case insensitive)
+func contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

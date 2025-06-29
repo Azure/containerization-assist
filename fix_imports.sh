@@ -5,25 +5,25 @@ echo "Fixing imports after interface cleanup..."
 # Update import statements in pkg/mcp files to use core instead of the main mcp package
 find pkg/mcp -name "*.go" -type f | while read file; do
     echo "Processing: $file"
-    
+
     # Skip core package files to avoid circular imports
     if [[ "$file" == *"/core/"* ]]; then
         echo "  Skipping core package file"
         continue
     fi
-    
+
     # Skip the main interfaces.go file we just cleaned
     if [[ "$file" == "pkg/mcp/interfaces.go" ]]; then
         echo "  Skipping main interfaces.go"
         continue
     fi
-    
+
     # Create backup
     cp "$file" "$file.bak"
-    
+
     # Update imports - replace bare mcp import with core import when needed
     sed -i 's|"github.com/Azure/container-kit/pkg/mcp"$|"github.com/Azure/container-kit/pkg/mcp/core"|g' "$file"
-    
+
     # Update type references from mcp.Type to core.Type
     sed -i 's|mcp\.Tool|core.Tool|g' "$file"
     sed -i 's|mcp\.ToolMetadata|core.ToolMetadata|g' "$file"
@@ -57,7 +57,7 @@ find pkg/mcp -name "*.go" -type f | while read file; do
     sed -i 's|mcp\.WorkspaceStats|core.WorkspaceStats|g' "$file"
     sed -i 's|mcp\.AlternativeStrategy|core.AlternativeStrategy|g' "$file"
     sed -i 's|mcp\.ConversationStage|core.ConversationStage|g' "$file"
-    
+
     # Update constants
     sed -i 's|mcp\.ConversationStagePreFlight|core.ConversationStagePreFlight|g' "$file"
     sed -i 's|mcp\.ConversationStageAnalyze|core.ConversationStageAnalyze|g' "$file"
@@ -69,7 +69,7 @@ find pkg/mcp -name "*.go" -type f | while read file; do
     sed -i 's|mcp\.ConversationStageScan|core.ConversationStageScan|g' "$file"
     sed -i 's|mcp\.ConversationStageCompleted|core.ConversationStageCompleted|g' "$file"
     sed -i 's|mcp\.ConversationStageError|core.ConversationStageError|g' "$file"
-    
+
     echo "  Updated: $file"
 done
 

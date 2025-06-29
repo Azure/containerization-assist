@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/stretchr/testify/assert"
@@ -112,7 +113,7 @@ func TestServerShutdownComponents(t *testing.T) {
 	require.NoError(t, err)
 
 	// Enable conversation mode
-	conversationConfig := ConversationConfig{
+	conversationConfig := core.ConversationConfig{
 		EnableTelemetry:   true,
 		TelemetryPort:     0, // Use random port
 		PreferencesDBPath: "",
@@ -128,7 +129,7 @@ func TestServerShutdownComponents(t *testing.T) {
 	// Create a session
 	sessionInterface, err := server.sessionManager.GetOrCreateSession("")
 	require.NoError(t, err)
-	// Try sessiontypes.SessionState instead of mcp.SessionState
+	// Try sessiontypes.SessionState instead of old interface
 	session, ok := sessionInterface.(*sessiontypes.SessionState)
 	require.True(t, ok, "session should be of correct type")
 	assert.NotEmpty(t, session.SessionID)

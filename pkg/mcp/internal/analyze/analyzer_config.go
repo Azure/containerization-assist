@@ -112,7 +112,7 @@ func (c *AnalyzerConfig) LoadFromEnv() {
 
 // CreateAnalyzerFromConfig creates an analyzer based on the provided configuration
 // Note: For CallerAnalyzer, you need to use AnalyzerFactory with a transport
-func CreateAnalyzerFromConfig(config *AnalyzerConfig, logger zerolog.Logger) mcp.AIAnalyzer {
+func CreateAnalyzerFromConfig(config *AnalyzerConfig, logger zerolog.Logger) core.AIAnalyzer {
 	if config.EnableAI {
 		logger.Warn().
 			Bool("ai_enabled", true).

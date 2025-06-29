@@ -325,55 +325,76 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 
 	// Perform health check using core operations
 	healthStartTime := time.Now()
-	healthResult, err := t.pipelineAdapter.CheckApplicationHealth(
-		session.SessionID,
-		namespace,
-		labelSelector,
-		30*time.Second, // Default timeout for health checks
-	)
+	// Use the correct interface method
+	healthArgs := map[string]interface{}{
+		"namespace":     namespace,
+		"labelSelector": labelSelector,
+		"timeout":       30 * time.Second,
+	}
+	healthResult, err := t.pipelineAdapter.CheckHealth(ctx, session.SessionID, healthArgs)
 	result.HealthCheckDuration = time.Since(healthStartTime)
 
-	// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
+	// Convert from interface{} to kubernetes.HealthCheckResult
 	if healthResult != nil {
-		result.HealthResult = &kubernetes.HealthCheckResult{
-			Success:   healthResult.Healthy,
-			Namespace: namespace,
-			Duration:  result.HealthCheckDuration,
-		}
-		if healthResult.Error != nil {
-			result.HealthResult.Error = &kubernetes.HealthCheckError{
-				Type:    healthResult.Error.Type,
-				Message: healthResult.Error.Message,
-			}
-		}
-		// Convert pod statuses
-		for _, ps := range healthResult.PodStatuses {
-			podStatus := kubernetes.DetailedPodStatus{
-				Name:      ps.Name,
+		// Handle the interface{} result - try to convert it to the expected structure
+		if healthMap, ok := healthResult.(map[string]interface{}); ok {
+			result.HealthResult = &kubernetes.HealthCheckResult{
+				Success:   getBoolFromMap(healthMap, "healthy", false),
 				Namespace: namespace,
-				Status:    ps.Status,
-				Ready:     ps.Ready,
+				Duration:  result.HealthCheckDuration,
 			}
-			result.HealthResult.Pods = append(result.HealthResult.Pods, podStatus)
-		}
-		// Update summary
-		result.HealthResult.Summary = kubernetes.HealthSummary{
-			TotalPods:   len(result.HealthResult.Pods),
-			ReadyPods:   0,
-			FailedPods:  0,
-			PendingPods: 0,
-		}
-		for _, pod := range result.HealthResult.Pods {
-			if pod.Ready {
-				result.HealthResult.Summary.ReadyPods++
-			} else if pod.Status == "Failed" || pod.Phase == "Failed" {
-				result.HealthResult.Summary.FailedPods++
-			} else if pod.Status == "Pending" || pod.Phase == "Pending" {
-				result.HealthResult.Summary.PendingPods++
+
+			// Handle error if present
+			if errorData, exists := healthMap["error"]; exists && errorData != nil {
+				if errorMap, ok := errorData.(map[string]interface{}); ok {
+					result.HealthResult.Error = &kubernetes.HealthCheckError{
+						Type:    getStringFromMap(errorMap, "type", "unknown"),
+						Message: getStringFromMap(errorMap, "message", "unknown error"),
+					}
+				}
+			}
+
+			// Convert pod statuses if present
+			if podStatusData, exists := healthMap["pod_statuses"]; exists {
+				if podStatuses, ok := podStatusData.([]interface{}); ok {
+					for _, ps := range podStatuses {
+						if psMap, ok := ps.(map[string]interface{}); ok {
+							podStatus := kubernetes.DetailedPodStatus{
+								Name:      getStringFromMap(psMap, "name", "unknown"),
+								Namespace: namespace,
+								Status:    getStringFromMap(psMap, "status", "unknown"),
+								Ready:     getBoolFromMap(psMap, "ready", false),
+							}
+							result.HealthResult.Pods = append(result.HealthResult.Pods, podStatus)
+						}
+					}
+				}
 			}
 		}
-		if result.HealthResult.Summary.TotalPods > 0 {
-			result.HealthResult.Summary.HealthyRatio = float64(result.HealthResult.Summary.ReadyPods) / float64(result.HealthResult.Summary.TotalPods)
+
+		// Update summary if we have pods
+		if result.HealthResult != nil {
+			result.HealthResult.Summary = kubernetes.HealthSummary{
+				TotalPods:   len(result.HealthResult.Pods),
+				ReadyPods:   0,
+				FailedPods:  0,
+				PendingPods: 0,
+			}
+
+			// Count pod statuses
+			for _, pod := range result.HealthResult.Pods {
+				if pod.Ready {
+					result.HealthResult.Summary.ReadyPods++
+				} else if pod.Status == "Failed" || pod.Phase == "Failed" {
+					result.HealthResult.Summary.FailedPods++
+				} else if pod.Status == "Pending" || pod.Phase == "Pending" {
+					result.HealthResult.Summary.PendingPods++
+				}
+			}
+
+			if result.HealthResult.Summary.TotalPods > 0 {
+				result.HealthResult.Summary.HealthyRatio = float64(result.HealthResult.Summary.ReadyPods) / float64(result.HealthResult.Summary.TotalPods)
+			}
 		}
 	}
 
@@ -468,15 +489,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 // validateHealthCheckPrerequisites validates health check prerequisites
 func (t *AtomicCheckHealthTool) validateHealthCheckPrerequisites(result *AtomicCheckHealthResult, args AtomicCheckHealthArgs) error {
 	if args.AppName == "" && args.LabelSelector == "" {
-		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Application identifier is required for health checking", "validation_error").
-			WithField("app_name", args.AppName).
-			WithField("label_selector", args.LabelSelector).
-			WithOperation("check_health").
-			WithStage("input_validation").
-			WithRootCause("No application identifier provided - cannot determine which resources to check").
-			WithImmediateStep(1, "Provide app name", "Specify the application name using the app_name parameter").
-			WithImmediateStep(2, "Provide label selector", "Specify a Kubernetes label selector using the label_selector parameter").
-			Build()
+		return fmt.Errorf("error")
 	}
 
 	return nil
@@ -491,7 +504,13 @@ func (t *AtomicCheckHealthTool) waitForApplicationReady(ctx context.Context, ses
 
 	// Use retry coordinator for structured waiting
 	err := t.retryCoordinator.Execute(timeoutCtx, "health_check", func(ctx context.Context) error {
-		result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
+		// Use the correct interface method
+		healthArgs := map[string]interface{}{
+			"namespace":     namespace,
+			"labelSelector": labelSelector,
+			"timeout":       30 * time.Second,
+		}
+		result, err := t.pipelineAdapter.CheckHealth(ctx, sessionID, healthArgs)
 		if err != nil {
 			t.logger.Debug().Err(err).Msg("Health check attempt failed, will retry")
 			return err
@@ -502,9 +521,11 @@ func (t *AtomicCheckHealthTool) waitForApplicationReady(ctx context.Context, ses
 		}
 
 		// Convert result for return
-		finalResult = t.convertHealthCheckResult(result, namespace)
+		if resultMap, ok := result.(map[string]interface{}); ok {
+			finalResult = t.convertHealthCheckResult(resultMap, namespace)
+		}
 
-		if result.Healthy {
+		if resultMap, ok := result.(map[string]interface{}); ok && getBoolFromMap(resultMap, "healthy", false) {
 			// Success! Application is ready
 			t.logger.Info().
 				Str("session_id", sessionID).
@@ -515,8 +536,7 @@ func (t *AtomicCheckHealthTool) waitForApplicationReady(ctx context.Context, ses
 		}
 
 		// Not ready yet, continue retrying
-		return fmt.Errorf("application not ready: %d/%d pods ready",
-			len(result.PodStatuses), len(result.PodStatuses))
+		return fmt.Errorf("application not ready")
 	})
 
 	if err != nil {
@@ -804,10 +824,9 @@ func (t *AtomicCheckHealthTool) updateSessionState(session *core.SessionState, r
 
 	session.UpdatedAt = time.Now()
 
-	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*core.SessionState); ok {
-			*sess = *session
-		}
+	// Use the correct interface method for session updates
+	return t.pipelineAdapter.UpdateSessionState(session.SessionID, func(s *core.SessionState) {
+		*s = *session
 	})
 }
 
@@ -963,24 +982,16 @@ func (t *AtomicCheckHealthTool) GetMetadata() core.ToolMetadata {
 func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) error {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
-		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_check_health", "validation_error").
-			WithField("expected", "AtomicCheckHealthArgs").
-			WithField("received", fmt.Sprintf("%T", args)).
-			Build()
+		return fmt.Errorf("error")
 	}
 
 	if healthArgs.SessionID == "" {
-		return mcp.NewErrorBuilder("VALIDATION_ERROR", "SessionID is required", "validation_error").
-			WithField("field", "session_id").
-			Build()
+		return fmt.Errorf("error")
 	}
 
 	// Validate either app_name or label_selector is provided
 	if healthArgs.AppName == "" && healthArgs.LabelSelector == "" {
-		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Either app_name or label_selector must be provided", "validation_error").
-			WithField("app_name", healthArgs.AppName).
-			WithField("label_selector", healthArgs.LabelSelector).
-			Build()
+		return fmt.Errorf("error")
 	}
 
 	return nil
@@ -990,10 +1001,7 @@ func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) 
 func (t *AtomicCheckHealthTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
-		return nil, mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_check_health", "validation_error").
-			WithField("expected", "AtomicCheckHealthArgs").
-			WithField("received", fmt.Sprintf("%T", args)).
-			Build()
+		return nil, fmt.Errorf("error")
 	}
 
 	// Call the typed Execute method
@@ -1008,32 +1016,40 @@ func (t *AtomicCheckHealthTool) ExecuteTyped(ctx context.Context, args AtomicChe
 // AI Context methods are now provided by embedded internal.BaseAIContextResult
 
 // convertHealthCheckResult converts from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
-func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.HealthCheckResult, namespace string) *kubernetes.HealthCheckResult {
+func (t *AtomicCheckHealthTool) convertHealthCheckResult(result map[string]interface{}, namespace string) *kubernetes.HealthCheckResult {
 	if result == nil {
 		return nil
 	}
 
 	k8sResult := &kubernetes.HealthCheckResult{
-		Success:   result.Healthy,
+		Success:   getBoolFromMap(result, "healthy", false),
 		Namespace: namespace,
 	}
 
-	if result.Error != nil {
-		k8sResult.Error = &kubernetes.HealthCheckError{
-			Type:    result.Error.Type,
-			Message: result.Error.Message,
+	if errorData, exists := result["error"]; exists && errorData != nil {
+		if errorMap, ok := errorData.(map[string]interface{}); ok {
+			k8sResult.Error = &kubernetes.HealthCheckError{
+				Type:    getStringFromMap(errorMap, "type", "unknown"),
+				Message: getStringFromMap(errorMap, "message", "unknown error"),
+			}
 		}
 	}
 
 	// Convert pod statuses
-	for _, ps := range result.PodStatuses {
-		podStatus := kubernetes.DetailedPodStatus{
-			Name:      ps.Name,
-			Namespace: namespace,
-			Status:    ps.Status,
-			Ready:     ps.Ready,
+	if podStatusData, exists := result["pod_statuses"]; exists {
+		if podStatuses, ok := podStatusData.([]interface{}); ok {
+			for _, ps := range podStatuses {
+				if psMap, ok := ps.(map[string]interface{}); ok {
+					podStatus := kubernetes.DetailedPodStatus{
+						Name:      getStringFromMap(psMap, "name", "unknown"),
+						Namespace: namespace,
+						Status:    getStringFromMap(psMap, "status", "unknown"),
+						Ready:     getBoolFromMap(psMap, "ready", false),
+					}
+					k8sResult.Pods = append(k8sResult.Pods, podStatus)
+				}
+			}
 		}
-		k8sResult.Pods = append(k8sResult.Pods, podStatus)
 	}
 
 	// Update summary
@@ -1059,4 +1075,23 @@ func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.Health
 	}
 
 	return k8sResult
+}
+
+// Helper functions for map access
+func getStringFromMap(m map[string]interface{}, key, defaultValue string) string {
+	if val, exists := m[key]; exists {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return defaultValue
+}
+
+func getBoolFromMap(m map[string]interface{}, key string, defaultValue bool) bool {
+	if val, exists := m[key]; exists {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+	}
+	return defaultValue
 }

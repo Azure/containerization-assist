@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,12 +137,11 @@ func TestWorkspaceManager_CheckQuota(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 
-				richErr, ok := err.(*mcp.RichError)
-				if ok {
-					assert.Equal(t, tt.errorCode, richErr.Code)
-					if tt.errorContains != "" {
-						assert.Contains(t, richErr.Message, tt.errorContains)
-					}
+				if tt.errorCode != "" {
+					assert.Contains(t, err.Error(), tt.errorCode)
+				}
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains)
 				}
 			} else {
 				assert.NoError(t, err)
@@ -414,9 +412,8 @@ func TestWorkspaceManager_EnforceGlobalQuota(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 
-				richErr, ok := err.(*mcp.RichError)
-				if ok {
-					assert.Equal(t, tt.errorCode, richErr.Code)
+				if tt.errorCode != "" {
+					assert.Contains(t, err.Error(), tt.errorCode)
 				}
 			} else {
 				assert.NoError(t, err)

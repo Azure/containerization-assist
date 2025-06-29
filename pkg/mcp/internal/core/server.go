@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
@@ -19,7 +18,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
-
 
 // Server represents the MCP server
 type Server struct {
@@ -352,7 +350,7 @@ func (s *Server) getAvailableToolSchemas() map[string]interface{} {
 }
 
 // GetLogger returns the server's logger
-func (s *Server) GetLogger() zerolog.Logger {
+func (s *Server) GetLogger() interface{} {
 	return s.logger
 }
 

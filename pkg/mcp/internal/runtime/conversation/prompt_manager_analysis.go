@@ -16,7 +16,7 @@ import (
 // startAnalysisWithFormData starts analysis after form data has been applied
 func (pm *PromptManager) startAnalysisWithFormData(ctx context.Context, state *ConversationState) *ConversationResponse {
 	pm.applyAnalysisFormDataToPreferences(state)
-	return pm.startAnalysis(ctx, state, state.RepoURL)
+	return pm.startAnalysis(ctx, state, state.SessionState.RepoURL)
 }
 
 // startAnalysis initiates repository analysis
@@ -32,7 +32,7 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 	// Execute analysis tool
 	params := map[string]interface{}{
 		"repo_url":       repoURL,
-		"session_id":     state.SessionID,
+		"session_id":     state.SessionState.SessionID,
 		"skip_file_tree": state.Preferences.SkipFileTree,
 	}
 
@@ -125,7 +125,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 	}
 
 	params := map[string]interface{}{
-		"session_id":           state.SessionID,
+		"session_id":           state.SessionState.SessionID,
 		"optimization":         state.Preferences.Optimization,
 		"include_health_check": state.Preferences.IncludeHealthCheck,
 	}

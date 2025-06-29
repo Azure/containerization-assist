@@ -292,6 +292,7 @@ func (v *ContextValidator) isRemoteURL(source string) bool {
 		strings.HasPrefix(source, "https://") ||
 		strings.HasPrefix(source, "ftp://")
 }
+
 func (v *ContextValidator) isArchive(source string) bool {
 	archiveExts := []string{
 		".tar", ".tar.gz", ".tgz", ".tar.bz2",
@@ -305,6 +306,7 @@ func (v *ContextValidator) isArchive(source string) bool {
 	}
 	return false
 }
+
 func (v *ContextValidator) hasFromFlag(flags []string) bool {
 	for _, flag := range flags {
 		if strings.HasPrefix(flag, "--from=") {
@@ -313,6 +315,7 @@ func (v *ContextValidator) hasFromFlag(flags []string) bool {
 	}
 	return false
 }
+
 func (v *ContextValidator) isSensitiveFile(source string) bool {
 	sensitivePatterns := []string{
 		".env", "secrets", "credentials", "password",
@@ -375,6 +378,7 @@ func (v *ContextValidator) ValidateWithContext(dockerfilePath, contextPath strin
 	// Note: TotalIssues field removed from ValidationResult
 	return result, nil
 }
+
 func (v *ContextValidator) calculateContextSize(path string) (int64, error) {
 	var size int64
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {

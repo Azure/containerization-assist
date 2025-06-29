@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
-	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
@@ -22,6 +19,7 @@ type BuildExecutorService struct {
 	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        *BuildAnalyzer
+	validator       *BuildValidatorImpl
 	troubleshooter  *BuildTroubleshooter
 	securityScanner *BuildSecurityScanner
 }
@@ -34,6 +32,7 @@ func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager core.T
 		sessionManager:  sessionManager,
 		logger:          executorLogger,
 		analyzer:        NewBuildAnalyzer(logger),
+		validator:       NewBuildValidator(logger),
 		troubleshooter:  NewBuildTroubleshooter(logger),
 		securityScanner: NewBuildSecurityScanner(logger),
 	}
@@ -58,434 +57,47 @@ func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args Atomic
 	}
 	// First validate basic requirements
 	if args.SessionID == "" {
-		return nil, mcp.NewErrorBuilder("SESSION_ID_REQUIRED", "Session ID is required", "validation_error").
-			WithField("session_id", args.SessionID).
-			WithOperation("build_image").
-			WithStage("input_validation").
-			WithImmediateStep(1, "Provide session ID", "Specify a valid session ID for the build operation").
-			Build()
+		return nil, fmt.Errorf("session ID is required")
 	}
 	if args.ImageName == "" {
-		return nil, mcp.NewErrorBuilder("IMAGE_NAME_REQUIRED", "Image name is required", "validation_error").
-			WithField("image_name", args.ImageName).
-			WithOperation("build_image").
-			WithStage("input_validation").
-			WithImmediateStep(1, "Provide image name", "Specify a Docker image name like 'myapp' or 'myregistry.com/myapp'").
-			Build()
+		return nil, fmt.Errorf("image name is required")
 	}
 	// Get session and workspace info
+	startTime := time.Now()
 	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
 	if err != nil {
-		return nil, types.NewSessionError(args.SessionID, "build_image").
-			WithStage("session_load").
-			WithTool("build_image_atomic").
-			WithRootCause("Session ID does not exist or has expired").
-			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
-			Build()
+		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
-	session := sessionInterface.(*core.SessionState)
-	workspaceDir := e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-	buildContext := e.getBuildContext(args.BuildContext, workspaceDir)
-	dockerfilePath := e.getDockerfilePath(args.DockerfilePath, buildContext)
-	e.logger.Info().
-		Str("session_id", args.SessionID).
-		Str("image_name", args.ImageName).
-		Str("dockerfile_path", dockerfilePath).
-		Str("build_context", buildContext).
-		Msg("Starting Docker build with AI-driven fixing")
-	// Note: The actual fixing logic would be handled by the fixingMixin
-	// This is a simplified version that just falls back to regular execution
-	startTime := time.Now()
-	result := &AtomicBuildImageResult{
-		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
-		SessionID:           args.SessionID,
-		ImageName:           args.ImageName,
-		ImageTag:            e.getImageTag(args.ImageTag),
-		Platform:            e.getPlatform(args.Platform),
-		BuildContext_Info:   &BuildContextInfo{},
+	session, ok := sessionInterface.(*session.SessionState)
+	if !ok {
+		return nil, fmt.Errorf("invalid session type")
 	}
-	return e.executeWithoutProgress(ctx, args, result, startTime)
-}
+	// Prepare workspace paths
+	workspaceDir := session.WorkspaceDir
 
-// ExecuteWithContext executes the tool with GoMCP server context for native progress tracking
-func (e *BuildExecutorService) ExecuteWithContext(serverCtx *server.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
-	startTime := time.Now()
-	// Create result object early for error handling
+	// Initialize result structure
 	result := &AtomicBuildImageResult{
-		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("build", false, 0), // Duration will be updated later
 		SessionID:           args.SessionID,
 		ImageName:           args.ImageName,
 		ImageTag:            e.getImageTag(args.ImageTag),
 		Platform:            e.getPlatform(args.Platform),
 		BuildContext_Info:   &BuildContextInfo{},
+		Success:             false,
+		BaseToolResponse:    types.NewBaseResponse("atomic_build_image", args.SessionID, args.DryRun),
+		BaseAIContextResult: mcptypes.NewBaseAIContextResult("build", false, 0),
+		WorkspaceDir:        workspaceDir,
 	}
-	// Use centralized build stages for progress tracking
-	// TODO: Move progress adapter to avoid import cycles
-	// _ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
-	//	{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
-	//	{Name: "Build", Weight: 0.70, Description: "Building Docker image"},
-	//	{Name: "Verify", Weight: 0.15, Description: "Verifying build results"},
-	//	{Name: "Finalize", Weight: 0.05, Description: "Updating session state"},
-	// })
+
+	// Set paths
+	result.BuildContext = e.getBuildContext(args.BuildContext, workspaceDir)
+	result.DockerfilePath = e.getDockerfilePath(args.DockerfilePath, result.BuildContext)
+	result.FullImageRef = fmt.Sprintf("%s:%s", args.ImageName, result.ImageTag)
+
 	// Execute with progress tracking
-	ctx := context.Background()
-	err := e.executeWithProgress(ctx, args, result, startTime, nil)
-	// Always set total duration
-	result.TotalDuration = time.Since(startTime)
-	// Complete progress tracking
-	if err != nil {
-		e.logger.Info().Msg("Build failed")
-		result.Success = false
-		return result, nil // Return result with error info, not the error itself
-	} else {
-		e.logger.Info().Msg("Build completed successfully")
+	if err := e.executeWithProgress(ctx, args, result, startTime, nil); err != nil {
+		return nil, err
 	}
 	return result, nil
-}
-
-// executeWithProgress handles the main execution with progress reporting
-func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, reporter interface{}) error {
-	// Stage 1: Initialize - Loading session and validating inputs
-	e.logger.Info().Msg("Loading session")
-	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
-	if err != nil {
-		e.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		return types.NewSessionError(args.SessionID, "build_image").
-			WithStage("initialize").
-			WithTool("build_image_atomic").
-			WithField("image_name", args.ImageName).
-			WithRootCause("Session ID does not exist or has expired").
-			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
-			Build()
-	}
-	session := sessionInterface.(*core.SessionState)
-	// Set session details
-	result.SessionID = session.SessionID
-	result.WorkspaceDir = e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-	result.FullImageRef = fmt.Sprintf("%s:%s", result.ImageName, result.ImageTag)
-	result.BuildContext = e.getBuildContext(args.BuildContext, result.WorkspaceDir)
-	result.DockerfilePath = e.getDockerfilePath(args.DockerfilePath, result.BuildContext)
-	e.logger.Info().Msg("Session initialized")
-	// Handle dry-run
-	if args.DryRun {
-		result.BuildContext_Info.NextStepSuggestions = []string{
-			"This is a dry-run - actual Docker image build would be performed",
-			fmt.Sprintf("Would build image: %s", result.FullImageRef),
-			fmt.Sprintf("Using Dockerfile: %s", result.DockerfilePath),
-			fmt.Sprintf("Build context: %s", result.BuildContext),
-		}
-		result.Success = true
-		e.logger.Info().Msg("Dry-run completed")
-		return nil
-	}
-	// Stage 2: Analyze - Analyzing build context and dependencies
-	e.logger.Info().Msg("Analyzing build context")
-	if err := e.analyzer.AnalyzeBuildContext(result); err != nil {
-		e.logger.Error().Err(err).
-			Str("dockerfile_path", result.DockerfilePath).
-			Str("build_context", result.BuildContext).
-			Msg("Build context analysis failed")
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build context analysis failed: %v", err), "filesystem_error")
-	}
-	e.logger.Info().Msg("Validating build prerequisites")
-	if err := e.analyzer.ValidateBuildPrerequisites(result); err != nil {
-		e.logger.Error().Err(err).
-			Str("dockerfile_path", result.DockerfilePath).
-			Str("build_context", result.BuildContext).
-			Int64("context_size", result.BuildContext_Info.ContextSize).
-			Msg("Build prerequisites validation failed")
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build prerequisites validation failed: %v", err), "validation_error")
-	}
-	e.logger.Info().Msg("Analysis completed")
-	// Stage 3: Build - Building Docker image
-	e.logger.Info().Msg("Building Docker image")
-	buildStartTime := time.Now()
-	buildResult, err := e.pipelineAdapter.BuildDockerImage(
-		session.SessionID, // Use compatibility method
-		result.FullImageRef,
-		result.DockerfilePath,
-	)
-	result.BuildDuration = time.Since(buildStartTime)
-	// Convert from mcptypes.BuildResult to coredocker.BuildResult
-	if buildResult != nil {
-		result.BuildResult = &coredocker.BuildResult{
-			Success:  buildResult.Success,
-			ImageID:  buildResult.ImageID,
-			ImageRef: buildResult.ImageRef,
-			Duration: result.BuildDuration, // Use the duration we already calculated
-		}
-		if buildResult.Error != nil {
-			result.BuildResult.Error = &coredocker.BuildError{
-				Type:    buildResult.Error.Type,
-				Message: buildResult.Error.Message,
-			}
-		}
-	}
-	if err != nil {
-		e.logger.Error().Err(err).
-			Str("image_ref", result.FullImageRef).
-			Str("dockerfile_path", result.DockerfilePath).
-			Str("session_id", session.SessionID).
-			Msg("Docker build failed")
-		result.BuildFailureAnalysis = e.troubleshooter.GenerateBuildFailureAnalysis(err, result.BuildResult, result)
-		e.troubleshooter.AddTroubleshootingTips(result, err)
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %v", err), "build_error")
-	}
-	if result.BuildResult != nil && !result.BuildResult.Success {
-		buildErr := mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build failed: %s", result.BuildResult.Error.Message), "build_error")
-		e.logger.Error().Err(buildErr).
-			Str("image_ref", result.FullImageRef).
-			Str("dockerfile_path", result.DockerfilePath).
-			Str("session_id", session.SessionID).
-			Msg("Docker build execution failed")
-		result.BuildFailureAnalysis = e.troubleshooter.GenerateBuildFailureAnalysis(buildErr, result.BuildResult, result)
-		e.troubleshooter.AddTroubleshootingTips(result, buildErr)
-		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build execution failed: %v", buildErr), "build_error")
-	}
-	result.Success = true
-	e.logger.Info().Msg("Docker image built successfully")
-	// Stage 4: Verify - Running post-build verification
-	e.logger.Info().Msg("Running security scan")
-	if err := e.securityScanner.RunSecurityScan(ctx, session, result); err != nil {
-		e.logger.Warn().Err(err).Msg("Security scan failed, but build was successful")
-		result.BuildContext_Info.TroubleshootingTips = append(
-			result.BuildContext_Info.TroubleshootingTips,
-			fmt.Sprintf("Security scan failed: %v - consider installing Trivy for vulnerability scanning", err),
-		)
-	}
-	// Push image if requested
-	if args.PushAfterBuild && args.RegistryURL != "" {
-		e.logger.Info().Msg("Pushing image to registry")
-		pushStartTime := time.Now()
-		// Construct full image ref with registry
-		registryImageRef := result.FullImageRef
-		if args.RegistryURL != "" && !strings.Contains(result.FullImageRef, "/") {
-			registryImageRef = fmt.Sprintf("%s/%s", args.RegistryURL, result.FullImageRef)
-		}
-		err := e.pipelineAdapter.PushDockerImage(
-			session.SessionID, // Use compatibility method
-			registryImageRef,
-		)
-		result.PushDuration = time.Since(pushStartTime)
-		// Create pushResult based on error
-		if err != nil {
-			// Detect authentication errors from error message
-			errorType := "push_error"
-			if strings.Contains(strings.ToLower(err.Error()), "authentication") ||
-				strings.Contains(strings.ToLower(err.Error()), "unauthorized") ||
-				strings.Contains(strings.ToLower(err.Error()), "login") ||
-				strings.Contains(strings.ToLower(err.Error()), "auth") {
-				errorType = "auth_error"
-			}
-			result.PushResult = &coredocker.RegistryPushResult{
-				Success: false,
-				Error: &coredocker.RegistryError{
-					Type:    errorType,
-					Message: err.Error(),
-				},
-			}
-			e.logger.Warn().Err(err).Msg("Failed to push image, but build was successful")
-			e.troubleshooter.AddPushTroubleshootingTips(result, result.PushResult, args.RegistryURL, err)
-		} else {
-			result.PushResult = &coredocker.RegistryPushResult{
-				Success:  true,
-				Registry: args.RegistryURL,
-				ImageRef: registryImageRef,
-			}
-		}
-	}
-	e.logger.Info().Msg("Verification completed")
-	// Stage 5: Finalize - Cleaning up and saving results
-	e.logger.Info().Msg("Finalizing")
-	e.analyzer.GenerateBuildContext(result)
-	if err := e.updateSessionState(session, result); err != nil {
-		e.logger.Warn().Err(err).Msg("Failed to update session state")
-	}
-	e.logger.Info().Msg("Build completed successfully")
-	return nil
-}
-
-// executeWithoutProgress handles execution without progress tracking (fallback)
-func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time) (*AtomicBuildImageResult, error) {
-	// Get session
-	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
-	if err != nil {
-		e.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		result.Success = false
-		result.TotalDuration = time.Since(startTime)
-		return result, types.NewSessionError(args.SessionID, "build_image").
-			WithStage("initialize").
-			WithTool("build_image_atomic").
-			WithField("image_name", args.ImageName).
-			WithField("image_tag", args.ImageTag).
-			WithRootCause("Session ID does not exist or has expired").
-			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
-			Build()
-	}
-	session := sessionInterface.(*core.SessionState)
-	// Set session details
-	result.SessionID = session.SessionID
-	result.WorkspaceDir = e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-	result.FullImageRef = fmt.Sprintf("%s:%s", result.ImageName, result.ImageTag)
-	result.BuildContext = e.getBuildContext(args.BuildContext, result.WorkspaceDir)
-	result.DockerfilePath = e.getDockerfilePath(args.DockerfilePath, result.BuildContext)
-	// Analyze build context
-	if err := e.analyzer.AnalyzeBuildContext(result); err != nil {
-		e.logger.Error().Err(err).
-			Str("dockerfile_path", result.DockerfilePath).
-			Str("build_context", result.BuildContext).
-			Msg("Build context analysis failed")
-		result.Success = false
-		result.TotalDuration = time.Since(startTime)
-		return result, types.NewBuildError("Build context analysis failed", args.SessionID, args.ImageName).
-			WithStage("analysis").
-			WithRelatedFiles(result.DockerfilePath, result.BuildContext).
-			WithRootCause(err.Error()).
-			WithImmediateStep(1, "Check Dockerfile exists", "Verify the Dockerfile exists at the specified path").
-			WithImmediateStep(2, "Validate build context", "Ensure build context directory contains necessary files").
-			WithPrevention("Always verify Dockerfile and build context paths before building").
-			Build()
-	}
-	if err := e.analyzer.ValidateBuildPrerequisites(result); err != nil {
-		e.logger.Error().Err(err).
-			Str("dockerfile_path", result.DockerfilePath).
-			Str("build_context", result.BuildContext).
-			Int64("context_size", result.BuildContext_Info.ContextSize).
-			Msg("Build prerequisites validation failed")
-		result.Success = false
-		result.TotalDuration = time.Since(startTime)
-		return result, types.NewBuildError("Build prerequisites validation failed", args.SessionID, args.ImageName).
-			WithStage("validation").
-			WithRelatedFiles(result.DockerfilePath).
-			WithRootCause(err.Error()).
-			WithField("context_size_mb", result.BuildContext_Info.ContextSize/1024/1024).
-			WithDiagnosticCheck("dockerfile_exists", result.BuildContext_Info.DockerfileExists, "Dockerfile presence check").
-			WithDiagnosticCheck("context_size", result.BuildContext_Info.ContextSize < 5*1024*1024*1024, "Build context size check").
-			WithImmediateStep(1, "Check Docker daemon", "Ensure Docker daemon is running").
-			WithCommand(2, "Test Docker", "Test Docker connectivity", "docker version", "Docker version information displayed").
-			Build()
-	}
-	// Build image
-	buildStartTime := time.Now()
-	buildResult, err := e.pipelineAdapter.BuildDockerImage(session.SessionID, result.FullImageRef, result.DockerfilePath)
-	result.BuildDuration = time.Since(buildStartTime)
-	// Convert from mcptypes.BuildResult to coredocker.BuildResult
-	if buildResult != nil {
-		result.BuildResult = &coredocker.BuildResult{
-			Success:  buildResult.Success,
-			ImageID:  buildResult.ImageID,
-			ImageRef: buildResult.ImageRef,
-			Duration: result.BuildDuration, // Use the duration we already calculated
-		}
-		if buildResult.Error != nil {
-			result.BuildResult.Error = &coredocker.BuildError{
-				Type:    buildResult.Error.Type,
-				Message: buildResult.Error.Message,
-			}
-		}
-		e.logger.Error().Err(err).Msg("Docker build failed")
-		result.BuildFailureAnalysis = e.troubleshooter.GenerateBuildFailureAnalysis(err, result.BuildResult, result)
-		e.troubleshooter.AddTroubleshootingTips(result, err)
-		result.Success = false
-		result.TotalDuration = time.Since(startTime)
-		return result, mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %v", err), "build_error")
-	}
-	result.Success = true
-	// Run security scan
-	if err := e.securityScanner.RunSecurityScan(ctx, session, result); err != nil {
-		e.logger.Warn().Err(err).Msg("Security scan failed, but build was successful")
-	}
-	// Push if requested
-	if args.PushAfterBuild && args.RegistryURL != "" {
-		pushStartTime := time.Now()
-		// Construct full image ref with registry
-		registryImageRef := result.FullImageRef
-		if args.RegistryURL != "" && !strings.Contains(result.FullImageRef, "/") {
-			registryImageRef = fmt.Sprintf("%s/%s", args.RegistryURL, result.FullImageRef)
-		}
-		err := e.pipelineAdapter.PushDockerImage(session.SessionID, registryImageRef)
-		result.PushDuration = time.Since(pushStartTime)
-		if err != nil {
-			// Detect authentication errors from error message
-			errorType := "push_error"
-			if strings.Contains(strings.ToLower(err.Error()), "authentication") ||
-				strings.Contains(strings.ToLower(err.Error()), "unauthorized") ||
-				strings.Contains(strings.ToLower(err.Error()), "login") ||
-				strings.Contains(strings.ToLower(err.Error()), "auth") {
-				errorType = "auth_error"
-			}
-			result.PushResult = &coredocker.RegistryPushResult{
-				Success: false,
-				Error: &coredocker.RegistryError{
-					Type:    errorType,
-					Message: err.Error(),
-				},
-			}
-			e.logger.Warn().Err(err).Msg("Failed to push image, but build was successful")
-			e.troubleshooter.AddPushTroubleshootingTips(result, result.PushResult, args.RegistryURL, err)
-		} else {
-			result.PushResult = &coredocker.RegistryPushResult{
-				Success:  true,
-				Registry: args.RegistryURL,
-				ImageRef: registryImageRef,
-			}
-		}
-	}
-	// Finalize
-	e.analyzer.GenerateBuildContext(result)
-	if err := e.updateSessionState(session, result); err != nil {
-		e.logger.Warn().Err(err).Msg("Failed to update session state")
-	}
-	result.TotalDuration = time.Since(startTime)
-	return result, nil
-}
-
-// updateSessionState updates the session with build results
-func (e *BuildExecutorService) updateSessionState(session *core.SessionState, result *AtomicBuildImageResult) error {
-	// Update session with build results
-	if session.Metadata == nil {
-		session.Metadata = make(map[string]interface{})
-	}
-	session.Metadata["last_built_image"] = result.FullImageRef
-	session.Metadata["build_duration"] = result.BuildDuration.Seconds()
-	session.Metadata["dockerfile_path"] = result.DockerfilePath
-	session.Metadata["build_context"] = result.BuildContext
-	if result.BuildResult != nil && result.BuildResult.Success {
-		// Add to StageHistory for stage tracking
-		now := time.Now()
-		startTime := now.Add(-result.BuildDuration) // Calculate start time from duration
-		execution := sessiontypes.ToolExecution{
-			Tool:       "build_image",
-			StartTime:  startTime,
-			EndTime:    &now,
-			Duration:   &result.BuildDuration,
-			Success:    true,
-			DryRun:     false,
-			TokensUsed: 0, // Could be tracked if needed
-		}
-		// Track tool execution in metadata
-		if session.Metadata == nil {
-			session.Metadata = make(map[string]interface{})
-		}
-		session.Metadata["last_tool_execution"] = execution
-		session.Metadata["build_success"] = true
-		session.Metadata["image_id"] = result.BuildResult.ImageID
-	} else {
-		session.Metadata["build_success"] = false
-	}
-	if result.PushResult != nil && result.PushResult.Success {
-		session.Metadata["push_success"] = true
-		session.Metadata["registry_url"] = result.PushResult.Registry
-	}
-	// Update session timestamp
-	session.UpdatedAt = time.Now()
-	return e.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*core.SessionState); ok {
-			*sess = *session
-		}
-	})
 }
 
 // Helper methods
@@ -522,4 +134,95 @@ func (e *BuildExecutorService) getDockerfilePath(dockerfilePath, buildContext st
 		return filepath.Join(buildContext, dockerfilePath)
 	}
 	return dockerfilePath
+}
+
+// executeWithoutProgress executes the build without progress tracking
+func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time) (*AtomicBuildImageResult, error) {
+	// Get session
+	sessionInterface, err := e.sessionManager.GetSession(args.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+	session, ok := sessionInterface.(*session.SessionState)
+	if !ok {
+		return nil, fmt.Errorf("invalid session type")
+	}
+
+	// Set workspace and paths
+	workspaceDir := session.WorkspaceDir
+	result.WorkspaceDir = workspaceDir
+	result.BuildContext = e.getBuildContext(args.BuildContext, workspaceDir)
+	result.DockerfilePath = e.getDockerfilePath(args.DockerfilePath, result.BuildContext)
+	result.FullImageRef = fmt.Sprintf("%s:%s", args.ImageName, result.ImageTag)
+
+	// Analyze build context
+	if e.analyzer != nil {
+		if err := e.analyzer.AnalyzeBuildContext(result); err != nil {
+			return nil, fmt.Errorf("build context analysis failed: %w", err)
+		}
+	}
+
+	// Validate build prerequisites
+	if e.validator != nil {
+		if err := e.validator.ValidateBuildPrerequisites(result.DockerfilePath, result.BuildContext); err != nil {
+			result.Success = false
+			result.TotalDuration = time.Since(startTime)
+			return result, fmt.Errorf("build prerequisites validation failed: %w", err)
+		}
+	}
+
+	// Build the image
+	buildStartTime := time.Now()
+	buildArgs := map[string]interface{}{
+		"dockerfilePath": result.DockerfilePath,
+		"buildContext":   result.BuildContext,
+		"imageName":      args.ImageName,
+		"imageTag":       result.ImageTag,
+	}
+	_, err = e.pipelineAdapter.BuildImage(ctx, session.SessionID, buildArgs)
+	result.BuildDuration = time.Since(buildStartTime)
+
+	if err != nil {
+		result.Success = false
+		e.logger.Error().Err(err).Str("image_name", args.ImageName).Msg("Failed to build image")
+		// Add troubleshooting tips
+		if e.troubleshooter != nil {
+			e.troubleshooter.AddTroubleshootingTips(result, err)
+		}
+		return result, nil
+	}
+
+	result.Success = true
+	result.TotalDuration = time.Since(startTime)
+	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("build", result.Success, result.TotalDuration)
+
+	// Push if requested
+	if args.PushAfterBuild && args.RegistryURL != "" {
+		pushStartTime := time.Now()
+		pushArgs := map[string]interface{}{
+			"imageRef":    result.FullImageRef,
+			"registryURL": args.RegistryURL,
+		}
+		_, err = e.pipelineAdapter.PushImage(ctx, session.SessionID, pushArgs)
+		result.PushDuration = time.Since(pushStartTime)
+		if err != nil {
+			e.logger.Error().Err(err).Msg("Failed to push image after build")
+			// Build succeeded but push failed
+			if e.troubleshooter != nil {
+				e.troubleshooter.AddPushTroubleshootingTips(result, nil, args.RegistryURL, err)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// executeWithProgress executes the build with progress tracking
+func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args AtomicBuildImageArgs, result *AtomicBuildImageResult, startTime time.Time, progress interface{}) error {
+	// For now, just call executeWithoutProgress
+	result, err := e.executeWithoutProgress(ctx, args, result, startTime)
+	if err != nil {
+		return err
+	}
+	return nil
 }

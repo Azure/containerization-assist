@@ -50,7 +50,7 @@ func (o *MCPToolOrchestrator) SetPipelineOperations(operations interface{}) {
 }
 
 // SetAnalyzer sets the AI analyzer for tool fixing capabilities
-func (o *MCPToolOrchestrator) SetAnalyzer(analyzer mcp.AIAnalyzer) {
+func (o *MCPToolOrchestrator) SetAnalyzer(analyzer core.AIAnalyzer) {
 	if o.dispatcher != nil {
 		o.dispatcher.SetAnalyzer(analyzer)
 	}
@@ -90,7 +90,7 @@ func (o *MCPToolOrchestrator) ExecuteTool(
 	return result, nil
 }
 
-// RegisterTool registers a tool with the orchestrator (required by mcp.Orchestrator interface)
+// RegisterTool registers a tool with the orchestrator (required by core.Orchestrator interface)
 func (o *MCPToolOrchestrator) RegisterTool(name string, tool core.Tool) error {
 	// This is part of the simplified interface - delegate to tool registry if needed
 	if o.toolRegistry != nil {

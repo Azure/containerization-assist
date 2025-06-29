@@ -15,7 +15,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
@@ -125,135 +124,22 @@ func (t *AtomicPullImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 			Timeout:       5 * time.Minute,
 			ExecuteFunc: func(ctx context.Context) error {
 				var err error
-				result, err = t.executePullCore(ctx, args)
+				result, err = t.executeWithoutProgress(ctx, args, nil, time.Now())
 				if err != nil {
 					return err
 				}
 				if !result.Success {
-					return fmt.Errorf("pull operation failed")
+					return fmt.Errorf("operation failed")
 				}
-				return nil
-			},
-			AnalyzeFunc: func() error {
-				if t.analyzer != nil {
-					return t.analyzer.AnalyzePullFailure(args.ImageRef, args.SessionID)
-				}
-				return nil
-			},
-			PrepareFunc: func() error {
-				// Prepare workspace for fixes
 				return nil
 			},
 		}, progress)
-		// Execute with retry and fixing
-		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
-		if err != nil {
+		if err := operation.Execute(ctx); err != nil {
 			return nil, err
 		}
 		return result, nil
 	}
-	// Fallback to standard execution
-	return t.executePullCore(ctx, args)
-}
-
-// ExecutePullImage runs the atomic Docker image pull (legacy method)
-func (t *AtomicPullImageTool) ExecutePullImage(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
-	return t.executePullCore(ctx, args)
-}
-
-// executePullCore contains the core pull logic
-func (t *AtomicPullImageTool) executePullCore(ctx context.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
-	startTime := time.Now()
-	// Create result object early for error handling
-	result := &AtomicPullImageResult{
-		BaseToolResponse:    types.NewBaseResponse("atomic_pull_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("pull", false, 0), // Will be updated later
-		ImageRef:            args.ImageRef,
-		PullContext:         &PullContext{},
-	}
-	// Direct execution without progress tracking
-	return t.executeWithoutProgress(ctx, args, result, startTime)
-}
-
-// ExecuteWithContext runs the atomic Docker image pull with GoMCP progress tracking
-func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args AtomicPullImageArgs) (*AtomicPullImageResult, error) {
-	startTime := time.Now()
-	// Create result object early for error handling
-	result := &AtomicPullImageResult{
-		BaseToolResponse:    types.NewBaseResponse("atomic_pull_image", args.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("pull", false, 0), // Will be updated later
-		ImageRef:            args.ImageRef,
-		PullContext:         &PullContext{},
-	}
-	// Create progress adapter for GoMCP using standard pull stages
-	progress := observability.NewUnifiedProgressReporter(serverCtx)
-	// Execute with progress tracking
-	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, progress)
-	// Always set total duration
-	result.TotalDuration = time.Since(startTime)
-	// Update AI context with final result
-	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("pull", result.Success, result.TotalDuration)
-	// Complete progress tracking
-	if err != nil {
-		t.logger.Info().Msg("Pull failed")
-		result.Success = false
-		return result, nil // Return result with error info, not the error itself
-	} else {
-		t.logger.Info().Msg("Pull completed successfully")
-	}
-	return result, nil
-}
-
-// executeWithProgress handles the main execution with progress reporting
-func (t *AtomicPullImageTool) executeWithProgress(ctx context.Context, args AtomicPullImageArgs, result *AtomicPullImageResult, startTime time.Time, reporter interface{}) error {
-	// Stage 1: Initialize - Loading session and validating inputs
-	t.logger.Info().Msg("Loading session")
-	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
-	if err != nil {
-		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
-		return utils.NewSessionNotFound(args.SessionID)
-	}
-	session := sessionInterface.(*core.SessionState)
-	// Set session details
-	result.SessionID = session.SessionID
-	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
-	t.logger.Info().
-		Str("session_id", session.SessionID).
-		Str("image_ref", args.ImageRef).
-		Msg("Starting atomic Docker pull")
-	t.logger.Info().Msg("Session initialized")
-	// Handle dry-run
-	if args.DryRun {
-		// Extract registry even in dry-run for testing
-		result.Registry = t.extractRegistryURL(args.ImageRef)
-		result.Success = true
-		// Update AI context with success
-		result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("pull", true, result.TotalDuration)
-		result.PullContext.PullStatus = "dry-run"
-		result.PullContext.NextStepSuggestions = []string{
-			"This is a dry-run - no actual pull was performed",
-			"Remove dry_run flag to perform actual pull",
-		}
-		t.logger.Info().Msg("Dry-run completed")
-		return nil
-	}
-	// Stage 2: Authenticate - Authenticating with registry
-	t.logger.Info().Msg("Validating prerequisites")
-	if err := t.validatePullPrerequisites(result, args); err != nil {
-		t.logger.Error().Err(err).
-			Str("session_id", session.SessionID).
-			Str("image_ref", result.ImageRef).
-			Msg("Pull prerequisites validation failed")
-		return utils.NewWithData("prerequisites_validation_failed", "Pull prerequisites validation failed", map[string]interface{}{
-			"session_id": session.SessionID,
-			"image_ref":  result.ImageRef,
-		})
-	}
-	t.logger.Info().Msg("Prerequisites validated")
-	// Stage 3: Pull - Pulling Docker image layers
-	t.logger.Info().Msg("Pulling Docker image")
-	return t.performPull(ctx, session, args, result, reporter)
+	return t.executeWithoutProgress(ctx, args, nil, time.Now())
 }
 
 // executeWithoutProgress handles execution without progress tracking (fallback)
@@ -322,7 +208,8 @@ func (t *AtomicPullImageTool) performPull(ctx context.Context, session *core.Ses
 	result.Registry = t.extractRegistryURL(args.ImageRef)
 	// Pull Docker image using pipeline adapter
 	pullStartTime := time.Now()
-	err := t.pipelineAdapter.PullDockerImage(session.SessionID, args.ImageRef)
+	// Use the correct interface method
+	_, err := t.pipelineAdapter.PullImage(ctx, session.SessionID, args)
 	result.PullDuration = time.Since(pullStartTime)
 	if err != nil {
 		result.Success = false
@@ -428,10 +315,9 @@ func (t *AtomicPullImageTool) updateSessionState(session *core.SessionState, res
 		}
 	}
 	session.UpdatedAt = time.Now()
-	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*core.SessionState); ok {
-			*sess = *session
-		}
+	// Use the correct interface method for session updates
+	return t.pipelineAdapter.UpdateSessionState(session.SessionID, func(s *core.SessionState) {
+		*s = *session
 	})
 }
 

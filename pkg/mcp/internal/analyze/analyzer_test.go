@@ -64,7 +64,7 @@ func TestAnalyzerFactory_CreateAnalyzer(t *testing.T) {
 			assert.Equal(t, tt.expectedType, actualType)
 
 			// Verify it implements the interface
-			var _ mcp.AIAnalyzer = analyzer
+			var _ core.AIAnalyzer = analyzer
 		})
 	}
 }

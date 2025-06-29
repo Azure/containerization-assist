@@ -177,7 +177,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	imageRef := getImageRef(state.SessionState)
 
 	params := map[string]interface{}{
-		"session_id":    state.SessionID,
+		"session_id":    state.SessionState.SessionID,
 		"app_name":      state.Context["app_name"],
 		"namespace":     state.Preferences.Namespace,
 		"image_ref":     imageRef,
@@ -328,7 +328,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 	imageRef := getImageRef(state.SessionState)
 
 	params := map[string]interface{}{
-		"session_id": state.SessionID,
+		"session_id": state.SessionState.SessionID,
 		"app_name":   state.Context["app_name"],
 		"namespace":  state.Preferences.Namespace,
 		"image_ref":  imageRef,
@@ -380,7 +380,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	imageRef := getImageRef(state.SessionState)
 
 	params := map[string]interface{}{
-		"session_id":     state.SessionID,
+		"session_id":     state.SessionState.SessionID,
 		"app_name":       state.Context["app_name"],
 		"namespace":      state.Preferences.Namespace,
 		"image_ref":      imageRef,
@@ -478,7 +478,7 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 	}
 
 	params := map[string]interface{}{
-		"session_id": state.SessionID,
+		"session_id": state.SessionState.SessionID,
 		"app_name":   state.Context["app_name"],
 		"namespace":  state.Preferences.Namespace,
 		"timeout":    60, // 1 minute for health check

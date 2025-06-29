@@ -10,13 +10,14 @@ import (
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	coreinterfaces "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
@@ -51,22 +52,7 @@ func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
 	return "", nil
 }
 
-// ConversationConfig holds configuration for conversation mode
-type ConversationConfig struct {
-	EnableTelemetry          bool
-	TelemetryPort            int
-	PreferencesDBPath        string
-	PreferencesEncryptionKey string // Optional encryption key for preference store
-
-	// OpenTelemetry configuration
-	EnableOTEL      bool
-	OTELEndpoint    string
-	OTELHeaders     map[string]string
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
-	TraceSampleRate float64
-}
+// Use ConversationConfig from core package to avoid type mismatch
 
 // ConversationComponents holds the conversation mode components
 type ConversationComponents struct {
@@ -76,7 +62,7 @@ type ConversationComponents struct {
 }
 
 // EnableConversationMode integrates the conversation components into the server
-func (s *Server) EnableConversationMode(config ConversationConfig) error {
+func (s *Server) EnableConversationMode(config coreinterfaces.ConversationConfig) error {
 	s.logger.Info().Msg("Enabling conversation mode")
 
 	// Initialize preference store
@@ -173,7 +159,16 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 	if transport, ok := s.transport.(types.LLMTransport); ok {
 		// Create adapter to bridge types.LLMTransport to analyze.LLMTransport
 		adapter := &llmTransportAdapter{transport: transport}
-		callerAnalyzer := analyze.NewCallerAnalyzer(adapter, analyze.CallerAnalyzerOpts{
+
+		// Create core analyzer for orchestrator
+		coreAnalyzer := analyze.NewCallerAnalyzer(adapter, analyze.CallerAnalyzerOpts{
+			ToolName:       "chat",
+			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
+			PerCallTimeout: 60 * time.Second,
+		})
+
+		// Create adapter for types interface
+		callerAnalyzer := analyze.NewCallerAnalyzerAdapter(adapter, analyze.CallerAnalyzerOpts{
 			ToolName:       "chat",
 			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
 			PerCallTimeout: 60 * time.Second,
@@ -182,7 +177,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 
 		// Also set the analyzer on the tool orchestrator for fixing capabilities
 		if s.toolOrchestrator != nil {
-			s.toolOrchestrator.SetAnalyzer(callerAnalyzer)
+			s.toolOrchestrator.SetAnalyzer(coreAnalyzer)
 		}
 
 		s.logger.Info().Msg("CallerAnalyzer enabled for conversation mode")

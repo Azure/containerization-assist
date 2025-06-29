@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	orchestrationtestutil "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/testutil"
 	profilingtestutil "github.com/Azure/container-kit/pkg/mcp/internal/profiling/testutil"
+	"github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -19,7 +18,7 @@ type IntegrationTestSuite struct {
 	logger              zerolog.Logger
 	sessionManager      *TestSessionManager
 	mockPipelineAdapter *MockPipelineAdapter
-	mockClients         *mcptypes.MCPClients
+	mockClients         *types.MCPClients
 	orchestratorCapture *orchestrationtestutil.ExecutionCapture
 	profilingTestSuite  *profilingtestutil.ProfiledTestSuite
 	testStartTime       time.Time
@@ -58,7 +57,7 @@ func (its *IntegrationTestSuite) GetPipelineAdapter() *MockPipelineAdapter {
 }
 
 // GetClients returns client sets
-func (its *IntegrationTestSuite) GetClients() *mcptypes.MCPClients {
+func (its *IntegrationTestSuite) GetClients() *types.MCPClients {
 	return its.mockClients
 }
 
@@ -476,13 +475,13 @@ func (mpa *MockPipelineAdapter) Clear() {
 }
 
 // NewTestClientSets creates pre-configured client mocks for testing
-func NewTestClientSets() *mcptypes.MCPClients {
+func NewTestClientSets() *types.MCPClients {
 	// Create mock clients with test implementations
-	return &mcptypes.MCPClients{
-		Docker:   nil,                       // Mock docker client can be injected as needed
-		Kind:     nil,                       // Mock kind runner can be injected as needed
-		Kube:     nil,                       // Mock kube runner can be injected as needed
-		Analyzer: analyze.NewStubAnalyzer(), // Use stub analyzer for testing
+	return &types.MCPClients{
+		Docker:   nil, // Mock docker client can be injected as needed
+		Kind:     nil, // Mock kind runner can be injected as needed
+		Kube:     nil, // Mock kube runner can be injected as needed
+		Analyzer: nil, // Use nil analyzer for testing
 	}
 }
 

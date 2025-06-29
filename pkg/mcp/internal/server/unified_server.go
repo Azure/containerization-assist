@@ -97,7 +97,7 @@ func NewUnifiedMCPServer(
 		// Use the tool orchestrator directly (no adapter needed with simplified interface)
 		server.promptManager = conversation.NewPromptManager(conversation.PromptManagerConfig{
 			SessionManager:   sessionManager,
-			ToolOrchestrator: toolOrchestrator, // Direct use - implements mcp.Orchestrator
+			ToolOrchestrator: toolOrchestrator, // Direct use - implements core.Orchestrator
 			PreferenceStore:  preferenceStore,
 			Logger:           logger,
 		})
@@ -492,10 +492,8 @@ func (dsm *directSessionManager) GetSession(sessionID string) (interface{}, erro
 	return dsm.sessionManager.GetOrCreateSession(sessionID)
 }
 
-func (dsm *directSessionManager) UpdateSession(session interface{}) error {
-	// Direct session updates are handled internally by the session manager
-	// The orchestration layer doesn't need to explicitly update sessions
-	return nil
+func (dsm *directSessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
+	return dsm.sessionManager.UpdateSession(sessionID, updater)
 }
 
 // ConversationOrchestratorAdapter removed - no longer needed with simplified interface

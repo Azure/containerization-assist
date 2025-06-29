@@ -506,15 +506,16 @@ func (a *AIContextAggregator) generateRecommendations(ctx *ComprehensiveContext)
 	return recommendations
 }
 
-func (a *AIContextAggregator) GetAIContext(ctx context.Context, sessionID string) (mcptypes.AIContext, error) {
+func (a *AIContextAggregator) GetAIContext(ctx context.Context, sessionID string) (map[string]interface{}, error) {
 	compContext, err := a.GetComprehensiveContext(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AIContextAdapter{
+	adapter := &AIContextAdapter{
 		comprehensiveContext: compContext,
-	}, nil
+	}
+	return adapter.GetContextData(), nil
 }
 
 type AIContextAdapter struct {
@@ -573,12 +574,12 @@ func (a *AIContextAdapter) GenerateRecommendations() []mcptypes.Recommendation {
 	return recommendations
 }
 
-func (a *AIContextAdapter) GetAssessment() *mcptypes.UnifiedAssessment {
-	return &mcptypes.UnifiedAssessment{}
+func (a *AIContextAdapter) GetAssessment() map[string]interface{} {
+	return map[string]interface{}{}
 }
 
-func (a *AIContextAdapter) GetToolContext() *mcptypes.ToolContext {
-	return &mcptypes.ToolContext{}
+func (a *AIContextAdapter) GetToolContext() map[string]interface{} {
+	return map[string]interface{}{}
 }
 
 func (a *AIContextAdapter) GetMetadata() map[string]interface{} {

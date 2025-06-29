@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -35,8 +36,8 @@ type CallerAnalyzerOpts struct {
 }
 
 // Ensure interface compliance at compile time.
-var _ mcp.AIAnalyzer = (*CallerAnalyzer)(nil)
-var _ mcp.AIAnalyzer = (*StubAnalyzer)(nil)
+var _ core.AIAnalyzer = (*CallerAnalyzer)(nil)
+var _ core.AIAnalyzer = (*StubAnalyzer)(nil)
 
 // NewCallerAnalyzer creates an analyzer that sends prompts back to the hosting LLM
 func NewCallerAnalyzer(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzer {
@@ -159,6 +160,33 @@ func (s *StubAnalyzer) ResetTokenUsage() {
 	// No-op for stub
 }
 
+// CallerAnalyzerAdapter adapts CallerAnalyzer to types.AIAnalyzer interface
+type CallerAnalyzerAdapter struct {
+	*CallerAnalyzer
+}
+
+// NewCallerAnalyzerAdapter creates an adapter that implements types.AIAnalyzer
+func NewCallerAnalyzerAdapter(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzerAdapter {
+	return &CallerAnalyzerAdapter{
+		CallerAnalyzer: NewCallerAnalyzer(transport, opts),
+	}
+}
+
+// GetTokenUsage implements types.AIAnalyzer interface
+func (a *CallerAnalyzerAdapter) GetTokenUsage() types.TokenUsage {
+	coreUsage := a.CallerAnalyzer.GetTokenUsage()
+	return types.TokenUsage{
+		CompletionTokens: coreUsage.CompletionTokens,
+		PromptTokens:     coreUsage.PromptTokens,
+		TotalTokens:      coreUsage.TotalTokens,
+	}
+}
+
+// GetCoreAnalyzer returns the underlying core.AIAnalyzer
+func (a *CallerAnalyzerAdapter) GetCoreAnalyzer() core.AIAnalyzer {
+	return a.CallerAnalyzer
+}
+
 // AnalyzerFactory creates the appropriate analyzer based on configuration
 type AnalyzerFactory struct {
 	logger       zerolog.Logger
@@ -187,7 +215,7 @@ func (f *AnalyzerFactory) SetAnalyzerOptions(opts CallerAnalyzerOpts) {
 }
 
 // CreateAnalyzer creates the appropriate analyzer based on configuration
-func (f *AnalyzerFactory) CreateAnalyzer() mcp.AIAnalyzer {
+func (f *AnalyzerFactory) CreateAnalyzer() core.AIAnalyzer {
 	if f.enableAI && f.transport != nil {
 		f.logger.Info().Msg("Creating CallerAnalyzer for AI-enabled mode")
 		return NewCallerAnalyzer(f.transport, f.analyzerOpts)
@@ -199,7 +227,7 @@ func (f *AnalyzerFactory) CreateAnalyzer() mcp.AIAnalyzer {
 
 // CreateAnalyzerFromEnv creates an analyzer based on environment configuration
 // Note: This returns a stub analyzer since we don't have transport available here
-func CreateAnalyzerFromEnv(logger zerolog.Logger) mcp.AIAnalyzer {
+func CreateAnalyzerFromEnv(logger zerolog.Logger) core.AIAnalyzer {
 	// Use centralized configuration logic
 	config := DefaultAnalyzerConfig()
 	config.LoadFromEnv()

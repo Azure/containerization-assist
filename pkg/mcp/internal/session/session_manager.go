@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -31,6 +32,10 @@ type SessionManager struct {
 	cleanupTicker *time.Ticker
 	cleanupDone   chan bool
 	stopped       bool
+
+	// Statistics tracking
+	startTime time.Time
+	diskUsage map[string]int64
 }
 
 // SessionManagerConfig represents session manager configuration
@@ -74,6 +79,8 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 		totalDiskLimit:    config.TotalDiskLimit,
 		logger:            config.Logger,
 		cleanupDone:       make(chan bool),
+		startTime:         time.Now(),
+		diskUsage:         make(map[string]int64),
 	}
 
 	if err := sm.loadExistingSessions(); err != nil {
@@ -200,6 +207,31 @@ func (sm *SessionManager) GetOrCreateSession(sessionID string) (interface{}, err
 		return nil, err
 	}
 	return session, nil
+}
+
+// CreateSession implements ToolSessionManager interface
+func (sm *SessionManager) CreateSession(userID string) (interface{}, error) {
+	// Generate a new session ID, optionally incorporating userID for uniqueness
+	sessionID := generateSessionID()
+	if userID != "" {
+		// Store user association in session metadata
+		session, err := sm.getOrCreateSessionConcrete(sessionID)
+		if err != nil {
+			return nil, err
+		}
+		if session.Metadata == nil {
+			session.Metadata = make(map[string]interface{})
+		}
+		session.Metadata["user_id"] = userID
+		session.UpdateLastAccessed()
+		// Save the updated session
+		if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
+			sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to save session with user metadata")
+		}
+		return session, nil
+	}
+	// Create session without user association
+	return sm.getOrCreateSessionConcrete(sessionID)
 }
 
 // ListSessionSummaries returns a list of all session summaries
@@ -502,41 +534,94 @@ func (sm *SessionManager) ListSessionsFiltered(filters SessionFilters) []Session
 }
 
 // GetStats returns statistics about the session manager
-func (sm *SessionManager) GetStats() *SessionManagerStats {
+func (sm *SessionManager) GetStats() *core.SessionManagerStats {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
-	stats := &SessionManagerStats{
-		TotalSessions:  len(sm.sessions),
-		TotalDiskUsage: sm.getTotalDiskUsage(),
-		MaxSessions:    sm.maxSessions,
-		TotalDiskLimit: sm.totalDiskLimit,
-	}
+	totalSessions := len(sm.sessions)
+	activeSessions := 0
+	failedSessions := 0
+	totalAge := 0.0
 
 	for _, session := range sm.sessions {
-		if session.GetActiveJobCount() > 0 {
-			stats.SessionsWithJobs++
-		}
-		if session.IsExpired() {
-			stats.ExpiredSessions++
+		if !session.IsExpired() {
+			activeSessions++
+			age := time.Since(session.CreatedAt).Minutes()
+			totalAge += age
 		} else {
-			stats.ActiveSessions++
+			failedSessions++
 		}
+	}
+
+	averageAge := 0.0
+	if activeSessions > 0 {
+		averageAge = totalAge / float64(activeSessions)
+	}
+
+	stats := &core.SessionManagerStats{
+		ActiveSessions:    activeSessions,
+		TotalSessions:     totalSessions,
+		FailedSessions:    failedSessions,
+		AverageSessionAge: averageAge,
+		SessionErrors:     0, // TODO: implement error tracking
 	}
 
 	return stats
 }
 
-// SessionManagerStats provides statistics about the session manager
-type SessionManagerStats struct {
-	TotalSessions    int       `json:"total_sessions"`
-	ActiveSessions   int       `json:"active_sessions"`
-	ExpiredSessions  int       `json:"expired_sessions"`
-	SessionsWithJobs int       `json:"sessions_with_jobs"`
-	TotalDiskUsage   int64     `json:"total_disk_usage_bytes"`
-	MaxSessions      int       `json:"max_sessions"`
-	TotalDiskLimit   int64     `json:"total_disk_limit_bytes"`
-	ServerStartTime  time.Time `json:"server_start_time"`
+// GetAllSessions implements ListSessionsManager interface
+func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	var sessions []*SessionData
+	for _, session := range sm.sessions {
+		sessionData := &SessionData{
+			ID:             session.SessionID,
+			State:          session,
+			CreatedAt:      session.CreatedAt,
+			UpdatedAt:      session.LastAccessed,
+			ExpiresAt:      session.ExpiresAt,
+			WorkspacePath:  session.WorkspaceDir,
+			DiskUsage:      sm.diskUsage[session.SessionID],
+			ActiveJobs:     []string{}, // TODO: implement actual job tracking
+			CompletedTools: []string{}, // TODO: implement actual tool tracking
+			LastError:      "",         // TODO: implement error tracking
+			Labels:         []string{}, // TODO: implement label support
+			RepoURL:        session.RepoURL,
+			Metadata:       make(map[string]string), // TODO: convert from interface{} metadata
+		}
+		sessions = append(sessions, sessionData)
+	}
+	return sessions, nil
+}
+
+// GetSessionData implements ListSessionsManager interface (SessionData version)
+func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error) {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	session, exists := sm.sessions[sessionID]
+	if !exists {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	sessionData := &SessionData{
+		ID:             session.SessionID,
+		State:          session,
+		CreatedAt:      session.CreatedAt,
+		UpdatedAt:      session.LastAccessed,
+		ExpiresAt:      session.ExpiresAt,
+		WorkspacePath:  session.WorkspaceDir,
+		DiskUsage:      sm.diskUsage[session.SessionID],
+		ActiveJobs:     []string{}, // TODO: implement actual job tracking
+		CompletedTools: []string{}, // TODO: implement actual tool tracking
+		LastError:      "",         // TODO: implement error tracking
+		Labels:         []string{}, // TODO: implement label support
+		RepoURL:        session.RepoURL,
+		Metadata:       make(map[string]string), // TODO: convert from interface{} metadata
+	}
+	return sessionData, nil
 }
 
 // SessionFilters defines criteria for filtering sessions

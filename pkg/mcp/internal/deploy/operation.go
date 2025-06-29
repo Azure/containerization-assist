@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
@@ -37,8 +36,8 @@ type Operation struct {
 
 	// Operation-specific functions (configurable)
 	ExecuteFunc  func(ctx context.Context) error
-	AnalyzeFunc  func(ctx context.Context, err error) (*mcp.RichError, error)
-	PrepareFunc  func(ctx context.Context, fixAttempt *mcp.FixAttempt) error
+	AnalyzeFunc  func(ctx context.Context, err error) (error, error)
+	PrepareFunc  func(ctx context.Context, fixAttempt interface{}) error
 	CanRetryFunc func(error) bool
 
 	// State
@@ -93,27 +92,28 @@ func (op *Operation) Execute(ctx context.Context) error {
 }
 
 // GetFailureAnalysis analyzes operation failures for categorization
-func (op *Operation) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
-	if op.AnalyzeFunc != nil {
-		return op.AnalyzeFunc(ctx, err)
+func (op *Operation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.FailureAnalysis, error) {
+	if err == nil {
+		return nil, nil
 	}
 
-	// Use type-specific default analysis
-	switch op.Type {
-	case OperationDeploy:
-		return analyzeDeploymentError(err)
-	case OperationHealthCheck:
-		return analyzeHealthCheckError(err)
-	default:
-		return &mcp.RichError{
-			Message: fmt.Sprintf("Operation failed: %v", err),
-			Code:    "OPERATION_FAILED",
-		}, nil
+	// Analyze error and determine failure characteristics
+	errorType, retryable := op.analyzeError(err)
+
+	analysis := &mcptypes.FailureAnalysis{
+		FailureType:    errorType,
+		IsCritical:     strings.Contains(strings.ToLower(err.Error()), "critical") || strings.Contains(strings.ToLower(err.Error()), "fatal"),
+		IsRetryable:    retryable,
+		RootCauses:     []string{err.Error()},
+		SuggestedFixes: op.getSuggestedFixes(errorType),
+		ErrorContext:   fmt.Sprintf("operation=%s, type=%s", op.Name, op.Type),
 	}
+
+	return analysis, nil
 }
 
 // PrepareForRetry prepares the environment for retry
-func (op *Operation) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
+func (op *Operation) PrepareForRetry(ctx context.Context, fixAttempt interface{}) error {
 	if op.PrepareFunc != nil {
 		return op.PrepareFunc(ctx, fixAttempt)
 	}
@@ -123,16 +123,19 @@ func (op *Operation) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAtt
 }
 
 // CanRetry determines if the operation can be retried based on error type
-func (op *Operation) CanRetry() bool {
-	if op.lastError == nil {
+func (op *Operation) CanRetry(err error) bool {
+	if err == nil {
+		err = op.lastError
+	}
+	if err == nil {
 		return false
 	}
 
 	if op.CanRetryFunc != nil {
-		return op.CanRetryFunc(op.lastError)
+		return op.CanRetryFunc(err)
 	}
 
-	return defaultCanRetry(op.lastError)
+	return defaultCanRetry(err)
 }
 
 // GetLastError returns the last error encountered
@@ -177,8 +180,92 @@ func defaultCanRetry(err error) bool {
 	return false
 }
 
+// analyzeError determines error type and retryability
+func (op *Operation) analyzeError(err error) (string, bool) {
+	if err == nil {
+		return "unknown", false
+	}
+
+	errStr := err.Error()
+	lowerErr := strings.ToLower(errStr)
+
+	// Categorize the error type and determine retryability
+	switch {
+	case strings.Contains(lowerErr, "imagepullbackoff") || strings.Contains(lowerErr, "errimage"):
+		return "image_error", true
+	case strings.Contains(lowerErr, "crashloopbackoff"):
+		return "runtime_error", true
+	case strings.Contains(lowerErr, "insufficient") || strings.Contains(lowerErr, "resource"):
+		return "resource_error", true
+	case strings.Contains(lowerErr, "forbidden") || strings.Contains(lowerErr, "unauthorized"):
+		return "permission_error", false
+	case strings.Contains(lowerErr, "timeout"):
+		return "timeout_error", true
+	case strings.Contains(lowerErr, "manifest") || strings.Contains(lowerErr, "yaml"):
+		return "manifest_error", true
+	case strings.Contains(lowerErr, "network") || strings.Contains(lowerErr, "connection"):
+		return "network_error", true
+	default:
+		return "deployment_error", true
+	}
+}
+
+// getSuggestedFixes returns suggested fixes based on error type
+func (op *Operation) getSuggestedFixes(errorType string) []string {
+	switch errorType {
+	case "image_error":
+		return []string{
+			"Verify the image exists and is accessible",
+			"Check registry credentials and permissions",
+			"Ensure correct image tag is specified",
+		}
+	case "runtime_error":
+		return []string{
+			"Check application logs for startup errors",
+			"Verify resource requests and limits",
+			"Review application configuration",
+		}
+	case "resource_error":
+		return []string{
+			"Check cluster resource availability",
+			"Review resource requests and limits",
+			"Consider scaling cluster or reducing requests",
+		}
+	case "permission_error":
+		return []string{
+			"Verify RBAC permissions",
+			"Check service account configuration",
+			"Review namespace access rights",
+		}
+	case "timeout_error":
+		return []string{
+			"Increase timeout values",
+			"Check network connectivity",
+			"Review application startup time",
+		}
+	case "manifest_error":
+		return []string{
+			"Validate YAML syntax",
+			"Check Kubernetes API compatibility",
+			"Review resource specifications",
+		}
+	case "network_error":
+		return []string{
+			"Check network connectivity",
+			"Verify DNS resolution",
+			"Review firewall rules",
+		}
+	default:
+		return []string{
+			"Check application logs",
+			"Review deployment configuration",
+			"Verify cluster health",
+		}
+	}
+}
+
 // analyzeDeploymentError provides rich error analysis for deployment failures
-func analyzeDeploymentError(err error) (*mcp.RichError, error) {
+func analyzeDeploymentError(err error) (error, error) {
 	if err == nil {
 		return nil, nil
 	}
@@ -187,56 +274,41 @@ func analyzeDeploymentError(err error) (*mcp.RichError, error) {
 	lowerErr := strings.ToLower(errStr)
 
 	// Categorize the error
-	var errorType, severity, code string
+	var errorType string
 	var retryable bool
+	_ = errorType // Use error type for analysis
 
 	switch {
 	case strings.Contains(lowerErr, "imagepullbackoff") || strings.Contains(lowerErr, "errimage"):
 		errorType = "image_error"
-		severity = "High"
-		code = "IMAGE_PULL_ERROR"
 		retryable = true
 
 	case strings.Contains(lowerErr, "crashloopbackoff"):
 		errorType = "runtime_error"
-		severity = "Critical"
-		code = "CRASH_LOOP_BACKOFF"
 		retryable = true
 
 	case strings.Contains(lowerErr, "insufficient") || strings.Contains(lowerErr, "resource"):
 		errorType = "resource_error"
-		severity = "High"
-		code = "INSUFFICIENT_RESOURCES"
 		retryable = true
 
 	case strings.Contains(lowerErr, "forbidden") || strings.Contains(lowerErr, "unauthorized"):
 		errorType = "permission_error"
-		severity = "Critical"
-		code = "PERMISSION_DENIED"
 		retryable = false
 
 	case strings.Contains(lowerErr, "timeout"):
 		errorType = "timeout_error"
-		severity = "Medium"
-		code = "DEPLOYMENT_TIMEOUT"
 		retryable = true
 
 	case strings.Contains(lowerErr, "manifest") || strings.Contains(lowerErr, "yaml"):
 		errorType = "manifest_error"
-		severity = "High"
-		code = "INVALID_MANIFEST"
 		retryable = true
 
 	case strings.Contains(lowerErr, "network") || strings.Contains(lowerErr, "connection"):
 		errorType = "network_error"
-		severity = "Medium"
-		code = "NETWORK_ERROR"
 		retryable = true
 
 	default:
 		errorType = "deployment_error"
-		severity = "High"
-		code = "DEPLOYMENT_FAILED"
 		retryable = true
 	}
 
@@ -252,22 +324,14 @@ func analyzeDeploymentError(err error) (*mcp.RichError, error) {
 		contextInfo += ", suggested_fix=reduce resource requests or scale cluster, escalation_target=generate_manifests"
 	}
 
-	return &mcp.RichError{
-		Code:     code,
-		Type:     errorType,
-		Severity: severity,
-		Message:  fmt.Sprintf("Deployment failed: %s (%s)", err.Error(), contextInfo),
-	}, nil
+	return fmt.Errorf("deployment failed: %s (%s)", err.Error(), contextInfo), nil
 }
 
 // analyzeHealthCheckError provides rich error analysis for health check failures
-func analyzeHealthCheckError(err error) (*mcp.RichError, error) {
+func analyzeHealthCheckError(err error) (error, error) {
 	if err == nil {
 		return nil, nil
 	}
 
-	return &mcp.RichError{
-		Message: fmt.Sprintf("Health check operation failed: %v", err),
-		Code:    "HEALTH_CHECK_FAILED",
-	}, nil
+	return fmt.Errorf("health check operation failed: %v", err), nil
 }

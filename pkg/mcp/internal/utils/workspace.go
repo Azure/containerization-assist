@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/utils"
 	"github.com/rs/zerolog"
 )
@@ -43,7 +42,7 @@ type WorkspaceConfig struct {
 // NewWorkspaceManager creates a new workspace manager
 func NewWorkspaceManager(ctx context.Context, config WorkspaceConfig) (*WorkspaceManager, error) {
 	if err := os.MkdirAll(config.BaseDir, 0o755); err != nil {
-		return nil, mcp.NewRichError("DIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create base directory: %v", err), "filesystem_error")
+		return nil, fmt.Errorf("failed to create base directory: %v", err)
 	}
 
 	wm := &WorkspaceManager{
@@ -76,7 +75,7 @@ func (wm *WorkspaceManager) InitializeWorkspace(ctx context.Context, sessionID s
 
 	// Create workspace directory
 	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
-		return "", mcp.NewRichError("WORKSPACE_CREATION_FAILED", fmt.Sprintf("failed to create workspace: %v", err), "filesystem_error")
+		return "", fmt.Errorf("failed to create workspace directory: %v", err)
 	}
 
 	// Create subdirectories
@@ -91,7 +90,7 @@ func (wm *WorkspaceManager) InitializeWorkspace(ctx context.Context, sessionID s
 	for _, subdir := range subdirs {
 		subdirPath := filepath.Join(workspaceDir, subdir)
 		if err := os.MkdirAll(subdirPath, 0o755); err != nil {
-			return "", mcp.NewRichError("SUBDIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create subdirectory %s: %v", subdir, err), "filesystem_error")
+			return "", fmt.Errorf("operation failed")
 		}
 	}
 
@@ -106,11 +105,11 @@ func (wm *WorkspaceManager) CloneRepository(ctx context.Context, sessionID, repo
 
 	// Clean existing repo directory
 	if err := os.RemoveAll(repoDir); err != nil {
-		return mcp.NewRichError("REPO_CLEANUP_FAILED", fmt.Sprintf("failed to clean repo directory: %v", err), "filesystem_error")
+		return fmt.Errorf("operation failed")
 	}
 
 	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		return mcp.NewRichError("REPO_DIRECTORY_CREATION_FAILED", fmt.Sprintf("failed to create repo directory: %v", err), "filesystem_error")
+		return fmt.Errorf("operation failed")
 	}
 
 	// Check quota before cloning
@@ -125,9 +124,9 @@ func (wm *WorkspaceManager) CloneRepository(ctx context.Context, sessionID, repo
 	// Run command with context cancellation
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return mcp.NewRichError("REPOSITORY_CLONE_CANCELLED", "repository clone was cancelled", "cancellation_error")
+			return fmt.Errorf("operation cancelled")
 		}
-		return mcp.NewRichError("REPOSITORY_CLONE_FAILED", fmt.Sprintf("failed to clone repository: %v", err), "git_error")
+		return fmt.Errorf("operation failed")
 	}
 
 	// Update disk usage
@@ -143,7 +142,7 @@ func (wm *WorkspaceManager) CloneRepository(ctx context.Context, sessionID, repo
 func (wm *WorkspaceManager) ValidateLocalPath(ctx context.Context, path string) error {
 	// Check for empty path first
 	if path == "" {
-		return mcp.NewRichError("EMPTY_PATH", "path cannot be empty", "validation_error")
+		return fmt.Errorf("path cannot be empty")
 	}
 
 	// Convert to absolute path - relative paths are relative to workspace base directory
@@ -156,25 +155,25 @@ func (wm *WorkspaceManager) ValidateLocalPath(ctx context.Context, path string) 
 
 	// Check for absolute paths outside workspace
 	if filepath.IsAbs(path) && !strings.HasPrefix(absPath, wm.baseDir) {
-		return mcp.NewRichError("ABSOLUTE_PATH_BLOCKED", "absolute paths not allowed outside workspace", "security_error")
+		return fmt.Errorf("absolute paths not allowed outside workspace")
 	}
 
 	// Check for path traversal attempts (before conversion to absolute path)
 	if strings.Contains(path, "..") {
-		return mcp.NewRichError("PATH_TRAVERSAL_BLOCKED", "path traversal not allowed", "security_error")
+		return fmt.Errorf("path traversal attempts are not allowed")
 	}
 
 	// Check for hidden files - check each path component
 	pathComponents := strings.Split(path, string(filepath.Separator))
 	for _, component := range pathComponents {
 		if component != "" && strings.HasPrefix(component, ".") && component != "." && component != ".." {
-			return mcp.NewRichError("HIDDEN_FILES_BLOCKED", "hidden files not allowed", "security_error")
+			return fmt.Errorf("hidden files are not allowed")
 		}
 	}
 
 	// Check if path exists
 	if _, err := os.Stat(absPath); err != nil {
-		return mcp.NewRichError("PATH_NOT_FOUND", fmt.Sprintf("path does not exist: %s", absPath), "filesystem_error")
+		return fmt.Errorf("path does not exist: %s", path)
 	}
 
 	// Additional security checks can be added here
@@ -194,7 +193,7 @@ func (wm *WorkspaceManager) CleanupWorkspace(ctx context.Context, sessionID stri
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
 
 	if err := os.RemoveAll(workspaceDir); err != nil {
-		return mcp.NewRichError("WORKSPACE_CLEANUP_FAILED", fmt.Sprintf("failed to cleanup workspace: %v", err), "filesystem_error")
+		return fmt.Errorf("operation failed")
 	}
 
 	// Remove from disk usage tracking
@@ -224,13 +223,15 @@ func (wm *WorkspaceManager) CheckQuota(sessionID string, additionalBytes int64) 
 
 	// Check per-session quota
 	if currentUsage+additionalBytes > wm.maxSizePerSession {
-		return mcp.NewRichError("SESSION_QUOTA_EXCEEDED", fmt.Sprintf("session disk quota would be exceeded: %d + %d > %d", currentUsage, additionalBytes, wm.maxSizePerSession), "quota_error")
+		return fmt.Errorf("SESSION_QUOTA_EXCEEDED: session disk quota would be exceeded: %d + %d > %d",
+			currentUsage, additionalBytes, wm.maxSizePerSession)
 	}
 
 	// Check global quota
 	totalUsage := wm.getTotalDiskUsage()
 	if totalUsage+additionalBytes > wm.totalMaxSize {
-		return mcp.NewRichError("GLOBAL_QUOTA_EXCEEDED", fmt.Sprintf("global disk quota would be exceeded: %d + %d > %d", totalUsage, additionalBytes, wm.totalMaxSize), "quota_error")
+		return fmt.Errorf("GLOBAL_QUOTA_EXCEEDED: global disk quota would be exceeded: %d + %d > %d",
+			totalUsage, additionalBytes, wm.totalMaxSize)
 	}
 
 	return nil
@@ -264,7 +265,7 @@ func (wm *WorkspaceManager) UpdateDiskUsage(ctx context.Context, sessionID strin
 		return nil
 	})
 	if err != nil {
-		return mcp.NewRichError("DISK_USAGE_CALCULATION_FAILED", fmt.Sprintf("failed to calculate disk usage: %v", err), "filesystem_error")
+		return fmt.Errorf("operation failed")
 	}
 
 	wm.mutex.Lock()
@@ -293,7 +294,7 @@ func (wm *WorkspaceManager) EnforceGlobalQuota() error {
 	if totalUsage > wm.totalMaxSize {
 		// Find sessions that can be cleaned up (oldest first)
 		// This is a simplified implementation - could be more sophisticated
-		return mcp.NewRichError("GLOBAL_QUOTA_EXCEEDED", fmt.Sprintf("global disk quota exceeded: %d > %d", totalUsage, wm.totalMaxSize), "quota_error")
+		return fmt.Errorf("GLOBAL_QUOTA_EXCEEDED: total disk usage %d exceeds limit %d", totalUsage, wm.totalMaxSize)
 	}
 
 	return nil
@@ -304,23 +305,23 @@ func (wm *WorkspaceManager) EnforceGlobalQuota() error {
 // SandboxedAnalysis runs repository analysis in a sandboxed environment
 func (wm *WorkspaceManager) SandboxedAnalysis(ctx context.Context, sessionID, repoPath string, options interface{}) (interface{}, error) {
 	if !wm.sandboxEnabled {
-		return nil, mcp.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
+		return nil, fmt.Errorf("operation not supported")
 	}
 
 	// Sandboxed execution not implemented
 	// Would require Docker-in-Docker or similar technology
-	return nil, mcp.NewRichError("SANDBOXED_ANALYSIS_NOT_IMPLEMENTED", "sandboxed analysis not implemented", "feature_error")
+	return nil, fmt.Errorf("operation not supported")
 }
 
 // SandboxedBuild runs Docker build in a sandboxed environment
 func (wm *WorkspaceManager) SandboxedBuild(ctx context.Context, sessionID, dockerfilePath string, options interface{}) (interface{}, error) {
 	if !wm.sandboxEnabled {
-		return nil, mcp.NewRichError("SANDBOXING_DISABLED", "sandboxing not enabled", "configuration_error")
+		return nil, fmt.Errorf("operation not supported")
 	}
 
 	// Sandboxed execution not implemented
 	// Would require Docker-in-Docker or similar technology
-	return nil, mcp.NewRichError("SANDBOXED_BUILD_NOT_IMPLEMENTED", "sandboxed build not implemented", "feature_error")
+	return nil, fmt.Errorf("operation not supported")
 }
 
 // Helper methods

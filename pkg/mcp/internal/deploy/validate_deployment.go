@@ -155,7 +155,7 @@ func (t *AtomicValidateDeploymentTool) ExecuteTyped(ctx context.Context, args Va
 	timeout, err := time.ParseDuration(args.Timeout)
 	if err != nil {
 		t.logger.Error().Err(err).Str("timeout", args.Timeout).Msg("Invalid timeout format")
-		return response, mcp.NewRichError("INVALID_TIMEOUT", fmt.Sprintf("invalid timeout format: %s", args.Timeout), "validation_error")
+		return response, fmt.Errorf("invalid timeout format: %s", args.Timeout)
 	}
 
 	// Create context with timeout
@@ -423,13 +423,13 @@ func (t *AtomicValidateDeploymentTool) Execute(ctx context.Context, args interfa
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return nil, fmt.Errorf("failed to marshal arguments")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return nil, fmt.Errorf("invalid argument structure for validate_deployment")
 		}
 	default:
-		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return nil, fmt.Errorf("invalid argument type for validate_deployment")
 	}
 
 	// Call the typed execute method
@@ -447,18 +447,18 @@ func (t *AtomicValidateDeploymentTool) Validate(ctx context.Context, args interf
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return fmt.Errorf("failed to marshal arguments")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return fmt.Errorf("invalid argument structure for validate_deployment")
 		}
 	default:
-		return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return fmt.Errorf("invalid argument type for validate_deployment")
 	}
 
 	// Validate required fields
 	if deployArgs.SessionID == "" {
-		return mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return fmt.Errorf("session_id is required")
 	}
 
 	return nil
