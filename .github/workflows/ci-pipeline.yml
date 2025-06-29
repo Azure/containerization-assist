@@ -368,23 +368,14 @@ jobs:
 
           threshold=${COVERAGE_THRESHOLDS[$package]}
 
-                echo "Package $package: ${coverage_percent}% coverage (threshold: ${threshold}%)"
+          echo "Package $package: ${coverage_percent}% coverage (threshold: ${threshold}%)"
 
-                # Compare coverage with threshold
-                if (( $(echo "$coverage_percent < $threshold" | bc -l) )); then
-                  echo "❌ $package coverage ${coverage_percent}% is below threshold ${threshold}%"
-                  FAILED_PACKAGES+=("$package (${coverage_percent}% < ${threshold}%)")
-                else
-                  echo "✅ $package coverage ${coverage_percent}% meets threshold ${threshold}%"
-                fi
-              else
-                echo "⚠️ Could not extract coverage for $package"
-              fi
-            else
-              echo "⚠️ No coverage file generated for $package"
-            fi
+          # Compare coverage with threshold
+          if (( $(echo "$coverage_percent < $threshold" | bc -l) )); then
+            echo "❌ $package coverage ${coverage_percent}% is below threshold ${threshold}%"
+            FAILED_PACKAGES+=("$package (${coverage_percent}% < ${threshold}%)")
           else
-            echo "⚠️ Tests failed for $package"
+            echo "✅ $package coverage ${coverage_percent}% meets threshold ${threshold}%"
           fi
         done
 
