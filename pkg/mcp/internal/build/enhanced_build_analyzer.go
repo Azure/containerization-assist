@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
@@ -14,7 +15,7 @@ import (
 // EnhancedBuildAnalyzer implements UnifiedAnalyzer with comprehensive build intelligence
 type EnhancedBuildAnalyzer struct {
 	aiAnalyzer         mcp.AIAnalyzer
-	repositoryAnalyzer RepositoryAnalyzerInterface
+	repositoryAnalyzer core.RepositoryAnalyzer // Use core interface directly
 	knowledgeBase      *CrossToolKnowledgeBase
 	failurePredictor   *FailurePredictor
 	strategizer        *BuildStrategizer
@@ -23,27 +24,11 @@ type EnhancedBuildAnalyzer struct {
 	capabilities *AnalyzerCapabilities
 }
 
-// RepositoryAnalyzerInterface defines interface for repository analysis to avoid import cycles
-type RepositoryAnalyzerInterface interface {
-	AnalyzeRepository(ctx context.Context, repoPath string) (*RepositoryInfo, error)
-	GetProjectMetadata(ctx context.Context, repoPath string) (*ProjectMetadata, error)
-}
-
-// RepositoryInfo represents repository analysis results
-type RepositoryInfo struct {
-	Language     string                 `json:"language"`
-	Framework    string                 `json:"framework"`
-	Dependencies []string               `json:"dependencies"`
-	BuildSystem  string                 `json:"build_system"`
-	ProjectSize  string                 `json:"project_size"`
-	Complexity   string                 `json:"complexity"`
-	Metadata     map[string]interface{} `json:"metadata"`
-}
 
 // NewEnhancedBuildAnalyzer creates a new unified analyzer with full capabilities
 func NewEnhancedBuildAnalyzer(
 	aiAnalyzer mcp.AIAnalyzer,
-	repositoryAnalyzer RepositoryAnalyzerInterface,
+	repositoryAnalyzer core.RepositoryAnalyzer, // Use core interface directly
 	logger zerolog.Logger,
 ) *EnhancedBuildAnalyzer {
 	analyzer := &EnhancedBuildAnalyzer{
@@ -495,7 +480,7 @@ func (e *EnhancedBuildAnalyzer) extractSolutionNames(strategies []*FixStrategy) 
 }
 
 // Placeholder implementations for repository-aware analysis
-func (e *EnhancedBuildAnalyzer) analyzeProjectInsights(ctx context.Context, repoInfo *RepositoryInfo, projectMeta *ProjectMetadata) (*ProjectInsights, error) {
+func (e *EnhancedBuildAnalyzer) analyzeProjectInsights(ctx context.Context, repoInfo *core.RepositoryInfo, projectMeta *ProjectMetadata) (*ProjectInsights, error) {
 	// Placeholder - would analyze code quality, architecture, etc.
 	return &ProjectInsights{
 		CodeQuality: &QualityMetrics{
@@ -536,7 +521,7 @@ func (e *EnhancedBuildAnalyzer) generateFrameworkOptimizations(projectMeta *Proj
 	}
 	return optimizations
 }
-func (e *EnhancedBuildAnalyzer) analyzeDependencies(ctx context.Context, repoInfo *RepositoryInfo) (*DependencyAnalysis, error) {
+func (e *EnhancedBuildAnalyzer) analyzeDependencies(ctx context.Context, repoInfo *core.RepositoryInfo) (*DependencyAnalysis, error) {
 	// Placeholder - would analyze actual dependencies
 	return &DependencyAnalysis{
 		OutdatedDeps:   []string{},
@@ -551,7 +536,7 @@ func (e *EnhancedBuildAnalyzer) analyzeDependencies(ctx context.Context, repoInf
 		Recommendations: []string{"Regular dependency updates", "Security scanning"},
 	}, nil
 }
-func (e *EnhancedBuildAnalyzer) analyzeSecurityImplications(repoInfo *RepositoryInfo, analysis *AnalysisResult) *GeneralSecurityAnalysis {
+func (e *EnhancedBuildAnalyzer) analyzeSecurityImplications(repoInfo *core.RepositoryInfo, analysis *AnalysisResult) *GeneralSecurityAnalysis {
 	// Placeholder - would analyze actual security implications
 	return &GeneralSecurityAnalysis{
 		VulnerabilityCount: 0,

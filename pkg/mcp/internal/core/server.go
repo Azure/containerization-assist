@@ -152,8 +152,8 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		Logger:     logger.With().Str("component", "job_manager").Logger(),
 	})
 
-	// Initialize transport
-	var mcpTransport transport.LocalTransport
+	// Initialize transport (using core.Transport interface directly)
+	var mcpTransport core.Transport
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -166,13 +166,12 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 			MaxBodyLogSize: config.MaxBodyLogSize,
 			LogLevel:       config.LogLevel,
 		}
-		httpTransport := transport.NewHTTPTransport(httpConfig)
-		mcpTransport = NewTransportAdapter(httpTransport)
+		mcpTransport = transport.NewCoreHTTPTransport(httpConfig)
 	case "stdio":
 		fallthrough
 	default:
-		// Use factory for consistent stdio transport creation
-		mcpTransport = transport.NewDefaultStdioTransport(logger)
+		// Create stdio transport using core interface
+		mcpTransport = transport.NewDefaultCoreStdioTransport(logger)
 	}
 
 	// Create gomcp manager with builder pattern

@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
@@ -12,7 +13,7 @@ import (
 type AnalyzerHelper struct {
 	analyzer              mcp.AIAnalyzer
 	enhancedBuildAnalyzer *build.EnhancedBuildAnalyzer
-	repositoryAdapter     *RepositoryAnalyzerAdapter
+	repositoryAnalyzer    core.RepositoryAnalyzer // Use core interface directly
 	toolFactory           *ToolFactory
 	sessionManager        mcp.ToolSessionManager
 	logger                zerolog.Logger
@@ -40,9 +41,9 @@ func NewAnalyzerHelperWithFactory(
 		logger:         logger,
 	}
 
-	// Create the repository analyzer adapter
+	// Create the core repository analyzer directly (no adapter needed)
 	if toolFactory != nil && sessionManager != nil {
-		helper.repositoryAdapter = NewRepositoryAnalyzerAdapter(toolFactory, sessionManager, logger)
+		helper.repositoryAnalyzer = analyze.NewCoreRepositoryAnalyzer(logger)
 	}
 
 	return helper
@@ -96,16 +97,16 @@ func (h *AnalyzerHelper) GetEnhancedBuildAnalyzer() *build.EnhancedBuildAnalyzer
 // ensureEnhancedAnalyzer creates the enhanced build analyzer if it doesn't exist
 func (h *AnalyzerHelper) ensureEnhancedAnalyzer() {
 	if h.enhancedBuildAnalyzer == nil && h.analyzer != nil {
-		// Use the repository analyzer adapter if available, otherwise nil
-		var repositoryAnalyzer build.RepositoryAnalyzerInterface
-		if h.repositoryAdapter != nil {
-			repositoryAnalyzer = h.repositoryAdapter
-			h.logger.Info().Msg("Using RepositoryAnalyzerAdapter for enhanced build analyzer")
+		// Use the core repository analyzer directly (no adapter needed)
+		if h.repositoryAnalyzer != nil {
+			h.logger.Info().Msg("Using core RepositoryAnalyzer for enhanced build analyzer")
 		} else {
-			h.logger.Warn().Msg("No repository adapter available - enhanced build analyzer will have limited functionality")
+			// Create one if it doesn't exist
+			h.repositoryAnalyzer = analyze.NewCoreRepositoryAnalyzer(h.logger)
+			h.logger.Info().Msg("Created new core RepositoryAnalyzer for enhanced build analyzer")
 		}
 
-		h.enhancedBuildAnalyzer = build.NewEnhancedBuildAnalyzer(h.analyzer, repositoryAnalyzer, h.logger)
+		h.enhancedBuildAnalyzer = build.NewEnhancedBuildAnalyzer(h.analyzer, h.repositoryAnalyzer, h.logger)
 	}
 }
 
