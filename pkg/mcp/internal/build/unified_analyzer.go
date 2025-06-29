@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // UnifiedAnalyzer combines AI and tool-specific analysis capabilities
@@ -65,7 +66,7 @@ type AnalysisResult struct {
 // RepositoryAnalysisRequest combines repository info with analysis context
 type RepositoryAnalysisRequest struct {
 	AnalysisRequest
-	RepositoryInfo  *RepositoryInfo      `json:"repository_info"`
+	RepositoryInfo  *core.RepositoryInfo `json:"repository_info"` // Use core interface
 	ProjectMetadata *ProjectMetadata     `json:"project_metadata"`
 	BuildHistory    []*BuildHistoryEntry `json:"build_history"`
 }

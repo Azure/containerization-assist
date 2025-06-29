@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -24,7 +25,7 @@ type LocalRequestHandler interface {
 	HandleRequest(ctx context.Context, req *mcp.MCPRequest) (*mcp.MCPResponse, error)
 }
 
-// HTTPTransport implements HTTP transport
+// HTTPTransport implements core.Transport for HTTP communication
 type HTTPTransport struct {
 	server         *http.Server
 	mcpServer      interface{}
@@ -39,7 +40,7 @@ type HTTPTransport struct {
 	rateLimiter    map[string]*rateLimiter
 	logBodies      bool
 	maxBodyLogSize int64
-	handler        LocalRequestHandler
+	handler        core.RequestHandler // Use core.RequestHandler instead of LocalRequestHandler
 }
 
 // HTTPTransportConfig holds configuration for HTTP transport
@@ -90,6 +91,11 @@ func NewHTTPTransport(config HTTPTransportConfig) *HTTPTransport {
 
 	transport.setupRouter()
 	return transport
+}
+
+// NewCoreHTTPTransport creates a new HTTP transport that implements core.Transport
+func NewCoreHTTPTransport(config HTTPTransportConfig) core.Transport {
+	return NewHTTPTransport(config)
 }
 
 // setupRouter initializes HTTP router and middleware
@@ -200,7 +206,8 @@ func (t *HTTPTransport) Close() error {
 }
 
 // SetHandler sets the request handler for this transport
-func (t *HTTPTransport) SetHandler(handler LocalRequestHandler) {
+// SetHandler sets the request handler (implements core.Transport)
+func (t *HTTPTransport) SetHandler(handler core.RequestHandler) {
 	t.handler = handler
 }
 

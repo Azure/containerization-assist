@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -18,13 +19,13 @@ type LocalTransport interface {
 	SetHandler(handler LocalRequestHandler)
 }
 
-// StdioTransport implements Transport for stdio communication
+// StdioTransport implements core.Transport for stdio communication
 type StdioTransport struct {
 	server       server.Server
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
 	logger       zerolog.Logger
-	handler      LocalRequestHandler
+	handler      core.RequestHandler // Use core.RequestHandler instead of LocalRequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
@@ -49,6 +50,11 @@ func NewStdioTransportWithLogger(logger zerolog.Logger) *StdioTransport {
 		logger:       transportLogger,
 		errorHandler: NewStdioErrorHandler(transportLogger),
 	}
+}
+
+// NewCoreStdioTransport creates a new stdio transport that implements core.Transport
+func NewCoreStdioTransport(logger zerolog.Logger) core.Transport {
+	return NewStdioTransportWithLogger(logger)
 }
 
 // Serve starts the stdio transport and blocks until context cancellation
@@ -97,8 +103,8 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 	}
 }
 
-// SetHandler sets the request handler for this transport
-func (s *StdioTransport) SetHandler(handler LocalRequestHandler) {
+// SetHandler sets the request handler for this transport (implements core.Transport)
+func (s *StdioTransport) SetHandler(handler core.RequestHandler) {
 	s.handler = handler
 }
 
