@@ -45,7 +45,7 @@ Coverage: Not measured
 PERFORMANCE HIGHLIGHTS
 ---------------------
 ✅ validate_invalid_args: 10.2% improvement
-✅ validate_valid_args: 26.2% improvement  
+✅ validate_valid_args: 26.2% improvement
 ✅ validate_dockerfile_tool: 26.5% improvement
 ✅ ArgumentMapping: 13.9% improvement
 ✅ docker_config_parsing: 15.7% improvement

@@ -7,8 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -34,9 +33,8 @@ type CallerAnalyzerOpts struct {
 	PerCallTimeout time.Duration // timeout per call (default: 60s)
 }
 
-// Ensure interface compliance at compile time.
-var _ core.AIAnalyzer = (*CallerAnalyzer)(nil)
-var _ core.AIAnalyzer = (*StubAnalyzer)(nil)
+// Note: CallerAnalyzer implements mcptypes.AIAnalyzer interface
+// For core.AIAnalyzer compatibility, use coreAnalyzerBridge wrapper
 
 // NewCallerAnalyzer creates an analyzer that sends prompts back to the hosting LLM
 func NewCallerAnalyzer(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzer {
@@ -114,7 +112,7 @@ func (c *CallerAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate s
 	return c.Analyze(ctx, formattedPrompt)
 }
 
-// GetTokenUsage implements AIAnalyzer interface
+// GetTokenUsage implements mcptypes.AIAnalyzer interface
 // For MCP, we don't track token usage as the hosting LLM handles this
 func (c *CallerAnalyzer) GetTokenUsage() mcptypes.TokenUsage {
 	return mcptypes.TokenUsage{} // Always empty for MCP
@@ -187,7 +185,7 @@ func (f *AnalyzerFactory) SetAnalyzerOptions(opts CallerAnalyzerOpts) {
 }
 
 // CreateAnalyzer creates the appropriate analyzer based on configuration
-func (f *AnalyzerFactory) CreateAnalyzer() core.AIAnalyzer {
+func (f *AnalyzerFactory) CreateAnalyzer() interface{} {
 	if f.enableAI && f.transport != nil {
 		f.logger.Info().Msg("Creating CallerAnalyzer for AI-enabled mode")
 		return NewCallerAnalyzer(f.transport, f.analyzerOpts)
@@ -199,14 +197,14 @@ func (f *AnalyzerFactory) CreateAnalyzer() core.AIAnalyzer {
 
 // CreateAnalyzerFromEnv creates an analyzer based on environment configuration
 // Note: This returns a stub analyzer since we don't have transport available here
-func CreateAnalyzerFromEnv(logger zerolog.Logger) core.AIAnalyzer {
+func CreateAnalyzerFromEnv(logger zerolog.Logger) interface{} {
 	// Always return stub analyzer for now
 	return NewStubAnalyzer()
 }
 
 // CreateAnalyzerFromConfig creates an analyzer from configuration
 // Note: This always returns a stub analyzer now that config is centralized
-func CreateAnalyzerFromConfig(config interface{}, logger zerolog.Logger) core.AIAnalyzer {
+func CreateAnalyzerFromConfig(config interface{}, logger zerolog.Logger) interface{} {
 	// Always return stub analyzer for now
 	return NewStubAnalyzer()
 }

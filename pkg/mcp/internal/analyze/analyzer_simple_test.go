@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/config"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -18,9 +19,15 @@ func TestCreateAnalyzerFromEnv_Simple(t *testing.T) {
 		t.Error("CreateAnalyzerFromEnv should not return nil")
 	}
 
+	// Cast to proper interface for testing
+	typedAnalyzer, ok := analyzer.(mcptypes.AIAnalyzer)
+	if !ok {
+		t.Error("CreateAnalyzerFromEnv should return mcptypes.AIAnalyzer")
+	}
+
 	// Test that we can call basic methods on the analyzer
 	ctx := context.Background()
-	result, err := analyzer.Analyze(ctx, "test prompt")
+	result, err := typedAnalyzer.Analyze(ctx, "test prompt")
 	// Stub analyzer returns specific error messages
 	if err == nil {
 		t.Error("Stub analyzer should return error for AI analysis")
@@ -204,9 +211,15 @@ func TestAnalyzerFactory_WithTransport(t *testing.T) {
 		t.Error("CreateAnalyzer should not return nil")
 	}
 
+	// Cast to proper interface for testing
+	typedAnalyzer, ok := analyzer.(mcptypes.AIAnalyzer)
+	if !ok {
+		t.Error("CreateAnalyzer should return mcptypes.AIAnalyzer")
+	}
+
 	// Test that we can analyze with the mock transport
 	ctx := context.Background()
-	result, err := analyzer.Analyze(ctx, "test prompt")
+	result, err := typedAnalyzer.Analyze(ctx, "test prompt")
 	if err != nil {
 		t.Errorf("Analyze should not return error with mock transport, got: %v", err)
 	}

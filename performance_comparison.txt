@@ -35,5 +35,5 @@ PERFORMANCE ANALYSIS:
 ✅ BoltSessionStore_Save: 1196654 → 918638 ns/op (23.2% improvement)
 ✅ BoltSessionStore_Load: 24875 → 22168 ns/op (10.9% improvement)
 
-OVERALL: Most operations show significant performance improvements (10-26%), 
+OVERALL: Most operations show significant performance improvements (10-26%),
 with only registry_validation showing degradation (possibly due to network variance).

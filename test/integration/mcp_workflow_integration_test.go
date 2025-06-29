@@ -269,28 +269,28 @@ Thumbs.db
 		suite.T().Logf("Git init failed: %s", string(output))
 		require.NoError(suite.T(), err)
 	}
-	
+
 	// Configure git user for the test repo
 	gitConfig := exec.Command("git", "config", "user.email", "test@example.com")
 	gitConfig.Dir = repoDir
 	require.NoError(suite.T(), gitConfig.Run())
-	
+
 	gitConfig2 := exec.Command("git", "config", "user.name", "Test User")
 	gitConfig2.Dir = repoDir
 	require.NoError(suite.T(), gitConfig2.Run())
-	
+
 	// Disable commit signing for tests
 	gitConfig3 := exec.Command("git", "config", "commit.gpgsign", "false")
 	gitConfig3.Dir = repoDir
 	require.NoError(suite.T(), gitConfig3.Run())
-	
+
 	gitAdd := exec.Command("git", "add", ".")
 	gitAdd.Dir = repoDir
 	if output, err := gitAdd.CombinedOutput(); err != nil {
 		suite.T().Logf("Git add failed: %s", string(output))
 		require.NoError(suite.T(), err)
 	}
-	
+
 	gitCommit := exec.Command("git", "commit", "-m", "Initial commit")
 	gitCommit.Dir = repoDir
 	if output, err := gitCommit.CombinedOutput(); err != nil {
@@ -399,7 +399,7 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		"params": map[string]interface{}{
 			"name": "analyze_repository",
 			"arguments": map[string]interface{}{
-				"repo_url":      "file://" + repo.LocalDir,  // Use file:// prefix for local directories
+				"repo_url":      "file://" + repo.LocalDir, // Use file:// prefix for local directories
 				"context":       fmt.Sprintf("Integration test for %s application", repo.Description),
 				"branch":        "main",
 				"language_hint": repo.Language,
@@ -411,7 +411,7 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 	assert.Contains(suite.T(), analyzeResp, "result")
 	result := analyzeResp["result"].(map[string]interface{})
 	suite.T().Logf("Repository analysis response: %+v", result)
-	
+
 	// Check if we have the expected fields
 	if success, ok := result["success"].(bool); ok {
 		assert.True(suite.T(), success)
@@ -434,7 +434,7 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 			}
 		}
 	}
-	
+
 	// Verify language detection if available
 	if analysis, ok := result["analysis"].(map[string]interface{}); ok {
 		if lang, ok := analysis["language"].(string); ok {

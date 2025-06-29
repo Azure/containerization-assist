@@ -21,20 +21,20 @@ import (
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
-// llmTransportAdapter adapts types.LLMTransport to analyze.LLMTransport
-type llmTransportAdapter struct {
+// directLLMTransport implements analyze.LLMTransport using types.LLMTransport
+type directLLMTransport struct {
 	transport types.LLMTransport
 }
 
 // SendPrompt implements analyze.LLMTransport by converting to InvokeTool call
-func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
+func (d *directLLMTransport) SendPrompt(prompt string) (string, error) {
 	ctx := context.Background()
 	payload := map[string]any{
 		"prompt": prompt,
 	}
 
 	// Call the chat tool with the prompt
-	ch, err := a.transport.InvokeTool(ctx, "chat", payload, false)
+	ch, err := d.transport.InvokeTool(ctx, "chat", payload, false)
 	if err != nil {
 		return "", err
 	}
@@ -50,46 +50,6 @@ func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
 	}
 
 	return "", nil
-}
-
-// analyzerTypeWrapper adapts core.AIAnalyzer to mcptypes.AIAnalyzer
-type analyzerTypeWrapper struct {
-	analyzer coreinterfaces.AIAnalyzer
-}
-
-// Analyze implements mcptypes.AIAnalyzer
-func (w *analyzerTypeWrapper) Analyze(ctx context.Context, prompt string) (string, error) {
-	return w.analyzer.Analyze(ctx, prompt)
-}
-
-// AnalyzeWithFileTools implements mcptypes.AIAnalyzer
-func (w *analyzerTypeWrapper) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
-	return w.analyzer.AnalyzeWithFileTools(ctx, prompt, baseDir)
-}
-
-// AnalyzeWithFormat implements mcptypes.AIAnalyzer
-func (w *analyzerTypeWrapper) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
-	return w.analyzer.AnalyzeWithFormat(ctx, promptTemplate, args...)
-}
-
-// GetTokenUsage implements mcptypes.AIAnalyzer
-func (w *analyzerTypeWrapper) GetTokenUsage() mcptypes.TokenUsage {
-	usage := w.analyzer.GetTokenUsage()
-	return mcptypes.TokenUsage{
-		CompletionTokens: usage.CompletionTokens,
-		PromptTokens:     usage.PromptTokens,
-		TotalTokens:      usage.TotalTokens,
-	}
-}
-
-// ResetTokenUsage implements mcptypes.AIAnalyzer
-func (w *analyzerTypeWrapper) ResetTokenUsage() {
-	w.analyzer.ResetTokenUsage()
-}
-
-// GetCoreAnalyzer returns the underlying core.AIAnalyzer
-func (w *analyzerTypeWrapper) GetCoreAnalyzer() coreinterfaces.AIAnalyzer {
-	return w.analyzer
 }
 
 // Use ConversationConfig from core package to avoid type mismatch
@@ -197,22 +157,23 @@ func (s *Server) EnableConversationMode(config coreinterfaces.ConversationConfig
 	// In conversation mode, use CallerAnalyzer instead of StubAnalyzer
 	// This requires the transport to be able to forward prompts to the LLM
 	if transport, ok := s.transport.(types.LLMTransport); ok {
-		// Create adapter to bridge types.LLMTransport to analyze.LLMTransport
-		adapter := &llmTransportAdapter{transport: transport}
+		// Create direct implementation of analyze.LLMTransport using the existing transport
+		llmTransport := &directLLMTransport{transport: transport}
 
 		// Create core analyzer for orchestrator and MCPClients
-		coreAnalyzer := analyze.NewCallerAnalyzer(adapter, analyze.CallerAnalyzerOpts{
+		coreAnalyzer := analyze.NewCallerAnalyzer(llmTransport, analyze.CallerAnalyzerOpts{
 			ToolName:       "chat",
 			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
 			PerCallTimeout: 60 * time.Second,
 		})
 
-		// Create wrapper to handle type conversion between core.AIAnalyzer and types.AIAnalyzer
-		mcpClients.Analyzer = &analyzerTypeWrapper{analyzer: coreAnalyzer}
+		// Use analyzer directly - CallerAnalyzer now implements mcptypes.AIAnalyzer correctly
+		mcpClients.Analyzer = coreAnalyzer
 
-		// Also set the analyzer on the tool orchestrator for fixing capabilities
+		// For tool orchestrator, create minimal bridge to handle TokenUsage type difference
+		bridgeAnalyzer := &coreAnalyzerBridge{analyzer: coreAnalyzer}
 		if s.toolOrchestrator != nil {
-			s.toolOrchestrator.SetAnalyzer(coreAnalyzer)
+			s.toolOrchestrator.SetAnalyzer(bridgeAnalyzer)
 		}
 
 		s.logger.Info().Msg("CallerAnalyzer enabled for conversation mode")
@@ -228,13 +189,11 @@ func (s *Server) EnableConversationMode(config coreinterfaces.ConversationConfig
 	)
 
 	// Use session manager directly - no adapter needed
-	sessionAdapter := s.sessionManager
 
 	// Use the server's canonical orchestrator instead of creating parallel orchestration
 	// This eliminates the tool registration conflicts and ensures single orchestration path
 	conversationHandler, err := conversation.NewConversationHandler(conversation.ConversationHandlerConfig{
 		SessionManager:     s.sessionManager,
-		SessionAdapter:     sessionAdapter,
 		PreferenceStore:    preferenceStore,
 		PipelineOperations: pipelineOps,
 		ToolOrchestrator:   s.toolOrchestrator, // Use canonical orchestrator

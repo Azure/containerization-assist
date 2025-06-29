@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	// "github.com/Azure/container-kit/pkg/mcp/internal/config" // TODO: uncomment when test is updated
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,8 +64,13 @@ func TestAnalyzerFactory_CreateAnalyzer(t *testing.T) {
 			actualType := fmt.Sprintf("%T", analyzer)
 			assert.Equal(t, tt.expectedType, actualType)
 
-			// Verify it implements the interface
-			var _ core.AIAnalyzer = analyzer
+			// Verify it implements the interface (via bridge pattern due to TokenUsage type differences)
+			if typedAnalyzer, ok := analyzer.(mcptypes.AIAnalyzer); ok {
+				// Can be used as mcptypes.AIAnalyzer
+				_ = typedAnalyzer
+			} else {
+				t.Errorf("analyzer should implement mcptypes.AIAnalyzer interface")
+			}
 		})
 	}
 }

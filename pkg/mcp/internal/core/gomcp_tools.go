@@ -27,6 +27,36 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// coreAnalyzerBridge bridges mcptypes.AIAnalyzer to core.AIAnalyzer for TokenUsage type compatibility
+type coreAnalyzerBridge struct {
+	analyzer mcptypes.AIAnalyzer
+}
+
+func (b *coreAnalyzerBridge) Analyze(ctx context.Context, prompt string) (string, error) {
+	return b.analyzer.Analyze(ctx, prompt)
+}
+
+func (b *coreAnalyzerBridge) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+	return b.analyzer.AnalyzeWithFileTools(ctx, prompt, baseDir)
+}
+
+func (b *coreAnalyzerBridge) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
+	return b.analyzer.AnalyzeWithFormat(ctx, promptTemplate, args...)
+}
+
+func (b *coreAnalyzerBridge) GetTokenUsage() core.TokenUsage {
+	usage := b.analyzer.GetTokenUsage()
+	return core.TokenUsage{
+		CompletionTokens: usage.CompletionTokens,
+		PromptTokens:     usage.PromptTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+func (b *coreAnalyzerBridge) ResetTokenUsage() {
+	b.analyzer.ResetTokenUsage()
+}
+
 // contextKey represents context key type
 type contextKey string
 
@@ -113,11 +143,8 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 		var analyzer core.AIAnalyzer
 		if deps.MCPClients.Analyzer != nil {
-			// Check if it's an analyzerTypeWrapper with access to core analyzer
-			if analyzerWrapper, ok := deps.MCPClients.Analyzer.(interface{ GetCoreAnalyzer() core.AIAnalyzer }); ok {
-				analyzer = analyzerWrapper.GetCoreAnalyzer()
-			}
-			// Note: Direct cast to core.AIAnalyzer is not possible due to conflicting interfaces
+			// Create bridge to convert mcptypes.AIAnalyzer to core.AIAnalyzer (needed for TokenUsage type differences)
+			analyzer = &coreAnalyzerBridge{analyzer: deps.MCPClients.Analyzer}
 		}
 		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, analyzer, deps.Logger)
 
