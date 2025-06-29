@@ -261,15 +261,20 @@ jobs:
         # Install gocovmerge if not available
         go install github.com/wadey/gocovmerge@latest
         
-        # Find all coverage files and merge them
-        coverage_files=$(find coverage-artifacts -name "coverage.out" -type f)
-        if [ -n "$coverage_files" ]; then
-          echo "Found coverage files: $coverage_files"
-          ~/go/bin/gocovmerge $coverage_files > merged-coverage.out
-          cp merged-coverage.out coverage.out
-          echo "✅ Merged coverage reports successfully"
+        # Check if coverage-artifacts directory exists
+        if [ -d "coverage-artifacts" ]; then
+          # Find all coverage files and merge them
+          coverage_files=$(find coverage-artifacts -name "coverage.out" -type f)
+          if [ -n "$coverage_files" ]; then
+            echo "Found coverage files: $coverage_files"
+            ~/go/bin/gocovmerge $coverage_files > merged-coverage.out
+            cp merged-coverage.out coverage.out
+            echo "✅ Merged coverage reports successfully"
+          else
+            echo "⚠️ No coverage files found in artifacts, will generate coverage during enforcement"
+          fi
         else
-          echo "⚠️ No coverage artifacts found, will generate coverage during enforcement"
+          echo "⚠️ No coverage artifacts directory found, will generate coverage during enforcement"
         fi
 
     - name: Run coverage enforcement for core packages
