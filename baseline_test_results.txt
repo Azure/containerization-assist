@@ -195,7 +195,7 @@ ok  	github.com/Azure/container-kit/pkg/pipeline/repoanalysisstage	0.009s
             {"level":"info","component":"mcp-server","time":"2025-06-29T16:51:10-04:00","message":"Utility tools registered successfully"}
             {"level":"info","component":"mcp-server","time":"2025-06-29T16:51:10-04:00","message":"All tools registered successfully with standardized patterns"}
             time=2025-06-29T16:51:10.401-04:00 level=INFO msg="Starting gomcp server with all tools registered"
-        mcp_workflow_integration_test.go:591: 
+        mcp_workflow_integration_test.go:591:
             	Error Trace:	/home/tng/workspace/d/test/integration/mcp_workflow_integration_test.go:591
             	Error:      	Received unexpected error:
             	            	exec: StdinPipe after process started
@@ -265,7 +265,7 @@ ok  	github.com/Azure/container-kit/pkg/pipeline/repoanalysisstage	0.009s
         mcp_workflow_integration_test.go:311: MCP Server: {"level":"info","component":"mcp-server","time":"2025-06-29T16:51:12-04:00","message":"Utility tools registered successfully"}
         mcp_workflow_integration_test.go:311: MCP Server: {"level":"info","component":"mcp-server","time":"2025-06-29T16:51:12-04:00","message":"All tools registered successfully with standardized patterns"}
         mcp_workflow_integration_test.go:311: MCP Server: time=2025-06-29T16:51:12.416-04:00 level=INFO msg="Starting gomcp server with all tools registered"
-        mcp_workflow_integration_test.go:508: 
+        mcp_workflow_integration_test.go:508:
             	Error Trace:	/home/tng/workspace/d/test/integration/mcp_workflow_integration_test.go:508
             	Error:      	Received unexpected error:
             	            	exec: StdinPipe after process started
@@ -339,7 +339,7 @@ ok  	github.com/Azure/container-kit/pkg/pipeline/repoanalysisstage	0.009s
                 {"level":"info","component":"mcp-server","time":"2025-06-29T16:51:16-04:00","message":"Utility tools registered successfully"}
                 {"level":"info","component":"mcp-server","time":"2025-06-29T16:51:16-04:00","message":"All tools registered successfully with standardized patterns"}
             mcp_workflow_integration_test.go:311: MCP Server: time=2025-06-29T16:51:16.011-04:00 level=INFO msg="Starting gomcp server with all tools registered"
-            mcp_workflow_integration_test.go:322: 
+            mcp_workflow_integration_test.go:322:
                 	Error Trace:	/home/tng/workspace/d/test/integration/mcp_workflow_integration_test.go:322
                 	            				/home/tng/workspace/d/test/integration/mcp_workflow_integration_test.go:284
                 	            				/home/tng/workspace/d/test/integration/mcp_workflow_integration_test.go:266

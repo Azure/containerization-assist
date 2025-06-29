@@ -208,4 +208,3 @@ func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (i
 	// Execute with nil server context (no progress tracking)
 	return t.ExecuteWithContext(nil, buildArgs)
 }
-

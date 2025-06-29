@@ -5,7 +5,7 @@ echo "=== Final Success Criteria Validation ==="
 interface_count=$(rg "type Tool interface" pkg/mcp/ | wc -l)
 echo "✅ Interface consolidation: $interface_count interfaces (target: 1)"
 
-# Adapter elimination  
+# Adapter elimination
 adapter_count=$(find pkg/mcp -name "*.go" -exec grep -l "type.*[Aa]dapter" {} \; | wc -l)
 echo "✅ Adapter elimination: $adapter_count adapters (target: 0)"
 

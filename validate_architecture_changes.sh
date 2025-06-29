@@ -6,7 +6,7 @@ echo "🔍 Checking interface consolidation..."
 interface_count=$(rg "type Tool interface" pkg/mcp/ | wc -l)
 echo "Tool interfaces found: $interface_count (target: 1)"
 
-# Adapter validation  
+# Adapter validation
 echo "🔍 Checking adapter elimination..."
 adapter_count=$(find pkg/mcp -name "*.go" -exec grep -l "type.*[Aa]dapter\|type.*[Ww]rapper" {} \; | wc -l)
 echo "Adapter files found: $adapter_count (target: 0)"

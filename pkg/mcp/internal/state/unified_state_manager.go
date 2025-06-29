@@ -68,7 +68,6 @@ type StateValidator interface {
 	ValidateState(ctx context.Context, stateType StateType, state interface{}) error
 }
 
-
 // UnifiedStateManager manages all state in the system
 type UnifiedStateManager struct {
 	sessionManager  *session.SessionManager
@@ -124,7 +123,6 @@ func (m *UnifiedStateManager) RegisterValidator(stateType StateType, validator S
 	m.validators[stateType] = validator
 	m.logger.Info().Str("state_type", string(stateType)).Msg("Registered state validator")
 }
-
 
 // GetState retrieves state of a specific type
 func (m *UnifiedStateManager) GetState(ctx context.Context, stateType StateType, id string) (interface{}, error) {
@@ -256,7 +254,6 @@ func (m *UnifiedStateManager) SyncStates(ctx context.Context, sourceType, target
 func (m *UnifiedStateManager) GetStateHistory(_ context.Context, stateType StateType, stateID string, limit int) ([]*StateEvent, error) {
 	return m.eventStore.GetEvents(stateType, stateID, limit)
 }
-
 
 // notifyObservers notifies all registered observers of a state change
 func (m *UnifiedStateManager) notifyObservers(event *StateEvent) {

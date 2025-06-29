@@ -261,7 +261,6 @@ func (t *AtomicTagImageTool) GetMetadata() core.ToolMetadata {
 	}
 }
 
-
 // ExecuteTyped provides the original typed execute method
 func (t *AtomicTagImageTool) ExecuteTyped(ctx context.Context, args AtomicTagImageArgs) (*AtomicTagImageResult, error) {
 	return t.ExecuteTag(ctx, args)

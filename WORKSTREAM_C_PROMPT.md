@@ -151,7 +151,7 @@ type SessionStateMigrator struct {
 }
 
 type GenericStateMigrator struct {
-    // Generic state migration capabilities  
+    // Generic state migration capabilities
 }
 
 type WorkflowStateMigrator struct {
@@ -175,7 +175,7 @@ type WorkflowStateMigrator struct {
 ```go
 // DELETE ENTIRE FILE containing:
 func MigrateAnalyzerConfig() // Migrates from old AnalyzerConfig pattern
-func MigrateServerConfigFromLegacy() // Migrates scattered server configuration  
+func MigrateServerConfigFromLegacy() // Migrates scattered server configuration
 func BackwardCompatibilityWarnings() // Checks deprecated environment variables
 
 // Old environment variable mappings (lines 92-98)
@@ -398,7 +398,7 @@ rg "legacy\|backward.*compat\|deprecated.*code\|TODO.*legacy\|FIXME.*legacy" pkg
 
 # Common legacy markers:
 "// legacy SimpleTool compatibility"
-"// backward compatibility"  
+"// backward compatibility"
 "// deprecated, remove after migration"
 "// TODO: remove legacy support"
 "// fallback for legacy"

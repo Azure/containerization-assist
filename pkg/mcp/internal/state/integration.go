@@ -38,7 +38,6 @@ func NewStateManagementIntegration(
 	manager.RegisterValidator(StateTypeConversation, NewConversationStateValidator())
 	manager.RegisterValidator(StateTypeWorkflow, NewWorkflowStateValidator())
 
-
 	// Create observers
 	loggingObserver := NewLoggingObserver(logger)
 	metricsObserver := NewMetricsObserver(5 * time.Minute)
@@ -176,7 +175,6 @@ func (i *StateManagementIntegration) RegisterStateChangeAlert(name string, handl
 	alertingObserver.RegisterAlert(name, handler)
 	i.manager.RegisterObserver(alertingObserver)
 }
-
 
 // EnableStateReplication enables state replication to a remote system
 func (i *StateManagementIntegration) EnableStateReplication(ctx context.Context, config ReplicationConfig) error {

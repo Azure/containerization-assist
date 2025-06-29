@@ -82,7 +82,7 @@ echo "📊 Adapter usage mapped - review adapter_usage.txt"
 # Modify factory functions to eliminate adapter instantiation
 # Update NewMCPClients() to use direct interface
 
-# 3. Remove CallerAnalyzerAdapter from analyzer.go  
+# 3. Remove CallerAnalyzerAdapter from analyzer.go
 # Delete lines 163-188 containing:
 # - type CallerAnalyzerAdapter struct
 # - func (a *CallerAnalyzerAdapter) GetTokenUsage()
@@ -97,7 +97,7 @@ echo "📊 Adapter usage mapped - review adapter_usage.txt"
 ```bash
 # 1. Remove sessionLabelManagerWrapper from gomcp_tools.go
 # Delete lines 959-1019 containing:
-# - type sessionLabelManagerWrapper struct  
+# - type sessionLabelManagerWrapper struct
 # - func (w *sessionLabelManagerWrapper) GetSession()
 # - func (w *sessionLabelManagerWrapper) UpdateSession()
 # - All conversion logic (60+ lines)
@@ -114,7 +114,7 @@ echo "📊 Adapter usage mapped - review adapter_usage.txt"
 
 #### Afternoon (4 hours): Evaluate Operation Wrappers
 ```bash
-# 1. Analyze Operation wrapper necessity 
+# 1. Analyze Operation wrapper necessity
 # Review pkg/mcp/internal/deploy/operation.go (lines 21-76)
 # Review pkg/mcp/internal/build/docker_operation.go (lines 21-84)
 # Document which functionality can be moved to tools directly
@@ -239,7 +239,7 @@ func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.
 }
 
 func (w *sessionLabelManagerWrapper) UpdateSession(sessionID string, updater func(sessiontypes.SessionLabelData) sessiontypes.SessionLabelData) error {
-    // ... 20+ lines of conversion logic  
+    // ... 20+ lines of conversion logic
 }
 ```
 
@@ -250,7 +250,7 @@ func (w *sessionLabelManagerWrapper) UpdateSession(sessionID string, updater fun
 
 ### Task 4: Operation Wrapper Evaluation (Day 2-3)
 
-**Locations**: 
+**Locations**:
 - `pkg/mcp/internal/deploy/operation.go:21-76`
 - `pkg/mcp/internal/build/docker_operation.go:21-84`
 

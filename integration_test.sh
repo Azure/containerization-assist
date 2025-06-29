@@ -6,7 +6,7 @@ echo "Testing complete tool execution pipeline..."
 go test -run TestToolExecution -v ./pkg/mcp/internal/core/
 
 # Test orchestration with all changes
-echo "Testing orchestration integration..."  
+echo "Testing orchestration integration..."
 go test -run TestOrchestration -v ./pkg/mcp/internal/orchestration/
 
 # Test build tools with all architecture changes

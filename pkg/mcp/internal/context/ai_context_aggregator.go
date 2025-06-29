@@ -523,4 +523,3 @@ func (a *AIContextAggregator) GetAIContext(ctx context.Context, sessionID string
 		"metadata":          compContext.Metadata,
 	}, nil
 }
-

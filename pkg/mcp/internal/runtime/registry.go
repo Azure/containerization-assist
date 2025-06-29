@@ -19,7 +19,6 @@ import (
 // Contracts
 ///////////////////////////////////////////////////////////////////////////////
 
-
 type ExecutableTool[TArgs, TResult any] interface {
 	core.Tool
 	PreValidate(ctx context.Context, args TArgs) error
