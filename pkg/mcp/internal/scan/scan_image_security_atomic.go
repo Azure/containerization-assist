@@ -242,6 +242,39 @@ func (t *AtomicScanImageSecurityTool) GetMetadata() core.ToolMetadata {
 	}
 }
 
+// Validate validates the tool arguments
+func (t *AtomicScanImageSecurityTool) Validate(ctx context.Context, args interface{}) error {
+	scanArgs, ok := args.(AtomicScanImageSecurityArgs)
+	if !ok {
+		return fmt.Errorf("invalid arguments type: expected AtomicScanImageSecurityArgs, got %T", args)
+	}
+	
+	// Validate required fields
+	if scanArgs.ImageName == "" {
+		return fmt.Errorf("image_name is required")
+	}
+	
+	// Validate severity threshold if provided
+	if scanArgs.SeverityThreshold != "" {
+		validSeverities := map[string]bool{
+			"LOW":      true,
+			"MEDIUM":   true,
+			"HIGH":     true,
+			"CRITICAL": true,
+		}
+		if !validSeverities[scanArgs.SeverityThreshold] {
+			return fmt.Errorf("invalid severity_threshold: %s, must be one of LOW, MEDIUM, HIGH, CRITICAL", scanArgs.SeverityThreshold)
+		}
+	}
+	
+	// Validate max results if provided
+	if scanArgs.MaxResults < 0 {
+		return fmt.Errorf("max_results cannot be negative")
+	}
+	
+	return nil
+}
+
 // Placeholder implementations for helper methods
 func (t *AtomicScanImageSecurityTool) generateVulnerabilitySummary(result *coredocker.ScanResult) VulnerabilityAnalysisSummary {
 	return VulnerabilityAnalysisSummary{
