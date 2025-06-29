@@ -371,6 +371,49 @@ After analyzing the codebase dependencies, **most work can be parallelized**. He
 
 #### 🔧 InfraBot (Team A: Core Infrastructure)
 
+## 🎯 Mission Brief
+You are **InfraBot**, the **Lead Developer for Core Infrastructure** in a critical TODO resolution project. Your mission is to **implement foundational Docker operations and session tracking** in the Container Kit MCP server codebase over **4 weeks**.
+
+## 📋 Project Context
+- **Repository**: Container Kit MCP server (`pkg/mcp/internal/` directory)
+- **Goal**: Complete core infrastructure to enable all containerization workflows
+- **Team**: 4 parallel workstreams (you are Team A - foundation for all others)
+- **Timeline**: 4 weeks (Sprint-based with weekly milestones)
+- **Impact**: Foundation enables all other teams, resolves 8 critical TODOs
+
+## 🚨 Critical Success Factors
+
+### Must-Do Items
+1. **Docker Operations**: Implement pull/push/tag operations with authentication
+2. **Session Infrastructure**: Complete tracking for errors, jobs, and tools
+3. **Atomic Framework**: Provide executeWithoutProgress base for atomic tools
+4. **Performance**: Maintain <300μs P95 performance target
+
+### Must-Not-Do Items
+- ❌ **Do NOT modify atomic tool implementations** (that's BuildSecBot)
+- ❌ **Do NOT work on context sharing** (that's OrchBot)  
+- ❌ **Do NOT implement sandboxing** (that's AdvancedBot)
+- ❌ **Do NOT break existing interfaces**
+
+## 📂 Your File Ownership (You Own These)
+
+### Primary Targets
+```
+pkg/mcp/internal/pipeline/operations.go              # Implement Docker operations
+pkg/mcp/internal/session/session_manager.go         # Complete session tracking
+pkg/mcp/internal/runtime/atomic_tool_base.go        # Base atomic tool framework
+pkg/mcp/internal/build/build_executor.go            # Docker client integration
+pkg/mcp/internal/observability/progress.go          # Progress tracking system
+```
+
+### Do NOT Touch (Other Teams)
+```
+pkg/mcp/internal/build/*_atomic.go                  # BuildSecBot (atomic tools)
+pkg/mcp/internal/build/context_sharer.go            # OrchBot (context sharing)
+pkg/mcp/internal/utils/workspace.go                 # AdvancedBot (sandboxing)
+pkg/mcp/internal/orchestration/workflow_*.go        # OrchBot (workflows)
+```
+
 **Primary Prompt:**
 ```
 You are InfraBot, the AI assistant for Team A: Core Infrastructure in the Container Kit project. Your expertise covers Docker operations, session management, and foundational systems architecture.
@@ -637,6 +680,199 @@ Sprint 3 (Week 3): Complete sandboxing, comprehensive testing
 Sprint 4 (Week 4): Final integration testing, documentation completion
 
 Focus on creating production-ready infrastructure that supports the entire Container Kit platform. Think holistically about system reliability, security, and maintainability.
+```
+
+---
+
+## 📅 Sprint-Based Implementation Timeline
+
+### Sprint 1 (Week 1): Foundation Sprint
+
+#### Daily Synchronized Timeline
+```
+ Time  │ InfraBot (Core)        │ BuildSecBot (Build)    │ OrchBot (Communication) │ AdvancedBot (Testing)
+───────┼────────────────────────┼────────────────────────┼─────────────────────────┼──────────────────────
+ 9:00  │ 🎯 DAILY STANDUP: Progress reporting, blocker identification, dependency coordination
+───────┼────────────────────────┼────────────────────────┼─────────────────────────┼──────────────────────
+ 9:15  │ Audit Docker ops TODO  │ Audit atomic tool TODO │ Audit context TODO      │ Setup test baseline
+10:00  │ Implement pull operation│ Fix executeWithoutProg │ Design routing rules    │ Create validation
+11:00  │ Implement push operation│   method base          │ Design data structures  │   framework
+12:00  │ Implement tag operation │ Begin atomic frameworks│ Begin protocol design   │ Monitor all teams
+13:00  │ 🍽️ LUNCH BREAK        │ 🍽️ LUNCH BREAK       │ 🍽️ LUNCH BREAK        │ 🍽️ LUNCH BREAK
+14:00  │ Session schema design  │ Security scan audit    │ Interface analysis      │ Continuous monitoring
+15:00  │ Error tracking system  │ Build strategy audit   │ Communication protocols │ Integration alerts
+16:00  │ Progress tracking      │ Test framework setup   │ Context sharing design  │ Daily quality report
+17:00  │ 📊 END-OF-DAY REPORTING: Create sprint_1_day_X_summary.txt files
+```
+
+#### Sprint 1 Success Criteria
+**InfraBot**:
+- [ ] All 3 Docker operations implemented (pull/push/tag)
+- [ ] Session tracking database schema complete
+- [ ] Base atomic tool framework available for BuildSecBot
+
+**BuildSecBot**:
+- [ ] executeWithoutProgress method implemented
+- [ ] Security scanning TODO addressed
+- [ ] Ready to use InfraBot's framework
+
+**OrchBot**:
+- [ ] Context sharing architecture designed
+- [ ] Interface contracts validated with all teams
+- [ ] Routing rules foundation complete
+
+**AdvancedBot**:
+- [ ] Test framework operational for all teams
+- [ ] Quality monitoring dashboard active
+- [ ] Sprint 1 integration tests passing
+
+### Sprint 2 (Week 2): Core Implementation
+
+#### Integration Points
+```
+Monday   │ InfraBot delivers Docker ops → BuildSecBot integrates atomic tools
+Tuesday  │ BuildSecBot delivers atomic tools → OrchBot integrates workflows  
+Wednesday│ OrchBot delivers context sharing → All teams integrate
+Thursday │ AdvancedBot validates full integration
+Friday   │ Sprint 2 demo and retrospective
+```
+
+### Sprint 3 (Week 3): Advanced Features
+
+### Sprint 4 (Week 4): Polish & Production
+
+---
+
+## 🤝 Coordination Protocol
+
+### Daily Work Process
+```
+Morning (9:00-9:15)
+├─ Daily standup with all AI assistants
+├─ Review dependencies and blockers
+├─ Confirm day's priorities
+└─ Identify shared file coordination needs
+
+Throughout Day
+├─ Work on assigned tasks following sprint plan
+├─ Test frequently: `make test-mcp` must pass
+├─ Document blockers immediately
+├─ Coordinate on shared files via daily communication
+└─ Monitor other teams' progress
+
+End of Day (17:00)
+├─ Create sprint_X_day_Y_summary.txt
+├─ Commit all changes with clear messages
+├─ Update shared progress dashboard
+├─ Note merge readiness status
+└─ STOP - wait for external merge coordination
+```
+
+### End-of-Day Report Format
+
+**Teams A, B, C create `sprint_X_day_Y_summary.txt`:**
+```
+[TEAM NAME] - SPRINT X DAY Y SUMMARY
+====================================
+Mission Progress: X% complete
+Today's Deliverables: ✅/❌ [list]
+
+Files Modified:
+- pkg/mcp/internal/[path]: [description]
+- [additional files]
+
+Dependencies Delivered:
+- [what other teams can now use]
+
+Dependencies Needed:
+- [what you need from other teams]
+
+Blockers & Issues:
+- [any current blockers]
+- [shared file coordination needed]
+
+Tomorrow's Priority:
+- [top 3 priorities for next day]
+
+Quality Status:
+- Tests: ✅/❌ make test-mcp passing
+- Build: ✅/❌ go build succeeding  
+- Lint: ✅/❌ golangci-lint clean
+
+Merge Readiness: READY/NOT READY/DEPENDS ON [team]
+```
+
+**AdvancedBot creates `sprint_X_day_Y_quality_report.txt`:**
+```
+ADVANCEDBOT - SPRINT X DAY Y QUALITY REPORT
+===========================================
+Overall System Health: [GREEN/YELLOW/RED]
+
+Team Integration Status:
+├─ InfraBot (Core): [status and metrics]
+├─ BuildSecBot (Build): [status and metrics]  
+├─ OrchBot (Communication): [status and metrics]
+└─ Cross-team Integration: [status]
+
+Quality Metrics:
+├─ Test Coverage: X% (target: >90%)
+├─ Performance: XμsP95 (target: <300μs)
+├─ Build Status: ✅/❌
+├─ Lint Status: X issues (target: <100)
+└─ Security: [scan results]
+
+Integration Test Results:
+├─ Docker Operations: ✅/❌
+├─ Atomic Tools: ✅/❌
+├─ Context Sharing: ✅/❌
+└─ End-to-End Workflows: ✅/❌
+
+MERGE RECOMMENDATIONS
+────────────────────
+InfraBot: READY/NOT READY [reason]
+BuildSecBot: READY/NOT READY [reason]
+OrchBot: READY/NOT READY [reason]
+
+SPRINT PROGRESS: X% complete (on track/behind/ahead)
+```
+
+### Shared File Coordination
+
+#### High-Risk Coordination Points
+1. **`pkg/mcp/internal/pipeline/operations.go`**
+   - **InfraBot**: Implements Docker operations
+   - **BuildSecBot**: May need to integrate with these operations
+   - **Resolution**: InfraBot provides interface, BuildSecBot uses it
+
+2. **Session Management Integration**
+   - **InfraBot**: Provides session tracking infrastructure
+   - **All Teams**: Need to integrate session tracking
+   - **Resolution**: InfraBot delivers first, others integrate
+
+3. **Interface Changes**
+   - **OrchBot**: May update interface contracts
+   - **All Teams**: Must adapt to interface changes
+   - **Resolution**: OrchBot validates contracts with all teams daily
+
+### Success Validation Commands
+
+#### Real-Time Progress Tracking
+```bash
+# Docker Operations Progress (InfraBot)
+implemented_ops=$(rg "func.*\(PullDockerImage|PushDockerImage|TagDockerImage\)" pkg/mcp/internal/pipeline/operations.go | grep -v "not implemented" | wc -l)
+echo "Docker Operations: $implemented_ops/3 implemented"
+
+# Atomic Tool Progress (BuildSecBot)  
+atomic_implementations=$(rg "executeWithoutProgress" pkg/mcp/internal/build/*_atomic.go | grep -v "not implemented" | wc -l)
+echo "Atomic Tools: $atomic_implementations implemented"
+
+# Context Sharing Progress (OrchBot)
+context_functions=$(rg "getDefaultRoutingRules|context cleanup" pkg/mcp/internal/build/context_sharer.go | grep -v "TODO" | wc -l)
+echo "Context Sharing: $context_functions/2 functions implemented"
+
+# Testing Coverage (AdvancedBot)
+test_coverage=$(go test -cover ./pkg/mcp/... | tail -n 1 | awk '{print $5}')
+echo "Test Coverage: $test_coverage (target: >90%)"
 ```
 
 ### AI Assistant Success Metrics
