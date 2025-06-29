@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -27,17 +28,17 @@ func (a *testSessionManagerAdapter) GetSession(sessionID string) (interface{}, e
 	return a.mgr.GetSession(sessionID)
 }
 
-func (a *testSessionManagerAdapter) UpdateSession(session interface{}) error {
+func (a *testSessionManagerAdapter) UpdateSession(sessionData interface{}) error {
 	// Type assert and update through the real session manager
-	s, ok := session.(*mcp.SessionState)
+	s, ok := sessionData.(*session.SessionState)
 	if !ok {
-		return fmt.Errorf("invalid session type: expected *mcp.SessionState, got %T", session)
+		return fmt.Errorf("invalid session type: expected *session.SessionState, got %T", sessionData)
 	}
 	if s.SessionID == "" {
 		return fmt.Errorf("session ID is required")
 	}
 	return a.mgr.UpdateSession(s.SessionID, func(existing interface{}) {
-		if state, ok := existing.(*mcp.SessionState); ok {
+		if state, ok := existing.(*session.SessionState); ok {
 			*state = *s
 		}
 	})
@@ -193,7 +194,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 
 		// Update session to enable autopilot
 		err = sessionMgr.UpdateSession("auto-advance-test", func(s interface{}) {
-			if state, ok := s.(*mcp.SessionState); ok {
+			if state, ok := s.(*session.SessionState); ok {
 				if state.Metadata == nil {
 					state.Metadata = make(map[string]interface{})
 				}
@@ -436,9 +437,12 @@ func TestSessionManagerAdapter(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update the session
-		updatedSession := &mcp.SessionState{
+		updatedSession := &session.SessionState{
 			SessionID: "update-test",
-			ImageRef:  "test/repo:updated",
+			ImageRef: types.ImageReference{
+				Repository: "test/repo",
+				Tag:        "updated",
+			},
 		}
 
 		err = adapter.UpdateSession(updatedSession)
@@ -449,9 +453,10 @@ func TestSessionManagerAdapter(t *testing.T) {
 		// Check that the update was applied
 		retrievedInterface, err := sessionMgr.GetSession("update-test")
 		require.NoError(t, err)
-		retrieved, ok := retrievedInterface.(*mcp.SessionState)
+		retrieved, ok := retrievedInterface.(*session.SessionState)
 		require.True(t, ok, "session should be of correct type")
-		assert.Equal(t, "test/repo:updated", retrieved.ImageRef)
+		assert.Equal(t, "test/repo", retrieved.ImageRef.Repository)
+		assert.Equal(t, "updated", retrieved.ImageRef.Tag)
 	})
 
 	t.Run("error on invalid type", func(t *testing.T) {
@@ -473,11 +478,11 @@ func TestSessionManagerAdapter(t *testing.T) {
 		adapter := &testSessionManagerAdapter{mgr: sessionMgr}
 
 		// Try to update without session ID
-		session := &mcp.SessionState{
+		sessionData := &session.SessionState{
 			SessionID: "", // Empty
 		}
 
-		err := adapter.UpdateSession(session)
+		err := adapter.UpdateSession(sessionData)
 
 		// Verify
 		assert.Error(t, err)

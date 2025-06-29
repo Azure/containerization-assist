@@ -25,14 +25,14 @@ type MCPToolRegistry struct {
 
 // ToolInfo contains information about a registered tool
 type ToolInfo struct {
-	Name         string           `json:"name"`
-	Instance     core.Tool        `json:"-"` // Use core.Tool interface instead of interface{}
-	Type         reflect.Type     `json:"-"`
-	Category     string           `json:"category"`
-	Description  string           `json:"description"`
-	Version      string           `json:"version"`
-	Dependencies []string         `json:"dependencies"`
-	Capabilities []string         `json:"capabilities"`
+	Name         string       `json:"name"`
+	Instance     core.Tool    `json:"-"` // Use core.Tool interface instead of interface{}
+	Type         reflect.Type `json:"-"`
+	Category     string       `json:"category"`
+	Description  string       `json:"description"`
+	Version      string       `json:"version"`
+	Dependencies []string     `json:"dependencies"`
+	Capabilities []string     `json:"capabilities"`
 }
 
 // NewMCPToolRegistry creates a new tool registry for MCP atomic tools

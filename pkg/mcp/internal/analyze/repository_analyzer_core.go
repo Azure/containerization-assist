@@ -66,7 +66,7 @@ func (r *CoreRepositoryAnalyzer) AnalyzeDockerfile(ctx context.Context, path str
 
 	// Check if Dockerfile exists
 	dockerfilePath := filepath.Join(path, "Dockerfile")
-	
+
 	// For now, return a basic implementation
 	// In a real implementation, you would parse the Dockerfile
 	dockerfileInfo := &core.DockerfileInfo{
@@ -107,7 +107,7 @@ func (r *CoreRepositoryAnalyzer) GetBuildRecommendations(ctx context.Context, re
 	// Generate language-specific recommendations
 	switch strings.ToLower(repo.Language) {
 	case "go":
-		recommendations.OptimizationTips = append(recommendations.OptimizationTips, 
+		recommendations.OptimizationTips = append(recommendations.OptimizationTips,
 			"Use multi-stage builds for smaller images",
 			"Use Go build cache for faster builds",
 			"Consider using scratch or distroless base images")
@@ -165,17 +165,17 @@ func (r *CoreRepositoryAnalyzer) convertToRepositoryInfo(path string, analysisRe
 	if analysisResult == nil {
 		r.logger.Warn().Msg("Nil analysis result, returning basic repository info")
 		return &core.RepositoryInfo{
-			Path:         path,
-			Type:         "unknown",
-			Language:     "unknown",
-			Framework:    "unknown",
-			Languages:    []string{},
-			Dependencies: make(map[string]string),
-			BuildTools:   []string{},
-			EntryPoint:   "",
-			Port:         0,
+			Path:          path,
+			Type:          "unknown",
+			Language:      "unknown",
+			Framework:     "unknown",
+			Languages:     []string{},
+			Dependencies:  make(map[string]string),
+			BuildTools:    []string{},
+			EntryPoint:    "",
+			Port:          0,
 			HasDockerfile: false,
-			Metadata:     make(map[string]interface{}),
+			Metadata:      make(map[string]interface{}),
 		}
 	}
 

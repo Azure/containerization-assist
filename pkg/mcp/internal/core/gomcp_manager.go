@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -22,8 +21,8 @@ type GomcpManager struct {
 	server        server.Server
 	config        GomcpConfig
 	logger        slog.Logger
-	transport     transport.LocalTransport // Injected transport
-	isInitialized bool                     // Prevent mutation after creation
+	transport     interface{} // Injected transport (stdio or http)
+	isInitialized bool        // Prevent mutation after creation
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -42,7 +41,7 @@ func NewGomcpManager(config GomcpConfig) *GomcpManager {
 }
 
 // WithTransport sets the transport for the gomcp manager
-func (gm *GomcpManager) WithTransport(t transport.LocalTransport) *GomcpManager {
+func (gm *GomcpManager) WithTransport(t interface{}) *GomcpManager {
 	if gm.isInitialized {
 		gm.logger.Error("cannot set transport: manager already initialized")
 		return gm
@@ -94,7 +93,7 @@ func (gm *GomcpManager) GetServer() server.Server {
 }
 
 // GetTransport returns the configured transport
-func (gm *GomcpManager) GetTransport() transport.LocalTransport {
+func (gm *GomcpManager) GetTransport() interface{} {
 	return gm.transport
 }
 
@@ -155,11 +154,13 @@ func (gm *GomcpManager) Shutdown(ctx context.Context) error {
 			shutdownErrors = append(shutdownErrors, ctx.Err())
 		default:
 			// Stop the transport
-			if err := gm.transport.Stop(ctx); err != nil {
-				gm.logger.Error("error stopping transport", "error", err)
-				shutdownErrors = append(shutdownErrors, err)
-			} else {
-				gm.logger.Info("transport stopped successfully")
+			if stopper, ok := gm.transport.(interface{ Stop(context.Context) error }); ok {
+				if err := stopper.Stop(ctx); err != nil {
+					gm.logger.Error("error stopping transport", "error", err)
+					shutdownErrors = append(shutdownErrors, err)
+				} else {
+					gm.logger.Info("transport stopped successfully")
+				}
 			}
 		}
 	}

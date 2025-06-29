@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -23,7 +23,6 @@ type EnhancedBuildAnalyzer struct {
 	// Capabilities
 	capabilities *AnalyzerCapabilities
 }
-
 
 // NewEnhancedBuildAnalyzer creates a new unified analyzer with full capabilities
 func NewEnhancedBuildAnalyzer(

@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // Helper functions for accessing metadata fields
 
 // getK8sManifestsFromMetadata checks if k8s manifests exist in metadata
-func getK8sManifestsFromMetadata(sessionState *mcp.SessionState) map[string]interface{} {
+func getK8sManifestsFromMetadata(sessionState *session.SessionState) map[string]interface{} {
 	if sessionState.Metadata == nil {
 		return nil
 	}
@@ -25,7 +25,7 @@ func getK8sManifestsFromMetadata(sessionState *mcp.SessionState) map[string]inte
 }
 
 // getDockerfilePushed checks if dockerfile has been pushed from metadata
-func getDockerfilePushed(sessionState *mcp.SessionState) bool {
+func getDockerfilePushed(sessionState *session.SessionState) bool {
 	if sessionState.Metadata == nil {
 		return false
 	}
@@ -36,7 +36,7 @@ func getDockerfilePushed(sessionState *mcp.SessionState) bool {
 }
 
 // getImageRef constructs the appropriate image reference based on push status
-func getImageRef(sessionState *mcp.SessionState) string {
+func getImageRef(sessionState *session.SessionState) string {
 	imageID := getDockerfileImageID(sessionState)
 	if getDockerfilePushed(sessionState) {
 		registry := getImageRefRegistry(sessionState)
@@ -48,7 +48,7 @@ func getImageRef(sessionState *mcp.SessionState) string {
 }
 
 // setK8sManifest stores a manifest in metadata
-func setK8sManifest(sessionState *mcp.SessionState, name string, manifest types.K8sManifest) {
+func setK8sManifest(sessionState *session.SessionState, name string, manifest types.K8sManifest) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -65,7 +65,7 @@ func setK8sManifest(sessionState *mcp.SessionState, name string, manifest types.
 }
 
 // getK8sManifestsAsTypes converts metadata manifests to types.K8sManifest format
-func getK8sManifestsAsTypes(sessionState *mcp.SessionState) map[string]types.K8sManifest {
+func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]types.K8sManifest {
 	result := make(map[string]types.K8sManifest)
 	manifestsData := getK8sManifestsFromMetadata(sessionState)
 	if manifestsData == nil {

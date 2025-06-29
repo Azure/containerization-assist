@@ -151,7 +151,7 @@ func TestConversationState(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*mcp.SessionState)
+		session, ok := sessionInterface.(*session.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
 		// Create conversation state
@@ -175,7 +175,7 @@ func TestConversationState(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*mcp.SessionState)
+		session, ok := sessionInterface.(*session.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
 		state := &runtimeconv.ConversationState{

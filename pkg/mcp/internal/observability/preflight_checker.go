@@ -14,6 +14,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/registry"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 
@@ -117,7 +118,7 @@ func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
 }
 
 // RunStageChecks executes pre-flight checks for a specific stage
-func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage mcp.ConversationStage, state *mcp.SessionState) (*PreFlightResult, error) {
+func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage mcp.ConversationStage, state *session.SessionState) (*PreFlightResult, error) {
 	checks := pfc.getChecksForStage(stage, state)
 	if len(checks) == 0 {
 		return &PreFlightResult{
@@ -131,7 +132,7 @@ func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage mcp.Conve
 }
 
 // getChecksForStage returns checks specific to a stage
-func (pfc *PreFlightChecker) getChecksForStage(stage mcp.ConversationStage, state *mcp.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getChecksForStage(stage mcp.ConversationStage, state *session.SessionState) []PreFlightCheck {
 	switch stage {
 	case mcp.ConversationStageBuild:
 		return pfc.getBuildChecks(state)
@@ -147,14 +148,14 @@ func (pfc *PreFlightChecker) getChecksForStage(stage mcp.ConversationStage, stat
 }
 
 // getBuildChecks returns pre-flight checks for the build stage
-func (pfc *PreFlightChecker) getBuildChecks(state *mcp.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getBuildChecks(state *session.SessionState) []PreFlightCheck {
 	checks := []PreFlightCheck{
 		{
 			Name:        "Dockerfile exists",
 			Description: "Verify Dockerfile has been generated",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if state.DockerfilePath == "" {
+				if state.Dockerfile.Path == "" {
 					return mcp.NewRichError("DOCKERFILE_NOT_GENERATED", "Dockerfile not generated yet", "validation_error")
 				}
 				return nil
@@ -181,13 +182,13 @@ func (pfc *PreFlightChecker) getBuildChecks(state *mcp.SessionState) []PreFlight
 	}
 
 	// Add Dockerfile validation check if Dockerfile was generated
-	if state.DockerfileGenerated && state.DockerfilePath != "" {
+	if state.Dockerfile.Content != "" && state.Dockerfile.Path != "" {
 		checks = append(checks, PreFlightCheck{
 			Name:        "Dockerfile validation",
 			Description: "Ensure Dockerfile exists and is accessible",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if state.DockerfilePath == "" {
+				if state.Dockerfile.Path == "" {
 					return mcp.NewRichError("DOCKERFILE_VALIDATION_FAILED", "Dockerfile path is empty", "validation_error")
 				}
 				// Could add file existence check here if needed
@@ -202,14 +203,14 @@ func (pfc *PreFlightChecker) getBuildChecks(state *mcp.SessionState) []PreFlight
 }
 
 // getPushChecks returns pre-flight checks for the push stage
-func (pfc *PreFlightChecker) getPushChecks(state *mcp.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getPushChecks(state *session.SessionState) []PreFlightCheck {
 	checks := []PreFlightCheck{
 		{
 			Name:        "Image built",
 			Description: "Verify Docker image has been built",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if !state.ImageBuilt || state.ImageRef == "" {
+				if !state.Dockerfile.Built || state.ImageRef.String() == "" {
 					return mcp.NewRichError("IMAGE_NOT_BUILT", "Docker image not built yet", "validation_error")
 				}
 				return nil
@@ -223,7 +224,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcp.SessionState) []PreFlightC
 			Category:    "registry",
 			CheckFunc: func(ctx context.Context) error {
 				// Extract registry from image reference
-				registry := extractRegistry(state.ImageRef)
+				registry := extractRegistry(state.ImageRef.String())
 				if registry == "" {
 					return mcp.NewRichError("NO_REGISTRY_SPECIFIED", "no registry specified", "configuration_error")
 				}
@@ -266,11 +267,11 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcp.SessionState) []PreFlightC
 			Description: "Ensure image has no critical vulnerabilities",
 			Category:    "security",
 			CheckFunc: func(ctx context.Context) error {
-				if state.SecurityScan.CriticalCount > 0 {
-					return mcp.NewRichError("CRITICAL_VULNERABILITIES", fmt.Sprintf("image has %d CRITICAL vulnerabilities", state.SecurityScan.CriticalCount), "security_error")
+				if state.SecurityScan.Summary.Critical > 0 {
+					return mcp.NewRichError("CRITICAL_VULNERABILITIES", fmt.Sprintf("image has %d CRITICAL vulnerabilities", state.SecurityScan.Summary.Critical), "security_error")
 				}
-				if state.SecurityScan.HighCount > 3 {
-					return mcp.NewRichError("HIGH_VULNERABILITIES", fmt.Sprintf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.HighCount), "security_error")
+				if state.SecurityScan.Summary.High > 3 {
+					return mcp.NewRichError("HIGH_VULNERABILITIES", fmt.Sprintf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.Summary.High), "security_error")
 				}
 				return nil
 			},
@@ -283,14 +284,14 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcp.SessionState) []PreFlightC
 }
 
 // getManifestChecks returns pre-flight checks for manifest generation
-func (pfc *PreFlightChecker) getManifestChecks(state *mcp.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getManifestChecks(state *session.SessionState) []PreFlightCheck {
 	return []PreFlightCheck{
 		{
 			Name:        "Image reference available",
 			Description: "Verify image has been built or pushed",
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
-				if state.ImageRef == "" {
+				if state.ImageRef.String() == "" {
 					return mcp.NewRichError("NO_IMAGE_REFERENCE", "no image reference available", "validation_error")
 				}
 				return nil
@@ -302,7 +303,7 @@ func (pfc *PreFlightChecker) getManifestChecks(state *mcp.SessionState) []PreFli
 }
 
 // getDeploymentChecks returns pre-flight checks for deployment
-func (pfc *PreFlightChecker) getDeploymentChecks(state *mcp.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getDeploymentChecks(state *session.SessionState) []PreFlightCheck {
 	return []PreFlightCheck{
 		{
 			Name:          "Kubernetes connectivity",
@@ -317,7 +318,7 @@ func (pfc *PreFlightChecker) getDeploymentChecks(state *mcp.SessionState) []PreF
 			Description: "Verify Kubernetes manifests exist",
 			Category:    "kubernetes",
 			CheckFunc: func(ctx context.Context) error {
-				if len(state.ManifestPaths) == 0 {
+				if len(state.K8sManifests) == 0 {
 					return mcp.NewRichError("NO_K8S_MANIFESTS", "no Kubernetes manifests generated", "validation_error")
 				}
 				return nil

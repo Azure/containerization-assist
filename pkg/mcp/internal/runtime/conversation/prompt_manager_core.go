@@ -85,8 +85,8 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Restore context from session if available
-	if session.Metadata != nil {
-		if repoAnalysis, ok := session.Metadata["repo_analysis"].(map[string]interface{}); ok {
+	if internalSession.Metadata != nil {
+		if repoAnalysis, ok := internalSession.Metadata["repo_analysis"].(map[string]interface{}); ok {
 			if ctx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
 				convState.Context = ctx
 			}

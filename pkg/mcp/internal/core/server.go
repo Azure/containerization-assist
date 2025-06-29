@@ -63,7 +63,7 @@ type Server struct {
 	workspaceManager *utils.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
-	transport        transport.LocalTransport
+	transport        interface{} // stdio or http transport
 	logger           zerolog.Logger
 	startTime        time.Time
 
@@ -152,8 +152,8 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		Logger:     logger.With().Str("component", "job_manager").Logger(),
 	})
 
-	// Initialize transport (using core.Transport interface directly)
-	var mcpTransport core.Transport
+	// Initialize transport
+	var transportInstance interface{}
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -166,12 +166,12 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 			MaxBodyLogSize: config.MaxBodyLogSize,
 			LogLevel:       config.LogLevel,
 		}
-		mcpTransport = transport.NewCoreHTTPTransport(httpConfig)
+		transportInstance = transport.NewHTTPTransport(httpConfig)
 	case "stdio":
 		fallthrough
 	default:
-		// Create stdio transport using core interface
-		mcpTransport = transport.NewDefaultCoreStdioTransport(logger)
+		// Create stdio transport
+		transportInstance = transport.NewStdioTransportWithLogger(logger)
 	}
 
 	// Create gomcp manager with builder pattern
@@ -181,14 +181,14 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		LogLevel:        convertZerologToSlog(logger.GetLevel()),
 	}
 	gomcpManager := NewGomcpManager(gomcpConfig).
-		WithTransport(mcpTransport).
+		WithTransport(transportInstance).
 		WithLogger(*slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 			Level: convertZerologToSlog(logger.GetLevel()),
 		})))
 
 	// Set GomcpManager on transport for proper lifecycle management
-	// Use type assertion since InternalTransport interface doesn't have Name() method
-	if setter, ok := mcpTransport.(interface{ SetGomcpManager(interface{}) }); ok {
+	// Use type assertion
+	if setter, ok := transportInstance.(interface{ SetGomcpManager(interface{}) }); ok {
 		setter.SetGomcpManager(gomcpManager)
 	}
 
@@ -256,7 +256,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		workspaceManager: workspaceManager,
 		circuitBreakers:  circuitBreakers,
 		jobManager:       jobManager,
-		transport:        mcpTransport,
+		transport:        transportInstance,
 		logger:           logger,
 		startTime:        time.Now(),
 		toolOrchestrator: toolOrchestrator,
@@ -291,7 +291,7 @@ func (s *Server) IsConversationModeEnabled() bool {
 }
 
 // GetTransport returns the server's transport
-func (s *Server) GetTransport() transport.LocalTransport {
+func (s *Server) GetTransport() interface{} {
 	return s.transport
 }
 

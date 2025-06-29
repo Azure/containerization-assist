@@ -35,7 +35,9 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Set the server as the request handler for the transport
-	s.transport.SetHandler(s)
+	if setter, ok := s.transport.(interface{ SetHandler(interface{}) }); ok {
+		setter.SetHandler(s)
+	}
 
 	// Start transport serving
 	transportDone := make(chan error, 1)
@@ -187,9 +189,11 @@ CONTINUE_SHUTDOWN:
 
 	// Step 9: Stop transport
 	s.logger.Info().Msg("Stopping transport")
-	if err := s.transport.Stop(context.Background()); err != nil {
-		s.logger.Error().Err(err).Msg("Error stopping transport")
-		shutdownErrors = append(shutdownErrors, fmt.Errorf("transport stop: %w", err))
+	if stopper, ok := s.transport.(interface{ Stop(context.Context) error }); ok {
+		if err := stopper.Stop(context.Background()); err != nil {
+			s.logger.Error().Err(err).Msg("Error stopping transport")
+			shutdownErrors = append(shutdownErrors, fmt.Errorf("transport stop: %w", err))
+		}
 	}
 
 	// Step 10: Shutdown OpenTelemetry provider

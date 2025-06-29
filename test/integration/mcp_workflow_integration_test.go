@@ -133,40 +133,40 @@ import (
 
 func main() {
 	mux := http.NewServeMux()
-	
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello from Container Kit Test App!")
 	})
-	
+
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK")
 	})
-	
+
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, "{\"status\": \"running\", \"timestamp\": \"%s\"}", time.Now().Format(time.RFC3339))
 	})
-	
+
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
 	}
-	
+
 	// Graceful shutdown
 	go func() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		<-c
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		if err := server.Shutdown(ctx); err != nil {
 			log.Printf("Server shutdown error: %v", err)
 		}
 	}()
-	
+
 	fmt.Println("Server starting on :8080")
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatalf("Server failed to start: %v", err)
@@ -196,7 +196,7 @@ This is a simple Go HTTP service used for Container Kit integration testing.
 ## Endpoints
 
 - / - Hello world endpoint
-- /health - Health check endpoint  
+- /health - Health check endpoint
 - /api/status - JSON status endpoint
 
 ## Build & Run

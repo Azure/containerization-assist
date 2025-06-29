@@ -103,11 +103,11 @@ type Artifact struct {
 // NewConversationState creates a new conversation state
 func NewConversationState(sessionID, workspaceDir string) *ConversationState {
 	return &ConversationState{
-		SessionState: &mcp.SessionState{
+		SessionState: &session.SessionState{
 			SessionID:    sessionID,
 			WorkspaceDir: workspaceDir,
 			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			LastAccessed: time.Now(),
 			Metadata:     make(map[string]interface{}),
 		},
 		CurrentStage: convertFromTypesStage(types.StageWelcome),
@@ -128,19 +128,19 @@ func (cs *ConversationState) AddConversationTurn(turn ConversationTurn) {
 	turn.ID = generateTurnID()
 	turn.Timestamp = time.Now()
 	cs.History = append(cs.History, turn)
-	cs.SessionState.UpdatedAt = time.Now()
+	cs.SessionState.LastAccessed = time.Now()
 }
 
 // SetStage updates the current conversation stage
 func (cs *ConversationState) SetStage(stage mcp.ConversationStage) {
 	cs.CurrentStage = stage
-	cs.SessionState.UpdatedAt = time.Now()
+	cs.SessionState.LastAccessed = time.Now()
 }
 
 // SetPendingDecision sets a decision point that needs user input
 func (cs *ConversationState) SetPendingDecision(decision *DecisionPoint) {
 	cs.PendingDecision = decision
-	cs.SessionState.UpdatedAt = time.Now()
+	cs.SessionState.LastAccessed = time.Now()
 }
 
 // ResolvePendingDecision resolves a pending decision with user's choice
@@ -152,7 +152,7 @@ func (cs *ConversationState) ResolvePendingDecision(decision Decision) {
 			cs.History[len(cs.History)-1].Decision = &decision
 		}
 	}
-	cs.SessionState.UpdatedAt = time.Now()
+	cs.SessionState.LastAccessed = time.Now()
 }
 
 // AddArtifact adds a generated artifact to the state
@@ -161,7 +161,7 @@ func (cs *ConversationState) AddArtifact(artifact Artifact) {
 	artifact.CreatedAt = time.Now()
 	artifact.UpdatedAt = time.Now()
 	cs.Artifacts[artifact.ID] = artifact
-	cs.SessionState.UpdatedAt = time.Now()
+	cs.SessionState.LastAccessed = time.Now()
 }
 
 // UpdateArtifact updates an existing artifact
@@ -170,7 +170,7 @@ func (cs *ConversationState) UpdateArtifact(artifactID, content string) {
 		artifact.Content = content
 		artifact.UpdatedAt = time.Now()
 		cs.Artifacts[artifactID] = artifact
-		cs.SessionState.UpdatedAt = time.Now()
+		cs.SessionState.LastAccessed = time.Now()
 	}
 }
 

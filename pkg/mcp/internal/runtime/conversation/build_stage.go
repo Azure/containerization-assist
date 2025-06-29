@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
-	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
@@ -31,7 +31,7 @@ func getIntFromMap(m map[string]interface{}, key string) int {
 }
 
 // getDockerfileBuilt checks if dockerfile has been built (from metadata)
-func getDockerfileBuilt(sessionState *mcp.SessionState) bool {
+func getDockerfileBuilt(sessionState *session.SessionState) bool {
 	if sessionState.Metadata == nil {
 		return false
 	}
@@ -42,7 +42,7 @@ func getDockerfileBuilt(sessionState *mcp.SessionState) bool {
 }
 
 // getDockerfileImageID gets the built image ID from metadata
-func getDockerfileImageID(sessionState *mcp.SessionState) string {
+func getDockerfileImageID(sessionState *session.SessionState) string {
 	if sessionState.Metadata == nil {
 		return ""
 	}
@@ -56,7 +56,7 @@ func getDockerfileImageID(sessionState *mcp.SessionState) string {
 }
 
 // setDockerfileBuilt sets the dockerfile built status in metadata
-func setDockerfileBuilt(sessionState *mcp.SessionState, built bool) {
+func setDockerfileBuilt(sessionState *session.SessionState, built bool) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -64,7 +64,7 @@ func setDockerfileBuilt(sessionState *mcp.SessionState, built bool) {
 }
 
 // setDockerfileImageID sets the built image ID in metadata
-func setDockerfileImageID(sessionState *mcp.SessionState, imageID string) {
+func setDockerfileImageID(sessionState *session.SessionState, imageID string) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -73,7 +73,7 @@ func setDockerfileImageID(sessionState *mcp.SessionState, imageID string) {
 }
 
 // getImageRefRegistry gets the image registry from metadata
-func getImageRefRegistry(sessionState *mcp.SessionState) string {
+func getImageRefRegistry(sessionState *session.SessionState) string {
 	if sessionState.Metadata == nil {
 		return ""
 	}
@@ -84,7 +84,7 @@ func getImageRefRegistry(sessionState *mcp.SessionState) string {
 }
 
 // getImageRefTag gets the image tag from metadata
-func getImageRefTag(sessionState *mcp.SessionState) string {
+func getImageRefTag(sessionState *session.SessionState) string {
 	if sessionState.Metadata == nil {
 		return ""
 	}
@@ -95,7 +95,7 @@ func getImageRefTag(sessionState *mcp.SessionState) string {
 }
 
 // setImageRefRegistry sets the image registry in metadata
-func setImageRefRegistry(sessionState *mcp.SessionState, registry string) {
+func setImageRefRegistry(sessionState *session.SessionState, registry string) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -103,7 +103,7 @@ func setImageRefRegistry(sessionState *mcp.SessionState, registry string) {
 }
 
 // setImageRefTag sets the image tag in metadata
-func setImageRefTag(sessionState *mcp.SessionState, tag string) {
+func setImageRefTag(sessionState *session.SessionState, tag string) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -207,12 +207,7 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 		"dry_run":    true,
 	}
 
-	req := mcp.ToolExecutionRequest{
-		ToolName: "build_image",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "build_image", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Failed to preview build: %v", err)
@@ -223,7 +218,13 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 	state.Context["build_dry_run_complete"] = true
 
 	// Format preview
-	details, _ := resultStruct.Result.(map[string]interface{})
+	resultMap, _ := result.(map[string]interface{})
+	var details map[string]interface{}
+	if resultField, ok := resultMap["result"]; ok {
+		details, _ = resultField.(map[string]interface{})
+	} else {
+		details = resultMap
+	}
 	layers := getIntFromMap(details, "estimated_layers")
 	size := int64(getIntFromMap(details, "estimated_size"))
 	baseImage := genericutils.MapGetWithDefault[string](details, "base_image", "")
@@ -268,12 +269,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 
 	// Execute build
 	startTime := time.Now()
-	req := mcp.ToolExecutionRequest{
-		ToolName: "build_image",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "build_image", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -308,11 +304,22 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 		return response
 	}
 
-	toolCall.Result = resultStruct.Result
+	// Extract result data
+	resultMap, _ := result.(map[string]interface{})
+	if resultField, ok := resultMap["result"]; ok {
+		toolCall.Result = resultField
+	} else {
+		toolCall.Result = result
+	}
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Extract details from result
-	details, _ := resultStruct.Result.(map[string]interface{})
+	var details map[string]interface{}
+	if resultField, ok := resultMap["result"]; ok {
+		details, _ = resultField.(map[string]interface{})
+	} else {
+		details = resultMap
+	}
 
 	// Update state with build results
 	setDockerfileBuilt(state.SessionState, true)
@@ -457,19 +464,22 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 	}
 
 	// First try dry-run to check access
-	dryReq := mcp.ToolExecutionRequest{
-		ToolName: "push_image",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	dryResultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, dryReq)
+	dryResult, err := pm.toolOrchestrator.ExecuteTool(ctx, "push_image", params)
 	if err != nil {
 		// Log dry-run failure but continue
 		pm.logger.Debug().Err(err).Msg("Dry-run push failed, proceeding with actual push")
 	}
-	if dryResultStruct != nil && dryResultStruct.Result != nil {
+	if dryResult != nil {
 		// Check if dry-run failed by examining the result
-		if dryResultMap, ok := dryResultStruct.Result.(map[string]interface{}); ok {
+		var dryResultMap map[string]interface{}
+		if resultMap, ok := dryResult.(map[string]interface{}); ok {
+			if resultField, ok := resultMap["result"]; ok {
+				dryResultMap, _ = resultField.(map[string]interface{})
+			} else {
+				dryResultMap = resultMap
+			}
+		}
+		if dryResultMap != nil {
 			if success, ok := dryResultMap["success"].(bool); ok && !success {
 				errorMsg := "unknown error"
 				if errStr, ok := dryResultMap["error"].(string); ok {
@@ -489,12 +499,7 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 
 	// Execute actual push
 	startTime := time.Now()
-	req := mcp.ToolExecutionRequest{
-		ToolName: "push_image",
-		Args:     params,
-		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
-	}
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
+	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "push_image", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -529,7 +534,13 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 		return response
 	}
 
-	toolCall.Result = resultStruct.Result
+	// Extract result data
+	resultMap, _ := result.(map[string]interface{})
+	if resultField, ok := resultMap["result"]; ok {
+		toolCall.Result = resultField
+	} else {
+		toolCall.Result = result
+	}
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Update state
