@@ -7,11 +7,12 @@ import (
 
 	// mcp import removed - using mcptypes
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
-// MCPToolOrchestrator implements InternalToolOrchestrator for MCP atomic tools
+// MCPToolOrchestrator implements ToolOrchestrationExecutor for MCP atomic tools
 // This is the updated version that uses type-safe dispatch instead of reflection
 type MCPToolOrchestrator struct {
 	toolRegistry       *MCPToolRegistry
@@ -49,7 +50,7 @@ func (o *MCPToolOrchestrator) SetPipelineOperations(operations interface{}) {
 }
 
 // SetAnalyzer sets the AI analyzer for tool fixing capabilities
-func (o *MCPToolOrchestrator) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+func (o *MCPToolOrchestrator) SetAnalyzer(analyzer mcp.AIAnalyzer) {
 	if o.dispatcher != nil {
 		o.dispatcher.SetAnalyzer(analyzer)
 	}
@@ -96,14 +97,14 @@ func (o *MCPToolOrchestrator) ValidateToolArgs(toolName string, args interface{}
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*mcp.ToolMetadata, error) {
 	localMetadata, err := o.toolRegistry.GetToolMetadata(toolName)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert from orchestration.ToolMetadata to mcptypes.ToolMetadata
-	converted := &mcptypes.ToolMetadata{
+	// Convert from orchestration.ToolMetadata to mcp.ToolMetadata
+	converted := &mcp.ToolMetadata{
 		Name:         localMetadata.Name,
 		Description:  localMetadata.Description,
 		Version:      localMetadata.Version,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +24,7 @@ func TestAutoFixHelper(t *testing.T) {
 		}
 		state := &ConversationState{}
 
-		result := helper.AttemptAutoFix(context.Background(), response, types.StageBuild, nil, state)
+		result := helper.AttemptAutoFix(context.Background(), response, convertFromTypesStage(types.StageBuild), nil, state)
 		assert.False(t, result, "Should return false when handler is nil")
 		assert.Equal(t, ResponseStatusError, response.Status, "Status should remain unchanged")
 	})
@@ -32,14 +33,14 @@ func TestAutoFixHelper(t *testing.T) {
 		helper := &AutoFixHelper{}
 
 		testCases := []struct {
-			stage    types.ConversationStage
+			stage    mcp.ConversationStage
 			expected string
 		}{
-			{types.StageBuild, "Continue to next stage"},
-			{types.StagePush, "Continue to manifest generation"},
-			{types.StageManifests, "Continue to deployment"},
-			{types.StageDeployment, "Continue to completion"},
-			{types.StageWelcome, "Continue"}, // Test default case
+			{convertFromTypesStage(types.StageBuild), "Continue to next stage"},
+			{convertFromTypesStage(types.StagePush), "Continue to manifest generation"},
+			{convertFromTypesStage(types.StageManifests), "Continue to deployment"},
+			{convertFromTypesStage(types.StageDeployment), "Continue to completion"},
+			{convertFromTypesStage(types.StageWelcome), "Continue"}, // Test default case
 		}
 
 		for _, tc := range testCases {
@@ -52,14 +53,14 @@ func TestAutoFixHelper(t *testing.T) {
 
 	t.Run("getStageDisplayName", func(t *testing.T) {
 		testCases := []struct {
-			stage    types.ConversationStage
+			stage    mcp.ConversationStage
 			expected string
 		}{
-			{types.StageBuild, "Build"},
-			{types.StagePush, "Push"},
-			{types.StageManifests, "Manifest generation"},
-			{types.StageDeployment, "Deployment"},
-			{types.StageWelcome, "Operation"}, // Test default case
+			{convertFromTypesStage(types.StageBuild), "Build"},
+			{convertFromTypesStage(types.StagePush), "Push"},
+			{convertFromTypesStage(types.StageManifests), "Manifest generation"},
+			{convertFromTypesStage(types.StageDeployment), "Deployment"},
+			{convertFromTypesStage(types.StageWelcome), "Operation"}, // Test default case
 		}
 
 		for _, tc := range testCases {
@@ -70,14 +71,14 @@ func TestAutoFixHelper(t *testing.T) {
 
 	t.Run("getStageErrorPrefix", func(t *testing.T) {
 		testCases := []struct {
-			stage    types.ConversationStage
+			stage    mcp.ConversationStage
 			expected string
 		}{
-			{types.StageBuild, "Build"},
-			{types.StagePush, "Failed to push Docker image"},
-			{types.StageManifests, "Failed to generate Kubernetes manifests"},
-			{types.StageDeployment, "Deployment"},
-			{types.StageWelcome, "Operation"}, // Test default case
+			{convertFromTypesStage(types.StageBuild), "Build"},
+			{convertFromTypesStage(types.StagePush), "Failed to push Docker image"},
+			{convertFromTypesStage(types.StageManifests), "Failed to generate Kubernetes manifests"},
+			{convertFromTypesStage(types.StageDeployment), "Deployment"},
+			{convertFromTypesStage(types.StageWelcome), "Operation"}, // Test default case
 		}
 
 		for _, tc := range testCases {
@@ -90,13 +91,13 @@ func TestAutoFixHelper(t *testing.T) {
 		helper := &AutoFixHelper{}
 
 		// Test all stages to ensure full coverage
-		allStages := []types.ConversationStage{
-			types.StageBuild,
-			types.StagePush,
-			types.StageManifests,
-			types.StageDeployment,
-			types.StageWelcome,   // default case
-			types.StagePreFlight, // another default case
+		allStages := []mcp.ConversationStage{
+			convertFromTypesStage(types.StageBuild),
+			convertFromTypesStage(types.StagePush),
+			convertFromTypesStage(types.StageManifests),
+			convertFromTypesStage(types.StageDeployment),
+			convertFromTypesStage(types.StageWelcome),   // default case
+			convertFromTypesStage(types.StagePreFlight), // another default case
 		}
 
 		for _, stage := range allStages {
@@ -110,13 +111,13 @@ func TestAutoFixHelper(t *testing.T) {
 
 	t.Run("getStageDisplayName coverage for all branches", func(t *testing.T) {
 		// Test all stages to ensure full coverage
-		allStages := []types.ConversationStage{
-			types.StageBuild,
-			types.StagePush,
-			types.StageManifests,
-			types.StageDeployment,
-			types.StageWelcome,   // default case
-			types.StagePreFlight, // another default case
+		allStages := []mcp.ConversationStage{
+			convertFromTypesStage(types.StageBuild),
+			convertFromTypesStage(types.StagePush),
+			convertFromTypesStage(types.StageManifests),
+			convertFromTypesStage(types.StageDeployment),
+			convertFromTypesStage(types.StageWelcome),   // default case
+			convertFromTypesStage(types.StagePreFlight), // another default case
 		}
 
 		for _, stage := range allStages {
@@ -127,13 +128,13 @@ func TestAutoFixHelper(t *testing.T) {
 
 	t.Run("getStageErrorPrefix coverage for all branches", func(t *testing.T) {
 		// Test all stages to ensure full coverage
-		allStages := []types.ConversationStage{
-			types.StageBuild,
-			types.StagePush,
-			types.StageManifests,
-			types.StageDeployment,
-			types.StageWelcome,   // default case
-			types.StagePreFlight, // another default case
+		allStages := []mcp.ConversationStage{
+			convertFromTypesStage(types.StageBuild),
+			convertFromTypesStage(types.StagePush),
+			convertFromTypesStage(types.StageManifests),
+			convertFromTypesStage(types.StageDeployment),
+			convertFromTypesStage(types.StageWelcome),   // default case
+			convertFromTypesStage(types.StagePreFlight), // another default case
 		}
 
 		for _, stage := range allStages {

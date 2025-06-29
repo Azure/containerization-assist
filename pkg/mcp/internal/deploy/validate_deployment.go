@@ -9,11 +9,12 @@ import (
 
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/mcp"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -154,7 +155,7 @@ func (t *AtomicValidateDeploymentTool) ExecuteTyped(ctx context.Context, args Va
 	timeout, err := time.ParseDuration(args.Timeout)
 	if err != nil {
 		t.logger.Error().Err(err).Str("timeout", args.Timeout).Msg("Invalid timeout format")
-		return response, mcptypes.NewRichError("INVALID_TIMEOUT", fmt.Sprintf("invalid timeout format: %s", args.Timeout), "validation_error")
+		return response, mcp.NewRichError("INVALID_TIMEOUT", fmt.Sprintf("invalid timeout format: %s", args.Timeout), "validation_error")
 	}
 
 	// Create context with timeout
@@ -422,13 +423,13 @@ func (t *AtomicValidateDeploymentTool) Execute(ctx context.Context, args interfa
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
 		}
 	default:
-		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
 	}
 
 	// Call the typed execute method
@@ -446,26 +447,26 @@ func (t *AtomicValidateDeploymentTool) Validate(ctx context.Context, args interf
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
 		}
 	default:
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
 	}
 
 	// Validate required fields
 	if deployArgs.SessionID == "" {
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
 	}
 
 	return nil
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *AtomicValidateDeploymentTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicValidateDeploymentTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:         "validate_deployment",
 		Description:  "Validates Kubernetes deployments on Kind clusters with comprehensive health checks",
 		Version:      "1.0.0",

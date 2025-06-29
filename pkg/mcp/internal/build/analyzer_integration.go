@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -19,7 +20,7 @@ type FixingContext struct {
 	BaseDir         string
 	WorkspaceDir    string
 	ErrorDetails    map[string]interface{}
-	AttemptHistory  []mcptypes.FixAttempt
+	AttemptHistory  []mcp.FixAttempt
 	EnvironmentInfo map[string]interface{}
 	SessionMetadata map[string]interface{}
 }
@@ -27,13 +28,13 @@ type FixingContext struct {
 // AnalyzerIntegratedFixer combines IterativeFixer with CallerAnalyzer
 type AnalyzerIntegratedFixer struct {
 	fixer        mcptypes.IterativeFixer
-	analyzer     mcptypes.AIAnalyzer
+	analyzer     mcp.AIAnalyzer
 	contextShare mcptypes.ContextSharer
 	logger       zerolog.Logger
 }
 
 // NewAnalyzerIntegratedFixer creates a fixer that integrates with CallerAnalyzer
-func NewAnalyzerIntegratedFixer(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
+func NewAnalyzerIntegratedFixer(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
 	// Use real DefaultIterativeFixer implementation instead of mock
 	fixer := NewDefaultIterativeFixer(analyzer, logger)
 	contextSharer := &realContextSharer{context: make(map[string]interface{})}
@@ -56,7 +57,7 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, sessionID
 		MaxAttempts:     maxAttempts,
 		BaseDir:         baseDir,
 		ErrorDetails:    make(map[string]interface{}),
-		AttemptHistory:  []mcptypes.FixAttempt{},
+		AttemptHistory:  []mcp.FixAttempt{},
 		EnvironmentInfo: make(map[string]interface{}),
 		SessionMetadata: make(map[string]interface{}),
 	}
@@ -69,7 +70,7 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, sessionID
 		fixingCtx.WorkspaceDir = workspaceDir
 	}
 	// Enhance error with rich details if possible
-	if richError, ok := err.(*mcptypes.RichError); ok {
+	if richError, ok := err.(*mcp.RichError); ok {
 		fixingCtx.ErrorDetails["code"] = richError.Code
 		fixingCtx.ErrorDetails["type"] = richError.Type
 		fixingCtx.ErrorDetails["severity"] = richError.Severity
@@ -110,7 +111,7 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, sessionID
 		// Check if we should route this failure to another tool
 		routing := a.fixer.GetFailureRouting()
 		errorType := "unknown_error"
-		if richError, ok := fixingCtx.OriginalError.(*mcptypes.RichError); ok {
+		if richError, ok := fixingCtx.OriginalError.(*mcp.RichError); ok {
 			errorType = richError.Type
 		}
 		targetTool, hasRouting := routing[errorType]
@@ -180,7 +181,7 @@ func (a *AnalyzerIntegratedFixer) GetFixingRecommendations(ctx context.Context, 
 		MaxAttempts:   1, // We're just analyzing, not fixing
 	}
 	// Enhance error details
-	if richError, ok := err.(*mcptypes.RichError); ok {
+	if richError, ok := err.(*mcp.RichError); ok {
 		fixingCtx.ErrorDetails["code"] = richError.Code
 		fixingCtx.ErrorDetails["type"] = richError.Type
 		fixingCtx.ErrorDetails["severity"] = richError.Severity
@@ -301,8 +302,8 @@ func GetEnhancedConfiguration(toolName string) *EnhancedFixingConfiguration {
 // mockIterativeFixer provides a minimal implementation for testing
 type mockIterativeFixer struct {
 	maxAttempts int
-	history     []mcptypes.FixAttempt
-	analyzer    mcptypes.AIAnalyzer
+	history     []mcp.FixAttempt
+	analyzer    mcp.AIAnalyzer
 }
 
 func (m *mockIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mcptypes.FixingResult, error) {
@@ -317,7 +318,7 @@ func (m *mockIterativeFixer) Fix(ctx context.Context, issue interface{}) (*mcpty
 		}
 	}
 	// For testing, simulate a successful fix with working Dockerfile content
-	attempt := mcptypes.FixAttempt{
+	attempt := mcp.FixAttempt{
 		AttemptNumber: len(m.history) + 1,
 		Success:       true,
 		Error:         nil,
@@ -340,14 +341,14 @@ CMD ["echo", "hello"]`,
 		FixApplied:    "Fixed Dockerfile base image",
 		Attempts:      attempt.AttemptNumber,
 		TotalAttempts: attempt.AttemptNumber,
-		FixHistory:    []mcptypes.FixAttempt{attempt},
+		FixHistory:    []mcp.FixAttempt{attempt},
 		FinalAttempt:  &attempt,
 	}, nil
 }
 func (m *mockIterativeFixer) SetMaxAttempts(max int) {
 	m.maxAttempts = max
 }
-func (m *mockIterativeFixer) GetFixHistory() []mcptypes.FixAttempt {
+func (m *mockIterativeFixer) GetFixHistory() []mcp.FixAttempt {
 	return m.history
 }
 func (m *mockIterativeFixer) AttemptFix(ctx context.Context, issue interface{}, attempt int) (*mcptypes.FixingResult, error) {

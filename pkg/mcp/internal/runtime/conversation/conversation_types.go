@@ -4,25 +4,26 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // ConversationResponse represents the response to a user prompt
 type ConversationResponse struct {
-	SessionID string                  `json:"session_id"`
-	Message   string                  `json:"message"`
-	Stage     types.ConversationStage `json:"stage"`
-	Status    ResponseStatus          `json:"status"`
-	Options   []Option                `json:"options,omitempty"`
-	Artifacts []ArtifactSummary       `json:"artifacts,omitempty"`
-	NextSteps []string                `json:"next_steps,omitempty"`
-	Progress  *StageProgress          `json:"progress,omitempty"`
-	ToolCalls []ToolCall              `json:"tool_calls,omitempty"`
+	SessionID string                `json:"session_id"`
+	Message   string                `json:"message"`
+	Stage     mcp.ConversationStage `json:"stage"`
+	Status    ResponseStatus        `json:"status"`
+	Options   []Option              `json:"options,omitempty"`
+	Artifacts []ArtifactSummary     `json:"artifacts,omitempty"`
+	NextSteps []string              `json:"next_steps,omitempty"`
+	Progress  *StageProgress        `json:"progress,omitempty"`
+	ToolCalls []ToolCall            `json:"tool_calls,omitempty"`
 
 	// Auto-advance support
-	RequiresInput bool                     `json:"requires_input"`         // If false, can auto-advance
-	NextStage     *types.ConversationStage `json:"next_stage,omitempty"`   // Stage to advance to
-	AutoAdvance   *AutoAdvanceConfig       `json:"auto_advance,omitempty"` // Auto-advance configuration
+	RequiresInput bool                   `json:"requires_input"`         // If false, can auto-advance
+	NextStage     *mcp.ConversationStage `json:"next_stage,omitempty"`   // Stage to advance to
+	AutoAdvance   *AutoAdvanceConfig     `json:"auto_advance,omitempty"` // Auto-advance configuration
 
 	// Structured forms support
 	Form *StructuredForm `json:"form,omitempty"` // Structured form for gathering input
@@ -57,14 +58,14 @@ type ArtifactSummary struct {
 	Size      int       `json:"size_bytes"`
 }
 
-// Note: InternalToolOrchestrator is imported from the orchestration package
+// Note: ToolOrchestrationExecutor is imported from the orchestration package
 
 // Note: UserPreferences and ResourceLimits are defined in conversation_state.go
 
 // Auto-advance helper methods
 
 // WithAutoAdvance configures the response for automatic progression to the next stage
-func (r *ConversationResponse) WithAutoAdvance(nextStage types.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
+func (r *ConversationResponse) WithAutoAdvance(nextStage mcp.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
 	r.RequiresInput = false
 	r.NextStage = &nextStage
 	r.AutoAdvance = &config
@@ -130,4 +131,4 @@ func (r *ConversationResponse) GetAutoAdvanceMessage() string {
 
 // Note: ErrorHandler is now in the errors package for centralized error management
 
-// Note: InternalToolOrchestrator is imported from the orchestration package
+// Note: ToolOrchestrationExecutor is imported from the orchestration package

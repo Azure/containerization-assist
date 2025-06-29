@@ -4,8 +4,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/config"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -112,7 +112,7 @@ func (c *AnalyzerConfig) LoadFromEnv() {
 
 // CreateAnalyzerFromConfig creates an analyzer based on the provided configuration
 // Note: For CallerAnalyzer, you need to use AnalyzerFactory with a transport
-func CreateAnalyzerFromConfig(config *AnalyzerConfig, logger zerolog.Logger) mcptypes.AIAnalyzer {
+func CreateAnalyzerFromConfig(config *AnalyzerConfig, logger zerolog.Logger) mcp.AIAnalyzer {
 	if config.EnableAI {
 		logger.Warn().
 			Bool("ai_enabled", true).

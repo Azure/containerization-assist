@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -32,21 +32,21 @@ func (s *sessionManagerAdapterImpl) GetSession(sessionID string) (interface{}, e
 func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
 	// Convert interface{} back to the concrete session type and update
 	switch sess := session.(type) {
-	case *mcptypes.SessionState:
+	case *mcp.SessionState:
 		if sess.SessionID == "" {
 			return errors.Validation("core/server", "session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*mcptypes.SessionState); ok {
+			if existingState, ok := existing.(*mcp.SessionState); ok {
 				*existingState = *sess
 			}
 		})
-	case mcptypes.SessionState:
+	case mcp.SessionState:
 		if sess.SessionID == "" {
 			return errors.Validation("core/server", "session ID is required for updates")
 		}
 		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*mcptypes.SessionState); ok {
+			if existingState, ok := existing.(*mcp.SessionState); ok {
 				*existingState = sess
 			}
 		})
@@ -63,7 +63,7 @@ type Server struct {
 	workspaceManager *utils.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
-	transport        InternalTransport
+	transport        transport.LocalTransport
 	logger           zerolog.Logger
 	startTime        time.Time
 
@@ -153,7 +153,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	})
 
 	// Initialize transport
-	var mcpTransport InternalTransport
+	var mcpTransport transport.LocalTransport
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -292,7 +292,7 @@ func (s *Server) IsConversationModeEnabled() bool {
 }
 
 // GetTransport returns the server's transport
-func (s *Server) GetTransport() InternalTransport {
+func (s *Server) GetTransport() transport.LocalTransport {
 	return s.transport
 }
 

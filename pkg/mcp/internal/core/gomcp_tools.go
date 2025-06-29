@@ -9,6 +9,8 @@ import (
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
@@ -19,7 +21,6 @@ import (
 	mcpserver "github.com/Azure/container-kit/pkg/mcp/internal/server"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/runner"
 	gomcpserver "github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -101,7 +102,7 @@ type ChatResult struct {
 // RegisterTools registers tools with the server
 func (gm *GomcpManager) RegisterTools(s *Server) error {
 	if !gm.isInitialized {
-		return mcptypes.NewErrorBuilder("manager_not_initialized", "Manager must be initialized before registering tools", "initialization").
+		return mcp.NewErrorBuilder("manager_not_initialized", "Manager must be initialized before registering tools", "initialization").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("initialization_check").
@@ -116,7 +117,11 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 	if deps.ToolOrchestrator != nil && deps.PipelineOperations != nil && deps.AtomicSessionMgr != nil {
 		deps.ToolOrchestrator.SetPipelineOperations(deps.PipelineOperations)
 
-		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, deps.MCPClients.Analyzer, deps.Logger)
+		var analyzer mcp.AIAnalyzer
+		if deps.MCPClients.Analyzer != nil {
+			analyzer, _ = deps.MCPClients.Analyzer.(mcp.AIAnalyzer)
+		}
+		toolFactory := orchestration.NewToolFactory(deps.PipelineOperations, deps.AtomicSessionMgr, analyzer, deps.Logger)
 
 		if dispatcher := getNoReflectDispatcher(deps.ToolOrchestrator); dispatcher != nil {
 			dispatcher.SetToolFactory(toolFactory)
@@ -128,7 +133,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	deps.Logger.Info().Msg("Registering core tools")
 	if err := gm.registerCoreTools(deps); err != nil {
-		return mcptypes.NewErrorBuilder("core_tools_registration_failed", "Failed to register core tools", "registration").
+		return mcp.NewErrorBuilder("core_tools_registration_failed", "Failed to register core tools", "registration").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("core_tools").
@@ -141,7 +146,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	deps.Logger.Info().Msg("Registering atomic tools")
 	if err := gm.registerAtomicTools(deps); err != nil {
-		return mcptypes.NewErrorBuilder("atomic_tools_registration_failed", "Failed to register atomic tools", "registration").
+		return mcp.NewErrorBuilder("atomic_tools_registration_failed", "Failed to register atomic tools", "registration").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("atomic_tools").
@@ -154,7 +159,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	deps.Logger.Info().Msg("Registering utility tools")
 	if err := gm.registerUtilityTools(deps); err != nil {
-		return mcptypes.NewErrorBuilder("utility_tools_registration_failed", "Failed to register utility tools", "registration").
+		return mcp.NewErrorBuilder("utility_tools_registration_failed", "Failed to register utility tools", "registration").
 			WithSeverity("high").
 			WithOperation("register_tools").
 			WithStage("utility_tools").
@@ -167,7 +172,7 @@ func (gm *GomcpManager) RegisterTools(s *Server) error {
 
 	if s.IsConversationModeEnabled() {
 		if err := gm.registerConversationTools(deps); err != nil {
-			return mcptypes.NewErrorBuilder("conversation_tools_registration_failed", "Failed to register conversation tools", "registration").
+			return mcp.NewErrorBuilder("conversation_tools_registration_failed", "Failed to register conversation tools", "registration").
 				WithSeverity("high").
 				WithOperation("register_tools").
 				WithStage("conversation_tools").
@@ -210,9 +215,7 @@ func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 		k8s.NewKubeCmdRunner(cmdRunner),
 	)
 
-	if err := mcpClients.ValidateAnalyzerForProduction(s.logger); err != nil {
-		s.logger.Error().Err(err).Msg("Analyzer validation failed")
-	}
+	// ValidateAnalyzerForProduction removed - validation handled elsewhere
 
 	pipelineOps := pipeline.NewOperations(
 		s.sessionManager,
@@ -354,9 +357,9 @@ func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependenci
 			"",  // workspaceBase - will be set from session
 			nil, // jobManager - will be created internally
 			&clients.Clients{
-				Docker: deps.MCPClients.Docker,
-				Kind:   deps.MCPClients.Kind,
-				Kube:   deps.MCPClients.Kube,
+				Docker: deps.MCPClients.Docker.(*docker.DockerCmdRunner),
+				Kind:   deps.MCPClients.Kind.(*kind.KindCmdRunner),
+				Kube:   deps.MCPClients.Kube.(*k8s.KubeCmdRunner),
 			},
 		),
 	}
@@ -389,7 +392,7 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 	if sessionID == "" {
 		// Check if SessionManager is initialized
 		if deps == nil || deps.SessionManager == nil {
-			return "", types.NewErrorBuilder("session_manager_not_initialized", "Session manager not initialized", "session").
+			return "", mcp.NewErrorBuilder("session_manager_not_initialized", "Session manager not initialized", "session").
 				WithOperation("ensure_session_id").
 				WithStage("initialization").
 				WithRootCause("SessionManager is nil - server may not be fully initialized").
@@ -401,7 +404,7 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 		deps.Logger.Debug().Str("tool", toolName).Msg("Creating new session")
 		sessionInterface, err := deps.SessionManager.GetOrCreateSession("")
 		if err != nil {
-			return "", mcptypes.NewErrorBuilder("session_creation_failed", "Failed to create containerization session", "session").
+			return "", mcp.NewErrorBuilder("session_creation_failed", "Failed to create containerization session", "session").
 				WithOperation("ensure_session_id").
 				WithStage("session_creation").
 				WithRootCause(fmt.Sprintf("Session creation failed: %v", err)).
@@ -410,14 +413,14 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 				WithImmediateStep(3, "Retry creation", "Retry session creation after brief delay").
 				Build()
 		}
-		if session, ok := sessionInterface.(*mcptypes.SessionState); ok {
+		if session, ok := sessionInterface.(*mcp.SessionState); ok {
 			deps.Logger.Info().Str("session_id", session.SessionID).Str("tool", toolName).Msg("Created new session")
 			return session.SessionID, nil
 		}
-		return "", types.NewErrorBuilder("session_type_assertion_failed", "Failed to assert session type", "session").
+		return "", mcp.NewErrorBuilder("session_type_assertion_failed", "Failed to assert session type", "session").
 			WithOperation("ensure_session_id").
 			WithStage("type_assertion").
-			WithRootCause(fmt.Sprintf("Expected *sessiontypes.SessionState, got %T", sessionInterface)).
+			WithRootCause(fmt.Sprintf("Expected *sessionmcp.SessionState, got %T", sessionInterface)).
 			Build()
 	}
 	return sessionID, nil
@@ -447,7 +450,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 			if analysisResult, ok := result.(*analyze.AtomicAnalysisResult); ok {
 				return analysisResult, nil
 			}
-			return nil, mcptypes.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository tool", "tool_execution").
+			return nil, mcp.NewErrorBuilder("unexpected_result_type", "Unexpected result type from analyze_repository_atomic tool", "tool_execution").
 				WithField("expected_type", "*types.AnalyzeRepositoryResult").
 				WithField("actual_type", fmt.Sprintf("%T", result)).
 				WithOperation("handle_analyze_repository").
@@ -982,9 +985,9 @@ func (w *sessionLabelManagerWrapper) GetSession(sessionID string) (sessiontypes.
 		return sessiontypes.SessionLabelData{}, err
 	}
 
-	session, ok := sessionInterface.(*mcptypes.SessionState)
+	session, ok := sessionInterface.(*mcp.SessionState)
 	if !ok {
-		return sessiontypes.SessionLabelData{}, mcptypes.NewErrorBuilder("unexpected_session_type", "Unexpected session type encountered", "session").
+		return sessiontypes.SessionLabelData{}, mcp.NewErrorBuilder("unexpected_session_type", "Unexpected session type encountered", "session").
 			WithOperation("get_session_label_data").
 			WithStage("type_detection").
 			WithRootCause("Session does not match any known session type patterns").

@@ -8,9 +8,10 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -18,7 +19,7 @@ import (
 // BuildExecutorService handles the execution of Docker builds with progress reporting
 type BuildExecutorService struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
+	sessionManager  mcp.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        *BuildAnalyzer
 	troubleshooter  *BuildTroubleshooter
@@ -26,7 +27,7 @@ type BuildExecutorService struct {
 }
 
 // NewBuildExecutor creates a new build executor
-func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *BuildExecutorService {
+func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *BuildExecutorService {
 	executorLogger := logger.With().Str("component", "build_executor").Logger()
 	return &BuildExecutorService{
 		pipelineAdapter: adapter,
@@ -57,7 +58,7 @@ func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args Atomic
 	}
 	// First validate basic requirements
 	if args.SessionID == "" {
-		return nil, mcptypes.NewErrorBuilder("SESSION_ID_REQUIRED", "Session ID is required", "validation_error").
+		return nil, mcp.NewErrorBuilder("SESSION_ID_REQUIRED", "Session ID is required", "validation_error").
 			WithField("session_id", args.SessionID).
 			WithOperation("build_image").
 			WithStage("input_validation").
@@ -65,7 +66,7 @@ func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args Atomic
 			Build()
 	}
 	if args.ImageName == "" {
-		return nil, mcptypes.NewErrorBuilder("IMAGE_NAME_REQUIRED", "Image name is required", "validation_error").
+		return nil, mcp.NewErrorBuilder("IMAGE_NAME_REQUIRED", "Image name is required", "validation_error").
 			WithField("image_name", args.ImageName).
 			WithOperation("build_image").
 			WithStage("input_validation").
@@ -82,7 +83,7 @@ func (e *BuildExecutorService) ExecuteWithFixes(ctx context.Context, args Atomic
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcptypes.SessionState)
+	session := sessionInterface.(*mcp.SessionState)
 	workspaceDir := e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 	buildContext := e.getBuildContext(args.BuildContext, workspaceDir)
 	dockerfilePath := e.getDockerfilePath(args.DockerfilePath, buildContext)
@@ -159,7 +160,7 @@ func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args Ato
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcptypes.SessionState)
+	session := sessionInterface.(*mcp.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -186,7 +187,7 @@ func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args Ato
 			Str("dockerfile_path", result.DockerfilePath).
 			Str("build_context", result.BuildContext).
 			Msg("Build context analysis failed")
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build context analysis failed: %v", err), "filesystem_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build context analysis failed: %v", err), "filesystem_error")
 	}
 	e.logger.Info().Msg("Validating build prerequisites")
 	if err := e.analyzer.ValidateBuildPrerequisites(result); err != nil {
@@ -195,7 +196,7 @@ func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args Ato
 			Str("build_context", result.BuildContext).
 			Int64("context_size", result.BuildContext_Info.ContextSize).
 			Msg("Build prerequisites validation failed")
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build prerequisites validation failed: %v", err), "validation_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build prerequisites validation failed: %v", err), "validation_error")
 	}
 	e.logger.Info().Msg("Analysis completed")
 	// Stage 3: Build - Building Docker image
@@ -230,10 +231,10 @@ func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args Ato
 			Msg("Docker build failed")
 		result.BuildFailureAnalysis = e.troubleshooter.GenerateBuildFailureAnalysis(err, result.BuildResult, result)
 		e.troubleshooter.AddTroubleshootingTips(result, err)
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %v", err), "build_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %v", err), "build_error")
 	}
 	if result.BuildResult != nil && !result.BuildResult.Success {
-		buildErr := mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build failed: %s", result.BuildResult.Error.Message), "build_error")
+		buildErr := mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("build failed: %s", result.BuildResult.Error.Message), "build_error")
 		e.logger.Error().Err(buildErr).
 			Str("image_ref", result.FullImageRef).
 			Str("dockerfile_path", result.DockerfilePath).
@@ -241,7 +242,7 @@ func (e *BuildExecutorService) executeWithProgress(ctx context.Context, args Ato
 			Msg("Docker build execution failed")
 		result.BuildFailureAnalysis = e.troubleshooter.GenerateBuildFailureAnalysis(buildErr, result.BuildResult, result)
 		e.troubleshooter.AddTroubleshootingTips(result, buildErr)
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build execution failed: %v", buildErr), "build_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build execution failed: %v", buildErr), "build_error")
 	}
 	result.Success = true
 	e.logger.Info().Msg("Docker image built successfully")
@@ -323,7 +324,7 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcptypes.SessionState)
+	session := sessionInterface.(*mcp.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = e.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -389,7 +390,7 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 		e.troubleshooter.AddTroubleshootingTips(result, err)
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
-		return result, mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %v", err), "build_error")
+		return result, mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %v", err), "build_error")
 	}
 	result.Success = true
 	// Run security scan
@@ -442,7 +443,7 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 }
 
 // updateSessionState updates the session with build results
-func (e *BuildExecutorService) updateSessionState(session *mcptypes.SessionState, result *AtomicBuildImageResult) error {
+func (e *BuildExecutorService) updateSessionState(session *mcp.SessionState, result *AtomicBuildImageResult) error {
 	// Update session with build results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -481,7 +482,7 @@ func (e *BuildExecutorService) updateSessionState(session *mcptypes.SessionState
 	// Update session timestamp
 	session.UpdatedAt = time.Now()
 	return e.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcptypes.SessionState); ok {
+		if sess, ok := s.(*mcp.SessionState); ok {
 			*sess = *session
 		}
 	})

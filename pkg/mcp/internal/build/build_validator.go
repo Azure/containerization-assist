@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -31,7 +33,7 @@ func NewBuildValidator(logger zerolog.Logger) *BuildValidatorImpl {
 func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, buildContext string) error {
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		return mcptypes.NewErrorBuilder("invalid_arguments",
+		return mcp.NewErrorBuilder("invalid_arguments",
 			fmt.Sprintf("Dockerfile not found at %s", dockerfilePath), "validation").
 			WithSeverity("high").
 			WithOperation("ValidateBuildPrerequisites").
@@ -40,7 +42,7 @@ func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, 
 	}
 	// Check if build context exists
 	if _, err := os.Stat(buildContext); os.IsNotExist(err) {
-		return mcptypes.NewErrorBuilder("invalid_arguments",
+		return mcp.NewErrorBuilder("invalid_arguments",
 			fmt.Sprintf("Build context directory not found at %s", buildContext), "validation").
 			WithSeverity("high").
 			WithOperation("ValidateBuildPrerequisites").
@@ -50,7 +52,7 @@ func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, 
 	// Check if Docker is available
 	cmd := exec.Command("docker", "version")
 	if err := cmd.Run(); err != nil {
-		return mcptypes.NewErrorBuilder("internal_server_error",
+		return mcp.NewErrorBuilder("internal_server_error",
 			"Docker is not available. Please ensure Docker is installed and running", "execution").
 			WithSeverity("critical").
 			WithOperation("ValidateBuildPrerequisites").
@@ -121,7 +123,7 @@ func (bv *BuildValidatorImpl) executeTrivyScan(ctx context.Context, fullImageRef
 
 // Helper method to create scan error
 func (bv *BuildValidatorImpl) createScanError(fullImageRef string) error {
-	return mcptypes.NewErrorBuilder("internal_server_error",
+	return mcp.NewErrorBuilder("internal_server_error",
 		"Security scan failed", "execution").
 		WithSeverity("medium").
 		WithOperation("RunSecurityScan").
@@ -312,7 +314,7 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 	// Validate image name
 	if args.ImageName == "" {
-		return mcptypes.NewErrorBuilder("invalid_arguments", "image_name is required", "validation").
+		return mcp.NewErrorBuilder("invalid_arguments", "image_name is required", "validation").
 			WithSeverity("high").
 			WithOperation("ValidateArgs").
 			Build()
@@ -328,7 +330,7 @@ func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 			}
 		}
 		if !valid {
-			return mcptypes.NewErrorBuilder("invalid_arguments",
+			return mcp.NewErrorBuilder("invalid_arguments",
 				fmt.Sprintf("invalid platform %s, must be one of: %v", args.Platform, validPlatforms), "validation").
 				WithSeverity("high").
 				WithOperation("ValidateArgs").
@@ -338,7 +340,7 @@ func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 	}
 	// Validate registry URL if push is requested
 	if args.PushAfterBuild && args.RegistryURL == "" {
-		return mcptypes.NewErrorBuilder("invalid_arguments",
+		return mcp.NewErrorBuilder("invalid_arguments",
 			"registry_url is required when push_after_build is true", "validation").
 			WithSeverity("high").
 			WithOperation("ValidateArgs").

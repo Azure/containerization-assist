@@ -11,7 +11,7 @@ import (
 // handleWelcomeStage handles the welcome stage where users choose their workflow mode
 func (pm *PromptManager) handleWelcomeStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageWelcome), getStageIntro(types.StageWelcome))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageWelcome)), getStageIntro(convertFromTypesStage(types.StageWelcome)))
 
 	// Check if this is the first interaction
 	if input == "" {
@@ -27,7 +27,7 @@ I'll guide you through:
 • 🚀 Deploying to your cluster
 
 How would you like to proceed?`, progressPrefix),
-			Stage:  types.StageWelcome,
+			Stage:  convertFromTypesStage(types.StageWelcome),
 			Status: ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -50,10 +50,10 @@ How would you like to proceed?`, progressPrefix),
 
 	if strings.Contains(lowerInput, "interactive") || strings.Contains(lowerInput, "guide") || input == "1" {
 		// Interactive mode - default behavior
-		state.SetStage(types.StageInit)
+		state.SetStage(convertFromTypesStage(types.StageInit))
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sGreat! I'll guide you through each step. Let's start by analyzing your repository.\n\nCould you provide the repository URL or local path?", progressPrefix),
-			Stage:   types.StageInit,
+			Stage:   convertFromTypesStage(types.StageInit),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -74,7 +74,7 @@ How would you like to proceed?`, progressPrefix),
 		// Enable autopilot mode
 		pm.enableAutopilot(state)
 		state.Context["skip_confirmations"] = true
-		state.SetStage(types.StageInit)
+		state.SetStage(convertFromTypesStage(types.StageInit))
 
 		return &ConversationResponse{
 			Message: fmt.Sprintf(`%s🤖 Autopilot mode enabled! I'll proceed automatically with smart defaults.
@@ -84,7 +84,7 @@ You can still:
 • Type 'autopilot off' to switch back to interactive mode
 
 Now, please provide your repository URL or local path:`, progressPrefix),
-			Stage:  types.StageInit,
+			Stage:  convertFromTypesStage(types.StageInit),
 			Status: ResponseStatusWaitingInput,
 		}
 	}
@@ -92,7 +92,7 @@ Now, please provide your repository URL or local path:`, progressPrefix),
 	// If input doesn't match expected options, re-prompt
 	return &ConversationResponse{
 		Message: fmt.Sprintf("%sPlease choose how you'd like to proceed:", progressPrefix),
-		Stage:   types.StageWelcome,
+		Stage:   convertFromTypesStage(types.StageWelcome),
 		Status:  ResponseStatusWaitingInput,
 		Options: []Option{
 			{
@@ -111,7 +111,7 @@ Now, please provide your repository URL or local path:`, progressPrefix),
 // handleInitStage handles the initial stage of the conversation
 func (pm *PromptManager) handleInitStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageInit), getStageIntro(types.StageInit))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageInit)), getStageIntro(convertFromTypesStage(types.StageInit)))
 
 	// Check if input contains a repository reference
 	repoRef := pm.extractRepositoryReference(input)
@@ -120,7 +120,7 @@ func (pm *PromptManager) handleInitStage(ctx context.Context, state *Conversatio
 		// Ask for repository
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sI'll help you containerize your application. Could you provide the repository URL or local path?", progressPrefix),
-			Stage:   types.StageInit,
+			Stage:   convertFromTypesStage(types.StageInit),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -139,7 +139,7 @@ func (pm *PromptManager) handleInitStage(ctx context.Context, state *Conversatio
 
 	// We have a repository, move to analysis
 	state.RepoURL = repoRef
-	state.SetStage(types.StageAnalysis)
+	state.SetStage(convertFromTypesStage(types.StageAnalysis))
 
 	// Enable autopilot mode when URL is provided directly
 	// This allows the conversation to automatically proceed through all stages
@@ -152,7 +152,7 @@ func (pm *PromptManager) handleInitStage(ctx context.Context, state *Conversatio
 // handleAnalysisStage handles the repository analysis stage
 func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageAnalysis), getStageIntro(types.StageAnalysis))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageAnalysis)), getStageIntro(convertFromTypesStage(types.StageAnalysis)))
 
 	// Check if we need to gather analysis preferences using structured form
 	repoAnalysisEmpty := true
@@ -214,7 +214,7 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 
 			response := &ConversationResponse{
 				Message: fmt.Sprintf("%sLet's configure how to analyze your repository. You can provide specific settings or type 'skip' to use defaults:", progressPrefix),
-				Stage:   types.StageAnalysis,
+				Stage:   convertFromTypesStage(types.StageAnalysis),
 				Status:  ResponseStatusWaitingInput,
 				Form:    form,
 			}
@@ -231,17 +231,17 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 		}
 	}
 	if repoAnalysisExists {
-		state.SetStage(types.StageDockerfile)
+		state.SetStage(convertFromTypesStage(types.StageDockerfile))
 
 		if pm.hasAutopilotEnabled(state) {
 			// Auto-advance to Dockerfile stage
 			response := &ConversationResponse{
 				Message: fmt.Sprintf("%sRepository analysis complete. Proceeding to Dockerfile generation...", progressPrefix),
-				Stage:   types.StageAnalysis,
+				Stage:   convertFromTypesStage(types.StageAnalysis),
 				Status:  ResponseStatusSuccess,
 			}
 
-			return response.WithAutoAdvance(types.StageDockerfile, AutoAdvanceConfig{
+			return response.WithAutoAdvance(convertFromTypesStage(types.StageDockerfile), AutoAdvanceConfig{
 				DelaySeconds:  2,
 				Confidence:    0.9,
 				Reason:        "Analysis complete, proceeding to Dockerfile generation",
@@ -251,7 +251,7 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 		} else {
 			return &ConversationResponse{
 				Message: fmt.Sprintf("%sAnalysis is complete. Shall we proceed to create a Dockerfile?", progressPrefix),
-				Stage:   types.StageAnalysis,
+				Stage:   convertFromTypesStage(types.StageAnalysis),
 				Status:  ResponseStatusWaitingInput,
 				Options: []Option{
 					{
@@ -275,7 +275,7 @@ func (pm *PromptManager) handleAnalysisStage(ctx context.Context, state *Convers
 // handleDockerfileStage handles Dockerfile generation
 func (pm *PromptManager) handleDockerfileStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageDockerfile), getStageIntro(types.StageDockerfile))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageDockerfile)), getStageIntro(convertFromTypesStage(types.StageDockerfile)))
 
 	// Check if we need to gather preferences using structured form
 	dockerfileContent := ""
@@ -333,11 +333,11 @@ func (pm *PromptManager) handleDockerfileStage(ctx context.Context, state *Conve
 
 			response := &ConversationResponse{
 				Message: fmt.Sprintf("%sUsing smart defaults for Dockerfile configuration...", progressPrefix),
-				Stage:   types.StageDockerfile,
+				Stage:   convertFromTypesStage(types.StageDockerfile),
 				Status:  ResponseStatusProcessing,
 			}
 
-			return response.WithAutoAdvance(types.StageBuild, AutoAdvanceConfig{
+			return response.WithAutoAdvance(convertFromTypesStage(types.StageBuild), AutoAdvanceConfig{
 				DelaySeconds:  1,
 				Confidence:    0.85,
 				Reason:        "Applied smart Dockerfile defaults",
@@ -351,7 +351,7 @@ func (pm *PromptManager) handleDockerfileStage(ctx context.Context, state *Conve
 
 		response := &ConversationResponse{
 			Message: fmt.Sprintf("%sLet's configure your Dockerfile. You can provide specific settings or type 'skip' to use smart defaults:", progressPrefix),
-			Stage:   types.StageDockerfile,
+			Stage:   convertFromTypesStage(types.StageDockerfile),
 			Status:  ResponseStatusWaitingInput,
 			Form:    form,
 		}
@@ -390,7 +390,7 @@ func (pm *PromptManager) handleCompletedStage(ctx context.Context, state *Conver
    ` + "`kubectl logs -n " + state.Preferences.Namespace + " -l app=" + state.Context["app_name"].(string) + "`" + `
 
 What else would you like to know?`,
-			Stage:  types.StageCompleted,
+			Stage:  convertFromTypesStage(types.StageCompleted),
 			Status: ResponseStatusSuccess,
 			Options: []Option{
 				{ID: "summary", Label: "Show deployment summary"},
@@ -403,7 +403,7 @@ What else would you like to know?`,
 	// Default completed message
 	return &ConversationResponse{
 		Message: "Your containerization journey is complete! 🎉\n\nType 'help' for next steps or 'summary' for a deployment overview.",
-		Stage:   types.StageCompleted,
+		Stage:   convertFromTypesStage(types.StageCompleted),
 		Status:  ResponseStatusSuccess,
 	}
 }

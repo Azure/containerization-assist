@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -64,14 +64,14 @@ func (lm *LabelManager) AddLabels(sessionID string, labels ...string) error {
 	// Validate labels
 	for _, label := range labels {
 		if err := lm.validator.ValidateLabel(label); err != nil {
-			return mcptypes.NewRichError("INVALID_LABEL", fmt.Sprintf("invalid label %q: %v", label, err), "validation_error")
+			return mcp.NewRichError("INVALID_LABEL", fmt.Sprintf("invalid label %q: %v", label, err), "validation_error")
 		}
 	}
 
 	// Get session
 	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	// Add labels (avoiding duplicates)
@@ -93,7 +93,7 @@ func (lm *LabelManager) AddLabels(sessionID string, labels ...string) error {
 		}
 	})
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
 	}
 
 	lm.logger.Info().
@@ -115,7 +115,7 @@ func (lm *LabelManager) RemoveLabels(sessionID string, labels ...string) error {
 	// Get session
 	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	// Create map of labels to remove
@@ -141,7 +141,7 @@ func (lm *LabelManager) RemoveLabels(sessionID string, labels ...string) error {
 		}
 	})
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
 	}
 
 	lm.logger.Info().
@@ -163,14 +163,14 @@ func (lm *LabelManager) SetLabels(sessionID string, labels []string) error {
 	// Validate all labels
 	for _, label := range labels {
 		if err := lm.validator.ValidateLabel(label); err != nil {
-			return mcptypes.NewRichError("INVALID_LABEL", fmt.Sprintf("invalid label %q: %v", label, err), "validation_error")
+			return mcp.NewRichError("INVALID_LABEL", fmt.Sprintf("invalid label %q: %v", label, err), "validation_error")
 		}
 	}
 
 	// Get session
 	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	// Set labels (removing duplicates)
@@ -184,7 +184,7 @@ func (lm *LabelManager) SetLabels(sessionID string, labels []string) error {
 		}
 	})
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
 	}
 
 	lm.logger.Info().
@@ -199,7 +199,7 @@ func (lm *LabelManager) SetLabels(sessionID string, labels []string) error {
 func (lm *LabelManager) GetLabels(sessionID string) ([]string, error) {
 	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
-		return nil, mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return nil, mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	return session.Labels, nil
@@ -215,14 +215,14 @@ func (lm *LabelManager) SetK8sLabels(sessionID string, labels map[string]string)
 	// Validate K8s labels
 	for key, value := range labels {
 		if err := lm.validator.ValidateK8sLabel(key, value); err != nil {
-			return mcptypes.NewRichError("INVALID_K8S_LABEL", fmt.Sprintf("invalid K8s label %q=%q: %v", key, value, err), "validation_error")
+			return mcp.NewRichError("INVALID_K8S_LABEL", fmt.Sprintf("invalid K8s label %q=%q: %v", key, value, err), "validation_error")
 		}
 	}
 
 	// Get session
 	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	// Initialize K8sLabels if nil
@@ -242,7 +242,7 @@ func (lm *LabelManager) SetK8sLabels(sessionID string, labels map[string]string)
 		}
 	})
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
 	}
 
 	lm.logger.Info().
@@ -268,7 +268,7 @@ func (lm *LabelManager) RemoveK8sLabel(sessionID string, key string) error {
 	// Get session
 	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	// Remove K8s label
@@ -283,7 +283,7 @@ func (lm *LabelManager) RemoveK8sLabel(sessionID string, key string) error {
 		}
 	})
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_SAVE_FAILED", fmt.Sprintf("failed to save session: %v", err), "session_error")
 	}
 
 	lm.logger.Info().
@@ -298,7 +298,7 @@ func (lm *LabelManager) RemoveK8sLabel(sessionID string, key string) error {
 func (lm *LabelManager) GetK8sLabels(sessionID string) (map[string]string, error) {
 	session, err := lm.sessionManager.GetSessionConcrete(sessionID)
 	if err != nil {
-		return nil, mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return nil, mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	if session.K8sLabels == nil {
@@ -311,24 +311,24 @@ func (lm *LabelManager) GetK8sLabels(sessionID string) (map[string]string, error
 // ValidateLabel validates a session label
 func (v *LabelValidator) ValidateLabel(label string) error {
 	if len(label) == 0 {
-		return mcptypes.NewRichError("EMPTY_LABEL", "label cannot be empty", "validation_error")
+		return mcp.NewRichError("EMPTY_LABEL", "label cannot be empty", "validation_error")
 	}
 
 	if len(label) > v.MaxLabelLength {
-		return mcptypes.NewRichError("LABEL_TOO_LONG", fmt.Sprintf("label exceeds maximum length of %d characters", v.MaxLabelLength), "validation_error")
+		return mcp.NewRichError("LABEL_TOO_LONG", fmt.Sprintf("label exceeds maximum length of %d characters", v.MaxLabelLength), "validation_error")
 	}
 
 	// Check if label is forbidden
 	for _, forbidden := range v.ForbiddenLabels {
 		if label == forbidden {
-			return mcptypes.NewRichError("FORBIDDEN_LABEL", fmt.Sprintf("label %q is forbidden", label), "validation_error")
+			return mcp.NewRichError("FORBIDDEN_LABEL", fmt.Sprintf("label %q is forbidden", label), "validation_error")
 		}
 	}
 
 	// Check reserved prefixes
 	for _, reserved := range v.ReservedPrefixes {
 		if strings.HasPrefix(label, reserved) {
-			return mcptypes.NewRichError("RESERVED_LABEL_PREFIX", fmt.Sprintf("label uses reserved prefix %q", reserved), "validation_error")
+			return mcp.NewRichError("RESERVED_LABEL_PREFIX", fmt.Sprintf("label uses reserved prefix %q", reserved), "validation_error")
 		}
 	}
 
@@ -341,7 +341,7 @@ func (v *LabelValidator) ValidateLabel(label string) error {
 
 			if pattern, exists := v.LabelPatterns[prefix]; exists {
 				if !pattern.MatchString(value) {
-					return mcptypes.NewRichError("INVALID_LABEL_PATTERN", fmt.Sprintf("label value %q does not match required pattern for prefix %q", value, prefix), "validation_error")
+					return mcp.NewRichError("INVALID_LABEL_PATTERN", fmt.Sprintf("label value %q does not match required pattern for prefix %q", value, prefix), "validation_error")
 				}
 			}
 		}
@@ -354,26 +354,26 @@ func (v *LabelValidator) ValidateLabel(label string) error {
 func (v *LabelValidator) ValidateK8sLabel(key, value string) error {
 	// Validate key
 	if len(key) == 0 {
-		return mcptypes.NewRichError("EMPTY_K8S_LABEL_KEY", "K8s label key cannot be empty", "validation_error")
+		return mcp.NewRichError("EMPTY_K8S_LABEL_KEY", "K8s label key cannot be empty", "validation_error")
 	}
 
 	if len(key) > v.MaxLabelLength {
-		return mcptypes.NewRichError("K8S_LABEL_KEY_TOO_LONG", fmt.Sprintf("K8s label key exceeds maximum length of %d characters", v.MaxLabelLength), "validation_error")
+		return mcp.NewRichError("K8S_LABEL_KEY_TOO_LONG", fmt.Sprintf("K8s label key exceeds maximum length of %d characters", v.MaxLabelLength), "validation_error")
 	}
 
 	// Validate value
 	if len(value) > v.MaxValueLength {
-		return mcptypes.NewRichError("K8S_LABEL_VALUE_TOO_LONG", fmt.Sprintf("K8s label value exceeds maximum length of %d characters", v.MaxValueLength), "validation_error")
+		return mcp.NewRichError("K8S_LABEL_VALUE_TOO_LONG", fmt.Sprintf("K8s label value exceeds maximum length of %d characters", v.MaxValueLength), "validation_error")
 	}
 
 	// Check Kubernetes label naming conventions (simplified)
 	k8sLabelRegex := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-_\.]*[a-zA-Z0-9])?)?$`)
 	if !k8sLabelRegex.MatchString(key) {
-		return mcptypes.NewRichError("INVALID_K8S_LABEL_KEY_FORMAT", fmt.Sprintf("K8s label key %q does not follow Kubernetes naming conventions", key), "validation_error")
+		return mcp.NewRichError("INVALID_K8S_LABEL_KEY_FORMAT", fmt.Sprintf("K8s label key %q does not follow Kubernetes naming conventions", key), "validation_error")
 	}
 
 	if value != "" && !k8sLabelRegex.MatchString(value) {
-		return mcptypes.NewRichError("INVALID_K8S_LABEL_VALUE_FORMAT", fmt.Sprintf("K8s label value %q does not follow Kubernetes naming conventions", value), "validation_error")
+		return mcp.NewRichError("INVALID_K8S_LABEL_VALUE_FORMAT", fmt.Sprintf("K8s label value %q does not follow Kubernetes naming conventions", value), "validation_error")
 	}
 
 	return nil

@@ -3,12 +3,13 @@ package orchestration
 import (
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -16,7 +17,7 @@ import (
 type ToolFactory struct {
 	pipelineOperations mcptypes.PipelineOperations
 	sessionManager     *session.SessionManager
-	analyzer           mcptypes.AIAnalyzer
+	analyzer           mcp.AIAnalyzer
 	analyzerHelper     *AnalyzerHelper
 	logger             zerolog.Logger
 }
@@ -25,7 +26,7 @@ type ToolFactory struct {
 func NewToolFactory(
 	pipelineOperations mcptypes.PipelineOperations,
 	sessionManager *session.SessionManager,
-	analyzer mcptypes.AIAnalyzer,
+	analyzer mcp.AIAnalyzer,
 	logger zerolog.Logger,
 ) *ToolFactory {
 	factory := &ToolFactory{

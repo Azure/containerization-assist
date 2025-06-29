@@ -4,50 +4,36 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 )
 
 // getStageProgress returns a formatted progress indicator for the current stage
-func getStageProgress(currentStage types.ConversationStage) string {
-	stages := []types.ConversationStage{
-		types.StageWelcome,
-		types.StagePreFlight,
-		types.StageInit,
-		types.StageAnalysis,
-		types.StageDockerfile,
-		types.StageBuild,
-		types.StagePush,
-		types.StageManifests,
-		types.StageDeployment,
-		types.StageCompleted,
+func getStageProgress(currentStage mcp.ConversationStage) string {
+	// Map the simplified mcp stages to detailed progress
+	progressMap := map[mcp.ConversationStage]int{
+		mcp.ConversationStageAnalyze: 4, // Maps to analysis stage
+		mcp.ConversationStageBuild:   6, // Maps to build stage
+		mcp.ConversationStageDeploy:  8, // Maps to deployment stage
+		mcp.ConversationStageScan:    9, // Maps to scan stage
 	}
 
 	currentStep := 1
-	totalSteps := len(stages)
+	totalSteps := 10
 
-	for i, stage := range stages {
-		if stage == currentStage {
-			currentStep = i + 1
-			break
-		}
+	if step, exists := progressMap[currentStage]; exists {
+		currentStep = step
 	}
 
 	return fmt.Sprintf("[Step %d/%d]", currentStep, totalSteps)
 }
 
 // getStageIntro returns a short introductory message for each stage
-func getStageIntro(stage types.ConversationStage) string {
-	intros := map[types.ConversationStage]string{
-		types.StageWelcome:    "Welcome! Let's containerize your application.",
-		types.StagePreFlight:  "Running pre-flight checks to ensure everything is ready.",
-		types.StageInit:       "Initializing session and gathering preferences.",
-		types.StageAnalysis:   "Analyzing your repository to understand the project structure.",
-		types.StageDockerfile: "Creating an optimized Dockerfile for your application.",
-		types.StageBuild:      "Building your Docker image with the generated Dockerfile.",
-		types.StagePush:       "Pushing the built image to your container registry.",
-		types.StageManifests:  "Generating Kubernetes manifests for deployment.",
-		types.StageDeployment: "Deploying your application to the Kubernetes cluster.",
-		types.StageCompleted:  "Containerization complete! Your application is ready.",
+func getStageIntro(stage mcp.ConversationStage) string {
+	intros := map[mcp.ConversationStage]string{
+		mcp.ConversationStageAnalyze: "Analyzing your repository to understand the project structure.",
+		mcp.ConversationStageBuild:   "Building your Docker image with the generated Dockerfile.",
+		mcp.ConversationStageDeploy:  "Deploying your application to the Kubernetes cluster.",
+		mcp.ConversationStageScan:    "Running security scans on your container image.",
 	}
 
 	if intro, exists := intros[stage]; exists {

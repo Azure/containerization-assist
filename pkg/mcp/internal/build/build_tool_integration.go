@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -19,7 +20,7 @@ type BuildImageWithFixes struct {
 }
 
 // NewBuildImageWithFixes creates a build tool with integrated fixing
-func NewBuildImageWithFixes(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *BuildImageWithFixes {
+func NewBuildImageWithFixes(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *BuildImageWithFixes {
 	return &BuildImageWithFixes{
 		fixingMixin: NewAtomicToolFixingMixin(analyzer, "atomic_build_image", logger),
 		logger:      logger.With().Str("component", "build_image_with_fixes").Logger(),
@@ -71,7 +72,7 @@ func (op *IntegratedDockerBuildOperation) ExecuteOnce(ctx context.Context) error
 		Msg("Executing Docker build")
 	// Check if Dockerfile exists
 	if _, err := os.Stat(op.DockerfilePath); os.IsNotExist(err) {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "DOCKERFILE_NOT_FOUND",
 			Type:     "dockerfile_error",
 			Severity: "High",
@@ -85,16 +86,16 @@ func (op *IntegratedDockerBuildOperation) ExecuteOnce(ctx context.Context) error
 }
 
 // GetFailureAnalysis analyzes why the Docker build failed
-func (op *IntegratedDockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
+func (op *IntegratedDockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
 	op.logger.Debug().Err(err).Msg("Analyzing Docker build failure")
 	// If it's already a RichError, return it
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		return richErr, nil
 	}
 	// Analyze the error message to categorize the failure
 	errorMsg := err.Error()
 	if strings.Contains(errorMsg, "no such file or directory") {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "FILE_NOT_FOUND",
 			Type:     "dockerfile_error",
 			Severity: "High",
@@ -102,7 +103,7 @@ func (op *IntegratedDockerBuildOperation) GetFailureAnalysis(ctx context.Context
 		}, nil
 	}
 	if strings.Contains(errorMsg, "unable to find image") {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "BASE_IMAGE_NOT_FOUND",
 			Type:     "dependency_error",
 			Severity: "High",
@@ -110,7 +111,7 @@ func (op *IntegratedDockerBuildOperation) GetFailureAnalysis(ctx context.Context
 		}, nil
 	}
 	if strings.Contains(errorMsg, "package not found") || strings.Contains(errorMsg, "command not found") {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "PACKAGE_INSTALL_FAILED",
 			Type:     "dependency_error",
 			Severity: "Medium",
@@ -118,7 +119,7 @@ func (op *IntegratedDockerBuildOperation) GetFailureAnalysis(ctx context.Context
 		}, nil
 	}
 	// Default categorization
-	return &mcptypes.RichError{
+	return &mcp.RichError{
 		Code:     "BUILD_FAILED",
 		Type:     "build_error",
 		Severity: "High",
@@ -127,7 +128,7 @@ func (op *IntegratedDockerBuildOperation) GetFailureAnalysis(ctx context.Context
 }
 
 // PrepareForRetry applies fixes and prepares for the next build attempt
-func (op *IntegratedDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_strategy", fixAttempt.FixStrategy.Name).
 		Msg("Preparing for retry after fix")
@@ -148,7 +149,7 @@ func (op *IntegratedDockerBuildOperation) PrepareForRetry(ctx context.Context, f
 }
 
 // applyDockerfileFix applies fixes to the Dockerfile
-func (op *IntegratedDockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	if fixAttempt.FixedContent == "" {
 		return fmt.Errorf("no fixed Dockerfile content provided")
 	}
@@ -169,7 +170,7 @@ func (op *IntegratedDockerBuildOperation) applyDockerfileFix(ctx context.Context
 }
 
 // applyDependencyFix applies dependency-related fixes
-func (op *IntegratedDockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_type", "dependency").
 		Int("file_changes", len(fixAttempt.FixStrategy.FileChanges)).
@@ -195,7 +196,7 @@ func (op *IntegratedDockerBuildOperation) applyDependencyFix(ctx context.Context
 }
 
 // applyConfigFix applies configuration-related fixes
-func (op *IntegratedDockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_type", "config").
 		Int("file_changes", len(fixAttempt.FixStrategy.FileChanges)).
@@ -220,7 +221,7 @@ func (op *IntegratedDockerBuildOperation) applyConfigFix(ctx context.Context, fi
 }
 
 // applyGenericFix applies generic fixes
-func (op *IntegratedDockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *IntegratedDockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	// Generic fix application
 	if fixAttempt.FixedContent != "" {
 		return op.applyDockerfileFix(ctx, fixAttempt)

@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	types "github.com/Azure/container-kit/pkg/mcp"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
-	types "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -231,14 +232,14 @@ func (t *PushImageTool) extractRegistry(imageRef string) string {
 // validateImageRef validates an image reference format
 func (t *PushImageTool) validateImageRef(imageRef string) error {
 	if imageRef == "" {
-		return mcptypes.NewRichError(
+		return mcp.NewRichError(
 			"INVALID_ARGUMENTS",
 			"image reference cannot be empty",
 			"validation_error",
 		)
 	}
 	if !strings.Contains(imageRef, ":") {
-		return mcptypes.NewRichError(
+		return mcp.NewRichError(
 			"INVALID_ARGUMENTS",
 			"image reference missing tag",
 			"validation_error",
@@ -246,7 +247,7 @@ func (t *PushImageTool) validateImageRef(imageRef string) error {
 	}
 	// Basic validation - in real implementation, this would be more thorough
 	if strings.Contains(imageRef, " ") {
-		return mcptypes.NewRichError(
+		return mcp.NewRichError(
 			"INVALID_ARGUMENTS",
 			"image reference cannot contain spaces",
 			"validation_error",
@@ -373,13 +374,13 @@ func (t *PushImageTool) Execute(ctx context.Context, args interface{}) (interfac
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &pushArgs); err != nil {
-			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
+			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
 		}
 	default:
-		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
+		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
 	}
 	// Call the typed execute method
 	return t.ExecuteTyped(ctx, pushArgs)
@@ -395,27 +396,27 @@ func (t *PushImageTool) Validate(ctx context.Context, args interface{}) error {
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &pushArgs); err != nil {
-			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
+			return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for push_image", "validation_error")
 		}
 	default:
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for push_image", "validation_error")
 	}
 	// Validate required fields
 	if pushArgs.SessionID == "" {
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
 	}
 	if pushArgs.ImageRef.Repository == "" {
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "image_ref.repository is required", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "image_ref.repository is required", "validation_error")
 	}
 	return nil
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *PushImageTool) GetMetadata() types.ToolMetadata {
-	return types.ToolMetadata{
+func (t *PushImageTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:         "push_image",
 		Description:  "Pushes Docker images to container registries with retry and authentication support",
 		Version:      "1.0.0",

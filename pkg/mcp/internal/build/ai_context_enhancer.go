@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -333,10 +333,10 @@ func (e *AIContextEnhancer) analyzeError(err error, _ string) *ErrorContextInfo 
 		ErrorMetadata:     make(map[string]interface{}),
 	}
 	// Analyze error type and severity
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		errorInfo.ErrorType = richErr.Type
 		errorInfo.ErrorSeverity = richErr.Severity
-	} else if mcpRichErr, ok := err.(*mcptypes.RichError); ok {
+	} else if mcpRichErr, ok := err.(*mcp.RichError); ok {
 		errorInfo.ErrorType = mcpRichErr.Type
 		errorInfo.ErrorSeverity = mcpRichErr.Severity
 	} else {

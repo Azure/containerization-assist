@@ -1,46 +1,62 @@
-// Package mcp provides a minimal public API surface for the MCP server.
-// Only essential types and functions are exposed publicly.
+// Package mcp provides unified interfaces and types for the MCP server.
+// This package contains only interface definitions and types.
+// Implementations are in internal packages.
 //
-// This package exposes:
-//   - Server: The main MCP server type
-//   - ServerConfig: Server configuration
-//   - ConversationConfig: Conversation mode configuration
-//   - NewServer: Server constructor
-//   - DefaultServerConfig: Default configuration factory
-//
-// All other types and implementation details are internal.
+// According to the interface unification architecture, this package should NOT
+// import from internal packages to avoid import cycles.
 package mcp
 
 import (
-	"context"
-
-	"github.com/Azure/container-kit/pkg/mcp/internal/core"
+	"os"
+	"path/filepath"
+	"time"
 )
 
-// Essential Public API Types
+// Note: NewServer has been moved to the factory package to avoid import cycles
+// Use github.com/Azure/container-kit/pkg/mcp/factory.NewServer instead
 
-// Server represents the MCP server.
-// Use NewServer() to create a new instance.
-type Server = core.Server
-
-// ServerConfig holds configuration for the MCP server.
-// Use DefaultServerConfig() to get default values.
-type ServerConfig = core.ServerConfig
-
-// ConversationConfig holds configuration for conversation mode.
-// Used with Server.EnableConversationMode().
-type ConversationConfig = core.ConversationConfig
-
-// Essential Public API Functions
-
-// NewServer creates a new MCP server with the given configuration.
-// This is the primary entry point for creating MCP servers.
-func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
-	return core.NewServer(ctx, config)
-}
-
-// DefaultServerConfig returns a default server configuration.
-// Modify the returned config as needed before passing to NewServer().
+// DefaultServerConfig returns the default server configuration
 func DefaultServerConfig() ServerConfig {
-	return core.DefaultServerConfig()
+	homeDir, _ := os.UserHomeDir()
+	defaultWorkspace := filepath.Join(homeDir, ".container-kit", "workspace")
+	defaultStore := filepath.Join(homeDir, ".container-kit", "sessions.db")
+
+	return ServerConfig{
+		// Session management
+		WorkspaceDir:      defaultWorkspace,
+		MaxSessions:       100,
+		SessionTTL:        24 * time.Hour,
+		MaxDiskPerSession: 1 << 30,  // 1GB
+		TotalDiskLimit:    10 << 30, // 10GB
+
+		// Storage
+		StorePath: defaultStore,
+
+		// Transport
+		TransportType: "stdio",
+		HTTPAddr:      "localhost",
+		HTTPPort:      8080,
+
+		// Features
+		SandboxEnabled: false,
+
+		// Logging
+		LogLevel:       "info",
+		LogHTTPBodies:  false,
+		MaxBodyLogSize: 1 << 20, // 1MB
+
+		// Cleanup
+		CleanupInterval: 1 * time.Hour,
+
+		// Job Management
+		MaxWorkers: 10,
+		JobTTL:     1 * time.Hour,
+
+		// OpenTelemetry defaults
+		EnableOTEL:      false,
+		ServiceName:     "container-kit-mcp",
+		ServiceVersion:  "dev",
+		Environment:     "development",
+		TraceSampleRate: 1.0,
+	}
 }

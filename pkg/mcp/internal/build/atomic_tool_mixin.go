@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -16,7 +17,7 @@ type AtomicToolFixingMixin struct {
 }
 
 // NewAtomicToolFixingMixin creates a new fixing mixin
-func NewAtomicToolFixingMixin(analyzer mcptypes.AIAnalyzer, toolName string, logger zerolog.Logger) *AtomicToolFixingMixin {
+func NewAtomicToolFixingMixin(analyzer mcp.AIAnalyzer, toolName string, logger zerolog.Logger) *AtomicToolFixingMixin {
 	return &AtomicToolFixingMixin{
 		fixer:  NewAnalyzerIntegratedFixer(analyzer, logger),
 		config: GetEnhancedConfiguration(toolName),
@@ -128,7 +129,7 @@ func (m *AtomicToolFixingMixin) AnalyzeError(ctx context.Context, sessionID stri
 }
 
 // shouldAttemptFix determines if fixing should be attempted based on error characteristics
-func (m *AtomicToolFixingMixin) shouldAttemptFix(richError *mcptypes.RichError) bool {
+func (m *AtomicToolFixingMixin) shouldAttemptFix(richError *mcp.RichError) bool {
 	// Don't attempt fixing for certain error types
 	nonFixableTypes := []string{
 		"permission_denied",
@@ -156,16 +157,16 @@ func (m *AtomicToolFixingMixin) shouldAttemptFix(richError *mcptypes.RichError) 
 // BuildOperationWrapper wraps build operations with fixing capabilities
 type BuildOperationWrapper struct {
 	originalOperation func(ctx context.Context) error
-	failureAnalyzer   func(ctx context.Context, err error) (*mcptypes.RichError, error)
-	retryPreparer     func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error
+	failureAnalyzer   func(ctx context.Context, err error) (*mcp.RichError, error)
+	retryPreparer     func(ctx context.Context, fixAttempt *mcp.FixAttempt) error
 	logger            zerolog.Logger
 }
 
 // NewBuildOperationWrapper creates a wrapper for build operations
 func NewBuildOperationWrapper(
 	operation func(ctx context.Context) error,
-	analyzer func(ctx context.Context, err error) (*mcptypes.RichError, error),
-	preparer func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error,
+	analyzer func(ctx context.Context, err error) (*mcp.RichError, error),
+	preparer func(ctx context.Context, fixAttempt *mcp.FixAttempt) error,
 	logger zerolog.Logger,
 ) *BuildOperationWrapper {
 	return &BuildOperationWrapper{
@@ -182,12 +183,12 @@ func (w *BuildOperationWrapper) ExecuteOnce(ctx context.Context) error {
 }
 
 // GetFailureAnalysis implements mcptypes.FixableOperation
-func (w *BuildOperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
+func (w *BuildOperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
 	if w.failureAnalyzer != nil {
 		return w.failureAnalyzer(ctx, err)
 	}
 	// Default analysis
-	return &mcptypes.RichError{
+	return &mcp.RichError{
 		Code:     "OPERATION_FAILED",
 		Type:     "build_error",
 		Severity: "High",
@@ -196,7 +197,7 @@ func (w *BuildOperationWrapper) GetFailureAnalysis(ctx context.Context, err erro
 }
 
 // PrepareForRetry implements mcptypes.FixableOperation
-func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	if w.retryPreparer != nil {
 		return w.retryPreparer(ctx, fixAttempt)
 	}
@@ -215,10 +216,10 @@ func (w *BuildOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt 
 //         func(ctx context.Context) error {
 //             return t.executeCoreOperation(ctx, args)
 //         },
-//         func(ctx context.Context, err error) (*mcptypes.RichError, error) {
+//         func(ctx context.Context, err error) (*mcp.RichError, error) {
 //             return t.analyzeFailure(ctx, err, args)
 //         },
-//         func(ctx context.Context, fixAttempt *fixing.mcptypes.FixAttempt) error {
+//         func(ctx context.Context, fixAttempt *fixing.mcp.FixAttempt) error {
 //             return t.applyFix(ctx, fixAttempt, args)
 //         },
 //         t.logger,

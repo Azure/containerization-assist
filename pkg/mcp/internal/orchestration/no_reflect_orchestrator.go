@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -26,7 +27,7 @@ type AtomicAnalyzeRepositoryArgs struct {
 type NoReflectToolOrchestrator struct {
 	toolRegistry       *MCPToolRegistry
 	sessionManager     SessionManager
-	analyzer           mcptypes.AIAnalyzer
+	analyzer           mcp.AIAnalyzer
 	logger             zerolog.Logger
 	toolFactory        *ToolFactory
 	pipelineOperations interface{}
@@ -76,7 +77,7 @@ func (o *NoReflectToolOrchestrator) SetToolFactory(factory *ToolFactory) {
 }
 
 // SetAnalyzer sets the AI analyzer for tool fixing capabilities
-func (o *NoReflectToolOrchestrator) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+func (o *NoReflectToolOrchestrator) SetAnalyzer(analyzer mcp.AIAnalyzer) {
 	o.analyzer = analyzer
 	// Tool factory recreation disabled due to import cycle prevention
 	o.logger.Debug().Msg("Tool factory recreation disabled - analyzer set for future factory creation")
@@ -92,7 +93,7 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 	// Get the args map
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS_TYPE", "arguments must be a map[string]interface{}", "validation_error")
+		return nil, mcp.NewRichError("INVALID_ARGUMENTS_TYPE", "arguments must be a map[string]interface{}", "validation_error")
 	}
 
 	// Type-safe dispatch based on tool name
@@ -122,7 +123,7 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 	case "validate_dockerfile_atomic":
 		return o.executeValidateDockerfile(ctx, argsMap)
 	default:
-		return nil, mcptypes.NewRichError("UNKNOWN_TOOL", fmt.Sprintf("unknown tool: %s", toolName), "tool_error")
+		return nil, mcp.NewRichError("UNKNOWN_TOOL", fmt.Sprintf("unknown tool: %s", toolName), "tool_error")
 	}
 }
 
@@ -135,48 +136,48 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 
 	// Check for session_id (required for all tools)
 	if _, exists := argsMap["session_id"]; !exists {
-		return mcptypes.NewRichError("SESSION_ID_REQUIRED", fmt.Sprintf("session_id is required for tool %s", toolName), "validation_error")
+		return mcp.NewRichError("SESSION_ID_REQUIRED", fmt.Sprintf("session_id is required for tool %s", toolName), "validation_error")
 	}
 
 	// Tool-specific validation
 	switch toolName {
 	case "analyze_repository_atomic":
 		if _, exists := argsMap["repo_url"]; !exists {
-			return mcptypes.NewRichError("REPO_URL_REQUIRED", "repo_url is required for analyze_repository_atomic", "validation_error")
+			return mcp.NewRichError("REPO_URL_REQUIRED", "repo_url is required for analyze_repository_atomic", "validation_error")
 		}
 	case "build_image_atomic":
 		if _, exists := argsMap["image_name"]; !exists {
-			return mcptypes.NewRichError("IMAGE_NAME_REQUIRED", "image_name is required for build_image_atomic", "validation_error")
+			return mcp.NewRichError("IMAGE_NAME_REQUIRED", "image_name is required for build_image_atomic", "validation_error")
 		}
 	case "push_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for push_image_atomic", "validation_error")
+			return mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for push_image_atomic", "validation_error")
 		}
 	case "pull_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for pull_image_atomic", "validation_error")
+			return mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for pull_image_atomic", "validation_error")
 		}
 	case "tag_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for tag_image_atomic", "validation_error")
+			return mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for tag_image_atomic", "validation_error")
 		}
 		if _, exists := argsMap["new_tag"]; !exists {
-			return mcptypes.NewRichError("NEW_TAG_REQUIRED", "new_tag is required for tag_image_atomic", "validation_error")
+			return mcp.NewRichError("NEW_TAG_REQUIRED", "new_tag is required for tag_image_atomic", "validation_error")
 		}
 	case "scan_image_security_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for scan_image_security_atomic", "validation_error")
+			return mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for scan_image_security_atomic", "validation_error")
 		}
 	case "generate_manifests_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return mcptypes.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for generate_manifests_atomic", "validation_error")
+			return mcp.NewRichError("IMAGE_REF_REQUIRED", "image_ref is required for generate_manifests_atomic", "validation_error")
 		}
 		if _, exists := argsMap["app_name"]; !exists {
-			return mcptypes.NewRichError("APP_NAME_REQUIRED", "app_name is required for generate_manifests_atomic", "validation_error")
+			return mcp.NewRichError("APP_NAME_REQUIRED", "app_name is required for generate_manifests_atomic", "validation_error")
 		}
 	case "deploy_kubernetes_atomic":
 		if _, exists := argsMap["manifest_path"]; !exists {
-			return mcptypes.NewRichError("MANIFEST_PATH_REQUIRED", "manifest_path is required for deploy_kubernetes_atomic", "validation_error")
+			return mcp.NewRichError("MANIFEST_PATH_REQUIRED", "manifest_path is required for deploy_kubernetes_atomic", "validation_error")
 		}
 	}
 
@@ -187,7 +188,7 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 
 func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, mcptypes.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
+		return nil, mcp.NewRichError("TOOL_FACTORY_NOT_INITIALIZED", "tool factory not initialized", "configuration_error")
 	}
 
 	// Convert args to typed struct

@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -40,14 +40,14 @@ func (a *GoMCPProgressAdapter) ReportStage(stageProgress float64, message string
 	for i := 0; i < a.current; i++ {
 		if stage, ok := a.stages[i].(interface{ GetWeight() float64 }); ok {
 			overallProgress += stage.GetWeight()
-		} else if stage, ok := a.stages[i].(mcptypes.ProgressStage); ok {
+		} else if stage, ok := a.stages[i].(mcp.ProgressStage); ok {
 			overallProgress += stage.Weight
 		}
 	}
 	if a.current < len(a.stages) {
 		if stage, ok := a.stages[a.current].(interface{ GetWeight() float64 }); ok {
 			overallProgress += stage.GetWeight() * stageProgress
-		} else if stage, ok := a.stages[a.current].(mcptypes.ProgressStage); ok {
+		} else if stage, ok := a.stages[a.current].(mcp.ProgressStage); ok {
 			overallProgress += stage.Weight * stageProgress
 		}
 	}
@@ -79,13 +79,13 @@ func (a *GoMCPProgressAdapter) ReportOverall(progress float64, message string) {
 }
 
 // GetCurrentStage implements mcptypes.ProgressReporter
-func (a *GoMCPProgressAdapter) GetCurrentStage() (int, mcptypes.ProgressStage) {
+func (a *GoMCPProgressAdapter) GetCurrentStage() (int, mcp.ProgressStage) {
 	if a.current >= 0 && a.current < len(a.stages) {
-		if stage, ok := a.stages[a.current].(mcptypes.ProgressStage); ok {
+		if stage, ok := a.stages[a.current].(mcp.ProgressStage); ok {
 			return a.current, stage
 		}
 	}
-	return 0, mcptypes.ProgressStage{}
+	return 0, mcp.ProgressStage{}
 }
 
 // Complete finalizes the progress tracking
@@ -118,7 +118,7 @@ func ExecuteToolWithGoMCPProgress[TArgs any, TResult any](
 		result, err = fallbackFn(ctx, args)
 	} else {
 		var zero TResult
-		return zero, mcptypes.NewRichError("INVALID_ARGUMENTS", "no execution function provided", "validation_error")
+		return zero, mcp.NewRichError("INVALID_ARGUMENTS", "no execution function provided", "validation_error")
 	}
 
 	// Complete progress tracking

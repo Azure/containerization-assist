@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -325,8 +326,8 @@ func (t *ListSessionsTool) sortSessions(sessions []*SessionData, sortBy, sortOrd
 }
 
 // GetMetadata returns comprehensive metadata about the list sessions tool
-func (t *ListSessionsTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *ListSessionsTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:        "list_sessions",
 		Description: "List and filter active sessions with detailed statistics and sorting options",
 		Version:     "1.0.0",

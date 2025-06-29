@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -31,7 +32,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 	// Convert args to map if needed
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "invalid argument type: expected map[string]interface{}", "validation_error")
+		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "invalid argument type: expected map[string]interface{}", "validation_error")
 	}
 
 	// Extract required fields
@@ -44,7 +45,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 	if !ok {
 		repoPath, ok = argsMap["path"].(string) // Try alternative field name
 		if !ok {
-			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "repo_path is required", "validation_error")
+			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "repo_path is required", "validation_error")
 		}
 	}
 
@@ -65,7 +66,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 	// Type assert to get the actual result
 	result, ok := resultInterface.(*AtomicAnalysisResult)
 	if !ok {
-		return nil, mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("unexpected result type: %T", resultInterface), "execution_error")
+		return nil, mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("unexpected result type: %T", resultInterface), "execution_error")
 	}
 
 	// Convert result to legacy format if needed
@@ -91,7 +92,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args interface{}) error {
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "invalid argument type: expected map[string]interface{}", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "invalid argument type: expected map[string]interface{}", "validation_error")
 	}
 
 	// Check required fields - session ID is optional, will be generated if missing
@@ -102,7 +103,7 @@ func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args inter
 	// Check for repo_path or path
 	if repoPath, ok := argsMap["repo_path"].(string); !ok || repoPath == "" {
 		if path, ok := argsMap["path"].(string); !ok || path == "" {
-			return mcptypes.NewRichError("INVALID_ARGUMENTS", "repo_path or path is required", "validation_error")
+			return mcp.NewRichError("INVALID_ARGUMENTS", "repo_path or path is required", "validation_error")
 		}
 	}
 
@@ -110,8 +111,8 @@ func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args inter
 }
 
 // GetMetadata returns the tool metadata
-func (t *AnalyzeRepositoryRedirectTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AnalyzeRepositoryRedirectTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:         "analyze_repository",
 		Description:  "Analyzes a repository to determine language, framework, dependencies, and containerization requirements",
 		Version:      "1.0.0",

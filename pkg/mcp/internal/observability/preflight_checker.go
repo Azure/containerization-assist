@@ -12,9 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/registry"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -131,7 +130,7 @@ func NewPreFlightChecker(logger zerolog.Logger) *PreFlightChecker {
 }
 
 // RunStageChecks executes pre-flight checks for a specific stage
-func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage types.ConversationStage, state *mcptypes.SessionState) (*PreFlightResult, error) {
+func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage mcp.ConversationStage, state *mcp.SessionState) (*PreFlightResult, error) {
 	checks := pfc.getChecksForStage(stage, state)
 	if len(checks) == 0 {
 		return &PreFlightResult{
@@ -145,15 +144,15 @@ func (pfc *PreFlightChecker) RunStageChecks(ctx context.Context, stage types.Con
 }
 
 // getChecksForStage returns checks specific to a stage
-func (pfc *PreFlightChecker) getChecksForStage(stage types.ConversationStage, state *mcptypes.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getChecksForStage(stage mcp.ConversationStage, state *mcp.SessionState) []PreFlightCheck {
 	switch stage {
-	case types.StageBuild:
+	case mcp.ConversationStageBuild:
 		return pfc.getBuildChecks(state)
-	case types.StagePush:
+	case "push":
 		return pfc.getPushChecks(state)
-	case types.StageManifests:
+	case "manifests":
 		return pfc.getManifestChecks(state)
-	case types.StageDeployment:
+	case mcp.ConversationStageDeploy:
 		return pfc.getDeploymentChecks(state)
 	default:
 		return []PreFlightCheck{}
@@ -161,7 +160,7 @@ func (pfc *PreFlightChecker) getChecksForStage(stage types.ConversationStage, st
 }
 
 // getBuildChecks returns pre-flight checks for the build stage
-func (pfc *PreFlightChecker) getBuildChecks(state *mcptypes.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getBuildChecks(state *mcp.SessionState) []PreFlightCheck {
 	checks := []PreFlightCheck{
 		{
 			Name:        "Dockerfile exists",
@@ -169,7 +168,7 @@ func (pfc *PreFlightChecker) getBuildChecks(state *mcptypes.SessionState) []PreF
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if state.DockerfilePath == "" {
-					return mcptypes.NewRichError("DOCKERFILE_NOT_GENERATED", "Dockerfile not generated yet", "validation_error")
+					return mcp.NewRichError("DOCKERFILE_NOT_GENERATED", "Dockerfile not generated yet", "validation_error")
 				}
 				return nil
 			},
@@ -202,7 +201,7 @@ func (pfc *PreFlightChecker) getBuildChecks(state *mcptypes.SessionState) []PreF
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if state.DockerfilePath == "" {
-					return mcptypes.NewRichError("DOCKERFILE_VALIDATION_FAILED", "Dockerfile path is empty", "validation_error")
+					return mcp.NewRichError("DOCKERFILE_VALIDATION_FAILED", "Dockerfile path is empty", "validation_error")
 				}
 				// Could add file existence check here if needed
 				return nil
@@ -216,7 +215,7 @@ func (pfc *PreFlightChecker) getBuildChecks(state *mcptypes.SessionState) []PreF
 }
 
 // getPushChecks returns pre-flight checks for the push stage
-func (pfc *PreFlightChecker) getPushChecks(state *mcptypes.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getPushChecks(state *mcp.SessionState) []PreFlightCheck {
 	checks := []PreFlightCheck{
 		{
 			Name:        "Image built",
@@ -224,7 +223,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcptypes.SessionState) []PreFl
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if !state.ImageBuilt || state.ImageRef == "" {
-					return mcptypes.NewRichError("IMAGE_NOT_BUILT", "Docker image not built yet", "validation_error")
+					return mcp.NewRichError("IMAGE_NOT_BUILT", "Docker image not built yet", "validation_error")
 				}
 				return nil
 			},
@@ -239,7 +238,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcptypes.SessionState) []PreFl
 				// Extract registry from image reference
 				registry := extractRegistry(state.ImageRef)
 				if registry == "" {
-					return mcptypes.NewRichError("NO_REGISTRY_SPECIFIED", "no registry specified", "configuration_error")
+					return mcp.NewRichError("NO_REGISTRY_SPECIFIED", "no registry specified", "configuration_error")
 				}
 
 				// Try to ping the registry using docker
@@ -254,7 +253,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcptypes.SessionState) []PreFl
 					testImage = fmt.Sprintf("%s/hello-world:latest", registry)
 					cmd = exec.CommandContext(ctx, "docker", "manifest", "inspect", testImage)
 					if err := cmd.Run(); err != nil {
-						return mcptypes.NewRichError("REGISTRY_CONNECTION_FAILED", fmt.Sprintf("cannot connect to registry %s: %v", registry, err), "network_error")
+						return mcp.NewRichError("REGISTRY_CONNECTION_FAILED", fmt.Sprintf("cannot connect to registry %s: %v", registry, err), "network_error")
 					}
 				}
 
@@ -280,11 +279,11 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcptypes.SessionState) []PreFl
 			Description: "Ensure image has no critical vulnerabilities",
 			Category:    "security",
 			CheckFunc: func(ctx context.Context) error {
-				if state.SecurityScan.Vulnerabilities.Critical > 0 {
-					return mcptypes.NewRichError("CRITICAL_VULNERABILITIES", fmt.Sprintf("image has %d CRITICAL vulnerabilities", state.SecurityScan.Vulnerabilities.Critical), "security_error")
+				if state.SecurityScan.CriticalCount > 0 {
+					return mcp.NewRichError("CRITICAL_VULNERABILITIES", fmt.Sprintf("image has %d CRITICAL vulnerabilities", state.SecurityScan.CriticalCount), "security_error")
 				}
-				if state.SecurityScan.Vulnerabilities.High > 3 {
-					return mcptypes.NewRichError("HIGH_VULNERABILITIES", fmt.Sprintf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.Vulnerabilities.High), "security_error")
+				if state.SecurityScan.HighCount > 3 {
+					return mcp.NewRichError("HIGH_VULNERABILITIES", fmt.Sprintf("image has %d HIGH vulnerabilities (threshold: 3)", state.SecurityScan.HighCount), "security_error")
 				}
 				return nil
 			},
@@ -297,7 +296,7 @@ func (pfc *PreFlightChecker) getPushChecks(state *mcptypes.SessionState) []PreFl
 }
 
 // getManifestChecks returns pre-flight checks for manifest generation
-func (pfc *PreFlightChecker) getManifestChecks(state *mcptypes.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getManifestChecks(state *mcp.SessionState) []PreFlightCheck {
 	return []PreFlightCheck{
 		{
 			Name:        "Image reference available",
@@ -305,7 +304,7 @@ func (pfc *PreFlightChecker) getManifestChecks(state *mcptypes.SessionState) []P
 			Category:    "docker",
 			CheckFunc: func(ctx context.Context) error {
 				if state.ImageRef == "" {
-					return mcptypes.NewRichError("NO_IMAGE_REFERENCE", "no image reference available", "validation_error")
+					return mcp.NewRichError("NO_IMAGE_REFERENCE", "no image reference available", "validation_error")
 				}
 				return nil
 			},
@@ -316,7 +315,7 @@ func (pfc *PreFlightChecker) getManifestChecks(state *mcptypes.SessionState) []P
 }
 
 // getDeploymentChecks returns pre-flight checks for deployment
-func (pfc *PreFlightChecker) getDeploymentChecks(state *mcptypes.SessionState) []PreFlightCheck {
+func (pfc *PreFlightChecker) getDeploymentChecks(state *mcp.SessionState) []PreFlightCheck {
 	return []PreFlightCheck{
 		{
 			Name:          "Kubernetes connectivity",
@@ -332,7 +331,7 @@ func (pfc *PreFlightChecker) getDeploymentChecks(state *mcptypes.SessionState) [
 			Category:    "kubernetes",
 			CheckFunc: func(ctx context.Context) error {
 				if len(state.ManifestPaths) == 0 {
-					return mcptypes.NewRichError("NO_K8S_MANIFESTS", "no Kubernetes manifests generated", "validation_error")
+					return mcp.NewRichError("NO_K8S_MANIFESTS", "no Kubernetes manifests generated", "validation_error")
 				}
 				return nil
 			},
@@ -478,12 +477,12 @@ func (pfc *PreFlightChecker) checkDockerDaemon(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "version", "--format", "{{.Server.Version}}")
 	output, err := cmd.Output()
 	if err != nil {
-		return mcptypes.NewRichError("DOCKER_DAEMON_NOT_ACCESSIBLE", fmt.Sprintf("Docker daemon not accessible: %v", err), "system_error")
+		return mcp.NewRichError("DOCKER_DAEMON_NOT_ACCESSIBLE", fmt.Sprintf("Docker daemon not accessible: %v", err), "system_error")
 	}
 
 	version := strings.TrimSpace(string(output))
 	if version == "" {
-		return mcptypes.NewRichError("DOCKER_DAEMON_NOT_RUNNING", "Docker daemon not running", "system_error")
+		return mcp.NewRichError("DOCKER_DAEMON_NOT_RUNNING", "Docker daemon not running", "system_error")
 	}
 
 	pfc.logger.Debug().Str("docker_version", version).Msg("Docker daemon check passed")
@@ -495,7 +494,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{.DockerRootDir}}")
 	output, err := cmd.Output()
 	if err != nil {
-		return mcptypes.NewRichError("DOCKER_ROOT_DIR_FAILED", fmt.Sprintf("failed to get Docker root directory: %v", err), "system_error")
+		return mcp.NewRichError("DOCKER_ROOT_DIR_FAILED", fmt.Sprintf("failed to get Docker root directory: %v", err), "system_error")
 	}
 
 	dockerRoot := strings.TrimSpace(string(output))
@@ -511,7 +510,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 		cmd = exec.CommandContext(ctx, "df", "-BG", "/")
 		output, err = cmd.Output()
 		if err != nil {
-			return mcptypes.NewErrorBuilder("disk_space_check_failed", "Failed to check disk space", "system").
+			return mcp.NewErrorBuilder("disk_space_check_failed", "Failed to check disk space", "system").
 				WithSeverity("high").
 				WithOperation("preflight_check").
 				WithStage("disk_space_validation").
@@ -526,7 +525,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 	// Parse df output
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 2 {
-		return mcptypes.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
+		return mcp.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
 			WithSeverity("medium").
 			WithOperation("preflight_check").
 			WithStage("output_parsing").
@@ -540,7 +539,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 	// Parse available space from second line
 	fields := strings.Fields(lines[1])
 	if len(fields) < 4 {
-		return mcptypes.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
+		return mcp.NewErrorBuilder("disk_space_parse_failed", "Unexpected disk space output format", "system").
 			WithSeverity("medium").
 			WithOperation("preflight_check").
 			WithStage("output_parsing").
@@ -556,7 +555,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 	availStr := strings.TrimSuffix(fields[3], "G")
 	availGB, err := strconv.Atoi(availStr)
 	if err != nil {
-		return mcptypes.NewErrorBuilder("disk_space_parse_failed", "Failed to parse available disk space", "system").
+		return mcp.NewErrorBuilder("disk_space_parse_failed", "Failed to parse available disk space", "system").
 			WithSeverity("medium").
 			WithOperation("preflight_check").
 			WithStage("space_calculation").
@@ -570,7 +569,7 @@ func (pfc *PreFlightChecker) checkDockerDiskSpace(ctx context.Context) error {
 
 	const minSpaceGB = 5
 	if availGB < minSpaceGB {
-		return mcptypes.NewErrorBuilder("insufficient_disk_space", "Insufficient disk space for container operations", "resource").
+		return mcp.NewErrorBuilder("insufficient_disk_space", "Insufficient disk space for container operations", "resource").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("space_validation").
@@ -695,7 +694,7 @@ func (pfc *PreFlightChecker) ValidateSpecificRegistry(ctx context.Context, regis
 	// Validate the registry
 	result, err := pfc.registryValidator.ValidateRegistry(ctx, registryURL, creds)
 	if err != nil {
-		return nil, mcptypes.NewErrorBuilder("registry_validation_failed", "Registry validation failed during preflight check", "validation").
+		return nil, mcp.NewErrorBuilder("registry_validation_failed", "Registry validation failed during preflight check", "validation").
 			WithSeverity("high").
 			WithField("registry", registryURL).
 			WithOperation("validate_registry_connection").
@@ -714,7 +713,7 @@ func (pfc *PreFlightChecker) ValidateSpecificRegistry(ctx context.Context, regis
 func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAuthSummary, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, mcptypes.NewErrorBuilder("home_directory_access_failed", "Failed to get user home directory", "system").
+		return nil, mcp.NewErrorBuilder("home_directory_access_failed", "Failed to get user home directory", "system").
 			WithSeverity("high").
 			WithOperation("parse_registry_auth").
 			WithStage("directory_access").
@@ -727,7 +726,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 
 	dockerConfigPath := filepath.Join(homeDir, ".docker", "config.json")
 	if _, err := os.Stat(dockerConfigPath); os.IsNotExist(err) {
-		return nil, mcptypes.NewErrorBuilder("docker_config_missing", "Docker configuration not found", "configuration").
+		return nil, mcp.NewErrorBuilder("docker_config_missing", "Docker configuration not found", "configuration").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("docker_auth_validation").
@@ -742,7 +741,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 	// Parse Docker config to check authentication details
 	configData, err := os.ReadFile(dockerConfigPath)
 	if err != nil {
-		return nil, mcptypes.NewErrorBuilder("docker_config_read_failed", "Failed to read Docker configuration", "configuration").
+		return nil, mcp.NewErrorBuilder("docker_config_read_failed", "Failed to read Docker configuration", "configuration").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("docker_auth_validation").
@@ -755,7 +754,7 @@ func (pfc *PreFlightChecker) parseRegistryAuth(ctx context.Context) (*RegistryAu
 
 	var config DockerConfig
 	if err := json.Unmarshal(configData, &config); err != nil {
-		return nil, mcptypes.NewErrorBuilder("docker_config_parse_failed", "Failed to parse Docker configuration", "configuration").
+		return nil, mcp.NewErrorBuilder("docker_config_parse_failed", "Failed to parse Docker configuration", "configuration").
 			WithSeverity("high").
 			WithOperation("preflight_check").
 			WithStage("docker_auth_validation").
@@ -844,7 +843,7 @@ func (pfc *PreFlightChecker) checkDiskSpace(ctx context.Context) error {
 		cmd = exec.CommandContext(ctx, "df", "-h", "/")
 		output, err = cmd.Output()
 		if err != nil {
-			return mcptypes.NewErrorBuilder("disk_space_check_failed", "Failed to check available disk space", "system").
+			return mcp.NewErrorBuilder("disk_space_check_failed", "Failed to check available disk space", "system").
 				WithSeverity("medium").
 				WithOperation("check_disk_space").
 				WithStage("disk_space_analysis").
@@ -859,7 +858,7 @@ func (pfc *PreFlightChecker) checkDiskSpace(ctx context.Context) error {
 	// Parse output to check available space
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 2 {
-		return mcptypes.NewErrorBuilder("unexpected_df_format", "Unexpected disk usage command output format", "system").
+		return mcp.NewErrorBuilder("unexpected_df_format", "Unexpected disk usage command output format", "system").
 			WithSeverity("medium").
 			WithOperation("check_disk_space").
 			WithStage("output_parsing").
@@ -875,7 +874,7 @@ func (pfc *PreFlightChecker) checkDiskSpace(ctx context.Context) error {
 	// In production, would parse the actual values
 	outputStr := string(output)
 	if strings.Contains(outputStr, "100%") || strings.Contains(outputStr, "99%") || strings.Contains(outputStr, "98%") {
-		return mcptypes.NewErrorBuilder("disk_space_critical", "Disk space critically low", "resource").
+		return mcp.NewErrorBuilder("disk_space_critical", "Disk space critically low", "resource").
 			WithSeverity("critical").
 			WithOperation("check_disk_space").
 			WithStage("space_validation").
@@ -894,7 +893,7 @@ func (pfc *PreFlightChecker) checkKubernetesContext(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "kubectl", "config", "current-context")
 	output, err := cmd.Output()
 	if err != nil {
-		return mcptypes.NewErrorBuilder("kubernetes_context_missing", "No Kubernetes context configured", "configuration").
+		return mcp.NewErrorBuilder("kubernetes_context_missing", "No Kubernetes context configured", "configuration").
 			WithSeverity("high").
 			WithOperation("check_kubernetes_context").
 			WithStage("context_check").
@@ -907,7 +906,7 @@ func (pfc *PreFlightChecker) checkKubernetesContext(ctx context.Context) error {
 
 	context := strings.TrimSpace(string(output))
 	if context == "" {
-		return mcptypes.NewErrorBuilder("kubernetes_context_empty", "No current Kubernetes context set", "configuration").
+		return mcp.NewErrorBuilder("kubernetes_context_empty", "No current Kubernetes context set", "configuration").
 			WithSeverity("high").
 			WithOperation("check_kubernetes_context").
 			WithStage("context_validation").

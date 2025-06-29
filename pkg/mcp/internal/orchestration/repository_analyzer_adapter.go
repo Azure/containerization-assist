@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -22,14 +22,14 @@ type ToolFactoryInterface interface {
 // This adapter prevents circular dependencies between the analyze and build packages
 type RepositoryAnalyzerAdapter struct {
 	toolFactory    ToolFactoryInterface
-	sessionManager mcptypes.ToolSessionManager
+	sessionManager mcp.ToolSessionManager
 	logger         zerolog.Logger
 }
 
 // NewRepositoryAnalyzerAdapter creates a new repository analyzer adapter
 func NewRepositoryAnalyzerAdapter(
 	toolFactory ToolFactoryInterface,
-	sessionManager mcptypes.ToolSessionManager,
+	sessionManager mcp.ToolSessionManager,
 	logger zerolog.Logger,
 ) *RepositoryAnalyzerAdapter {
 	return &RepositoryAnalyzerAdapter{

@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"sync"
 
-	// mcp import removed - using mcptypes
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"
 )
+
+// mcp import removed - using mcptypes
 
 ///////////////////////////////////////////////////////////////////////////////
 // Contracts
@@ -22,7 +22,7 @@ import (
 // UnifiedTool represents the unified interface for all MCP tools (matches mcptypes.Tool)
 type UnifiedTool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
-	GetMetadata() mcptypes.ToolMetadata
+	GetMetadata() mcp.ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
 }
 
@@ -65,11 +65,11 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	defer reg.mu.Unlock()
 
 	if reg.frozen {
-		return mcptypes.NewRichError("INVALID_REQUEST", "tool registry frozen", "system_error")
+		return mcp.NewRichError("INVALID_REQUEST", "tool registry frozen", "system_error")
 	}
 	metadata := t.GetMetadata()
 	if _, dup := reg.tools[metadata.Name]; dup {
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
 	}
 
 	// Use invopop/jsonschema which properly handles array items
@@ -107,7 +107,7 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 		Handler: func(ctx context.Context, raw json.RawMessage) (interface{}, error) {
 			var args TArgs
 			if err := json.Unmarshal(raw, &args); err != nil {
-				return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "unmarshal args: "+err.Error(), "validation_error")
+				return nil, mcp.NewRichError("INVALID_ARGUMENTS", "unmarshal args: "+err.Error(), "validation_error")
 			}
 			if err := t.PreValidate(ctx, args); err != nil {
 				return nil, err
@@ -197,7 +197,7 @@ type LongRunningTool interface {
 func (r *ToolRegistry) ExecuteTool(ctx context.Context, name string, raw json.RawMessage) (interface{}, error) {
 	reg, ok := r.GetTool(name)
 	if !ok {
-		return nil, mcptypes.NewRichError("INVALID_REQUEST", fmt.Sprintf("tool %s not found", name), "validation_error")
+		return nil, mcp.NewRichError("INVALID_REQUEST", fmt.Sprintf("tool %s not found", name), "validation_error")
 	}
 
 	r.logger.Debug().Str("tool", name).Msg("executing tool")

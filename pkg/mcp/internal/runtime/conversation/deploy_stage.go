@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // Helper functions for accessing metadata fields
 
 // getK8sManifestsFromMetadata checks if k8s manifests exist in metadata
-func getK8sManifestsFromMetadata(sessionState *mcptypes.SessionState) map[string]interface{} {
+func getK8sManifestsFromMetadata(sessionState *mcp.SessionState) map[string]interface{} {
 	if sessionState.Metadata == nil {
 		return nil
 	}
@@ -25,7 +25,7 @@ func getK8sManifestsFromMetadata(sessionState *mcptypes.SessionState) map[string
 }
 
 // getDockerfilePushed checks if dockerfile has been pushed from metadata
-func getDockerfilePushed(sessionState *mcptypes.SessionState) bool {
+func getDockerfilePushed(sessionState *mcp.SessionState) bool {
 	if sessionState.Metadata == nil {
 		return false
 	}
@@ -36,7 +36,7 @@ func getDockerfilePushed(sessionState *mcptypes.SessionState) bool {
 }
 
 // getImageRef constructs the appropriate image reference based on push status
-func getImageRef(sessionState *mcptypes.SessionState) string {
+func getImageRef(sessionState *mcp.SessionState) string {
 	imageID := getDockerfileImageID(sessionState)
 	if getDockerfilePushed(sessionState) {
 		registry := getImageRefRegistry(sessionState)
@@ -48,7 +48,7 @@ func getImageRef(sessionState *mcptypes.SessionState) string {
 }
 
 // setK8sManifest stores a manifest in metadata
-func setK8sManifest(sessionState *mcptypes.SessionState, name string, manifest types.K8sManifest) {
+func setK8sManifest(sessionState *mcp.SessionState, name string, manifest types.K8sManifest) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -65,7 +65,7 @@ func setK8sManifest(sessionState *mcptypes.SessionState, name string, manifest t
 }
 
 // getK8sManifestsAsTypes converts metadata manifests to types.K8sManifest format
-func getK8sManifestsAsTypes(sessionState *mcptypes.SessionState) map[string]types.K8sManifest {
+func getK8sManifestsAsTypes(sessionState *mcp.SessionState) map[string]types.K8sManifest {
 	result := make(map[string]types.K8sManifest)
 	manifestsData := getK8sManifestsFromMetadata(sessionState)
 	if manifestsData == nil {
@@ -98,7 +98,7 @@ func getK8sManifestsAsTypes(sessionState *mcptypes.SessionState) map[string]type
 // handleManifestsStage handles Kubernetes manifest generation
 func (pm *PromptManager) handleManifestsStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageManifests), getStageIntro(types.StageManifests))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageManifests)), getStageIntro(convertFromTypesStage(types.StageManifests)))
 
 	// Gather manifest preferences if not set
 	appName, _ := state.Context["app_name"].(string) //nolint:errcheck // Will prompt if empty
@@ -127,7 +127,7 @@ func (pm *PromptManager) gatherManifestPreferences(ctx context.Context, state *C
 	// Create decision point for app configuration
 	decision := &DecisionPoint{
 		ID:       "k8s-config",
-		Stage:    types.StageManifests,
+		Stage:    convertFromTypesStage(types.StageManifests),
 		Question: "Let's configure your Kubernetes deployment. What should we name the application?",
 		Required: true,
 	}
@@ -145,7 +145,7 @@ func (pm *PromptManager) gatherManifestPreferences(ctx context.Context, state *C
 		// Ask for next preference
 		return &ConversationResponse{
 			Message: fmt.Sprintf("App name set to '%s'. How many replicas would you like?", state.Context["app_name"]),
-			Stage:   types.StageManifests,
+			Stage:   convertFromTypesStage(types.StageManifests),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{ID: "1", Label: "1 replica (development)"},
@@ -160,7 +160,7 @@ func (pm *PromptManager) gatherManifestPreferences(ctx context.Context, state *C
 
 	return &ConversationResponse{
 		Message: decision.Question + fmt.Sprintf("\n\nSuggested: %s", suggestedName),
-		Stage:   types.StageManifests,
+		Stage:   convertFromTypesStage(types.StageManifests),
 		Status:  ResponseStatusWaitingInput,
 	}
 }
@@ -168,7 +168,7 @@ func (pm *PromptManager) gatherManifestPreferences(ctx context.Context, state *C
 // generateManifests creates Kubernetes manifests
 func (pm *PromptManager) generateManifests(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StageManifests,
+		Stage:   convertFromTypesStage(types.StageManifests),
 		Status:  ResponseStatusProcessing,
 		Message: "Generating Kubernetes manifests...",
 	}
@@ -206,7 +206,12 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	}
 
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "generate_manifests", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "generate_manifests",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -227,7 +232,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 
 		// Attempt automatic fix before showing manual options
 		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, types.StageManifests, err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(types.StageManifests), err, state) {
 			return response
 		}
 
@@ -241,11 +246,11 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct.Result
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse manifests from result
-	if resultData, ok := result.(map[string]interface{}); ok {
+	if resultData, ok := resultStruct.Result.(map[string]interface{}); ok {
 		if manifests, ok := resultData["manifests"].(map[string]interface{}); ok {
 			for name, content := range manifests {
 				contentStr, ok := content.(string)
@@ -264,7 +269,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 					Type:    "k8s-manifest",
 					Name:    fmt.Sprintf("%s (%s)", name, manifest.Kind),
 					Content: manifest.Content,
-					Stage:   types.StageManifests,
+					Stage:   convertFromTypesStage(types.StageManifests),
 				}
 				state.AddArtifact(artifact)
 			}
@@ -287,7 +292,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 // handleDeploymentStage handles Kubernetes deployment
 func (pm *PromptManager) handleDeploymentStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageDeployment), getStageIntro(types.StageDeployment))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageDeployment)), getStageIntro(convertFromTypesStage(types.StageDeployment)))
 
 	// Check for retry request
 	if strings.Contains(strings.ToLower(input), "retry") {
@@ -319,7 +324,7 @@ func (pm *PromptManager) handleDeploymentStage(ctx context.Context, state *Conve
 // deploymentDryRun performs a dry-run deployment
 func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StageDeployment,
+		Stage:   convertFromTypesStage(types.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Running deployment preview (dry-run)...",
 	}
@@ -335,7 +340,12 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 		"dry_run":    true,
 	}
 
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "deploy_kubernetes",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Dry-run failed: %v", err)
@@ -343,7 +353,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 	}
 
 	// Extract the dry-run preview from the result
-	if toolResult, ok := result.(map[string]interface{}); ok {
+	if toolResult, ok := resultStruct.Result.(map[string]interface{}); ok {
 		dryRunPreview := genericutils.MapGetWithDefault[string](toolResult, "dry_run_preview", "")
 		if dryRunPreview == "" {
 			dryRunPreview = "No changes detected - resources are already up to date"
@@ -371,7 +381,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 // executeDeployment performs the actual Kubernetes deployment
 func (pm *PromptManager) executeDeployment(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StageDeployment,
+		Stage:   convertFromTypesStage(types.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Deploying to Kubernetes cluster...",
 	}
@@ -389,7 +399,12 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	}
 
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "deploy_kubernetes",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -410,7 +425,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 
 		// Attempt automatic fix before showing manual options
 		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, types.StageDeployment, err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(types.StageDeployment), err, state) {
 			return response
 		}
 
@@ -444,7 +459,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct.Result
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Mark manifests as deployed
@@ -458,11 +473,11 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	// Check health if requested
 	waitForReady, _ := state.Context["wait_for_ready"].(bool)   //nolint:errcheck // Defaults to true
 	if waitForReady || state.Context["wait_for_ready"] == nil { // Default to true
-		return pm.checkDeploymentHealth(ctx, state, result)
+		return pm.checkDeploymentHealth(ctx, state, resultStruct.Result)
 	}
 
 	// Success - move to completed
-	state.SetStage(types.StageCompleted)
+	state.SetStage(convertFromTypesStage(types.StageCompleted))
 	response.Status = ResponseStatusSuccess
 	response.Message = pm.formatDeploymentSuccess(state, duration)
 
@@ -472,7 +487,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 // checkDeploymentHealth verifies deployment health
 func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *ConversationState, deployResult interface{}) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StageDeployment,
+		Stage:   convertFromTypesStage(types.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Checking deployment health...",
 	}
@@ -484,7 +499,12 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 		"timeout":    60, // 1 minute for health check
 	}
 
-	_, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "check_health",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	_, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	if err != nil {
 		response.Status = ResponseStatusWarning
 		response.Message = fmt.Sprintf(
@@ -500,7 +520,7 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 	}
 
 	// Health check passed
-	state.SetStage(types.StageCompleted)
+	state.SetStage(convertFromTypesStage(types.StageCompleted))
 	response.Status = ResponseStatusSuccess
 	response.Message = fmt.Sprintf(
 		"✅ Deployment successful and healthy!\n\n"+
@@ -533,7 +553,7 @@ func (pm *PromptManager) handleDeploymentRetry(ctx context.Context, state *Conve
 				"- Checking your Kubernetes cluster connectivity\n" +
 				"- Reviewing the manifest configuration\n" +
 				"- Checking if the image exists and is accessible",
-			Stage:  types.StageDeployment,
+			Stage:  convertFromTypesStage(types.StageDeployment),
 			Status: ResponseStatusError,
 			Options: []Option{
 				{ID: "modify", Label: "Modify manifests"},

@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -128,7 +128,7 @@ func (svm *StandardizedValidationMixin) StandardValidateSession(
 		workspaceDir = sessionWithWorkspace.GetWorkspaceDir()
 	} else {
 		// Fallback: try reflection to extract SessionID field for workspace calculation
-		if sessionStruct, ok := session.(*mcptypes.SessionState); ok {
+		if sessionStruct, ok := session.(*mcp.SessionState); ok {
 			workspaceDir = filepath.Join("/tmp", "sessions", sessionStruct.SessionID)
 		}
 	}
@@ -344,7 +344,7 @@ func (svm *StandardizedValidationMixin) StandardValidateImageRef(
 func (svm *StandardizedValidationMixin) ConvertValidationToRichError(
 	result *ValidationResult,
 	operation, stage string,
-) *mcptypes.RichError {
+) *mcp.RichError {
 	if result.Valid {
 		return nil
 	}
@@ -355,7 +355,7 @@ func (svm *StandardizedValidationMixin) ConvertValidationToRichError(
 	}
 
 	// Create a RichError using the types package instead of the errors package
-	builtError := mcptypes.NewRichError(firstError.Code, firstError.Message, types.ErrTypeValidation)
+	builtError := mcp.NewRichError(firstError.Code, firstError.Message, types.ErrTypeValidation)
 
 	// Manually add context information
 	builtError.Context.Operation = operation
@@ -364,34 +364,22 @@ func (svm *StandardizedValidationMixin) ConvertValidationToRichError(
 	// Add diagnostics for all errors
 	for i, validationError := range result.Errors {
 		if builtError.Context.Metadata == nil {
-			builtError.Context.Metadata = make(map[string]interface{})
+			builtError.Context.Metadata = mcp.NewErrorMetadata("", "", operation)
 		}
-		builtError.Context.Metadata[fmt.Sprintf("validation_error_%d", i)] = fmt.Sprintf("Field: %s, Error: %s", validationError.Field, validationError.Message)
+		builtError.Context.Metadata.AddCustom(fmt.Sprintf("validation_error_%d", i), fmt.Sprintf("Field: %s, Error: %s", validationError.Field, validationError.Message))
 	}
 
 	// Add resolution steps
 	if len(result.Errors) > 0 {
 		builtError.Resolution.ImmediateSteps = append(builtError.Resolution.ImmediateSteps,
-			struct {
-				Order       int    `json:"order"`
-				Action      string `json:"action"`
-				Description string `json:"description"`
-				Command     string `json:"command"`
-				Expected    string `json:"expected"`
-			}{
+			mcp.ResolutionStep{
 				Order:       1,
 				Action:      "Check input parameters",
 				Description: "Check input parameters for correctness",
 				Command:     "",
 				Expected:    "All parameters should be valid",
 			},
-			struct {
-				Order       int    `json:"order"`
-				Action      string `json:"action"`
-				Description string `json:"description"`
-				Command     string `json:"command"`
-				Expected    string `json:"expected"`
-			}{
+			mcp.ResolutionStep{
 				Order:       2,
 				Action:      "Provide required fields",
 				Description: "Ensure all required fields are provided",
@@ -401,13 +389,7 @@ func (svm *StandardizedValidationMixin) ConvertValidationToRichError(
 		)
 		if len(result.Errors) > 1 {
 			builtError.Resolution.ImmediateSteps = append(builtError.Resolution.ImmediateSteps,
-				struct {
-					Order       int    `json:"order"`
-					Action      string `json:"action"`
-					Description string `json:"description"`
-					Command     string `json:"command"`
-					Expected    string `json:"expected"`
-				}{
+				mcp.ResolutionStep{
 					Order:       3,
 					Action:      "Fix validation errors",
 					Description: fmt.Sprintf("Fix all %d validation errors", len(result.Errors)),

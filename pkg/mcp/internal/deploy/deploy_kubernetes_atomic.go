@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/mcp"
+
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -224,16 +226,16 @@ type DeploymentContext struct {
 // AtomicDeployKubernetesTool implements atomic Kubernetes deployment using core operations
 type AtomicDeployKubernetesTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
+	sessionManager  mcp.ToolSessionManager
 	fixingMixin     *build.AtomicToolFixingMixin
-	analyzer        mcptypes.AIAnalyzer
+	analyzer        mcp.AIAnalyzer
 	contextSharer   *build.DefaultContextSharer
 	contextEnhancer *build.AIContextEnhancer
 	logger          zerolog.Logger
 }
 
 // NewAtomicDeployKubernetesTool creates a new atomic deploy Kubernetes tool
-func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
+func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicDeployKubernetesTool {
 	toolLogger := logger.With().Str("tool", "atomic_deploy_kubernetes").Logger()
 
 	contextSharer := build.NewDefaultContextSharer(toolLogger)
@@ -251,7 +253,7 @@ func NewAtomicDeployKubernetesTool(adapter mcptypes.PipelineOperations, sessionM
 }
 
 func (t *AtomicDeployKubernetesTool) SetAnalyzer(analyzer interface{}) {
-	if aiAnalyzer, ok := analyzer.(mcptypes.AIAnalyzer); ok {
+	if aiAnalyzer, ok := analyzer.(mcp.AIAnalyzer); ok {
 		t.analyzer = aiAnalyzer
 		t.fixingMixin = build.NewAtomicToolFixingMixin(aiAnalyzer, "atomic_deploy_kubernetes", t.logger)
 		t.logger.Info().Msg("Deploy tool analyzer and fixing mixin initialized")
@@ -281,9 +283,9 @@ func (t *AtomicDeployKubernetesTool) ExecuteDeploymentWithFixes(ctx context.Cont
 				}
 				return nil
 			},
-			func(_ context.Context, err error) (*mcptypes.RichError, error) {
+			func(_ context.Context, err error) (*mcp.RichError, error) {
 				if result != nil && result.FailureAnalysis != nil {
-					return &mcptypes.RichError{
+					return &mcp.RichError{
 						Code:     "DEPLOYMENT_FAILED",
 						Type:     result.FailureAnalysis.FailureType,
 						Severity: result.FailureAnalysis.ImpactSeverity,
@@ -292,7 +294,7 @@ func (t *AtomicDeployKubernetesTool) ExecuteDeploymentWithFixes(ctx context.Cont
 				}
 				return analyzeDeploymentError(err)
 			},
-			func(_ context.Context, fixAttempt *mcptypes.FixAttempt) error {
+			func(_ context.Context, fixAttempt *mcp.FixAttempt) error {
 				t.logger.Info().
 					Str("fix_strategy", fixAttempt.FixStrategy.Name).
 					Str("session_id", args.SessionID).
@@ -353,7 +355,7 @@ func (t *AtomicDeployKubernetesTool) executeDeploymentCore(ctx context.Context, 
 		result.Success = false
 		return result, fmt.Errorf("failed to get session: %w", err)
 	}
-	session := sessionInterface.(*mcptypes.SessionState)
+	session := sessionInterface.(*mcp.SessionState)
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 
 	if result.AppName == "" {
@@ -432,8 +434,8 @@ func extractAppNameFromImage(imageRef string) string {
 	return "unknown-app"
 }
 
-func (t *AtomicDeployKubernetesTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicDeployKubernetesTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:         "atomic_deploy_kubernetes",
 		Description:  "Deploys containerized applications to Kubernetes with manifest generation, health checks, and rollback support",
 		Version:      "1.0.0",

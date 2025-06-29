@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/mcp"
+	types "github.com/Azure/container-kit/pkg/mcp"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
-	types "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/pipeline"
 	"github.com/Azure/container-kit/pkg/pipeline/dockerstage"
 	"github.com/rs/zerolog"
@@ -331,13 +332,13 @@ func (t *BuildImageTool) Execute(ctx context.Context, args interface{}) (interfa
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &buildArgs); err != nil {
-			return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for build_image", "validation_error")
+			return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for build_image", "validation_error")
 		}
 	default:
-		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
+		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
 	}
 	// Call the typed execute method
 	return t.ExecuteTyped(ctx, buildArgs)
@@ -353,24 +354,24 @@ func (t *BuildImageTool) Validate(ctx context.Context, args interface{}) error {
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return mcp.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
 		}
 		if err = json.Unmarshal(jsonData, &buildArgs); err != nil {
-			return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for build_image", "validation_error")
+			return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for build_image", "validation_error")
 		}
 	default:
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for build_image", "validation_error")
 	}
 	// Validate required fields
 	if buildArgs.SessionID == "" {
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
 	}
 	return nil
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *BuildImageTool) GetMetadata() types.ToolMetadata {
-	return types.ToolMetadata{
+func (t *BuildImageTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:         "build_image",
 		Description:  "Builds Docker images with AI-powered error fixing and iterative optimization",
 		Version:      "1.0.0",

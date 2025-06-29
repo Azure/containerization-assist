@@ -6,10 +6,11 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/Azure/container-kit/pkg/docker" // init docker client
-	_ "github.com/Azure/container-kit/pkg/k8s"    // init k8s client
+	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -47,7 +48,7 @@ func (o *Operations) GetSessionWorkspace(sessionID string) string {
 	}
 
 	// Type assert to get the SessionState
-	if sessionState, ok := session.(*mcptypes.SessionState); ok {
+	if sessionState, ok := session.(*mcp.SessionState); ok {
 		return sessionState.WorkspaceDir
 	}
 	o.logger.Error().Str("session_id", sessionID).Msg("Session type assertion failed")
@@ -60,7 +61,7 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, result int
 	}
 
 	return o.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		sess, ok := s.(*mcptypes.SessionState)
+		sess, ok := s.(*mcp.SessionState)
 		if !ok {
 			return
 		}
@@ -91,8 +92,9 @@ func (o *Operations) BuildDockerImage(sessionID, imageRef, dockerfilePath string
 	ctx := context.Background()
 	buildCtx := filepath.Dir(dockerfilePath)
 
-	// Use the docker client's Build method
-	_, err := o.clients.Docker.Build(ctx, dockerfilePath, imageRef, buildCtx)
+	// Use the docker client's Build method with type assertion
+	dockerClient := o.clients.Docker.(docker.DockerClient)
+	_, err := dockerClient.Build(ctx, dockerfilePath, imageRef, buildCtx)
 	if err != nil {
 		return &mcptypes.BuildResult{
 			Success: false,
@@ -126,7 +128,8 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 
 func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
 	ctx := context.Background()
-	_, err := o.clients.Docker.Push(ctx, imageRef)
+	dockerClient := o.clients.Docker.(docker.DockerClient)
+	_, err := dockerClient.Push(ctx, imageRef)
 	return err
 }
 
@@ -183,10 +186,11 @@ func (o *Operations) DeployToKubernetes(sessionID string, manifests []string) (*
 	namespace := "default"
 
 	for _, manifest := range manifests {
-		if _, err := o.clients.Kube.Apply(ctx, manifest); err != nil {
+		kubeClient := o.clients.Kubernetes.(k8s.KubeRunner)
+		if _, err := kubeClient.Apply(ctx, manifest); err != nil {
 			return &mcptypes.KubernetesDeploymentResult{
 				Success: false,
-				Error: &mcptypes.RichError{
+				Error: &mcp.RichError{
 					Code:     "deploy_failed",
 					Type:     "kubernetes_error",
 					Severity: "high",
@@ -209,7 +213,8 @@ func (o *Operations) CheckApplicationHealth(sessionID, namespace, deploymentName
 
 	// Get pods for the deployment
 	labelSelector := fmt.Sprintf("app=%s", deploymentName)
-	podsOutput, err := o.clients.Kube.GetPods(ctx, namespace, labelSelector)
+	kubeClient := o.clients.Kubernetes.(k8s.KubeRunner)
+	podsOutput, err := kubeClient.GetPods(ctx, namespace, labelSelector)
 	if err != nil {
 		return &mcptypes.HealthCheckResult{
 			Healthy: false,

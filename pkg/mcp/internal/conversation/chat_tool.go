@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -69,8 +70,8 @@ func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatT
 }
 
 // GetMetadata returns comprehensive metadata about the chat tool
-func (ct *ChatTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (ct *ChatTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:        "chat",
 		Description: "Interactive chat tool for conversation mode with AI assistance",
 		Version:     "1.0.0",

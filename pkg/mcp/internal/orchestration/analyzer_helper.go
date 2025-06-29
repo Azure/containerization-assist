@@ -1,25 +1,25 @@
 package orchestration
 
 import (
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // AnalyzerHelper provides common analyzer initialization patterns
 type AnalyzerHelper struct {
-	analyzer              mcptypes.AIAnalyzer
+	analyzer              mcp.AIAnalyzer
 	enhancedBuildAnalyzer *build.EnhancedBuildAnalyzer
 	repositoryAdapter     *RepositoryAnalyzerAdapter
 	toolFactory           *ToolFactory
-	sessionManager        mcptypes.ToolSessionManager
+	sessionManager        mcp.ToolSessionManager
 	logger                zerolog.Logger
 }
 
 // NewAnalyzerHelper creates a new analyzer helper
-func NewAnalyzerHelper(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *AnalyzerHelper {
+func NewAnalyzerHelper(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *AnalyzerHelper {
 	return &AnalyzerHelper{
 		analyzer: analyzer,
 		logger:   logger,
@@ -28,9 +28,9 @@ func NewAnalyzerHelper(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *Ana
 
 // NewAnalyzerHelperWithFactory creates a new analyzer helper with tool factory support
 func NewAnalyzerHelperWithFactory(
-	analyzer mcptypes.AIAnalyzer,
+	analyzer mcp.AIAnalyzer,
 	toolFactory *ToolFactory,
-	sessionManager mcptypes.ToolSessionManager,
+	sessionManager mcp.ToolSessionManager,
 	logger zerolog.Logger,
 ) *AnalyzerHelper {
 	helper := &AnalyzerHelper{

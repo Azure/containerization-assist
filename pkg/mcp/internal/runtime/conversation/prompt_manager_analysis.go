@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/mcp"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
@@ -22,7 +23,7 @@ func (pm *PromptManager) startAnalysisWithFormData(ctx context.Context, state *C
 // startAnalysis initiates repository analysis
 func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationState, repoURL string) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  types.StageAnalysis,
+		Stage:  convertFromTypesStage(types.StageAnalysis),
 		Status: ResponseStatusProcessing,
 	}
 
@@ -44,7 +45,12 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 	}
 
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "analyze_repository", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "analyze_repository",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -66,12 +72,12 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct.Result
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse analysis results
-	if result != nil {
-		if analysis, ok := result.(map[string]interface{}); ok {
+	if resultStruct.Result != nil {
+		if analysis, ok := resultStruct.Result.(map[string]interface{}); ok {
 			if state.SessionState.Metadata == nil {
 				state.SessionState.Metadata = make(map[string]interface{})
 			}
@@ -120,7 +126,7 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 // generateDockerfile creates the Dockerfile
 func (pm *PromptManager) generateDockerfile(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  types.StageDockerfile,
+		Stage:  convertFromTypesStage(types.StageDockerfile),
 		Status: ResponseStatusProcessing,
 	}
 
@@ -135,7 +141,12 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 	}
 
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "generate_dockerfile", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "generate_dockerfile",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -157,12 +168,12 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct.Result
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse Dockerfile result
-	if result != nil {
-		if dockerResult, ok := result.(map[string]interface{}); ok {
+	if resultStruct.Result != nil {
+		if dockerResult, ok := resultStruct.Result.(map[string]interface{}); ok {
 			content := genericutils.MapGetWithDefault[string](dockerResult, "content", "")
 			if content != "" {
 				if state.SessionState.Metadata == nil {
@@ -216,7 +227,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 					Type:    "dockerfile",
 					Name:    path,
 					Content: content,
-					Stage:   types.StageDockerfile,
+					Stage:   convertFromTypesStage(types.StageDockerfile),
 				}
 				state.AddArtifact(artifact)
 
@@ -231,7 +242,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 				response.NextSteps = []string{"Build Docker image", "Review Dockerfile"}
 
 				// Move to next stage
-				state.SetStage(types.StageBuild)
+				state.SetStage(convertFromTypesStage(types.StageBuild))
 			}
 		}
 	}

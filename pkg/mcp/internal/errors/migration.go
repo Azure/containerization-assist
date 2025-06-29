@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // MigrateMCPError converts an MCPError to CoreError
@@ -37,7 +37,7 @@ func MigrateMCPError(mcpErr *mcperrors.MCPError) *CoreError {
 }
 
 // MigrateRichError converts a RichError to CoreError
-func MigrateRichError(richErr *mcptypes.RichError) *CoreError {
+func MigrateRichError(richErr *mcp.RichError) *CoreError {
 	if richErr == nil {
 		return nil
 	}
@@ -65,7 +65,7 @@ func MigrateRichError(richErr *mcptypes.RichError) *CoreError {
 
 	// Basic resolution mapping
 	coreErr.Resolution = &ErrorResolution{
-		Prevention:    []string{richErr.Resolution.Prevention},
+		Prevention:    richErr.Resolution.Prevention,
 		ManualSteps:   richErr.Resolution.ManualSteps,
 		RetryStrategy: mapRetryStrategy(richErr.Resolution.RetryStrategy),
 	}
@@ -233,13 +233,7 @@ func mapAlternatives(alternatives []types.Alternative) []Alternative {
 	return result
 }
 
-func mapRetryStrategy(strategy struct {
-	Recommended     bool     `json:"recommended"`
-	WaitTime        int      `json:"wait_time"`
-	MaxAttempts     int      `json:"max_attempts"`
-	BackoffStrategy string   `json:"backoff_strategy"`
-	Conditions      []string `json:"conditions"`
-}) *RetryStrategy {
+func mapRetryStrategy(strategy mcp.RetryStrategy) *RetryStrategy {
 	if !strategy.Recommended {
 		return nil
 	}
@@ -247,7 +241,7 @@ func mapRetryStrategy(strategy struct {
 	return &RetryStrategy{
 		Retryable:     strategy.Recommended,
 		MaxAttempts:   strategy.MaxAttempts,
-		BackoffMs:     strategy.WaitTime,
+		BackoffMs:     int(strategy.WaitTime.Milliseconds()),
 		ExponentialMs: 0, // Not available in simplified RichError
 		Conditions:    strategy.Conditions,
 	}
@@ -285,7 +279,7 @@ func WrapError(err error, module, operation string) *CoreError {
 	}
 
 	// Check if it's a RichError
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		return MigrateRichError(richErr)
 	}
 
@@ -301,7 +295,7 @@ func IsRetryable(err error) bool {
 	if mcpErr, ok := err.(*mcperrors.MCPError); ok {
 		return mcpErr.Retryable
 	}
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		return richErr.Resolution.RetryStrategy.Recommended
 	}
 	return false
@@ -327,7 +321,7 @@ func GetErrorCategory(err error) ErrorCategory {
 	if mcpErr, ok := err.(*mcperrors.MCPError); ok {
 		return mapMCPCategory(mcpErr.Category)
 	}
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		return mapRichErrorCategory(richErr.Type)
 	}
 	return CategoryInternal
@@ -338,7 +332,7 @@ func GetErrorSeverity(err error) Severity {
 	if coreErr, ok := err.(*CoreError); ok {
 		return coreErr.Severity
 	}
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		return mapRichErrorSeverity(richErr.Severity)
 	}
 	return SeverityMedium
@@ -352,7 +346,7 @@ func FormatError(err error) string {
 	if mcpErr, ok := err.(*mcperrors.MCPError); ok {
 		return mcpErr.Error()
 	}
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		return richErr.Error()
 	}
 	return fmt.Sprintf("mcp: %v", err)

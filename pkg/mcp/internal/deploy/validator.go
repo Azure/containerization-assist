@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -38,7 +38,7 @@ func (v *ManifestValidator) ValidateManifest(manifest ManifestFile) error {
 
 	// Basic validation
 	if manifest.Content == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Manifest content is empty", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Manifest content is empty", "validation_error").
 			WithOperation("validate_manifest").
 			WithStage("content_validation").
 			WithRootCause("Manifest file contains no content or failed to load").
@@ -50,7 +50,7 @@ func (v *ManifestValidator) ValidateManifest(manifest ManifestFile) error {
 	// Parse YAML to check structure
 	var doc map[string]interface{}
 	if err := yaml.Unmarshal([]byte(manifest.Content), &doc); err != nil {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid YAML syntax in manifest", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid YAML syntax in manifest", "validation_error").
 			WithOperation("validate_manifest").
 			WithStage("yaml_parsing").
 			WithRootCause(fmt.Sprintf("YAML parsing failed: %v", err)).
@@ -121,7 +121,7 @@ func (v *ManifestValidator) ValidateManifests(manifests []ManifestFile) []Valida
 func (v *ManifestValidator) validateRequiredFields(doc map[string]interface{}, kind string) error {
 	// Check API version
 	if _, ok := doc["apiVersion"]; !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: apiVersion", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: apiVersion", "validation_error").
 			WithOperation("validate_manifest").
 			WithStage("required_fields").
 			WithRootCause("Kubernetes manifests must specify an apiVersion").
@@ -132,7 +132,7 @@ func (v *ManifestValidator) validateRequiredFields(doc map[string]interface{}, k
 
 	// Check kind
 	if docKind, ok := doc["kind"].(string); !ok || docKind != kind {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Kind mismatch in manifest", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Kind mismatch in manifest", "validation_error").
 			WithField("expected", kind).
 			WithOperation("validate_manifest").
 			WithStage("required_fields").
@@ -145,7 +145,7 @@ func (v *ManifestValidator) validateRequiredFields(doc map[string]interface{}, k
 	// Check metadata
 	metadata, ok := doc["metadata"].(map[string]interface{})
 	if !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: metadata", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: metadata", "validation_error").
 			WithOperation("validate_manifest").
 			WithStage("required_fields").
 			WithRootCause("Kubernetes manifests must have a metadata section").
@@ -156,7 +156,7 @@ func (v *ManifestValidator) validateRequiredFields(doc map[string]interface{}, k
 
 	// Check name
 	if _, ok := metadata["name"]; !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: metadata.name", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: metadata.name", "validation_error").
 			WithOperation("validate_manifest").
 			WithStage("required_fields").
 			WithRootCause("Kubernetes resources must have a name in metadata").
@@ -178,7 +178,7 @@ func (v *ManifestValidator) validateRequiredFields(doc map[string]interface{}, k
 // validateKubernetesName validates Kubernetes resource names
 func (v *ManifestValidator) validateKubernetesName(name string) error {
 	if name == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Resource name cannot be empty", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Resource name cannot be empty", "validation_error").
 			WithOperation("validate_name").
 			WithStage("name_validation").
 			WithRootCause("Kubernetes resources must have non-empty names").
@@ -188,7 +188,7 @@ func (v *ManifestValidator) validateKubernetesName(name string) error {
 	}
 
 	if len(name) > 253 {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Resource name too long", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Resource name too long", "validation_error").
 			WithField("length", len(name)).
 			WithField("max_length", 253).
 			WithOperation("validate_name").
@@ -202,7 +202,7 @@ func (v *ManifestValidator) validateKubernetesName(name string) error {
 	// Must consist of lower case alphanumeric characters, '-' or '.'
 	validName := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
 	if !validName.MatchString(name) {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid resource name format", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid resource name format", "validation_error").
 			WithOperation("validate_name").
 			WithStage("name_validation").
 			WithRootCause("Name doesn't follow Kubernetes naming conventions").
@@ -219,7 +219,7 @@ func (v *ManifestValidator) validateKubernetesName(name string) error {
 func (v *ManifestValidator) validateDeployment(doc map[string]interface{}) error {
 	spec, ok := doc["spec"].(map[string]interface{})
 	if !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec", "validation_error").
 			WithOperation("validate_deployment").
 			WithStage("spec_validation").
 			WithRootCause("Deployment manifests must have a spec section").
@@ -230,7 +230,7 @@ func (v *ManifestValidator) validateDeployment(doc map[string]interface{}) error
 
 	// Check replicas
 	if replicas, ok := spec["replicas"].(int); ok && replicas < 0 {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid replicas count", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid replicas count", "validation_error").
 			WithOperation("validate_deployment").
 			WithStage("replicas_validation").
 			WithRootCause("Replica count cannot be negative").
@@ -241,7 +241,7 @@ func (v *ManifestValidator) validateDeployment(doc map[string]interface{}) error
 
 	// Check selector
 	if _, ok := spec["selector"]; !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec.selector", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec.selector", "validation_error").
 			WithOperation("validate_deployment").
 			WithStage("selector_validation").
 			WithRootCause("Deployments must specify a selector to match pods").
@@ -253,7 +253,7 @@ func (v *ManifestValidator) validateDeployment(doc map[string]interface{}) error
 	// Check template
 	template, ok := spec["template"].(map[string]interface{})
 	if !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec.template", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec.template", "validation_error").
 			WithOperation("validate_deployment").
 			WithStage("template_validation").
 			WithRootCause("Deployments must specify a pod template").
@@ -268,7 +268,7 @@ func (v *ManifestValidator) validateDeployment(doc map[string]interface{}) error
 		// Check containers
 		containers, ok := templateSpec["containers"].([]interface{})
 		if !ok || len(containers) == 0 {
-			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "At least one container is required", "validation_error").
+			return mcp.NewErrorBuilder("VALIDATION_ERROR", "At least one container is required", "validation_error").
 				WithOperation("validate_deployment").
 				WithStage("container_validation").
 				WithRootCause("Pod templates must specify at least one container").
@@ -285,7 +285,7 @@ func (v *ManifestValidator) validateDeployment(doc map[string]interface{}) error
 			}
 		}
 	} else {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec.template.spec", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Missing required field: spec.template.spec", "validation_error").
 			WithOperation("validate_deployment").
 			WithStage("template_validation").
 			WithRootCause("Pod templates must have a spec section").

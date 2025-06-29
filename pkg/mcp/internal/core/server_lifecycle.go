@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // Start starts the MCP server
@@ -22,6 +22,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.sessionManager.StartCleanupRoutine()
 
 	// Initialize and configure gomcp server
+	if s.gomcpManager == nil {
+		return fmt.Errorf("gomcp manager is nil - server initialization failed")
+	}
 	if err := s.gomcpManager.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize gomcp manager: %w", err)
 	}
@@ -58,12 +61,12 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // HandleRequest implements the LocalRequestHandler interface
-func (s *Server) HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error) {
+func (s *Server) HandleRequest(ctx context.Context, req *mcp.MCPRequest) (*mcp.MCPResponse, error) {
 	// This is handled by the underlying MCP library for stdio transport
 	// For HTTP transport, we would implement custom request routing here
-	return &mcptypes.MCPResponse{
+	return &mcp.MCPResponse{
 		ID: req.ID,
-		Error: &mcptypes.MCPError{
+		Error: &mcp.MCPError{
 			Code:    -32601,
 			Message: "direct request handling not implemented",
 		},

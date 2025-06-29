@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -300,7 +301,7 @@ func TestServerMetrics(t *testing.T) {
 type mockFailingTransport struct {
 	failOnServe bool
 	serveErr    error
-	handler     InternalRequestHandler
+	handler     transport.LocalRequestHandler
 }
 
 func (m *mockFailingTransport) Serve(ctx context.Context) error {
@@ -331,10 +332,8 @@ func (m *mockFailingTransport) Name() string {
 	return "mock-failing-transport"
 }
 
-func (m *mockFailingTransport) SetHandler(handler interface{}) {
-	if h, ok := handler.(InternalRequestHandler); ok {
-		m.handler = h
-	}
+func (m *mockFailingTransport) SetHandler(handler transport.LocalRequestHandler) {
+	m.handler = handler
 }
 
 // TestServerConfigValidation tests configuration validation
@@ -404,13 +403,13 @@ func TestServerResourceLimits(t *testing.T) {
 	// Create sessions up to the limit
 	session1Interface, err := server.sessionManager.GetOrCreateSession("")
 	assert.NoError(t, err)
-	session1, ok := session1Interface.(*mcptypes.SessionState)
+	session1, ok := session1Interface.(*session.SessionState)
 	require.True(t, ok, "session1 should be of correct type")
 	assert.NotEmpty(t, session1.SessionID)
 
 	session2Interface, err := server.sessionManager.GetOrCreateSession("")
 	assert.NoError(t, err)
-	session2, ok := session2Interface.(*mcptypes.SessionState)
+	session2, ok := session2Interface.(*session.SessionState)
 	require.True(t, ok, "session2 should be of correct type")
 	assert.NotEmpty(t, session2.SessionID)
 

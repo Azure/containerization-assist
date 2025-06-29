@@ -10,10 +10,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// LocalTransport interface for transport types (local interface to avoid import cycles)
+// LocalTransport interface for transport types
 type LocalTransport interface {
 	Serve(ctx context.Context) error
-	Stop() error
+	Stop(ctx context.Context) error
 	Name() string
 	SetHandler(handler LocalRequestHandler)
 }

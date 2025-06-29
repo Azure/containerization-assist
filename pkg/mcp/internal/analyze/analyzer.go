@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -34,8 +35,8 @@ type CallerAnalyzerOpts struct {
 }
 
 // Ensure interface compliance at compile time.
-var _ mcptypes.AIAnalyzer = (*CallerAnalyzer)(nil)
-var _ mcptypes.AIAnalyzer = (*StubAnalyzer)(nil)
+var _ mcp.AIAnalyzer = (*CallerAnalyzer)(nil)
+var _ mcp.AIAnalyzer = (*StubAnalyzer)(nil)
 
 // NewCallerAnalyzer creates an analyzer that sends prompts back to the hosting LLM
 func NewCallerAnalyzer(transport LLMTransport, opts CallerAnalyzerOpts) *CallerAnalyzer {
@@ -186,7 +187,7 @@ func (f *AnalyzerFactory) SetAnalyzerOptions(opts CallerAnalyzerOpts) {
 }
 
 // CreateAnalyzer creates the appropriate analyzer based on configuration
-func (f *AnalyzerFactory) CreateAnalyzer() mcptypes.AIAnalyzer {
+func (f *AnalyzerFactory) CreateAnalyzer() mcp.AIAnalyzer {
 	if f.enableAI && f.transport != nil {
 		f.logger.Info().Msg("Creating CallerAnalyzer for AI-enabled mode")
 		return NewCallerAnalyzer(f.transport, f.analyzerOpts)
@@ -198,7 +199,7 @@ func (f *AnalyzerFactory) CreateAnalyzer() mcptypes.AIAnalyzer {
 
 // CreateAnalyzerFromEnv creates an analyzer based on environment configuration
 // Note: This returns a stub analyzer since we don't have transport available here
-func CreateAnalyzerFromEnv(logger zerolog.Logger) mcptypes.AIAnalyzer {
+func CreateAnalyzerFromEnv(logger zerolog.Logger) mcp.AIAnalyzer {
 	// Use centralized configuration logic
 	config := DefaultAnalyzerConfig()
 	config.LoadFromEnv()

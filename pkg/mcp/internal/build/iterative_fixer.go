@@ -6,25 +6,26 @@ import (
 	"strings"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
 // DefaultIterativeFixer implements the IterativeFixer interface using CallerAnalyzer
 type DefaultIterativeFixer struct {
-	analyzer    mcptypes.AIAnalyzer
+	analyzer    mcp.AIAnalyzer
 	logger      zerolog.Logger
 	maxAttempts int
-	fixHistory  []mcptypes.FixAttempt
+	fixHistory  []mcp.FixAttempt
 }
 
 // NewDefaultIterativeFixer creates a new iterative fixer
-func NewDefaultIterativeFixer(analyzer mcptypes.AIAnalyzer, logger zerolog.Logger) *DefaultIterativeFixer {
+func NewDefaultIterativeFixer(analyzer mcp.AIAnalyzer, logger zerolog.Logger) *DefaultIterativeFixer {
 	return &DefaultIterativeFixer{
 		analyzer:    analyzer,
 		logger:      logger.With().Str("component", "iterative_fixer").Logger(),
 		maxAttempts: 3, // default max attempts
-		fixHistory:  make([]mcptypes.FixAttempt, 0),
+		fixHistory:  make([]mcp.FixAttempt, 0),
 	}
 }
 
@@ -32,7 +33,7 @@ func NewDefaultIterativeFixer(analyzer mcptypes.AIAnalyzer, logger zerolog.Logge
 func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCtx *FixingContext) (*mcptypes.FixingResult, error) {
 	startTime := time.Now()
 	result := &mcptypes.FixingResult{
-		AllAttempts:   []mcptypes.FixAttempt{},
+		AllAttempts:   []mcp.FixAttempt{},
 		TotalAttempts: 0,
 	}
 	f.logger.Info().
@@ -117,9 +118,9 @@ func (f *DefaultIterativeFixer) getFixStrategiesForContext(ctx context.Context, 
 }
 
 // ApplyFix applies a specific fix strategy
-func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingContext, strategy mcptypes.FixStrategy) (*mcptypes.FixAttempt, error) {
+func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingContext, strategy mcptypes.FixStrategy) (*mcp.FixAttempt, error) {
 	startTime := time.Now()
-	attempt := &mcptypes.FixAttempt{
+	attempt := &mcp.FixAttempt{
 		AttemptNumber: len(fixingCtx.AttemptHistory) + 1,
 		StartTime:     startTime,
 		FixStrategy:   strategy,
@@ -158,7 +159,7 @@ func (f *DefaultIterativeFixer) ApplyFix(ctx context.Context, fixingCtx *FixingC
 }
 
 // ValidateFix checks if a fix was successful by attempting the operation
-func (f *DefaultIterativeFixer) ValidateFix(ctx context.Context, fixingCtx *FixingContext, attempt *mcptypes.FixAttempt) (bool, error) {
+func (f *DefaultIterativeFixer) ValidateFix(ctx context.Context, fixingCtx *FixingContext, attempt *mcp.FixAttempt) (bool, error) {
 	// This is a simplified validation - in a real implementation,
 	// this would trigger the actual operation (build, deploy, etc.)
 	// to verify the fix worked
@@ -370,7 +371,7 @@ func (f *DefaultIterativeFixer) SetMaxAttempts(max int) {
 }
 
 // GetFixHistory implements the IterativeFixer interface method
-func (f *DefaultIterativeFixer) GetFixHistory() []mcptypes.FixAttempt {
+func (f *DefaultIterativeFixer) GetFixHistory() []mcp.FixAttempt {
 	return f.fixHistory
 }
 

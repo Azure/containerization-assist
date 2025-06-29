@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/mcp"
+
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -153,7 +155,7 @@ type RestartAnalysis struct {
 // AtomicCheckHealthTool implements atomic application health checking using core operations
 type AtomicCheckHealthTool struct {
 	pipelineAdapter  mcptypes.PipelineOperations
-	sessionManager   mcptypes.ToolSessionManager
+	sessionManager   mcp.ToolSessionManager
 	retryCoordinator *retry.Coordinator
 	// errorHandler field removed - using direct error handling
 	logger      zerolog.Logger
@@ -162,7 +164,7 @@ type AtomicCheckHealthTool struct {
 }
 
 // NewAtomicCheckHealthTool creates a new atomic check health tool
-func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
+func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
 	coordinator := retry.New()
 
 	// Set up health check specific retry policy
@@ -263,7 +265,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		// Session retrieval error is returned directly
 		return result, nil
 	}
-	session := sessionInterface.(*mcptypes.SessionState)
+	session := sessionInterface.(*mcp.SessionState)
 
 	// Build label selector
 	labelSelector := t.buildLabelSelector(args, session)
@@ -469,7 +471,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 // validateHealthCheckPrerequisites validates health check prerequisites
 func (t *AtomicCheckHealthTool) validateHealthCheckPrerequisites(result *AtomicCheckHealthResult, args AtomicCheckHealthArgs) error {
 	if args.AppName == "" && args.LabelSelector == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Application identifier is required for health checking", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Application identifier is required for health checking", "validation_error").
 			WithField("app_name", args.AppName).
 			WithField("label_selector", args.LabelSelector).
 			WithOperation("check_health").
@@ -784,7 +786,7 @@ func (t *AtomicCheckHealthTool) addTroubleshootingTips(result *AtomicCheckHealth
 }
 
 // updateSessionState updates the session with health check results
-func (t *AtomicCheckHealthTool) updateSessionState(session *mcptypes.SessionState, result *AtomicCheckHealthResult) error {
+func (t *AtomicCheckHealthTool) updateSessionState(session *mcp.SessionState, result *AtomicCheckHealthResult) error {
 	// Update session with health check results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -806,7 +808,7 @@ func (t *AtomicCheckHealthTool) updateSessionState(session *mcptypes.SessionStat
 	session.UpdatedAt = time.Now()
 
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcptypes.SessionState); ok {
+		if sess, ok := s.(*mcp.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -814,7 +816,7 @@ func (t *AtomicCheckHealthTool) updateSessionState(session *mcptypes.SessionStat
 
 // Helper methods
 
-func (t *AtomicCheckHealthTool) buildLabelSelector(args AtomicCheckHealthArgs, session *mcptypes.SessionState) string {
+func (t *AtomicCheckHealthTool) buildLabelSelector(args AtomicCheckHealthArgs, session *mcp.SessionState) string {
 	if args.LabelSelector != "" {
 		return args.LabelSelector
 	}
@@ -889,8 +891,8 @@ func (t *AtomicCheckHealthTool) GetCapabilities() types.ToolCapabilities {
 }
 
 // GetMetadata returns comprehensive metadata about the tool
-func (t *AtomicCheckHealthTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicCheckHealthTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:        "atomic_check_health",
 		Description: "Performs comprehensive health checks on Kubernetes applications including pod status, service availability, and resource utilization",
 		Version:     "1.0.0",
@@ -964,21 +966,21 @@ func (t *AtomicCheckHealthTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) error {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_check_health", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_check_health", "validation_error").
 			WithField("expected", "AtomicCheckHealthArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
 
 	if healthArgs.SessionID == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "SessionID is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "SessionID is required", "validation_error").
 			WithField("field", "session_id").
 			Build()
 	}
 
 	// Validate either app_name or label_selector is provided
 	if healthArgs.AppName == "" && healthArgs.LabelSelector == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Either app_name or label_selector must be provided", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Either app_name or label_selector must be provided", "validation_error").
 			WithField("app_name", healthArgs.AppName).
 			WithField("label_selector", healthArgs.LabelSelector).
 			Build()
@@ -991,7 +993,7 @@ func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) 
 func (t *AtomicCheckHealthTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
-		return nil, mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_check_health", "validation_error").
+		return nil, mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_check_health", "validation_error").
 			WithField("expected", "AtomicCheckHealthArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()

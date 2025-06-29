@@ -4,19 +4,20 @@ import (
 	"fmt"
 
 	// mcp import removed - using mcptypes
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
 // ToolDependencies contains all dependencies needed for tool instantiation
 type ToolDependencies struct {
 	PipelineOperations mcptypes.PipelineOperations
-	SessionManager     mcptypes.ToolSessionManager
+	SessionManager     mcp.ToolSessionManager
 	ToolRegistry       interface {
 		RegisterTool(name string, tool interface{}) error
 	}
@@ -71,8 +72,8 @@ func (ora *OrchestratorRegistryAdapter) List() []string {
 }
 
 // GetMetadata is not implemented in the orchestrator registry
-func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcptypes.ToolMetadata {
-	return map[string]mcptypes.ToolMetadata{}
+func (ora *OrchestratorRegistryAdapter) GetMetadata() map[string]mcp.ToolMetadata {
+	return map[string]mcp.ToolMetadata{}
 }
 
 // RegisterAtomicTools registers all atomic tools that are ready for auto-registration

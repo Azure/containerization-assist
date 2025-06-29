@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,14 +36,17 @@ func (m *MockInternalTransport) SetHandler(handler transport.LocalRequestHandler
 	m.Called(handler)
 }
 
-// MockInternalRequestHandler for testing
-type MockInternalRequestHandler struct {
+// MockRequestHandler for testing
+type MockRequestHandler struct {
 	mock.Mock
 }
 
-func (m *MockInternalRequestHandler) HandleRequest(ctx context.Context, request interface{}) (interface{}, error) {
-	args := m.Called(ctx, request)
-	return args.Get(0), args.Error(1)
+func (m *MockRequestHandler) HandleRequest(ctx context.Context, req *mcp.MCPRequest) (*mcp.MCPResponse, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*mcp.MCPResponse), args.Error(1)
 }
 
 // mockLocalRequestHandler implements transport.LocalRequestHandler for testing
@@ -51,12 +54,12 @@ type mockLocalRequestHandler struct {
 	mock.Mock
 }
 
-func (m *mockLocalRequestHandler) HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error) {
+func (m *mockLocalRequestHandler) HandleRequest(ctx context.Context, req *mcp.MCPRequest) (*mcp.MCPResponse, error) {
 	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*mcptypes.MCPResponse), args.Error(1)
+	return args.Get(0).(*mcp.MCPResponse), args.Error(1)
 }
 
 func TestNewTransportAdapter_ValidTransport(t *testing.T) {
@@ -176,18 +179,18 @@ func TestTransportAdapter_SetHandler(t *testing.T) {
 }
 
 func TestRequestHandlerAdapter_HandleRequest_Success(t *testing.T) {
-	mockHandler := &MockInternalRequestHandler{}
+	mockHandler := &MockRequestHandler{}
 	adapter := &requestHandlerAdapter{handler: mockHandler}
 
 	ctx := context.Background()
-	req := &mcptypes.MCPRequest{
+	req := &mcp.MCPRequest{
 		Method: "test_method",
 		Params: map[string]interface{}{"key": "value"},
 	}
 
 	// Test when handler returns MCPResponse
 	t.Run("ReturnsValidMCPResponse", func(t *testing.T) {
-		expectedResponse := &mcptypes.MCPResponse{
+		expectedResponse := &mcp.MCPResponse{
 			Result: map[string]interface{}{"success": true},
 		}
 
@@ -199,28 +202,14 @@ func TestRequestHandlerAdapter_HandleRequest_Success(t *testing.T) {
 		assert.Equal(t, expectedResponse, response)
 		mockHandler.AssertExpectations(t)
 	})
-
-	// Test when handler returns other result that needs wrapping
-	t.Run("ReturnsOtherResult", func(t *testing.T) {
-		otherResult := map[string]interface{}{"data": "test"}
-
-		mockHandler.On("HandleRequest", ctx, req).Return(otherResult, nil).Once()
-
-		response, err := adapter.HandleRequest(ctx, req)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, response)
-		assert.Equal(t, otherResult, response.Result)
-		mockHandler.AssertExpectations(t)
-	})
 }
 
 func TestRequestHandlerAdapter_HandleRequest_Error(t *testing.T) {
-	mockHandler := &MockInternalRequestHandler{}
+	mockHandler := &MockRequestHandler{}
 	adapter := &requestHandlerAdapter{handler: mockHandler}
 
 	ctx := context.Background()
-	req := &mcptypes.MCPRequest{
+	req := &mcp.MCPRequest{
 		Method: "test_method",
 		Params: map[string]interface{}{"key": "value"},
 	}
@@ -237,11 +226,11 @@ func TestRequestHandlerAdapter_HandleRequest_Error(t *testing.T) {
 }
 
 func TestRequestHandlerAdapter_HandleRequest_NilResult(t *testing.T) {
-	mockHandler := &MockInternalRequestHandler{}
+	mockHandler := &MockRequestHandler{}
 	adapter := &requestHandlerAdapter{handler: mockHandler}
 
 	ctx := context.Background()
-	req := &mcptypes.MCPRequest{
+	req := &mcp.MCPRequest{
 		Method: "test_method",
 		Params: map[string]interface{}{"key": "value"},
 	}
@@ -292,12 +281,12 @@ func TestTransportAdapter_IntegrationWithMocks(t *testing.T) {
 }
 
 func TestTransportAdapter_TypeAssertion(t *testing.T) {
-	// Test that the adapter properly implements InternalTransport
+	// Test that the adapter properly implements transport.LocalTransport
 	mockTransport := &MockInternalTransport{}
 	adapter := NewTransportAdapter(mockTransport)
 
 	// This should compile and not panic
-	var _ InternalTransport = adapter
+	var _ transport.LocalTransport = adapter
 
 	assert.NotNil(t, adapter)
 }

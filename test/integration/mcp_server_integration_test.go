@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/factory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +72,7 @@ func testServerLifecycle(t *testing.T, workspaceDir, storeDir string) {
 	config.TransportType = "stdio" // Use stdio for testing
 
 	// Create server
-	server, err := mcp.NewServer(ctx, config)
+	server, err := factory.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create MCP server")
 	require.NotNil(t, server, "Server should not be nil")
 
@@ -131,7 +132,7 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 			config := mcp.DefaultServerConfig()
 			tt.configModifier(&config)
 
-			server, err := mcp.NewServer(ctx, config)
+			server, err := factory.NewServer(ctx, config)
 
 			if tt.expectError {
 				assert.Error(t, err, "Expected error for invalid configuration")
@@ -159,7 +160,7 @@ func testWorkspaceManagement(t *testing.T, workspaceDir, storeDir string) {
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
-	server, err := mcp.NewServer(ctx, config)
+	server, err := factory.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -195,7 +196,7 @@ func testSessionHandling(t *testing.T, workspaceDir, storeDir string) {
 	config.MaxSessions = 5
 	config.SessionTTL = 10 * time.Minute
 
-	server, err := mcp.NewServer(ctx, config)
+	server, err := factory.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -249,7 +250,7 @@ func testToolRegistration(t *testing.T, workspaceDir, storeDir string) {
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
-	server, err := mcp.NewServer(ctx, config)
+	server, err := factory.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -297,7 +298,7 @@ func TestMCPServerStressTest(t *testing.T) {
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 	config.MaxSessions = 100
 
-	server, err := mcp.NewServer(ctx, config)
+	server, err := factory.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

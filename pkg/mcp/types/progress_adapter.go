@@ -4,6 +4,15 @@ import (
 	"github.com/localrivet/gomcp/server"
 )
 
+// Local type definitions to avoid import cycles
+
+// LocalProgressStage represents a stage in progress tracking (local copy to avoid import cycle)
+type LocalProgressStage struct {
+	Name        string
+	Weight      float64
+	Description string
+}
+
 // LocalProgressReporter provides progress reporting (local interface to avoid import cycles)
 type LocalProgressReporter interface {
 	ReportStage(stageProgress float64, message string)

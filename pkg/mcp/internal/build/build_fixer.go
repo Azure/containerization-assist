@@ -9,8 +9,9 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -424,11 +425,41 @@ func (t *AtomicBuildImageTool) identifySecurityImplications(errStr string, build
 	return implications
 }
 
+// createBuildErrorContext creates a standard ErrorContext for build operations
+func createBuildErrorContext(operation, stage, component string, args interface{}, metadata map[string]interface{}, relatedFiles []string) mcp.ErrorContext {
+	return mcp.ErrorContext{
+		Operation:    operation,
+		Stage:        stage,
+		Component:    component,
+		Input:        map[string]interface{}{"args": args},
+		RelatedFiles: relatedFiles,
+		SystemState: mcp.SystemState{
+			DockerAvailable: true,
+			K8sConnected:    false,
+			DiskSpaceMB:     0,
+			WorkspaceQuota:  0,
+		},
+		ResourceUsage: mcp.ResourceUsage{
+			CPUPercent:  0,
+			MemoryMB:    0,
+			DiskUsageMB: 0,
+		},
+		Metadata: &mcp.ErrorMetadata{
+			SessionID: "",
+			Tool:      "",
+			Operation: operation,
+			RequestID: "",
+			TraceID:   "",
+			Custom:    metadata,
+		},
+	}
+}
+
 // AtomicDockerBuildOperation implements FixableOperation for Docker builds
 type AtomicDockerBuildOperation struct {
 	tool           *AtomicBuildImageTool
 	args           AtomicBuildImageArgs
-	session        *mcptypes.SessionState
+	session        *mcp.SessionState
 	workspaceDir   string
 	buildContext   string
 	dockerfilePath string
@@ -443,39 +474,22 @@ func (op *AtomicDockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 		Msg("Executing Docker build")
 	// Check if Dockerfile exists
 	if _, err := os.Stat(op.dockerfilePath); os.IsNotExist(err) {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "DOCKERFILE_NOT_FOUND",
 			Type:     "dockerfile_error",
 			Severity: "High",
 			Message:  fmt.Sprintf("Dockerfile not found at %s", op.dockerfilePath),
-			Context: struct {
-				Input struct {
-					Args interface{} `json:"args"`
-				} `json:"input"`
-				Operation   string                 `json:"operation"`
-				Stage       string                 `json:"stage"`
-				Component   string                 `json:"component"`
-				Metadata    map[string]interface{} `json:"metadata"`
-				SystemState struct {
-					DockerAvailable bool `json:"docker_available"`
-					K8sConnected    bool `json:"k8s_connected"`
-					DiskSpaceMB     int  `json:"disk_space_mb"`
-					WorkspaceQuota  int  `json:"workspace_quota"`
-				} `json:"system_state"`
-				ResourceUsage struct {
-					CPUPercent  float64 `json:"cpu_percent"`
-					MemoryMB    int     `json:"memory_mb"`
-					DiskUsageMB int     `json:"disk_usage_mb"`
-				} `json:"resource_usage"`
-				Logs         []interface{} `json:"logs"`
-				RelatedFiles []string      `json:"related_files"`
-			}{
-				Operation:    "docker_build",
-				Stage:        "pre_build_validation",
-				Component:    "dockerfile",
-				Metadata:     map[string]interface{}{"dockerfile_path": op.dockerfilePath, "build_context": op.buildContext},
-				RelatedFiles: []string{op.dockerfilePath},
-			},
+			Context: createBuildErrorContext(
+				"docker_build",
+				"pre_build_validation",
+				"dockerfile",
+				op.args,
+				map[string]interface{}{
+					"dockerfile_path": op.dockerfilePath,
+					"build_context":   op.buildContext,
+				},
+				[]string{op.dockerfilePath},
+			),
 		}
 	}
 	// Get full image reference
@@ -496,7 +510,7 @@ func (op *AtomicDockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 		if buildResult != nil && buildResult.Error != nil {
 			errorMsg = buildResult.Error.Message
 		}
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %s", errorMsg), "build_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("docker build failed: %s", errorMsg), "build_error")
 	}
 	op.logger.Info().
 		Str("image_name", fullImageRef).
@@ -505,158 +519,85 @@ func (op *AtomicDockerBuildOperation) ExecuteOnce(ctx context.Context) error {
 }
 
 // GetFailureAnalysis analyzes why the Docker build failed
-func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
+func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
 	op.logger.Debug().Err(err).Msg("Analyzing Docker build failure")
 	// If it's already a RichError, return it
-	if richErr, ok := err.(*mcptypes.RichError); ok {
+	if richErr, ok := err.(*mcp.RichError); ok {
 		return richErr, nil
 	}
 	// Analyze the error message to categorize the failure
 	errorMsg := err.Error()
 	if strings.Contains(errorMsg, "no such file or directory") {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "FILE_NOT_FOUND",
 			Type:     "dockerfile_error",
 			Severity: "High",
 			Message:  errorMsg,
-			Context: struct {
-				Input struct {
-					Args interface{} `json:"args"`
-				} `json:"input"`
-				Operation   string                 `json:"operation"`
-				Stage       string                 `json:"stage"`
-				Component   string                 `json:"component"`
-				Metadata    map[string]interface{} `json:"metadata"`
-				SystemState struct {
-					DockerAvailable bool `json:"docker_available"`
-					K8sConnected    bool `json:"k8s_connected"`
-					DiskSpaceMB     int  `json:"disk_space_mb"`
-					WorkspaceQuota  int  `json:"workspace_quota"`
-				} `json:"system_state"`
-				ResourceUsage struct {
-					CPUPercent  float64 `json:"cpu_percent"`
-					MemoryMB    int     `json:"memory_mb"`
-					DiskUsageMB int     `json:"disk_usage_mb"`
-				} `json:"resource_usage"`
-				Logs         []interface{} `json:"logs"`
-				RelatedFiles []string      `json:"related_files"`
-			}{
-				Operation:    "docker_build",
-				Stage:        "file_access",
-				Component:    "dockerfile",
-				Metadata:     map[string]interface{}{"dockerfile_path": op.dockerfilePath, "build_context": op.buildContext, "suggested_fix": "Check file paths in Dockerfile"},
-				RelatedFiles: []string{op.dockerfilePath},
-			},
+			Context: createBuildErrorContext(
+				"docker_build",
+				"file_access",
+				"dockerfile",
+				op.args,
+				map[string]interface{}{
+					"dockerfile_path": op.dockerfilePath,
+					"build_context":   op.buildContext,
+					"suggested_fix":   "Check file paths in Dockerfile",
+				},
+				[]string{op.dockerfilePath},
+			),
 		}, nil
 	}
 	if strings.Contains(errorMsg, "unable to find image") {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "BASE_IMAGE_NOT_FOUND",
 			Type:     "dependency_error",
 			Severity: "High",
 			Message:  errorMsg,
-			Context: struct {
-				Input struct {
-					Args interface{} `json:"args"`
-				} `json:"input"`
-				Operation   string                 `json:"operation"`
-				Stage       string                 `json:"stage"`
-				Component   string                 `json:"component"`
-				Metadata    map[string]interface{} `json:"metadata"`
-				SystemState struct {
-					DockerAvailable bool `json:"docker_available"`
-					K8sConnected    bool `json:"k8s_connected"`
-					DiskSpaceMB     int  `json:"disk_space_mb"`
-					WorkspaceQuota  int  `json:"workspace_quota"`
-				} `json:"system_state"`
-				ResourceUsage struct {
-					CPUPercent  float64 `json:"cpu_percent"`
-					MemoryMB    int     `json:"memory_mb"`
-					DiskUsageMB int     `json:"disk_usage_mb"`
-				} `json:"resource_usage"`
-				Logs         []interface{} `json:"logs"`
-				RelatedFiles []string      `json:"related_files"`
-			}{
-				Operation: "docker_build",
-				Stage:     "base_image",
-				Component: "dockerfile",
-				Metadata:  map[string]interface{}{"suggested_fix": "Update base image tag or use a different base image"},
-			},
+			Context: createBuildErrorContext(
+				"docker_build",
+				"base_image",
+				"dockerfile",
+				op.args,
+				map[string]interface{}{"suggested_fix": "Update base image tag or use a different base image"},
+				[]string{},
+			),
 		}, nil
 	}
 	if strings.Contains(errorMsg, "package not found") || strings.Contains(errorMsg, "command not found") {
-		return &mcptypes.RichError{
+		return &mcp.RichError{
 			Code:     "PACKAGE_INSTALL_FAILED",
 			Type:     "dependency_error",
 			Severity: "Medium",
 			Message:  errorMsg,
-			Context: struct {
-				Input struct {
-					Args interface{} `json:"args"`
-				} `json:"input"`
-				Operation   string                 `json:"operation"`
-				Stage       string                 `json:"stage"`
-				Component   string                 `json:"component"`
-				Metadata    map[string]interface{} `json:"metadata"`
-				SystemState struct {
-					DockerAvailable bool `json:"docker_available"`
-					K8sConnected    bool `json:"k8s_connected"`
-					DiskSpaceMB     int  `json:"disk_space_mb"`
-					WorkspaceQuota  int  `json:"workspace_quota"`
-				} `json:"system_state"`
-				ResourceUsage struct {
-					CPUPercent  float64 `json:"cpu_percent"`
-					MemoryMB    int     `json:"memory_mb"`
-					DiskUsageMB int     `json:"disk_usage_mb"`
-				} `json:"resource_usage"`
-				Logs         []interface{} `json:"logs"`
-				RelatedFiles []string      `json:"related_files"`
-			}{
-				Operation: "docker_build",
-				Stage:     "package_install",
-				Component: "package_manager",
-				Metadata:  map[string]interface{}{"suggested_fix": "Update package names or installation commands"},
-			},
+			Context: createBuildErrorContext(
+				"docker_build",
+				"package_install",
+				"package_manager",
+				op.args,
+				map[string]interface{}{"suggested_fix": "Update package names or installation commands"},
+				[]string{},
+			),
 		}, nil
 	}
 	// Default categorization
-	return &mcptypes.RichError{
+	return &mcp.RichError{
 		Code:     "BUILD_FAILED",
 		Type:     "build_error",
 		Severity: "High",
 		Message:  errorMsg,
-		Context: struct {
-			Input struct {
-				Args interface{} `json:"args"`
-			} `json:"input"`
-			Operation   string                 `json:"operation"`
-			Stage       string                 `json:"stage"`
-			Component   string                 `json:"component"`
-			Metadata    map[string]interface{} `json:"metadata"`
-			SystemState struct {
-				DockerAvailable bool `json:"docker_available"`
-				K8sConnected    bool `json:"k8s_connected"`
-				DiskSpaceMB     int  `json:"disk_space_mb"`
-				WorkspaceQuota  int  `json:"workspace_quota"`
-			} `json:"system_state"`
-			ResourceUsage struct {
-				CPUPercent  float64 `json:"cpu_percent"`
-				MemoryMB    int     `json:"memory_mb"`
-				DiskUsageMB int     `json:"disk_usage_mb"`
-			} `json:"resource_usage"`
-			Logs         []interface{} `json:"logs"`
-			RelatedFiles []string      `json:"related_files"`
-		}{
-			Operation: "docker_build",
-			Stage:     "build_execution",
-			Component: "docker",
-			Metadata:  map[string]interface{}{},
-		},
+		Context: createBuildErrorContext(
+			"docker_build",
+			"build_execution",
+			"docker",
+			op.args,
+			map[string]interface{}{},
+			[]string{},
+		),
 	}, nil
 }
 
 // PrepareForRetry applies fixes and prepares for the next build attempt
-func (op *AtomicDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	op.logger.Info().
 		Str("fix_strategy", fixAttempt.FixStrategy.Name).
 		Msg("Preparing for retry after fix")
@@ -677,9 +618,9 @@ func (op *AtomicDockerBuildOperation) PrepareForRetry(ctx context.Context, fixAt
 }
 
 // applyDockerfileFix applies fixes to the Dockerfile
-func (op *AtomicDockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyDockerfileFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	if fixAttempt.FixedContent == "" {
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", "no fixed Dockerfile content provided", "missing_content")
+		return mcp.NewRichError("INVALID_ARGUMENTS", "no fixed Dockerfile content provided", "missing_content")
 	}
 	// Backup the original Dockerfile
 	backupPath := op.dockerfilePath + ".backup"
@@ -689,7 +630,7 @@ func (op *AtomicDockerBuildOperation) applyDockerfileFix(ctx context.Context, fi
 	// Write the fixed Dockerfile
 	err := os.WriteFile(op.dockerfilePath, []byte(fixAttempt.FixedContent), 0644)
 	if err != nil {
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to write fixed Dockerfile: %v", err), "file_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to write fixed Dockerfile: %v", err), "file_error")
 	}
 	op.logger.Info().
 		Str("dockerfile_path", op.dockerfilePath).
@@ -698,12 +639,12 @@ func (op *AtomicDockerBuildOperation) applyDockerfileFix(ctx context.Context, fi
 }
 
 // applyDependencyFix applies dependency-related fixes
-func (op *AtomicDockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyDependencyFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	op.logger.Info().Msg("Applying dependency fix")
 	// Apply file changes specified in the fix strategy
 	for _, change := range fixAttempt.FixStrategy.FileChanges {
 		if err := op.applyFileChange(change); err != nil {
-			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply dependency fix to %s: %v", change.FilePath, err), "file_error")
+			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply dependency fix to %s: %v", change.FilePath, err), "file_error")
 		}
 		op.logger.Info().
 			Str("file", change.FilePath).
@@ -723,12 +664,12 @@ func (op *AtomicDockerBuildOperation) applyDependencyFix(ctx context.Context, fi
 }
 
 // applyConfigFix applies configuration-related fixes
-func (op *AtomicDockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyConfigFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	op.logger.Info().Msg("Applying configuration fix")
 	// Apply file changes specified in the fix strategy
 	for _, change := range fixAttempt.FixStrategy.FileChanges {
 		if err := op.applyFileChange(change); err != nil {
-			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply config fix to %s: %v", change.FilePath, err), "file_error")
+			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply config fix to %s: %v", change.FilePath, err), "file_error")
 		}
 		op.logger.Info().
 			Str("file", change.FilePath).
@@ -748,7 +689,7 @@ func (op *AtomicDockerBuildOperation) applyConfigFix(ctx context.Context, fixAtt
 }
 
 // applyGenericFix applies generic fixes
-func (op *AtomicDockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (op *AtomicDockerBuildOperation) applyGenericFix(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	op.logger.Info().Msg("Applying generic fix")
 	// If there's fixed content, treat it as a Dockerfile fix
 	if fixAttempt.FixedContent != "" {
@@ -757,7 +698,7 @@ func (op *AtomicDockerBuildOperation) applyGenericFix(ctx context.Context, fixAt
 	// Apply file changes specified in the fix strategy
 	for _, change := range fixAttempt.FixStrategy.FileChanges {
 		if err := op.applyFileChange(change); err != nil {
-			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply generic fix to %s: %v", change.FilePath, err), "file_error")
+			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to apply generic fix to %s: %v", change.FilePath, err), "file_error")
 		}
 		op.logger.Info().
 			Str("file", change.FilePath).
@@ -785,14 +726,14 @@ func (op *AtomicDockerBuildOperation) applyFileChange(change mcptypes.FileChange
 	// Ensure the directory exists for the target file
 	dir := filepath.Dir(change.FilePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create directory %s: %v", dir, err), "filesystem_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create directory %s: %v", dir, err), "filesystem_error")
 	}
 	switch change.Operation {
 	case "create":
 		// Create a new file
 		err := os.WriteFile(change.FilePath, []byte(change.NewContent), 0644)
 		if err != nil {
-			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create file: %v", err), "file_error")
+			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create file: %v", err), "file_error")
 		}
 	case "update":
 		// Backup the original file if it exists
@@ -805,15 +746,15 @@ func (op *AtomicDockerBuildOperation) applyFileChange(change mcptypes.FileChange
 		// Write the updated content
 		err := os.WriteFile(change.FilePath, []byte(change.NewContent), 0644)
 		if err != nil {
-			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to update file: %v", err), "file_error")
+			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to update file: %v", err), "file_error")
 		}
 	case "delete":
 		// Delete the file
 		if err := os.Remove(change.FilePath); err != nil && !os.IsNotExist(err) {
-			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to delete file: %v", err), "file_error")
+			return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to delete file: %v", err), "file_error")
 		}
 	default:
-		return mcptypes.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("unsupported file operation: %s", change.Operation), "invalid_operation")
+		return mcp.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("unsupported file operation: %s", change.Operation), "invalid_operation")
 	}
 	return nil
 }

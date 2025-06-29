@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,16 +21,12 @@ func TestErrorMetrics_RecordError(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a test error
-	richErr := mcptypes.NewRichError("TEST_ERROR", "Test error message", "test_error")
+	richErr := mcp.NewRichError("TEST_ERROR", "Test error message", "test_error")
 	richErr.Severity = "medium"
 	richErr.Context.Operation = "test_operation"
 	richErr.Context.Component = "test_component"
-	// Note: mcptypes.RichError uses a different Context structure
-	richErr.Context.Metadata = map[string]interface{}{
-		"session_id": "session123",
-		"tool_name":  "test_tool",
-		"operation":  "test_op",
-	}
+	// Note: mcp.RichError uses ErrorMetadata struct
+	richErr.Context.Metadata = mcp.NewErrorMetadata("session123", "test_tool", "test_op")
 	richErr.Diagnostics.RootCause = "test root cause"
 	richErr.Diagnostics.ErrorPattern = "test pattern"
 	richErr.Diagnostics.Symptoms = []string{"symptom1", "symptom2"}
@@ -54,7 +50,7 @@ func TestErrorMetrics_RecordResolution(t *testing.T) {
 	ctx := context.Background()
 
 	// Create and record an error
-	richErr := mcptypes.NewRichError("RESOLVE_TEST", "Error to be resolved", "resolvable_error")
+	richErr := mcp.NewRichError("RESOLVE_TEST", "Error to be resolved", "resolvable_error")
 	richErr.Severity = "high"
 
 	em.RecordError(ctx, richErr)
@@ -74,19 +70,15 @@ func TestErrorMetrics_EnrichContext(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "correlation_id", "test-correlation-123")
 
 	// Create error with metadata
-	richErr := mcptypes.NewRichError("ENRICHED_ERROR", "", "")
-	richErr.Context.Metadata = map[string]interface{}{
-		"session_id": "session456",
-		"tool_name":  "enrich_tool",
-		"operation":  "enrich_op",
-	}
+	richErr := mcp.NewRichError("ENRICHED_ERROR", "", "")
+	richErr.Context.Metadata = mcp.NewErrorMetadata("session456", "enrich_tool", "enrich_op")
 
 	// Enrich the context
 	em.EnrichContext(ctx, richErr)
 
 	// Verify correlation ID was added
-	if richErr.Context.Metadata != nil {
-		assert.Equal(t, "test-correlation-123", richErr.Context.Metadata["correlation_id"])
+	if richErr.Context.Metadata != nil && richErr.Context.Metadata.Custom != nil {
+		assert.Equal(t, "test-correlation-123", richErr.Context.Metadata.Custom["correlation_id"])
 	}
 }
 
@@ -100,7 +92,7 @@ func TestErrorMetrics_GetRecentErrors(t *testing.T) {
 	// Record multiple errors
 	testErrors := 5
 	for i := 0; i < testErrors; i++ {
-		err := mcptypes.NewRichError(
+		err := mcp.NewRichError(
 			"ERROR_"+string(rune('A'+i)),
 			"Test error "+string(rune('A'+i)),
 			"",
@@ -140,7 +132,7 @@ func TestErrorMetrics_ErrorPatterns(t *testing.T) {
 
 	for _, e := range errors {
 		for i := 0; i < e.count; i++ {
-			err := mcptypes.NewRichError(e.code, "", e.errType)
+			err := mcp.NewRichError(e.code, "", e.errType)
 			em.RecordError(ctx, err)
 		}
 	}
@@ -162,7 +154,7 @@ func TestErrorMetricsMiddleware(t *testing.T) {
 	middleware := ErrorMetricsMiddleware(em)
 
 	// Create handler that resolves errors
-	handler := middleware(func(ctx context.Context, err *mcptypes.RichError) error {
+	handler := middleware(func(ctx context.Context, err *mcp.RichError) error {
 		handlerCalled = true
 		if err.Code == "RESOLVABLE" {
 			errorResolved = true
@@ -174,7 +166,7 @@ func TestErrorMetricsMiddleware(t *testing.T) {
 	ctx := context.Background()
 
 	// Test with resolvable error
-	resolvableErr := mcptypes.NewRichError("RESOLVABLE", "This error will be resolved", "")
+	resolvableErr := mcp.NewRichError("RESOLVABLE", "This error will be resolved", "")
 
 	result := handler(ctx, resolvableErr)
 	assert.Nil(t, result)

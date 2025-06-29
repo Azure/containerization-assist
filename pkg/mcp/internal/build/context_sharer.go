@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -105,7 +105,7 @@ func (c *DefaultContextSharer) GetSharedContext(ctx context.Context, sessionID s
 }
 
 // GetFailureRouting determines which tool should handle a specific failure
-func (c *DefaultContextSharer) GetFailureRouting(ctx context.Context, sessionID string, failure *mcptypes.RichError) (string, error) {
+func (c *DefaultContextSharer) GetFailureRouting(ctx context.Context, sessionID string, failure *mcp.RichError) (string, error) {
 	currentTool := getToolFromContext(ctx)
 	c.logger.Debug().
 		Str("session_id", sessionID).
@@ -153,7 +153,7 @@ func (c *DefaultContextSharer) GetFailureRouting(ctx context.Context, sessionID 
 }
 
 // matchesConditions checks if additional routing conditions are met
-func (c *DefaultContextSharer) matchesConditions(ctx context.Context, sessionID string, failure *mcptypes.RichError, conditions map[string]interface{}) bool {
+func (c *DefaultContextSharer) matchesConditions(ctx context.Context, sessionID string, failure *mcp.RichError, conditions map[string]interface{}) bool {
 	if len(conditions) == 0 {
 		return true
 	}

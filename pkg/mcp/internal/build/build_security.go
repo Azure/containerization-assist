@@ -6,7 +6,8 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -23,7 +24,7 @@ func NewBuildSecurityScanner(logger zerolog.Logger) *BuildSecurityScanner {
 }
 
 // RunSecurityScan performs security scanning on the built image
-func (s *BuildSecurityScanner) RunSecurityScan(ctx context.Context, session *mcptypes.SessionState, result *AtomicBuildImageResult) error {
+func (s *BuildSecurityScanner) RunSecurityScan(ctx context.Context, session *mcp.SessionState, result *AtomicBuildImageResult) error {
 	// Create Trivy scanner
 	scanner := coredocker.NewTrivyScanner(s.logger)
 	// Check if Trivy is installed
@@ -42,7 +43,7 @@ func (s *BuildSecurityScanner) RunSecurityScan(ctx context.Context, session *mcp
 	// Run security scan with HIGH severity threshold
 	scanResult, err := scanner.ScanImage(ctx, result.FullImageRef, "HIGH,CRITICAL")
 	if err != nil {
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("security scan failed: %v", err), "scan_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("security scan failed: %v", err), "scan_error")
 	}
 	result.ScanDuration = time.Since(scanStartTime)
 	result.SecurityScan = scanResult
@@ -111,7 +112,7 @@ func (s *BuildSecurityScanner) processScanResults(scanResult *coredocker.ScanRes
 				Str("image_ref", result.FullImageRef).
 				Msg("Critical security vulnerabilities found")
 			result.Success = false
-			return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", "critical vulnerabilities found", "security_error")
+			return mcp.NewRichError("INTERNAL_SERVER_ERROR", "critical vulnerabilities found", "security_error")
 		}
 	}
 	// Update next steps based on scan results

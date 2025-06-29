@@ -3,11 +3,11 @@ package core
 import (
 	"context"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
-// TransportAdapter adapts internal transport to mcptypes.Transport interface
+// TransportAdapter adapts internal transport to transport.LocalTransport interface
 type TransportAdapter struct {
 	internal interface {
 		Serve(ctx context.Context) error
@@ -18,7 +18,7 @@ type TransportAdapter struct {
 }
 
 // NewTransportAdapter creates a new transport adapter
-func NewTransportAdapter(t interface{}) InternalTransport {
+func NewTransportAdapter(t interface{}) transport.LocalTransport {
 	// Type assert to ensure it has the required methods
 	if transport, ok := t.(interface {
 		Serve(ctx context.Context) error
@@ -51,26 +51,23 @@ func (ta *TransportAdapter) SetHandler(handler transport.LocalRequestHandler) {
 	ta.internal.SetHandler(handler)
 }
 
-// requestHandlerAdapter adapts InternalRequestHandler to transport.LocalRequestHandler
+// requestHandlerAdapter adapts between different request handler types
 type requestHandlerAdapter struct {
-	handler InternalRequestHandler
+	handler transport.LocalRequestHandler
 }
 
 // HandleRequest implements transport.LocalRequestHandler
-func (rha *requestHandlerAdapter) HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error) {
-	// Call the wrapped handler
-	result, err := rha.handler.HandleRequest(ctx, req)
+func (rha *requestHandlerAdapter) HandleRequest(ctx context.Context, req *mcp.MCPRequest) (*mcp.MCPResponse, error) {
+	// Direct pass-through since both use the same types now
+	response, err := rha.handler.HandleRequest(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-
-	// Type assert the result
-	if resp, ok := result.(*mcptypes.MCPResponse); ok {
-		return resp, nil
+	// Handle nil response
+	if response == nil {
+		return &mcp.MCPResponse{
+			Result: nil,
+		}, nil
 	}
-
-	// If not already an MCPResponse, wrap it
-	return &mcptypes.MCPResponse{
-		Result: result,
-	}, nil
+	return response, nil
 }

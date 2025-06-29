@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -129,7 +129,7 @@ func (rv *RegistryValidator) testConnectivity(ctx context.Context, registryURL s
 
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
-		return false, mcptypes.NewErrorBuilder("request_creation_failed", "Failed to create HTTP request for registry connectivity test", "network").
+		return false, mcp.NewErrorBuilder("request_creation_failed", "Failed to create HTTP request for registry connectivity test", "network").
 			WithField("endpoint", endpoint).
 			WithOperation("test_connectivity").
 			WithStage("request_creation").
@@ -141,7 +141,7 @@ func (rv *RegistryValidator) testConnectivity(ctx context.Context, registryURL s
 
 	resp, err := rv.httpClient.Do(req)
 	if err != nil {
-		return false, mcptypes.NewErrorBuilder("registry_connection_failed", "Failed to connect to registry", "network").
+		return false, mcp.NewErrorBuilder("registry_connection_failed", "Failed to connect to registry", "network").
 			WithField("endpoint", endpoint).
 			WithOperation("test_connectivity").
 			WithStage("connection_attempt").

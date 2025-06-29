@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // RetryState tracks retry attempts for a specific operation
@@ -17,13 +17,13 @@ type RetryState struct {
 
 // ConversationState extends SessionState with conversation-specific fields
 type ConversationState struct {
-	*mcptypes.SessionState
+	*mcp.SessionState
 
 	// Conversation flow
-	CurrentStage    types.ConversationStage `json:"current_stage"`
-	History         []ConversationTurn      `json:"conversation_history"`
-	Preferences     types.UserPreferences   `json:"user_preferences"`
-	PendingDecision *DecisionPoint          `json:"pending_decision,omitempty"`
+	CurrentStage    mcp.ConversationStage `json:"current_stage"`
+	History         []ConversationTurn    `json:"conversation_history"`
+	Preferences     types.UserPreferences `json:"user_preferences"`
+	PendingDecision *DecisionPoint        `json:"pending_decision,omitempty"`
 
 	// Conversation context
 	Context   map[string]interface{} `json:"conversation_context"`
@@ -39,14 +39,14 @@ type ConversationState struct {
 
 // ConversationTurn represents a single turn in the conversation
 type ConversationTurn struct {
-	ID        string                  `json:"id"`
-	Timestamp time.Time               `json:"timestamp"`
-	UserInput string                  `json:"user_input"`
-	Assistant string                  `json:"assistant_response"`
-	Stage     types.ConversationStage `json:"stage"`
-	ToolCalls []ToolCall              `json:"tool_calls,omitempty"`
-	Decision  *Decision               `json:"decision,omitempty"`
-	Error     *types.ToolError        `json:"error,omitempty"`
+	ID        string                `json:"id"`
+	Timestamp time.Time             `json:"timestamp"`
+	UserInput string                `json:"user_input"`
+	Assistant string                `json:"assistant_response"`
+	Stage     mcp.ConversationStage `json:"stage"`
+	ToolCalls []ToolCall            `json:"tool_calls,omitempty"`
+	Decision  *Decision             `json:"decision,omitempty"`
+	Error     *types.ToolError      `json:"error,omitempty"`
 }
 
 // ToolCall represents a tool invocation within a conversation turn
@@ -60,13 +60,13 @@ type ToolCall struct {
 
 // DecisionPoint represents a point where user input is needed
 type DecisionPoint struct {
-	ID       string                  `json:"id"`
-	Stage    types.ConversationStage `json:"stage"`
-	Question string                  `json:"question"`
-	Options  []Option                `json:"options"`
-	Default  string                  `json:"default,omitempty"`
-	Required bool                    `json:"required"`
-	Context  map[string]interface{}  `json:"context,omitempty"`
+	ID       string                 `json:"id"`
+	Stage    mcp.ConversationStage  `json:"stage"`
+	Question string                 `json:"question"`
+	Options  []Option               `json:"options"`
+	Default  string                 `json:"default,omitempty"`
+	Required bool                   `json:"required"`
+	Context  map[string]interface{} `json:"context,omitempty"`
 }
 
 // Option represents a choice in a decision point
@@ -88,28 +88,28 @@ type Decision struct {
 
 // Artifact represents a generated file or output
 type Artifact struct {
-	ID        string                  `json:"id"`
-	Type      string                  `json:"type"` // "dockerfile", "manifest", "config"
-	Name      string                  `json:"name"`
-	Content   string                  `json:"content"`
-	Path      string                  `json:"path,omitempty"`
-	CreatedAt time.Time               `json:"created_at"`
-	UpdatedAt time.Time               `json:"updated_at"`
-	Stage     types.ConversationStage `json:"stage"`
-	Metadata  map[string]interface{}  `json:"metadata,omitempty"`
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"` // "dockerfile", "manifest", "config"
+	Name      string                 `json:"name"`
+	Content   string                 `json:"content"`
+	Path      string                 `json:"path,omitempty"`
+	CreatedAt time.Time              `json:"created_at"`
+	UpdatedAt time.Time              `json:"updated_at"`
+	Stage     mcp.ConversationStage  `json:"stage"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // NewConversationState creates a new conversation state
 func NewConversationState(sessionID, workspaceDir string) *ConversationState {
 	return &ConversationState{
-		SessionState: &mcptypes.SessionState{
+		SessionState: &mcp.SessionState{
 			SessionID:    sessionID,
 			WorkspaceDir: workspaceDir,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
 			Metadata:     make(map[string]interface{}),
 		},
-		CurrentStage: types.StageWelcome,
+		CurrentStage: convertFromTypesStage(types.StageWelcome),
 		History:      make([]ConversationTurn, 0),
 		Preferences: types.UserPreferences{
 			Namespace:          "default",
@@ -131,7 +131,7 @@ func (cs *ConversationState) AddConversationTurn(turn ConversationTurn) {
 }
 
 // SetStage updates the current conversation stage
-func (cs *ConversationState) SetStage(stage types.ConversationStage) {
+func (cs *ConversationState) SetStage(stage mcp.ConversationStage) {
 	cs.CurrentStage = stage
 	cs.SessionState.UpdatedAt = time.Now()
 }
@@ -193,45 +193,49 @@ func (cs *ConversationState) GetLatestTurn() *ConversationTurn {
 }
 
 // CanProceedToStage checks if the conversation can proceed to a given stage
-func (cs *ConversationState) CanProceedToStage(stage types.ConversationStage) bool {
-	// Define stage dependencies
+func (cs *ConversationState) CanProceedToStage(stage mcp.ConversationStage) bool {
+	// For mcp.ConversationStage, we'll check based on simplified workflow
 	switch stage {
-	case types.StageInit:
-		return cs.CurrentStage == types.StageWelcome
-	case types.StageAnalysis:
+	case mcp.ConversationStageAnalyze:
+		// Can proceed to analyze if we have a repo URL
 		repoURL := ""
 		if cs.SessionState.Metadata != nil {
 			if url, ok := cs.SessionState.Metadata["repo_url"].(string); ok {
 				repoURL = url
 			}
 		}
-		return cs.CurrentStage == types.StageInit && repoURL != ""
-	case types.StageDockerfile:
+		return repoURL != ""
+
+	case mcp.ConversationStageBuild:
+		// Can proceed to build if we have repo analysis
 		repoAnalysisExists := false
 		if cs.SessionState.Metadata != nil {
 			if repoAnalysis, ok := cs.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
 				repoAnalysisExists = len(repoAnalysis) > 0
 			}
 		}
-		return cs.CurrentStage == types.StageAnalysis && repoAnalysisExists
-	case types.StageManifests:
-		dockerfileContent := ""
+		return repoAnalysisExists
+
+	case mcp.ConversationStageDeploy:
+		// Can proceed to deploy if we have built image
+		imageBuilt := false
 		if cs.SessionState.Metadata != nil {
-			if content, ok := cs.SessionState.Metadata["dockerfile_content"].(string); ok {
-				dockerfileContent = content
+			if built, ok := cs.SessionState.Metadata["image_built"].(bool); ok {
+				imageBuilt = built
 			}
 		}
-		return cs.CurrentStage == types.StageDockerfile && dockerfileContent != ""
-	case types.StageDeployment:
-		k8sManifestsExist := false
+		return imageBuilt
+
+	case mcp.ConversationStageScan:
+		// Can proceed to scan if we have an image
+		imageRef := ""
 		if cs.SessionState.Metadata != nil {
-			if manifests, ok := cs.SessionState.Metadata["k8s_manifests"].(map[string]interface{}); ok {
-				k8sManifestsExist = len(manifests) > 0
+			if ref, ok := cs.SessionState.Metadata["image_ref"].(string); ok {
+				imageRef = ref
 			}
 		}
-		return cs.CurrentStage == types.StageManifests && k8sManifestsExist
-	case types.StageCompleted:
-		return cs.CurrentStage == types.StageDeployment
+		return imageRef != ""
+
 	default:
 		return false
 	}
@@ -239,14 +243,13 @@ func (cs *ConversationState) CanProceedToStage(stage types.ConversationStage) bo
 
 // GetStageProgress returns the progress through the workflow
 func (cs *ConversationState) GetStageProgress() StageProgress {
-	stages := []types.ConversationStage{
-		types.StageWelcome,
-		types.StageInit,
-		types.StageAnalysis,
-		types.StageDockerfile,
-		types.StageManifests,
-		types.StageDeployment,
-		types.StageCompleted,
+	// Define simplified stages for mcp.ConversationStage
+	stages := []mcp.ConversationStage{
+		mcp.ConversationStagePreFlight,
+		mcp.ConversationStageAnalyze,
+		mcp.ConversationStageBuild,
+		mcp.ConversationStageDeploy,
+		mcp.ConversationStageScan,
 	}
 
 	currentIndex := 0
@@ -269,12 +272,12 @@ func (cs *ConversationState) GetStageProgress() StageProgress {
 
 // StageProgress represents progress through the workflow
 type StageProgress struct {
-	CurrentStage    types.ConversationStage   `json:"current_stage"`
-	CurrentStep     int                       `json:"current_step"`
-	TotalSteps      int                       `json:"total_steps"`
-	Percentage      int                       `json:"percentage"`
-	CompletedStages []types.ConversationStage `json:"completed_stages"`
-	RemainingStages []types.ConversationStage `json:"remaining_stages"`
+	CurrentStage    mcp.ConversationStage   `json:"current_stage"`
+	CurrentStep     int                     `json:"current_step"`
+	TotalSteps      int                     `json:"total_steps"`
+	Percentage      int                     `json:"percentage"`
+	CompletedStages []mcp.ConversationStage `json:"completed_stages"`
+	RemainingStages []mcp.ConversationStage `json:"remaining_stages"`
 }
 
 // Helper functions

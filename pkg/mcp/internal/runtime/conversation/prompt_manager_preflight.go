@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // Pre-flight check methods
@@ -24,13 +24,13 @@ func (pm *PromptManager) hasPassedPreFlightChecks(state *ConversationState) bool
 	return false
 }
 
-func (pm *PromptManager) hasPassedStagePreFlightChecks(state *ConversationState, stage types.ConversationStage) bool {
+func (pm *PromptManager) hasPassedStagePreFlightChecks(state *ConversationState, stage mcp.ConversationStage) bool {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	_, passed := state.Context[key]
 	return passed
 }
 
-func (pm *PromptManager) markStagePreFlightPassed(state *ConversationState, stage types.ConversationStage) {
+func (pm *PromptManager) markStagePreFlightPassed(state *ConversationState, stage mcp.ConversationStage) {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	state.Context[key] = true
 }
@@ -64,7 +64,7 @@ func (pm *PromptManager) shouldAutoRunPreFlightChecks(state *ConversationState, 
 	return !isFirstTime
 }
 
-func (pm *PromptManager) handleFailedPreFlightChecks(ctx context.Context, state *ConversationState, result *observability.PreFlightResult, stage types.ConversationStage) *ConversationResponse {
+func (pm *PromptManager) handleFailedPreFlightChecks(ctx context.Context, state *ConversationState, result *observability.PreFlightResult, stage mcp.ConversationStage) *ConversationResponse {
 	var failedChecks []string
 	var suggestions []string
 
@@ -102,7 +102,7 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 		state.Context["preflight_skipped"] = true
 		response := pm.newResponse(state)
 		response.Message = "⚠️ Skipping pre-flight checks. Note that you may encounter issues if your environment isn't properly configured.\n\nWhat would you like to containerize?"
-		response.Stage = types.StageInit
+		response.Stage = convertFromTypesStage(types.StageInit)
 		response.Status = ResponseStatusWarning
 		return response
 	}
@@ -129,14 +129,14 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 		response.Message = "Let me run some pre-flight checks before we begin..."
 	}
 
-	response.Stage = types.StagePreFlight
+	response.Stage = convertFromTypesStage(types.StagePreFlight)
 	response.Status = ResponseStatusProcessing
 
 	result, err := pm.preFlightChecker.RunChecks(ctx)
 	if err != nil {
 		response := pm.newResponse(state)
 		response.Message = fmt.Sprintf("Failed to run pre-flight checks: %v\n\nWould you like to skip the checks and proceed anyway?", err)
-		response.Stage = types.StagePreFlight
+		response.Stage = convertFromTypesStage(types.StagePreFlight)
 		response.Status = ResponseStatusError
 		response.Options = []Option{
 			{ID: "skip", Label: "Skip checks and continue"},
@@ -169,7 +169,7 @@ func (pm *PromptManager) handlePreFlightChecks(ctx context.Context, state *Conve
 
 		// Save session to persist the context
 		if err := pm.sessionManager.UpdateSession(state.SessionID, func(s interface{}) {
-			if sess, ok := s.(*mcptypes.SessionState); ok {
+			if sess, ok := s.(*mcp.SessionState); ok {
 				sess.CurrentStage = string(response.Stage)
 				sess.Status = string(response.Status)
 			}
@@ -206,7 +206,7 @@ func (pm *PromptManager) rerunSingleCheck(ctx context.Context, state *Conversati
 	if err != nil {
 		return &ConversationResponse{
 			Message: fmt.Sprintf("Failed to run check: %v", err),
-			Stage:   types.StageInit,
+			Stage:   convertFromTypesStage(types.StageInit),
 			Status:  ResponseStatusError,
 		}
 	}
@@ -219,7 +219,7 @@ func (pm *PromptManager) rerunSingleCheck(ctx context.Context, state *Conversati
 	// Still failing
 	return &ConversationResponse{
 		Message: fmt.Sprintf("❌ %s check still failing: %s\n\n%s", result.Name, result.Message, result.RecoveryAction),
-		Stage:   types.StageInit,
+		Stage:   convertFromTypesStage(types.StageInit),
 		Status:  ResponseStatusError,
 		Options: []Option{
 			{ID: "retry", Label: "I've fixed it, try again"},

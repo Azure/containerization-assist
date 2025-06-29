@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	publicutils "github.com/Azure/container-kit/pkg/mcp/utils"
 )
 
@@ -30,7 +31,7 @@ func getIntFromMap(m map[string]interface{}, key string) int {
 }
 
 // getDockerfileBuilt checks if dockerfile has been built (from metadata)
-func getDockerfileBuilt(sessionState *mcptypes.SessionState) bool {
+func getDockerfileBuilt(sessionState *mcp.SessionState) bool {
 	if sessionState.Metadata == nil {
 		return false
 	}
@@ -41,7 +42,7 @@ func getDockerfileBuilt(sessionState *mcptypes.SessionState) bool {
 }
 
 // getDockerfileImageID gets the built image ID from metadata
-func getDockerfileImageID(sessionState *mcptypes.SessionState) string {
+func getDockerfileImageID(sessionState *mcp.SessionState) string {
 	if sessionState.Metadata == nil {
 		return ""
 	}
@@ -55,7 +56,7 @@ func getDockerfileImageID(sessionState *mcptypes.SessionState) string {
 }
 
 // setDockerfileBuilt sets the dockerfile built status in metadata
-func setDockerfileBuilt(sessionState *mcptypes.SessionState, built bool) {
+func setDockerfileBuilt(sessionState *mcp.SessionState, built bool) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -63,7 +64,7 @@ func setDockerfileBuilt(sessionState *mcptypes.SessionState, built bool) {
 }
 
 // setDockerfileImageID sets the built image ID in metadata
-func setDockerfileImageID(sessionState *mcptypes.SessionState, imageID string) {
+func setDockerfileImageID(sessionState *mcp.SessionState, imageID string) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -72,7 +73,7 @@ func setDockerfileImageID(sessionState *mcptypes.SessionState, imageID string) {
 }
 
 // getImageRefRegistry gets the image registry from metadata
-func getImageRefRegistry(sessionState *mcptypes.SessionState) string {
+func getImageRefRegistry(sessionState *mcp.SessionState) string {
 	if sessionState.Metadata == nil {
 		return ""
 	}
@@ -83,7 +84,7 @@ func getImageRefRegistry(sessionState *mcptypes.SessionState) string {
 }
 
 // getImageRefTag gets the image tag from metadata
-func getImageRefTag(sessionState *mcptypes.SessionState) string {
+func getImageRefTag(sessionState *mcp.SessionState) string {
 	if sessionState.Metadata == nil {
 		return ""
 	}
@@ -94,7 +95,7 @@ func getImageRefTag(sessionState *mcptypes.SessionState) string {
 }
 
 // setImageRefRegistry sets the image registry in metadata
-func setImageRefRegistry(sessionState *mcptypes.SessionState, registry string) {
+func setImageRefRegistry(sessionState *mcp.SessionState, registry string) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -102,7 +103,7 @@ func setImageRefRegistry(sessionState *mcptypes.SessionState, registry string) {
 }
 
 // setImageRefTag sets the image tag in metadata
-func setImageRefTag(sessionState *mcptypes.SessionState, tag string) {
+func setImageRefTag(sessionState *mcp.SessionState, tag string) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -112,37 +113,37 @@ func setImageRefTag(sessionState *mcptypes.SessionState, tag string) {
 // handleBuildStage handles the Docker image build stage
 func (pm *PromptManager) handleBuildStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StageBuild), getStageIntro(types.StageBuild))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageBuild)), getStageIntro(convertFromTypesStage(types.StageBuild)))
 
 	// Check if user wants to skip build
 	if strings.Contains(strings.ToLower(input), "skip") {
-		state.SetStage(types.StagePush)
+		state.SetStage(convertFromTypesStage(types.StagePush))
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sSkipping build stage. Moving to push stage...", progressPrefix),
-			Stage:   types.StagePush,
+			Stage:   convertFromTypesStage(types.StagePush),
 			Status:  ResponseStatusSuccess,
 		}
 	}
 
 	// Run pre-flight checks for build stage
-	if !pm.hasPassedStagePreFlightChecks(state, types.StageBuild) {
-		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, types.StageBuild, state.SessionState)
+	if !pm.hasPassedStagePreFlightChecks(state, convertFromTypesStage(types.StageBuild)) {
+		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, convertFromTypesStage(types.StageBuild), state.SessionState)
 		if err != nil {
 			return &ConversationResponse{
 				Message: fmt.Sprintf("%sFailed to run pre-flight checks: %v", progressPrefix, err),
-				Stage:   types.StageBuild,
+				Stage:   convertFromTypesStage(types.StageBuild),
 				Status:  ResponseStatusError,
 			}
 		}
 
 		if !checkResult.Passed {
-			response := pm.handleFailedPreFlightChecks(ctx, state, checkResult, types.StageBuild)
+			response := pm.handleFailedPreFlightChecks(ctx, state, checkResult, convertFromTypesStage(types.StageBuild))
 			response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 			return response
 		}
 
 		// Mark pre-flight checks as passed
-		pm.markStagePreFlightPassed(state, types.StageBuild)
+		pm.markStagePreFlightPassed(state, convertFromTypesStage(types.StageBuild))
 	}
 
 	// Check if we need to gather build preferences
@@ -161,7 +162,7 @@ func (pm *PromptManager) handleBuildStage(ctx context.Context, state *Conversati
 	// Build already complete, determine next action based on user preferences
 	response := &ConversationResponse{
 		Message: fmt.Sprintf("%sImage built successfully: %s", progressPrefix, getDockerfileImageID(state.SessionState)),
-		Stage:   types.StageBuild,
+		Stage:   convertFromTypesStage(types.StageBuild),
 		Status:  ResponseStatusSuccess,
 	}
 
@@ -170,7 +171,7 @@ func (pm *PromptManager) handleBuildStage(ctx context.Context, state *Conversati
 
 	if hasAutopilot {
 		// Auto-advance to push stage
-		response.WithAutoAdvance(types.StagePush, AutoAdvanceConfig{
+		response.WithAutoAdvance(convertFromTypesStage(types.StagePush), AutoAdvanceConfig{
 			DelaySeconds:  2,
 			Confidence:    0.9,
 			Reason:        "Build successful, proceeding to push stage",
@@ -180,8 +181,8 @@ func (pm *PromptManager) handleBuildStage(ctx context.Context, state *Conversati
 		response.Message = response.GetAutoAdvanceMessage()
 	} else {
 		// Manual mode: ask user for input
-		state.SetStage(types.StagePush)
-		response.Stage = types.StagePush
+		state.SetStage(convertFromTypesStage(types.StagePush))
+		response.Stage = convertFromTypesStage(types.StagePush)
 		response.WithUserInput()
 		response.Message += "\n\nWould you like to push it to a registry?"
 		response.Options = []Option{
@@ -196,7 +197,7 @@ func (pm *PromptManager) handleBuildStage(ctx context.Context, state *Conversati
 // offerBuildDryRun offers a dry-run preview of the build
 func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  types.StageBuild,
+		Stage:  convertFromTypesStage(types.StageBuild),
 		Status: ResponseStatusProcessing,
 	}
 
@@ -206,7 +207,12 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 		"dry_run":    true,
 	}
 
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "build_image", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "build_image",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Failed to preview build: %v", err)
@@ -217,7 +223,7 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 	state.Context["build_dry_run_complete"] = true
 
 	// Format preview
-	details, _ := result.(map[string]interface{})
+	details, _ := resultStruct.Result.(map[string]interface{})
 	layers := getIntFromMap(details, "estimated_layers")
 	size := int64(getIntFromMap(details, "estimated_size"))
 	baseImage := genericutils.MapGetWithDefault[string](details, "base_image", "")
@@ -243,7 +249,7 @@ func (pm *PromptManager) offerBuildDryRun(ctx context.Context, state *Conversati
 // executeBuild performs the actual Docker build
 func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StageBuild,
+		Stage:   convertFromTypesStage(types.StageBuild),
 		Status:  ResponseStatusProcessing,
 		Message: "Building Docker image... This may take a few minutes.",
 	}
@@ -262,7 +268,12 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 
 	// Execute build
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "build_image", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "build_image",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -283,7 +294,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 
 		// Attempt automatic fix before showing manual options
 		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, types.StageBuild, err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(types.StageBuild), err, state) {
 			return response
 		}
 
@@ -297,11 +308,11 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct.Result
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Extract details from result
-	details, _ := result.(map[string]interface{})
+	details, _ := resultStruct.Result.(map[string]interface{})
 
 	// Update state with build results
 	setDockerfileBuilt(state.SessionState, true)
@@ -317,7 +328,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 		Type:    "docker-image",
 		Name:    "Docker Image",
 		Content: imageTag,
-		Stage:   types.StageBuild,
+		Stage:   convertFromTypesStage(types.StageBuild),
 		Metadata: map[string]interface{}{
 			"size":     details["size"],
 			"layers":   details["layers"],
@@ -327,7 +338,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 	state.AddArtifact(artifact)
 
 	// Success - move to push stage
-	state.SetStage(types.StagePush)
+	state.SetStage(convertFromTypesStage(types.StagePush))
 	response.Status = ResponseStatusSuccess
 	response.Message = fmt.Sprintf(
 		"✅ Image built successfully!\n\n"+
@@ -351,7 +362,7 @@ func (pm *PromptManager) executeBuild(ctx context.Context, state *ConversationSt
 // handlePushStage handles the Docker image push stage
 func (pm *PromptManager) handlePushStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	// Add progress indicator and stage intro
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(types.StagePush), getStageIntro(types.StagePush))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StagePush)), getStageIntro(convertFromTypesStage(types.StagePush)))
 
 	// Check for security scan request
 	if strings.Contains(strings.ToLower(input), "scan") {
@@ -362,33 +373,33 @@ func (pm *PromptManager) handlePushStage(ctx context.Context, state *Conversatio
 
 	// Check if user wants to skip push
 	if strings.Contains(strings.ToLower(input), "skip") || strings.Contains(strings.ToLower(input), "local") {
-		state.SetStage(types.StageManifests)
+		state.SetStage(convertFromTypesStage(types.StageManifests))
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sKeeping image local. Moving to Kubernetes manifest generation...", progressPrefix),
-			Stage:   types.StageManifests,
+			Stage:   convertFromTypesStage(types.StageManifests),
 			Status:  ResponseStatusSuccess,
 		}
 	}
 
 	// Run pre-flight checks for push stage
-	if !pm.hasPassedStagePreFlightChecks(state, types.StagePush) {
-		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, types.StagePush, state.SessionState)
+	if !pm.hasPassedStagePreFlightChecks(state, convertFromTypesStage(types.StagePush)) {
+		checkResult, err := pm.preFlightChecker.RunStageChecks(ctx, convertFromTypesStage(types.StagePush), state.SessionState)
 		if err != nil {
 			return &ConversationResponse{
 				Message: fmt.Sprintf("%sFailed to run pre-flight checks: %v", progressPrefix, err),
-				Stage:   types.StagePush,
+				Stage:   convertFromTypesStage(types.StagePush),
 				Status:  ResponseStatusError,
 			}
 		}
 
 		if !checkResult.Passed {
-			response := pm.handleFailedPreFlightChecks(ctx, state, checkResult, types.StagePush)
+			response := pm.handleFailedPreFlightChecks(ctx, state, checkResult, convertFromTypesStage(types.StagePush))
 			response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 			return response
 		}
 
 		// Mark pre-flight checks as passed
-		pm.markStagePreFlightPassed(state, types.StagePush)
+		pm.markStagePreFlightPassed(state, convertFromTypesStage(types.StagePush))
 	}
 
 	// Check if we need registry information
@@ -415,7 +426,7 @@ func (pm *PromptManager) gatherRegistryInfo(ctx context.Context, state *Conversa
 
 	return &ConversationResponse{
 		Message: "Which container registry would you like to use?",
-		Stage:   types.StagePush,
+		Stage:   convertFromTypesStage(types.StagePush),
 		Status:  ResponseStatusWaitingInput,
 		Options: []Option{
 			{ID: "dockerhub", Label: "Docker Hub (docker.io)"},
@@ -430,7 +441,7 @@ func (pm *PromptManager) gatherRegistryInfo(ctx context.Context, state *Conversa
 // executePush performs the Docker push
 func (pm *PromptManager) executePush(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StagePush,
+		Stage:   convertFromTypesStage(types.StagePush),
 		Status:  ResponseStatusProcessing,
 		Message: "Pushing image to registry...",
 	}
@@ -446,14 +457,19 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 	}
 
 	// First try dry-run to check access
-	dryResult, err := pm.toolOrchestrator.ExecuteTool(ctx, "push_image", params, state.SessionState.SessionID)
+	dryReq := mcp.ToolExecutionRequest{
+		ToolName: "push_image",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	dryResultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, dryReq)
 	if err != nil {
 		// Log dry-run failure but continue
 		pm.logger.Debug().Err(err).Msg("Dry-run push failed, proceeding with actual push")
 	}
-	if dryResult != nil {
+	if dryResultStruct != nil && dryResultStruct.Result != nil {
 		// Check if dry-run failed by examining the result
-		if dryResultMap, ok := dryResult.(map[string]interface{}); ok {
+		if dryResultMap, ok := dryResultStruct.Result.(map[string]interface{}); ok {
 			if success, ok := dryResultMap["success"].(bool); ok && !success {
 				errorMsg := "unknown error"
 				if errStr, ok := dryResultMap["error"].(string); ok {
@@ -473,7 +489,12 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 
 	// Execute actual push
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "push_image", params, state.SessionState.SessionID)
+	req := mcp.ToolExecutionRequest{
+		ToolName: "push_image",
+		Args:     params,
+		Metadata: map[string]interface{}{"session_id": state.SessionState.SessionID},
+	}
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, req)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -494,7 +515,7 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 
 		// Attempt automatic fix before showing manual options
 		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, types.StagePush, err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(types.StagePush), err, state) {
 			return response
 		}
 
@@ -508,7 +529,7 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct.Result
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Update state
@@ -520,7 +541,7 @@ func (pm *PromptManager) executePush(ctx context.Context, state *ConversationSta
 	setImageRefTag(state.SessionState, extractTag(imageRef))
 
 	// Success - move to manifests
-	state.SetStage(types.StageManifests)
+	state.SetStage(convertFromTypesStage(types.StageManifests))
 	response.Status = ResponseStatusSuccess
 	response.Message = fmt.Sprintf(
 		"✅ Image pushed successfully!\n\n"+

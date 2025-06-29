@@ -8,9 +8,10 @@ import (
 	"time"
 
 	// mcp import removed - using mcptypes
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/prometheus/client_golang/prometheus"
 
 	dto "github.com/prometheus/client_model/go"
@@ -92,7 +93,7 @@ func (t *GetTelemetryMetricsTool) ExecuteTyped(ctx context.Context, args GetTele
 	}
 
 	if args.Format != "prometheus" && args.Format != "json" {
-		return nil, mcptypes.NewRichError(
+		return nil, mcp.NewRichError(
 			"INVALID_ARGUMENTS",
 			fmt.Sprintf("unsupported format: %s (supported: prometheus, json)", args.Format),
 			"validation_error",
@@ -289,7 +290,7 @@ func (t *GetTelemetryMetricsTool) parseTimeRange(timeRange string) (time.Time, e
 		return time.Now().Add(-duration), nil
 	}
 
-	return time.Time{}, mcptypes.NewRichError(
+	return time.Time{}, mcp.NewRichError(
 		"INVALID_ARGUMENTS",
 		"time range must be either a duration (e.g., '1h', '24h') or RFC3339 timestamp",
 		"validation_error",
@@ -394,8 +395,8 @@ func (t *GetTelemetryMetricsTool) countMetricFamilies(families []*dto.MetricFami
 	return count
 }
 
-func (t *GetTelemetryMetricsTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *GetTelemetryMetricsTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:        "get_telemetry_metrics",
 		Description: "Export telemetry metrics in Prometheus format with filtering and analysis",
 		Version:     "1.0.0",

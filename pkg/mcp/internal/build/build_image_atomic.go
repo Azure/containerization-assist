@@ -8,9 +8,10 @@ import (
 	// mcp import removed - using mcptypes
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -62,7 +63,7 @@ type AtomicBuildImageResult struct {
 // AtomicBuildImageTool is the main tool for atomic Docker image building
 type AtomicBuildImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
+	sessionManager  mcp.ToolSessionManager
 	logger          zerolog.Logger
 	// Module components
 	contextAnalyzer *BuildContextAnalyzer
@@ -72,7 +73,7 @@ type AtomicBuildImageTool struct {
 }
 
 // NewAtomicBuildImageTool creates a new atomic build image tool
-func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
+func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicBuildImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_build_image").Logger()
 	// Initialize all modules
 	contextAnalyzer := NewBuildContextAnalyzer(toolLogger)
@@ -90,7 +91,7 @@ func NewAtomicBuildImageTool(adapter mcptypes.PipelineOperations, sessionManager
 }
 
 // SetAnalyzer enables AI-driven fixing capabilities by providing an analyzer
-func (t *AtomicBuildImageTool) SetAnalyzer(analyzer mcptypes.AIAnalyzer) {
+func (t *AtomicBuildImageTool) SetAnalyzer(analyzer mcp.AIAnalyzer) {
 	if analyzer != nil {
 		t.fixingMixin = NewAtomicToolFixingMixin(analyzer, "atomic_build_image", t.logger)
 	}
@@ -144,8 +145,8 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 
 // Tool interface implementation (unified MCP interface)
 // GetMetadata returns comprehensive tool metadata
-func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicBuildImageTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:         "atomic_build_image",
 		Description:  "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
 		Version:      "1.0.0",
@@ -191,18 +192,18 @@ func (t *AtomicBuildImageTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) error {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
-		return mcptypes.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
+		return mcp.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
 			WithField("expected", "AtomicBuildImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
 	if buildArgs.ImageName == "" {
-		return mcptypes.NewErrorBuilder("IMAGE_NAME_REQUIRED", "ImageName is required", "validation_error").
+		return mcp.NewErrorBuilder("IMAGE_NAME_REQUIRED", "ImageName is required", "validation_error").
 			WithField("field", "image_name").
 			Build()
 	}
 	if buildArgs.SessionID == "" {
-		return mcptypes.NewErrorBuilder("SESSION_ID_REQUIRED", "SessionID is required", "validation_error").
+		return mcp.NewErrorBuilder("SESSION_ID_REQUIRED", "SessionID is required", "validation_error").
 			WithField("field", "session_id").
 			Build()
 	}
@@ -213,7 +214,7 @@ func (t *AtomicBuildImageTool) Validate(ctx context.Context, args interface{}) e
 func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	buildArgs, ok := args.(AtomicBuildImageArgs)
 	if !ok {
-		return nil, mcptypes.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
+		return nil, mcp.NewErrorBuilder("INVALID_ARGUMENTS", "Invalid argument type for atomic_build_image", "validation_error").
 			WithField("expected", "AtomicBuildImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()

@@ -10,13 +10,13 @@ import (
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
@@ -178,7 +178,7 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
 			PerCallTimeout: 60 * time.Second,
 		})
-		mcpClients.SetAnalyzer(callerAnalyzer)
+		mcpClients.Analyzer = callerAnalyzer
 
 		// Also set the analyzer on the tool orchestrator for fixing capabilities
 		if s.toolOrchestrator != nil {

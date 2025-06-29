@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -208,7 +208,7 @@ func GetBuildContext(buildContext string, workspaceDir string) (string, error) {
 	}
 	// Validate the path exists
 	if _, err := os.Stat(buildContext); err != nil {
-		return "", mcptypes.NewErrorBuilder("invalid_arguments", "build context directory does not exist", "validation").
+		return "", mcp.NewErrorBuilder("invalid_arguments", "build context directory does not exist", "validation").
 			WithSeverity("high").
 			WithOperation("GetBuildContext").
 			WithField("buildContext", buildContext).

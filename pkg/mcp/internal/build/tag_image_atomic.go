@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp"
+
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -80,14 +82,14 @@ type TagContext struct {
 // AtomicTagImageTool implements atomic Docker image tagging using core operations
 type AtomicTagImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
+	sessionManager  mcp.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        ToolAnalyzer
 	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicTagImageTool creates a new atomic tag image tool
-func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
+func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager mcp.ToolSessionManager, logger zerolog.Logger) *AtomicTagImageTool {
 	toolLogger := logger.With().Str("tool", "atomic_tag_image").Logger()
 	return &AtomicTagImageTool{
 		pipelineAdapter: adapter,
@@ -229,7 +231,7 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 			WithCommand(2, "Create new session", "Create a new session if the current one is invalid", "analyze_repository --repo_path /path/to/repo", "New session created").
 			Build()
 	}
-	session := sessionInterface.(*mcptypes.SessionState)
+	session := sessionInterface.(*mcp.SessionState)
 	// Set session details
 	result.SessionID = session.SessionID // Use compatibility method
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
@@ -282,13 +284,13 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 }
 
 // performTag executes the actual Docker tag operation
-func (t *AtomicTagImageTool) performTag(ctx context.Context, session *mcptypes.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter interface{}) error {
+func (t *AtomicTagImageTool) performTag(ctx context.Context, session *mcp.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter interface{}) error {
 	// Get session if not provided
 	if session == nil {
 		var err error
 		sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 		if err == nil {
-			session = sessionInterface.(*mcptypes.SessionState)
+			session = sessionInterface.(*mcp.SessionState)
 		}
 		if err != nil {
 			t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
@@ -357,7 +359,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *mcptypes.S
 	session.UpdatedAt = time.Now()
 	// Save session state
 	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*mcptypes.SessionState); ok {
+		if sess, ok := s.(*mcp.SessionState); ok {
 			*sess = *session
 		}
 	})
@@ -367,14 +369,14 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *mcptypes.S
 func (t *AtomicTagImageTool) validateTagPrerequisites(result *AtomicTagImageResult, args AtomicTagImageArgs) error {
 	// Basic input validation using RichError
 	if args.SourceImage == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Source image reference is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Source image reference is required", "validation_error").
 			WithOperation("tag_image").
 			WithStage("input_validation").
 			WithImmediateStep(1, "Provide source image", "Specify a valid Docker image reference like 'nginx:latest'").
 			Build()
 	}
 	if args.TargetImage == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Target image reference is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Target image reference is required", "validation_error").
 			WithOperation("tag_image").
 			WithStage("input_validation").
 			WithImmediateStep(1, "Provide target image", "Specify a target image name with tag like 'myregistry.com/nginx:production'").
@@ -382,7 +384,7 @@ func (t *AtomicTagImageTool) validateTagPrerequisites(result *AtomicTagImageResu
 	}
 	// Validate image name formats using RichError
 	if !t.isValidImageReference(args.SourceImage) {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid source image reference format", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid source image reference format", "validation_error").
 			WithOperation("tag_image").
 			WithStage("format_validation").
 			WithRootCause("Image reference does not match required Docker naming conventions").
@@ -390,7 +392,7 @@ func (t *AtomicTagImageTool) validateTagPrerequisites(result *AtomicTagImageResu
 			Build()
 	}
 	if !t.isValidImageReference(args.TargetImage) {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid target image reference format", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid target image reference format", "validation_error").
 			WithOperation("tag_image").
 			WithStage("format_validation").
 			WithRootCause("Image reference does not match required Docker naming conventions").
@@ -431,34 +433,34 @@ func (t *AtomicTagImageTool) extractRegistryURL(imageRef string) string {
 func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) error {
 	tagArgs, ok := args.(AtomicTagImageArgs)
 	if !ok {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_tag_image", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_tag_image", "validation_error").
 			WithField("expected", "AtomicTagImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
 	}
 	if tagArgs.SourceImage == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "SourceImage is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "SourceImage is required", "validation_error").
 			WithField("field", "source_image").
 			Build()
 	}
 	if tagArgs.TargetImage == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "TargetImage is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "TargetImage is required", "validation_error").
 			WithField("field", "target_image").
 			Build()
 	}
 	if tagArgs.SessionID == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "SessionID is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "SessionID is required", "validation_error").
 			WithField("field", "session_id").
 			Build()
 	}
 	// Validate image reference formats
 	if !t.isValidImageReference(tagArgs.SourceImage) {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid source image reference", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid source image reference", "validation_error").
 			WithField("field", "source_image").
 			Build()
 	}
 	if !t.isValidImageReference(tagArgs.TargetImage) {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid target image reference", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid target image reference", "validation_error").
 			WithField("field", "target_image").
 			Build()
 	}
@@ -469,7 +471,7 @@ func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) err
 func (t *AtomicTagImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	tagArgs, ok := args.(AtomicTagImageArgs)
 	if !ok {
-		return nil, mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_tag_image", "validation_error").
+		return nil, mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid argument type for atomic_tag_image", "validation_error").
 			WithField("expected", "AtomicTagImageArgs").
 			WithField("received", fmt.Sprintf("%T", args)).
 			Build()
@@ -480,8 +482,8 @@ func (t *AtomicTagImageTool) Execute(ctx context.Context, args interface{}) (int
 
 // Tool interface implementation (unified interface)
 // GetMetadata returns comprehensive tool metadata
-func (t *AtomicTagImageTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicTagImageTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:         "atomic_tag_image",
 		Description:  "Tags Docker images with new names for versioning, environment promotion, or registry organization",
 		Version:      "1.0.0",

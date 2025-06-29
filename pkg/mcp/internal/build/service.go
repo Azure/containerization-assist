@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
@@ -48,7 +48,7 @@ func (s *ValidationService) RegisterSchema(name string, schema interface{}) {
 // TODO: Implement without runtime dependency
 func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Session ID is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Session ID is required", "validation_error").
 			WithOperation("validate_session").
 			WithStage("input_validation").
 			WithRootCause("Session ID parameter is empty or missing").
@@ -58,7 +58,7 @@ func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID str
 	}
 	// Check format (alphanumeric with hyphens)
 	if !regexp.MustCompile(`^[a-zA-Z0-9\-_]+$`).MatchString(sessionID) {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Session ID contains invalid characters", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Session ID contains invalid characters", "validation_error").
 			WithOperation("validate_session").
 			WithStage("format_validation").
 			WithRootCause("Session ID contains characters other than letters, numbers, hyphens, or underscores").
@@ -68,7 +68,7 @@ func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID str
 	}
 	// Check length
 	if len(sessionID) < 3 || len(sessionID) > 64 {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Session ID length is invalid", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Session ID length is invalid", "validation_error").
 			WithField("length", len(sessionID)).
 			WithField("min_length", 3).
 			WithField("max_length", 64).
@@ -87,7 +87,7 @@ func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID str
 // TODO: Implement without runtime dependency
 func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef string) error {
 	if imageRef == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Image reference is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Image reference is required", "validation_error").
 			WithOperation("validate_image").
 			WithStage("input_validation").
 			WithRootCause("Image reference parameter is empty or missing").
@@ -98,7 +98,7 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 	// Basic format validation
 	parts := strings.Split(imageRef, ":")
 	if len(parts) > 2 {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid image reference format", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid image reference format", "validation_error").
 			WithOperation("validate_image").
 			WithStage("format_validation").
 			WithRootCause("Image reference contains more than one colon separator").
@@ -108,7 +108,7 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 	}
 	// Check for invalid characters
 	if strings.Contains(imageRef, " ") {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Image reference cannot contain spaces", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Image reference cannot contain spaces", "validation_error").
 			WithOperation("validate_image").
 			WithStage("format_validation").
 			WithRootCause("Docker image references cannot contain whitespace characters").
@@ -120,7 +120,7 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 	if !strings.Contains(imageRef, "/") && !strings.Contains(imageRef, ":") {
 		// Single name images should be official images
 		if len(imageRef) < 2 {
-			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Image reference too short", "validation_error").
+			return mcp.NewErrorBuilder("VALIDATION_ERROR", "Image reference too short", "validation_error").
 				WithField("length", len(imageRef)).
 				WithField("min_length", 2).
 				WithOperation("validate_image").
@@ -139,7 +139,7 @@ func (s *ValidationService) ValidateImageReference(ctx context.Context, imageRef
 // TODO: Implement without runtime dependency
 func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, mustExist bool) error {
 	if path == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "File path is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "File path is required", "validation_error").
 			WithOperation("validate_file_path").
 			WithStage("input_validation").
 			WithRootCause("File path parameter is empty or missing").
@@ -149,7 +149,7 @@ func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, m
 	}
 	// Check for path traversal attempts
 	if strings.Contains(path, "..") {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Path traversal is not allowed", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Path traversal is not allowed", "validation_error").
 			WithOperation("validate_file_path").
 			WithStage("security_validation").
 			WithRootCause("File path contains directory traversal sequences (..)").
@@ -167,7 +167,7 @@ func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, m
 	// Check if file exists if required
 	if mustExist {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "File does not exist", "validation_error").
+			return mcp.NewErrorBuilder("VALIDATION_ERROR", "File does not exist", "validation_error").
 				WithOperation("validate_file_path").
 				WithStage("existence_check").
 				WithRootCause(fmt.Sprintf("Required file not found at path: %s", path)).
@@ -183,7 +183,7 @@ func (s *ValidationService) ValidateFilePath(ctx context.Context, path string, m
 		sensitive := []string{"/etc/passwd", "/etc/shadow", "/root"}
 		for _, s := range sensitive {
 			if strings.HasPrefix(path, s) {
-				return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Access to sensitive path is not allowed", "validation_error").
+				return mcp.NewErrorBuilder("VALIDATION_ERROR", "Access to sensitive path is not allowed", "validation_error").
 					WithField("sensitive_prefix", s).
 					WithOperation("validate_file_path").
 					WithStage("security_validation").
@@ -211,7 +211,7 @@ func (s *ValidationService) ValidateJSON(ctx context.Context, content []byte, sc
 	// Basic JSON validation
 	var data interface{}
 	if err := json.Unmarshal(content, &data); err != nil {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid JSON content", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid JSON content", "validation_error").
 			WithOperation("validate_json").
 			WithStage("json_parsing").
 			WithRootCause(fmt.Sprintf("JSON parsing failed: %v", err)).
@@ -223,7 +223,7 @@ func (s *ValidationService) ValidateJSON(ctx context.Context, content []byte, sc
 	// Schema validation if schema is registered
 	if schema, exists := s.schemas[schemaName]; exists {
 		if err := s.validateAgainstSchema(data, schema); err != nil {
-			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "JSON schema validation failed", "validation_error").
+			return mcp.NewErrorBuilder("VALIDATION_ERROR", "JSON schema validation failed", "validation_error").
 				WithOperation("validate_json").
 				WithStage("schema_validation").
 				WithRootCause(fmt.Sprintf("Content does not match schema %s: %v", schemaName, err)).

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/factory"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -174,10 +175,14 @@ func main() {
 		Str("workspace_dir", config.WorkspaceDir).
 		Msg("Starting Container Kit MCP Server")
 
-	// Create server
-	server, err := mcp.NewServer(context.Background(), config)
+	// Create server using the factory
+	server, err := factory.NewServer(context.Background(), config)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create server")
+		os.Exit(1)
+	}
+	if server == nil {
+		log.Error().Msg("Server is nil despite no error")
 		os.Exit(1)
 	}
 
@@ -474,37 +479,37 @@ func getVersion() string {
 }
 
 // runDemo runs the specified demo mode
-func runDemo(ctx context.Context, server *mcp.Server, demoMode string) error {
+func runDemo(ctx context.Context, server mcp.Server, demoMode string) error {
 	log.Warn().Str("mode", demoMode).Msg("Demo mode temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runAllDemos runs all demonstration scenarios
-func runAllDemos(ctx context.Context, server *mcp.Server) error {
+func runAllDemos(ctx context.Context, server mcp.Server) error {
 	log.Warn().Msg("All demos temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runBasicWorkflowDemo demonstrates standard containerization workflow
-func runBasicWorkflowDemo(ctx context.Context, server *mcp.Server) error {
+func runBasicWorkflowDemo(ctx context.Context, server mcp.Server) error {
 	log.Warn().Msg("Basic workflow demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runErrorHandlingDemo demonstrates error handling and recovery
-func runErrorHandlingDemo(ctx context.Context, server *mcp.Server) error {
+func runErrorHandlingDemo(ctx context.Context, server mcp.Server) error {
 	log.Warn().Msg("Error handling demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runSessionManagementDemo demonstrates session lifecycle
-func runSessionManagementDemo(ctx context.Context, server *mcp.Server) error {
+func runSessionManagementDemo(ctx context.Context, server mcp.Server) error {
 	log.Warn().Msg("Session management demo temporarily disabled due to API restructuring")
 	return nil
 }
 
 // runPerformanceDemo demonstrates performance monitoring
-func runPerformanceDemo(ctx context.Context, server *mcp.Server) error {
+func runPerformanceDemo(ctx context.Context, server mcp.Server) error {
 	log.Warn().Msg("Performance demo temporarily disabled due to API restructuring")
 	return nil
 }

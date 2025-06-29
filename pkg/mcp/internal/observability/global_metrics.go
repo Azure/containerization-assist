@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -34,7 +34,7 @@ func GetGlobalErrorMetrics() *ErrorMetrics {
 }
 
 // RecordRichError is a convenience function to record errors globally
-func RecordRichError(ctx context.Context, err *mcptypes.RichError) {
+func RecordRichError(ctx context.Context, err *mcp.RichError) {
 	if err == nil {
 		return
 	}
@@ -56,7 +56,7 @@ func RecordRichError(ctx context.Context, err *mcptypes.RichError) {
 }
 
 // RecordErrorResolution is a convenience function to record error resolutions globally
-func RecordErrorResolution(ctx context.Context, err *mcptypes.RichError, resolutionType string, duration time.Duration) {
+func RecordErrorResolution(ctx context.Context, err *mcp.RichError, resolutionType string, duration time.Duration) {
 	if err == nil {
 		return
 	}
@@ -76,7 +76,7 @@ func RecordErrorResolution(ctx context.Context, err *mcptypes.RichError, resolut
 }
 
 // EnrichErrorContext adds observability context to errors globally
-func EnrichErrorContext(ctx context.Context, err *mcptypes.RichError) {
+func EnrichErrorContext(ctx context.Context, err *mcp.RichError) {
 	if err == nil {
 		return
 	}

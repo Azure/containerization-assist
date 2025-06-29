@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	// mcp import removed - using mcptypes
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -83,13 +81,13 @@ func (t *DeleteSessionTool) ExecuteTyped(ctx context.Context, args DeleteSession
 
 	// Validate session ID
 	if args.SessionID == "" {
-		return nil, mcptypes.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return nil, mcp.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
 	}
 
 	// Check if session exists
 	session, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
-		return nil, mcptypes.NewRichError("INTERNAL_SERVER_ERROR", "failed to get session: "+err.Error(), "execution_error")
+		return nil, mcp.NewRichError("INTERNAL_SERVER_ERROR", "failed to get session: "+err.Error(), "execution_error")
 	}
 	if session == nil {
 		return &DeleteSessionResult{
@@ -144,7 +142,7 @@ func (t *DeleteSessionTool) ExecuteTyped(ctx context.Context, args DeleteSession
 
 	// Delete the session from persistence
 	if err := t.sessionManager.DeleteSession(args.SessionID); err != nil {
-		return nil, mcptypes.NewRichError("INTERNAL_SERVER_ERROR", "failed to delete session: "+err.Error(), "execution_error")
+		return nil, mcp.NewRichError("INTERNAL_SERVER_ERROR", "failed to delete session: "+err.Error(), "execution_error")
 	}
 
 	// Delete workspace if requested
@@ -181,8 +179,8 @@ func (t *DeleteSessionTool) ExecuteTyped(ctx context.Context, args DeleteSession
 }
 
 // GetMetadata returns comprehensive metadata about the delete session tool
-func (t *DeleteSessionTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *DeleteSessionTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:        "delete_session",
 		Description: "Delete a session and optionally its workspace with safety checks",
 		Version:     "1.0.0",
@@ -210,7 +208,7 @@ func (t *DeleteSessionTool) GetMetadata() mcptypes.ToolMetadata {
 			"force":            "Optional: Force deletion even if jobs are running",
 			"delete_workspace": "Optional: Also delete the workspace directory",
 		},
-		Examples: []mcptypes.ToolExample{
+		Examples: []mcp.ToolExample{
 			{
 				Name:        "Delete inactive session",
 				Description: "Delete a session with no active jobs",

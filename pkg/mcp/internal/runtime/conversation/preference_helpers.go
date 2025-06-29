@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -112,15 +113,19 @@ func (pm *PromptManager) handlePendingDecision(ctx context.Context, state *Conve
 	}
 
 	// Continue with the stage
-	switch state.CurrentStage {
-	case types.StageDockerfile:
-		return pm.generateDockerfile(ctx, state)
-	default:
-		return &ConversationResponse{
-			Message: "Let's continue...",
-			Stage:   state.CurrentStage,
-			Status:  ResponseStatusSuccess,
+	// Check if current stage maps to dockerfile generation
+	if state.CurrentStage == mcp.ConversationStageBuild {
+		// Check detailed stage from context
+		if detailedStage, ok := state.Context["detailed_stage"].(string); ok &&
+			types.ConversationStage(detailedStage) == types.StageDockerfile {
+			return pm.generateDockerfile(ctx, state)
 		}
+	}
+
+	return &ConversationResponse{
+		Message: "Let's continue...",
+		Stage:   state.CurrentStage,
+		Status:  ResponseStatusSuccess,
 	}
 }
 
@@ -164,7 +169,7 @@ func (pm *PromptManager) generateSummary(ctx context.Context, state *Conversatio
 
 	return &ConversationResponse{
 		Message: summary.String(),
-		Stage:   types.StageCompleted,
+		Stage:   convertFromTypesStage(types.StageCompleted),
 		Status:  ResponseStatusSuccess,
 	}
 }
@@ -192,7 +197,7 @@ func (pm *PromptManager) exportArtifacts(ctx context.Context, state *Conversatio
 
 	return &ConversationResponse{
 		Message: exports.String(),
-		Stage:   types.StageCompleted,
+		Stage:   convertFromTypesStage(types.StageCompleted),
 		Status:  ResponseStatusSuccess,
 	}
 }

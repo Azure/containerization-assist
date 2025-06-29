@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 )
 
 // StageValidator handles validation of workflow stages
 type StageValidator struct {
-	toolRegistry InternalToolRegistry
+	toolRegistry mcp.ToolRegistry
 }
 
 // NewStageValidator creates a new stage validator
-func NewStageValidator(toolRegistry InternalToolRegistry) *StageValidator {
+func NewStageValidator(toolRegistry mcp.ToolRegistry) *StageValidator {
 	return &StageValidator{
 		toolRegistry: toolRegistry,
 	}
@@ -57,7 +57,7 @@ func (sv *StageValidator) Validate(ctx context.Context, stage *WorkflowStage) er
 // validateBasicRequirements checks basic stage requirements
 func (sv *StageValidator) validateBasicRequirements(ctx context.Context, stage *WorkflowStage) error {
 	if stage.Name == "" {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Stage name is required", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Stage name is required", "validation_error").
 			WithOperation("validate_stage").
 			WithStage("basic_requirements").
 			WithRootCause("Stage name field is empty").
@@ -67,7 +67,7 @@ func (sv *StageValidator) validateBasicRequirements(ctx context.Context, stage *
 	}
 
 	if len(stage.Tools) == 0 {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Stage must specify at least one tool", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Stage must specify at least one tool", "validation_error").
 			WithField("stage_name", stage.Name).
 			WithOperation("validate_stage").
 			WithStage("basic_requirements").
@@ -84,7 +84,7 @@ func (sv *StageValidator) validateBasicRequirements(ctx context.Context, stage *
 func (sv *StageValidator) validateTools(stage *WorkflowStage) error {
 	for _, toolName := range stage.Tools {
 		if _, err := sv.toolRegistry.GetTool(toolName); err != nil {
-			return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Invalid tool in stage", "validation_error").
+			return mcp.NewErrorBuilder("VALIDATION_ERROR", "Invalid tool in stage", "validation_error").
 				WithField("stage_name", stage.Name).
 				WithOperation("validate_stage").
 				WithStage("tool_validation").
@@ -101,7 +101,7 @@ func (sv *StageValidator) validateTools(stage *WorkflowStage) error {
 // validateTimeout validates timeout configuration
 func (sv *StageValidator) validateTimeout(stage *WorkflowStage) error {
 	if stage.Timeout != nil && *stage.Timeout <= 0 {
-		return mcptypes.NewErrorBuilder("VALIDATION_ERROR", "Stage timeout must be positive", "validation_error").
+		return mcp.NewErrorBuilder("VALIDATION_ERROR", "Stage timeout must be positive", "validation_error").
 			WithField("stage_name", stage.Name).
 			WithOperation("validate_stage").
 			WithStage("timeout_validation").

@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"strings"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
 // OperationWrapper wraps deployment operations with fixing capabilities
 type OperationWrapper struct {
 	originalOperation func(ctx context.Context) error
-	failureAnalyzer   func(ctx context.Context, err error) (*mcptypes.RichError, error)
-	retryPreparer     func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error
+	failureAnalyzer   func(ctx context.Context, err error) (*mcp.RichError, error)
+	retryPreparer     func(ctx context.Context, fixAttempt *mcp.FixAttempt) error
 	canRetry          func() bool
 	lastError         error
 	logger            zerolog.Logger
@@ -22,8 +22,8 @@ type OperationWrapper struct {
 // NewDeployOperationWrapper creates a wrapper for deployment operations
 func NewDeployOperationWrapper(
 	operation func(ctx context.Context) error,
-	analyzer func(ctx context.Context, err error) (*mcptypes.RichError, error),
-	preparer func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error,
+	analyzer func(ctx context.Context, err error) (*mcp.RichError, error),
+	preparer func(ctx context.Context, fixAttempt *mcp.FixAttempt) error,
 	logger zerolog.Logger,
 ) *OperationWrapper {
 	return &OperationWrapper{
@@ -55,7 +55,7 @@ func (w *OperationWrapper) Execute(ctx context.Context) error {
 }
 
 // GetFailureAnalysis implements mcptypes.FixableOperation
-func (w *OperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
+func (w *OperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
 	if w.failureAnalyzer != nil {
 		return w.failureAnalyzer(ctx, err)
 	}
@@ -65,7 +65,7 @@ func (w *OperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*
 }
 
 // PrepareForRetry implements mcptypes.FixableOperation
-func (w *OperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (w *OperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	if w.retryPreparer != nil {
 		return w.retryPreparer(ctx, fixAttempt)
 	}
@@ -85,7 +85,7 @@ func (w *OperationWrapper) GetLastError() error {
 }
 
 // analyzeDeploymentError provides rich error analysis for deployment failures
-func analyzeDeploymentError(err error) (*mcptypes.RichError, error) {
+func analyzeDeploymentError(err error) (*mcp.RichError, error) {
 	if err == nil {
 		return nil, nil
 	}
@@ -159,7 +159,7 @@ func analyzeDeploymentError(err error) (*mcptypes.RichError, error) {
 		contextInfo += ", suggested_fix=reduce resource requests or scale cluster, escalation_target=generate_manifests"
 	}
 
-	return &mcptypes.RichError{
+	return &mcp.RichError{
 		Code:     code,
 		Type:     errorType,
 		Severity: severity,

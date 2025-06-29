@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -83,7 +84,7 @@ func TestStdioErrorHandler_HandleRichError(t *testing.T) {
 	handler := NewStdioErrorHandler(logger)
 
 	// Create a rich error with comprehensive information
-	richErr := mcptypes.NewRichError("BUILD_FAILED", "Docker build failed", "build_error")
+	richErr := mcp.NewRichError("BUILD_FAILED", "Docker build failed", "build_error")
 	richErr.Severity = "high"
 	richErr.Context.Operation = "docker_build"
 	richErr.Context.Stage = "compilation"
@@ -92,13 +93,7 @@ func TestStdioErrorHandler_HandleRichError(t *testing.T) {
 	richErr.Diagnostics.Symptoms = []string{"Package not found", "Build step failed"}
 
 	// Add resolution steps
-	richErr.Resolution.ImmediateSteps = []struct {
-		Order       int    `json:"order"`
-		Action      string `json:"action"`
-		Description string `json:"description"`
-		Command     string `json:"command"`
-		Expected    string `json:"expected"`
-	}{
+	richErr.Resolution.ImmediateSteps = []mcp.ResolutionStep{
 		{
 			Order:       1,
 			Action:      "Check Dockerfile",
@@ -109,12 +104,7 @@ func TestStdioErrorHandler_HandleRichError(t *testing.T) {
 	}
 
 	// Add alternatives
-	richErr.Resolution.Alternatives = []struct {
-		Name        string   `json:"name"`
-		Description string   `json:"description"`
-		Steps       []string `json:"steps"`
-		Confidence  float64  `json:"confidence"`
-	}{
+	richErr.Resolution.Alternatives = []mcp.Alternative{
 		{
 			Name:        "Use different base image",
 			Description: "Try using alpine instead of ubuntu",
@@ -124,15 +114,9 @@ func TestStdioErrorHandler_HandleRichError(t *testing.T) {
 	}
 
 	// Add retry strategy
-	richErr.Resolution.RetryStrategy = struct {
-		Recommended     bool     `json:"recommended"`
-		WaitTime        int      `json:"wait_time"`
-		MaxAttempts     int      `json:"max_attempts"`
-		BackoffStrategy string   `json:"backoff_strategy"`
-		Conditions      []string `json:"conditions"`
-	}{
+	richErr.Resolution.RetryStrategy = mcp.RetryStrategy{
 		Recommended:     true,
-		WaitTime:        30,
+		WaitTime:        30 * time.Second,
 		MaxAttempts:     3,
 		BackoffStrategy: "exponential",
 		Conditions:      []string{"Fix Dockerfile", "Check network"},
@@ -176,7 +160,7 @@ func TestStdioErrorHandler_HandleRichError(t *testing.T) {
 	recommended, ok := retryStrategy["recommended"].(bool)
 	assert.True(t, ok, "recommended should be a bool")
 	assert.True(t, recommended)
-	assert.Equal(t, 30, retryStrategy["wait_time"])
+	assert.Equal(t, float64(30), retryStrategy["wait_time"])
 	assert.Equal(t, 3, retryStrategy["max_attempts"])
 
 	// Check diagnostics
@@ -255,18 +239,18 @@ func TestStdioErrorHandler_FormatErrorMessages(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		richErr  *mcptypes.RichError
+		richErr  *mcp.RichError
 		expected []string // Substrings that should be in the formatted message
 	}{
 		{
 			name:     "basic error",
-			richErr:  mcptypes.NewRichError("", "Build failed", "build_error"),
+			richErr:  mcp.NewRichError("", "Build failed", "build_error"),
 			expected: []string{"❌", "build_error", "Build failed"},
 		},
 		{
 			name: "error with context",
-			richErr: func() *mcptypes.RichError {
-				err := mcptypes.NewRichError("", "Deployment failed", "deploy_error")
+			richErr: func() *mcp.RichError {
+				err := mcp.NewRichError("", "Deployment failed", "deploy_error")
 				err.Context.Operation = "kubernetes_deploy"
 				err.Context.Stage = "apply"
 				err.Context.Component = "deployment"
@@ -276,15 +260,9 @@ func TestStdioErrorHandler_FormatErrorMessages(t *testing.T) {
 		},
 		{
 			name: "error with resolution steps",
-			richErr: func() *mcptypes.RichError {
-				err := mcptypes.NewRichError("", "Connection failed", "network_error")
-				err.Resolution.ImmediateSteps = []struct {
-					Order       int    `json:"order"`
-					Action      string `json:"action"`
-					Description string `json:"description"`
-					Command     string `json:"command"`
-					Expected    string `json:"expected"`
-				}{
+			richErr: func() *mcp.RichError {
+				err := mcp.NewRichError("", "Connection failed", "network_error")
+				err.Resolution.ImmediateSteps = []mcp.ResolutionStep{
 					{Order: 1, Action: "Check network", Command: "ping google.com"},
 					{Order: 2, Action: "Restart service", Command: "systemctl restart network"},
 				}

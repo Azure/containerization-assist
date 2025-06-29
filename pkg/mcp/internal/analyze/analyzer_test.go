@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,7 +64,7 @@ func TestAnalyzerFactory_CreateAnalyzer(t *testing.T) {
 			assert.Equal(t, tt.expectedType, actualType)
 
 			// Verify it implements the interface
-			var _ mcptypes.AIAnalyzer = analyzer
+			var _ mcp.AIAnalyzer = analyzer
 		})
 	}
 }

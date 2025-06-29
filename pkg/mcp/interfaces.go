@@ -53,6 +53,7 @@ type SessionState struct {
 	SessionID string
 	UserID    string
 	CreatedAt time.Time
+	UpdatedAt time.Time
 	ExpiresAt time.Time
 
 	WorkspaceDir string
@@ -92,13 +93,110 @@ type RepositoryInfo struct {
 
 // SecurityScanResult represents security scan results
 type SecurityScanResult struct {
-	HasVulnerabilities bool      `json:"has_vulnerabilities"`
-	CriticalCount      int       `json:"critical_count"`
-	HighCount          int       `json:"high_count"`
-	MediumCount        int       `json:"medium_count"`
-	LowCount           int       `json:"low_count"`
-	Vulnerabilities    []string  `json:"vulnerabilities"`
-	ScanTime           time.Time `json:"scan_time"`
+	Success            bool               `json:"success"`
+	HasVulnerabilities bool               `json:"has_vulnerabilities"`
+	ScannedAt          time.Time          `json:"scanned_at"`
+	ImageRef           string             `json:"image_ref"`
+	Scanner            string             `json:"scanner"`
+	Vulnerabilities    VulnerabilityCount `json:"vulnerabilities"`
+	CriticalCount      int                `json:"critical_count"`
+	HighCount          int                `json:"high_count"`
+	MediumCount        int                `json:"medium_count"`
+	LowCount           int                `json:"low_count"`
+	VulnerabilityList  []string           `json:"vulnerability_list"`
+	ScanTime           time.Time          `json:"scan_time"`
+}
+
+// VulnerabilityCount represents counts of vulnerabilities by severity
+type VulnerabilityCount struct {
+	Total    int `json:"total"`
+	Critical int `json:"critical"`
+	High     int `json:"high"`
+	Medium   int `json:"medium"`
+	Low      int `json:"low"`
+	Unknown  int `json:"unknown"`
+}
+
+// AlternativeStrategy represents an alternative approach or strategy
+type AlternativeStrategy struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Priority    int      `json:"priority"`
+	Commands    []string `json:"commands"`
+}
+
+// Server represents the MCP server interface
+type Server interface {
+	Start(ctx context.Context) error
+	Stop() error
+	Shutdown(ctx context.Context) error
+	EnableConversationMode(config ConversationConfig) error
+	GetStats() *ServerStats
+	GetSessionManagerStats() *SessionManagerStats
+	GetWorkspaceStats() *WorkspaceStats
+	GetLogger() interface{} // Returns the logger instance
+}
+
+// ServerConfig holds configuration for the MCP server
+type ServerConfig struct {
+	// Session management
+	WorkspaceDir      string
+	MaxSessions       int
+	SessionTTL        time.Duration
+	MaxDiskPerSession int64
+	TotalDiskLimit    int64
+
+	// Storage
+	StorePath string
+
+	// Transport
+	TransportType string // "stdio", "http"
+	HTTPAddr      string
+	HTTPPort      int
+	CORSOrigins   []string // CORS allowed origins
+	APIKey        string   // API key for authentication
+	RateLimit     int      // Requests per minute per IP
+
+	// Features
+	SandboxEnabled bool
+
+	// Logging
+	LogLevel       string
+	LogHTTPBodies  bool  // Log HTTP request/response bodies
+	MaxBodyLogSize int64 // Maximum size of bodies to log
+
+	// Cleanup
+	CleanupInterval time.Duration
+
+	// Job Management
+	MaxWorkers int
+	JobTTL     time.Duration
+
+	// OpenTelemetry configuration
+	EnableOTEL      bool
+	OTELEndpoint    string
+	OTELHeaders     map[string]string
+	ServiceName     string
+	ServiceVersion  string
+	Environment     string
+	TraceSampleRate float64
+}
+
+// ConversationConfig holds configuration for conversation mode
+type ConversationConfig struct {
+	EnableTelemetry          bool
+	TelemetryPort            int
+	PreferencesDBPath        string
+	PreferencesEncryptionKey string // Optional encryption key for preference store
+
+	// OpenTelemetry configuration
+	EnableOTEL      bool
+	OTELEndpoint    string
+	OTELHeaders     map[string]string
+	ServiceName     string
+	ServiceVersion  string
+	Environment     string
+	TraceSampleRate float64
 }
 
 // Transport represents MCP transport interface
@@ -152,6 +250,7 @@ type Orchestrator interface {
 type ToolRegistry interface {
 	Register(name string, factory ToolFactory) error
 	Get(name string) (ToolFactory, error)
+	GetTool(name string) (Tool, error)
 	List() []string
 	GetMetadata() map[string]ToolMetadata
 }
@@ -202,6 +301,42 @@ type StronglyTypedToolFactory[T Tool] interface {
 
 // TypedFactoryFunc represents typed factory function
 type TypedFactoryFunc[T Tool] func() T
+
+// ToolInstanceRegistry provides thread-safe storage for tool instances
+type ToolInstanceRegistry interface {
+	RegisterInstance(toolName string, factory ToolFactory) error
+	GetInstance(toolName string) (Tool, error)
+	ListTools() []string
+	HasTool(toolName string) bool
+}
+
+// ToolExecutionRequest represents a tool execution request
+type ToolExecutionRequest struct {
+	ToolName string                 `json:"tool_name"`
+	Args     map[string]interface{} `json:"args"`
+	Metadata map[string]interface{} `json:"metadata"`
+}
+
+// ToolExecutionResult represents the result of tool execution
+type ToolExecutionResult struct {
+	Result   interface{}            `json:"result"`
+	Error    error                  `json:"error"`
+	Metadata map[string]interface{} `json:"metadata"`
+}
+
+// ToolDispatcher manages tool instances and execution
+type ToolDispatcher interface {
+	RegisterTool(name string, factory ToolFactory, converter ArgConverter) error
+	ExecuteTool(ctx context.Context, toolName string, args map[string]interface{}) (interface{}, error)
+	ListTools() []string
+	GetToolsByCategory(category string) []string
+}
+
+// ToolOrchestrationExecutor handles tool execution within orchestration context
+type ToolOrchestrationExecutor interface {
+	ExecuteTool(ctx context.Context, request ToolExecutionRequest) (*ToolExecutionResult, error)
+	GetDispatcher() ToolDispatcher
+}
 
 // NewStronglyTypedFactory creates typed factory
 func NewStronglyTypedFactory[T Tool](factoryFunc TypedFactoryFunc[T], toolType string, metadata ToolMetadata) StronglyTypedToolFactory[T] {
@@ -687,9 +822,637 @@ type RecentError struct {
 	Context   map[string]interface{} `json:"context,omitempty"`
 }
 
+// ServerStats represents overall server statistics
+type ServerStats struct {
+	Transport string               `json:"transport"`
+	Sessions  *SessionManagerStats `json:"sessions"`
+	Workspace *WorkspaceStats      `json:"workspace"`
+	Uptime    time.Duration        `json:"uptime"`
+	StartTime time.Time            `json:"start_time"`
+}
+
+// SessionManagerStats represents session management statistics
+type SessionManagerStats struct {
+	ActiveSessions    int     `json:"active_sessions"`
+	TotalSessions     int     `json:"total_sessions"`
+	FailedSessions    int     `json:"failed_sessions"`
+	AverageSessionAge float64 `json:"average_session_age_minutes"`
+	SessionErrors     int     `json:"session_errors_last_hour"`
+}
+
+// WorkspaceStats represents workspace statistics
+type WorkspaceStats struct {
+	TotalDiskUsage int64 `json:"total_disk_usage"`
+	SessionCount   int   `json:"session_count"`
+	TotalFiles     int   `json:"total_files"`
+	DiskLimit      int64 `json:"disk_limit"`
+}
+
 // Circuit breaker states
 const (
 	CircuitBreakerClosed   = "closed"
 	CircuitBreakerOpen     = "open"
 	CircuitBreakerHalfOpen = "half-open"
 )
+
+// =============================================================================
+// SESSION MANAGEMENT INTERFACES (from types package)
+// =============================================================================
+
+// ToolSessionManager interface for managing tool sessions
+type ToolSessionManager interface {
+	GetSession(sessionID string) (interface{}, error)
+	GetSessionInterface(sessionID string) (interface{}, error)
+	GetOrCreateSession(sessionID string) (interface{}, error)
+	GetOrCreateSessionFromRepo(repoURL string) (interface{}, error)
+	UpdateSession(sessionID string, updateFunc func(interface{})) error
+	DeleteSession(ctx context.Context, sessionID string) error
+
+	ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error)
+	FindSessionByRepo(ctx context.Context, repoURL string) (interface{}, error)
+}
+
+// SessionMetadata contains metadata about sessions
+type SessionMetadata struct {
+	CreatedAt      time.Time `json:"created_at"`
+	LastAccessedAt time.Time `json:"last_accessed_at"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	WorkspaceSize  int64     `json:"workspace_size"`
+	OperationCount int       `json:"operation_count"`
+	CurrentStage   string    `json:"current_stage"`
+	Labels         []string  `json:"labels"`
+}
+
+// SessionData additional session data structure
+type SessionData struct {
+	ID           string                 `json:"id"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+	ExpiresAt    time.Time              `json:"expires_at"`
+	CurrentStage string                 `json:"current_stage"`
+	Metadata     map[string]interface{} `json:"metadata"`
+	IsActive     bool                   `json:"is_active"`
+	LastAccess   time.Time              `json:"last_access"`
+}
+
+// =============================================================================
+// PIPELINE OPERATIONS INTERFACE (from types package)
+// =============================================================================
+
+// PipelineOperations interface for pipeline operations
+type PipelineOperations interface {
+	GetSessionWorkspace(sessionID string) string
+	UpdateSessionFromDockerResults(sessionID string, result interface{}) error
+
+	BuildDockerImage(sessionID, imageRef, dockerfilePath string) (*BuildResult, error)
+	PullDockerImage(sessionID, imageRef string) error
+	PushDockerImage(sessionID, imageRef string) error
+	TagDockerImage(sessionID, sourceRef, targetRef string) error
+	ConvertToDockerState(sessionID string) (*DockerState, error)
+
+	GenerateKubernetesManifests(sessionID, imageRef, appName string, port int, cpuRequest, memoryRequest, cpuLimit, memoryLimit string) (*KubernetesManifestResult, error)
+	DeployToKubernetes(sessionID string, manifests []string) (*KubernetesDeploymentResult, error)
+	CheckApplicationHealth(sessionID, namespace, deploymentName string, timeout time.Duration) (*HealthCheckResult, error)
+
+	AcquireResource(sessionID, resourceType string) error
+	ReleaseResource(sessionID, resourceType string) error
+}
+
+// BuildResult different structure for pipeline operations
+type BuildResult struct {
+	ImageID  string      `json:"image_id"`
+	ImageRef string      `json:"image_ref"`
+	Success  bool        `json:"success"`
+	Error    *BuildError `json:"error,omitempty"`
+	Logs     string      `json:"logs,omitempty"`
+}
+
+// BuildError build-specific error
+type BuildError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+// DockerState docker state information
+type DockerState struct {
+	Images     []string `json:"images"`
+	Containers []string `json:"containers"`
+	Networks   []string `json:"networks"`
+	Volumes    []string `json:"volumes"`
+}
+
+// HealthCheckResult different structure for deployment health
+type HealthCheckResult struct {
+	Healthy     bool              `json:"healthy"`
+	Status      string            `json:"status"`
+	PodStatuses []PodStatus       `json:"pod_statuses"`
+	Error       *HealthCheckError `json:"error,omitempty"`
+}
+
+// PodStatus kubernetes pod status
+type PodStatus struct {
+	Name   string `json:"name"`
+	Ready  bool   `json:"ready"`
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// HealthCheckError health check specific error
+type HealthCheckError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+// KubernetesManifestResult k8s manifest generation result
+type KubernetesManifestResult struct {
+	Success   bool                `json:"success"`
+	Manifests []GeneratedManifest `json:"manifests"`
+	Error     *RichError          `json:"error,omitempty"`
+}
+
+// GeneratedManifest generated k8s manifest
+type GeneratedManifest struct {
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+// KubernetesDeploymentResult k8s deployment result
+type KubernetesDeploymentResult struct {
+	Success     bool       `json:"success"`
+	Namespace   string     `json:"namespace"`
+	Deployments []string   `json:"deployments"`
+	Services    []string   `json:"services"`
+	Error       *RichError `json:"error,omitempty"`
+}
+
+// =============================================================================
+// ITERATIVE FIXING INTERFACES (from types package)
+// =============================================================================
+
+// IterativeFixer interface for iterative fixing
+type IterativeFixer interface {
+	Fix(ctx context.Context, issue interface{}) (*FixingResult, error)
+	AttemptFix(ctx context.Context, issue interface{}, attempt int) (*FixingResult, error)
+	SetMaxAttempts(max int)
+	GetFixHistory() []FixAttempt
+	GetFailureRouting() map[string]string
+	GetFixStrategies() []string
+}
+
+// FixingResult result of fix attempts
+type FixingResult struct {
+	Success         bool                   `json:"success"`
+	Error           error                  `json:"error,omitempty"`
+	FixApplied      string                 `json:"fix_applied"`
+	Attempts        int                    `json:"attempts"`
+	Duration        time.Duration          `json:"duration"`
+	TotalDuration   time.Duration          `json:"total_duration"`
+	TotalAttempts   int                    `json:"total_attempts"`
+	FixHistory      []FixAttempt           `json:"fix_history"`
+	AllAttempts     []FixAttempt           `json:"all_attempts"`
+	FinalAttempt    *FixAttempt            `json:"final_attempt"`
+	RecommendedNext []string               `json:"recommended_next"`
+	Metadata        map[string]interface{} `json:"metadata"`
+}
+
+// FixAttempt individual fix attempt details
+type FixAttempt struct {
+	AttemptNumber  int                    `json:"attempt_number"`
+	Strategy       string                 `json:"strategy"`
+	FixStrategy    FixStrategy            `json:"fix_strategy"`
+	Error          error                  `json:"error,omitempty"`
+	Success        bool                   `json:"success"`
+	Duration       time.Duration          `json:"duration"`
+	StartTime      time.Time              `json:"start_time"`
+	EndTime        time.Time              `json:"end_time"`
+	AnalysisPrompt string                 `json:"analysis_prompt,omitempty"`
+	AnalysisResult string                 `json:"analysis_result,omitempty"`
+	Changes        []string               `json:"changes"`
+	FixedContent   string                 `json:"fixed_content,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata"`
+}
+
+// FixStrategy strategy for fixing errors
+type FixStrategy struct {
+	Name          string                             `json:"name"`
+	Description   string                             `json:"description"`
+	Type          string                             `json:"type"`
+	Priority      int                                `json:"priority"`
+	EstimatedTime time.Duration                      `json:"estimated_time"`
+	Applicable    func(error) bool                   `json:"-"`
+	Apply         func(context.Context, error) error `json:"-"`
+	FileChanges   []FileChange                       `json:"file_changes,omitempty"`
+	Commands      []string                           `json:"commands,omitempty"`
+	Metadata      map[string]interface{}             `json:"metadata"`
+}
+
+// FileChange file change description
+type FileChange struct {
+	FilePath   string `json:"file_path"`
+	Operation  string `json:"operation"`
+	Content    string `json:"content,omitempty"`
+	NewContent string `json:"new_content,omitempty"`
+	Reason     string `json:"reason"`
+}
+
+// FixableOperation interface for fixable operations
+type FixableOperation interface {
+	ExecuteOnce(ctx context.Context) error
+	GetFailureAnalysis(ctx context.Context, err error) (*RichError, error)
+	PrepareForRetry(ctx context.Context, fixAttempt *FixAttempt) error
+	Execute(ctx context.Context) error
+	CanRetry() bool
+	GetLastError() error
+}
+
+// =============================================================================
+// AI ANALYSIS INTERFACES (from types package)
+// =============================================================================
+
+// AIAnalyzer interface for AI analysis
+type AIAnalyzer interface {
+	Analyze(ctx context.Context, prompt string) (string, error)
+	AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error)
+	AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error)
+	GetTokenUsage() TokenUsage
+	ResetTokenUsage()
+}
+
+// TokenUsage token usage tracking
+type TokenUsage struct {
+	CompletionTokens int `json:"completion_tokens"`
+	PromptTokens     int `json:"prompt_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+// =============================================================================
+// PROGRESS TRACKING INTERFACES (from types package)
+// =============================================================================
+
+// ProgressTracker different from ProgressReporter
+type ProgressTracker interface {
+	RunWithProgress(
+		ctx context.Context,
+		operation string,
+		stages []LocalProgressStage,
+		fn func(ctx context.Context, reporter interface{}) error,
+	) error
+}
+
+// LocalProgressStage different from ProgressStage
+type LocalProgressStage struct {
+	Name        string
+	Weight      float64
+	Description string
+}
+
+// =============================================================================
+// UTILITY INTERFACES (from types package)
+// =============================================================================
+
+// ContextSharer interface for sharing context
+type ContextSharer interface {
+	ShareContext(ctx context.Context, key string, value interface{}) error
+	GetSharedContext(ctx context.Context, key string) (interface{}, bool)
+}
+
+// ArgConverter function type for argument conversion
+type ArgConverter func(args map[string]interface{}) (interface{}, error)
+
+// ResultConverter function type for result conversion
+type ResultConverter func(result interface{}) (map[string]interface{}, error)
+
+// =============================================================================
+// MCP CLIENT TYPES (from types package)
+// =============================================================================
+
+// MCPClients contains client instances for external services
+type MCPClients struct {
+	Docker     interface{} `json:"-"`
+	Kubernetes interface{} `json:"-"`
+	Kind       interface{} `json:"-"`
+	Registry   interface{} `json:"-"`
+	Analyzer   interface{} `json:"-"`
+	Kube       interface{} `json:"-"`
+}
+
+// =============================================================================
+// CONVERSATION STAGE ENUM (from types package)
+// =============================================================================
+
+// ConversationStage represents different stages of conversation
+type ConversationStage string
+
+const (
+	ConversationStagePreFlight  ConversationStage = "preflight"
+	ConversationStageAnalyze    ConversationStage = "analyze"
+	ConversationStageDockerfile ConversationStage = "dockerfile"
+	ConversationStageBuild      ConversationStage = "build"
+	ConversationStagePush       ConversationStage = "push"
+	ConversationStageManifests  ConversationStage = "manifests"
+	ConversationStageDeploy     ConversationStage = "deploy"
+	ConversationStageScan       ConversationStage = "scan"
+	ConversationStageCompleted  ConversationStage = "completed"
+	ConversationStageError      ConversationStage = "error"
+)
+
+// =============================================================================
+// ERROR CONSTANTS (from types package)
+// =============================================================================
+
+const (
+	ErrorCodeInvalidRequest = -32600
+)
+
+// =============================================================================
+// BASE TYPES FOR AI CONTEXT (from types package)
+// =============================================================================
+
+// BaseAIContextResult provides common fields for AI-powered tool results
+type BaseAIContextResult struct {
+	Context         string        `json:"context"`
+	TokensUsed      int           `json:"tokens_used"`
+	IsSuccessful    bool          `json:"is_successful"`
+	Duration        time.Duration `json:"duration"`
+	Recommendations []string      `json:"recommendations,omitempty"`
+}
+
+// NewBaseAIContextResult creates a new base AI context result
+func NewBaseAIContextResult(context string, successful bool, duration time.Duration) BaseAIContextResult {
+	return BaseAIContextResult{
+		Context:      context,
+		IsSuccessful: successful,
+		Duration:     duration,
+	}
+}
+
+// Recommendation represents a recommendation with confidence level
+type Recommendation struct {
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Priority    string  `json:"priority"`
+	Confidence  float64 `json:"confidence"`
+	Rationale   string  `json:"rationale"`
+}
+
+// =============================================================================
+// AI CONTEXT TYPES (from types package)
+// =============================================================================
+
+// AIContext provides context for AI-based analysis
+type AIContext interface {
+	GetAssessment() *UnifiedAssessment
+	GenerateRecommendations() []Recommendation
+	GetToolContext() *ToolContext
+	GetMetadata() map[string]interface{}
+}
+
+// UnifiedAssessment represents a unified assessment result
+type UnifiedAssessment struct {
+	// Add fields as needed based on actual implementation
+}
+
+// ToolContext represents tool-specific context
+type ToolContext struct {
+	// Add fields as needed based on actual implementation
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+// NewGoMCPProgressAdapter creates a progress adapter for GoMCP integration
+// This function signature is based on the implementation in internal/gomcp_progress_adapter.go
+func NewGoMCPProgressAdapter(serverCtx interface{}, stages []LocalProgressStage) interface{} {
+	// This is a placeholder that returns an interface{} to avoid import cycles
+	// The actual implementation is in internal/gomcp_progress_adapter.go
+	return nil
+}
+
+// NewMCPClients creates a new MCPClients instance
+func NewMCPClients(docker, kind, kube interface{}) *MCPClients {
+	return &MCPClients{
+		Docker: docker,
+		Kind:   kind,
+		Kube:   kube,
+	}
+}
+
+// =============================================================================
+// ANALYSIS AND VALIDATION INTERFACES (from types package)
+// =============================================================================
+
+// ScoreCalculator interface for score calculation
+type ScoreCalculator interface {
+	CalculateScore(data interface{}) int
+	DetermineRiskLevel(score int, factors map[string]interface{}) string
+	CalculateConfidence(evidence []string) int
+}
+
+// TradeoffAnalyzer interface for tradeoff analysis
+type TradeoffAnalyzer interface {
+	AnalyzeTradeoffs(options []string, context map[string]interface{}) []TradeoffAnalysis
+	CompareAlternatives(alternatives []AlternativeStrategy) *ComparisonMatrix
+	RecommendBestOption(analysis []TradeoffAnalysis) *DecisionRecommendation
+}
+
+// TradeoffAnalysis represents tradeoff analysis
+type TradeoffAnalysis struct {
+	// Add fields as needed based on actual implementation
+}
+
+// ComparisonMatrix represents comparison matrix
+type ComparisonMatrix struct {
+	// Add fields as needed based on actual implementation
+}
+
+// DecisionRecommendation represents decision recommendation
+type DecisionRecommendation struct {
+	// Add fields as needed based on actual implementation
+}
+
+// BaseAnalysisOptions common options for analysis operations
+type BaseAnalysisOptions struct {
+	Depth                   string
+	Aspects                 []string
+	GenerateRecommendations bool
+	CustomParams            map[string]interface{}
+}
+
+// BaseValidationOptions common options for validation operations
+type BaseValidationOptions struct {
+	Severity     string
+	IgnoreRules  []string
+	StrictMode   bool
+	CustomParams map[string]interface{}
+}
+
+// BaseAnalysisResult common result structure for analysis
+type BaseAnalysisResult struct {
+	Summary         BaseAnalysisSummary
+	Findings        []BaseFinding
+	Recommendations []BaseRecommendation
+	Metrics         map[string]interface{}
+	RiskAssessment  BaseRiskAssessment
+	Context         map[string]interface{}
+	Metadata        BaseAnalysisMetadata
+}
+
+// BaseValidationResult common result structure for validation
+type BaseValidationResult struct {
+	IsValid bool
+	Score   int
+
+	Errors   []BaseValidationError
+	Warnings []BaseValidationWarning
+
+	TotalIssues    int
+	CriticalIssues int
+
+	Context  map[string]interface{}
+	Metadata BaseValidationMetadata
+}
+
+// BaseAnalyzerCapabilities analyzer capabilities description
+type BaseAnalyzerCapabilities struct {
+	SupportedTypes   []string
+	SupportedAspects []string
+	RequiresContext  bool
+	SupportsDeepScan bool
+}
+
+// BaseAnalysisSummary summary of analysis results
+type BaseAnalysisSummary struct {
+	TotalFindings    int
+	CriticalFindings int
+	Strengths        []string
+	Weaknesses       []string
+	OverallScore     int
+}
+
+// BaseFinding represents a finding from analysis
+type BaseFinding struct {
+	ID          string
+	Type        string
+	Category    string
+	Severity    string
+	Title       string
+	Description string
+	Evidence    []string
+	Impact      string
+	Location    BaseFindingLocation
+}
+
+// BaseFindingLocation location information for findings
+type BaseFindingLocation struct {
+	File      string
+	Line      int
+	Component string
+	Context   string
+}
+
+// BaseRecommendation represents a recommendation
+type BaseRecommendation struct {
+	ID          string
+	Priority    string
+	Category    string
+	Title       string
+	Description string
+	Benefits    []string
+	Effort      string
+	Impact      string
+}
+
+// BaseRiskAssessment represents risk assessment
+type BaseRiskAssessment struct {
+	OverallRisk string
+	RiskFactors []BaseRiskFactor
+	Mitigations []BaseMitigation
+}
+
+// BaseRiskFactor represents a risk factor
+type BaseRiskFactor struct {
+	ID          string
+	Category    string
+	Description string
+	Likelihood  string
+	Impact      string
+	Score       int
+}
+
+// BaseMitigation represents a mitigation strategy
+type BaseMitigation struct {
+	RiskID        string
+	Description   string
+	Effort        string
+	Effectiveness string
+}
+
+// BaseAnalysisMetadata metadata for analysis operations
+type BaseAnalysisMetadata struct {
+	AnalyzerName    string
+	AnalyzerVersion string
+	Duration        time.Duration
+	Timestamp       time.Time
+	Parameters      map[string]interface{}
+}
+
+// BaseValidationError represents a validation error
+type BaseValidationError struct {
+	Code          string
+	Type          string
+	Message       string
+	Severity      string
+	Location      BaseErrorLocation
+	Fix           string
+	Documentation string
+}
+
+// BaseValidationWarning represents a validation warning
+type BaseValidationWarning struct {
+	Code       string
+	Type       string
+	Message    string
+	Suggestion string
+	Impact     string
+	Location   BaseWarningLocation
+}
+
+// BaseErrorLocation location information for errors
+type BaseErrorLocation struct {
+	File   string
+	Line   int
+	Column int
+	Path   string
+}
+
+// BaseWarningLocation location information for warnings
+type BaseWarningLocation struct {
+	File string
+	Line int
+	Path string
+}
+
+// BaseValidationMetadata metadata for validation operations
+type BaseValidationMetadata struct {
+	ValidatorName    string
+	ValidatorVersion string
+	Duration         time.Duration
+	Timestamp        time.Time
+	Parameters       map[string]interface{}
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS (from types package)
+// =============================================================================
+
+// UpdateSessionHelper provides a generic helper for session updates
+func UpdateSessionHelper[T any](manager ToolSessionManager, sessionID string, updater func(*T)) error {
+	return manager.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*T); ok {
+			updater(session)
+		}
+	})
+}

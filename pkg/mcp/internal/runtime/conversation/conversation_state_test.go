@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +17,7 @@ func TestNewConversationState(t *testing.T) {
 
 	assert.NotNil(t, state)
 	assert.Equal(t, sessionID, state.SessionID)
-	assert.Equal(t, types.StageWelcome, state.CurrentStage)
+	assert.Equal(t, convertFromTypesStage(types.StageWelcome), state.CurrentStage)
 	assert.NotNil(t, state.Context)
 	assert.NotNil(t, state.History)
 	assert.Empty(t, state.History)
@@ -32,11 +33,11 @@ func TestConversationStateAddToHistory(t *testing.T) {
 	turns := []struct {
 		input    string
 		response string
-		stage    types.ConversationStage
+		stage    mcp.ConversationStage
 	}{
-		{"hello", "Welcome!", types.StageWelcome},
-		{"analyze", "Starting analysis...", types.StageAnalysis},
-		{"github.com/test/repo", "Analyzing repository...", types.StageAnalysis},
+		{"hello", "Welcome!", convertFromTypesStage(types.StageWelcome)},
+		{"analyze", "Starting analysis...", convertFromTypesStage(types.StageAnalysis)},
+		{"github.com/test/repo", "Analyzing repository...", convertFromTypesStage(types.StageAnalysis)},
 	}
 
 	for _, turnData := range turns {
@@ -151,7 +152,7 @@ func TestConversationStateDecisionHandling(t *testing.T) {
 	// Set a decision point
 	decision := &DecisionPoint{
 		ID:       "test_decision",
-		Stage:    types.StageAnalysis,
+		Stage:    convertFromTypesStage(types.StageAnalysis),
 		Question: "What would you like to do?",
 		Options: []Option{
 			{
@@ -186,7 +187,7 @@ func TestConversationStateErrorTracking(t *testing.T) {
 		ID:        "turn-1",
 		Timestamp: time.Now(),
 		UserInput: "test input",
-		Stage:     types.StageBuild,
+		Stage:     convertFromTypesStage(types.StageBuild),
 		Error: &types.ToolError{
 			Type:      "test_error",
 			Message:   "Something went wrong",
@@ -205,16 +206,16 @@ func TestConversationStateStageTransitions(t *testing.T) {
 	state := NewConversationState("test-session", "/tmp/workspace")
 
 	// Track stage transitions
-	stages := []types.ConversationStage{
-		types.StageWelcome,
-		types.StagePreFlight,
-		types.StageInit,
-		types.StageAnalysis,
-		types.StageDockerfile,
-		types.StageBuild,
-		types.StageManifests,
-		types.StageDeployment,
-		types.StageCompleted,
+	stages := []mcp.ConversationStage{
+		convertFromTypesStage(types.StageWelcome),
+		convertFromTypesStage(types.StagePreFlight),
+		convertFromTypesStage(types.StageInit),
+		convertFromTypesStage(types.StageAnalysis),
+		convertFromTypesStage(types.StageDockerfile),
+		convertFromTypesStage(types.StageBuild),
+		convertFromTypesStage(types.StageManifests),
+		convertFromTypesStage(types.StageDeployment),
+		convertFromTypesStage(types.StageCompleted),
 	}
 
 	for _, stage := range stages {
@@ -223,7 +224,7 @@ func TestConversationStateStageTransitions(t *testing.T) {
 	}
 
 	// Test stage progression validation
-	assert.Equal(t, types.StageCompleted, state.CurrentStage)
+	assert.Equal(t, convertFromTypesStage(types.StageCompleted), state.CurrentStage)
 }
 
 func TestConversationStateArtifacts(t *testing.T) {
@@ -234,7 +235,7 @@ func TestConversationStateArtifacts(t *testing.T) {
 		Type:    "dockerfile",
 		Name:    "Dockerfile",
 		Content: "FROM alpine:latest",
-		Stage:   types.StageDockerfile,
+		Stage:   convertFromTypesStage(types.StageDockerfile),
 	}
 	state.AddArtifact(artifact1)
 
@@ -242,7 +243,7 @@ func TestConversationStateArtifacts(t *testing.T) {
 		Type:    "manifest",
 		Name:    "deployment.yaml",
 		Content: "apiVersion: apps/v1",
-		Stage:   types.StageManifests,
+		Stage:   convertFromTypesStage(types.StageManifests),
 	}
 	state.AddArtifact(artifact2)
 
@@ -264,14 +265,14 @@ func TestConversationStateStageProgression(t *testing.T) {
 
 	// Test stage progression logic
 	progress := state.GetStageProgress()
-	assert.Equal(t, types.StageWelcome, progress.CurrentStage)
+	assert.Equal(t, convertFromTypesStage(types.StageWelcome), progress.CurrentStage)
 	assert.Equal(t, 1, progress.CurrentStep)
 	assert.Greater(t, progress.TotalSteps, 1)
 
 	// Test stage progression
-	state.SetStage(types.StageAnalysis)
+	state.SetStage(convertFromTypesStage(types.StageAnalysis))
 	progress = state.GetStageProgress()
-	assert.Equal(t, types.StageAnalysis, progress.CurrentStage)
+	assert.Equal(t, convertFromTypesStage(types.StageAnalysis), progress.CurrentStage)
 	assert.Greater(t, progress.CurrentStep, 1)
 }
 
@@ -280,13 +281,13 @@ func TestConversationTurn(t *testing.T) {
 		UserInput: "test input",
 		Assistant: "test response",
 		Timestamp: time.Now(),
-		Stage:     types.StageWelcome,
+		Stage:     convertFromTypesStage(types.StageWelcome),
 	}
 
 	assert.Equal(t, "test input", turn.UserInput)
 	assert.Equal(t, "test response", turn.Assistant)
 	assert.False(t, turn.Timestamp.IsZero())
-	assert.Equal(t, types.StageWelcome, turn.Stage)
+	assert.Equal(t, convertFromTypesStage(types.StageWelcome), turn.Stage)
 }
 
 func TestConversationHistoryManagement(t *testing.T) {
@@ -297,7 +298,7 @@ func TestConversationHistoryManagement(t *testing.T) {
 		turn := ConversationTurn{
 			UserInput: fmt.Sprintf("input-%d", i),
 			Assistant: fmt.Sprintf("response-%d", i),
-			Stage:     types.StageWelcome,
+			Stage:     convertFromTypesStage(types.StageWelcome),
 		}
 		state.AddConversationTurn(turn)
 	}

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/state"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -60,7 +61,7 @@ func (i *AIContextIntegration) GetAggregator() *AIContextAggregator {
 	return i.aggregator
 }
 
-func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer mcptypes.AIAnalyzer) mcptypes.AIAnalyzer {
+func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer mcp.AIAnalyzer) mcp.AIAnalyzer {
 	return &AIAwareAnalyzer{
 		baseAnalyzer: baseAnalyzer,
 		integration:  i,
@@ -69,7 +70,7 @@ func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer mcptypes.AIAna
 }
 
 type AIAwareAnalyzer struct {
-	baseAnalyzer mcptypes.AIAnalyzer
+	baseAnalyzer mcp.AIAnalyzer
 	integration  *AIContextIntegration
 	logger       zerolog.Logger
 }

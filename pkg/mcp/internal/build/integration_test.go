@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -182,8 +183,8 @@ func TestFixingConfiguration(t *testing.T) {
 // MockOperation implements mcptypes.FixableOperation for testing
 type MockOperation struct {
 	executeFunc         func(ctx context.Context) error
-	failureAnalysisFunc func(ctx context.Context, err error) (*mcptypes.RichError, error)
-	prepareRetryFunc    func(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error
+	failureAnalysisFunc func(ctx context.Context, err error) (*mcp.RichError, error)
+	prepareRetryFunc    func(ctx context.Context, fixAttempt *mcp.FixAttempt) error
 }
 
 func (m *MockOperation) ExecuteOnce(ctx context.Context) error {
@@ -192,18 +193,18 @@ func (m *MockOperation) ExecuteOnce(ctx context.Context) error {
 	}
 	return nil
 }
-func (m *MockOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
+func (m *MockOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
 	if m.failureAnalysisFunc != nil {
 		return m.failureAnalysisFunc(ctx, err)
 	}
-	return &mcptypes.RichError{
+	return &mcp.RichError{
 		Code:     "TEST_ERROR",
 		Type:     "test_error",
 		Severity: "Medium",
 		Message:  err.Error(),
 	}, nil
 }
-func (m *MockOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (m *MockOperation) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	if m.prepareRetryFunc != nil {
 		return m.prepareRetryFunc(ctx, fixAttempt)
 	}
@@ -219,7 +220,7 @@ func (m *MockOperation) GetLastError() error {
 	return nil
 }
 func TestFixAttemptSerialization(t *testing.T) {
-	fixAttempt := mcptypes.FixAttempt{
+	fixAttempt := mcp.FixAttempt{
 		AttemptNumber: 1,
 		StartTime:     time.Now(),
 		EndTime:       time.Now().Add(time.Minute),

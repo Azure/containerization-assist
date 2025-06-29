@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 )
 
 // UnifiedAnalyzer combines AI and tool-specific analysis capabilities
 type UnifiedAnalyzer interface {
 	// Core AI capabilities from AIAnalyzer interface
-	mcptypes.AIAnalyzer
+	mcp.AIAnalyzer
 	// Enhanced analysis capabilities
 	AnalyzeFailure(ctx context.Context, failure *AnalysisRequest) (*AnalysisResult, error)
 	GetCapabilities() *AnalyzerCapabilities

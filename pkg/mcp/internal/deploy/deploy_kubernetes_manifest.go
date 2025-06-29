@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 )
 
 // performManifestGeneration generates Kubernetes manifests
-func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Context, session *mcptypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
+func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Context, session *mcp.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
 	// Progress reporting removed
 
 	generationStart := time.Now()
@@ -57,13 +57,13 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 
 	if err != nil {
 		_ = t.handleGenerationError(ctx, err, result.ManifestResult, result)
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", err), "generation_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", err), "generation_error")
 	}
 
 	if manifestResult != nil && !manifestResult.Success {
-		generationErr := mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %s", manifestResult.Error.Message), "generation_error")
+		generationErr := mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %s", manifestResult.Error.Message), "generation_error")
 		_ = t.handleGenerationError(ctx, generationErr, result.ManifestResult, result)
-		return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", generationErr), "generation_error")
+		return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", generationErr), "generation_error")
 	}
 
 	t.logger.Info().
@@ -79,5 +79,5 @@ func (t *AtomicDeployKubernetesTool) performManifestGeneration(ctx context.Conte
 
 // handleGenerationError creates an error for manifest generation failures
 func (t *AtomicDeployKubernetesTool) handleGenerationError(_ context.Context, err error, _ *kubernetes.ManifestGenerationResult, _ *AtomicDeployKubernetesResult) error {
-	return mcptypes.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", err), "generation_error")
+	return mcp.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("manifest generation failed: %v", err), "generation_error")
 }

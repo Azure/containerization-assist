@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -18,7 +18,7 @@ type Tool interface {
 // ToolWithMetadata interface for tools that provide metadata
 type ToolWithMetadata interface {
 	Tool
-	GetMetadata() (*mcptypes.ToolMetadata, error)
+	GetMetadata() (*mcp.ToolMetadata, error)
 }
 
 // ToolWithValidation interface for tools that provide validation
@@ -38,13 +38,13 @@ func getToolName(tool interface{}) string {
 }
 
 // getToolMetadata safely extracts tool metadata from interface{} tool
-func getToolMetadata(tool interface{}) *mcptypes.ToolMetadata {
+func getToolMetadata(tool interface{}) *mcp.ToolMetadata {
 	if t, ok := tool.(ToolWithMetadata); ok {
 		if metadata, err := t.GetMetadata(); err == nil {
 			return metadata
 		}
 	}
-	return &mcptypes.ToolMetadata{Name: "unknown"}
+	return &mcp.ToolMetadata{Name: "unknown"}
 }
 
 // ToolMiddleware provides middleware functionality for atomic tools

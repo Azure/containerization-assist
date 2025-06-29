@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
 // EnhancedBuildAnalyzer implements UnifiedAnalyzer with comprehensive build intelligence
 type EnhancedBuildAnalyzer struct {
-	aiAnalyzer         mcptypes.AIAnalyzer
+	aiAnalyzer         mcp.AIAnalyzer
 	repositoryAnalyzer RepositoryAnalyzerInterface
 	knowledgeBase      *CrossToolKnowledgeBase
 	failurePredictor   *FailurePredictor
@@ -41,7 +42,7 @@ type RepositoryInfo struct {
 
 // NewEnhancedBuildAnalyzer creates a new unified analyzer with full capabilities
 func NewEnhancedBuildAnalyzer(
-	aiAnalyzer mcptypes.AIAnalyzer,
+	aiAnalyzer mcp.AIAnalyzer,
 	repositoryAnalyzer RepositoryAnalyzerInterface,
 	logger zerolog.Logger,
 ) *EnhancedBuildAnalyzer {

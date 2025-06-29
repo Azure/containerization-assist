@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
 )
@@ -508,23 +509,41 @@ type ConversationOrchestratorAdapter struct {
 	logger           zerolog.Logger
 }
 
-func (adapter *ConversationOrchestratorAdapter) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
-	// Execute tool using MCP orchestrator
-	// The session can be either a string sessionID or a session object
-	result, err := adapter.toolOrchestrator.ExecuteTool(ctx, toolName, args, session)
-	if err != nil {
-		return nil, err
+func (adapter *ConversationOrchestratorAdapter) ExecuteTool(ctx context.Context, request mcp.ToolExecutionRequest) (*mcp.ToolExecutionResult, error) {
+	// Extract session from metadata or args
+	var session interface{}
+	if request.Metadata != nil {
+		if sid, ok := request.Metadata["session_id"]; ok {
+			session = sid
+		}
+	}
+	if session == nil && request.Args != nil {
+		if sid, ok := request.Args["session_id"]; ok {
+			session = sid
+		}
 	}
 
-	// Return result directly
-	return result, nil
+	// Execute tool using MCP orchestrator
+	result, err := adapter.toolOrchestrator.ExecuteTool(ctx, request.ToolName, request.Args, session)
+
+	// Return wrapped result
+	return &mcp.ToolExecutionResult{
+		Result:   result,
+		Error:    err,
+		Metadata: make(map[string]interface{}),
+	}, err
 }
 
 func (adapter *ConversationOrchestratorAdapter) ValidateToolArgs(toolName string, args interface{}) error {
 	return adapter.toolOrchestrator.ValidateToolArgs(toolName, args)
 }
 
-func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
+func (adapter *ConversationOrchestratorAdapter) GetDispatcher() mcp.ToolDispatcher {
+	// Return nil for now - this might need implementation based on actual needs
+	return nil
+}
+
+func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*mcp.ToolMetadata, error) {
 	return adapter.toolOrchestrator.GetToolMetadata(toolName)
 }
 
@@ -575,14 +594,14 @@ func (adapter *RegistryAdapter) List() []string {
 	return adapter.registry.ListTools()
 }
 
-func (adapter *RegistryAdapter) GetMetadata() map[string]mcptypes.ToolMetadata {
+func (adapter *RegistryAdapter) GetMetadata() map[string]mcp.ToolMetadata {
 	toolNames := adapter.registry.ListTools()
-	metadata := make(map[string]mcptypes.ToolMetadata)
+	metadata := make(map[string]mcp.ToolMetadata)
 
 	for _, name := range toolNames {
 		if meta, err := adapter.registry.GetToolMetadata(name); err == nil {
-			// Convert from orchestration.ToolMetadata to mcptypes.ToolMetadata
-			metadata[name] = mcptypes.ToolMetadata{
+			// Convert from orchestration.ToolMetadata to mcp.ToolMetadata
+			metadata[name] = mcp.ToolMetadata{
 				Name:         meta.Name,
 				Description:  meta.Description,
 				Version:      meta.Version,

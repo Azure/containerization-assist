@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel"
@@ -34,7 +34,7 @@ type ErrorMetrics struct {
 
 	// Internal state
 	mu              sync.RWMutex
-	recentErrors    []*mcptypes.RichError
+	recentErrors    []*mcp.RichError
 	errorPatterns   map[string]int
 	maxRecentErrors int
 }
@@ -51,7 +51,7 @@ func NewErrorMetrics() *ErrorMetrics {
 		em := &ErrorMetrics{
 			errorPatterns:   make(map[string]int),
 			maxRecentErrors: 1000,
-			recentErrors:    make([]*mcptypes.RichError, 0, 1000),
+			recentErrors:    make([]*mcp.RichError, 0, 1000),
 		}
 
 		// Initialize Prometheus metrics
@@ -127,7 +127,7 @@ func NewErrorMetrics() *ErrorMetrics {
 }
 
 // RecordError records a RichError with full observability integration
-func (em *ErrorMetrics) RecordError(ctx context.Context, err *mcptypes.RichError) {
+func (em *ErrorMetrics) RecordError(ctx context.Context, err *mcp.RichError) {
 	if err == nil {
 		return
 	}
@@ -196,7 +196,7 @@ func (em *ErrorMetrics) RecordError(ctx context.Context, err *mcptypes.RichError
 }
 
 // RecordResolution records when an error is successfully resolved
-func (em *ErrorMetrics) RecordResolution(ctx context.Context, err *mcptypes.RichError, resolutionType string, duration time.Duration) {
+func (em *ErrorMetrics) RecordResolution(ctx context.Context, err *mcp.RichError, resolutionType string, duration time.Duration) {
 	if err == nil {
 		return
 	}
@@ -250,7 +250,7 @@ func (em *ErrorMetrics) GetErrorPatterns() map[string]int {
 }
 
 // GetRecentErrors returns recent errors for analysis
-func (em *ErrorMetrics) GetRecentErrors(limit int) []*mcptypes.RichError {
+func (em *ErrorMetrics) GetRecentErrors(limit int) []*mcp.RichError {
 	em.mu.RLock()
 	defer em.mu.RUnlock()
 
@@ -258,13 +258,13 @@ func (em *ErrorMetrics) GetRecentErrors(limit int) []*mcptypes.RichError {
 		limit = len(em.recentErrors)
 	}
 
-	result := make([]*mcptypes.RichError, limit)
+	result := make([]*mcp.RichError, limit)
 	copy(result, em.recentErrors[len(em.recentErrors)-limit:])
 	return result
 }
 
 // EnrichContext adds observability context to a RichError
-func (em *ErrorMetrics) EnrichContext(ctx context.Context, err *mcptypes.RichError) {
+func (em *ErrorMetrics) EnrichContext(ctx context.Context, err *mcp.RichError) {
 	if err == nil {
 		return
 	}
@@ -273,18 +273,18 @@ func (em *ErrorMetrics) EnrichContext(ctx context.Context, err *mcptypes.RichErr
 	spanCtx := trace.SpanContextFromContext(ctx)
 	if spanCtx.IsValid() {
 		if err.Context.Metadata == nil {
-			err.Context.Metadata = make(map[string]interface{})
+			err.Context.Metadata = mcp.NewErrorMetadata("", "", "")
 		}
-		err.Context.Metadata["trace_id"] = spanCtx.TraceID().String()
-		err.Context.Metadata["span_id"] = spanCtx.SpanID().String()
+		err.Context.Metadata.AddCustom("trace_id", spanCtx.TraceID().String())
+		err.Context.Metadata.AddCustom("span_id", spanCtx.SpanID().String())
 	}
 
 	// Add correlation ID if available
 	if corrID := ctx.Value("correlation_id"); corrID != nil {
 		if err.Context.Metadata == nil {
-			err.Context.Metadata = make(map[string]interface{})
+			err.Context.Metadata = mcp.NewErrorMetadata("", "", "")
 		}
-		err.Context.Metadata["correlation_id"] = corrID
+		err.Context.Metadata.AddCustom("correlation_id", corrID)
 	}
 }
 
@@ -294,9 +294,9 @@ func (em *ErrorMetrics) updateSeverityGauge(severity string, delta float64) {
 }
 
 // ErrorMetricsMiddleware provides middleware for automatic error tracking
-func ErrorMetricsMiddleware(em *ErrorMetrics) func(next func(context.Context, *mcptypes.RichError) error) func(context.Context, *mcptypes.RichError) error {
-	return func(next func(context.Context, *mcptypes.RichError) error) func(context.Context, *mcptypes.RichError) error {
-		return func(ctx context.Context, err *mcptypes.RichError) error {
+func ErrorMetricsMiddleware(em *ErrorMetrics) func(next func(context.Context, *mcp.RichError) error) func(context.Context, *mcp.RichError) error {
+	return func(next func(context.Context, *mcp.RichError) error) func(context.Context, *mcp.RichError) error {
+		return func(ctx context.Context, err *mcp.RichError) error {
 			start := time.Now()
 
 			// Record the error

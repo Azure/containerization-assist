@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"testing"
 
-	// mcp import removed - using mcptypes
-
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mcp import removed - using mcptypes
 
 // Test types for mock tools
 type TestArgs struct {
@@ -56,8 +56,8 @@ func (m *mockTool) Validate(ctx context.Context, args interface{}) error {
 	return nil
 }
 
-func (m *mockTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (m *mockTool) GetMetadata() mcp.ToolMetadata {
+	return mcp.ToolMetadata{
 		Name:        m.name,
 		Description: "Mock tool for testing",
 		Version:     "1.0.0",
@@ -293,7 +293,7 @@ func TestToolRegistry_ExecuteTool_PreValidationError(t *testing.T) {
 		name: "validation_tool",
 		preValidateFunc: func(ctx context.Context, args TestArgs) error {
 			if args.Message == "" {
-				return mcptypes.NewRichError("VALIDATION_ERROR", "message cannot be empty", "validation_error")
+				return mcp.NewRichError("VALIDATION_ERROR", "message cannot be empty", "validation_error")
 			}
 			return nil
 		},
@@ -318,7 +318,7 @@ func TestToolRegistry_ExecuteTool_ExecutionError(t *testing.T) {
 	tool := &mockTool{
 		name: "error_tool",
 		executeFunc: func(ctx context.Context, args interface{}) (interface{}, error) {
-			return nil, mcptypes.NewRichError("EXECUTION_ERROR", "tool execution failed", "runtime_error")
+			return nil, mcp.NewRichError("EXECUTION_ERROR", "tool execution failed", "runtime_error")
 		},
 	}
 

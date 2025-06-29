@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/rs/zerolog"
 )
 
@@ -212,7 +212,7 @@ func (c *Coordinator) ExecuteWorkflow(
 	// Initialize or restore session
 	session, err := c.initializeSession(workflowSpec, options)
 	if err != nil {
-		return nil, mcptypes.NewRichError("SESSION_INITIALIZATION_FAILED", fmt.Sprintf("failed to initialize session: %v", err), "workflow_error")
+		return nil, mcp.NewRichError("SESSION_INITIALIZATION_FAILED", fmt.Sprintf("failed to initialize session: %v", err), "workflow_error")
 	}
 
 	c.logger.Info().
@@ -222,7 +222,7 @@ func (c *Coordinator) ExecuteWorkflow(
 
 	// Transition to running state
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusRunning); err != nil {
-		return nil, mcptypes.NewRichError("WORKFLOW_START_FAILED", fmt.Sprintf("failed to start workflow: %v", err), "workflow_error")
+		return nil, mcp.NewRichError("WORKFLOW_START_FAILED", fmt.Sprintf("failed to start workflow: %v", err), "workflow_error")
 	}
 
 	// Execute workflow
@@ -238,11 +238,11 @@ func (c *Coordinator) ExecuteWorkflow(
 func (c *Coordinator) PauseWorkflow(sessionID string) error {
 	session, err := c.sessionManager.GetSession(sessionID)
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusPaused); err != nil {
-		return mcptypes.NewRichError("WORKFLOW_PAUSE_FAILED", fmt.Sprintf("failed to pause workflow: %v", err), "workflow_error")
+		return mcp.NewRichError("WORKFLOW_PAUSE_FAILED", fmt.Sprintf("failed to pause workflow: %v", err), "workflow_error")
 	}
 
 	c.logger.Info().
@@ -260,11 +260,11 @@ func (c *Coordinator) ResumeWorkflow(ctx context.Context, sessionID string, work
 	}
 
 	if session.Status != WorkflowStatusPaused {
-		return nil, mcptypes.NewRichError("WORKFLOW_NOT_PAUSED", fmt.Sprintf("workflow is not paused (current status: %s)", session.Status), "workflow_error")
+		return nil, mcp.NewRichError("WORKFLOW_NOT_PAUSED", fmt.Sprintf("workflow is not paused (current status: %s)", session.Status), "workflow_error")
 	}
 
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusRunning); err != nil {
-		return nil, mcptypes.NewRichError("WORKFLOW_RESUME_FAILED", fmt.Sprintf("failed to resume workflow: %v", err), "workflow_error")
+		return nil, mcp.NewRichError("WORKFLOW_RESUME_FAILED", fmt.Sprintf("failed to resume workflow: %v", err), "workflow_error")
 	}
 
 	c.logger.Info().
@@ -287,15 +287,15 @@ func (c *Coordinator) ResumeWorkflow(ctx context.Context, sessionID string, work
 func (c *Coordinator) CancelWorkflow(sessionID string) error {
 	session, err := c.sessionManager.GetSession(sessionID)
 	if err != nil {
-		return mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
 	}
 
 	if c.stateMachine.IsTerminalState(session.Status) {
-		return mcptypes.NewRichError("WORKFLOW_ALREADY_TERMINAL", fmt.Sprintf("cannot cancel workflow in terminal state: %s", session.Status), "workflow_error")
+		return mcp.NewRichError("WORKFLOW_ALREADY_TERMINAL", fmt.Sprintf("cannot cancel workflow in terminal state: %s", session.Status), "workflow_error")
 	}
 
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusCancelled); err != nil {
-		return mcptypes.NewRichError("WORKFLOW_CANCEL_FAILED", fmt.Sprintf("failed to cancel workflow: %v", err), "workflow_error")
+		return mcp.NewRichError("WORKFLOW_CANCEL_FAILED", fmt.Sprintf("failed to cancel workflow: %v", err), "workflow_error")
 	}
 
 	c.logger.Info().
@@ -312,7 +312,7 @@ func (c *Coordinator) initializeSession(workflowSpec *WorkflowSpec, options *Exe
 	if options.ResumeFromCheckpoint != "" {
 		session, err := c.checkpointManager.RestoreFromCheckpoint(options.SessionID, options.ResumeFromCheckpoint)
 		if err != nil {
-			return nil, mcptypes.NewRichError("CHECKPOINT_RESTORE_FAILED", fmt.Sprintf("failed to restore from checkpoint: %v", err), "workflow_error")
+			return nil, mcp.NewRichError("CHECKPOINT_RESTORE_FAILED", fmt.Sprintf("failed to restore from checkpoint: %v", err), "workflow_error")
 		}
 		c.logger.Info().
 			Str("session_id", session.ID).
@@ -325,7 +325,7 @@ func (c *Coordinator) initializeSession(workflowSpec *WorkflowSpec, options *Exe
 	if options.SessionID != "" {
 		session, err := c.sessionManager.GetSession(options.SessionID)
 		if err != nil {
-			return nil, mcptypes.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get existing session: %v", err), "session_error")
+			return nil, mcp.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get existing session: %v", err), "session_error")
 		}
 		return session, nil
 	}
@@ -333,7 +333,7 @@ func (c *Coordinator) initializeSession(workflowSpec *WorkflowSpec, options *Exe
 	// Create new session
 	session, err := c.sessionManager.CreateSession(workflowSpec)
 	if err != nil {
-		return nil, mcptypes.NewRichError("SESSION_CREATION_FAILED", fmt.Sprintf("failed to create session: %v", err), "session_error")
+		return nil, mcp.NewRichError("SESSION_CREATION_FAILED", fmt.Sprintf("failed to create session: %v", err), "session_error")
 	}
 
 	// Store workflow variables for enhanced variable expansion
@@ -642,7 +642,7 @@ func (c *Coordinator) ResumeFromStage(ctx context.Context, sessionID, stageName 
 	}
 
 	if !stageExists {
-		return nil, mcptypes.NewRichError("STAGE_NOT_FOUND", fmt.Sprintf("stage '%s' not found in workflow", stageName), "workflow_error")
+		return nil, mcp.NewRichError("STAGE_NOT_FOUND", fmt.Sprintf("stage '%s' not found in workflow", stageName), "workflow_error")
 	}
 
 	// Update session state for resume
@@ -665,7 +665,7 @@ func (c *Coordinator) ResumeFromStage(ctx context.Context, sessionID, stageName 
 	// Create checkpoint for this resume point
 	checkpoint, err := c.checkpointManager.CreateCheckpoint(session, stageName, fmt.Sprintf("Resume from stage: %s", stageName), workflowSpec)
 	if err != nil {
-		return nil, mcptypes.NewRichError("CHECKPOINT_CREATION_FAILED", fmt.Sprintf("failed to create resume checkpoint: %v", err), "workflow_error")
+		return nil, mcp.NewRichError("CHECKPOINT_CREATION_FAILED", fmt.Sprintf("failed to create resume checkpoint: %v", err), "workflow_error")
 	}
 
 	c.logger.Info().

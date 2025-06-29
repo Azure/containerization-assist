@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp"
 )
 
 // PullOperationWrapper wraps pull operations for retry and fixing
@@ -38,21 +39,21 @@ func (w *PullOperationWrapper) Execute(ctx context.Context) error {
 }
 
 // GetFailureAnalysis analyzes pull failures for categorization
-func (w *PullOperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.RichError, error) {
+func (w *PullOperationWrapper) GetFailureAnalysis(ctx context.Context, err error) (*mcp.RichError, error) {
 	if w.analyzer != nil {
 		if analyzerErr := w.analyzer(); analyzerErr != nil {
 			return nil, analyzerErr
 		}
 	}
 	// Create a simple RichError for now - this would be enhanced with proper analysis
-	return &mcptypes.RichError{
+	return &mcp.RichError{
 		Message: fmt.Sprintf("Pull operation failed: %v", err),
 		Code:    "PULL_FAILED",
 	}, nil
 }
 
 // PrepareForRetry prepares the environment for retry
-func (w *PullOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *mcptypes.FixAttempt) error {
+func (w *PullOperationWrapper) PrepareForRetry(ctx context.Context, fixAttempt *mcp.FixAttempt) error {
 	if w.preparer != nil {
 		return w.preparer()
 	}
