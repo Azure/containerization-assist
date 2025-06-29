@@ -4,241 +4,81 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
-// Package mcp defines core interfaces for the Model Context Protocol
+// ============================================================================
+// BACKWARD COMPATIBILITY: Re-export core interfaces
+// ============================================================================
 
-// Tool represents the interface for MCP tools
-type Tool interface {
-	Execute(ctx context.Context, args interface{}) (interface{}, error)
-	GetMetadata() ToolMetadata
-	Validate(ctx context.Context, args interface{}) error
-}
+// Core Tool Interface (re-exported from core)
+type Tool = core.Tool
+type ToolMetadata = core.ToolMetadata
+type ToolExample = core.ToolExample
 
-// ToolMetadata represents tool metadata
-type ToolMetadata struct {
-	Name         string            `json:"name"`
-	Description  string            `json:"description"`
-	Version      string            `json:"version"`
-	Category     string            `json:"category"`
-	Dependencies []string          `json:"dependencies"`
-	Capabilities []string          `json:"capabilities"`
-	Requirements []string          `json:"requirements"`
-	Parameters   map[string]string `json:"parameters"`
-	Examples     []ToolExample     `json:"examples"`
-}
+// Progress Reporting (re-exported from core)
+type ProgressReporter = core.ProgressReporter
+type ProgressToken = core.ProgressToken
+type ProgressStage = core.ProgressStage
 
-// ToolExample represents tool usage example
-type ToolExample struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Input       map[string]interface{} `json:"input"`
-	Output      map[string]interface{} `json:"output"`
-}
+// Repository Analysis (re-exported from core)
+type RepositoryAnalyzer = core.RepositoryAnalyzer
+type RepositoryInfo = core.RepositoryInfo
+type DockerfileInfo = core.DockerfileInfo
+type HealthCheckInfo = core.HealthCheckInfo
+type BuildRecommendations = core.BuildRecommendations
 
-// Session represents session management interface
-type Session interface {
-	// ID returns session identifier
-	ID() string
+// Transport (re-exported from core)
+type Transport = core.Transport
+type RequestHandler = core.RequestHandler
 
-	// GetWorkspace returns the workspace directory path
-	GetWorkspace() string
+// Tool Registry (re-exported from core)
+type ToolRegistry = core.ToolRegistry
 
-	// UpdateState applies a function to update the session state
-	UpdateState(func(*SessionState))
-}
+// Session Management (re-exported from core)
+type SessionManager = core.SessionManager
+type Session = core.Session
+type SessionState = core.SessionState
+type SecurityScanResult = core.SecurityScanResult
+type VulnerabilityCount = core.VulnerabilityCount
+type SecurityFinding = core.SecurityFinding
 
-// SessionState represents session state
-type SessionState struct {
-	SessionID string
-	UserID    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ExpiresAt time.Time
+// MCP Protocol (re-exported from core)
+type MCPRequest = core.MCPRequest
+type MCPResponse = core.MCPResponse
+type MCPError = core.MCPError
 
-	WorkspaceDir string
+// Base Types (re-exported from core)
+type BaseToolResponse = core.BaseToolResponse
 
-	RepositoryAnalyzed bool
-	RepositoryInfo     *RepositoryInfo
-	RepoURL            string
+// Server Types (re-exported from core)
+type Server = core.Server
+type ServerConfig = core.ServerConfig
+type ConversationConfig = core.ConversationConfig
+type ServerStats = core.ServerStats
+type SessionManagerStats = core.SessionManagerStats
+type WorkspaceStats = core.WorkspaceStats
+type AlternativeStrategy = core.AlternativeStrategy
+type ConversationStage = core.ConversationStage
 
-	DockerfileGenerated bool
-	DockerfilePath      string
-	ImageBuilt          bool
-	ImageRef            string
-	ImagePushed         bool
+// Constants (re-exported from core)
+const (
+	ConversationStagePreFlight  = core.ConversationStagePreFlight
+	ConversationStageAnalyze    = core.ConversationStageAnalyze
+	ConversationStageDockerfile = core.ConversationStageDockerfile
+	ConversationStageBuild      = core.ConversationStageBuild
+	ConversationStagePush       = core.ConversationStagePush
+	ConversationStageManifests  = core.ConversationStageManifests
+	ConversationStageDeploy     = core.ConversationStageDeploy
+	ConversationStageScan       = core.ConversationStageScan
+	ConversationStageCompleted  = core.ConversationStageCompleted
+	ConversationStageError      = core.ConversationStageError
+)
 
-	ManifestsGenerated  bool
-	ManifestPaths       []string
-	DeploymentValidated bool
-
-	CurrentStage string
-	Status       string
-	Stage        string
-	Errors       []string
-	Metadata     map[string]interface{}
-
-	SecurityScan *SecurityScanResult
-}
-
-// RepositoryInfo represents repository information
-type RepositoryInfo struct {
-	Language     string                 `json:"language"`
-	Framework    string                 `json:"framework"`
-	Dependencies []string               `json:"dependencies"`
-	EntryPoint   string                 `json:"entry_point"`
-	Port         int                    `json:"port"`
-	Metadata     map[string]interface{} `json:"metadata"`
-}
-
-// SecurityScanResult represents security scan results
-type SecurityScanResult struct {
-	Success            bool               `json:"success"`
-	HasVulnerabilities bool               `json:"has_vulnerabilities"`
-	ScannedAt          time.Time          `json:"scanned_at"`
-	ImageRef           string             `json:"image_ref"`
-	Scanner            string             `json:"scanner"`
-	Vulnerabilities    VulnerabilityCount `json:"vulnerabilities"`
-	CriticalCount      int                `json:"critical_count"`
-	HighCount          int                `json:"high_count"`
-	MediumCount        int                `json:"medium_count"`
-	LowCount           int                `json:"low_count"`
-	VulnerabilityList  []string           `json:"vulnerability_list"`
-	ScanTime           time.Time          `json:"scan_time"`
-}
-
-// VulnerabilityCount represents counts of vulnerabilities by severity
-type VulnerabilityCount struct {
-	Total    int `json:"total"`
-	Critical int `json:"critical"`
-	High     int `json:"high"`
-	Medium   int `json:"medium"`
-	Low      int `json:"low"`
-	Unknown  int `json:"unknown"`
-}
-
-// AlternativeStrategy represents an alternative approach or strategy
-type AlternativeStrategy struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Priority    int      `json:"priority"`
-	Commands    []string `json:"commands"`
-}
-
-// Server represents the MCP server interface
-type Server interface {
-	Start(ctx context.Context) error
-	Stop() error
-	Shutdown(ctx context.Context) error
-	EnableConversationMode(config ConversationConfig) error
-	GetStats() *ServerStats
-	GetSessionManagerStats() *SessionManagerStats
-	GetWorkspaceStats() *WorkspaceStats
-	GetLogger() interface{} // Returns the logger instance
-}
-
-// ServerConfig holds configuration for the MCP server
-type ServerConfig struct {
-	// Session management
-	WorkspaceDir      string
-	MaxSessions       int
-	SessionTTL        time.Duration
-	MaxDiskPerSession int64
-	TotalDiskLimit    int64
-
-	// Storage
-	StorePath string
-
-	// Transport
-	TransportType string // "stdio", "http"
-	HTTPAddr      string
-	HTTPPort      int
-	CORSOrigins   []string // CORS allowed origins
-	APIKey        string   // API key for authentication
-	RateLimit     int      // Requests per minute per IP
-
-	// Features
-	SandboxEnabled bool
-
-	// Logging
-	LogLevel       string
-	LogHTTPBodies  bool  // Log HTTP request/response bodies
-	MaxBodyLogSize int64 // Maximum size of bodies to log
-
-	// Cleanup
-	CleanupInterval time.Duration
-
-	// Job Management
-	MaxWorkers int
-	JobTTL     time.Duration
-
-	// OpenTelemetry configuration
-	EnableOTEL      bool
-	OTELEndpoint    string
-	OTELHeaders     map[string]string
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
-	TraceSampleRate float64
-}
-
-// ConversationConfig holds configuration for conversation mode
-type ConversationConfig struct {
-	EnableTelemetry          bool
-	TelemetryPort            int
-	PreferencesDBPath        string
-	PreferencesEncryptionKey string // Optional encryption key for preference store
-
-	// OpenTelemetry configuration
-	EnableOTEL      bool
-	OTELEndpoint    string
-	OTELHeaders     map[string]string
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
-	TraceSampleRate float64
-}
-
-// Transport represents MCP transport interface
-type Transport interface {
-	// Serve starts transport
-	Serve(ctx context.Context) error
-
-	// Stop stops transport
-	Stop() error
-
-	// Name returns transport name
-	Name() string
-
-	// SetHandler sets request handler
-	SetHandler(handler RequestHandler)
-}
-
-// RequestHandler handles MCP requests
-type RequestHandler interface {
-	HandleRequest(ctx context.Context, req *MCPRequest) (*MCPResponse, error)
-}
-
-// MCPRequest represents MCP request
-type MCPRequest struct {
-	ID     string      `json:"id"`
-	Method string      `json:"method"`
-	Params interface{} `json:"params"`
-}
-
-// MCPResponse represents MCP response
-type MCPResponse struct {
-	ID     string      `json:"id"`
-	Result interface{} `json:"result,omitempty"`
-	Error  *MCPError   `json:"error,omitempty"`
-}
-
-// MCPError represents MCP error
-type MCPError struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
-}
+// ============================================================================
+// LEGACY TYPES AND INTERFACES (maintained for compatibility during transition)
+// ============================================================================
 
 // Orchestrator represents tool orchestration interface
 type Orchestrator interface {
@@ -246,21 +86,12 @@ type Orchestrator interface {
 	RegisterTool(name string, tool Tool) error
 }
 
-// ToolRegistry manages tool registration
-type ToolRegistry interface {
-	Register(name string, factory ToolFactory) error
-	Get(name string) (ToolFactory, error)
-	GetTool(name string) (Tool, error)
-	List() []string
-	GetMetadata() map[string]ToolMetadata
-}
-
 // StronglyTypedToolRegistry manages typed tool registration
 type StronglyTypedToolRegistry interface {
 	RegisterTyped(name string, factory StronglyTypedToolFactory[Tool]) error
 	GetTyped(name string) (StronglyTypedToolFactory[Tool], error)
 	List() []string
-	GetMetadata() map[string]ToolMetadata
+	GetAllMetadata() map[string]ToolMetadata
 }
 
 // StandardRegistry combines tool registration approaches
@@ -269,10 +100,7 @@ type StandardRegistry interface {
 	StronglyTypedToolRegistry
 
 	RegisterStandard(name string, tool Tool) error
-
-	GetTool(name string) (Tool, error)
 	GetToolInfo(name string) (*StandardToolInfo, error)
-
 	IsRegistered(name string) bool
 	Count() int
 	Clear()
@@ -398,18 +226,6 @@ func (b BaseToolArgs) Validate() error {
 	return nil
 }
 
-// BaseToolResponse provides common fields for all tool responses
-type BaseToolResponse struct {
-	Success bool                   `json:"success"`
-	Message string                 `json:"message,omitempty"`
-	Data    map[string]interface{} `json:"data,omitempty"`
-	Errors  []string               `json:"errors,omitempty"`
-}
-
-// GetSuccess implements ToolResult interface
-func (b BaseToolResponse) GetSuccess() bool {
-	return b.Success
-}
 
 // =============================================================================
 // ERROR HANDLING INTERFACES
@@ -730,28 +546,13 @@ func NewValidationErrorBuilder(message, field string, value interface{}) *Valida
 	return &ValidationErrorBuilder{ErrorBuilder: builder}
 }
 
-// =============================================================================
-// PROGRESS REPORTING INTERFACE
-// =============================================================================
-
-// ProgressReporter provides stage-aware progress reporting
-type ProgressReporter interface {
-	ReportStage(stageProgress float64, message string)
-	NextStage(message string)
-	SetStage(stageIndex int, message string)
-	ReportOverall(progress float64, message string)
-	GetCurrentStage() (int, ProgressStage)
-}
-
-// ProgressStage represents a stage in a multi-step operation
-type ProgressStage struct {
-	Name        string  // Human-readable stage name
-	Weight      float64 // Relative weight (0.0-1.0) of this stage in overall progress
-	Description string  // Optional detailed description
+// NewValidationError creates a validation error
+func NewValidationError(message string) *RichError {
+	return NewRichError("VALIDATION_ERROR", message, "validation_error")
 }
 
 // =============================================================================
-// HEALTH CHECKING INTERFACE
+// ADDITIONAL INTERFACES FOR COMPATIBILITY
 // =============================================================================
 
 // HealthChecker defines the interface for health checking operations
@@ -820,32 +621,6 @@ type RecentError struct {
 	Component string                 `json:"component"`
 	Severity  string                 `json:"severity"`
 	Context   map[string]interface{} `json:"context,omitempty"`
-}
-
-// ServerStats represents overall server statistics
-type ServerStats struct {
-	Transport string               `json:"transport"`
-	Sessions  *SessionManagerStats `json:"sessions"`
-	Workspace *WorkspaceStats      `json:"workspace"`
-	Uptime    time.Duration        `json:"uptime"`
-	StartTime time.Time            `json:"start_time"`
-}
-
-// SessionManagerStats represents session management statistics
-type SessionManagerStats struct {
-	ActiveSessions    int     `json:"active_sessions"`
-	TotalSessions     int     `json:"total_sessions"`
-	FailedSessions    int     `json:"failed_sessions"`
-	AverageSessionAge float64 `json:"average_session_age_minutes"`
-	SessionErrors     int     `json:"session_errors_last_hour"`
-}
-
-// WorkspaceStats represents workspace statistics
-type WorkspaceStats struct {
-	TotalDiskUsage int64 `json:"total_disk_usage"`
-	SessionCount   int   `json:"session_count"`
-	TotalFiles     int   `json:"total_files"`
-	DiskLimit      int64 `json:"disk_limit"`
 }
 
 // Circuit breaker states
@@ -1137,26 +912,6 @@ type MCPClients struct {
 	Analyzer   interface{} `json:"-"`
 	Kube       interface{} `json:"-"`
 }
-
-// =============================================================================
-// CONVERSATION STAGE ENUM (from types package)
-// =============================================================================
-
-// ConversationStage represents different stages of conversation
-type ConversationStage string
-
-const (
-	ConversationStagePreFlight  ConversationStage = "preflight"
-	ConversationStageAnalyze    ConversationStage = "analyze"
-	ConversationStageDockerfile ConversationStage = "dockerfile"
-	ConversationStageBuild      ConversationStage = "build"
-	ConversationStagePush       ConversationStage = "push"
-	ConversationStageManifests  ConversationStage = "manifests"
-	ConversationStageDeploy     ConversationStage = "deploy"
-	ConversationStageScan       ConversationStage = "scan"
-	ConversationStageCompleted  ConversationStage = "completed"
-	ConversationStageError      ConversationStage = "error"
-)
 
 // =============================================================================
 // ERROR CONSTANTS (from types package)

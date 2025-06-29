@@ -59,8 +59,8 @@ func (r *stronglyTypedRegistry) List() []string {
 	return names
 }
 
-// GetMetadata returns metadata for all registered tools
-func (r *stronglyTypedRegistry) GetMetadata() map[string]ToolMetadata {
+// GetAllMetadata returns metadata for all registered tools
+func (r *stronglyTypedRegistry) GetAllMetadata() map[string]ToolMetadata {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
