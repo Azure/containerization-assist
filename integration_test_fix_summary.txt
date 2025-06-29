@@ -1,0 +1,47 @@
+INTEGRATION TEST FIX SUMMARY
+============================
+
+ORIGINAL PROBLEM:
+- Integration tests failing with "exec: StdinPipe after process started" error
+- Root cause: Test was calling StdinPipe() after starting the process
+
+FIXES APPLIED:
+1. **Process Pipe Management Fix**:
+   - Created MCPServerInstance struct to hold cmd and pipes
+   - Modified startMCPServer() to get all pipes (stdin, stdout, stderr) BEFORE starting process
+   - Updated executeWorkflowSteps() and other functions to use pre-created pipes
+
+2. **Tool Name Corrections**:
+   - Fixed tool names from "atomic_analyze_repository" to "analyze_repository"
+   - Fixed "atomic_validate_dockerfile" to "validate_dockerfile"
+   - Fixed "atomic_generate_manifests" to "generate_manifests"
+
+3. **Tool Arguments Enhancement**:
+   - Added missing required fields for analyze_repository tool:
+     - branch: "main"
+     - language_hint: repo.Language
+     - shallow: true
+   - Updated repo_url format to use "file://" prefix
+
+4. **Git Repository Setup**:
+   - Added proper git repository initialization for test repos
+   - Configured git user and disabled commit signing for tests
+   - Added initial commit to create proper git history
+
+RESULTS:
+✅ Fixed the main "StdinPipe after process started" error
+✅ Process starts correctly and pipes work
+✅ MCP server initializes successfully in tests
+✅ Tool communication layer is functional
+
+REMAINING ISSUES:
+- Some tools still have validation/execution issues (separate from pipe problem)
+- These are tool-specific implementation issues, not test infrastructure problems
+
+The critical test infrastructure problem has been resolved. The integration tests now properly:
+1. Start the MCP server process
+2. Establish communication pipes correctly
+3. Send and receive MCP protocol messages
+4. Handle tool execution requests
+
+This fix resolves the systematic test failure and enables proper integration testing going forward.
