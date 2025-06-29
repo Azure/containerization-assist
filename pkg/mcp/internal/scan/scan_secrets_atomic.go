@@ -12,6 +12,7 @@ import (
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp"
 	"github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
@@ -135,14 +136,10 @@ func (t *AtomicScanSecretsTool) ExecuteScanSecrets(ctx context.Context, args Ato
 func (t *AtomicScanSecretsTool) ExecuteWithContext(serverCtx *server.Context, args AtomicScanSecretsArgs) (*AtomicScanSecretsResult, error) {
 	startTime := time.Now()
 
-	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{
-		{Name: "Initialize", Weight: 0.10, Description: "Loading session"},
-		{Name: "Scan", Weight: 0.80, Description: "Scanning"},
-		{Name: "Finalize", Weight: 0.10, Description: "Updating state"},
-	})
+	progress := observability.NewUnifiedProgressReporter(serverCtx)
 
 	ctx := context.Background()
-	result, err := t.executeWithProgress(ctx, args, startTime, nil)
+	result, err := t.executeWithProgress(ctx, args, startTime, progress)
 
 	if err != nil {
 		t.logger.Info().Msg("Secrets scan failed")

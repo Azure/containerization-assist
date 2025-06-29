@@ -4,8 +4,8 @@
 
 **Objective**: Consolidate 6 adapter/wrapper files (657 lines total) into 2 unified implementations, eliminating duplication while preserving functionality.
 
-**Duration**: 4 days (can start immediately after Workstream A Day 1)  
-**Team Size**: 2 developers  
+**Duration**: 4 days (can start immediately after Workstream A Day 1)
+**Team Size**: 2 developers
 **Expected Reduction**: -657 lines, -6 files → +~200 lines, +2 files = **Net -457 lines**
 
 ## Target Files (Priority Order)
@@ -17,7 +17,7 @@
 
 ### **Progress Adapters (Priority 1)**
 - `pkg/mcp/types/progress_adapter.go` (138 lines)
-- `pkg/mcp/internal/gomcp_progress_adapter.go` (132 lines)  
+- `pkg/mcp/internal/gomcp_progress_adapter.go` (132 lines)
 - `pkg/mcp/internal/runtime/gomcp_progress_adapter.go` (100 lines)
 
 ### **Operation Wrappers (Priority 2)**
@@ -38,7 +38,7 @@ find pkg/mcp -name "*progress_adapter*.go" | grep -v test
 
 # Expected results:
 # pkg/mcp/types/progress_adapter.go
-# pkg/mcp/internal/gomcp_progress_adapter.go  
+# pkg/mcp/internal/gomcp_progress_adapter.go
 # pkg/mcp/internal/runtime/gomcp_progress_adapter.go
 
 # Analyze usage patterns
@@ -58,7 +58,7 @@ type GoMCPProgressAdapter struct {
     current   int
 }
 
-// Current Pattern 2: internal/gomcp_progress_adapter.go  
+// Current Pattern 2: internal/gomcp_progress_adapter.go
 type GoMCPProgressAdapter struct {
     serverCtx *server.Context
     stages    []mcp.ProgressStage
@@ -122,9 +122,9 @@ func NewUnifiedProgressReporter(serverCtx *server.Context) core.ProgressReporter
 func (p *UnifiedProgressReporter) StartStage(stage string) core.ProgressToken {
     p.mutex.Lock()
     defer p.mutex.Unlock()
-    
+
     token := core.ProgressToken(fmt.Sprintf("stage_%d_%s", time.Now().UnixNano(), stage))
-    
+
     progressStage := &core.ProgressStage{
         Name:        stage,
         Description: stage,
@@ -133,13 +133,13 @@ func (p *UnifiedProgressReporter) StartStage(stage string) core.ProgressToken {
         Message:     fmt.Sprintf("Starting %s", stage),
         Weight:      1.0, // Default weight
     }
-    
+
     p.stages[token] = &progressState{
         stage:     progressStage,
         startTime: time.Now(),
         progress:  0,
     }
-    
+
     // Direct GoMCP integration - no adapter needed
     if p.serverCtx != nil {
         p.serverCtx.NotifyProgress(string(token), &server.Progress{
@@ -149,30 +149,30 @@ func (p *UnifiedProgressReporter) StartStage(stage string) core.ProgressToken {
             Progress: 0,
         })
     }
-    
+
     p.logger.Info().
         Str("token", string(token)).
         Str("stage", stage).
         Msg("Progress stage started")
-    
+
     return token
 }
 
 func (p *UnifiedProgressReporter) UpdateProgress(token core.ProgressToken, message string, percent int) {
     p.mutex.Lock()
     defer p.mutex.Unlock()
-    
+
     state, exists := p.stages[token]
     if !exists {
         p.logger.Warn().Str("token", string(token)).Msg("Progress token not found")
         return
     }
-    
+
     state.stage.Message = message
     state.stage.Progress = percent
     state.lastUpdate = time.Now()
     state.progress = percent
-    
+
     // GoMCP integration
     if p.serverCtx != nil {
         p.serverCtx.NotifyProgress(string(token), &server.Progress{
@@ -182,7 +182,7 @@ func (p *UnifiedProgressReporter) UpdateProgress(token core.ProgressToken, messa
             Progress: percent,
         })
     }
-    
+
     p.logger.Debug().
         Str("token", string(token)).
         Str("message", message).
@@ -193,12 +193,12 @@ func (p *UnifiedProgressReporter) UpdateProgress(token core.ProgressToken, messa
 func (p *UnifiedProgressReporter) CompleteStage(token core.ProgressToken, success bool, message string) {
     p.mutex.Lock()
     defer p.mutex.Unlock()
-    
+
     state, exists := p.stages[token]
     if !exists {
         return
     }
-    
+
     if success {
         state.stage.Status = "completed"
         state.stage.Progress = 100
@@ -206,7 +206,7 @@ func (p *UnifiedProgressReporter) CompleteStage(token core.ProgressToken, succes
         state.stage.Status = "failed"
     }
     state.stage.Message = message
-    
+
     // GoMCP integration
     if p.serverCtx != nil {
         p.serverCtx.NotifyProgress(string(token), &server.Progress{
@@ -218,7 +218,7 @@ func (p *UnifiedProgressReporter) CompleteStage(token core.ProgressToken, succes
             Error: !success,
         })
     }
-    
+
     duration := time.Since(state.startTime)
     p.logger.Info().
         Str("token", string(token)).
@@ -226,7 +226,7 @@ func (p *UnifiedProgressReporter) CompleteStage(token core.ProgressToken, succes
         Dur("duration", duration).
         Str("message", message).
         Msg("Progress stage completed")
-    
+
     // Clean up completed stages after a delay
     go func() {
         time.Sleep(5 * time.Minute)
@@ -239,7 +239,7 @@ func (p *UnifiedProgressReporter) CompleteStage(token core.ProgressToken, succes
 
 **Expected Day 1 Results:**
 - ✅ Unified progress implementation designed
-- ✅ Core interface fully implemented  
+- ✅ Core interface fully implemented
 - ✅ GoMCP integration without adapters
 - ✅ Foundation ready for atomic tool updates
 
@@ -256,7 +256,7 @@ grep -r "GoMCPProgressAdapter\|ProgressAdapter" pkg/mcp/internal/*/atomic*.go
 
 # Expected tools (~12 files):
 # - build atomic tools
-# - analyze atomic tools  
+# - analyze atomic tools
 # - deploy atomic tools
 # - scan atomic tools
 ```
@@ -302,21 +302,21 @@ func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (i
     if !ok {
         return nil, fmt.Errorf("invalid arguments for build_image")
     }
-    
+
     // Use unified progress reporting - no adapter needed
     token := t.progress.StartStage("build_image")
-    
+
     t.progress.UpdateProgress(token, "Analyzing Dockerfile", 10)
     // ... dockerfile analysis
-    
+
     t.progress.UpdateProgress(token, "Starting image build", 30)
     // ... image build
-    
+
     t.progress.UpdateProgress(token, "Finalizing build", 90)
     // ... finalization
-    
+
     t.progress.CompleteStage(token, true, "Image built successfully")
-    
+
     return &BuildImageResult{
         BaseToolResponse: core.BaseToolResponse{
             Success:   true,
@@ -375,7 +375,7 @@ go build -tags mcp ./pkg/mcp/internal/analyze/...
 find pkg/mcp/internal/build -name "*operation_wrapper*.go"
 
 # Expected results:
-# pkg/mcp/internal/build/pull_operation_wrapper.go  
+# pkg/mcp/internal/build/pull_operation_wrapper.go
 # pkg/mcp/internal/build/push_operation_wrapper.go
 # pkg/mcp/internal/build/tag_operation_wrapper.go
 
@@ -393,11 +393,11 @@ type PullOperationWrapper struct {
     lastError error
 }
 
-// Current Pattern 2: push_operation_wrapper.go  
+// Current Pattern 2: push_operation_wrapper.go
 type PushOperationWrapper struct {
     operation func(context.Context) error
     analyzer  func() error
-    preparer  func() error  
+    preparer  func() error
     validator func() error
     lastError error
 }
@@ -439,21 +439,21 @@ type DockerOperation struct {
     // Operation identification
     Type         OperationType
     Name         string
-    
+
     // Configuration
     RetryAttempts int
     Timeout      time.Duration
-    
+
     // Dependencies
     Progress     core.ProgressReporter
     Logger       zerolog.Logger
-    
+
     // Operation-specific functions (configurable)
     Execute  func(ctx context.Context) error
     Analyze  func() error
     Prepare  func() error
     Validate func() error
-    
+
     // State
     lastError error
     attempt   int
@@ -464,7 +464,7 @@ type DockerOperationConfig struct {
     Name          string
     RetryAttempts int
     Timeout       time.Duration
-    
+
     ExecuteFunc  func(ctx context.Context) error
     AnalyzeFunc  func() error
     PrepareFunc  func() error
@@ -493,34 +493,34 @@ func NewDockerOperation(config DockerOperationConfig, progress core.ProgressRepo
 ```go
 func (op *DockerOperation) Run(ctx context.Context) error {
     token := op.Progress.StartStage(fmt.Sprintf("%s_%s", op.Type, op.Name))
-    
+
     // Pre-operation steps
     if err := op.runPreOperation(ctx, token); err != nil {
         op.Progress.CompleteStage(token, false, err.Error())
         return err
     }
-    
+
     // Main operation with retry logic
     var lastError error
     for op.attempt = 1; op.attempt <= op.RetryAttempts; op.attempt++ {
-        op.Progress.UpdateProgress(token, 
-            fmt.Sprintf("Attempt %d/%d: %s", op.attempt, op.RetryAttempts, op.Name), 
+        op.Progress.UpdateProgress(token,
+            fmt.Sprintf("Attempt %d/%d: %s", op.attempt, op.RetryAttempts, op.Name),
             30 + (60 * op.attempt / op.RetryAttempts))
-            
+
         if err := op.executeWithTimeout(ctx); err == nil {
             op.Progress.CompleteStage(token, true, "Operation completed successfully")
             return nil
         } else {
             lastError = err
             op.lastError = err
-            
+
             if op.attempt < op.RetryAttempts {
                 op.Logger.Warn().Err(err).Int("attempt", op.attempt).Msg("Operation failed, retrying")
                 time.Sleep(time.Duration(op.attempt) * time.Second) // Exponential backoff
             }
         }
     }
-    
+
     op.Progress.CompleteStage(token, false, fmt.Sprintf("Operation failed after %d attempts: %v", op.RetryAttempts, lastError))
     return fmt.Errorf("operation failed after %d attempts: %w", op.RetryAttempts, lastError)
 }
@@ -532,21 +532,21 @@ func (op *DockerOperation) runPreOperation(ctx context.Context, token core.Progr
             return fmt.Errorf("analysis failed: %w", err)
         }
     }
-    
+
     if op.Prepare != nil {
         op.Progress.UpdateProgress(token, "Preparing operation", 20)
         if err := op.Prepare(); err != nil {
             return fmt.Errorf("preparation failed: %w", err)
         }
     }
-    
+
     if op.Validate != nil {
         op.Progress.UpdateProgress(token, "Validating operation", 25)
         if err := op.Validate(); err != nil {
             return fmt.Errorf("validation failed: %w", err)
         }
     }
-    
+
     return nil
 }
 
@@ -554,11 +554,11 @@ func (op *DockerOperation) executeWithTimeout(ctx context.Context) error {
     if op.Execute == nil {
         return fmt.Errorf("no execute function configured")
     }
-    
+
     // Create timeout context
     timeoutCtx, cancel := context.WithTimeout(ctx, op.Timeout)
     defer cancel()
-    
+
     // Execute operation
     return op.Execute(timeoutCtx)
 }
@@ -581,27 +581,27 @@ func (op *DockerOperation) executeWithTimeout(ctx context.Context) error {
 // File: pkg/mcp/internal/build/pull_image_atomic.go
 func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
     pullArgs := args.(*PullImageArgs)
-    
+
     // Configure operation using generic wrapper
     operation := NewDockerOperation(DockerOperationConfig{
         Type:          OperationPull,
         Name:          pullArgs.ImageRef,
         RetryAttempts: 3,
         Timeout:       5 * time.Minute,
-        
+
         ExecuteFunc: func(ctx context.Context) error {
             return t.dockerClient.ImagePull(ctx, pullArgs.ImageRef, types.ImagePullOptions{})
         },
-        
+
         ValidateFunc: func() error {
             return validateImageRef(pullArgs.ImageRef)
         },
-        
+
         PrepareFunc: func() error {
             return t.ensureDockerConnection()
         },
     }, t.progress)
-    
+
     // Execute using generic wrapper
     if err := operation.Run(ctx); err != nil {
         return &PullImageResult{
@@ -611,7 +611,7 @@ func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (in
             },
         }, err
     }
-    
+
     return &PullImageResult{
         BaseToolResponse: core.BaseToolResponse{
             Success: true,
@@ -682,7 +682,7 @@ ls -la pkg/mcp/internal/build/docker_operation.go                  # Expected: ~
 
 # Calculate line reduction
 echo "Lines eliminated: 657 (from 6 files)"
-echo "Lines added: ~350 (2 unified implementations)" 
+echo "Lines added: ~350 (2 unified implementations)"
 echo "Net reduction: ~307 lines"
 echo "File reduction: 6 → 2 files (-4 files)"
 ```
@@ -756,7 +756,7 @@ echo "Total elimination: 657 lines from 6 files"
 echo "Total addition: ~350 lines in 2 files"
 echo "Net reduction: ~457 lines (-4 files)"
 
-# Architecture verification  
+# Architecture verification
 echo "Unified progress: pkg/mcp/internal/observability/progress.go"
 echo "Generic operations: pkg/mcp/internal/build/docker_operation.go"
 echo "Core interface usage: 100% for progress and operations"

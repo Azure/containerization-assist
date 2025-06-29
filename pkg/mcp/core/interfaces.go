@@ -43,7 +43,7 @@ type ToolExample struct {
 }
 
 // ============================================================================
-// Progress Reporting Interface  
+// Progress Reporting Interface
 // ============================================================================
 
 // ProgressReporter provides unified progress reporting across all tools.
@@ -61,7 +61,7 @@ type ProgressToken string
 type ProgressStage struct {
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
-	Status      string  `json:"status"` // "pending", "running", "completed", "failed"
+	Status      string  `json:"status"`   // "pending", "running", "completed", "failed"
 	Progress    int     `json:"progress"` // 0-100
 	Message     string  `json:"message"`
 	Weight      float64 `json:"weight"` // Relative weight (0.0-1.0) of this stage in overall progress
@@ -81,17 +81,17 @@ type RepositoryAnalyzer interface {
 
 // RepositoryInfo represents repository analysis results
 type RepositoryInfo struct {
-	Path           string                 `json:"path"`
-	Type           string                 `json:"type"`
-	Language       string                 `json:"language"`
-	Framework      string                 `json:"framework"`
-	Languages      []string               `json:"languages"`
-	Dependencies   map[string]string      `json:"dependencies"`
-	BuildTools     []string               `json:"build_tools"`
-	EntryPoint     string                 `json:"entry_point"`
-	Port           int                    `json:"port"`
-	HasDockerfile  bool                   `json:"has_dockerfile"`
-	Metadata       map[string]interface{} `json:"metadata"`
+	Path          string                 `json:"path"`
+	Type          string                 `json:"type"`
+	Language      string                 `json:"language"`
+	Framework     string                 `json:"framework"`
+	Languages     []string               `json:"languages"`
+	Dependencies  map[string]string      `json:"dependencies"`
+	BuildTools    []string               `json:"build_tools"`
+	EntryPoint    string                 `json:"entry_point"`
+	Port          int                    `json:"port"`
+	HasDockerfile bool                   `json:"has_dockerfile"`
+	Metadata      map[string]interface{} `json:"metadata"`
 }
 
 // DockerfileInfo represents Dockerfile analysis results
@@ -275,8 +275,8 @@ type MCPResponse struct {
 
 // MCPError represents an MCP protocol error
 type MCPError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
 

@@ -65,7 +65,7 @@ go test -tags mcp ./pkg/mcp/internal/runtime/... -run TestToolRegistration
 
 **Success Criteria**:
 - [ ] stdio transport works correctly
-- [ ] HTTP transport works correctly  
+- [ ] HTTP transport works correctly
 - [ ] Request handling functions properly
 - [ ] No transport adapter code executed
 
@@ -169,7 +169,7 @@ go test -benchmem -run=^$ ./pkg/mcp/internal/runtime/...
 ```bash
 # Test error scenarios work without adapters
 # - Invalid repository path
-# - Tool registration failures  
+# - Tool registration failures
 # - Transport connection errors
 # - Dockerfile validation errors
 ```
@@ -207,7 +207,7 @@ go test -benchmem -run=^$ ./pkg/mcp/internal/runtime/...
 
 # Test operations:
 docker_pull_retry_test.sh   # Simulates pull failures
-docker_push_retry_test.sh   # Simulates push failures  
+docker_push_retry_test.sh   # Simulates push failures
 docker_tag_retry_test.sh    # Simulates tag failures
 ```
 
@@ -346,7 +346,7 @@ go test -benchmem -run=^$ ./pkg/mcp/internal/build/...
 
 # Full workflow:
 # 1. analyze_repository (B's work)
-# 2. generate_dockerfile (C's progress)  
+# 2. generate_dockerfile (C's progress)
 # 3. build_image (C's docker operations)
 # 4. deploy_kubernetes (B's tool registry)
 ```
@@ -383,7 +383,7 @@ make test-integration-bc
 # Tests include:
 # - Repository analysis → build integration
 # - Progress reporting → tool execution
-# - Docker operations → retry scenarios  
+# - Docker operations → retry scenarios
 # - Tool registry → tool execution
 ```
 
@@ -423,7 +423,7 @@ else
     ((B_ERRORS++))
 fi
 
-# Workstream C Validation  
+# Workstream C Validation
 echo "Validating Workstream C..."
 C_ERRORS=0
 

@@ -115,7 +115,7 @@ import "github.com/Azure/container-kit/pkg/mcp/core"
 // Deprecated: Use core.Tool instead
 type Tool = core.Tool
 
-// Deprecated: Use core.ProgressReporter instead  
+// Deprecated: Use core.ProgressReporter instead
 type ProgressReporter = core.ProgressReporter
 
 // ... other re-exports
@@ -130,11 +130,11 @@ type ProgressReporter = core.ProgressReporter
 // Before
 import "github.com/Azure/container-kit/pkg/mcp"
 
-// After  
+// After
 import "github.com/Azure/container-kit/pkg/mcp/core"
 ```
 
-**Validation**: 
+**Validation**:
 ```bash
 # Verify no import cycles
 go build -tags mcp ./pkg/mcp/core/...
@@ -147,7 +147,7 @@ go build -tags mcp ./pkg/mcp/internal/...
 
 **Target**: `pkg/mcp/internal/orchestration/repository_analyzer_adapter.go` (357 lines)
 
-**Current Problem**: 
+**Current Problem**:
 - `analyze` package can't import `build` package (import cycle)
 - `build` package needs repository analysis functionality
 - Adapter bridges with 200+ lines of conversion logic
@@ -185,19 +185,19 @@ type RepositoryInfo struct {
    ```go
    // pkg/mcp/internal/analyze/repository_analyzer.go
    package analyze
-   
+
    import "github.com/Azure/container-kit/pkg/mcp/core"
-   
+
    type repositoryAnalyzer struct {
        logger zerolog.Logger
    }
-   
+
    func NewRepositoryAnalyzer() core.RepositoryAnalyzer {
        return &repositoryAnalyzer{
            logger: zerolog.Logger{},
        }
    }
-   
+
    func (r *repositoryAnalyzer) AnalyzeStructure(ctx context.Context, path string) (*core.RepositoryInfo, error) {
        // Direct implementation - no conversion needed
    }
@@ -207,13 +207,13 @@ type RepositoryInfo struct {
    ```go
    // pkg/mcp/internal/build/analyzer_integration.go
    package build
-   
+
    import "github.com/Azure/container-kit/pkg/mcp/core"
-   
+
    type EnhancedBuildAnalyzer struct {
        repositoryAnalyzer core.RepositoryAnalyzer // Direct dependency injection
    }
-   
+
    func NewEnhancedBuildAnalyzer(analyzer core.RepositoryAnalyzer) *EnhancedBuildAnalyzer {
        return &EnhancedBuildAnalyzer{
            repositoryAnalyzer: analyzer,
@@ -260,14 +260,14 @@ type RepositoryInfo struct {
    // Example: Update a tool still using old pattern
    // Before (old pattern)
    type SomeTool struct{}
-   
+
    func (t *SomeTool) Execute(args interface{}) (interface{}, error)
-   
+
    // After (unified pattern)
    import "github.com/Azure/container-kit/pkg/mcp/core"
-   
+
    type SomeTool struct{}
-   
+
    func (t *SomeTool) Execute(ctx context.Context, args interface{}) (interface{}, error)
    func (t *SomeTool) GetMetadata() core.ToolMetadata
    func (t *SomeTool) Validate(ctx context.Context, args interface{}) error
@@ -277,18 +277,18 @@ type RepositoryInfo struct {
    ```go
    // pkg/mcp/internal/runtime/registry.go
    package runtime
-   
+
    import "github.com/Azure/container-kit/pkg/mcp/core"
-   
+
    type Registry struct {
        tools map[string]core.Tool
    }
-   
+
    func (r *Registry) Register(tool core.Tool) {
        metadata := tool.GetMetadata()
        r.tools[metadata.Name] = tool
    }
-   
+
    func (r *Registry) Get(name string) (core.Tool, bool) {
        tool, exists := r.tools[name]
        return tool, exists
@@ -329,9 +329,9 @@ type RepositoryInfo struct {
        UpdateProgress(token ProgressToken, message string, percent int)
        CompleteStage(token ProgressToken, success bool, message string)
    }
-   
+
    type ProgressToken string
-   
+
    type ProgressStage struct {
        Name        string `json:"name"`
        Description string `json:"description"`
@@ -345,28 +345,28 @@ type RepositoryInfo struct {
    ```go
    // pkg/mcp/internal/observability/progress.go
    package observability
-   
+
    import "github.com/Azure/container-kit/pkg/mcp/core"
-   
+
    type ProgressReporter struct {
        serverCtx *server.Context // GoMCP integration
        stages    map[core.ProgressToken]*core.ProgressStage
    }
-   
+
    func NewProgressReporter(serverCtx *server.Context) core.ProgressReporter {
        return &ProgressReporter{
            serverCtx: serverCtx,
            stages:    make(map[core.ProgressToken]*core.ProgressStage),
        }
    }
-   
+
    func (p *ProgressReporter) StartStage(stage string) core.ProgressToken {
        token := core.ProgressToken(fmt.Sprintf("stage_%d", time.Now().UnixNano()))
        p.stages[token] = &core.ProgressStage{
            Name:   stage,
            Status: "running",
        }
-       
+
        // Direct GoMCP integration - no adapter needed
        if p.serverCtx != nil {
            p.serverCtx.NotifyProgress(string(token), &server.Progress{
@@ -374,7 +374,7 @@ type RepositoryInfo struct {
                Title: stage,
            })
        }
-       
+
        return token
    }
    ```
@@ -384,7 +384,7 @@ type RepositoryInfo struct {
    // Example: Update atomic tool
    // Before (with adapter)
    progress := NewGoMCPProgressAdapter(serverCtx, "build_image")
-   
+
    // After (direct interface)
    progress := observability.NewProgressReporter(serverCtx)
    token := progress.StartStage("build_image")
@@ -418,7 +418,7 @@ type RepositoryInfo struct {
    type AtomicBuildTool struct {
        progress core.ProgressReporter
    }
-   
+
    func NewAtomicBuildTool(progress core.ProgressReporter) *AtomicBuildTool {
        return &AtomicBuildTool{
            progress: progress,
@@ -451,33 +451,33 @@ type RepositoryInfo struct {
    ```go
    // pkg/mcp/internal/build/docker_operation.go
    package build
-   
+
    import "github.com/Azure/container-kit/pkg/mcp/core"
-   
+
    type OperationType string
-   
+
    const (
        OperationPull OperationType = "pull"
        OperationPush OperationType = "push"
        OperationTag  OperationType = "tag"
    )
-   
+
    type DockerOperation struct {
        Type         OperationType
        RetryAttempts int
        Timeout      time.Duration
        Progress     core.ProgressReporter
-       
+
        // Operation-specific functions
        Execute  func(ctx context.Context) error
        Analyze  func() error
        Prepare  func() error
        Validate func() error
    }
-   
+
    func (op *DockerOperation) Run(ctx context.Context) error {
        token := op.Progress.StartStage(string(op.Type))
-       
+
        // Common retry logic
        for attempt := 0; attempt < op.RetryAttempts; attempt++ {
            if err := op.executeWithRetry(ctx, attempt); err == nil {
@@ -485,7 +485,7 @@ type RepositoryInfo struct {
                return nil
            }
        }
-       
+
        op.Progress.CompleteStage(token, false, "Operation failed after retries")
        return fmt.Errorf("operation failed after %d attempts", op.RetryAttempts)
    }
@@ -496,7 +496,7 @@ type RepositoryInfo struct {
    // pkg/mcp/internal/build/pull_image_atomic.go
    func (t *AtomicPullImageTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
        pullArgs := args.(*PullImageArgs)
-       
+
        operation := &DockerOperation{
            Type:         OperationPull,
            RetryAttempts: 3,
@@ -509,7 +509,7 @@ type RepositoryInfo struct {
                return validateImageRef(pullArgs.ImageRef)
            },
        }
-       
+
        return operation.Run(ctx)
    }
    ```
@@ -517,7 +517,7 @@ type RepositoryInfo struct {
 3. **Remove individual wrapper files**:
    ```bash
    rm pkg/mcp/internal/build/pull_operation_wrapper.go
-   rm pkg/mcp/internal/build/push_operation_wrapper.go  
+   rm pkg/mcp/internal/build/push_operation_wrapper.go
    rm pkg/mcp/internal/build/tag_operation_wrapper.go
    ```
 
@@ -637,7 +637,7 @@ grep -r "type.*Tool.*interface" pkg/mcp/ | wc -l  # Target: 1
 - [ ] Progress reporting works correctly
 - [ ] Docker operations succeed with retry logic
 
-### Architectural Requirements  
+### Architectural Requirements
 - [ ] Zero adapter files in codebase
 - [ ] Single Tool interface definition
 - [ ] No import cycles between packages

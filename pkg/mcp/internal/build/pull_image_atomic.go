@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
@@ -116,8 +117,13 @@ func (t *AtomicPullImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 	if t.fixingMixin != nil && !args.DryRun {
 		// Create wrapper operation for pull process
 		var result *AtomicPullImageResult
-		operation := NewPullOperationWrapper(
-			func(ctx context.Context) error {
+		progress := observability.NewUnifiedProgressReporter(nil) // No server context in ExecuteWithFixes
+		operation := NewDockerOperation(DockerOperationConfig{
+			Type:          OperationPull,
+			Name:          args.ImageRef,
+			RetryAttempts: 3,
+			Timeout:       5 * time.Minute,
+			ExecuteFunc: func(ctx context.Context) error {
 				var err error
 				result, err = t.executePullCore(ctx, args)
 				if err != nil {
@@ -128,17 +134,17 @@ func (t *AtomicPullImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 				}
 				return nil
 			},
-			func() error {
+			AnalyzeFunc: func() error {
 				if t.analyzer != nil {
 					return t.analyzer.AnalyzePullFailure(args.ImageRef, args.SessionID)
 				}
 				return nil
 			},
-			func() error {
+			PrepareFunc: func() error {
 				// Prepare workspace for fixes
 				return nil
 			},
-		)
+		}, progress)
 		// Execute with retry and fixing
 		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, t.pipelineAdapter.GetSessionWorkspace(args.SessionID), operation)
 		if err != nil {
@@ -180,10 +186,10 @@ func (t *AtomicPullImageTool) ExecuteWithContext(serverCtx *server.Context, args
 		PullContext:         &PullContext{},
 	}
 	// Create progress adapter for GoMCP using standard pull stages
-	// _ = nil // TODO: Progress adapter removed to break import cycles
+	progress := observability.NewUnifiedProgressReporter(serverCtx)
 	// Execute with progress tracking
 	ctx := context.Background()
-	err := t.executeWithProgress(ctx, args, result, startTime, nil)
+	err := t.executeWithProgress(ctx, args, result, startTime, progress)
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 	// Update AI context with final result
