@@ -152,7 +152,7 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
        go func() {
            ticker := time.NewTicker(5 * time.Minute)
            defer ticker.Stop()
-           
+
            for {
                select {
                case <-ticker.C:
@@ -163,14 +163,14 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
            }
        }()
    }
-   
+
    func (c *DefaultContextSharer) cleanupExpiredContexts() {
        c.mutex.Lock()
        defer c.mutex.Unlock()
-       
+
        now := time.Now()
        cleaned := 0
-       
+
        for sessionID, sessionContexts := range c.contextStore {
            for contextType, context := range sessionContexts {
                if now.After(context.ExpiresAt) {
@@ -182,13 +182,13 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
                        Msg("Cleaned up expired context")
                }
            }
-           
+
            // Remove empty session entries
            if len(sessionContexts) == 0 {
                delete(c.contextStore, sessionID)
            }
        }
-       
+
        if cleaned > 0 {
            c.logger.Info().Int("cleaned_contexts", cleaned).Msg("Context cleanup completed")
        }
@@ -200,21 +200,21 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
    func (c *DefaultContextSharer) extractToolsFromContext(ctx context.Context, sessionID string) ([]ToolInfo, error) {
        c.mutex.RLock()
        defer c.mutex.RUnlock()
-       
+
        var tools []ToolInfo
-       
+
        sessionContexts, exists := c.contextStore[sessionID]
        if !exists {
            return tools, nil
        }
-       
+
        for contextType, sharedContext := range sessionContexts {
            if contextType == "tool_registry" {
                if toolData, ok := sharedContext.Data.(map[string]interface{}); ok {
                    tools = append(tools, c.parseToolData(toolData)...)
                }
            }
-           
+
            // Extract tools from execution context
            if contextType == "execution_history" {
                if historyData, ok := sharedContext.Data.([]interface{}); ok {
@@ -222,12 +222,12 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
                }
            }
        }
-       
+
        c.logger.Debug().
            Str("session_id", sessionID).
            Int("tools_found", len(tools)).
            Msg("Extracted tools from context")
-       
+
        return tools, nil
    }
    ```
@@ -249,7 +249,7 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
        if err := wo.validateWorkflow(workflow); err != nil {
            return nil, fmt.Errorf("invalid workflow: %w", err)
        }
-       
+
        // Create execution context
        execCtx := &WorkflowExecutionContext{
            WorkflowID:   workflow.ID,
@@ -259,7 +259,7 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
            Steps:        make(map[string]*StepResult),
            SharedData:   make(map[string]interface{}),
        }
-       
+
        // Execute workflow steps
        result, err := wo.executeWorkflowSteps(ctx, workflow, execCtx)
        if err != nil {
@@ -268,10 +268,10 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
        } else {
            execCtx.Status = "completed"
        }
-       
+
        execCtx.EndTime = time.Now()
        execCtx.Duration = execCtx.EndTime.Sub(execCtx.StartTime)
-       
+
        return &WorkflowResult{
            WorkflowID:      workflow.ID,
            ExecutionID:     execCtx.SessionID,
@@ -292,12 +292,12 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
        if err != nil {
            return nil, fmt.Errorf("failed to parse custom workflow: %w", err)
        }
-       
+
        // Add custom workflow validation
        if err := wo.validateCustomWorkflow(workflow); err != nil {
            return nil, fmt.Errorf("invalid custom workflow: %w", err)
        }
-       
+
        // Execute using standard workflow engine
        return wo.ExecuteWorkflow(ctx, workflow)
    }
@@ -310,17 +310,17 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
        if workflow.ID == "" {
            return fmt.Errorf("workflow ID is required")
        }
-       
+
        if len(workflow.Steps) == 0 {
            return fmt.Errorf("workflow must have at least one step")
        }
-       
+
        // Validate step dependencies
        stepMap := make(map[string]bool)
        for _, step := range workflow.Steps {
            stepMap[step.ID] = true
        }
-       
+
        for _, step := range workflow.Steps {
            for _, dep := range step.Dependencies {
                if !stepMap[dep] {
@@ -328,12 +328,12 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
                }
            }
        }
-       
+
        // Check for circular dependencies
        if wo.hasCircularDependencies(workflow.Steps) {
            return fmt.Errorf("workflow has circular dependencies")
        }
-       
+
        return nil
    }
    ```
@@ -353,7 +353,7 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
                return fmt.Errorf("tool %s does not implement required interfaces", tool.GetMetadata().Name)
            }
        }
-       
+
        return nil
    }
    ```
@@ -366,26 +366,26 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
        circuitBreakers    map[string]*CircuitBreaker
        logger      zerolog.Logger
    }
-   
+
    func (cm *CommunicationManager) SendRequest(ctx context.Context, request ToolRequest) (*ToolResponse, error) {
        // Add correlation ID for traceability
        correlationID := cm.generateCorrelationID()
        request.CorrelationID = correlationID
-       
+
        // Check circuit breaker
        if breaker, exists := cm.circuitBreakers[request.ToolName]; exists {
            if breaker.IsOpen() {
                return nil, fmt.Errorf("circuit breaker open for tool %s", request.ToolName)
            }
        }
-       
+
        // Send request with timeout and retry
        response, err := cm.sendWithRetry(ctx, request)
        if err != nil {
            cm.handleRequestFailure(request.ToolName, err)
            return nil, err
        }
-       
+
        return response, nil
    }
    ```
@@ -492,7 +492,7 @@ Tomorrow's Priority:
 
 Quality Status:
 - Tests: ✅/❌ make test-mcp passing
-- Build: ✅/❌ go build succeeding  
+- Build: ✅/❌ go build succeeding
 - Lint: ✅/❌ golangci-lint clean
 - Interface Compatibility: ✅/❌ all tools compatible
 

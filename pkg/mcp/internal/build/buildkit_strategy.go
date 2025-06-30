@@ -86,10 +86,10 @@ func (s *BuildKitStrategy) Validate(ctx BuildContext) error {
 	if ctx.BuildPath == "" {
 		return fmt.Errorf("build path is required for BuildKit strategy")
 	}
-	
+
 	// BuildKit-specific validations could go here
 	// For example, checking if BuildKit is available
-	
+
 	return nil
 }
 
@@ -97,11 +97,11 @@ func (s *BuildKitStrategy) Validate(ctx BuildContext) error {
 func (s *BuildKitStrategy) ScoreCompatibility(info interface{}) int {
 	// BuildKit is better for advanced builds
 	score := 70
-	
+
 	// Could analyze project info for:
 	// - Multi-stage Dockerfiles (higher score)
 	// - Complex build requirements (higher score)
 	// - Security requirements (higher score)
-	
+
 	return score
 }

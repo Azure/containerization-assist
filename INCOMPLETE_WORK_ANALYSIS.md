@@ -391,7 +391,7 @@ You are **InfraBot**, the **Lead Developer for Core Infrastructure** in a critic
 
 ### Must-Not-Do Items
 - ❌ **Do NOT modify atomic tool implementations** (that's BuildSecBot)
-- ❌ **Do NOT work on context sharing** (that's OrchBot)  
+- ❌ **Do NOT work on context sharing** (that's OrchBot)
 - ❌ **Do NOT implement sandboxing** (that's AdvancedBot)
 - ❌ **Do NOT break existing interfaces**
 
@@ -731,7 +731,7 @@ Focus on creating production-ready infrastructure that supports the entire Conta
 #### Integration Points
 ```
 Monday   │ InfraBot delivers Docker ops → BuildSecBot integrates atomic tools
-Tuesday  │ BuildSecBot delivers atomic tools → OrchBot integrates workflows  
+Tuesday  │ BuildSecBot delivers atomic tools → OrchBot integrates workflows
 Wednesday│ OrchBot delivers context sharing → All teams integrate
 Thursday │ AdvancedBot validates full integration
 Friday   │ Sprint 2 demo and retrospective
@@ -796,7 +796,7 @@ Tomorrow's Priority:
 
 Quality Status:
 - Tests: ✅/❌ make test-mcp passing
-- Build: ✅/❌ go build succeeding  
+- Build: ✅/❌ go build succeeding
 - Lint: ✅/❌ golangci-lint clean
 
 Merge Readiness: READY/NOT READY/DEPENDS ON [team]
@@ -810,7 +810,7 @@ Overall System Health: [GREEN/YELLOW/RED]
 
 Team Integration Status:
 ├─ InfraBot (Core): [status and metrics]
-├─ BuildSecBot (Build): [status and metrics]  
+├─ BuildSecBot (Build): [status and metrics]
 ├─ OrchBot (Communication): [status and metrics]
 └─ Cross-team Integration: [status]
 
@@ -862,7 +862,7 @@ SPRINT PROGRESS: X% complete (on track/behind/ahead)
 implemented_ops=$(rg "func.*\(PullDockerImage|PushDockerImage|TagDockerImage\)" pkg/mcp/internal/pipeline/operations.go | grep -v "not implemented" | wc -l)
 echo "Docker Operations: $implemented_ops/3 implemented"
 
-# Atomic Tool Progress (BuildSecBot)  
+# Atomic Tool Progress (BuildSecBot)
 atomic_implementations=$(rg "executeWithoutProgress" pkg/mcp/internal/build/*_atomic.go | grep -v "not implemented" | wc -l)
 echo "Atomic Tools: $atomic_implementations implemented"
 

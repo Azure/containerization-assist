@@ -317,24 +317,24 @@ func (wm *WorkspaceManager) EnforceGlobalQuota() error {
 
 // SandboxOptions configures sandboxed execution
 type SandboxOptions struct {
-	BaseImage     string            `json:"base_image"`
-	Environment   map[string]string `json:"environment"`
-	MemoryLimit   int64             `json:"memory_limit"`
-	CPUQuota      int64             `json:"cpu_quota"`
-	Timeout       time.Duration     `json:"timeout"`
-	ReadOnly      bool              `json:"read_only"`
-	NetworkAccess bool              `json:"network_access"`
-	SecurityPolicy SecurityPolicy  `json:"security_policy"`
+	BaseImage      string            `json:"base_image"`
+	Environment    map[string]string `json:"environment"`
+	MemoryLimit    int64             `json:"memory_limit"`
+	CPUQuota       int64             `json:"cpu_quota"`
+	Timeout        time.Duration     `json:"timeout"`
+	ReadOnly       bool              `json:"read_only"`
+	NetworkAccess  bool              `json:"network_access"`
+	SecurityPolicy SecurityPolicy    `json:"security_policy"`
 }
 
 // SecurityPolicy defines security constraints for sandboxed execution
 type SecurityPolicy struct {
-	AllowNetworking    bool     `json:"allow_networking"`
-	AllowFileSystem    bool     `json:"allow_filesystem"`
-	AllowedSyscalls    []string `json:"allowed_syscalls"`
-	ResourceLimits     ResourceLimits `json:"resource_limits"`
-	TrustedRegistries  []string `json:"trusted_registries"`
-	RequireNonRoot     bool     `json:"require_non_root"`
+	AllowNetworking   bool           `json:"allow_networking"`
+	AllowFileSystem   bool           `json:"allow_filesystem"`
+	AllowedSyscalls   []string       `json:"allowed_syscalls"`
+	ResourceLimits    ResourceLimits `json:"resource_limits"`
+	TrustedRegistries []string       `json:"trusted_registries"`
+	RequireNonRoot    bool           `json:"require_non_root"`
 }
 
 // ResourceLimits defines resource constraints
@@ -346,19 +346,19 @@ type ResourceLimits struct {
 
 // ExecResult contains the result of sandboxed execution
 type ExecResult struct {
-	ExitCode int               `json:"exit_code"`
-	Stdout   string            `json:"stdout"`
-	Stderr   string            `json:"stderr"`
-	Duration time.Duration     `json:"duration"`
-	Metrics  ExecutionMetrics  `json:"metrics"`
+	ExitCode int              `json:"exit_code"`
+	Stdout   string           `json:"stdout"`
+	Stderr   string           `json:"stderr"`
+	Duration time.Duration    `json:"duration"`
+	Metrics  ExecutionMetrics `json:"metrics"`
 }
 
 // ExecutionMetrics provides runtime metrics for sandboxed execution
 type ExecutionMetrics struct {
-	MemoryUsage    int64 `json:"memory_usage"`
-	CPUUsage       int64 `json:"cpu_usage"`
-	NetworkIO      int64 `json:"network_io"`
-	DiskIO         int64 `json:"disk_io"`
+	MemoryUsage int64 `json:"memory_usage"`
+	CPUUsage    int64 `json:"cpu_usage"`
+	NetworkIO   int64 `json:"network_io"`
+	DiskIO      int64 `json:"disk_io"`
 }
 
 // Sandboxing methods
@@ -401,7 +401,7 @@ func (wm *WorkspaceManager) SandboxedAnalysis(ctx context.Context, sessionID, re
 	sandboxOpts := SandboxOptions{
 		BaseImage:     "alpine:latest",
 		MemoryLimit:   256 * 1024 * 1024, // 256MB
-		CPUQuota:      50000,              // 50% of one CPU
+		CPUQuota:      50000,             // 50% of one CPU
 		Timeout:       5 * time.Minute,
 		ReadOnly:      true,
 		NetworkAccess: false,
@@ -433,7 +433,7 @@ func (wm *WorkspaceManager) SandboxedBuild(ctx context.Context, sessionID, docke
 	sandboxOpts := SandboxOptions{
 		BaseImage:     "docker:dind",
 		MemoryLimit:   1024 * 1024 * 1024, // 1GB
-		CPUQuota:      100000,              // 100% of one CPU
+		CPUQuota:      100000,             // 100% of one CPU
 		Timeout:       15 * time.Minute,
 		ReadOnly:      false,
 		NetworkAccess: true, // Needed for pulling base images
@@ -478,9 +478,9 @@ func (wm *WorkspaceManager) validateSecurityPolicy(policy SecurityPolicy) error 
 
 func (wm *WorkspaceManager) buildDockerRunCommand(sessionID string, cmd []string, options SandboxOptions) ([]string, error) {
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
-	
+
 	args := []string{"run", "--rm"}
-	
+
 	// Resource limits
 	if options.MemoryLimit > 0 {
 		args = append(args, fmt.Sprintf("--memory=%d", options.MemoryLimit))
@@ -489,61 +489,61 @@ func (wm *WorkspaceManager) buildDockerRunCommand(sessionID string, cmd []string
 		cpuLimit := float64(options.CPUQuota) / 100000.0 // Convert from Docker quota to CPU limit
 		args = append(args, fmt.Sprintf("--cpus=%.2f", cpuLimit))
 	}
-	
+
 	// Security settings
 	if options.SecurityPolicy.RequireNonRoot {
 		args = append(args, "--user=1000:1000")
 	}
-	
+
 	if options.ReadOnly {
 		args = append(args, "--read-only")
 	}
-	
+
 	// Network access
 	if !options.NetworkAccess || !options.SecurityPolicy.AllowNetworking {
 		args = append(args, "--network=none")
 	}
-	
+
 	// Environment variables
 	env := wm.sanitizeEnvironment(options.Environment)
 	for _, envVar := range env {
 		args = append(args, "-e", envVar)
 	}
-	
+
 	// Mount workspace
 	mountType := "bind"
 	if options.ReadOnly {
 		mountType = "bind,readonly"
 	}
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace:%s", workspaceDir, mountType))
-	
+
 	// Add temporary directory
 	args = append(args, "--tmpfs", "/tmp:size=100m")
-	
+
 	// Add Docker socket for Docker-in-Docker if needed
 	if strings.Contains(options.BaseImage, "dind") {
 		args = append(args, "-v", "/var/run/docker.sock:/var/run/docker.sock")
 		args = append(args, "--privileged")
 	}
-	
+
 	// Working directory
 	args = append(args, "-w", "/workspace")
-	
+
 	// Image
 	args = append(args, options.BaseImage)
-	
+
 	// Command
 	args = append(args, cmd...)
-	
+
 	return args, nil
 }
 
 func (wm *WorkspaceManager) sanitizeEnvironment(env map[string]string) []string {
 	var sanitized []string
-	
+
 	// Allow list of safe environment variables
 	allowedPrefixes := []string{"PATH", "HOME", "USER", "LANG", "LC_"}
-	
+
 	for key, value := range env {
 		safe := false
 		for _, prefix := range allowedPrefixes {
@@ -552,32 +552,32 @@ func (wm *WorkspaceManager) sanitizeEnvironment(env map[string]string) []string 
 				break
 			}
 		}
-		
+
 		// Additional validation for specific variables
 		if safe && !strings.Contains(value, ";") && !strings.Contains(value, "|") {
 			sanitized = append(sanitized, fmt.Sprintf("%s=%s", key, value))
 		}
 	}
-	
+
 	return sanitized
 }
 
 func (wm *WorkspaceManager) executeDockerCommand(ctx context.Context, dockerArgs []string, sessionID string) (*ExecResult, error) {
 	startTime := time.Now()
-	
+
 	// Create the docker command
 	cmd := exec.CommandContext(ctx, wm.dockerCmd, dockerArgs...)
-	
+
 	// Capture stdout and stderr separately
 	stdoutBuf := &strings.Builder{}
 	stderrBuf := &strings.Builder{}
 	cmd.Stdout = stdoutBuf
 	cmd.Stderr = stderrBuf
-	
+
 	// Execute the command
 	err := cmd.Run()
 	duration := time.Since(startTime)
-	
+
 	// Get exit code
 	exitCode := 0
 	if err != nil {
@@ -588,16 +588,16 @@ func (wm *WorkspaceManager) executeDockerCommand(ctx context.Context, dockerArgs
 			return nil, fmt.Errorf("failed to execute docker command: %v", err)
 		}
 	}
-	
+
 	stdout := stdoutBuf.String()
 	stderr := stderrBuf.String()
-	
+
 	wm.logger.Info().
 		Str("session_id", sessionID).
 		Int("exit_code", exitCode).
 		Dur("duration", duration).
 		Msg("Sandboxed execution completed")
-	
+
 	return &ExecResult{
 		ExitCode: exitCode,
 		Stdout:   stdout,

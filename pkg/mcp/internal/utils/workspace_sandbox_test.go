@@ -12,17 +12,17 @@ import (
 
 func TestWorkspaceSandboxing(t *testing.T) {
 	logger := zerolog.New(zerolog.NewTestWriter(t)).With().Timestamp().Logger()
-	
+
 	// Create workspace manager with sandboxing enabled
 	workspace, err := NewWorkspaceManager(context.Background(), WorkspaceConfig{
 		BaseDir:           t.TempDir(),
-		MaxSizePerSession: 512 * 1024 * 1024, // 512MB per session
+		MaxSizePerSession: 512 * 1024 * 1024,      // 512MB per session
 		TotalMaxSize:      2 * 1024 * 1024 * 1024, // 2GB total
 		Cleanup:           true,
 		SandboxEnabled:    true,
 		Logger:            logger,
 	})
-	
+
 	// Skip if Docker is not available
 	if err != nil && err.Error() == "docker command not found for sandboxing: exec: \"docker\": executable file not found in $PATH" {
 		t.Skip("Docker not available, skipping sandboxing tests")
@@ -65,7 +65,7 @@ func TestWorkspaceSandboxing(t *testing.T) {
 		secureOptions := SandboxOptions{
 			BaseImage:     "alpine:latest",
 			MemoryLimit:   256 * 1024 * 1024, // 256MB
-			CPUQuota:      50000,              // 50% CPU
+			CPUQuota:      50000,             // 50% CPU
 			Timeout:       30 * time.Second,
 			ReadOnly:      true,
 			NetworkAccess: false,
@@ -97,7 +97,7 @@ func TestWorkspaceSandboxing(t *testing.T) {
 		dindOptions := SandboxOptions{
 			BaseImage:     "docker:dind",
 			MemoryLimit:   1024 * 1024 * 1024, // 1GB
-			CPUQuota:      100000,              // 100% CPU
+			CPUQuota:      100000,             // 100% CPU
 			Timeout:       5 * time.Minute,
 			ReadOnly:      false,
 			NetworkAccess: true,
@@ -114,13 +114,13 @@ func TestWorkspaceSandboxing(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify Docker-in-Docker settings
-		assert.Contains(t, dockerArgs, "--memory=1073741824") // 1GB in bytes
-		assert.Contains(t, dockerArgs, "--cpus=1.00")         // 100% CPU
-		assert.Contains(t, dockerArgs, "--privileged")        // Privileged mode for DinD
+		assert.Contains(t, dockerArgs, "--memory=1073741824")                       // 1GB in bytes
+		assert.Contains(t, dockerArgs, "--cpus=1.00")                               // 100% CPU
+		assert.Contains(t, dockerArgs, "--privileged")                              // Privileged mode for DinD
 		assert.Contains(t, dockerArgs, "/var/run/docker.sock:/var/run/docker.sock") // Docker socket mount
-		assert.Contains(t, dockerArgs, "docker:dind")         // DinD image
-		assert.NotContains(t, dockerArgs, "--network=none")   // Network access allowed
-		assert.NotContains(t, dockerArgs, "--read-only")      // Not read-only
+		assert.Contains(t, dockerArgs, "docker:dind")                               // DinD image
+		assert.NotContains(t, dockerArgs, "--network=none")                         // Network access allowed
+		assert.NotContains(t, dockerArgs, "--read-only")                            // Not read-only
 	})
 
 	t.Run("EnvironmentSanitization", func(t *testing.T) {
@@ -154,7 +154,7 @@ func TestWorkspaceSandboxing(t *testing.T) {
 	t.Run("SandboxedAnalysisOptions", func(t *testing.T) {
 		// Test that SandboxedAnalysis creates appropriate options
 		result, err := workspace.SandboxedAnalysis(ctx, sessionID, "/workspace/repo", nil)
-		
+
 		// Should fail gracefully if Docker isn't available
 		if err != nil {
 			assert.Contains(t, err.Error(), "failed to execute docker command")
@@ -169,7 +169,7 @@ func TestWorkspaceSandboxing(t *testing.T) {
 	t.Run("SandboxedBuildOptions", func(t *testing.T) {
 		// Test that SandboxedBuild creates appropriate options for Docker-in-Docker
 		result, err := workspace.SandboxedBuild(ctx, sessionID, "/workspace/repo/Dockerfile", nil)
-		
+
 		// Should fail gracefully if Docker isn't available
 		if err != nil {
 			assert.Contains(t, err.Error(), "failed to execute docker command")
@@ -188,7 +188,7 @@ func TestWorkspaceSandboxing(t *testing.T) {
 
 func TestSandboxingDisabled(t *testing.T) {
 	logger := zerolog.New(zerolog.NewTestWriter(t)).With().Timestamp().Logger()
-	
+
 	// Create workspace manager with sandboxing disabled
 	workspace, err := NewWorkspaceManager(context.Background(), WorkspaceConfig{
 		BaseDir:           t.TempDir(),
@@ -234,7 +234,7 @@ func TestSandboxingDisabled(t *testing.T) {
 
 func TestWorkspaceStats(t *testing.T) {
 	logger := zerolog.New(zerolog.NewTestWriter(t)).With().Timestamp().Logger()
-	
+
 	workspace, err := NewWorkspaceManager(context.Background(), WorkspaceConfig{
 		BaseDir:           t.TempDir(),
 		MaxSizePerSession: 512 * 1024 * 1024,
@@ -243,7 +243,7 @@ func TestWorkspaceStats(t *testing.T) {
 		SandboxEnabled:    true,
 		Logger:            logger,
 	})
-	
+
 	// Skip if Docker is not available
 	if err != nil && err.Error() == "docker command not found for sandboxing: exec: \"docker\": executable file not found in $PATH" {
 		workspace, err = NewWorkspaceManager(context.Background(), WorkspaceConfig{
@@ -261,7 +261,7 @@ func TestWorkspaceStats(t *testing.T) {
 	assert.NotNil(t, stats)
 	assert.Equal(t, int64(512*1024*1024), stats.PerSessionLimit)
 	assert.Equal(t, int64(2*1024*1024*1024), stats.TotalDiskLimit)
-	
+
 	// SandboxEnabled should reflect the actual state
 	assert.IsType(t, false, stats.SandboxEnabled) // Just check it's a boolean
 }

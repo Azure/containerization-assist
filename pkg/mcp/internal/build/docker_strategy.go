@@ -92,7 +92,7 @@ func (s *DockerBuildStrategy) Validate(ctx BuildContext) error {
 func (s *DockerBuildStrategy) ScoreCompatibility(info interface{}) int {
 	// Standard Docker build is the baseline - always compatible
 	score := 50
-	
+
 	// Can analyze project info here when available
 	// For now, return baseline score
 	return score

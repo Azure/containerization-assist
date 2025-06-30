@@ -12,9 +12,9 @@ import (
 // WorkflowOrchestrator manages workflow execution and coordination
 type WorkflowOrchestrator struct {
 	logger            zerolog.Logger
-	sessionManager    interface{}              // Session manager
-	toolRegistry      interface{}              // Tool registry
-	contextSharer     interface{}              // Context sharer
+	sessionManager    interface{}                  // Session manager
+	toolRegistry      interface{}                  // Tool registry
+	contextSharer     interface{}                  // Context sharer
 	executionSessions map[string]*ExecutionSession // Active execution sessions
 	mutex             sync.RWMutex
 	engine            *Engine                  // Workflow engine
@@ -47,17 +47,17 @@ func NewWorkflowOrchestrator(deps ...interface{}) *WorkflowOrchestrator {
 // ExecuteWorkflow executes a workflow with variadic options
 func (wo *WorkflowOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID string, options ...ExecutionOption) (interface{}, error) {
 	startTime := time.Now()
-	
+
 	// Get or create workflow specification
 	spec, exists := wo.workflowSpecs[workflowID]
 	if !exists {
 		spec = wo.createDefaultWorkflowSpec(workflowID)
 		wo.workflowSpecs[workflowID] = spec
 	}
-	
+
 	// Merge execution options
 	mergedOptions := wo.mergeExecutionOptions(options...)
-	
+
 	// Create execution session
 	session := &ExecutionSession{
 		SessionID:        wo.generateSessionID(),
@@ -83,26 +83,26 @@ func (wo *WorkflowOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID 
 		WorkflowVersion:  spec.Version,
 		Labels:           make(map[string]string),
 	}
-	
+
 	// Store session for tracking
 	wo.mutex.Lock()
 	wo.executionSessions[session.SessionID] = session
 	wo.mutex.Unlock()
-	
+
 	wo.logger.Info().
 		Str("session_id", session.SessionID).
 		Str("workflow_id", workflowID).
 		Str("workflow_name", spec.Name).
 		Msg("Starting workflow execution")
-	
+
 	// Execute workflow using engine
 	_, err := wo.executeWorkflowStages(ctx, spec, session, mergedOptions)
-	
+
 	// Update session status
 	endTime := time.Now()
 	session.EndTime = &endTime
 	session.UpdatedAt = endTime
-	
+
 	if err != nil {
 		session.Status = WorkflowStatusFailed
 		session.ErrorContext["execution_error"] = err.Error()
@@ -119,7 +119,7 @@ func (wo *WorkflowOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID 
 			Dur("duration", endTime.Sub(startTime)).
 			Msg("Workflow execution completed successfully")
 	}
-	
+
 	// Return comprehensive result
 	return &WorkflowResult{
 		Success:         err == nil,
@@ -137,23 +137,23 @@ func (wo *WorkflowOrchestrator) ExecuteCustomWorkflow(ctx context.Context, spec 
 	if spec == nil {
 		return nil, fmt.Errorf("workflow specification cannot be nil")
 	}
-	
+
 	// Validate workflow specification
 	if err := wo.validateWorkflowSpec(spec); err != nil {
 		return nil, fmt.Errorf("invalid workflow specification: %w", err)
 	}
-	
+
 	// Register the custom workflow spec temporarily
 	wo.mutex.Lock()
 	wo.workflowSpecs[spec.ID] = spec
 	wo.mutex.Unlock()
-	
+
 	// Execute workflow using standard execution path
 	options := []ExecutionOption{}
 	if spec.Variables != nil {
 		options = append(options, WithVariables(spec.Variables))
 	}
-	
+
 	result, err := wo.ExecuteWorkflow(ctx, spec.ID, options...)
 	if err != nil {
 		wo.logger.Error().
@@ -163,12 +163,12 @@ func (wo *WorkflowOrchestrator) ExecuteCustomWorkflow(ctx context.Context, spec 
 			Msg("Custom workflow execution failed")
 		return nil, err
 	}
-	
+
 	wo.logger.Info().
 		Str("workflow_id", spec.ID).
 		Str("workflow_name", spec.Name).
 		Msg("Custom workflow execution completed successfully")
-	
+
 	return result, nil
 }
 
@@ -176,14 +176,14 @@ func (wo *WorkflowOrchestrator) ExecuteCustomWorkflow(ctx context.Context, spec 
 func (wo *WorkflowOrchestrator) GetWorkflowStatus(workflowID string) (string, error) {
 	wo.mutex.RLock()
 	defer wo.mutex.RUnlock()
-	
+
 	// Find the session associated with this workflow
 	for _, session := range wo.executionSessions {
 		if session.WorkflowID == workflowID {
 			return session.Status, nil
 		}
 	}
-	
+
 	return "not_found", fmt.Errorf("no active session found for workflow ID: %s", workflowID)
 }
 
@@ -191,7 +191,7 @@ func (wo *WorkflowOrchestrator) GetWorkflowStatus(workflowID string) (string, er
 func ListAvailableWorkflows() []string {
 	return []string{
 		"analyze_and_build",
-		"deploy_application", 
+		"deploy_application",
 		"scan_and_fix",
 		"containerize_app",
 		"full_deployment_pipeline",
@@ -211,7 +211,7 @@ func (wo *WorkflowOrchestrator) mergeExecutionOptions(options ...ExecutionOption
 	merged := ExecutionOption{
 		Variables: make(map[string]interface{}),
 	}
-	
+
 	for _, opt := range options {
 		if opt.Parallel {
 			merged.Parallel = true
@@ -227,7 +227,7 @@ func (wo *WorkflowOrchestrator) mergeExecutionOptions(options ...ExecutionOption
 			merged.Variables[k] = v
 		}
 	}
-	
+
 	return merged
 }
 
@@ -241,20 +241,20 @@ func (wo *WorkflowOrchestrator) createDefaultWorkflowSpec(workflowID string) *Wo
 			Version: "1.0.0",
 			Stages: []ExecutionStage{
 				{
-					ID:       "analyze",
-					Name:     "Analyze Repository",
-					Type:     "analysis",
-					Tools:    []string{"analyze_repository"},
+					ID:        "analyze",
+					Name:      "Analyze Repository",
+					Type:      "analysis",
+					Tools:     []string{"analyze_repository"},
 					DependsOn: []string{},
-					Parallel: false,
+					Parallel:  false,
 				},
 				{
-					ID:       "build",
-					Name:     "Build Container Image",
-					Type:     "build",
-					Tools:    []string{"build_image"},
+					ID:        "build",
+					Name:      "Build Container Image",
+					Type:      "build",
+					Tools:     []string{"build_image"},
 					DependsOn: []string{"analyze"},
-					Parallel: false,
+					Parallel:  false,
 				},
 			},
 			Variables: make(map[string]interface{}),
@@ -266,20 +266,20 @@ func (wo *WorkflowOrchestrator) createDefaultWorkflowSpec(workflowID string) *Wo
 			Version: "1.0.0",
 			Stages: []ExecutionStage{
 				{
-					ID:       "generate_manifests",
-					Name:     "Generate Kubernetes Manifests", 
-					Type:     "deployment",
-					Tools:    []string{"generate_manifests"},
+					ID:        "generate_manifests",
+					Name:      "Generate Kubernetes Manifests",
+					Type:      "deployment",
+					Tools:     []string{"generate_manifests"},
 					DependsOn: []string{},
-					Parallel: false,
+					Parallel:  false,
 				},
 				{
-					ID:       "deploy",
-					Name:     "Deploy to Kubernetes",
-					Type:     "deployment",
-					Tools:    []string{"deploy_kubernetes"},
+					ID:        "deploy",
+					Name:      "Deploy to Kubernetes",
+					Type:      "deployment",
+					Tools:     []string{"deploy_kubernetes"},
 					DependsOn: []string{"generate_manifests"},
-					Parallel: false,
+					Parallel:  false,
 				},
 			},
 			Variables: make(map[string]interface{}),
@@ -288,15 +288,15 @@ func (wo *WorkflowOrchestrator) createDefaultWorkflowSpec(workflowID string) *Wo
 		return &WorkflowSpec{
 			ID:      workflowID,
 			Name:    "Security Scan and Fix",
-			Version: "1.0.0", 
+			Version: "1.0.0",
 			Stages: []ExecutionStage{
 				{
-					ID:       "scan",
-					Name:     "Security Scan",
-					Type:     "security",
-					Tools:    []string{"scan_security"},
+					ID:        "scan",
+					Name:      "Security Scan",
+					Type:      "security",
+					Tools:     []string{"scan_security"},
 					DependsOn: []string{},
-					Parallel: false,
+					Parallel:  false,
 				},
 			},
 			Variables: make(map[string]interface{}),
@@ -323,7 +323,7 @@ func (wo *WorkflowOrchestrator) validateWorkflowSpec(spec *WorkflowSpec) error {
 	if len(spec.Stages) == 0 {
 		return fmt.Errorf("workflow must have at least one stage")
 	}
-	
+
 	// Validate stage dependencies
 	stageMap := make(map[string]bool)
 	for _, stage := range spec.Stages {
@@ -332,7 +332,7 @@ func (wo *WorkflowOrchestrator) validateWorkflowSpec(spec *WorkflowSpec) error {
 		}
 		stageMap[stage.ID] = true
 	}
-	
+
 	for _, stage := range spec.Stages {
 		for _, dep := range stage.DependsOn {
 			if !stageMap[dep] {
@@ -340,12 +340,12 @@ func (wo *WorkflowOrchestrator) validateWorkflowSpec(spec *WorkflowSpec) error {
 			}
 		}
 	}
-	
+
 	// Check for circular dependencies
 	if wo.hasCircularDependencies(spec.Stages) {
 		return fmt.Errorf("workflow has circular dependencies")
 	}
-	
+
 	return nil
 }
 
@@ -353,13 +353,13 @@ func (wo *WorkflowOrchestrator) validateWorkflowSpec(spec *WorkflowSpec) error {
 func (wo *WorkflowOrchestrator) hasCircularDependencies(stages []ExecutionStage) bool {
 	visited := make(map[string]bool)
 	recursionStack := make(map[string]bool)
-	
+
 	// Create adjacency map
 	dependencies := make(map[string][]string)
 	for _, stage := range stages {
 		dependencies[stage.ID] = stage.DependsOn
 	}
-	
+
 	// Check each stage for cycles
 	for _, stage := range stages {
 		if !visited[stage.ID] {
@@ -368,7 +368,7 @@ func (wo *WorkflowOrchestrator) hasCircularDependencies(stages []ExecutionStage)
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -376,7 +376,7 @@ func (wo *WorkflowOrchestrator) hasCircularDependencies(stages []ExecutionStage)
 func (wo *WorkflowOrchestrator) hasCycleDFS(stageID string, dependencies map[string][]string, visited map[string]bool, recursionStack map[string]bool) bool {
 	visited[stageID] = true
 	recursionStack[stageID] = true
-	
+
 	for _, dep := range dependencies[stageID] {
 		if !visited[dep] {
 			if wo.hasCycleDFS(dep, dependencies, visited, recursionStack) {
@@ -386,7 +386,7 @@ func (wo *WorkflowOrchestrator) hasCycleDFS(stageID string, dependencies map[str
 			return true
 		}
 	}
-	
+
 	recursionStack[stageID] = false
 	return false
 }
@@ -398,22 +398,22 @@ func (wo *WorkflowOrchestrator) executeWorkflowStages(ctx context.Context, spec 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create execution order: %w", err)
 	}
-	
+
 	wo.logger.Info().
 		Str("session_id", session.SessionID).
 		Int("total_stages", len(executionOrder)).
 		Msg("Starting stage execution")
-	
+
 	// Execute stages in order
 	for i, stageID := range executionOrder {
 		stage := wo.findStageByID(spec.Stages, stageID)
 		if stage == nil {
 			return nil, fmt.Errorf("stage not found: %s", stageID)
 		}
-		
+
 		session.CurrentStage = stageID
 		session.LastActivity = time.Now()
-		
+
 		wo.logger.Info().
 			Str("session_id", session.SessionID).
 			Str("stage_id", stageID).
@@ -421,7 +421,7 @@ func (wo *WorkflowOrchestrator) executeWorkflowStages(ctx context.Context, spec 
 			Int("stage_index", i+1).
 			Int("total_stages", len(executionOrder)).
 			Msg("Executing stage")
-		
+
 		// Execute stage
 		stageResult, err := wo.executeStage(ctx, stage, session, options)
 		if err != nil {
@@ -429,17 +429,17 @@ func (wo *WorkflowOrchestrator) executeWorkflowStages(ctx context.Context, spec 
 			session.ErrorContext[fmt.Sprintf("stage_%s_error", stageID)] = err.Error()
 			return nil, fmt.Errorf("stage %s failed: %w", stageID, err)
 		}
-		
+
 		// Store stage result
 		session.StageResults[stageID] = stageResult
 		session.CompletedStages = append(session.CompletedStages, stageID)
-		
+
 		wo.logger.Info().
 			Str("session_id", session.SessionID).
 			Str("stage_id", stageID).
 			Msg("Stage completed successfully")
 	}
-	
+
 	return session.StageResults, nil
 }
 
@@ -449,14 +449,14 @@ func (wo *WorkflowOrchestrator) createExecutionOrder(stages []ExecutionStage) ([
 	inDegree := make(map[string]int)
 	dependencies := make(map[string][]string)
 	stageMap := make(map[string]*ExecutionStage)
-	
+
 	// Initialize
 	for _, stage := range stages {
 		stageMap[stage.ID] = &stage
 		inDegree[stage.ID] = 0
 		dependencies[stage.ID] = []string{}
 	}
-	
+
 	// Build dependency graph
 	for _, stage := range stages {
 		for _, dep := range stage.DependsOn {
@@ -464,7 +464,7 @@ func (wo *WorkflowOrchestrator) createExecutionOrder(stages []ExecutionStage) ([
 			inDegree[stage.ID]++
 		}
 	}
-	
+
 	// Topological sort
 	var queue []string
 	for stageID, degree := range inDegree {
@@ -472,13 +472,13 @@ func (wo *WorkflowOrchestrator) createExecutionOrder(stages []ExecutionStage) ([
 			queue = append(queue, stageID)
 		}
 	}
-	
+
 	var result []string
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
 		result = append(result, current)
-		
+
 		for _, dependent := range dependencies[current] {
 			inDegree[dependent]--
 			if inDegree[dependent] == 0 {
@@ -486,11 +486,11 @@ func (wo *WorkflowOrchestrator) createExecutionOrder(stages []ExecutionStage) ([
 			}
 		}
 	}
-	
+
 	if len(result) != len(stages) {
 		return nil, fmt.Errorf("circular dependency detected in workflow stages")
 	}
-	
+
 	return result, nil
 }
 
@@ -513,10 +513,10 @@ func (wo *WorkflowOrchestrator) executeStage(ctx context.Context, stage *Executi
 		stageCtx, cancel = context.WithTimeout(ctx, *stage.Timeout)
 		defer cancel()
 	}
-	
+
 	// Execute tools in stage
 	stageResults := make(map[string]interface{})
-	
+
 	if stage.Parallel && len(stage.Tools) > 1 {
 		// Execute tools in parallel
 		type toolResult struct {
@@ -524,16 +524,16 @@ func (wo *WorkflowOrchestrator) executeStage(ctx context.Context, stage *Executi
 			result interface{}
 			err    error
 		}
-		
+
 		resultChan := make(chan toolResult, len(stage.Tools))
-		
+
 		for _, toolName := range stage.Tools {
 			go func(tool string) {
 				result, err := wo.executeTool(stageCtx, tool, stage, session)
 				resultChan <- toolResult{tool: tool, result: result, err: err}
 			}(toolName)
 		}
-		
+
 		// Collect results
 		for i := 0; i < len(stage.Tools); i++ {
 			result := <-resultChan
@@ -552,7 +552,7 @@ func (wo *WorkflowOrchestrator) executeStage(ctx context.Context, stage *Executi
 			stageResults[toolName] = result
 		}
 	}
-	
+
 	return stageResults, nil
 }
 
@@ -563,17 +563,17 @@ func (wo *WorkflowOrchestrator) executeTool(ctx context.Context, toolName string
 		Str("stage_id", stage.ID).
 		Str("tool_name", toolName).
 		Msg("Executing tool")
-	
+
 	// Simulate tool execution
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Return mock result
 	return map[string]interface{}{
-		"tool":       toolName,
-		"stage":      stage.ID,
-		"session":    session.SessionID,
-		"success":    true,
-		"timestamp":  time.Now(),
+		"tool":      toolName,
+		"stage":     stage.ID,
+		"session":   session.SessionID,
+		"success":   true,
+		"timestamp": time.Now(),
 	}, nil
 }
 
@@ -582,7 +582,7 @@ func (wo *WorkflowOrchestrator) formatWorkflowError(err error) *WorkflowError {
 	if err == nil {
 		return nil
 	}
-	
+
 	return &WorkflowError{
 		ID:        fmt.Sprintf("error_%d", time.Now().UnixNano()),
 		Message:   err.Error(),
@@ -598,7 +598,7 @@ func (wo *WorkflowOrchestrator) formatWorkflowError(err error) *WorkflowError {
 // extractArtifactsFromSession extracts artifacts from execution session
 func (wo *WorkflowOrchestrator) extractArtifactsFromSession(session *ExecutionSession) []ExecutionArtifact {
 	var artifacts []ExecutionArtifact
-	
+
 	// Extract artifacts from stage results
 	for stageID, result := range session.StageResults {
 		if resultMap, ok := result.(map[string]interface{}); ok {
@@ -608,7 +608,7 @@ func (wo *WorkflowOrchestrator) extractArtifactsFromSession(session *ExecutionSe
 				}
 			}
 		}
-		
+
 		// Create default artifact for each stage
 		artifacts = append(artifacts, ExecutionArtifact{
 			ID:        fmt.Sprintf("%s_%s_result", session.SessionID, stageID),
@@ -620,6 +620,6 @@ func (wo *WorkflowOrchestrator) extractArtifactsFromSession(session *ExecutionSe
 			CreatedAt: time.Now(),
 		})
 	}
-	
+
 	return artifacts
 }

@@ -34,12 +34,12 @@ func NewOperations(
 		clients:        clients,
 		logger:         logger.With().Str("component", "pipeline_operations").Logger(),
 	}
-	
+
 	// Extract Docker client from clients if available
 	if mcpClients, ok := clients.(*mcptypes.MCPClients); ok {
 		ops.dockerClient = mcpClients.Docker
 	}
-	
+
 	return ops
 }
 
@@ -148,7 +148,7 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 			Str("image_ref", imageRef).
 			Str("output", output).
 			Msg("Failed to pull Docker image")
-		
+
 		// Update session with error
 		o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 			"operation": "pull",
@@ -157,7 +157,7 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 			"error":     err.Error(),
 			"output":    output,
 		})
-		
+
 		return fmt.Errorf("failed to pull image %s: %w", imageRef, err)
 	}
 
@@ -228,7 +228,7 @@ func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
 			Str("image_ref", imageRef).
 			Str("output", output).
 			Msg("Failed to push Docker image")
-		
+
 		// Update session with error
 		o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 			"operation": "push",
@@ -237,7 +237,7 @@ func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
 			"error":     err.Error(),
 			"output":    output,
 		})
-		
+
 		return fmt.Errorf("failed to push image %s: %w", imageRef, err)
 	}
 
@@ -314,7 +314,7 @@ func (o *Operations) TagDockerImage(sessionID, sourceRef, targetRef string) erro
 			Str("target_ref", targetRef).
 			Str("output", output).
 			Msg("Failed to tag Docker image")
-		
+
 		// Update session with error
 		o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 			"operation":  "tag",
@@ -324,7 +324,7 @@ func (o *Operations) TagDockerImage(sessionID, sourceRef, targetRef string) erro
 			"error":      err.Error(),
 			"output":     output,
 		})
-		
+
 		return fmt.Errorf("failed to tag image %s as %s: %w", sourceRef, targetRef, err)
 	}
 

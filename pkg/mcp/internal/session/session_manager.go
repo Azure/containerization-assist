@@ -601,7 +601,7 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 		for jobID := range session.ActiveJobs {
 			activeJobs = append(activeJobs, jobID)
 		}
-		
+
 		// Get completed tools from stage history
 		completedTools := make([]string, 0, len(session.StageHistory))
 		for _, execution := range session.StageHistory {
@@ -609,13 +609,7 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 				completedTools = append(completedTools, execution.Tool)
 			}
 		}
-		
-		// Get last error message
-		lastError := ""
-		if session.LastError != nil {
-			lastError = session.LastError.Error()
-		}
-		
+
 		// Convert metadata from interface{} to string
 		metadata := make(map[string]string)
 		for key, value := range session.Metadata {
@@ -634,9 +628,9 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 			ExpiresAt:      session.ExpiresAt,
 			WorkspacePath:  session.WorkspaceDir,
 			DiskUsage:      sm.diskUsage[session.SessionID],
-		ActiveJobs:     sm.jobTracking[session.SessionID],
-		CompletedTools: sm.toolTracking[session.SessionID],
-		LastError:      sm.getLastError(session.SessionID),
+			ActiveJobs:     sm.jobTracking[session.SessionID],
+			CompletedTools: sm.toolTracking[session.SessionID],
+			LastError:      sm.getLastError(session.SessionID),
 			Labels:         session.Labels,
 			RepoURL:        session.RepoURL,
 			Metadata:       metadata,
@@ -661,7 +655,7 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 	for jobID := range session.ActiveJobs {
 		activeJobs = append(activeJobs, jobID)
 	}
-	
+
 	// Get completed tools from stage history
 	completedTools := make([]string, 0, len(session.StageHistory))
 	for _, execution := range session.StageHistory {
@@ -669,13 +663,7 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 			completedTools = append(completedTools, execution.Tool)
 		}
 	}
-	
-	// Get last error message
-	lastError := ""
-	if session.LastError != nil {
-		lastError = session.LastError.Error()
-	}
-	
+
 	// Convert metadata from interface{} to string
 	metadata := make(map[string]string)
 	for key, value := range session.Metadata {
@@ -947,7 +935,7 @@ func (sm *SessionManager) TrackError(sessionID string, err error, context map[st
 // StartJob starts tracking a job for a session
 func (sm *SessionManager) StartJob(sessionID, jobType string) (string, error) {
 	jobID := generateSessionID() // Reuse the session ID generator for job IDs
-	
+
 	return jobID, sm.UpdateSession(sessionID, func(s interface{}) {
 		if session, ok := s.(*SessionState); ok {
 			jobInfo := JobInfo{
@@ -1030,31 +1018,56 @@ func (sm *SessionManager) TrackToolExecution(sessionID, toolName string, args in
 
 // CompleteToolExecution marks a tool execution as complete
 func (sm *SessionManager) CompleteToolExecution(sessionID, toolName string, success bool, err error, tokensUsed int) error {
-	return sm.UpdateSession(sessionID, func(s interface{}) {
-		if session, ok := s.(*SessionState); ok {
-			// Find the most recent execution of this tool and update it
-			for i := len(session.StageHistory) - 1; i >= 0; i-- {
-				if session.StageHistory[i].Tool == toolName && session.StageHistory[i].EndTime == nil {
-					endTime := time.Now()
-					duration := endTime.Sub(session.StageHistory[i].StartTime)
-					
-					session.StageHistory[i].EndTime = &endTime
-					session.StageHistory[i].Duration = &duration
-					session.StageHistory[i].Success = success
-					session.StageHistory[i].TokensUsed = tokensUsed
-					
-					if err != nil {
-						session.StageHistory[i].Error = &types.ToolError{
-							Type:      "TOOL_EXECUTION_FAILED",
-							Message:   err.Error(),
-							Timestamp: time.Now(),
-						}
-					}
-					break
-				}
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
+
+	// Update completed tools tracking
+	if success {
+		if sm.toolTracking[sessionID] == nil {
+			sm.toolTracking[sessionID] = make([]string, 0)
+		}
+		// Add to completed tools if not already present
+		found := false
+		for _, tool := range sm.toolTracking[sessionID] {
+			if tool == toolName {
+				found = true
+				break
 			}
 		}
-	})
+		if !found {
+			sm.toolTracking[sessionID] = append(sm.toolTracking[sessionID], toolName)
+		}
+	}
+
+	// Update session state directly (mutex already held)
+	session, exists := sm.sessions[sessionID]
+	if !exists {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	// Find the most recent execution of this tool and update it
+	for i := len(session.StageHistory) - 1; i >= 0; i-- {
+		if session.StageHistory[i].Tool == toolName && session.StageHistory[i].EndTime == nil {
+			endTime := time.Now()
+			duration := endTime.Sub(session.StageHistory[i].StartTime)
+
+			session.StageHistory[i].EndTime = &endTime
+			session.StageHistory[i].Duration = &duration
+			session.StageHistory[i].Success = success
+			session.StageHistory[i].TokensUsed = tokensUsed
+
+			if err != nil {
+				session.StageHistory[i].Error = &types.ToolError{
+					Type:      "TOOL_EXECUTION_FAILED",
+					Message:   err.Error(),
+					Timestamp: time.Now(),
+				}
+			}
+			break
+		}
+	}
+
+	return nil
 }
 
 // SessionFromContext extracts session ID from context
@@ -1071,7 +1084,7 @@ func SessionFromContext(ctx context.Context) string {
 func (sm *SessionManager) AddJob(sessionID, jobID string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-	
+
 	if sm.jobTracking[sessionID] == nil {
 		sm.jobTracking[sessionID] = make([]string, 0)
 	}
@@ -1083,7 +1096,7 @@ func (sm *SessionManager) AddJob(sessionID, jobID string) {
 func (sm *SessionManager) RemoveJob(sessionID, jobID string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-	
+
 	jobs := sm.jobTracking[sessionID]
 	for i, job := range jobs {
 		if job == jobID {
@@ -1098,7 +1111,7 @@ func (sm *SessionManager) RemoveJob(sessionID, jobID string) {
 func (sm *SessionManager) AddCompletedTool(sessionID, toolName string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-	
+
 	if sm.toolTracking[sessionID] == nil {
 		sm.toolTracking[sessionID] = make([]string, 0)
 	}
@@ -1110,7 +1123,7 @@ func (sm *SessionManager) AddCompletedTool(sessionID, toolName string) {
 func (sm *SessionManager) RecordError(sessionID string, err error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-	
+
 	sm.errorCounts[sessionID]++
 	sm.logger.Error().Str("session_id", sessionID).Err(err).Msg("Recorded session error")
 }
