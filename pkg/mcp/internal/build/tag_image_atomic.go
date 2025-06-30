@@ -10,6 +10,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
+	// "github.com/Azure/container-kit/pkg/mcp/internal/runtime" // Temporarily commented to avoid import cycle
+
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
@@ -131,8 +133,21 @@ func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTa
 				return nil
 			},
 		}, progress)
-		if err := operation.Execute(ctx); err != nil {
-			return nil, err
+		// Use fixing mixin to handle retries
+		startTime := time.Now()
+		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, "/workspace", operation)
+		if err != nil {
+			if result == nil {
+				result = &AtomicTagImageResult{
+					BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
+					BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0),
+					SourceImage:         args.SourceImage,
+					TargetImage:         args.TargetImage,
+				}
+			}
+			result.Success = false
+			result.TotalDuration = time.Since(startTime)
+			return result, err
 		}
 		return result, nil
 	}
@@ -208,6 +223,59 @@ func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) err
 	if !t.isValidImageReference(tagArgs.TargetImage) {
 		return fmt.Errorf("validation error")
 	}
+	return nil
+}
+
+// executeTagWithCallback executes the tag operation with progress callback
+// ProgressCallback type temporarily defined here to avoid import cycle
+type TagProgressCallback func(progress float64, message string)
+
+func (t *AtomicTagImageTool) executeTagWithCallback(ctx context.Context, args AtomicTagImageArgs, result *AtomicTagImageResult, progress TagProgressCallback) error {
+	// Get session
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
+	if err != nil {
+		return fmt.Errorf("session not found: %s", args.SessionID)
+	}
+	session := sessionInterface.(*core.SessionState)
+
+	// Report initial progress
+	progress(0.1, "Starting image tag operation")
+
+	// Validate inputs
+	progress(0.2, "Validating tag parameters")
+	if err := t.validateTagPrerequisites(result, args); err != nil {
+		return err
+	}
+
+	// Perform the actual tag
+	progress(0.3, fmt.Sprintf("Tagging %s as %s", args.SourceImage, args.TargetImage))
+
+	// Create tag arguments
+	tagArgs := map[string]interface{}{
+		"sourceImage": args.SourceImage,
+		"targetImage": args.TargetImage,
+		"force":       args.Force,
+	}
+
+	// Report progress
+	progress(0.5, "Executing tag operation")
+
+	// Use the pipeline adapter to tag the image
+	tagResult, err := t.pipelineAdapter.TagImage(ctx, session.SessionID, tagArgs)
+	if err != nil {
+		return fmt.Errorf("failed to tag image: %w", err)
+	}
+
+	// Extract results
+	if tagResultTyped, ok := tagResult.(*docker.TagResult); ok {
+		result.TagResult = tagResultTyped
+		result.Success = true
+		progress(0.9, "Tag operation completed")
+	}
+
+	// Complete
+	progress(1.0, "Image tagged successfully")
+
 	return nil
 }
 

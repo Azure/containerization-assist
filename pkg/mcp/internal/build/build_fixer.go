@@ -16,7 +16,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// BuildFixerError represents a structured build error for the fixer
+// BuildFixerError represents a structured build error
 type BuildFixerError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -28,7 +28,7 @@ func (e *BuildFixerError) Error() string {
 	return fmt.Sprintf("[%s] %s (stage: %s, type: %s)", e.Code, e.Message, e.Stage, e.Type)
 }
 
-// BuildFixerOptions contains build configuration options for the fixer
+// BuildFixerOptions contains build configuration options
 type BuildFixerOptions struct {
 	NetworkTimeout    int           `json:"network_timeout"`
 	NetworkRetries    int           `json:"network_retries"`
@@ -540,7 +540,7 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 	})
 
 	// Create error context
-	_ = createBuildErrorContext(
+	errorContext := createBuildErrorContext(
 		"docker_build",
 		"build_execution",
 		"build_failure",
@@ -556,7 +556,7 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 	// Return as a structured error that can be understood by the AI fixer
 	return &BuildFixerError{
 		Code:    "BUILD_FAILED",
-		Message: err.Error(),
+		Message: fmt.Sprintf("%v (context: %v)", err.Error(), errorContext),
 		Stage:   analysis.FailureStage,
 		Type:    analysis.FailureType,
 	}, nil
@@ -1237,7 +1237,6 @@ func (s *DependencyErrorRecoveryStrategy) fixPackageManagerIssues(content string
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		_ = trimmed // Use the trimmed variable
 
 		// Fix apt-get issues
 		if strings.Contains(trimmed, "apt-get") {
