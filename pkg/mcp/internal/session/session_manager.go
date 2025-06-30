@@ -610,11 +610,7 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 			}
 		}
 		
-		// Get last error message
-		lastError := ""
-		if session.LastError != nil {
-			lastError = session.LastError.Error()
-		}
+		// Get last error message (already handled by getLastError method)
 		
 		// Convert metadata from interface{} to string
 		metadata := make(map[string]string)
@@ -670,11 +666,7 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 		}
 	}
 	
-	// Get last error message
-	lastError := ""
-	if session.LastError != nil {
-		lastError = session.LastError.Error()
-	}
+	// Get last error message (already handled by getLastError method)
 	
 	// Convert metadata from interface{} to string
 	metadata := make(map[string]string)

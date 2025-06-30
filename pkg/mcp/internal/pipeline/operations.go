@@ -114,11 +114,18 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
+	// Start job tracking for this operation
+	jobID, err := o.sessionManager.StartJob(sessionID, "docker_pull")
+	if err != nil {
+		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to start job tracking")
+	}
+
 	// Update session state to track operation start
-	err := o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
+	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation": "pull",
 		"image_ref": imageRef,
 		"status":    "starting",
+		"job_id":    jobID,
 	})
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
@@ -149,6 +156,18 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 			Str("output", output).
 			Msg("Failed to pull Docker image")
 		
+		// Update job status to failed
+		if jobID != "" {
+			o.sessionManager.UpdateJobStatus(sessionID, jobID, "failed", nil, err)
+		}
+		
+		// Record error for session statistics
+		o.sessionManager.TrackError(sessionID, err, map[string]interface{}{
+			"operation": "pull",
+			"image_ref": imageRef,
+			"output":    output,
+		})
+		
 		// Update session with error
 		o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 			"operation": "pull",
@@ -156,6 +175,7 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 			"status":    "failed",
 			"error":     err.Error(),
 			"output":    output,
+			"job_id":    jobID,
 		})
 		
 		return fmt.Errorf("failed to pull image %s: %w", imageRef, err)
@@ -166,6 +186,18 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 		Str("image_ref", imageRef).
 		Msg("Successfully pulled Docker image")
 
+	// Complete job tracking
+	if jobID != "" {
+		o.sessionManager.CompleteJob(sessionID, jobID, map[string]interface{}{
+			"operation": "pull",
+			"image_ref": imageRef,
+			"output":    output,
+		})
+	}
+
+	// Track tool execution completion
+	o.sessionManager.CompleteToolExecution(sessionID, "docker_pull", true, nil, 0)
+
 	// Update session with success
 	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation": "pull",
@@ -173,6 +205,7 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 		"status":    "completed",
 		"success":   true,
 		"output":    output,
+		"job_id":    jobID,
 	})
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
@@ -194,11 +227,18 @@ func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
+	// Start job tracking
+	jobID, err := o.sessionManager.StartJob(sessionID, "docker_push")
+	if err != nil {
+		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to start job tracking")
+	}
+
 	// Update session state to track operation start
-	err := o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
+	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation": "push",
 		"image_ref": imageRef,
 		"status":    "starting",
+		"job_id":    jobID,
 	})
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
@@ -277,12 +317,19 @@ func (o *Operations) TagDockerImage(sessionID, sourceRef, targetRef string) erro
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
+	// Start job tracking
+	jobID, err := o.sessionManager.StartJob(sessionID, "docker_tag")
+	if err != nil {
+		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to start job tracking")
+	}
+
 	// Update session state to track operation start
-	err := o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
+	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation":  "tag",
 		"source_ref": sourceRef,
 		"target_ref": targetRef,
 		"status":     "starting",
+		"job_id":     jobID,
 	})
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")

@@ -347,6 +347,14 @@ func WithEnableParallel(enable bool) ExecutionOption {
 	return ExecutionOption{Parallel: enable}
 }
 
+func WithMaxRetries(retries int) ExecutionOption {
+	return ExecutionOption{MaxRetries: retries}
+}
+
+func WithTimeout(timeout time.Duration) ExecutionOption {
+	return ExecutionOption{Timeout: timeout}
+}
+
 // VariableContext contains variables available for expansion
 type VariableContext struct {
 	WorkflowVars    map[string]string      `json:"workflow_vars"`
