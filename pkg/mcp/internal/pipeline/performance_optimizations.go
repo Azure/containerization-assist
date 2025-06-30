@@ -21,7 +21,7 @@ type PerformanceOptimizer struct {
 	cacheMutex     sync.RWMutex
 	
 	// Performance metrics
-	operationMetrics map[string]*OperationMetrics
+	operationMetrics map[string]*PerformanceOperationMetrics
 	metricsMutex     sync.RWMutex
 }
 
@@ -34,8 +34,8 @@ type CachedOperation struct {
 	AccessCount int         `json:"access_count"`
 }
 
-// OperationMetrics tracks performance metrics for operations
-type OperationMetrics struct {
+// PerformanceOperationMetrics tracks performance metrics for operations
+type PerformanceOperationMetrics struct {
 	OperationType     string        `json:"operation_type"`
 	TotalExecutions   int64         `json:"total_executions"`
 	SuccessfulOps     int64         `json:"successful_ops"`
@@ -57,7 +57,7 @@ func NewPerformanceOptimizer(sessionManager *session.SessionManager, logger zero
 		logger:           logger.With().Str("component", "performance_optimizer").Logger(),
 		connectionPool:   make(map[string]interface{}),
 		operationCache:   make(map[string]*CachedOperation),
-		operationMetrics: make(map[string]*OperationMetrics),
+		operationMetrics: make(map[string]*PerformanceOperationMetrics),
 	}
 	
 	// Start background cleanup goroutine
@@ -177,12 +177,12 @@ func (po *PerformanceOptimizer) BatchOptimizeOperations(ctx context.Context, ope
 }
 
 // GetPerformanceMetrics returns current performance metrics
-func (po *PerformanceOptimizer) GetPerformanceMetrics() map[string]*OperationMetrics {
+func (po *PerformanceOptimizer) GetPerformanceMetrics() map[string]*PerformanceOperationMetrics {
 	po.metricsMutex.RLock()
 	defer po.metricsMutex.RUnlock()
 	
 	// Create deep copy to avoid race conditions
-	metrics := make(map[string]*OperationMetrics)
+	metrics := make(map[string]*PerformanceOperationMetrics)
 	for k, v := range po.operationMetrics {
 		metricsCopy := *v
 		metrics[k] = &metricsCopy
@@ -262,7 +262,7 @@ func (po *PerformanceOptimizer) updateMetrics(operationType string, startTime ti
 	
 	metrics, exists := po.operationMetrics[operationType]
 	if !exists {
-		metrics = &OperationMetrics{
+		metrics = &PerformanceOperationMetrics{
 			OperationType: operationType,
 			MinLatency:    latency,
 			MaxLatency:    latency,
