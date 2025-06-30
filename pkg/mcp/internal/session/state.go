@@ -117,6 +117,8 @@ type JobInfo struct {
 	Tool      string           `json:"tool"`
 	Status    JobStatus        `json:"status"`
 	StartTime time.Time        `json:"start_time"`
+	EndTime   *time.Time       `json:"end_time,omitempty"`
+	Duration  *time.Duration   `json:"duration,omitempty"`
 	Progress  *JobProgress     `json:"progress,omitempty"`
 	Result    interface{}      `json:"result,omitempty"`
 	Error     *types.ToolError `json:"error,omitempty"`

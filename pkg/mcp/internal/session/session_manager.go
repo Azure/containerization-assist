@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -558,12 +559,25 @@ func (sm *SessionManager) GetStats() *core.SessionManagerStats {
 		averageAge = totalAge / float64(activeSessions)
 	}
 
+	totalErrors := 0
+	for _, session := range sm.sessions {
+		if session.LastError != nil {
+			totalErrors++
+		}
+		// Count errors in stage history
+		for _, execution := range session.StageHistory {
+			if execution.Error != nil {
+				totalErrors++
+			}
+		}
+	}
+
 	stats := &core.SessionManagerStats{
 		ActiveSessions:    activeSessions,
 		TotalSessions:     totalSessions,
 		FailedSessions:    failedSessions,
 		AverageSessionAge: averageAge,
-		SessionErrors:     0, // TODO: implement error tracking
+		SessionErrors:     totalErrors,
 	}
 
 	return stats
@@ -576,6 +590,36 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 
 	var sessions []*SessionData
 	for _, session := range sm.sessions {
+		// Get active job IDs
+		activeJobs := make([]string, 0, len(session.ActiveJobs))
+		for jobID := range session.ActiveJobs {
+			activeJobs = append(activeJobs, jobID)
+		}
+		
+		// Get completed tools from stage history
+		completedTools := make([]string, 0, len(session.StageHistory))
+		for _, execution := range session.StageHistory {
+			if execution.Success {
+				completedTools = append(completedTools, execution.Tool)
+			}
+		}
+		
+		// Get last error message
+		lastError := ""
+		if session.LastError != nil {
+			lastError = session.LastError.Error()
+		}
+		
+		// Convert metadata from interface{} to string
+		metadata := make(map[string]string)
+		for key, value := range session.Metadata {
+			if strValue, ok := value.(string); ok {
+				metadata[key] = strValue
+			} else {
+				metadata[key] = fmt.Sprintf("%v", value)
+			}
+		}
+
 		sessionData := &SessionData{
 			ID:             session.SessionID,
 			State:          session,
@@ -584,12 +628,12 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 			ExpiresAt:      session.ExpiresAt,
 			WorkspacePath:  session.WorkspaceDir,
 			DiskUsage:      sm.diskUsage[session.SessionID],
-			ActiveJobs:     []string{}, // TODO: implement actual job tracking
-			CompletedTools: []string{}, // TODO: implement actual tool tracking
-			LastError:      "",         // TODO: implement error tracking
-			Labels:         []string{}, // TODO: implement label support
+			ActiveJobs:     activeJobs,
+			CompletedTools: completedTools,
+			LastError:      lastError,
+			Labels:         session.Labels,
 			RepoURL:        session.RepoURL,
-			Metadata:       make(map[string]string), // TODO: convert from interface{} metadata
+			Metadata:       metadata,
 		}
 		sessions = append(sessions, sessionData)
 	}
@@ -606,6 +650,36 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 
+	// Get active job IDs
+	activeJobs := make([]string, 0, len(session.ActiveJobs))
+	for jobID := range session.ActiveJobs {
+		activeJobs = append(activeJobs, jobID)
+	}
+	
+	// Get completed tools from stage history
+	completedTools := make([]string, 0, len(session.StageHistory))
+	for _, execution := range session.StageHistory {
+		if execution.Success {
+			completedTools = append(completedTools, execution.Tool)
+		}
+	}
+	
+	// Get last error message
+	lastError := ""
+	if session.LastError != nil {
+		lastError = session.LastError.Error()
+	}
+	
+	// Convert metadata from interface{} to string
+	metadata := make(map[string]string)
+	for key, value := range session.Metadata {
+		if strValue, ok := value.(string); ok {
+			metadata[key] = strValue
+		} else {
+			metadata[key] = fmt.Sprintf("%v", value)
+		}
+	}
+
 	sessionData := &SessionData{
 		ID:             session.SessionID,
 		State:          session,
@@ -614,12 +688,12 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 		ExpiresAt:      session.ExpiresAt,
 		WorkspacePath:  session.WorkspaceDir,
 		DiskUsage:      sm.diskUsage[session.SessionID],
-		ActiveJobs:     []string{}, // TODO: implement actual job tracking
-		CompletedTools: []string{}, // TODO: implement actual tool tracking
-		LastError:      "",         // TODO: implement error tracking
-		Labels:         []string{}, // TODO: implement label support
+		ActiveJobs:     activeJobs,
+		CompletedTools: completedTools,
+		LastError:      lastError,
+		Labels:         session.Labels,
 		RepoURL:        session.RepoURL,
-		Metadata:       make(map[string]string), // TODO: convert from interface{} metadata
+		Metadata:       metadata,
 	}
 	return sessionData, nil
 }
@@ -846,6 +920,135 @@ func (sm *SessionManager) deleteSessionInternalWithContext(ctx context.Context, 
 
 	sm.logger.Info().Str("session_id", sessionID).Msg("Session cleaned up successfully")
 	return nil
+}
+
+// TrackError tracks an error for a session
+func (sm *SessionManager) TrackError(sessionID string, err error, context map[string]interface{}) error {
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*SessionState); ok {
+			// Create tool error
+			toolError := &types.ToolError{
+				Type:      "OPERATION_FAILED",
+				Message:   err.Error(),
+				Context:   context,
+				Timestamp: time.Now(),
+			}
+			session.SetError(toolError)
+		}
+	})
+}
+
+// StartJob starts tracking a job for a session
+func (sm *SessionManager) StartJob(sessionID, jobType string) (string, error) {
+	jobID := generateSessionID() // Reuse the session ID generator for job IDs
+	
+	return jobID, sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*SessionState); ok {
+			jobInfo := JobInfo{
+				JobID:     jobID,
+				Tool:      jobType,
+				Status:    JobStatusPending,
+				StartTime: time.Now(),
+			}
+			session.AddJob(jobInfo)
+		}
+	})
+}
+
+// UpdateJobStatus updates the status of a job
+func (sm *SessionManager) UpdateJobStatus(sessionID, jobID string, status JobStatus, result interface{}, err error) error {
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*SessionState); ok {
+			session.UpdateJob(jobID, func(job *JobInfo) {
+				job.Status = status
+				if result != nil {
+					job.Result = result
+				}
+				if err != nil {
+					job.Error = &types.ToolError{
+						Type:      "JOB_FAILED",
+						Message:   err.Error(),
+						Timestamp: time.Now(),
+					}
+				}
+				if status == JobStatusCompleted || status == JobStatusFailed || status == JobStatusCancelled {
+					endTime := time.Now()
+					job.EndTime = &endTime
+					duration := endTime.Sub(job.StartTime)
+					job.Duration = &duration
+				}
+			})
+		}
+	})
+}
+
+// CompleteJob completes a job and removes it from active jobs
+func (sm *SessionManager) CompleteJob(sessionID, jobID string, result interface{}) error {
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*SessionState); ok {
+			session.UpdateJob(jobID, func(job *JobInfo) {
+				job.Status = JobStatusCompleted
+				job.Result = result
+				endTime := time.Now()
+				job.EndTime = &endTime
+				duration := endTime.Sub(job.StartTime)
+				job.Duration = &duration
+			})
+			// Remove completed job after a short delay to allow for status checking
+			go func() {
+				time.Sleep(1 * time.Minute)
+				sm.UpdateSession(sessionID, func(s interface{}) {
+					if session, ok := s.(*SessionState); ok {
+						session.RemoveJob(jobID)
+					}
+				})
+			}()
+		}
+	})
+}
+
+// TrackToolExecution tracks the execution of a tool
+func (sm *SessionManager) TrackToolExecution(sessionID, toolName string, args interface{}) error {
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*SessionState); ok {
+			execution := ToolExecution{
+				Tool:      toolName,
+				StartTime: time.Now(),
+				Success:   true, // Will be updated if there's an error
+				DryRun:    false,
+			}
+			session.AddToolExecution(execution)
+		}
+	})
+}
+
+// CompleteToolExecution marks a tool execution as complete
+func (sm *SessionManager) CompleteToolExecution(sessionID, toolName string, success bool, err error, tokensUsed int) error {
+	return sm.UpdateSession(sessionID, func(s interface{}) {
+		if session, ok := s.(*SessionState); ok {
+			// Find the most recent execution of this tool and update it
+			for i := len(session.StageHistory) - 1; i >= 0; i-- {
+				if session.StageHistory[i].Tool == toolName && session.StageHistory[i].EndTime == nil {
+					endTime := time.Now()
+					duration := endTime.Sub(session.StageHistory[i].StartTime)
+					
+					session.StageHistory[i].EndTime = &endTime
+					session.StageHistory[i].Duration = &duration
+					session.StageHistory[i].Success = success
+					session.StageHistory[i].TokensUsed = tokensUsed
+					
+					if err != nil {
+						session.StageHistory[i].Error = &types.ToolError{
+							Type:      "TOOL_EXECUTION_FAILED",
+							Message:   err.Error(),
+							Timestamp: time.Now(),
+						}
+					}
+					break
+				}
+			}
+		}
+	})
 }
 
 // SessionFromContext extracts session ID from context
