@@ -53,10 +53,10 @@ func NewDefaultContextSharer(logger zerolog.Logger) *DefaultContextSharer {
 		ctx:          ctx,
 		cancel:       cancel,
 	}
-	
+
 	// Start cleanup goroutine
 	go sharer.cleanupExpiredContext(ctx)
-	
+
 	return sharer
 }
 
@@ -132,21 +132,21 @@ func getToolFromContext(ctx context.Context) string {
 			return name
 		}
 	}
-	
+
 	// Check for operation name in context values
 	if opName := ctx.Value("operation"); opName != nil {
 		if name, ok := opName.(string); ok {
 			return name
 		}
 	}
-	
+
 	// Check for MCP tool identifier
 	if mcpTool := ctx.Value("mcp_tool"); mcpTool != nil {
 		if name, ok := mcpTool.(string); ok {
 			return name
 		}
 	}
-	
+
 	return "unknown"
 }
 

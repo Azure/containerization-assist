@@ -250,7 +250,7 @@ func (t *AtomicPushImageTool) extractRegistryURL(imageRef string, registryURL st
 	if registryURL != "" {
 		return registryURL
 	}
-	
+
 	// Split by slash to get registry part
 	parts := strings.Split(imageRef, "/")
 	if len(parts) > 1 && strings.Contains(parts[0], ".") {
@@ -266,7 +266,7 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 
 	// Push Docker image using pipeline adapter
 	pushStartTime := time.Now()
-	
+
 	// Create push arguments
 	pushArgs := map[string]interface{}{
 		"imageRef":   args.ImageRef,
@@ -297,7 +297,7 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 	result.Success = true
 	if pushResultTyped, ok := pushResult.(*coredocker.RegistryPushResult); ok {
 		result.PushResult = pushResultTyped
-		
+
 		// Extract metrics from context if available
 		if pushResultTyped.Context != nil {
 			if layersPushed, ok := pushResultTyped.Context["layers_pushed"].(int); ok {
@@ -310,13 +310,13 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 				result.PushContext.PushSizeMB = float64(bytesTransferred) / (1024 * 1024)
 			}
 		}
-		
+
 		// Calculate cache hit ratio if we have layer information
 		total := result.PushContext.LayersPushed + result.PushContext.LayersCached
 		if total > 0 {
 			result.PushContext.CacheHitRatio = float64(result.PushContext.LayersCached) / float64(total)
 		}
-		
+
 		// Use the duration from the push result
 		result.PushDuration = pushResultTyped.Duration
 	}
