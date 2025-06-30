@@ -26,9 +26,6 @@ func TestConstants(t *testing.T) {
 	assert.Equal(t, "maven", BuildSystemMaven)
 	assert.Equal(t, "gradle", BuildSystemGradle)
 
-	// Test dockerfile strategy constants
-	assert.Equal(t, "multi-stage", DockerfileStrategyMultiStage)
-
 	// Test application server constants
 	assert.Equal(t, "tomcat", AppServerTomcat)
 
@@ -375,26 +372,25 @@ func TestConstantsUniqueness(t *testing.T) {
 // TestConstantsNotEmpty ensures constants are not empty strings
 func TestConstantsNotEmpty(t *testing.T) {
 	constants := map[string]string{
-		"DefaultRegistry":              DefaultRegistry,
-		"NetworkError":                 NetworkError,
-		"LanguageTypeScript":           LanguageTypeScript,
-		"LanguagePython":               LanguagePython,
-		"LanguageJavaScript":           LanguageJavaScript,
-		"LanguageJava":                 LanguageJava,
-		"LanguageJSON":                 LanguageJSON,
-		"BuildSystemMaven":             BuildSystemMaven,
-		"BuildSystemGradle":            BuildSystemGradle,
-		"DockerfileStrategyMultiStage": DockerfileStrategyMultiStage,
-		"AppServerTomcat":              AppServerTomcat,
-		"SizeSmall":                    SizeSmall,
-		"SizeLarge":                    SizeLarge,
-		"HealthStatusHealthy":          HealthStatusHealthy,
-		"HealthStatusUnhealthy":        HealthStatusUnhealthy,
-		"HealthStatusDegraded":         HealthStatusDegraded,
-		"HealthStatusPending":          HealthStatusPending,
-		"HealthStatusFailed":           HealthStatusFailed,
-		"CurrentSchemaVersion":         CurrentSchemaVersion,
-		"ToolAPIVersion":               ToolAPIVersion,
+		"DefaultRegistry":       DefaultRegistry,
+		"NetworkError":          NetworkError,
+		"LanguageTypeScript":    LanguageTypeScript,
+		"LanguagePython":        LanguagePython,
+		"LanguageJavaScript":    LanguageJavaScript,
+		"LanguageJava":          LanguageJava,
+		"LanguageJSON":          LanguageJSON,
+		"BuildSystemMaven":      BuildSystemMaven,
+		"BuildSystemGradle":     BuildSystemGradle,
+		"AppServerTomcat":       AppServerTomcat,
+		"SizeSmall":             SizeSmall,
+		"SizeLarge":             SizeLarge,
+		"HealthStatusHealthy":   HealthStatusHealthy,
+		"HealthStatusUnhealthy": HealthStatusUnhealthy,
+		"HealthStatusDegraded":  HealthStatusDegraded,
+		"HealthStatusPending":   HealthStatusPending,
+		"HealthStatusFailed":    HealthStatusFailed,
+		"CurrentSchemaVersion":  CurrentSchemaVersion,
+		"ToolAPIVersion":        ToolAPIVersion,
 	}
 
 	for name, value := range constants {

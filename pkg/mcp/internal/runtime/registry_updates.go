@@ -32,7 +32,6 @@ func (t *ToolRegistryUpdates) GetUpdatedToolMap() map[string]string {
 		"get_job_status":      "get_job_status",      // Job tracking
 		"list_sessions":       "list_sessions",       // Session management
 		"delete_session":      "delete_session",      // Session cleanup
-		"get_server_health":   "get_server_health",   // Health check
 
 		// New atomic tool
 		"check_health": "check_health_atomic", // Health checking

@@ -12,20 +12,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ManifestValidator validates Kubernetes manifests against API schemas
 type ManifestValidator struct {
 	logger    zerolog.Logger
 	k8sClient K8sValidationClient
 }
 
-// K8sValidationClient interface for Kubernetes validation operations
 type K8sValidationClient interface {
 	ValidateManifest(ctx context.Context, manifest []byte) (*ValidationResult, error)
 	GetSupportedVersions(ctx context.Context) ([]string, error)
 	DryRunManifest(ctx context.Context, manifest []byte) (*DryRunResult, error)
 }
 
-// ValidationResult represents the result of manifest validation
 type ValidationResult struct {
 	Valid         bool                `json:"valid"`
 	Errors        []ValidationError   `json:"errors,omitempty"`
@@ -40,7 +37,6 @@ type ValidationResult struct {
 	Duration      time.Duration       `json:"duration"`
 }
 
-// ValidationError represents a validation error
 type ValidationError struct {
 	Field    string                 `json:"field"`
 	Message  string                 `json:"message"`
@@ -50,7 +46,6 @@ type ValidationError struct {
 	Details  map[string]interface{} `json:"details,omitempty"`
 }
 
-// ValidationWarning represents a validation warning
 type ValidationWarning struct {
 	Field      string                 `json:"field"`
 	Message    string                 `json:"message"`
@@ -60,7 +55,6 @@ type ValidationWarning struct {
 	Details    map[string]interface{} `json:"details,omitempty"`
 }
 
-// ValidationSeverity represents the severity of a validation issue
 type ValidationSeverity string
 
 const (
@@ -70,7 +64,6 @@ const (
 	SeverityInfo     ValidationSeverity = "info"
 )
 
-// DryRunResult represents the result of a dry-run validation
 type DryRunResult struct {
 	Accepted  bool                `json:"accepted"`
 	Errors    []ValidationError   `json:"errors,omitempty"`
@@ -81,7 +74,6 @@ type DryRunResult struct {
 	Duration  time.Duration       `json:"duration"`
 }
 
-// K8sEvent represents a Kubernetes event from dry-run
 type K8sEvent struct {
 	Type      string    `json:"type"`
 	Reason    string    `json:"reason"`
@@ -89,7 +81,6 @@ type K8sEvent struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// ManifestValidationOptions holds options for manifest validation
 type ManifestValidationOptions struct {
 	K8sVersion           string   `json:"k8s_version,omitempty"`
 	SkipDryRun           bool     `json:"skip_dry_run"`
@@ -100,7 +91,6 @@ type ManifestValidationOptions struct {
 	StrictValidation     bool     `json:"strict_validation"`
 }
 
-// BatchValidationResult represents results for multiple manifests
 type BatchValidationResult struct {
 	Results        map[string]*ValidationResult `json:"results"`
 	OverallValid   bool                         `json:"overall_valid"`
@@ -112,7 +102,6 @@ type BatchValidationResult struct {
 	Timestamp      time.Time                    `json:"timestamp"`
 }
 
-// NewManifestValidator creates a new manifest validator
 func NewManifestValidator(logger zerolog.Logger, k8sClient K8sValidationClient) *ManifestValidator {
 	return &ManifestValidator{
 		logger:    logger,
@@ -120,7 +109,6 @@ func NewManifestValidator(logger zerolog.Logger, k8sClient K8sValidationClient) 
 	}
 }
 
-// ValidateManifestFile validates a single manifest file
 func (mv *ManifestValidator) ValidateManifestFile(ctx context.Context, filePath string, options ManifestValidationOptions) (*ValidationResult, error) {
 	start := time.Now()
 
@@ -147,7 +135,6 @@ func (mv *ManifestValidator) ValidateManifestFile(ctx context.Context, filePath 
 	return result, nil
 }
 
-// ValidateManifestContent validates manifest content directly
 func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, content []byte, options ManifestValidationOptions) (*ValidationResult, error) {
 	start := time.Now()
 
@@ -158,7 +145,6 @@ func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, conten
 		Timestamp: start,
 	}
 
-	// Parse the manifest to extract basic info
 	var manifest map[string]interface{}
 	if err := yaml.Unmarshal(content, &manifest); err != nil {
 		result.Valid = false
@@ -172,7 +158,6 @@ func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, conten
 		return result, nil
 	}
 
-	// Extract basic manifest information
 	if apiVersion, ok := manifest["apiVersion"].(string); ok {
 		result.APIVersion = apiVersion
 	}
@@ -188,28 +173,22 @@ func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, conten
 		}
 	}
 
-	// Perform basic structure validation
 	mv.validateBasicStructure(manifest, result)
 
-	// Validate required fields
 	mv.validateRequiredFields(manifest, result)
 
-	// Validate against allowed kinds
 	if len(options.AllowedKinds) > 0 {
 		mv.validateAllowedKinds(result.Kind, options.AllowedKinds, result)
 	}
 
-	// Validate required labels
 	if len(options.RequiredLabels) > 0 {
 		mv.validateRequiredLabels(manifest, options.RequiredLabels, result)
 	}
 
-	// Validate forbidden fields
 	if len(options.ForbiddenFields) > 0 {
 		mv.validateForbiddenFields(manifest, options.ForbiddenFields, result)
 	}
 
-	// Perform schema validation if not skipped and we have a k8s client
 	if !options.SkipSchemaValidation && mv.k8sClient != nil {
 		schemaResult, err := mv.k8sClient.ValidateManifest(ctx, content)
 		if err != nil {
@@ -220,7 +199,6 @@ func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, conten
 				Code:    "SCHEMA_UNAVAILABLE",
 			})
 		} else if schemaResult != nil {
-			// Merge schema validation results
 			result.Errors = append(result.Errors, schemaResult.Errors...)
 			result.Warnings = append(result.Warnings, schemaResult.Warnings...)
 			result.SchemaVersion = schemaResult.SchemaVersion
@@ -230,7 +208,6 @@ func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, conten
 		}
 	}
 
-	// Perform dry-run validation if not skipped
 	if !options.SkipDryRun && mv.k8sClient != nil {
 		dryRunResult, err := mv.k8sClient.DryRunManifest(ctx, content)
 		if err != nil {
@@ -247,10 +224,8 @@ func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, conten
 		}
 	}
 
-	// Generate suggestions for common issues
 	mv.generateSuggestions(result)
 
-	// Final validation status
 	if len(result.Errors) > 0 {
 		for _, err := range result.Errors {
 			if err.Severity == SeverityCritical || err.Severity == SeverityError {
@@ -264,7 +239,6 @@ func (mv *ManifestValidator) ValidateManifestContent(ctx context.Context, conten
 	return result, nil
 }
 
-// ValidateManifestDirectory validates all manifests in a directory
 func (mv *ManifestValidator) ValidateManifestDirectory(ctx context.Context, dirPath string, options ManifestValidationOptions) (*BatchValidationResult, error) {
 	start := time.Now()
 
@@ -274,7 +248,6 @@ func (mv *ManifestValidator) ValidateManifestDirectory(ctx context.Context, dirP
 		Timestamp:    start,
 	}
 
-	// Find all YAML manifest files
 	manifestFiles, err := mv.findManifestFiles(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find manifest files: %w", err)
@@ -282,7 +255,6 @@ func (mv *ManifestValidator) ValidateManifestDirectory(ctx context.Context, dirP
 
 	result.TotalManifests = len(manifestFiles)
 
-	// Validate each manifest file
 	for _, filePath := range manifestFiles {
 		validationResult, err := mv.ValidateManifestFile(ctx, filePath, options)
 		if err != nil {
@@ -291,7 +263,6 @@ func (mv *ManifestValidator) ValidateManifestDirectory(ctx context.Context, dirP
 				Err(err).
 				Msg("Failed to validate manifest file")
 
-			// Create error result for failed validation
 			validationResult = &ValidationResult{
 				Valid: false,
 				Errors: []ValidationError{
@@ -334,9 +305,7 @@ func (mv *ManifestValidator) ValidateManifestDirectory(ctx context.Context, dirP
 	return result, nil
 }
 
-// validateBasicStructure validates basic Kubernetes manifest structure
 func (mv *ManifestValidator) validateBasicStructure(manifest map[string]interface{}, result *ValidationResult) {
-	// Check required top-level fields
 	requiredFields := []string{"apiVersion", "kind", "metadata"}
 	for _, field := range requiredFields {
 		if _, exists := manifest[field]; !exists {
@@ -351,7 +320,6 @@ func (mv *ManifestValidator) validateBasicStructure(manifest map[string]interfac
 		}
 	}
 
-	// Validate apiVersion format
 	if apiVersion, ok := manifest["apiVersion"].(string); ok {
 		if !strings.Contains(apiVersion, "/") && !isBuiltinAPIVersion(apiVersion) {
 			result.Warnings = append(result.Warnings, ValidationWarning{
@@ -364,7 +332,6 @@ func (mv *ManifestValidator) validateBasicStructure(manifest map[string]interfac
 		}
 	}
 
-	// Validate metadata structure
 	if metadata, ok := manifest["metadata"].(map[string]interface{}); ok {
 		if _, exists := metadata["name"]; !exists {
 			result.Valid = false
@@ -377,7 +344,6 @@ func (mv *ManifestValidator) validateBasicStructure(manifest map[string]interfac
 			})
 		}
 
-		// Validate name format
 		if name, ok := metadata["name"].(string); ok {
 			if !isValidKubernetesName(name) {
 				result.Errors = append(result.Errors, ValidationError{
@@ -396,7 +362,6 @@ func (mv *ManifestValidator) validateBasicStructure(manifest map[string]interfac
 	}
 }
 
-// validateRequiredFields validates manifest-specific required fields
 func (mv *ManifestValidator) validateRequiredFields(manifest map[string]interface{}, result *ValidationResult) {
 	kind, _ := manifest["kind"].(string)
 
@@ -414,7 +379,6 @@ func (mv *ManifestValidator) validateRequiredFields(manifest map[string]interfac
 	}
 }
 
-// validateDeploymentFields validates Deployment-specific fields
 func (mv *ManifestValidator) validateDeploymentFields(manifest map[string]interface{}, result *ValidationResult) {
 	spec, ok := manifest["spec"].(map[string]interface{})
 	if !ok {
@@ -428,7 +392,6 @@ func (mv *ManifestValidator) validateDeploymentFields(manifest map[string]interf
 		return
 	}
 
-	// Validate template
 	template, ok := spec["template"].(map[string]interface{})
 	if !ok {
 		result.Errors = append(result.Errors, ValidationError{
@@ -441,7 +404,6 @@ func (mv *ManifestValidator) validateDeploymentFields(manifest map[string]interf
 		return
 	}
 
-	// Validate template spec
 	templateSpec, ok := template["spec"].(map[string]interface{})
 	if !ok {
 		result.Errors = append(result.Errors, ValidationError{
@@ -454,7 +416,6 @@ func (mv *ManifestValidator) validateDeploymentFields(manifest map[string]interf
 		return
 	}
 
-	// Validate containers
 	containers, ok := templateSpec["containers"].([]interface{})
 	if !ok || len(containers) == 0 {
 		result.Errors = append(result.Errors, ValidationError{
@@ -467,7 +428,6 @@ func (mv *ManifestValidator) validateDeploymentFields(manifest map[string]interf
 	}
 }
 
-// validateServiceFields validates Service-specific fields
 func (mv *ManifestValidator) validateServiceFields(manifest map[string]interface{}, result *ValidationResult) {
 	spec, ok := manifest["spec"].(map[string]interface{})
 	if !ok {
@@ -481,7 +441,6 @@ func (mv *ManifestValidator) validateServiceFields(manifest map[string]interface
 		return
 	}
 
-	// Validate ports
 	ports, ok := spec["ports"].([]interface{})
 	if !ok || len(ports) == 0 {
 		result.Warnings = append(result.Warnings, ValidationWarning{
@@ -494,9 +453,7 @@ func (mv *ManifestValidator) validateServiceFields(manifest map[string]interface
 	}
 }
 
-// validateConfigMapFields validates ConfigMap-specific fields
 func (mv *ManifestValidator) validateConfigMapFields(manifest map[string]interface{}, result *ValidationResult) {
-	// Check if ConfigMap has either data or binaryData
 	_, hasData := manifest["data"]
 	_, hasBinaryData := manifest["binaryData"]
 
@@ -510,7 +467,6 @@ func (mv *ManifestValidator) validateConfigMapFields(manifest map[string]interfa
 		})
 	}
 
-	// Validate data field if present
 	if hasData {
 		if data, ok := manifest["data"]; ok {
 			if dataMap, ok := data.(map[string]interface{}); ok {
@@ -528,9 +484,7 @@ func (mv *ManifestValidator) validateConfigMapFields(manifest map[string]interfa
 	}
 }
 
-// validateSecretFields validates Secret-specific fields
 func (mv *ManifestValidator) validateSecretFields(manifest map[string]interface{}, result *ValidationResult) {
-	// Check if Secret has data
 	_, hasData := manifest["data"]
 	_, hasStringData := manifest["stringData"]
 
@@ -544,7 +498,6 @@ func (mv *ManifestValidator) validateSecretFields(manifest map[string]interface{
 		})
 	}
 
-	// Validate secret type
 	if secretType, ok := manifest["type"].(string); ok {
 		if !isValidSecretType(secretType) {
 			result.Warnings = append(result.Warnings, ValidationWarning{
@@ -558,7 +511,6 @@ func (mv *ManifestValidator) validateSecretFields(manifest map[string]interface{
 	}
 }
 
-// validateIngressFields validates Ingress-specific fields
 func (mv *ManifestValidator) validateIngressFields(manifest map[string]interface{}, result *ValidationResult) {
 	spec, ok := manifest["spec"].(map[string]interface{})
 	if !ok {
@@ -572,7 +524,6 @@ func (mv *ManifestValidator) validateIngressFields(manifest map[string]interface
 		return
 	}
 
-	// Check for rules or defaultBackend
 	rules, hasRules := spec["rules"]
 	_, hasDefaultBackend := spec["defaultBackend"]
 
@@ -586,7 +537,6 @@ func (mv *ManifestValidator) validateIngressFields(manifest map[string]interface
 		})
 	}
 
-	// Validate rules if present
 	if hasRules {
 		if rulesList, ok := rules.([]interface{}); ok && len(rulesList) == 0 {
 			result.Warnings = append(result.Warnings, ValidationWarning{
@@ -600,7 +550,6 @@ func (mv *ManifestValidator) validateIngressFields(manifest map[string]interface
 	}
 }
 
-// validateAllowedKinds checks if the manifest kind is in the allowed list
 func (mv *ManifestValidator) validateAllowedKinds(kind string, allowedKinds []string, result *ValidationResult) {
 	for _, allowedKind := range allowedKinds {
 		if kind == allowedKind {
@@ -622,7 +571,6 @@ func (mv *ManifestValidator) validateAllowedKinds(kind string, allowedKinds []st
 	})
 }
 
-// validateRequiredLabels checks if required labels are present
 func (mv *ManifestValidator) validateRequiredLabels(manifest map[string]interface{}, requiredLabels []string, result *ValidationResult) {
 	metadata, ok := manifest["metadata"].(map[string]interface{})
 	if !ok {
@@ -650,7 +598,6 @@ func (mv *ManifestValidator) validateRequiredLabels(manifest map[string]interfac
 	}
 }
 
-// validateForbiddenFields checks for forbidden fields
 func (mv *ManifestValidator) validateForbiddenFields(manifest map[string]interface{}, forbiddenFields []string, result *ValidationResult) {
 	for _, forbiddenField := range forbiddenFields {
 		if mv.hasField(manifest, forbiddenField) {
@@ -668,26 +615,21 @@ func (mv *ManifestValidator) validateForbiddenFields(manifest map[string]interfa
 	}
 }
 
-// generateSuggestions generates helpful suggestions for common issues
 func (mv *ManifestValidator) generateSuggestions(result *ValidationResult) {
 	suggestions := []string{}
 
-	// Suggest adding namespace for namespaced resources
 	if result.Namespace == "" && isNamespacedResource(result.Kind) {
 		suggestions = append(suggestions, "Consider adding a namespace to the metadata")
 	}
 
-	// Suggest adding resource limits for containers
 	if result.Kind == "Deployment" && len(result.Errors) == 0 {
 		suggestions = append(suggestions, "Consider adding resource limits and requests to containers")
 	}
 
-	// Suggest adding health checks
 	if result.Kind == "Deployment" {
 		suggestions = append(suggestions, "Consider adding readiness and liveness probes")
 	}
 
-	// Suggest using labels for better organization
 	if len(result.Warnings) > 0 {
 		suggestions = append(suggestions, "Add meaningful labels for better resource organization")
 	}
@@ -695,9 +637,6 @@ func (mv *ManifestValidator) generateSuggestions(result *ValidationResult) {
 	result.Suggestions = suggestions
 }
 
-// Helper functions
-
-// findManifestFiles finds all YAML manifest files in a directory
 func (mv *ManifestValidator) findManifestFiles(dirPath string) ([]string, error) {
 	var manifestFiles []string
 
@@ -716,7 +655,6 @@ func (mv *ManifestValidator) findManifestFiles(dirPath string) ([]string, error)
 	return manifestFiles, err
 }
 
-// hasField checks if a field exists in the manifest (supports nested fields with dot notation)
 func (mv *ManifestValidator) hasField(manifest map[string]interface{}, fieldPath string) bool {
 	parts := strings.Split(fieldPath, ".")
 	current := manifest
@@ -737,7 +675,6 @@ func (mv *ManifestValidator) hasField(manifest map[string]interface{}, fieldPath
 	return false
 }
 
-// isBuiltinAPIVersion checks if an API version is a built-in Kubernetes API version
 func isBuiltinAPIVersion(apiVersion string) bool {
 	builtinVersions := []string{"v1"}
 	for _, version := range builtinVersions {
@@ -748,13 +685,11 @@ func isBuiltinAPIVersion(apiVersion string) bool {
 	return false
 }
 
-// isValidKubernetesName validates Kubernetes resource name format
 func isValidKubernetesName(name string) bool {
 	if len(name) == 0 || len(name) > 253 {
 		return false
 	}
 
-	// Simple validation - in practice, you'd use regex for full validation
 	for _, char := range name {
 		if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-' || char == '.') {
 			return false
@@ -764,7 +699,6 @@ func isValidKubernetesName(name string) bool {
 	return true
 }
 
-// isValidSecretType checks if a secret type is valid
 func isValidSecretType(secretType string) bool {
 	validTypes := []string{
 		"Opaque",
@@ -786,7 +720,6 @@ func isValidSecretType(secretType string) bool {
 	return false
 }
 
-// isNamespacedResource checks if a resource kind is namespaced
 func isNamespacedResource(kind string) bool {
 	namespacedResources := []string{
 		"Deployment", "Service", "ConfigMap", "Secret", "Ingress",

@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// SessionManager manages MCP sessions with persistence and quotas
+// SessionManager manages MCP sessions
 type SessionManager struct {
 	sessions     map[string]*SessionState
 	mutex        sync.RWMutex
@@ -21,23 +21,19 @@ type SessionManager struct {
 	maxSessions  int
 	sessionTTL   time.Duration
 
-	// Persistence layer
 	store SessionStore
 
-	// Resource quotas
 	maxDiskPerSession int64
 	totalDiskLimit    int64
 
-	// Logger
 	logger zerolog.Logger
 
-	// Cleanup
 	cleanupTicker *time.Ticker
 	cleanupDone   chan bool
-	stopped       bool // Track if already stopped to prevent double-close
+	stopped       bool
 }
 
-// SessionManagerConfig holds configuration for the session manager
+// SessionManagerConfig represents session manager configuration
 type SessionManagerConfig struct {
 	WorkspaceDir      string
 	MaxSessions       int
@@ -48,15 +44,13 @@ type SessionManagerConfig struct {
 	Logger            zerolog.Logger
 }
 
-// NewSessionManager creates a new session manager with persistence
+// NewSessionManager creates a new SessionManager
 func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
-	// Create workspace directory if it doesn't exist
 	if err := os.MkdirAll(config.WorkspaceDir, 0o750); err != nil {
 		config.Logger.Error().Err(err).Str("path", config.WorkspaceDir).Msg("Failed to create workspace directory")
 		return nil, fmt.Errorf("failed to create workspace directory %s: %w", config.WorkspaceDir, err)
 	}
 
-	// Initialize persistence store
 	var store SessionStore
 	var err error
 
@@ -82,7 +76,6 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 		cleanupDone:       make(chan bool),
 	}
 
-	// Load existing sessions from persistence
 	if err := sm.loadExistingSessions(); err != nil {
 		sm.logger.Warn().Err(err).Msg("Failed to load existing sessions")
 	}
@@ -90,18 +83,16 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 	return sm, nil
 }
 
-// getOrCreateSessionConcrete retrieves an existing session or creates a new one
+// getOrCreateSessionConcrete retrieves or creates session
 func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*SessionState, error) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	// Check if session exists in memory
 	if session, exists := sm.sessions[sessionID]; exists {
 		session.UpdateLastAccessed()
 		return session, nil
 	}
 
-	// Try to load from persistence
 	if session, err := sm.store.Load(context.Background(), sessionID); err == nil {
 		sm.sessions[sessionID] = session
 		session.UpdateLastAccessed()
@@ -109,22 +100,21 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 		return session, nil
 	}
 
-	// Create new session if it doesn't exist
 	if sessionID == "" {
 		sessionID = generateSessionID()
 	}
 
-	// Check session limit
 	if len(sm.sessions) >= sm.maxSessions {
-		return nil, fmt.Errorf("maximum number of sessions (%d) reached", sm.maxSessions)
+		// Automatically clean up the oldest session to make room
+		if err := sm.cleanupOldestSession(); err != nil {
+			return nil, fmt.Errorf("maximum number of sessions (%d) reached and failed to cleanup oldest session: %w", sm.maxSessions, err)
+		}
 	}
 
-	// Check total disk usage
 	if err := sm.checkGlobalDiskQuota(); err != nil {
 		return nil, err
 	}
 
-	// Create workspace for the session
 	workspaceDir := filepath.Join(sm.workspaceDir, sessionID)
 	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create session workspace: %w", err)
@@ -135,7 +125,6 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 
 	sm.sessions[sessionID] = session
 
-	// Persist the new session
 	if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to persist new session")
 	}
@@ -144,7 +133,7 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 	return session, nil
 }
 
-// UpdateSession updates a session and persists the changes (interface-compliant version)
+// UpdateSession updates and persists session
 func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
@@ -157,7 +146,6 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 	updater(session)
 	session.UpdateLastAccessed()
 
-	// Persist the changes
 	if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to persist session update")
 		return err
@@ -166,7 +154,7 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 	return nil
 }
 
-// UpdateSessionTyped updates a session with a typed function (for backward compatibility)
+// UpdateSessionTyped updates session with typed function
 func (sm *SessionManager) UpdateSessionTyped(sessionID string, updater func(*SessionState)) error {
 	return sm.UpdateSession(sessionID, func(s interface{}) {
 		if session, ok := s.(*SessionState); ok {
@@ -175,7 +163,7 @@ func (sm *SessionManager) UpdateSessionTyped(sessionID string, updater func(*Ses
 	})
 }
 
-// GetSessionConcrete retrieves a session by ID with concrete return type
+// GetSessionConcrete retrieves session by ID
 func (sm *SessionManager) GetSessionConcrete(sessionID string) (*SessionState, error) {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
@@ -187,7 +175,7 @@ func (sm *SessionManager) GetSessionConcrete(sessionID string) (*SessionState, e
 	return nil, fmt.Errorf("session not found: %s", sessionID)
 }
 
-// GetSessionInterface (interface compatible) for ToolSessionManager interface
+// GetSessionInterface implements ToolSessionManager interface
 func (sm *SessionManager) GetSessionInterface(sessionID string) (interface{}, error) {
 	session, err := sm.GetSessionConcrete(sessionID)
 	if err != nil {
@@ -196,7 +184,7 @@ func (sm *SessionManager) GetSessionInterface(sessionID string) (interface{}, er
 	return session, nil
 }
 
-// GetSession (interface override) for ToolSessionManager interface compatibility
+// GetSession implements ToolSessionManager interface
 func (sm *SessionManager) GetSession(sessionID string) (interface{}, error) {
 	session, err := sm.GetSessionConcrete(sessionID)
 	if err != nil {
@@ -205,7 +193,7 @@ func (sm *SessionManager) GetSession(sessionID string) (interface{}, error) {
 	return session, nil
 }
 
-// GetOrCreateSession (interface override) for ToolSessionManager interface compatibility
+// GetOrCreateSession implements ToolSessionManager interface
 func (sm *SessionManager) GetOrCreateSession(sessionID string) (interface{}, error) {
 	session, err := sm.getOrCreateSessionConcrete(sessionID)
 	if err != nil {
@@ -369,16 +357,19 @@ func (sm *SessionManager) CheckDiskQuota(sessionID string, additionalBytes int64
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	if session.DiskUsage+additionalBytes > session.MaxDiskUsage {
+	// Check per-session quota only if a limit is set
+	if session.MaxDiskUsage > 0 && session.DiskUsage+additionalBytes > session.MaxDiskUsage {
 		return fmt.Errorf("session disk quota exceeded: %d + %d > %d",
 			session.DiskUsage, additionalBytes, session.MaxDiskUsage)
 	}
 
-	// Check global quota
-	totalUsage := sm.getTotalDiskUsage()
-	if totalUsage+additionalBytes > sm.totalDiskLimit {
-		return fmt.Errorf("global disk quota exceeded: %d + %d > %d",
-			totalUsage, additionalBytes, sm.totalDiskLimit)
+	// Check global quota only if a limit is set
+	if sm.totalDiskLimit > 0 {
+		totalUsage := sm.getTotalDiskUsage()
+		if totalUsage+additionalBytes > sm.totalDiskLimit {
+			return fmt.Errorf("global disk quota exceeded: %d + %d > %d",
+				totalUsage, additionalBytes, sm.totalDiskLimit)
+		}
 	}
 
 	return nil
@@ -689,6 +680,11 @@ func (sm *SessionManager) getTotalDiskUsage() int64 {
 }
 
 func (sm *SessionManager) checkGlobalDiskQuota() error {
+	// If totalDiskLimit is 0, it means no limit is set
+	if sm.totalDiskLimit <= 0 {
+		return nil
+	}
+
 	totalUsage := sm.getTotalDiskUsage()
 	if totalUsage >= sm.totalDiskLimit {
 		return fmt.Errorf("global disk quota exceeded: %d >= %d", totalUsage, sm.totalDiskLimit)
@@ -704,6 +700,67 @@ func generateSessionID() string {
 		return fmt.Sprintf("session-%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(bytes)
+}
+
+// cleanupOldestSession removes the oldest session to make room for a new one
+// IMPORTANT: This method must be called with sm.mutex already held
+func (sm *SessionManager) cleanupOldestSession() error {
+	if len(sm.sessions) == 0 {
+		return nil
+	}
+
+	// Find the session with the oldest LastAccessed time
+	var oldestSessionID string
+	var oldestTime time.Time = time.Now()
+
+	for sessionID, session := range sm.sessions {
+		if session.LastAccessed.Before(oldestTime) {
+			oldestTime = session.LastAccessed
+			oldestSessionID = sessionID
+		}
+	}
+
+	if oldestSessionID != "" {
+		sm.logger.Info().
+			Str("session_id", oldestSessionID).
+			Time("last_accessed", oldestTime).
+			Msg("Automatically cleaning up oldest session to make room for new session")
+
+		return sm.deleteSessionInternal(oldestSessionID)
+	}
+
+	return nil
+}
+
+// deleteSessionInternal removes a session without acquiring the mutex (for internal use)
+// IMPORTANT: This method must be called with sm.mutex already held
+func (sm *SessionManager) deleteSessionInternal(sessionID string) error {
+	return sm.deleteSessionInternalWithContext(context.Background(), sessionID)
+}
+
+// deleteSessionInternalWithContext removes a session with context support
+// IMPORTANT: This method must be called with sm.mutex already held
+func (sm *SessionManager) deleteSessionInternalWithContext(ctx context.Context, sessionID string) error {
+	session, exists := sm.sessions[sessionID]
+	if !exists {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	// Remove from memory
+	delete(sm.sessions, sessionID)
+
+	// Clean up workspace directory
+	if err := os.RemoveAll(session.WorkspaceDir); err != nil {
+		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to clean up session workspace")
+	}
+
+	// Remove from persistent store
+	if err := sm.store.Delete(ctx, sessionID); err != nil {
+		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to remove session from persistent store")
+	}
+
+	sm.logger.Info().Str("session_id", sessionID).Msg("Session cleaned up successfully")
+	return nil
 }
 
 // SessionFromContext extracts session ID from context

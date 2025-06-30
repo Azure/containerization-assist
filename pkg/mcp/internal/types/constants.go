@@ -24,11 +24,6 @@ const (
 	BuildSystemGradle = "gradle"
 )
 
-// Dockerfile strategy constants
-const (
-	DockerfileStrategyMultiStage = "multi-stage"
-)
-
 // Application server constants
 const (
 	AppServerTomcat = "tomcat"
@@ -101,7 +96,6 @@ const (
 // Validation constants
 const (
 	ValidationModeInline = "inline"
-	ValidationTypeError  = "error"
 )
 
 // Common strings
@@ -110,15 +104,9 @@ const (
 	AppLabel             = "app"
 	ExternalSecretsLabel = "external-secrets"
 	UnknownString        = "unknown"
-	PromptString         = "prompt"
 )
 
 // Quality/Performance levels
 const (
 	QualityPoor = "poor"
-)
-
-// Test-specific constants (only used in test files)
-const (
-	TestStringHello = "hello"
 )

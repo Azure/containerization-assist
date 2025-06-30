@@ -19,12 +19,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// LocalRequestHandler processes MCP requests (local interface to avoid import cycles)
+// LocalRequestHandler processes MCP requests
 type LocalRequestHandler interface {
 	HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error)
 }
 
-// HTTPTransport implements the Transport interface for HTTP/REST communication
+// HTTPTransport implements HTTP transport
 type HTTPTransport struct {
 	server         *http.Server
 	mcpServer      interface{}
@@ -47,14 +47,14 @@ type HTTPTransportConfig struct {
 	Port           int
 	CORSOrigins    []string
 	APIKey         string
-	RateLimit      int // requests per minute per IP
+	RateLimit      int
 	Logger         zerolog.Logger
 	LogBodies      bool
-	MaxBodyLogSize int64  // Maximum size of request/response bodies to log
-	LogLevel       string // "debug", "info", "warn", "error"
+	MaxBodyLogSize int64
+	LogLevel       string
 }
 
-// ToolHandler is the function signature for tool handlers
+// ToolHandler is the tool handler function signature
 type ToolHandler func(ctx context.Context, args interface{}) (interface{}, error)
 
 // rateLimiter tracks request rates
@@ -84,35 +84,29 @@ func NewHTTPTransport(config HTTPTransportConfig) *HTTPTransport {
 		maxBodyLogSize: config.MaxBodyLogSize,
 	}
 
-	// Set default max body log size if not specified
 	if transport.maxBodyLogSize == 0 {
-		transport.maxBodyLogSize = 10 * 1024 // Default 10KB
+		transport.maxBodyLogSize = 10 * 1024
 	}
 
 	transport.setupRouter()
 	return transport
 }
 
-// setupRouter initializes the HTTP router and middleware
+// setupRouter initializes HTTP router and middleware
 func (t *HTTPTransport) setupRouter() {
 	t.router = chi.NewRouter()
 
-	// Standard middleware chain: CORS → rate-limit → auth → telemetry
 	t.setupMiddlewareChain()
 
-	// API v1 routes
 	t.router.Route("/api/v1", func(r chi.Router) {
-		// Tool endpoints
 		r.Get("/tools", t.handleListTools)
 		r.Options("/tools", t.handleOptions)
 		r.Post("/tools/{tool}", t.handleExecuteTool)
 		r.Options("/tools/{tool}", t.handleOptions)
 
-		// Health and status
 		r.Get("/health", t.handleHealth)
 		r.Get("/status", t.handleStatus)
 
-		// Session management
 		r.Get("/sessions", t.handleListSessions)
 		r.Options("/sessions", t.handleOptions)
 		r.Get("/sessions/{sessionID}", t.handleGetSession)
@@ -122,32 +116,25 @@ func (t *HTTPTransport) setupRouter() {
 	})
 }
 
-// setupMiddlewareChain configures the middleware chain in the proper order
+// setupMiddlewareChain configures middleware chain
 func (t *HTTPTransport) setupMiddlewareChain() {
-	// 1. Basic Chi middleware
 	t.router.Use(middleware.RequestID)
 	t.router.Use(middleware.RealIP)
 	t.router.Use(middleware.Recoverer)
 
-	// 2. CORS (first in chain to handle preflight requests)
 	t.router.Use(t.setupCORS())
 
-	// 3. Rate limiting (after CORS, before auth)
 	t.router.Use(t.rateLimitMiddleware)
 
-	// 4. Authentication (after rate limiting)
 	t.router.Use(t.authMiddleware)
 
-	// 5. Telemetry/Logging (last, to capture complete request flow)
 	t.router.Use(t.loggingMiddleware)
 
-	// 6. Timeout
 	t.router.Use(middleware.Timeout(30 * time.Second))
 }
 
-// setupCORS creates and configures the CORS middleware
+// setupCORS creates CORS middleware
 func (t *HTTPTransport) setupCORS() func(http.Handler) http.Handler {
-	// Default CORS options
 	corsOptions := cors.Options{
 		AllowedOrigins:   t.corsOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -157,10 +144,9 @@ func (t *HTTPTransport) setupCORS() func(http.Handler) http.Handler {
 		MaxAge:           300, // 5 minutes
 	}
 
-	// If no origins specified, allow all (for development)
 	if len(t.corsOrigins) == 0 || (len(t.corsOrigins) == 1 && t.corsOrigins[0] == "*") {
 		corsOptions.AllowedOrigins = []string{"*"}
-		corsOptions.AllowCredentials = false // Cannot use credentials with wildcard origin
+		corsOptions.AllowCredentials = false
 	}
 
 	return cors.Handler(corsOptions)
@@ -168,7 +154,6 @@ func (t *HTTPTransport) setupCORS() func(http.Handler) http.Handler {
 
 // handleOptions handles preflight OPTIONS requests
 func (t *HTTPTransport) handleOptions(w http.ResponseWriter, r *http.Request) {
-	// CORS headers are already handled by the CORS middleware
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -185,7 +170,6 @@ func (t *HTTPTransport) Serve(ctx context.Context) error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// Start server in goroutine
 	errCh := make(chan error, 1)
 	go func() {
 		t.logger.Info().Int("port", t.port).Msg("Starting HTTP transport")
@@ -194,7 +178,6 @@ func (t *HTTPTransport) Serve(ctx context.Context) error {
 		}
 	}()
 
-	// Wait for context cancellation or error
 	select {
 	case <-ctx.Done():
 		return t.Close()
@@ -221,7 +204,7 @@ func (t *HTTPTransport) SetHandler(handler LocalRequestHandler) {
 	t.handler = handler
 }
 
-// Start starts the HTTP transport - alias for Serve
+// Start starts the HTTP transport
 func (t *HTTPTransport) Start(ctx context.Context) error {
 	return t.Serve(ctx)
 }
@@ -236,17 +219,13 @@ func (t *HTTPTransport) Stop(ctx context.Context) error {
 	return t.server.Shutdown(ctx)
 }
 
-// SendMessage sends a message via HTTP (not applicable for HTTP REST API)
+// SendMessage not applicable for HTTP transport
 func (t *HTTPTransport) SendMessage(message interface{}) error {
-	// HTTP transport doesn't use message-based communication
-	// Messages are sent via HTTP responses
 	return fmt.Errorf("SendMessage not applicable for HTTP transport")
 }
 
-// ReceiveMessage receives a message via HTTP (not applicable for HTTP REST API)
+// ReceiveMessage not applicable for HTTP transport
 func (t *HTTPTransport) ReceiveMessage() (interface{}, error) {
-	// HTTP transport doesn't use message-based communication
-	// Messages are received via HTTP requests
 	return nil, fmt.Errorf("ReceiveMessage not applicable for HTTP transport")
 }
 
@@ -286,19 +265,15 @@ func (t *HTTPTransport) GetPort() int {
 	return t.port
 }
 
-// Middleware
-
 func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		// Get request ID from chi middleware (if available)
 		requestID := middleware.GetReqID(r.Context())
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
 
-		// Prepare request log event
 		logEvent := t.logger.Info().
 			Str("request_id", requestID).
 			Str("method", r.Method).
@@ -306,18 +281,16 @@ func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
 			Str("remote_addr", r.RemoteAddr).
 			Str("user_agent", r.UserAgent())
 
-		// Add headers to log (security audit trail)
 		if t.logBodies {
 			headers := make(map[string]string)
 			for k, v := range r.Header {
-				if k != "Authorization" && k != "Api-Key" { // Don't log sensitive headers
+				if k != "Authorization" && k != "Api-Key" {
 					headers[k] = strings.Join(v, ", ")
 				}
 			}
 			logEvent.Interface("request_headers", headers)
 		}
 
-		// Read and log request body if enabled
 		if t.logBodies && r.Body != nil {
 			bodyReader := io.LimitReader(r.Body, t.maxBodyLogSize)
 			requestBody, err := io.ReadAll(bodyReader)
@@ -328,10 +301,8 @@ func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
 				t.logger.Debug().Err(err).Msg("Failed to close request body")
 			}
 
-			// Restore body for handler
 			r.Body = io.NopCloser(bytes.NewReader(requestBody))
 
-			// Log body if not empty
 			if len(requestBody) > 0 {
 				logEvent.RawJSON("request_body", requestBody)
 			}
@@ -339,7 +310,6 @@ func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
 
 		logEvent.Msg("HTTP request received")
 
-		// Wrap response writer to capture status and body
 		wrapped := &loggingResponseWriter{
 			ResponseWriter: w,
 			statusCode:     http.StatusOK,
@@ -347,24 +317,20 @@ func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
 			maxSize:        t.maxBodyLogSize,
 		}
 
-		// Process request
 		next.ServeHTTP(wrapped, r)
 
-		// Log response
 		responseLog := t.logger.Info().
 			Str("request_id", requestID).
 			Int("status", wrapped.statusCode).
 			Dur("duration", time.Since(start)).
 			Int("response_size", wrapped.bytesWritten)
 
-		// Add response body to log if enabled
 		if t.logBodies && len(wrapped.body) > 0 {
 			responseLog.RawJSON("response_body", wrapped.body)
 		}
 
 		responseLog.Msg("HTTP response sent")
 
-		// Log security audit trail for important operations
 		if wrapped.statusCode >= 400 || r.Method != "GET" {
 			t.logger.Warn().
 				Str("request_id", requestID).
@@ -379,13 +345,11 @@ func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
 
 func (t *HTTPTransport) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth for health endpoint
 		if r.URL.Path == "/api/v1/health" {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// Check API key if configured
 		if t.apiKey != "" {
 			providedKey := r.Header.Get("X-API-Key")
 			if providedKey == "" {
@@ -404,13 +368,11 @@ func (t *HTTPTransport) authMiddleware(next http.Handler) http.Handler {
 
 func (t *HTTPTransport) rateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Get client IP
 		clientIP := r.RemoteAddr
 		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 			clientIP = strings.Split(forwarded, ",")[0]
 		}
 
-		// Check rate limit
 		if !t.checkRateLimit(clientIP) {
 			t.sendError(w, http.StatusTooManyRequests, "Rate limit exceeded")
 			return
@@ -419,8 +381,6 @@ func (t *HTTPTransport) rateLimitMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-// Handler methods
 
 func (t *HTTPTransport) handleListTools(w http.ResponseWriter, r *http.Request) {
 	t.toolsMutex.RLock()
@@ -452,14 +412,12 @@ func (t *HTTPTransport) handleExecuteTool(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Parse request body
 	var args map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
 		t.sendError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
 
-	// Execute tool
 	ctx := r.Context()
 	result, err := handler(ctx, args)
 	if err != nil {
@@ -494,7 +452,6 @@ func (t *HTTPTransport) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *HTTPTransport) handleListSessions(w http.ResponseWriter, r *http.Request) {
-	// This would call the list_sessions tool
 	t.toolsMutex.RLock()
 	handler, exists := t.tools["list_sessions"]
 	t.toolsMutex.RUnlock()
@@ -516,7 +473,6 @@ func (t *HTTPTransport) handleListSessions(w http.ResponseWriter, r *http.Reques
 func (t *HTTPTransport) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
-	// Use list_sessions tool to get session details
 	if listTool, exists := t.tools["list_sessions"]; exists {
 		listResponse, err := listTool(r.Context(), map[string]interface{}{
 			"session_id": sessionID,
@@ -558,8 +514,6 @@ func (t *HTTPTransport) handleDeleteSession(w http.ResponseWriter, r *http.Reque
 	t.sendJSON(w, http.StatusOK, result)
 }
 
-// Helper methods
-
 func (t *HTTPTransport) sendJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -577,7 +531,6 @@ func (t *HTTPTransport) sendError(w http.ResponseWriter, status int, message str
 }
 
 func (t *HTTPTransport) checkRateLimit(clientIP string) bool {
-	// Get or create rate limiter for this IP
 	limiter, exists := t.rateLimiter[clientIP]
 	if !exists {
 		limiter = &rateLimiter{
@@ -592,7 +545,6 @@ func (t *HTTPTransport) checkRateLimit(clientIP string) bool {
 	now := time.Now()
 	windowStart := now.Add(-1 * time.Minute)
 
-	// Remove old requests
 	validRequests := make([]time.Time, 0)
 	for _, reqTime := range limiter.requests {
 		if reqTime.After(windowStart) {
@@ -600,17 +552,15 @@ func (t *HTTPTransport) checkRateLimit(clientIP string) bool {
 		}
 	}
 
-	// Check if under limit
 	if len(validRequests) >= t.rateLimit {
 		return false
 	}
 
-	// Add current request
 	limiter.requests = append(validRequests, now)
 	return true
 }
 
-// responseWriter wraps http.ResponseWriter to capture status code
+// responseWriter wraps http.ResponseWriter to capture status
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
@@ -621,7 +571,7 @@ func (w *responseWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
-// loggingResponseWriter captures response data for logging
+// loggingResponseWriter captures response data
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode   int
@@ -637,7 +587,6 @@ func (w *loggingResponseWriter) WriteHeader(code int) {
 }
 
 func (w *loggingResponseWriter) Write(data []byte) (int, error) {
-	// Capture body for logging if enabled
 	if w.logBodies && int64(len(w.body)) < w.maxSize {
 		remaining := w.maxSize - int64(len(w.body))
 		if remaining > 0 {

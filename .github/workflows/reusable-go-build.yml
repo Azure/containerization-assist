@@ -105,6 +105,12 @@ on:
         type: string
         default: 'ubuntu-latest'
 
+      job-suffix:
+        description: 'Unique suffix for artifact names to prevent conflicts'
+        required: false
+        type: string
+        default: ''
+
     outputs:
       build-success:
         description: 'Whether build succeeded'
@@ -363,11 +369,19 @@ jobs:
           flags: ${{ inputs.coverage-flags }}
           fail_ci_if_error: false
 
+      - name: Upload coverage artifact
+        if: ${{ inputs.coverage }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ inputs.job-suffix || hashFiles(inputs.packages) }}-${{ github.run_id }}
+          path: coverage.out
+          retention-days: 1
+
       - name: Upload binary artifact
         if: ${{ inputs.build-binary && inputs.binary-output != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.binary-output }}-${{ runner.os }}
+          name: ${{ inputs.binary-output }}-${{ runner.os }}-${{ github.run_id }}
           path: ${{ inputs.binary-output }}
 
       - name: Print summary

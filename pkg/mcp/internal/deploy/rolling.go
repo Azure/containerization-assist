@@ -10,14 +10,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// RollingUpdateStrategy implements a rolling update deployment strategy
-// This strategy gradually replaces old instances with new ones, ensuring zero downtime
 type RollingUpdateStrategy struct {
 	*BaseStrategy
 	logger zerolog.Logger
 }
 
-// NewRollingUpdateStrategy creates a new rolling update strategy
 func NewRollingUpdateStrategy(logger zerolog.Logger) *RollingUpdateStrategy {
 	return &RollingUpdateStrategy{
 		BaseStrategy: NewBaseStrategy(logger),
@@ -25,29 +22,24 @@ func NewRollingUpdateStrategy(logger zerolog.Logger) *RollingUpdateStrategy {
 	}
 }
 
-// GetName returns the strategy name
 func (r *RollingUpdateStrategy) GetName() string {
 	return "rolling"
 }
 
-// GetDescription returns a human-readable description
 func (r *RollingUpdateStrategy) GetDescription() string {
 	return "Rolling update deployment that gradually replaces old instances with new ones, ensuring zero downtime"
 }
 
-// ValidatePrerequisites checks if the rolling update strategy can be used
 func (r *RollingUpdateStrategy) ValidatePrerequisites(ctx context.Context, config DeploymentConfig) error {
 	r.logger.Debug().
 		Str("app_name", config.AppName).
 		Str("namespace", config.Namespace).
 		Msg("Validating rolling update prerequisites")
 
-	// Check if K8sDeployer is available
 	if config.K8sDeployer == nil {
 		return fmt.Errorf("K8sDeployer is required for rolling update deployment")
 	}
 
-	// Check if we have required configuration
 	if config.AppName == "" {
 		return fmt.Errorf("app name is required for rolling update deployment")
 	}
@@ -60,7 +52,6 @@ func (r *RollingUpdateStrategy) ValidatePrerequisites(ctx context.Context, confi
 		config.Namespace = "default"
 	}
 
-	// Check if we can connect to the cluster
 	if err := r.checkClusterConnection(ctx, config); err != nil {
 		return fmt.Errorf("cluster connection check failed: %w", err)
 	}
@@ -73,7 +64,6 @@ func (r *RollingUpdateStrategy) ValidatePrerequisites(ctx context.Context, confi
 	return nil
 }
 
-// Deploy executes the rolling update deployment
 func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentConfig) (*DeploymentResult, error) {
 	startTime := time.Now()
 	r.logger.Info().
@@ -88,7 +78,6 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 		Resources: make([]DeployedResource, 0),
 	}
 
-	// Report initial progress
 	if config.ProgressReporter != nil {
 		if reporter, ok := config.ProgressReporter.(interface {
 			ReportStage(float64, string)
@@ -97,12 +86,10 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 		}
 	}
 
-	// Step 1: Validate prerequisites
 	if err := r.ValidatePrerequisites(ctx, config); err != nil {
 		return r.handleDeploymentError(result, "validation", err, startTime)
 	}
 
-	// Step 2: Check for existing deployment and capture current version
 	if config.ProgressReporter != nil {
 		if reporter, ok := config.ProgressReporter.(interface {
 			ReportStage(float64, string)
@@ -118,7 +105,6 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 	result.PreviousVersion = previousVersion
 	result.RollbackAvailable = rollbackAvailable
 
-	// Step 3: Deploy manifests using rolling update
 	if config.ProgressReporter != nil {
 		if reporter, ok := config.ProgressReporter.(interface {
 			ReportStage(float64, string)
@@ -132,10 +118,8 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 		return r.handleDeploymentError(result, "deployment", err, startTime)
 	}
 
-	// Extract deployed resources from the deployment result
 	result.Resources = r.extractDeployedResources(deploymentResult)
 
-	// Step 4: Wait for rollout to complete
 	if config.ProgressReporter != nil {
 		if reporter, ok := config.ProgressReporter.(interface {
 			ReportStage(float64, string)
@@ -148,7 +132,6 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 		return r.handleDeploymentError(result, "rollout", err, startTime)
 	}
 
-	// Step 5: Perform health checks
 	if config.ProgressReporter != nil {
 		if reporter, ok := config.ProgressReporter.(interface {
 			ReportStage(float64, string)
@@ -166,7 +149,6 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 	result.ReadyReplicas = readyReplicas
 	result.TotalReplicas = totalReplicas
 
-	// Step 6: Finalize deployment
 	if config.ProgressReporter != nil {
 		if reporter, ok := config.ProgressReporter.(interface {
 			ReportStage(float64, string)
@@ -189,14 +171,12 @@ func (r *RollingUpdateStrategy) Deploy(ctx context.Context, config DeploymentCon
 	return result, nil
 }
 
-// Rollback performs a rollback to the previous version
 func (r *RollingUpdateStrategy) Rollback(ctx context.Context, config DeploymentConfig) error {
 	r.logger.Info().
 		Str("app_name", config.AppName).
 		Str("namespace", config.Namespace).
 		Msg("Starting rollback operation")
 
-	// Check if rollback is possible
 	previousVersion, rollbackAvailable, err := r.getPreviousVersion(ctx, config)
 	if err != nil {
 		return fmt.Errorf("failed to check rollback availability: %w", err)
@@ -210,17 +190,14 @@ func (r *RollingUpdateStrategy) Rollback(ctx context.Context, config DeploymentC
 		Str("previous_version", previousVersion).
 		Msg("Rolling back to previous version")
 
-	// Perform rollback using kubectl rollout undo
 	if err := r.performRollback(ctx, config); err != nil {
 		return fmt.Errorf("rollback failed: %w", err)
 	}
 
-	// Wait for rollback to complete
 	if err := r.waitForRolloutCompletion(ctx, config); err != nil {
 		return fmt.Errorf("rollback completion failed: %w", err)
 	}
 
-	// Verify rollback health
 	healthStatus, readyReplicas, totalReplicas, err := r.performHealthChecks(ctx, config)
 	if err != nil {
 		return fmt.Errorf("rollback health check failed: %w", err)
@@ -235,14 +212,12 @@ func (r *RollingUpdateStrategy) Rollback(ctx context.Context, config DeploymentC
 	return nil
 }
 
-// performRollingUpdate applies the manifest and manages the rolling update
 func (r *RollingUpdateStrategy) performRollingUpdate(ctx context.Context, config DeploymentConfig) (*kubernetes.DeploymentResult, error) {
 	r.logger.Debug().
 		Str("manifest_path", config.ManifestPath).
 		Str("namespace", config.Namespace).
 		Msg("Performing rolling update deployment")
 
-	// Configure deployment options for rolling update
 	options := kubernetes.DeploymentOptions{
 		Namespace:   config.Namespace,
 		Wait:        true,
@@ -252,7 +227,6 @@ func (r *RollingUpdateStrategy) performRollingUpdate(ctx context.Context, config
 		Validate:    true,
 	}
 
-	// Apply the manifest using the K8sDeployer
 	deploymentConfig := kubernetes.DeploymentConfig{
 		ManifestPath: config.ManifestPath,
 		Namespace:    config.Namespace,
@@ -262,23 +236,20 @@ func (r *RollingUpdateStrategy) performRollingUpdate(ctx context.Context, config
 	return config.K8sDeployer.Deploy(deploymentConfig)
 }
 
-// waitForRolloutCompletion waits for the rolling update to complete
 func (r *RollingUpdateStrategy) waitForRolloutCompletion(ctx context.Context, config DeploymentConfig) error {
 	r.logger.Debug().
 		Str("app_name", config.AppName).
 		Str("namespace", config.Namespace).
 		Msg("Waiting for rollout completion")
 
-	// Create a timeout context
 	timeout := config.WaitTimeout
 	if timeout == 0 {
-		timeout = 5 * time.Minute // Default timeout
+		timeout = 5 * time.Minute
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Wait for rollout using kubectl rollout status
 	rolloutConfig := kubernetes.RolloutConfig{
 		ResourceType: "deployment",
 		ResourceName: config.AppName,
@@ -289,14 +260,12 @@ func (r *RollingUpdateStrategy) waitForRolloutCompletion(ctx context.Context, co
 	return config.K8sDeployer.WaitForRollout(timeoutCtx, rolloutConfig)
 }
 
-// performHealthChecks performs comprehensive health checks after deployment
 func (r *RollingUpdateStrategy) performHealthChecks(ctx context.Context, config DeploymentConfig) (string, int, int, error) {
 	r.logger.Debug().
 		Str("app_name", config.AppName).
 		Str("namespace", config.Namespace).
 		Msg("Performing deployment health checks")
 
-	// Configure health check
 	healthOptions := kubernetes.HealthCheckOptions{
 		Namespace:       config.Namespace,
 		LabelSelector:   "app=" + config.AppName,
@@ -305,7 +274,6 @@ func (r *RollingUpdateStrategy) performHealthChecks(ctx context.Context, config 
 		Timeout:         config.WaitTimeout,
 	}
 
-	// Perform health check
 	result, err := config.K8sDeployer.CheckApplicationHealth(ctx, healthOptions)
 	if err != nil {
 		return "unhealthy", 0, 0, fmt.Errorf("health check failed: %w", err)
@@ -328,14 +296,12 @@ func (r *RollingUpdateStrategy) performHealthChecks(ctx context.Context, config 
 	return status, readyReplicas, totalReplicas, nil
 }
 
-// getPreviousVersion retrieves information about the previous deployment version
 func (r *RollingUpdateStrategy) getPreviousVersion(ctx context.Context, config DeploymentConfig) (string, bool, error) {
 	r.logger.Debug().
 		Str("app_name", config.AppName).
 		Str("namespace", config.Namespace).
 		Msg("Checking previous version information")
 
-	// Get rollout history
 	historyConfig := kubernetes.RolloutHistoryConfig{
 		ResourceType: "deployment",
 		ResourceName: config.AppName,
@@ -347,17 +313,14 @@ func (r *RollingUpdateStrategy) getPreviousVersion(ctx context.Context, config D
 		return "", false, fmt.Errorf("failed to get rollout history: %w", err)
 	}
 
-	// Check if there are previous revisions
 	if len(history.Revisions) < 2 {
 		return "", false, nil
 	}
 
-	// Get the previous revision (second to last)
 	previousRevision := history.Revisions[len(history.Revisions)-2]
 	return fmt.Sprintf("revision-%d", previousRevision.Number), true, nil
 }
 
-// performRollback executes the rollback operation
 func (r *RollingUpdateStrategy) performRollback(ctx context.Context, config DeploymentConfig) error {
 	r.logger.Debug().
 		Str("app_name", config.AppName).
@@ -373,17 +336,13 @@ func (r *RollingUpdateStrategy) performRollback(ctx context.Context, config Depl
 	return config.K8sDeployer.RollbackDeployment(ctx, rollbackConfig)
 }
 
-// checkClusterConnection verifies connection to the Kubernetes cluster
 func (r *RollingUpdateStrategy) checkClusterConnection(ctx context.Context, config DeploymentConfig) error {
-	// Simple check by trying to list pods in the target namespace
 	testConfig := kubernetes.HealthCheckOptions{
 		Namespace:     config.Namespace,
 		LabelSelector: "app=test-connection",
 		Timeout:       10 * time.Second,
 	}
 
-	// This is a simple connectivity test - we expect it might fail if no pods exist
-	// We're just checking if we can communicate with the cluster
 	_, err := config.K8sDeployer.CheckApplicationHealth(ctx, testConfig)
 	if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "no resources found") {
 		return err
@@ -391,7 +350,6 @@ func (r *RollingUpdateStrategy) checkClusterConnection(ctx context.Context, conf
 	return nil
 }
 
-// extractDeployedResources extracts deployed resource information from deployment result
 func (r *RollingUpdateStrategy) extractDeployedResources(deploymentResult *kubernetes.DeploymentResult) []DeployedResource {
 	resources := make([]DeployedResource, 0)
 
@@ -399,7 +357,6 @@ func (r *RollingUpdateStrategy) extractDeployedResources(deploymentResult *kuber
 		return resources
 	}
 
-	// Convert kubernetes.DeployedResource to deploy_strategies.DeployedResource
 	for _, kubeResource := range deploymentResult.Resources {
 		resource := DeployedResource{
 			Kind:      kubeResource.Kind,
@@ -408,9 +365,8 @@ func (r *RollingUpdateStrategy) extractDeployedResources(deploymentResult *kuber
 			Status:    kubeResource.Status,
 		}
 
-		// Extract API version if available
 		if kubeResource.Status != "" {
-			resource.APIVersion = "apps/v1" // Default for deployments
+			resource.APIVersion = "apps/v1"
 		}
 
 		resources = append(resources, resource)
@@ -419,14 +375,12 @@ func (r *RollingUpdateStrategy) extractDeployedResources(deploymentResult *kuber
 	return resources
 }
 
-// handleDeploymentError creates a deployment result with error information
 func (r *RollingUpdateStrategy) handleDeploymentError(result *DeploymentResult, stage string, err error, startTime time.Time) (*DeploymentResult, error) {
 	result.Success = false
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(startTime)
 	result.Error = err
 
-	// Create failure analysis
 	result.FailureAnalysis = r.createFailureAnalysis(err, stage)
 
 	r.logger.Error().
@@ -438,7 +392,6 @@ func (r *RollingUpdateStrategy) handleDeploymentError(result *DeploymentResult, 
 	return result, nil
 }
 
-// createFailureAnalysis creates detailed failure analysis for troubleshooting
 func (r *RollingUpdateStrategy) createFailureAnalysis(err error, stage string) *FailureAnalysis {
 	analysis := &FailureAnalysis{
 		Stage:    stage,
@@ -449,7 +402,6 @@ func (r *RollingUpdateStrategy) createFailureAnalysis(err error, stage string) *
 
 	errStr := strings.ToLower(err.Error())
 
-	// Categorize the error and provide specific suggestions
 	switch {
 	case strings.Contains(errStr, "connection refused") || strings.Contains(errStr, "unable to connect"):
 		analysis.Reason = "cluster_connection_failed"

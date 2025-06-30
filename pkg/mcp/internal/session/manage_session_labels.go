@@ -10,6 +10,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// getSessionLabels safely extracts labels from a session interface
+func getSessionLabels(sessionInterface interface{}) ([]string, error) {
+	session, ok := sessionInterface.(*SessionState)
+	if !ok {
+		return nil, fmt.Errorf("unexpected session type")
+	}
+	return session.Labels, nil
+}
+
 // AddSessionLabelArgs represents arguments for adding a label to a session
 type AddSessionLabelArgs struct {
 	types.BaseToolArgs
@@ -86,16 +95,6 @@ type SessionLabelingSummary struct {
 	AverageLabels     int `json:"average_labels_per_session"`
 }
 
-// SessionLabelManager interface for managing session labels
-type SessionLabelManager interface {
-	AddSessionLabel(sessionID, label string) error
-	RemoveSessionLabel(sessionID, label string) error
-	SetSessionLabels(sessionID string, labels []string) error
-	GetSession(sessionID string) (SessionLabelData, error)
-	GetAllLabels() []string
-	ListSessions() []SessionLabelData
-}
-
 // SessionLabelData represents minimal session data needed for label management
 type SessionLabelData struct {
 	SessionID string
@@ -105,11 +104,11 @@ type SessionLabelData struct {
 // AddSessionLabelTool implements adding labels to sessions
 type AddSessionLabelTool struct {
 	logger         zerolog.Logger
-	sessionManager SessionLabelManager
+	sessionManager *SessionManager
 }
 
 // NewAddSessionLabelTool creates a new add session label tool
-func NewAddSessionLabelTool(logger zerolog.Logger, sessionManager SessionLabelManager) *AddSessionLabelTool {
+func NewAddSessionLabelTool(logger zerolog.Logger, sessionManager *SessionManager) *AddSessionLabelTool {
 	return &AddSessionLabelTool{
 		logger:         logger,
 		sessionManager: sessionManager,
@@ -162,7 +161,7 @@ func (t *AddSessionLabelTool) ExecuteTyped(ctx context.Context, args *AddSession
 	}
 
 	// Get updated session data
-	session, err := t.sessionManager.GetSession(targetSessionID)
+	sessionInterface, err := t.sessionManager.GetSession(targetSessionID)
 	if err != nil {
 		return &AddSessionLabelResult{
 			BaseToolResponse: types.NewBaseResponse("add_session_label", args.SessionID, args.DryRun),
@@ -173,19 +172,30 @@ func (t *AddSessionLabelTool) ExecuteTyped(ctx context.Context, args *AddSession
 		}, nil
 	}
 
+	labels, err := getSessionLabels(sessionInterface)
+	if err != nil {
+		return &AddSessionLabelResult{
+			BaseToolResponse: types.NewBaseResponse("add_session_label", args.SessionID, args.DryRun),
+			Success:          false,
+			TargetSessionID:  targetSessionID,
+			Label:            label,
+			Message:          "Failed to get session labels: " + err.Error(),
+		}, nil
+	}
+
 	result := &AddSessionLabelResult{
 		BaseToolResponse: types.NewBaseResponse("add_session_label", args.SessionID, args.DryRun),
 		Success:          true,
 		TargetSessionID:  targetSessionID,
 		Label:            label,
-		AllLabels:        session.Labels,
+		AllLabels:        labels,
 		Message:          "Successfully added label '" + label + "' to session " + targetSessionID,
 	}
 
 	t.logger.Info().
 		Str("target_session_id", targetSessionID).
 		Str("label", label).
-		Strs("all_labels", session.Labels).
+		Strs("all_labels", labels).
 		Msg("Label added successfully")
 
 	return result, nil
@@ -194,11 +204,11 @@ func (t *AddSessionLabelTool) ExecuteTyped(ctx context.Context, args *AddSession
 // RemoveSessionLabelTool implements removing labels from sessions
 type RemoveSessionLabelTool struct {
 	logger         zerolog.Logger
-	sessionManager SessionLabelManager
+	sessionManager *SessionManager
 }
 
 // NewRemoveSessionLabelTool creates a new remove session label tool
-func NewRemoveSessionLabelTool(logger zerolog.Logger, sessionManager SessionLabelManager) *RemoveSessionLabelTool {
+func NewRemoveSessionLabelTool(logger zerolog.Logger, sessionManager *SessionManager) *RemoveSessionLabelTool {
 	return &RemoveSessionLabelTool{
 		logger:         logger,
 		sessionManager: sessionManager,
@@ -251,7 +261,7 @@ func (t *RemoveSessionLabelTool) ExecuteTyped(ctx context.Context, args *RemoveS
 	}
 
 	// Get updated session data
-	session, err := t.sessionManager.GetSession(targetSessionID)
+	sessionInterface, err := t.sessionManager.GetSession(targetSessionID)
 	if err != nil {
 		return &RemoveSessionLabelResult{
 			BaseToolResponse: types.NewBaseResponse("remove_session_label", args.SessionID, args.DryRun),
@@ -262,19 +272,30 @@ func (t *RemoveSessionLabelTool) ExecuteTyped(ctx context.Context, args *RemoveS
 		}, nil
 	}
 
+	labels, err := getSessionLabels(sessionInterface)
+	if err != nil {
+		return &RemoveSessionLabelResult{
+			BaseToolResponse: types.NewBaseResponse("remove_session_label", args.SessionID, args.DryRun),
+			Success:          false,
+			TargetSessionID:  targetSessionID,
+			Label:            label,
+			Message:          "Failed to get session labels: " + err.Error(),
+		}, nil
+	}
+
 	result := &RemoveSessionLabelResult{
 		BaseToolResponse: types.NewBaseResponse("remove_session_label", args.SessionID, args.DryRun),
 		Success:          true,
 		TargetSessionID:  targetSessionID,
 		Label:            label,
-		AllLabels:        session.Labels,
+		AllLabels:        labels,
 		Message:          "Successfully removed label '" + label + "' from session " + targetSessionID,
 	}
 
 	t.logger.Info().
 		Str("target_session_id", targetSessionID).
 		Str("label", label).
-		Strs("all_labels", session.Labels).
+		Strs("all_labels", labels).
 		Msg("Label removed successfully")
 
 	return result, nil
@@ -283,11 +304,11 @@ func (t *RemoveSessionLabelTool) ExecuteTyped(ctx context.Context, args *RemoveS
 // UpdateSessionLabelsTool implements updating all labels on a session
 type UpdateSessionLabelsTool struct {
 	logger         zerolog.Logger
-	sessionManager SessionLabelManager
+	sessionManager *SessionManager
 }
 
 // NewUpdateSessionLabelsTool creates a new update session labels tool
-func NewUpdateSessionLabelsTool(logger zerolog.Logger, sessionManager SessionLabelManager) *UpdateSessionLabelsTool {
+func NewUpdateSessionLabelsTool(logger zerolog.Logger, sessionManager *SessionManager) *UpdateSessionLabelsTool {
 	return &UpdateSessionLabelsTool{
 		logger:         logger,
 		sessionManager: sessionManager,
@@ -331,7 +352,7 @@ func (t *UpdateSessionLabelsTool) ExecuteTyped(ctx context.Context, args UpdateS
 		Msg("Updating session labels")
 
 	// Get current session data
-	currentSession, err := t.sessionManager.GetSession(targetSessionID)
+	currentSessionInterface, err := t.sessionManager.GetSession(targetSessionID)
 	if err != nil {
 		return &UpdateSessionLabelsResult{
 			BaseToolResponse: types.NewBaseResponse("update_session_labels", args.SessionID, args.DryRun),
@@ -341,8 +362,18 @@ func (t *UpdateSessionLabelsTool) ExecuteTyped(ctx context.Context, args UpdateS
 		}, err
 	}
 
-	previousLabels := make([]string, len(currentSession.Labels))
-	copy(previousLabels, currentSession.Labels)
+	currentLabels, err := getSessionLabels(currentSessionInterface)
+	if err != nil {
+		return &UpdateSessionLabelsResult{
+			BaseToolResponse: types.NewBaseResponse("update_session_labels", args.SessionID, args.DryRun),
+			Success:          false,
+			TargetSessionID:  targetSessionID,
+			Message:          "Failed to get session labels: " + err.Error(),
+		}, err
+	}
+
+	previousLabels := make([]string, len(currentLabels))
+	copy(previousLabels, currentLabels)
 
 	// Update the labels
 	err = t.sessionManager.SetSessionLabels(targetSessionID, cleanLabels)
@@ -377,11 +408,11 @@ func (t *UpdateSessionLabelsTool) ExecuteTyped(ctx context.Context, args UpdateS
 // ListSessionLabelsTool implements listing all labels across sessions
 type ListSessionLabelsTool struct {
 	logger         zerolog.Logger
-	sessionManager SessionLabelManager
+	sessionManager *SessionManager
 }
 
 // NewListSessionLabelsTool creates a new list session labels tool
-func NewListSessionLabelsTool(logger zerolog.Logger, sessionManager SessionLabelManager) *ListSessionLabelsTool {
+func NewListSessionLabelsTool(logger zerolog.Logger, sessionManager *SessionManager) *ListSessionLabelsTool {
 	return &ListSessionLabelsTool{
 		logger:         logger,
 		sessionManager: sessionManager,
@@ -415,7 +446,7 @@ func (t *ListSessionLabelsTool) ExecuteTyped(ctx context.Context, args *ListSess
 
 	// Calculate label counts and summary if requested
 	if args.IncludeCount {
-		sessions := t.sessionManager.ListSessions()
+		sessions := t.sessionManager.ListSessionSummaries()
 		labelCounts := make(map[string]int)
 		labeledSessions := 0
 		totalLabels := 0

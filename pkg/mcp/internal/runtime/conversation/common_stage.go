@@ -42,7 +42,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 		"image_ref":  state.Dockerfile.ImageID,
 	}
 
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "scan_image_security_atomic", params, state.SessionState.SessionID)
+	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "scan_image_security", params, state.SessionState.SessionID)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Security scan failed: %v\n\nContinue anyway?", err)
@@ -189,7 +189,7 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 		"log_lines":    100,
 	}
 
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health_atomic", params, state.SessionState.SessionID)
+	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params, state.SessionState.SessionID)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Failed to fetch logs: %v", err)

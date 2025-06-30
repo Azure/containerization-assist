@@ -9,19 +9,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// ContextValidator handles build context validation
+// ContextValidator validates build context
 type ContextValidator struct {
 	logger zerolog.Logger
 }
 
-// NewContextValidator creates a new context validator
+// NewContextValidator creates a new ContextValidator
 func NewContextValidator(logger zerolog.Logger) *ContextValidator {
 	return &ContextValidator{
 		logger: logger.With().Str("component", "context_validator").Logger(),
 	}
 }
 
-// Validate performs build context validation
+// Validate validates build context
 func (v *ContextValidator) Validate(content string, options ValidationOptions) (*ValidationResult, error) {
 	v.logger.Info().Msg("Starting build context validation")
 
@@ -33,18 +33,14 @@ func (v *ContextValidator) Validate(content string, options ValidationOptions) (
 
 	lines := strings.Split(content, "\n")
 
-	// Extract file operations
 	fileOps := v.extractFileOperations(lines)
 
-	// Validate file operations
 	v.validateFileOperations(fileOps, result)
 
-	// Check for build context issues
 	v.checkBuildContextSize(fileOps, result)
 	v.checkDockerignore(fileOps, result)
 	v.checkFilePaths(fileOps, result)
 
-	// Update result state
 	if len(result.Errors) > 0 {
 		result.Valid = false
 	}
@@ -52,7 +48,7 @@ func (v *ContextValidator) Validate(content string, options ValidationOptions) (
 	return result, nil
 }
 
-// Analyze provides context-specific analysis
+// Analyze performs context analysis
 func (v *ContextValidator) Analyze(lines []string, context ValidationContext) interface{} {
 	fileOps := v.extractFileOperations(lines)
 
@@ -64,7 +60,6 @@ func (v *ContextValidator) Analyze(lines []string, context ValidationContext) in
 		BuildContextTips:  make([]string, 0),
 	}
 
-	// Count operation types
 	for _, op := range fileOps {
 		switch op.Type {
 		case "COPY":
@@ -74,13 +69,11 @@ func (v *ContextValidator) Analyze(lines []string, context ValidationContext) in
 		}
 	}
 
-	// Check for common patterns
 	if analysis.AddOperations > 0 && analysis.CopyOperations > 0 {
 		analysis.BuildContextTips = append(analysis.BuildContextTips,
 			"Prefer COPY over ADD unless you need ADD's special features")
 	}
 
-	// Check for inefficient patterns
 	hasWildcard := false
 	for _, op := range fileOps {
 		if strings.Contains(op.Source, "*") || strings.Contains(op.Source, "?") {
@@ -94,7 +87,6 @@ func (v *ContextValidator) Analyze(lines []string, context ValidationContext) in
 			"Use .dockerignore to exclude unnecessary files when using wildcards")
 	}
 
-	// Check for large context operations
 	for _, op := range fileOps {
 		if op.Source == "." || op.Source == "./" {
 			analysis.LargeFileWarnings = append(analysis.LargeFileWarnings,
@@ -107,16 +99,16 @@ func (v *ContextValidator) Analyze(lines []string, context ValidationContext) in
 	return analysis
 }
 
-// FileOperation represents a file operation in Dockerfile
+// FileOperation represents Dockerfile file operation
 type FileOperation struct {
 	Line        int
-	Type        string // COPY, ADD
+	Type        string
 	Source      string
 	Destination string
 	Flags       []string
 }
 
-// ContextAnalysis contains build context analysis results
+// ContextAnalysis represents context analysis results
 type ContextAnalysis struct {
 	TotalFileOps      int
 	CopyOperations    int
@@ -125,7 +117,7 @@ type ContextAnalysis struct {
 	BuildContextTips  []string
 }
 
-// extractFileOperations extracts COPY and ADD operations
+// extractFileOperations extracts file operations
 func (v *ContextValidator) extractFileOperations(lines []string) []FileOperation {
 	operations := make([]FileOperation, 0)
 
@@ -142,14 +134,12 @@ func (v *ContextValidator) extractFileOperations(lines []string) []FileOperation
 			if len(parts) >= 3 {
 				op.Type = strings.ToUpper(parts[0])
 
-				// Parse flags
 				j := 1
 				for j < len(parts) && strings.HasPrefix(parts[j], "--") {
 					op.Flags = append(op.Flags, parts[j])
 					j++
 				}
 
-				// Get source and destination
 				if j < len(parts)-1 {
 					op.Source = parts[j]
 					op.Destination = parts[len(parts)-1]
@@ -166,7 +156,6 @@ func (v *ContextValidator) extractFileOperations(lines []string) []FileOperation
 // validateFileOperations validates file operations
 func (v *ContextValidator) validateFileOperations(operations []FileOperation, result *ValidationResult) {
 	for _, op := range operations {
-		// Check for ADD with local files (prefer COPY)
 		if op.Type == "ADD" && !v.isRemoteURL(op.Source) && !v.isArchive(op.Source) {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "add_local_files",
@@ -177,7 +166,6 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 			})
 		}
 
-		// Check for copying to root
 		if op.Destination == "/" {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "copy_to_root",
@@ -188,7 +176,6 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 			})
 		}
 
-		// Check for absolute source paths
 		if filepath.IsAbs(op.Source) && !v.hasFromFlag(op.Flags) {
 			result.Errors = append(result.Errors, ValidationError{
 				//Type:     "absolute_source_path",
@@ -198,7 +185,6 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 			})
 		}
 
-		// Check for copying sensitive files
 		if v.isSensitiveFile(op.Source) {
 			result.Warnings = append(result.Warnings, ValidationWarning{
 				//Type:       "sensitive_file_copy",
@@ -211,7 +197,7 @@ func (v *ContextValidator) validateFileOperations(operations []FileOperation, re
 	}
 }
 
-// checkBuildContextSize checks for operations that might increase context size
+// checkBuildContextSize checks context size
 func (v *ContextValidator) checkBuildContextSize(operations []FileOperation, result *ValidationResult) {
 	wholeDirCopies := 0
 

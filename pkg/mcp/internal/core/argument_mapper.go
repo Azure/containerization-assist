@@ -42,6 +42,20 @@ func BuildArgsMap(ctx context.Context, args interface{}) (map[string]interface{}
 			continue
 		}
 
+		// Handle embedded structs (anonymous fields) by flattening them
+		if fieldType.Anonymous && field.Kind() == reflect.Struct {
+			// Recursively process embedded struct and merge its fields
+			embeddedMap, err := BuildArgsMap(ctx, field.Interface())
+			if err != nil {
+				return nil, fmt.Errorf("failed to process embedded struct %s: %w", fieldType.Name, err)
+			}
+			// Merge embedded fields into result
+			for k, v := range embeddedMap {
+				result[k] = v
+			}
+			continue
+		}
+
 		// Get field name from JSON tag or field name
 		fieldName := getFieldName(fieldType)
 
