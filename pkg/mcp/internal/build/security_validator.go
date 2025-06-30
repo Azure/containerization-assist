@@ -9,12 +9,29 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ComplianceResult represents the result of a compliance check
+type ComplianceResult struct {
+	Framework  string                        `json:"framework"`
+	Compliant  bool                          `json:"compliant"`
+	Score      float64                       `json:"score"`
+	Violations []SecurityComplianceViolation `json:"violations"`
+}
+
+// SecurityComplianceViolation represents a specific compliance violation
+type SecurityComplianceViolation struct {
+	Requirement string `json:"requirement"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+	Line        int    `json:"line,omitempty"`
+}
+
 // SecurityValidator handles Dockerfile security validation
 // Implements DockerfileValidator interface
 type SecurityValidator struct {
 	logger            zerolog.Logger
 	secretPatterns    []*regexp.Regexp
 	trustedRegistries []string
+	policies          []SecurityPolicy
 }
 
 // NewSecurityValidator creates a new security validator
@@ -23,6 +40,7 @@ func NewSecurityValidator(logger zerolog.Logger, trustedRegistries []string) *Se
 		logger:            logger.With().Str("component", "security_validator").Logger(),
 		trustedRegistries: trustedRegistries,
 		secretPatterns:    compileSecretPatterns(),
+		policies:          []SecurityPolicy{},
 	}
 }
 
@@ -53,6 +71,45 @@ func (v *SecurityValidator) Validate(content string, options ValidationOptions) 
 		result.Valid = false
 	}
 	return result, nil
+}
+
+// ValidateCompliance validates a Dockerfile against a specific compliance framework
+func (v *SecurityValidator) ValidateCompliance(dockerfile string, framework string) *ComplianceResult {
+	result := &ComplianceResult{
+		Framework:  framework,
+		Compliant:  true,
+		Score:      100.0,
+		Violations: []SecurityComplianceViolation{},
+	}
+
+	// Perform standard validation first
+	validationResult, _ := v.Validate(dockerfile, ValidationOptions{
+		CheckSecurity: true,
+	})
+
+	// Check framework-specific requirements
+	switch framework {
+	case "cis-docker":
+		v.checkCISDockerCompliance(dockerfile, validationResult, result)
+	case "nist-800-190":
+		v.checkNIST800190Compliance(dockerfile, validationResult, result)
+	case "pci-dss":
+		v.checkPCIDSSCompliance(dockerfile, validationResult, result)
+	case "hipaa":
+		v.checkHIPAACompliance(dockerfile, validationResult, result)
+	case "soc2":
+		v.checkSOC2Compliance(dockerfile, validationResult, result)
+	default:
+		result.Compliant = false
+		result.Score = 0
+		result.Violations = append(result.Violations, SecurityComplianceViolation{
+			Requirement: "framework",
+			Description: fmt.Sprintf("Unknown compliance framework: %s", framework),
+			Severity:    "critical",
+		})
+	}
+
+	return result
 }
 
 // checkForRootUser checks if the container runs as root
@@ -411,7 +468,7 @@ func (v *EnhancedSecurityValidator) SetActivePolicy(policyName string) error {
 }
 
 // ValidateWithPolicy performs validation with the active security policy
-func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options ValidationOptions) (*SecurityValidationResult, error) {
+func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options ValidationOptions) (*ExtendedSecurityValidationResult, error) {
 	if v.activePolicy == nil {
 		return nil, fmt.Errorf("no active security policy set")
 	}
@@ -423,14 +480,14 @@ func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options V
 	}
 
 	// Create enhanced result
-	result := &SecurityValidationResult{
+	result := &ExtendedSecurityValidationResult{
 		ValidationResult: baseResult,
 		PolicyName:       v.activePolicy.Name,
 		PolicyVersion:    v.activePolicy.Version,
 		ComplianceStatus: make(map[string]bool),
 		PolicyViolations: []PolicyViolation{},
 		SecurityScore:    100, // Start with perfect score
-		RiskAssessment:   RiskAssessment{},
+		RiskAssessment:   SecurityRiskAssessment{},
 	}
 
 	// Apply policy rules
@@ -450,7 +507,7 @@ func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options V
 }
 
 // applyPolicyRules applies security policy rules
-func (v *EnhancedSecurityValidator) applyPolicyRules(lines []string, result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) applyPolicyRules(lines []string, result *ExtendedSecurityValidationResult) {
 	for _, rule := range v.activePolicy.Rules {
 		if !rule.Enabled {
 			continue
@@ -515,7 +572,7 @@ func (v *EnhancedSecurityValidator) checkRule(lines []string, rule SecurityRule)
 }
 
 // checkCompliance checks compliance with frameworks
-func (v *EnhancedSecurityValidator) checkCompliance(lines []string, result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) checkCompliance(lines []string, result *ExtendedSecurityValidationResult) {
 	for _, framework := range v.activePolicy.ComplianceFrameworks {
 		compliant := true
 		for _, req := range framework.Requirements {
@@ -564,7 +621,7 @@ func (v *EnhancedSecurityValidator) checkComplianceRequirement(lines []string, r
 }
 
 // assessRisk performs risk assessment
-func (v *EnhancedSecurityValidator) assessRisk(result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) assessRisk(result *ExtendedSecurityValidationResult) {
 	risk := &result.RiskAssessment
 
 	// Count violations by severity
@@ -600,8 +657,8 @@ func (v *EnhancedSecurityValidator) assessRisk(result *SecurityValidationResult)
 	}
 
 	// Add risk factors
-	if len(result.Errors) > 0 {
-		risk.RiskFactors = append(risk.RiskFactors, fmt.Sprintf("%d security errors found", len(result.Errors)))
+	if len(result.ValidationResult.Errors) > 0 {
+		risk.RiskFactors = append(risk.RiskFactors, fmt.Sprintf("%d security errors found", len(result.ValidationResult.Errors)))
 	}
 	if risk.CriticalRisks > 0 {
 		risk.RiskFactors = append(risk.RiskFactors, fmt.Sprintf("%d critical security risks identified", risk.CriticalRisks))
@@ -612,7 +669,7 @@ func (v *EnhancedSecurityValidator) assessRisk(result *SecurityValidationResult)
 }
 
 // calculateSecurityScore calculates overall security score
-func (v *EnhancedSecurityValidator) calculateSecurityScore(result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) calculateSecurityScore(result *ExtendedSecurityValidationResult) {
 	score := 100
 
 	// Deduct points for violations
@@ -665,7 +722,7 @@ func (v *EnhancedSecurityValidator) getComplianceRemediation(framework, reqID st
 	return fmt.Sprintf("Implement %s requirement %s", framework, reqID)
 }
 
-func (v *EnhancedSecurityValidator) generateMitigations(result *SecurityValidationResult) []string {
+func (v *EnhancedSecurityValidator) generateMitigations(result *ExtendedSecurityValidationResult) []string {
 	mitigations := []string{}
 
 	if result.RiskAssessment.CriticalRisks > 0 {
@@ -683,15 +740,15 @@ func (v *EnhancedSecurityValidator) generateMitigations(result *SecurityValidati
 
 // Additional types for enhanced security validation
 
-// SecurityValidationResult extends ValidationResult with security-specific information
-type SecurityValidationResult struct {
+// ExtendedSecurityValidationResult extends ValidationResult with security-specific information
+type ExtendedSecurityValidationResult struct {
 	*ValidationResult
-	PolicyName       string            `json:"policy_name"`
-	PolicyVersion    string            `json:"policy_version"`
-	ComplianceStatus map[string]bool   `json:"compliance_status"`
-	PolicyViolations []PolicyViolation `json:"policy_violations"`
-	SecurityScore    int               `json:"security_score"`
-	RiskAssessment   RiskAssessment    `json:"risk_assessment"`
+	PolicyName       string                 `json:"policy_name"`
+	PolicyVersion    string                 `json:"policy_version"`
+	ComplianceStatus map[string]bool        `json:"compliance_status"`
+	PolicyViolations []PolicyViolation      `json:"policy_violations"`
+	SecurityScore    int                    `json:"security_score"`
+	RiskAssessment   SecurityRiskAssessment `json:"risk_assessment"`
 }
 
 // PolicyViolation represents a security policy violation
@@ -704,8 +761,8 @@ type PolicyViolation struct {
 	Remediation string `json:"remediation"`
 }
 
-// RiskAssessment contains risk analysis results
-type RiskAssessment struct {
+// SecurityRiskAssessment contains risk analysis results
+type SecurityRiskAssessment struct {
 	OverallRisk   string   `json:"overall_risk"`
 	RiskScore     int      `json:"risk_score"`
 	CriticalRisks int      `json:"critical_risks"`
@@ -1130,4 +1187,149 @@ func (v *EnhancedSecurityValidator) LoadDefaultComplianceFrameworks() {
 	// Load the default policy
 	v.LoadPolicy(defaultPolicy)
 	v.SetActivePolicy("default-compliance")
+}
+
+// Compliance check method implementations
+
+func (v *SecurityValidator) checkCISDockerCompliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for root user
+	if len(validationResult.Errors) > 0 {
+		for _, err := range validationResult.Errors {
+			if err.Rule == "root_user" {
+				result.Compliant = false
+				result.Score -= 20
+				result.Violations = append(result.Violations, SecurityComplianceViolation{
+					Requirement: "CIS 4.1",
+					Description: "Container running as root user",
+					Severity:    "high",
+					Line:        err.Line,
+				})
+			}
+		}
+	}
+
+	// Check for health check
+	if !strings.Contains(dockerfile, "HEALTHCHECK") {
+		result.Compliant = false
+		result.Score -= 10
+		result.Violations = append(result.Violations, SecurityComplianceViolation{
+			Requirement: "CIS 4.6",
+			Description: "No HEALTHCHECK instruction defined",
+			Severity:    "medium",
+		})
+	}
+}
+
+func (v *SecurityValidator) checkNIST800190Compliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for insecure downloads
+	for _, err := range validationResult.Errors {
+		if err.Rule == "insecure_download" {
+			result.Compliant = false
+			result.Score -= 15
+			result.Violations = append(result.Violations, SecurityComplianceViolation{
+				Requirement: "NIST 800-190 4.3.3",
+				Description: "Insecure download detected",
+				Severity:    "high",
+				Line:        err.Line,
+			})
+		}
+	}
+}
+
+func (v *SecurityValidator) checkPCIDSSCompliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for hardcoded secrets
+	for _, err := range validationResult.Errors {
+		if err.Rule == "hardcoded_secret" {
+			result.Compliant = false
+			result.Score -= 30
+			result.Violations = append(result.Violations, SecurityComplianceViolation{
+				Requirement: "PCI-DSS 8.2.1",
+				Description: "Hardcoded credentials detected",
+				Severity:    "critical",
+				Line:        err.Line,
+			})
+		}
+	}
+}
+
+func (v *SecurityValidator) checkHIPAACompliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for telnet/unencrypted services
+	for _, warn := range validationResult.Warnings {
+		if warn.Rule == "sensitive_port" && strings.Contains(warn.Message, "23") {
+			result.Compliant = false
+			result.Score -= 25
+			result.Violations = append(result.Violations, SecurityComplianceViolation{
+				Requirement: "HIPAA 164.312(e)(1)",
+				Description: "Unencrypted transmission protocol (telnet) exposed",
+				Severity:    "high",
+				Line:        warn.Line,
+			})
+		}
+	}
+}
+
+func (v *SecurityValidator) checkSOC2Compliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for permission issues
+	if strings.Contains(dockerfile, "chmod 777") {
+		result.Compliant = false
+		result.Score -= 20
+		result.Violations = append(result.Violations, SecurityComplianceViolation{
+			Requirement: "SOC 2 CC6.3",
+			Description: "Overly permissive file permissions detected",
+			Severity:    "high",
+		})
+	}
+}
+
+// AddPolicy adds a custom security policy to the validator
+func (v *SecurityValidator) AddPolicy(policy SecurityPolicy) {
+	v.policies = append(v.policies, policy)
+	v.logger.Info().Str("policy", policy.Name).Msg("Policy added to validator")
+}
+
+// VulnerabilityScanResult represents the result of a vulnerability scan
+type VulnerabilityScanResult struct {
+	Critical int `json:"critical"`
+	High     int `json:"high"`
+	Medium   int `json:"medium"`
+	Low      int `json:"low"`
+}
+
+// ProcessVulnerabilityScan processes vulnerability scan results
+func (v *SecurityValidator) ProcessVulnerabilityScan(scanResult *VulnerabilityScanResult) *ValidationResult {
+	result := &ValidationResult{
+		Valid:    true,
+		Errors:   []ValidationError{},
+		Warnings: []ValidationWarning{},
+	}
+
+	if scanResult.Critical > 0 {
+		result.Valid = false
+		result.Errors = append(result.Errors, ValidationError{
+			Line:    0,
+			Column:  0,
+			Message: fmt.Sprintf("Found %d critical vulnerabilities that must be fixed", scanResult.Critical),
+			Rule:    "critical_vulnerabilities",
+		})
+	}
+
+	if scanResult.High > 0 {
+		result.Warnings = append(result.Warnings, ValidationWarning{
+			Line:    0,
+			Column:  0,
+			Message: fmt.Sprintf("Found %d high severity vulnerabilities", scanResult.High),
+			Rule:    "high_vulnerabilities",
+		})
+	}
+
+	if scanResult.Medium > 0 {
+		result.Warnings = append(result.Warnings, ValidationWarning{
+			Line:    0,
+			Column:  0,
+			Message: fmt.Sprintf("Found %d medium severity vulnerabilities", scanResult.Medium),
+			Rule:    "medium_vulnerabilities",
+		})
+	}
+
+	return result
 }

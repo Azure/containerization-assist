@@ -191,7 +191,7 @@ func (m *PerformanceMonitor) StartBuildMonitoring(ctx context.Context, operation
 }
 
 // AnalyzePerformance analyzes build performance and provides insights
-func (m *PerformanceMonitor) AnalyzePerformance(ctx context.Context, sessionID string) (*PerformanceAnalysis, error) {
+func (m *PerformanceMonitor) AnalyzePerformance(ctx context.Context, sessionID string) (*BuildPerformanceAnalysis, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -273,7 +273,7 @@ func (b *BuildMonitor) RecordCacheMiss(layer string) {
 }
 
 // Complete marks the build operation as complete
-func (b *BuildMonitor) Complete(success bool, errorType string, imageInfo *ImageInfo) {
+func (b *BuildMonitor) Complete(success bool, errorType string, imageInfo *BuildImageInfo) {
 	b.endTime = time.Now()
 	b.success = success
 	b.errorType = errorType
@@ -347,8 +347,8 @@ func NewPerformanceAnalyzer(logger zerolog.Logger) *PerformanceAnalyzer {
 }
 
 // Analyze performs performance analysis
-func (a *PerformanceAnalyzer) Analyze(ctx context.Context, sessionID string, metrics *BuildMetrics) (*PerformanceAnalysis, error) {
-	analysis := &PerformanceAnalysis{
+func (a *PerformanceAnalyzer) Analyze(ctx context.Context, sessionID string, metrics *BuildMetrics) (*BuildPerformanceAnalysis, error) {
+	analysis := &BuildPerformanceAnalysis{
 		SessionID:       sessionID,
 		AnalysisTime:    time.Now(),
 		Insights:        []PerformanceInsight{},
@@ -456,8 +456,8 @@ type StageMetrics struct {
 	Success   bool
 }
 
-// ImageInfo contains information about a built image
-type ImageInfo struct {
+// BuildImageInfo contains information about a built image
+type BuildImageInfo struct {
 	Name       string
 	Tag        string
 	Size       int64
@@ -483,8 +483,8 @@ type StageReport struct {
 	Percentage float64       `json:"percentage"`
 }
 
-// PerformanceAnalysis contains performance analysis results
-type PerformanceAnalysis struct {
+// BuildPerformanceAnalysis contains performance analysis results
+type BuildPerformanceAnalysis struct {
 	SessionID       string               `json:"session_id"`
 	AnalysisTime    time.Time            `json:"analysis_time"`
 	Insights        []PerformanceInsight `json:"insights"`

@@ -11,6 +11,8 @@ import (
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
+
+	// "github.com/Azure/container-kit/pkg/mcp/internal/runtime" // Temporarily commented to avoid import cycle
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
@@ -104,14 +106,14 @@ func (t *AtomicPushImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
 // ExecuteWithFixes runs the atomic Docker image push with automatic fixes
 func (t *AtomicPushImageTool) ExecuteWithFixes(ctx context.Context, args AtomicPushImageArgs) (*AtomicPushImageResult, error) {
 	if t.fixingMixin != nil && !args.DryRun {
-		// Create wrapper operation for push process
+		// Use fixing mixin to handle retries
 		var result *AtomicPushImageResult
-		progress := observability.NewUnifiedProgressReporter(nil) // No server context in ExecuteWithFixes
+		startTime := time.Now()
 		operation := NewDockerOperation(DockerOperationConfig{
 			Type:          OperationPush,
 			Name:          args.ImageRef,
 			RetryAttempts: 3,
-			Timeout:       10 * time.Minute, // Push operations typically take longer
+			Timeout:       10 * time.Minute,
 			ExecuteFunc: func(ctx context.Context) error {
 				var err error
 				result, err = t.executeWithoutProgress(ctx, args, nil, time.Now())
@@ -123,11 +125,19 @@ func (t *AtomicPushImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 				}
 				return nil
 			},
-		}, progress)
-		// TODO: Fix method call - ExecuteWithProgress method not found
-		// if err := operation.ExecuteWithProgress(ctx, progress); err != nil {
-		if err := operation.ExecuteOnce(ctx); err != nil {
-			return nil, err
+		}, observability.NewUnifiedProgressReporter(nil))
+		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, "/workspace", operation)
+		if err != nil {
+			if result == nil {
+				result = &AtomicPushImageResult{
+					BaseToolResponse:    types.NewBaseResponse("atomic_push_image", args.SessionID, args.DryRun),
+					BaseAIContextResult: mcptypes.NewBaseAIContextResult("push", false, 0),
+					ImageRef:            args.ImageRef,
+				}
+			}
+			result.Success = false
+			result.TotalDuration = time.Since(startTime)
+			return result, err
 		}
 		return result, nil
 	}
@@ -244,6 +254,43 @@ func (t *AtomicPushImageTool) isValidImageReference(imageRef string) bool {
 	return true
 }
 
+// executePushWithCallback executes the push operation with progress callback
+// ProgressCallback type temporarily defined here to avoid import cycle
+type ProgressCallback func(progress float64, message string)
+
+func (t *AtomicPushImageTool) executePushWithCallback(ctx context.Context, args AtomicPushImageArgs, result *AtomicPushImageResult, progress ProgressCallback) error {
+	// Get session
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
+	if err != nil {
+		return fmt.Errorf("session not found: %s", args.SessionID)
+	}
+	session := sessionInterface.(*core.SessionState)
+
+	// Report initial progress
+	progress(0.1, "Starting image push operation")
+
+	// Validate inputs
+	progress(0.2, "Validating push parameters")
+	if err := t.validatePushPrerequisites(result, args); err != nil {
+		return err
+	}
+
+	// Perform the actual push
+	progress(0.3, "Authenticating with registry")
+
+	// Execute push operation
+	err = t.performPush(ctx, session, args, result, progress)
+	if err != nil {
+		return err
+	}
+
+	// Complete
+	progress(1.0, "Push operation completed successfully")
+	result.Success = true
+
+	return nil
+}
+
 // extractRegistryURL extracts the registry URL from an image reference
 func (t *AtomicPushImageTool) extractRegistryURL(imageRef string, registryURL string) string {
 	// If registry URL is explicitly provided, use it
@@ -260,12 +307,24 @@ func (t *AtomicPushImageTool) extractRegistryURL(imageRef string, registryURL st
 }
 
 // performPush contains the actual push logic that can be used with or without progress reporting
-func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.SessionState, args AtomicPushImageArgs, result *AtomicPushImageResult, reporter interface{}) error {
+func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.SessionState, args AtomicPushImageArgs, result *AtomicPushImageResult, progressCallback interface{}) error {
+	// Type assert progress callback if provided
+	var progress ProgressCallback
+	if progressCallback != nil {
+		if pc, ok := progressCallback.(ProgressCallback); ok {
+			progress = pc
+		}
+	}
 	// Extract registry from image reference
 	result.RegistryURL = t.extractRegistryURL(args.ImageRef, args.RegistryURL)
 
 	// Push Docker image using pipeline adapter
 	pushStartTime := time.Now()
+
+	// Report progress if callback provided
+	if progress != nil {
+		progress(0.4, "Preparing image for push")
+	}
 
 	// Create push arguments
 	pushArgs := map[string]interface{}{
@@ -273,6 +332,11 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 		"force":      args.Force,
 		"timeout":    args.Timeout,
 		"retryCount": args.RetryCount,
+	}
+
+	// Report progress
+	if progress != nil {
+		progress(0.5, fmt.Sprintf("Pushing image %s to %s", args.ImageRef, result.RegistryURL))
 	}
 
 	// Use the pipeline adapter to push the image
@@ -291,6 +355,11 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 		}
 		t.logger.Error().Err(err).Str("image_ref", args.ImageRef).Msg("Failed to push image")
 		return fmt.Errorf("failed to push image: %w", err)
+	}
+
+	// Report progress
+	if progress != nil {
+		progress(0.8, "Finalizing push operation")
 	}
 
 	// Success - extract push results

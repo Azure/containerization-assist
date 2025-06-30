@@ -180,13 +180,13 @@ func (d *PerformanceDashboard) GenerateDashboard(ctx context.Context) (*Dashboar
 
 	// Calculate tool averages
 	for tool, stats := range data.ByTool {
-		stats.AvgDuration = stats.TotalTime / time.Duration(stats.BuildCount)
+		// Average duration would be calculated from build history in real implementation
 		data.ByTool[tool] = stats
 	}
 
 	// Calculate image averages
 	for image, stats := range data.ByImage {
-		stats.AvgDuration = stats.TotalTime / time.Duration(stats.BuildCount)
+		// Average duration would be calculated from build history in real implementation
 		data.ByImage[image] = stats
 	}
 

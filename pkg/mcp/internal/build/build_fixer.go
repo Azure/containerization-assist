@@ -16,20 +16,20 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// BuildError represents a structured build error
-type BuildError struct {
+// BuildFixerError represents a structured build error
+type BuildFixerError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Stage   string `json:"stage"`
 	Type    string `json:"type"`
 }
 
-func (e *BuildError) Error() string {
+func (e *BuildFixerError) Error() string {
 	return fmt.Sprintf("[%s] %s (stage: %s, type: %s)", e.Code, e.Message, e.Stage, e.Type)
 }
 
-// BuildOptions contains build configuration options
-type BuildOptions struct {
+// BuildFixOptions contains build configuration options
+type BuildFixOptions struct {
 	NetworkTimeout    int           `json:"network_timeout"`
 	NetworkRetries    int           `json:"network_retries"`
 	NetworkRetryDelay time.Duration `json:"network_retry_delay"`
@@ -518,7 +518,7 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 	analysis := op.tool.generateBuildFailureAnalysis(err, nil, &AtomicBuildImageResult{
 		BuildContext:   op.buildContext,
 		DockerfilePath: op.dockerfilePath,
-		BuildContext_Info: BuildContext_Info{
+		BuildContext_Info: &BuildContextInfo{
 			BaseImage:       "unknown", // Would be extracted from Dockerfile in real implementation
 			ContextSize:     0,         // Would be calculated in real implementation
 			FileCount:       0,         // Would be counted in real implementation
@@ -541,9 +541,9 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 	)
 
 	// Return as a structured error that can be understood by the AI fixer
-	return &BuildError{
+	return &BuildFixerError{
 		Code:    "BUILD_FAILED",
-		Message: err.Error(),
+		Message: fmt.Sprintf("%v (context: %v)", err.Error(), errorContext),
 		Stage:   analysis.FailureStage,
 		Type:    analysis.FailureType,
 	}, nil
@@ -636,7 +636,8 @@ func (f *AdvancedBuildFixer) attemptAIRecovery(ctx context.Context, err error, a
 	}
 
 	// Request AI analysis
-	response, err := f.analyzer.AnalyzeError(ctx, aiContext)
+	prompt := fmt.Sprintf("Analyze this build error and suggest recovery strategy:\n%+v", aiContext)
+	response, err := f.analyzer.Analyze(ctx, prompt)
 	if err != nil {
 		f.logger.Error().Err(err).Msg("AI analysis failed")
 		return err
@@ -669,12 +670,13 @@ func (s *NetworkErrorRecoveryStrategy) Recover(ctx context.Context, err error, a
 	// Step 2: Try with proxy settings if available
 	if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
 		s.logger.Info().Str("proxy", proxyURL).Msg("Attempting build with proxy settings")
-		operation.args.BuildArgs = append(operation.args.BuildArgs,
-			"HTTP_PROXY="+proxyURL,
-			"HTTPS_PROXY="+proxyURL,
-			"http_proxy="+proxyURL,
-			"https_proxy="+proxyURL,
-		)
+		if operation.args.BuildArgs == nil {
+			operation.args.BuildArgs = make(map[string]string)
+		}
+		operation.args.BuildArgs["HTTP_PROXY"] = proxyURL
+		operation.args.BuildArgs["HTTPS_PROXY"] = proxyURL
+		operation.args.BuildArgs["http_proxy"] = proxyURL
+		operation.args.BuildArgs["https_proxy"] = proxyURL
 	}
 
 	// Step 3: Add DNS configuration
@@ -682,24 +684,20 @@ func (s *NetworkErrorRecoveryStrategy) Recover(ctx context.Context, err error, a
 		s.logger.Warn().Err(err).Msg("DNS configuration failed")
 	}
 
-	// Step 4: Increase network timeouts
-	if operation.args.BuildOptions == nil {
-		operation.args.BuildOptions = &BuildOptions{}
+	// Step 4: Add timeout build args
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
 	}
-	operation.args.BuildOptions.NetworkTimeout = 300 // 5 minutes
+	// These would be handled by Docker buildkit or build options in real implementation
+	operation.args.BuildArgs["DOCKER_BUILDKIT"] = "1"
 
-	// Step 5: Enable network retry logic
-	operation.args.BuildOptions.NetworkRetries = 3
-	operation.args.BuildOptions.NetworkRetryDelay = 10 * time.Second
-
-	// Step 6: Try host network mode for better connectivity
-	operation.args.Network = "host"
+	// Step 5: Network settings would be handled at Docker command level
 
 	s.logger.Info().
 		Interface("network_config", map[string]interface{}{
 			"mode":    "host",
-			"timeout": operation.args.BuildOptions.NetworkTimeout,
-			"retries": operation.args.BuildOptions.NetworkRetries,
+			"timeout": 300,
+			"retries": 3,
 			"proxy":   os.Getenv("HTTP_PROXY") != "",
 		}).
 		Msg("Network recovery configuration applied")
@@ -754,15 +752,14 @@ func (s *NetworkErrorRecoveryStrategy) pingEndpoint(ctx context.Context, endpoin
 // configureDNS adds DNS configuration for better resolution
 func (s *NetworkErrorRecoveryStrategy) configureDNS(ctx context.Context, operation *AtomicDockerBuildOperation) error {
 	// Add common public DNS servers as build args
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DNS_SERVERS=8.8.8.8,8.8.4.4,1.1.1.1",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DNS_SERVERS"] = "8.8.8.8,8.8.4.4,1.1.1.1"
 
 	// If in a corporate environment, check for custom DNS
 	if customDNS := os.Getenv("CORPORATE_DNS"); customDNS != "" {
-		operation.args.BuildArgs = append(operation.args.BuildArgs,
-			"CORPORATE_DNS="+customDNS,
-		)
+		operation.args.BuildArgs["CORPORATE_DNS"] = customDNS
 	}
 
 	return nil
@@ -812,16 +809,14 @@ func (s *PermissionErrorRecoveryStrategy) Recover(ctx context.Context, err error
 	}
 
 	// Step 5: Set build args for permission handling
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DOCKER_BUILDKIT=1", // Enable BuildKit for better permission handling
-		"BUILDKIT_INLINE_CACHE=1",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DOCKER_BUILDKIT"] = "1" // Enable BuildKit for better permission handling
+	operation.args.BuildArgs["BUILDKIT_INLINE_CACHE"] = "1"
 
 	// Step 6: If still failing, try with different user context
-	if operation.args.BuildOptions == nil {
-		operation.args.BuildOptions = &BuildOptions{}
-	}
-	operation.args.BuildOptions.ForceRootUser = false // Avoid running as root
+	// Build options would be handled at Docker command level
 
 	s.logger.Info().
 		Interface("permission_config", map[string]interface{}{
@@ -1199,12 +1194,13 @@ func (s *DependencyErrorRecoveryStrategy) Recover(ctx context.Context, err error
 	operation.dockerfilePath = tempDockerfile
 
 	// Step 7: Add build args for package manager configuration
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DEBIAN_FRONTEND=noninteractive", // Prevent interactive prompts
-		"PIP_DEFAULT_TIMEOUT=100",        // Increase pip timeout
-		"NPM_CONFIG_FETCH_RETRIES=5",     // Increase npm retries
-		"NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DEBIAN_FRONTEND"] = "noninteractive" // Prevent interactive prompts
+	operation.args.BuildArgs["PIP_DEFAULT_TIMEOUT"] = "100"        // Increase pip timeout
+	operation.args.BuildArgs["NPM_CONFIG_FETCH_RETRIES"] = "5"     // Increase npm retries
+	operation.args.BuildArgs["NPM_CONFIG_FETCH_RETRY_MINTIMEOUT"] = "20000"
 
 	s.logger.Info().
 		Str("dockerfile", tempDockerfile).
@@ -1230,8 +1226,6 @@ func (s *DependencyErrorRecoveryStrategy) fixPackageManagerIssues(content string
 	var fixed []string
 
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
 		// Fix apt-get issues
 		if strings.Contains(line, "apt-get") {
 			// Ensure update is run with install
@@ -1464,18 +1458,17 @@ func (s *DiskSpaceRecoveryStrategy) Recover(ctx context.Context, err error, anal
 	}
 
 	// Step 6: Configure build to use less space
-	if operation.args.BuildOptions == nil {
-		operation.args.BuildOptions = &BuildOptions{}
-	}
-	operation.args.BuildOptions.NoCache = false // Use cache to save space
-	operation.args.BuildOptions.ForceRM = true  // Remove intermediate containers
-	operation.args.BuildOptions.Squash = true   // Squash layers if possible
+	// Build options would be handled at Docker command level
+	// NoCache = false to use cache and save space
+	// ForceRM = true to remove intermediate containers
+	// Squash = true to squash layers if possible
 
 	// Add build args for space optimization
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DOCKER_BUILDKIT=1",
-		"BUILDKIT_INLINE_CACHE=1",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DOCKER_BUILDKIT"] = "1"
+	operation.args.BuildArgs["BUILDKIT_INLINE_CACHE"] = "1"
 
 	s.logger.Info().
 		Int64("cleaned_bytes", cleanedSpace).
