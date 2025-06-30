@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -26,6 +25,7 @@ const (
 	AZURE_OPENAI_KEY           = "AZURE_OPENAI_KEY"
 	AZURE_OPENAI_ENDPOINT      = "AZURE_OPENAI_ENDPOINT"
 	AZURE_OPENAI_DEPLOYMENT_ID = "AZURE_OPENAI_DEPLOYMENT_ID"
+	ENV_FILE_NAME              = ".env"
 )
 
 var (
@@ -64,18 +64,24 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+func getProjectRoot() string {
+	execPath, err := os.Executable()
+	if err != nil {
+		logger.Warnf("Warning: Error getting executable path: %v", err)
+		return "."
+	}
+	return filepath.Dir(execPath)
+}
+
 // loadEnvFile attempts to load the .env file from the project root
 func loadEnvFile() {
-	_, file, _, ok := runtime.Caller(0)
-	if ok {
-		projectRoot := filepath.Dir(filepath.Dir(file))
-		envFile := filepath.Join(projectRoot, ".env")
+	projectRoot := getProjectRoot()
+	envFile := filepath.Join(projectRoot, ENV_FILE_NAME)
 
-		// Check if .env file exists and load it
-		if _, err := os.Stat(envFile); err == nil {
-			if err := godotenv.Load(envFile); err != nil {
-				logger.Warnf("Warning: Error loading .env file: %v", err)
-			}
+	// Check if .env file exists and load it
+	if _, err := os.Stat(envFile); err == nil {
+		if err := godotenv.Load(envFile); err != nil {
+			logger.Warnf("Warning: Error loading .env file: %v", err)
 		}
 	}
 }
@@ -215,21 +221,14 @@ var setupCmd = &cobra.Command{
 	Short: "Set up Azure OpenAI resources and run container-kit",
 	Long:  `The setup command will provision Azure OpenAI resources, deploy the model, and run container-kit to generate artifacts.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, file, _, ok := runtime.Caller(0)
-		if !ok {
-			return fmt.Errorf("failed to determine source file location")
-		}
-
-		// Get the project root directory
-		projectRoot := filepath.Dir(filepath.Dir(file))
+		projectRoot := getProjectRoot()
 
 		// Check force-setup flag first, before loading .env file
 		forceSetup, _ := cmd.Flags().GetBool("force-setup")
-
+		envFile := filepath.Join(projectRoot, ENV_FILE_NAME)
 		if forceSetup {
 			logger.Info("Force setup enabled - deleting existing .env file and proceeding with fresh setup...")
 			// Delete existing .env file if it exists
-			envFile := filepath.Join(projectRoot, ".env")
 			if _, err := os.Stat(envFile); err == nil {
 				if err := os.Remove(envFile); err != nil {
 					logger.Warnf("Warning: Failed to delete existing .env file: %v", err)
@@ -370,14 +369,7 @@ func initClients(ctx context.Context) (*clients.Clients, error) {
 func runAutoSetup() error {
 	// Load any existing environment variables from .env file
 	loadEnvFile()
-
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		return fmt.Errorf("failed to determine source file location")
-	}
-
-	// Get the project root directory
-	projectRoot := filepath.Dir(filepath.Dir(file))
+	projectRoot := getProjectRoot()
 
 	// Create a temporary command to load config
 	tempCmd := &cobra.Command{}

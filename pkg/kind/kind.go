@@ -59,17 +59,22 @@ func (k *KindCmdRunner) SetupRegistry(ctx context.Context) (string, error) {
         if (-Not (docker network inspect kind -ErrorAction SilentlyContinue)) { docker network create kind }
         if (-Not (docker ps -q -f name=kind-registry)) { docker run -d --restart=always -p 5001:5001 --name kind-registry registry:2 }
         if (-Not (docker network inspect kind | Select-String kind-registry)) { docker network connect kind kind-registry }
-        kubectl apply -f - <<EOF
-        apiVersion: v1
-        kind: ConfigMap
-        metadata:
-          name: local-registry-hosting
-          namespace: kube-public
-        data:
-          localRegistryHosting.v1: |
-            host: "localhost:5001"
-            help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
-        EOF
+        kind create cluster --name container-kit
+		$configMap = @"
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-registry-hosting
+  namespace: kube-public
+data:
+  localRegistryHosting.v1: |
+	host: "localhost:5001"
+	help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
+"@
+        $configMap | Out-File -FilePath local-registry-hosting.yaml -Encoding ascii
+        kubectl apply -f local-registry-hosting.yaml
+        Remove-Item local-registry-hosting.yaml
         `)
 	} else {
 		return k.runner.RunCommand("sh", "-c", kindSetupScript)

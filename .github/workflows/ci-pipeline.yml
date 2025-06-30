@@ -687,7 +687,7 @@ jobs:
     - name: Download CLI binary
       uses: actions/download-artifact@v4
       with:
-        name: container-kit-ubuntu-latest-${{ github.run_id }}
+        name: container-kit-${{ runner.os }}-${{ github.run_id }}
         path: ./
 
     - name: Run integration tests
