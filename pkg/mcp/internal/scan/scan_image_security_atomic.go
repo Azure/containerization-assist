@@ -277,19 +277,43 @@ func (t *AtomicScanImageSecurityTool) Validate(ctx context.Context, args interfa
 
 // Placeholder implementations for helper methods
 func (t *AtomicScanImageSecurityTool) generateVulnerabilitySummary(result *coredocker.ScanResult) VulnerabilityAnalysisSummary {
-	return VulnerabilityAnalysisSummary{
+	summary := VulnerabilityAnalysisSummary{
 		TotalVulnerabilities:   len(result.Vulnerabilities),
-		FixableVulnerabilities: 0, // TODO: implement
+		FixableVulnerabilities: t.calculateFixableVulns(result.Vulnerabilities),
 		SeverityBreakdown:      make(map[string]int),
 		PackageBreakdown:       make(map[string]int),
 		LayerBreakdown:         make(map[string]int),
 		AgeAnalysis:            VulnAgeAnalysis{},
 	}
+
+	// Generate severity breakdown
+	for _, vuln := range result.Vulnerabilities {
+		if vuln.Severity != "" {
+			summary.SeverityBreakdown[vuln.Severity]++
+		}
+	}
+
+	// Generate package breakdown
+	for _, vuln := range result.Vulnerabilities {
+		if vuln.PkgName != "" {
+			summary.PackageBreakdown[vuln.PkgName]++
+		}
+	}
+
+	// Generate layer breakdown (if available)
+	for _, vuln := range result.Vulnerabilities {
+		layerID := t.extractLayerID(vuln)
+		if layerID != "" {
+			summary.LayerBreakdown[layerID]++
+		}
+	}
+
+	// Generate age analysis
+	summary.AgeAnalysis = t.generateAgeAnalysis(result.Vulnerabilities)
+
+	return summary
 }
 
-func (t *AtomicScanImageSecurityTool) calculateSecurityScore(summary *VulnerabilityAnalysisSummary) int {
-	return 50 // Placeholder
-}
 
 func (t *AtomicScanImageSecurityTool) determineRiskLevel(score int, summary *VulnerabilityAnalysisSummary) string {
 	if score >= 80 {
@@ -302,19 +326,111 @@ func (t *AtomicScanImageSecurityTool) determineRiskLevel(score int, summary *Vul
 }
 
 func (t *AtomicScanImageSecurityTool) extractCriticalFindings(result *coredocker.ScanResult) []CriticalSecurityFinding {
-	return []CriticalSecurityFinding{} // Placeholder
+	var findings []CriticalSecurityFinding
+	
+	for _, vuln := range result.Vulnerabilities {
+		if vuln.Severity == "CRITICAL" || vuln.Severity == "HIGH" {
+			finding := CriticalSecurityFinding{
+				Type:            "vulnerability",
+				Severity:        vuln.Severity,
+				Title:           vuln.Title,
+				Description:     vuln.Description,
+				Impact:          fmt.Sprintf("Affects package %s version %s", vuln.PkgName, vuln.InstalledVersion),
+				AffectedPackage: vuln.PkgName,
+				FixAvailable:    t.isVulnerabilityFixable(vuln),
+				CVEReferences:   []string{vuln.VulnerabilityID},
+				Remediation:     fmt.Sprintf("Upgrade %s to version %s or later", vuln.PkgName, vuln.FixedVersion),
+			}
+			findings = append(findings, finding)
+		}
+	}
+	
+	return findings
 }
 
 func (t *AtomicScanImageSecurityTool) generateRecommendations(result *coredocker.ScanResult, summary *VulnerabilityAnalysisSummary) []SecurityRecommendation {
-	return []SecurityRecommendation{} // Placeholder
+	var recommendations []SecurityRecommendation
+	
+	// Base image recommendations
+	if summary.TotalVulnerabilities > 10 {
+		recommendations = append(recommendations, SecurityRecommendation{
+			Category:    "image",
+			Priority:    "high",
+			Title:       "Consider using a more secure base image",
+			Description: "Current base image has many vulnerabilities",
+			Action:      "Switch to a minimal or distroless base image",
+			Impact:      "Reduced attack surface and fewer vulnerabilities",
+			Effort:      "medium",
+		})
+	}
+	
+	// Package management recommendations
+	if summary.FixableVulnerabilities > 0 {
+		recommendations = append(recommendations, SecurityRecommendation{
+			Category:    "package",
+			Priority:    "high",
+			Title:       "Update vulnerable packages",
+			Description: fmt.Sprintf("%d vulnerabilities can be fixed by updating packages", summary.FixableVulnerabilities),
+			Action:      "Run package updates and rebuild the image",
+			Impact:      fmt.Sprintf("Fixes %d security issues", summary.FixableVulnerabilities),
+			Effort:      "low",
+		})
+	}
+	
+	return recommendations
 }
 
 func (t *AtomicScanImageSecurityTool) analyzeCompliance(result *coredocker.ScanResult) ComplianceAnalysis {
-	return ComplianceAnalysis{} // Placeholder
-}
-
-func (t *AtomicScanImageSecurityTool) generateRemediationPlan(result *coredocker.ScanResult, summary *VulnerabilityAnalysisSummary) *SecurityRemediationPlan {
-	return &SecurityRemediationPlan{} // Placeholder
+	analysis := ComplianceAnalysis{
+		OverallScore: 75.0,
+		Framework:    "CIS Docker Benchmark",
+		Items:        []ComplianceItem{},
+		Passed:       0,
+		Failed:       0,
+		Skipped:      0,
+	}
+	
+	// Basic compliance checks
+	criticalCount := 0
+	highCount := 0
+	
+	for _, vuln := range result.Vulnerabilities {
+		if vuln.Severity == "CRITICAL" {
+			criticalCount++
+		} else if vuln.Severity == "HIGH" {
+			highCount++
+		}
+	}
+	
+	// Critical vulnerabilities compliance check
+	if criticalCount == 0 {
+		analysis.Items = append(analysis.Items, ComplianceItem{
+			CheckID:     "CIS-4.1",
+			Title:       "No critical vulnerabilities",
+			Status:      "pass",
+			Severity:    "high",
+			Description: "Image contains no critical vulnerabilities",
+			Remediation: "Continue monitoring for new vulnerabilities",
+		})
+		analysis.Passed++
+	} else {
+		analysis.Items = append(analysis.Items, ComplianceItem{
+			CheckID:     "CIS-4.1",
+			Title:       "Critical vulnerabilities found",
+			Status:      "fail",
+			Severity:    "high",
+			Description: fmt.Sprintf("Image contains %d critical vulnerabilities", criticalCount),
+			Remediation: "Update vulnerable packages immediately",
+		})
+		analysis.Failed++
+	}
+	
+	// Calculate overall score
+	if analysis.Passed+analysis.Failed > 0 {
+		analysis.OverallScore = float64(analysis.Passed) / float64(analysis.Passed+analysis.Failed) * 100
+	}
+	
+	return analysis
 }
 
 func (t *AtomicScanImageSecurityTool) generateSecurityReport(result *AtomicScanImageSecurityResult) string {
@@ -325,4 +441,266 @@ func (t *AtomicScanImageSecurityTool) updateSessionState(session *core.SessionSt
 	// Update session with scan results
 	// Placeholder implementation
 	return nil
+}
+
+// calculateFixableVulns calculates the number of vulnerabilities that have available fixes
+func (t *AtomicScanImageSecurityTool) calculateFixableVulns(vulns []coresecurity.Vulnerability) int {
+	fixable := 0
+	for _, vuln := range vulns {
+		if t.isVulnerabilityFixable(vuln) {
+			fixable++
+		}
+	}
+	return fixable
+}
+
+// isVulnerabilityFixable determines if a vulnerability has a fix available
+func (t *AtomicScanImageSecurityTool) isVulnerabilityFixable(vuln coresecurity.Vulnerability) bool {
+	// Check if there's a fixed version available
+	if vuln.FixedVersion != "" && vuln.FixedVersion != "unknown" && vuln.FixedVersion != "not available" {
+		return true
+	}
+	
+	// Check if there are any references that suggest fixes
+	if len(vuln.References) > 0 {
+		for _, ref := range vuln.References {
+			refLower := strings.ToLower(ref)
+			if strings.Contains(refLower, "upgrade") || 
+			   strings.Contains(refLower, "update") ||
+			   strings.Contains(refLower, "patch") ||
+			   strings.Contains(refLower, "fix") {
+				return true
+			}
+		}
+	}
+	
+	return false
+}
+
+// extractLayerID extracts the layer ID from a vulnerability (if available)
+func (t *AtomicScanImageSecurityTool) extractLayerID(vuln coresecurity.Vulnerability) string {
+	// Try to extract layer information from vulnerability metadata
+	if vuln.Layer != "" {
+		return vuln.Layer
+	}
+	
+	// Try to extract from data source or other metadata
+	if vuln.DataSource.Name != "" {
+		return fmt.Sprintf("layer_%s", vuln.DataSource.Name[:min(8, len(vuln.DataSource.Name))])
+	}
+	
+	return "unknown_layer"
+}
+
+// generateAgeAnalysis analyzes the age distribution of vulnerabilities
+func (t *AtomicScanImageSecurityTool) generateAgeAnalysis(vulns []coresecurity.Vulnerability) VulnAgeAnalysis {
+	analysis := VulnAgeAnalysis{
+		RecentVulns:  0,
+		OlderVulns:   0,
+		AncientVulns: 0,
+	}
+	
+	if len(vulns) == 0 {
+		return analysis
+	}
+	
+	now := time.Now()
+	
+	for _, vuln := range vulns {
+		// Try to parse published date
+		if vuln.PublishedDate != "" {
+			if publishedDate, err := time.Parse(time.RFC3339, vuln.PublishedDate); err == nil {
+				ageDays := int(now.Sub(publishedDate).Hours() / 24)
+				
+				// Categorize by age
+				if ageDays < 30 {
+					analysis.RecentVulns++
+				} else if ageDays < 365 {
+					analysis.OlderVulns++
+				} else {
+					analysis.AncientVulns++
+				}
+			}
+		}
+	}
+	
+	return analysis
+}
+
+// generateRemediationPlan creates a comprehensive remediation plan
+func (t *AtomicScanImageSecurityTool) generateRemediationPlan(result *coredocker.ScanResult, summary *VulnerabilityAnalysisSummary) *SecurityRemediationPlan {
+	plan := &SecurityRemediationPlan{
+		Summary: RemediationSummary{
+			TotalVulnerabilities:   summary.TotalVulnerabilities,
+			FixableVulnerabilities: summary.FixableVulnerabilities,
+			CriticalActions:        0,
+			EstimatedEffort:        "medium",
+		},
+		Steps: []RemediationStep{},
+		PackageUpdates: make(map[string]PackageUpdate),
+		Priority: "medium",
+	}
+	
+	// Group vulnerabilities by package
+	packageVulns := t.groupVulnerabilitiesByPackage(result.Vulnerabilities)
+	
+	// Generate remediation steps for each package
+	for pkg, vulnList := range packageVulns {
+		if hasFixableVulns := t.hasFixableVulnerabilities(vulnList); hasFixableVulns {
+			step := RemediationStep{
+				Priority:    t.getPriorityFromSeverity(vulnList),
+				Type:        "package_upgrade",
+				Description: fmt.Sprintf("Upgrade %s to fix %d vulnerabilities", pkg, len(vulnList)),
+				Command:     t.generateUpgradeCommand(pkg, vulnList),
+				Impact:      fmt.Sprintf("Fixes %d vulnerabilities in %s", len(vulnList), pkg),
+			}
+			plan.Steps = append(plan.Steps, step)
+			
+			// Track package update
+			plan.PackageUpdates[pkg] = PackageUpdate{
+				CurrentVersion: t.getCurrentVersion(vulnList),
+				TargetVersion:  t.getTargetVersion(vulnList),
+				VulnCount:      len(vulnList),
+			}
+			
+			// Count critical actions
+			if step.Priority == "critical" || step.Priority == "high" {
+				plan.Summary.CriticalActions++
+			}
+		}
+	}
+	
+	// Set overall priority based on vulnerabilities
+	plan.Priority = t.calculateOverallPriority(summary)
+	plan.Summary.EstimatedEffort = t.estimateEffort(plan.Steps)
+	
+	return plan
+}
+
+// Helper methods for remediation plan generation
+func (t *AtomicScanImageSecurityTool) groupVulnerabilitiesByPackage(vulns []coresecurity.Vulnerability) map[string][]coresecurity.Vulnerability {
+	packageVulns := make(map[string][]coresecurity.Vulnerability)
+	for _, vuln := range vulns {
+		pkg := vuln.PkgName
+		if pkg == "" {
+			pkg = "unknown"
+		}
+		packageVulns[pkg] = append(packageVulns[pkg], vuln)
+	}
+	return packageVulns
+}
+
+func (t *AtomicScanImageSecurityTool) hasFixableVulnerabilities(vulns []coresecurity.Vulnerability) bool {
+	for _, vuln := range vulns {
+		if t.isVulnerabilityFixable(vuln) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *AtomicScanImageSecurityTool) getPriorityFromSeverity(vulns []coresecurity.Vulnerability) string {
+	for _, vuln := range vulns {
+		switch strings.ToUpper(vuln.Severity) {
+		case "CRITICAL":
+			return "critical"
+		case "HIGH":
+			return "high"
+		}
+	}
+	for _, vuln := range vulns {
+		if strings.ToUpper(vuln.Severity) == "MEDIUM" {
+			return "medium"
+		}
+	}
+	return "low"
+}
+
+func (t *AtomicScanImageSecurityTool) generateUpgradeCommand(pkg string, vulns []coresecurity.Vulnerability) string {
+	targetVersion := t.getTargetVersion(vulns)
+	if targetVersion != "" {
+		return fmt.Sprintf("# Upgrade %s to version %s\n# This will fix %d vulnerabilities", pkg, targetVersion, len(vulns))
+	}
+	return fmt.Sprintf("# Update %s package\n# Check for latest secure version", pkg)
+}
+
+func (t *AtomicScanImageSecurityTool) getCurrentVersion(vulns []coresecurity.Vulnerability) string {
+	for _, vuln := range vulns {
+		if vuln.InstalledVersion != "" {
+			return vuln.InstalledVersion
+		}
+	}
+	return "unknown"
+}
+
+func (t *AtomicScanImageSecurityTool) getTargetVersion(vulns []coresecurity.Vulnerability) string {
+	for _, vuln := range vulns {
+		if vuln.FixedVersion != "" && vuln.FixedVersion != "unknown" {
+			return vuln.FixedVersion
+		}
+	}
+	return ""
+}
+
+func (t *AtomicScanImageSecurityTool) calculateOverallPriority(summary *VulnerabilityAnalysisSummary) string {
+	if summary.SeverityBreakdown["CRITICAL"] > 0 {
+		return "critical"
+	}
+	if summary.SeverityBreakdown["HIGH"] > 0 {
+		return "high"
+	}
+	if summary.SeverityBreakdown["MEDIUM"] > 0 {
+		return "medium"
+	}
+	return "low"
+}
+
+func (t *AtomicScanImageSecurityTool) estimateEffort(steps []RemediationStep) string {
+	if len(steps) > 10 {
+		return "high"
+	}
+	if len(steps) > 5 {
+		return "medium"
+	}
+	return "low"
+}
+
+// Enhanced security score calculation
+func (t *AtomicScanImageSecurityTool) calculateSecurityScore(summary *VulnerabilityAnalysisSummary) int {
+	if summary.TotalVulnerabilities == 0 {
+		return 100 // Perfect score for no vulnerabilities
+	}
+	
+	// Start with base score
+	score := 100
+	
+	// Deduct points based on severity
+	score -= summary.SeverityBreakdown["CRITICAL"] * 20
+	score -= summary.SeverityBreakdown["HIGH"] * 10
+	score -= summary.SeverityBreakdown["MEDIUM"] * 5
+	score -= summary.SeverityBreakdown["LOW"] * 2
+	
+	// Bonus points for fixable vulnerabilities (shows maintenance potential)
+	if summary.TotalVulnerabilities > 0 {
+		fixableRatio := float64(summary.FixableVulnerabilities) / float64(summary.TotalVulnerabilities)
+		score += int(fixableRatio * 10) // Up to 10 bonus points
+	}
+	
+	// Ensure score stays within bounds
+	if score < 0 {
+		score = 0
+	}
+	if score > 100 {
+		score = 100
+	}
+	
+	return score
+}
+
+// min helper function
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

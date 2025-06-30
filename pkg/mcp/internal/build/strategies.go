@@ -19,9 +19,9 @@ func NewStrategyManager(logger zerolog.Logger) *StrategyManager {
 		logger:     logger.With().Str("component", "strategy_manager").Logger(),
 	}
 	// Register default strategies
-	// TODO: Fix method calls - strategy constructors not found
-	// sm.RegisterStrategy(NewDockerBuildStrategy(logger))
-	// sm.RegisterStrategy(NewBuildKitStrategy(logger))
+	sm.RegisterStrategy(NewDockerBuildStrategy(logger))
+	sm.RegisterStrategy(NewBuildKitStrategy(logger))
+	sm.RegisterStrategy(NewMultiStageBuildStrategy(logger))
 	return sm
 }
 

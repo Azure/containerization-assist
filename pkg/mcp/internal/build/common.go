@@ -17,6 +17,8 @@ type BuildStrategy interface {
 	SupportsFeature(feature string) bool
 	// Validate checks if the strategy can be used with the given context
 	Validate(ctx BuildContext) error
+	// ScoreCompatibility scores how well this strategy fits the given project info
+	ScoreCompatibility(projectInfo interface{}) int
 }
 
 // BuildContext contains all information needed for a build

@@ -122,13 +122,32 @@ type ComplianceItem struct {
 
 // SecurityRemediationPlan provides structured remediation guidance
 type SecurityRemediationPlan struct {
-	Priority        string              `json:"priority"`
-	EstimatedTime   string              `json:"estimated_time"`
-	Actions         []RemediationAction `json:"actions"`
-	BaseImageGuide  *BaseImageGuidance  `json:"base_image_guidance,omitempty"`
-	PackageUpdates  []PackageUpdate     `json:"package_updates"`
-	ConfigFixes     []ConfigFix         `json:"config_fixes"`
-	AdditionalNotes string              `json:"additional_notes"`
+	Summary         RemediationSummary             `json:"summary"`
+	Priority        string                         `json:"priority"`
+	EstimatedTime   string                         `json:"estimated_time"`
+	Steps           []RemediationStep              `json:"steps"`
+	Actions         []RemediationAction            `json:"actions"`
+	BaseImageGuide  *BaseImageGuidance             `json:"base_image_guidance,omitempty"`
+	PackageUpdates  map[string]PackageUpdate       `json:"package_updates"`
+	ConfigFixes     []ConfigFix                    `json:"config_fixes"`
+	AdditionalNotes string                         `json:"additional_notes"`
+}
+
+// RemediationSummary provides high-level remediation metrics
+type RemediationSummary struct {
+	TotalVulnerabilities   int    `json:"total_vulnerabilities"`
+	FixableVulnerabilities int    `json:"fixable_vulnerabilities"`
+	CriticalActions        int    `json:"critical_actions"`
+	EstimatedEffort        string `json:"estimated_effort"` // low, medium, high
+}
+
+// RemediationStep represents a specific step in the remediation process
+type RemediationStep struct {
+	Priority    string `json:"priority"`    // critical, high, medium, low
+	Type        string `json:"type"`        // package_upgrade, config_change, etc.
+	Description string `json:"description"`
+	Command     string `json:"command,omitempty"`
+	Impact      string `json:"impact"`
 }
 
 // RemediationAction represents a specific remediation step
@@ -153,6 +172,7 @@ type PackageUpdate struct {
 	Package         string `json:"package"`
 	CurrentVersion  string `json:"current_version"`
 	TargetVersion   string `json:"target_version"`
+	VulnCount       int    `json:"vuln_count"`
 	SecurityImpact  string `json:"security_impact"`
 	BreakingChanges bool   `json:"breaking_changes"`
 }
