@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// MetricsCollector provides comprehensive metrics 
+// MetricsCollector provides comprehensive metrics
 type MetricsCollector struct {
 	logger  zerolog.Logger
 	mutex   sync.RWMutex

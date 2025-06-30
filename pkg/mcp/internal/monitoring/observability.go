@@ -176,7 +176,7 @@ func (om *ObservabilityManager) initializeTracing(res *resource.Resource) error 
 	))
 
 	om.tracerProvider = tp
-	om.tracer = tp.Tracer("container-kit",)
+	om.tracer = tp.Tracer("container-kit")
 
 	return nil
 }
@@ -199,7 +199,7 @@ func (om *ObservabilityManager) initializeMetrics(res *resource.Resource) error 
 	otel.SetMeterProvider(mp)
 
 	om.meterProvider = mp
-	om.meter = mp.Meter("container-kit",)
+	om.meter = mp.Meter("container-kit")
 
 	return nil
 }
