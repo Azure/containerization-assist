@@ -121,10 +121,7 @@ func (t *AtomicTagImageTool) ExecuteWithFixes(ctx context.Context, args AtomicTa
 			Timeout:       2 * time.Minute, // Tag operations are typically fast
 			ExecuteFunc: func(ctx context.Context) error {
 				var err error
-				// TODO: Fix method call - executeWithoutProgress method not found
-				// result, err = t.executeWithoutProgress(ctx, args, nil, time.Now())
-				result = &AtomicTagImageResult{Success: false}
-				err = fmt.Errorf("tag operation not implemented")
+				result, err = t.executeWithoutProgress(ctx, args, nil, time.Now())
 				if err != nil {
 					return err
 				}
@@ -354,6 +351,151 @@ func (t *AtomicTagImageTool) ExecuteTag(ctx context.Context, args AtomicTagImage
 		Msg("Tag operation completed successfully")
 
 	return result, nil
+}
+
+// executeWithoutProgress handles tag execution without progress tracking (fallback)
+func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args AtomicTagImageArgs, result *AtomicTagImageResult, startTime time.Time) (*AtomicTagImageResult, error) {
+	// Create result if not provided
+	if result == nil {
+		result = &AtomicTagImageResult{
+			BaseToolResponse:    types.NewBaseResponse("atomic_tag_image", args.SessionID, args.DryRun),
+			BaseAIContextResult: mcptypes.NewBaseAIContextResult("tag", false, 0),
+			SourceImage:         args.SourceImage,
+			TargetImage:         args.TargetImage,
+			TagContext:          &TagContext{},
+		}
+	}
+
+	// Get session
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
+	if err != nil {
+		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
+		result.Success = false
+		result.TotalDuration = time.Since(startTime)
+		return result, fmt.Errorf("session not found: %s", args.SessionID)
+	}
+
+	session := sessionInterface.(*core.SessionState)
+	result.SessionID = session.SessionID
+	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
+
+	t.logger.Info().
+		Str("session_id", session.SessionID).
+		Str("source_image", args.SourceImage).
+		Str("target_image", args.TargetImage).
+		Msg("Starting atomic Docker tag")
+
+	// Handle dry-run
+	if args.DryRun {
+		result.Success = true
+		result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", true, result.TotalDuration)
+		result.TagContext.TagStatus = "dry-run"
+		result.TagContext.SourceRegistry = t.extractRegistryURL(args.SourceImage)
+		result.TagContext.TargetRegistry = t.extractRegistryURL(args.TargetImage)
+		result.TagContext.SameRegistry = result.TagContext.SourceRegistry == result.TagContext.TargetRegistry
+		result.TagContext.NextStepSuggestions = []string{
+			"This is a dry-run - no actual tag was performed",
+			"Remove dry_run flag to perform actual tag",
+		}
+		result.TotalDuration = time.Since(startTime)
+		return result, nil
+	}
+
+	// Validate prerequisites
+	if err := t.validateTagPrerequisites(result, args); err != nil {
+		t.logger.Error().Err(err).
+			Str("session_id", session.SessionID).
+			Str("source_image", args.SourceImage).
+			Str("target_image", args.TargetImage).
+			Msg("Tag prerequisites validation failed")
+		result.Success = false
+		result.TotalDuration = time.Since(startTime)
+		return result, err
+	}
+
+	// Perform the tag without progress reporting
+	err = t.performTag(ctx, session, args, result, nil)
+	result.TotalDuration = time.Since(startTime)
+
+	// Update AI context with final result
+	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("tag", result.Success, result.TotalDuration)
+
+	if err != nil {
+		result.Success = false
+		return result, nil
+	}
+
+	return result, nil
+}
+
+// performTag contains the actual tag logic that can be used with or without progress reporting
+func (t *AtomicTagImageTool) performTag(ctx context.Context, session *core.SessionState, args AtomicTagImageArgs, result *AtomicTagImageResult, reporter interface{}) error {
+	// Extract registry information
+	result.TagContext.SourceRegistry = t.extractRegistryURL(args.SourceImage)
+	result.TagContext.TargetRegistry = t.extractRegistryURL(args.TargetImage)
+	result.TagContext.SameRegistry = result.TagContext.SourceRegistry == result.TagContext.TargetRegistry
+
+	// Tag Docker image using pipeline adapter
+	tagStartTime := time.Now()
+	
+	// Create tag arguments
+	tagArgs := map[string]interface{}{
+		"sourceImage": args.SourceImage,
+		"targetImage": args.TargetImage,
+		"force":       args.Force,
+	}
+
+	// Use the pipeline adapter to tag the image
+	_, err := t.pipelineAdapter.TagImage(ctx, session.SessionID, tagArgs)
+	result.TagDuration = time.Since(tagStartTime)
+
+	if err != nil {
+		result.Success = false
+		result.TagContext.TagStatus = "failed"
+		result.TagContext.ErrorType = "tag_error"
+		result.TagContext.IsRetryable = true
+		result.TagContext.NextStepSuggestions = []string{
+			"Check that source image exists locally",
+			"Verify target image name format",
+			"Check if target tag already exists (use force flag if needed)",
+		}
+		t.logger.Error().Err(err).
+			Str("source_image", args.SourceImage).
+			Str("target_image", args.TargetImage).
+			Msg("Failed to tag image")
+		return fmt.Errorf("failed to tag image: %w", err)
+	}
+
+	// Success - create tag result
+	result.Success = true
+	result.TagResult = &docker.TagResult{
+		Success:     true,
+		SourceImage: args.SourceImage,
+		TargetImage: args.TargetImage,
+	}
+
+	result.TagContext.TagStatus = "successful"
+	result.TagContext.SourceImageExists = true
+	result.TagContext.TargetImageExists = true
+	result.TagContext.TagOverwrite = args.Force
+	result.TagContext.NextStepSuggestions = []string{
+		fmt.Sprintf("Image %s successfully tagged as %s", args.SourceImage, args.TargetImage),
+		"Tagged image is now available for use or push to registry",
+	}
+
+	// Add registry-specific suggestions
+	if !result.TagContext.SameRegistry {
+		result.TagContext.NextStepSuggestions = append(result.TagContext.NextStepSuggestions,
+			fmt.Sprintf("Consider pushing %s to %s registry", args.TargetImage, result.TagContext.TargetRegistry))
+	}
+
+	t.logger.Info().
+		Str("source_image", args.SourceImage).
+		Str("target_image", args.TargetImage).
+		Dur("tag_duration", result.TagDuration).
+		Msg("Tag operation completed successfully")
+
+	return nil
 }
 
 // AI Context is provided by embedded internal.BaseAIContextResult
