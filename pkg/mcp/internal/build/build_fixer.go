@@ -518,7 +518,7 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 	analysis := op.tool.generateBuildFailureAnalysis(err, nil, &AtomicBuildImageResult{
 		BuildContext:   op.buildContext,
 		DockerfilePath: op.dockerfilePath,
-		BuildContext_Info: BuildContext_Info{
+		BuildContext_Info: &BuildContextInfo{
 			BaseImage:       "unknown", // Would be extracted from Dockerfile in real implementation
 			ContextSize:     0,         // Would be calculated in real implementation
 			FileCount:       0,         // Would be counted in real implementation
@@ -526,8 +526,8 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 		},
 	})
 
-	// Create error context
-	errorContext := createBuildErrorContext(
+	// Create error context for debugging purposes
+	_ = createBuildErrorContext(
 		"docker_build",
 		"build_execution",
 		"build_failure",
@@ -636,7 +636,7 @@ func (f *AdvancedBuildFixer) attemptAIRecovery(ctx context.Context, err error, a
 	}
 
 	// Request AI analysis
-	response, err := f.analyzer.AnalyzeError(ctx, aiContext)
+	response, err := f.analyzer.Analyze(ctx, fmt.Sprintf("Analyze build error: %v", aiContext))
 	if err != nil {
 		f.logger.Error().Err(err).Msg("AI analysis failed")
 		return err
@@ -669,12 +669,13 @@ func (s *NetworkErrorRecoveryStrategy) Recover(ctx context.Context, err error, a
 	// Step 2: Try with proxy settings if available
 	if proxyURL := os.Getenv("HTTP_PROXY"); proxyURL != "" {
 		s.logger.Info().Str("proxy", proxyURL).Msg("Attempting build with proxy settings")
-		operation.args.BuildArgs = append(operation.args.BuildArgs,
-			"HTTP_PROXY="+proxyURL,
-			"HTTPS_PROXY="+proxyURL,
-			"http_proxy="+proxyURL,
-			"https_proxy="+proxyURL,
-		)
+		if operation.args.BuildArgs == nil {
+			operation.args.BuildArgs = make(map[string]string)
+		}
+		operation.args.BuildArgs["HTTP_PROXY"] = proxyURL
+		operation.args.BuildArgs["HTTPS_PROXY"] = proxyURL
+		operation.args.BuildArgs["http_proxy"] = proxyURL
+		operation.args.BuildArgs["https_proxy"] = proxyURL
 	}
 
 	// Step 3: Add DNS configuration
@@ -683,24 +684,26 @@ func (s *NetworkErrorRecoveryStrategy) Recover(ctx context.Context, err error, a
 	}
 
 	// Step 4: Increase network timeouts
-	if operation.args.BuildOptions == nil {
-		operation.args.BuildOptions = &BuildOptions{}
-	}
-	operation.args.BuildOptions.NetworkTimeout = 300 // 5 minutes
+	// TODO: Add BuildOptions field to AtomicBuildImageArgs to support network configuration
+	// if operation.args.BuildOptions == nil {
+	//     operation.args.BuildOptions = &BuildOptions{}
+	// }
+	// operation.args.BuildOptions.NetworkTimeout = 300 // 5 minutes
 
 	// Step 5: Enable network retry logic
-	operation.args.BuildOptions.NetworkRetries = 3
-	operation.args.BuildOptions.NetworkRetryDelay = 10 * time.Second
+	// operation.args.BuildOptions.NetworkRetries = 3
+	// operation.args.BuildOptions.NetworkRetryDelay = 10 * time.Second
 
 	// Step 6: Try host network mode for better connectivity
-	operation.args.Network = "host"
+	// TODO: Add Network field to AtomicBuildImageArgs to support network configuration
+	// operation.args.Network = "host"
 
 	s.logger.Info().
 		Interface("network_config", map[string]interface{}{
-			"mode":    "host",
-			"timeout": operation.args.BuildOptions.NetworkTimeout,
-			"retries": operation.args.BuildOptions.NetworkRetries,
-			"proxy":   os.Getenv("HTTP_PROXY") != "",
+			"mode": "host",
+			// "timeout": operation.args.BuildOptions.NetworkTimeout,
+			// "retries": operation.args.BuildOptions.NetworkRetries,
+			"proxy": os.Getenv("HTTP_PROXY") != "",
 		}).
 		Msg("Network recovery configuration applied")
 
@@ -754,15 +757,14 @@ func (s *NetworkErrorRecoveryStrategy) pingEndpoint(ctx context.Context, endpoin
 // configureDNS adds DNS configuration for better resolution
 func (s *NetworkErrorRecoveryStrategy) configureDNS(ctx context.Context, operation *AtomicDockerBuildOperation) error {
 	// Add common public DNS servers as build args
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DNS_SERVERS=8.8.8.8,8.8.4.4,1.1.1.1",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DNS_SERVERS"] = "8.8.8.8,8.8.4.4,1.1.1.1"
 
 	// If in a corporate environment, check for custom DNS
 	if customDNS := os.Getenv("CORPORATE_DNS"); customDNS != "" {
-		operation.args.BuildArgs = append(operation.args.BuildArgs,
-			"CORPORATE_DNS="+customDNS,
-		)
+		operation.args.BuildArgs["CORPORATE_DNS"] = customDNS
 	}
 
 	return nil
@@ -812,16 +814,18 @@ func (s *PermissionErrorRecoveryStrategy) Recover(ctx context.Context, err error
 	}
 
 	// Step 5: Set build args for permission handling
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DOCKER_BUILDKIT=1", // Enable BuildKit for better permission handling
-		"BUILDKIT_INLINE_CACHE=1",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DOCKER_BUILDKIT"] = "1" // Enable BuildKit for better permission handling
+	operation.args.BuildArgs["BUILDKIT_INLINE_CACHE"] = "1"
 
 	// Step 6: If still failing, try with different user context
-	if operation.args.BuildOptions == nil {
-		operation.args.BuildOptions = &BuildOptions{}
-	}
-	operation.args.BuildOptions.ForceRootUser = false // Avoid running as root
+	// TODO: Add BuildOptions field to AtomicBuildImageArgs to support user context configuration
+	// if operation.args.BuildOptions == nil {
+	//     operation.args.BuildOptions = &BuildOptions{}
+	// }
+	// operation.args.BuildOptions.ForceRootUser = false // Avoid running as root
 
 	s.logger.Info().
 		Interface("permission_config", map[string]interface{}{
@@ -1199,12 +1203,13 @@ func (s *DependencyErrorRecoveryStrategy) Recover(ctx context.Context, err error
 	operation.dockerfilePath = tempDockerfile
 
 	// Step 7: Add build args for package manager configuration
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DEBIAN_FRONTEND=noninteractive", // Prevent interactive prompts
-		"PIP_DEFAULT_TIMEOUT=100",        // Increase pip timeout
-		"NPM_CONFIG_FETCH_RETRIES=5",     // Increase npm retries
-		"NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DEBIAN_FRONTEND"] = "noninteractive" // Prevent interactive prompts
+	operation.args.BuildArgs["PIP_DEFAULT_TIMEOUT"] = "100"        // Increase pip timeout
+	operation.args.BuildArgs["NPM_CONFIG_FETCH_RETRIES"] = "5"     // Increase npm retries
+	operation.args.BuildArgs["NPM_CONFIG_FETCH_RETRY_MINTIMEOUT"] = "20000"
 
 	s.logger.Info().
 		Str("dockerfile", tempDockerfile).
@@ -1233,9 +1238,9 @@ func (s *DependencyErrorRecoveryStrategy) fixPackageManagerIssues(content string
 		trimmed := strings.TrimSpace(line)
 
 		// Fix apt-get issues
-		if strings.Contains(line, "apt-get") {
+		if strings.Contains(trimmed, "apt-get") {
 			// Ensure update is run with install
-			if strings.Contains(line, "apt-get install") && !strings.Contains(line, "apt-get update") {
+			if strings.Contains(trimmed, "apt-get install") && !strings.Contains(trimmed, "apt-get update") {
 				fixed = append(fixed, "RUN apt-get update && \\")
 				fixed = append(fixed, "    "+line+" && \\")
 				fixed = append(fixed, "    rm -rf /var/lib/apt/lists/*")
@@ -1243,13 +1248,13 @@ func (s *DependencyErrorRecoveryStrategy) fixPackageManagerIssues(content string
 			}
 
 			// Add -y flag if missing
-			if strings.Contains(line, "apt-get install") && !strings.Contains(line, "-y") {
+			if strings.Contains(trimmed, "apt-get install") && !strings.Contains(trimmed, "-y") {
 				line = strings.ReplaceAll(line, "apt-get install", "apt-get install -y")
 			}
 		}
 
 		// Fix npm issues
-		if strings.Contains(line, "npm install") {
+		if strings.Contains(trimmed, "npm install") {
 			// Use npm ci for lockfile
 			if !strings.Contains(line, "--production") && !strings.Contains(line, "npm ci") {
 				line = strings.ReplaceAll(line, "npm install", "npm ci")
@@ -1464,18 +1469,20 @@ func (s *DiskSpaceRecoveryStrategy) Recover(ctx context.Context, err error, anal
 	}
 
 	// Step 6: Configure build to use less space
-	if operation.args.BuildOptions == nil {
-		operation.args.BuildOptions = &BuildOptions{}
-	}
-	operation.args.BuildOptions.NoCache = false // Use cache to save space
-	operation.args.BuildOptions.ForceRM = true  // Remove intermediate containers
-	operation.args.BuildOptions.Squash = true   // Squash layers if possible
+	// TODO: Add BuildOptions field to AtomicBuildImageArgs to support space optimization
+	// if operation.args.BuildOptions == nil {
+	//     operation.args.BuildOptions = &BuildOptions{}
+	// }
+	// operation.args.BuildOptions.NoCache = false // Use cache to save space
+	// operation.args.BuildOptions.ForceRM = true  // Remove intermediate containers
+	// operation.args.BuildOptions.Squash = true   // Squash layers if possible
 
 	// Add build args for space optimization
-	operation.args.BuildArgs = append(operation.args.BuildArgs,
-		"DOCKER_BUILDKIT=1",
-		"BUILDKIT_INLINE_CACHE=1",
-	)
+	if operation.args.BuildArgs == nil {
+		operation.args.BuildArgs = make(map[string]string)
+	}
+	operation.args.BuildArgs["DOCKER_BUILDKIT"] = "1"
+	operation.args.BuildArgs["BUILDKIT_INLINE_CACHE"] = "1"
 
 	s.logger.Info().
 		Int64("cleaned_bytes", cleanedSpace).

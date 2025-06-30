@@ -306,6 +306,30 @@ func (m *MockDockerClientWithTagCapture) Push(_ context.Context, _ string) (stri
 	return "", nil
 }
 
+func (m *MockDockerClientWithTagCapture) Pull(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClientWithTagCapture) Tag(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClientWithTagCapture) Login(_ context.Context, _, _, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClientWithTagCapture) LoginWithToken(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClientWithTagCapture) Logout(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClientWithTagCapture) IsLoggedIn(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
 func TestBuildDockerfileContent_TempDirCleanup(t *testing.T) {
 	// Test that temporary directories are properly cleaned up
 	mockDocker := &MockDockerClient{

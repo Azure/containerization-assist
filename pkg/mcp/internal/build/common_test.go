@@ -20,9 +20,9 @@ func TestBuildErrorError(t *testing.T) {
 	}
 }
 
-// Test NewBuildError constructor
-func TestNewBuildError(t *testing.T) {
-	err := NewBuildError("BUILD_TIMEOUT", "Build operation timed out", "compilation", "timeout_error")
+// Test NewCommonBuildError constructor
+func TestNewCommonBuildError(t *testing.T) {
+	err := NewCommonBuildError("BUILD_TIMEOUT", "Build operation timed out", "compilation", "timeout_error")
 	if err == nil {
 		t.Error("NewBuildError should not return nil")
 	}
@@ -42,7 +42,7 @@ func TestNewBuildError(t *testing.T) {
 
 // Test BuildError struct fields
 func TestBuildErrorStruct(t *testing.T) {
-	err := BuildError{
+	err := CommonBuildError{
 		Code:    "VALIDATION_ERROR",
 		Message: "Invalid dockerfile syntax",
 		Stage:   "validation",

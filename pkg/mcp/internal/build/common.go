@@ -185,8 +185,8 @@ type ExtendedBuildReporter interface {
 	ReportInfo(message string)
 }
 
-// BuildOptions contains additional options for builds
-type BuildOptions struct {
+// CommonBuildOptions contains additional options for builds
+type CommonBuildOptions struct {
 	Timeout          time.Duration
 	CPULimit         string
 	MemoryLimit      string
@@ -196,8 +196,8 @@ type BuildOptions struct {
 	ExperimentalOpts map[string]string
 }
 
-// BuildError represents a build-specific error
-type BuildError struct {
+// CommonBuildError represents a build-specific error
+type CommonBuildError struct {
 	Code    string
 	Message string
 	Stage   string
@@ -205,13 +205,13 @@ type BuildError struct {
 	Type    string
 }
 
-func (e *BuildError) Error() string {
+func (e *CommonBuildError) Error() string {
 	return e.Message
 }
 
-// NewBuildError creates a new build error
-func NewBuildError(code, message, stage string, errType string) *BuildError {
-	return &BuildError{
+// NewCommonBuildError creates a new build error
+func NewCommonBuildError(code, message, stage string, errType string) *CommonBuildError {
+	return &CommonBuildError{
 		Code:    code,
 		Message: message,
 		Stage:   stage,

@@ -36,18 +36,18 @@ type CachedOperation struct {
 
 // PerformanceOperationMetrics tracks performance metrics for operations
 type PerformanceOperationMetrics struct {
-	OperationType     string        `json:"operation_type"`
-	TotalExecutions   int64         `json:"total_executions"`
-	SuccessfulOps     int64         `json:"successful_ops"`
-	FailedOps         int64         `json:"failed_ops"`
-	AverageLatency    time.Duration `json:"average_latency"`
-	TotalLatency      time.Duration `json:"total_latency"`
-	MinLatency        time.Duration `json:"min_latency"`
-	MaxLatency        time.Duration `json:"max_latency"`
-	LastExecution     time.Time     `json:"last_execution"`
-	CacheHitRate      float64       `json:"cache_hit_rate"`
-	CacheHits         int64         `json:"cache_hits"`
-	CacheMisses       int64         `json:"cache_misses"`
+	OperationType   string        `json:"operation_type"`
+	TotalExecutions int64         `json:"total_executions"`
+	SuccessfulOps   int64         `json:"successful_ops"`
+	FailedOps       int64         `json:"failed_ops"`
+	AverageLatency  time.Duration `json:"average_latency"`
+	TotalLatency    time.Duration `json:"total_latency"`
+	MinLatency      time.Duration `json:"min_latency"`
+	MaxLatency      time.Duration `json:"max_latency"`
+	LastExecution   time.Time     `json:"last_execution"`
+	CacheHitRate    float64       `json:"cache_hit_rate"`
+	CacheHits       int64         `json:"cache_hits"`
+	CacheMisses     int64         `json:"cache_misses"`
 }
 
 // NewPerformanceOptimizer creates a new performance optimizer

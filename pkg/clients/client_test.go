@@ -63,14 +63,26 @@ func (m *MockLLMClient) GetTokenUsage() ai.TokenUsage {
 
 // MockDockerClient for testing
 type MockDockerClient struct {
-	versionResult string
-	versionErr    error
-	buildResult   string
-	buildErr      error
-	infoResult    string
-	infoErr       error
-	pushResult    string
-	pushErr       error
+	versionResult    string
+	versionErr       error
+	buildResult      string
+	buildErr         error
+	infoResult       string
+	infoErr          error
+	pushResult       string
+	pushErr          error
+	pullResult       string
+	pullErr          error
+	tagResult        string
+	tagErr           error
+	loginResult      string
+	loginErr         error
+	loginTokenResult string
+	loginTokenErr    error
+	logoutResult     string
+	logoutErr        error
+	isLoggedInResult bool
+	isLoggedInErr    error
 }
 
 func (m *MockDockerClient) Version(_ context.Context) (string, error) {
@@ -87,6 +99,30 @@ func (m *MockDockerClient) Info(_ context.Context) (string, error) {
 
 func (m *MockDockerClient) Push(_ context.Context, _ string) (string, error) {
 	return m.pushResult, m.pushErr
+}
+
+func (m *MockDockerClient) Pull(_ context.Context, _ string) (string, error) {
+	return m.pullResult, m.pullErr
+}
+
+func (m *MockDockerClient) Tag(_ context.Context, _, _ string) (string, error) {
+	return m.tagResult, m.tagErr
+}
+
+func (m *MockDockerClient) Login(_ context.Context, _, _, _ string) (string, error) {
+	return m.loginResult, m.loginErr
+}
+
+func (m *MockDockerClient) LoginWithToken(_ context.Context, _, _ string) (string, error) {
+	return m.loginTokenResult, m.loginTokenErr
+}
+
+func (m *MockDockerClient) Logout(_ context.Context, _ string) (string, error) {
+	return m.logoutResult, m.logoutErr
+}
+
+func (m *MockDockerClient) IsLoggedIn(_ context.Context, _ string) (bool, error) {
+	return m.isLoggedInResult, m.isLoggedInErr
 }
 
 // MockKindRunner for testing

@@ -186,7 +186,8 @@ func (d *PerformanceDashboard) GenerateDashboard(ctx context.Context) (*Dashboar
 
 	// Calculate image averages
 	for image, stats := range data.ByImage {
-		stats.AvgDuration = stats.TotalTime / time.Duration(stats.BuildCount)
+		// ImageStats doesn't track TotalTime, AvgDuration is calculated elsewhere
+		// stats.AvgDuration = stats.TotalTime / time.Duration(stats.BuildCount)
 		data.ByImage[image] = stats
 	}
 

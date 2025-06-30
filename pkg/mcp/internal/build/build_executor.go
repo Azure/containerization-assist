@@ -212,7 +212,7 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 		buildMonitor = e.perfMonitor.StartBuildMonitoring(ctx, buildOp)
 		defer func() {
 			if buildMonitor != nil {
-				imageInfo := &ImageInfo{
+				imageInfo := &PerformanceImageInfo{
 					Name:       args.ImageName,
 					Tag:        result.ImageTag,
 					Size:       0, // Would be populated from build result

@@ -269,7 +269,7 @@ func (er *ErrorRouter) applyRoutingRule(ctx context.Context, errorCtx *ErrorCont
 	// Check if custom handler exists for this rule
 	handlerKey := fmt.Sprintf("%s_%s", rule.FromTool, rule.ToTool)
 	if handler, exists := er.errorHandlers[handlerKey]; exists {
-		customDecision, err := handler(ctx, fmt.Errorf(errorCtx.ErrorMessage), errorCtx)
+		customDecision, err := handler(ctx, fmt.Errorf("%s", errorCtx.ErrorMessage), errorCtx)
 		if err == nil && customDecision != nil {
 			// Merge custom decision with base decision
 			if customDecision.Action != "" {
