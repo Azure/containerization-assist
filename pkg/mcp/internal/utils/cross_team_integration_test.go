@@ -364,6 +364,6 @@ func (suite *CrossTeamIntegrationSuite) validateQualityMonitoringContract(t *tes
 
 func (suite *CrossTeamIntegrationSuite) cleanup() {
 	if suite.workspace != nil {
-		suite.workspace.CleanupWorkspace(suite.ctx, suite.testSessionID)
+		_ = suite.workspace.CleanupWorkspace(suite.ctx, suite.testSessionID)
 	}
 }

@@ -74,20 +74,16 @@ type SecurityAuditEntry struct {
 	Action      string    `json:"action"`
 }
 
-// AdvancedSandboxOptions extends basic sandbox options
-type AdvancedSandboxOptions struct {
-	SandboxOptions
+// ExecutorOptions extends basic sandbox options for the executor
+type ExecutorOptions struct {
 	EnableMetrics    bool              `json:"enable_metrics"`
 	EnableAudit      bool              `json:"enable_audit"`
 	CustomSeccomp    string            `json:"custom_seccomp"`
 	AppArmorProfile  string            `json:"apparmor_profile"`
 	SELinuxContext   string            `json:"selinux_context"`
-	Capabilities     []string          `json:"capabilities"`
 	DNSServers       []string          `json:"dns_servers"`
 	ExtraHosts       map[string]string `json:"extra_hosts"`
 	WorkingDirectory string            `json:"working_directory"`
-	User             string            `json:"user"`
-	Group            string            `json:"group"`
 }
 
 // NewSandboxExecutor creates a new sandbox executor
@@ -142,7 +138,7 @@ func NewResourceMonitor() *ResourceMonitor {
 }
 
 // ExecuteAdvanced performs sandboxed execution with advanced features
-func (se *SandboxExecutor) ExecuteAdvanced(ctx context.Context, sessionID string, cmd []string, options AdvancedSandboxOptions) (*ExecResult, error) {
+func (se *SandboxExecutor) ExecuteAdvanced(ctx context.Context, sessionID string, cmd []string, options SandboxOptions) (*ExecResult, error) {
 	// Validate security policy
 	if err := se.validateAdvancedSecurity(sessionID, options); err != nil {
 		se.auditSecurityEvent(sessionID, "EXECUTION_BLOCKED", "HIGH", err.Error(), "DENY")
@@ -184,7 +180,7 @@ func (se *SandboxExecutor) ExecuteAdvanced(ctx context.Context, sessionID string
 }
 
 // executeWithMonitoring executes commands with resource monitoring
-func (se *SandboxExecutor) executeWithMonitoring(ctx context.Context, sessionID string, cmd []string, options AdvancedSandboxOptions, record *ExecutionRecord) (*ExecResult, error) {
+func (se *SandboxExecutor) executeWithMonitoring(ctx context.Context, sessionID string, cmd []string, options SandboxOptions, record *ExecutionRecord) (*ExecResult, error) {
 	// Build secure Docker command
 	dockerArgs, err := se.buildSecureDockerCommand(sessionID, cmd, options)
 	if err != nil {
@@ -220,7 +216,7 @@ func (se *SandboxExecutor) executeWithMonitoring(ctx context.Context, sessionID 
 }
 
 // buildSecureDockerCommand builds a secure Docker command with advanced options
-func (se *SandboxExecutor) buildSecureDockerCommand(sessionID string, cmd []string, options AdvancedSandboxOptions) ([]string, error) {
+func (se *SandboxExecutor) buildSecureDockerCommand(sessionID string, cmd []string, options SandboxOptions) ([]string, error) {
 	args := []string{"run", "--rm"}
 
 	// Basic security settings
@@ -317,7 +313,7 @@ func (se *SandboxExecutor) buildSecureDockerCommand(sessionID string, cmd []stri
 }
 
 // validateAdvancedSecurity performs advanced security validation
-func (se *SandboxExecutor) validateAdvancedSecurity(sessionID string, options AdvancedSandboxOptions) error {
+func (se *SandboxExecutor) validateAdvancedSecurity(sessionID string, options SandboxOptions) error {
 	// Get applicable security policy
 	policy := se.securityPolicy.getPolicy(sessionID)
 
@@ -353,7 +349,7 @@ func (se *SandboxExecutor) validateAdvancedSecurity(sessionID string, options Ad
 }
 
 // checkResourceAvailability checks if resources are available
-func (se *SandboxExecutor) checkResourceAvailability(sessionID string, options AdvancedSandboxOptions) error {
+func (se *SandboxExecutor) checkResourceAvailability(sessionID string, options SandboxOptions) error {
 	se.resourceMonitor.mutex.RLock()
 	defer se.resourceMonitor.mutex.RUnlock()
 
@@ -508,10 +504,7 @@ func (smc *SandboxMetricsCollector) updateMetrics(sessionID string, result *Exec
 	}
 
 	// Update metrics based on result
-	if result.ExitCode == 0 {
-		// Success metrics would be updated here
-		// For now, just track that we have metrics for this session
-	}
+	// TODO: Track success/failure metrics based on result.ExitCode
 }
 
 func (smc *SandboxMetricsCollector) addRecord(record ExecutionRecord) {
