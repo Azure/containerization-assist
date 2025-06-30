@@ -40,6 +40,7 @@ type DefaultContextSharer struct {
 	defaultTTL   time.Duration
 	ctx          context.Context
 	cancel       context.CancelFunc
+	errorRouter  *ErrorRouter // Advanced error routing
 }
 
 // NewDefaultContextSharer creates a new context sharer
@@ -122,6 +123,37 @@ func (c *DefaultContextSharer) ClearContext(ctx context.Context, sessionID strin
 func (c *DefaultContextSharer) Close() error {
 	c.cancel()
 	return nil
+}
+
+// SetErrorRouter sets the error router for advanced routing
+func (c *DefaultContextSharer) SetErrorRouter(router *ErrorRouter) {
+	c.errorRouter = router
+}
+
+// RouteError routes an error using the error router
+func (c *DefaultContextSharer) RouteError(ctx context.Context, sessionID, sourceTool, errorType, errorCode, errorMessage string) (*RoutingDecision, error) {
+	if c.errorRouter == nil {
+		return nil, fmt.Errorf("error router not configured")
+	}
+
+	errorCtx := &ErrorContext{
+		SessionID:      sessionID,
+		SourceTool:     sourceTool,
+		ErrorType:      errorType,
+		ErrorCode:      errorCode,
+		ErrorMessage:   errorMessage,
+		Timestamp:      time.Now(),
+		ExecutionTrace: []string{sourceTool},
+	}
+
+	// Get tool context from shared context
+	if toolData, err := c.GetSharedContext(ctx, sessionID, fmt.Sprintf("tool_%s", sourceTool)); err == nil {
+		if toolContext, ok := toolData.(map[string]interface{}); ok {
+			errorCtx.ToolContext = toolContext
+		}
+	}
+
+	return c.errorRouter.RouteError(ctx, errorCtx)
 }
 
 // getToolFromContext extracts tool name from context
