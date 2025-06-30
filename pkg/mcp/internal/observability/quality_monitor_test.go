@@ -31,12 +31,12 @@ func TestQualityMonitor(t *testing.T) {
 			BuildSuccessRate: 98.0,
 			Components: map[string]ComponentHealth{
 				"docker_operations": {
-					Name:            "docker_operations",
-					Status:          "GREEN",
-					TestsPassing:    true,
-					PerformanceMet:  true,
-					SecurityClean:   true,
-					LastTested:      time.Now(),
+					Name:           "docker_operations",
+					Status:         "GREEN",
+					TestsPassing:   true,
+					PerformanceMet: true,
+					SecurityClean:  true,
+					LastTested:     time.Now(),
 				},
 			},
 		}
@@ -54,10 +54,10 @@ func TestQualityMonitor(t *testing.T) {
 		// Test team that fails quality thresholds
 		failingTeam := TeamQuality{
 			TeamName:         "FailingBot",
-			TestCoverage:     75.0, // Below 90% threshold
-			LintIssues:       150,  // Above 100 threshold
+			TestCoverage:     75.0,                   // Below 90% threshold
+			LintIssues:       150,                    // Above 100 threshold
 			PerformanceP95:   500 * time.Microsecond, // Above 300μs threshold
-			BuildSuccessRate: 85.0, // Below 95% threshold
+			BuildSuccessRate: 85.0,                   // Below 95% threshold
 		}
 
 		err := monitor.UpdateTeamQuality(ctx, "FailingBot", failingTeam)
@@ -94,7 +94,7 @@ func TestQualityMonitor(t *testing.T) {
 
 		// Should pass most gates due to good team metrics
 		assert.Equal(t, "PASS", gates.TestCoverageGate)
-		assert.Equal(t, "FAIL", gates.LintGate) // Still fails due to FailingBot having 150 issues
+		assert.Equal(t, "FAIL", gates.LintGate)        // Still fails due to FailingBot having 150 issues
 		assert.Equal(t, "FAIL", gates.PerformanceGate) // Still fails due to FailingBot
 		assert.Equal(t, "PASS", gates.SecurityGate)
 	})

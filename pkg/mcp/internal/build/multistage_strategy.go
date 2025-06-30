@@ -45,9 +45,9 @@ func (s *MultiStageBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) 
 		Success:        true,
 		FullImageRef:   fmt.Sprintf("%s:%s", ctx.ImageName, ctx.ImageTag),
 		BuildLogs:      []string{"Multi-stage build strategy execution"},
-		LayerCount:     5,  // Multi-stage typically has fewer final layers
+		LayerCount:     5,                 // Multi-stage typically has fewer final layers
 		ImageSizeBytes: 100 * 1024 * 1024, // Smaller image size due to optimization
-		CacheHits:      15, // Better cache utilization with multi-stage
+		CacheHits:      15,                // Better cache utilization with multi-stage
 	}
 
 	s.logger.Info().
@@ -90,10 +90,10 @@ func (s *MultiStageBuildStrategy) Validate(ctx BuildContext) error {
 	if ctx.BuildPath == "" {
 		return fmt.Errorf("build path is required for multi-stage strategy")
 	}
-	
+
 	// Could add validation to check if Dockerfile actually uses multi-stage
 	// For now, assume it's compatible
-	
+
 	return nil
 }
 
@@ -101,11 +101,11 @@ func (s *MultiStageBuildStrategy) Validate(ctx BuildContext) error {
 func (s *MultiStageBuildStrategy) ScoreCompatibility(info interface{}) int {
 	// Multi-stage is great for complex builds that need optimization
 	score := 80
-	
+
 	// Could analyze project info for:
 	// - Presence of multi-stage Dockerfile (much higher score)
 	// - Complex dependency chains (higher score)
 	// - Size optimization requirements (higher score)
-	
+
 	return score
 }

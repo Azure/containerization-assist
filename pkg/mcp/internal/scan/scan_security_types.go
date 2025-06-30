@@ -122,15 +122,15 @@ type ComplianceItem struct {
 
 // SecurityRemediationPlan provides structured remediation guidance
 type SecurityRemediationPlan struct {
-	Summary         RemediationSummary             `json:"summary"`
-	Priority        string                         `json:"priority"`
-	EstimatedTime   string                         `json:"estimated_time"`
-	Steps           []RemediationStep              `json:"steps"`
-	Actions         []RemediationAction            `json:"actions"`
-	BaseImageGuide  *BaseImageGuidance             `json:"base_image_guidance,omitempty"`
-	PackageUpdates  map[string]PackageUpdate       `json:"package_updates"`
-	ConfigFixes     []ConfigFix                    `json:"config_fixes"`
-	AdditionalNotes string                         `json:"additional_notes"`
+	Summary         RemediationSummary       `json:"summary"`
+	Priority        string                   `json:"priority"`
+	EstimatedTime   string                   `json:"estimated_time"`
+	Steps           []RemediationStep        `json:"steps"`
+	Actions         []RemediationAction      `json:"actions"`
+	BaseImageGuide  *BaseImageGuidance       `json:"base_image_guidance,omitempty"`
+	PackageUpdates  map[string]PackageUpdate `json:"package_updates"`
+	ConfigFixes     []ConfigFix              `json:"config_fixes"`
+	AdditionalNotes string                   `json:"additional_notes"`
 }
 
 // RemediationSummary provides high-level remediation metrics
@@ -143,8 +143,8 @@ type RemediationSummary struct {
 
 // RemediationStep represents a specific step in the remediation process
 type RemediationStep struct {
-	Priority    string `json:"priority"`    // critical, high, medium, low
-	Type        string `json:"type"`        // package_upgrade, config_change, etc.
+	Priority    string `json:"priority"` // critical, high, medium, low
+	Type        string `json:"type"`     // package_upgrade, config_change, etc.
 	Description string `json:"description"`
 	Command     string `json:"command,omitempty"`
 	Impact      string `json:"impact"`

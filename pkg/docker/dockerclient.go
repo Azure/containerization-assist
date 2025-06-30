@@ -64,7 +64,7 @@ func (d *DockerCmdRunner) Login(ctx context.Context, registry, username, passwor
 		os.Setenv("DOCKER_USER", oldUser)
 		os.Setenv("DOCKER_PASSWORD", oldPass)
 	}()
-	
+
 	os.Setenv("DOCKER_USER", username)
 	os.Setenv("DOCKER_PASSWORD", password)
 

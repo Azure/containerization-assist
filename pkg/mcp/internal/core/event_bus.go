@@ -43,13 +43,13 @@ type EventHandler func(ctx context.Context, event Event) error
 
 // EventSubscription represents a subscription to events
 type EventSubscription struct {
-	ID          string       `json:"id"`
-	EventType   EventType    `json:"event_type"`
-	Handler     EventHandler `json:"-"`
-	CreatedAt   time.Time    `json:"created_at"`
-	Active      bool         `json:"active"`
-	HandledCount int64       `json:"handled_count"`
-	ErrorCount   int64       `json:"error_count"`
+	ID           string       `json:"id"`
+	EventType    EventType    `json:"event_type"`
+	Handler      EventHandler `json:"-"`
+	CreatedAt    time.Time    `json:"created_at"`
+	Active       bool         `json:"active"`
+	HandledCount int64        `json:"handled_count"`
+	ErrorCount   int64        `json:"error_count"`
 }
 
 // EventBus provides pub/sub functionality for system events
@@ -70,7 +70,7 @@ type EventBus struct {
 // NewEventBus creates a new event bus
 func NewEventBus(logger zerolog.Logger) *EventBus {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	bus := &EventBus{
 		subscriptions: make(map[EventType][]*EventSubscription),
 		eventHistory:  make([]Event, 0),
@@ -81,10 +81,10 @@ func NewEventBus(logger zerolog.Logger) *EventBus {
 		workerCtx:     ctx,
 		workerCancel:  cancel,
 	}
-	
+
 	// Start worker goroutines
 	bus.startWorkers()
-	
+
 	return bus
 }
 
@@ -99,9 +99,9 @@ func (eb *EventBus) startWorkers() {
 // worker processes events from the event channel
 func (eb *EventBus) worker(workerID int) {
 	defer eb.wg.Done()
-	
+
 	eb.logger.Debug().Int("worker_id", workerID).Msg("Event bus worker started")
-	
+
 	for {
 		select {
 		case <-eb.workerCtx.Done():
@@ -118,33 +118,33 @@ func (eb *EventBus) processEvent(workerID int, event Event) {
 	eb.mutex.RLock()
 	subscriptions := eb.subscriptions[event.Type]
 	eb.mutex.RUnlock()
-	
+
 	if len(subscriptions) == 0 {
 		return
 	}
-	
+
 	eb.logger.Debug().
 		Int("worker_id", workerID).
 		Str("event_id", event.ID).
 		Str("event_type", string(event.Type)).
 		Int("subscribers", len(subscriptions)).
 		Msg("Processing event")
-	
+
 	// Process all subscriptions for this event type
 	for _, subscription := range subscriptions {
 		if !subscription.Active {
 			continue
 		}
-		
+
 		// Create context with timeout for handler execution
 		handlerCtx, cancel := context.WithTimeout(eb.workerCtx, 30*time.Second)
-		
+
 		// Call handler
 		if err := subscription.Handler(handlerCtx, event); err != nil {
 			eb.mutex.Lock()
 			subscription.ErrorCount++
 			eb.mutex.Unlock()
-			
+
 			eb.logger.Error().
 				Err(err).
 				Str("subscription_id", subscription.ID).
@@ -156,7 +156,7 @@ func (eb *EventBus) processEvent(workerID int, event Event) {
 			subscription.HandledCount++
 			eb.mutex.Unlock()
 		}
-		
+
 		cancel()
 	}
 }
@@ -167,7 +167,7 @@ func (eb *EventBus) Publish(eventType EventType, data map[string]interface{}) {
 		eb.logger.Warn().Str("event_type", string(eventType)).Msg("Cannot publish event - event bus is closed")
 		return
 	}
-	
+
 	event := Event{
 		ID:        eb.generateEventID(),
 		Type:      eventType,
@@ -175,12 +175,12 @@ func (eb *EventBus) Publish(eventType EventType, data map[string]interface{}) {
 		Data:      data,
 		Timestamp: time.Now(),
 	}
-	
+
 	// Extract session ID if available
 	if sessionID, ok := data["session_id"].(string); ok {
 		event.SessionID = sessionID
 	}
-	
+
 	// Add to history
 	eb.mutex.Lock()
 	eb.eventHistory = append(eb.eventHistory, event)
@@ -188,12 +188,12 @@ func (eb *EventBus) Publish(eventType EventType, data map[string]interface{}) {
 		eb.eventHistory = eb.eventHistory[1:]
 	}
 	eb.mutex.Unlock()
-	
+
 	eb.logger.Debug().
 		Str("event_id", event.ID).
 		Str("event_type", string(eventType)).
 		Msg("Publishing event")
-	
+
 	// Send to worker channel (non-blocking)
 	select {
 	case eb.eventChan <- event:
@@ -213,24 +213,24 @@ func (eb *EventBus) Subscribe(eventType EventType, handler EventHandler) string 
 		eb.logger.Warn().Str("event_type", string(eventType)).Msg("Cannot subscribe - event bus is closed")
 		return ""
 	}
-	
+
 	subscription := &EventSubscription{
-		ID:          eb.generateSubscriptionID(),
-		EventType:   eventType,
-		Handler:     handler,
-		CreatedAt:   time.Now(),
-		Active:      true,
+		ID:        eb.generateSubscriptionID(),
+		EventType: eventType,
+		Handler:   handler,
+		CreatedAt: time.Now(),
+		Active:    true,
 	}
-	
+
 	eb.mutex.Lock()
 	eb.subscriptions[eventType] = append(eb.subscriptions[eventType], subscription)
 	eb.mutex.Unlock()
-	
+
 	eb.logger.Info().
 		Str("subscription_id", subscription.ID).
 		Str("event_type", string(eventType)).
 		Msg("New event subscription created")
-	
+
 	return subscription.ID
 }
 
@@ -238,14 +238,14 @@ func (eb *EventBus) Subscribe(eventType EventType, handler EventHandler) string 
 func (eb *EventBus) Unsubscribe(subscriptionID string) bool {
 	eb.mutex.Lock()
 	defer eb.mutex.Unlock()
-	
+
 	for eventType, subscriptions := range eb.subscriptions {
 		for i, subscription := range subscriptions {
 			if subscription.ID == subscriptionID {
 				subscription.Active = false
 				// Remove from slice
 				eb.subscriptions[eventType] = append(subscriptions[:i], subscriptions[i+1:]...)
-				
+
 				eb.logger.Info().
 					Str("subscription_id", subscriptionID).
 					Str("event_type", string(eventType)).
@@ -254,7 +254,7 @@ func (eb *EventBus) Unsubscribe(subscriptionID string) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -262,14 +262,14 @@ func (eb *EventBus) Unsubscribe(subscriptionID string) bool {
 func (eb *EventBus) GetEventHistory(limit int) []Event {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
-	
+
 	if limit <= 0 || limit > len(eb.eventHistory) {
 		// Return copy of all events
 		result := make([]Event, len(eb.eventHistory))
 		copy(result, eb.eventHistory)
 		return result
 	}
-	
+
 	// Return copy of last 'limit' events
 	start := len(eb.eventHistory) - limit
 	result := make([]Event, limit)
@@ -281,10 +281,10 @@ func (eb *EventBus) GetEventHistory(limit int) []Event {
 func (eb *EventBus) GetEventsByType(eventType EventType, limit int) []Event {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
-	
+
 	var results []Event
 	count := 0
-	
+
 	// Search from most recent to oldest
 	for i := len(eb.eventHistory) - 1; i >= 0 && (limit <= 0 || count < limit); i-- {
 		if eb.eventHistory[i].Type == eventType {
@@ -292,7 +292,7 @@ func (eb *EventBus) GetEventsByType(eventType EventType, limit int) []Event {
 			count++
 		}
 	}
-	
+
 	return results
 }
 
@@ -300,13 +300,13 @@ func (eb *EventBus) GetEventsByType(eventType EventType, limit int) []Event {
 func (eb *EventBus) GetSubscriptions() map[EventType][]*EventSubscription {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
-	
+
 	result := make(map[EventType][]*EventSubscription)
 	for eventType, subscriptions := range eb.subscriptions {
 		result[eventType] = make([]*EventSubscription, len(subscriptions))
 		copy(result[eventType], subscriptions)
 	}
-	
+
 	return result
 }
 
@@ -314,15 +314,15 @@ func (eb *EventBus) GetSubscriptions() map[EventType][]*EventSubscription {
 func (eb *EventBus) GetSubscriptionStats() map[EventType]SubscriptionStats {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
-	
+
 	stats := make(map[EventType]SubscriptionStats)
-	
+
 	for eventType, subscriptions := range eb.subscriptions {
 		stat := SubscriptionStats{
 			EventType:        eventType,
 			TotalSubscribers: len(subscriptions),
 		}
-		
+
 		for _, sub := range subscriptions {
 			if sub.Active {
 				stat.ActiveSubscribers++
@@ -330,20 +330,20 @@ func (eb *EventBus) GetSubscriptionStats() map[EventType]SubscriptionStats {
 			stat.TotalEventsHandled += sub.HandledCount
 			stat.TotalErrors += sub.ErrorCount
 		}
-		
+
 		stats[eventType] = stat
 	}
-	
+
 	return stats
 }
 
 // SubscriptionStats represents statistics for event subscriptions
 type SubscriptionStats struct {
-	EventType           EventType `json:"event_type"`
-	TotalSubscribers    int       `json:"total_subscribers"`
-	ActiveSubscribers   int       `json:"active_subscribers"`
-	TotalEventsHandled  int64     `json:"total_events_handled"`
-	TotalErrors         int64     `json:"total_errors"`
+	EventType          EventType `json:"event_type"`
+	TotalSubscribers   int       `json:"total_subscribers"`
+	ActiveSubscribers  int       `json:"active_subscribers"`
+	TotalEventsHandled int64     `json:"total_events_handled"`
+	TotalErrors        int64     `json:"total_errors"`
 }
 
 // PublishWorkflowEvent publishes workflow-related events
@@ -351,10 +351,10 @@ func (eb *EventBus) PublishWorkflowEvent(eventType EventType, workflowID, sessio
 	if data == nil {
 		data = make(map[string]interface{})
 	}
-	
+
 	data["workflow_id"] = workflowID
 	data["session_id"] = sessionID
-	
+
 	eb.Publish(eventType, data)
 }
 
@@ -363,11 +363,11 @@ func (eb *EventBus) PublishStageEvent(eventType EventType, stageID, workflowID, 
 	if data == nil {
 		data = make(map[string]interface{})
 	}
-	
+
 	data["stage_id"] = stageID
 	data["workflow_id"] = workflowID
 	data["session_id"] = sessionID
-	
+
 	eb.Publish(eventType, data)
 }
 
@@ -376,10 +376,10 @@ func (eb *EventBus) PublishContextEvent(eventType EventType, sessionID, contextT
 	if data == nil {
 		data = make(map[string]interface{})
 	}
-	
+
 	data["session_id"] = sessionID
 	data["context_type"] = contextType
-	
+
 	eb.Publish(eventType, data)
 }
 
@@ -392,18 +392,18 @@ func (eb *EventBus) Close() {
 	}
 	eb.closed = true
 	eb.mutex.Unlock()
-	
+
 	eb.logger.Info().Msg("Shutting down event bus")
-	
+
 	// Stop workers
 	eb.workerCancel()
-	
+
 	// Close event channel
 	close(eb.eventChan)
-	
+
 	// Wait for workers to finish
 	eb.wg.Wait()
-	
+
 	eb.logger.Info().Msg("Event bus shutdown complete")
 }
 

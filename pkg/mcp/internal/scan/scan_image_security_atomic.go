@@ -314,7 +314,6 @@ func (t *AtomicScanImageSecurityTool) generateVulnerabilitySummary(result *cored
 	return summary
 }
 
-
 func (t *AtomicScanImageSecurityTool) determineRiskLevel(score int, summary *VulnerabilityAnalysisSummary) string {
 	if score >= 80 {
 		return "low"
@@ -327,7 +326,7 @@ func (t *AtomicScanImageSecurityTool) determineRiskLevel(score int, summary *Vul
 
 func (t *AtomicScanImageSecurityTool) extractCriticalFindings(result *coredocker.ScanResult) []CriticalSecurityFinding {
 	var findings []CriticalSecurityFinding
-	
+
 	for _, vuln := range result.Vulnerabilities {
 		if vuln.Severity == "CRITICAL" || vuln.Severity == "HIGH" {
 			finding := CriticalSecurityFinding{
@@ -344,13 +343,13 @@ func (t *AtomicScanImageSecurityTool) extractCriticalFindings(result *coredocker
 			findings = append(findings, finding)
 		}
 	}
-	
+
 	return findings
 }
 
 func (t *AtomicScanImageSecurityTool) generateRecommendations(result *coredocker.ScanResult, summary *VulnerabilityAnalysisSummary) []SecurityRecommendation {
 	var recommendations []SecurityRecommendation
-	
+
 	// Base image recommendations
 	if summary.TotalVulnerabilities > 10 {
 		recommendations = append(recommendations, SecurityRecommendation{
@@ -363,7 +362,7 @@ func (t *AtomicScanImageSecurityTool) generateRecommendations(result *coredocker
 			Effort:      "medium",
 		})
 	}
-	
+
 	// Package management recommendations
 	if summary.FixableVulnerabilities > 0 {
 		recommendations = append(recommendations, SecurityRecommendation{
@@ -376,7 +375,7 @@ func (t *AtomicScanImageSecurityTool) generateRecommendations(result *coredocker
 			Effort:      "low",
 		})
 	}
-	
+
 	return recommendations
 }
 
@@ -389,11 +388,11 @@ func (t *AtomicScanImageSecurityTool) analyzeCompliance(result *coredocker.ScanR
 		Failed:       0,
 		Skipped:      0,
 	}
-	
+
 	// Basic compliance checks
 	criticalCount := 0
 	highCount := 0
-	
+
 	for _, vuln := range result.Vulnerabilities {
 		if vuln.Severity == "CRITICAL" {
 			criticalCount++
@@ -401,7 +400,7 @@ func (t *AtomicScanImageSecurityTool) analyzeCompliance(result *coredocker.ScanR
 			highCount++
 		}
 	}
-	
+
 	// Critical vulnerabilities compliance check
 	if criticalCount == 0 {
 		analysis.Items = append(analysis.Items, ComplianceItem{
@@ -424,12 +423,12 @@ func (t *AtomicScanImageSecurityTool) analyzeCompliance(result *coredocker.ScanR
 		})
 		analysis.Failed++
 	}
-	
+
 	// Calculate overall score
 	if analysis.Passed+analysis.Failed > 0 {
 		analysis.OverallScore = float64(analysis.Passed) / float64(analysis.Passed+analysis.Failed) * 100
 	}
-	
+
 	return analysis
 }
 
@@ -460,20 +459,20 @@ func (t *AtomicScanImageSecurityTool) isVulnerabilityFixable(vuln coresecurity.V
 	if vuln.FixedVersion != "" && vuln.FixedVersion != "unknown" && vuln.FixedVersion != "not available" {
 		return true
 	}
-	
+
 	// Check if there are any references that suggest fixes
 	if len(vuln.References) > 0 {
 		for _, ref := range vuln.References {
 			refLower := strings.ToLower(ref)
-			if strings.Contains(refLower, "upgrade") || 
-			   strings.Contains(refLower, "update") ||
-			   strings.Contains(refLower, "patch") ||
-			   strings.Contains(refLower, "fix") {
+			if strings.Contains(refLower, "upgrade") ||
+				strings.Contains(refLower, "update") ||
+				strings.Contains(refLower, "patch") ||
+				strings.Contains(refLower, "fix") {
 				return true
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -483,12 +482,12 @@ func (t *AtomicScanImageSecurityTool) extractLayerID(vuln coresecurity.Vulnerabi
 	if vuln.Layer != "" {
 		return vuln.Layer
 	}
-	
+
 	// Try to extract from data source or other metadata
 	if vuln.DataSource.Name != "" {
 		return fmt.Sprintf("layer_%s", vuln.DataSource.Name[:min(8, len(vuln.DataSource.Name))])
 	}
-	
+
 	return "unknown_layer"
 }
 
@@ -499,19 +498,19 @@ func (t *AtomicScanImageSecurityTool) generateAgeAnalysis(vulns []coresecurity.V
 		OlderVulns:   0,
 		AncientVulns: 0,
 	}
-	
+
 	if len(vulns) == 0 {
 		return analysis
 	}
-	
+
 	now := time.Now()
-	
+
 	for _, vuln := range vulns {
 		// Try to parse published date
 		if vuln.PublishedDate != "" {
 			if publishedDate, err := time.Parse(time.RFC3339, vuln.PublishedDate); err == nil {
 				ageDays := int(now.Sub(publishedDate).Hours() / 24)
-				
+
 				// Categorize by age
 				if ageDays < 30 {
 					analysis.RecentVulns++
@@ -523,7 +522,7 @@ func (t *AtomicScanImageSecurityTool) generateAgeAnalysis(vulns []coresecurity.V
 			}
 		}
 	}
-	
+
 	return analysis
 }
 
@@ -536,14 +535,14 @@ func (t *AtomicScanImageSecurityTool) generateRemediationPlan(result *coredocker
 			CriticalActions:        0,
 			EstimatedEffort:        "medium",
 		},
-		Steps: []RemediationStep{},
+		Steps:          []RemediationStep{},
 		PackageUpdates: make(map[string]PackageUpdate),
-		Priority: "medium",
+		Priority:       "medium",
 	}
-	
+
 	// Group vulnerabilities by package
 	packageVulns := t.groupVulnerabilitiesByPackage(result.Vulnerabilities)
-	
+
 	// Generate remediation steps for each package
 	for pkg, vulnList := range packageVulns {
 		if hasFixableVulns := t.hasFixableVulnerabilities(vulnList); hasFixableVulns {
@@ -555,25 +554,25 @@ func (t *AtomicScanImageSecurityTool) generateRemediationPlan(result *coredocker
 				Impact:      fmt.Sprintf("Fixes %d vulnerabilities in %s", len(vulnList), pkg),
 			}
 			plan.Steps = append(plan.Steps, step)
-			
+
 			// Track package update
 			plan.PackageUpdates[pkg] = PackageUpdate{
 				CurrentVersion: t.getCurrentVersion(vulnList),
 				TargetVersion:  t.getTargetVersion(vulnList),
 				VulnCount:      len(vulnList),
 			}
-			
+
 			// Count critical actions
 			if step.Priority == "critical" || step.Priority == "high" {
 				plan.Summary.CriticalActions++
 			}
 		}
 	}
-	
+
 	// Set overall priority based on vulnerabilities
 	plan.Priority = t.calculateOverallPriority(summary)
 	plan.Summary.EstimatedEffort = t.estimateEffort(plan.Steps)
-	
+
 	return plan
 }
 
@@ -670,22 +669,22 @@ func (t *AtomicScanImageSecurityTool) calculateSecurityScore(summary *Vulnerabil
 	if summary.TotalVulnerabilities == 0 {
 		return 100 // Perfect score for no vulnerabilities
 	}
-	
+
 	// Start with base score
 	score := 100
-	
+
 	// Deduct points based on severity
 	score -= summary.SeverityBreakdown["CRITICAL"] * 20
 	score -= summary.SeverityBreakdown["HIGH"] * 10
 	score -= summary.SeverityBreakdown["MEDIUM"] * 5
 	score -= summary.SeverityBreakdown["LOW"] * 2
-	
+
 	// Bonus points for fixable vulnerabilities (shows maintenance potential)
 	if summary.TotalVulnerabilities > 0 {
 		fixableRatio := float64(summary.FixableVulnerabilities) / float64(summary.TotalVulnerabilities)
 		score += int(fixableRatio * 10) // Up to 10 bonus points
 	}
-	
+
 	// Ensure score stays within bounds
 	if score < 0 {
 		score = 0
@@ -693,7 +692,7 @@ func (t *AtomicScanImageSecurityTool) calculateSecurityScore(summary *Vulnerabil
 	if score > 100 {
 		score = 100
 	}
-	
+
 	return score
 }
 

@@ -12,20 +12,20 @@ import (
 
 // CrossTeamIntegrationSuite validates integration between all teams
 type CrossTeamIntegrationSuite struct {
-	t               *testing.T
-	ctx             context.Context
-	logger          zerolog.Logger
-	workspace       *WorkspaceManager
-	testSessionID   string
+	t             *testing.T
+	ctx           context.Context
+	logger        zerolog.Logger
+	workspace     *WorkspaceManager
+	testSessionID string
 }
 
 // NewCrossTeamIntegrationSuite creates a new cross-team integration test suite
 func NewCrossTeamIntegrationSuite(t *testing.T) *CrossTeamIntegrationSuite {
 	logger := zerolog.New(zerolog.NewTestWriter(t)).With().Timestamp().Logger()
-	
+
 	workspace, err := NewWorkspaceManager(context.Background(), WorkspaceConfig{
 		BaseDir:           t.TempDir(),
-		MaxSizePerSession: 1024 * 1024 * 1024, // 1GB per session
+		MaxSizePerSession: 1024 * 1024 * 1024,     // 1GB per session
 		TotalMaxSize:      5 * 1024 * 1024 * 1024, // 5GB total
 		Cleanup:           true,
 		SandboxEnabled:    false, // Start disabled for basic integration tests
@@ -34,11 +34,11 @@ func NewCrossTeamIntegrationSuite(t *testing.T) *CrossTeamIntegrationSuite {
 	require.NoError(t, err)
 
 	return &CrossTeamIntegrationSuite{
-		t:               t,
-		ctx:             context.Background(),
-		logger:          logger,
-		workspace:       workspace,
-		testSessionID:   "integration-test-" + time.Now().Format("20060102-150405"),
+		t:             t,
+		ctx:           context.Background(),
+		logger:        logger,
+		workspace:     workspace,
+		testSessionID: "integration-test-" + time.Now().Format("20060102-150405"),
 	}
 }
 
@@ -156,23 +156,23 @@ func TestPerformanceBenchmarks(t *testing.T) {
 	t.Run("WorkspaceOperationsPerformance", func(t *testing.T) {
 		// Benchmark workspace operations
 		start := time.Now()
-		
+
 		workspaceDir, err := suite.workspace.InitializeWorkspace(suite.ctx, suite.testSessionID)
 		require.NoError(t, err)
-		
+
 		initDuration := time.Since(start)
-		
+
 		// Should be fast (< 100ms for basic operations)
 		assert.Less(t, initDuration, 100*time.Millisecond)
-		
+
 		// Benchmark disk usage calculation
 		start = time.Now()
 		err = suite.workspace.UpdateDiskUsage(suite.ctx, suite.testSessionID)
 		require.NoError(t, err)
-		
+
 		updateDuration := time.Since(start)
 		assert.Less(t, updateDuration, 50*time.Millisecond)
-		
+
 		suite.logger.Info().
 			Dur("init_duration", initDuration).
 			Dur("update_duration", updateDuration).
@@ -185,7 +185,7 @@ func TestPerformanceBenchmarks(t *testing.T) {
 		start := time.Now()
 		stats := suite.workspace.GetStats()
 		statsDuration := time.Since(start)
-		
+
 		assert.NotNil(t, stats)
 		assert.Less(t, statsDuration, 5*time.Millisecond)
 
@@ -193,7 +193,7 @@ func TestPerformanceBenchmarks(t *testing.T) {
 		start = time.Now()
 		err := suite.workspace.CheckQuota(suite.testSessionID, 100*1024*1024) // 100MB
 		quotaDuration := time.Since(start)
-		
+
 		assert.NoError(t, err)
 		assert.Less(t, quotaDuration, 1*time.Millisecond)
 
@@ -238,7 +238,7 @@ func TestSecurityIntegration(t *testing.T) {
 		// Test public security policy validation method
 		err := suite.workspace.ValidateSecurityPolicy(validPolicy)
 		assert.NoError(t, err)
-		
+
 		// Test invalid policy
 		invalidPolicy := SecurityPolicy{
 			TrustedRegistries: []string{}, // Empty - should fail
@@ -246,7 +246,7 @@ func TestSecurityIntegration(t *testing.T) {
 		err = suite.workspace.ValidateSecurityPolicy(invalidPolicy)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "at least one trusted registry must be specified")
-		
+
 		suite.logger.Info().Msg("Security policy validation working correctly")
 	})
 }
@@ -275,23 +275,23 @@ func (suite *CrossTeamIntegrationSuite) validateAdvancedBotInterfaces(t *testing
 	// Validate AdvancedBot interface contracts
 	stats := suite.workspace.GetStats()
 	assert.NotNil(t, stats)
-	
+
 	// Validate workspace operations are working
 	assert.IsType(t, int64(0), stats.TotalDiskUsage)
 	assert.IsType(t, int64(0), stats.TotalDiskLimit)
 	assert.IsType(t, false, stats.SandboxEnabled)
-	
+
 	suite.logger.Info().Msg("Validating AdvancedBot interfaces - workspace operations operational")
 }
 
 func (suite *CrossTeamIntegrationSuite) validateErrorPropagation(t *testing.T) {
 	// Test error handling across teams
-	
+
 	// Test quota exceeded error
 	err := suite.workspace.CheckQuota(suite.testSessionID, 999*1024*1024*1024) // 999GB - should exceed quota
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "QUOTA_EXCEEDED")
-	
+
 	suite.logger.Info().Msg("Error propagation validation completed")
 }
 

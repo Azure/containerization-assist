@@ -72,14 +72,14 @@ type RequestCorrelation struct {
 
 // CircuitBreaker provides circuit breaker pattern for tool failures
 type CircuitBreaker struct {
-	name           string
-	maxFailures    int
-	resetTimeout   time.Duration
-	failureCount   int
-	lastFailure    time.Time
-	state          CircuitBreakerState
-	mutex          sync.RWMutex
-	logger         zerolog.Logger
+	name         string
+	maxFailures  int
+	resetTimeout time.Duration
+	failureCount int
+	lastFailure  time.Time
+	state        CircuitBreakerState
+	mutex        sync.RWMutex
+	logger       zerolog.Logger
 }
 
 // CircuitBreakerState represents the state of a circuit breaker
@@ -93,27 +93,27 @@ const (
 
 // RequestMetrics tracks metrics for tool requests
 type RequestMetrics struct {
-	ToolName         string        `json:"tool_name"`
-	TotalRequests    int64         `json:"total_requests"`
-	SuccessfulReqs   int64         `json:"successful_requests"`
-	FailedRequests   int64         `json:"failed_requests"`
-	AverageLatency   time.Duration `json:"average_latency"`
-	LastRequestTime  time.Time     `json:"last_request_time"`
-	P95Latency       time.Duration `json:"p95_latency"`
-	ErrorRate        float64       `json:"error_rate"`
-	latencyHistory   []time.Duration
-	maxHistorySize   int
+	ToolName        string        `json:"tool_name"`
+	TotalRequests   int64         `json:"total_requests"`
+	SuccessfulReqs  int64         `json:"successful_requests"`
+	FailedRequests  int64         `json:"failed_requests"`
+	AverageLatency  time.Duration `json:"average_latency"`
+	LastRequestTime time.Time     `json:"last_request_time"`
+	P95Latency      time.Duration `json:"p95_latency"`
+	ErrorRate       float64       `json:"error_rate"`
+	latencyHistory  []time.Duration
+	maxHistorySize  int
 }
 
 // SendRequest sends a request with comprehensive communication patterns
 func (cm *CommunicationManager) SendRequest(ctx context.Context, request ToolRequest) (*ToolResponse, error) {
 	startTime := time.Now()
-	
+
 	// Add correlation ID for traceability
 	if request.CorrelationID == "" {
 		request.CorrelationID = cm.generateCorrelationID()
 	}
-	
+
 	// Track correlation
 	correlation := &RequestCorrelation{
 		ID:            request.CorrelationID,
@@ -124,50 +124,50 @@ func (cm *CommunicationManager) SendRequest(ctx context.Context, request ToolReq
 		ToolChain:     []string{request.ToolName},
 		Context:       request.Context,
 	}
-	
+
 	cm.mutex.Lock()
 	cm.correlationTracker[request.CorrelationID] = correlation
 	cm.mutex.Unlock()
-	
+
 	// Check circuit breaker
 	breaker := cm.getOrCreateCircuitBreaker(request.ToolName)
 	if !breaker.Allow() {
 		correlation.Status = "circuit_breaker_open"
 		correlation.EndTime = &startTime
-		
+
 		cm.logger.Warn().
 			Str("tool_name", request.ToolName).
 			Str("correlation_id", request.CorrelationID).
 			Msg("Request blocked by circuit breaker")
-		
+
 		return nil, fmt.Errorf("circuit breaker open for tool %s", request.ToolName)
 	}
-	
+
 	// Publish request event
 	cm.eventBus.Publish(EventTypeToolRequestStarted, map[string]interface{}{
 		"request":        request,
 		"correlation_id": request.CorrelationID,
 		"timestamp":      startTime,
 	})
-	
+
 	cm.logger.Info().
 		Str("tool_name", request.ToolName).
 		Str("session_id", request.SessionID).
 		Str("correlation_id", request.CorrelationID).
 		Msg("Sending tool request")
-	
+
 	// Send request with timeout and retry
 	response, err := cm.sendWithRetry(ctx, request)
 	endTime := time.Now()
 	duration := endTime.Sub(startTime)
-	
+
 	// Update correlation
 	correlation.EndTime = &endTime
 	if err != nil {
 		correlation.Status = "failed"
 		breaker.RecordFailure()
 		cm.updateMetrics(request.ToolName, duration, false)
-		
+
 		// Publish failure event
 		cm.eventBus.Publish(EventTypeToolRequestFailed, map[string]interface{}{
 			"request":        request,
@@ -176,21 +176,21 @@ func (cm *CommunicationManager) SendRequest(ctx context.Context, request ToolReq
 			"correlation_id": request.CorrelationID,
 			"timestamp":      endTime,
 		})
-		
+
 		cm.logger.Error().
 			Err(err).
 			Str("tool_name", request.ToolName).
 			Str("correlation_id", request.CorrelationID).
 			Dur("duration", duration).
 			Msg("Tool request failed")
-		
+
 		return nil, err
 	}
-	
+
 	correlation.Status = "completed"
 	breaker.RecordSuccess()
 	cm.updateMetrics(request.ToolName, duration, true)
-	
+
 	// Publish success event
 	cm.eventBus.Publish(EventTypeToolRequestCompleted, map[string]interface{}{
 		"request":        request,
@@ -199,13 +199,13 @@ func (cm *CommunicationManager) SendRequest(ctx context.Context, request ToolReq
 		"correlation_id": request.CorrelationID,
 		"timestamp":      endTime,
 	})
-	
+
 	cm.logger.Info().
 		Str("tool_name", request.ToolName).
 		Str("correlation_id", request.CorrelationID).
 		Dur("duration", duration).
 		Msg("Tool request completed successfully")
-	
+
 	return response, nil
 }
 
@@ -213,19 +213,19 @@ func (cm *CommunicationManager) SendRequest(ctx context.Context, request ToolReq
 func (cm *CommunicationManager) sendWithRetry(ctx context.Context, request ToolRequest) (*ToolResponse, error) {
 	maxRetries := 3
 	baseDelay := 100 * time.Millisecond
-	
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			// Exponential backoff
 			delay := baseDelay * time.Duration(1<<uint(attempt-1))
-			
+
 			cm.logger.Debug().
 				Str("tool_name", request.ToolName).
 				Str("correlation_id", request.CorrelationID).
 				Int("attempt", attempt).
 				Dur("delay", delay).
 				Msg("Retrying tool request")
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -233,21 +233,21 @@ func (cm *CommunicationManager) sendWithRetry(ctx context.Context, request ToolR
 				// Continue with retry
 			}
 		}
-		
+
 		// Simulate tool execution (in real implementation, this would call actual tools)
 		response, err := cm.executeToolRequest(ctx, request)
 		if err == nil {
 			return response, nil
 		}
-		
+
 		// Check if error is retryable
 		if !cm.isRetryableError(err) || attempt == maxRetries {
 			return nil, err
 		}
-		
+
 		request.RetryCount = attempt + 1
 	}
-	
+
 	return nil, fmt.Errorf("request failed after %d retries", maxRetries)
 }
 
@@ -282,13 +282,13 @@ func (cm *CommunicationManager) isRetryableError(err error) bool {
 	// Simple implementation - in practice, this would check specific error types
 	errStr := err.Error()
 	retryableErrors := []string{"timeout", "connection", "temporary", "unavailable"}
-	
+
 	for _, retryable := range retryableErrors {
 		if contains(errStr, retryable) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -306,11 +306,11 @@ func (cm *CommunicationManager) generateResponseID() string {
 func (cm *CommunicationManager) getOrCreateCircuitBreaker(toolName string) *CircuitBreaker {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
-	
+
 	if breaker, exists := cm.circuitBreakers[toolName]; exists {
 		return breaker
 	}
-	
+
 	breaker := &CircuitBreaker{
 		name:         toolName,
 		maxFailures:  5,
@@ -318,7 +318,7 @@ func (cm *CommunicationManager) getOrCreateCircuitBreaker(toolName string) *Circ
 		state:        CircuitBreakerClosed,
 		logger:       cm.logger.With().Str("circuit_breaker", toolName).Logger(),
 	}
-	
+
 	cm.circuitBreakers[toolName] = breaker
 	return breaker
 }
@@ -327,39 +327,39 @@ func (cm *CommunicationManager) getOrCreateCircuitBreaker(toolName string) *Circ
 func (cm *CommunicationManager) updateMetrics(toolName string, duration time.Duration, success bool) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
-	
+
 	metrics, exists := cm.requestMetrics[toolName]
 	if !exists {
 		metrics = &RequestMetrics{
-			ToolName:        toolName,
-			maxHistorySize:  100,
-			latencyHistory:  make([]time.Duration, 0, 100),
+			ToolName:       toolName,
+			maxHistorySize: 100,
+			latencyHistory: make([]time.Duration, 0, 100),
 		}
 		cm.requestMetrics[toolName] = metrics
 	}
-	
+
 	metrics.TotalRequests++
 	metrics.LastRequestTime = time.Now()
-	
+
 	if success {
 		metrics.SuccessfulReqs++
 	} else {
 		metrics.FailedRequests++
 	}
-	
+
 	// Update latency metrics
 	metrics.latencyHistory = append(metrics.latencyHistory, duration)
 	if len(metrics.latencyHistory) > metrics.maxHistorySize {
 		metrics.latencyHistory = metrics.latencyHistory[1:]
 	}
-	
+
 	// Calculate average latency
 	var total time.Duration
 	for _, d := range metrics.latencyHistory {
 		total += d
 	}
 	metrics.AverageLatency = total / time.Duration(len(metrics.latencyHistory))
-	
+
 	// Calculate P95 latency (simplified)
 	if len(metrics.latencyHistory) >= 20 {
 		sorted := make([]time.Duration, len(metrics.latencyHistory))
@@ -375,7 +375,7 @@ func (cm *CommunicationManager) updateMetrics(toolName string, duration time.Dur
 		p95Index := int(float64(len(sorted)) * 0.95)
 		metrics.P95Latency = sorted[p95Index]
 	}
-	
+
 	// Calculate error rate
 	if metrics.TotalRequests > 0 {
 		metrics.ErrorRate = float64(metrics.FailedRequests) / float64(metrics.TotalRequests)
@@ -386,7 +386,7 @@ func (cm *CommunicationManager) updateMetrics(toolName string, duration time.Dur
 func (cm *CommunicationManager) GetCorrelation(correlationID string) (*RequestCorrelation, bool) {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
-	
+
 	correlation, exists := cm.correlationTracker[correlationID]
 	return correlation, exists
 }
@@ -395,7 +395,7 @@ func (cm *CommunicationManager) GetCorrelation(correlationID string) (*RequestCo
 func (cm *CommunicationManager) GetMetrics(toolName string) (*RequestMetrics, bool) {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
-	
+
 	metrics, exists := cm.requestMetrics[toolName]
 	return metrics, exists
 }
@@ -404,12 +404,12 @@ func (cm *CommunicationManager) GetMetrics(toolName string) (*RequestMetrics, bo
 func (cm *CommunicationManager) GetAllMetrics() map[string]*RequestMetrics {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
-	
+
 	result := make(map[string]*RequestMetrics)
 	for k, v := range cm.requestMetrics {
 		result[k] = v
 	}
-	
+
 	return result
 }
 
@@ -430,7 +430,7 @@ func (cm *CommunicationManager) Close() error {
 func (cb *CircuitBreaker) Allow() bool {
 	cb.mutex.RLock()
 	defer cb.mutex.RUnlock()
-	
+
 	switch cb.state {
 	case CircuitBreakerClosed:
 		return true
@@ -459,7 +459,7 @@ func (cb *CircuitBreaker) Allow() bool {
 func (cb *CircuitBreaker) RecordSuccess() {
 	cb.mutex.Lock()
 	defer cb.mutex.Unlock()
-	
+
 	switch cb.state {
 	case CircuitBreakerHalfOpen:
 		cb.state = CircuitBreakerClosed
@@ -474,10 +474,10 @@ func (cb *CircuitBreaker) RecordSuccess() {
 func (cb *CircuitBreaker) RecordFailure() {
 	cb.mutex.Lock()
 	defer cb.mutex.Unlock()
-	
+
 	cb.failureCount++
 	cb.lastFailure = time.Now()
-	
+
 	switch cb.state {
 	case CircuitBreakerClosed:
 		if cb.failureCount >= cb.maxFailures {
@@ -501,11 +501,11 @@ func (cb *CircuitBreaker) GetState() CircuitBreakerState {
 
 // Helper function
 func contains(str, substr string) bool {
-	return len(str) >= len(substr) && (str == substr || 
-		(len(str) > len(substr) && 
-			(str[:len(substr)] == substr || 
-			 str[len(str)-len(substr):] == substr ||
-			 containsSubstring(str, substr))))
+	return len(str) >= len(substr) && (str == substr ||
+		(len(str) > len(substr) &&
+			(str[:len(substr)] == substr ||
+				str[len(str)-len(substr):] == substr ||
+				containsSubstring(str, substr))))
 }
 
 func containsSubstring(str, substr string) bool {

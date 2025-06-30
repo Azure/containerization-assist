@@ -15,30 +15,30 @@ import (
 
 // PerformanceMonitor tracks performance metrics across all teams
 type PerformanceMonitor struct {
-	logger       zerolog.Logger
-	mutex        sync.RWMutex
-	metrics      map[string]*PerformanceMetrics
-	benchmarks   map[string]*BenchmarkResults
-	thresholds   PerformanceThresholds
+	logger     zerolog.Logger
+	mutex      sync.RWMutex
+	metrics    map[string]*PerformanceMetrics
+	benchmarks map[string]*BenchmarkResults
+	thresholds PerformanceThresholds
 }
 
 // PerformanceThresholds defines performance targets
 type PerformanceThresholds struct {
-	MaxP95Latency    time.Duration `json:"max_p95_latency"`    // Target: <300μs P95
-	MaxP99Latency    time.Duration `json:"max_p99_latency"`    // Target: <1ms P99
-	MinThroughput    float64       `json:"min_throughput"`     // Requests per second
-	MaxMemoryUsage   int64         `json:"max_memory_usage"`   // Bytes
-	MaxCPUUsage      float64       `json:"max_cpu_usage"`      // Percentage
+	MaxP95Latency  time.Duration `json:"max_p95_latency"`  // Target: <300μs P95
+	MaxP99Latency  time.Duration `json:"max_p99_latency"`  // Target: <1ms P99
+	MinThroughput  float64       `json:"min_throughput"`   // Requests per second
+	MaxMemoryUsage int64         `json:"max_memory_usage"` // Bytes
+	MaxCPUUsage    float64       `json:"max_cpu_usage"`    // Percentage
 }
 
 // PerformanceMetrics tracks performance for a specific component
 type PerformanceMetrics struct {
-	ComponentName   string             `json:"component_name"`
-	TeamName        string             `json:"team_name"`
-	Measurements    []Measurement      `json:"measurements"`
-	Statistics      Statistics         `json:"statistics"`
-	LastUpdated     time.Time          `json:"last_updated"`
-	AlertStatus     string             `json:"alert_status"` // "GREEN", "YELLOW", "RED"
+	ComponentName string        `json:"component_name"`
+	TeamName      string        `json:"team_name"`
+	Measurements  []Measurement `json:"measurements"`
+	Statistics    Statistics    `json:"statistics"`
+	LastUpdated   time.Time     `json:"last_updated"`
+	AlertStatus   string        `json:"alert_status"` // "GREEN", "YELLOW", "RED"
 }
 
 // Measurement represents a single performance measurement
@@ -53,25 +53,25 @@ type Measurement struct {
 
 // Statistics provides aggregated performance statistics
 type Statistics struct {
-	Count        int           `json:"count"`
-	SuccessRate  float64       `json:"success_rate"`
-	AvgLatency   time.Duration `json:"avg_latency"`
-	P50Latency   time.Duration `json:"p50_latency"`
-	P95Latency   time.Duration `json:"p95_latency"`
-	P99Latency   time.Duration `json:"p99_latency"`
-	MaxLatency   time.Duration `json:"max_latency"`
-	MinLatency   time.Duration `json:"min_latency"`
-	AvgMemory    int64         `json:"avg_memory"`
-	MaxMemory    int64         `json:"max_memory"`
-	AvgCPU       float64       `json:"avg_cpu"`
-	MaxCPU       float64       `json:"max_cpu"`
-	Throughput   float64       `json:"throughput"` // requests per second
+	Count       int           `json:"count"`
+	SuccessRate float64       `json:"success_rate"`
+	AvgLatency  time.Duration `json:"avg_latency"`
+	P50Latency  time.Duration `json:"p50_latency"`
+	P95Latency  time.Duration `json:"p95_latency"`
+	P99Latency  time.Duration `json:"p99_latency"`
+	MaxLatency  time.Duration `json:"max_latency"`
+	MinLatency  time.Duration `json:"min_latency"`
+	AvgMemory   int64         `json:"avg_memory"`
+	MaxMemory   int64         `json:"max_memory"`
+	AvgCPU      float64       `json:"avg_cpu"`
+	MaxCPU      float64       `json:"max_cpu"`
+	Throughput  float64       `json:"throughput"` // requests per second
 }
 
 // BenchmarkResults tracks benchmark performance over time
 type BenchmarkResults struct {
-	BenchmarkName string        `json:"benchmark_name"`
-	TeamName      string        `json:"team_name"`
+	BenchmarkName string         `json:"benchmark_name"`
+	TeamName      string         `json:"team_name"`
 	Runs          []BenchmarkRun `json:"runs"`
 	Baseline      *BenchmarkRun  `json:"baseline,omitempty"`
 	Trend         string         `json:"trend"` // "IMPROVING", "STABLE", "DEGRADING"
@@ -79,14 +79,14 @@ type BenchmarkResults struct {
 
 // BenchmarkRun represents a single benchmark execution
 type BenchmarkRun struct {
-	Timestamp     time.Time     `json:"timestamp"`
-	Duration      time.Duration `json:"duration"`
-	Operations    int64         `json:"operations"`
-	OpsPerSecond  float64       `json:"ops_per_second"`
-	P95Latency    time.Duration `json:"p95_latency"`
-	MemoryUsage   int64         `json:"memory_usage"`
-	Success       bool          `json:"success"`
-	Version       string        `json:"version,omitempty"`
+	Timestamp    time.Time     `json:"timestamp"`
+	Duration     time.Duration `json:"duration"`
+	Operations   int64         `json:"operations"`
+	OpsPerSecond float64       `json:"ops_per_second"`
+	P95Latency   time.Duration `json:"p95_latency"`
+	MemoryUsage  int64         `json:"memory_usage"`
+	Success      bool          `json:"success"`
+	Version      string        `json:"version,omitempty"`
 }
 
 // NewPerformanceMonitor creates a new performance monitor
@@ -98,9 +98,9 @@ func NewPerformanceMonitor(logger zerolog.Logger) *PerformanceMonitor {
 		thresholds: PerformanceThresholds{
 			MaxP95Latency:  300 * time.Microsecond, // From CLAUDE.md requirements
 			MaxP99Latency:  1 * time.Millisecond,
-			MinThroughput:  100.0, // 100 RPS minimum
+			MinThroughput:  100.0,             // 100 RPS minimum
 			MaxMemoryUsage: 512 * 1024 * 1024, // 512MB
-			MaxCPUUsage:    80.0, // 80% CPU
+			MaxCPUUsage:    80.0,              // 80% CPU
 		},
 	}
 }
@@ -111,7 +111,7 @@ func (pm *PerformanceMonitor) RecordMeasurement(teamName, componentName string, 
 	defer pm.mutex.Unlock()
 
 	key := fmt.Sprintf("%s/%s", teamName, componentName)
-	
+
 	if pm.metrics[key] == nil {
 		pm.metrics[key] = &PerformanceMetrics{
 			ComponentName: componentName,
@@ -122,7 +122,7 @@ func (pm *PerformanceMonitor) RecordMeasurement(teamName, componentName string, 
 
 	metrics := pm.metrics[key]
 	metrics.Measurements = append(metrics.Measurements, measurement)
-	
+
 	// Keep only last 1000 measurements to prevent memory growth
 	if len(metrics.Measurements) > 1000 {
 		metrics.Measurements = metrics.Measurements[len(metrics.Measurements)-1000:]
@@ -147,7 +147,7 @@ func (pm *PerformanceMonitor) RecordBenchmark(teamName, benchmarkName string, ru
 	defer pm.mutex.Unlock()
 
 	key := fmt.Sprintf("%s/%s", teamName, benchmarkName)
-	
+
 	if pm.benchmarks[key] == nil {
 		pm.benchmarks[key] = &BenchmarkResults{
 			BenchmarkName: benchmarkName,
@@ -158,7 +158,7 @@ func (pm *PerformanceMonitor) RecordBenchmark(teamName, benchmarkName string, ru
 
 	benchmark := pm.benchmarks[key]
 	benchmark.Runs = append(benchmark.Runs, run)
-	
+
 	// Keep only last 100 runs
 	if len(benchmark.Runs) > 100 {
 		benchmark.Runs = benchmark.Runs[len(benchmark.Runs)-100:]
@@ -183,11 +183,11 @@ func (pm *PerformanceMonitor) GetPerformanceReport() *TeamPerformanceReport {
 	defer pm.mutex.RUnlock()
 
 	report := &TeamPerformanceReport{
-		Timestamp:      time.Now(),
-		OverallHealth:  "GREEN",
-		TeamMetrics:    make(map[string]TeamPerformance),
-		SystemSummary:  pm.calculateSystemSummary(),
-		AlertsSummary:  pm.calculateAlertsSummary(),
+		Timestamp:     time.Now(),
+		OverallHealth: "GREEN",
+		TeamMetrics:   make(map[string]TeamPerformance),
+		SystemSummary: pm.calculateSystemSummary(),
+		AlertsSummary: pm.calculateAlertsSummary(),
 	}
 
 	// Group metrics by team
@@ -200,7 +200,7 @@ func (pm *PerformanceMonitor) GetPerformanceReport() *TeamPerformanceReport {
 				Components: make(map[string]PerformanceMetrics),
 			}
 		}
-		
+
 		teamPerf.Components[metrics.ComponentName] = *metrics
 		report.TeamMetrics[teamName] = teamPerf
 	}
@@ -214,7 +214,7 @@ func (pm *PerformanceMonitor) GetPerformanceReport() *TeamPerformanceReport {
 // GeneratePerformanceSummary creates a human-readable performance summary
 func (pm *PerformanceMonitor) GeneratePerformanceSummary() string {
 	report := pm.GetPerformanceReport()
-	
+
 	summary := fmt.Sprintf(`PERFORMANCE MONITORING SUMMARY
 ==============================
 Overall Performance Health: %s
@@ -228,7 +228,7 @@ SYSTEM-WIDE METRICS:
 └─ Overall Success Rate: %.2f%%
 
 TEAM PERFORMANCE:
-`, 
+`,
 		report.OverallHealth,
 		report.Timestamp.Format("2006-01-02 15:04:05"),
 		report.SystemSummary.AvgP95Latency,
@@ -245,8 +245,8 @@ TEAM PERFORMANCE:
 	for teamName, teamPerf := range report.TeamMetrics {
 		summary += fmt.Sprintf("├─ %s: %s\n", teamName, pm.getTeamHealthStatus(teamPerf))
 		for componentName, metrics := range teamPerf.Components {
-			summary += fmt.Sprintf("│  └─ %s: P95=%v, Success=%.1f%%\n", 
-				componentName, 
+			summary += fmt.Sprintf("│  └─ %s: P95=%v, Success=%.1f%%\n",
+				componentName,
 				metrics.Statistics.P95Latency,
 				metrics.Statistics.SuccessRate,
 			)
@@ -268,7 +268,7 @@ TEAM PERFORMANCE:
 // SavePerformanceReport saves the performance report to disk
 func (pm *PerformanceMonitor) SavePerformanceReport(ctx context.Context, filename string) error {
 	report := pm.GetPerformanceReport()
-	
+
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal performance report: %v", err)
@@ -285,25 +285,25 @@ func (pm *PerformanceMonitor) SavePerformanceReport(ctx context.Context, filenam
 // Helper types for reporting
 
 type TeamPerformanceReport struct {
-	Timestamp      time.Time                   `json:"timestamp"`
-	OverallHealth  string                      `json:"overall_health"`
-	TeamMetrics    map[string]TeamPerformance  `json:"team_metrics"`
-	SystemSummary  SystemPerformanceSummary    `json:"system_summary"`
-	AlertsSummary  AlertsSummary               `json:"alerts_summary"`
+	Timestamp     time.Time                  `json:"timestamp"`
+	OverallHealth string                     `json:"overall_health"`
+	TeamMetrics   map[string]TeamPerformance `json:"team_metrics"`
+	SystemSummary SystemPerformanceSummary   `json:"system_summary"`
+	AlertsSummary AlertsSummary              `json:"alerts_summary"`
 }
 
 type TeamPerformance struct {
-	TeamName   string                          `json:"team_name"`
-	Components map[string]PerformanceMetrics   `json:"components"`
+	TeamName   string                        `json:"team_name"`
+	Components map[string]PerformanceMetrics `json:"components"`
 }
 
 type SystemPerformanceSummary struct {
-	AvgP95Latency       time.Duration `json:"avg_p95_latency"`
-	AvgThroughput       float64       `json:"avg_throughput"`
-	AvgMemoryUsage      int64         `json:"avg_memory_usage"`
-	AvgCPUUsage         float64       `json:"avg_cpu_usage"`
-	OverallSuccessRate  float64       `json:"overall_success_rate"`
-	TotalMeasurements   int           `json:"total_measurements"`
+	AvgP95Latency      time.Duration `json:"avg_p95_latency"`
+	AvgThroughput      float64       `json:"avg_throughput"`
+	AvgMemoryUsage     int64         `json:"avg_memory_usage"`
+	AvgCPUUsage        float64       `json:"avg_cpu_usage"`
+	OverallSuccessRate float64       `json:"overall_success_rate"`
+	TotalMeasurements  int           `json:"total_measurements"`
 }
 
 type AlertsSummary struct {
@@ -312,10 +312,10 @@ type AlertsSummary struct {
 }
 
 type TeamPerformanceAlert struct {
-	Component  string    `json:"component"`
-	Severity   string    `json:"severity"`
-	Message    string    `json:"message"`
-	Timestamp  time.Time `json:"timestamp"`
+	Component string    `json:"component"`
+	Severity  string    `json:"severity"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // Helper methods
@@ -334,9 +334,9 @@ func (pm *PerformanceMonitor) updateStatistics(metrics *PerformanceMetrics) {
 	var totalLatency time.Duration
 	var totalMemory int64
 	var totalCPU float64
-	
+
 	latencies := make([]time.Duration, 0, len(measurements))
-	
+
 	for _, m := range measurements {
 		if m.Success {
 			successCount++
@@ -399,14 +399,14 @@ func (pm *PerformanceMonitor) calculateAlertStatus(stats Statistics) string {
 		stats.MaxCPU > pm.thresholds.MaxCPUUsage {
 		return "RED"
 	}
-	
+
 	if stats.P95Latency > pm.thresholds.MaxP95Latency*80/100 ||
 		stats.SuccessRate < 98.0 ||
 		stats.MaxMemory > pm.thresholds.MaxMemoryUsage*80/100 ||
 		stats.MaxCPU > pm.thresholds.MaxCPUUsage*80/100 {
 		return "YELLOW"
 	}
-	
+
 	return "GREEN"
 }
 
@@ -510,17 +510,17 @@ func (pm *PerformanceMonitor) generateAlertMessage(metrics *PerformanceMetrics) 
 	issues := []string{}
 
 	if metrics.Statistics.P95Latency > pm.thresholds.MaxP95Latency {
-		issues = append(issues, fmt.Sprintf("P95 latency %v exceeds threshold %v", 
+		issues = append(issues, fmt.Sprintf("P95 latency %v exceeds threshold %v",
 			metrics.Statistics.P95Latency, pm.thresholds.MaxP95Latency))
 	}
 
 	if metrics.Statistics.SuccessRate < 95.0 {
-		issues = append(issues, fmt.Sprintf("Success rate %.1f%% below threshold 95%%", 
+		issues = append(issues, fmt.Sprintf("Success rate %.1f%% below threshold 95%%",
 			metrics.Statistics.SuccessRate))
 	}
 
 	if metrics.Statistics.MaxMemory > pm.thresholds.MaxMemoryUsage {
-		issues = append(issues, fmt.Sprintf("Memory usage %d MB exceeds threshold %d MB", 
+		issues = append(issues, fmt.Sprintf("Memory usage %d MB exceeds threshold %d MB",
 			metrics.Statistics.MaxMemory/(1024*1024), pm.thresholds.MaxMemoryUsage/(1024*1024)))
 	}
 
