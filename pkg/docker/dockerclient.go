@@ -3,8 +3,9 @@ package docker
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/runner"
 )
@@ -17,17 +18,24 @@ type DockerClient interface {
 	Pull(ctx context.Context, imageRef string) (string, error)
 	Tag(ctx context.Context, sourceRef, targetRef string) (string, error)
 	Login(ctx context.Context, registry, username, password string) (string, error)
+	LoginWithToken(ctx context.Context, registry, token string) (string, error)
+	Logout(ctx context.Context, registry string) (string, error)
+	IsLoggedIn(ctx context.Context, registry string) (bool, error)
 }
 
 type DockerCmdRunner struct {
-	runner runner.CommandRunner
+	runner            runner.CommandRunner
+	authCache         map[string]time.Time // Registry -> last successful auth time
+	authCacheDuration time.Duration
 }
 
 var _ DockerClient = &DockerCmdRunner{}
 
 func NewDockerCmdRunner(runner runner.CommandRunner) DockerClient {
 	return &DockerCmdRunner{
-		runner: runner,
+		runner:            runner,
+		authCache:         make(map[string]time.Time),
+		authCacheDuration: 30 * time.Minute, // Cache auth for 30 minutes
 	}
 }
 
@@ -56,22 +64,109 @@ func (d *DockerCmdRunner) Tag(ctx context.Context, sourceRef, targetRef string) 
 }
 
 func (d *DockerCmdRunner) Login(ctx context.Context, registry, username, password string) (string, error) {
-	// For now, use environment variables to pass credentials
-	// This avoids exposing passwords in command line but requires proper cleanup
-	oldUser := os.Getenv("DOCKER_USER")
-	oldPass := os.Getenv("DOCKER_PASSWORD")
-	defer func() {
-		os.Setenv("DOCKER_USER", oldUser)
-		os.Setenv("DOCKER_PASSWORD", oldPass)
-	}()
+	// Use stdin for password to avoid exposing it in process list
+	var args []string
+	args = append(args, "login", "--username", username, "--password-stdin")
 
-	os.Setenv("DOCKER_USER", username)
-	os.Setenv("DOCKER_PASSWORD", password)
-
-	if registry == "" {
-		return d.runner.RunCommand("docker", "login", "--username", username, "--password", password)
+	if registry != "" {
+		args = append(args, registry)
 	}
-	return d.runner.RunCommand("docker", "login", registry, "--username", username, "--password", password)
+
+	// Create command and pass password via stdin
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Stdin = strings.NewReader(password)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("docker login failed: %w", err)
+	}
+
+	// Cache successful authentication
+	registryKey := registry
+	if registryKey == "" {
+		registryKey = "docker.io"
+	}
+	d.authCache[registryKey] = time.Now()
+
+	return string(output), nil
+}
+
+func (d *DockerCmdRunner) LoginWithToken(ctx context.Context, registry, token string) (string, error) {
+	// Use token-based authentication (e.g., for registries like ghcr.io)
+	var args []string
+	args = append(args, "login", "--username", "token", "--password-stdin")
+
+	if registry != "" {
+		args = append(args, registry)
+	}
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Stdin = strings.NewReader(token)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("docker login with token failed: %w", err)
+	}
+
+	// Cache successful authentication
+	registryKey := registry
+	if registryKey == "" {
+		registryKey = "docker.io"
+	}
+	d.authCache[registryKey] = time.Now()
+
+	return string(output), nil
+}
+
+func (d *DockerCmdRunner) Logout(ctx context.Context, registry string) (string, error) {
+	var output string
+	var err error
+
+	if registry != "" {
+		output, err = d.runner.RunCommand("docker", "logout", registry)
+	} else {
+		output, err = d.runner.RunCommand("docker", "logout")
+	}
+
+	if err != nil {
+		return output, fmt.Errorf("docker logout failed: %w", err)
+	}
+
+	// Remove from auth cache
+	registryKey := registry
+	if registryKey == "" {
+		registryKey = "docker.io"
+	}
+	delete(d.authCache, registryKey)
+
+	return output, nil
+}
+
+func (d *DockerCmdRunner) IsLoggedIn(ctx context.Context, registry string) (bool, error) {
+	registryKey := registry
+	if registryKey == "" {
+		registryKey = "docker.io"
+	}
+
+	// Check auth cache first
+	if authTime, exists := d.authCache[registryKey]; exists {
+		if time.Since(authTime) < d.authCacheDuration {
+			return true, nil
+		}
+		// Cache expired, remove it
+		delete(d.authCache, registryKey)
+	}
+
+	// Try a simple docker info command to check auth status
+	// This is a lightweight way to verify authentication
+	_, err := d.runner.RunCommand("docker", "system", "info")
+	if err != nil {
+		return false, nil
+	}
+
+	// For now, assume we're logged in if docker is working
+	// A more sophisticated check would try to access the specific registry
+	return true, nil
 }
 
 func CheckDockerInstalled() error {

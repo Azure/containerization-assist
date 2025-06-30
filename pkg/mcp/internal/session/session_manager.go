@@ -1022,6 +1022,12 @@ func (sm *SessionManager) TrackToolExecution(sessionID, toolName string, args in
 func (sm *SessionManager) CompleteToolExecution(sessionID, toolName string, success bool, err error, tokensUsed int) error {
 	return sm.UpdateSession(sessionID, func(s interface{}) {
 		if session, ok := s.(*SessionState); ok {
+			// Update completed tools tracking
+			if success {
+				// Use the AddCompletedTool method which handles thread safety
+				sm.AddCompletedTool(sessionID, toolName)
+			}
+			
 			// Find the most recent execution of this tool and update it
 			for i := len(session.StageHistory) - 1; i >= 0; i-- {
 				if session.StageHistory[i].Tool == toolName && session.StageHistory[i].EndTime == nil {
