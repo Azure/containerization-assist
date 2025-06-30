@@ -22,6 +22,8 @@ type BuildExecutorService struct {
 	validator       *BuildValidatorImpl
 	troubleshooter  *BuildTroubleshooter
 	securityScanner *BuildSecurityScanner
+	optimizer       *BuildOptimizer
+	perfMonitor     *PerformanceMonitor
 }
 
 // NewBuildExecutor creates a new build executor
@@ -35,6 +37,8 @@ func NewBuildExecutor(adapter mcptypes.PipelineOperations, sessionManager core.T
 		validator:       NewBuildValidator(logger),
 		troubleshooter:  NewBuildTroubleshooter(logger),
 		securityScanner: NewBuildSecurityScanner(logger),
+		optimizer:       NewBuildOptimizer(logger),
+		perfMonitor:     NewPerformanceMonitor(logger),
 	}
 }
 
@@ -171,14 +175,69 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 		}
 	}
 
+	// Optimize build if optimizer is available
+	optimizationResult := &OptimizationResult{}
+	if e.optimizer != nil && !args.DryRun {
+		e.logger.Info().Msg("Running build optimization analysis")
+		optResult, err := e.optimizer.OptimizeBuild(ctx, result.DockerfilePath, result.BuildContext)
+		if err != nil {
+			e.logger.Warn().Err(err).Msg("Build optimization analysis failed, continuing with standard build")
+		} else {
+			optimizationResult = optResult
+			// Log optimization recommendations
+			for _, rec := range optResult.Recommendations {
+				e.logger.Info().
+					Str("type", rec.Type).
+					Str("priority", rec.Priority).
+					Str("title", rec.Title).
+					Msg("Build optimization recommendation")
+			}
+		}
+	}
+
 	// Build the image
 	buildStartTime := time.Now()
+
+	// Start performance monitoring if available
+	var buildMonitor *BuildMonitor
+	if e.perfMonitor != nil {
+		buildOp := &BuildOperation{
+			Name:        fmt.Sprintf("build-%s:%s", args.ImageName, result.ImageTag),
+			Tool:        "atomic_build_image",
+			Type:        "docker",
+			Strategy:    "standard",
+			SessionID:   args.SessionID,
+			ContextSize: result.BuildContext_Info.ContextSize,
+		}
+		buildMonitor = e.perfMonitor.StartBuildMonitoring(ctx, buildOp)
+		defer func() {
+			if buildMonitor != nil {
+				imageInfo := &ImageInfo{
+					Name:       args.ImageName,
+					Tag:        result.ImageTag,
+					Size:       0, // Would be populated from build result
+					LayerCount: 0, // Would be populated from build result
+				}
+				buildMonitor.Complete(result.Success, "", imageInfo)
+			}
+		}()
+	}
+
 	buildArgs := map[string]interface{}{
 		"dockerfilePath": result.DockerfilePath,
 		"buildContext":   result.BuildContext,
 		"imageName":      args.ImageName,
 		"imageTag":       result.ImageTag,
 	}
+
+	// Apply optimization cache settings if available
+	if len(optimizationResult.CacheStrategy.CacheFrom) > 0 {
+		buildArgs["cacheFrom"] = optimizationResult.CacheStrategy.CacheFrom
+	}
+	if len(optimizationResult.CacheStrategy.CacheTo) > 0 {
+		buildArgs["cacheTo"] = optimizationResult.CacheStrategy.CacheTo
+	}
+
 	_, err = e.pipelineAdapter.BuildImage(ctx, session.SessionID, buildArgs)
 	result.BuildDuration = time.Since(buildStartTime)
 
@@ -195,6 +254,16 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 	result.Success = true
 	result.TotalDuration = time.Since(startTime)
 	result.BaseAIContextResult = mcptypes.NewBaseAIContextResult("build", result.Success, result.TotalDuration)
+
+	// Add optimization result to response
+	if optimizationResult != nil && len(optimizationResult.Recommendations) > 0 {
+		result.OptimizationResult = optimizationResult
+	}
+
+	// Get performance report if available
+	if buildMonitor != nil {
+		result.PerformanceReport = buildMonitor.GetReport()
+	}
 
 	// Push if requested
 	if args.PushAfterBuild && args.RegistryURL != "" {
