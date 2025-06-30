@@ -178,12 +178,12 @@ func (r *ToolRegistry) IsFrozen() bool {
 	return r.frozen
 }
 
-type RegistryProgressCallback func(stage string, percent float64, message string)
+type ToolProgressCallback func(stage string, percent float64, message string)
 
 // LongRunningTool indicates a tool can stream progress updates.
 type LongRunningTool interface {
 	ExecuteWithProgress(ctx context.Context, args interface{},
-		cb RegistryProgressCallback) (interface{}, error)
+		cb ToolProgressCallback) (interface{}, error)
 }
 
 // ExecuteTool runs a registered tool by name with raw JSON arguments.

@@ -295,11 +295,11 @@ func (m *MockDockerClientWithTagCapture) Build(_ context.Context, _, tag, _ stri
 }
 
 func (m *MockDockerClientWithTagCapture) Version(_ context.Context) (string, error) {
-	return "Docker version", nil
+	return "", nil
 }
 
 func (m *MockDockerClientWithTagCapture) Info(_ context.Context) (string, error) {
-	return "Docker info", nil
+	return "", nil
 }
 
 func (m *MockDockerClientWithTagCapture) Push(_ context.Context, _ string) (string, error) {
@@ -327,7 +327,7 @@ func (m *MockDockerClientWithTagCapture) Logout(_ context.Context, _ string) (st
 }
 
 func (m *MockDockerClientWithTagCapture) IsLoggedIn(_ context.Context, _ string) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 func TestBuildDockerfileContent_TempDirCleanup(t *testing.T) {

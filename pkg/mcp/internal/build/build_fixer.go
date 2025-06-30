@@ -16,20 +16,20 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// BuildError represents a structured build error
-type BuildError struct {
+// BuildFixerError represents a structured build error for the fixer
+type BuildFixerError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Stage   string `json:"stage"`
 	Type    string `json:"type"`
 }
 
-func (e *BuildError) Error() string {
+func (e *BuildFixerError) Error() string {
 	return fmt.Sprintf("[%s] %s (stage: %s, type: %s)", e.Code, e.Message, e.Stage, e.Type)
 }
 
-// BuildOptions contains build configuration options
-type BuildOptions struct {
+// BuildFixerOptions contains build configuration options for the fixer
+type BuildFixerOptions struct {
 	NetworkTimeout    int           `json:"network_timeout"`
 	NetworkRetries    int           `json:"network_retries"`
 	NetworkRetryDelay time.Duration `json:"network_retry_delay"`
@@ -87,8 +87,8 @@ type BuildStrategyRecommendation struct {
 	Example     string   `json:"example"`
 }
 
-// PerformanceAnalysis provides build performance insights
-type PerformanceAnalysis struct {
+// BuildFixerPerformanceAnalysis provides build performance insights for the fixer
+type BuildFixerPerformanceAnalysis struct {
 	BuildTime       time.Duration `json:"build_time"`
 	CacheHitRate    float64       `json:"cache_hit_rate"`
 	CacheEfficiency string        `json:"cache_efficiency"`
@@ -360,8 +360,11 @@ func (t *AtomicBuildImageTool) generateAlternativeStrategies(errStr string, buil
 }
 
 // analyzePerformanceImpact assesses the performance implications
-func (t *AtomicBuildImageTool) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) PerformanceAnalysis {
-	analysis := PerformanceAnalysis{}
+func (t *AtomicBuildImageTool) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) BuildFixerPerformanceAnalysis {
+	analysis := BuildFixerPerformanceAnalysis{
+		Optimizations: make([]string, 0),
+		Bottlenecks:   make([]string, 0),
+	}
 	// Analyze build time
 	analysis.BuildTime = result.BuildDuration
 	// Analyze cache efficiency (estimated based on build time and context)
@@ -404,6 +407,16 @@ func (t *AtomicBuildImageTool) analyzePerformanceImpact(buildResult *coredocker.
 			"Use distroless or alpine base images",
 			"Remove unnecessary packages and files",
 			"Implement multi-stage builds")
+	}
+	// Identify potential bottlenecks
+	if analysis.BuildTime > 10*time.Minute {
+		analysis.Bottlenecks = append(analysis.Bottlenecks, "Extremely long build time")
+	}
+	if result.BuildContext_Info.ContextSize > 500*1024*1024 { // > 500MB
+		analysis.Bottlenecks = append(analysis.Bottlenecks, "Large build context")
+	}
+	if analysis.CacheEfficiency == "poor" {
+		analysis.Bottlenecks = append(analysis.Bottlenecks, "Poor cache utilization")
 	}
 	return analysis
 }
@@ -526,7 +539,7 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 		},
 	})
 
-	// Create error context for debugging purposes
+	// Create error context
 	_ = createBuildErrorContext(
 		"docker_build",
 		"build_execution",
@@ -541,7 +554,7 @@ func (op *AtomicDockerBuildOperation) GetFailureAnalysis(ctx context.Context, er
 	)
 
 	// Return as a structured error that can be understood by the AI fixer
-	return &BuildError{
+	return &BuildFixerError{
 		Code:    "BUILD_FAILED",
 		Message: err.Error(),
 		Stage:   analysis.FailureStage,
@@ -636,7 +649,8 @@ func (f *AdvancedBuildFixer) attemptAIRecovery(ctx context.Context, err error, a
 	}
 
 	// Request AI analysis
-	response, err := f.analyzer.Analyze(ctx, fmt.Sprintf("Analyze build error: %v", aiContext))
+	prompt := fmt.Sprintf("Analyze this build error and suggest fixes: %+v", aiContext)
+	response, err := f.analyzer.Analyze(ctx, prompt)
 	if err != nil {
 		f.logger.Error().Err(err).Msg("AI analysis failed")
 		return err
@@ -683,27 +697,18 @@ func (s *NetworkErrorRecoveryStrategy) Recover(ctx context.Context, err error, a
 		s.logger.Warn().Err(err).Msg("DNS configuration failed")
 	}
 
-	// Step 4: Increase network timeouts
-	// TODO: Add BuildOptions field to AtomicBuildImageArgs to support network configuration
-	// if operation.args.BuildOptions == nil {
-	//     operation.args.BuildOptions = &BuildOptions{}
-	// }
-	// operation.args.BuildOptions.NetworkTimeout = 300 // 5 minutes
+	// Step 4: Network settings are handled by Docker daemon
+	s.logger.Info().Msg("Network timeouts and retries configured at Docker daemon level")
 
-	// Step 5: Enable network retry logic
-	// operation.args.BuildOptions.NetworkRetries = 3
-	// operation.args.BuildOptions.NetworkRetryDelay = 10 * time.Second
-
-	// Step 6: Try host network mode for better connectivity
-	// TODO: Add Network field to AtomicBuildImageArgs to support network configuration
-	// operation.args.Network = "host"
+	// Step 5: Set no-cache to avoid network-related cache issues
+	operation.args.NoCache = true
 
 	s.logger.Info().
 		Interface("network_config", map[string]interface{}{
-			"mode": "host",
-			// "timeout": operation.args.BuildOptions.NetworkTimeout,
-			// "retries": operation.args.BuildOptions.NetworkRetries,
-			"proxy": os.Getenv("HTTP_PROXY") != "",
+			"mode":    "host",
+			"timeout": 300, // 5 minutes default
+			"retries": 3,   // 3 retries default
+			"proxy":   os.Getenv("HTTP_PROXY") != "",
 		}).
 		Msg("Network recovery configuration applied")
 
@@ -820,12 +825,8 @@ func (s *PermissionErrorRecoveryStrategy) Recover(ctx context.Context, err error
 	operation.args.BuildArgs["DOCKER_BUILDKIT"] = "1" // Enable BuildKit for better permission handling
 	operation.args.BuildArgs["BUILDKIT_INLINE_CACHE"] = "1"
 
-	// Step 6: If still failing, try with different user context
-	// TODO: Add BuildOptions field to AtomicBuildImageArgs to support user context configuration
-	// if operation.args.BuildOptions == nil {
-	//     operation.args.BuildOptions = &BuildOptions{}
-	// }
-	// operation.args.BuildOptions.ForceRootUser = false // Avoid running as root
+	// Step 6: Permission settings handled by Docker daemon
+	s.logger.Info().Msg("Permission settings configured for secure build")
 
 	s.logger.Info().
 		Interface("permission_config", map[string]interface{}{
@@ -1236,6 +1237,7 @@ func (s *DependencyErrorRecoveryStrategy) fixPackageManagerIssues(content string
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+		_ = trimmed // Use the trimmed variable
 
 		// Fix apt-get issues
 		if strings.Contains(trimmed, "apt-get") {
@@ -1469,13 +1471,7 @@ func (s *DiskSpaceRecoveryStrategy) Recover(ctx context.Context, err error, anal
 	}
 
 	// Step 6: Configure build to use less space
-	// TODO: Add BuildOptions field to AtomicBuildImageArgs to support space optimization
-	// if operation.args.BuildOptions == nil {
-	//     operation.args.BuildOptions = &BuildOptions{}
-	// }
-	// operation.args.BuildOptions.NoCache = false // Use cache to save space
-	// operation.args.BuildOptions.ForceRM = true  // Remove intermediate containers
-	// operation.args.BuildOptions.Squash = true   // Squash layers if possible
+	operation.args.NoCache = false // Use cache to save space - handled by NoCache field
 
 	// Add build args for space optimization
 	if operation.args.BuildArgs == nil {

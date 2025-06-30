@@ -273,7 +273,7 @@ func (b *BuildMonitor) RecordCacheMiss(layer string) {
 }
 
 // Complete marks the build operation as complete
-func (b *BuildMonitor) Complete(success bool, errorType string, imageInfo *PerformanceImageInfo) {
+func (b *BuildMonitor) Complete(success bool, errorType string, imageInfo *BuiltImageInfo) {
 	b.endTime = time.Now()
 	b.success = success
 	b.errorType = errorType
@@ -456,8 +456,8 @@ type StageMetrics struct {
 	Success   bool
 }
 
-// PerformanceImageInfo contains information about a built image
-type PerformanceImageInfo struct {
+// BuiltImageInfo contains information about a built image
+type BuiltImageInfo struct {
 	Name       string
 	Tag        string
 	Size       int64
