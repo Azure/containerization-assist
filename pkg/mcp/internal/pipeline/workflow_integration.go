@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 
@@ -35,19 +35,19 @@ func NewWorkflowSessionIntegrator(
 
 // WorkflowSessionConfig configures workflow execution with session management
 type WorkflowSessionConfig struct {
-	SessionID       string                 `json:"session_id"`
-	WorkflowID      string                 `json:"workflow_id"`
-	Variables       map[string]interface{} `json:"variables"`
-	TrackExecution  bool                   `json:"track_execution"`
-	EnableCheckpoints bool                 `json:"enable_checkpoints"`
-	MaxRetries      int                    `json:"max_retries"`
-	Timeout         time.Duration          `json:"timeout"`
+	SessionID         string                 `json:"session_id"`
+	WorkflowID        string                 `json:"workflow_id"`
+	Variables         map[string]interface{} `json:"variables"`
+	TrackExecution    bool                   `json:"track_execution"`
+	EnableCheckpoints bool                   `json:"enable_checkpoints"`
+	MaxRetries        int                    `json:"max_retries"`
+	Timeout           time.Duration          `json:"timeout"`
 }
 
 // ExecuteWorkflowWithSession executes a workflow with full session integration
 func (wsi *WorkflowSessionIntegrator) ExecuteWorkflowWithSession(ctx context.Context, config WorkflowSessionConfig) (*WorkflowSessionResult, error) {
 	startTime := time.Now()
-	
+
 	// Validate session exists
 	sessionInterface, err := wsi.sessionManager.GetSession(config.SessionID)
 	if err != nil {
@@ -82,17 +82,17 @@ func (wsi *WorkflowSessionIntegrator) ExecuteWorkflowWithSession(ctx context.Con
 
 	// Execute workflow
 	workflowResult, err := wsi.workflowOrchestrator.ExecuteWorkflow(ctx, config.WorkflowID, executionOptions...)
-	
+
 	result := &WorkflowSessionResult{
-		SessionID:         config.SessionID,
-		WorkflowID:        config.WorkflowID,
-		StartTime:         startTime,
-		EndTime:           time.Now(),
-		Duration:          time.Since(startTime),
-		Success:           err == nil,
-		JobID:             jobID,
-		WorkflowResult:    workflowResult,
-		SessionState:      sessionInterface,
+		SessionID:      config.SessionID,
+		WorkflowID:     config.WorkflowID,
+		StartTime:      startTime,
+		EndTime:        time.Now(),
+		Duration:       time.Since(startTime),
+		Success:        err == nil,
+		JobID:          jobID,
+		WorkflowResult: workflowResult,
+		SessionState:   sessionInterface,
 	}
 
 	if err != nil {
@@ -101,23 +101,23 @@ func (wsi *WorkflowSessionIntegrator) ExecuteWorkflowWithSession(ctx context.Con
 			Str("session_id", config.SessionID).
 			Str("workflow_id", config.WorkflowID).
 			Msg("Workflow execution failed")
-		
+
 		// Update job status to failed
 		if jobID != "" {
 			wsi.sessionManager.UpdateJobStatus(config.SessionID, jobID, "failed", nil, err)
 		}
-		
+
 		// Track error
 		wsi.sessionManager.TrackError(config.SessionID, err, map[string]interface{}{
 			"workflow_id": config.WorkflowID,
 			"duration":    result.Duration,
 		})
-		
+
 		// Complete tool execution with error
 		if config.TrackExecution {
 			wsi.sessionManager.CompleteToolExecution(config.SessionID, fmt.Sprintf("workflow_%s", config.WorkflowID), false, err, 0)
 		}
-		
+
 		result.Error = err
 		return result, err
 	}
@@ -190,15 +190,15 @@ func (wsi *WorkflowSessionIntegrator) GetWorkflowStatus(sessionID, workflowID st
 
 	// Create status from session data
 	status := &WorkflowSessionStatus{
-		SessionID:       sessionID,
-		WorkflowID:      workflowID,
-		WorkflowStatus:  workflowStatus,
-		ActiveJobs:      sessionData.ActiveJobs,
-		CompletedTools:  sessionData.CompletedTools,
-		LastError:       sessionData.LastError,
-		SessionCreated:  sessionData.CreatedAt,
-		SessionUpdated:  sessionData.UpdatedAt,
-		DiskUsage:       sessionData.DiskUsage,
+		SessionID:      sessionID,
+		WorkflowID:     workflowID,
+		WorkflowStatus: workflowStatus,
+		ActiveJobs:     sessionData.ActiveJobs,
+		CompletedTools: sessionData.CompletedTools,
+		LastError:      sessionData.LastError,
+		SessionCreated: sessionData.CreatedAt,
+		SessionUpdated: sessionData.UpdatedAt,
+		DiskUsage:      sessionData.DiskUsage,
 	}
 
 	return status, nil
@@ -244,16 +244,17 @@ type WorkflowSessionResult struct {
 
 // WorkflowSessionStatus contains status information for workflow execution
 type WorkflowSessionStatus struct {
-	SessionID       string    `json:"session_id"`
-	WorkflowID      string    `json:"workflow_id"`
-	WorkflowStatus  string    `json:"workflow_status"`
-	ActiveJobs      []string  `json:"active_jobs"`
-	CompletedTools  []string  `json:"completed_tools"`
-	LastError       string    `json:"last_error,omitempty"`
-	SessionCreated  time.Time `json:"session_created"`
-	SessionUpdated  time.Time `json:"session_updated"`
-	DiskUsage       int64     `json:"disk_usage"`
+	SessionID      string    `json:"session_id"`
+	WorkflowID     string    `json:"workflow_id"`
+	WorkflowStatus string    `json:"workflow_status"`
+	ActiveJobs     []string  `json:"active_jobs"`
+	CompletedTools []string  `json:"completed_tools"`
+	LastError      string    `json:"last_error,omitempty"`
+	SessionCreated time.Time `json:"session_created"`
+	SessionUpdated time.Time `json:"session_updated"`
+	DiskUsage      int64     `json:"disk_usage"`
 }
+
 // extractSessionID extracts session ID from session interface
 func (wsi *WorkflowSessionIntegrator) extractSessionID(sessionInterface interface{}) string {
 	// For now return a generated session ID since we cannot access SessionState directly

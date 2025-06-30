@@ -14,12 +14,12 @@ import (
 type PerformanceOptimizer struct {
 	sessionManager *session.SessionManager
 	logger         zerolog.Logger
-	
+
 	// Connection pooling and caching
 	connectionPool map[string]interface{}
 	operationCache map[string]*CachedOperation
 	cacheMutex     sync.RWMutex
-	
+
 	// Performance metrics
 	operationMetrics map[string]*OperationMetrics
 	metricsMutex     sync.RWMutex
@@ -27,27 +27,27 @@ type PerformanceOptimizer struct {
 
 // CachedOperation represents a cached operation result
 type CachedOperation struct {
-	Key        string      `json:"key"`
-	Result     interface{} `json:"result"`
-	Timestamp  time.Time   `json:"timestamp"`
-	TTL        time.Duration `json:"ttl"`
-	AccessCount int         `json:"access_count"`
+	Key         string        `json:"key"`
+	Result      interface{}   `json:"result"`
+	Timestamp   time.Time     `json:"timestamp"`
+	TTL         time.Duration `json:"ttl"`
+	AccessCount int           `json:"access_count"`
 }
 
 // OperationMetrics tracks performance metrics for operations
 type OperationMetrics struct {
-	OperationType     string        `json:"operation_type"`
-	TotalExecutions   int64         `json:"total_executions"`
-	SuccessfulOps     int64         `json:"successful_ops"`
-	FailedOps         int64         `json:"failed_ops"`
-	AverageLatency    time.Duration `json:"average_latency"`
-	TotalLatency      time.Duration `json:"total_latency"`
-	MinLatency        time.Duration `json:"min_latency"`
-	MaxLatency        time.Duration `json:"max_latency"`
-	LastExecution     time.Time     `json:"last_execution"`
-	CacheHitRate      float64       `json:"cache_hit_rate"`
-	CacheHits         int64         `json:"cache_hits"`
-	CacheMisses       int64         `json:"cache_misses"`
+	OperationType   string        `json:"operation_type"`
+	TotalExecutions int64         `json:"total_executions"`
+	SuccessfulOps   int64         `json:"successful_ops"`
+	FailedOps       int64         `json:"failed_ops"`
+	AverageLatency  time.Duration `json:"average_latency"`
+	TotalLatency    time.Duration `json:"total_latency"`
+	MinLatency      time.Duration `json:"min_latency"`
+	MaxLatency      time.Duration `json:"max_latency"`
+	LastExecution   time.Time     `json:"last_execution"`
+	CacheHitRate    float64       `json:"cache_hit_rate"`
+	CacheHits       int64         `json:"cache_hits"`
+	CacheMisses     int64         `json:"cache_misses"`
 }
 
 // NewPerformanceOptimizer creates a new performance optimizer
@@ -59,39 +59,39 @@ func NewPerformanceOptimizer(sessionManager *session.SessionManager, logger zero
 		operationCache:   make(map[string]*CachedOperation),
 		operationMetrics: make(map[string]*OperationMetrics),
 	}
-	
+
 	// Start background cleanup goroutine
 	go optimizer.startCacheCleanup()
-	
+
 	return optimizer
 }
 
 // OptimizeDockerOperation optimizes Docker operations with caching and pooling
 func (po *PerformanceOptimizer) OptimizeDockerOperation(ctx context.Context, operationType, sessionID string, args map[string]interface{}) (interface{}, error) {
 	startTime := time.Now()
-	
+
 	// Generate cache key
 	cacheKey := po.generateCacheKey(operationType, args)
-	
+
 	// Check cache first
 	if cachedResult := po.getCachedResult(cacheKey); cachedResult != nil {
 		po.recordCacheHit(operationType)
 		po.updateMetrics(operationType, startTime, true, true)
-		
+
 		po.logger.Debug().
 			Str("operation", operationType).
 			Str("cache_key", cacheKey).
 			Msg("Cache hit for Docker operation")
-		
+
 		return cachedResult.Result, nil
 	}
-	
+
 	po.recordCacheMiss(operationType)
-	
+
 	// Execute operation
 	var result interface{}
 	var err error
-	
+
 	switch operationType {
 	case "pull":
 		imageRef, _ := args["image_ref"].(string)
@@ -105,7 +105,7 @@ func (po *PerformanceOptimizer) OptimizeDockerOperation(ctx context.Context, ope
 		imageRef, _ := args["image_ref"].(string)
 		err = po.executePushWithOptimization(ctx, sessionID, imageRef)
 		result = map[string]interface{}{
-			"operation": "push", 
+			"operation": "push",
 			"image_ref": imageRef,
 			"success":   err == nil,
 		}
@@ -122,15 +122,15 @@ func (po *PerformanceOptimizer) OptimizeDockerOperation(ctx context.Context, ope
 	default:
 		err = fmt.Errorf("unsupported operation type: %s", operationType)
 	}
-	
+
 	// Cache successful results
 	if err == nil && po.shouldCache(operationType, args) {
 		po.cacheResult(cacheKey, result, po.getCacheTTL(operationType))
 	}
-	
+
 	// Update metrics
 	po.updateMetrics(operationType, startTime, err == nil, false)
-	
+
 	return result, err
 }
 
@@ -138,11 +138,11 @@ func (po *PerformanceOptimizer) OptimizeDockerOperation(ctx context.Context, ope
 func (po *PerformanceOptimizer) BatchOptimizeOperations(ctx context.Context, operations []BatchOperation) ([]interface{}, error) {
 	results := make([]interface{}, len(operations))
 	errors := make([]error, len(operations))
-	
+
 	// Use worker pool for parallel execution
 	workerCount := min(len(operations), 5) // Limit concurrent operations
 	jobs := make(chan int, len(operations))
-	
+
 	var wg sync.WaitGroup
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
@@ -156,23 +156,23 @@ func (po *PerformanceOptimizer) BatchOptimizeOperations(ctx context.Context, ope
 			}
 		}()
 	}
-	
+
 	// Send jobs
 	for i := range operations {
 		jobs <- i
 	}
 	close(jobs)
-	
+
 	// Wait for completion
 	wg.Wait()
-	
+
 	// Check for errors
 	for i, err := range errors {
 		if err != nil {
 			po.logger.Error().Err(err).Int("operation_index", i).Msg("Batch operation failed")
 		}
 	}
-	
+
 	return results, nil
 }
 
@@ -180,14 +180,14 @@ func (po *PerformanceOptimizer) BatchOptimizeOperations(ctx context.Context, ope
 func (po *PerformanceOptimizer) GetPerformanceMetrics() map[string]*OperationMetrics {
 	po.metricsMutex.RLock()
 	defer po.metricsMutex.RUnlock()
-	
+
 	// Create deep copy to avoid race conditions
 	metrics := make(map[string]*OperationMetrics)
 	for k, v := range po.operationMetrics {
 		metricsCopy := *v
 		metrics[k] = &metricsCopy
 	}
-	
+
 	return metrics
 }
 
@@ -201,17 +201,17 @@ func (po *PerformanceOptimizer) generateCacheKey(operationType string, args map[
 func (po *PerformanceOptimizer) getCachedResult(key string) *CachedOperation {
 	po.cacheMutex.RLock()
 	defer po.cacheMutex.RUnlock()
-	
+
 	cached, exists := po.operationCache[key]
 	if !exists {
 		return nil
 	}
-	
+
 	// Check TTL
 	if time.Since(cached.Timestamp) > cached.TTL {
 		return nil
 	}
-	
+
 	cached.AccessCount++
 	return cached
 }
@@ -219,12 +219,12 @@ func (po *PerformanceOptimizer) getCachedResult(key string) *CachedOperation {
 func (po *PerformanceOptimizer) cacheResult(key string, result interface{}, ttl time.Duration) {
 	po.cacheMutex.Lock()
 	defer po.cacheMutex.Unlock()
-	
+
 	po.operationCache[key] = &CachedOperation{
-		Key:        key,
-		Result:     result,
-		Timestamp:  time.Now(),
-		TTL:        ttl,
+		Key:         key,
+		Result:      result,
+		Timestamp:   time.Now(),
+		TTL:         ttl,
 		AccessCount: 0,
 	}
 }
@@ -246,7 +246,7 @@ func (po *PerformanceOptimizer) getCacheTTL(operationType string) time.Duration 
 	case "pull":
 		return 30 * time.Minute // Images don't change frequently
 	case "push":
-		return 5 * time.Minute  // Shorter TTL for push operations
+		return 5 * time.Minute // Shorter TTL for push operations
 	case "tag":
 		return 10 * time.Minute // Medium TTL for tag operations
 	default:
@@ -257,9 +257,9 @@ func (po *PerformanceOptimizer) getCacheTTL(operationType string) time.Duration 
 func (po *PerformanceOptimizer) updateMetrics(operationType string, startTime time.Time, success bool, cacheHit bool) {
 	po.metricsMutex.Lock()
 	defer po.metricsMutex.Unlock()
-	
+
 	latency := time.Since(startTime)
-	
+
 	metrics, exists := po.operationMetrics[operationType]
 	if !exists {
 		metrics = &OperationMetrics{
@@ -269,16 +269,16 @@ func (po *PerformanceOptimizer) updateMetrics(operationType string, startTime ti
 		}
 		po.operationMetrics[operationType] = metrics
 	}
-	
+
 	metrics.TotalExecutions++
 	metrics.LastExecution = time.Now()
-	
+
 	if success {
 		metrics.SuccessfulOps++
 	} else {
 		metrics.FailedOps++
 	}
-	
+
 	if !cacheHit {
 		metrics.TotalLatency += latency
 		if latency < metrics.MinLatency {
@@ -287,12 +287,12 @@ func (po *PerformanceOptimizer) updateMetrics(operationType string, startTime ti
 		if latency > metrics.MaxLatency {
 			metrics.MaxLatency = latency
 		}
-		
+
 		if metrics.TotalExecutions > 0 {
 			metrics.AverageLatency = metrics.TotalLatency / time.Duration(metrics.TotalExecutions)
 		}
 	}
-	
+
 	// Update cache hit rate
 	if metrics.CacheHits+metrics.CacheMisses > 0 {
 		metrics.CacheHitRate = float64(metrics.CacheHits) / float64(metrics.CacheHits+metrics.CacheMisses)
@@ -302,7 +302,7 @@ func (po *PerformanceOptimizer) updateMetrics(operationType string, startTime ti
 func (po *PerformanceOptimizer) recordCacheHit(operationType string) {
 	po.metricsMutex.Lock()
 	defer po.metricsMutex.Unlock()
-	
+
 	if metrics, exists := po.operationMetrics[operationType]; exists {
 		metrics.CacheHits++
 	}
@@ -311,7 +311,7 @@ func (po *PerformanceOptimizer) recordCacheHit(operationType string) {
 func (po *PerformanceOptimizer) recordCacheMiss(operationType string) {
 	po.metricsMutex.Lock()
 	defer po.metricsMutex.Unlock()
-	
+
 	if metrics, exists := po.operationMetrics[operationType]; exists {
 		metrics.CacheMisses++
 	}
@@ -320,7 +320,7 @@ func (po *PerformanceOptimizer) recordCacheMiss(operationType string) {
 func (po *PerformanceOptimizer) startCacheCleanup() {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		po.cleanupExpiredCache()
 	}
@@ -329,20 +329,20 @@ func (po *PerformanceOptimizer) startCacheCleanup() {
 func (po *PerformanceOptimizer) cleanupExpiredCache() {
 	po.cacheMutex.Lock()
 	defer po.cacheMutex.Unlock()
-	
+
 	now := time.Now()
 	var expiredKeys []string
-	
+
 	for key, cached := range po.operationCache {
 		if now.Sub(cached.Timestamp) > cached.TTL {
 			expiredKeys = append(expiredKeys, key)
 		}
 	}
-	
+
 	for _, key := range expiredKeys {
 		delete(po.operationCache, key)
 	}
-	
+
 	if len(expiredKeys) > 0 {
 		po.logger.Debug().Int("expired_count", len(expiredKeys)).Msg("Cleaned up expired cache entries")
 	}

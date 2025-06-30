@@ -609,7 +609,7 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 				completedTools = append(completedTools, execution.Tool)
 			}
 		}
-		
+
 		// Get last error message (already handled by getLastError method)
 		// Convert metadata from interface{} to string
 		metadata := make(map[string]string)
@@ -664,7 +664,7 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 			completedTools = append(completedTools, execution.Tool)
 		}
 	}
-	
+
 	// Get last error message (already handled by getLastError method)
 	// Convert metadata from interface{} to string
 	metadata := make(map[string]string)
@@ -1027,7 +1027,7 @@ func (sm *SessionManager) CompleteToolExecution(sessionID, toolName string, succ
 				// Use the AddCompletedTool method which handles thread safety
 				sm.AddCompletedTool(sessionID, toolName)
 			}
-			
+
 			// Find the most recent execution of this tool and update it
 			for i := len(session.StageHistory) - 1; i >= 0; i-- {
 				if session.StageHistory[i].Tool == toolName && session.StageHistory[i].EndTime == nil {

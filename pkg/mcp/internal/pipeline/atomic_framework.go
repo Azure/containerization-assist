@@ -18,7 +18,7 @@ type AtomicOperationFramework struct {
 
 // NewAtomicOperationFramework creates a new atomic operation framework
 func NewAtomicOperationFramework(
-	sessionManager *session.SessionManager, 
+	sessionManager *session.SessionManager,
 	operations *Operations,
 	logger zerolog.Logger,
 ) *AtomicOperationFramework {
@@ -31,37 +31,37 @@ func NewAtomicOperationFramework(
 
 // AtomicOperationConfig configures an atomic operation
 type AtomicOperationConfig struct {
-	SessionID    string
+	SessionID     string
 	OperationType string
-	DryRun       bool
-	Timeout      time.Duration
-	RetryCount   int
-	Force        bool
-	Metadata     map[string]interface{}
+	DryRun        bool
+	Timeout       time.Duration
+	RetryCount    int
+	Force         bool
+	Metadata      map[string]interface{}
 }
 
 // AtomicOperationResult provides standardized result structure
 type AtomicOperationResult struct {
-	Success      bool                   `json:"success"`
-	SessionID    string                 `json:"session_id"`
-	Operation    string                 `json:"operation"`
-	Duration     time.Duration          `json:"duration"`
-	Result       interface{}            `json:"result"`
-	Error        error                  `json:"error,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata"`
-	JobID        string                 `json:"job_id,omitempty"`
-	Timestamp    time.Time              `json:"timestamp"`
+	Success   bool                   `json:"success"`
+	SessionID string                 `json:"session_id"`
+	Operation string                 `json:"operation"`
+	Duration  time.Duration          `json:"duration"`
+	Result    interface{}            `json:"result"`
+	Error     error                  `json:"error,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata"`
+	JobID     string                 `json:"job_id,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
 }
 
 // ExecuteAtomicDockerPull executes atomic Docker pull operation
 func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context, config AtomicOperationConfig, imageRef string) (*AtomicOperationResult, error) {
 	startTime := time.Now()
-	
+
 	result := &AtomicOperationResult{
-		SessionID:    config.SessionID,
-		Operation:    "docker_pull",
-		Timestamp:    startTime,
-		Metadata:     config.Metadata,
+		SessionID: config.SessionID,
+		Operation: "docker_pull",
+		Timestamp: startTime,
+		Metadata:  config.Metadata,
 	}
 
 	// Validate session exists
@@ -111,15 +111,15 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 	if err != nil {
 		result.Success = false
 		result.Error = err
-		
+
 		// Update job status
 		if jobID != "" {
 			af.sessionManager.UpdateJobStatus(config.SessionID, jobID, "failed", nil, err)
 		}
-		
+
 		// Complete tool execution with error
 		af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_pull", false, err, 0)
-		
+
 		af.logger.Error().Err(err).Str("image_ref", imageRef).Msg("Atomic Docker pull failed")
 		return result, err
 	}
@@ -150,12 +150,12 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 // ExecuteAtomicDockerPush executes atomic Docker push operation
 func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context, config AtomicOperationConfig, imageRef string) (*AtomicOperationResult, error) {
 	startTime := time.Now()
-	
+
 	result := &AtomicOperationResult{
-		SessionID:    config.SessionID,
-		Operation:    "docker_push",
-		Timestamp:    startTime,
-		Metadata:     config.Metadata,
+		SessionID: config.SessionID,
+		Operation: "docker_push",
+		Timestamp: startTime,
+		Metadata:  config.Metadata,
 	}
 
 	// Validate session exists
@@ -205,15 +205,15 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 	if err != nil {
 		result.Success = false
 		result.Error = err
-		
+
 		// Update job status
 		if jobID != "" {
 			af.sessionManager.UpdateJobStatus(config.SessionID, jobID, "failed", nil, err)
 		}
-		
+
 		// Complete tool execution with error
 		af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_push", false, err, 0)
-		
+
 		af.logger.Error().Err(err).Str("image_ref", imageRef).Msg("Atomic Docker push failed")
 		return result, err
 	}
@@ -244,12 +244,12 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 // ExecuteAtomicDockerTag executes atomic Docker tag operation
 func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, config AtomicOperationConfig, sourceRef, targetRef string) (*AtomicOperationResult, error) {
 	startTime := time.Now()
-	
+
 	result := &AtomicOperationResult{
-		SessionID:    config.SessionID,
-		Operation:    "docker_tag",
-		Timestamp:    startTime,
-		Metadata:     config.Metadata,
+		SessionID: config.SessionID,
+		Operation: "docker_tag",
+		Timestamp: startTime,
+		Metadata:  config.Metadata,
 	}
 
 	// Validate session exists
@@ -300,15 +300,15 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 	if err != nil {
 		result.Success = false
 		result.Error = err
-		
+
 		// Update job status
 		if jobID != "" {
 			af.sessionManager.UpdateJobStatus(config.SessionID, jobID, "failed", nil, err)
 		}
-		
+
 		// Complete tool execution with error
 		af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_tag", false, err, 0)
-		
+
 		af.logger.Error().Err(err).
 			Str("source_ref", sourceRef).
 			Str("target_ref", targetRef).
@@ -346,7 +346,7 @@ func (af *AtomicOperationFramework) GetSessionManager() *session.SessionManager 
 	return af.sessionManager
 }
 
-// GetOperations returns the operations instance for external access  
+// GetOperations returns the operations instance for external access
 func (af *AtomicOperationFramework) GetOperations() *Operations {
 	return af.operations
 }
@@ -356,14 +356,14 @@ func (af *AtomicOperationFramework) ValidateAtomicConfig(config AtomicOperationC
 	if config.SessionID == "" {
 		return fmt.Errorf("session ID is required")
 	}
-	
+
 	if config.OperationType == "" {
 		return fmt.Errorf("operation type is required")
 	}
-	
+
 	if config.Timeout <= 0 {
 		config.Timeout = 10 * time.Minute // Default timeout
 	}
-	
+
 	return nil
 }

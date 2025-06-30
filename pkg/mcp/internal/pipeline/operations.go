@@ -155,12 +155,12 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 			Str("image_ref", imageRef).
 			Str("output", output).
 			Msg("Failed to pull Docker image")
-		
+
 		// Update job status to failed
 		if jobID != "" {
 			o.sessionManager.UpdateJobStatus(sessionID, jobID, "failed", nil, err)
 		}
-		
+
 		// Record error for session statistics
 		o.sessionManager.TrackError(sessionID, err, map[string]interface{}{
 			"operation": "pull",
