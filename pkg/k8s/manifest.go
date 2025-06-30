@@ -13,6 +13,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const DefaultImageAndTag = "localhost:5001/app:latest"
+
 const SNAPSHOT_DIR_NAME = ".container-kit-snapshots"
 const MANIFEST_DIR_NAME = "manifests"
 
@@ -121,7 +123,7 @@ const (
 const MANIFEST_TEMPLATE_DIR = "manifests"
 const MANIFEST_TARGET_DIR = "manifests"
 
-func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string) error {
+func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string, imageNameAndTag string) error {
 	basePath := filepath.Join(MANIFEST_TEMPLATE_DIR, string(templateName))
 	filesToCopy := []string{"deployment.yaml", "service.yaml", "configmap.yaml", "secret.yaml"}
 
@@ -142,8 +144,10 @@ func WriteManifestsFromTemplate(templateName ManifestsName, targetDir string) er
 		}
 
 		destPath := filepath.Join(manifestsDir, filename)
-		logger.Debugf("Writing manifest file: %s", destPath)
-
+		logger.Infof("Updating image name to %s in deployment manifest: %s", imageNameAndTag, destPath)
+		updatedData := strings.ReplaceAll(string(data), DefaultImageAndTag, imageNameAndTag)
+		logger.Debugf("Writing updated manifest to: %s", destPath)
+		data = []byte(updatedData)
 		if err := os.WriteFile(destPath, data, 0644); err != nil {
 			return fmt.Errorf("writing file %q: %w", destPath, err)
 		}
