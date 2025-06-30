@@ -44,17 +44,17 @@ type SecureConfiguration struct {
     // Layer 1: User isolation
     User:  "1000",
     Group: "1000",
-    
+
     // Layer 2: Filesystem protection
     ReadonlyRootfs: true,
-    
+
     // Layer 3: Network isolation
     NetworkMode: "none",
-    
+
     // Layer 4: Resource limits
     MemoryLimit: "512MB",
     CPULimit:    "1.0",
-    
+
     // Layer 5: Security profiles
     SecurityOpt: []string{
         "no-new-privileges:true",
@@ -129,25 +129,25 @@ func (sv *SecurityValidator) validateImage(ctx context.Context, image string) er
     if !sv.isTrustedRegistry(image) {
         return fmt.Errorf("untrusted registry: %s", image)
     }
-    
+
     // Scan for vulnerabilities
     vulns, err := sv.scanner.ScanImage(ctx, image)
     if err != nil {
         return fmt.Errorf("image scan failed: %w", err)
     }
-    
+
     // Check vulnerability thresholds
     criticalCount := sv.countVulnerabilities(vulns, "CRITICAL")
     highCount := sv.countVulnerabilities(vulns, "HIGH")
-    
+
     if criticalCount > 0 {
         return fmt.Errorf("image contains %d critical vulnerabilities", criticalCount)
     }
-    
+
     if highCount > 5 { // Configurable threshold
         return fmt.Errorf("image contains %d high-severity vulnerabilities", highCount)
     }
-    
+
     return nil
 }
 ```
@@ -187,26 +187,26 @@ func buildSecureHostConfig() *container.HostConfig {
             "no-new-privileges:true",
             "apparmor:container-default",
         },
-        
+
         // Resource limits
         Memory:    512 * 1024 * 1024, // 512MB
         CPUQuota:  100000,            // 1 CPU
         CPUPeriod: 100000,
         PidsLimit: &[]int64{100}[0],  // Process limit
-        
+
         // Network isolation
         NetworkMode: "bridge", // Use bridge, not host
-        
+
         // Capability management
         CapDrop: []string{"ALL"},
         CapAdd:  []string{}, // Add only necessary capabilities
-        
+
         // Filesystem management
         Tmpfs: map[string]string{
             "/tmp":     "rw,noexec,nosuid,size=100m",
             "/var/tmp": "rw,noexec,nosuid,size=100m",
         },
-        
+
         // Volume restrictions
         Binds: []string{
             // Read-only mounts only
@@ -235,23 +235,23 @@ func (sv *SecurityValidator) enforceResourceLimits(config *container.HostConfig,
         config.Memory = memoryBytes
         config.MemorySwap = memoryBytes // Disable swap
     }
-    
+
     // CPU limit
     if cpuShares, err := parseCPU(policy.MaxCPU); err == nil {
         config.CPUShares = cpuShares
     }
-    
+
     // Process limit
     if policy.MaxProcesses > 0 {
         limit := int64(policy.MaxProcesses)
         config.PidsLimit = &limit
     }
-    
+
     // Execution timeout
     if policy.Timeout > 0 {
         // Implement timeout in execution context
     }
-    
+
     return nil
 }
 ```
@@ -268,7 +268,7 @@ func (sv *SecurityValidator) configureNetworkSecurity(options AdvancedSandboxOpt
         Mode:     "none", // Default to no network
         Isolated: true,
     }
-    
+
     // Only enable networking if explicitly required and approved
     if options.SecurityPolicy.AllowNetworking {
         if sv.isNetworkingJustified(options) {
@@ -277,7 +277,7 @@ func (sv *SecurityValidator) configureNetworkSecurity(options AdvancedSandboxOpt
             config.DNSServers = []string{"8.8.8.8", "8.8.4.4"} // Controlled DNS
         }
     }
-    
+
     return config
 }
 
@@ -288,7 +288,7 @@ func (sv *SecurityValidator) isNetworkingJustified(options AdvancedSandboxOption
         "DATABASE_CONNECTION", // Needs database access
         "SERVICE_DISCOVERY",   // Needs service registry access
     }
-    
+
     return contains(justifications, options.NetworkJustification)
 }
 ```
@@ -307,10 +307,10 @@ type NetworkMonitor struct {
 func (nm *NetworkMonitor) MonitorTraffic(ctx context.Context, containerID string) {
     // Monitor outbound connections
     go nm.monitorOutboundConnections(ctx, containerID)
-    
+
     // Monitor DNS queries
     go nm.monitorDNSQueries(ctx, containerID)
-    
+
     // Monitor port usage
     go nm.monitorPortUsage(ctx, containerID)
 }
@@ -321,13 +321,13 @@ func (nm *NetworkMonitor) evaluateConnection(dest string, port int) bool {
         nm.logger.Warn().Str("destination", dest).Msg("Blocked connection to blacklisted destination")
         return false
     }
-    
+
     // Check against whitelist (if used)
     if len(nm.whitelist) > 0 && !nm.whitelist[dest] {
         nm.logger.Warn().Str("destination", dest).Msg("Blocked connection to non-whitelisted destination")
         return false
     }
-    
+
     return true
 }
 ```
@@ -362,12 +362,12 @@ func getSecretFromVault(secretPath string) (string, error) {
     if err != nil {
         return "", err
     }
-    
+
     secret, err := client.Logical().Read(secretPath)
     if err != nil {
         return "", err
     }
-    
+
     return secret.Data["value"].(string), nil
 }
 ```
@@ -387,17 +387,17 @@ func NewDataProtection(key string) (*DataProtection, error) {
     if err != nil {
         return nil, err
     }
-    
+
     block, err := aes.NewCipher(keyBytes)
     if err != nil {
         return nil, err
     }
-    
+
     aead, err := cipher.NewGCM(block)
     if err != nil {
         return nil, err
     }
-    
+
     return &DataProtection{
         encryptionKey: keyBytes,
         cipher:       aead,
@@ -409,7 +409,7 @@ func (dp *DataProtection) Encrypt(data []byte) ([]byte, error) {
     if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
         return nil, err
     }
-    
+
     ciphertext := dp.cipher.Seal(nonce, nonce, data, nil)
     return ciphertext, nil
 }
@@ -442,12 +442,12 @@ type SecurityEvent struct {
 
 func (sl *SecurityLogger) LogSecurityEvent(event SecurityEvent) {
     event.Timestamp = time.Now()
-    
+
     logEvent := sl.logger.Info()
     if event.Severity == "HIGH" || event.Severity == "CRITICAL" {
         logEvent = sl.logger.Error()
     }
-    
+
     logEvent.
         Str("event_type", event.EventType).
         Str("severity", event.Severity).
@@ -498,7 +498,7 @@ func NewSecurityMetrics() *SecurityMetrics {
             Help: "Total number of container execution attempts",
         }),
         SecurityViolations: prometheus.NewCounter(prometheus.CounterOpts{
-            Name: "security_violations_total", 
+            Name: "security_violations_total",
             Help: "Total number of security violations detected",
         }),
         HighRiskExecutions: prometheus.NewCounter(prometheus.CounterOpts{
@@ -534,17 +534,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Run Security Tests
         run: |
           make test-security
           make lint-security
-          
+
       - name: Vulnerability Scan
         uses: securecodewarrior/github-action-add-sarif@v1
         with:
           sarif-file: security-scan-results.sarif
-          
+
       - name: Container Security Scan
         run: |
           docker build -t test-image .
@@ -561,7 +561,7 @@ func validateInput(input string) error {
     if len(input) > 1000 {
         return fmt.Errorf("input too long")
     }
-    
+
     // Check for dangerous patterns
     dangerousPatterns := []string{
         `\$\(.*\)`,  // Command substitution
@@ -569,13 +569,13 @@ func validateInput(input string) error {
         "&&", "||",  // Command chaining
         "|", ">", "<", ";", // Shell operators
     }
-    
+
     for _, pattern := range dangerousPatterns {
         if matched, _ := regexp.MatchString(pattern, input); matched {
             return fmt.Errorf("dangerous pattern detected: %s", pattern)
         }
     }
-    
+
     return nil
 }
 
@@ -583,13 +583,13 @@ func validateInput(input string) error {
 func getUserByID(db *sql.DB, userID string) (*User, error) {
     query := "SELECT id, name, email FROM users WHERE id = ?"
     row := db.QueryRow(query, userID)
-    
+
     var user User
     err := row.Scan(&user.ID, &user.Name, &user.Email)
     if err != nil {
         return nil, err
     }
-    
+
     return &user, nil
 }
 
@@ -620,7 +620,7 @@ func (ir *IncidentResponse) HandleSecurityIncident(incident SecurityIncident) {
         Str("incident_id", incident.ID).
         Str("severity", incident.Severity).
         Msg("Security incident detected")
-    
+
     switch incident.Severity {
     case "CRITICAL":
         ir.handleCriticalIncident(incident)
@@ -636,13 +636,13 @@ func (ir *IncidentResponse) handleCriticalIncident(incident SecurityIncident) {
     if incident.ContainerID != "" {
         ir.quarantine.QuarantineContainer(incident.ContainerID)
     }
-    
+
     // Alert security team
     ir.alerter.SendCriticalAlert(incident)
-    
+
     // Block further executions from affected session
     ir.blockSession(incident.SessionID)
-    
+
     // Collect forensic data
     go ir.collectForensicData(incident)
 }
@@ -675,7 +675,7 @@ func (fc *ForensicCollector) CollectEvidence(incident SecurityIncident) (*Forens
         Timestamp:  time.Now(),
         Collector:  "container-kit-forensics",
     }
-    
+
     // Collect container state
     if incident.ContainerID != "" {
         containerState, err := fc.collectContainerState(incident.ContainerID)
@@ -685,7 +685,7 @@ func (fc *ForensicCollector) CollectEvidence(incident SecurityIncident) (*Forens
             report.ContainerState = containerState
         }
     }
-    
+
     // Collect system logs
     logs, err := fc.collectSystemLogs(incident.Timestamp.Add(-5*time.Minute), time.Now())
     if err != nil {
@@ -693,7 +693,7 @@ func (fc *ForensicCollector) CollectEvidence(incident SecurityIncident) (*Forens
     } else {
         report.SystemLogs = logs
     }
-    
+
     // Collect network data
     networkData, err := fc.collectNetworkData(incident.SessionID)
     if err != nil {
@@ -701,12 +701,12 @@ func (fc *ForensicCollector) CollectEvidence(incident SecurityIncident) (*Forens
     } else {
         report.NetworkData = networkData
     }
-    
+
     // Store evidence
     if err := fc.storage.StoreEvidence(report); err != nil {
         return nil, fmt.Errorf("failed to store forensic evidence: %w", err)
     }
-    
+
     return report, nil
 }
 ```
@@ -727,7 +727,7 @@ type AuditManager struct {
 func (am *AuditManager) LogAuditEvent(event AuditEvent) error {
     event.Timestamp = time.Now()
     event.ID = generateAuditID()
-    
+
     // Log to structured logger
     am.logger.Info().
         Str("audit_id", event.ID).
@@ -738,7 +738,7 @@ func (am *AuditManager) LogAuditEvent(event AuditEvent) error {
         Str("resource", event.Resource).
         Interface("details", event.Details).
         Msg("Audit event")
-    
+
     // Store in audit database
     return am.storage.StoreAuditEvent(event)
 }
@@ -771,22 +771,22 @@ type OptimizedSecurityValidator struct {
     fastMode    bool
 }
 
-func (osv *OptimizedSecurityValidator) ValidateWithProfile(ctx context.Context, 
+func (osv *OptimizedSecurityValidator) ValidateWithProfile(ctx context.Context,
     sessionID string, options AdvancedSandboxOptions) (*SecurityValidationReport, error) {
-    
+
     // Check cache for recent validation
     if cached := osv.cache.Get(sessionID, options.Hash()); cached != nil {
         if time.Since(cached.Timestamp) < 5*time.Minute {
             return cached.Report, nil
         }
     }
-    
+
     // Determine validation depth based on risk profile
     depth := osv.getValidationDepth(options)
-    
+
     var report *SecurityValidationReport
     var err error
-    
+
     switch depth {
     case ValidationDepthFast:
         report, err = osv.performFastValidation(ctx, sessionID, options)
@@ -795,14 +795,14 @@ func (osv *OptimizedSecurityValidator) ValidateWithProfile(ctx context.Context,
     case ValidationDepthDeep:
         report, err = osv.performDeepValidation(ctx, sessionID, options)
     }
-    
+
     if err != nil {
         return nil, err
     }
-    
+
     // Cache result
     osv.cache.Set(sessionID, options.Hash(), report)
-    
+
     return report, nil
 }
 
@@ -811,12 +811,12 @@ func (osv *OptimizedSecurityValidator) getValidationDepth(options AdvancedSandbo
     if osv.isKnownSafeConfiguration(options) {
         return ValidationDepthFast
     }
-    
+
     // Deep validation for high-risk configurations
     if osv.isHighRiskConfiguration(options) {
         return ValidationDepthDeep
     }
-    
+
     // Standard validation for everything else
     return ValidationDepthStandard
 }

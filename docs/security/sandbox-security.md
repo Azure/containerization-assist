@@ -146,15 +146,15 @@ if options.RequireNetworking {
 
 /usr/bin/sandbox-executor {
   #include <abstractions/base>
-  
+
   capability setuid,
   capability setgid,
-  
+
   /bin/** mr,
   /usr/bin/** mr,
   /lib/** mr,
   /usr/lib/** mr,
-  
+
   deny /proc/sys/** w,
   deny /sys/** w,
   deny @{HOME}/.ssh/** rw,
@@ -166,23 +166,23 @@ if options.RequireNetworking {
 ### Core Execution Flow
 
 ```go
-func (se *SandboxExecutor) ExecuteSecure(ctx context.Context, 
+func (se *SandboxExecutor) ExecuteSecure(ctx context.Context,
     sessionID string, options AdvancedSandboxOptions) (*ExecutionResult, error) {
-    
+
     // 1. Security validation
     report, err := se.validator.ValidateSecurity(ctx, sessionID, options)
     if err != nil {
         return nil, fmt.Errorf("security validation failed: %w", err)
     }
-    
+
     // 2. Risk assessment
     if report.RiskLevel == "HIGH" || report.RiskLevel == "CRITICAL" {
         return nil, fmt.Errorf("execution blocked: %s risk level", report.RiskLevel)
     }
-    
+
     // 3. Secure container configuration
     config := se.buildSecureConfig(options)
-    
+
     // 4. Execute with monitoring
     return se.executeWithMonitoring(ctx, config)
 }
@@ -214,21 +214,21 @@ func (se *SandboxExecutor) buildHostConfig(options AdvancedSandboxOptions) *cont
         CPUQuota:   100000,            // 1 CPU
         CPUPeriod:  100000,
         PidsLimit:  &[]int64{100}[0],  // Process limit
-        
+
         // Security options
         ReadonlyRootfs: true,
         SecurityOpt: []string{
             "no-new-privileges:true",
             "apparmor:sandbox-profile",
         },
-        
+
         // Capability dropping
         CapDrop: []string{"ALL"},
         CapAdd:  options.Capabilities,
-        
+
         // Network isolation
         NetworkMode: container.NetworkMode("none"),
-        
+
         // Filesystem mounts
         Tmpfs: map[string]string{
             "/tmp":     "rw,noexec,nosuid,size=100m",
@@ -254,7 +254,7 @@ type ResourceMonitor struct {
 func (rm *ResourceMonitor) Monitor(ctx context.Context, containerID string) {
     ticker := time.NewTicker(1 * time.Second)
     defer ticker.Stop()
-    
+
     for {
         select {
         case <-ctx.Done():
@@ -308,18 +308,18 @@ func (se *SandboxExecutor) validateImage(ctx context.Context, image string) erro
     if !se.isTrustedRegistry(image) {
         return fmt.Errorf("untrusted registry: %s", image)
     }
-    
+
     // Vulnerability scanning
     vulnerabilities, err := se.scanner.ScanImage(ctx, image)
     if err != nil {
         return fmt.Errorf("image scan failed: %w", err)
     }
-    
+
     // Risk assessment
     if se.hasHighRiskVulnerabilities(vulnerabilities) {
         return fmt.Errorf("high-risk vulnerabilities detected")
     }
-    
+
     return nil
 }
 ```
@@ -338,7 +338,7 @@ func (se *SandboxExecutor) validateImage(ctx context.Context, image string) erro
 
 **Kernel Namespace Isolation:**
 - PID namespace - process isolation
-- NET namespace - network isolation  
+- NET namespace - network isolation
 - MNT namespace - mount isolation
 - UTS namespace - hostname isolation
 - IPC namespace - inter-process communication isolation
@@ -352,19 +352,19 @@ func (se *SandboxExecutor) validateExecution(options AdvancedSandboxOptions) err
     if options.Privileged {
         return fmt.Errorf("privileged execution not allowed")
     }
-    
+
     // Check for dangerous mounts
     for _, mount := range options.Mounts {
         if se.isDangerousMount(mount) {
             return fmt.Errorf("dangerous mount detected: %s", mount)
         }
     }
-    
+
     // Check for host network access
     if options.SecurityPolicy.AllowNetworking && !se.isNetworkingAllowed() {
         return fmt.Errorf("network access not permitted")
     }
-    
+
     return nil
 }
 ```
@@ -382,10 +382,10 @@ type BreakoutDetector struct {
 func (bd *BreakoutDetector) MonitorContainer(ctx context.Context, containerID string) {
     // Monitor for suspicious process activity
     go bd.processMonitor.WatchProcesses(ctx, containerID)
-    
+
     // Monitor filesystem access patterns
     go bd.filesystemWatch.WatchFileAccess(ctx, containerID)
-    
+
     // Monitor network activity
     go bd.networkMonitor.WatchNetworkConnections(ctx, containerID)
 }

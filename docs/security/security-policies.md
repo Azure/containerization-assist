@@ -14,16 +14,16 @@ graph TD
     B --> C[Policy Repository]
     B --> D[Rule Evaluator]
     B --> E[Context Analyzer]
-    
+
     C --> F[Policy Rules]
     D --> G[Decision Engine]
     E --> G
-    
+
     G --> H{Policy Decision}
     H -->|ALLOW| I[Execute with Monitoring]
     H -->|DENY| J[Block & Audit]
     H -->|CONDITIONAL| K[Execute with Restrictions]
-    
+
     I --> L[Audit Log]
     J --> L
     K --> L
@@ -69,7 +69,7 @@ type SecurityPolicy struct {
     Metadata          map[string]interface{} `json:"metadata"`
     CreatedAt         time.Time              `json:"created_at"`
     UpdatedAt         time.Time              `json:"updated_at"`
-    
+
     // Runtime configuration
     AllowNetworking   bool                   `json:"allow_networking"`
     AllowFileSystem   bool                   `json:"allow_filesystem"`
@@ -122,7 +122,7 @@ const (
 func GetDefaultSecurityPolicy() *SecurityPolicy {
     return &SecurityPolicy{
         ID:          "default-security-policy",
-        Name:        "Default Container Security Policy", 
+        Name:        "Default Container Security Policy",
         Version:     "1.0.0",
         Description: "Baseline security policy for all container operations",
         Scope: PolicyScope{
@@ -228,7 +228,7 @@ func GetProductionPolicy() *SecurityPolicy {
     return &SecurityPolicy{
         ID:          "production-policy",
         Name:        "Production Environment Policy",
-        Version:     "1.0.0", 
+        Version:     "1.0.0",
         Description: "Strict security policy for production environments",
         Scope: PolicyScope{
             Environment: []string{"prod", "production"},
@@ -320,19 +320,19 @@ func (re *RuleEvaluator) EvaluateRule(rule PolicyRule, context PolicyContext) (b
     if err != nil {
         return false, fmt.Errorf("invalid rule condition: %w", err)
     }
-    
+
     // Evaluate expression with context
     result, err := expr.Evaluate(context)
     if err != nil {
         return false, fmt.Errorf("rule evaluation failed: %w", err)
     }
-    
+
     // Convert result to boolean
     boolResult, ok := result.(bool)
     if !ok {
         return false, fmt.Errorf("rule condition must evaluate to boolean")
     }
-    
+
     return boolResult, nil
 }
 
@@ -357,15 +357,15 @@ type PolicyContext struct {
 ### Decision Logic
 
 ```go
-func (spe *SecurityPolicyEngine) EvaluatePolicy(ctx context.Context, 
+func (spe *SecurityPolicyEngine) EvaluatePolicy(ctx context.Context,
     policyID string, context PolicyContext) (*PolicyDecision, error) {
-    
+
     // Get policy
     policy, err := spe.getPolicy(policyID)
     if err != nil {
         return nil, fmt.Errorf("policy not found: %w", err)
     }
-    
+
     // Check policy scope
     if !spe.matchesScope(policy.Scope, context) {
         return &PolicyDecision{
@@ -374,23 +374,23 @@ func (spe *SecurityPolicyEngine) EvaluatePolicy(ctx context.Context,
             Applied: false,
         }, nil
     }
-    
+
     // Evaluate rules in priority order
     sort.Slice(policy.Rules, func(i, j int) bool {
         return policy.Rules[i].Priority > policy.Rules[j].Priority
     })
-    
+
     for _, rule := range policy.Rules {
         if !rule.Enabled {
             continue
         }
-        
+
         matches, err := spe.evaluator.EvaluateRule(rule, context)
         if err != nil {
             spe.logger.Error().Err(err).Str("rule_id", rule.ID).Msg("Rule evaluation error")
             continue
         }
-        
+
         if matches {
             return &PolicyDecision{
                 Action:     rule.Action,
@@ -401,7 +401,7 @@ func (spe *SecurityPolicyEngine) EvaluatePolicy(ctx context.Context,
             }, nil
         }
     }
-    
+
     // No rules matched, use default action
     return &PolicyDecision{
         Action:  policy.DefaultAction,
@@ -444,18 +444,18 @@ type FilePolicyRepository struct {
 func (fpr *FilePolicyRepository) GetPolicy(id string) (*SecurityPolicy, error) {
     fpr.mutex.RLock()
     defer fpr.mutex.RUnlock()
-    
+
     filePath := filepath.Join(fpr.basePath, id+".json")
     data, err := os.ReadFile(filePath)
     if err != nil {
         return nil, fmt.Errorf("failed to read policy file: %w", err)
     }
-    
+
     var policy SecurityPolicy
     if err := json.Unmarshal(data, &policy); err != nil {
         return nil, fmt.Errorf("failed to parse policy: %w", err)
     }
-    
+
     return &policy, nil
 }
 ```
@@ -465,47 +465,47 @@ func (fpr *FilePolicyRepository) GetPolicy(id string) (*SecurityPolicy, error) {
 ```go
 func (spe *SecurityPolicyEngine) ValidatePolicy(policy *SecurityPolicy) error {
     var errors []string
-    
+
     // Validate basic fields
     if policy.ID == "" {
         errors = append(errors, "policy ID is required")
     }
-    
+
     if policy.Name == "" {
         errors = append(errors, "policy name is required")
     }
-    
+
     // Validate rules
     for i, rule := range policy.Rules {
         if rule.ID == "" {
             errors = append(errors, fmt.Sprintf("rule %d: ID is required", i))
         }
-        
+
         if rule.Condition == "" {
             errors = append(errors, fmt.Sprintf("rule %s: condition is required", rule.ID))
         }
-        
+
         // Validate rule condition syntax
         if _, err := spe.evaluator.parser.Parse(rule.Condition); err != nil {
             errors = append(errors, fmt.Sprintf("rule %s: invalid condition: %v", rule.ID, err))
         }
-        
+
         // Validate action
         validActions := []PolicyAction{ActionAllow, ActionDeny, ActionRestrict, ActionMonitor, ActionAudit}
         if !contains(validActions, rule.Action) {
             errors = append(errors, fmt.Sprintf("rule %s: invalid action: %s", rule.ID, rule.Action))
         }
     }
-    
+
     // Validate resource limits
     if err := spe.validateResourceLimits(policy.MaxResourceLimits); err != nil {
         errors = append(errors, fmt.Sprintf("invalid resource limits: %v", err))
     }
-    
+
     if len(errors) > 0 {
         return fmt.Errorf("policy validation failed: %s", strings.Join(errors, "; "))
     }
-    
+
     return nil
 }
 ```
@@ -532,30 +532,30 @@ func NewPolicyCache(ttl time.Duration) *PolicyCache {
         cache: make(map[string]*CacheEntry),
         ttl:   ttl,
     }
-    
+
     // Start cache cleanup goroutine
     pc.janitor = time.NewTicker(ttl / 2)
     go pc.cleanup()
-    
+
     return pc
 }
 
 func (pc *PolicyCache) Get(id string) (*SecurityPolicy, bool) {
     pc.mutex.RLock()
     defer pc.mutex.RUnlock()
-    
+
     entry, exists := pc.cache[id]
     if !exists || time.Now().After(entry.ExpiresAt) {
         return nil, false
     }
-    
+
     return entry.Policy, true
 }
 
 func (pc *PolicyCache) Set(id string, policy *SecurityPolicy) {
     pc.mutex.Lock()
     defer pc.mutex.Unlock()
-    
+
     pc.cache[id] = &CacheEntry{
         Policy:    policy,
         ExpiresAt: time.Now().Add(pc.ttl),
@@ -581,9 +581,9 @@ func (pc *PolicyCache) cleanup() {
 ### Enforcement Integration
 
 ```go
-func (spe *SecurityPolicyEngine) EnforcePolicy(ctx context.Context, 
+func (spe *SecurityPolicyEngine) EnforcePolicy(ctx context.Context,
     sessionID string, options AdvancedSandboxOptions) (*EnforcementResult, error) {
-    
+
     // Build policy context
     context := PolicyContext{
         User:            options.User,
@@ -595,16 +595,16 @@ func (spe *SecurityPolicyEngine) EnforcePolicy(ctx context.Context,
         AllowNetworking: options.SecurityPolicy.AllowNetworking,
         // ... other context fields
     }
-    
+
     // Get applicable policy
     policyID := spe.getApplicablePolicy(context)
-    
+
     // Evaluate policy
     decision, err := spe.EvaluatePolicy(ctx, policyID, context)
     if err != nil {
         return nil, fmt.Errorf("policy evaluation failed: %w", err)
     }
-    
+
     // Apply enforcement
     result := &EnforcementResult{
         Decision:    decision,
@@ -613,15 +613,15 @@ func (spe *SecurityPolicyEngine) EnforcePolicy(ctx context.Context,
         Monitored:   decision.Action == ActionMonitor,
         Timestamp:   time.Now(),
     }
-    
+
     // Apply restrictions if needed
     if decision.Action == ActionRestrict {
         result.Restrictions = spe.applyRestrictions(decision.Parameters, options)
     }
-    
+
     // Audit enforcement
     spe.auditEnforcement(sessionID, decision, result)
-    
+
     return result, nil
 }
 
@@ -652,9 +652,9 @@ type PolicyAuditEvent struct {
     Metadata    map[string]string `json:"metadata"`
 }
 
-func (spe *SecurityPolicyEngine) auditEnforcement(sessionID string, 
+func (spe *SecurityPolicyEngine) auditEnforcement(sessionID string,
     decision *PolicyDecision, result *EnforcementResult) {
-    
+
     event := PolicyAuditEvent{
         Timestamp:   time.Now(),
         SessionID:   sessionID,
@@ -669,7 +669,7 @@ func (spe *SecurityPolicyEngine) auditEnforcement(sessionID string,
             "monitored":  fmt.Sprintf("%t", result.Monitored),
         },
     }
-    
+
     // Log to audit system
     spe.logger.Info().
         Str("event_type", "policy_enforcement").
@@ -685,12 +685,12 @@ func (spe *SecurityPolicyEngine) auditEnforcement(sessionID string,
 ```go
 func TestPolicyEvaluation(t *testing.T) {
     engine := NewSecurityPolicyEngine(zerolog.New(os.Stdout))
-    
+
     // Load default policy
     policy := GetDefaultSecurityPolicy()
     err := engine.LoadPolicy(policy)
     assert.NoError(t, err)
-    
+
     testCases := []struct {
         name     string
         context  PolicyContext
@@ -713,10 +713,10 @@ func TestPolicyEvaluation(t *testing.T) {
             expected: ActionAllow,
         },
     }
-    
+
     for _, tc := range testCases {
         t.Run(tc.name, func(t *testing.T) {
-            decision, err := engine.EvaluatePolicy(context.Background(), 
+            decision, err := engine.EvaluatePolicy(context.Background(),
                 policy.ID, tc.context)
             assert.NoError(t, err)
             assert.Equal(t, tc.expected, decision.Action)

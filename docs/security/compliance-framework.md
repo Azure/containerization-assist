@@ -25,7 +25,7 @@ func (cf *ComplianceFramework) CheckCIS_4_1(config ContainerConfig) ComplianceRe
             Severity:    "HIGH",
         }
     }
-    
+
     return ComplianceResult{
         ControlID:   "CIS-4.1",
         Status:      "PASS",
@@ -42,13 +42,13 @@ func (cf *ComplianceFramework) CheckCIS_4_5(options AdvancedSandboxOptions) Comp
     if len(options.SecurityPolicy.TrustedRegistries) == 0 {
         return ComplianceResult{
             ControlID:   "CIS-4.5",
-            Status:      "FAIL", 
+            Status:      "FAIL",
             Description: "No trusted registries configured",
             Remediation: "Configure trusted container registries",
             Severity:    "MEDIUM",
         }
     }
-    
+
     return ComplianceResult{
         ControlID:   "CIS-4.5",
         Status:      "PASS",
@@ -66,7 +66,7 @@ func (cf *ComplianceFramework) CheckCIS_5_3(config ContainerConfig) ComplianceRe
         "CAP_SYS_MODULE", "CAP_DAC_OVERRIDE", "CAP_SETUID",
         "CAP_SETGID", "CAP_NET_RAW",
     }
-    
+
     for _, cap := range config.Capabilities {
         for _, dangerous := range dangerousCapabilities {
             if cap == dangerous {
@@ -80,9 +80,9 @@ func (cf *ComplianceFramework) CheckCIS_5_3(config ContainerConfig) ComplianceRe
             }
         }
     }
-    
+
     return ComplianceResult{
-        ControlID:   "CIS-5.3", 
+        ControlID:   "CIS-5.3",
         Status:      "PASS",
         Description: "No dangerous capabilities detected",
         Severity:    "INFO",
@@ -102,10 +102,10 @@ func (cf *ComplianceFramework) CheckCIS_5_9(config ContainerConfig) ComplianceRe
             Severity:    "HIGH",
         }
     }
-    
+
     return ComplianceResult{
         ControlID:   "CIS-5.9",
-        Status:      "PASS", 
+        Status:      "PASS",
         Description: "Container network properly isolated",
         Severity:    "INFO",
     }
@@ -124,7 +124,7 @@ func (cf *ComplianceFramework) CheckCIS_5_12(config ContainerConfig) ComplianceR
             Severity:    "MEDIUM",
         }
     }
-    
+
     return ComplianceResult{
         ControlID:   "CIS-5.12",
         Status:      "PASS",
@@ -145,20 +145,20 @@ NIST Special Publication 800-190 provides application container security guideli
 func (cf *ComplianceFramework) CheckNIST_CM2(config ContainerConfig) ComplianceResult {
     baselineChecks := []func(ContainerConfig) bool{
         cf.hasNonRootUser,
-        cf.hasReadOnlyFilesystem, 
+        cf.hasReadOnlyFilesystem,
         cf.hasResourceLimits,
         cf.hasSecurityOptions,
     }
-    
+
     passed := 0
     for _, check := range baselineChecks {
         if check(config) {
             passed++
         }
     }
-    
+
     percentage := float64(passed) / float64(len(baselineChecks)) * 100
-    
+
     if percentage < 80 {
         return ComplianceResult{
             ControlID:   "NIST-CM-2",
@@ -168,7 +168,7 @@ func (cf *ComplianceFramework) CheckNIST_CM2(config ContainerConfig) ComplianceR
             Severity:    "MEDIUM",
         }
     }
-    
+
     return ComplianceResult{
         ControlID:   "NIST-CM-2",
         Status:      "PASS",
@@ -182,22 +182,22 @@ func (cf *ComplianceFramework) CheckNIST_CM2(config ContainerConfig) ComplianceR
 ```go
 func (cf *ComplianceFramework) CheckNIST_AC6(config ContainerConfig) ComplianceResult {
     violations := []string{}
-    
+
     // Check for root user
     if config.User == "" || config.User == "0" || config.User == "root" {
         violations = append(violations, "Running as root user")
     }
-    
+
     // Check for excessive capabilities
     if len(config.Capabilities) > 3 {
         violations = append(violations, "Too many capabilities granted")
     }
-    
+
     // Check for privileged mode
     if config.Privileged {
         violations = append(violations, "Privileged mode enabled")
     }
-    
+
     if len(violations) > 0 {
         return ComplianceResult{
             ControlID:   "NIST-AC-6",
@@ -207,7 +207,7 @@ func (cf *ComplianceFramework) CheckNIST_AC6(config ContainerConfig) ComplianceR
             Severity:    "HIGH",
         }
     }
-    
+
     return ComplianceResult{
         ControlID:   "NIST-AC-6",
         Status:      "PASS",
@@ -227,14 +227,14 @@ func (cf *ComplianceFramework) CheckNIST_SC3(config ContainerConfig) ComplianceR
         "User namespace":        config.UsernsMode != "host",
         "UTS isolation":         config.UtsMode != "host",
     }
-    
+
     failures := []string{}
     for check, passed := range isolationChecks {
         if !passed {
             failures = append(failures, check)
         }
     }
-    
+
     if len(failures) > 0 {
         return ComplianceResult{
             ControlID:   "NIST-SC-3",
@@ -244,7 +244,7 @@ func (cf *ComplianceFramework) CheckNIST_SC3(config ContainerConfig) ComplianceR
             Severity:    "HIGH",
         }
     }
-    
+
     return ComplianceResult{
         ControlID:   "NIST-SC-3",
         Status:      "PASS",
@@ -321,9 +321,9 @@ func (cdc *CISDockerChecker) CheckCompliance(config interface{}) []ComplianceRes
             Timestamp:   time.Now(),
         }}
     }
-    
+
     var results []ComplianceResult
-    
+
     // Run all CIS checks
     checks := []func(ContainerConfig) ComplianceResult{
         cdc.checkCIS_4_1,  // Non-root user
@@ -334,7 +334,7 @@ func (cdc *CISDockerChecker) CheckCompliance(config interface{}) []ComplianceRes
         cdc.checkCIS_5_13, // Memory limits
         cdc.checkCIS_5_14, // CPU limits
     }
-    
+
     for _, check := range checks {
         start := time.Now()
         result := check(containerConfig)
@@ -343,7 +343,7 @@ func (cdc *CISDockerChecker) CheckCompliance(config interface{}) []ComplianceRes
         result.CheckDuration = time.Since(start)
         results = append(results, result)
     }
-    
+
     return results
 }
 ```
@@ -374,9 +374,9 @@ func (nc *NISTChecker) CheckCompliance(config interface{}) []ComplianceResult {
             Timestamp:   time.Now(),
         }}
     }
-    
+
     var results []ComplianceResult
-    
+
     // Run NIST checks
     checks := []func(ContainerConfig) ComplianceResult{
         nc.checkNIST_CM2, // Baseline configuration
@@ -384,7 +384,7 @@ func (nc *NISTChecker) CheckCompliance(config interface{}) []ComplianceResult {
         nc.checkNIST_SC3, // Security function isolation
         nc.checkNIST_SI3, // Malicious code protection
     }
-    
+
     for _, check := range checks {
         start := time.Now()
         result := check(containerConfig)
@@ -393,7 +393,7 @@ func (nc *NISTChecker) CheckCompliance(config interface{}) []ComplianceResult {
         result.CheckDuration = time.Since(start)
         results = append(results, result)
     }
-    
+
     return results
 }
 ```
@@ -403,11 +403,11 @@ func (nc *NISTChecker) CheckCompliance(config interface{}) []ComplianceResult {
 ### Assessment Engine
 
 ```go
-func (cf *ComplianceFramework) AssessCompliance(ctx context.Context, 
+func (cf *ComplianceFramework) AssessCompliance(ctx context.Context,
     sessionID string, config ContainerConfig) (*ComplianceAssessment, error) {
-    
+
     cf.logger.Info().Str("session_id", sessionID).Msg("Starting compliance assessment")
-    
+
     assessment := &ComplianceAssessment{
         SessionID:   sessionID,
         Timestamp:   time.Now(),
@@ -415,27 +415,27 @@ func (cf *ComplianceFramework) AssessCompliance(ctx context.Context,
         Results:     make(map[string][]ComplianceResult),
         Summary:     ComplianceSummary{},
     }
-    
+
     // Run all registered checkers
     for framework, checker := range cf.checkers {
         start := time.Now()
         results := checker.CheckCompliance(config)
         assessment.Results[framework] = results
-        
+
         cf.logger.Debug().
             Str("framework", framework).
             Int("checks", len(results)).
             Dur("duration", time.Since(start)).
             Msg("Framework assessment completed")
     }
-    
+
     // Generate summary
     assessment.Summary = cf.generateSummary(assessment.Results)
-    
+
     // Calculate overall compliance score
     assessment.OverallScore = cf.calculateComplianceScore(assessment.Results)
     assessment.ComplianceLevel = cf.getComplianceLevel(assessment.OverallScore)
-    
+
     return assessment, nil
 }
 
@@ -477,28 +477,28 @@ type FrameworkSummary struct {
 func (cf *ComplianceFramework) calculateComplianceScore(results map[string][]ComplianceResult) float64 {
     totalWeight := 0.0
     weightedScore := 0.0
-    
+
     weights := map[string]float64{
         "CIS Docker": 0.4,  // 40% weight
         "NIST":       0.3,  // 30% weight
         "Custom":     0.3,  // 30% weight
     }
-    
+
     for framework, frameworkResults := range results {
         weight := weights[framework]
         if weight == 0 {
             weight = 0.1 // Default weight for unknown frameworks
         }
-        
+
         frameworkScore := cf.calculateFrameworkScore(frameworkResults)
         weightedScore += frameworkScore * weight
         totalWeight += weight
     }
-    
+
     if totalWeight == 0 {
         return 0.0
     }
-    
+
     return weightedScore / totalWeight * 100 // Convert to percentage
 }
 
@@ -506,10 +506,10 @@ func (cf *ComplianceFramework) calculateFrameworkScore(results []ComplianceResul
     if len(results) == 0 {
         return 0.0
     }
-    
+
     totalScore := 0.0
     totalWeight := 0.0
-    
+
     severityWeights := map[string]float64{
         "CRITICAL": 1.0,
         "HIGH":     0.8,
@@ -517,13 +517,13 @@ func (cf *ComplianceFramework) calculateFrameworkScore(results []ComplianceResul
         "LOW":      0.4,
         "INFO":     0.2,
     }
-    
+
     for _, result := range results {
         weight := severityWeights[result.Severity]
         if weight == 0 {
             weight = 0.5 // Default weight
         }
-        
+
         var score float64
         switch result.Status {
         case StatusPass:
@@ -535,15 +535,15 @@ func (cf *ComplianceFramework) calculateFrameworkScore(results []ComplianceResul
         case StatusNotApplicable:
             continue // Skip non-applicable checks
         }
-        
+
         totalScore += score * weight
         totalWeight += weight
     }
-    
+
     if totalWeight == 0 {
         return 0.0
     }
-    
+
     return totalScore / totalWeight
 }
 
@@ -581,7 +581,7 @@ func (cr *ComplianceReporter) GenerateReport(assessment *ComplianceAssessment) (
         Recommendations:  cr.generateRecommendations(assessment),
         ActionPlan:       cr.generateActionPlan(assessment),
     }
-    
+
     return report, nil
 }
 
@@ -610,11 +610,11 @@ func (cr *ComplianceReporter) generateExecutiveSummary(assessment *ComplianceAss
         CriticalIssues:   assessment.Summary.BySeverity["CRITICAL"],
         HighIssues:       assessment.Summary.BySeverity["HIGH"],
     }
-    
+
     // Generate key findings
     summary.KeyFindings = cr.extractKeyFindings(assessment)
     summary.TopRecommendations = cr.extractTopRecommendations(assessment)
-    
+
     return summary
 }
 ```
@@ -637,7 +637,7 @@ type ComplianceRecommendation struct {
 
 func (cf *ComplianceFramework) generateRecommendations(assessment *ComplianceAssessment) []ComplianceRecommendation {
     var recommendations []ComplianceRecommendation
-    
+
     // Analyze failed checks and generate recommendations
     for framework, results := range assessment.Results {
         for _, result := range results {
@@ -647,13 +647,13 @@ func (cf *ComplianceFramework) generateRecommendations(assessment *ComplianceAss
             }
         }
     }
-    
+
     // Sort by priority and impact
     sort.Slice(recommendations, func(i, j int) bool {
-        return cf.getPriorityWeight(recommendations[i].Priority) > 
+        return cf.getPriorityWeight(recommendations[i].Priority) >
                cf.getPriorityWeight(recommendations[j].Priority)
     })
-    
+
     return recommendations
 }
 
@@ -702,31 +702,31 @@ func (cm *ComplianceMonitor) StartMonitoring(ctx context.Context) error {
     if err != nil {
         return fmt.Errorf("failed to schedule compliance monitoring: %w", err)
     }
-    
+
     cm.scheduler.Start()
     cm.logger.Info().Msg("Compliance monitoring started")
-    
+
     return nil
 }
 
 func (cm *ComplianceMonitor) runScheduledCompliance(ctx context.Context) {
     cm.logger.Info().Msg("Running scheduled compliance check")
-    
+
     // Get active sessions
     sessions := cm.getActiveSessions()
-    
+
     for _, session := range sessions {
         assessment, err := cm.framework.AssessCompliance(ctx, session.ID, session.Config)
         if err != nil {
             cm.logger.Error().Err(err).Str("session_id", session.ID).Msg("Compliance assessment failed")
             continue
         }
-        
+
         // Check for compliance violations
         if assessment.OverallScore < 75 { // Threshold for alerting
             cm.alerts.SendComplianceAlert(session.ID, assessment)
         }
-        
+
         // Store assessment results
         cm.storeAssessment(assessment)
     }
@@ -768,7 +768,7 @@ type ControlViolation struct {
 func TestComplianceFramework(t *testing.T) {
     logger := zerolog.New(os.Stdout)
     framework := NewComplianceFramework(logger)
-    
+
     // Test secure configuration
     secureConfig := ContainerConfig{
         User:           "1000",
@@ -777,12 +777,12 @@ func TestComplianceFramework(t *testing.T) {
         Capabilities:   []string{},
         SecurityOpt:    []string{"no-new-privileges:true"},
     }
-    
+
     assessment, err := framework.AssessCompliance(context.Background(), "test-session", secureConfig)
     assert.NoError(t, err)
     assert.True(t, assessment.OverallScore > 80)
     assert.Equal(t, "GOOD", assessment.ComplianceLevel)
-    
+
     // Test insecure configuration
     insecureConfig := ContainerConfig{
         User:           "root",
@@ -791,7 +791,7 @@ func TestComplianceFramework(t *testing.T) {
         Capabilities:   []string{"CAP_SYS_ADMIN"},
         Privileged:     true,
     }
-    
+
     assessment, err = framework.AssessCompliance(context.Background(), "test-session-insecure", insecureConfig)
     assert.NoError(t, err)
     assert.True(t, assessment.OverallScore < 50)
@@ -806,13 +806,13 @@ func TestComplianceFramework(t *testing.T) {
 ```go
 func (sv *SecurityValidator) ValidateSecurityWithCompliance(ctx context.Context,
     sessionID string, options AdvancedSandboxOptions) (*SecurityValidationReport, error) {
-    
+
     // Run standard security validation
     report, err := sv.ValidateSecurity(ctx, sessionID, options)
     if err != nil {
         return nil, err
     }
-    
+
     // Add compliance assessment
     config := sv.buildContainerConfig(options)
     compliance, err := sv.complianceFramework.AssessCompliance(ctx, sessionID, config)
@@ -826,7 +826,7 @@ func (sv *SecurityValidator) ValidateSecurityWithCompliance(ctx context.Context,
             Violations:      sv.extractViolations(compliance),
         }
     }
-    
+
     return report, nil
 }
 

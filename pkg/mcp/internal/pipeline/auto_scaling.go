@@ -13,32 +13,32 @@ import (
 
 // AutoScaler provides intelligent auto-scaling for session management and pipeline operations
 type AutoScaler struct {
-	sessionManager      *session.SessionManager
-	logger              zerolog.Logger
+	sessionManager       *session.SessionManager
+	logger               zerolog.Logger
 	monitoringIntegrator *MonitoringIntegrator
-	
+
 	// Scaling configuration
-	config               AutoScalingConfig
-	
+	config AutoScalingConfig
+
 	// Current scaling state
-	currentCapacity      int
-	targetCapacity       int
-	lastScaleAction      time.Time
-	scalingInProgress    bool
-	scalingMutex         sync.RWMutex
-	
+	currentCapacity   int
+	targetCapacity    int
+	lastScaleAction   time.Time
+	scalingInProgress bool
+	scalingMutex      sync.RWMutex
+
 	// Metrics tracking
-	loadHistory          []LoadMetric
-	capacityHistory      []CapacityMetric
-	metricsMutex         sync.RWMutex
-	
+	loadHistory     []LoadMetric
+	capacityHistory []CapacityMetric
+	metricsMutex    sync.RWMutex
+
 	// Worker pools
-	sessionWorkerPool    *WorkerPool
-	operationWorkerPool  *WorkerPool
-	
+	sessionWorkerPool   *WorkerPool
+	operationWorkerPool *WorkerPool
+
 	// Predictive scaling
-	loadPredictor        *LoadPredictor
-	anomalyDetector      *AnomalyDetector
+	loadPredictor   *LoadPredictor
+	anomalyDetector *AnomalyDetector
 }
 
 // AutoScalingConfig configures auto-scaling behavior
@@ -59,33 +59,33 @@ type AutoScalingConfig struct {
 
 // LoadMetric represents load metrics at a point in time
 type LoadMetric struct {
-	Timestamp           time.Time `json:"timestamp"`
-	SessionCount        int       `json:"session_count"`
-	ActiveOperations    int       `json:"active_operations"`
-	QueuedOperations    int       `json:"queued_operations"`
-	CPUUtilization      float64   `json:"cpu_utilization"`
-	MemoryUtilization   float64   `json:"memory_utilization"`
-	ResponseTime        time.Duration `json:"response_time"`
-	ErrorRate           float64   `json:"error_rate"`
+	Timestamp         time.Time     `json:"timestamp"`
+	SessionCount      int           `json:"session_count"`
+	ActiveOperations  int           `json:"active_operations"`
+	QueuedOperations  int           `json:"queued_operations"`
+	CPUUtilization    float64       `json:"cpu_utilization"`
+	MemoryUtilization float64       `json:"memory_utilization"`
+	ResponseTime      time.Duration `json:"response_time"`
+	ErrorRate         float64       `json:"error_rate"`
 }
 
 // CapacityMetric represents capacity changes over time
 type CapacityMetric struct {
-	Timestamp     time.Time `json:"timestamp"`
-	Capacity      int       `json:"capacity"`
-	ScaleAction   string    `json:"scale_action"`
-	Reason        string    `json:"reason"`
-	LoadAtScale   float64   `json:"load_at_scale"`
+	Timestamp   time.Time `json:"timestamp"`
+	Capacity    int       `json:"capacity"`
+	ScaleAction string    `json:"scale_action"`
+	Reason      string    `json:"reason"`
+	LoadAtScale float64   `json:"load_at_scale"`
 }
 
 // WorkerPool manages a pool of workers for operations
 type WorkerPool struct {
-	workers     []Worker
-	workChan    chan WorkItem
-	capacity    int
-	active      int
-	mutex       sync.RWMutex
-	shutdownCh  chan struct{}
+	workers    []Worker
+	workChan   chan WorkItem
+	capacity   int
+	active     int
+	mutex      sync.RWMutex
+	shutdownCh chan struct{}
 }
 
 // Worker represents a worker in the pool
@@ -98,11 +98,11 @@ type Worker struct {
 
 // WorkItem represents work to be processed
 type WorkItem struct {
-	ID        string
-	Type      string
-	Data      interface{}
-	Callback  func(interface{}) error
-	Context   context.Context
+	ID       string
+	Type     string
+	Data     interface{}
+	Callback func(interface{}) error
+	Context  context.Context
 }
 
 // LoadPredictor provides predictive load analysis
@@ -114,11 +114,11 @@ type LoadPredictor struct {
 
 // LoadPattern represents recurring load patterns
 type LoadPattern struct {
-	Name        string    `json:"name"`
-	TimeOfDay   time.Time `json:"time_of_day"`
-	DayOfWeek   int       `json:"day_of_week"`
-	LoadFactor  float64   `json:"load_factor"`
-	Confidence  float64   `json:"confidence"`
+	Name       string    `json:"name"`
+	TimeOfDay  time.Time `json:"time_of_day"`
+	DayOfWeek  int       `json:"day_of_week"`
+	LoadFactor float64   `json:"load_factor"`
+	Confidence float64   `json:"confidence"`
 }
 
 // AnomalyDetector detects unusual load patterns
@@ -131,18 +131,18 @@ type AnomalyDetector struct {
 
 // AnomalyThresholds defines thresholds for anomaly detection
 type AnomalyThresholds struct {
-	CPUVariance      float64 `json:"cpu_variance"`
-	MemoryVariance   float64 `json:"memory_variance"`
-	SessionSpike     float64 `json:"session_spike"`
-	ErrorRateSpike   float64 `json:"error_rate_spike"`
+	CPUVariance    float64 `json:"cpu_variance"`
+	MemoryVariance float64 `json:"memory_variance"`
+	SessionSpike   float64 `json:"session_spike"`
+	ErrorRateSpike float64 `json:"error_rate_spike"`
 }
 
 // Anomaly represents a detected anomaly
 type Anomaly struct {
-	Timestamp   time.Time `json:"timestamp"`
-	Type        string    `json:"type"`
-	Severity    string    `json:"severity"`
-	Description string    `json:"description"`
+	Timestamp   time.Time  `json:"timestamp"`
+	Type        string     `json:"type"`
+	Severity    string     `json:"severity"`
+	Description string     `json:"description"`
 	Metric      LoadMetric `json:"metric"`
 }
 
@@ -163,7 +163,7 @@ func NewAutoScaler(
 	config AutoScalingConfig,
 	logger zerolog.Logger,
 ) *AutoScaler {
-	
+
 	// Set defaults
 	if config.MinCapacity == 0 {
 		config.MinCapacity = 2
@@ -198,7 +198,7 @@ func NewAutoScaler(
 	if config.MaxScaleDownPercent == 0 {
 		config.MaxScaleDownPercent = 50.0
 	}
-	
+
 	as := &AutoScaler{
 		sessionManager:       sessionManager,
 		logger:               logger.With().Str("component", "auto_scaler").Logger(),
@@ -209,11 +209,11 @@ func NewAutoScaler(
 		loadHistory:          make([]LoadMetric, 0),
 		capacityHistory:      make([]CapacityMetric, 0),
 	}
-	
+
 	// Initialize worker pools
 	as.sessionWorkerPool = NewWorkerPool(config.MinCapacity, "session")
 	as.operationWorkerPool = NewWorkerPool(config.MinCapacity, "operation")
-	
+
 	// Initialize predictive scaling components
 	if config.PredictiveScaling {
 		as.loadPredictor = NewLoadPredictor()
@@ -224,20 +224,20 @@ func NewAutoScaler(
 			ErrorRateSpike: 10.0,
 		})
 	}
-	
+
 	// Start auto-scaling loop
 	go as.startAutoScalingLoop()
-	
+
 	// Start metrics collection
 	go as.startMetricsCollection()
-	
+
 	as.logger.Info().
 		Int("min_capacity", config.MinCapacity).
 		Int("max_capacity", config.MaxCapacity).
 		Float64("target_utilization", config.TargetUtilization).
 		Bool("predictive_scaling", config.PredictiveScaling).
 		Msg("Auto-scaler initialized")
-	
+
 	return as
 }
 
@@ -245,19 +245,19 @@ func NewAutoScaler(
 func (as *AutoScaler) EvaluateScaling(ctx context.Context) (*ScalingDecision, error) {
 	as.scalingMutex.RLock()
 	defer as.scalingMutex.RUnlock()
-	
+
 	// Get current load metrics
 	loadMetric, err := as.getCurrentLoadMetric(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get load metrics: %w", err)
 	}
-	
+
 	// Record load metric
 	as.recordLoadMetric(loadMetric)
-	
+
 	// Calculate utilization
 	utilization := as.calculateUtilization(loadMetric)
-	
+
 	// Determine scaling action
 	decision := &ScalingDecision{
 		CurrentCapacity: as.currentCapacity,
@@ -265,10 +265,10 @@ func (as *AutoScaler) EvaluateScaling(ctx context.Context) (*ScalingDecision, er
 		Timestamp:       time.Now(),
 		Confidence:      1.0,
 	}
-	
+
 	// Check cooldown periods
 	timeSinceLastScale := time.Since(as.lastScaleAction)
-	
+
 	if utilization > as.config.ScaleUpThreshold {
 		if timeSinceLastScale >= as.config.ScaleUpCooldown {
 			newCapacity := as.calculateScaleUpCapacity(utilization, loadMetric)
@@ -277,7 +277,7 @@ func (as *AutoScaler) EvaluateScaling(ctx context.Context) (*ScalingDecision, er
 			decision.Reason = fmt.Sprintf("High utilization: %.2f%% > %.2f%%", utilization, as.config.ScaleUpThreshold)
 		} else {
 			decision.Action = "none"
-			decision.Reason = fmt.Sprintf("Scale up in cooldown (%.1fs remaining)", 
+			decision.Reason = fmt.Sprintf("Scale up in cooldown (%.1fs remaining)",
 				as.config.ScaleUpCooldown.Seconds()-timeSinceLastScale.Seconds())
 		}
 	} else if utilization < as.config.ScaleDownThreshold {
@@ -288,14 +288,14 @@ func (as *AutoScaler) EvaluateScaling(ctx context.Context) (*ScalingDecision, er
 			decision.Reason = fmt.Sprintf("Low utilization: %.2f%% < %.2f%%", utilization, as.config.ScaleDownThreshold)
 		} else {
 			decision.Action = "none"
-			decision.Reason = fmt.Sprintf("Scale down in cooldown (%.1fs remaining)", 
+			decision.Reason = fmt.Sprintf("Scale down in cooldown (%.1fs remaining)",
 				as.config.ScaleDownCooldown.Seconds()-timeSinceLastScale.Seconds())
 		}
 	} else {
 		decision.Action = "none"
 		decision.Reason = fmt.Sprintf("Utilization within target range: %.2f%%", utilization)
 	}
-	
+
 	// Apply predictive scaling if enabled
 	if as.config.PredictiveScaling && decision.Action == "none" {
 		predictiveDecision := as.evaluatePredictiveScaling(loadMetric)
@@ -303,10 +303,10 @@ func (as *AutoScaler) EvaluateScaling(ctx context.Context) (*ScalingDecision, er
 			decision = predictiveDecision
 		}
 	}
-	
+
 	// Validate scaling decision
 	decision.TargetCapacity = as.validateCapacity(decision.TargetCapacity)
-	
+
 	return decision, nil
 }
 
@@ -315,19 +315,19 @@ func (as *AutoScaler) ExecuteScaling(ctx context.Context, decision *ScalingDecis
 	if decision.Action == "none" || decision.TargetCapacity == as.currentCapacity {
 		return nil
 	}
-	
+
 	as.scalingMutex.Lock()
 	defer as.scalingMutex.Unlock()
-	
+
 	if as.scalingInProgress {
 		return fmt.Errorf("scaling operation already in progress")
 	}
-	
+
 	as.scalingInProgress = true
 	defer func() { as.scalingInProgress = false }()
-	
+
 	oldCapacity := as.currentCapacity
-	
+
 	// Execute scaling
 	switch decision.Action {
 	case "scale_up":
@@ -341,12 +341,12 @@ func (as *AutoScaler) ExecuteScaling(ctx context.Context, decision *ScalingDecis
 			return fmt.Errorf("failed to scale down: %w", err)
 		}
 	}
-	
+
 	// Update state
 	as.currentCapacity = decision.TargetCapacity
 	as.targetCapacity = decision.TargetCapacity
 	as.lastScaleAction = time.Now()
-	
+
 	// Record capacity change
 	as.recordCapacityChange(CapacityMetric{
 		Timestamp:   time.Now(),
@@ -355,14 +355,14 @@ func (as *AutoScaler) ExecuteScaling(ctx context.Context, decision *ScalingDecis
 		Reason:      decision.Reason,
 		LoadAtScale: as.calculateCurrentLoad(),
 	})
-	
+
 	as.logger.Info().
 		Str("action", decision.Action).
 		Int("old_capacity", oldCapacity).
 		Int("new_capacity", decision.TargetCapacity).
 		Str("reason", decision.Reason).
 		Msg("Scaling operation completed")
-	
+
 	return nil
 }
 
@@ -370,12 +370,12 @@ func (as *AutoScaler) ExecuteScaling(ctx context.Context, decision *ScalingDecis
 func (as *AutoScaler) GetScalingMetrics() ScalingMetrics {
 	as.metricsMutex.RLock()
 	defer as.metricsMutex.RUnlock()
-	
+
 	currentLoad := LoadMetric{}
 	if len(as.loadHistory) > 0 {
 		currentLoad = as.loadHistory[len(as.loadHistory)-1]
 	}
-	
+
 	return ScalingMetrics{
 		CurrentCapacity:   as.currentCapacity,
 		TargetCapacity:    as.targetCapacity,
@@ -392,25 +392,25 @@ func (as *AutoScaler) GetScalingMetrics() ScalingMetrics {
 func (as *AutoScaler) startAutoScalingLoop() {
 	ticker := time.NewTicker(as.config.EvaluationInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			
+
 			decision, err := as.EvaluateScaling(ctx)
 			if err != nil {
 				as.logger.Error().Err(err).Msg("Failed to evaluate scaling")
 				cancel()
 				continue
 			}
-			
+
 			if decision.Action != "none" {
 				if err := as.ExecuteScaling(ctx, decision); err != nil {
 					as.logger.Error().Err(err).Msg("Failed to execute scaling")
 				}
 			}
-			
+
 			cancel()
 		}
 	}
@@ -419,15 +419,15 @@ func (as *AutoScaler) startAutoScalingLoop() {
 func (as *AutoScaler) startMetricsCollection() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			
+
 			if loadMetric, err := as.getCurrentLoadMetric(ctx); err == nil {
 				as.recordLoadMetric(loadMetric)
-				
+
 				// Detect anomalies if enabled
 				if as.anomalyDetector != nil {
 					if anomaly := as.anomalyDetector.DetectAnomaly(loadMetric); anomaly != nil {
@@ -435,7 +435,7 @@ func (as *AutoScaler) startMetricsCollection() {
 					}
 				}
 			}
-			
+
 			cancel()
 		}
 	}
@@ -447,7 +447,7 @@ func (as *AutoScaler) getCurrentLoadMetric(ctx context.Context) (LoadMetric, err
 	if err != nil {
 		return LoadMetric{}, fmt.Errorf("failed to get monitoring metrics: %w", err)
 	}
-	
+
 	return LoadMetric{
 		Timestamp:         time.Now(),
 		SessionCount:      int(monitoringMetrics.ActiveSessions),
@@ -464,13 +464,13 @@ func (as *AutoScaler) calculateUtilization(metric LoadMetric) float64 {
 	// Calculate composite utilization score
 	sessionUtilization := float64(metric.SessionCount) / float64(as.currentCapacity) * 100
 	operationUtilization := float64(metric.ActiveOperations) / float64(as.currentCapacity) * 100
-	
+
 	// Weight different factors
-	utilization := sessionUtilization*0.4 + 
-		operationUtilization*0.3 + 
-		metric.CPUUtilization*0.2 + 
+	utilization := sessionUtilization*0.4 +
+		operationUtilization*0.3 +
+		metric.CPUUtilization*0.2 +
 		metric.MemoryUtilization*0.1
-	
+
 	return math.Min(utilization, 100.0)
 }
 
@@ -478,13 +478,13 @@ func (as *AutoScaler) calculateScaleUpCapacity(utilization float64, metric LoadM
 	// Calculate target capacity based on utilization
 	scaleFactor := utilization / as.config.TargetUtilization
 	newCapacity := int(math.Ceil(float64(as.currentCapacity) * scaleFactor))
-	
+
 	// Apply maximum scale up percentage
 	maxIncrease := int(math.Ceil(float64(as.currentCapacity) * as.config.MaxScaleUpPercent / 100))
 	if newCapacity > as.currentCapacity+maxIncrease {
 		newCapacity = as.currentCapacity + maxIncrease
 	}
-	
+
 	return as.validateCapacity(newCapacity)
 }
 
@@ -492,13 +492,13 @@ func (as *AutoScaler) calculateScaleDownCapacity(utilization float64, metric Loa
 	// Calculate target capacity based on utilization
 	scaleFactor := utilization / as.config.TargetUtilization
 	newCapacity := int(math.Floor(float64(as.currentCapacity) * scaleFactor))
-	
+
 	// Apply maximum scale down percentage
 	maxDecrease := int(math.Ceil(float64(as.currentCapacity) * as.config.MaxScaleDownPercent / 100))
 	if newCapacity < as.currentCapacity-maxDecrease {
 		newCapacity = as.currentCapacity - maxDecrease
 	}
-	
+
 	return as.validateCapacity(newCapacity)
 }
 
@@ -514,42 +514,42 @@ func (as *AutoScaler) validateCapacity(capacity int) int {
 
 func (as *AutoScaler) scaleUp(ctx context.Context, targetCapacity int) error {
 	increase := targetCapacity - as.currentCapacity
-	
+
 	// Scale session worker pool
 	if err := as.sessionWorkerPool.ScaleUp(increase); err != nil {
 		return fmt.Errorf("failed to scale up session worker pool: %w", err)
 	}
-	
+
 	// Scale operation worker pool
 	if err := as.operationWorkerPool.ScaleUp(increase); err != nil {
 		return fmt.Errorf("failed to scale up operation worker pool: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (as *AutoScaler) scaleDown(ctx context.Context, targetCapacity int) error {
 	decrease := as.currentCapacity - targetCapacity
-	
+
 	// Scale down session worker pool
 	if err := as.sessionWorkerPool.ScaleDown(decrease); err != nil {
 		return fmt.Errorf("failed to scale down session worker pool: %w", err)
 	}
-	
+
 	// Scale down operation worker pool
 	if err := as.operationWorkerPool.ScaleDown(decrease); err != nil {
 		return fmt.Errorf("failed to scale down operation worker pool: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (as *AutoScaler) recordLoadMetric(metric LoadMetric) {
 	as.metricsMutex.Lock()
 	defer as.metricsMutex.Unlock()
-	
+
 	as.loadHistory = append(as.loadHistory, metric)
-	
+
 	// Keep only recent history
 	cutoff := time.Now().Add(-as.config.MetricsWindow * 2)
 	var filteredHistory []LoadMetric
@@ -564,7 +564,7 @@ func (as *AutoScaler) recordLoadMetric(metric LoadMetric) {
 func (as *AutoScaler) recordCapacityChange(metric CapacityMetric) {
 	as.metricsMutex.Lock()
 	defer as.metricsMutex.Unlock()
-	
+
 	as.capacityHistory = append(as.capacityHistory, metric)
 }
 
@@ -626,12 +626,12 @@ func NewWorkerPool(capacity int, poolType string) *WorkerPool {
 		capacity:   capacity,
 		shutdownCh: make(chan struct{}),
 	}
-	
+
 	// Start initial workers
 	for i := 0; i < capacity; i++ {
 		wp.addWorker(i)
 	}
-	
+
 	return wp
 }
 
@@ -642,9 +642,9 @@ func (wp *WorkerPool) addWorker(id int) {
 		QuitChan: make(chan struct{}),
 		Active:   true,
 	}
-	
+
 	wp.workers = append(wp.workers, worker)
-	
+
 	go func() {
 		for {
 			select {
@@ -663,13 +663,13 @@ func (wp *WorkerPool) processWork(work WorkItem) {
 	wp.mutex.Lock()
 	wp.active++
 	wp.mutex.Unlock()
-	
+
 	defer func() {
 		wp.mutex.Lock()
 		wp.active--
 		wp.mutex.Unlock()
 	}()
-	
+
 	if work.Callback != nil {
 		work.Callback(work.Data)
 	}
@@ -678,11 +678,11 @@ func (wp *WorkerPool) processWork(work WorkItem) {
 func (wp *WorkerPool) ScaleUp(increase int) error {
 	wp.mutex.Lock()
 	defer wp.mutex.Unlock()
-	
+
 	for i := 0; i < increase; i++ {
 		wp.addWorker(len(wp.workers))
 	}
-	
+
 	wp.capacity += increase
 	return nil
 }
@@ -690,11 +690,11 @@ func (wp *WorkerPool) ScaleUp(increase int) error {
 func (wp *WorkerPool) ScaleDown(decrease int) error {
 	wp.mutex.Lock()
 	defer wp.mutex.Unlock()
-	
+
 	if decrease >= len(wp.workers) {
 		decrease = len(wp.workers) - 1 // Keep at least one worker
 	}
-	
+
 	// Stop workers
 	for i := 0; i < decrease; i++ {
 		if len(wp.workers) > 0 {
@@ -703,7 +703,7 @@ func (wp *WorkerPool) ScaleDown(decrease int) error {
 			wp.workers = wp.workers[:len(wp.workers)-1]
 		}
 	}
-	
+
 	wp.capacity -= decrease
 	return nil
 }
@@ -747,17 +747,17 @@ func (ad *AnomalyDetector) DetectAnomaly(metric LoadMetric) *Anomaly {
 			Metric:      metric,
 		}
 	}
-	
+
 	return nil
 }
 
 // ScalingMetrics represents current scaling state and metrics
 type ScalingMetrics struct {
-	CurrentCapacity   int               `json:"current_capacity"`
-	TargetCapacity    int               `json:"target_capacity"`
-	Utilization       float64           `json:"utilization"`
-	LoadHistory       []LoadMetric      `json:"load_history"`
-	CapacityHistory   []CapacityMetric  `json:"capacity_history"`
-	ScalingInProgress bool              `json:"scaling_in_progress"`
-	LastScaleAction   time.Time         `json:"last_scale_action"`
+	CurrentCapacity   int              `json:"current_capacity"`
+	TargetCapacity    int              `json:"target_capacity"`
+	Utilization       float64          `json:"utilization"`
+	LoadHistory       []LoadMetric     `json:"load_history"`
+	CapacityHistory   []CapacityMetric `json:"capacity_history"`
+	ScalingInProgress bool             `json:"scaling_in_progress"`
+	LastScaleAction   time.Time        `json:"last_scale_action"`
 }

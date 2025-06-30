@@ -35,15 +35,15 @@ graph TD
     B --> C[Threat Assessment]
     B --> D[Control Evaluation]
     B --> E[Vulnerability Scan]
-    
+
     C --> F[Risk Calculation]
     D --> F
     E --> F
-    
+
     F --> G{Risk Level}
     G -->|LOW/MEDIUM| H[Execute]
     G -->|HIGH/CRITICAL| I[Block & Report]
-    
+
     H --> J[Monitor Execution]
     I --> K[Security Audit Log]
     J --> K

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -16,7 +15,6 @@ import (
 // SecurityValidator provides comprehensive security validation for sandboxed execution
 type SecurityValidator struct {
 	logger       zerolog.Logger
-	mutex        sync.RWMutex
 	vulnDatabase map[string]VulnerabilityInfo
 	policyEngine *SecurityPolicyEngine
 	threatModel  *ThreatModel
@@ -314,7 +312,7 @@ func NewThreatModel() *ThreatModel {
 }
 
 // ValidateSecurity performs comprehensive security validation
-func (sv *SecurityValidator) ValidateSecurity(ctx context.Context, sessionID string, options AdvancedSandboxOptions) (*SecurityValidationReport, error) {
+func (sv *SecurityValidator) ValidateSecurity(ctx context.Context, sessionID string, options SandboxOptions) (*SecurityValidationReport, error) {
 	sv.logger.Info().Str("session_id", sessionID).Msg("Starting security validation")
 
 	report := &SecurityValidationReport{
@@ -354,7 +352,7 @@ func (sv *SecurityValidator) ValidateSecurity(ctx context.Context, sessionID str
 }
 
 // assessThreats evaluates all threats in the threat model
-func (sv *SecurityValidator) assessThreats(report *SecurityValidationReport, options AdvancedSandboxOptions) {
+func (sv *SecurityValidator) assessThreats(report *SecurityValidationReport, options SandboxOptions) {
 	for threatID, threat := range sv.threatModel.Threats {
 		assessment := ThreatAssessment{
 			ThreatID:  threatID,
@@ -395,7 +393,7 @@ func (sv *SecurityValidator) assessThreats(report *SecurityValidationReport, opt
 }
 
 // evaluateControls assesses the effectiveness of security controls
-func (sv *SecurityValidator) evaluateControls(report *SecurityValidationReport, options AdvancedSandboxOptions) {
+func (sv *SecurityValidator) evaluateControls(report *SecurityValidationReport, options SandboxOptions) {
 	for controlID, control := range sv.threatModel.Controls {
 		assessment := ControlAssessment{
 			ControlID:    controlID,
@@ -459,7 +457,7 @@ func (sv *SecurityValidator) evaluateControls(report *SecurityValidationReport, 
 }
 
 // scanVulnerabilities scans for known vulnerabilities
-func (sv *SecurityValidator) scanVulnerabilities(ctx context.Context, report *SecurityValidationReport, options AdvancedSandboxOptions) {
+func (sv *SecurityValidator) scanVulnerabilities(ctx context.Context, report *SecurityValidationReport, options SandboxOptions) {
 	// Check for common misconfigurations
 	if options.User == "root" || options.User == "0" {
 		vuln := VulnerabilityInfo{
@@ -967,7 +965,7 @@ func (sv *SecurityValidator) SaveSecurityReport(report *SecurityValidationReport
 }
 
 // isControlEffective checks if a control is effective given the current configuration
-func (sv *SecurityValidator) isControlEffective(controlID string, options AdvancedSandboxOptions) bool {
+func (sv *SecurityValidator) isControlEffective(controlID string, options SandboxOptions) bool {
 	switch controlID {
 	case "C001": // Non-root user
 		return options.User != "" && options.User != "root" && options.User != "0"

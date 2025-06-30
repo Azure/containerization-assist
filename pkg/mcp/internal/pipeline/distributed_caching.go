@@ -16,93 +16,93 @@ import (
 type DistributedCacheManager struct {
 	sessionManager *session.SessionManager
 	logger         zerolog.Logger
-	
+
 	// Local cache
-	localCache     map[string]*CacheEntry
-	localMutex     sync.RWMutex
-	
+	localCache map[string]*CacheEntry
+	localMutex sync.RWMutex
+
 	// Distributed cache nodes
-	cacheNodes     map[string]*CacheNode
-	nodesMutex     sync.RWMutex
-	localNodeID    string
-	
+	cacheNodes  map[string]*CacheNode
+	nodesMutex  sync.RWMutex
+	localNodeID string
+
 	// Cache configuration
-	config         DistributedCacheConfig
-	
+	config DistributedCacheConfig
+
 	// Consistency management
 	consistencyTracker *ConsistencyTracker
 	replicationManager *ReplicationManager
-	
+
 	// Performance monitoring
-	cacheMetrics   *DistributedCacheMetrics
-	metricsMutex   sync.RWMutex
-	
+	cacheMetrics *DistributedCacheMetrics
+	metricsMutex sync.RWMutex
+
 	// Background processes
-	shutdownCh     chan struct{}
+	shutdownCh chan struct{}
 }
 
 // DistributedCacheConfig configures distributed caching behavior
 type DistributedCacheConfig struct {
-	ReplicationFactor   int           `json:"replication_factor"`
-	ConsistencyLevel    string        `json:"consistency_level"` // eventual, strong, session
-	EvictionPolicy      string        `json:"eviction_policy"`   // lru, lfu, ttl
-	MaxCacheSize        int64         `json:"max_cache_size"`
-	DefaultTTL          time.Duration `json:"default_ttl"`
-	SyncInterval        time.Duration `json:"sync_interval"`
-	HeartbeatInterval   time.Duration `json:"heartbeat_interval"`
-	PartitionCount      int           `json:"partition_count"`
-	EnableCompression   bool          `json:"enable_compression"`
-	EnableEncryption    bool          `json:"enable_encryption"`
+	ReplicationFactor int           `json:"replication_factor"`
+	ConsistencyLevel  string        `json:"consistency_level"` // eventual, strong, session
+	EvictionPolicy    string        `json:"eviction_policy"`   // lru, lfu, ttl
+	MaxCacheSize      int64         `json:"max_cache_size"`
+	DefaultTTL        time.Duration `json:"default_ttl"`
+	SyncInterval      time.Duration `json:"sync_interval"`
+	HeartbeatInterval time.Duration `json:"heartbeat_interval"`
+	PartitionCount    int           `json:"partition_count"`
+	EnableCompression bool          `json:"enable_compression"`
+	EnableEncryption  bool          `json:"enable_encryption"`
 }
 
 // CacheEntry represents a cached item with metadata
 type CacheEntry struct {
-	Key            string                 `json:"key"`
-	Value          interface{}            `json:"value"`
-	CreatedAt      time.Time              `json:"created_at"`
-	LastAccessed   time.Time              `json:"last_accessed"`
-	TTL            time.Duration          `json:"ttl"`
-	Version        int64                  `json:"version"`
-	AccessCount    int64                  `json:"access_count"`
-	Size           int64                  `json:"size"`
-	Partition      int                    `json:"partition"`
-	ReplicaNodes   []string               `json:"replica_nodes"`
-	Checksum       string                 `json:"checksum"`
-	Metadata       map[string]interface{} `json:"metadata"`
-	Compressed     bool                   `json:"compressed"`
-	Encrypted      bool                   `json:"encrypted"`
+	Key          string                 `json:"key"`
+	Value        interface{}            `json:"value"`
+	CreatedAt    time.Time              `json:"created_at"`
+	LastAccessed time.Time              `json:"last_accessed"`
+	TTL          time.Duration          `json:"ttl"`
+	Version      int64                  `json:"version"`
+	AccessCount  int64                  `json:"access_count"`
+	Size         int64                  `json:"size"`
+	Partition    int                    `json:"partition"`
+	ReplicaNodes []string               `json:"replica_nodes"`
+	Checksum     string                 `json:"checksum"`
+	Metadata     map[string]interface{} `json:"metadata"`
+	Compressed   bool                   `json:"compressed"`
+	Encrypted    bool                   `json:"encrypted"`
 }
 
 // CacheNode represents a node in the distributed cache cluster
 type CacheNode struct {
-	ID             string                `json:"id"`
-	Address        string                `json:"address"`
-	Port           int                   `json:"port"`
-	Status         CacheNodeStatus       `json:"status"`
-	LastSeen       time.Time             `json:"last_seen"`
-	Capacity       int64                 `json:"capacity"`
-	UsedSpace      int64                 `json:"used_space"`
-	Partitions     []int                 `json:"partitions"`
-	Version        string                `json:"version"`
-	Metadata       map[string]interface{} `json:"metadata"`
+	ID         string                 `json:"id"`
+	Address    string                 `json:"address"`
+	Port       int                    `json:"port"`
+	Status     CacheNodeStatus        `json:"status"`
+	LastSeen   time.Time              `json:"last_seen"`
+	Capacity   int64                  `json:"capacity"`
+	UsedSpace  int64                  `json:"used_space"`
+	Partitions []int                  `json:"partitions"`
+	Version    string                 `json:"version"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 // CacheNodeStatus represents the status of a cache node
 type CacheNodeStatus string
 
 const (
-	CacheNodeStatusOnline    CacheNodeStatus = "online"
-	CacheNodeStatusOffline   CacheNodeStatus = "offline"
-	CacheNodeStatusDraining  CacheNodeStatus = "draining"
-	CacheNodeStatusFailed    CacheNodeStatus = "failed"
+	CacheNodeStatusOnline   CacheNodeStatus = "online"
+	CacheNodeStatusOffline  CacheNodeStatus = "offline"
+	CacheNodeStatusDraining CacheNodeStatus = "draining"
+	CacheNodeStatusFailed   CacheNodeStatus = "failed"
 )
 
 // ConsistencyTracker manages data consistency across nodes
 type ConsistencyTracker struct {
-	vectorClock    map[string]int64
-	pendingWrites  map[string]*WriteOperation
-	readRepairs    map[string]*RepairOperation
-	mutex          sync.RWMutex
+	vectorClock   map[string]int64
+	pendingWrites map[string]*WriteOperation
+	readRepairs   map[string]*RepairOperation
+	mutex         sync.RWMutex
 }
 
 // WriteOperation represents a pending write operation
@@ -117,10 +117,10 @@ type WriteOperation struct {
 
 // RepairOperation represents a read repair operation
 type RepairOperation struct {
-	Key       string    `json:"key"`
+	Key       string       `json:"key"`
 	Conflicts []CacheEntry `json:"conflicts"`
-	Timestamp time.Time `json:"timestamp"`
-	Resolved  bool      `json:"resolved"`
+	Timestamp time.Time    `json:"timestamp"`
+	Resolved  bool         `json:"resolved"`
 }
 
 // ReplicationManager handles data replication across nodes
@@ -143,10 +143,10 @@ type ReplicationTask struct {
 
 // ReplicationWorker processes replication tasks
 type ReplicationWorker struct {
-	ID         int
-	TaskChan   chan ReplicationTask
-	QuitChan   chan struct{}
-	Manager    *ReplicationManager
+	ID       int
+	TaskChan chan ReplicationTask
+	QuitChan chan struct{}
+	Manager  *ReplicationManager
 }
 
 // ReplicationConfig configures replication behavior
@@ -162,28 +162,28 @@ type ReplicationConfig struct {
 
 // DistributedCacheMetrics tracks cache performance across the cluster
 type DistributedCacheMetrics struct {
-	TotalRequests     int64   `json:"total_requests"`
-	CacheHits         int64   `json:"cache_hits"`
-	CacheMisses       int64   `json:"cache_misses"`
-	ReplicationOps    int64   `json:"replication_ops"`
-	ConsistencyRepairs int64  `json:"consistency_repairs"`
-	AverageLatency    time.Duration `json:"average_latency"`
-	HitRatio          float64 `json:"hit_ratio"`
-	NodeCount         int     `json:"node_count"`
-	TotalCacheSize    int64   `json:"total_cache_size"`
-	NetworkTraffic    int64   `json:"network_traffic"`
-	LastUpdated       time.Time `json:"last_updated"`
+	TotalRequests      int64         `json:"total_requests"`
+	CacheHits          int64         `json:"cache_hits"`
+	CacheMisses        int64         `json:"cache_misses"`
+	ReplicationOps     int64         `json:"replication_ops"`
+	ConsistencyRepairs int64         `json:"consistency_repairs"`
+	AverageLatency     time.Duration `json:"average_latency"`
+	HitRatio           float64       `json:"hit_ratio"`
+	NodeCount          int           `json:"node_count"`
+	TotalCacheSize     int64         `json:"total_cache_size"`
+	NetworkTraffic     int64         `json:"network_traffic"`
+	LastUpdated        time.Time     `json:"last_updated"`
 }
 
 // CacheOperation represents a cache operation result
 type CacheOperation struct {
-	Success       bool          `json:"success"`
-	Found         bool          `json:"found"`
-	Value         interface{}   `json:"value"`
-	Latency       time.Duration `json:"latency"`
-	NodeID        string        `json:"node_id"`
-	Version       int64         `json:"version"`
-	Error         error         `json:"error,omitempty"`
+	Success bool          `json:"success"`
+	Found   bool          `json:"found"`
+	Value   interface{}   `json:"value"`
+	Latency time.Duration `json:"latency"`
+	NodeID  string        `json:"node_id"`
+	Version int64         `json:"version"`
+	Error   error         `json:"error,omitempty"`
 }
 
 // NewDistributedCacheManager creates a new distributed cache manager
@@ -192,7 +192,7 @@ func NewDistributedCacheManager(
 	config DistributedCacheConfig,
 	logger zerolog.Logger,
 ) *DistributedCacheManager {
-	
+
 	// Set defaults
 	if config.ReplicationFactor == 0 {
 		config.ReplicationFactor = 3
@@ -218,7 +218,7 @@ func NewDistributedCacheManager(
 	if config.PartitionCount == 0 {
 		config.PartitionCount = 256
 	}
-	
+
 	dcm := &DistributedCacheManager{
 		sessionManager: sessionManager,
 		logger:         logger.With().Str("component", "distributed_cache").Logger(),
@@ -231,14 +231,14 @@ func NewDistributedCacheManager(
 			LastUpdated: time.Now(),
 		},
 	}
-	
+
 	// Initialize consistency tracker
 	dcm.consistencyTracker = &ConsistencyTracker{
 		vectorClock:   make(map[string]int64),
 		pendingWrites: make(map[string]*WriteOperation),
 		readRepairs:   make(map[string]*RepairOperation),
 	}
-	
+
 	// Initialize replication manager
 	dcm.replicationManager = NewReplicationManager(ReplicationConfig{
 		WorkerCount:       5,
@@ -249,41 +249,41 @@ func NewDistributedCacheManager(
 		EnableBatching:    true,
 		EnableCompression: config.EnableCompression,
 	})
-	
+
 	// Start background processes
 	go dcm.startSynchronization()
 	go dcm.startHeartbeat()
 	go dcm.startEviction()
 	go dcm.startMetricsCollection()
-	
+
 	dcm.logger.Info().
 		Int("replication_factor", config.ReplicationFactor).
 		Str("consistency_level", config.ConsistencyLevel).
 		Int("partition_count", config.PartitionCount).
 		Str("node_id", dcm.localNodeID).
 		Msg("Distributed cache manager initialized")
-	
+
 	return dcm
 }
 
 // Get retrieves a value from the distributed cache
 func (dcm *DistributedCacheManager) Get(ctx context.Context, key string) (*CacheOperation, error) {
 	startTime := time.Now()
-	
+
 	// Calculate partition
 	partition := dcm.calculatePartition(key)
-	
+
 	// Try local cache first
 	dcm.localMutex.RLock()
 	if entry, exists := dcm.localCache[key]; exists && dcm.isEntryValid(entry) {
 		dcm.localMutex.RUnlock()
-		
+
 		// Update access metrics
 		entry.LastAccessed = time.Now()
 		entry.AccessCount++
-		
+
 		dcm.recordCacheHit()
-		
+
 		return &CacheOperation{
 			Success: true,
 			Found:   true,
@@ -294,30 +294,30 @@ func (dcm *DistributedCacheManager) Get(ctx context.Context, key string) (*Cache
 		}, nil
 	}
 	dcm.localMutex.RUnlock()
-	
+
 	// Try remote nodes
 	targetNodes := dcm.getNodesForPartition(partition)
-	
+
 	for _, nodeID := range targetNodes {
 		if nodeID == dcm.localNodeID {
 			continue
 		}
-		
+
 		operation, err := dcm.getFromNode(ctx, nodeID, key)
 		if err == nil && operation.Found {
 			// Cache locally for future use
 			if operation.Value != nil {
 				dcm.setLocal(key, operation.Value, dcm.config.DefaultTTL)
 			}
-			
+
 			dcm.recordCacheHit()
 			operation.Latency = time.Since(startTime)
 			return operation, nil
 		}
 	}
-	
+
 	dcm.recordCacheMiss()
-	
+
 	return &CacheOperation{
 		Success: true,
 		Found:   false,
@@ -331,7 +331,7 @@ func (dcm *DistributedCacheManager) Set(ctx context.Context, key string, value i
 	// Calculate partition and target nodes
 	partition := dcm.calculatePartition(key)
 	targetNodes := dcm.getNodesForPartition(partition)
-	
+
 	// Create cache entry
 	entry := &CacheEntry{
 		Key:          key,
@@ -349,20 +349,20 @@ func (dcm *DistributedCacheManager) Set(ctx context.Context, key string, value i
 		Compressed:   dcm.config.EnableCompression,
 		Encrypted:    dcm.config.EnableEncryption,
 	}
-	
+
 	// Apply compression if enabled
 	if dcm.config.EnableCompression {
 		entry.Value = dcm.compressValue(value)
 	}
-	
+
 	// Apply encryption if enabled
 	if dcm.config.EnableEncryption {
 		entry.Value = dcm.encryptValue(entry.Value)
 	}
-	
+
 	// Store locally
 	dcm.setLocal(key, entry.Value, ttl)
-	
+
 	// Replicate to other nodes based on consistency level
 	switch dcm.config.ConsistencyLevel {
 	case "strong":
@@ -379,12 +379,12 @@ func (dcm *DistributedCacheManager) Delete(ctx context.Context, key string) erro
 	// Calculate partition and target nodes
 	partition := dcm.calculatePartition(key)
 	targetNodes := dcm.getNodesForPartition(partition)
-	
+
 	// Delete locally
 	dcm.localMutex.Lock()
 	delete(dcm.localCache, key)
 	dcm.localMutex.Unlock()
-	
+
 	// Create replication tasks for deletion
 	for _, nodeID := range targetNodes {
 		if nodeID != dcm.localNodeID {
@@ -398,7 +398,7 @@ func (dcm *DistributedCacheManager) Delete(ctx context.Context, key string) erro
 			dcm.replicationManager.EnqueueTask(task)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -406,17 +406,17 @@ func (dcm *DistributedCacheManager) Delete(ctx context.Context, key string) erro
 func (dcm *DistributedCacheManager) GetMetrics() *DistributedCacheMetrics {
 	dcm.metricsMutex.RLock()
 	defer dcm.metricsMutex.RUnlock()
-	
+
 	// Calculate current hit ratio
 	if dcm.cacheMetrics.TotalRequests > 0 {
 		dcm.cacheMetrics.HitRatio = float64(dcm.cacheMetrics.CacheHits) / float64(dcm.cacheMetrics.TotalRequests)
 	}
-	
+
 	// Update node count and cache size
 	dcm.nodesMutex.RLock()
 	dcm.cacheMetrics.NodeCount = len(dcm.cacheNodes)
 	dcm.nodesMutex.RUnlock()
-	
+
 	dcm.localMutex.RLock()
 	var totalSize int64
 	for _, entry := range dcm.localCache {
@@ -424,9 +424,9 @@ func (dcm *DistributedCacheManager) GetMetrics() *DistributedCacheMetrics {
 	}
 	dcm.cacheMetrics.TotalCacheSize = totalSize
 	dcm.localMutex.RUnlock()
-	
+
 	dcm.cacheMetrics.LastUpdated = time.Now()
-	
+
 	// Return a copy to avoid race conditions
 	metrics := *dcm.cacheMetrics
 	return &metrics
@@ -435,22 +435,22 @@ func (dcm *DistributedCacheManager) GetMetrics() *DistributedCacheMetrics {
 // Shutdown gracefully shuts down the distributed cache manager
 func (dcm *DistributedCacheManager) Shutdown(ctx context.Context) error {
 	dcm.logger.Info().Msg("Shutting down distributed cache manager")
-	
+
 	// Signal shutdown to background processes
 	close(dcm.shutdownCh)
-	
+
 	// Shutdown replication manager
 	if dcm.replicationManager != nil {
 		dcm.replicationManager.Shutdown()
 	}
-	
+
 	// Final metrics update
 	dcm.logger.Info().
 		Int64("cache_hits", dcm.cacheMetrics.CacheHits).
 		Int64("cache_misses", dcm.cacheMetrics.CacheMisses).
 		Float64("hit_ratio", dcm.cacheMetrics.HitRatio).
 		Msg("Final cache statistics")
-	
+
 	return nil
 }
 
@@ -468,7 +468,7 @@ func (dcm *DistributedCacheManager) calculatePartition(key string) int {
 func (dcm *DistributedCacheManager) getNodesForPartition(partition int) []string {
 	dcm.nodesMutex.RLock()
 	defer dcm.nodesMutex.RUnlock()
-	
+
 	var nodes []string
 	for nodeID, node := range dcm.cacheNodes {
 		for _, p := range node.Partitions {
@@ -478,15 +478,15 @@ func (dcm *DistributedCacheManager) getNodesForPartition(partition int) []string
 			}
 		}
 	}
-	
+
 	// Add local node if it handles this partition
 	nodes = append(nodes, dcm.localNodeID)
-	
+
 	// Limit to replication factor
 	if len(nodes) > dcm.config.ReplicationFactor {
 		nodes = nodes[:dcm.config.ReplicationFactor]
 	}
-	
+
 	return nodes
 }
 
@@ -500,7 +500,7 @@ func (dcm *DistributedCacheManager) isEntryValid(entry *CacheEntry) bool {
 func (dcm *DistributedCacheManager) setLocal(key string, value interface{}, ttl time.Duration) {
 	dcm.localMutex.Lock()
 	defer dcm.localMutex.Unlock()
-	
+
 	entry := &CacheEntry{
 		Key:          key,
 		Value:        value,
@@ -513,7 +513,7 @@ func (dcm *DistributedCacheManager) setLocal(key string, value interface{}, ttl 
 		Checksum:     dcm.calculateChecksum(value),
 		Metadata:     make(map[string]interface{}),
 	}
-	
+
 	dcm.localCache[key] = entry
 }
 
@@ -530,7 +530,7 @@ func (dcm *DistributedCacheManager) getFromNode(ctx context.Context, nodeID, key
 func (dcm *DistributedCacheManager) setStrong(ctx context.Context, entry *CacheEntry) error {
 	// Strong consistency: wait for acknowledgment from majority of nodes
 	requiredAck := (dcm.config.ReplicationFactor / 2) + 1
-	
+
 	writeOp := &WriteOperation{
 		Key:         entry.Key,
 		Value:       entry.Value,
@@ -539,11 +539,11 @@ func (dcm *DistributedCacheManager) setStrong(ctx context.Context, entry *CacheE
 		AckCount:    1, // Local node always acknowledges
 		RequiredAck: requiredAck,
 	}
-	
+
 	dcm.consistencyTracker.mutex.Lock()
 	dcm.consistencyTracker.pendingWrites[entry.Key] = writeOp
 	dcm.consistencyTracker.mutex.Unlock()
-	
+
 	// Replicate to other nodes
 	for _, nodeID := range entry.ReplicaNodes {
 		if nodeID != dcm.localNodeID {
@@ -558,7 +558,7 @@ func (dcm *DistributedCacheManager) setStrong(ctx context.Context, entry *CacheE
 			dcm.replicationManager.EnqueueTask(task)
 		}
 	}
-	
+
 	// Wait for required acknowledgments (simplified)
 	// In production, this would use channels and timeouts
 	return nil
@@ -584,14 +584,14 @@ func (dcm *DistributedCacheManager) setEventual(ctx context.Context, entry *Cach
 			dcm.replicationManager.EnqueueTask(task)
 		}
 	}
-	
+
 	return nil
 }
 
 func (dcm *DistributedCacheManager) getNextVersion(key string) int64 {
 	dcm.consistencyTracker.mutex.Lock()
 	defer dcm.consistencyTracker.mutex.Unlock()
-	
+
 	dcm.consistencyTracker.vectorClock[key]++
 	return dcm.consistencyTracker.vectorClock[key]
 }
@@ -620,7 +620,7 @@ func (dcm *DistributedCacheManager) encryptValue(value interface{}) interface{} 
 func (dcm *DistributedCacheManager) recordCacheHit() {
 	dcm.metricsMutex.Lock()
 	defer dcm.metricsMutex.Unlock()
-	
+
 	dcm.cacheMetrics.CacheHits++
 	dcm.cacheMetrics.TotalRequests++
 }
@@ -628,7 +628,7 @@ func (dcm *DistributedCacheManager) recordCacheHit() {
 func (dcm *DistributedCacheManager) recordCacheMiss() {
 	dcm.metricsMutex.Lock()
 	defer dcm.metricsMutex.Unlock()
-	
+
 	dcm.cacheMetrics.CacheMisses++
 	dcm.cacheMetrics.TotalRequests++
 }
@@ -636,7 +636,7 @@ func (dcm *DistributedCacheManager) recordCacheMiss() {
 func (dcm *DistributedCacheManager) startSynchronization() {
 	ticker := time.NewTicker(dcm.config.SyncInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -650,7 +650,7 @@ func (dcm *DistributedCacheManager) startSynchronization() {
 func (dcm *DistributedCacheManager) startHeartbeat() {
 	ticker := time.NewTicker(dcm.config.HeartbeatInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -664,7 +664,7 @@ func (dcm *DistributedCacheManager) startHeartbeat() {
 func (dcm *DistributedCacheManager) startEviction() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -678,7 +678,7 @@ func (dcm *DistributedCacheManager) startEviction() {
 func (dcm *DistributedCacheManager) startMetricsCollection() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -702,20 +702,20 @@ func (dcm *DistributedCacheManager) sendHeartbeat() {
 func (dcm *DistributedCacheManager) evictExpiredEntries() {
 	dcm.localMutex.Lock()
 	defer dcm.localMutex.Unlock()
-	
+
 	now := time.Now()
 	var expiredKeys []string
-	
+
 	for key, entry := range dcm.localCache {
 		if entry.TTL > 0 && now.Sub(entry.CreatedAt) > entry.TTL {
 			expiredKeys = append(expiredKeys, key)
 		}
 	}
-	
+
 	for _, key := range expiredKeys {
 		delete(dcm.localCache, key)
 	}
-	
+
 	if len(expiredKeys) > 0 {
 		dcm.logger.Debug().Int("expired_entries", len(expiredKeys)).Msg("Evicted expired cache entries")
 	}
@@ -725,7 +725,7 @@ func (dcm *DistributedCacheManager) collectMetrics() {
 	// Update metrics with current state
 	dcm.metricsMutex.Lock()
 	defer dcm.metricsMutex.Unlock()
-	
+
 	dcm.cacheMetrics.LastUpdated = time.Now()
 }
 
@@ -741,7 +741,7 @@ func NewReplicationManager(config ReplicationConfig) *ReplicationManager {
 		workers:          make([]*ReplicationWorker, config.WorkerCount),
 		config:           config,
 	}
-	
+
 	// Start replication workers
 	for i := 0; i < config.WorkerCount; i++ {
 		worker := &ReplicationWorker{
@@ -753,7 +753,7 @@ func NewReplicationManager(config ReplicationConfig) *ReplicationManager {
 		rm.workers[i] = worker
 		go worker.Start()
 	}
-	
+
 	return rm
 }
 

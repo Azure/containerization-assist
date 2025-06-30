@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 
 	bolt "go.etcd.io/bbolt"
+	bboltErrors "go.etcd.io/bbolt/errors"
 )
 
 type PreferenceStore struct {
@@ -71,7 +72,7 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 			break
 		}
 
-		if i == 2 && err == bolt.ErrTimeout {
+		if i == 2 && err == bboltErrors.ErrTimeout {
 			logger.Warn().
 				Str("path", dbPath).
 				Msg("Preference database appears to be locked, attempting recovery")
