@@ -437,7 +437,7 @@ func (t *AtomicTagImageTool) performTag(ctx context.Context, session *core.Sessi
 
 	// Tag Docker image using pipeline adapter
 	tagStartTime := time.Now()
-	
+
 	// Create tag arguments
 	tagArgs := map[string]interface{}{
 		"sourceImage": args.SourceImage,

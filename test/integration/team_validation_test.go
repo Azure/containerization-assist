@@ -23,11 +23,11 @@ type TeamValidationSuite struct {
 // NewTeamValidationSuite creates a new validation suite
 func NewTeamValidationSuite(t *testing.T) *TeamValidationSuite {
 	logger := zerolog.New(zerolog.NewTestWriter(t)).With().Timestamp().Logger()
-	
+
 	// Create workspace manager for testing
 	workspace, err := utils.NewWorkspaceManager(context.Background(), utils.WorkspaceConfig{
 		BaseDir:           t.TempDir(),
-		MaxSizePerSession: 1024 * 1024 * 1024, // 1GB per session
+		MaxSizePerSession: 1024 * 1024 * 1024,     // 1GB per session
 		TotalMaxSize:      5 * 1024 * 1024 * 1024, // 5GB total
 		Cleanup:           true,
 		SandboxEnabled:    false, // Start with sandboxing disabled for basic tests
@@ -46,13 +46,13 @@ func NewTeamValidationSuite(t *testing.T) *TeamValidationSuite {
 
 // ValidationResult represents the result of a team validation
 type ValidationResult struct {
-	TeamName      string    `json:"team_name"`
-	Component     string    `json:"component"`
-	Status        string    `json:"status"` // "PASS", "FAIL", "SKIP"
-	Message       string    `json:"message"`
-	Timestamp     time.Time `json:"timestamp"`
-	Duration      time.Duration `json:"duration"`
-	TestCoverage  float64   `json:"test_coverage"`
+	TeamName       string        `json:"team_name"`
+	Component      string        `json:"component"`
+	Status         string        `json:"status"` // "PASS", "FAIL", "SKIP"
+	Message        string        `json:"message"`
+	Timestamp      time.Time     `json:"timestamp"`
+	Duration       time.Duration `json:"duration"`
+	TestCoverage   float64       `json:"test_coverage"`
 	PerformanceP95 time.Duration `json:"performance_p95"`
 }
 
@@ -66,11 +66,11 @@ type ValidationReport struct {
 
 // ValidationSummary provides aggregate metrics
 type ValidationSummary struct {
-	TotalTests    int     `json:"total_tests"`
-	PassedTests   int     `json:"passed_tests"`
-	FailedTests   int     `json:"failed_tests"`
-	SkippedTests  int     `json:"skipped_tests"`
-	AvgCoverage   float64 `json:"avg_coverage"`
+	TotalTests     int           `json:"total_tests"`
+	PassedTests    int           `json:"passed_tests"`
+	FailedTests    int           `json:"failed_tests"`
+	SkippedTests   int           `json:"skipped_tests"`
+	AvgCoverage    float64       `json:"avg_coverage"`
 	AvgPerformance time.Duration `json:"avg_performance"`
 }
 
@@ -78,11 +78,11 @@ type ValidationSummary struct {
 func TestInfraBotValidation(t *testing.T) {
 	suite := NewTeamValidationSuite(t)
 	report := suite.ValidateInfraBot()
-	
+
 	// Ensure critical InfraBot components pass
 	assert.True(t, suite.hasPassingResult(report, "docker_operations"))
 	assert.True(t, suite.hasPassingResult(report, "session_tracking"))
-	
+
 	suite.logValidationReport("InfraBot", report)
 }
 
@@ -90,11 +90,11 @@ func TestInfraBotValidation(t *testing.T) {
 func TestBuildSecBotValidation(t *testing.T) {
 	suite := NewTeamValidationSuite(t)
 	report := suite.ValidateBuildSecBot()
-	
+
 	// Ensure critical BuildSecBot components pass
 	assert.True(t, suite.hasPassingResult(report, "atomic_tools"))
 	assert.True(t, suite.hasPassingResult(report, "security_scanning"))
-	
+
 	suite.logValidationReport("BuildSecBot", report)
 }
 
@@ -102,11 +102,11 @@ func TestBuildSecBotValidation(t *testing.T) {
 func TestOrchBotValidation(t *testing.T) {
 	suite := NewTeamValidationSuite(t)
 	report := suite.ValidateOrchBot()
-	
+
 	// Ensure critical OrchBot components pass
 	assert.True(t, suite.hasPassingResult(report, "context_sharing"))
 	assert.True(t, suite.hasPassingResult(report, "workflow_orchestration"))
-	
+
 	suite.logValidationReport("OrchBot", report)
 }
 
@@ -114,11 +114,11 @@ func TestOrchBotValidation(t *testing.T) {
 func TestAdvancedBotValidation(t *testing.T) {
 	suite := NewTeamValidationSuite(t)
 	report := suite.ValidateAdvancedBot()
-	
+
 	// Ensure critical AdvancedBot components pass
 	assert.True(t, suite.hasPassingResult(report, "sandboxing"))
 	assert.True(t, suite.hasPassingResult(report, "testing_framework"))
-	
+
 	suite.logValidationReport("AdvancedBot", report)
 }
 
@@ -126,18 +126,18 @@ func TestAdvancedBotValidation(t *testing.T) {
 func TestCrossTeamIntegration(t *testing.T) {
 	suite := NewTeamValidationSuite(t)
 	report := suite.ValidateCrossTeamIntegration()
-	
+
 	// Ensure end-to-end workflows pass
 	assert.True(t, suite.hasPassingResult(report, "end_to_end_workflow"))
 	assert.True(t, suite.hasPassingResult(report, "interface_compatibility"))
-	
+
 	suite.logValidationReport("CrossTeam", report)
 }
 
 // ValidateInfraBot validates InfraBot implementations
 func (suite *TeamValidationSuite) ValidateInfraBot() ValidationReport {
 	results := []ValidationResult{}
-	
+
 	// Test Docker operations interface
 	result := suite.validateComponent("InfraBot", "docker_operations", func() error {
 		// Validate Docker operations interface exists and is properly structured
@@ -146,7 +146,7 @@ func (suite *TeamValidationSuite) ValidateInfraBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	// Test session tracking
 	result = suite.validateComponent("InfraBot", "session_tracking", func() error {
 		// Validate session management functionality
@@ -154,13 +154,13 @@ func (suite *TeamValidationSuite) ValidateInfraBot() ValidationReport {
 		if err != nil {
 			return err
 		}
-		
+
 		// Verify workspace was created
 		suite.logger.Info().Str("workspace", workspaceDir).Msg("Workspace created successfully")
 		return nil
 	})
 	results = append(results, result)
-	
+
 	// Test atomic framework
 	result = suite.validateComponent("InfraBot", "atomic_framework", func() error {
 		// Validate atomic tool framework
@@ -168,14 +168,14 @@ func (suite *TeamValidationSuite) ValidateInfraBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	return suite.buildReport("InfraBot", results)
 }
 
 // ValidateBuildSecBot validates BuildSecBot implementations
 func (suite *TeamValidationSuite) ValidateBuildSecBot() ValidationReport {
 	results := []ValidationResult{}
-	
+
 	// Test atomic tools
 	result := suite.validateComponent("BuildSecBot", "atomic_tools", func() error {
 		// Validate atomic tools implementation
@@ -183,7 +183,7 @@ func (suite *TeamValidationSuite) ValidateBuildSecBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	// Test security scanning
 	result = suite.validateComponent("BuildSecBot", "security_scanning", func() error {
 		// Validate security scanning functionality
@@ -191,7 +191,7 @@ func (suite *TeamValidationSuite) ValidateBuildSecBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	// Test build strategies
 	result = suite.validateComponent("BuildSecBot", "build_strategies", func() error {
 		// Validate build strategies
@@ -199,14 +199,14 @@ func (suite *TeamValidationSuite) ValidateBuildSecBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	return suite.buildReport("BuildSecBot", results)
 }
 
 // ValidateOrchBot validates OrchBot implementations
 func (suite *TeamValidationSuite) ValidateOrchBot() ValidationReport {
 	results := []ValidationResult{}
-	
+
 	// Test context sharing
 	result := suite.validateComponent("OrchBot", "context_sharing", func() error {
 		// Validate context sharing implementation
@@ -214,7 +214,7 @@ func (suite *TeamValidationSuite) ValidateOrchBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	// Test workflow orchestration
 	result = suite.validateComponent("OrchBot", "workflow_orchestration", func() error {
 		// Validate workflow orchestration
@@ -222,7 +222,7 @@ func (suite *TeamValidationSuite) ValidateOrchBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	// Test communication
 	result = suite.validateComponent("OrchBot", "communication", func() error {
 		// Validate communication systems
@@ -230,14 +230,14 @@ func (suite *TeamValidationSuite) ValidateOrchBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	return suite.buildReport("OrchBot", results)
 }
 
 // ValidateAdvancedBot validates AdvancedBot implementations
 func (suite *TeamValidationSuite) ValidateAdvancedBot() ValidationReport {
 	results := []ValidationResult{}
-	
+
 	// Test sandboxing
 	result := suite.validateComponent("AdvancedBot", "sandboxing", func() error {
 		// Validate sandboxing implementation
@@ -248,7 +248,7 @@ func (suite *TeamValidationSuite) ValidateAdvancedBot() ValidationReport {
 		return nil
 	})
 	results = append(results, result)
-	
+
 	// Test testing framework
 	result = suite.validateComponent("AdvancedBot", "testing_framework", func() error {
 		// Validate testing framework (this test itself!)
@@ -256,7 +256,7 @@ func (suite *TeamValidationSuite) ValidateAdvancedBot() ValidationReport {
 		return nil
 	})
 	results = append(results, result)
-	
+
 	// Test observability
 	result = suite.validateComponent("AdvancedBot", "observability", func() error {
 		// Validate observability features
@@ -264,14 +264,14 @@ func (suite *TeamValidationSuite) ValidateAdvancedBot() ValidationReport {
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	return suite.buildReport("AdvancedBot", results)
 }
 
 // ValidateCrossTeamIntegration validates integration between all teams
 func (suite *TeamValidationSuite) ValidateCrossTeamIntegration() ValidationReport {
 	results := []ValidationResult{}
-	
+
 	// Test end-to-end workflow
 	result := suite.validateComponent("CrossTeam", "end_to_end_workflow", func() error {
 		// Validate complete workflow from analysis to deployment
@@ -279,7 +279,7 @@ func (suite *TeamValidationSuite) ValidateCrossTeamIntegration() ValidationRepor
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	// Test interface compatibility
 	result = suite.validateComponent("CrossTeam", "interface_compatibility", func() error {
 		// Validate that all team interfaces are compatible
@@ -287,7 +287,7 @@ func (suite *TeamValidationSuite) ValidateCrossTeamIntegration() ValidationRepor
 		return nil // Placeholder - would implement actual validation
 	})
 	results = append(results, result)
-	
+
 	return suite.buildReport("CrossTeam", results)
 }
 
@@ -295,18 +295,18 @@ func (suite *TeamValidationSuite) ValidateCrossTeamIntegration() ValidationRepor
 
 func (suite *TeamValidationSuite) validateComponent(teamName, component string, validator func() error) ValidationResult {
 	start := time.Now()
-	
+
 	err := validator()
 	duration := time.Since(start)
-	
+
 	status := "PASS"
 	message := "Component validation successful"
-	
+
 	if err != nil {
 		status = "FAIL"
 		message = err.Error()
 	}
-	
+
 	return ValidationResult{
 		TeamName:       teamName,
 		Component:      component,
@@ -323,10 +323,10 @@ func (suite *TeamValidationSuite) buildReport(teamName string, results []Validat
 	summary := ValidationSummary{
 		TotalTests: len(results),
 	}
-	
+
 	var totalDuration time.Duration
 	var totalCoverage float64
-	
+
 	for _, result := range results {
 		switch result.Status {
 		case "PASS":
@@ -336,21 +336,21 @@ func (suite *TeamValidationSuite) buildReport(teamName string, results []Validat
 		case "SKIP":
 			summary.SkippedTests++
 		}
-		
+
 		totalDuration += result.Duration
 		totalCoverage += result.TestCoverage
 	}
-	
+
 	if len(results) > 0 {
 		summary.AvgCoverage = totalCoverage / float64(len(results))
 		summary.AvgPerformance = totalDuration / time.Duration(len(results))
 	}
-	
+
 	overallStatus := "PASS"
 	if summary.FailedTests > 0 {
 		overallStatus = "FAIL"
 	}
-	
+
 	return ValidationReport{
 		Timestamp:     time.Now(),
 		OverallStatus: overallStatus,

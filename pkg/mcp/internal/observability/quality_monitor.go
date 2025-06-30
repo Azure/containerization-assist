@@ -23,59 +23,59 @@ type QualityMonitor struct {
 
 // QualityThresholds defines the quality gates for each metric
 type QualityThresholds struct {
-	MinTestCoverage     float64       `json:"min_test_coverage"`     // Minimum test coverage percentage
-	MaxLintIssues       int           `json:"max_lint_issues"`       // Maximum allowed lint issues
-	MaxPerformanceP95   time.Duration `json:"max_performance_p95"`   // Maximum P95 performance target
+	MinTestCoverage     float64       `json:"min_test_coverage"`      // Minimum test coverage percentage
+	MaxLintIssues       int           `json:"max_lint_issues"`        // Maximum allowed lint issues
+	MaxPerformanceP95   time.Duration `json:"max_performance_p95"`    // Maximum P95 performance target
 	MinBuildSuccessRate float64       `json:"min_build_success_rate"` // Minimum build success rate
 }
 
 // QualityReport represents the overall quality status
 type QualityReport struct {
-	Timestamp     time.Time          `json:"timestamp"`
-	OverallHealth string             `json:"overall_health"` // GREEN, YELLOW, RED
+	Timestamp     time.Time              `json:"timestamp"`
+	OverallHealth string                 `json:"overall_health"` // GREEN, YELLOW, RED
 	Teams         map[string]TeamQuality `json:"teams"`
-	SystemMetrics SystemMetrics      `json:"system_metrics"`
-	QualityGates  QualityGates       `json:"quality_gates"`
+	SystemMetrics SystemMetrics          `json:"system_metrics"`
+	QualityGates  QualityGates           `json:"quality_gates"`
 }
 
 // TeamQuality represents quality metrics for a specific team
 type TeamQuality struct {
-	TeamName        string            `json:"team_name"`
-	Status          string            `json:"status"` // GREEN, YELLOW, RED
-	TestCoverage    float64           `json:"test_coverage"`
-	LintIssues      int               `json:"lint_issues"`
-	PerformanceP95  time.Duration     `json:"performance_p95"`
-	BuildSuccessRate float64          `json:"build_success_rate"`
-	Components      map[string]ComponentHealth `json:"components"`
-	LastUpdated     time.Time         `json:"last_updated"`
+	TeamName         string                     `json:"team_name"`
+	Status           string                     `json:"status"` // GREEN, YELLOW, RED
+	TestCoverage     float64                    `json:"test_coverage"`
+	LintIssues       int                        `json:"lint_issues"`
+	PerformanceP95   time.Duration              `json:"performance_p95"`
+	BuildSuccessRate float64                    `json:"build_success_rate"`
+	Components       map[string]ComponentHealth `json:"components"`
+	LastUpdated      time.Time                  `json:"last_updated"`
 }
 
 // ComponentHealth represents health of a specific component
 type ComponentHealth struct {
-	Name            string        `json:"name"`
-	Status          string        `json:"status"`
-	TestsPassing    bool          `json:"tests_passing"`
-	PerformanceMet  bool          `json:"performance_met"`
-	SecurityClean   bool          `json:"security_clean"`
-	LastTested      time.Time     `json:"last_tested"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+	TestsPassing   bool      `json:"tests_passing"`
+	PerformanceMet bool      `json:"performance_met"`
+	SecurityClean  bool      `json:"security_clean"`
+	LastTested     time.Time `json:"last_tested"`
 }
 
 // SystemMetrics provides overall system health metrics
 type SystemMetrics struct {
-	TotalTestCoverage    float64   `json:"total_test_coverage"`
-	TotalLintIssues      int       `json:"total_lint_issues"`
+	TotalTestCoverage    float64       `json:"total_test_coverage"`
+	TotalLintIssues      int           `json:"total_lint_issues"`
 	AvgPerformanceP95    time.Duration `json:"avg_performance_p95"`
-	OverallBuildSuccess  float64   `json:"overall_build_success"`
-	IntegrationTestsPass bool      `json:"integration_tests_pass"`
+	OverallBuildSuccess  float64       `json:"overall_build_success"`
+	IntegrationTestsPass bool          `json:"integration_tests_pass"`
 }
 
 // QualityGates represents the status of various quality gates
 type QualityGates struct {
-	TestCoverageGate     string `json:"test_coverage_gate"`     // PASS, FAIL
-	LintGate            string `json:"lint_gate"`              // PASS, FAIL  
-	PerformanceGate     string `json:"performance_gate"`       // PASS, FAIL
-	SecurityGate        string `json:"security_gate"`          // PASS, FAIL
-	IntegrationGate     string `json:"integration_gate"`       // PASS, FAIL
+	TestCoverageGate string `json:"test_coverage_gate"` // PASS, FAIL
+	LintGate         string `json:"lint_gate"`          // PASS, FAIL
+	PerformanceGate  string `json:"performance_gate"`   // PASS, FAIL
+	SecurityGate     string `json:"security_gate"`      // PASS, FAIL
+	IntegrationGate  string `json:"integration_gate"`   // PASS, FAIL
 }
 
 // NewQualityMonitor creates a new quality monitor
@@ -85,10 +85,10 @@ func NewQualityMonitor(baseDir string, logger zerolog.Logger) *QualityMonitor {
 		logger:  logger.With().Str("component", "quality_monitor").Logger(),
 		reports: make(map[string]*QualityReport),
 		thresholds: QualityThresholds{
-			MinTestCoverage:     90.0,            // 90% test coverage
-			MaxLintIssues:       100,             // Max 100 lint issues (from CLAUDE.md)
+			MinTestCoverage:     90.0,                   // 90% test coverage
+			MaxLintIssues:       100,                    // Max 100 lint issues (from CLAUDE.md)
 			MaxPerformanceP95:   300 * time.Microsecond, // <300μs P95 (from CLAUDE.md)
-			MinBuildSuccessRate: 95.0,            // 95% build success rate
+			MinBuildSuccessRate: 95.0,                   // 95% build success rate
 		},
 	}
 }
@@ -141,8 +141,8 @@ func (qm *QualityMonitor) GetCurrentQualityReport() *QualityReport {
 
 	// Return empty report if none exists
 	return &QualityReport{
-		Timestamp: time.Now(),
-		Teams:     make(map[string]TeamQuality),
+		Timestamp:     time.Now(),
+		Teams:         make(map[string]TeamQuality),
 		OverallHealth: "UNKNOWN",
 	}
 }
@@ -150,13 +150,13 @@ func (qm *QualityMonitor) GetCurrentQualityReport() *QualityReport {
 // ValidateQualityGates checks all quality gates and returns status
 func (qm *QualityMonitor) ValidateQualityGates(ctx context.Context) (QualityGates, error) {
 	report := qm.GetCurrentQualityReport()
-	
+
 	gates := QualityGates{
 		TestCoverageGate: qm.validateTestCoverageGate(report),
-		LintGate:        qm.validateLintGate(report),
-		PerformanceGate: qm.validatePerformanceGate(report),
-		SecurityGate:    qm.validateSecurityGate(report),
-		IntegrationGate: qm.validateIntegrationGate(report),
+		LintGate:         qm.validateLintGate(report),
+		PerformanceGate:  qm.validatePerformanceGate(report),
+		SecurityGate:     qm.validateSecurityGate(report),
+		IntegrationGate:  qm.validateIntegrationGate(report),
 	}
 
 	qm.logger.Info().
@@ -173,7 +173,7 @@ func (qm *QualityMonitor) ValidateQualityGates(ctx context.Context) (QualityGate
 // SaveQualityReport saves the quality report to disk
 func (qm *QualityMonitor) SaveQualityReport(ctx context.Context, filename string) error {
 	report := qm.GetCurrentQualityReport()
-	
+
 	reportPath := filepath.Join(qm.baseDir, filename)
 	if err := os.MkdirAll(filepath.Dir(reportPath), 0755); err != nil {
 		return fmt.Errorf("failed to create report directory: %v", err)
@@ -196,7 +196,7 @@ func (qm *QualityMonitor) SaveQualityReport(ctx context.Context, filename string
 func (qm *QualityMonitor) GenerateDailySummary(ctx context.Context) (string, error) {
 	report := qm.GetCurrentQualityReport()
 	gates, _ := qm.ValidateQualityGates(ctx)
-	
+
 	summary := fmt.Sprintf(`ADVANCEDBOT - SPRINT 1 DAY 1 QUALITY REPORT
 ===========================================
 Overall System Health: %s
@@ -209,7 +209,7 @@ Team Integration Status:
 
 Quality Metrics:
 ├─ Test Coverage: %.1f%% (target: >%.1f%%)
-├─ Performance: %v (target: <%v)  
+├─ Performance: %v (target: <%v)
 ├─ Build Status: %.1f%% success rate
 ├─ Lint Status: %d issues (target: <%d)
 ├─ Security: %s
@@ -276,13 +276,13 @@ func (qm *QualityMonitor) calculateTeamStatus(metrics TeamQuality) string {
 		metrics.BuildSuccessRate < qm.thresholds.MinBuildSuccessRate {
 		return "RED"
 	}
-	
+
 	if metrics.TestCoverage < qm.thresholds.MinTestCoverage+5 ||
 		metrics.LintIssues > qm.thresholds.MaxLintIssues-20 ||
 		metrics.BuildSuccessRate < qm.thresholds.MinBuildSuccessRate+3 {
 		return "YELLOW"
 	}
-	
+
 	return "GREEN"
 }
 
@@ -290,7 +290,7 @@ func (qm *QualityMonitor) updateOverallHealth(report *QualityReport) {
 	redCount := 0
 	yellowCount := 0
 	greenCount := 0
-	
+
 	for _, team := range report.Teams {
 		switch team.Status {
 		case "RED":
@@ -301,7 +301,7 @@ func (qm *QualityMonitor) updateOverallHealth(report *QualityReport) {
 			greenCount++
 		}
 	}
-	
+
 	if redCount > 0 {
 		report.OverallHealth = "RED"
 	} else if yellowCount > 0 {
@@ -311,10 +311,10 @@ func (qm *QualityMonitor) updateOverallHealth(report *QualityReport) {
 	} else {
 		report.OverallHealth = "UNKNOWN"
 	}
-	
+
 	// Update system metrics
 	qm.updateSystemMetrics(report)
-	
+
 	// Update quality gates
 	report.QualityGates, _ = qm.ValidateQualityGates(context.Background())
 }
@@ -323,18 +323,18 @@ func (qm *QualityMonitor) updateSystemMetrics(report *QualityReport) {
 	if len(report.Teams) == 0 {
 		return
 	}
-	
+
 	var totalCoverage, totalBuildSuccess float64
 	var totalLintIssues int
 	var totalPerformance time.Duration
 	var allIntegrationPass = true
-	
+
 	for _, team := range report.Teams {
 		totalCoverage += team.TestCoverage
 		totalLintIssues += team.LintIssues
 		totalPerformance += team.PerformanceP95
 		totalBuildSuccess += team.BuildSuccessRate
-		
+
 		// Check if any integration tests are failing
 		for _, component := range team.Components {
 			if !component.TestsPassing {
@@ -342,7 +342,7 @@ func (qm *QualityMonitor) updateSystemMetrics(report *QualityReport) {
 			}
 		}
 	}
-	
+
 	teamCount := float64(len(report.Teams))
 	report.SystemMetrics = SystemMetrics{
 		TotalTestCoverage:    totalCoverage / teamCount,
@@ -423,48 +423,48 @@ func (qm *QualityMonitor) getTeamPerformance(report *QualityReport, teamName str
 
 func (qm *QualityMonitor) generateMergeRecommendations(report *QualityReport, gates QualityGates) string {
 	recommendations := ""
-	
+
 	for teamName, team := range report.Teams {
 		status := "NOT READY"
 		reason := "quality gates not met"
-		
+
 		if team.Status == "GREEN" && gates.TestCoverageGate == "PASS" && gates.LintGate == "PASS" {
 			status = "READY"
 			reason = "all quality gates passed"
 		}
-		
+
 		recommendations += fmt.Sprintf("%s: %s [%s]\n", teamName, status, reason)
 	}
-	
+
 	return recommendations
 }
 
 func (qm *QualityMonitor) generateQualityIssues(report *QualityReport, gates QualityGates) string {
 	issues := ""
-	
+
 	if gates.TestCoverageGate == "FAIL" {
 		issues += fmt.Sprintf("- Test coverage below %.1f%% threshold\n", qm.thresholds.MinTestCoverage)
 	}
-	
+
 	if gates.LintGate == "FAIL" {
 		issues += fmt.Sprintf("- Lint issues exceed %d threshold\n", qm.thresholds.MaxLintIssues)
 	}
-	
+
 	if gates.PerformanceGate == "FAIL" {
 		issues += fmt.Sprintf("- Performance exceeds %v P95 threshold\n", qm.thresholds.MaxPerformanceP95)
 	}
-	
+
 	if gates.SecurityGate == "FAIL" {
 		issues += "- Security vulnerabilities detected\n"
 	}
-	
+
 	if gates.IntegrationGate == "FAIL" {
 		issues += "- Integration tests failing\n"
 	}
-	
+
 	if issues == "" {
 		issues = "No critical quality issues detected"
 	}
-	
+
 	return issues
 }

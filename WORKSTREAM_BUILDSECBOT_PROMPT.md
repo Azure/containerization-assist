@@ -165,10 +165,10 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
    ```go
    func (t *AtomicScanImageSecurityTool) generateRemediationPlan(vulns []Vulnerability) []RemediationStep {
        var steps []RemediationStep
-       
+
        // Group by package and suggest upgrade paths
        packageVulns := groupVulnerabilitiesByPackage(vulns)
-       
+
        for pkg, vulnList := range packageVulns {
            if hasFixableVulns(vulnList) {
                steps = append(steps, RemediationStep{
@@ -179,7 +179,7 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
                })
            }
        }
-       
+
        return steps
    }
    ```
@@ -213,12 +213,12 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
            strategies: make(map[string]BuildStrategy),
            logger:     logger.With().Str("component", "strategy_manager").Logger(),
        }
-       
+
        // Register default strategies with proper constructors
        sm.RegisterStrategy(NewDockerBuildStrategy(logger))
        sm.RegisterStrategy(NewBuildKitStrategy(logger))
        sm.RegisterStrategy(NewMultiStageBuildStrategy(logger))
-       
+
        return sm
    }
    ```
@@ -231,20 +231,20 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
        if err != nil {
            return nil, fmt.Errorf("failed to analyze project: %w", err)
        }
-       
+
        // Score strategies based on project characteristics
        scores := make(map[string]int)
        for name, strategy := range sm.strategies {
            score := strategy.ScoreCompatibility(projectInfo)
            scores[name] = score
        }
-       
+
        // Select highest scoring strategy
        bestStrategy := sm.findBestStrategy(scores)
        if bestStrategy == nil {
            return nil, fmt.Errorf("no suitable build strategy found for project")
        }
-       
+
        return bestStrategy, nil
    }
    ```
@@ -254,7 +254,7 @@ pkg/mcp/internal/utils/workspace.go                  # AdvancedBot (sandboxing)
    type BuildStrategyFactory struct {
        logger zerolog.Logger
    }
-   
+
    func (f *BuildStrategyFactory) CreateStrategy(strategyType string, options BuildOptions) (BuildStrategy, error) {
        switch strategyType {
        case "docker":
@@ -370,7 +370,7 @@ Tomorrow's Priority:
 
 Quality Status:
 - Tests: ✅/❌ make test-mcp passing
-- Build: ✅/❌ go build succeeding  
+- Build: ✅/❌ go build succeeding
 - Lint: ✅/❌ golangci-lint clean
 - Security: ✅/❌ vulnerability scans clean
 
