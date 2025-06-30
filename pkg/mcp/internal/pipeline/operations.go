@@ -3,7 +3,9 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/docker"
@@ -100,13 +102,19 @@ func (o *Operations) BuildDockerImage(sessionID, imageRef, dockerfilePath string
 }
 
 func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
-	if o.dockerClient == nil {
-		return fmt.Errorf("docker client not available")
+	// Input validation
+	if sessionID == "" {
+		return fmt.Errorf("session ID is required")
 	}
-	
-	ctx := context.Background()
-	
-	// Update session state to track operation
+	if imageRef == "" {
+		return fmt.Errorf("image reference is required")
+	}
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// Update session state to track operation start
 	err := o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation": "pull",
 		"image_ref": imageRef,
@@ -115,13 +123,24 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
 	}
-	
+
 	o.logger.Info().
 		Str("session_id", sessionID).
 		Str("image_ref", imageRef).
 		Msg("Starting Docker image pull")
-	
-	output, err := o.dockerClient.Pull(ctx, imageRef)
+
+	// Try Docker client first if available, fallback to exec
+	var output string
+	if o.dockerClient != nil {
+		output, err = o.dockerClient.Pull(ctx, imageRef)
+	} else {
+		// Fallback to direct docker command execution
+		cmd := exec.CommandContext(ctx, "docker", "pull", imageRef)
+		outputBytes, execErr := cmd.CombinedOutput()
+		output = string(outputBytes)
+		err = execErr
+	}
+
 	if err != nil {
 		o.logger.Error().
 			Err(err).
@@ -136,37 +155,46 @@ func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
 			"image_ref": imageRef,
 			"status":    "failed",
 			"error":     err.Error(),
+			"output":    output,
 		})
 		
 		return fmt.Errorf("failed to pull image %s: %w", imageRef, err)
 	}
-	
+
 	o.logger.Info().
 		Str("session_id", sessionID).
 		Str("image_ref", imageRef).
 		Msg("Successfully pulled Docker image")
-	
+
 	// Update session with success
 	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation": "pull",
 		"image_ref": imageRef,
 		"status":    "completed",
+		"success":   true,
+		"output":    output,
 	})
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
 	}
-	
+
 	return nil
 }
 
 func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
-	if o.dockerClient == nil {
-		return fmt.Errorf("docker client not available")
+	// Input validation
+	if sessionID == "" {
+		return fmt.Errorf("session ID is required")
 	}
-	
-	ctx := context.Background()
-	
-	// Update session state to track operation
+	if imageRef == "" {
+		return fmt.Errorf("image reference is required")
+	}
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	// Update session state to track operation start
 	err := o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation": "push",
 		"image_ref": imageRef,
@@ -175,13 +203,24 @@ func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
 	}
-	
+
 	o.logger.Info().
 		Str("session_id", sessionID).
 		Str("image_ref", imageRef).
 		Msg("Starting Docker image push")
-	
-	output, err := o.dockerClient.Push(ctx, imageRef)
+
+	// Try Docker client first if available, fallback to exec
+	var output string
+	if o.dockerClient != nil {
+		output, err = o.dockerClient.Push(ctx, imageRef)
+	} else {
+		// Fallback to direct docker command execution
+		cmd := exec.CommandContext(ctx, "docker", "push", imageRef)
+		outputBytes, execErr := cmd.CombinedOutput()
+		output = string(outputBytes)
+		err = execErr
+	}
+
 	if err != nil {
 		o.logger.Error().
 			Err(err).
@@ -196,37 +235,49 @@ func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
 			"image_ref": imageRef,
 			"status":    "failed",
 			"error":     err.Error(),
+			"output":    output,
 		})
 		
 		return fmt.Errorf("failed to push image %s: %w", imageRef, err)
 	}
-	
+
 	o.logger.Info().
 		Str("session_id", sessionID).
 		Str("image_ref", imageRef).
 		Msg("Successfully pushed Docker image")
-	
+
 	// Update session with success
 	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation": "push",
 		"image_ref": imageRef,
 		"status":    "completed",
+		"success":   true,
+		"output":    output,
 	})
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
 	}
-	
+
 	return nil
 }
 
 func (o *Operations) TagDockerImage(sessionID, sourceRef, targetRef string) error {
-	if o.dockerClient == nil {
-		return fmt.Errorf("docker client not available")
+	// Input validation
+	if sessionID == "" {
+		return fmt.Errorf("session ID is required")
 	}
-	
-	ctx := context.Background()
-	
-	// Update session state to track operation
+	if sourceRef == "" {
+		return fmt.Errorf("source image reference is required")
+	}
+	if targetRef == "" {
+		return fmt.Errorf("target image reference is required")
+	}
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Update session state to track operation start
 	err := o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation":  "tag",
 		"source_ref": sourceRef,
@@ -236,14 +287,25 @@ func (o *Operations) TagDockerImage(sessionID, sourceRef, targetRef string) erro
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
 	}
-	
+
 	o.logger.Info().
 		Str("session_id", sessionID).
 		Str("source_ref", sourceRef).
 		Str("target_ref", targetRef).
 		Msg("Starting Docker image tag")
-	
-	output, err := o.dockerClient.Tag(ctx, sourceRef, targetRef)
+
+	// Try Docker client first if available, fallback to exec
+	var output string
+	if o.dockerClient != nil {
+		output, err = o.dockerClient.Tag(ctx, sourceRef, targetRef)
+	} else {
+		// Fallback to direct docker command execution
+		cmd := exec.CommandContext(ctx, "docker", "tag", sourceRef, targetRef)
+		outputBytes, execErr := cmd.CombinedOutput()
+		output = strings.TrimSpace(string(outputBytes))
+		err = execErr
+	}
+
 	if err != nil {
 		o.logger.Error().
 			Err(err).
@@ -260,28 +322,31 @@ func (o *Operations) TagDockerImage(sessionID, sourceRef, targetRef string) erro
 			"target_ref": targetRef,
 			"status":     "failed",
 			"error":      err.Error(),
+			"output":     output,
 		})
 		
 		return fmt.Errorf("failed to tag image %s as %s: %w", sourceRef, targetRef, err)
 	}
-	
+
 	o.logger.Info().
 		Str("session_id", sessionID).
 		Str("source_ref", sourceRef).
 		Str("target_ref", targetRef).
 		Msg("Successfully tagged Docker image")
-	
+
 	// Update session with success
 	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
 		"operation":  "tag",
 		"source_ref": sourceRef,
 		"target_ref": targetRef,
 		"status":     "completed",
+		"success":    true,
+		"output":     output,
 	})
 	if err != nil {
 		o.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session state")
 	}
-	
+
 	return nil
 }
 
