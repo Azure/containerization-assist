@@ -40,6 +40,9 @@ type SessionManager struct {
 	errorCounts  map[string]int
 	jobTracking  map[string][]string
 	toolTracking map[string][]string
+
+	// Analytics integration
+	analytics *SessionAnalytics
 }
 
 // SessionManagerConfig represents session manager configuration
@@ -51,6 +54,7 @@ type SessionManagerConfig struct {
 	TotalDiskLimit    int64
 	StorePath         string
 	Logger            zerolog.Logger
+	EnableAnalytics   bool // Enable advanced session analytics
 }
 
 // NewSessionManager creates a new SessionManager
@@ -92,6 +96,12 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 
 	if err := sm.loadExistingSessions(); err != nil {
 		sm.logger.Warn().Err(err).Msg("Failed to load existing sessions")
+	}
+
+	// Initialize analytics if enabled
+	if config.EnableAnalytics {
+		sm.analytics = NewSessionAnalytics(sm, config.Logger)
+		sm.logger.Info().Msg("Session analytics enabled")
 	}
 
 	return sm, nil
@@ -1067,6 +1077,13 @@ func (sm *SessionManager) CompleteToolExecution(sessionID, toolName string, succ
 		}
 	}
 
+	// Update analytics if enabled
+	if sm.analytics != nil {
+		if err := sm.analytics.UpdateSessionMetrics(sessionID); err != nil {
+			sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to update session analytics")
+		}
+	}
+
 	return nil
 }
 
@@ -1135,6 +1152,20 @@ func (sm *SessionManager) getTotalErrorCount() int {
 		total += count
 	}
 	return total
+}
+
+// GetAnalytics returns the session analytics instance if enabled
+func (sm *SessionManager) GetAnalytics() *SessionAnalytics {
+	return sm.analytics
+}
+
+// UpdateSessionAnalytics manually triggers analytics update for a session
+func (sm *SessionManager) UpdateSessionAnalytics(sessionID string) error {
+	if sm.analytics == nil {
+		return fmt.Errorf("analytics not enabled")
+	}
+
+	return sm.analytics.UpdateSessionMetrics(sessionID)
 }
 
 // getLastError returns the last error message for a session (simplified implementation)
