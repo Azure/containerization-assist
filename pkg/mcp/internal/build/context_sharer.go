@@ -38,18 +38,25 @@ type DefaultContextSharer struct {
 	mutex        sync.RWMutex
 	logger       zerolog.Logger
 	defaultTTL   time.Duration
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 // NewDefaultContextSharer creates a new context sharer
 func NewDefaultContextSharer(logger zerolog.Logger) *DefaultContextSharer {
+	ctx, cancel := context.WithCancel(context.Background())
 	sharer := &DefaultContextSharer{
 		contextStore: make(map[string]map[string]*SharedContext),
-		routingRules: []FailureRoutingRule{}, // TODO: implement getDefaultRoutingRules()
+		routingRules: getDefaultRoutingRules(),
 		logger:       logger.With().Str("component", "context_sharer").Logger(),
 		defaultTTL:   time.Hour, // Default 1-hour TTL for shared context
+		ctx:          ctx,
+		cancel:       cancel,
 	}
-	// TODO: Start cleanup goroutine
-	// go sharer.cleanupExpiredContext()
+	
+	// Start cleanup goroutine
+	go sharer.cleanupExpiredContext(ctx)
+	
 	return sharer
 }
 
@@ -111,9 +118,35 @@ func (c *DefaultContextSharer) ClearContext(ctx context.Context, sessionID strin
 	return nil
 }
 
+// Close gracefully shuts down the context sharer
+func (c *DefaultContextSharer) Close() error {
+	c.cancel()
+	return nil
+}
+
 // getToolFromContext extracts tool name from context
 func getToolFromContext(ctx context.Context) string {
-	// TODO: Implement actual tool extraction from context
+	// Check for tool name in context values
+	if toolName := ctx.Value("tool_name"); toolName != nil {
+		if name, ok := toolName.(string); ok {
+			return name
+		}
+	}
+	
+	// Check for operation name in context values
+	if opName := ctx.Value("operation"); opName != nil {
+		if name, ok := opName.(string); ok {
+			return name
+		}
+	}
+	
+	// Check for MCP tool identifier
+	if mcpTool := ctx.Value("mcp_tool"); mcpTool != nil {
+		if name, ok := mcpTool.(string); ok {
+			return name
+		}
+	}
+	
 	return "unknown"
 }
 
