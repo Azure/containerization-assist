@@ -70,7 +70,7 @@ metadata:
 data:
   localRegistryHosting.v1: |
 	host: "localhost:5001"
-	help: "https://kind.sigs.k8s.io/docs/user/local-registry/\"
+	help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 "@
         $configMap | Out-File -FilePath local-registry-hosting.yaml -Encoding ascii
         kubectl apply -f local-registry-hosting.yaml
