@@ -609,13 +609,8 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 				completedTools = append(completedTools, execution.Tool)
 			}
 		}
-
-		// Get last error message
-		lastError := ""
-		if session.LastError != nil {
-			lastError = session.LastError.Error()
-		}
-
+		
+		// Get last error message (already handled by getLastError method)
 		// Convert metadata from interface{} to string
 		metadata := make(map[string]string)
 		for key, value := range session.Metadata {
@@ -669,12 +664,8 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 			completedTools = append(completedTools, execution.Tool)
 		}
 	}
-
-	// Get last error message
-	lastError := ""
-	if session.LastError != nil {
-		lastError = session.LastError.Error()
-	}
+	
+	// Get last error message (already handled by getLastError method)
 	// Convert metadata from interface{} to string
 	metadata := make(map[string]string)
 	for key, value := range session.Metadata {
