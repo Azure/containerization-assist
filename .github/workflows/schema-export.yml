@@ -15,6 +15,11 @@ on:
       - 'cmd/mcp-server/**'
   workflow_dispatch: # Allow manual trigger
 
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write

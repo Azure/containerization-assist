@@ -14,11 +14,11 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	mcperror "github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
-// AtomicAnalyzeRepositoryArgs defines arguments for atomic repository analysis
 type AtomicAnalyzeRepositoryArgs struct {
 	types.BaseToolArgs
 	RepoURL      string `json:"repo_url" description:"Repository URL (GitHub, GitLab, etc.) or local path"`
@@ -28,48 +28,34 @@ type AtomicAnalyzeRepositoryArgs struct {
 	Shallow      bool   `json:"shallow,omitempty" description:"Perform shallow clone for faster analysis"`
 }
 
-// AtomicAnalysisResult defines the response from atomic repository analysis
 type AtomicAnalysisResult struct {
 	types.BaseToolResponse
-	mcptypes.BaseAIContextResult      // Embed AI context methods
-	Success                      bool `json:"success"`
+	mcptypes.BaseAIContextResult
+	Success bool `json:"success"`
 
-	// Session context
 	SessionID    string `json:"session_id"`
 	WorkspaceDir string `json:"workspace_dir"`
 
-	// Repository info
 	RepoURL  string `json:"repo_url"`
 	Branch   string `json:"branch"`
 	CloneDir string `json:"clone_dir"`
 
-	// Analysis results from core operations
 	Analysis *analysis.AnalysisResult `json:"analysis"`
 
-	// Clone results for debugging
 	CloneResult *git.CloneResult `json:"clone_result,omitempty"`
 
-	// Timing information
 	CloneDuration    time.Duration `json:"clone_duration"`
 	AnalysisDuration time.Duration `json:"analysis_duration"`
 	TotalDuration    time.Duration `json:"total_duration"`
 
-	// Rich context for Claude reasoning
 	AnalysisContext *AnalysisContext `json:"analysis_context"`
 
-	// AI context for decision-making
 	ContainerizationAssessment *ContainerizationAssessment `json:"containerization_assessment"`
 }
 
-// Note: ContainerizationAssessment and related types are defined in types.go
-
-// Uses interfaces from interfaces.go to avoid import cycles
-
-// AtomicAnalyzeRepositoryTool implements atomic repository analysis using core operations
 type AtomicAnalyzeRepositoryTool struct {
-	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
-	// errorHandler field removed - using direct error handling
+	pipelineAdapter  mcptypes.PipelineOperations
+	sessionManager   mcptypes.ToolSessionManager
 	logger           zerolog.Logger
 	gitManager       *git.Manager
 	repoAnalyzer     *analysis.RepositoryAnalyzer
@@ -77,12 +63,10 @@ type AtomicAnalyzeRepositoryTool struct {
 	contextGenerator *ContextGenerator
 }
 
-// NewAtomicAnalyzeRepositoryTool creates a new atomic analyze repository tool
 func NewAtomicAnalyzeRepositoryTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicAnalyzeRepositoryTool {
 	return &AtomicAnalyzeRepositoryTool{
-		pipelineAdapter: adapter,
-		sessionManager:  sessionManager,
-		// errorHandler initialization removed - using direct error handling
+		pipelineAdapter:  adapter,
+		sessionManager:   sessionManager,
 		logger:           logger.With().Str("tool", "atomic_analyze_repository").Logger(),
 		gitManager:       git.NewManager(logger),
 		repoAnalyzer:     analysis.NewRepositoryAnalyzer(logger),
@@ -91,30 +75,22 @@ func NewAtomicAnalyzeRepositoryTool(adapter mcptypes.PipelineOperations, session
 	}
 }
 
-// Note: Using centralized stage definitions from core.StandardAnalysisStages()
-
-// ExecuteRepositoryAnalysis runs the atomic repository analysis (legacy method)
 func (t *AtomicAnalyzeRepositoryTool) ExecuteRepositoryAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
-	// Direct execution without progress tracking
 	return t.executeWithoutProgress(ctx, args)
 }
 
-// ExecuteWithContext runs the atomic repository analysis with GoMCP progress tracking
 func (t *AtomicAnalyzeRepositoryTool) ExecuteWithContext(serverCtx *server.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
-	// Create progress adapter for GoMCP using standard analysis stages
 	_ = mcptypes.NewGoMCPProgressAdapter(serverCtx, []mcptypes.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Analyze", Weight: 0.80, Description: "Analyzing"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
-	// Execute with progress tracking
 	ctx := context.Background()
 	result, err := t.performAnalysis(ctx, args, nil)
 
-	// Complete progress tracking
 	if err != nil {
 		t.logger.Info().Msg("Analysis failed")
 		if result != nil {
 			result.Success = false
 		}
-		return result, nil // Return result with error info, not the error itself
+		return result, nil
 	} else {
 		t.logger.Info().Msg("Analysis completed successfully")
 	}
@@ -122,19 +98,15 @@ func (t *AtomicAnalyzeRepositoryTool) ExecuteWithContext(serverCtx *server.Conte
 	return result, nil
 }
 
-// executeWithoutProgress executes without progress tracking
 func (t *AtomicAnalyzeRepositoryTool) executeWithoutProgress(ctx context.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
 	return t.performAnalysis(ctx, args, nil)
 }
 
-// performAnalysis performs the actual repository analysis
 func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args AtomicAnalyzeRepositoryArgs, reporter interface{}) (*AtomicAnalysisResult, error) {
 	startTime := time.Now()
 
-	// Get or create session
 	session, err := t.getOrCreateSession(args.SessionID)
 	if err != nil {
-		// Create result with error for session failure
 		result := &AtomicAnalysisResult{
 			BaseToolResponse:           types.NewBaseResponse("atomic_analyze_repository", args.SessionID, args.DryRun),
 			BaseAIContextResult:        mcptypes.NewBaseAIContextResult("analysis", false, time.Since(startTime)),
@@ -158,13 +130,9 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		Str("branch", args.Branch).
 		Msg("Starting atomic repository analysis")
 
-	// Stage 1: Initialize
-	// Progress reporting removed
-
-	// Create base response
 	result := &AtomicAnalysisResult{
 		BaseToolResponse:           types.NewBaseResponse("atomic_analyze_repository", session.SessionID, args.DryRun),
-		BaseAIContextResult:        mcptypes.NewBaseAIContextResult("analysis", false, 0), // Duration and success will be updated later
+		BaseAIContextResult:        mcptypes.NewBaseAIContextResult("analysis", false, 0),
 		SessionID:                  session.SessionID,
 		WorkspaceDir:               t.pipelineAdapter.GetSessionWorkspace(session.SessionID),
 		RepoURL:                    args.RepoURL,
@@ -173,11 +141,10 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		ContainerizationAssessment: &ContainerizationAssessment{},
 	}
 
-	// Check if this is a resumed session
 	if session.Metadata != nil {
 		if resumedFrom, ok := session.Metadata["resumed_from"].(map[string]interface{}); ok {
-			oldSessionID, _ := resumedFrom["old_session_id"].(string) //nolint:errcheck // Only for logging
-			lastRepoURL, _ := resumedFrom["last_repo_url"].(string)   //nolint:errcheck // Only for logging
+			oldSessionID, _ := resumedFrom["old_session_id"].(string)
+			lastRepoURL, _ := resumedFrom["last_repo_url"].(string)
 
 			t.logger.Info().
 				Str("old_session_id", oldSessionID).
@@ -185,13 +152,11 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 				Str("last_repo_url", lastRepoURL).
 				Msg("Session was resumed from expired session")
 
-			// Add context about the resume
 			result.AnalysisContext.NextStepSuggestions = append(result.AnalysisContext.NextStepSuggestions,
 				fmt.Sprintf("Note: Your previous session (%s) expired. A new session has been created.", oldSessionID),
 				"You'll need to regenerate your Dockerfile and rebuild your image with the new session.",
 			)
 
-			// If no repo URL provided but we have the last one, suggest it
 			if args.RepoURL == "" && lastRepoURL != "" {
 				result.AnalysisContext.NextStepSuggestions = append(result.AnalysisContext.NextStepSuggestions,
 					fmt.Sprintf("Tip: Your last repository was: %s", lastRepoURL),
@@ -200,9 +165,6 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		}
 	}
 
-	// Progress reporting removed
-
-	// Handle dry-run
 	if args.DryRun {
 		result.AnalysisContext.NextStepSuggestions = []string{
 			"This is a dry-run - actual repository cloning and analysis would be performed",
@@ -212,11 +174,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		return result, nil
 	}
 
-	// Stage 2: Clone repository if it's a URL
-	// Progress reporting removed
-
 	if t.isURL(args.RepoURL) {
-		// Progress reporting removed
 
 		cloneResult, err := t.cloneRepository(ctx, session.SessionID, args)
 		result.CloneResult = cloneResult
@@ -245,39 +203,28 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 			Dur("clone_duration", result.CloneDuration).
 			Msg("Repository cloned successfully")
 
-		// Progress reporting removed
 	} else {
-		// Local path - validate and use directly
-		if err := t.validateLocalPath(args.RepoURL); err != nil {
+		if err := utils.ValidateLocalPath(args.RepoURL); err != nil {
 			t.logger.Error().Err(err).
 				Str("local_path", args.RepoURL).
 				Str("session_id", session.SessionID).
 				Msg("Invalid local path for repository")
-			// Local path validation error is returned directly
 			result.Success = false
 			result.TotalDuration = time.Since(startTime)
 			return result, nil
 		}
 		result.CloneDir = args.RepoURL
 
-		// Progress reporting removed
 	}
 
-	// Stage 3: Analyze repository
-	// Progress reporting removed
-
-	// Check for cached analysis results
 	if session.ScanSummary != nil && session.ScanSummary.RepoPath == result.CloneDir {
-		// Check if cache is still valid (less than 1 hour old)
 		if time.Since(session.ScanSummary.CachedAt) < time.Hour {
-			// Progress reporting removed
 			t.logger.Info().
 				Str("session_id", session.SessionID).
 				Str("repo_path", result.CloneDir).
 				Time("cached_at", session.ScanSummary.CachedAt).
 				Msg("Using cached repository analysis results")
 
-			// Build analysis result from cache
 			result.Analysis = &analysis.AnalysisResult{
 				Language:     session.ScanSummary.Language,
 				Framework:    session.ScanSummary.Framework,
@@ -285,12 +232,10 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 				Dependencies: make([]analysis.Dependency, len(session.ScanSummary.Dependencies)),
 			}
 
-			// Convert dependencies back
 			for i, dep := range session.ScanSummary.Dependencies {
 				result.Analysis.Dependencies[i] = analysis.Dependency{Name: dep}
 			}
 
-			// Populate analysis context from cache
 			result.AnalysisContext = &AnalysisContext{
 				FilesAnalyzed:               session.ScanSummary.FilesAnalyzed,
 				ConfigFilesFound:            session.ScanSummary.ConfigFilesFound,
@@ -313,8 +258,8 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 			result.AnalysisDuration = time.Duration(session.ScanSummary.AnalysisDuration * float64(time.Second))
 			result.TotalDuration = time.Since(startTime)
 			result.Success = true
-			result.BaseAIContextResult.IsSuccessful = true
-			result.BaseAIContextResult.Duration = result.TotalDuration
+			result.IsSuccessful = true
+			result.Duration = result.TotalDuration
 
 			t.logger.Info().
 				Str("session_id", session.SessionID).
@@ -323,8 +268,6 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 				Dur("cached_analysis_duration", result.AnalysisDuration).
 				Dur("total_duration", result.TotalDuration).
 				Msg("Repository analysis completed using cached results")
-
-				// Progress reporting removed
 
 			return result, nil
 		} else {
@@ -335,9 +278,6 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 				Msg("Cached analysis results are stale, performing fresh analysis")
 		}
 	}
-
-	// Perform mechanical analysis using repository module
-	// Progress reporting removed
 
 	analysisStartTime := time.Now()
 	analysisOpts := AnalysisOptions{
@@ -352,7 +292,6 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		return result, err
 	}
 
-	// Create our wrapped result with additional context
 	repoAnalysisResult := &AnalysisResult{
 		AnalysisResult: coreAnalysisResult,
 		Duration:       time.Since(analysisStartTime),
@@ -379,15 +318,6 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 	result.Analysis = repoAnalysisResult.AnalysisResult
 	result.AnalysisContext = repoAnalysisResult.Context
 
-	// Progress reporting removed
-
-	// Stage 4: Generate analysis context
-	// Progress reporting removed
-
-	// Analysis context already generated by repository module
-	// Progress reporting removed
-
-	// Generate containerization assessment for AI decision-making
 	assessment, err := t.contextGenerator.GenerateContainerizationAssessment(result.Analysis, result.AnalysisContext)
 	if err != nil {
 		t.logger.Warn().Err(err).Msg("Failed to generate containerization assessment")
@@ -395,25 +325,15 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		result.ContainerizationAssessment = assessment
 	}
 
-	// Progress reporting removed
-
-	// Stage 5: Finalize and save results
-	// Progress reporting removed
-
-	// Update session state
 	if err := t.updateSessionState(session, result); err != nil {
 		t.logger.Warn().Err(err).Msg("Failed to update session state")
 	}
 
-	// Progress reporting removed
-
-	// Mark the operation as successful
 	result.Success = true
 	result.TotalDuration = time.Since(startTime)
 
-	// Update mcptypes.BaseAIContextResult fields
-	result.BaseAIContextResult.IsSuccessful = true
-	result.BaseAIContextResult.Duration = result.TotalDuration
+	result.IsSuccessful = true
+	result.Duration = result.TotalDuration
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -423,25 +343,19 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		Dur("total_duration", result.TotalDuration).
 		Msg("Atomic repository analysis completed successfully")
 
-	// Progress reporting removed
-
 	return result, nil
 }
 
-// getOrCreateSession gets existing session or creates a new one
 func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*sessiontypes.SessionState, error) {
 	if sessionID != "" {
-		// Try to get existing session
 		sessionInterface, err := t.sessionManager.GetSession(sessionID)
 		if err == nil {
 			session := sessionInterface.(*sessiontypes.SessionState)
-			// Check if session is expired
 			if time.Now().After(session.ExpiresAt) {
 				t.logger.Info().
 					Str("session_id", sessionID).
 					Time("expired_at", session.ExpiresAt).
 					Msg("Session has expired, will create new session and attempt to resume")
-				// Store old session info for potential resume
 				oldSessionInfo := map[string]interface{}{
 					"old_session_id": sessionID,
 					"expired_at":     session.ExpiresAt,
@@ -450,7 +364,6 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 				if session.ScanSummary != nil && session.ScanSummary.RepoURL != "" {
 					oldSessionInfo["last_repo_url"] = session.ScanSummary.RepoURL
 				}
-				// Create new session with metadata about the old one
 				newSessionInterface, err := t.sessionManager.GetOrCreateSession("")
 				if err != nil {
 					return nil, mcperror.NewSessionNotFound("replacement_session")
@@ -479,7 +392,6 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 		t.logger.Debug().Str("session_id", sessionID).Msg("Session not found, creating new one")
 	}
 
-	// Create new session
 	sessionInterface, err := t.sessionManager.GetOrCreateSession("")
 	if err != nil {
 		return nil, mcperror.NewSessionNotFound("new_session")
@@ -490,16 +402,13 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*ses
 	return session, nil
 }
 
-// cloneRepository clones the repository using the repository module
 func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessionID string, args AtomicAnalyzeRepositoryArgs) (*git.CloneResult, error) {
-	// Get session to find workspace directory
 	sessionInterface, err := t.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
-	// Prepare clone options
 	cloneOpts := CloneOptions{
 		RepoURL:   args.RepoURL,
 		Branch:    args.Branch,
@@ -508,11 +417,10 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 		SessionID: sessionID,
 	}
 
-	// Clone using the git manager
 	result, err := t.repoCloner.CloneRepository(ctx, cloneOpts.TargetDir, git.CloneOptions{
 		URL:          cloneOpts.RepoURL,
 		Branch:       cloneOpts.Branch,
-		Depth:        1, // shallow clone
+		Depth:        1,
 		SingleBranch: true,
 		Recursive:    false,
 	})
@@ -520,7 +428,6 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 		return nil, err
 	}
 
-	// Update session with clone info
 	session.RepoPath = result.RepoPath
 	session.RepoURL = args.RepoURL
 	t.sessionManager.UpdateSession(sessionID, func(s interface{}) {
@@ -533,19 +440,15 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 	return result, nil
 }
 
-// updateSessionState updates the session with analysis results
 func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.SessionState, result *AtomicAnalysisResult) error {
-	// Update session with repository analysis results
 	analysis := result.Analysis
-	// Convert dependencies to string slice
 	dependencyNames := make([]string, len(analysis.Dependencies))
 	for i, dep := range analysis.Dependencies {
 		dependencyNames[i] = dep.Name
 	}
 
-	// Add to StageHistory for stage tracking
 	now := time.Now()
-	startTime := now.Add(-result.AnalysisDuration) // Calculate start time from duration
+	startTime := now.Add(-result.AnalysisDuration)
 	execution := sessiontypes.ToolExecution{
 		Tool:       "analyze_repository",
 		StartTime:  startTime,
@@ -559,46 +462,38 @@ func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.S
 
 	session.UpdateLastAccessed()
 
-	// Store structured scan summary for caching
 	session.ScanSummary = &types.RepositoryScanSummary{
-		// Core analysis results
 		Language:     analysis.Language,
 		Framework:    analysis.Framework,
 		Port:         analysis.Port,
 		Dependencies: dependencyNames,
 
-		// File structure insights
 		FilesAnalyzed:    result.AnalysisContext.FilesAnalyzed,
 		ConfigFilesFound: result.AnalysisContext.ConfigFilesFound,
 		EntryPointsFound: result.AnalysisContext.EntryPointsFound,
 		TestFilesFound:   result.AnalysisContext.TestFilesFound,
 		BuildFilesFound:  result.AnalysisContext.BuildFilesFound,
 
-		// Ecosystem insights
 		PackageManagers: result.AnalysisContext.PackageManagers,
 		DatabaseFiles:   result.AnalysisContext.DatabaseFiles,
 		DockerFiles:     result.AnalysisContext.DockerFiles,
 		K8sFiles:        result.AnalysisContext.K8sFiles,
 
-		// Repository metadata
 		HasGitIgnore:   result.AnalysisContext.HasGitIgnore,
 		HasReadme:      result.AnalysisContext.HasReadme,
 		HasLicense:     result.AnalysisContext.HasLicense,
 		HasCI:          result.AnalysisContext.HasCI,
 		RepositorySize: result.AnalysisContext.RepositorySize,
 
-		// Cache metadata
 		CachedAt:         time.Now(),
 		AnalysisDuration: result.AnalysisDuration.Seconds(),
 		RepoPath:         result.CloneDir,
 		RepoURL:          result.RepoURL,
 
-		// Suggestions for reuse
 		ContainerizationSuggestions: result.AnalysisContext.ContainerizationSuggestions,
 		NextStepSuggestions:         result.AnalysisContext.NextStepSuggestions,
 	}
 
-	// Store additional context
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
 	}
@@ -617,8 +512,6 @@ func (t *AtomicAnalyzeRepositoryTool) updateSessionState(session *sessiontypes.S
 	})
 }
 
-// Helper methods
-
 func (t *AtomicAnalyzeRepositoryTool) isURL(path string) bool {
 	return strings.HasPrefix(path, "http://") ||
 		strings.HasPrefix(path, "https://") ||
@@ -626,9 +519,7 @@ func (t *AtomicAnalyzeRepositoryTool) isURL(path string) bool {
 		strings.HasPrefix(path, "ssh://")
 }
 
-// generateAnalysisContext creates rich context from the analysis results
 func (t *AtomicAnalyzeRepositoryTool) generateAnalysisContext(repoPath string, analysis *analysis.AnalysisResult) *AnalysisContext {
-	// This is a simplified version - in practice you'd analyze the repo more thoroughly
 	return &AnalysisContext{
 		FilesAnalyzed:               len(analysis.ConfigFiles),
 		ConfigFilesFound:            []string{},
@@ -649,27 +540,6 @@ func (t *AtomicAnalyzeRepositoryTool) generateAnalysisContext(repoPath string, a
 	}
 }
 
-func (t *AtomicAnalyzeRepositoryTool) validateLocalPath(path string) error {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return types.NewRichError("INVALID_PATH", fmt.Sprintf("failed to resolve absolute path for '%s': %v", path, err), types.ErrTypeValidation)
-	}
-
-	// Basic path validation (more could be added)
-	if strings.Contains(absPath, "..") {
-		return types.NewRichError("PATH_TRAVERSAL_DENIED", fmt.Sprintf("path traversal not allowed for '%s' (resolved to: %s)", path, absPath), types.ErrTypeSecurity)
-	}
-
-	return nil
-}
-
-// Unified AI Context Interface Implementations
-
-// AI Context methods are now provided by embedded mcptypes.BaseAIContextResult
-
-// Tool interface implementation (unified interface)
-
-// GetMetadata returns comprehensive tool metadata
 func (t *AtomicAnalyzeRepositoryTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:         "atomic_analyze_repository",
@@ -710,9 +580,7 @@ func (t *AtomicAnalyzeRepositoryTool) GetMetadata() mcptypes.ToolMetadata {
 	}
 }
 
-// Validate validates the tool arguments (unified interface)
 func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interface{}) error {
-	// Handle both pointer and value types
 	var analyzeArgs AtomicAnalyzeRepositoryArgs
 	switch v := args.(type) {
 	case AtomicAnalyzeRepositoryArgs:
@@ -741,9 +609,7 @@ func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interfa
 	return nil
 }
 
-// Execute implements unified Tool interface
 func (t *AtomicAnalyzeRepositoryTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-	// Handle different argument types including orchestration types
 	var analyzeArgs AtomicAnalyzeRepositoryArgs
 
 	switch v := args.(type) {
@@ -752,7 +618,6 @@ func (t *AtomicAnalyzeRepositoryTool) Execute(ctx context.Context, args interfac
 	case *AtomicAnalyzeRepositoryArgs:
 		analyzeArgs = *v
 	default:
-		// Try to convert from orchestration types (reflection-like conversion)
 		if converted := t.convertFromOrchestrationArgs(args); converted != nil {
 			analyzeArgs = *converted
 		} else {
@@ -764,20 +629,12 @@ func (t *AtomicAnalyzeRepositoryTool) Execute(ctx context.Context, args interfac
 		}
 	}
 
-	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, analyzeArgs)
 }
 
-// convertFromOrchestrationArgs converts orchestration types to analyze types
 func (t *AtomicAnalyzeRepositoryTool) convertFromOrchestrationArgs(args interface{}) *AtomicAnalyzeRepositoryArgs {
-	// Handle orchestration.AtomicAnalyzeRepositoryArgs (by checking field names and types)
-	// This is a bit of a hack, but necessary due to import cycle prevention
-
-	// Use reflection to extract fields
 	switch v := args.(type) {
 	case interface{}:
-		// Try to extract fields by field access if possible
-		// Check if it has the expected fields using type assertion tricks
 		if converted := t.extractFieldsFromInterface(v); converted != nil {
 			return converted
 		}
@@ -786,27 +643,17 @@ func (t *AtomicAnalyzeRepositoryTool) convertFromOrchestrationArgs(args interfac
 	return nil
 }
 
-// extractFieldsFromInterface attempts to extract fields from an interface{}
-// that might be an orchestration.AtomicAnalyzeRepositoryArgs
 func (t *AtomicAnalyzeRepositoryTool) extractFieldsFromInterface(v interface{}) *AtomicAnalyzeRepositoryArgs {
-	// This is a more direct approach - check for specific interface methods or use a map conversion
-	// Since we can't import orchestration package, we'll use interface{} conversion tricks
-
-	// Try to get the underlying value and convert via intermediate representation
-	// Convert to map via JSON marshaling/unmarshaling as a fallback
 	return t.convertViaJSON(v)
 }
 
-// convertViaJSON converts via JSON marshaling/unmarshaling
 func (t *AtomicAnalyzeRepositoryTool) convertViaJSON(v interface{}) *AtomicAnalyzeRepositoryArgs {
-	// Marshal to JSON
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
 		t.logger.Error().Err(err).Msg("Failed to marshal args to JSON")
 		return nil
 	}
 
-	// Unmarshal to our type
 	var result AtomicAnalyzeRepositoryArgs
 	if err := json.Unmarshal(jsonBytes, &result); err != nil {
 		t.logger.Error().Err(err).Msg("Failed to unmarshal JSON to AtomicAnalyzeRepositoryArgs")
@@ -817,24 +664,18 @@ func (t *AtomicAnalyzeRepositoryTool) convertViaJSON(v interface{}) *AtomicAnaly
 	return &result
 }
 
-// Legacy interface methods for backward compatibility
-
-// GetName returns the tool name (legacy SimpleTool compatibility)
 func (t *AtomicAnalyzeRepositoryTool) GetName() string {
 	return t.GetMetadata().Name
 }
 
-// GetDescription returns the tool description (legacy SimpleTool compatibility)
 func (t *AtomicAnalyzeRepositoryTool) GetDescription() string {
 	return t.GetMetadata().Description
 }
 
-// GetVersion returns the tool version (legacy SimpleTool compatibility)
 func (t *AtomicAnalyzeRepositoryTool) GetVersion() string {
 	return t.GetMetadata().Version
 }
 
-// ToolCapabilities for local use (to avoid import cycles)
 type ToolCapabilities struct {
 	SupportsDryRun    bool
 	SupportsStreaming bool
@@ -842,7 +683,6 @@ type ToolCapabilities struct {
 	RequiresAuth      bool
 }
 
-// GetCapabilities returns the tool capabilities (legacy SimpleTool compatibility)
 func (t *AtomicAnalyzeRepositoryTool) GetCapabilities() ToolCapabilities {
 	return ToolCapabilities{
 		SupportsDryRun:    true,
@@ -852,8 +692,6 @@ func (t *AtomicAnalyzeRepositoryTool) GetCapabilities() ToolCapabilities {
 	}
 }
 
-// ExecuteTyped provides the original typed execute method
 func (t *AtomicAnalyzeRepositoryTool) ExecuteTyped(ctx context.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
-	// Direct execution without progress tracking
 	return t.executeWithoutProgress(ctx, args)
 }

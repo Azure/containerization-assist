@@ -428,7 +428,7 @@ func TestDefaultServerConfig(t *testing.T) {
 	assert.NotEmpty(t, config.WorkspaceDir)
 	assert.Contains(t, config.WorkspaceDir, ".container-kit")
 	assert.NotEmpty(t, config.StorePath)
-	assert.Equal(t, 10, config.MaxSessions)
+	assert.Equal(t, 50, config.MaxSessions)
 	assert.Equal(t, 24*time.Hour, config.SessionTTL)
 	assert.Equal(t, "stdio", config.TransportType)
 	assert.Equal(t, 8080, config.HTTPPort)

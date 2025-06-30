@@ -1,3 +1,5 @@
+[![CI Pipeline](https://github.com/Azure/container-kit/actions/workflows/ci-pipeline.yml/badge.svg)](https://github.com/Azure/container-kit/actions/workflows/ci-pipeline.yml)
+
 # Container Kit
 
 AI-Powered Application Containerization and Kubernetes Deployment

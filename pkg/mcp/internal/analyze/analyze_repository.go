@@ -94,9 +94,9 @@ func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args inter
 		return types.NewRichError("INVALID_ARGUMENTS", "invalid argument type: expected map[string]interface{}", "validation_error")
 	}
 
-	// Check required fields
+	// Check required fields - session ID is optional, will be generated if missing
 	if sessionID, _ := argsMap["session_id"].(string); sessionID == "" {
-		// Session ID is optional, will be generated if missing
+		t.logger.Debug().Msg("Session ID not provided, will be generated")
 	}
 
 	// Check for repo_path or path

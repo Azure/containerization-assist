@@ -18,10 +18,7 @@ import (
 // Contracts
 ///////////////////////////////////////////////////////////////////////////////
 
-// NOTE: Tool interface is now defined in pkg/mcp/interfaces.go
-// Using mcp.Tool for the unified interface
-
-// UnifiedTool represents the unified interface for all MCP tools
+// UnifiedTool represents the unified interface for all MCP tools (matches mcp.Tool)
 type UnifiedTool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
 	GetMetadata() mcptypes.ToolMetadata

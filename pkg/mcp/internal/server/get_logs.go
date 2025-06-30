@@ -37,12 +37,6 @@ type GetLogsResult struct {
 	Error         *types.ToolError `json:"error,omitempty"`
 }
 
-// LogProvider interface for accessing logs
-type LogProvider interface {
-	GetLogs(level string, since time.Time, pattern string, limit int) ([]utils.LogEntry, error)
-	GetTotalLogCount() int
-}
-
 // RingBufferLogProvider implements LogProvider using a ring buffer
 type RingBufferLogProvider struct {
 	buffer *utils.RingBuffer
@@ -76,11 +70,11 @@ func (p *RingBufferLogProvider) GetTotalLogCount() int {
 // GetLogsTool implements the get_logs MCP tool
 type GetLogsTool struct {
 	logger      zerolog.Logger
-	logProvider LogProvider
+	logProvider *RingBufferLogProvider
 }
 
 // NewGetLogsTool creates a new get logs tool
-func NewGetLogsTool(logger zerolog.Logger, logProvider LogProvider) *GetLogsTool {
+func NewGetLogsTool(logger zerolog.Logger, logProvider *RingBufferLogProvider) *GetLogsTool {
 	return &GetLogsTool{
 		logger:      logger,
 		logProvider: logProvider,
@@ -198,7 +192,7 @@ func (t *GetLogsTool) ExecuteTyped(ctx context.Context, args GetLogsArgs) (*GetL
 }
 
 // CreateGlobalLogProvider creates a log provider using the global log buffer
-func CreateGlobalLogProvider() LogProvider {
+func CreateGlobalLogProvider() *RingBufferLogProvider {
 	buffer := utils.GetGlobalLogBuffer()
 	if buffer == nil {
 		// Initialize if not already done

@@ -56,11 +56,12 @@ func (d *DatabaseDetectionStage) Run(ctx context.Context, state *pipeline.Pipeli
 	detectedDatabases, err := d.detectDatabases(targetDir)
 	if err != nil {
 		d.errors = append(d.errors, err)
+		state.Metadata["detectedDatabaseErrors"] = err
 		return err
 	}
 
 	// Save the detection results into the pipeline state
-	state.Metadata["detectedDatabases"] = detectedDatabases
+	state.DetectedDatabases = detectedDatabases
 	logger.Infof("Final detected databases: %v", detectedDatabases)
 
 	return nil
@@ -72,7 +73,7 @@ func (d *DatabaseDetectionStage) Deploy(ctx context.Context, state *pipeline.Pip
 }
 
 // detectDatabases inspects repository files to detect database types and versions.
-func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDetectionResult, error) {
+func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]pipeline.DatabaseDetectionResult, error) {
 	logger.Infof("Detecting databases in repository: %s", targetDir)
 
 	// Initialize progress tracker
@@ -80,7 +81,7 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 
 	totalFiles, _ := calculateTotalFiles(targetDir)
 	var processedFiles int
-	detectedDatabases := make(map[DatabaseType]*DatabaseDetectionResult) // Use a map to avoid duplicates
+	detectedDatabases := make(map[DatabaseType]*pipeline.DatabaseDetectionResult) // Use a map to avoid duplicates
 
 	err := filepath.Walk(targetDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -112,9 +113,9 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 			logger.Debugf("Detected database type %s (version %s) in file %s", dbType, version, path)
 
 			// Update or add the database detection result in the map
-			if existing, exists := detectedDatabases[dbType]; exists && existing.Version == "unknown" || !exists {
+			if existing, exists := detectedDatabases[dbType]; !exists || existing.Version == "unknown" {
 				// Only overwrite if the existing version is "unknown"
-				detectedDatabases[dbType] = &DatabaseDetectionResult{
+				detectedDatabases[dbType] = &pipeline.DatabaseDetectionResult{
 					Type:    string(dbType),
 					Version: version,
 					Source:  path,
@@ -133,7 +134,7 @@ func (d *DatabaseDetectionStage) detectDatabases(targetDir string) ([]DatabaseDe
 	}
 
 	// Convert the map to a slice for the final result
-	var result []DatabaseDetectionResult
+	var result []pipeline.DatabaseDetectionResult
 	for _, db := range detectedDatabases {
 		result = append(result, *db)
 	}

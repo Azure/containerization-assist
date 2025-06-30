@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -8,7 +9,7 @@ import (
 
 // BuildArgsMap converts a struct to a map[string]interface{} using reflection
 // It prioritizes JSON tags and converts snake_case to camelCase for consistency
-func BuildArgsMap(args interface{}) (map[string]interface{}, error) {
+func BuildArgsMap(ctx context.Context, args interface{}) (map[string]interface{}, error) {
 	if args == nil {
 		return nil, fmt.Errorf("args cannot be nil")
 	}
@@ -38,6 +39,20 @@ func BuildArgsMap(args interface{}) (map[string]interface{}, error) {
 
 		// Skip unexported fields
 		if !field.CanInterface() {
+			continue
+		}
+
+		// Handle embedded structs (anonymous fields) by flattening them
+		if fieldType.Anonymous && field.Kind() == reflect.Struct {
+			// Recursively process embedded struct and merge its fields
+			embeddedMap, err := BuildArgsMap(ctx, field.Interface())
+			if err != nil {
+				return nil, fmt.Errorf("failed to process embedded struct %s: %w", fieldType.Name, err)
+			}
+			// Merge embedded fields into result
+			for k, v := range embeddedMap {
+				result[k] = v
+			}
 			continue
 		}
 

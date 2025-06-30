@@ -28,7 +28,7 @@ func TestDefaultServerConfigGeneration(t *testing.T) {
 			},
 			validateConfig: func(t *testing.T, config ServerConfig) {
 				assert.Contains(t, config.WorkspaceDir, "container-kit")
-				assert.Equal(t, 10, config.MaxSessions)
+				assert.Equal(t, 50, config.MaxSessions)
 				assert.Equal(t, 24*time.Hour, config.SessionTTL)                 // Actual default is 24h
 				assert.Equal(t, int64(1024*1024*1024), config.MaxDiskPerSession) // 1GB
 				assert.Equal(t, int64(10*1024*1024*1024), config.TotalDiskLimit) // 10GB
@@ -79,7 +79,7 @@ func TestConfigDefaults(t *testing.T) {
 	config := DefaultServerConfig()
 
 	// Test all expected defaults
-	assert.Equal(t, 10, config.MaxSessions)
+	assert.Equal(t, 50, config.MaxSessions)
 	assert.Equal(t, 24*time.Hour, config.SessionTTL)
 	assert.Equal(t, int64(1024*1024*1024), config.MaxDiskPerSession) // 1GB
 	assert.Equal(t, int64(10*1024*1024*1024), config.TotalDiskLimit) // 10GB

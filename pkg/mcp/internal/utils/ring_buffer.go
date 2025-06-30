@@ -83,7 +83,28 @@ func (rb *RingBuffer) GetEntriesFiltered(level string, since time.Time, pattern 
 	rb.mu.RLock()
 	defer rb.mu.RUnlock()
 
-	allEntries := rb.GetEntries()
+	// Get all entries directly without calling GetEntries to avoid deadlock
+	if rb.count == 0 {
+		return nil
+	}
+
+	var allEntries []LogEntry
+	if rb.count < rb.capacity {
+		// Buffer not full yet, entries are from 0 to head-1
+		allEntries = make([]LogEntry, rb.count)
+		copy(allEntries, rb.entries[:rb.count])
+	} else {
+		// Buffer is full, entries wrap around
+		allEntries = make([]LogEntry, rb.count)
+		// Copy from head to end
+		firstPart := rb.capacity - rb.head
+		copy(allEntries, rb.entries[rb.head:])
+		// Copy from beginning to head
+		if rb.head > 0 {
+			copy(allEntries[firstPart:], rb.entries[:rb.head])
+		}
+	}
+
 	if len(allEntries) == 0 {
 		return nil
 	}

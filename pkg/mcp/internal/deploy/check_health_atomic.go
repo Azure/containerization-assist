@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -17,86 +18,66 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// AtomicCheckHealthArgs defines arguments for atomic application health checking
 type AtomicCheckHealthArgs struct {
 	types.BaseToolArgs
 
-	// Target specification
 	Namespace     string `json:"namespace,omitempty" description:"Kubernetes namespace (default: default)"`
 	AppName       string `json:"app_name,omitempty" description:"Application name for label selection"`
 	LabelSelector string `json:"label_selector,omitempty" description:"Custom label selector (e.g., app=myapp,version=v1)"`
 
-	// Health check configuration
 	IncludeServices bool `json:"include_services,omitempty" description:"Include service health checks (default: true)"`
 	IncludeEvents   bool `json:"include_events,omitempty" description:"Include pod events in analysis (default: true)"`
 	WaitForReady    bool `json:"wait_for_ready,omitempty" description:"Wait for pods to become ready"`
 	WaitTimeout     int  `json:"wait_timeout,omitempty" description:"Wait timeout in seconds (default: 300)"`
 
-	// Analysis depth
 	DetailedAnalysis bool `json:"detailed_analysis,omitempty" description:"Perform detailed container and condition analysis"`
 	IncludeLogs      bool `json:"include_logs,omitempty" description:"Include recent container logs in analysis"`
 	LogLines         int  `json:"log_lines,omitempty" description:"Number of log lines to include (default: 50)"`
 }
 
-// AtomicCheckHealthResult defines the response from atomic health checking
 type AtomicCheckHealthResult struct {
 	types.BaseToolResponse
-	internal.BaseAIContextResult      // Embed AI context methods
-	Success                      bool `json:"success"`
+	internal.BaseAIContextResult
+	Success bool `json:"success"`
 
-	// Session context
 	SessionID     string `json:"session_id"`
 	Namespace     string `json:"namespace"`
 	LabelSelector string `json:"label_selector"`
 
-	// Health check results from core operations
 	HealthResult *kubernetes.HealthCheckResult `json:"health_result"`
 
-	// Wait results (if waiting was requested)
 	WaitResult *kubernetes.HealthCheckResult `json:"wait_result,omitempty"`
 
-	// Timing information
 	HealthCheckDuration time.Duration `json:"health_check_duration"`
 	WaitDuration        time.Duration `json:"wait_duration,omitempty"`
 	TotalDuration       time.Duration `json:"total_duration"`
 
-	// Rich context for Claude reasoning
 	HealthContext *HealthContext `json:"health_context"`
-
-	// Rich error information if operation failed
 }
 
-// HealthContext provides rich context for Claude to reason about application health
 type HealthContext struct {
-	// Overall health summary
-	OverallStatus  string  `json:"overall_status"`  // Health status: healthy, degraded, unhealthy, unknown
-	HealthScore    float64 `json:"health_score"`    // 0.0 to 1.0
-	ReadinessRatio float64 `json:"readiness_ratio"` // Ready pods / Total pods
+	OverallStatus  string  `json:"overall_status"`
+	HealthScore    float64 `json:"health_score"`
+	ReadinessRatio float64 `json:"readiness_ratio"`
 
-	// Pod analysis
 	PodSummary      PodSummary       `json:"pod_summary"`
 	PodIssues       []PodIssue       `json:"pod_issues"`
 	ContainerIssues []ContainerIssue `json:"container_issues"`
 
-	// Service analysis
 	ServiceSummary ServiceSummary `json:"service_summary"`
 	ServiceIssues  []string       `json:"service_issues"`
 
-	// Performance insights
 	ResourceUsage     ResourceUsageInfo `json:"resource_usage"`
 	PerformanceIssues []string          `json:"performance_issues"`
 
-	// Stability analysis
 	RestartAnalysis RestartAnalysis `json:"restart_analysis"`
 	StabilityIssues []string        `json:"stability_issues"`
 
-	// Recommendations
 	HealthRecommendations []string `json:"health_recommendations"`
 	NextStepSuggestions   []string `json:"next_step_suggestions"`
 	TroubleshootingTips   []string `json:"troubleshooting_tips,omitempty"`
 }
 
-// PodSummary provides summary of pod health
 type PodSummary struct {
 	TotalPods   int `json:"total_pods"`
 	ReadyPods   int `json:"ready_pods"`
@@ -105,28 +86,25 @@ type PodSummary struct {
 	RunningPods int `json:"running_pods"`
 }
 
-// PodIssue represents a pod-level health issue
 type PodIssue struct {
 	PodName     string   `json:"pod_name"`
 	IssueType   string   `json:"issue_type"` // Issue type: not_ready, failed, pending, crashloop
 	Description string   `json:"description"`
-	Severity    string   `json:"severity"` // "low", "medium", "high", "critical"
+	Severity    string   `json:"severity"`
 	Since       string   `json:"since"`
 	Suggestions []string `json:"suggestions"`
 }
 
-// ContainerIssue represents a container-level health issue
 type ContainerIssue struct {
 	PodName       string `json:"pod_name"`
 	ContainerName string `json:"container_name"`
-	IssueType     string `json:"issue_type"` // Issue type: not_ready, restart_loop, oom_killed, failed
+	IssueType     string `json:"issue_type"`
 	Description   string `json:"description"`
 	Severity      string `json:"severity"`
 	RestartCount  int    `json:"restart_count"`
 	LastRestart   string `json:"last_restart,omitempty"`
 }
 
-// ServiceSummary provides summary of service health
 type ServiceSummary struct {
 	TotalServices   int `json:"total_services"`
 	HealthyServices int `json:"healthy_services"`
@@ -134,52 +112,60 @@ type ServiceSummary struct {
 	EndpointsTotal  int `json:"endpoints_total"`
 }
 
-// ResourceUsageInfo provides resource usage insights
 type ResourceUsageInfo struct {
 	HighCPUPods      []string `json:"high_cpu_pods"`
 	HighMemoryPods   []string `json:"high_memory_pods"`
 	ResourceWarnings []string `json:"resource_warnings"`
 }
 
-// RestartAnalysis provides pod restart analysis
 type RestartAnalysis struct {
 	TotalRestarts    int      `json:"total_restarts"`
 	PodsWithRestarts int      `json:"pods_with_restarts"`
-	HighRestartPods  []string `json:"high_restart_pods"` // Pods with >5 restarts
-	RecentRestarts   int      `json:"recent_restarts"`   // Restarts in last hour
+	HighRestartPods  []string `json:"high_restart_pods"`
+	RecentRestarts   int      `json:"recent_restarts"`
 }
 
-// AtomicCheckHealthTool implements atomic application health checking using core operations
 type AtomicCheckHealthTool struct {
-	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
-	// errorHandler field removed - using direct error handling
-	logger      zerolog.Logger
-	analyzer    ToolAnalyzer
-	fixingMixin *build.AtomicToolFixingMixin
+	pipelineAdapter  mcptypes.PipelineOperations
+	sessionManager   mcptypes.ToolSessionManager
+	retryCoordinator *retry.Coordinator
+	logger           zerolog.Logger
+	analyzer         ToolAnalyzer
+	fixingMixin      *build.AtomicToolFixingMixin
 }
 
-// NewAtomicCheckHealthTool creates a new atomic check health tool
 func NewAtomicCheckHealthTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicCheckHealthTool {
+	coordinator := retry.New()
+
+	coordinator.SetPolicy("health_check", &retry.Policy{
+		MaxAttempts:     10,
+		InitialDelay:    5 * time.Second,
+		MaxDelay:        30 * time.Second,
+		BackoffStrategy: retry.BackoffExponential,
+		Multiplier:      1.5,
+		Jitter:          true,
+		ErrorPatterns: []string{
+			"timeout", "connection refused", "network unreachable",
+			"service unavailable", "not ready", "pending",
+		},
+	})
+
 	return &AtomicCheckHealthTool{
-		pipelineAdapter: adapter,
-		sessionManager:  sessionManager,
-		// errorHandler initialization removed - using direct error handling
-		logger: logger.With().Str("tool", "atomic_check_health").Logger(),
+		pipelineAdapter:  adapter,
+		sessionManager:   sessionManager,
+		retryCoordinator: coordinator,
+		logger:           logger.With().Str("tool", "atomic_check_health").Logger(),
 	}
 }
 
-// SetAnalyzer sets the analyzer for failure analysis
 func (t *AtomicCheckHealthTool) SetAnalyzer(analyzer ToolAnalyzer) {
 	t.analyzer = analyzer
 }
 
-// SetFixingMixin sets the fixing mixin for automatic error recovery
 func (t *AtomicCheckHealthTool) SetFixingMixin(mixin *build.AtomicToolFixingMixin) {
 	t.fixingMixin = mixin
 }
 
-// standardHealthCheckStages provides common stages for health check operations
 func standardHealthCheckStages() []internal.LocalProgressStage {
 	return []internal.LocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and namespace"},
@@ -190,22 +176,16 @@ func standardHealthCheckStages() []internal.LocalProgressStage {
 	}
 }
 
-// ExecuteHealthCheck runs the atomic application health check
 func (t *AtomicCheckHealthTool) ExecuteHealthCheck(ctx context.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
-	// Direct execution without progress tracking
 	return t.executeWithoutProgress(ctx, args)
 }
 
-// ExecuteWithContext runs the atomic health check with GoMCP progress tracking
 func (t *AtomicCheckHealthTool) ExecuteWithContext(serverCtx *server.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
-	// Create progress adapter for GoMCP using centralized health stages
 	_ = internal.NewGoMCPProgressAdapter(serverCtx, []internal.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Health", Weight: 0.80, Description: "Checking health"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
 
-	// Execute with progress tracking
 	ctx := context.Background()
 	result, err := t.performHealthCheck(ctx, args, nil)
 
-	// Complete progress tracking
 	if err != nil {
 		t.logger.Info().Msg("Health check failed")
 	} else {
@@ -215,19 +195,15 @@ func (t *AtomicCheckHealthTool) ExecuteWithContext(serverCtx *server.Context, ar
 	return result, err
 }
 
-// executeWithoutProgress executes without progress tracking
 func (t *AtomicCheckHealthTool) executeWithoutProgress(ctx context.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
 	return t.performHealthCheck(ctx, args, nil)
 }
 
-// performHealthCheck performs the actual health check
 func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args AtomicCheckHealthArgs, reporter interface{}) (*AtomicCheckHealthResult, error) {
 	startTime := time.Now()
 
-	// Get session
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
-		// Create result with error for session failure
 		result := &AtomicCheckHealthResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_check_health", args.SessionID, args.DryRun),
 			BaseAIContextResult: internal.NewBaseAIContextResult("health", false, time.Since(startTime)),
@@ -241,12 +217,10 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		t.logger.Error().Err(err).
 			Str("session_id", args.SessionID).
 			Msg("Failed to get session")
-		// Session retrieval error is returned directly
 		return result, nil
 	}
 	session := sessionInterface.(*sessiontypes.SessionState)
 
-	// Build label selector
 	labelSelector := t.buildLabelSelector(args, session)
 	namespace := t.getNamespace(args.Namespace)
 
@@ -257,10 +231,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		Bool("wait_for_ready", args.WaitForReady).
 		Msg("Starting atomic application health check")
 
-	// Stage 1: Initialize
-	// Progress reporting removed
-
-	// Create base response
 	result := &AtomicCheckHealthResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_check_health", session.SessionID, args.DryRun),
 		BaseAIContextResult: internal.NewBaseAIContextResult("health", true, 0), // Duration will be set later
@@ -270,9 +240,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		HealthContext:       &HealthContext{},
 	}
 
-	// Progress reporting removed
-
-	// Handle dry-run
 	if args.DryRun {
 		result.HealthContext.NextStepSuggestions = []string{
 			"This is a dry-run - actual health check would be performed",
@@ -283,25 +250,17 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		return result, nil
 	}
 
-	// Validate prerequisites
-	// Progress reporting removed
-
 	if err := t.validateHealthCheckPrerequisites(result, args); err != nil {
 		t.logger.Error().Err(err).
 			Str("session_id", session.SessionID).
 			Str("namespace", namespace).
 			Str("label_selector", labelSelector).
 			Msg("Health check prerequisites validation failed")
-		// Prerequisites validation error is returned directly
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
 		return result, nil
 	}
 
-	// Stage 2: Query Kubernetes resources
-	// Progress reporting removed
-
-	// Perform health check using core operations
 	healthStartTime := time.Now()
 	healthResult, err := t.pipelineAdapter.CheckApplicationHealth(
 		session.SessionID,
@@ -311,7 +270,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 	)
 	result.HealthCheckDuration = time.Since(healthStartTime)
 
-	// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
 	if healthResult != nil {
 		result.HealthResult = &kubernetes.HealthCheckResult{
 			Success:   healthResult.Healthy,
@@ -324,7 +282,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 				Message: healthResult.Error.Message,
 			}
 		}
-		// Convert pod statuses
 		for _, ps := range healthResult.PodStatuses {
 			podStatus := kubernetes.DetailedPodStatus{
 				Name:      ps.Name,
@@ -334,7 +291,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 			}
 			result.HealthResult.Pods = append(result.HealthResult.Pods, podStatus)
 		}
-		// Update summary
 		result.HealthResult.Summary = kubernetes.HealthSummary{
 			TotalPods:   len(result.HealthResult.Pods),
 			ReadyPods:   0,
@@ -355,8 +311,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		}
 	}
 
-	// Progress reporting removed
-
 	if err != nil {
 		t.logger.Error().Err(err).
 			Str("session_id", session.SessionID).
@@ -364,7 +318,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 			Str("label_selector", labelSelector).
 			Msg("Health check failed")
 		t.addTroubleshootingTips(result, "health_check", err)
-		// Health check error is returned directly
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
 		return result, nil
@@ -378,17 +331,9 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		Dur("health_check_duration", result.HealthCheckDuration).
 		Msg("Application health check completed")
 
-	// Stage 3: Analyze pod and service health
-	// Progress reporting removed
-
-	// Analyze the health results to populate the context
 	result.Success = result.HealthResult != nil && result.HealthResult.Success
 
-	// Progress reporting removed
-
-	// Stage 4: Wait for readiness if requested
 	if args.WaitForReady && (result.HealthResult == nil || !result.HealthResult.Success) {
-		// Progress reporting removed
 
 		waitStartTime := time.Now()
 		timeout := t.getWaitTimeout(args.WaitTimeout)
@@ -398,7 +343,6 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 			Dur("timeout", timeout).
 			Msg("Waiting for application to become ready")
 
-		// Simple polling loop for readiness (core operations don't have wait functionality)
 		waitResult := t.waitForApplicationReady(ctx, session.SessionID, namespace, labelSelector, timeout)
 		result.WaitDuration = time.Since(waitStartTime)
 		result.WaitResult = waitResult
@@ -415,19 +359,11 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 				Msg("Application did not become ready within timeout")
 		}
 
-		// Progress reporting removed
 	}
 
-	// Stage 5: Generate health report
-	// Progress reporting removed
-
-	// Analyze health results in detail
 	t.analyzeApplicationHealth(result, args)
 
-	// Progress reporting removed
-
 	result.TotalDuration = time.Since(startTime)
-	// Update internal.BaseAIContextResult fields
 	result.BaseAIContextResult.Duration = result.TotalDuration
 	result.BaseAIContextResult.IsSuccessful = result.Success
 	if result.HealthContext != nil {
@@ -442,12 +378,9 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		Dur("total_duration", result.TotalDuration).
 		Msg("Atomic application health check completed successfully")
 
-	// Progress reporting removed
-
 	return result, nil
 }
 
-// validateHealthCheckPrerequisites validates health check prerequisites
 func (t *AtomicCheckHealthTool) validateHealthCheckPrerequisites(result *AtomicCheckHealthResult, args AtomicCheckHealthArgs) error {
 	if args.AppName == "" && args.LabelSelector == "" {
 		return types.NewValidationErrorBuilder("Application identifier is required for health checking", "app_identifier", "").
@@ -464,45 +397,54 @@ func (t *AtomicCheckHealthTool) validateHealthCheckPrerequisites(result *AtomicC
 	return nil
 }
 
-// waitForApplicationReady implements a simple polling wait for application readiness
 func (t *AtomicCheckHealthTool) waitForApplicationReady(ctx context.Context, sessionID, namespace, labelSelector string, timeout time.Duration) *kubernetes.HealthCheckResult {
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second) // Poll every 10 seconds
-	defer ticker.Stop()
+	var finalResult *kubernetes.HealthCheckResult
 
-	for {
-		select {
-		case <-timeoutCtx.Done():
-			// Timeout reached, return final status
-			result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
-			if err != nil || result == nil {
-				return nil
-			}
-			// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
-			return t.convertHealthCheckResult(result, namespace)
-
-		case <-ticker.C:
-			result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
-			if err != nil || result == nil {
-				continue // Continue polling on error
-			}
-
-			if result.Healthy {
-				// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
-				return t.convertHealthCheckResult(result, namespace) // Application is ready
-			}
+	err := t.retryCoordinator.Execute(timeoutCtx, "health_check", func(ctx context.Context) error {
+		result, err := t.pipelineAdapter.CheckApplicationHealth(sessionID, namespace, labelSelector, 30*time.Second)
+		if err != nil {
+			t.logger.Debug().Err(err).Msg("Health check attempt failed, will retry")
+			return err
 		}
+
+		if result == nil {
+			return fmt.Errorf("health check returned nil result")
+		}
+
+		finalResult = t.convertHealthCheckResult(result, namespace)
+
+		if result.Healthy {
+			t.logger.Info().
+				Str("session_id", sessionID).
+				Str("namespace", namespace).
+				Str("label_selector", labelSelector).
+				Msg("Application became ready")
+			return nil
+		}
+
+		return fmt.Errorf("application not ready: %d/%d pods ready",
+			len(result.PodStatuses), len(result.PodStatuses))
+	})
+
+	if err != nil {
+		t.logger.Warn().Err(err).
+			Str("session_id", sessionID).
+			Str("namespace", namespace).
+			Str("label_selector", labelSelector).
+			Dur("timeout", timeout).
+			Msg("Application did not become ready within timeout")
 	}
+
+	return finalResult
 }
 
-// analyzeApplicationHealth performs detailed analysis of health results
 func (t *AtomicCheckHealthTool) analyzeApplicationHealth(result *AtomicCheckHealthResult, args AtomicCheckHealthArgs) {
 	ctx := result.HealthContext
 	healthResult := result.HealthResult
 
-	// Calculate overall health metrics
 	ctx.ReadinessRatio = 0.0
 	if healthResult.Summary.TotalPods > 0 {
 		ctx.ReadinessRatio = float64(healthResult.Summary.ReadyPods) / float64(healthResult.Summary.TotalPods)
@@ -510,7 +452,6 @@ func (t *AtomicCheckHealthTool) analyzeApplicationHealth(result *AtomicCheckHeal
 
 	ctx.HealthScore = ctx.ReadinessRatio // Simple health score based on readiness
 
-	// Determine overall status
 	if ctx.ReadinessRatio >= 1.0 {
 		ctx.OverallStatus = types.HealthStatusHealthy
 	} else if ctx.ReadinessRatio >= 0.7 {
@@ -521,7 +462,6 @@ func (t *AtomicCheckHealthTool) analyzeApplicationHealth(result *AtomicCheckHeal
 		ctx.OverallStatus = "unknown"
 	}
 
-	// Analyze pod summary
 	ctx.PodSummary = PodSummary{
 		TotalPods:   healthResult.Summary.TotalPods,
 		ReadyPods:   healthResult.Summary.ReadyPods,
@@ -530,7 +470,6 @@ func (t *AtomicCheckHealthTool) analyzeApplicationHealth(result *AtomicCheckHeal
 		RunningPods: healthResult.Summary.ReadyPods, // Simplification
 	}
 
-	// Analyze service summary
 	ctx.ServiceSummary = ServiceSummary{
 		TotalServices:   len(healthResult.Services),
 		HealthyServices: len(healthResult.Services), // Assume all discovered services are healthy
@@ -538,20 +477,16 @@ func (t *AtomicCheckHealthTool) analyzeApplicationHealth(result *AtomicCheckHeal
 		EndpointsTotal:  healthResult.Summary.TotalPods,
 	}
 
-	// Analyze individual pods for issues
 	t.analyzePodIssues(ctx, healthResult)
 
-	// Analyze restart patterns
 	t.analyzeRestartPatterns(ctx, healthResult)
 }
 
-// analyzePodIssues analyzes individual pod health issues
 func (t *AtomicCheckHealthTool) analyzePodIssues(ctx *HealthContext, healthResult *kubernetes.HealthCheckResult) {
 	var totalRestarts int
 	var podsWithRestarts int
 
 	for _, pod := range healthResult.Pods {
-		// Analyze pod-level issues
 		if !pod.Ready {
 			issue := PodIssue{
 				PodName:     pod.Name,
@@ -593,7 +528,6 @@ func (t *AtomicCheckHealthTool) analyzePodIssues(ctx *HealthContext, healthResul
 			ctx.PodIssues = append(ctx.PodIssues, issue)
 		}
 
-		// Analyze container-level issues
 		for _, container := range pod.Containers {
 			if container.RestartCount > 0 {
 				totalRestarts += container.RestartCount
@@ -635,13 +569,11 @@ func (t *AtomicCheckHealthTool) analyzePodIssues(ctx *HealthContext, healthResul
 		}
 	}
 
-	// Update restart analysis
 	ctx.RestartAnalysis = RestartAnalysis{
 		TotalRestarts:    totalRestarts,
 		PodsWithRestarts: podsWithRestarts,
 	}
 
-	// Identify high restart pods
 	for _, pod := range healthResult.Pods {
 		for _, container := range pod.Containers {
 			if container.RestartCount > 5 {
@@ -654,7 +586,6 @@ func (t *AtomicCheckHealthTool) analyzePodIssues(ctx *HealthContext, healthResul
 	}
 }
 
-// analyzeRestartPatterns analyzes pod restart patterns for stability issues
 func (t *AtomicCheckHealthTool) analyzeRestartPatterns(ctx *HealthContext, healthResult *kubernetes.HealthCheckResult) {
 	if ctx.RestartAnalysis.TotalRestarts > 0 {
 		if ctx.RestartAnalysis.TotalRestarts > 20 {
@@ -670,11 +601,9 @@ func (t *AtomicCheckHealthTool) analyzeRestartPatterns(ctx *HealthContext, healt
 	}
 }
 
-// generateHealthContext generates rich context for Claude reasoning
 func (t *AtomicCheckHealthTool) generateHealthContext(result *AtomicCheckHealthResult, args AtomicCheckHealthArgs) {
 	ctx := result.HealthContext
 
-	// Generate health recommendations
 	if ctx.OverallStatus == types.HealthStatusHealthy {
 		ctx.HealthRecommendations = append(ctx.HealthRecommendations,
 			"Application is healthy - monitor for continued stability")
@@ -687,7 +616,6 @@ func (t *AtomicCheckHealthTool) generateHealthContext(result *AtomicCheckHealthR
 			"Check pod logs and events to diagnose issues")
 	}
 
-	// Add specific recommendations based on issues
 	if len(ctx.PodIssues) > 0 {
 		ctx.HealthRecommendations = append(ctx.HealthRecommendations,
 			"Address pod-level issues to improve application health")
@@ -703,13 +631,11 @@ func (t *AtomicCheckHealthTool) generateHealthContext(result *AtomicCheckHealthR
 			"Review application configuration and resource limits to reduce restarts")
 	}
 
-	// Add monitoring recommendations
 	ctx.HealthRecommendations = append(ctx.HealthRecommendations,
 		"Set up health check endpoints and monitoring dashboards")
 	ctx.HealthRecommendations = append(ctx.HealthRecommendations,
 		"Configure alerting for pod failures and high restart rates")
 
-	// Generate next steps
 	if result.WaitResult != nil && result.WaitResult.Success {
 		ctx.NextStepSuggestions = append(ctx.NextStepSuggestions,
 			"Application became ready after waiting - monitor for stability")
@@ -722,7 +648,6 @@ func (t *AtomicCheckHealthTool) generateHealthContext(result *AtomicCheckHealthR
 		"Use this health check regularly to monitor application status")
 }
 
-// addTroubleshootingTips adds troubleshooting tips based on errors
 func (t *AtomicCheckHealthTool) addTroubleshootingTips(result *AtomicCheckHealthResult, stage string, err error) {
 	ctx := result.HealthContext
 	errStr := strings.ToLower(err.Error())
@@ -748,9 +673,7 @@ func (t *AtomicCheckHealthTool) addTroubleshootingTips(result *AtomicCheckHealth
 	}
 }
 
-// updateSessionState updates the session with health check results
 func (t *AtomicCheckHealthTool) updateSessionState(session *sessiontypes.SessionState, result *AtomicCheckHealthResult) error {
-	// Update session with health check results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
 	}
@@ -777,8 +700,6 @@ func (t *AtomicCheckHealthTool) updateSessionState(session *sessiontypes.Session
 	})
 }
 
-// Helper methods
-
 func (t *AtomicCheckHealthTool) buildLabelSelector(args AtomicCheckHealthArgs, session *sessiontypes.SessionState) string {
 	if args.LabelSelector != "" {
 		return args.LabelSelector
@@ -788,14 +709,12 @@ func (t *AtomicCheckHealthTool) buildLabelSelector(args AtomicCheckHealthArgs, s
 		return fmt.Sprintf("app=%s", args.AppName)
 	}
 
-	// Try to get app name from session metadata
 	if session.Metadata != nil {
 		if lastDeployedApp, ok := session.Metadata["last_deployed_app"].(string); ok && lastDeployedApp != "" {
 			return fmt.Sprintf("app=%s", lastDeployedApp)
 		}
 	}
 
-	// Default label selector
 	return types.AppLabel
 }
 
@@ -824,26 +743,18 @@ func (t *AtomicCheckHealthTool) determinePodIssueSeverity(status string) string 
 	}
 }
 
-// AI Context Interface Implementations for AtomicCheckHealthResult
-
-// SimpleTool interface implementation
-
-// GetName returns the tool name
 func (t *AtomicCheckHealthTool) GetName() string {
 	return "atomic_check_health"
 }
 
-// GetDescription returns the tool description
 func (t *AtomicCheckHealthTool) GetDescription() string {
 	return "Performs comprehensive health checks on Kubernetes applications including pod status, service availability, and resource utilization"
 }
 
-// GetVersion returns the tool version
 func (t *AtomicCheckHealthTool) GetVersion() string {
 	return "1.0.0"
 }
 
-// GetCapabilities returns the tool capabilities
 func (t *AtomicCheckHealthTool) GetCapabilities() types.ToolCapabilities {
 	return types.ToolCapabilities{
 		SupportsDryRun:    true,
@@ -853,7 +764,6 @@ func (t *AtomicCheckHealthTool) GetCapabilities() types.ToolCapabilities {
 	}
 }
 
-// GetMetadata returns comprehensive metadata about the tool
 func (t *AtomicCheckHealthTool) GetMetadata() mcptypes.ToolMetadata {
 	return mcptypes.ToolMetadata{
 		Name:        "atomic_check_health",
@@ -925,7 +835,6 @@ func (t *AtomicCheckHealthTool) GetMetadata() mcptypes.ToolMetadata {
 	}
 }
 
-// Validate validates the tool arguments
 func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) error {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
@@ -941,7 +850,6 @@ func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) 
 			Build()
 	}
 
-	// Validate either app_name or label_selector is provided
 	if healthArgs.AppName == "" && healthArgs.LabelSelector == "" {
 		return types.NewValidationErrorBuilder("Either app_name or label_selector must be provided", "selection", "").
 			WithField("app_name", healthArgs.AppName).
@@ -952,7 +860,6 @@ func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) 
 	return nil
 }
 
-// Execute implements SimpleTool interface with generic signature
 func (t *AtomicCheckHealthTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
@@ -962,18 +869,13 @@ func (t *AtomicCheckHealthTool) Execute(ctx context.Context, args interface{}) (
 			Build()
 	}
 
-	// Call the typed Execute method
 	return t.ExecuteTyped(ctx, healthArgs)
 }
 
-// ExecuteTyped provides the original typed execute method
 func (t *AtomicCheckHealthTool) ExecuteTyped(ctx context.Context, args AtomicCheckHealthArgs) (*AtomicCheckHealthResult, error) {
 	return t.ExecuteHealthCheck(ctx, args)
 }
 
-// AI Context methods are now provided by embedded internal.BaseAIContextResult
-
-// convertHealthCheckResult converts from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
 func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.HealthCheckResult, namespace string) *kubernetes.HealthCheckResult {
 	if result == nil {
 		return nil
@@ -991,7 +893,6 @@ func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.Health
 		}
 	}
 
-	// Convert pod statuses
 	for _, ps := range result.PodStatuses {
 		podStatus := kubernetes.DetailedPodStatus{
 			Name:      ps.Name,
@@ -1002,7 +903,6 @@ func (t *AtomicCheckHealthTool) convertHealthCheckResult(result *mcptypes.Health
 		k8sResult.Pods = append(k8sResult.Pods, podStatus)
 	}
 
-	// Update summary
 	k8sResult.Summary = kubernetes.HealthSummary{
 		TotalPods:   len(k8sResult.Pods),
 		ReadyPods:   0,

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -37,18 +38,108 @@ func (h *StdioErrorHandler) HandleToolError(ctx context.Context, toolName string
 
 	// Handle different error types
 	switch typedErr := err.(type) {
+	case *errors.CoreError:
+		return h.handleCoreError(typedErr, toolName), nil
 	case *types.RichError:
-		return h.handleRichError(typedErr, toolName), nil
+		// Migrate RichError to CoreError
+		coreErr := errors.MigrateRichError(typedErr)
+		return h.handleCoreError(coreErr, toolName), nil
 	case *types.ToolError:
 		return h.handleToolError(typedErr, toolName), nil
 	case *server.InvalidParametersError:
 		return nil, h.createInvalidParametersError(typedErr.Message)
 	default:
+		// Handle generic errors with categorization
 		return h.handleGenericError(err, toolName), nil
 	}
 }
 
-// handleRichError creates a comprehensive error response from RichError
+// handleCoreError creates a comprehensive error response from CoreError
+func (h *StdioErrorHandler) handleCoreError(coreErr *errors.CoreError, toolName string) interface{} {
+	// Create MCP-compatible error response
+	response := map[string]interface{}{
+		"content": []map[string]interface{}{
+			{
+				"type": "text",
+				"text": h.formatCoreErrorMessage(coreErr),
+			},
+		},
+		"isError": true,
+		"error": map[string]interface{}{
+			"code":      coreErr.Code,
+			"category":  string(coreErr.Category),
+			"severity":  string(coreErr.Severity),
+			"message":   coreErr.Message,
+			"tool":      toolName,
+			"timestamp": coreErr.Timestamp,
+			"retryable": coreErr.Retryable,
+			"fatal":     coreErr.Fatal,
+		},
+	}
+
+	// Add context information if available
+	if coreErr.Operation != "" {
+		if errorMap, ok := response["error"].(map[string]interface{}); ok {
+			errorMap["operation"] = coreErr.Operation
+			errorMap["stage"] = coreErr.Stage
+			errorMap["component"] = coreErr.Component
+			errorMap["module"] = coreErr.Module
+		}
+	}
+
+	// Add resolution steps if available
+	if coreErr.Resolution != nil && len(coreErr.Resolution.ImmediateSteps) > 0 {
+		steps := make([]map[string]interface{}, len(coreErr.Resolution.ImmediateSteps))
+		for i, step := range coreErr.Resolution.ImmediateSteps {
+			steps[i] = map[string]interface{}{
+				"step":        step.Step,
+				"action":      step.Action,
+				"description": step.Description,
+				"command":     step.Command,
+				"expected":    step.Expected,
+			}
+		}
+		response["resolution_steps"] = steps
+	}
+
+	// Add alternatives if available
+	if coreErr.Resolution != nil && len(coreErr.Resolution.Alternatives) > 0 {
+		alternatives := make([]map[string]interface{}, len(coreErr.Resolution.Alternatives))
+		for i, alt := range coreErr.Resolution.Alternatives {
+			alternatives[i] = map[string]interface{}{
+				"approach":    alt.Approach,
+				"description": alt.Description,
+				"effort":      alt.Effort,
+				"risk":        alt.Risk,
+			}
+		}
+		response["alternatives"] = alternatives
+	}
+
+	// Add retry information
+	if coreErr.Resolution != nil && coreErr.Resolution.RetryStrategy != nil && coreErr.Resolution.RetryStrategy.Retryable {
+		response["retry_strategy"] = map[string]interface{}{
+			"retryable":      coreErr.Resolution.RetryStrategy.Retryable,
+			"max_attempts":   coreErr.Resolution.RetryStrategy.MaxAttempts,
+			"backoff_ms":     coreErr.Resolution.RetryStrategy.BackoffMs,
+			"exponential_ms": coreErr.Resolution.RetryStrategy.ExponentialMs,
+			"conditions":     coreErr.Resolution.RetryStrategy.Conditions,
+		}
+	}
+
+	// Add diagnostic information
+	if coreErr.Diagnostics != nil && coreErr.Diagnostics.RootCause != "" {
+		response["diagnostics"] = map[string]interface{}{
+			"root_cause":    coreErr.Diagnostics.RootCause,
+			"error_pattern": coreErr.Diagnostics.ErrorPattern,
+			"symptoms":      coreErr.Diagnostics.Symptoms,
+		}
+	}
+
+	return response
+}
+
+// handleRichError creates a comprehensive error response from RichError (legacy support)
 func (h *StdioErrorHandler) handleRichError(richErr *types.RichError, toolName string) interface{} {
 	// Create MCP-compatible error response
 	response := map[string]interface{}{
@@ -281,6 +372,68 @@ func (h *StdioErrorHandler) formatToolErrorMessage(toolErr *types.ToolError) str
 				msg.WriteString(fmt.Sprintf("  • %s\n", suggestion))
 			}
 		}
+	}
+
+	return msg.String()
+}
+
+// formatCoreErrorMessage creates a user-friendly error message from CoreError
+func (h *StdioErrorHandler) formatCoreErrorMessage(coreErr *errors.CoreError) string {
+	var msg strings.Builder
+
+	// Start with the basic error
+	msg.WriteString(fmt.Sprintf("❌ %s/%s: %s\n", coreErr.Category, coreErr.Module, coreErr.Message))
+
+	// Add context if available
+	if coreErr.Operation != "" {
+		msg.WriteString(fmt.Sprintf("\n🔍 Context: %s → %s → %s\n",
+			coreErr.Operation, coreErr.Stage, coreErr.Component))
+	}
+
+	// Add root cause if available
+	if coreErr.Diagnostics != nil && coreErr.Diagnostics.RootCause != "" {
+		msg.WriteString(fmt.Sprintf("\n🎯 Root Cause: %s\n", coreErr.Diagnostics.RootCause))
+	}
+
+	// Add immediate resolution steps
+	if coreErr.Resolution != nil && len(coreErr.Resolution.ImmediateSteps) > 0 {
+		msg.WriteString("\n🔧 Immediate Steps:\n")
+		for _, step := range coreErr.Resolution.ImmediateSteps {
+			msg.WriteString(fmt.Sprintf("  %d. %s\n", step.Step, step.Action))
+			if step.Command != "" {
+				msg.WriteString(fmt.Sprintf("     Command: %s\n", step.Command))
+			}
+		}
+	}
+
+	// Add alternatives if available
+	if coreErr.Resolution != nil && len(coreErr.Resolution.Alternatives) > 0 {
+		msg.WriteString("\n💡 Alternatives:\n")
+		// Limit to top 2 alternatives
+		limit := len(coreErr.Resolution.Alternatives)
+		if limit > 2 {
+			limit = 2
+		}
+		for i := 0; i < limit; i++ {
+			alt := coreErr.Resolution.Alternatives[i]
+			msg.WriteString(fmt.Sprintf("  %d. %s (effort: %s, risk: %s)\n",
+				i+1, alt.Approach, alt.Effort, alt.Risk))
+		}
+	}
+
+	// Add retry information if recommended
+	if coreErr.Resolution != nil && coreErr.Resolution.RetryStrategy != nil && coreErr.Resolution.RetryStrategy.Retryable {
+		msg.WriteString(fmt.Sprintf("\n🔄 Retry: Max %d attempts, backoff %dms\n",
+			coreErr.Resolution.RetryStrategy.MaxAttempts, coreErr.Resolution.RetryStrategy.BackoffMs))
+	}
+
+	// Add severity information
+	if coreErr.Severity == errors.SeverityCritical || coreErr.Severity == errors.SeverityHigh {
+		msg.WriteString(fmt.Sprintf("\n⚠️  Severity: %s", coreErr.Severity))
+		if coreErr.Fatal {
+			msg.WriteString(" (FATAL)")
+		}
+		msg.WriteString("\n")
 	}
 
 	return msg.String()

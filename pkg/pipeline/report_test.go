@@ -32,6 +32,10 @@ func TestWriteReport(t *testing.T) {
 				Outcome:    StageOutcomeSuccess,
 			},
 		},
+		DetectedDatabases: []DatabaseDetectionResult{
+			{Type: "PostgreSQL", Version: "13.3", Source: "docker-compose.yml"},
+			{Type: "MySQL", Version: "8.0", Source: "Dockerfile"},
+		},
 	}
 	ctx := context.Background()
 
@@ -111,4 +115,41 @@ func validateReportFiles(t *testing.T, jsonFile, mdFile string, state *PipelineS
 	assertContains(fmt.Sprintf("Prompt Tokens: %d", state.TokenUsage.PromptTokens), "prompt tokens")
 	assertContains(fmt.Sprintf("Completion Tokens: %d", state.TokenUsage.CompletionTokens), "completion tokens")
 	assertContains(fmt.Sprintf("Total Tokens: %d", state.TokenUsage.TotalTokens), "total tokens")
+
+	// Validate Detected Databases
+	assertContains("## Detected Databases", "Detected Databases section")
+	if len(state.DetectedDatabases) > 0 {
+		for _, db := range state.DetectedDatabases {
+			dbRow := fmt.Sprintf("| %s | %s | %s |", db.Type, db.Version, db.Source)
+			assertContains(dbRow, fmt.Sprintf("detected database row for %s", db.Type))
+		}
+	} else {
+		assertContains("No databases detected.", "no databases detected message")
+	}
+}
+
+func TestNoDetectedDatabases(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &PipelineState{
+		IterationCount:    3,
+		Success:           true,
+		DetectedDatabases: []DatabaseDetectionResult{}, // No databases detected
+	}
+	ctx := context.Background()
+
+	if err := WriteReport(ctx, state, tmpDir); err != nil {
+		t.Fatalf("WriteReport returned error: %v", err)
+	}
+
+	mdFile := filepath.Join(tmpDir, ReportDirectory, ReportMarkdownFileName)
+	mdData, err := os.ReadFile(mdFile)
+	if err != nil {
+		t.Fatalf("Failed to read Markdown report at %s: %v", mdFile, err)
+	}
+	mdContent := string(mdData)
+
+	if !strings.Contains(mdContent, "No databases detected.") {
+		t.Errorf("Markdown report does not show 'No databases detected' when no databases are present")
+	}
 }

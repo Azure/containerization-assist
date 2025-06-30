@@ -255,7 +255,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 		"dry_run":    true,
 	}
 
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes_atomic", params, state.SessionState.SessionID)
+	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params, state.SessionState.SessionID)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Dry-run failed: %v", err)
@@ -312,11 +312,11 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	}
 
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes_atomic", params, state.SessionState.SessionID)
+	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params, state.SessionState.SessionID)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
-		Tool:       "deploy_kubernetes_atomic",
+		Tool:       "deploy_kubernetes",
 		Parameters: params,
 		Duration:   duration,
 	}
@@ -324,7 +324,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	if err != nil {
 		toolCall.Error = &types.ToolError{
 			Type:      "deployment_error",
-			Message:   fmt.Sprintf("deploy_kubernetes_atomic error: %v", err),
+			Message:   fmt.Sprintf("deploy_kubernetes error: %v", err),
 			Retryable: true,
 			Timestamp: time.Now(),
 		}
@@ -400,7 +400,7 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 		"timeout":    60, // 1 minute for health check
 	}
 
-	_, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health_atomic", params, state.SessionState.SessionID)
+	_, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params, state.SessionState.SessionID)
 	if err != nil {
 		response.Status = ResponseStatusWarning
 		response.Message = fmt.Sprintf(

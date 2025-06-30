@@ -17,7 +17,6 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// PreferenceStore manages user preferences across sessions
 type PreferenceStore struct {
 	db            *bolt.DB
 	mutex         sync.RWMutex
@@ -25,15 +24,12 @@ type PreferenceStore struct {
 	encryptionKey []byte // 32-byte key for AES-256
 }
 
-// UserPreferenceStore is the bucket name for user preferences
 const UserPreferencesBucket = "user_preferences"
 
-// GlobalPreferences stores user defaults that persist across sessions
 type GlobalPreferences struct {
 	UserID    string    `json:"user_id"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	// General defaults
 	DefaultOptimization string `json:"default_optimization"` // size, speed, security
 	DefaultNamespace    string `json:"default_namespace"`
 	DefaultReplicas     int    `json:"default_replicas"`
@@ -41,25 +37,20 @@ type GlobalPreferences struct {
 	DefaultServiceType  string `json:"default_service_type"` // ClusterIP, LoadBalancer, NodePort
 	AutoRollbackEnabled bool   `json:"auto_rollback_enabled"`
 
-	// Build preferences
 	AlwaysUseHealthCheck bool   `json:"always_use_health_check"`
 	PreferMultiStage     bool   `json:"prefer_multi_stage"`
 	DefaultPlatform      string `json:"default_platform"` // linux/amd64, linux/arm64, etc.
 
-	// Deployment preferences
 	DefaultResourceLimits  types.ResourceLimits `json:"default_resource_limits"`
 	PreferredCloudProvider string               `json:"preferred_cloud_provider"` // aws, gcp, azure, local
 
-	// Per-language defaults
 	LanguageDefaults map[string]LanguagePrefs `json:"language_defaults"`
 
-	// Recently used values for smart defaults
 	RecentRepositories []string `json:"recent_repositories"`
 	RecentNamespaces   []string `json:"recent_namespaces"`
 	RecentAppNames     []string `json:"recent_app_names"`
 }
 
-// LanguagePrefs stores language-specific preferences
 type LanguagePrefs struct {
 	PreferredBaseImage  string            `json:"preferred_base_image"`
 	DefaultBuildTool    string            `json:"default_build_tool"` // npm, yarn, maven, gradle, etc.
@@ -69,9 +60,7 @@ type LanguagePrefs struct {
 	HealthCheckEndpoint string            `json:"health_check_endpoint"`
 }
 
-// NewPreferenceStore creates a new preference store with optional encryption
 func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphrase string) (*PreferenceStore, error) {
-	// Try to open database with retries and longer timeout
 	var db *bolt.DB
 	var err error
 
@@ -81,13 +70,11 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 			break
 		}
 
-		// On timeout error and final retry, try to move the locked file
 		if i == 2 && err == bolt.ErrTimeout {
 			logger.Warn().
 				Str("path", dbPath).
 				Msg("Preference database appears to be locked, attempting recovery")
 
-			// Try to move the locked database file
 			backupPath := fmt.Sprintf("%s.locked.%d", dbPath, time.Now().Unix())
 			if renameErr := os.Rename(dbPath, backupPath); renameErr == nil {
 				logger.Warn().
@@ -95,7 +82,6 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 					Str("new_path", backupPath).
 					Msg("Moved locked preference database")
 
-				// Try one more time with the moved file
 				db, err = bolt.Open(dbPath, 0o600, &bolt.Options{Timeout: 5 * time.Second})
 				if err == nil {
 					break
@@ -113,23 +99,35 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to open preference database: %w", err)
+		return nil, types.NewErrorBuilder("database_open_failed", "Failed to open preference database", "system").
+			WithSeverity("high").
+			WithOperation("initialize_preferences").
+			WithStage("database_connection").
+			WithRootCause(fmt.Sprintf("BoltDB open failed: %v", err)).
+			WithImmediateStep(1, "Check permissions", "Verify write permissions to the data directory").
+			WithImmediateStep(2, "Check disk space", "Ensure sufficient disk space is available").
+			WithImmediateStep(3, "Check file locks", "Verify no other process is using the database file").
+			Build()
 	}
 
-	// Initialize bucket
 	err = db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(UserPreferencesBucket))
 		return err
 	})
 	if err != nil {
 		if closeErr := db.Close(); closeErr != nil {
-			// Log the close error but return the original error
 			logger.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
 		}
-		return nil, fmt.Errorf("failed to create preferences bucket: %w", err)
+		return nil, types.NewErrorBuilder("bucket_creation_failed", "Failed to create preferences bucket", "system").
+			WithSeverity("high").
+			WithOperation("initialize_preferences").
+			WithStage("bucket_creation").
+			WithRootCause(fmt.Sprintf("BoltDB bucket creation failed: %v", err)).
+			WithImmediateStep(1, "Check database integrity", "Verify the database file is not corrupted").
+			WithImmediateStep(2, "Restart with clean database", "Delete database file and restart if corruption is suspected").
+			Build()
 	}
 
-	// Derive encryption key from passphrase
 	var encryptionKey []byte
 	if encryptionPassphrase != "" {
 		hash := sha256.Sum256([]byte(encryptionPassphrase))
@@ -146,7 +144,6 @@ func NewPreferenceStore(dbPath string, logger zerolog.Logger, encryptionPassphra
 	}, nil
 }
 
-// GetUserPreferences retrieves preferences for a user
 func (ps *PreferenceStore) GetUserPreferences(userID string) (*GlobalPreferences, error) {
 	ps.mutex.RLock()
 	defer ps.mutex.RUnlock()
@@ -161,12 +158,10 @@ func (ps *PreferenceStore) GetUserPreferences(userID string) (*GlobalPreferences
 
 		data := bucket.Get([]byte(userID))
 		if data == nil {
-			// Return default preferences for new user
 			prefs = ps.getDefaultPreferences(userID)
 			return nil
 		}
 
-		// Decrypt data if encryption is enabled
 		decryptedData, err := ps.decrypt(data)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt preferences: %w", err)
@@ -181,7 +176,6 @@ func (ps *PreferenceStore) GetUserPreferences(userID string) (*GlobalPreferences
 	return &prefs, nil
 }
 
-// SaveUserPreferences saves user preferences
 func (ps *PreferenceStore) SaveUserPreferences(prefs *GlobalPreferences) error {
 	ps.mutex.Lock()
 	defer ps.mutex.Unlock()
@@ -199,7 +193,6 @@ func (ps *PreferenceStore) SaveUserPreferences(prefs *GlobalPreferences) error {
 			return fmt.Errorf("failed to marshal preferences: %w", err)
 		}
 
-		// Encrypt data if encryption is enabled
 		encryptedData, err := ps.encrypt(data)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt preferences: %w", err)
@@ -209,14 +202,12 @@ func (ps *PreferenceStore) SaveUserPreferences(prefs *GlobalPreferences) error {
 	})
 }
 
-// UpdatePreferencesFromSession updates preferences based on session choices
 func (ps *PreferenceStore) UpdatePreferencesFromSession(userID string, sessionPrefs types.UserPreferences) error {
 	prefs, err := ps.GetUserPreferences(userID)
 	if err != nil {
 		return err
 	}
 
-	// Update with non-default values from session
 	if sessionPrefs.Optimization != "" && sessionPrefs.Optimization != prefs.DefaultOptimization {
 		prefs.DefaultOptimization = sessionPrefs.Optimization
 	}
@@ -234,13 +225,9 @@ func (ps *PreferenceStore) UpdatePreferencesFromSession(userID string, sessionPr
 		prefs.DefaultServiceType = sessionPrefs.ServiceType
 	}
 
-	// Update security preferences
-
-	// Save updated preferences
 	return ps.SaveUserPreferences(prefs)
 }
 
-// GetLanguageDefaults retrieves language-specific defaults
 func (ps *PreferenceStore) GetLanguageDefaults(userID, language string) (LanguagePrefs, error) {
 	prefs, err := ps.GetUserPreferences(userID)
 	if err != nil {
@@ -251,11 +238,9 @@ func (ps *PreferenceStore) GetLanguageDefaults(userID, language string) (Languag
 		return langPrefs, nil
 	}
 
-	// Return system defaults for language
 	return ps.getSystemLanguageDefaults(language), nil
 }
 
-// UpdateLanguageDefaults updates language-specific preferences
 func (ps *PreferenceStore) UpdateLanguageDefaults(userID, language string, langPrefs LanguagePrefs) error {
 	prefs, err := ps.GetUserPreferences(userID)
 	if err != nil {
@@ -271,14 +256,12 @@ func (ps *PreferenceStore) UpdateLanguageDefaults(userID, language string, langP
 	return ps.SaveUserPreferences(prefs)
 }
 
-// ApplyPreferencesToSession applies saved preferences to a new session
 func (ps *PreferenceStore) ApplyPreferencesToSession(userID string, sessionPrefs *types.UserPreferences) error {
 	prefs, err := ps.GetUserPreferences(userID)
 	if err != nil {
 		return err
 	}
 
-	// Apply saved defaults only if session doesn't already have values
 	if sessionPrefs.Optimization == "" {
 		sessionPrefs.Optimization = prefs.DefaultOptimization
 	}
@@ -295,19 +278,16 @@ func (ps *PreferenceStore) ApplyPreferencesToSession(userID string, sessionPrefs
 		sessionPrefs.ServiceType = prefs.DefaultServiceType
 	}
 
-	// Apply resource limits if not set
 	if sessionPrefs.ResourceLimits.CPULimit == "" && prefs.DefaultResourceLimits.CPULimit != "" {
 		sessionPrefs.ResourceLimits = prefs.DefaultResourceLimits
 	}
 
-	// Apply security settings
 	sessionPrefs.IncludeHealthCheck = sessionPrefs.IncludeHealthCheck || prefs.AlwaysUseHealthCheck
 	sessionPrefs.AutoRollback = sessionPrefs.AutoRollback || prefs.AutoRollbackEnabled
 
 	return nil
 }
 
-// GetSmartDefaults returns intelligent defaults based on recent usage
 func (ps *PreferenceStore) GetSmartDefaults(userID string) (SmartDefaults, error) {
 	prefs, err := ps.GetUserPreferences(userID)
 	if err != nil {
@@ -322,15 +302,12 @@ func (ps *PreferenceStore) GetSmartDefaults(userID string) (SmartDefaults, error
 	}, nil
 }
 
-// SmartDefaults provides intelligent suggestions based on usage patterns
 type SmartDefaults struct {
 	RecentNamespaces   []string `json:"recent_namespaces"`
 	RecentAppNames     []string `json:"recent_app_names"`
 	SuggestedNamespace string   `json:"suggested_namespace"`
 	SuggestedRegistry  string   `json:"suggested_registry"`
 }
-
-// Helper methods
 
 func (ps *PreferenceStore) getDefaultPreferences(userID string) GlobalPreferences {
 	return GlobalPreferences{
@@ -396,7 +373,6 @@ func (ps *PreferenceStore) getSystemLanguageDefaults(language string) LanguagePr
 		return prefs
 	}
 
-	// Generic defaults
 	return LanguagePrefs{
 		DefaultPort:         8080,
 		HealthCheckEndpoint: "/health",
@@ -404,7 +380,6 @@ func (ps *PreferenceStore) getSystemLanguageDefaults(language string) LanguagePr
 }
 
 func (ps *PreferenceStore) addToRecentList(list *[]string, item string, maxSize int) {
-	// Remove if already exists
 	for i, existing := range *list {
 		if existing == item {
 			*list = append((*list)[:i], (*list)[i+1:]...)
@@ -412,10 +387,8 @@ func (ps *PreferenceStore) addToRecentList(list *[]string, item string, maxSize 
 		}
 	}
 
-	// Add to front
 	*list = append([]string{item}, *list...)
 
-	// Trim to max size
 	if len(*list) > maxSize {
 		*list = (*list)[:maxSize]
 	}
@@ -426,21 +399,24 @@ func (ps *PreferenceStore) getMostFrequent(items []string) string {
 		return ""
 	}
 
-	// Simple heuristic: return most recent (first item)
-	// Could be enhanced with frequency counting
 	return items[0]
 }
 
-// encrypt encrypts data using AES-GCM if encryption is enabled
 func (ps *PreferenceStore) encrypt(data []byte) ([]byte, error) {
 	if ps.encryptionKey == nil {
-		// No encryption - return data as-is
 		return data, nil
 	}
 
 	block, err := aes.NewCipher(ps.encryptionKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
+		return nil, types.NewErrorBuilder("encryption_cipher_failed", "Failed to create encryption cipher", "security").
+			WithSeverity("high").
+			WithOperation("encrypt_preferences").
+			WithStage("cipher_creation").
+			WithRootCause(fmt.Sprintf("AES cipher creation failed: %v", err)).
+			WithImmediateStep(1, "Check encryption key", "Verify encryption key is 32 bytes (256-bit)").
+			WithImmediateStep(2, "Check system crypto", "Ensure system crypto libraries are functional").
+			Build()
 	}
 
 	gcm, err := cipher.NewGCM(block)
@@ -448,21 +424,17 @@ func (ps *PreferenceStore) encrypt(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	// Generate random nonce
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
-	// Encrypt and prepend nonce
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
 	return ciphertext, nil
 }
 
-// decrypt decrypts data using AES-GCM if encryption is enabled
 func (ps *PreferenceStore) decrypt(data []byte) ([]byte, error) {
 	if ps.encryptionKey == nil {
-		// No encryption - return data as-is
 		return data, nil
 	}
 
@@ -494,7 +466,6 @@ func (ps *PreferenceStore) decrypt(data []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// Close closes the preference store
 func (ps *PreferenceStore) Close() error {
 	return ps.db.Close()
 }

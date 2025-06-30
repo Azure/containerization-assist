@@ -1,0 +1,90 @@
+{
+  "description": "Coverage thresholds and configuration for CI pipeline",
+  "last_updated": "2025-01-28",
+  "ratchet": {
+    "regression_tolerance": 3.5,
+    "comment": "Temporarily increased from 2.0% to account for dead code cleanup impact. Consider reducing back to 2.0% after stabilization."
+  },
+  "package_thresholds": {
+    "description": "Minimum required coverage percentages per package",
+    "comment": "These values match current coverage levels to prevent regression",
+    "./pkg/mcp/internal/core/...": {
+      "threshold": 30,
+      "current": 37.0,
+      "target": 50
+    },
+    "./pkg/mcp/internal/runtime/...": {
+      "threshold": 20,
+      "current": 21.3,
+      "target": 40
+    },
+    "./pkg/mcp/internal/orchestration/...": {
+      "threshold": 1,
+      "current": 1.7,
+      "target": 30
+    },
+    "./pkg/mcp/internal/session/...": {
+      "threshold": 9,
+      "current": 9.7,
+      "target": 40
+    },
+    "./pkg/mcp/internal/build/...": {
+      "threshold": 6,
+      "current": 6.8,
+      "target": 35
+    },
+    "./pkg/mcp/internal/deploy/...": {
+      "threshold": 7,
+      "current": 7.5,
+      "target": 35
+    },
+    "./pkg/mcp/internal/analyze/...": {
+      "threshold": 14,
+      "current": 14.1,
+      "target": 40
+    },
+    "./pkg/mcp/internal/server/...": {
+      "threshold": 17,
+      "current": 17.5,
+      "target": 45
+    },
+    "./pkg/mcp/types/...": {
+      "threshold": 30,
+      "current": 34.4,
+      "target": 50
+    }
+  },
+  "global": {
+    "minimum_coverage": 15.0,
+    "target_coverage": 70.0,
+    "comment": "Global minimum to prevent severe regression"
+  },
+  "exemptions": {
+    "description": "Packages exempted from coverage requirements",
+    "packages": [
+      "./pkg/mcp/testing/...",
+      "./pkg/mcp/internal/testutil/...",
+      "./tools/...",
+      "./scripts/..."
+    ],
+    "comment": "Test utilities and tooling are exempted from coverage requirements"
+  },
+  "phase_targets": {
+    "description": "Phased approach to improving coverage",
+    "phase_1": {
+      "deadline": "2025-02-15",
+      "goal": "Establish baseline and prevent regression",
+      "targets": "Current thresholds as defined above"
+    },
+    "phase_2": {
+      "deadline": "2025-03-15",
+      "goal": "Improve critical packages",
+      "targets": "Increase core, runtime, and session packages to 30% minimum"
+    },
+    "phase_3": {
+      "deadline": "2025-04-15",
+      "goal": "Reach production standards",
+      "targets": "All packages at target levels defined above"
+    }
+  }
+}

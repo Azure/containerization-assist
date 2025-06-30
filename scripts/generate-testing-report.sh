@@ -366,12 +366,19 @@ update_pr_comment() {
     local report_file=$1
     local pr_number=${GITHUB_PR_NUMBER:-""}
 
+    # Skip PR comment if SKIP_PR_COMMENT is set
+    if [[ "${SKIP_PR_COMMENT:-}" == "true" ]]; then
+        log "SKIP_PR_COMMENT is set, skipping PR comment creation"
+        cat "$report_file"
+        return
+    fi
+
     if [[ -z "$pr_number" ]]; then
         log "No PR number found, outputting report to stdout"
         cat "$report_file"
         return
     fi
-    
+
     # Verify we can access the PR
     if ! gh pr view "$pr_number" >/dev/null 2>&1; then
         error "Cannot access PR #$pr_number - this may be due to permissions or the PR not existing"
@@ -435,7 +442,7 @@ generate_quality_metrics() {
 
     # Temporarily disable exit on error for arithmetic operations
     set +e
-    
+
     # Calculate overall test coverage
     local total_coverage=0
     local package_count=0
@@ -497,7 +504,7 @@ generate_quality_metrics() {
 EOF
 
     log "Quality metrics generated: $metrics_file"
-    
+
     # Re-enable exit on error
     set -e
 }

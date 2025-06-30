@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,6 +47,7 @@ type AnalyzerConfig struct {
 	EnableDependencyScanning bool          `yaml:"enable_dependency_scanning" json:"enable_dependency_scanning" env:"MCP_ANALYZER_ENABLE_DEPENDENCY_SCANNING"`
 	CacheResults             bool          `yaml:"cache_results" json:"cache_results" env:"MCP_ANALYZER_CACHE_RESULTS"`
 	CacheTTL                 time.Duration `yaml:"cache_ttl" json:"cache_ttl" env:"MCP_ANALYZER_CACHE_TTL"`
+	UseRefactoredDockerfile  bool          `yaml:"use_refactored_dockerfile" json:"use_refactored_dockerfile" env:"USE_REFACTORED_DOCKERFILE"`
 }
 
 // TransportConfig contains transport-related configuration
@@ -103,7 +105,15 @@ func (cm *ConfigManager) LoadConfig(configPath string) error {
 	// Load from file if specified and exists
 	if configPath != "" {
 		if err := cm.loadFromFile(configPath); err != nil {
-			return fmt.Errorf("failed to load config file %s: %w", configPath, err)
+			return types.NewErrorBuilder("config_file_load_failed", "Failed to load configuration file", "configuration").
+				WithField("config_path", configPath).
+				WithOperation("load_config").
+				WithStage("file_loading").
+				WithRootCause(fmt.Sprintf("Cannot load config file %s: %v", configPath, err)).
+				WithImmediateStep(1, "Check file", "Verify config file exists and is readable").
+				WithImmediateStep(2, "Check format", "Ensure config file is valid YAML/JSON").
+				WithImmediateStep(3, "Check permissions", "Verify read permissions on config file").
+				Build()
 		}
 	} else {
 		// Try default locations

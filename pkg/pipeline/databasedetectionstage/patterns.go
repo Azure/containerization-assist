@@ -35,12 +35,6 @@ var KnownDatabaseTypes = []DatabaseType{
 	CosmosDB,
 }
 
-type DatabaseDetectionResult struct {
-	Type    string `json:"type"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
-}
-
 // DatabasePatterns maps each supported database type to a regex pattern for detecting its name or alias.
 var DatabasePatterns map[DatabaseType]*regexp.Regexp
 
