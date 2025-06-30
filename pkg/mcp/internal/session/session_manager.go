@@ -34,8 +34,11 @@ type SessionManager struct {
 	stopped       bool
 
 	// Statistics tracking
-	startTime time.Time
-	diskUsage map[string]int64
+	startTime    time.Time
+	diskUsage    map[string]int64
+	errorCounts  map[string]int
+	jobTracking  map[string][]string
+	toolTracking map[string][]string
 }
 
 // SessionManagerConfig represents session manager configuration
@@ -81,6 +84,9 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 		cleanupDone:       make(chan bool),
 		startTime:         time.Now(),
 		diskUsage:         make(map[string]int64),
+		errorCounts:       make(map[string]int),
+		jobTracking:       make(map[string][]string),
+		toolTracking:      make(map[string][]string),
 	}
 
 	if err := sm.loadExistingSessions(); err != nil {
@@ -563,7 +569,7 @@ func (sm *SessionManager) GetStats() *core.SessionManagerStats {
 		TotalSessions:     totalSessions,
 		FailedSessions:    failedSessions,
 		AverageSessionAge: averageAge,
-		SessionErrors:     0, // TODO: implement error tracking
+		SessionErrors:     sm.getTotalErrorCount(),
 	}
 
 	return stats
@@ -584,10 +590,10 @@ func (sm *SessionManager) GetAllSessions() ([]*SessionData, error) {
 			ExpiresAt:      session.ExpiresAt,
 			WorkspacePath:  session.WorkspaceDir,
 			DiskUsage:      sm.diskUsage[session.SessionID],
-			ActiveJobs:     []string{}, // TODO: implement actual job tracking
-			CompletedTools: []string{}, // TODO: implement actual tool tracking
-			LastError:      "",         // TODO: implement error tracking
-			Labels:         []string{}, // TODO: implement label support
+			ActiveJobs:     sm.jobTracking[session.SessionID],
+			CompletedTools: sm.toolTracking[session.SessionID],
+			LastError:      sm.getLastError(session.SessionID),
+			Labels:         session.Labels,
 			RepoURL:        session.RepoURL,
 			Metadata:       make(map[string]string), // TODO: convert from interface{} metadata
 		}
@@ -614,10 +620,10 @@ func (sm *SessionManager) GetSessionData(sessionID string) (*SessionData, error)
 		ExpiresAt:      session.ExpiresAt,
 		WorkspacePath:  session.WorkspaceDir,
 		DiskUsage:      sm.diskUsage[session.SessionID],
-		ActiveJobs:     []string{}, // TODO: implement actual job tracking
-		CompletedTools: []string{}, // TODO: implement actual tool tracking
-		LastError:      "",         // TODO: implement error tracking
-		Labels:         []string{}, // TODO: implement label support
+		ActiveJobs:     sm.jobTracking[session.SessionID],
+		CompletedTools: sm.toolTracking[session.SessionID],
+		LastError:      sm.getLastError(session.SessionID),
+		Labels:         session.Labels,
 		RepoURL:        session.RepoURL,
 		Metadata:       make(map[string]string), // TODO: convert from interface{} metadata
 	}
@@ -852,6 +858,73 @@ func (sm *SessionManager) deleteSessionInternalWithContext(ctx context.Context, 
 func SessionFromContext(ctx context.Context) string {
 	if sessionID, ok := ctx.Value("session_id").(string); ok {
 		return sessionID
+	}
+	return ""
+}
+
+// Session tracking methods
+
+// AddJob adds a job to session tracking
+func (sm *SessionManager) AddJob(sessionID, jobID string) {
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
+	
+	if sm.jobTracking[sessionID] == nil {
+		sm.jobTracking[sessionID] = make([]string, 0)
+	}
+	sm.jobTracking[sessionID] = append(sm.jobTracking[sessionID], jobID)
+	sm.logger.Debug().Str("session_id", sessionID).Str("job_id", jobID).Msg("Added job to session tracking")
+}
+
+// RemoveJob removes a job from session tracking
+func (sm *SessionManager) RemoveJob(sessionID, jobID string) {
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
+	
+	jobs := sm.jobTracking[sessionID]
+	for i, job := range jobs {
+		if job == jobID {
+			sm.jobTracking[sessionID] = append(jobs[:i], jobs[i+1:]...)
+			sm.logger.Debug().Str("session_id", sessionID).Str("job_id", jobID).Msg("Removed job from session tracking")
+			break
+		}
+	}
+}
+
+// AddCompletedTool adds a completed tool to session tracking
+func (sm *SessionManager) AddCompletedTool(sessionID, toolName string) {
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
+	
+	if sm.toolTracking[sessionID] == nil {
+		sm.toolTracking[sessionID] = make([]string, 0)
+	}
+	sm.toolTracking[sessionID] = append(sm.toolTracking[sessionID], toolName)
+	sm.logger.Debug().Str("session_id", sessionID).Str("tool", toolName).Msg("Added completed tool to session tracking")
+}
+
+// RecordError records an error for session statistics
+func (sm *SessionManager) RecordError(sessionID string, err error) {
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
+	
+	sm.errorCounts[sessionID]++
+	sm.logger.Error().Str("session_id", sessionID).Err(err).Msg("Recorded session error")
+}
+
+// getTotalErrorCount returns total error count across all sessions
+func (sm *SessionManager) getTotalErrorCount() int {
+	total := 0
+	for _, count := range sm.errorCounts {
+		total += count
+	}
+	return total
+}
+
+// getLastError returns the last error message for a session (simplified implementation)
+func (sm *SessionManager) getLastError(sessionID string) string {
+	if sm.errorCounts[sessionID] > 0 {
+		return fmt.Sprintf("Session has %d errors", sm.errorCounts[sessionID])
 	}
 	return ""
 }

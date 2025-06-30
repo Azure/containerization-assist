@@ -3,7 +3,9 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
@@ -90,18 +92,121 @@ func (o *Operations) BuildDockerImage(sessionID, imageRef, dockerfilePath string
 }
 
 func (o *Operations) PullDockerImage(sessionID, imageRef string) error {
-	o.logger.Warn().Str("image_ref", imageRef).Msg("Pull operation not implemented")
-	return fmt.Errorf("pull operation not implemented")
+	if sessionID == "" {
+		return fmt.Errorf("session ID is required")
+	}
+	if imageRef == "" {
+		return fmt.Errorf("image reference is required")
+	}
+
+	o.logger.Info().Str("image_ref", imageRef).Str("session_id", sessionID).Msg("Pulling Docker image")
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// Execute docker pull command
+	cmd := exec.CommandContext(ctx, "docker", "pull", imageRef)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		o.logger.Error().Err(err).Str("image_ref", imageRef).Str("output", string(output)).Msg("Docker pull failed")
+		return fmt.Errorf("failed to pull image %s: %w", imageRef, err)
+	}
+
+	o.logger.Info().Str("image_ref", imageRef).Str("output", string(output)).Msg("Docker pull completed successfully")
+
+	// Update session with pull result
+	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
+		"operation": "pull",
+		"image_ref": imageRef,
+		"success":   true,
+		"output":    string(output),
+	})
+	if err != nil {
+		o.logger.Warn().Err(err).Msg("Failed to update session with pull results")
+	}
+
+	return nil
 }
 
 func (o *Operations) PushDockerImage(sessionID, imageRef string) error {
-	o.logger.Warn().Str("image_ref", imageRef).Msg("Push operation not implemented")
-	return fmt.Errorf("push operation not implemented")
+	if sessionID == "" {
+		return fmt.Errorf("session ID is required")
+	}
+	if imageRef == "" {
+		return fmt.Errorf("image reference is required")
+	}
+
+	o.logger.Info().Str("image_ref", imageRef).Str("session_id", sessionID).Msg("Pushing Docker image")
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	// Execute docker push command
+	cmd := exec.CommandContext(ctx, "docker", "push", imageRef)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		o.logger.Error().Err(err).Str("image_ref", imageRef).Str("output", string(output)).Msg("Docker push failed")
+		return fmt.Errorf("failed to push image %s: %w", imageRef, err)
+	}
+
+	o.logger.Info().Str("image_ref", imageRef).Str("output", string(output)).Msg("Docker push completed successfully")
+
+	// Update session with push result
+	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
+		"operation": "push",
+		"image_ref": imageRef,
+		"success":   true,
+		"output":    string(output),
+	})
+	if err != nil {
+		o.logger.Warn().Err(err).Msg("Failed to update session with push results")
+	}
+
+	return nil
 }
 
 func (o *Operations) TagDockerImage(sessionID, sourceRef, targetRef string) error {
-	o.logger.Warn().Msg("Tag operation not implemented")
-	return fmt.Errorf("tag operation not implemented")
+	if sessionID == "" {
+		return fmt.Errorf("session ID is required")
+	}
+	if sourceRef == "" {
+		return fmt.Errorf("source image reference is required")
+	}
+	if targetRef == "" {
+		return fmt.Errorf("target image reference is required")
+	}
+
+	o.logger.Info().Str("source_ref", sourceRef).Str("target_ref", targetRef).Str("session_id", sessionID).Msg("Tagging Docker image")
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Execute docker tag command
+	cmd := exec.CommandContext(ctx, "docker", "tag", sourceRef, targetRef)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		o.logger.Error().Err(err).Str("source_ref", sourceRef).Str("target_ref", targetRef).Str("output", string(output)).Msg("Docker tag failed")
+		return fmt.Errorf("failed to tag image %s as %s: %w", sourceRef, targetRef, err)
+	}
+
+	o.logger.Info().Str("source_ref", sourceRef).Str("target_ref", targetRef).Str("output", strings.TrimSpace(string(output))).Msg("Docker tag completed successfully")
+
+	// Update session with tag result
+	err = o.UpdateSessionFromDockerResults(sessionID, map[string]interface{}{
+		"operation":  "tag",
+		"source_ref": sourceRef,
+		"target_ref": targetRef,
+		"success":    true,
+		"output":     string(output),
+	})
+	if err != nil {
+		o.logger.Warn().Err(err).Msg("Failed to update session with tag results")
+	}
+
+	return nil
 }
 
 func (o *Operations) ConvertToDockerState(sessionID string) (interface{}, error) {
