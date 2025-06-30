@@ -459,7 +459,18 @@ func (rm *DockerRetryManager) GetCircuitBreakerStatus(operation string) *Circuit
 	defer rm.mutex.RUnlock()
 
 	if breaker, exists := rm.circuitBreakers[operation]; exists {
-		breakerCopy := *breaker
+		breaker.mutex.RLock()
+		breakerCopy := CircuitBreaker{
+			Name:            breaker.Name,
+			State:           breaker.State,
+			FailureCount:    breaker.FailureCount,
+			SuccessCount:    breaker.SuccessCount,
+			LastFailure:     breaker.LastFailure,
+			LastSuccess:     breaker.LastSuccess,
+			LastStateChange: breaker.LastStateChange,
+			Config:          breaker.Config,
+		}
+		breaker.mutex.RUnlock()
 		return &breakerCopy
 	}
 	return nil
