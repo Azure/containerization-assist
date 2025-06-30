@@ -159,8 +159,7 @@ func (base *AtomicToolBase) LogOperationComplete(operation string, success bool,
 	}
 }
 
-// ProgressCallback is a function type for reporting progress
-type ProgressCallback func(progress float64, message string)
+// ProgressCallback is defined in registry.go
 
 // executeWithoutProgress executes an operation without progress tracking
 // This is the base method that BuildSecBot's atomic tools can use
@@ -234,9 +233,10 @@ func (base *AtomicToolBase) ExecuteWithProgress(ctx context.Context, sessionID s
 		Msg("Starting atomic tool execution with progress tracking")
 
 	// Create a progress callback that logs to the session
-	progressCallback := func(progress float64, message string) {
+	progressCallback := func(stage string, percent float64, message string) {
 		base.logger.Debug().
-			Float64("progress", progress).
+			Str("stage", stage).
+			Float64("percent", percent).
 			Str("message", message).
 			Str("tool", base.name).
 			Str("session_id", sessionID).
