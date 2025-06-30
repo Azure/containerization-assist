@@ -84,6 +84,7 @@ type ImageStats struct {
 	BuildCount    int           `json:"build_count"`
 	SuccessRate   float64       `json:"success_rate"`
 	AvgDuration   time.Duration `json:"avg_duration"`
+	TotalTime     time.Duration `json:"total_time"`
 	AvgSize       int64         `json:"avg_size"`
 	LastBuildTime time.Time     `json:"last_build_time"`
 }

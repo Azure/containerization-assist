@@ -89,6 +89,30 @@ func (m *MockDockerClient) Push(_ context.Context, _ string) (string, error) {
 	return m.pushResult, m.pushErr
 }
 
+func (m *MockDockerClient) Pull(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClient) Tag(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClient) Login(_ context.Context, _, _, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClient) LoginWithToken(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClient) Logout(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
+func (m *MockDockerClient) IsLoggedIn(_ context.Context, _ string) (bool, error) {
+	return true, nil
+}
+
 // MockKindRunner for testing
 type MockKindRunner struct {
 	versionResult     string

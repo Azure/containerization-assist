@@ -54,34 +54,34 @@
 		<div id="topbar">
 			<div id="nav">
 				<select id="files">
-				
+
 				<option value="file0">github.com/Azure/container-kit/pkg/mcp/internal/utils/log_capture.go (0.0%)</option>
-				
+
 				<option value="file1">github.com/Azure/container-kit/pkg/mcp/internal/utils/mcperror.go (44.4%)</option>
-				
+
 				<option value="file2">github.com/Azure/container-kit/pkg/mcp/internal/utils/preference_store.go (0.0%)</option>
-				
+
 				<option value="file3">github.com/Azure/container-kit/pkg/mcp/internal/utils/ring_buffer.go (84.8%)</option>
-				
+
 				<option value="file4">github.com/Azure/container-kit/pkg/mcp/internal/utils/sandbox_executor.go (93.0%)</option>
-				
+
 				<option value="file5">github.com/Azure/container-kit/pkg/mcp/internal/utils/schema_utils.go (0.0%)</option>
-				
+
 				<option value="file6">github.com/Azure/container-kit/pkg/mcp/internal/utils/secret_scanner.go (69.9%)</option>
-				
+
 				<option value="file7">github.com/Azure/container-kit/pkg/mcp/internal/utils/security_validator.go (91.9%)</option>
-				
+
 				<option value="file8">github.com/Azure/container-kit/pkg/mcp/internal/utils/slog_utils.go (0.0%)</option>
-				
+
 				<option value="file9">github.com/Azure/container-kit/pkg/mcp/internal/utils/validation_standardizer.go (54.5%)</option>
-				
+
 				<option value="file10">github.com/Azure/container-kit/pkg/mcp/internal/utils/workspace.go (78.0%)</option>
-				
+
 				</select>
 			</div>
 			<div id="legend">
 				<span>not tracked</span>
-			
+
 				<span class="cov0">no coverage</span>
 				<span class="cov1">low coverage</span>
 				<span class="cov2">*</span>
@@ -93,11 +93,11 @@
 				<span class="cov8">*</span>
 				<span class="cov9">*</span>
 				<span class="cov10">high coverage</span>
-			
+
 			</div>
 		</div>
 		<div id="content">
-		
+
 		<pre class="file" id="file0" style="display: none">package utils
 
 import (
@@ -307,7 +307,7 @@ func FormatLogEntry(entry LogEntry) string <span class="cov0" title="0">{
         <span class="cov0" title="0">return strings.Join(parts, " ")</span>
 }
 </pre>
-		
+
 		<pre class="file" id="file1" style="display: none">package utils
 
 import (
@@ -720,7 +720,7 @@ func GetRecoverySteps(mcpErr *MCPError) []string <span class="cov0" title="0">{
         <span class="cov0" title="0">return []string{"Check error details", "Review logs for more information"}</span>
 }
 </pre>
-		
+
 		<pre class="file" id="file2" style="display: none">package utils
 
 import (
@@ -1172,7 +1172,7 @@ func (ps *PreferenceStore) Close() error <span class="cov0" title="0">{
         return ps.db.Close()
 }</span>
 </pre>
-		
+
 		<pre class="file" id="file3" style="display: none">package utils
 
 import (
@@ -1368,7 +1368,7 @@ func containsIgnoreCase(s, substr string) bool <span class="cov4" title="6">{
         return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }</span>
 </pre>
-		
+
 		<pre class="file" id="file4" style="display: none">package utils
 
 import (
@@ -1939,7 +1939,7 @@ func (se *SandboxExecutor) ExportMetrics(ctx context.Context) ([]byte, error) <s
         return json.MarshalIndent(data, "", "  ")
 }</span>
 </pre>
-		
+
 		<pre class="file" id="file5" style="display: none">package utils
 
 import (
@@ -2022,7 +2022,7 @@ func RemoveCopilotIncompatible(node map[string]any) <span class="cov0" title="0"
         }
 }
 </pre>
-		
+
 		<pre class="file" id="file6" style="display: none">package utils
 
 import (
@@ -2373,7 +2373,7 @@ func (ss *SecretScanner) generateDummySecretValue(key string) string <span class
         }
 }
 </pre>
-		
+
 		<pre class="file" id="file7" style="display: none">package utils
 
 import (
@@ -3140,7 +3140,7 @@ func (sv *SecurityValidator) GenerateSecurityReport(report *SecurityValidationRe
                 if !assessment.Mitigated </span><span class="cov3" title="4">{
                         status = "❌"
                 }</span>
-                <span class="cov5" title="10">sb.WriteString(fmt.Sprintf("%s %s: %s (Risk: %s)\n", status, threatID, 
+                <span class="cov5" title="10">sb.WriteString(fmt.Sprintf("%s %s: %s (Risk: %s)\n", status, threatID,
                         sv.threatModel.Threats[threatID].Name, assessment.RiskLevel))
                 if len(assessment.Gaps) &gt; 0 </span><span class="cov3" title="4">{
                         for _, gap := range assessment.Gaps </span><span class="cov3" title="5">{
@@ -3362,7 +3362,7 @@ func (sv *SecurityValidator) isControlEffective(controlID string, options Advanc
                 return true</span>
         }
 }</pre>
-		
+
 		<pre class="file" id="file8" style="display: none">package utils
 
 import (
@@ -3494,7 +3494,7 @@ func DebugMCP(ctx context.Context, logger *slog.Logger, msg string, args ...any)
         logger.DebugContext(ctx, msg, args...)
 }</span>
 </pre>
-		
+
 		<pre class="file" id="file9" style="display: none">package utils
 
 import (
@@ -3913,7 +3913,7 @@ func (svm *StandardizedValidationMixin) checkWritePermission(path string) error 
         return nil</span>
 }
 </pre>
-		
+
 		<pre class="file" id="file10" style="display: none">package utils
 
 import (
@@ -4578,7 +4578,7 @@ type WorkspaceStats struct {
         SandboxEnabled  bool  `json:"sandbox_enabled"`
 }
 </pre>
-		
+
 		</div>
 	</body>
 	<script>

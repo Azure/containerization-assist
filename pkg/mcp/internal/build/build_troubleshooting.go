@@ -350,8 +350,8 @@ func (t *BuildTroubleshooter) generateAlternativeStrategies(errStr string, build
 }
 
 // analyzePerformanceImpact analyzes how the failure impacts build performance
-func (t *BuildTroubleshooter) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) PerformanceAnalysis {
-	analysis := PerformanceAnalysis{
+func (t *BuildTroubleshooter) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) BuildFixerPerformanceAnalysis {
+	analysis := BuildFixerPerformanceAnalysis{
 		BuildTime:       buildResult.Duration,
 		CacheEfficiency: "unknown",
 		CacheHitRate:    0.0,

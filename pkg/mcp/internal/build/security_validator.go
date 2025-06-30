@@ -411,7 +411,7 @@ func (v *EnhancedSecurityValidator) SetActivePolicy(policyName string) error {
 }
 
 // ValidateWithPolicy performs validation with the active security policy
-func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options ValidationOptions) (*SecurityValidationResult, error) {
+func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options ValidationOptions) (*DetailedSecurityValidationResult, error) {
 	if v.activePolicy == nil {
 		return nil, fmt.Errorf("no active security policy set")
 	}
@@ -423,14 +423,14 @@ func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options V
 	}
 
 	// Create enhanced result
-	result := &SecurityValidationResult{
+	result := &DetailedSecurityValidationResult{
 		ValidationResult: baseResult,
 		PolicyName:       v.activePolicy.Name,
 		PolicyVersion:    v.activePolicy.Version,
 		ComplianceStatus: make(map[string]bool),
 		PolicyViolations: []PolicyViolation{},
 		SecurityScore:    100, // Start with perfect score
-		RiskAssessment:   RiskAssessment{},
+		RiskAssessment:   SecurityRiskAssessment{},
 	}
 
 	// Apply policy rules
@@ -450,7 +450,7 @@ func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options V
 }
 
 // applyPolicyRules applies security policy rules
-func (v *EnhancedSecurityValidator) applyPolicyRules(lines []string, result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) applyPolicyRules(lines []string, result *DetailedSecurityValidationResult) {
 	for _, rule := range v.activePolicy.Rules {
 		if !rule.Enabled {
 			continue
@@ -515,7 +515,7 @@ func (v *EnhancedSecurityValidator) checkRule(lines []string, rule SecurityRule)
 }
 
 // checkCompliance checks compliance with frameworks
-func (v *EnhancedSecurityValidator) checkCompliance(lines []string, result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) checkCompliance(lines []string, result *DetailedSecurityValidationResult) {
 	for _, framework := range v.activePolicy.ComplianceFrameworks {
 		compliant := true
 		for _, req := range framework.Requirements {
@@ -564,7 +564,7 @@ func (v *EnhancedSecurityValidator) checkComplianceRequirement(lines []string, r
 }
 
 // assessRisk performs risk assessment
-func (v *EnhancedSecurityValidator) assessRisk(result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) assessRisk(result *DetailedSecurityValidationResult) {
 	risk := &result.RiskAssessment
 
 	// Count violations by severity
@@ -612,7 +612,7 @@ func (v *EnhancedSecurityValidator) assessRisk(result *SecurityValidationResult)
 }
 
 // calculateSecurityScore calculates overall security score
-func (v *EnhancedSecurityValidator) calculateSecurityScore(result *SecurityValidationResult) {
+func (v *EnhancedSecurityValidator) calculateSecurityScore(result *DetailedSecurityValidationResult) {
 	score := 100
 
 	// Deduct points for violations
@@ -665,7 +665,7 @@ func (v *EnhancedSecurityValidator) getComplianceRemediation(framework, reqID st
 	return fmt.Sprintf("Implement %s requirement %s", framework, reqID)
 }
 
-func (v *EnhancedSecurityValidator) generateMitigations(result *SecurityValidationResult) []string {
+func (v *EnhancedSecurityValidator) generateMitigations(result *DetailedSecurityValidationResult) []string {
 	mitigations := []string{}
 
 	if result.RiskAssessment.CriticalRisks > 0 {
@@ -683,15 +683,15 @@ func (v *EnhancedSecurityValidator) generateMitigations(result *SecurityValidati
 
 // Additional types for enhanced security validation
 
-// SecurityValidationResult extends ValidationResult with security-specific information
-type SecurityValidationResult struct {
+// DetailedSecurityValidationResult extends ValidationResult with security-specific information
+type DetailedSecurityValidationResult struct {
 	*ValidationResult
-	PolicyName       string            `json:"policy_name"`
-	PolicyVersion    string            `json:"policy_version"`
-	ComplianceStatus map[string]bool   `json:"compliance_status"`
-	PolicyViolations []PolicyViolation `json:"policy_violations"`
-	SecurityScore    int               `json:"security_score"`
-	RiskAssessment   RiskAssessment    `json:"risk_assessment"`
+	PolicyName       string                 `json:"policy_name"`
+	PolicyVersion    string                 `json:"policy_version"`
+	ComplianceStatus map[string]bool        `json:"compliance_status"`
+	PolicyViolations []PolicyViolation      `json:"policy_violations"`
+	SecurityScore    int                    `json:"security_score"`
+	RiskAssessment   SecurityRiskAssessment `json:"risk_assessment"`
 }
 
 // PolicyViolation represents a security policy violation
@@ -704,8 +704,8 @@ type PolicyViolation struct {
 	Remediation string `json:"remediation"`
 }
 
-// RiskAssessment contains risk analysis results
-type RiskAssessment struct {
+// SecurityRiskAssessment contains risk analysis results for security validation
+type SecurityRiskAssessment struct {
 	OverallRisk   string   `json:"overall_risk"`
 	RiskScore     int      `json:"risk_score"`
 	CriticalRisks int      `json:"critical_risks"`
