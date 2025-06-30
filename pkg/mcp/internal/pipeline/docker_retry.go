@@ -249,7 +249,7 @@ func (rm *DockerRetryManager) ExecuteWithRetry(
 
 	// Check circuit breaker
 	if policy.EnableCircuitBreaker {
-		if !rm.canExecute(operation) {
+		if !rm.canExecute(policyName) {
 			return nil, fmt.Errorf("circuit breaker is open for operation: %s", operation)
 		}
 	}
@@ -299,7 +299,7 @@ func (rm *DockerRetryManager) ExecuteWithRetry(
 		if err == nil {
 			rm.updateSuccessMetrics(operation, attempt, time.Since(startTime))
 			if policy.EnableCircuitBreaker {
-				rm.recordSuccess(operation)
+				rm.recordSuccess(policyName)
 			}
 			if rm.learningEnabled {
 				rm.updateAdaptiveSettings(operation, duration, true)
@@ -360,7 +360,7 @@ func (rm *DockerRetryManager) ExecuteWithRetry(
 	// All attempts failed
 	rm.updateFailureMetrics(operation, policy.MaxAttempts, time.Since(startTime))
 	if policy.EnableCircuitBreaker {
-		rm.recordFailure(operation)
+		rm.recordFailure(policyName)
 	}
 	if rm.learningEnabled {
 		rm.updateAdaptiveSettings(operation, time.Since(startTime), false)

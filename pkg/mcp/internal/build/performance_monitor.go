@@ -10,6 +10,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var (
+	metricsOnce   sync.Once
+	globalMetrics *BuildMetrics
+)
+
 // PerformanceMonitor tracks and analyzes build performance metrics
 type PerformanceMonitor struct {
 	logger    zerolog.Logger
@@ -46,125 +51,128 @@ type BuildMetrics struct {
 
 // NewPerformanceMonitor creates a new performance monitor
 func NewPerformanceMonitor(logger zerolog.Logger) *PerformanceMonitor {
-	metrics := &BuildMetrics{
-		BuildDuration: promauto.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    "container_kit_build_duration_seconds",
-				Help:    "Duration of Docker build operations",
-				Buckets: prometheus.ExponentialBuckets(1, 2, 10), // 1s to ~17min
-			},
-			[]string{"tool", "status", "strategy"},
-		),
+	// Initialize metrics only once to avoid duplicate registration
+	metricsOnce.Do(func() {
+		globalMetrics = &BuildMetrics{
+			BuildDuration: promauto.NewHistogramVec(
+				prometheus.HistogramOpts{
+					Name:    "container_kit_build_duration_seconds",
+					Help:    "Duration of Docker build operations",
+					Buckets: prometheus.ExponentialBuckets(1, 2, 10), // 1s to ~17min
+				},
+				[]string{"tool", "status", "strategy"},
+			),
 
-		StageDuration: promauto.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    "container_kit_build_stage_duration_seconds",
-				Help:    "Duration of individual build stages",
-				Buckets: prometheus.ExponentialBuckets(0.1, 2, 10), // 0.1s to ~100s
-			},
-			[]string{"tool", "stage", "status"},
-		),
+			StageDuration: promauto.NewHistogramVec(
+				prometheus.HistogramOpts{
+					Name:    "container_kit_build_stage_duration_seconds",
+					Help:    "Duration of individual build stages",
+					Buckets: prometheus.ExponentialBuckets(0.1, 2, 10), // 0.1s to ~100s
+				},
+				[]string{"tool", "stage", "status"},
+			),
 
-		BuildsTotal: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "container_kit_builds_total",
-				Help: "Total number of build operations",
-			},
-			[]string{"tool", "type"},
-		),
+			BuildsTotal: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "container_kit_builds_total",
+					Help: "Total number of build operations",
+				},
+				[]string{"tool", "type"},
+			),
 
-		BuildsSucceeded: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "container_kit_builds_succeeded_total",
-				Help: "Total number of successful build operations",
-			},
-			[]string{"tool", "type"},
-		),
+			BuildsSucceeded: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "container_kit_builds_succeeded_total",
+					Help: "Total number of successful build operations",
+				},
+				[]string{"tool", "type"},
+			),
 
-		BuildsFailed: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "container_kit_builds_failed_total",
-				Help: "Total number of failed build operations",
-			},
-			[]string{"tool", "type", "error_type"},
-		),
+			BuildsFailed: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "container_kit_builds_failed_total",
+					Help: "Total number of failed build operations",
+				},
+				[]string{"tool", "type", "error_type"},
+			),
 
-		CacheHits: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "container_kit_cache_hits_total",
-				Help: "Total number of Docker cache hits",
-			},
-			[]string{"tool", "layer"},
-		),
+			CacheHits: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "container_kit_cache_hits_total",
+					Help: "Total number of Docker cache hits",
+				},
+				[]string{"tool", "layer"},
+			),
 
-		CacheMisses: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "container_kit_cache_misses_total",
-				Help: "Total number of Docker cache misses",
-			},
-			[]string{"tool", "layer"},
-		),
+			CacheMisses: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "container_kit_cache_misses_total",
+					Help: "Total number of Docker cache misses",
+				},
+				[]string{"tool", "layer"},
+			),
 
-		ActiveBuilds: promauto.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "container_kit_active_builds",
-				Help: "Number of currently active build operations",
-			},
-		),
+			ActiveBuilds: promauto.NewGauge(
+				prometheus.GaugeOpts{
+					Name: "container_kit_active_builds",
+					Help: "Number of currently active build operations",
+				},
+			),
 
-		BuildQueueSize: promauto.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "container_kit_build_queue_size",
-				Help: "Number of builds waiting in queue",
-			},
-		),
+			BuildQueueSize: promauto.NewGauge(
+				prometheus.GaugeOpts{
+					Name: "container_kit_build_queue_size",
+					Help: "Number of builds waiting in queue",
+				},
+			),
 
-		CacheSize: promauto.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "container_kit_cache_size_bytes",
-				Help: "Total size of Docker build cache",
-			},
-		),
+			CacheSize: promauto.NewGauge(
+				prometheus.GaugeOpts{
+					Name: "container_kit_cache_size_bytes",
+					Help: "Total size of Docker build cache",
+				},
+			),
 
-		LayerCount: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "container_kit_image_layers",
-				Help: "Number of layers in built images",
-			},
-			[]string{"image", "tag"},
-		),
+			LayerCount: promauto.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: "container_kit_image_layers",
+					Help: "Number of layers in built images",
+				},
+				[]string{"image", "tag"},
+			),
 
-		ImageSize: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "container_kit_image_size_bytes",
-				Help: "Size of built Docker images",
-			},
-			[]string{"image", "tag"},
-		),
+			ImageSize: promauto.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: "container_kit_image_size_bytes",
+					Help: "Size of built Docker images",
+				},
+				[]string{"image", "tag"},
+			),
 
-		ContextSize: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "container_kit_build_context_size_bytes",
-				Help: "Size of build context",
-			},
-			[]string{"tool", "session"},
-		),
+			ContextSize: promauto.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: "container_kit_build_context_size_bytes",
+					Help: "Size of build context",
+				},
+				[]string{"tool", "session"},
+			),
 
-		BuildTimeSummary: promauto.NewSummaryVec(
-			prometheus.SummaryOpts{
-				Name:       "container_kit_build_time_summary_seconds",
-				Help:       "Summary of build times with percentiles",
-				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.005, 0.99: 0.001},
-			},
-			[]string{"tool", "type"},
-		),
-	}
+			BuildTimeSummary: promauto.NewSummaryVec(
+				prometheus.SummaryOpts{
+					Name:       "container_kit_build_time_summary_seconds",
+					Help:       "Summary of build times with percentiles",
+					Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.005, 0.99: 0.001},
+				},
+				[]string{"tool", "type"},
+			),
+		}
+	})
 
 	return &PerformanceMonitor{
 		logger:    logger.With().Str("component", "performance_monitor").Logger(),
-		metrics:   metrics,
+		metrics:   globalMetrics,
 		analyzer:  NewPerformanceAnalyzer(logger),
-		collector: NewMetricsCollector(logger, metrics),
+		collector: NewMetricsCollector(logger, globalMetrics),
 	}
 }
 

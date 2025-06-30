@@ -59,21 +59,21 @@ type MonitoringConfig struct {
 
 // MonitoringMetrics represents comprehensive monitoring metrics
 type MonitoringMetrics struct {
-	Timestamp          time.Time                   `json:"timestamp"`
-	TotalOperations    int64                       `json:"total_operations"`
-	SuccessfulOps      int64                       `json:"successful_ops"`
-	FailedOps          int64                       `json:"failed_ops"`
-	ActiveSessions     int64                       `json:"active_sessions"`
-	AverageLatency     time.Duration               `json:"average_latency"`
-	P95Latency         time.Duration               `json:"p95_latency"`
-	ErrorRate          float64                     `json:"error_rate"`
-	OperationBreakdown map[string]OperationMetrics `json:"operation_breakdown"`
-	SessionMetrics     SessionMetrics              `json:"session_metrics"`
-	SystemHealth       SystemHealthMetrics         `json:"system_health"`
+	Timestamp          time.Time                             `json:"timestamp"`
+	TotalOperations    int64                                 `json:"total_operations"`
+	SuccessfulOps      int64                                 `json:"successful_ops"`
+	FailedOps          int64                                 `json:"failed_ops"`
+	ActiveSessions     int64                                 `json:"active_sessions"`
+	AverageLatency     time.Duration                         `json:"average_latency"`
+	P95Latency         time.Duration                         `json:"p95_latency"`
+	ErrorRate          float64                               `json:"error_rate"`
+	OperationBreakdown map[string]MonitoringOperationMetrics `json:"operation_breakdown"`
+	SessionMetrics     SessionMetrics                        `json:"session_metrics"`
+	SystemHealth       SystemHealthMetrics                   `json:"system_health"`
 }
 
-// OperationMetrics represents metrics for specific operations
-type OperationMetrics struct {
+// MonitoringOperationMetrics represents metrics for specific operations
+type MonitoringOperationMetrics struct {
 	OperationType  string        `json:"operation_type"`
 	Count          int64         `json:"count"`
 	SuccessRate    float64       `json:"success_rate"`
@@ -268,7 +268,7 @@ func (mi *MonitoringIntegrator) GetMonitoringMetrics(ctx context.Context) (*Moni
 
 	metrics := &MonitoringMetrics{
 		Timestamp:          time.Now(),
-		OperationBreakdown: make(map[string]OperationMetrics),
+		OperationBreakdown: make(map[string]MonitoringOperationMetrics),
 	}
 
 	// Process Prometheus metrics

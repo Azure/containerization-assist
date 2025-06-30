@@ -313,9 +313,16 @@ func (rm *ResourceMonitor) GetCurrentResources() *CurrentResourceUsage {
 	rm.currentResources.mutex.RLock()
 	defer rm.currentResources.mutex.RUnlock()
 
-	// Return a copy
-	current := *rm.currentResources
-	return &current
+	// Return a copy without the mutex
+	return &CurrentResourceUsage{
+		TotalMemory:      rm.currentResources.TotalMemory,
+		TotalDisk:        rm.currentResources.TotalDisk,
+		ActiveSessions:   rm.currentResources.ActiveSessions,
+		OldestSession:    rm.currentResources.OldestSession,
+		ResourcePressure: rm.currentResources.ResourcePressure,
+		HealthStatus:     rm.currentResources.HealthStatus,
+		LastUpdated:      rm.currentResources.LastUpdated,
+	}
 }
 
 // GetResourceHistory returns recent resource snapshots

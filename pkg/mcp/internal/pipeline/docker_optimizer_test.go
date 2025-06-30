@@ -204,7 +204,7 @@ func TestDockerOperationOptimizer_CacheEviction(t *testing.T) {
 
 	// Cache should be at capacity
 	stats := optimizer.GetCacheStats()
-	assert.Equal(t, 2.0, stats["cache_size"])
+	assert.Equal(t, 2, stats["cache_size"])
 
 	// Add third entry, should evict oldest
 	cached3 := &CachedOperation{
@@ -220,7 +220,7 @@ func TestDockerOperationOptimizer_CacheEviction(t *testing.T) {
 
 	// Cache should still be at capacity, but oldest entry should be gone
 	stats = optimizer.GetCacheStats()
-	assert.Equal(t, 2.0, stats["cache_size"])
+	assert.Equal(t, 2, stats["cache_size"])
 
 	// key1 should be evicted, key2 and key3 should remain
 	assert.Nil(t, optimizer.getCachedOperation("key1"))
@@ -379,7 +379,7 @@ func TestDockerOperationOptimizer_CacheStats(t *testing.T) {
 
 	stats := optimizer.GetCacheStats()
 
-	assert.Equal(t, 10.0, stats["cache_size"])
+	assert.Equal(t, 10, stats["cache_size"])
 	assert.Equal(t, 100, stats["max_cache_size"])
 	assert.Equal(t, "1h0m0s", stats["cache_ttl"])
 	assert.Equal(t, 10.0, stats["utilization"])
@@ -433,14 +433,14 @@ func TestDockerOperationOptimizer_ClearCache(t *testing.T) {
 
 	// Verify cache has entries
 	stats := optimizer.GetCacheStats()
-	assert.Equal(t, 5.0, stats["cache_size"])
+	assert.Equal(t, 5, stats["cache_size"])
 
 	// Clear cache
 	optimizer.ClearCache()
 
 	// Verify cache is empty
 	stats = optimizer.GetCacheStats()
-	assert.Equal(t, 0.0, stats["cache_size"])
+	assert.Equal(t, 0, stats["cache_size"])
 }
 
 // Benchmark tests

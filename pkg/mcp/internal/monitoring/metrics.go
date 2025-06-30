@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// MetricsCollector provides comprehensive metrics collection for InfraBot
+// MetricsCollector provides comprehensive metrics 
 type MetricsCollector struct {
 	logger  zerolog.Logger
 	mutex   sync.RWMutex
@@ -98,7 +98,7 @@ type MetricsConfig struct {
 // NewMetricsCollector creates a new metrics collector
 func NewMetricsCollector(config MetricsConfig, logger zerolog.Logger) *MetricsCollector {
 	if config.Namespace == "" {
-		config.Namespace = "infrabot"
+		config.Namespace = "ContainerKit"
 	}
 	if config.Subsystem == "" {
 		config.Subsystem = "mcp"

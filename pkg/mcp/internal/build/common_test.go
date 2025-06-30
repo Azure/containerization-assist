@@ -9,7 +9,7 @@ import (
 
 // Test BuildError Error method
 func TestBuildErrorError(t *testing.T) {
-	err := &BuildError{
+	err := &CommonBuildError{
 		Code:    "BUILD_FAILED",
 		Message: "Docker build failed",
 		Stage:   "build",

@@ -21,7 +21,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// ObservabilityManager manages distributed tracing and metrics for InfraBot
+// ObservabilityManager manages distributed tracing and metric
 type ObservabilityManager struct {
 	logger         zerolog.Logger
 	config         ObservabilityConfig
@@ -71,7 +71,7 @@ type SpanContext struct {
 // NewObservabilityManager creates a new observability manager
 func NewObservabilityManager(config ObservabilityConfig, logger zerolog.Logger) (*ObservabilityManager, error) {
 	if config.ServiceName == "" {
-		config.ServiceName = "infrabot-mcp"
+		config.ServiceName = "container-kit"
 	}
 	if config.ServiceVersion == "" {
 		config.ServiceVersion = "1.0.0"
@@ -176,7 +176,7 @@ func (om *ObservabilityManager) initializeTracing(res *resource.Resource) error 
 	))
 
 	om.tracerProvider = tp
-	om.tracer = tp.Tracer("infrabot-mcp")
+	om.tracer = tp.Tracer("container-kit",)
 
 	return nil
 }
@@ -199,7 +199,7 @@ func (om *ObservabilityManager) initializeMetrics(res *resource.Resource) error 
 	otel.SetMeterProvider(mp)
 
 	om.meterProvider = mp
-	om.meter = mp.Meter("infrabot-mcp")
+	om.meter = mp.Meter("container-kit",)
 
 	return nil
 }
@@ -214,7 +214,7 @@ func (om *ObservabilityManager) initializeInstruments() error {
 
 	// Request counter
 	om.requestCounter, err = om.meter.Int64Counter(
-		"infrabot_requests_total",
+		"containerkit_requests_total",
 		metric.WithDescription("Total number of requests"),
 		metric.WithUnit("1"),
 	)
@@ -224,7 +224,7 @@ func (om *ObservabilityManager) initializeInstruments() error {
 
 	// Request duration histogram
 	om.requestDuration, err = om.meter.Float64Histogram(
-		"infrabot_request_duration_seconds",
+		"containerkit_request_duration_seconds",
 		metric.WithDescription("Request duration in seconds"),
 		metric.WithUnit("s"),
 	)
@@ -234,7 +234,7 @@ func (om *ObservabilityManager) initializeInstruments() error {
 
 	// Operation counter
 	om.operationCounter, err = om.meter.Int64Counter(
-		"infrabot_operations_total",
+		"containerkit_operations_total",
 		metric.WithDescription("Total number of operations"),
 		metric.WithUnit("1"),
 	)
@@ -244,7 +244,7 @@ func (om *ObservabilityManager) initializeInstruments() error {
 
 	// Operation duration histogram
 	om.operationDuration, err = om.meter.Float64Histogram(
-		"infrabot_operation_duration_seconds",
+		"containerkit_operation_duration_seconds",
 		metric.WithDescription("Operation duration in seconds"),
 		metric.WithUnit("s"),
 	)
@@ -254,7 +254,7 @@ func (om *ObservabilityManager) initializeInstruments() error {
 
 	// Error counter
 	om.errorCounter, err = om.meter.Int64Counter(
-		"infrabot_errors_total",
+		"containerkit_errors_total",
 		metric.WithDescription("Total number of errors"),
 		metric.WithUnit("1"),
 	)
@@ -264,7 +264,7 @@ func (om *ObservabilityManager) initializeInstruments() error {
 
 	// Cache hit counter
 	om.cacheHitCounter, err = om.meter.Int64Counter(
-		"infrabot_cache_hits_total",
+		"containerkit_cache_hits_total",
 		metric.WithDescription("Total number of cache hits"),
 		metric.WithUnit("1"),
 	)
@@ -274,7 +274,7 @@ func (om *ObservabilityManager) initializeInstruments() error {
 
 	// Retry counter
 	om.retryCounter, err = om.meter.Int64Counter(
-		"infrabot_retries_total",
+		"containerkit_retries_total",
 		metric.WithDescription("Total number of retries"),
 		metric.WithUnit("1"),
 	)

@@ -108,30 +108,45 @@ func (o *BuildOptimizer) analyzeDockerfile(dockerfilePath string) ([]Optimizatio
 
 // checkLayerOrdering checks if layers are ordered for optimal caching
 func (o *BuildOptimizer) checkLayerOrdering(lines []string) *OptimizationRecommendation {
-	copyIndex := -1
-	runIndex := -1
+	copyAllIndex := -1
+	installIndex := -1
+	hasPackageManager := false
 
 	for i, line := range lines {
-		trimmed := strings.TrimSpace(strings.ToUpper(line))
-		if strings.HasPrefix(trimmed, "COPY") && strings.Contains(line, "package") {
-			copyIndex = i
+		trimmed := strings.TrimSpace(line)
+		trimmedUpper := strings.ToUpper(trimmed)
+
+		// Check for COPY . . or COPY . /path
+		if strings.HasPrefix(trimmedUpper, "COPY") && (strings.Contains(trimmed, " . ") || strings.HasSuffix(trimmed, " .")) {
+			copyAllIndex = i
 		}
-		if strings.HasPrefix(trimmed, "RUN") && (strings.Contains(line, "npm install") || strings.Contains(line, "pip install")) {
-			runIndex = i
+
+		// Check for package manager install commands
+		if strings.HasPrefix(trimmedUpper, "RUN") &&
+			(strings.Contains(line, "npm install") ||
+				strings.Contains(line, "npm ci") ||
+				strings.Contains(line, "yarn install") ||
+				strings.Contains(line, "pip install") ||
+				strings.Contains(line, "go mod download") ||
+				strings.Contains(line, "bundle install")) {
+			installIndex = i
+			hasPackageManager = true
 		}
-		if strings.HasPrefix(trimmed, "COPY") && !strings.Contains(line, "package") && copyIndex > 0 && runIndex > 0 && i < runIndex {
-			return &OptimizationRecommendation{
-				Type:        "layer_ordering",
-				Priority:    "high",
-				Title:       "Suboptimal layer ordering detected",
-				Description: "Source code is copied before dependency installation, causing cache invalidation",
-				Impact:      "Major impact on build time - dependencies reinstalled on every code change",
-				Solution:    "Move COPY commands for source code after dependency installation",
-				Example: `# Better ordering:
+	}
+
+	// If we found COPY . . before package installation, that's inefficient
+	if hasPackageManager && copyAllIndex != -1 && installIndex != -1 && copyAllIndex < installIndex {
+		return &OptimizationRecommendation{
+			Type:        "layer_ordering",
+			Priority:    "high",
+			Title:       "Suboptimal layer ordering detected",
+			Description: "Source code is copied before dependency installation",
+			Impact:      "Major impact on build time - dependencies reinstalled on every code change",
+			Solution:    "Move COPY commands for source code after dependency installation",
+			Example: `# Better ordering:
 COPY package*.json ./
 RUN npm ci --only=production
 COPY . .`,
-			}
 		}
 	}
 
@@ -176,22 +191,25 @@ func (o *BuildOptimizer) checkCacheBusting(lines []string) *OptimizationRecommen
 // checkMultiStageOpportunities checks if multi-stage build would help
 func (o *BuildOptimizer) checkMultiStageOpportunities(lines []string) *OptimizationRecommendation {
 	hasBuildTools := false
-	hasRuntimeOnly := false
+	notUsingMultiStage := false
 	buildCommands := 0
 
 	for _, line := range lines {
-		if strings.Contains(line, "gcc") || strings.Contains(line, "make") || strings.Contains(line, "build-essential") {
+		if strings.Contains(line, "gcc") || strings.Contains(line, "make") || strings.Contains(line, "build-essential") ||
+			strings.Contains(line, "g++") || strings.Contains(line, "python-dev") || strings.Contains(line, "node-gyp") {
 			hasBuildTools = true
 		}
-		if strings.Contains(line, "npm run build") || strings.Contains(line, "go build") || strings.Contains(line, "cargo build") {
+		if strings.Contains(line, "npm run build") || strings.Contains(line, "go build") ||
+			strings.Contains(line, "cargo build") || strings.Contains(line, "make build") ||
+			strings.Contains(line, "mvn package") || strings.Contains(line, "gradle build") {
 			buildCommands++
 		}
 		if strings.Contains(line, "FROM") && !strings.Contains(line, " AS ") {
-			hasRuntimeOnly = true
+			notUsingMultiStage = true
 		}
 	}
 
-	if hasBuildTools && hasRuntimeOnly && buildCommands > 0 {
+	if hasBuildTools && notUsingMultiStage && buildCommands > 0 {
 		return &OptimizationRecommendation{
 			Type:        "multi_stage",
 			Priority:    "high",
@@ -501,7 +519,7 @@ func (o *ContextOptimizer) isUnnecessaryFile(path string) bool {
 		".git", ".svn", ".hg",
 		"node_modules", "vendor", "__pycache__",
 		".pytest_cache", ".coverage", "htmlcov",
-		"*.log", "*.tmp", "*.temp",
+		".log", ".tmp", ".temp",
 		".DS_Store", "Thumbs.db",
 		".env", ".env.local",
 		"test", "tests", "spec",

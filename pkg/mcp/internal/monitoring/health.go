@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// HealthChecker provides comprehensive health checking for InfraBot components
+// HealthChecker provides comprehensive health checking
 type HealthChecker struct {
 	logger       zerolog.Logger
 	mutex        sync.RWMutex

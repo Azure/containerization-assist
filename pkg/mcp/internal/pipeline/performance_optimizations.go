@@ -17,7 +17,7 @@ type PerformanceOptimizer struct {
 
 	// Connection pooling and caching
 	connectionPool map[string]interface{}
-	operationCache map[string]*CachedOperation
+	operationCache map[string]*PerformanceCachedOperation
 	cacheMutex     sync.RWMutex
 
 	// Performance metrics
@@ -25,8 +25,8 @@ type PerformanceOptimizer struct {
 	metricsMutex     sync.RWMutex
 }
 
-// CachedOperation represents a cached operation result
-type CachedOperation struct {
+// PerformanceCachedOperation represents a cached operation result
+type PerformanceCachedOperation struct {
 	Key         string        `json:"key"`
 	Result      interface{}   `json:"result"`
 	Timestamp   time.Time     `json:"timestamp"`
@@ -56,7 +56,7 @@ func NewPerformanceOptimizer(sessionManager *session.SessionManager, logger zero
 		sessionManager:   sessionManager,
 		logger:           logger.With().Str("component", "performance_optimizer").Logger(),
 		connectionPool:   make(map[string]interface{}),
-		operationCache:   make(map[string]*CachedOperation),
+		operationCache:   make(map[string]*PerformanceCachedOperation),
 		operationMetrics: make(map[string]*PerformanceOperationMetrics),
 	}
 
@@ -198,7 +198,7 @@ func (po *PerformanceOptimizer) generateCacheKey(operationType string, args map[
 	return fmt.Sprintf("%s:%v", operationType, args)
 }
 
-func (po *PerformanceOptimizer) getCachedResult(key string) *CachedOperation {
+func (po *PerformanceOptimizer) getCachedResult(key string) *PerformanceCachedOperation {
 	po.cacheMutex.RLock()
 	defer po.cacheMutex.RUnlock()
 
@@ -220,7 +220,7 @@ func (po *PerformanceOptimizer) cacheResult(key string, result interface{}, ttl 
 	po.cacheMutex.Lock()
 	defer po.cacheMutex.Unlock()
 
-	po.operationCache[key] = &CachedOperation{
+	po.operationCache[key] = &PerformanceCachedOperation{
 		Key:         key,
 		Result:      result,
 		Timestamp:   time.Now(),

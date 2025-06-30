@@ -7,6 +7,7 @@ import (
 	"time"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
@@ -219,7 +220,7 @@ func (base *AtomicToolBase) ExecuteWithoutProgress(ctx context.Context, sessionI
 }
 
 // ExecuteWithProgress executes an operation with progress tracking
-func (base *AtomicToolBase) ExecuteWithProgress(ctx context.Context, sessionID string, operation func(ProgressCallback) error) error {
+func (base *AtomicToolBase) ExecuteWithProgress(ctx context.Context, sessionID string, operation func(observability.ProgressCallback) error) error {
 	// Start tracking the tool execution
 	if base.sessionManager != nil {
 		if err := base.sessionManager.TrackToolExecution(sessionID, base.name, nil); err != nil {
@@ -233,9 +234,8 @@ func (base *AtomicToolBase) ExecuteWithProgress(ctx context.Context, sessionID s
 		Msg("Starting atomic tool execution with progress tracking")
 
 	// Create a progress callback that logs to the session
-	progressCallback := func(stage string, percent float64, message string) {
+	progressCallback := func(percent float64, message string) {
 		base.logger.Debug().
-			Str("stage", stage).
 			Float64("percent", percent).
 			Str("message", message).
 			Str("tool", base.name).

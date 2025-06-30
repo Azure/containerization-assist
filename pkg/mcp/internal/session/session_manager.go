@@ -1034,8 +1034,8 @@ func (sm *SessionManager) CompleteToolExecution(sessionID, toolName string, succ
 		if session, ok := s.(*SessionState); ok {
 			// Update completed tools tracking
 			if success {
-				// Use the AddCompletedTool method which handles thread safety
-				sm.AddCompletedTool(sessionID, toolName)
+				// Use the locked version since we're already inside UpdateSession which holds the lock
+				sm.addCompletedToolLocked(sessionID, toolName)
 			}
 
 			// Find the most recent execution of this tool and update it
@@ -1118,6 +1118,11 @@ func (sm *SessionManager) AddCompletedTool(sessionID, toolName string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
+	sm.addCompletedToolLocked(sessionID, toolName)
+}
+
+// addCompletedToolLocked adds a completed tool to session tracking (caller must hold lock)
+func (sm *SessionManager) addCompletedToolLocked(sessionID, toolName string) {
 	if sm.toolTracking[sessionID] == nil {
 		sm.toolTracking[sessionID] = make([]string, 0)
 	}
