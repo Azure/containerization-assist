@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"container-kit/pkg/mcp/internal/core"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // TestServer wraps an HTTP test server with MCP functionality

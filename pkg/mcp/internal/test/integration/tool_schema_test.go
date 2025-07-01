@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"container-kit/pkg/mcp/internal/test/testutil"
+	"github.com/Azure/container-kit/pkg/mcp/internal/test/testutil"
 )
 
 // TestToolSchemaIntegration validates tool schema compliance through MCP protocol

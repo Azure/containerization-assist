@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"container-kit/pkg/mcp/internal/core"
-	"container-kit/pkg/mcp/internal/test/testutil"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/test/testutil"
 )
 
 // MCPIntegrationTestSuite provides real MCP client/server integration testing

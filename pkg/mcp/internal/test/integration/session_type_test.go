@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"container-kit/pkg/mcp/internal/test/testutil"
+	"github.com/Azure/container-kit/pkg/mcp/internal/test/testutil"
 )
 
 // TestSessionTypeConsistency validates that GetOrCreateSession returns correct types
