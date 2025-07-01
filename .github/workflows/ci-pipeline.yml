@@ -416,7 +416,7 @@ jobs:
           done
           average_success_rate=$((average_success_rate / ${#success_rates[@]}))
           pass_rate_message=""
-          if [ $average_success_rate -ge green_threshold ]; then
+          if [ $average_success_rate -ge $green_threshold ]; then
             pass_rate_message="✅ Average success rate: $average_success_rate% >= $green_threshold%"
           elif [ $average_success_rate -ge $pass_threshold ]; then
             pass_rate_message="⚠️ Average success rate: $average_success_rate% >= $pass_threshold%"
