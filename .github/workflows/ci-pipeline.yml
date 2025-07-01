@@ -209,300 +209,13 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Run Coverage Enforcement
+      uses: ./.github/actions/coverage-enforcement
       with:
         go-version: '1.24'
-
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-
-    - name: Install dependencies
-      run: go mod download
-
-    - name: Download coverage artifacts
-      uses: actions/download-artifact@v4
-      with:
-        pattern: coverage-*-${{ github.run_id }}
-        path: coverage-artifacts
-
-    - name: Merge coverage reports
-      run: |
-        echo "📊 Merging coverage reports from unit tests..."
-
-        # Install gocovmerge if not available
-        go install github.com/wadey/gocovmerge@latest
-
-        # Check if coverage-artifacts directory exists
-        if [ -d "coverage-artifacts" ]; then
-          # Find all coverage files and merge them
-          coverage_files=$(find coverage-artifacts -name "coverage.out" -type f)
-          if [ -n "$coverage_files" ]; then
-            echo "Found coverage files: $coverage_files"
-            ~/go/bin/gocovmerge $coverage_files > merged-coverage.out
-            cp merged-coverage.out coverage.out
-            echo "✅ Merged coverage reports successfully"
-          else
-            echo "⚠️ No coverage files found in artifacts, will generate coverage during enforcement"
-          fi
-        else
-          echo "⚠️ No coverage artifacts directory found, will generate coverage during enforcement"
-        fi
-
-    - name: Run coverage enforcement for core packages
-      run: |
-        echo "📊 Running coverage enforcement..."
-
-        # Define core packages that need coverage enforcement
-        CORE_PACKAGES=(
-          "./pkg/mcp/internal/core/..."
-          "./pkg/mcp/internal/runtime/..."
-          "./pkg/mcp/internal/orchestration/..."
-          "./pkg/mcp/internal/session/..."
-          "./pkg/mcp/internal/build/..."
-          "./pkg/mcp/internal/deploy/..."
-          "./pkg/mcp/internal/analyze/..."
-          "./pkg/mcp/internal/server/..."
-          "./pkg/mcp/types/..."
-        )
-
-        # Coverage thresholds (minimum required coverage percentages)
-        # Load from configuration file if available, otherwise use defaults
-        declare -A COVERAGE_THRESHOLDS
-
-        if [ -f .github/coverage-thresholds.json ]; then
-          echo "Loading coverage thresholds from configuration file..."
-          # Parse JSON and populate the array
-          while IFS="=" read -r package threshold; do
-            COVERAGE_THRESHOLDS["$package"]="$threshold"
-          done < <(jq -r '.package_thresholds | to_entries[] | select(.key | endswith("...")) | "\(.key)=\(.value.threshold)"' .github/coverage-thresholds.json)
-        else
-          echo "Using default coverage thresholds..."
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/core/..."]=30
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/runtime/..."]=20
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/orchestration/..."]=1
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/session/..."]=9
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/build/..."]=6
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/deploy/..."]=7
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/analyze/..."]=14
-          COVERAGE_THRESHOLDS["./pkg/mcp/internal/server/..."]=17
-          COVERAGE_THRESHOLDS["./pkg/mcp/types/..."]=30
-        fi
-
-        FAILED_PACKAGES=()
-
-        # Check if we have a merged coverage file
-        if [ -f "coverage.out" ]; then
-          echo "Using merged coverage file from unit tests"
-          USE_MERGED_COVERAGE=true
-        else
-          echo "No merged coverage file found, will run tests for each package"
-          USE_MERGED_COVERAGE=false
-        fi
-
-        for package in "${CORE_PACKAGES[@]}"; do
-          echo "Checking coverage for $package..."
-
-          if [ "$USE_MERGED_COVERAGE" = "true" ]; then
-            # Extract coverage from merged file
-            coverage_line=$(go tool cover -func=coverage.out | grep -E "^${package//\./\\.}" | grep -v "test" | awk '{sum+=$3; count++} END {if(count>0) printf "%.1f\n", sum/count; else print "0.0"}')
-            if [ -n "$coverage_line" ] && [ "$coverage_line" != "0.0" ]; then
-              coverage_percent="$coverage_line"
-            else
-              # Package might not be in merged coverage, run test for this package only
-              coverage_file="/tmp/coverage-$(echo $package | tr '/' '-' | tr '.' '-').out"
-              if go test -coverprofile="$coverage_file" "$package" 2>/dev/null; then
-                coverage_line=$(go tool cover -func="$coverage_file" | grep "total:" | tail -1)
-                coverage_percent=$(echo "$coverage_line" | awk '{print $3}' | sed 's/%//')
-              else
-                coverage_percent="0.0"
-              fi
-            fi
-          else
-            # Run tests with coverage for this package
-            coverage_file="/tmp/coverage-$(echo $package | tr '/' '-' | tr '.' '-').out"
-            if go test -coverprofile="$coverage_file" "$package" 2>/dev/null; then
-              if [ -f "$coverage_file" ]; then
-                # Extract coverage percentage
-                coverage_line=$(go tool cover -func="$coverage_file" | grep "total:" | tail -1)
-                if [ -n "$coverage_line" ]; then
-                  coverage_percent=$(echo "$coverage_line" | awk '{print $3}' | sed 's/%//')
-                else
-                  coverage_percent="0.0"
-                fi
-              else
-                coverage_percent="0.0"
-              fi
-            else
-              coverage_percent="0.0"
-            fi
-          fi
-
-          threshold=${COVERAGE_THRESHOLDS[$package]}
-
-          echo "Package $package: ${coverage_percent}% coverage (threshold: ${threshold}%)"
-
-          # Compare coverage with threshold
-          if (( $(echo "$coverage_percent < $threshold" | bc -l) )); then
-            echo "❌ $package coverage ${coverage_percent}% is below threshold ${threshold}%"
-            FAILED_PACKAGES+=("$package (${coverage_percent}% < ${threshold}%)")
-          else
-            echo "✅ $package coverage ${coverage_percent}% meets threshold ${threshold}%"
-          fi
-        done
-
-        # Report results
-        if [ ${#FAILED_PACKAGES[@]} -eq 0 ]; then
-          echo "🎉 All packages meet coverage requirements!"
-        else
-          echo "❌ Coverage enforcement failed for the following packages:"
-          for pkg in "${FAILED_PACKAGES[@]}"; do
-            echo "  - $pkg"
-          done
-          echo ""
-          echo "Please add tests to increase coverage for the failing packages."
-          exit 1
-        fi
-
-    - name: Download coverage artifacts from unit tests
-      uses: actions/download-artifact@v4
-      with:
-        pattern: coverage-*
-        path: coverage-artifacts
-
-    - name: Generate global coverage report
-      run: |
-        echo "📊 Generating global coverage report..."
-
-        # Merge coverage files from unit tests
-        echo "mode: atomic" > coverage.out
-
-        # Find all coverage files and merge them
-        for file in coverage-artifacts/*/coverage.out; do
-          if [ -f "$file" ]; then
-            echo "Merging coverage from: $file"
-            # Skip the first line (mode: atomic) and append the rest
-            tail -n +2 "$file" >> coverage.out
-          fi
-        done
-
-        # Check if we have any coverage data
-        if [ $(wc -l < coverage.out) -le 1 ]; then
-          echo "⚠️ No coverage data found from unit tests. Running tests now..."
-          go test -v -coverprofile=coverage.out -covermode=atomic ./...
-        fi
-
-        # Generate HTML report
-        go tool cover -html=coverage.out -o coverage.html
-
-        # Install coverage tools
-        go install github.com/axw/gocov/gocov@latest
-        go install github.com/AlekSi/gocov-xml@latest
-
-        # Convert coverage to XML
-        gocov convert coverage.out | gocov-xml > coverage.xml
-
-        # Generate coverage summary
-        go tool cover -func=coverage.out > coverage-summary.txt
-        echo "## Global Coverage Summary" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        cat coverage-summary.txt >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-
-    - name: Check global coverage thresholds
-      run: |
-        # Extract total coverage
-        TOTAL_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-        echo "Total coverage: ${TOTAL_COV}%"
-
-        # Set default thresholds (can be overridden with config file)
-        MIN_THRESHOLD=10    # Minimum acceptable coverage
-        TARGET_THRESHOLD=25 # Target coverage goal
-
-        # Try to load from config file if it exists
-        if [ -f .github/coverage-thresholds.json ]; then
-          MIN_THRESHOLD=$(jq -r '.global.line_coverage.minimum' .github/coverage-thresholds.json 2>/dev/null || echo "10")
-          TARGET_THRESHOLD=$(jq -r '.global.line_coverage.target' .github/coverage-thresholds.json 2>/dev/null || echo "25")
-        fi
-
-        echo "Minimum threshold: ${MIN_THRESHOLD}%"
-        echo "Target threshold: ${TARGET_THRESHOLD}%"
-
-        # Check if coverage meets minimum
-        if (( $(echo "$TOTAL_COV < $MIN_THRESHOLD" | bc -l) )); then
-          echo "❌ Global coverage ${TOTAL_COV}% is below minimum threshold ${MIN_THRESHOLD}%"
-          exit 1
-        fi
-
-        # Check if coverage meets target
-        if (( $(echo "$TOTAL_COV >= $TARGET_THRESHOLD" | bc -l) )); then
-          echo "✅ Global coverage ${TOTAL_COV}% meets target threshold ${TARGET_THRESHOLD}%"
-        else
-          echo "⚠️ Global coverage ${TOTAL_COV}% meets minimum but is below target ${TARGET_THRESHOLD}%"
-        fi
-
-    - name: Check coverage ratchet (PR only)
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "🔄 Checking coverage ratchet..."
-
-        # Get base branch coverage
-        git checkout ${{ github.event.pull_request.base.sha }}
-        go test -coverprofile=base-coverage.out ./... > /dev/null 2>&1 || true
-
-        if [ -f base-coverage.out ]; then
-          BASE_COV=$(go tool cover -func=base-coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          git checkout ${{ github.event.pull_request.head.sha }}
-          CURRENT_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-
-          echo "Base coverage: ${BASE_COV}%"
-          echo "Current coverage: ${CURRENT_COV}%"
-
-          # Calculate difference
-          DIFF=$(echo "$CURRENT_COV - $BASE_COV" | bc -l)
-
-          # Set default tolerance (can be overridden with config file)
-          # Note: Temporarily increased to 3.5% to account for dead code cleanup impact
-          TOLERANCE=3.5
-          if [ -f .github/coverage-thresholds.json ]; then
-            TOLERANCE=$(jq -r '.ratchet.regression_tolerance' .github/coverage-thresholds.json 2>/dev/null || echo "3.5")
-          fi
-
-          echo "Coverage change: ${DIFF}% (tolerance: -${TOLERANCE}%)"
-
-          if (( $(echo "$DIFF < -$TOLERANCE" | bc -l) )); then
-            echo "❌ Coverage regression detected: ${DIFF}% (tolerance: -${TOLERANCE}%)"
-            echo "## Coverage Ratchet Failed ❌" >> $GITHUB_STEP_SUMMARY
-            echo "Coverage decreased by ${DIFF}% which exceeds tolerance of -${TOLERANCE}%" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          else
-            echo "✅ Coverage ratchet passed: ${DIFF}%"
-            echo "## Coverage Ratchet Passed ✅" >> $GITHUB_STEP_SUMMARY
-            echo "Coverage change: ${DIFF}%" >> $GITHUB_STEP_SUMMARY
-          fi
-        else
-          echo "⚠️ Could not determine base coverage, skipping ratchet check"
-          echo "## Coverage Ratchet Skipped ⚠️" >> $GITHUB_STEP_SUMMARY
-          echo "Base coverage could not be determined" >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: global-coverage-reports-${{ github.run_id }}
-        path: |
-          coverage.out
-          coverage.html
-          coverage.xml
-          coverage-summary.txt
-          base-coverage.out
-        retention-days: 30
+        min-threshold: '10'
+        target-threshold: '25'
+        regression-tolerance: '3.5'
 
   # Phase 5: Security Scanning (parallel with coverage)
   security-scan:
@@ -517,106 +230,11 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
+    - name: Run Security Scanning
+      uses: ./.github/actions/security-scan
       with:
-        go-version: '1.24'
-
-    - name: Setup security tools
-      uses: ./.github/actions/security-setup
-
-    - name: Run GitLeaks (Secret Detection)
-      run: |
-        echo "🔍 Scanning for secrets..."
-
-        # Create gitleaks config to exclude test files and known test patterns
-        cat > .gitleaks.toml << 'EOF'
-        [allowlist]
-          description = "Test secrets and known safe patterns"
-
-          # Exclude test files
-          files = [
-            '''.*_test\.go''',
-            '''.*test.*\.go''',
-            '''test/.*''',
-            '''.*testdata.*''',
-            '''examples/.*''',
-            '''repomix-output\.xml'''
-          ]
-
-          # Exclude known test patterns
-          regexes = [
-            '''sk-1234567890abcdef''',
-            '''AKIAFAKETEST12345678''',
-            '''AKIAIOSFODNN7EXAMPLE''',
-            '''test-api-key-123456''',
-            '''zN8BP6lnPUDpumenHCZLVwZkFcSIGPr0''',
-            '''dGhpcyBpcyBhIHNlY3JldCBtZXNzYWdl''',
-            '''4e1243bd22c66e76c2ba9bef8c5e8f8a''',
-            '''YOUR_PRIVATE_KEY_CONTENT_HERE_REPLACE_WITH_ACTUAL_KEY''',
-            '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE''',
-            '''dXNlcjpwYXNzd29yZA==''',
-            '''abc123def456''',
-            '''sk_test_abcdef123456'''
-          ]
-        EOF
-
-        # Run gitleaks with config
-        gitleaks detect --config .gitleaks.toml --report-format json --report-path gitleaks-report.json --verbose
-
-        if [ -f gitleaks-report.json ]; then
-          leak_count=$(jq '. | length' gitleaks-report.json 2>/dev/null || echo "0")
-          echo "Found $leak_count potential secrets"
-
-          if [ "$leak_count" -gt 0 ]; then
-            echo "❌ Potential secrets found!"
-            jq -r '.[] | "- \(.RuleID): \(.File):\(.StartLine) - \(.Description)"' gitleaks-report.json
-            exit 1
-          else
-            echo "✅ No secrets detected"
-          fi
-        else
-          echo "✅ No secrets detected"
-        fi
-
-    - name: Run Trivy (Vulnerability Scanning)
-      run: |
-        echo "🛡️ Scanning for vulnerabilities..."
-
-        # Scan filesystem for vulnerabilities
-        trivy fs --format json --output trivy-fs-report.json .
-
-        # Scan for configuration issues
-        trivy config --format json --output trivy-config-report.json .
-
-        # Process results
-        fs_vulns=$(jq '.Results[]?.Vulnerabilities? // [] | length' trivy-fs-report.json | awk '{sum += $1} END {print sum+0}')
-        config_issues=$(jq '.Results[]?.Misconfigurations? // [] | length' trivy-config-report.json | awk '{sum += $1} END {print sum+0}')
-
-        echo "Found $fs_vulns filesystem vulnerabilities"
-        echo "Found $config_issues configuration issues"
-
-        # Report critical/high severity issues
-        critical_vulns=$(jq '.Results[]?.Vulnerabilities? // [] | map(select(.Severity == "CRITICAL" or .Severity == "HIGH")) | length' trivy-fs-report.json | awk '{sum += $1} END {print sum+0}')
-
-        if [ "$critical_vulns" -gt 0 ]; then
-          echo "❌ Found $critical_vulns critical/high severity vulnerabilities!"
-          jq -r '.Results[]?.Vulnerabilities? // [] | map(select(.Severity == "CRITICAL" or .Severity == "HIGH")) | .[] | "- \(.Severity): \(.VulnerabilityID) in \(.PkgName) - \(.Title)"' trivy-fs-report.json
-          exit 1
-        else
-          echo "✅ No critical or high severity vulnerabilities found"
-        fi
-
-    - name: Upload security reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-reports-${{ github.run_id }}
-        path: |
-          gitleaks-report.json
-          trivy-fs-report.json
-          trivy-config-report.json
-        retention-days: 30
+        upload-artifacts: true
+        artifact-name: security-reports-${{ github.run_id }}
 
   # Phase 6: Quality Gates (after coverage and security)
   quality-gates:
@@ -636,258 +254,210 @@ jobs:
         echo "🎉 All quality gates passed!"
 
   # Phase 5: Integration Tests (after everything else)
-  integration-test-canary:
-    name: Integration Test Canary
-    needs: [canary, unit-test-core, unit-test-cli, build-cli]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
-    runs-on: ubuntu-latest
-    outputs:
-      canary-passed: ${{ steps.canary_test.outputs.result == 'success' }}
-
-    steps:
-    - name: Download CLI binary
-      uses: actions/download-artifact@v4
-      with:
-        name: container-kit-${{ runner.os }}-${{ github.run_id }}
-        path: ./
-
-    - name: Make binary executable
-      run: |
-        chmod +x container-kit
-        sudo mv container-kit /usr/local/bin/
-
-    - name: Checkout Test Repo (Canary)
-      uses: actions/checkout@v4
-      with:
-        repository: Azure-Samples/containerize-and-deploy-Java-app-to-Azure
-        path: test-repo
-
-    - name: Setup Docker
-      uses: docker/setup-buildx-action@v3
-
-    - name: Install Kind
-      uses: helm/kind-action@v1
-      with:
-        install_only: true
-
-    - name: Run Canary Integration Test
-      id: canary_test
-      continue-on-error: true
-      env:
-        AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
-        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-        AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
-      run: |
-        cd test-repo
-        mkdir -p artifacts/logs
-
-        SUCCESS_MESSAGE="🎉 All stages completed successfully!"
-
-        # Clean slate
-        rm -f Dockerfile || true
-        rm -rf manifests || true
-        mkdir -p manifests
-
-        echo "🧪 Running integration test canary..."
-        container-kit generate . --snapshot > "artifacts/logs/canary-run.log" 2>&1
-
-        # Save artifacts
-        if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
-          [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
-          [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
-        fi
-
-        if grep -q "context deadline exceeded" "artifacts/logs/canary-run.log"; then
-          echo "❌ Integration test canary: Operation timed out"
-          echo "result=timeout" >> $GITHUB_OUTPUT
-          exit 1
-        elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/canary-run.log"; then
-          echo "✅ Integration test canary PASSED"
-          echo "result=success" >> $GITHUB_OUTPUT
-        else
-          echo "❌ Integration test canary FAILED"
-          echo "result=failure" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-
-    - name: Upload canary test artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: integration-canary-${{ github.run_id }}
-        path: test-repo/artifacts/
-        retention-days: 7
-
   integration-tests:
-    name: Integration Tests
-    needs: [canary, unit-test-core, unit-test-cli, build-cli, integration-test-canary]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.integration-test-canary.outputs.canary-passed == 'true'
     runs-on: ubuntu-latest
+    name: Integration Tests
+    needs: [canary, unit-test-core, unit-test-cli, build-cli]
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-cli == 'true'
     strategy:
-      max-parallel: 10
+      max-parallel: 25
       matrix:
         test-repo:
           - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
-          - Azure/wildfly-container-quickstart
+          # - Azure-Samples/open-liberty-on-aks
+          # - Azure/wildfly-container-quickstart
           - Mariemfakhreldein/e-commerce-app
-          - N-Usha/java-on-aks-piggymetrics
+          # - N-Usha/java-on-aks-piggymetrics
           - SaiUpadhyayula/SpringAngularEcommerce
-          - agoncal/agoncal-application-petstore-ee7
+          # - Zaaim-Halim/java-EE-E-Commerce-Web-App
+          # - agoncal/agoncal-application-petstore-ee7
           - aws-samples/aws-codedeploy-sample-tomcat
           - chamilad/tomcat-hello-world
-          - dhruvinrsoni/online-pizza-ordering-system
-          - eNKay2408/Note-Taking
+          # - colinbut/monolith-enterprise-application
+          # - dhruvinrsoni/online-pizza-ordering-system
+          # - eNKay2408/Note-Taking
+          # - jamesfalkner/jboss-daytrader
           - konveyor-ecosystem/coolstore
-        test-number: [1, 2]
+          # - kparent/jboss-helloworld
+          # - oracle-samples/weblogic-examples
+          # - shekhargulati/todoapp-forge
+          # - spring-petclinic/spring-petclinic-microservices
+        test-number: [1, 2, 3, 4, 5]
       fail-fast: false
 
     steps:
-    - name: Download CLI binary
-      uses: actions/download-artifact@v4
-      with:
-        name: container-kit-${{ runner.os }}-${{ github.run_id }}
-        path: ./
+      - name: Download CLI binary
+        uses: actions/download-artifact@v4
+        with:
+          name: container-kit-${{ runner.os }}-${{ github.run_id }}
+          path: ./
 
-    - name: Make binary executable
-      run: |
-        chmod +x container-kit
-        sudo mv container-kit /usr/local/bin/
+      - name: Run Integration Test
+        id: integration-test
+        uses: ./.github/actions/integration-test-runner
+        with:
+          repository: ${{ matrix.test-repo }}
+          test-number: ${{ matrix.test-number }}
+          binary-name: container-kit
+          azure-openai-key: ${{ secrets.AZURE_OPENAI_KEY }}
+          azure-openai-endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          azure-openai-deployment-id: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
 
-    - name: Checkout Test Repo
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ matrix.test-repo }}
-        path: test-repo
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cc-run-${{ steps.integration-test.outputs.run-name }}
+          path: test-repo/artifacts/
+          retention-days: 14
 
-    - name: Setup Docker
-      uses: docker/setup-buildx-action@v3
+  aggregate-integration-matrix-results:
+    needs: [integration-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cc-run-*
+          path: results
 
-    - name: Install Kind
-      uses: helm/kind-action@v1
-      with:
-        install_only: true
+      - name: Integration Test Results Summary
+        id: aggregate_results
+        run: |
+          tests_per_repo=5
 
-    - name: Run Integration Test ${{ matrix.test-number }}
-      id: run_test
-      continue-on-error: true
-      env:
-        AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
-        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-        AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
-      run: |
-        cd test-repo
-        mkdir -p artifacts/logs
+          github_summary_table=""
+          echo "## Container-Kit Integration Test Results" > $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          github_summary_table+="| Repo | Status | Success Rate | Passed | Failed | Timed Out |
+          "
+          github_summary_table+="| --- | --- | --- | --- | --- | --- |
+          "
 
-        SUCCESS_MESSAGE="🎉 All stages completed successfully!"
+          # List repos without numbers
+          export REPOS="$(ls results | grep -oP 'cc-run-\K[^#]+' | uniq)"
+          echo "Repos: $REPOS"
 
-        # Clean slate
-        rm -f Dockerfile || true
-        rm -rf manifests || true
-        mkdir -p manifests
+          success_rates=()
 
-        REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|.|g' )
-        RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ matrix.test-number }}"
-        echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
+          single_run_pass_threshold=30
+          single_run_green_threshold=80
 
-        echo "🧪 Running integration test for $RUN_NAME..."
-        container-kit generate . --snapshot > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
+          # Loop through repos
+          for repo in $REPOS; do
+            echo "Processing results for $repo"
 
-        # Save artifacts
-        if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
-          [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
-          [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
-        fi
+            # Count successes and failures
+            success_count=0
+            failure_count=0
 
-        if grep -q "context deadline exceeded" "artifacts/logs/run-${RUN_NAME}.log"; then
-          echo "❌ Test Run $RUN_NAME: Operation timed out"
-          echo "result=timeout" >> $GITHUB_OUTPUT
-        elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/run-${RUN_NAME}.log"; then
-          echo "✅ Test Run $RUN_NAME PASSED"
-          echo "result=success" >> $GITHUB_OUTPUT
-        else
-          echo "❌ Test Run $RUN_NAME FAILED"
-          echo "result=failure" >> $GITHUB_OUTPUT
-        fi
+            # Build detailed results
+            passed_tests=""
+            failed_tests="" # includes failed and timed out tests
+            timedout_test_count=0
 
-    - name: Save result
-      if: always()
-      run: |
-        if [ -d "test-repo/.container-kit" ]; then
-          cp -r test-repo/.container-kit test-repo/artifacts/snapshot
-        fi
-        echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
+            # Loop through test runs
+            for ((i=1; i<=$tests_per_repo; i++)); do
+              if [ -f "results/cc-run-$repo#$i/result.txt" ]; then
+                result=$(cat "results/cc-run-$repo#$i/result.txt")
+                if [ "$result" == "success" ]; then
+                  success_count=$((success_count + 1))
+                  passed_tests+="- Test Run $i ✅\n"
+                else
+                  if [ "$result" == "timeout" ]; then
+                    timedout_test_count=$((timedout_test_count + 1))
+                  else
+                    failure_count=$((failure_count + 1))
+                    failed_tests+="- Test Run $i ❌\n"
+                    echo "::warning::Test Run $i Failed"
+                  fi
+                fi
+              else
+                echo "::warning::Test Run $repo#$i Result Not Found"
+              fi
+            done
 
-    - name: Upload test artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: integration-run-${{ steps.run_test.outputs.run_name }}
-        path: test-repo/artifacts/
-        retention-days: 7
+            success_rate=$((success_count * 100 / tests_per_repo))
+            completed_tests=$((success_count + failure_count))
+
+            success_emote=""
+            if [ $success_rate -ge $single_run_green_threshold ]; then
+              success_emote="✅"
+            elif [ $success_rate -ge $single_run_pass_threshold ]; then
+              success_emote="⚠️"
+            else
+              success_emote="❌"
+            fi
+
+            # Show results
+            echo ""
+            echo "===== $repo Test Results ====="
+            echo "Total tests: $tests_per_repo"
+            echo "Passed: $success_count"
+            echo "Failed: $failure_count"
+            echo "Timed out: $timedout_test_count"
+            echo "Success rate: $success_rate%"
+
+            # Convert the repo name back to GitHub URL format (replace dots with slashes)
+            repo_url=$(echo "$repo" | sed 's/\./\//g')
+            repo_markdown_link="[$repo_url](https://github.com/$repo_url)"
+            github_summary_table+="| $repo_markdown_link | $success_emote | $success_rate% | $success_count | $failure_count | $timedout_test_count |
+            "
+            echo ""
+            success_rates+=("$success_rate")
+          done
+
+          pass_threshold=50
+          green_threshold=80
+          average_success_rate=0
+          for rate in "${success_rates[@]}"; do
+            average_success_rate=$((average_success_rate + rate))
+          done
+          average_success_rate=$((average_success_rate / ${#success_rates[@]}))
+          pass_rate_message=""
+          if [ $average_success_rate -ge green_threshold ]; then
+            pass_rate_message="✅ Average success rate: $average_success_rate% >= $green_threshold%"
+          elif [ $average_success_rate -ge $pass_threshold ]; then
+            pass_rate_message="⚠️ Average success rate: $average_success_rate% >= $pass_threshold%"
+          else
+            pass_rate_message="❌ Average success rate: $average_success_rate% < $pass_threshold%"
+          fi
+          echo "$pass_rate_message"
+          echo "" >> $GITHUB_STEP_SUMMARY # add a blank line to separate the summary from the table
+          echo "$pass_rate_message" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Output the summary table
+          echo "$github_summary_table" >> $GITHUB_STEP_SUMMARY
+
+          #last check to fail the job if the average success rate is below the threshold
+          if [ $average_success_rate -lt $pass_threshold ]; then
+            echo "Average success rate: $average_success_rate% < $pass_threshold%"
+            exit 1
+          fi
 
   # Phase 6: MCP Integration Tests (parallel with integration tests)
   mcp-integration-tests:
     name: MCP Integration Tests
     needs: [canary, unit-test-mcp, build-mcp]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-mcp == 'true'
     runs-on: ubuntu-latest
-
-    services:
-      docker:
-        image: docker:dind
-        options: --privileged
 
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v5
+    - name: Run MCP Integration Tests
+      uses: ./.github/actions/mcp-integration-tests
       with:
         go-version: '1.24'
-
-    - name: Install Kind
-      run: |
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
-        chmod +x ./kind
-        sudo mv ./kind /usr/local/bin/kind
-
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-
-    - name: Download dependencies
-      run: go mod download
-
-    - name: Run MCP unit tests
-      run: go test -v ./pkg/mcp/... -short
-
-    - name: Run MCP unit tests with race detector
-      run: go test -race -v ./pkg/mcp/... -short
-
-    - name: Build MCP server
-      run: go build -o container-kit-mcp ./cmd/mcp-server
-
-    - name: Run MCP integration tests
-      run: |
-        export CONTAINER_KIT_TEST_WORKSPACE="/tmp/container-kit-test"
-        export CONTAINER_KIT_LOG_LEVEL="debug"
-        mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
-
-        echo "🧪 Running MCP workflow integration tests..."
-        # Run the comprehensive MCP workflow integration test
-        go test -v ./test/integration/mcp_workflow_integration_test.go -timeout=10m
-
-        # Run other integration tests
-        go test -v ./test/integration/...
+        test-scenario: 'basic'
+        log-level: 'debug'
 
   # MCP Workflow Integration Tests - Dedicated job for comprehensive workflow testing
   mcp-workflow-tests:
     name: MCP Workflow Integration Tests
     needs: [canary, unit-test-mcp, build-mcp]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-mcp == 'true'
     runs-on: ubuntu-latest
 
     strategy:
@@ -897,66 +467,13 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-go@v5
+    - name: Run MCP Workflow Tests
+      uses: ./.github/actions/mcp-integration-tests
       with:
         go-version: '1.24'
-
-    - name: Setup test environment
-      run: |
-        # Install required tools
-        sudo apt-get update
-        sudo apt-get install -y jq bc
-
-        # Create test workspace
-        export CONTAINER_KIT_TEST_WORKSPACE="/tmp/container-kit-test-${{ matrix.test-scenario }}"
-        mkdir -p "$CONTAINER_KIT_TEST_WORKSPACE"
-        echo "CONTAINER_KIT_TEST_WORKSPACE=$CONTAINER_KIT_TEST_WORKSPACE" >> $GITHUB_ENV
-
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-
-    - name: Download dependencies
-      run: go mod download
-
-    - name: Build MCP server (if not failing due to compilation)
-      run: |
-        echo "🔨 Attempting to build MCP server..."
-        if go build -o container-kit-mcp ./cmd/mcp-server; then
-          echo "✅ MCP server built successfully"
-          echo "MCP_SERVER_BUILT=true" >> $GITHUB_ENV
-        else
-          echo "⚠️ MCP server build failed - will run tests without binary"
-          echo "MCP_SERVER_BUILT=false" >> $GITHUB_ENV
-        fi
-
-    - name: Run MCP workflow integration test - ${{ matrix.test-scenario }}
-      run: |
-        export CONTAINER_KIT_LOG_LEVEL="debug"
-
-        echo "🧪 Running MCP workflow integration test for: ${{ matrix.test-scenario }}"
-
-        if [ "${{ matrix.test-scenario }}" = "simple-go-service" ]; then
-          # Run just the simple Go service test
-          go test -v -run TestMCPWorkflowIntegrationSuite/TestMCPWorkflowIntegration/Workflow_simple-go-service ./test/integration/mcp_workflow_integration_test.go -timeout=10m
-        elif [ "${{ matrix.test-scenario }}" = "all-workflows" ]; then
-          # Run all workflow tests
-          go test -v -run TestMCPWorkflowIntegrationSuite ./test/integration/mcp_workflow_integration_test.go -timeout=15m
-        fi
-
-    - name: Upload test artifacts
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: mcp-workflow-test-artifacts-${{ matrix.test-scenario }}-${{ github.run_id }}
-        path: |
-          ${{ env.CONTAINER_KIT_TEST_WORKSPACE }}/**/*
-          /tmp/mcp-workflow-test-*/**/*
-        retention-days: 7
+        test-scenario: ${{ matrix.test-scenario }}
+        log-level: 'debug'
+        timeout: '15m'
 
   # Phase 7: Testing Dashboard (after all tests complete)
   testing-dashboard:
@@ -1028,25 +545,14 @@ jobs:
   pipeline-summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-test-canary, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, aggregate-integration-matrix-results, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
     if: always()
     permissions:
       pull-requests: write
       issues: write
 
     steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        pattern: "*-${{ github.run_id }}"
-        path: artifacts
-      continue-on-error: true
-
     - uses: actions/checkout@v4
-
-    - uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
 
     - name: Run architecture analysis
       id: arch-analysis
@@ -1058,179 +564,22 @@ jobs:
         large-file-threshold: '800'
         large-file-budget: '10'
 
-    - name: Prepare CI Status Data
-      id: ci-status
-      run: |
-        # Extract security scan results
-        SECURITY_SECRETS="⚠️ No Data: Security scan report not available"
-        SECURITY_VULNERABILITIES="⚠️ No Data: Vulnerability scan report not available"
-
-        if [ -f "artifacts/security-reports-${{ github.run_id }}/gitleaks-report.json" ]; then
-          leak_count=$(jq '. | length' artifacts/security-reports-${{ github.run_id }}/gitleaks-report.json 2>/dev/null || echo "0")
-          if [ "$leak_count" = "0" ]; then
-            SECURITY_SECRETS="✅ Passed: No secrets detected"
-          else
-            SECURITY_SECRETS="❌ Failed: $leak_count secrets detected"
-          fi
-        fi
-
-        if [ -f "artifacts/security-reports-${{ github.run_id }}/trivy-fs-report.json" ]; then
-          vuln_count=$(jq '.Results[].Vulnerabilities | length' artifacts/security-reports-${{ github.run_id }}/trivy-fs-report.json 2>/dev/null | awk '{s+=$1} END {print s}' || echo "0")
-          if [ "$vuln_count" = "0" ] || [ -z "$vuln_count" ]; then
-            SECURITY_VULNERABILITIES="✅ Passed: No vulnerabilities detected"
-          else
-            SECURITY_VULNERABILITIES="❌ Failed: $vuln_count vulnerabilities detected"
-          fi
-        fi
-
-        # Extract lint results
-        # If we reach this point, linting passed (otherwise workflow would have failed)
-        LINT_RESULTS="✅ Passed: All linting checks completed successfully"
-
-        # Extract coverage results
-        COVERAGE_RESULTS="⚠️ No Data: Coverage report not available"
-        if [ -f "artifacts/global-coverage-reports-${{ github.run_id }}/coverage-summary.txt" ]; then
-          total_cov=$(grep "total:" artifacts/global-coverage-reports-${{ github.run_id }}/coverage-summary.txt | awk '{print $3}' || echo "unknown")
-          COVERAGE_RESULTS="📊 Total Coverage: $total_cov\n\n"
-          COVERAGE_RESULTS+="Package Coverage:\n"
-          # Get top packages
-          head -n 20 artifacts/global-coverage-reports-${{ github.run_id }}/coverage-summary.txt | grep -E "github.com/Azure/container-kit" | while read line; do
-            COVERAGE_RESULTS+="- $line\n"
-          done
-        fi
-
-        # Extract quality gates results
-        QUALITY_RESULTS="⚠️ No Data: Quality metrics not available"
-        if [ "${{ needs.quality-gates.result }}" = "success" ]; then
-          QUALITY_RESULTS="✅ All quality checks passed"
-        elif [ "${{ needs.quality-gates.result }}" = "failure" ]; then
-          QUALITY_RESULTS="❌ Quality checks failed"
-        fi
-
-        # Save to outputs
-        echo "security_secrets<<EOF" >> $GITHUB_OUTPUT
-        echo "$SECURITY_SECRETS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-
-        echo "security_vulnerabilities<<EOF" >> $GITHUB_OUTPUT
-        echo "$SECURITY_VULNERABILITIES" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-
-        echo "lint_results<<EOF" >> $GITHUB_OUTPUT
-        echo -e "$LINT_RESULTS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-
-        echo "coverage_results<<EOF" >> $GITHUB_OUTPUT
-        echo -e "$COVERAGE_RESULTS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-
-        echo "quality_results<<EOF" >> $GITHUB_OUTPUT
-        echo "$QUALITY_RESULTS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-
-    - name: Create PR Comment
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
+    - name: Generate comprehensive PR status and summary
+      uses: ./.github/actions/pr-status-generator
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const body = `## 🤖 CI Status Summary
-
-          ### 🔒 Security Scan
-          ${{ steps.ci-status.outputs.security_secrets }}
-
-          ${{ steps.ci-status.outputs.security_vulnerabilities }}
-
-          ### 🧹 Lint Results
-          ${{ steps.ci-status.outputs.lint_results }}
-
-          [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-          ### 📊 Test Coverage
-          ${{ steps.ci-status.outputs.coverage_results }}
-
-          ### 🎯 Quality Gates
-          ${{ steps.ci-status.outputs.quality_results }}
-
-          ### 🏗️ Architecture Quality
-          **Score:** ${{ steps.arch-analysis.outputs.architecture-score }}/100 (${{ steps.arch-analysis.outputs.architecture-status }})
-
-          **Details:** Adapters/Wrappers/Cycles: ${{ steps.arch-analysis.outputs.adapter-count }}/${{ steps.arch-analysis.outputs.wrapper-count }}/${{ steps.arch-analysis.outputs.import-cycles }} | Large files: ${{ steps.arch-analysis.outputs.large-files }} | Complex functions: ${{ steps.arch-analysis.outputs.complex-functions || 'N/A' }}
-
-          ### 📝 Next Steps:
-          - Review any failed checks above
-          - Check individual workflow runs for detailed logs
-          - Address issues before merging
-
-          ---
-          *This comment is automatically updated as CI jobs complete.*`;
-
-          // Find existing comment
-          const { data: comments } = await github.rest.issues.listComments({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.issue.number,
-          });
-
-          const botComment = comments.find(comment =>
-            comment.user.type === 'Bot' &&
-            comment.body.includes('🤖 CI Status Summary')
-          );
-
-          if (botComment) {
-            // Update existing comment
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: botComment.id,
-              body: body
-            });
-          } else {
-            // Create new comment
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
-          }
-
-    - name: Pipeline Summary
-      run: |
-        echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Phase Results" >> $GITHUB_STEP_SUMMARY
-        echo "| Phase | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Canary Validation | ${{ needs.canary.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Core Unit Tests | ${{ needs.unit-test-core.result == 'success' && '✅ Passed' || needs.unit-test-core.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| MCP Unit Tests | ${{ needs.unit-test-mcp.result == 'success' && '✅ Passed' || needs.unit-test-mcp.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| CLI Unit Tests | ${{ needs.unit-test-cli.result == 'success' && '✅ Passed' || needs.unit-test-cli.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| CLI Build | ${{ needs.build-cli.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| MCP Build | ${{ needs.build-mcp.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Coverage Enforcement | ${{ needs.coverage-enforcement.result == 'success' && '✅ Passed' || needs.coverage-enforcement.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || needs.security-scan.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Quality Gates | ${{ needs.quality-gates.result == 'success' && '✅ Passed' || needs.quality-gates.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Integration Test Canary | ${{ needs.integration-test-canary.result == 'success' && '✅ Passed' || needs.integration-test-canary.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Integration Tests | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || needs.integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| MCP Integration Tests | ${{ needs.mcp-integration-tests.result == 'success' && '✅ Passed' || needs.mcp-integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| MCP Workflow Tests | ${{ needs.mcp-workflow-tests.result == 'success' && '✅ Passed' || needs.mcp-workflow-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Testing Dashboard | ${{ needs.testing-dashboard.result == 'success' && '✅ Passed' || needs.testing-dashboard.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        # Overall result
-        if [ "${{ needs.canary.result }}" = "success" ]; then
-          echo "### Overall Result: ✅ Pipeline Completed Successfully" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "### Overall Result: ❌ Pipeline Failed at Canary Stage" >> $GITHUB_STEP_SUMMARY
-        fi
+        run-id: ${{ github.run_id }}
+        architecture-score: ${{ steps.arch-analysis.outputs.architecture-score }}
+        architecture-status: ${{ steps.arch-analysis.outputs.architecture-status }}
+        architecture-details: 'Adapters/Wrappers/Cycles: ${{ steps.arch-analysis.outputs.adapter-count }}/${{ steps.arch-analysis.outputs.wrapper-count }}/${{ steps.arch-analysis.outputs.import-cycles }} | Large files: ${{ steps.arch-analysis.outputs.large-files }} | Complex functions: ${{ steps.arch-analysis.outputs.complex-functions }}'
+        quality-results: ${{ needs.quality-gates.result == 'success' && '✅ All quality checks passed' || '⚠️ Quality checks failed or skipped' }}
 
   # Status Check - Single job to use as required check in branch protection
   # This job will only pass if ALL required jobs pass
   ci-status-check:
     name: CI Status Check
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-test-canary, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, aggregate-integration-matrix-results, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
     if: always()
     steps:
       - name: Check all required jobs
@@ -1280,8 +629,8 @@ jobs:
           fi
 
           # Integration tests must pass if they ran
-          if [ "${{ needs.integration-test-canary.result }}" != "success" ] && [ "${{ needs.integration-test-canary.result }}" != "skipped" ]; then
-            FAILED_JOBS="${FAILED_JOBS}integration-test-canary "
+          if [ "${{ needs.aggregate-integration-matrix-results.result }}" != "success" ] && [ "${{ needs.aggregate-integration-matrix-results.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}aggregate-integration-matrix-results "
           fi
           if [ "${{ needs.integration-tests.result }}" != "success" ] && [ "${{ needs.integration-tests.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}integration-tests "
