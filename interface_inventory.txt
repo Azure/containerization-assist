@@ -1,0 +1,163 @@
+pkg/mcp/validation/migration.go:	"2. Catalog current validation types and interfaces",
+pkg/mcp/client_factory.go:type ClientFactory interface {
+pkg/mcp/client_factory.go:type InjectableClientProvider interface {
+pkg/mcp/validation/doc.go://   - Unified validation types and interfaces
+pkg/mcp/validation/doc.go://   - core: Core types, interfaces, and registry
+pkg/mcp/validation/core/interfaces.go:type Validator interface {
+pkg/mcp/validation/core/interfaces.go:type FieldValidator interface {
+pkg/mcp/validation/core/interfaces.go:type TypedValidator[T any] interface {
+pkg/mcp/validation/core/interfaces.go:type ChainableValidator interface {
+pkg/mcp/validation/core/interfaces.go:type ConditionalValidator interface {
+pkg/mcp/validation/core/interfaces.go:type SecurityValidator interface {
+pkg/mcp/validation/core/interfaces.go:type ValidatorRegistry interface {
+pkg/mcp/validation/core/interfaces.go:type ValidatorFactory interface {
+pkg/mcp/validation/core/interfaces.go:type ValidatorChain interface {
+pkg/mcp/validation/core/interfaces.go:type ValidationRule interface {
+pkg/mcp/validation/core/interfaces.go:type RuleEngine interface {
+pkg/mcp/validation/core/interfaces.go:type ContextAware interface {
+pkg/mcp/validation/core/interfaces.go:type Configurable interface {
+pkg/mcp/validation/core/interfaces.go:type Cacheable interface {
+pkg/mcp/validation/core/interfaces.go:type StatefulValidator interface {
+pkg/mcp/validation/core/interfaces.go:type AsyncValidator interface {
+pkg/mcp/validation/core/interfaces.go:type BatchValidator interface {
+pkg/mcp/validation/core/interfaces.go:type StreamValidator interface {
+pkg/mcp/internal/context/ai_context_aggregator.go:type ContextProvider interface {
+pkg/mcp/internal/context/ai_context_aggregator.go:type ContextEnricher interface {
+pkg/mcp/internal/core/graceful_shutdown.go:type ShutdownService interface {
+pkg/mcp/internal/core/error_service.go:type ErrorHandler interface {
+pkg/mcp/internal/core/error_service.go:type ErrorReporter interface {
+pkg/mcp/internal/core/telemetry_service.go:type MetricsCollector interface {
+pkg/mcp/internal/core/server_shutdown_test.go:	// Try sessiontypes.SessionState instead of old interface
+pkg/mcp/internal/deploy/manifests_common.go:type ManifestGeneratorInterface interface {
+pkg/mcp/internal/deploy/manifests_common.go:type SecretHandler interface {
+pkg/mcp/internal/deploy/deploy_kubernetes_validate.go:		return utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_deploy_kubernetes", map[string]interface{}{
+pkg/mcp/internal/deploy/deploy_kubernetes_atomic.go:		return nil, utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_deploy_kubernetes", map[string]interface{}{
+pkg/mcp/internal/deploy/validate_deployment.go:type JobManager interface {
+pkg/mcp/internal/deploy/generator.go:type Generator interface {
+pkg/mcp/internal/deploy/base.go:type K8sDeployerAdapter interface {
+pkg/mcp/internal/deploy/base.go:type DeploymentStrategy interface {
+pkg/mcp/internal/deploy/tool_analyzer.go:type ToolAnalyzer interface {
+pkg/mcp/internal/deploy/k8s_generator.go:type PipelineAdapter interface {
+pkg/mcp/internal/workflow/coordinator.go:type StateMachine interface {
+pkg/mcp/internal/workflow/coordinator.go:type Executor interface {
+pkg/mcp/internal/workflow/coordinator.go:type WorkflowSessionManager interface {
+pkg/mcp/internal/workflow/coordinator.go:type DependencyResolver interface {
+pkg/mcp/internal/workflow/coordinator.go:type CheckpointManager interface {
+pkg/mcp/internal/types/llm_transport.go:type LLMTransport interface {
+pkg/mcp/internal/state/unified_state_manager.go:type StateObserver interface {
+pkg/mcp/internal/state/unified_state_manager.go:type StateValidator interface {
+pkg/mcp/internal/state/unified_state_manager.go:type StateProvider interface {
+pkg/mcp/internal/state/state_sync_coordinator.go:type StateMapping interface {
+pkg/mcp/internal/state/types.go:type CheckpointManagerInterface interface {
+pkg/mcp/internal/state/types.go:type WorkflowSessionInterface interface {
+pkg/mcp/internal/state/types.go:type ConversationStateInterface interface {
+pkg/mcp/internal/state/types.go:type ConversationEntryInterface interface {
+pkg/mcp/internal/state/types.go:type DecisionInterface interface {
+pkg/mcp/internal/state/types.go:type ArtifactInterface interface {
+pkg/mcp/internal/build/build_image.go:type BuildImageSessionManager interface {
+pkg/mcp/internal/build/build_image.go:type BuildImagePipelineAdapter interface {
+pkg/mcp/internal/build/cleanup_fixes.md:type ProgressReporter interface {
+pkg/mcp/internal/build/dockerfile_common.go:type DockerfileValidator interface {
+pkg/mcp/internal/build/dockerfile_common.go:type DockerfileAnalyzer interface {
+pkg/mcp/internal/build/dockerfile_common.go:type DockerfileFixer interface {
+pkg/mcp/internal/build/security_types.go:type SecurityChecksProvider interface {
+pkg/mcp/internal/build/common.go:type BuildStrategy interface {
+pkg/mcp/internal/build/common.go:type BuildValidator interface {
+pkg/mcp/internal/build/common.go:type BuildExecutor interface {
+pkg/mcp/internal/build/common.go:type BuildProgressReporter interface {
+pkg/mcp/internal/build/common.go:type ExtendedBuildReporter interface {
+pkg/mcp/internal/build/fixer_core.go:type BuildRecoveryStrategyInterface interface {
+pkg/mcp/types/validation.go:type BaseValidator interface {
+pkg/mcp/internal/build/fixer_types.go:type BuildRecoveryStrategy interface {
+pkg/mcp/types/mcp_clients.go:type AIAnalyzer interface {
+pkg/mcp/internal/build/tool_analyzer.go:type ToolAnalyzer interface {
+pkg/mcp/internal/build/pull_image_atomic.go:		return utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_pull_image", map[string]interface{}{
+pkg/mcp/internal/build/pull_image_atomic.go:		return nil, utils.NewWithData("invalid_arguments", "Invalid argument type for atomic_pull_image", map[string]interface{}{
+pkg/mcp/internal/build/error_router.go:type EventPublisher interface {
+pkg/mcp/internal/build/unified_analyzer.go:type UnifiedAnalyzer interface {
+pkg/mcp/internal/retry/coordinator.go:type FixProvider interface {
+pkg/mcp/internal/monitoring/health.go:type ComponentCheckFunc func(ctx context.Context) (HealthStatus, map[string]interface{}, error)
+pkg/mcp/internal/monitoring/health.go:type DependencyCheckFunc func(ctx context.Context) (HealthStatus, time.Duration, map[string]interface{}, error)
+pkg/mcp/internal/monitoring/health.go:type HealthChangeCallback func(name string, oldStatus, newStatus HealthStatus, details map[string]interface{})
+pkg/mcp/internal/monitoring/observability.go:type TraceableFunc func(ctx context.Context) (interface{}, error)
+pkg/mcp/internal/session/workflow_provider.go:type LabelProvider interface {
+pkg/mcp/validation/utils/pattern_analysis.go:					typeDef.Definition = "interface"
+pkg/mcp/validation/utils/pattern_analysis.go:	if typeDef.Definition == "interface" {
+pkg/mcp/validation/utils/pattern_analysis.go:	if typeDef.Definition == "interface" {
+pkg/mcp/core/interfaces.go:type Tool interface {
+pkg/mcp/core/interfaces.go:type ProgressReporter interface {
+pkg/mcp/core/interfaces.go:type RepositoryAnalyzer interface {
+pkg/mcp/core/interfaces.go:type Transport interface {
+pkg/mcp/core/interfaces.go:type RequestHandler interface {
+pkg/mcp/core/interfaces.go:type ToolRegistry interface {
+pkg/mcp/core/interfaces.go:type Orchestrator interface {
+pkg/mcp/core/interfaces.go:type SessionManager interface {
+pkg/mcp/core/interfaces.go:type Session interface {
+pkg/mcp/core/interfaces.go:type Server interface {
+pkg/mcp/core/interfaces.go:type AIAnalyzer interface {
+pkg/mcp/core/interfaces.go:type IterativeFixer interface {
+pkg/mcp/core/interfaces.go:type ContextSharer interface {
+pkg/mcp/core/interfaces.go:type PipelineOperations interface {
+pkg/mcp/core/interfaces.go:type ToolSessionManager interface {
+pkg/mcp/core/interfaces.go:type FixableOperation interface {
+pkg/mcp/internal/session/delete_session.go:type SessionDeleter interface {
+pkg/mcp/internal/session/delete_session.go:type WorkspaceDeleter interface {
+pkg/mcp/internal/session/list_sessions.go:type ListSessionsManager interface {
+pkg/mcp/internal/session/persistence.go:type SessionStore interface {
+pkg/mcp/internal/observability/progress_tracker.go:type ProgressTracker interface {
+pkg/mcp/internal/observability/distributed_tracing.go:type SpanProcessor interface {
+pkg/mcp/internal/observability/interface.go:type ObservabilityMetricsCollector interface {
+pkg/mcp/internal/observability/interface.go:type TracingProvider interface {
+pkg/mcp/internal/observability/interface.go:type SpanContext interface {
+pkg/mcp/internal/observability/interface.go:type ObservabilityManager interface {
+pkg/mcp/internal/observability/integration.go:type ToolOrchestrator interface {
+pkg/mcp/internal/observability/integration.go:// NOTE: Using internal mcptypes.ToolOrchestrator interface to avoid import cycles
+pkg/mcp/internal/observability/integration.go:// getTypeName returns the type name of an interface{}
+pkg/mcp/internal/analyze/analyze_repository_atomic.go:		return mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_analyze_repository", map[string]interface{}{
+pkg/mcp/internal/analyze/analyze_repository_atomic.go:			return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_analyze_repository", map[string]interface{}{
+pkg/mcp/internal/observability/manifest_validator.go:type K8sValidationClient interface {
+pkg/mcp/internal/analyze/analyzer_test.go:				t.Errorf("analyzer should implement mcptypes.AIAnalyzer interface")
+pkg/mcp/internal/analyze/generate_dockerfile.go:			return fmt.Errorf("invalid argument type: expected GenerateDockerfileArgs or map[string]interface{}")
+pkg/mcp/internal/analyze/common.go:type AnalysisEngine interface {
+pkg/mcp/internal/scan/common.go:type SecretScanner interface {
+pkg/mcp/internal/runtime/validator.go:type BaseValidator interface {
+pkg/mcp/internal/runtime/registration_helper.go:type AtomicTool[TArgs, TResult any] interface {
+pkg/mcp/internal/runtime/registration_helper.go:type UtilityToolFunc[TArgs, TResult any] func(deps interface{}) (func(ctx *server.Context, args *TArgs) (*TResult, error), error)
+pkg/mcp/internal/runtime/registration_helper.go:type ResourceFunc[TArgs any] func(ctx *server.Context, args TArgs) (interface{}, error)
+pkg/mcp/internal/scan/tool_analyzer.go:type ToolAnalyzer interface {
+pkg/mcp/internal/runtime/registry.go:type ExecutableTool[TArgs, TResult any] interface {
+pkg/mcp/internal/runtime/registry.go:type LongRunningTool interface {
+pkg/mcp/internal/runtime/analyzer.go:type BaseAnalyzer interface {
+pkg/mcp/internal/analyze/analyzer.go:type LLMTransport interface {
+pkg/mcp/internal/analyze/analyzer.go:// Note: CallerAnalyzer implements mcptypes.AIAnalyzer interface
+pkg/mcp/internal/analyze/analyzer.go:// GetTokenUsage implements mcptypes.AIAnalyzer interface
+pkg/mcp/internal/orchestration/workflow_templates.go:type TemplateRegistry interface {
+pkg/mcp/internal/orchestration/workflow_templates.go:type TemplateValidator interface {
+pkg/mcp/internal/orchestration/no_reflect_orchestrator_impl.go:	if vulnTypes, ok := argsMap["vuln_types"].([]interface{}); ok {
+pkg/mcp/internal/analyze/tool_analyzer.go:type ToolAnalyzer interface {
+pkg/mcp/internal/orchestration/retry_manager.go:type RetryableOperation interface {
+pkg/mcp/internal/orchestration/tool_types.go:type ToolExecutor interface {
+pkg/mcp/validation/scripts/migrate.sh:        grep -r "type.*Validator.*interface" pkg/mcp --include="*.go"
+pkg/mcp/validation/scripts/migrate.sh:    local validator_interfaces=$(grep -r "type.*Validator.*interface" pkg/mcp --include="*.go" | wc -l)
+pkg/mcp/internal/orchestration/execution_types.go:type Executor interface {
+pkg/mcp/internal/server/unified_server.go:// RegistryAdapter adapts MCPToolRegistry to the types.ToolRegistry interface
+pkg/mcp/internal/transport/stdio.go:type LocalTransport interface {
+pkg/mcp/internal/transport/stdio_error_handler.go:func (h *StdioErrorHandler) handleToolError(toolErr *types.ToolError, toolName string) interface{} {
+pkg/mcp/internal/transport/http.go:type LocalRequestHandler interface {
+pkg/mcp/internal/transport/http.go:type ToolHandler func(ctx context.Context, args interface{}) (interface{}, error)
+pkg/mcp/internal/pipeline/distributed_operations.go:type LoadBalancer interface {
+pkg/mcp/internal/pipeline/distributed_operations.go:type RoutingPolicy interface {
+pkg/mcp/utils/logging.go:type Logger interface {
+pkg/mcp/internal/orchestration/monitoring.go:type Tracer interface {
+pkg/mcp/internal/orchestration/monitoring.go:type SpanContext interface {
+pkg/mcp/internal/orchestration/monitoring.go:type TraceSampler interface {
+pkg/mcp/internal/orchestration/monitoring.go:type TraceExporter interface {
+pkg/mcp/internal/orchestration/monitoring.go:type AlertEvaluator interface {
+pkg/mcp/internal/orchestration/monitoring.go:type Widget interface {
+pkg/mcp/internal/orchestration/monitoring.go:type MetricsExporter interface {
+pkg/mcp/internal/orchestration/tool_coordinator.go:type DataTransformFunction func(sourceData interface{}) (interface{}, error)
+pkg/mcp/internal/orchestration/tool_coordinator.go:type CommunicationBridge interface {
+pkg/mcp/internal/orchestration/types.go:type SessionManager interface {
+pkg/mcp/utils/typed_validation.go:type ValidatableStruct interface {
+pkg/mcp/utils/typed_validation.go:type Validatable[T any] interface {
+pkg/mcp/internal/pipeline/recovery_mechanisms.go:type HealthChecker interface {
