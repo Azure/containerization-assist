@@ -1,0 +1,336 @@
+name: 'Coverage Enforcement'
+description: 'Enforces coverage thresholds and generates coverage reports'
+inputs:
+  go-version:
+    description: 'Go version to use'
+    required: false
+    default: '1.24'
+  min-threshold:
+    description: 'Minimum global coverage threshold'
+    required: false
+    default: '10'
+  target-threshold:
+    description: 'Target global coverage threshold'
+    required: false
+    default: '25'
+  regression-tolerance:
+    description: 'Coverage regression tolerance for PR checks'
+    required: false
+    default: '3.5'
+  config-file:
+    description: 'Path to coverage configuration file'
+    required: false
+    default: '.github/coverage-thresholds.json'
+outputs:
+  total-coverage:
+    description: 'Total coverage percentage'
+  coverage-status:
+    description: 'Coverage status (pass/warning/fail)'
+  regression-check:
+    description: 'Result of regression check (pass/fail/skipped)'
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      shell: bash
+      run: go mod download
+
+    - name: Download coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-*-${{ github.run_id }}
+        path: coverage-artifacts
+      continue-on-error: true
+
+    - name: Merge coverage reports
+      shell: bash
+      run: |
+        echo "📊 Merging coverage reports from unit tests..."
+
+        # Install gocovmerge if not available
+        go install github.com/wadey/gocovmerge@latest
+
+        # Check if coverage-artifacts directory exists
+        if [ -d "coverage-artifacts" ]; then
+          # Find all coverage files and merge them
+          coverage_files=$(find coverage-artifacts -name "coverage.out" -type f)
+          if [ -n "$coverage_files" ]; then
+            echo "Found coverage files: $coverage_files"
+            ~/go/bin/gocovmerge $coverage_files > merged-coverage.out
+            cp merged-coverage.out coverage.out
+            echo "✅ Merged coverage reports successfully"
+          else
+            echo "⚠️ No coverage files found in artifacts, will generate coverage during enforcement"
+          fi
+        else
+          echo "⚠️ No coverage artifacts directory found, will generate coverage during enforcement"
+        fi
+
+    - name: Run coverage enforcement for core packages
+      shell: bash
+      run: |
+        echo "📊 Running coverage enforcement..."
+
+        # Define core packages that need coverage enforcement
+        CORE_PACKAGES=(
+          "./pkg/mcp/internal/core/..."
+          "./pkg/mcp/internal/runtime/..."
+          "./pkg/mcp/internal/orchestration/..."
+          "./pkg/mcp/internal/session/..."
+          "./pkg/mcp/internal/build/..."
+          "./pkg/mcp/internal/deploy/..."
+          "./pkg/mcp/internal/analyze/..."
+          "./pkg/mcp/internal/server/..."
+          "./pkg/mcp/types/..."
+        )
+
+        # Coverage thresholds (minimum required coverage percentages)
+        # Load from configuration file if available, otherwise use defaults
+        declare -A COVERAGE_THRESHOLDS
+
+        if [ -f "${{ inputs.config-file }}" ]; then
+          echo "📋 Loading coverage thresholds from configuration file..."
+          # Parse JSON and populate the array
+          while IFS="=" read -r package threshold; do
+            COVERAGE_THRESHOLDS["$package"]="$threshold"
+          done < <(jq -r '.package_thresholds | to_entries[] | select(.key | endswith("...")) | "\(.key)=\(.value.threshold)"' "${{ inputs.config-file }}")
+        else
+          echo "📋 Using default coverage thresholds..."
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/core/..."]=30
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/runtime/..."]=20
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/orchestration/..."]=1
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/session/..."]=9
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/build/..."]=6
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/deploy/..."]=7
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/analyze/..."]=14
+          COVERAGE_THRESHOLDS["./pkg/mcp/internal/server/..."]=17
+          COVERAGE_THRESHOLDS["./pkg/mcp/types/..."]=30
+        fi
+
+        FAILED_PACKAGES=()
+
+        # Check if we have a merged coverage file
+        if [ -f "coverage.out" ]; then
+          echo "📊 Using merged coverage file from unit tests"
+          USE_MERGED_COVERAGE=true
+        else
+          echo "📊 No merged coverage file found, will run tests for each package"
+          USE_MERGED_COVERAGE=false
+        fi
+
+        for package in "${CORE_PACKAGES[@]}"; do
+          echo "🔍 Checking coverage for $package..."
+
+          if [ "$USE_MERGED_COVERAGE" = "true" ]; then
+            # Extract coverage from merged file
+            coverage_line=$(go tool cover -func=coverage.out | grep -E "^${package//\./\\.}" | grep -v "test" | awk '{sum+=$3; count++} END {if(count>0) printf "%.1f\n", sum/count; else print "0.0"}')
+            if [ -n "$coverage_line" ] && [ "$coverage_line" != "0.0" ]; then
+              coverage_percent="$coverage_line"
+            else
+              # Package might not be in merged coverage, run test for this package only
+              coverage_file="/tmp/coverage-$(echo $package | tr '/' '-' | tr '.' '-').out"
+              if go test -coverprofile="$coverage_file" "$package" 2>/dev/null; then
+                coverage_line=$(go tool cover -func="$coverage_file" | grep "total:" | tail -1)
+                coverage_percent=$(echo "$coverage_line" | awk '{print $3}' | sed 's/%//')
+              else
+                coverage_percent="0.0"
+              fi
+            fi
+          else
+            # Run tests with coverage for this package
+            coverage_file="/tmp/coverage-$(echo $package | tr '/' '-' | tr '.' '-').out"
+            if go test -coverprofile="$coverage_file" "$package" 2>/dev/null; then
+              if [ -f "$coverage_file" ]; then
+                # Extract coverage percentage
+                coverage_line=$(go tool cover -func="$coverage_file" | grep "total:" | tail -1)
+                if [ -n "$coverage_line" ]; then
+                  coverage_percent=$(echo "$coverage_line" | awk '{print $3}' | sed 's/%//')
+                else
+                  coverage_percent="0.0"
+                fi
+              else
+                coverage_percent="0.0"
+              fi
+            else
+              coverage_percent="0.0"
+            fi
+          fi
+
+          threshold=${COVERAGE_THRESHOLDS[$package]}
+
+          echo "📊 Package $package: ${coverage_percent}% coverage (threshold: ${threshold}%)"
+
+          # Compare coverage with threshold
+          if (( $(echo "$coverage_percent < $threshold" | bc -l) )); then
+            echo "❌ $package coverage ${coverage_percent}% is below threshold ${threshold}%"
+            FAILED_PACKAGES+=("$package (${coverage_percent}% < ${threshold}%)")
+          else
+            echo "✅ $package coverage ${coverage_percent}% meets threshold ${threshold}%"
+          fi
+        done
+
+        # Report results
+        if [ ${#FAILED_PACKAGES[@]} -eq 0 ]; then
+          echo "🎉 All packages meet coverage requirements!"
+        else
+          echo "❌ Coverage enforcement failed for the following packages:"
+          for pkg in "${FAILED_PACKAGES[@]}"; do
+            echo "  - $pkg"
+          done
+          echo ""
+          echo "Please add tests to increase coverage for the failing packages."
+          exit 1
+        fi
+
+    - name: Generate global coverage report
+      shell: bash
+      run: |
+        echo "📊 Generating global coverage report..."
+
+        # Merge coverage files from unit tests if not already done
+        if [ ! -f "coverage.out" ]; then
+          echo "mode: atomic" > coverage.out
+
+          # Find all coverage files and merge them
+          for file in coverage-artifacts/*/coverage.out; do
+            if [ -f "$file" ]; then
+              echo "📁 Merging coverage from: $file"
+              # Skip the first line (mode: atomic) and append the rest
+              tail -n +2 "$file" >> coverage.out
+            fi
+          done
+
+          # Check if we have any coverage data
+          if [ $(wc -l < coverage.out) -le 1 ]; then
+            echo "⚠️ No coverage data found from unit tests. Running tests now..."
+            go test -v -coverprofile=coverage.out -covermode=atomic ./...
+          fi
+        fi
+
+        # Generate HTML report
+        go tool cover -html=coverage.out -o coverage.html
+
+        # Install coverage tools
+        go install github.com/axw/gocov/gocov@latest
+        go install github.com/AlekSi/gocov-xml@latest
+
+        # Convert coverage to XML
+        gocov convert coverage.out | gocov-xml > coverage.xml
+
+        # Generate coverage summary
+        go tool cover -func=coverage.out > coverage-summary.txt
+        echo "## Global Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat coverage-summary.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Check global coverage thresholds
+      shell: bash
+      run: |
+        # Extract total coverage
+        TOTAL_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "📊 Total coverage: ${TOTAL_COV}%"
+        echo "total-coverage=${TOTAL_COV}" >> $GITHUB_OUTPUT
+
+        # Set thresholds from inputs
+        MIN_THRESHOLD=${{ inputs.min-threshold }}
+        TARGET_THRESHOLD=${{ inputs.target-threshold }}
+
+        # Try to load from config file if it exists
+        if [ -f "${{ inputs.config-file }}" ]; then
+          MIN_THRESHOLD=$(jq -r '.global.line_coverage.minimum' "${{ inputs.config-file }}" 2>/dev/null || echo "${{ inputs.min-threshold }}")
+          TARGET_THRESHOLD=$(jq -r '.global.line_coverage.target' "${{ inputs.config-file }}" 2>/dev/null || echo "${{ inputs.target-threshold }}")
+        fi
+
+        echo "📏 Minimum threshold: ${MIN_THRESHOLD}%"
+        echo "🎯 Target threshold: ${TARGET_THRESHOLD}%"
+
+        # Check if coverage meets minimum
+        if (( $(echo "$TOTAL_COV < $MIN_THRESHOLD" | bc -l) )); then
+          echo "❌ Global coverage ${TOTAL_COV}% is below minimum threshold ${MIN_THRESHOLD}%"
+          echo "coverage-status=fail" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        # Check if coverage meets target
+        if (( $(echo "$TOTAL_COV >= $TARGET_THRESHOLD" | bc -l) )); then
+          echo "✅ Global coverage ${TOTAL_COV}% meets target threshold ${TARGET_THRESHOLD}%"
+          echo "coverage-status=pass" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Global coverage ${TOTAL_COV}% meets minimum but is below target ${TARGET_THRESHOLD}%"
+          echo "coverage-status=warning" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Check coverage ratchet (PR only)
+      if: github.event_name == 'pull_request'
+      shell: bash
+      run: |
+        echo "🔄 Checking coverage ratchet..."
+
+        # Get base branch coverage
+        git checkout ${{ github.event.pull_request.base.sha }}
+        go test -coverprofile=base-coverage.out ./... > /dev/null 2>&1 || true
+
+        if [ -f base-coverage.out ]; then
+          BASE_COV=$(go tool cover -func=base-coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          git checkout ${{ github.event.pull_request.head.sha }}
+          CURRENT_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+
+          echo "📊 Base coverage: ${BASE_COV}%"
+          echo "📊 Current coverage: ${CURRENT_COV}%"
+
+          # Calculate difference
+          DIFF=$(echo "$CURRENT_COV - $BASE_COV" | bc -l)
+
+          # Set tolerance from input
+          TOLERANCE=${{ inputs.regression-tolerance }}
+          if [ -f "${{ inputs.config-file }}" ]; then
+            TOLERANCE=$(jq -r '.ratchet.regression_tolerance' "${{ inputs.config-file }}" 2>/dev/null || echo "${{ inputs.regression-tolerance }}")
+          fi
+
+          echo "📈 Coverage change: ${DIFF}% (tolerance: -${TOLERANCE}%)"
+
+          if (( $(echo "$DIFF < -$TOLERANCE" | bc -l) )); then
+            echo "❌ Coverage regression detected: ${DIFF}% (tolerance: -${TOLERANCE}%)"
+            echo "## Coverage Ratchet Failed ❌" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage decreased by ${DIFF}% which exceeds tolerance of -${TOLERANCE}%" >> $GITHUB_STEP_SUMMARY
+            echo "regression-check=fail" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ Coverage ratchet passed: ${DIFF}%"
+            echo "## Coverage Ratchet Passed ✅" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage change: ${DIFF}%" >> $GITHUB_STEP_SUMMARY
+            echo "regression-check=pass" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "⚠️ Could not determine base coverage, skipping ratchet check"
+          echo "## Coverage Ratchet Skipped ⚠️" >> $GITHUB_STEP_SUMMARY
+          echo "Base coverage could not be determined" >> $GITHUB_STEP_SUMMARY
+          echo "regression-check=skipped" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: global-coverage-reports-${{ github.run_id }}
+        path: |
+          coverage.out
+          coverage.html
+          coverage.xml
+          coverage-summary.txt
+          base-coverage.out
+        retention-days: 30

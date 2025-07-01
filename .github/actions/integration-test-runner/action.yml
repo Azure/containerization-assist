@@ -1,0 +1,125 @@
+name: 'Integration Test Runner'
+description: 'Runs integration tests against a specific repository'
+inputs:
+  repository:
+    description: 'Repository to test against (e.g., konveyor-ecosystem/coolstore)'
+    required: true
+  test-number:
+    description: 'Test iteration number'
+    required: true
+    default: '1'
+  binary-name:
+    description: 'Name of the binary to use'
+    required: false
+    default: 'container-kit'
+  azure-openai-key:
+    description: 'Azure OpenAI API key'
+    required: false
+  azure-openai-endpoint:
+    description: 'Azure OpenAI endpoint'
+    required: false
+  azure-openai-deployment-id:
+    description: 'Azure OpenAI deployment ID'
+    required: false
+outputs:
+  run-name:
+    description: 'Generated run name for this test'
+  result:
+    description: 'Test result (success/failure/timeout)'
+  log-file:
+    description: 'Path to the test log file'
+runs:
+  using: "composite"
+  steps:
+    - name: Make binary executable
+      shell: bash
+      run: |
+        chmod +x ${{ inputs.binary-name }}
+        sudo mv ${{ inputs.binary-name }} /usr/local/bin/
+
+    - name: Checkout Test Repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.repository }}
+        path: test-repo
+
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Install Kind
+      uses: helm/kind-action@v1
+      with:
+        install_only: true
+
+    - name: Run Integration Test
+      shell: bash
+      env:
+        AZURE_OPENAI_KEY: ${{ inputs.azure-openai-key }}
+        AZURE_OPENAI_ENDPOINT: ${{ inputs.azure-openai-endpoint }}
+        AZURE_OPENAI_DEPLOYMENT_ID: ${{ inputs.azure-openai-deployment-id }}
+      run: |
+        cd test-repo
+
+        # Make sure we have a place to store logs
+        mkdir -p artifacts/logs
+
+        # The success message we're looking for in the output
+        SUCCESS_MESSAGE="🎉 All stages completed successfully!"
+
+        # Start with a clean slate
+        rm -f Dockerfile || true
+        rm -rf manifests || true
+        mkdir -p manifests
+
+        # Generate run name
+        REPO_NAME_WITHOUT_SLASH=$(echo "${{ inputs.repository }}" | sed 's|/|.|g' )
+        RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ inputs.test-number }}"
+        echo "run-name=$RUN_NAME" >> $GITHUB_OUTPUT
+
+        LOG_FILE="artifacts/logs/run-${RUN_NAME}.log"
+        echo "log-file=$LOG_FILE" >> $GITHUB_OUTPUT
+
+        echo "🧪 Running integration test for $RUN_NAME..."
+        ${{ inputs.binary-name }} generate . --snapshot > "$LOG_FILE" 2>&1
+
+        # Save the files it created for successful tests
+        if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
+          [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
+          [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
+        fi
+
+        # Copy snapshot files to run artifacts if they exist
+        if [ -d ".container-kit" ]; then
+          cp -r .container-kit artifacts/snapshot
+        else
+          echo "No .container-kit directory found - skipping snapshot copy"
+        fi
+
+        # Determine test result
+        if grep -q "context deadline exceeded" "$LOG_FILE"; then
+          echo "❌ Test Run $RUN_NAME: Operation timed out - context deadline exceeded"
+          echo "result=timeout" >> $GITHUB_OUTPUT
+        elif grep -q "$SUCCESS_MESSAGE" "$LOG_FILE"; then
+          echo "✅ Test Run $RUN_NAME PASSED - Found '$SUCCESS_MESSAGE'"
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Test Run $RUN_NAME: FAILED - Did not find '$SUCCESS_MESSAGE'"
+          echo "result=failure" >> $GITHUB_OUTPUT
+        fi
+
+        # Save result to file for artifact collection
+        echo "${{ env.GITHUB_OUTPUT }}" | grep "result=" | cut -d'=' -f2 > artifacts/result.txt
+
+    - name: Check Artifact Directory Size
+      shell: bash
+      run: |
+        cd test-repo
+        max_size_bytes=$((20 * 1024 * 1024))  # 20 MiB in bytes
+        echo "📏 Max Artifact Directory Size: $max_size_bytes bytes"
+        size_in_bytes=$(du -sb artifacts/ | cut -f1)
+        echo "📊 Artifact Directory Size: $size_in_bytes bytes"
+        if [ "$size_in_bytes" -gt "$max_size_bytes" ]; then
+          echo "❌ Artifact Directory Size $size_in_bytes exceeds $max_size_bytes"
+          exit 1
+        fi
+        echo "✅ Artifact size check passed"

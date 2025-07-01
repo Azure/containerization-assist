@@ -25,7 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should-continue: ${{ steps.canary-check.outputs.success }}
-      changed-packages: ${{ steps.detect-changes.outputs.packages }}
+      test-mcp: ${{ steps.detect-paths.outputs.test_mcp }}
+      test-core: ${{ steps.detect-paths.outputs.test_core }}
+      test-cli: ${{ steps.detect-paths.outputs.test_cli }}
 
     steps:
     - uses: actions/checkout@v4
@@ -36,17 +38,42 @@ jobs:
       with:
         go-version: '1.24'
 
-    - name: Detect changed files
-      id: detect-changes
+    - name: Install golangci-lint
       run: |
-        # Get changed files
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.1.6
+
+    - name: Detect changed paths
+      id: detect-paths
+      run: |
         if [ "${{ github.event_name }}" = "pull_request" ]; then
-          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
-          changed_packages=$(echo "$changed_files" | xargs -r dirname | sort -u | sed 's|^|./|' | tr '\n' ' ')
-          echo "packages=$changed_packages" >> $GITHUB_OUTPUT
-          echo "Changed packages: $changed_packages"
+          # Get changed files
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
+          echo "Changed files:"
+          echo "$changed_files"
+
+          # Check for MCP changes
+          mcp_changes=$(echo "$changed_files" | grep -E "^(pkg/mcp|cmd/mcp-server)" || true)
+
+          # Check for Core changes
+          core_changes=$(echo "$changed_files" | grep -E "^(pkg/core|pkg/utils)" || true)
+
+          # Check for CLI changes
+          cli_changes=$(echo "$changed_files" | grep -E "^(pkg/ai|pkg/pipeline|cmd/)" || true)
+
+          # Set outputs
+          echo "test_mcp=$([ -n "$mcp_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "test_core=$([ -n "$core_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "test_cli=$([ -n "$cli_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+
+          echo "MCP changes: $([ -n "$mcp_changes" ] && echo "yes" || echo "no")"
+          echo "Core changes: $([ -n "$core_changes" ] && echo "yes" || echo "no")"
+          echo "CLI changes: $([ -n "$cli_changes" ] && echo "yes" || echo "no")"
         else
-          echo "packages=./..." >> $GITHUB_OUTPUT
+          # For non-PR events, test everything
+          echo "test_mcp=true" >> $GITHUB_OUTPUT
+          echo "test_core=true" >> $GITHUB_OUTPUT
+          echo "test_cli=true" >> $GITHUB_OUTPUT
+          echo "Non-PR event: testing all packages"
         fi
 
     - name: Fast format check
@@ -78,10 +105,8 @@ jobs:
     - name: Fast syntax check
       run: |
         echo "📦 Checking syntax..."
-        if [ -n "${{ steps.detect-changes.outputs.packages }}" ]; then
-          # Only compile changed packages, don't generate output
-          go build -o /dev/null ${{ steps.detect-changes.outputs.packages }}
-        fi
+        # Quick syntax check - just compile without output
+        go build -o /dev/null ./...
         echo "✅ Syntax check passed"
 
 
