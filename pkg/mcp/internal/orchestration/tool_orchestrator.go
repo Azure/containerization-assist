@@ -19,7 +19,7 @@ type MCPToolOrchestrator struct {
 	sessionManager     SessionManager
 	logger             zerolog.Logger
 	dispatcher         *NoReflectToolOrchestrator
-	pipelineOperations interface{} // Store for passing to dispatcher
+	pipelineOperations core.PipelineOperations // Typed pipeline operations
 }
 
 // NewMCPToolOrchestrator creates a new tool orchestrator for MCP atomic tools
@@ -42,7 +42,7 @@ func (o *MCPToolOrchestrator) GetDispatcher() *NoReflectToolOrchestrator {
 }
 
 // SetPipelineOperations sets the pipeline operations for tool creation
-func (o *MCPToolOrchestrator) SetPipelineOperations(operations interface{}) {
+func (o *MCPToolOrchestrator) SetPipelineOperations(operations core.PipelineOperations) {
 	o.pipelineOperations = operations
 	if o.dispatcher != nil {
 		o.dispatcher.SetPipelineOperations(operations)

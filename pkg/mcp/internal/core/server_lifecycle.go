@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/constants"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 )
@@ -56,7 +57,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return nil
 	case <-ctx.Done():
 		s.logger.Info().Msg("Context cancelled")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), constants.ShutdownTimeout)
 		defer cancel()
 		return s.Shutdown(shutdownCtx)
 	}
@@ -77,7 +78,7 @@ func (s *Server) HandleRequest(ctx context.Context, req *core.MCPRequest) (*core
 
 // Stop gracefully stops the MCP server
 func (s *Server) Stop() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), constants.ShutdownTimeout)
 	defer cancel()
 	return s.Shutdown(ctx)
 }
@@ -104,7 +105,7 @@ func (s *Server) shutdown() error {
 
 	// Step 2: Wait for in-flight requests to complete (with timeout)
 	s.logger.Info().Msg("Waiting for in-flight requests to complete")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), constants.ShutdownTimeout)
 	defer cancel()
 
 	// Check if job manager has active jobs
@@ -199,7 +200,7 @@ CONTINUE_SHUTDOWN:
 	// Step 10: Shutdown OpenTelemetry provider
 	if s.otelProvider != nil && s.otelProvider.IsInitialized() {
 		s.logger.Info().Msg("Shutting down OpenTelemetry provider")
-		otelCtx, otelCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		otelCtx, otelCancel := context.WithTimeout(context.Background(), constants.ContextTimeout)
 		defer otelCancel()
 
 		if err := s.otelProvider.Shutdown(otelCtx); err != nil {

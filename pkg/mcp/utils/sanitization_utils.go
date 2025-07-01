@@ -82,8 +82,23 @@ func SanitizeSecretKey(envName string) string {
 	return result
 }
 
+// JSONSchemaDefinition represents a JSON schema structure
+type JSONSchemaDefinition struct {
+	Type                 string                           `json:"type,omitempty"`
+	Format               string                           `json:"format,omitempty"`
+	Description          string                           `json:"description,omitempty"`
+	Default              interface{}                      `json:"default,omitempty"`
+	Enum                 []interface{}                    `json:"enum,omitempty"`
+	Properties           map[string]*JSONSchemaDefinition `json:"properties,omitempty"`
+	Items                *JSONSchemaDefinition            `json:"items,omitempty"`
+	Required             []string                         `json:"required,omitempty"`
+	AdditionalProperties interface{}                      `json:"additionalProperties,omitempty"`
+	Definitions          map[string]*JSONSchemaDefinition `json:"definitions,omitempty"`
+}
+
 // SanitizeJSONSchema sanitizes JSON schemas for compatibility
 // Consolidates sanitizeInvopopSchema functions from tool_registry.go and registry.go
+// Deprecated: Consider using JSONSchemaDefinition for type safety
 func SanitizeJSONSchema(schema map[string]interface{}) map[string]interface{} {
 	if schema == nil {
 		return make(map[string]interface{})
@@ -99,6 +114,39 @@ func SanitizeJSONSchema(schema map[string]interface{}) map[string]interface{} {
 	sanitizeSchemaRecursive(result)
 
 	return result
+}
+
+// SanitizeTypedJSONSchema provides type-safe JSON schema sanitization
+func SanitizeTypedJSONSchema(schema *JSONSchemaDefinition) *JSONSchemaDefinition {
+	if schema == nil {
+		return &JSONSchemaDefinition{}
+	}
+
+	// Fix array types that need items
+	if schema.Type == "array" && schema.Items == nil {
+		schema.Items = &JSONSchemaDefinition{Type: "string"}
+	}
+
+	// Recursively sanitize properties
+	if schema.Properties != nil {
+		for _, propSchema := range schema.Properties {
+			SanitizeTypedJSONSchema(propSchema)
+		}
+	}
+
+	// Recursively sanitize items
+	if schema.Items != nil {
+		SanitizeTypedJSONSchema(schema.Items)
+	}
+
+	// Recursively sanitize definitions
+	if schema.Definitions != nil {
+		for _, defSchema := range schema.Definitions {
+			SanitizeTypedJSONSchema(defSchema)
+		}
+	}
+
+	return schema
 }
 
 // sanitizeSchemaRecursive applies schema sanitization recursively
@@ -291,6 +339,7 @@ func SanitizeLogMessage(message string) string {
 }
 
 // SanitizeJSONValue sanitizes a value before JSON encoding
+// Deprecated: Use type-safe alternatives like SanitizeStringMap, SanitizeStringSlice
 func SanitizeJSONValue(value interface{}) interface{} {
 	if value == nil {
 		return nil
@@ -314,6 +363,57 @@ func SanitizeJSONValue(value interface{}) interface{} {
 	default:
 		return value
 	}
+}
+
+// SanitizeStringMap provides type-safe sanitization for string maps
+func SanitizeStringMap(data map[string]string) map[string]string {
+	if data == nil {
+		return make(map[string]string)
+	}
+
+	sanitized := make(map[string]string)
+	for k, v := range data {
+		sanitized[k] = SanitizeLogMessage(v)
+	}
+	return sanitized
+}
+
+// SanitizeStringSlice provides type-safe sanitization for string slices
+func SanitizeStringSlice(data []string) []string {
+	if data == nil {
+		return []string{}
+	}
+
+	sanitized := make([]string, len(data))
+	for i, v := range data {
+		sanitized[i] = SanitizeLogMessage(v)
+	}
+	return sanitized
+}
+
+// SanitizeStringInterfaceMap provides controlled sanitization for mixed-type maps
+// Use this only when interface{} is absolutely necessary
+func SanitizeStringInterfaceMap(data map[string]interface{}) map[string]interface{} {
+	if data == nil {
+		return make(map[string]interface{})
+	}
+
+	sanitized := make(map[string]interface{})
+	for k, v := range data {
+		switch val := v.(type) {
+		case string:
+			sanitized[k] = SanitizeLogMessage(val)
+		case []string:
+			sanitized[k] = SanitizeStringSlice(val)
+		case map[string]string:
+			sanitized[k] = SanitizeStringMap(val)
+		default:
+			// For other types, just pass through
+			// Consider adding specific handlers as needed
+			sanitized[k] = val
+		}
+	}
+	return sanitized
 }
 
 // RemoveSensitiveData removes potentially sensitive data from strings
