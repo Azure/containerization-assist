@@ -451,7 +451,7 @@ func (s *UnifiedMCPServer) isAtomicTool(toolName string) bool {
 }
 
 // Build input schema from tool metadata
-func (s *UnifiedMCPServer) buildInputSchema(metadata *orchestration.ToolMetadata) map[string]interface{} {
+func (s *UnifiedMCPServer) buildInputSchema(metadata *core.ToolMetadata) map[string]interface{} {
 	schema := map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -498,6 +498,28 @@ func (dsm *directSessionManager) GetSession(sessionID string) (interface{}, erro
 
 func (dsm *directSessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
 	return dsm.sessionManager.UpdateSession(sessionID, updater)
+}
+
+// Implement missing methods required by core.ToolSessionManager interface
+
+func (dsm *directSessionManager) GetOrCreateSession(sessionID string) (interface{}, error) {
+	return dsm.sessionManager.GetOrCreateSession(sessionID)
+}
+
+func (dsm *directSessionManager) CreateSession(userID string) (interface{}, error) {
+	return dsm.sessionManager.CreateSession(userID)
+}
+
+func (dsm *directSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+	return dsm.sessionManager.DeleteSession(ctx, sessionID)
+}
+
+func (dsm *directSessionManager) ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error) {
+	return dsm.sessionManager.ListSessions(ctx, filter)
+}
+
+func (dsm *directSessionManager) GetStats() *core.SessionManagerStats {
+	return dsm.sessionManager.GetStats()
 }
 
 // ConversationOrchestratorAdapter removed - no longer needed with simplified interface
@@ -587,7 +609,7 @@ func convertParametersMapToString(params map[string]interface{}) map[string]stri
 }
 
 // Helper function to convert examples from orchestration types to mcptypes
-func convertExamplesToTypes(examples []orchestration.ToolExample) []mcptypes.ToolExample {
+func convertExamplesToTypes(examples []core.ToolExample) []mcptypes.ToolExample {
 	result := make([]mcptypes.ToolExample, len(examples))
 	for i, example := range examples {
 		result[i] = mcptypes.ToolExample{

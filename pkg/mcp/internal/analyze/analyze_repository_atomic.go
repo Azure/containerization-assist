@@ -594,7 +594,7 @@ func (t *AtomicAnalyzeRepositoryTool) generateAnalysisContext(repoPath string, a
 func (t *AtomicAnalyzeRepositoryTool) GetMetadata() core.ToolMetadata {
 	return core.ToolMetadata{
 		Name:         "atomic_analyze_repository",
-		Description:  "Analyzes repository structure, detects programming language, framework, and generates containerization recommendations",
+		Description:  "Analyzes repository structure, detects programming language, framework, and generates containerization recommendations. Creates a new session to track the analysis workflow",
 		Version:      "1.0.0",
 		Category:     "analysis",
 		Dependencies: []string{"git"},

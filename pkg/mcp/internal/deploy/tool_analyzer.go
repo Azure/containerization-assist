@@ -1,34 +1,44 @@
 package deploy
 
-// ToolAnalyzer provides analysis capabilities for atomic deployment tools
-type ToolAnalyzer interface {
-	// AnalyzeDeploymentFailure analyzes deployment operation failures
-	AnalyzeDeploymentFailure(namespace, sessionID string) error
+import (
+	"context"
 
-	// AnalyzeHealthCheckFailure analyzes health check operation failures
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
+	"github.com/rs/zerolog"
+)
+
+// ToolAnalyzer provides analysis capabilities for atomic deployment tools
+// Deprecated: Use common.FailureAnalyzer for unified failure analysis
+type ToolAnalyzer interface {
+	AnalyzeDeploymentFailure(namespace, sessionID string) error
 	AnalyzeHealthCheckFailure(namespace, appName, sessionID string) error
 }
 
-// DefaultToolAnalyzer provides a default implementation
+// DefaultToolAnalyzer provides a default implementation using the unified analyzer
 type DefaultToolAnalyzer struct {
-	toolName string
+	*common.DefaultFailureAnalyzer
 }
 
 // NewDefaultToolAnalyzer creates a new default tool analyzer
 func NewDefaultToolAnalyzer(toolName string) *DefaultToolAnalyzer {
 	return &DefaultToolAnalyzer{
-		toolName: toolName,
+		DefaultFailureAnalyzer: common.NewDefaultFailureAnalyzer(toolName, "deploy", zerolog.Nop()),
 	}
 }
 
-// AnalyzeDeploymentFailure analyzes deployment failures
+// AnalyzeDeploymentFailure analyzes deployment failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzeDeploymentFailure(namespace, sessionID string) error {
-	// Default implementation - could be enhanced with actual analysis
-	return nil
+	params := map[string]interface{}{
+		"namespace": namespace,
+	}
+	return a.AnalyzeFailure(context.Background(), "deployment", sessionID, params)
 }
 
-// AnalyzeHealthCheckFailure analyzes health check failures
+// AnalyzeHealthCheckFailure analyzes health check failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzeHealthCheckFailure(namespace, appName, sessionID string) error {
-	// Default implementation - could be enhanced with actual analysis
-	return nil
+	params := map[string]interface{}{
+		"namespace": namespace,
+		"app_name":  appName,
+	}
+	return a.AnalyzeFailure(context.Background(), "health_check", sessionID, params)
 }

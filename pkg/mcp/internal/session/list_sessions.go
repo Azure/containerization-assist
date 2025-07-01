@@ -65,13 +65,6 @@ type ListSessionsResult struct {
 	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
-// ListSessionsManager interface for listing sessions
-type ListSessionsManager interface {
-	GetAllSessions() ([]*SessionData, error)
-	GetSessionData(sessionID string) (*SessionData, error)
-	GetStats() *core.SessionManagerStats
-}
-
 // SessionData represents the session data structure
 type SessionData struct {
 	ID             string
@@ -92,11 +85,11 @@ type SessionData struct {
 // ListSessionsTool implements the list_sessions MCP tool
 type ListSessionsTool struct {
 	logger         zerolog.Logger
-	sessionManager ListSessionsManager
+	sessionManager *SessionManager
 }
 
 // NewListSessionsTool creates a new list sessions tool
-func NewListSessionsTool(logger zerolog.Logger, sessionManager ListSessionsManager) *ListSessionsTool {
+func NewListSessionsTool(logger zerolog.Logger, sessionManager *SessionManager) *ListSessionsTool {
 	return &ListSessionsTool{
 		logger:         logger,
 		sessionManager: sessionManager,
@@ -180,27 +173,23 @@ func (t *ListSessionsTool) ExecuteTyped(ctx context.Context, args ListSessionsAr
 		sessionInfos = append(sessionInfos, info)
 	}
 
-	// Get additional stats from the concrete session manager
-	sm, ok := t.sessionManager.(*SessionManager)
-	var uptime time.Duration
+	// Get additional stats from the session manager
+	uptime := time.Since(t.sessionManager.startTime)
 	var expiredCount int
 	var totalDiskUsed int64
 
-	if ok {
-		uptime = time.Since(sm.startTime)
-		// Calculate expired sessions
-		for _, session := range sessionInfos {
-			if session.Status == "expired" {
-				expiredCount++
-			}
+	// Calculate expired sessions
+	for _, session := range sessionInfos {
+		if session.Status == "expired" {
+			expiredCount++
 		}
-		// Calculate total disk usage
-		sm.mutex.RLock()
-		for _, usage := range sm.diskUsage {
-			totalDiskUsed += usage
-		}
-		sm.mutex.RUnlock()
 	}
+	// Calculate total disk usage
+	t.sessionManager.mutex.RLock()
+	for _, usage := range t.sessionManager.diskUsage {
+		totalDiskUsed += usage
+	}
+	t.sessionManager.mutex.RUnlock()
 
 	result := &ListSessionsResult{
 		Version:       "v1.0.0",

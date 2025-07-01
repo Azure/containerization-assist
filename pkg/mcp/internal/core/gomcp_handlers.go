@@ -7,6 +7,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -142,6 +143,36 @@ func (gm *GomcpManager) handleListSessions(deps *ToolDependencies, args *Session
 	return &SessionListResult{
 		Sessions: sessionData,
 		Total:    len(sessions),
+	}, nil
+}
+
+// handleGetSession implements the get_session tool logic
+func (gm *GomcpManager) handleGetSession(deps *ToolDependencies, args *GetSessionArgs) (*GetSessionResult, error) {
+	if args.SessionID == "" {
+		return nil, fmt.Errorf("session_id is required")
+	}
+
+	// Get the full session state
+	sessionInterface, err := deps.Server.sessionManager.GetSession(args.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	session, ok := sessionInterface.(*session.SessionState)
+	if !ok {
+		return nil, fmt.Errorf("unexpected session type: %T", sessionInterface)
+	}
+
+	// Return the essential session information including workspace_dir
+	return &GetSessionResult{
+		SessionID:    session.SessionID,
+		WorkspaceDir: session.WorkspaceDir,
+		CreatedAt:    session.CreatedAt,
+		LastAccessed: session.LastAccessed,
+		Status:       getSessionStatus(session),
+		RepoURL:      session.RepoURL,
+		Labels:       session.Labels,
+		Metadata:     session.Metadata,
 	}, nil
 }
 
@@ -319,4 +350,24 @@ func (gm *GomcpManager) handleChat(deps *ToolDependencies, args *ChatArgs) (*Cha
 		Response:  response,
 		SessionID: result.SessionID,
 	}, nil
+}
+
+// getSessionStatus derives the status from session state
+func getSessionStatus(session *session.SessionState) string {
+	if len(session.ActiveJobs) > 0 {
+		return "active"
+	}
+	if session.LastError != nil {
+		return "error"
+	}
+	if session.Dockerfile.Built {
+		return "built"
+	}
+	if session.Dockerfile.Content != "" {
+		return "dockerfile_ready"
+	}
+	if len(session.RepoAnalysis) > 0 {
+		return "analyzed"
+	}
+	return "initialized"
 }

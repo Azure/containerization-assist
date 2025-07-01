@@ -18,7 +18,7 @@ import (
 // MCPToolRegistry implements ToolInstanceRegistry for MCP atomic tools
 type MCPToolRegistry struct {
 	tools    map[string]ToolInfo
-	metadata map[string]*ToolMetadata
+	metadata map[string]*core.ToolMetadata
 	mutex    sync.RWMutex
 	logger   zerolog.Logger
 }
@@ -39,7 +39,7 @@ type ToolInfo struct {
 func NewMCPToolRegistry(logger zerolog.Logger) *MCPToolRegistry {
 	registry := &MCPToolRegistry{
 		tools:    make(map[string]ToolInfo),
-		metadata: make(map[string]*ToolMetadata),
+		metadata: make(map[string]*core.ToolMetadata),
 		logger:   logger.With().Str("component", "tool_registry").Logger(),
 	}
 
@@ -86,7 +86,7 @@ func (r *MCPToolRegistry) RegisterTool(name string, tool interface{}) error {
 	}
 
 	// Create internal metadata structure (using reflection for legacy compatibility)
-	metadata := &ToolMetadata{
+	metadata := &core.ToolMetadata{
 		Name:         name,
 		Description:  toolInfo.Description,
 		Version:      toolInfo.Version,
@@ -95,7 +95,6 @@ func (r *MCPToolRegistry) RegisterTool(name string, tool interface{}) error {
 		Capabilities: toolInfo.Capabilities,
 		Requirements: r.inferRequirements(name),
 		Parameters:   r.inferParameters(tool),
-		OutputSchema: r.inferOutputSchema(tool),
 		Examples:     r.generateExamples(name),
 	}
 
@@ -175,7 +174,7 @@ func (r *MCPToolRegistry) ValidateTool(name string) error {
 }
 
 // GetToolMetadata returns metadata for a specific tool
-func (r *MCPToolRegistry) GetToolMetadata(name string) (*ToolMetadata, error) {
+func (r *MCPToolRegistry) GetToolMetadata(name string) (*core.ToolMetadata, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -198,6 +197,49 @@ func (r *MCPToolRegistry) GetToolInfo(name string) (*ToolInfo, error) {
 	}
 
 	return &toolInfo, nil
+}
+
+// GetToolSchema returns the full JSON schema for a tool including parameters and output
+func (r *MCPToolRegistry) GetToolSchema(name string) (map[string]interface{}, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	toolInfo, exists := r.tools[name]
+	if !exists {
+		return nil, fmt.Errorf("tool %s not found", name)
+	}
+
+	// Build comprehensive schema
+	schema := map[string]interface{}{
+		"name":         name,
+		"description":  toolInfo.Description,
+		"category":     toolInfo.Category,
+		"version":      toolInfo.Version,
+		"dependencies": toolInfo.Dependencies,
+		"capabilities": toolInfo.Capabilities,
+	}
+
+	// Get parameter schema using reflection
+	if toolInfo.Instance != nil {
+		paramSchema := r.inferParameters(toolInfo.Instance)
+		if len(paramSchema) > 0 {
+			schema["parameters"] = paramSchema
+		}
+
+		// Get output schema
+		outputSchema := r.inferOutputSchema(toolInfo.Instance)
+		if len(outputSchema) > 0 {
+			schema["output"] = outputSchema
+		}
+	}
+
+	// Add metadata if available
+	if metadata, exists := r.metadata[name]; exists {
+		schema["requirements"] = metadata.Requirements
+		schema["examples"] = metadata.Examples
+	}
+
+	return schema, nil
 }
 
 // GetToolsByCategory returns all tools in a specific category
@@ -508,9 +550,9 @@ func (r *MCPToolRegistry) inferOutputSchema(tool interface{}) map[string]interfa
 	return map[string]interface{}{}
 }
 
-func (r *MCPToolRegistry) generateExamples(name string) []ToolExample {
+func (r *MCPToolRegistry) generateExamples(name string) []core.ToolExample {
 	// Generate basic examples for each tool
-	exampleMap := map[string][]ToolExample{
+	exampleMap := map[string][]core.ToolExample{
 		"analyze_repository_atomic": {
 			{
 				Name:        "Basic Repository Analysis",
@@ -549,7 +591,7 @@ func (r *MCPToolRegistry) generateExamples(name string) []ToolExample {
 	}
 
 	// Return default example
-	return []ToolExample{
+	return []core.ToolExample{
 		{
 			Name:        "Basic Usage",
 			Description: fmt.Sprintf("Basic usage of %s tool", name),

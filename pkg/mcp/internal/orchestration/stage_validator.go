@@ -3,17 +3,15 @@ package orchestration
 import (
 	"context"
 	"fmt"
-
-	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // StageValidator handles validation of workflow stages
 type StageValidator struct {
-	toolRegistry core.ToolRegistry
+	toolRegistry *MCPToolRegistry
 }
 
 // NewStageValidator creates a new stage validator
-func NewStageValidator(toolRegistry core.ToolRegistry) *StageValidator {
+func NewStageValidator(toolRegistry *MCPToolRegistry) *StageValidator {
 	return &StageValidator{
 		toolRegistry: toolRegistry,
 	}

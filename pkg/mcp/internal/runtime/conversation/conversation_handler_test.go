@@ -31,6 +31,28 @@ func (a *testSessionManagerAdapter) UpdateSession(sessionID string, updater func
 	return a.mgr.UpdateSession(sessionID, updater)
 }
 
+// Implement missing methods required by core.ToolSessionManager interface
+
+func (a *testSessionManagerAdapter) GetOrCreateSession(sessionID string) (interface{}, error) {
+	return a.mgr.GetOrCreateSession(sessionID)
+}
+
+func (a *testSessionManagerAdapter) CreateSession(userID string) (interface{}, error) {
+	return a.mgr.CreateSession(userID)
+}
+
+func (a *testSessionManagerAdapter) DeleteSession(ctx context.Context, sessionID string) error {
+	return a.mgr.DeleteSession(ctx, sessionID)
+}
+
+func (a *testSessionManagerAdapter) ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error) {
+	return a.mgr.ListSessions(ctx, filter)
+}
+
+func (a *testSessionManagerAdapter) GetStats() *core.SessionManagerStats {
+	return a.mgr.GetStats()
+}
+
 type mockOrchestrator struct {
 	executeCalls []executeCall
 	executeFunc  func(ctx context.Context, toolName string, params map[string]interface{}, session interface{}) (interface{}, error)
@@ -462,7 +484,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 
 		// Verify
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.Contains(t, err.Error(), "SESSION_NOT_FOUND")
 	})
 
 	t.Run("error on missing session ID", func(t *testing.T) {
@@ -477,7 +499,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 
 		// Verify
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.Contains(t, err.Error(), "SESSION_NOT_FOUND")
 	})
 }
 

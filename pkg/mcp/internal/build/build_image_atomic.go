@@ -148,7 +148,7 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 func (t *AtomicBuildImageTool) GetMetadata() core.ToolMetadata {
 	return core.ToolMetadata{
 		Name:         "atomic_build_image",
-		Description:  "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning",
+		Description:  "Builds Docker images atomically with multi-stage support, caching optimization, and security scanning. Uses session context for build configuration",
 		Version:      "1.0.0",
 		Category:     "docker",
 		Dependencies: []string{"docker"},

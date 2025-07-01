@@ -1,13 +1,14 @@
 package scan
 
 import (
-	"fmt"
-	"strings"
+	"context"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/rs/zerolog"
 )
 
 // ToolAnalyzer interface defines the contract for scan tool analyzers
+// Deprecated: Use common.FailureAnalyzer for unified failure analysis
 type ToolAnalyzer interface {
 	AnalyzeScanFailure(imageRef, sessionID string) error
 	AnalyzeSecretsFailure(path, sessionID string) error
@@ -15,15 +16,18 @@ type ToolAnalyzer interface {
 
 // DefaultToolAnalyzer provides default implementation for scan tool analysis
 type DefaultToolAnalyzer struct {
+	*common.DefaultFailureAnalyzer
 	toolName string
 	logger   zerolog.Logger
 }
 
 // NewDefaultToolAnalyzer creates a new default scan tool analyzer
 func NewDefaultToolAnalyzer(toolName string) *DefaultToolAnalyzer {
+	logger := zerolog.Nop()
 	return &DefaultToolAnalyzer{
-		toolName: toolName,
-		logger:   zerolog.Nop(),
+		DefaultFailureAnalyzer: common.NewDefaultFailureAnalyzer(toolName, "scan", logger),
+		toolName:               toolName,
+		logger:                 logger,
 	}
 }
 
@@ -32,74 +36,18 @@ func (a *DefaultToolAnalyzer) SetLogger(logger zerolog.Logger) {
 	a.logger = logger.With().Str("component", "scan_analyzer").Str("tool", a.toolName).Logger()
 }
 
-// AnalyzeScanFailure analyzes security scan failures
+// AnalyzeScanFailure analyzes security scan failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzeScanFailure(imageRef, sessionID string) error {
-	a.logger.Info().
-		Str("image_ref", imageRef).
-		Str("session_id", sessionID).
-		Msg("Analyzing security scan failure")
-
-	// Basic analysis logic
-	if imageRef == "" {
-		return fmt.Errorf("image reference is required for scan analysis")
+	params := map[string]interface{}{
+		"image_ref": imageRef,
 	}
-
-	// Check common scan failure patterns
-	commonPatterns := []struct {
-		pattern string
-		advice  string
-	}{
-		{"not found", "Ensure the image exists and is accessible"},
-		{"timeout", "Increase timeout or check network connectivity"},
-		{"authentication", "Check registry credentials"},
-		{"rate limit", "Wait and retry or upgrade plan"},
-	}
-
-	// Log analysis insights
-	for _, p := range commonPatterns {
-		if strings.Contains(strings.ToLower(imageRef), p.pattern) {
-			a.logger.Info().
-				Str("pattern", p.pattern).
-				Str("advice", p.advice).
-				Msg("Detected known failure pattern")
-		}
-	}
-
-	return nil
+	return a.AnalyzeFailure(context.Background(), "scan", sessionID, params)
 }
 
-// AnalyzeSecretsFailure analyzes secrets scan failures
+// AnalyzeSecretsFailure analyzes secrets scan failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzeSecretsFailure(path, sessionID string) error {
-	a.logger.Info().
-		Str("path", path).
-		Str("session_id", sessionID).
-		Msg("Analyzing secrets scan failure")
-
-	// Basic validation
-	if path == "" {
-		return fmt.Errorf("path is required for secrets scan analysis")
+	params := map[string]interface{}{
+		"path": path,
 	}
-
-	// Check common secrets scan failure patterns
-	commonPatterns := []struct {
-		pattern string
-		advice  string
-	}{
-		{"permission denied", "Check file permissions"},
-		{"no such file", "Verify the path exists"},
-		{"too many files", "Consider scanning smaller directories"},
-		{"memory", "Increase memory limits or scan in batches"},
-	}
-
-	// Log analysis insights
-	for _, p := range commonPatterns {
-		if strings.Contains(strings.ToLower(path), p.pattern) {
-			a.logger.Info().
-				Str("pattern", p.pattern).
-				Str("advice", p.advice).
-				Msg("Detected known failure pattern")
-		}
-	}
-
-	return nil
+	return a.AnalyzeFailure(context.Background(), "secrets", sessionID, params)
 }

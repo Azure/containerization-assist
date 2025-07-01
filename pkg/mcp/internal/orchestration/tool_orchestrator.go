@@ -16,16 +16,16 @@ import (
 // This is the updated version that uses type-safe dispatch instead of reflection
 type MCPToolOrchestrator struct {
 	toolRegistry       *MCPToolRegistry
-	sessionManager     SessionManager
+	sessionManager     core.ToolSessionManager
 	logger             zerolog.Logger
 	dispatcher         *NoReflectToolOrchestrator
-	pipelineOperations interface{} // Store for passing to dispatcher
+	pipelineOperations core.PipelineOperations // Typed pipeline operations
 }
 
 // NewMCPToolOrchestrator creates a new tool orchestrator for MCP atomic tools
 func NewMCPToolOrchestrator(
 	toolRegistry *MCPToolRegistry,
-	sessionManager SessionManager,
+	sessionManager core.ToolSessionManager,
 	logger zerolog.Logger,
 ) *MCPToolOrchestrator {
 	return &MCPToolOrchestrator{
@@ -42,7 +42,7 @@ func (o *MCPToolOrchestrator) GetDispatcher() *NoReflectToolOrchestrator {
 }
 
 // SetPipelineOperations sets the pipeline operations for tool creation
-func (o *MCPToolOrchestrator) SetPipelineOperations(operations interface{}) {
+func (o *MCPToolOrchestrator) SetPipelineOperations(operations core.PipelineOperations) {
 	o.pipelineOperations = operations
 	if o.dispatcher != nil {
 		o.dispatcher.SetPipelineOperations(operations)
@@ -136,21 +136,12 @@ func (o *MCPToolOrchestrator) GetToolMetadata(toolName string) (*core.ToolMetada
 }
 
 // convertExamples converts from orchestration.ToolExample to mcptypes.ToolExample
-func convertExamples(examples []ToolExample) []mcptypes.ToolExample {
+func convertExamples(examples []core.ToolExample) []mcptypes.ToolExample {
 	converted := make([]mcptypes.ToolExample, len(examples))
 	for i, example := range examples {
-		// Type assert Input and Output to map[string]interface{}
-		var input, output map[string]interface{}
-		if inputMap, ok := example.Input.(map[string]interface{}); ok {
-			input = inputMap
-		} else {
-			input = make(map[string]interface{})
-		}
-		if outputMap, ok := example.Output.(map[string]interface{}); ok {
-			output = outputMap
-		} else {
-			output = make(map[string]interface{})
-		}
+		// Input and Output are already map[string]interface{} in core.ToolExample
+		input := example.Input
+		output := example.Output
 
 		converted[i] = mcptypes.ToolExample{
 			Name:        example.Name,
@@ -168,7 +159,7 @@ func convertExamples(examples []ToolExample) []mcptypes.ToolExample {
 func (o *MCPToolOrchestrator) validateRequiredParameters(
 	toolName string,
 	args map[string]interface{},
-	metadata *ToolMetadata,
+	metadata *core.ToolMetadata,
 ) error {
 	// Delegate to dispatcher's validation
 	return o.dispatcher.ValidateToolArgs(toolName, args)
@@ -178,7 +169,7 @@ func (o *MCPToolOrchestrator) validateRequiredParameters(
 func (o *MCPToolOrchestrator) validateParameterTypes(
 	toolName string,
 	args map[string]interface{},
-	metadata *ToolMetadata,
+	metadata *core.ToolMetadata,
 ) error {
 	// Type validation now happens at compile time in the dispatcher
 	// This method is kept for backward compatibility

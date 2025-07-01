@@ -11,16 +11,16 @@ func TestNewDefaultToolAnalyzer(t *testing.T) {
 	if analyzer == nil {
 		t.Error("NewDefaultToolAnalyzer should not return nil")
 	}
-	if analyzer.toolName != toolName {
-		t.Errorf("Expected toolName to be '%s', got '%s'", toolName, analyzer.toolName)
+	if analyzer.GetToolName() != toolName {
+		t.Errorf("Expected toolName to be '%s', got '%s'", toolName, analyzer.GetToolName())
 	}
 	// Test with empty tool name
 	emptyAnalyzer := NewDefaultToolAnalyzer("")
 	if emptyAnalyzer == nil {
 		t.Error("NewDefaultToolAnalyzer should not return nil even with empty name")
 	}
-	if emptyAnalyzer.toolName != "" {
-		t.Errorf("Expected empty toolName, got '%s'", emptyAnalyzer.toolName)
+	if emptyAnalyzer.GetToolName() != "" {
+		t.Errorf("Expected empty toolName, got '%s'", emptyAnalyzer.GetToolName())
 	}
 }
 
@@ -141,8 +141,8 @@ func TestToolAnalyzerVariousNames(t *testing.T) {
 	}
 	for _, toolName := range testCases {
 		analyzer := NewDefaultToolAnalyzer(toolName)
-		if analyzer.toolName != toolName {
-			t.Errorf("Expected toolName '%s', got '%s'", toolName, analyzer.toolName)
+		if analyzer.GetToolName() != toolName {
+			t.Errorf("Expected toolName '%s', got '%s'", toolName, analyzer.GetToolName())
 		}
 		// Test that all methods work regardless of tool name
 		if err := analyzer.AnalyzeBuildFailure("session", "image"); err != nil {

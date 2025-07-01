@@ -254,15 +254,19 @@ func (e *InsightEnricher) generateCrossToolInsights(data *ComprehensiveContext) 
 			deployData := deployCtx.Data
 
 			// Check if deployed image matches built image
-			if buildImages, ok := buildData["docker_build"].(map[string]interface{})["images_built"].(int); ok {
-				if deployManifests, ok := deployData["kubernetes"].(map[string]interface{})["manifests_count"].(int); ok {
-					if buildImages > 0 && deployManifests == 0 {
-						insights = append(insights, map[string]interface{}{
-							"type":        "build_deploy_gap",
-							"description": "Images built but not deployed",
-							"severity":    "medium",
-							"action":      "Consider deploying built images",
-						})
+			if dockerBuild, ok := buildData["docker_build"].(map[string]interface{}); ok {
+				if buildImages, ok := dockerBuild["images_built"].(int); ok {
+					if kubernetesData, ok := deployData["kubernetes"].(map[string]interface{}); ok {
+						if deployManifests, ok := kubernetesData["manifests_count"].(int); ok {
+							if buildImages > 0 && deployManifests == 0 {
+								insights = append(insights, map[string]interface{}{
+									"type":        "build_deploy_gap",
+									"description": "Images built but not deployed",
+									"severity":    "medium",
+									"action":      "Consider deploying built images",
+								})
+							}
+						}
 					}
 				}
 			}

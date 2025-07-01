@@ -175,7 +175,7 @@ func (r *CoreRepositoryAnalyzer) convertToRepositoryInfo(path string, analysisRe
 			EntryPoint:    "",
 			Port:          0,
 			HasDockerfile: false,
-			Metadata:      make(map[string]interface{}),
+			Metadata:      make(map[string]string),
 		}
 	}
 
@@ -203,11 +203,15 @@ func (r *CoreRepositoryAnalyzer) convertToRepositoryInfo(path string, analysisRe
 		entryPoint = analysisResult.EntryPoints[0]
 	}
 
-	// Build metadata
-	metadata := map[string]interface{}{
-		"entry_points": analysisResult.EntryPoints,
-		"structure":    analysisResult.Structure,
-		"context":      analysisResult.Context,
+	// Build metadata - converting to string values for type safety
+	metadata := map[string]string{
+		"language":  analysisResult.Language,
+		"framework": analysisResult.Framework,
+		"type":      "repository",
+	}
+	// Add entry points as comma-separated string if available
+	if len(analysisResult.EntryPoints) > 0 {
+		metadata["entry_points"] = fmt.Sprintf("%v", analysisResult.EntryPoints)
 	}
 
 	return &core.RepositoryInfo{

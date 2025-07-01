@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
@@ -62,6 +63,39 @@ type contextKey string
 
 const mcpContextKey contextKey = "mcp_context"
 
+// coreToolWrapper wraps core tools to implement the Tool interface
+type coreToolWrapper struct {
+	name    string
+	execute func(ctx context.Context, args interface{}) (interface{}, error)
+}
+
+func (w *coreToolWrapper) Name() string {
+	return w.name
+}
+
+func (w *coreToolWrapper) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+	return w.execute(ctx, args)
+}
+
+func (w *coreToolWrapper) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
+		Name:        w.name,
+		Description: "Core session management tool",
+		Version:     "1.0.0",
+		Category:    "session",
+		Parameters:  make(map[string]string),
+		Examples:    make([]core.ToolExample, 0),
+	}
+}
+
+func (w *coreToolWrapper) Validate(ctx context.Context, args interface{}) error {
+	// Basic validation - just ensure args is not nil
+	if args == nil {
+		return fmt.Errorf("arguments cannot be nil")
+	}
+	return nil
+}
+
 // ServerStatusArgs represents server status arguments
 type ServerStatusArgs struct {
 	SessionID        *string `json:"session_id,omitempty" description:"Session ID for detailed analysis"`
@@ -92,6 +126,23 @@ type SessionListArgs struct {
 type SessionListResult struct {
 	Sessions []map[string]interface{} `json:"sessions"`
 	Total    int                      `json:"total"`
+}
+
+// GetSessionArgs represents get session arguments
+type GetSessionArgs struct {
+	SessionID string `json:"session_id" description:"Session ID to retrieve"`
+}
+
+// GetSessionResult represents get session result
+type GetSessionResult struct {
+	SessionID    string                 `json:"session_id"`
+	WorkspaceDir string                 `json:"workspace_dir"`
+	CreatedAt    time.Time              `json:"created_at"`
+	LastAccessed time.Time              `json:"last_accessed"`
+	Status       string                 `json:"status"`
+	RepoURL      string                 `json:"repo_url,omitempty"`
+	Labels       []string               `json:"labels,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // SessionDeleteArgs represents session delete arguments
@@ -249,23 +300,97 @@ func (gm *GomcpManager) createToolDependencies(s *Server) *ToolDependencies {
 func (gm *GomcpManager) registerCoreTools(deps *ToolDependencies) error {
 	registrar := runtime.NewStandardToolRegistrar(gm.server, deps.Logger)
 
+	// Register server_status
 	runtime.RegisterSimpleTool(registrar, "server_status",
 		"[Advanced] Diagnostic tool for debugging server issues - not needed for normal operations",
 		func(ctx *gomcpserver.Context, args *ServerStatusArgs) (*ServerStatusResult, error) {
 			return gm.handleServerStatus(deps, args)
 		})
+	// Also register with tool registry for HTTP access
+	if err := deps.ToolRegistry.RegisterTool("server_status", &coreToolWrapper{
+		name: "server_status",
+		execute: func(ctx context.Context, args interface{}) (interface{}, error) {
+			argsMap, _ := args.(map[string]interface{})
+			toolArgs := &ServerStatusArgs{}
+			if sessionID, ok := argsMap["session_id"].(string); ok {
+				toolArgs.SessionID = &sessionID
+			}
+			return gm.handleServerStatus(deps, toolArgs)
+		},
+	}); err != nil {
+		deps.Logger.Error().Err(err).Str("tool", "server_status").Msg("Failed to register with tool registry")
+	}
 
+	// Register list_sessions
 	runtime.RegisterSimpleTool(registrar, "list_sessions",
 		"List all active containerization sessions with their metadata and status",
 		func(ctx *gomcpserver.Context, args *SessionListArgs) (*SessionListResult, error) {
 			return gm.handleListSessions(deps, args)
 		})
+	// Also register with tool registry for HTTP access
+	if err := deps.ToolRegistry.RegisterTool("list_sessions", &coreToolWrapper{
+		name: "list_sessions",
+		execute: func(ctx context.Context, args interface{}) (interface{}, error) {
+			argsMap, _ := args.(map[string]interface{})
+			toolArgs := &SessionListArgs{}
+			if includeInactive, ok := argsMap["include_inactive"].(bool); ok {
+				toolArgs.IncludeInactive = includeInactive
+			}
+			if limit, ok := argsMap["limit"].(float64); ok {
+				toolArgs.Limit = int(limit)
+			}
+			return gm.handleListSessions(deps, toolArgs)
+		},
+	}); err != nil {
+		deps.Logger.Error().Err(err).Str("tool", "list_sessions").Msg("Failed to register with tool registry")
+	}
 
+	// Register get_session
+	runtime.RegisterSimpleTool(registrar, "get_session",
+		"Get detailed information about a specific session",
+		func(ctx *gomcpserver.Context, args *GetSessionArgs) (*GetSessionResult, error) {
+			return gm.handleGetSession(deps, args)
+		})
+	// Also register with tool registry for HTTP access
+	if err := deps.ToolRegistry.RegisterTool("get_session", &coreToolWrapper{
+		name: "get_session",
+		execute: func(ctx context.Context, args interface{}) (interface{}, error) {
+			argsMap, _ := args.(map[string]interface{})
+			toolArgs := &GetSessionArgs{}
+			if sessionID, ok := argsMap["session_id"].(string); ok {
+				toolArgs.SessionID = sessionID
+			}
+			return gm.handleGetSession(deps, toolArgs)
+		},
+	}); err != nil {
+		deps.Logger.Error().Err(err).Str("tool", "get_session").Msg("Failed to register with tool registry")
+	} else {
+		deps.Logger.Info().Str("tool", "get_session").Msg("Successfully registered with tool registry")
+	}
+
+	// Register delete_session
 	runtime.RegisterSimpleTool(registrar, "delete_session",
 		"Delete a containerization session and clean up its resources",
 		func(ctx *gomcpserver.Context, args *SessionDeleteArgs) (*SessionDeleteResult, error) {
 			return gm.handleDeleteSession(deps, args)
 		})
+	// Also register with tool registry for HTTP access
+	if err := deps.ToolRegistry.RegisterTool("delete_session", &coreToolWrapper{
+		name: "delete_session",
+		execute: func(ctx context.Context, args interface{}) (interface{}, error) {
+			argsMap, _ := args.(map[string]interface{})
+			toolArgs := &SessionDeleteArgs{}
+			if sessionID, ok := argsMap["session_id"].(string); ok {
+				toolArgs.SessionID = sessionID
+			}
+			if force, ok := argsMap["force"].(bool); ok {
+				toolArgs.Force = force
+			}
+			return gm.handleDeleteSession(deps, toolArgs)
+		},
+	}); err != nil {
+		deps.Logger.Error().Err(err).Str("tool", "delete_session").Msg("Failed to register with tool registry")
+	}
 
 	return nil
 }
@@ -296,15 +421,15 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 // registerAtomicToolsWithOrchestrator creates and registers atomic tools with the orchestrator
 func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependencies) error {
 	atomicTools := map[string]interface{}{
-		"analyze_repository": analyze.NewAtomicAnalyzeRepositoryTool(
+		"analyze_repository_atomic": analyze.NewAtomicAnalyzeRepositoryTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "analyze_repository").Logger(),
+			deps.Logger.With().Str("tool", "analyze_repository_atomic").Logger(),
 		),
-		"build_image": build.NewAtomicBuildImageTool(
+		"build_image_atomic": build.NewAtomicBuildImageTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "build_image").Logger(),
+			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
 		),
 		"generate_dockerfile": analyze.NewAtomicGenerateDockerfileTool(
 			deps.AtomicSessionMgr,
@@ -370,6 +495,18 @@ func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependenci
 			deps.Logger.Info().Str("tool", name).Msg("Registered atomic tool successfully")
 		}
 	}
+
+	// Also register the redirect tool for analyze_repository
+	analyzeRedirect := analyze.NewAnalyzeRepositoryRedirectTool(
+		atomicTools["analyze_repository_atomic"].(*analyze.AtomicAnalyzeRepositoryTool),
+		deps.Logger.With().Str("tool", "analyze_repository_redirect").Logger(),
+	)
+	if err := deps.ToolRegistry.RegisterTool("analyze_repository", analyzeRedirect); err != nil {
+		deps.Logger.Error().Err(err).Str("tool", "analyze_repository").Msg("Failed to register redirect tool")
+	} else {
+		deps.Logger.Info().Str("tool", "analyze_repository").Msg("Registered redirect tool successfully")
+	}
+
 	return nil
 }
 
@@ -410,7 +547,7 @@ func (gm *GomcpManager) ensureSessionID(sessionID string, deps *ToolDependencies
 // registerAnalyzeRepository registers the analyze_repository tool
 func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) {
 	runtime.RegisterSimpleTool(registrar, "analyze_repository",
-		"Analyze a repository to detect language, framework, and containerization requirements",
+		"Analyze a repository to detect language, framework, and containerization requirements. Creates a new session to track the analysis workflow",
 		func(ctx *gomcpserver.Context, args *analyze.AtomicAnalyzeRepositoryArgs) (*analyze.AtomicAnalysisResult, error) {
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "analyze_repository")
 			if err != nil {
@@ -443,7 +580,7 @@ func (gm *GomcpManager) registerAnalyzeRepository(registrar *runtime.StandardToo
 // registerGenerateDockerfile registers the generate_dockerfile tool
 func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) {
 	runtime.RegisterSimpleTool(registrar, "generate_dockerfile",
-		"Generate a Dockerfile for the analyzed repository",
+		"Generate a Dockerfile for the analyzed repository using session-based configuration",
 		func(ctx *gomcpserver.Context, args *analyze.GenerateDockerfileArgs) (*analyze.GenerateDockerfileResult, error) {
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "generate_dockerfile")
 			if err != nil {
@@ -476,7 +613,7 @@ func (gm *GomcpManager) registerGenerateDockerfile(registrar *runtime.StandardTo
 // registerBuildImage registers the build_image tool
 func (gm *GomcpManager) registerBuildImage(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) {
 	runtime.RegisterSimpleTool(registrar, "build_image",
-		"Build a Docker image from the analyzed repository using generated Dockerfile",
+		"Build a Docker image from the analyzed repository using generated Dockerfile and session context",
 		func(ctx *gomcpserver.Context, args *build.AtomicBuildImageArgs) (*build.AtomicBuildImageResult, error) {
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "build_image")
 			if err != nil {
@@ -640,6 +777,7 @@ func (gm *GomcpManager) registerFixedSchemaTools(registrar *runtime.StandardTool
 	gm.registerGenerateManifests(registrar, deps)
 	gm.registerValidateDockerfile(registrar, deps)
 	gm.registerScanImageSecurity(registrar, deps)
+	gm.registerScanImage(registrar, deps) // Alias for scan_image_security
 	gm.registerScanSecrets(registrar, deps)
 	return nil
 }
@@ -647,7 +785,7 @@ func (gm *GomcpManager) registerFixedSchemaTools(registrar *runtime.StandardTool
 // registerGenerateManifests registers the generate_manifests tool
 func (gm *GomcpManager) registerGenerateManifests(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) {
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "generate_manifests",
-		"Generate Kubernetes manifests for the containerized application",
+		"Generate Kubernetes manifests for the containerized application using session-based configuration",
 		func(ctx *gomcpserver.Context, args *deploy.AtomicGenerateManifestsArgs) (*deploy.AtomicGenerateManifestsResult, error) {
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "generate_manifests")
 			if err != nil {
@@ -715,9 +853,43 @@ func (gm *GomcpManager) registerValidateDockerfile(registrar *runtime.StandardTo
 // registerScanImageSecurity registers the scan_image_security tool
 func (gm *GomcpManager) registerScanImageSecurity(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) {
 	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_image_security",
-		"Scan Docker images for security vulnerabilities using Trivy",
+		"Scan Docker images for security vulnerabilities using Trivy and session-tracked build artifacts",
 		func(ctx *gomcpserver.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
 			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_image_security")
+			if err != nil {
+				return nil, err
+			}
+			args.SessionID = sessionID
+
+			// Convert args to map using JSON marshal/unmarshal
+			jsonData, err := json.Marshal(args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal args: %w", err)
+			}
+			var argsMap map[string]interface{}
+			if err := json.Unmarshal(jsonData, &argsMap); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal args: %w", err)
+			}
+
+			goCtx := context.WithValue(context.Background(), mcpContextKey, ctx)
+			result, err := deps.ToolOrchestrator.ExecuteTool(goCtx, "scan_image_security_atomic", argsMap)
+			if err != nil {
+				return nil, err
+			}
+			if scanResult, ok := result.(*scan.AtomicScanImageSecurityResult); ok {
+				return scanResult, nil
+			}
+			return nil, fmt.Errorf("unexpected result type from scan_image_security: %T", result)
+		})
+}
+
+// registerScanImage registers the scan_image tool as an alias for scan_image_security
+func (gm *GomcpManager) registerScanImage(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) {
+	runtime.RegisterSimpleToolWithFixedSchema(registrar, "scan_image",
+		"Scan Docker images for vulnerabilities using session-tracked build artifacts",
+		func(ctx *gomcpserver.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
+			// This is an alias for scan_image_security, so we just forward the call
+			sessionID, err := gm.ensureSessionID(args.SessionID, deps, "scan_image")
 			if err != nil {
 				return nil, err
 			}

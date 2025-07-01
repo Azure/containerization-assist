@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 	"github.com/Azure/container-kit/pkg/utils"
 	"github.com/rs/zerolog"
 )
@@ -111,7 +112,18 @@ func (wm *WorkspaceManager) InitializeWorkspace(ctx context.Context, sessionID s
 	for _, subdir := range subdirs {
 		subdirPath := filepath.Join(workspaceDir, subdir)
 		if err := os.MkdirAll(subdirPath, 0o755); err != nil {
-			return "", fmt.Errorf("operation failed")
+			return "", rich.NewError().
+				Code("WORKSPACE_SUBDIRECTORY_CREATION_FAILED").
+				Message("Failed to create workspace subdirectory").
+				Type(rich.ErrTypeSystem).
+				Severity(rich.SeverityMedium).
+				Cause(err).
+				Context("session_id", sessionID).
+				Context("subdirectory", subdir).
+				Context("full_path", subdirPath).
+				Suggestion("Check directory permissions and available disk space").
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -126,11 +138,33 @@ func (wm *WorkspaceManager) CloneRepository(ctx context.Context, sessionID, repo
 
 	// Clean existing repo directory
 	if err := os.RemoveAll(repoDir); err != nil {
-		return fmt.Errorf("operation failed")
+		return rich.NewError().
+			Code("WORKSPACE_CLEANUP_FAILED").
+			Message("Failed to clean existing repository directory").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Context("repo_dir", repoDir).
+			Context("operation", "clone_preparation").
+			Suggestion("Check if directory is in use or has permission issues").
+			WithLocation().
+			Build()
 	}
 
 	if err := os.MkdirAll(repoDir, 0o755); err != nil {
-		return fmt.Errorf("operation failed")
+		return rich.NewError().
+			Code("WORKSPACE_REPO_DIRECTORY_CREATION_FAILED").
+			Message("Failed to create repository directory").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Context("repo_dir", repoDir).
+			Context("repo_url", repoURL).
+			Suggestion("Ensure workspace directory exists and has write permissions").
+			WithLocation().
+			Build()
 	}
 
 	// Check quota before cloning
@@ -145,9 +179,31 @@ func (wm *WorkspaceManager) CloneRepository(ctx context.Context, sessionID, repo
 	// Run command with context cancellation
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return fmt.Errorf("operation cancelled")
+			return rich.NewError().
+				Code("GIT_CLONE_CANCELLED").
+				Message("Git clone operation was cancelled").
+				Type(rich.ErrTypeTimeout).
+				Severity(rich.SeverityMedium).
+				Cause(ctx.Err()).
+				Context("session_id", sessionID).
+				Context("repo_url", repoURL).
+				Context("operation", "git_clone").
+				Suggestion("Retry the clone operation or check network connectivity").
+				WithLocation().
+				Build()
 		}
-		return fmt.Errorf("operation failed")
+		return rich.NewError().
+			Code("GIT_CLONE_FAILED").
+			Message("Failed to clone git repository").
+			Type(rich.ErrTypeNetwork).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Context("repo_url", repoURL).
+			Context("repo_dir", repoDir).
+			Suggestion("Check repository URL, network connectivity, and authentication if required").
+			WithLocation().
+			Build()
 	}
 
 	// Update disk usage
@@ -214,7 +270,18 @@ func (wm *WorkspaceManager) CleanupWorkspace(ctx context.Context, sessionID stri
 	workspaceDir := filepath.Join(wm.baseDir, sessionID)
 
 	if err := os.RemoveAll(workspaceDir); err != nil {
-		return fmt.Errorf("operation failed")
+		return rich.NewError().
+			Code("WORKSPACE_CLEANUP_FAILED").
+			Message("Failed to clean up session workspace").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Context("workspace_dir", workspaceDir).
+			Context("operation", "session_cleanup").
+			Suggestion("Check if workspace is in use or has permission issues - may need manual cleanup").
+			WithLocation().
+			Build()
 	}
 
 	// Remove from disk usage tracking
@@ -244,15 +311,45 @@ func (wm *WorkspaceManager) CheckQuota(sessionID string, additionalBytes int64) 
 
 	// Check per-session quota
 	if currentUsage+additionalBytes > wm.maxSizePerSession {
-		return fmt.Errorf("SESSION_QUOTA_EXCEEDED: session disk quota would be exceeded: %d + %d > %d",
-			currentUsage, additionalBytes, wm.maxSizePerSession)
+		return rich.NewError().
+			Code("SESSION_QUOTA_EXCEEDED").
+			Message("Session disk quota would be exceeded").
+			Type(rich.ErrTypeResource).
+			Severity(rich.SeverityHigh).
+			Context("session_id", sessionID).
+			Context("current_usage_bytes", currentUsage).
+			Context("current_usage_mb", currentUsage/1024/1024).
+			Context("requested_bytes", additionalBytes).
+			Context("requested_mb", additionalBytes/1024/1024).
+			Context("quota_bytes", wm.maxSizePerSession).
+			Context("quota_mb", wm.maxSizePerSession/1024/1024).
+			Context("available_bytes", wm.maxSizePerSession-currentUsage).
+			Context("available_mb", (wm.maxSizePerSession-currentUsage)/1024/1024).
+			Suggestion("Clean up unused files in the workspace or request a quota increase").
+			WithLocation().
+			Build()
 	}
 
 	// Check global quota
 	totalUsage := wm.getTotalDiskUsage()
 	if totalUsage+additionalBytes > wm.totalMaxSize {
-		return fmt.Errorf("GLOBAL_QUOTA_EXCEEDED: global disk quota would be exceeded: %d + %d > %d",
-			totalUsage, additionalBytes, wm.totalMaxSize)
+		return rich.NewError().
+			Code("GLOBAL_QUOTA_EXCEEDED").
+			Message("Global disk quota would be exceeded").
+			Type(rich.ErrTypeResource).
+			Severity(rich.SeverityCritical).
+			Context("session_id", sessionID).
+			Context("total_usage_bytes", totalUsage).
+			Context("total_usage_gb", totalUsage/1024/1024/1024).
+			Context("requested_bytes", additionalBytes).
+			Context("requested_mb", additionalBytes/1024/1024).
+			Context("global_quota_bytes", wm.totalMaxSize).
+			Context("global_quota_gb", wm.totalMaxSize/1024/1024/1024).
+			Context("available_bytes", wm.totalMaxSize-totalUsage).
+			Context("available_gb", (wm.totalMaxSize-totalUsage)/1024/1024/1024).
+			Suggestion("Contact administrator to increase global quota or clean up other sessions").
+			WithLocation().
+			Build()
 	}
 
 	return nil
@@ -286,7 +383,18 @@ func (wm *WorkspaceManager) UpdateDiskUsage(ctx context.Context, sessionID strin
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("operation failed")
+		return rich.NewError().
+			Code("DISK_USAGE_CALCULATION_FAILED").
+			Message("Failed to calculate disk usage for workspace").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Context("workspace_dir", workspaceDir).
+			Context("partial_size_bytes", totalSize).
+			Suggestion("Check workspace directory permissions and filesystem health").
+			WithLocation().
+			Build()
 	}
 
 	wm.mutex.Lock()

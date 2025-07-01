@@ -110,7 +110,8 @@ func TestRegisterTool_DuplicateName(t *testing.T) {
 	// Try to register second tool with same name
 	err = RegisterTool[TestArgs, TestResult](registry, tool2)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "registry operation failed")
+	assert.Contains(t, err.Error(), "TOOL_ALREADY_REGISTERED")
+	assert.Contains(t, err.Error(), "Tool with this name is already registered")
 }
 
 func TestRegisterTool_FrozenRegistry(t *testing.T) {
@@ -121,7 +122,8 @@ func TestRegisterTool_FrozenRegistry(t *testing.T) {
 	err := RegisterTool[TestArgs, TestResult](registry, tool)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "registry operation failed")
+	assert.Contains(t, err.Error(), "REGISTRY_FROZEN")
+	assert.Contains(t, err.Error(), "Cannot register tool on frozen registry")
 }
 
 func TestRegisterTool_SchemaGeneration(t *testing.T) {
@@ -283,7 +285,8 @@ func TestToolRegistry_ExecuteTool_InvalidJSON(t *testing.T) {
 
 	_, err = registry.ExecuteTool(context.Background(), "json_tool", invalidJSON)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "registry operation failed")
+	assert.Contains(t, err.Error(), "TOOL_PARAMETER_UNMARSHAL_FAILED")
+	assert.Contains(t, err.Error(), "Failed to unmarshal tool parameters")
 }
 
 func TestToolRegistry_ExecuteTool_PreValidationError(t *testing.T) {

@@ -117,15 +117,17 @@ type GenerateDockerfileArgs struct {
 
 // GenerateDockerfileResult represents the result of generating a Dockerfile
 type GenerateDockerfileResult struct {
-	Content      string      `json:"content"`
-	BaseImage    string      `json:"base_image"`
-	ExposedPorts []int       `json:"exposed_ports"`
-	HealthCheck  string      `json:"health_check,omitempty"`
-	BuildSteps   []string    `json:"build_steps"`
-	Template     string      `json:"template_used"`
-	FilePath     string      `json:"file_path"`
-	Message      string      `json:"message,omitempty"`
-	Validation   interface{} `json:"validation,omitempty"`
+	SessionID      string      `json:"session_id"`
+	Content        string      `json:"content"`
+	BaseImage      string      `json:"base_image"`
+	ExposedPorts   []int       `json:"exposed_ports"`
+	HealthCheck    string      `json:"health_check,omitempty"`
+	BuildSteps     []string    `json:"build_steps"`
+	Template       string      `json:"template_used"`
+	FilePath       string      `json:"file_path"`
+	DockerfilePath string      `json:"dockerfile_path"`
+	Message        string      `json:"message,omitempty"`
+	Validation     interface{} `json:"validation,omitempty"`
 
 	TemplateSelection *TemplateSelectionContext `json:"template_selection,omitempty"`
 	OptimizationHints *OptimizationContext      `json:"optimization_hints,omitempty"`

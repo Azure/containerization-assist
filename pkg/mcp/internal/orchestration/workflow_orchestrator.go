@@ -6,15 +6,41 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
+
+// ContextSharer interface for type safety
+// DEPRECATED: Use TypedContextSharer for type-safe context sharing
+type ContextSharer interface {
+	ShareContext(sessionID string, context map[string]interface{}) error
+	GetSharedContext(sessionID string) (map[string]interface{}, error)
+}
+
+// TypedContextSharer provides type-safe context sharing
+type TypedContextSharer interface {
+	ShareTypedContext(sessionID string, context *SharedContext) error
+	GetTypedSharedContext(sessionID string) (*SharedContext, error)
+}
+
+// SharedContext represents typed shared context data
+type SharedContext struct {
+	SessionID     string            `json:"session_id"`
+	WorkflowID    string            `json:"workflow_id"`
+	Stage         string            `json:"stage"`
+	Status        string            `json:"status"`
+	LastUpdated   time.Time         `json:"last_updated"`
+	ToolResults   map[string]string `json:"tool_results"`
+	Configuration map[string]string `json:"configuration"`
+	Metadata      map[string]string `json:"metadata"`
+}
 
 // WorkflowOrchestrator manages workflow execution and coordination
 type WorkflowOrchestrator struct {
 	logger            zerolog.Logger
-	sessionManager    interface{}                  // Session manager
-	toolRegistry      interface{}                  // Tool registry
-	contextSharer     interface{}                  // Context sharer
+	sessionManager    core.ToolSessionManager      // Session manager
+	toolRegistry      *MCPToolRegistry             // Tool registry
+	contextSharer     ContextSharer                // Context sharer
 	executionSessions map[string]*ExecutionSession // Active execution sessions
 	mutex             sync.RWMutex
 	engine            *Engine                  // Workflow engine
@@ -23,23 +49,43 @@ type WorkflowOrchestrator struct {
 	persistence       *WorkflowPersistence     // Persistence manager
 }
 
-// NewWorkflowOrchestrator creates a new workflow orchestrator
-// Accepts db, registryAdapter, toolOrchestrator, logger as parameters
+// NewWorkflowOrchestrator creates a new workflow orchestrator with typed dependencies
+// Deprecated: Use NewWorkflowOrchestratorTyped for type-safe construction
 func NewWorkflowOrchestrator(deps ...interface{}) *WorkflowOrchestrator {
 	var logger zerolog.Logger
-	// Extract logger from the last parameter (expected to be logger)
-	if len(deps) > 0 {
-		if l, ok := deps[len(deps)-1].(zerolog.Logger); ok {
-			logger = l
-		} else {
-			logger = zerolog.Nop()
+	var sessionManager core.ToolSessionManager
+	var toolRegistry *MCPToolRegistry
+	var contextSharer ContextSharer
+
+	// Extract dependencies from variadic args for backward compatibility
+	for _, dep := range deps {
+		switch v := dep.(type) {
+		case zerolog.Logger:
+			logger = v
+		case core.ToolSessionManager:
+			sessionManager = v
+		case *MCPToolRegistry:
+			toolRegistry = v
+		case ContextSharer:
+			contextSharer = v
 		}
-	} else {
+	}
+
+	if logger.GetLevel() == zerolog.Disabled {
 		logger = zerolog.Nop()
 	}
 
+	return NewWorkflowOrchestratorTyped(sessionManager, toolRegistry, contextSharer, logger)
+}
+
+// NewWorkflowOrchestratorTyped creates a new workflow orchestrator with fully typed dependencies
+func NewWorkflowOrchestratorTyped(sessionManager core.ToolSessionManager, toolRegistry *MCPToolRegistry, contextSharer ContextSharer, logger zerolog.Logger) *WorkflowOrchestrator {
+
 	orchestrator := &WorkflowOrchestrator{
 		logger:            logger.With().Str("component", "workflow_orchestrator").Logger(),
+		sessionManager:    sessionManager,
+		toolRegistry:      toolRegistry,
+		contextSharer:     contextSharer,
 		executionSessions: make(map[string]*ExecutionSession),
 		engine:            NewEngine(),
 		workflowSpecs:     make(map[string]*WorkflowSpec),

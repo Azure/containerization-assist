@@ -11,14 +11,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// LocalTransport interface for transport types
-type LocalTransport interface {
-	Serve(ctx context.Context) error
-	Stop(ctx context.Context) error
-	Name() string
-	SetHandler(handler LocalRequestHandler)
-}
-
 // StdioTransport implements core.Transport for stdio communication
 type StdioTransport struct {
 	server       server.Server
@@ -245,6 +237,6 @@ func (s *StdioTransport) CreateRecoveryResponse(originalError error, recoverySte
 }
 
 // LogTransportInfo logs transport startup information
-func LogTransportInfo(transport LocalTransport) {
+func LogTransportInfo(transport core.Transport) {
 	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on stdio transport\n")
 }
