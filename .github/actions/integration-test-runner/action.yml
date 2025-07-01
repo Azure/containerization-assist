@@ -112,6 +112,8 @@ runs:
         echo "Test Run $RUN_NAME Result: $result"
         echo "Test Run $RUN_NAME Log File: $LOG_FILE"
         echo "Test Run $RUN_NAME Log File Size: $(du -sh "$LOG_FILE" | cut -f1)"
+        # write run name output
+        echo "run-name=$RUN_NAME" >> "$GITHUB_OUTPUT"
 
         # Save result to file for artifact collection
         echo "writing result to artifacts/result.txt"
