@@ -150,18 +150,18 @@ type DockerTagTool = tools.Tool[DockerTagParams, DockerTagResult]
 
 // Helper function for validation errors
 func validationError(field, message string) error {
-	return &ValidationError{
+	return &ToolValidationError{
 		Field:   field,
 		Message: message,
 	}
 }
 
-// ValidationError represents a parameter validation error
-type ValidationError struct {
+// ToolValidationError represents a parameter validation error for build tools
+type ToolValidationError struct {
 	Field   string
 	Message string
 }
 
-func (e *ValidationError) Error() string {
+func (e *ToolValidationError) Error() string {
 	return e.Field + ": " + e.Message
 }

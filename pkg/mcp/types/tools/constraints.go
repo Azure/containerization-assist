@@ -47,7 +47,7 @@ func (c StringConstraint) Validate(value interface{}) error {
 	if !ok {
 		return fmt.Errorf("expected string, got %T", value)
 	}
-
+	
 	if c.Required && str == "" {
 		return fmt.Errorf("value is required")
 	}

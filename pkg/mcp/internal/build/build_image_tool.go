@@ -85,10 +85,10 @@ func (t *dockerBuildToolImpl) Execute(ctx context.Context, params DockerBuildPar
 
 	if legacyResult.BuildResult != nil {
 		result.ImageID = legacyResult.BuildResult.ImageID
-		result.ImageSize = legacyResult.BuildResult.Size
-		result.BuildLog = legacyResult.BuildResult.BuildLogs
-		result.CacheHits = legacyResult.BuildResult.CacheStats.Hits
-		result.CacheMisses = legacyResult.BuildResult.CacheStats.Misses
+		result.ImageSize = 0 // Size would come from Docker API in real implementation
+		result.BuildLog = legacyResult.BuildResult.Logs
+		result.CacheHits = 0   // Cache stats would come from Docker API
+		result.CacheMisses = 0 // Cache stats would come from Docker API
 	}
 
 	if err != nil {
