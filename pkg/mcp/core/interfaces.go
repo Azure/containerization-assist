@@ -16,10 +16,28 @@ import (
 
 // Tool represents the unified interface for all MCP tools.
 // This is the single Tool interface definition used throughout the system.
+// Deprecated: Use GenericTool[TParams, TResult] for type-safe tool implementations
 type Tool interface {
 	Execute(ctx context.Context, args interface{}) (interface{}, error)
 	GetMetadata() ToolMetadata
 	Validate(ctx context.Context, args interface{}) error
+}
+
+// GenericTool provides type-safe tool interface using BETA's generic types
+type GenericTool[TParams ToolParams, TResult ToolResult] interface {
+	Execute(ctx context.Context, params TParams) (TResult, error)
+	GetMetadata() ToolMetadata
+	Validate(ctx context.Context, params TParams) error
+}
+
+// ToolParams constraint for tool parameter types
+type ToolParams interface {
+	Validate() error
+}
+
+// ToolResult constraint for tool result types
+type ToolResult interface {
+	IsSuccess() bool
 }
 
 // ToolMetadata represents tool metadata information
@@ -39,8 +57,16 @@ type ToolMetadata struct {
 type ToolExample struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
-	Input       map[string]interface{} `json:"input"`
-	Output      map[string]interface{} `json:"output"`
+	Input       map[string]interface{} `json:"input"`  // Keeping interface{} for JSON compatibility
+	Output      map[string]interface{} `json:"output"` // Keeping interface{} for JSON compatibility
+}
+
+// GenericToolExample represents type-safe tool usage example
+type GenericToolExample[TParams ToolParams, TResult ToolResult] struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Input       TParams `json:"input"`
+	Output      TResult `json:"output"`
 }
 
 // ============================================================================
@@ -289,14 +315,19 @@ type MCPError struct {
 
 // BaseToolResponse provides common response structure for all tools
 type BaseToolResponse struct {
-	Success   bool                   `json:"success"`
-	Message   string                 `json:"message,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
+	Success   bool              `json:"success"`
+	Message   string            `json:"message,omitempty"`
+	Error     string            `json:"error,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"` // Changed to map[string]string for type safety
+	Timestamp time.Time         `json:"timestamp"`
 }
 
-// GetSuccess implements ToolResult interface
+// IsSuccess implements ToolResult interface
+func (b BaseToolResponse) IsSuccess() bool {
+	return b.Success
+}
+
+// GetSuccess implements legacy interface (deprecated)
 func (b BaseToolResponse) GetSuccess() bool {
 	return b.Success
 }
@@ -322,7 +353,7 @@ type Server interface {
 	GetStats() *ServerStats
 	GetSessionManagerStats() *SessionManagerStats
 	GetWorkspaceStats() *WorkspaceStats
-	GetLogger() interface{} // Returns the logger instance
+	GetLogger() interface{} // Returns the logger instance - keeping interface{} for logger compatibility
 }
 
 // ServerConfig holds configuration for the MCP server
