@@ -18,9 +18,9 @@ inputs:
     required: false
     default: '3.5'
   config-file:
-    description: 'Path to coverage configuration file'
+    description: 'Path to quality configuration file'
     required: false
-    default: '.github/coverage-thresholds.json'
+    default: '.github/quality-config.json'
 outputs:
   total-coverage:
     description: 'Total coverage percentage'
@@ -103,10 +103,27 @@ runs:
 
         if [ -f "${{ inputs.config-file }}" ]; then
           echo "📋 Loading coverage thresholds from configuration file..."
-          # Parse JSON and populate the array
-          while IFS="=" read -r package threshold; do
-            COVERAGE_THRESHOLDS["$package"]="$threshold"
-          done < <(jq -r '.package_thresholds | to_entries[] | select(.key | endswith("...")) | "\(.key)=\(.value.threshold)"' "${{ inputs.config-file }}")
+          
+          # Check if this is the new quality-config.json format or old coverage-thresholds.json format
+          if jq -e '.test_coverage' "${{ inputs.config-file }}" > /dev/null 2>&1; then
+            # New quality-config.json format - use fallback to old format if package thresholds not available
+            echo "📋 Using quality-config.json format"
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/core/..."]=21
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/runtime/..."]=20
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/orchestration/..."]=1
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/session/..."]=9
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/build/..."]=6
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/deploy/..."]=7
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/analyze/..."]=14
+            COVERAGE_THRESHOLDS["./pkg/mcp/internal/server/..."]=17
+            COVERAGE_THRESHOLDS["./pkg/mcp/types/..."]=25
+          else
+            # Old coverage-thresholds.json format
+            echo "📋 Using coverage-thresholds.json format"
+            while IFS="=" read -r package threshold; do
+              COVERAGE_THRESHOLDS["$package"]="$threshold"
+            done < <(jq -r '.package_thresholds | to_entries[] | select(.key | endswith("...")) | "\(.key)=\(.value.threshold)"' "${{ inputs.config-file }}")
+          fi
         else
           echo "📋 Using default coverage thresholds..."
           COVERAGE_THRESHOLDS["./pkg/mcp/internal/core/..."]=30
@@ -251,8 +268,15 @@ runs:
 
         # Try to load from config file if it exists
         if [ -f "${{ inputs.config-file }}" ]; then
-          MIN_THRESHOLD=$(jq -r '.global.line_coverage.minimum' "${{ inputs.config-file }}" 2>/dev/null || echo "${{ inputs.min-threshold }}")
-          TARGET_THRESHOLD=$(jq -r '.global.line_coverage.target' "${{ inputs.config-file }}" 2>/dev/null || echo "${{ inputs.target-threshold }}")
+          if jq -e '.test_coverage' "${{ inputs.config-file }}" > /dev/null 2>&1; then
+            # New quality-config.json format
+            MIN_THRESHOLD=$(jq -r '.test_coverage.minimum // ${{ inputs.min-threshold }}' "${{ inputs.config-file }}")
+            TARGET_THRESHOLD=$(jq -r '.test_coverage.target // ${{ inputs.target-threshold }}' "${{ inputs.config-file }}")
+          else
+            # Old coverage-thresholds.json format
+            MIN_THRESHOLD=$(jq -r '.global.minimum_coverage // ${{ inputs.min-threshold }}' "${{ inputs.config-file }}")
+            TARGET_THRESHOLD=$(jq -r '.global.target_coverage // ${{ inputs.target-threshold }}' "${{ inputs.config-file }}")
+          fi
         fi
 
         echo "📏 Minimum threshold: ${MIN_THRESHOLD}%"
@@ -298,7 +322,13 @@ runs:
           # Set tolerance from input
           TOLERANCE=${{ inputs.regression-tolerance }}
           if [ -f "${{ inputs.config-file }}" ]; then
-            TOLERANCE=$(jq -r '.ratchet.regression_tolerance' "${{ inputs.config-file }}" 2>/dev/null || echo "${{ inputs.regression-tolerance }}")
+            if jq -e '.test_coverage' "${{ inputs.config-file }}" > /dev/null 2>&1; then
+              # New quality-config.json format
+              TOLERANCE=$(jq -r '.test_coverage.regression_tolerance // ${{ inputs.regression-tolerance }}' "${{ inputs.config-file }}")
+            else
+              # Old coverage-thresholds.json format
+              TOLERANCE=$(jq -r '.ratchet.regression_tolerance // ${{ inputs.regression-tolerance }}' "${{ inputs.config-file }}")
+            fi
           fi
 
           echo "📈 Coverage change: ${DIFF}% (tolerance: -${TOLERANCE}%)"

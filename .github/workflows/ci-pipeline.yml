@@ -213,9 +213,7 @@ jobs:
       uses: ./.github/actions/coverage-enforcement
       with:
         go-version: '1.24'
-        min-threshold: '10'
-        target-threshold: '25'
-        regression-tolerance: '3.5'
+        config-file: '.github/quality-config.json'
 
   # Phase 5: Security Scanning (parallel with coverage)
   security-scan:
@@ -559,10 +557,7 @@ jobs:
       uses: ./.github/actions/architecture-check
       with:
         path: 'pkg/mcp'
-        complexity-threshold: '15'
-        complexity-budget: '700'
-        large-file-threshold: '800'
-        large-file-budget: '10'
+        config-file: '.github/quality-config.json'
 
     - name: Generate comprehensive PR status and summary
       uses: ./.github/actions/pr-status-generator

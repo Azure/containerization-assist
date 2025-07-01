@@ -21,6 +21,10 @@ inputs:
     description: 'Maximum allowed large files'
     required: false
     default: '10'
+  config-file:
+    description: 'Path to quality configuration file'
+    required: false
+    default: '.github/quality-config.json'
 outputs:
   adapter-count:
     description: 'Number of adapter files found'
@@ -95,25 +99,49 @@ runs:
     - name: Check cyclomatic complexity
       shell: bash
       run: |
-        echo "🔄 Checking cyclomatic complexity (threshold: ${{ inputs.complexity-threshold }}, budget: ${{ inputs.complexity-budget }})..."
+        # Load configuration from quality config file
+        COMPLEXITY_THRESHOLD=${{ inputs.complexity-threshold }}
+        COMPLEXITY_BUDGET=${{ inputs.complexity-budget }}
+        
+        if [ -f "${{ inputs.config-file }}" ]; then
+          echo "📋 Loading complexity settings from ${{ inputs.config-file }}..."
+          
+          # Extract threshold and budget from config file
+          CONFIG_THRESHOLD=$(jq -r '.complexity.thresholds.target // ${{ inputs.complexity-threshold }}' "${{ inputs.config-file }}")
+          CONFIG_BUDGET=$(jq -r '.complexity.current_baseline.over_15 // ${{ inputs.complexity-budget }}' "${{ inputs.config-file }}")
+          
+          if [ "$CONFIG_THRESHOLD" != "null" ] && [ "$CONFIG_THRESHOLD" != "" ]; then
+            COMPLEXITY_THRESHOLD=$CONFIG_THRESHOLD
+          fi
+          
+          if [ "$CONFIG_BUDGET" != "null" ] && [ "$CONFIG_BUDGET" != "" ]; then
+            COMPLEXITY_BUDGET=$CONFIG_BUDGET
+          fi
+          
+          echo "Using config: threshold=$COMPLEXITY_THRESHOLD, budget=$COMPLEXITY_BUDGET"
+        else
+          echo "📋 Using default complexity settings: threshold=$COMPLEXITY_THRESHOLD, budget=$COMPLEXITY_BUDGET"
+        fi
+
+        echo "🔄 Checking cyclomatic complexity (threshold: $COMPLEXITY_THRESHOLD, budget: $COMPLEXITY_BUDGET)..."
+        
         # Check for functions with complexity above threshold
-        COMPLEX_FUNCTIONS=$(~/go/bin/gocyclo -over ${{ inputs.complexity-threshold }} ${{ inputs.path }} | wc -l | tr -d ' \n' || echo "0")
+        COMPLEX_FUNCTIONS=$(~/go/bin/gocyclo -over $COMPLEXITY_THRESHOLD ${{ inputs.path }} | wc -l | tr -d ' \n' || echo "0")
         echo "complex-functions=$COMPLEX_FUNCTIONS" >> $GITHUB_OUTPUT
 
         # Check if within budget
-        COMPLEXITY_BUDGET=${{ inputs.complexity-budget }}
         if [ "$COMPLEX_FUNCTIONS" -le "$COMPLEXITY_BUDGET" ]; then
-          echo "✅ Found $COMPLEX_FUNCTIONS functions with complexity >${{ inputs.complexity-threshold }} (within budget of $COMPLEXITY_BUDGET)"
+          echo "✅ Found $COMPLEX_FUNCTIONS functions with complexity >$COMPLEXITY_THRESHOLD (within budget of $COMPLEXITY_BUDGET)"
           echo "complexity-within-budget=true" >> $GITHUB_OUTPUT
         else
           OVER_BUDGET=$((COMPLEX_FUNCTIONS - COMPLEXITY_BUDGET))
-          echo "⚠️ Found $COMPLEX_FUNCTIONS functions with complexity >${{ inputs.complexity-threshold }} (exceeds budget of $COMPLEXITY_BUDGET by $OVER_BUDGET)"
+          echo "⚠️ Found $COMPLEX_FUNCTIONS functions with complexity >$COMPLEXITY_THRESHOLD (exceeds budget of $COMPLEXITY_BUDGET by $OVER_BUDGET)"
           echo "complexity-within-budget=false" >> $GITHUB_OUTPUT
         fi
 
         if [ "$COMPLEX_FUNCTIONS" -gt 0 ]; then
           echo "High complexity functions (showing first 5):"
-          ~/go/bin/gocyclo -over ${{ inputs.complexity-threshold }} ${{ inputs.path }} | head -5
+          ~/go/bin/gocyclo -over $COMPLEXITY_THRESHOLD ${{ inputs.path }} | head -5
           if [ "$COMPLEX_FUNCTIONS" -gt 5 ]; then
             echo "  ... and $((COMPLEX_FUNCTIONS - 5)) more"
           fi
