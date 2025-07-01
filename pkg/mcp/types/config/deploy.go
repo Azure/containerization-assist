@@ -7,59 +7,59 @@ import (
 // DeployConfig represents typed configuration for Kubernetes deployment operations
 type DeployConfig struct {
 	// Basic deployment information
-	Name          string            `json:"name" validate:"required"`
-	Namespace     string            `json:"namespace" validate:"required"`
-	Labels        map[string]string `json:"labels,omitempty"`
-	Annotations   map[string]string `json:"annotations,omitempty"`
-	
+	Name        string            `json:"name" validate:"required"`
+	Namespace   string            `json:"namespace" validate:"required"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Image configuration
-	Image         string            `json:"image" validate:"required"`
-	ImageTag      string            `json:"image_tag,omitempty"`
-	PullPolicy    string            `json:"pull_policy,omitempty"`
-	PullSecrets   []string          `json:"pull_secrets,omitempty"`
-	
+	Image       string   `json:"image" validate:"required"`
+	ImageTag    string   `json:"image_tag,omitempty"`
+	PullPolicy  string   `json:"pull_policy,omitempty"`
+	PullSecrets []string `json:"pull_secrets,omitempty"`
+
 	// Replica configuration
-	Replicas      int32             `json:"replicas" validate:"min=1"`
-	MinReplicas   int32             `json:"min_replicas,omitempty"`
-	MaxReplicas   int32             `json:"max_replicas,omitempty"`
-	
+	Replicas    int32 `json:"replicas" validate:"min=1"`
+	MinReplicas int32 `json:"min_replicas,omitempty"`
+	MaxReplicas int32 `json:"max_replicas,omitempty"`
+
 	// Resource requirements
-	Resources     ResourceConfig    `json:"resources,omitempty"`
-	
+	Resources ResourceConfig `json:"resources,omitempty"`
+
 	// Container configuration
-	Ports         []PortConfig      `json:"ports,omitempty"`
-	Environment   map[string]string `json:"environment,omitempty"`
-	Secrets       []SecretConfig    `json:"secrets,omitempty"`
-	ConfigMaps    []ConfigMapConfig `json:"config_maps,omitempty"`
-	
+	Ports       []PortConfig      `json:"ports,omitempty"`
+	Environment map[string]string `json:"environment,omitempty"`
+	Secrets     []SecretConfig    `json:"secrets,omitempty"`
+	ConfigMaps  []ConfigMapConfig `json:"config_maps,omitempty"`
+
 	// Health checks
-	HealthCheck   HealthCheckConfig `json:"health_check,omitempty"`
-	
+	HealthCheck HealthCheckConfig `json:"health_check,omitempty"`
+
 	// Service configuration
-	Service       ServiceConfig     `json:"service,omitempty"`
-	
+	Service ServiceConfig `json:"service,omitempty"`
+
 	// Ingress configuration
-	Ingress       IngressConfig     `json:"ingress,omitempty"`
-	
+	Ingress IngressConfig `json:"ingress,omitempty"`
+
 	// Deployment strategy
-	Strategy      DeploymentStrategy `json:"strategy,omitempty"`
-	
+	Strategy DeploymentStrategy `json:"strategy,omitempty"`
+
 	// Timeout and retry configuration
-	Timeout       time.Duration     `json:"timeout" validate:"required,min=1s"`
-	Retries       int               `json:"retries" validate:"min=0,max=10"`
-	
+	Timeout time.Duration `json:"timeout" validate:"required,min=1s"`
+	Retries int           `json:"retries" validate:"min=0,max=10"`
+
 	// Security context
-	Security      SecurityConfig    `json:"security,omitempty"`
-	
+	Security SecurityConfig `json:"security,omitempty"`
+
 	// Persistence configuration
-	Persistence   []VolumeConfig    `json:"persistence,omitempty"`
-	
+	Persistence []VolumeConfig `json:"persistence,omitempty"`
+
 	// Monitoring and observability
-	Monitoring    MonitoringConfig  `json:"monitoring,omitempty"`
-	
+	Monitoring MonitoringConfig `json:"monitoring,omitempty"`
+
 	// Metadata
-	CreatedBy     string            `json:"created_by,omitempty"`
-	DeploymentID  string            `json:"deployment_id,omitempty"`
+	CreatedBy    string `json:"created_by,omitempty"`
+	DeploymentID string `json:"deployment_id,omitempty"`
 }
 
 // ResourceConfig represents resource requirements and limits
@@ -84,17 +84,17 @@ type PortConfig struct {
 
 // SecretConfig represents secret mount configuration
 type SecretConfig struct {
-	Name      string `json:"name" validate:"required"`
-	MountPath string `json:"mount_path" validate:"required"`
-	ReadOnly  bool   `json:"read_only,omitempty"`
+	Name      string      `json:"name" validate:"required"`
+	MountPath string      `json:"mount_path" validate:"required"`
+	ReadOnly  bool        `json:"read_only,omitempty"`
 	Items     []KeyToPath `json:"items,omitempty"`
 }
 
-// ConfigMapConfig represents configmap mount configuration  
+// ConfigMapConfig represents configmap mount configuration
 type ConfigMapConfig struct {
-	Name      string `json:"name" validate:"required"`
-	MountPath string `json:"mount_path" validate:"required"`
-	ReadOnly  bool   `json:"read_only,omitempty"`
+	Name      string      `json:"name" validate:"required"`
+	MountPath string      `json:"mount_path" validate:"required"`
+	ReadOnly  bool        `json:"read_only,omitempty"`
 	Items     []KeyToPath `json:"items,omitempty"`
 }
 
@@ -107,30 +107,30 @@ type KeyToPath struct {
 
 // HealthCheckConfig represents health check configuration
 type HealthCheckConfig struct {
-	Enabled             bool          `json:"enabled,omitempty"`
-	LivenessProbe       ProbeConfig   `json:"liveness_probe,omitempty"`
-	ReadinessProbe      ProbeConfig   `json:"readiness_probe,omitempty"`
-	StartupProbe        ProbeConfig   `json:"startup_probe,omitempty"`
+	Enabled        bool        `json:"enabled,omitempty"`
+	LivenessProbe  ProbeConfig `json:"liveness_probe,omitempty"`
+	ReadinessProbe ProbeConfig `json:"readiness_probe,omitempty"`
+	StartupProbe   ProbeConfig `json:"startup_probe,omitempty"`
 }
 
 // ProbeConfig represents a health check probe configuration
 type ProbeConfig struct {
-	HTTPGet             *HTTPGetAction `json:"http_get,omitempty"`
+	HTTPGet             *HTTPGetAction   `json:"http_get,omitempty"`
 	TCPSocket           *TCPSocketAction `json:"tcp_socket,omitempty"`
-	Exec                *ExecAction    `json:"exec,omitempty"`
-	InitialDelaySeconds int32          `json:"initial_delay_seconds,omitempty"`
-	PeriodSeconds       int32          `json:"period_seconds,omitempty"`
-	TimeoutSeconds      int32          `json:"timeout_seconds,omitempty"`
-	SuccessThreshold    int32          `json:"success_threshold,omitempty"`
-	FailureThreshold    int32          `json:"failure_threshold,omitempty"`
+	Exec                *ExecAction      `json:"exec,omitempty"`
+	InitialDelaySeconds int32            `json:"initial_delay_seconds,omitempty"`
+	PeriodSeconds       int32            `json:"period_seconds,omitempty"`
+	TimeoutSeconds      int32            `json:"timeout_seconds,omitempty"`
+	SuccessThreshold    int32            `json:"success_threshold,omitempty"`
+	FailureThreshold    int32            `json:"failure_threshold,omitempty"`
 }
 
 // HTTPGetAction represents an HTTP GET probe
 type HTTPGetAction struct {
-	Path   string            `json:"path,omitempty"`
-	Port   int32             `json:"port" validate:"required"`
-	Host   string            `json:"host,omitempty"`
-	Scheme string            `json:"scheme,omitempty"` // HTTP, HTTPS
+	Path    string            `json:"path,omitempty"`
+	Port    int32             `json:"port" validate:"required"`
+	Host    string            `json:"host,omitempty"`
+	Scheme  string            `json:"scheme,omitempty"` // HTTP, HTTPS
 	Headers map[string]string `json:"headers,omitempty"`
 }
 
@@ -147,12 +147,12 @@ type ExecAction struct {
 
 // ServiceConfig represents Kubernetes service configuration
 type ServiceConfig struct {
-	Enabled     bool              `json:"enabled,omitempty"`
-	Type        string            `json:"type,omitempty"` // ClusterIP, NodePort, LoadBalancer, ExternalName
-	Ports       []ServicePort     `json:"ports,omitempty"`
-	Selector    map[string]string `json:"selector,omitempty"`
-	ExternalIPs []string          `json:"external_ips,omitempty"`
-	LoadBalancerIP string         `json:"load_balancer_ip,omitempty"`
+	Enabled        bool              `json:"enabled,omitempty"`
+	Type           string            `json:"type,omitempty"` // ClusterIP, NodePort, LoadBalancer, ExternalName
+	Ports          []ServicePort     `json:"ports,omitempty"`
+	Selector       map[string]string `json:"selector,omitempty"`
+	ExternalIPs    []string          `json:"external_ips,omitempty"`
+	LoadBalancerIP string            `json:"load_balancer_ip,omitempty"`
 }
 
 // ServicePort represents a service port configuration
@@ -166,12 +166,12 @@ type ServicePort struct {
 
 // IngressConfig represents Kubernetes ingress configuration
 type IngressConfig struct {
-	Enabled     bool                `json:"enabled,omitempty"`
-	Host        string              `json:"host,omitempty"`
-	Paths       []IngressPath       `json:"paths,omitempty"`
-	TLS         []IngressTLS        `json:"tls,omitempty"`
-	Annotations map[string]string   `json:"annotations,omitempty"`
-	ClassName   string              `json:"class_name,omitempty"`
+	Enabled     bool              `json:"enabled,omitempty"`
+	Host        string            `json:"host,omitempty"`
+	Paths       []IngressPath     `json:"paths,omitempty"`
+	TLS         []IngressTLS      `json:"tls,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	ClassName   string            `json:"class_name,omitempty"`
 }
 
 // IngressPath represents an ingress path configuration
@@ -202,12 +202,12 @@ type RollingUpdateStrategy struct {
 
 // SecurityConfig represents security context configuration
 type SecurityConfig struct {
-	RunAsUser         int64  `json:"run_as_user,omitempty"`
-	RunAsGroup        int64  `json:"run_as_group,omitempty"`
-	RunAsNonRoot      bool   `json:"run_as_non_root,omitempty"`
-	ReadOnlyRootFS    bool   `json:"read_only_root_fs,omitempty"`
-	AllowPrivilegeEscalation bool `json:"allow_privilege_escalation,omitempty"`
-	Capabilities      CapabilitiesConfig `json:"capabilities,omitempty"`
+	RunAsUser                int64              `json:"run_as_user,omitempty"`
+	RunAsGroup               int64              `json:"run_as_group,omitempty"`
+	RunAsNonRoot             bool               `json:"run_as_non_root,omitempty"`
+	ReadOnlyRootFS           bool               `json:"read_only_root_fs,omitempty"`
+	AllowPrivilegeEscalation bool               `json:"allow_privilege_escalation,omitempty"`
+	Capabilities             CapabilitiesConfig `json:"capabilities,omitempty"`
 }
 
 // CapabilitiesConfig represents Linux capabilities configuration
@@ -218,27 +218,27 @@ type CapabilitiesConfig struct {
 
 // VolumeConfig represents persistent volume configuration
 type VolumeConfig struct {
-	Name         string `json:"name" validate:"required"`
-	MountPath    string `json:"mount_path" validate:"required"`
-	Size         string `json:"size,omitempty"`          // e.g., "10Gi"
-	StorageClass string `json:"storage_class,omitempty"`
+	Name         string   `json:"name" validate:"required"`
+	MountPath    string   `json:"mount_path" validate:"required"`
+	Size         string   `json:"size,omitempty"` // e.g., "10Gi"
+	StorageClass string   `json:"storage_class,omitempty"`
 	AccessModes  []string `json:"access_modes,omitempty"` // ReadWriteOnce, ReadOnlyMany, ReadWriteMany
 }
 
 // MonitoringConfig represents monitoring and observability configuration
 type MonitoringConfig struct {
-	Enabled    bool              `json:"enabled,omitempty"`
-	Metrics    MetricsConfig     `json:"metrics,omitempty"`
-	Logging    LoggingConfig     `json:"logging,omitempty"`
-	Tracing    TracingConfig     `json:"tracing,omitempty"`
+	Enabled bool          `json:"enabled,omitempty"`
+	Metrics MetricsConfig `json:"metrics,omitempty"`
+	Logging LoggingConfig `json:"logging,omitempty"`
+	Tracing TracingConfig `json:"tracing,omitempty"`
 }
 
 // MetricsConfig represents metrics collection configuration
 type MetricsConfig struct {
-	Enabled   bool   `json:"enabled,omitempty"`
-	Path      string `json:"path,omitempty"`
-	Port      int32  `json:"port,omitempty"`
-	Interval  string `json:"interval,omitempty"`
+	Enabled  bool   `json:"enabled,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Port     int32  `json:"port,omitempty"`
+	Interval string `json:"interval,omitempty"`
 }
 
 // LoggingConfig represents logging configuration
@@ -259,34 +259,34 @@ func (dc *DeployConfig) Validate() error {
 	if dc.Name == "" {
 		return NewValidationError("name", "required field cannot be empty")
 	}
-	
+
 	if dc.Namespace == "" {
 		return NewValidationError("namespace", "required field cannot be empty")
 	}
-	
+
 	if dc.Image == "" {
 		return NewValidationError("image", "required field cannot be empty")
 	}
-	
+
 	if dc.Replicas < 1 {
 		return NewValidationError("replicas", "must be at least 1")
 	}
-	
+
 	if dc.Timeout < time.Second {
 		return NewValidationError("timeout", "must be at least 1 second")
 	}
-	
+
 	if dc.Retries < 0 || dc.Retries > 10 {
 		return NewValidationError("retries", "must be between 0 and 10")
 	}
-	
+
 	// Validate ports
 	for i, port := range dc.Ports {
 		if port.ContainerPort < 1 || port.ContainerPort > 65535 {
 			return NewValidationError("ports["+string(rune(i))+"].container_port", "must be between 1 and 65535")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -295,27 +295,27 @@ func (dc *DeployConfig) SetDefaults() {
 	if dc.Namespace == "" {
 		dc.Namespace = "default"
 	}
-	
+
 	if dc.Replicas == 0 {
 		dc.Replicas = 1
 	}
-	
+
 	if dc.Timeout == 0 {
 		dc.Timeout = 5 * time.Minute
 	}
-	
+
 	if dc.Retries == 0 {
 		dc.Retries = 3
 	}
-	
+
 	if dc.ImageTag == "" {
 		dc.ImageTag = "latest"
 	}
-	
+
 	if dc.PullPolicy == "" {
 		dc.PullPolicy = "Always"
 	}
-	
+
 	// Set default resource requests
 	if dc.Resources.Requests.CPU == "" {
 		dc.Resources.Requests.CPU = "100m"
@@ -323,7 +323,7 @@ func (dc *DeployConfig) SetDefaults() {
 	if dc.Resources.Requests.Memory == "" {
 		dc.Resources.Requests.Memory = "128Mi"
 	}
-	
+
 	// Set default resource limits
 	if dc.Resources.Limits.CPU == "" {
 		dc.Resources.Limits.CPU = "500m"
@@ -331,7 +331,7 @@ func (dc *DeployConfig) SetDefaults() {
 	if dc.Resources.Limits.Memory == "" {
 		dc.Resources.Limits.Memory = "512Mi"
 	}
-	
+
 	// Set default deployment strategy
 	if dc.Strategy.Type == "" {
 		dc.Strategy.Type = "RollingUpdate"

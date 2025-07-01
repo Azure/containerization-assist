@@ -31,7 +31,7 @@ This analysis categorizes all interface{} usage in the Container Kit MCP codebas
 - Common patterns: `map[string]interface{}` for K8s manifests
 - Replacement strategy: Typed K8s resource structs
 
-### Build Package  
+### Build Package
 **Instances: 188**
 - Location: `pkg/mcp/internal/build/`
 - Impact: High - Docker build operations
