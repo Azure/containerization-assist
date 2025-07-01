@@ -9,6 +9,7 @@ import (
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	"github.com/localrivet/gomcp/server"
@@ -149,15 +150,15 @@ func (t *AtomicGenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Ge
 func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileArgs) (*core.SessionState, error) {
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("failed to get session %s: %w", args.SessionID, err)
 	}
 
-	session, ok := sessionInterface.(*core.SessionState)
+	sessionState, ok := sessionInterface.(*sessiontypes.SessionState)
 	if !ok {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("invalid session type: expected *session.SessionState, got %T", sessionInterface)
 	}
 
-	return session, nil
+	return sessionState.ToCoreSessionState(), nil
 }
 
 // selectTemplateFromSession determines template name from session analysis or user input
@@ -206,7 +207,7 @@ func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args Ge
 
 	content, err := t.previewDockerfile(templateName, args, repositoryData)
 	if err != nil {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("failed to preview Dockerfile with template %s: %w", templateName, err)
 	}
 
 	response.Content = content
@@ -231,7 +232,7 @@ func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName st
 
 	content, err := t.generateDockerfile(templateName, dockerfilePath, args, repositoryData)
 	if err != nil {
-		return fmt.Errorf("error")
+		return fmt.Errorf("failed to generate Dockerfile with template %s at path %s: %w", templateName, dockerfilePath, err)
 	}
 
 	response.Content = content
@@ -1200,16 +1201,14 @@ func (t *AtomicGenerateDockerfileTool) Validate(ctx context.Context, args interf
 			var err error
 			dockerfileArgs, err = convertToGenerateDockerfileArgs(mapArgs)
 			if err != nil {
-				return fmt.Errorf("error")
+				return fmt.Errorf("failed to convert arguments to GenerateDockerfileArgs: %w", err)
 			}
 		} else {
-			return fmt.Errorf("error")
+			return fmt.Errorf("invalid argument type: expected GenerateDockerfileArgs or map[string]interface{}, got %T", args)
 		}
 	}
 
-	if dockerfileArgs.SessionID == "" {
-		return fmt.Errorf("error")
-	}
+	// Session ID is now optional - will be auto-generated if empty
 
 	if dockerfileArgs.Optimization != "" {
 		validOptimizations := []string{"size", "security", "speed", "balanced"}
@@ -1221,7 +1220,7 @@ func (t *AtomicGenerateDockerfileTool) Validate(ctx context.Context, args interf
 			}
 		}
 		if !valid {
-			return fmt.Errorf("error")
+			return fmt.Errorf("invalid optimization parameter '%s': must be one of [size, security, speed, balanced]", dockerfileArgs.Optimization)
 		}
 	}
 

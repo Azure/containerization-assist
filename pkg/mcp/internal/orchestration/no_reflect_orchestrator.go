@@ -92,7 +92,7 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 	// Get the args map
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("invalid arguments: expected map[string]interface{}, got %T", args)
 	}
 
 	// Type-safe dispatch based on tool name
@@ -121,8 +121,10 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 		return o.executeGenerateDockerfile(ctx, argsMap)
 	case "validate_dockerfile_atomic":
 		return o.executeValidateDockerfile(ctx, argsMap)
+	case "validate_deployment":
+		return o.executeValidateDeployment(ctx, argsMap)
 	default:
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
 }
 
@@ -147,51 +149,50 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 		return fmt.Errorf("arguments must be a map[string]interface{}")
 	}
 
-	// Check for session_id (required for all tools)
-	if _, exists := argsMap["session_id"]; !exists {
-		return fmt.Errorf("error")
-	}
+	// session_id is optional - will be auto-generated if not provided
 
 	// Tool-specific validation
 	switch toolName {
 	case "analyze_repository_atomic":
 		if _, exists := argsMap["repo_url"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: repo_url")
 		}
 	case "build_image_atomic":
 		if _, exists := argsMap["image_name"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: image_name")
 		}
 	case "push_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: image_ref")
 		}
 	case "pull_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: image_ref")
 		}
 	case "tag_image_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: image_ref")
 		}
 		if _, exists := argsMap["new_tag"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: new_tag")
 		}
 	case "scan_image_security_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: image_ref")
 		}
 	case "generate_manifests_atomic":
 		if _, exists := argsMap["image_ref"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: image_ref")
 		}
 		if _, exists := argsMap["app_name"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: app_name")
 		}
 	case "deploy_kubernetes_atomic":
 		if _, exists := argsMap["manifest_path"]; !exists {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: manifest_path")
 		}
+	case "validate_deployment":
+		// All parameters are optional for validate_deployment
 	}
 
 	return nil
@@ -201,7 +202,7 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 
 func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
 	if o.toolFactory == nil {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("tool factory not initialized")
 	}
 
 	// Convert args to typed struct

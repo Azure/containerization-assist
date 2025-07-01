@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// mcp import removed - using mcptypes
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
@@ -152,7 +153,8 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 		result.TotalDuration = time.Since(startTime)
 		return result, utils.NewSessionNotFound(args.SessionID)
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 	// Set session details
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)

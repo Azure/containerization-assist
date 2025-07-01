@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -512,4 +513,22 @@ func contains(s, substr string) bool {
 	s = strings.ToLower(s)
 	substr = strings.ToLower(substr)
 	return strings.Contains(s, substr)
+}
+
+// ToCoreSessionState converts internal SessionState to core.SessionState
+func (s *SessionState) ToCoreSessionState() *core.SessionState {
+	return &core.SessionState{
+		SessionID:    s.SessionID,
+		CreatedAt:    s.CreatedAt,
+		ExpiresAt:    s.ExpiresAt,
+		UpdatedAt:    s.LastAccessed,
+		WorkspaceDir: s.WorkspaceDir,
+		// Map other commonly used fields
+		RepoURL:             s.RepoURL,
+		RepositoryAnalyzed:  len(s.RepoAnalysis) > 0,
+		DockerfileGenerated: len(s.Dockerfile.Content) > 0,
+		DockerfilePath:      s.Dockerfile.Path,
+		ImageBuilt:          s.Dockerfile.Built,
+		ImageRef:            s.ImageRef.Repository,
+	}
 }

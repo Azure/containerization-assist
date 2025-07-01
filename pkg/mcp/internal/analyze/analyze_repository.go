@@ -32,7 +32,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 	// Convert args to map if needed
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("invalid arguments: expected map[string]interface{}, got %T", args)
 	}
 
 	// Extract required fields
@@ -45,7 +45,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 	if !ok {
 		repoPath, ok = argsMap["path"].(string) // Try alternative field name
 		if !ok {
-			return nil, fmt.Errorf("error")
+			return nil, fmt.Errorf("missing required parameter: 'repo_path' or 'path' must be provided")
 		}
 	}
 
@@ -66,7 +66,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 	// Type assert to get the actual result
 	result, ok := resultInterface.(*AtomicAnalysisResult)
 	if !ok {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("unexpected result type from atomic tool: expected *AtomicAnalysisResult, got %T", resultInterface)
 	}
 
 	// Convert result to legacy format if needed
@@ -92,7 +92,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args interface{}) error {
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("error")
+		return fmt.Errorf("invalid arguments: expected map[string]interface{}, got %T", args)
 	}
 
 	// Check required fields - session ID is optional, will be generated if missing
@@ -103,7 +103,7 @@ func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args inter
 	// Check for repo_path or path
 	if repoPath, ok := argsMap["repo_path"].(string); !ok || repoPath == "" {
 		if path, ok := argsMap["path"].(string); !ok || path == "" {
-			return fmt.Errorf("error")
+			return fmt.Errorf("missing required parameter: 'repo_path' or 'path' must be provided")
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
@@ -356,7 +357,8 @@ func (t *AtomicDeployKubernetesTool) executeDeploymentCore(ctx context.Context, 
 		result.Success = false
 		return result, fmt.Errorf("failed to get session: %w", err)
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 
 	if result.AppName == "" {

@@ -149,12 +149,15 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 		sessionInterface, err := ch.sessionManager.GetSession(sessionID)
 		if err == nil && sessionInterface != nil {
 			// Type assert to concrete session type
-			if session, ok := sessionInterface.(*core.SessionState); ok && session.Metadata != nil {
-				if repoAnalysis, ok := session.Metadata["repo_analysis"].(map[string]interface{}); ok {
-					if sessionCtx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
-						if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
-							// Override user preferences when autopilot is explicitly enabled
-							userPrefs.SkipConfirmations = true
+			if sessionState, ok := sessionInterface.(*session.SessionState); ok {
+				coreSession := sessionState.ToCoreSessionState()
+				if coreSession.Metadata != nil {
+					if repoAnalysis, ok := coreSession.Metadata["repo_analysis"].(map[string]interface{}); ok {
+						if sessionCtx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
+							if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
+								// Override user preferences when autopilot is explicitly enabled
+								userPrefs.SkipConfirmations = true
+							}
 						}
 					}
 				}

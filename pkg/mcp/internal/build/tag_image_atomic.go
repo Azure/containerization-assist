@@ -13,6 +13,7 @@ import (
 	// "github.com/Azure/container-kit/pkg/mcp/internal/runtime" // Temporarily commented to avoid import cycle
 
 	// mcp import removed - using mcptypes
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
@@ -208,20 +209,20 @@ func (t *AtomicTagImageTool) Validate(ctx context.Context, args interface{}) err
 		return fmt.Errorf("invalid argument type for atomic_tag_image")
 	}
 	if tagArgs.SourceImage == "" {
-		return fmt.Errorf("validation error")
+		return fmt.Errorf("source image is required for tag operation")
 	}
 	if tagArgs.TargetImage == "" {
-		return fmt.Errorf("validation error")
+		return fmt.Errorf("target image is required for tag operation")
 	}
 	if tagArgs.SessionID == "" {
-		return fmt.Errorf("validation error")
+		return fmt.Errorf("session ID is required for tag operation")
 	}
 	// Validate image reference formats
 	if !t.isValidImageReference(tagArgs.SourceImage) {
-		return fmt.Errorf("validation error")
+		return fmt.Errorf("invalid source image reference format")
 	}
 	if !t.isValidImageReference(tagArgs.TargetImage) {
-		return fmt.Errorf("validation error")
+		return fmt.Errorf("invalid target image reference format")
 	}
 	return nil
 }
@@ -236,7 +237,8 @@ func (t *AtomicTagImageTool) executeTagWithCallback(ctx context.Context, args At
 	if err != nil {
 		return fmt.Errorf("session not found: %s", args.SessionID)
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 
 	// Report initial progress
 	progress(0.1, "Starting image tag operation")
@@ -353,7 +355,8 @@ func (t *AtomicTagImageTool) ExecuteTag(ctx context.Context, args AtomicTagImage
 		return result, fmt.Errorf("session not found: %s", args.SessionID)
 	}
 
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 
@@ -443,7 +446,8 @@ func (t *AtomicTagImageTool) executeWithoutProgress(ctx context.Context, args At
 		return result, fmt.Errorf("session not found: %s", args.SessionID)
 	}
 
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 

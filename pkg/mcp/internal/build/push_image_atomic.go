@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// "github.com/Azure/container-kit/pkg/mcp/internal/runtime" // Temporarily commented to avoid import cycle
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
@@ -166,7 +167,8 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 		return result, fmt.Errorf("session not found: %s", args.SessionID)
 	}
 
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 	result.SessionID = session.SessionID
 	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
 
@@ -264,7 +266,8 @@ func (t *AtomicPushImageTool) executePushWithCallback(ctx context.Context, args 
 	if err != nil {
 		return fmt.Errorf("session not found: %s", args.SessionID)
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 
 	// Report initial progress
 	progress(0.1, "Starting image push operation")

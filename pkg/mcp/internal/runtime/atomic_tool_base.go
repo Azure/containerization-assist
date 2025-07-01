@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
@@ -63,14 +62,8 @@ func (base *AtomicToolBase) ValidateAndPrepareExecution(
 		}
 	}
 
-	// Validate session ID
-	if strings.TrimSpace(sessionID) == "" {
-		base.logger.Error().Msg("Session ID is required and cannot be empty")
-		return nil, fmt.Errorf("atomic tool operation failed")
-	}
-
-	// Get session using our *session.SessionManager interface
-	session, err := base.sessionManager.GetSession(sessionID)
+	// Get or create session - sessionID can be empty for auto-creation
+	session, err := base.sessionManager.GetOrCreateSession(sessionID)
 	if err != nil {
 		base.logger.Error().Err(err).Str("session_id", sessionID).Msg("Failed to get session")
 		return nil, fmt.Errorf("atomic tool operation failed")

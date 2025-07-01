@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	constants "github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	"github.com/localrivet/gomcp/server"
@@ -229,7 +230,8 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, nil
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -957,16 +959,16 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() core.ToolMetadata {
 func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
-		return fmt.Errorf("error")
+		return fmt.Errorf("invalid argument type for dockerfile validation")
 	}
 
 	if validateArgs.SessionID == "" {
-		return fmt.Errorf("error")
+		return fmt.Errorf("session ID is required for dockerfile validation")
 	}
 
 	// Must provide either path or content
 	if validateArgs.DockerfilePath == "" && validateArgs.DockerfileContent == "" {
-		return fmt.Errorf("error")
+		return fmt.Errorf("either dockerfile_path or dockerfile_content is required")
 	}
 
 	if validateArgs.Severity != "" {
@@ -974,7 +976,7 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 			"info": true, "warning": true, "error": true,
 		}
 		if !validSeverities[strings.ToLower(validateArgs.Severity)] {
-			return fmt.Errorf("error")
+			return fmt.Errorf("invalid severity level: %s, valid options are info, warning, error", validateArgs.Severity)
 		}
 	}
 
@@ -984,7 +986,7 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 func (t *AtomicValidateDockerfileTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("invalid argument type for typed dockerfile validation")
 	}
 
 	return t.ExecuteTyped(ctx, validateArgs)

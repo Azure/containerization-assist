@@ -368,7 +368,9 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*cor
 	if sessionID != "" {
 		sessionInterface, err := t.sessionManager.GetSession(sessionID)
 		if err == nil {
-			session := sessionInterface.(*core.SessionState)
+			// Convert from internal session.SessionState to core.SessionState
+			sessionState := sessionInterface.(*sessiontypes.SessionState)
+			session := sessionState.ToCoreSessionState()
 			// Check if session is expired
 			if time.Now().After(session.ExpiresAt) {
 				t.logger.Info().
@@ -389,7 +391,8 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*cor
 				if err != nil {
 					return nil, mcperror.NewSessionNotFound("replacement_session")
 				}
-				newSession := newSessionInterface.(*core.SessionState)
+				newSessionState := newSessionInterface.(*sessiontypes.SessionState)
+				newSession := newSessionState.ToCoreSessionState()
 				if newSession.Metadata == nil {
 					newSession.Metadata = make(map[string]interface{})
 				}
@@ -415,7 +418,8 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*cor
 	if err != nil {
 		return nil, mcperror.NewSessionNotFound("new_session")
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 
 	t.logger.Info().Str("session_id", session.SessionID).Msg("Created new session for repository analysis")
 	return session, nil
@@ -426,7 +430,8 @@ func (t *AtomicAnalyzeRepositoryTool) cloneRepository(ctx context.Context, sessi
 	if err != nil {
 		return nil, err
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 
 	cloneOpts := CloneOptions{
 		RepoURL:   args.RepoURL,
@@ -634,11 +639,7 @@ func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interfa
 		})
 	}
 
-	if analyzeArgs.SessionID == "" {
-		return mcperror.NewWithData("missing_required_field", "SessionID is required", map[string]interface{}{
-			"field": "session_id",
-		})
-	}
+	// SessionID is optional - will be auto-generated if empty
 
 	return nil
 }

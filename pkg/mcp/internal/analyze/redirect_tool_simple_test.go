@@ -51,8 +51,8 @@ func TestAnalyzeRepositoryRedirectTool_Execute_InvalidArgType_Simple(t *testing.
 	}
 
 	// Check that error contains expected message
-	if !strings.Contains(err.Error(), "error") {
-		t.Errorf("Expected error to contain 'error', got '%s'", err.Error())
+	if !strings.Contains(err.Error(), "invalid arguments") {
+		t.Errorf("Expected error to contain 'invalid arguments', got '%s'", err.Error())
 	}
 }
 
@@ -81,8 +81,8 @@ func TestAnalyzeRepositoryRedirectTool_Execute_MissingPath_Simple(t *testing.T) 
 	}
 
 	// Check that error contains expected message
-	if !strings.Contains(err.Error(), "error") {
-		t.Errorf("Expected error to contain 'error', got '%s'", err.Error())
+	if !strings.Contains(err.Error(), "missing required parameter") {
+		t.Errorf("Expected error to contain 'missing required parameter', got '%s'", err.Error())
 	}
 }
 

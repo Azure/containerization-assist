@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
@@ -266,7 +267,8 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 		// Session retrieval error is returned directly
 		return result, nil
 	}
-	session := sessionInterface.(*core.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 
 	// Build label selector
 	labelSelector := t.buildLabelSelector(args, session)
@@ -489,7 +491,7 @@ func (t *AtomicCheckHealthTool) performHealthCheck(ctx context.Context, args Ato
 // validateHealthCheckPrerequisites validates health check prerequisites
 func (t *AtomicCheckHealthTool) validateHealthCheckPrerequisites(result *AtomicCheckHealthResult, args AtomicCheckHealthArgs) error {
 	if args.AppName == "" && args.LabelSelector == "" {
-		return fmt.Errorf("error")
+		return fmt.Errorf("either app_name or label_selector is required for health check")
 	}
 
 	return nil
@@ -982,16 +984,16 @@ func (t *AtomicCheckHealthTool) GetMetadata() core.ToolMetadata {
 func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) error {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
-		return fmt.Errorf("error")
+		return fmt.Errorf("invalid argument type for health check")
 	}
 
 	if healthArgs.SessionID == "" {
-		return fmt.Errorf("error")
+		return fmt.Errorf("session ID is required for health check")
 	}
 
 	// Validate either app_name or label_selector is provided
 	if healthArgs.AppName == "" && healthArgs.LabelSelector == "" {
-		return fmt.Errorf("error")
+		return fmt.Errorf("either app_name or label_selector is required for health check")
 	}
 
 	return nil
@@ -1001,7 +1003,7 @@ func (t *AtomicCheckHealthTool) Validate(ctx context.Context, args interface{}) 
 func (t *AtomicCheckHealthTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	healthArgs, ok := args.(AtomicCheckHealthArgs)
 	if !ok {
-		return nil, fmt.Errorf("error")
+		return nil, fmt.Errorf("invalid argument type for typed health check")
 	}
 
 	// Call the typed Execute method

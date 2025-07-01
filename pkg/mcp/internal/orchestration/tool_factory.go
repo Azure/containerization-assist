@@ -164,9 +164,19 @@ func (f *ToolFactory) CreateTool(toolName string) (interface{}, error) {
 		return f.CreateGenerateDockerfileTool(), nil
 	case "validate_dockerfile":
 		return f.CreateValidateDockerfileTool(), nil
+	case "validate_deployment":
+		return f.CreateValidateDeploymentTool(), nil
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
+}
+
+// CreateValidateDeploymentTool creates an instance of AtomicValidateDeploymentTool
+func (f *ToolFactory) CreateValidateDeploymentTool() *deploy.AtomicValidateDeploymentTool {
+	tool := deploy.NewAtomicValidateDeploymentTool(f.logger, "", nil, nil)
+	initializer := NewDeployToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "validate_deployment")
+	return tool
 }
 
 // GetEnhancedBuildAnalyzer returns the enhanced build analyzer instance
