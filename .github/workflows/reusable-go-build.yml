@@ -363,7 +363,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && inputs.coverage }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.out
           flags: ${{ inputs.coverage-flags }}
