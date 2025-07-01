@@ -77,7 +77,7 @@ runs:
 
         # Generate run name
         REPO_NAME_WITHOUT_SLASH=$(echo "${{ inputs.repository }}" | sed 's|/|.|g' )
-      echo "replacing repo slashes with dots: $REPO_NAME_WITHOUT_SLASH"
+        echo "replacing repo slashes with dots: $REPO_NAME_WITHOUT_SLASH"
         RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ inputs.test-number }}"
         echo "writing run name to gh ouput: $RUN_NAME"
         echo "run-name=$RUN_NAME" >> $GITHUB_OUTPUT
