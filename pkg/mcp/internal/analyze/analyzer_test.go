@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/Azure/container-kit/pkg/mcp/internal/config" // TODO: uncomment when test is updated
+	"github.com/Azure/container-kit/pkg/mcp/internal/config"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -114,44 +114,40 @@ func TestCreateAnalyzerFromEnv(t *testing.T) {
 	assert.IsType(t, &StubAnalyzer{}, analyzer)
 }
 
-// TODO: Update this test to work with new config system
-// LoadFromEnv is now handled by config.ConfigManager
-/*
 func TestAnalyzerConfig_LoadFromEnv(t *testing.T) {
 	tests := []struct {
-		name     string
-		envVars  map[string]string
-		expected *config.AnalyzerConfig
+		name      string
+		envVars   map[string]string
+		checkFunc func(t *testing.T, cm *config.ConfigManager)
 	}{
 		{
 			name: "all valid values",
 			envVars: map[string]string{
-				"MCP_ENABLE_AI_ANALYZER":         "true",
-				"MCP_ANALYZER_LOG_LEVEL":         "debug",
-				"MCP_ANALYZER_MAX_PROMPT_LENGTH": "8192",
-				"MCP_ANALYZER_CACHE_ENABLED":     "true",
-				"MCP_ANALYZER_CACHE_TTL":         "600",
+				"MCP_ANALYZER_ENABLE_AI":             "true",
+				"MCP_ANALYZER_AI_LOG_LEVEL":          "debug",
+				"MCP_ANALYZER_MAX_ANALYSIS_TIME":     "30s",
+				"MCP_ANALYZER_ENABLE_FILE_DETECTION": "true",
+				"MCP_ANALYZER_CACHE_RESULTS":         "true",
+				"MCP_ANALYZER_CACHE_TTL":             "10m",
 			},
-			expected: &config.AnalyzerConfig{
-				EnableAI:        true,
-				LogLevel:        "debug",
-				MaxPromptLength: 8192,
-				CacheEnabled:    true,
-				CacheTTLSeconds: 600,
+			checkFunc: func(t *testing.T, cm *config.ConfigManager) {
+				assert.True(t, cm.Analyzer.EnableAI)
+				assert.Equal(t, "debug", cm.Analyzer.AIAnalyzerLogLevel)
+				assert.Equal(t, 30*time.Second, cm.Analyzer.MaxAnalysisTime)
+				assert.True(t, cm.Analyzer.EnableFileDetection)
+				assert.True(t, cm.Analyzer.CacheResults)
+				assert.Equal(t, 10*time.Minute, cm.Analyzer.CacheTTL)
 			},
 		},
 		{
-			name: "invalid numeric values use defaults",
-			envVars: map[string]string{
-				"MCP_ANALYZER_MAX_PROMPT_LENGTH": "not-a-number",
-				"MCP_ANALYZER_CACHE_TTL":         "invalid",
-			},
-			expected: &config.AnalyzerConfig{
-				EnableAI:        false,
-				LogLevel:        "info",
-				MaxPromptLength: 4096, // default
-				CacheEnabled:    true,
-				CacheTTLSeconds: 300, // default
+			name:    "defaults when env not set",
+			envVars: map[string]string{},
+			checkFunc: func(t *testing.T, cm *config.ConfigManager) {
+				// Check that defaults are applied
+				assert.False(t, cm.Analyzer.EnableAI)
+				// Default log level is "info" when not set
+				assert.Equal(t, "info", cm.Analyzer.AIAnalyzerLogLevel)
+				assert.Greater(t, cm.Analyzer.MaxAnalysisTime, time.Duration(0))
 			},
 		},
 	}
@@ -163,18 +159,13 @@ func TestAnalyzerConfig_LoadFromEnv(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			config := &config.AnalyzerConfig{
-				EnableAI: true,
-				MaxAnalysisTime: 60 * time.Second,
-			}
-			config.LoadFromEnv()
+			// Create ConfigManager and load from env
+			cm := config.NewConfigManager()
+			err := cm.LoadConfig("")
+			assert.NoError(t, err)
 
-			assert.Equal(t, tt.expected.EnableAI, config.EnableAI)
-			assert.Equal(t, tt.expected.LogLevel, config.LogLevel)
-			assert.Equal(t, tt.expected.MaxPromptLength, config.MaxPromptLength)
-			assert.Equal(t, tt.expected.CacheEnabled, config.CacheEnabled)
-			assert.Equal(t, tt.expected.CacheTTLSeconds, config.CacheTTLSeconds)
+			// Run check function
+			tt.checkFunc(t, cm)
 		})
 	}
 }
-*/

@@ -377,10 +377,22 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*cor
 					Str("session_id", sessionID).
 					Time("expired_at", session.ExpiresAt).
 					Msg("Session has expired, will create new session and attempt to resume")
+				// Check if session had previous analysis results
+				hadAnalysis := false
+				if session.Metadata != nil {
+					if _, hasAnalysis := session.Metadata["analysis_completed"]; hasAnalysis {
+						hadAnalysis = true
+					}
+					// Also check for dockerfile info as indicator of analysis
+					if _, hasDockerfile := session.Metadata["dockerfile_created"]; hasDockerfile {
+						hadAnalysis = true
+					}
+				}
+
 				oldSessionInfo := map[string]interface{}{
 					"old_session_id": sessionID,
 					"expired_at":     session.ExpiresAt,
-					"had_analysis":   false, // TODO: Check metadata for previous analysis
+					"had_analysis":   hadAnalysis,
 				}
 				if session.Metadata != nil {
 					if repoURL, ok := session.Metadata["repo_url"].(string); ok && repoURL != "" {

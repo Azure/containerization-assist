@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -82,20 +82,12 @@ func (tvr *TypedValidationResult) AddError(field, message, code string, value in
 // ValidateString validates string fields with type safety
 func (tv *TypedValidator) ValidateString(value, fieldName string, required bool, validators ...func(string) error) error {
 	if required && IsEmpty(value) {
-		return types.NewValidationErrorBuilder(
-			fmt.Sprintf("Required field '%s' cannot be empty", fieldName),
-			fieldName,
-			value,
-		).WithOperation("validate_string").Build()
+		return errors.Validationf("validator", "Required field '%s' cannot be empty", fieldName)
 	}
 
 	for _, validator := range validators {
 		if err := validator(value); err != nil {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Validation failed for field '%s': %v", fieldName, err),
-				fieldName,
-				value,
-			).WithOperation("validate_string").Build()
+			return errors.Wrapf(err, "validator", "Validation failed for field '%s'", fieldName)
 		}
 	}
 
@@ -105,20 +97,12 @@ func (tv *TypedValidator) ValidateString(value, fieldName string, required bool,
 // ValidateInt validates integer fields with type safety
 func (tv *TypedValidator) ValidateInt(value int, fieldName string, required bool, validators ...func(int) error) error {
 	if required && value == 0 {
-		return types.NewValidationErrorBuilder(
-			fmt.Sprintf("Required field '%s' cannot be zero", fieldName),
-			fieldName,
-			value,
-		).WithOperation("validate_int").Build()
+		return errors.Validationf("validator", "Required field '%s' cannot be zero", fieldName)
 	}
 
 	for _, validator := range validators {
 		if err := validator(value); err != nil {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Validation failed for field '%s': %v", fieldName, err),
-				fieldName,
-				value,
-			).WithOperation("validate_int").Build()
+			return errors.Wrapf(err, "validator", "Validation failed for field '%s'", fieldName)
 		}
 	}
 
@@ -128,20 +112,12 @@ func (tv *TypedValidator) ValidateInt(value int, fieldName string, required bool
 // ValidateStringSlice validates string slice fields with type safety
 func (tv *TypedValidator) ValidateStringSlice(value []string, fieldName string, required bool, validators ...func([]string) error) error {
 	if required && len(value) == 0 {
-		return types.NewValidationErrorBuilder(
-			fmt.Sprintf("Required field '%s' cannot be empty", fieldName),
-			fieldName,
-			value,
-		).WithOperation("validate_string_slice").Build()
+		return errors.Validationf("validator", "Required field '%s' cannot be empty", fieldName)
 	}
 
 	for _, validator := range validators {
 		if err := validator(value); err != nil {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Validation failed for field '%s': %v", fieldName, err),
-				fieldName,
-				value,
-			).WithOperation("validate_string_slice").Build()
+			return errors.Wrapf(err, "validator", "Validation failed for field '%s'", fieldName)
 		}
 	}
 
@@ -152,62 +128,38 @@ func (tv *TypedValidator) ValidateStringSlice(value []string, fieldName string, 
 func (tv *TypedValidator) ValidatePath(path, fieldName string, requirements PathRequirements) error {
 	if path == "" {
 		if requirements.Required {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Required path field '%s' cannot be empty", fieldName),
-				fieldName,
-				path,
-			).WithOperation("validate_path").Build()
+			return errors.Validationf("validator", "Required path field '%s' cannot be empty", fieldName)
 		}
 		return nil
 	}
 
 	// Use centralized path validation
 	if err := ValidateLocalPath(path); err != nil {
-		return types.NewValidationErrorBuilder(
-			fmt.Sprintf("Path validation failed for field '%s': %v", fieldName, err),
-			fieldName,
-			path,
-		).WithOperation("validate_path").Build()
+		return errors.Wrapf(err, "validator", "Path validation failed for field '%s'", fieldName)
 	}
 
 	// Check specific requirements
 	if requirements.MustExist {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Path '%s' in field '%s' does not exist", path, fieldName),
-				fieldName,
-				path,
-			).WithOperation("validate_path").Build()
+			return errors.Validationf("validator", "Path '%s' in field '%s' does not exist", path, fieldName)
 		}
 	}
 
 	if requirements.MustBeDirectory {
 		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Path '%s' in field '%s' must be a directory", path, fieldName),
-				fieldName,
-				path,
-			).WithOperation("validate_path").Build()
+			return errors.Validationf("validator", "Path '%s' in field '%s' must be a directory", path, fieldName)
 		}
 	}
 
 	if requirements.MustBeFile {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Path '%s' in field '%s' must be a file", path, fieldName),
-				fieldName,
-				path,
-			).WithOperation("validate_path").Build()
+			return errors.Validationf("validator", "Path '%s' in field '%s' must be a file", path, fieldName)
 		}
 	}
 
 	if requirements.MustBeReadable {
 		if err := tv.checkReadPermission(path); err != nil {
-			return types.NewValidationErrorBuilder(
-				fmt.Sprintf("Path '%s' in field '%s' is not readable: %v", path, fieldName, err),
-				fieldName,
-				path,
-			).WithOperation("validate_path").Build()
+			return errors.Wrapf(err, "validator", "Path '%s' in field '%s' is not readable", path, fieldName)
 		}
 	}
 

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog/log"
 	bolt "go.etcd.io/bbolt"
 )
@@ -66,14 +66,7 @@ func NewBoltSessionStore(ctx context.Context, dbPath string) (*BoltSessionStore,
 	})
 
 	if err != nil {
-		return nil, types.NewSessionError("", "open_database").
-			WithField("database_path", dbPath).
-			WithField("attempts", 3).
-			WithRootCause(fmt.Sprintf("BoltDB open failed after 3 attempts: %v", err)).
-			WithImmediateStep(1, "Check lock file", "Verify no other container-kit instance is running").
-			WithImmediateStep(2, "Check permissions", "Ensure write permissions to database directory").
-			WithImmediateStep(3, "Check disk space", "Verify sufficient disk space is available").
-			Build()
+		return nil, errors.Wrapf(err, "persistence", "Failed to open BoltDB database at %s after 3 attempts", dbPath)
 	}
 
 	// Create the sessions bucket if it doesn't exist
@@ -86,11 +79,7 @@ func NewBoltSessionStore(ctx context.Context, dbPath string) (*BoltSessionStore,
 			// Log the close error but return the original error
 			log.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
 		}
-		return nil, types.NewSessionError("", "create_bucket").
-			WithRootCause(fmt.Sprintf("Sessions bucket creation failed: %v", err)).
-			WithImmediateStep(1, "Check database integrity", "Verify database file is not corrupted").
-			WithImmediateStep(2, "Restart with clean database", "Delete database file if corruption suspected").
-			Build()
+		return nil, errors.Wrapf(err, "persistence", "Failed to create sessions bucket in database")
 	}
 
 	return &BoltSessionStore{db: db}, nil

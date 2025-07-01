@@ -25,6 +25,7 @@ import (
 type AtomicScanImageSecurityTool struct {
 	pipelineAdapter interface{}
 	sessionManager  interface{}
+	analyzer        ToolAnalyzer
 	// fixingMixin removed - functionality will be integrated directly
 	logger  zerolog.Logger
 	metrics *SecurityMetrics
@@ -38,6 +39,13 @@ func NewAtomicScanImageSecurityTool(adapter interface{}, sessionManager interfac
 		// fixingMixin removed - functionality will be integrated directly
 		logger:  logger.With().Str("tool", "atomic_scan_image_security").Logger(),
 		metrics: NewSecurityMetrics(),
+	}
+}
+
+// SetAnalyzer sets the analyzer for failure analysis
+func (t *AtomicScanImageSecurityTool) SetAnalyzer(analyzer interface{}) {
+	if a, ok := analyzer.(ToolAnalyzer); ok {
+		t.analyzer = a
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -244,10 +245,23 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 	if err != nil {
 		result.Success = false
 		e.logger.Error().Err(err).Str("image_name", args.ImageName).Msg("Failed to build image")
-		// Add troubleshooting tips
+
+		// Generate comprehensive failure analysis
 		if e.troubleshooter != nil {
+			// Add troubleshooting tips
 			e.troubleshooter.AddTroubleshootingTips(result, err)
+
+			// Generate and attach failure analysis for AI-driven fixes
+			buildResult := &coredocker.BuildResult{
+				Success: false,
+				Error: &coredocker.BuildError{
+					Message: err.Error(),
+					Type:    "build_error",
+				},
+			}
+			result.BuildFailureAnalysis = e.troubleshooter.GenerateBuildFailureAnalysis(err, buildResult, result)
 		}
+
 		return result, nil
 	}
 

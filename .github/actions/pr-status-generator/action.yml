@@ -174,12 +174,12 @@ runs:
 
           ### 🔒 Security Scan
           **Secrets Detection:** ${{ steps.ci-status.outputs.security_secrets }}
-          
+
           **Vulnerability Scan:** ${{ steps.ci-status.outputs.security_vulnerabilities }}
 
           ### 🧹 Code Quality
           **Lint Results:** ${{ steps.ci-status.outputs.lint_results }}
-          
+
           **Quality Gates:** ${{ steps.ci-status.outputs.quality_results }}
 
           ### ⚡ Performance
@@ -190,7 +190,7 @@ runs:
 
           ---
           *This comment is automatically updated as CI jobs complete.*
-          
+
           Last updated: ${new Date().toISOString()}`;
 
           // Find existing comment

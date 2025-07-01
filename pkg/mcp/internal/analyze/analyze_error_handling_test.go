@@ -368,27 +368,25 @@ func TestGenerateDockerfileTool_ErrorHandling(t *testing.T) {
 			{
 				name:      "very_long_template",
 				template:  string(make([]byte, 10000)),
-				wantError: false,
+				wantError: true, // Invalid template name should cause error
 			},
 			{
 				name:      "template_with_special_chars",
 				template:  "template-123!@#$%^&*()",
-				wantError: false,
+				wantError: true, // Invalid template name should cause error
 			},
 			{
 				name:      "unicode_template",
 				template:  "模板-λ",
-				wantError: false,
+				wantError: true, // Invalid template name should cause error
 			},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				args := GenerateDockerfileArgs{
-					BaseToolArgs: types.BaseToolArgs{
-						SessionID: "session-123",
-					},
-					Template: tt.template,
+					SessionID: "session-123",
+					Template:  tt.template,
 				}
 
 				err := tool.Validate(ctx, args)
@@ -459,9 +457,7 @@ func TestGenerateDockerfileTool_ErrorHandling(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				args := GenerateDockerfileArgs{
-					BaseToolArgs: types.BaseToolArgs{
-						SessionID: "session-123",
-					},
+					SessionID: "session-123",
 					BuildArgs: tt.buildArgs,
 				}
 
@@ -512,9 +508,7 @@ func BenchmarkAnalyzeTools_ErrorHandling(b *testing.B) {
 
 	b.Run("validate_dockerfile_tool", func(b *testing.B) {
 		args := GenerateDockerfileArgs{
-			BaseToolArgs: types.BaseToolArgs{
-				SessionID: "session-123",
-			},
+			SessionID: "session-123",
 		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

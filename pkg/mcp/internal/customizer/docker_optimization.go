@@ -3,6 +3,7 @@ package customizer
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 )
@@ -134,7 +135,10 @@ USER appuser`
 	// Use specific version tags
 	if strings.Contains(content, ":latest") {
 		optimizations = append(optimizations, "# Security: Avoid using 'latest' tag, specify exact versions")
-		content = strings.ReplaceAll(content, ":latest", ":specific-version # TODO: Replace with actual version")
+		// Replace :latest with a version placeholder that includes the current date
+		// This makes it clear that the version needs to be specified
+		versionPlaceholder := fmt.Sprintf(":%s-CHANGEME", time.Now().Format("20060102"))
+		content = strings.ReplaceAll(content, ":latest", versionPlaceholder+" # SECURITY: Replace with specific version")
 	}
 
 	// Minimal base images

@@ -69,7 +69,7 @@ func (rv *RegistryValidator) ValidateRegistry(ctx context.Context, registryURL s
 	}
 
 	// Test basic connectivity
-	accessible, err := rv.testConnectivity(ctx, registryURL)
+	accessible, err := rv.TestConnectivity(ctx, registryURL)
 	if err != nil {
 		result.Error = err.Error()
 		result.Latency = time.Since(startTime)
@@ -119,7 +119,7 @@ func (rv *RegistryValidator) ValidateRegistry(ctx context.Context, registryURL s
 }
 
 // TestConnectivity tests basic network connectivity to a registry
-func (rv *RegistryValidator) testConnectivity(ctx context.Context, registryURL string) (bool, error) {
+func (rv *RegistryValidator) TestConnectivity(ctx context.Context, registryURL string) (bool, error) {
 	// Normalize URL
 	url := rv.normalizeRegistryURL(registryURL)
 

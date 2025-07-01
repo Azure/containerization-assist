@@ -107,7 +107,7 @@ runs:
 
         if [ -f "${{ inputs.config-file }}" ]; then
           echo "📋 Loading coverage thresholds from configuration file..."
-          
+
           # Check if this is the new quality-config.json format or old coverage-thresholds.json format
           if jq -e '.test_coverage' "${{ inputs.config-file }}" > /dev/null 2>&1; then
             # New quality-config.json format - use fallback to old format if package thresholds not available
@@ -157,7 +157,7 @@ runs:
 
           # Initialize coverage_percent to avoid undefined variable errors
           coverage_percent="0.0"
-          
+
           if [ "$USE_MERGED_COVERAGE" = "true" ]; then
             # Extract coverage from merged file
             coverage_line=$(go tool cover -func=coverage.out | grep -E "^${package//\./\\.}" | grep -v "test" | awk '{sum+=$3; count++} END {if(count>0) printf "%.1f\n", sum/count; else print "0.0"}' 2>/dev/null || echo "0.0")
@@ -198,7 +198,7 @@ runs:
           # Convert to integers for comparison (multiply by 10 to handle decimals)
           coverage_int=$(echo "$coverage_percent * 10" | bc 2>/dev/null || echo "0")
           threshold_int=$(echo "$threshold * 10" | bc 2>/dev/null || echo "0")
-          
+
           if [ "$coverage_int" -lt "$threshold_int" ]; then
             echo "❌ $package coverage ${coverage_percent}% is below threshold ${threshold}%"
             FAILED_PACKAGES+=("$package (${coverage_percent}% < ${threshold}%)")

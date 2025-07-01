@@ -100,3 +100,85 @@ type DeploymentRecommendation struct {
 	Complexity string   `json:"complexity"` // simple, moderate, complex
 	UseCase    string   `json:"use_case"`
 }
+
+// Dockerfile generation types
+
+// GenerateDockerfileArgs represents the arguments for generating a Dockerfile
+type GenerateDockerfileArgs struct {
+	BaseImage          string            `json:"base_image,omitempty" description:"Override detected base image"`
+	Template           string            `json:"template,omitempty" jsonschema:"enum=go,node,python,java,rust,php,ruby,dotnet,golang" description:"Use specific template (go, node, python, etc.)"`
+	Optimization       string            `json:"optimization,omitempty" jsonschema:"enum=size,speed,security,balanced" description:"Optimization level (size, speed, security)"`
+	IncludeHealthCheck bool              `json:"include_health_check,omitempty" description:"Add health check to Dockerfile"`
+	BuildArgs          map[string]string `json:"build_args,omitempty" description:"Docker build arguments"`
+	Platform           string            `json:"platform,omitempty" jsonschema:"enum=linux/amd64,linux/arm64,linux/arm/v7" description:"Target platform (e.g., linux/amd64)"`
+	SessionID          string            `json:"session_id,omitempty" description:"Session ID for context"`
+	DryRun             bool              `json:"dry_run,omitempty" description:"Preview without writing file"`
+}
+
+// GenerateDockerfileResult represents the result of generating a Dockerfile
+type GenerateDockerfileResult struct {
+	Content      string      `json:"content"`
+	BaseImage    string      `json:"base_image"`
+	ExposedPorts []int       `json:"exposed_ports"`
+	HealthCheck  string      `json:"health_check,omitempty"`
+	BuildSteps   []string    `json:"build_steps"`
+	Template     string      `json:"template_used"`
+	FilePath     string      `json:"file_path"`
+	Message      string      `json:"message,omitempty"`
+	Validation   interface{} `json:"validation,omitempty"`
+
+	TemplateSelection *TemplateSelectionContext `json:"template_selection,omitempty"`
+	OptimizationHints *OptimizationContext      `json:"optimization_hints,omitempty"`
+}
+
+// TemplateSelectionContext provides context about template selection
+type TemplateSelectionContext struct {
+	DetectedLanguage    string                `json:"detected_language"`
+	DetectedFramework   string                `json:"detected_framework"`
+	AvailableTemplates  []TemplateOption      `json:"available_templates"`
+	RecommendedTemplate string                `json:"recommended_template"`
+	SelectionReasoning  []string              `json:"selection_reasoning"`
+	AlternativeOptions  []AlternativeTemplate `json:"alternative_options"`
+}
+
+// TemplateOption represents a Dockerfile template option
+type TemplateOption struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	BestFor     []string `json:"best_for"`
+	Limitations []string `json:"limitations"`
+	MatchScore  int      `json:"match_score"`
+}
+
+// AlternativeTemplate represents an alternative template suggestion
+type AlternativeTemplate struct {
+	Template  string   `json:"template"`
+	Reason    string   `json:"reason"`
+	TradeOffs []string `json:"trade_offs"`
+	UseCases  []string `json:"use_cases"`
+}
+
+// OptimizationContext provides optimization hints and suggestions
+type OptimizationContext struct {
+	CurrentSize       string               `json:"current_size,omitempty"`
+	OptimizationGoals []string             `json:"optimization_goals"`
+	SuggestedChanges  []OptimizationChange `json:"suggested_changes"`
+	SecurityConcerns  []SecurityConcern    `json:"security_concerns"`
+	BestPractices     []string             `json:"best_practices"`
+}
+
+// OptimizationChange represents a suggested optimization
+type OptimizationChange struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Impact      string `json:"impact"`
+	Example     string `json:"example,omitempty"`
+}
+
+// SecurityConcern represents a security issue and suggestion
+type SecurityConcern struct {
+	Issue      string `json:"issue"`
+	Severity   string `json:"severity"`
+	Suggestion string `json:"suggestion"`
+	Reference  string `json:"reference,omitempty"`
+}

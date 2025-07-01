@@ -102,29 +102,29 @@ runs:
         # Load configuration from quality config file
         COMPLEXITY_THRESHOLD=${{ inputs.complexity-threshold }}
         COMPLEXITY_BUDGET=${{ inputs.complexity-budget }}
-        
+
         if [ -f "${{ inputs.config-file }}" ]; then
           echo "📋 Loading complexity settings from ${{ inputs.config-file }}..."
-          
+
           # Extract threshold and budget from config file
           CONFIG_THRESHOLD=$(jq -r '.complexity.thresholds.target // ${{ inputs.complexity-threshold }}' "${{ inputs.config-file }}")
           CONFIG_BUDGET=$(jq -r '.complexity.current_baseline.over_15 // ${{ inputs.complexity-budget }}' "${{ inputs.config-file }}")
-          
+
           if [ "$CONFIG_THRESHOLD" != "null" ] && [ "$CONFIG_THRESHOLD" != "" ]; then
             COMPLEXITY_THRESHOLD=$CONFIG_THRESHOLD
           fi
-          
+
           if [ "$CONFIG_BUDGET" != "null" ] && [ "$CONFIG_BUDGET" != "" ]; then
             COMPLEXITY_BUDGET=$CONFIG_BUDGET
           fi
-          
+
           echo "Using config: threshold=$COMPLEXITY_THRESHOLD, budget=$COMPLEXITY_BUDGET"
         else
           echo "📋 Using default complexity settings: threshold=$COMPLEXITY_THRESHOLD, budget=$COMPLEXITY_BUDGET"
         fi
 
         echo "🔄 Checking cyclomatic complexity (threshold: $COMPLEXITY_THRESHOLD, budget: $COMPLEXITY_BUDGET)..."
-        
+
         # Check for functions with complexity above threshold
         COMPLEX_FUNCTIONS=$(~/go/bin/gocyclo -over $COMPLEXITY_THRESHOLD ${{ inputs.path }} | wc -l | tr -d ' \n' || echo "0")
         echo "complex-functions=$COMPLEX_FUNCTIONS" >> $GITHUB_OUTPUT
@@ -162,7 +162,7 @@ runs:
         LARGE_FILES=$(grep "large-files=" $GITHUB_OUTPUT | cut -d'=' -f2 || echo "0")
         COMPLEX_FUNCTIONS=$(grep "complex-functions=" $GITHUB_OUTPUT | cut -d'=' -f2 || echo "0")
         COMPLEXITY_WITHIN_BUDGET=$(grep "complexity-within-budget=" $GITHUB_OUTPUT | cut -d'=' -f2 || echo "false")
-        
+
         echo "Retrieved values: adapters=$ADAPTER_COUNT, wrappers=$WRAPPER_COUNT, cycles=$CYCLE_COUNT, large_files=$LARGE_FILES, complex_functions=$COMPLEX_FUNCTIONS"
 
         # Calculate score (100 - deductions)
@@ -176,7 +176,7 @@ runs:
         # Load configuration values like the complexity check does
         LARGE_FILE_BUDGET=${{ inputs.large-file-budget }}
         COMPLEXITY_BUDGET=${{ inputs.complexity-budget }}
-        
+
         if [ -f "${{ inputs.config-file }}" ]; then
           # Read from config file if available
           CONFIG_COMPLEXITY_BUDGET=$(jq -r '.complexity.current_baseline.over_15 // ${{ inputs.complexity-budget }}' "${{ inputs.config-file }}")
@@ -186,7 +186,7 @@ runs:
           # For now, set a realistic large file budget since we have 22 files
           LARGE_FILE_BUDGET=25
         fi
-        
+
         echo "Using budgets: large_files=$LARGE_FILE_BUDGET, complexity=$COMPLEXITY_BUDGET"
 
         # Large files deduction with budget system
@@ -244,7 +244,7 @@ runs:
         else
           echo "  - Complex functions: 0 ($COMPLEX_FUNCTIONS functions, within budget of $COMPLEXITY_BUDGET)"
         fi
-        
+
         echo ""
         echo "✅ Architecture analysis completed successfully"
         exit 0

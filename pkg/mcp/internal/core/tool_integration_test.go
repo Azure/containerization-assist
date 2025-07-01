@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -86,9 +85,7 @@ func TestToolArgumentPassthrough(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create args from input
 			args := &analyze.GenerateDockerfileArgs{
-				BaseToolArgs: types.BaseToolArgs{
-					SessionID: tt.input["session_id"].(string),
-				},
+				SessionID: tt.input["session_id"].(string),
 			}
 
 			if dryRun, ok := tt.input["dry_run"]; ok {
@@ -161,10 +158,8 @@ func TestSessionIDHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := &analyze.GenerateDockerfileArgs{
-				BaseToolArgs: types.BaseToolArgs{
-					SessionID: tt.inputSessionID,
-				},
-				Template: "java",
+				SessionID: tt.inputSessionID,
+				Template:  "java",
 			}
 
 			// Simulate the session handling logic from our tool registration

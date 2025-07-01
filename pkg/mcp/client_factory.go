@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/Azure/container-kit/pkg/ai"
@@ -225,33 +226,33 @@ func (b *BaseInjectableClients) GetClientFactory() ClientFactory {
 }
 
 // GetDockerClient provides convenient access to Docker client
-func (b *BaseInjectableClients) GetDockerClient() docker.DockerClient {
+func (b *BaseInjectableClients) GetDockerClient() (docker.DockerClient, error) {
 	if b.clientFactory == nil {
-		panic("client factory not injected - call SetClientFactory first")
+		return nil, fmt.Errorf("client factory not injected - call SetClientFactory first")
 	}
-	return b.clientFactory.CreateDockerClient()
+	return b.clientFactory.CreateDockerClient(), nil
 }
 
 // GetK8sClient provides convenient access to Kubernetes client
-func (b *BaseInjectableClients) GetK8sClient() k8s.KubeRunner {
+func (b *BaseInjectableClients) GetK8sClient() (k8s.KubeRunner, error) {
 	if b.clientFactory == nil {
-		panic("client factory not injected - call SetClientFactory first")
+		return nil, fmt.Errorf("client factory not injected - call SetClientFactory first")
 	}
-	return b.clientFactory.CreateK8sClient()
+	return b.clientFactory.CreateK8sClient(), nil
 }
 
 // GetKindClient provides convenient access to Kind client
-func (b *BaseInjectableClients) GetKindClient() kind.KindRunner {
+func (b *BaseInjectableClients) GetKindClient() (kind.KindRunner, error) {
 	if b.clientFactory == nil {
-		panic("client factory not injected - call SetClientFactory first")
+		return nil, fmt.Errorf("client factory not injected - call SetClientFactory first")
 	}
-	return b.clientFactory.CreateKindClient()
+	return b.clientFactory.CreateKindClient(), nil
 }
 
 // GetAIClient provides convenient access to AI client
-func (b *BaseInjectableClients) GetAIClient() mcptypes.AIAnalyzer {
+func (b *BaseInjectableClients) GetAIClient() (mcptypes.AIAnalyzer, error) {
 	if b.clientFactory == nil {
-		panic("client factory not injected - call SetClientFactory first")
+		return nil, fmt.Errorf("client factory not injected - call SetClientFactory first")
 	}
-	return b.clientFactory.CreateAIClient()
+	return b.clientFactory.CreateAIClient(), nil
 }
