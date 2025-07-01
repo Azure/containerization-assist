@@ -108,17 +108,17 @@ type RepositoryAnalyzer interface {
 
 // RepositoryInfo represents repository analysis results
 type RepositoryInfo struct {
-	Path          string                 `json:"path"`
-	Type          string                 `json:"type"`
-	Language      string                 `json:"language"`
-	Framework     string                 `json:"framework"`
-	Languages     []string               `json:"languages"`
-	Dependencies  map[string]string      `json:"dependencies"`
-	BuildTools    []string               `json:"build_tools"`
-	EntryPoint    string                 `json:"entry_point"`
-	Port          int                    `json:"port"`
-	HasDockerfile bool                   `json:"has_dockerfile"`
-	Metadata      map[string]interface{} `json:"metadata"`
+	Path          string            `json:"path"`
+	Type          string            `json:"type"`
+	Language      string            `json:"language"`
+	Framework     string            `json:"framework"`
+	Languages     []string          `json:"languages"`
+	Dependencies  map[string]string `json:"dependencies"`
+	BuildTools    []string          `json:"build_tools"`
+	EntryPoint    string            `json:"entry_point"`
+	Port          int               `json:"port"`
+	HasDockerfile bool              `json:"has_dockerfile"`
+	Metadata      map[string]string `json:"metadata"` // Changed to map[string]string for type safety
 }
 
 // DockerfileInfo represents Dockerfile analysis results
@@ -516,6 +516,7 @@ func NewBaseAIContextResult(contextType string, successful bool, duration time.D
 // ============================================================================
 
 // PipelineOperations provides pipeline operation functionality
+// DEPRECATED: Use TypedPipelineOperations for type-safe operations
 type PipelineOperations interface {
 	// Session operations
 	GetSessionWorkspace(sessionID string) string
@@ -541,7 +542,34 @@ type PipelineOperations interface {
 	ScanSecrets(ctx context.Context, sessionID string, args interface{}) (interface{}, error)
 }
 
+// TypedPipelineOperations provides type-safe pipeline operation functionality
+type TypedPipelineOperations interface {
+	// Session operations
+	GetSessionWorkspace(sessionID string) string
+	UpdateSessionState(sessionID string, updateFunc func(*SessionState)) error
+
+	// Docker operations with type-safe parameters and results
+	BuildImageTyped(ctx context.Context, sessionID string, params BuildImageParams) (*BuildImageResult, error)
+	PushImageTyped(ctx context.Context, sessionID string, params PushImageParams) (*PushImageResult, error)
+	PullImageTyped(ctx context.Context, sessionID string, params PullImageParams) (*PullImageResult, error)
+	TagImageTyped(ctx context.Context, sessionID string, params TagImageParams) (*TagImageResult, error)
+
+	// Kubernetes operations with type-safe parameters and results
+	GenerateManifestsTyped(ctx context.Context, sessionID string, params GenerateManifestsParams) (*GenerateManifestsResult, error)
+	DeployKubernetesTyped(ctx context.Context, sessionID string, params DeployParams) (*DeployResult, error)
+	CheckHealthTyped(ctx context.Context, sessionID string, params HealthCheckParams) (*HealthCheckResult, error)
+
+	// Analysis operations with type-safe parameters and results
+	AnalyzeRepositoryTyped(ctx context.Context, sessionID string, params AnalyzeParams) (*AnalyzeResult, error)
+	ValidateDockerfileTyped(ctx context.Context, sessionID string, params ValidateParams) (*ValidateResult, error)
+
+	// Security operations with type-safe parameters and results
+	ScanSecurityTyped(ctx context.Context, sessionID string, params ScanParams) (*ScanResult, error)
+	ScanSecretsTyped(ctx context.Context, sessionID string, params ScanSecretsParams) (*ScanSecretsResult, error)
+}
+
 // ToolSessionManager provides session management functionality for tools
+// DEPRECATED: Use TypedToolSessionManager for type-safe operations
 type ToolSessionManager interface {
 	// Session retrieval and creation
 	GetSession(sessionID string) (interface{}, error)
@@ -554,6 +582,31 @@ type ToolSessionManager interface {
 
 	// Statistics
 	GetStats() *SessionManagerStats
+}
+
+// TypedToolSessionManager provides type-safe session management functionality for tools
+type TypedToolSessionManager interface {
+	// Session retrieval and creation with type safety
+	GetSessionTyped(sessionID string) (*SessionState, error)
+	GetOrCreateSessionTyped(sessionID string) (*SessionState, error)
+	CreateSessionTyped(userID string) (*SessionState, error)
+
+	// Session lifecycle
+	DeleteSession(ctx context.Context, sessionID string) error
+	ListSessionsTyped(ctx context.Context, filter SessionFilter) ([]*SessionState, error)
+
+	// Statistics
+	GetStats() *SessionManagerStats
+}
+
+// SessionFilter represents filters for session listing
+type SessionFilter struct {
+	UserID        string     `json:"user_id,omitempty"`
+	Status        string     `json:"status,omitempty"`
+	CreatedAfter  *time.Time `json:"created_after,omitempty"`
+	CreatedBefore *time.Time `json:"created_before,omitempty"`
+	Limit         int        `json:"limit,omitempty"`
+	Offset        int        `json:"offset,omitempty"`
 }
 
 // ============================================================================
@@ -594,12 +647,12 @@ func (fa *FailureAnalysis) Error() string {
 
 // ErrorContext provides contextual information about errors
 type ErrorContext struct {
-	SessionID     string                 `json:"session_id"`
-	OperationType string                 `json:"operation_type"`
-	Phase         string                 `json:"phase"`
-	ErrorCode     string                 `json:"error_code"`
-	Metadata      map[string]interface{} `json:"metadata"`
-	Timestamp     time.Time              `json:"timestamp"`
+	SessionID     string            `json:"session_id"`
+	OperationType string            `json:"operation_type"`
+	Phase         string            `json:"phase"`
+	ErrorCode     string            `json:"error_code"`
+	Metadata      map[string]string `json:"metadata"` // Changed to map[string]string for type safety
+	Timestamp     time.Time         `json:"timestamp"`
 }
 
 // LocalProgressStage represents a local progress stage
@@ -613,10 +666,302 @@ type LocalProgressStage struct {
 
 // Recommendation represents an AI recommendation
 type Recommendation struct {
-	Type        string                 `json:"type"`
-	Priority    int                    `json:"priority"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description"`
-	Action      string                 `json:"action"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Type        string            `json:"type"`
+	Priority    int               `json:"priority"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Action      string            `json:"action"`
+	Metadata    map[string]string `json:"metadata"` // Changed to map[string]string for type safety
+}
+
+// ============================================================================
+// Type-Safe Parameter and Result Types
+// ============================================================================
+
+// BuildImageParams represents parameters for build operations
+type BuildImageParams struct {
+	SessionID      string            `json:"session_id"`
+	DockerfilePath string            `json:"dockerfile_path"`
+	ContextPath    string            `json:"context_path"`
+	ImageName      string            `json:"image_name"`
+	Tags           []string          `json:"tags"`
+	BuildArgs      map[string]string `json:"build_args"`
+	NoCache        bool              `json:"no_cache"`
+	Pull           bool              `json:"pull"`
+}
+
+// Validate implements ToolParams interface
+func (p BuildImageParams) Validate() error {
+	if p.SessionID == "" {
+		return fmt.Errorf("session_id is required")
+	}
+	if p.DockerfilePath == "" {
+		return fmt.Errorf("dockerfile_path is required")
+	}
+	return nil
+}
+
+// GetSessionID implements ToolParams interface
+func (p BuildImageParams) GetSessionID() string {
+	return p.SessionID
+}
+
+// BuildImageResult represents the result of a build operation
+type BuildImageResult struct {
+	BaseToolResponse
+	ImageID    string   `json:"image_id"`
+	ImageRef   string   `json:"image_ref"`
+	Tags       []string `json:"tags"`
+	Size       int64    `json:"size"`
+	BuildTime  float64  `json:"build_time_seconds"`
+	LayerCount int      `json:"layer_count"`
+}
+
+// PushImageParams represents parameters for push operations
+type PushImageParams struct {
+	ImageRef   string `json:"image_ref"`
+	Registry   string `json:"registry"`
+	Repository string `json:"repository"`
+	Tag        string `json:"tag"`
+}
+
+// PushImageResult represents the result of a push operation
+type PushImageResult struct {
+	BaseToolResponse
+	ImageRef  string  `json:"image_ref"`
+	Registry  string  `json:"registry"`
+	PushTime  float64 `json:"push_time_seconds"`
+	ImageSize int64   `json:"image_size"`
+}
+
+// PullImageParams represents parameters for pull operations
+type PullImageParams struct {
+	ImageRef string `json:"image_ref"`
+	Platform string `json:"platform,omitempty"`
+}
+
+// PullImageResult represents the result of a pull operation
+type PullImageResult struct {
+	BaseToolResponse
+	ImageRef  string  `json:"image_ref"`
+	ImageID   string  `json:"image_id"`
+	PullTime  float64 `json:"pull_time_seconds"`
+	ImageSize int64   `json:"image_size"`
+}
+
+// TagImageParams represents parameters for tag operations
+type TagImageParams struct {
+	SourceImage string `json:"source_image"`
+	TargetImage string `json:"target_image"`
+}
+
+// TagImageResult represents the result of a tag operation
+type TagImageResult struct {
+	BaseToolResponse
+	SourceImage string `json:"source_image"`
+	TargetImage string `json:"target_image"`
+}
+
+// GenerateManifestsParams represents parameters for manifest generation
+type GenerateManifestsParams struct {
+	ImageRef    string            `json:"image_ref"`
+	AppName     string            `json:"app_name"`
+	Namespace   string            `json:"namespace"`
+	Port        int               `json:"port"`
+	Replicas    int               `json:"replicas"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	Resources   ResourceLimits    `json:"resources"`
+	HealthCheck HealthCheckConfig `json:"health_check"`
+}
+
+// GenerateManifestsResult represents the result of manifest generation
+type GenerateManifestsResult struct {
+	BaseToolResponse
+	ManifestPaths []string `json:"manifest_paths"`
+	ManifestCount int      `json:"manifest_count"`
+	Resources     []string `json:"resources"`
+	Warnings      []string `json:"warnings"`
+}
+
+// DeployParams represents parameters for deployment operations
+type DeployParams struct {
+	SessionID     string   `json:"session_id"`
+	ManifestPaths []string `json:"manifest_paths"`
+	Namespace     string   `json:"namespace"`
+	DryRun        bool     `json:"dry_run"`
+	Wait          bool     `json:"wait"`
+	Timeout       int      `json:"timeout_seconds"`
+}
+
+// Validate implements ToolParams interface
+func (p DeployParams) Validate() error {
+	if p.SessionID == "" {
+		return fmt.Errorf("session_id is required")
+	}
+	if len(p.ManifestPaths) == 0 {
+		return fmt.Errorf("manifest_paths cannot be empty")
+	}
+	return nil
+}
+
+// GetSessionID implements ToolParams interface
+func (p DeployParams) GetSessionID() string {
+	return p.SessionID
+}
+
+// DeployResult represents the result of a deployment operation
+type DeployResult struct {
+	BaseToolResponse
+	DeployedResources []string `json:"deployed_resources"`
+	Namespace         string   `json:"namespace"`
+	Status            string   `json:"status"`
+	Warnings          []string `json:"warnings"`
+}
+
+// HealthCheckParams represents parameters for health check operations
+type HealthCheckParams struct {
+	Namespace   string   `json:"namespace"`
+	AppName     string   `json:"app_name"`
+	Resources   []string `json:"resources"`
+	WaitTimeout int      `json:"wait_timeout_seconds"`
+}
+
+// HealthCheckResult represents the result of a health check operation
+type HealthCheckResult struct {
+	BaseToolResponse
+	HealthyResources   []string          `json:"healthy_resources"`
+	UnhealthyResources []string          `json:"unhealthy_resources"`
+	ResourceStatuses   map[string]string `json:"resource_statuses"`
+	OverallHealth      string            `json:"overall_health"`
+}
+
+// AnalyzeParams represents parameters for analysis operations
+type AnalyzeParams struct {
+	RepositoryPath string   `json:"repository_path"`
+	IncludeFiles   []string `json:"include_files"`
+	ExcludeFiles   []string `json:"exclude_files"`
+	DeepAnalysis   bool     `json:"deep_analysis"`
+}
+
+// AnalyzeResult represents the result of an analysis operation
+type AnalyzeResult struct {
+	BaseToolResponse
+	RepositoryInfo   *RepositoryInfo  `json:"repository_info"`
+	Recommendations  []Recommendation `json:"recommendations"`
+	SecurityIssues   []string         `json:"security_issues"`
+	PerformanceHints []string         `json:"performance_hints"`
+}
+
+// ValidateParams represents parameters for validation operations
+type ValidateParams struct {
+	DockerfilePath string   `json:"dockerfile_path"`
+	Rules          []string `json:"rules"`
+	StrictMode     bool     `json:"strict_mode"`
+}
+
+// ValidateResult represents the result of a validation operation
+type ValidateResult struct {
+	BaseToolResponse
+	Violations  []ValidationIssue `json:"violations"`
+	Warnings    []ValidationIssue `json:"warnings"`
+	Score       float64           `json:"score"`
+	Suggestions []string          `json:"suggestions"`
+}
+
+// ScanParams represents parameters for security scan operations
+type ScanParams struct {
+	SessionID   string   `json:"session_id"`
+	ImageRef    string   `json:"image_ref"`
+	ScanType    string   `json:"scan_type"` // "vulnerability", "compliance", "both"
+	Severity    []string `json:"severity"`  // ["critical", "high", "medium", "low"]
+	Format      string   `json:"format"`    // "json", "sarif", "table"
+	ExitOnError bool     `json:"exit_on_error"`
+}
+
+// Validate implements ToolParams interface
+func (p ScanParams) Validate() error {
+	if p.SessionID == "" {
+		return fmt.Errorf("session_id is required")
+	}
+	if p.ImageRef == "" {
+		return fmt.Errorf("image_ref is required")
+	}
+	return nil
+}
+
+// GetSessionID implements ToolParams interface
+func (p ScanParams) GetSessionID() string {
+	return p.SessionID
+}
+
+// ScanResult represents the result of a security scan operation
+type ScanResult struct {
+	BaseToolResponse
+	ScanReport           *SecurityScanResult `json:"scan_report"`
+	VulnerabilityDetails []SecurityFinding   `json:"vulnerability_details"`
+	ComplianceIssues     []string            `json:"compliance_issues"`
+	ReportPath           string              `json:"report_path"`
+}
+
+// ScanSecretsParams represents parameters for secrets scan operations
+type ScanSecretsParams struct {
+	Path        string   `json:"path"`
+	Recursive   bool     `json:"recursive"`
+	FileTypes   []string `json:"file_types"`
+	ExcludeDirs []string `json:"exclude_dirs"`
+}
+
+// ScanSecretsResult represents the result of a secrets scan operation
+type ScanSecretsResult struct {
+	BaseToolResponse
+	SecretsFound []SecretFinding `json:"secrets_found"`
+	FilesScanned int             `json:"files_scanned"`
+	SecretTypes  []string        `json:"secret_types"`
+	RiskLevel    string          `json:"risk_level"`
+}
+
+// Supporting types for the above parameters and results
+
+// ResourceLimits represents resource limits and requests
+type ResourceLimits struct {
+	Requests ResourceSpec `json:"requests"`
+	Limits   ResourceSpec `json:"limits"`
+}
+
+// ResourceSpec represents CPU and memory specifications
+type ResourceSpec struct {
+	CPU    string `json:"cpu"`
+	Memory string `json:"memory"`
+}
+
+// HealthCheckConfig represents health check configuration
+type HealthCheckConfig struct {
+	Enabled             bool   `json:"enabled"`
+	Path                string `json:"path"`
+	Port                int    `json:"port"`
+	InitialDelaySeconds int    `json:"initial_delay_seconds"`
+	PeriodSeconds       int    `json:"period_seconds"`
+	TimeoutSeconds      int    `json:"timeout_seconds"`
+	FailureThreshold    int    `json:"failure_threshold"`
+}
+
+// ValidationIssue represents a validation issue
+type ValidationIssue struct {
+	Rule       string `json:"rule"`
+	Severity   string `json:"severity"`
+	Message    string `json:"message"`
+	Line       int    `json:"line"`
+	Column     int    `json:"column"`
+	Suggestion string `json:"suggestion"`
+}
+
+// SecretFinding represents a detected secret
+type SecretFinding struct {
+	Type        string `json:"type"`
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Description string `json:"description"`
+	Confidence  string `json:"confidence"`
+	RuleID      string `json:"rule_id"`
 }

@@ -10,9 +10,28 @@ import (
 )
 
 // ContextSharer interface for type safety
+// DEPRECATED: Use TypedContextSharer for type-safe context sharing
 type ContextSharer interface {
 	ShareContext(sessionID string, context map[string]interface{}) error
 	GetSharedContext(sessionID string) (map[string]interface{}, error)
+}
+
+// TypedContextSharer provides type-safe context sharing
+type TypedContextSharer interface {
+	ShareTypedContext(sessionID string, context *SharedContext) error
+	GetTypedSharedContext(sessionID string) (*SharedContext, error)
+}
+
+// SharedContext represents typed shared context data
+type SharedContext struct {
+	SessionID     string            `json:"session_id"`
+	WorkflowID    string            `json:"workflow_id"`
+	Stage         string            `json:"stage"`
+	Status        string            `json:"status"`
+	LastUpdated   time.Time         `json:"last_updated"`
+	ToolResults   map[string]string `json:"tool_results"`
+	Configuration map[string]string `json:"configuration"`
+	Metadata      map[string]string `json:"metadata"`
 }
 
 // WorkflowOrchestrator manages workflow execution and coordination

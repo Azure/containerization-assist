@@ -101,7 +101,7 @@ func (e *GenericRichError[TContext]) GetTypedContext() TContext {
 type ToolExecutionContext struct {
 	ToolName      string
 	ToolType      string
-	Parameters    interface{}
+	Parameters    interface{} // Keep as interface{} for flexibility with different parameter types
 	SessionID     string
 	RequestID     string
 	ExecutionID   string
@@ -109,7 +109,7 @@ type ToolExecutionContext struct {
 	Duration      int64
 	RetryCount    int
 	MaxRetries    int
-	ResourcesUsed map[string]interface{}
+	ResourcesUsed map[string]string // Changed to map[string]string for type safety
 }
 
 // DockerBuildContext provides context for Docker build errors
@@ -181,13 +181,13 @@ type NetworkContext struct {
 // ValidationContext provides context for validation errors
 type ValidationContext struct {
 	FieldName       string
-	FieldValue      interface{}
+	FieldValue      interface{} // Keep as interface{} since field values can be of any type
 	FieldType       string
 	Constraint      string
 	ValidatorName   string
 	SchemaVersion   string
 	ValidationRules []string
-	RelatedFields   map[string]interface{}
+	RelatedFields   map[string]string // Changed to map[string]string for type safety
 	InputSource     string
 }
 
@@ -204,7 +204,7 @@ type ResourceContext struct {
 	Size         int64
 	MaxSize      int64
 	Usage        float64
-	Limits       map[string]interface{}
+	Limits       map[string]string // Changed to map[string]string for type safety
 	Dependencies []string
 }
 

@@ -67,13 +67,13 @@ const (
 
 // CheckpointEnvelope wraps checkpoint data with metadata for compression and integrity
 type CheckpointEnvelope struct {
-	Version    int                    `json:"version"`
-	Compressed bool                   `json:"compressed"`
-	Checksum   string                 `json:"checksum,omitempty"`
-	DataSize   int                    `json:"data_size"`
-	CreatedAt  time.Time              `json:"created_at"`
-	Metadata   map[string]interface{} `json:"metadata,omitempty"`
-	Data       []byte                 `json:"data"`
+	Version    int               `json:"version"`
+	Compressed bool              `json:"compressed"`
+	Checksum   string            `json:"checksum,omitempty"`
+	DataSize   int               `json:"data_size"`
+	CreatedAt  time.Time         `json:"created_at"`
+	Metadata   map[string]string `json:"metadata,omitempty"` // Changed to map[string]string for type safety
+	Data       []byte            `json:"data"`
 }
 
 // compressData compresses data using the configured compression mode
@@ -221,11 +221,11 @@ func (cm *BoltCheckpointManager) CreateCheckpoint(
 			DataSize:   len(checkpointData),
 			CreatedAt:  time.Now(),
 			Data:       compressedData,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]string{
 				"session_id":       session.ID,
 				"stage_name":       stageName,
 				"workflow_name":    session.WorkflowName,
-				"compression_mode": cm.compressionMode,
+				"compression_mode": fmt.Sprintf("%d", cm.compressionMode),
 			},
 		}
 
@@ -314,12 +314,12 @@ func (cm *BoltCheckpointManager) CreateIncrementalCheckpoint(
 			DataSize:   len(checkpointData),
 			CreatedAt:  time.Now(),
 			Data:       compressedData,
-			Metadata: map[string]interface{}{
+			Metadata: map[string]string{
 				"session_id":        session.ID,
 				"stage_name":        stageName,
 				"workflow_name":     session.WorkflowName,
-				"compression_mode":  cm.compressionMode,
-				"incremental":       true,
+				"compression_mode":  fmt.Sprintf("%d", cm.compressionMode),
+				"incremental":       "true",
 				"parent_checkpoint": latestCheckpoint.ID,
 			},
 		}

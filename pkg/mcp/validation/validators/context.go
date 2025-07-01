@@ -276,9 +276,36 @@ func (c *ContextValidator) validateCopyOperations(data interface{}, result *core
 	}
 
 	for i, op := range operations {
-		instruction := op["instruction"].(string)
-		source := op["source"].(string)
-		dest := op["destination"].(string)
+		instruction, ok := op["instruction"].(string)
+		if !ok {
+			result.AddError(core.NewValidationError(
+				"INVALID_INSTRUCTION",
+				fmt.Sprintf("Operation %d missing or invalid instruction field", i),
+				core.ErrTypeValidation,
+				core.SeverityHigh,
+			))
+			continue
+		}
+		source, ok := op["source"].(string)
+		if !ok {
+			result.AddError(core.NewValidationError(
+				"INVALID_SOURCE",
+				fmt.Sprintf("Operation %d missing or invalid source field", i),
+				core.ErrTypeValidation,
+				core.SeverityHigh,
+			))
+			continue
+		}
+		dest, ok := op["destination"].(string)
+		if !ok {
+			result.AddError(core.NewValidationError(
+				"INVALID_DESTINATION",
+				fmt.Sprintf("Operation %d missing or invalid destination field", i),
+				core.ErrTypeValidation,
+				core.SeverityHigh,
+			))
+			continue
+		}
 		line := i + 1
 		if l, ok := op["line"].(int); ok {
 			line = l
