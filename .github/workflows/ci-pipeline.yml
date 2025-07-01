@@ -1338,11 +1338,7 @@ jobs:
   ci-status-check:
     name: CI Status Check
     runs-on: ubuntu-latest
-<<<<<<< Updated upstream
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
-=======
     needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, testing-dashboard, aggregate-integration-matrix-results]
->>>>>>> Stashed changes
     if: always()
     steps:
       - name: Check all required jobs
