@@ -24,7 +24,7 @@ inputs:
 outputs:
   run-name:
     description: "Generated run name for this test"
-    value: ${{ steps.run-itegration-test.outputs.random-number }}
+    value: ${{ steps.run-integration-test.outputs.random-number }}
   result:
     description: "Test result (success/failure/timeout)"
     value: ${{ steps.result.outputs.random-number }}
