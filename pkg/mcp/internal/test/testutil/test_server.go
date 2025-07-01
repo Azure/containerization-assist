@@ -13,9 +13,10 @@ import (
 
 // TestServer wraps an HTTP test server with MCP functionality
 type TestServer struct {
-	server    *httptest.Server
-	mcpServer *core.Server
-	tempDir   string
+	server      *httptest.Server
+	mcpServer   *core.Server
+	tempDir     string
+	cancelStart context.CancelFunc
 }
 
 // NewTestServer creates a new test server with real MCP functionality
@@ -45,19 +46,48 @@ func NewTestServer() (*TestServer, error) {
 		return nil, err
 	}
 
-	// Create HTTP test server with a simple handler
-	// Note: We'll need to implement the HTTPHandler method or use a basic handler
-	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Basic handler for testing - in real implementation this would use mcpServer's handler
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "ok"}`))
-	}))
+	// Start the MCP server in a goroutine to initialize all components
+	startCtx, cancel := context.WithCancel(ctx)
+	serverStarted := make(chan error, 1)
+	go func() {
+		err := mcpServer.Start(startCtx)
+		serverStarted <- err
+	}()
+
+	// Wait a moment for server initialization
+	time.Sleep(100 * time.Millisecond)
+
+	// Get the transport from the MCP server to access its HTTP handler
+	var httpHandler http.Handler
+
+	// Try to get the router from the transport if it's HTTP
+	if transport := mcpServer.GetTransport(); transport != nil {
+		if httpTransport, ok := transport.(interface{ GetRouter() http.Handler }); ok {
+			httpHandler = httpTransport.GetRouter()
+		}
+	}
+
+	// If we couldn't get the router, create a fallback handler
+	if httpHandler == nil {
+		httpHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Fallback for non-HTTP transports
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotImplemented)
+			w.Write([]byte(`{"error": "HTTP transport not available"}`))
+		})
+	}
+
+	// Create HTTP test server with the actual MCP handler
+	httpServer := httptest.NewServer(httpHandler)
+
+	// Cancel the server's start context since we're using httptest.Server
+	cancel()
 
 	return &TestServer{
-		server:    httpServer,
-		mcpServer: mcpServer,
-		tempDir:   tempDir,
+		server:      httpServer,
+		mcpServer:   mcpServer,
+		tempDir:     tempDir,
+		cancelStart: cancel,
 	}, nil
 }
 
@@ -68,6 +98,9 @@ func (ts *TestServer) URL() string {
 
 // Close shuts down the test server and cleans up resources
 func (ts *TestServer) Close() {
+	if ts.cancelStart != nil {
+		ts.cancelStart()
+	}
 	if ts.server != nil {
 		ts.server.Close()
 	}

@@ -2,11 +2,14 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -19,12 +22,13 @@ type GomcpConfig struct {
 
 // GomcpManager manages the gomcp server and tool registration
 type GomcpManager struct {
-	server        server.Server
-	config        GomcpConfig
-	logger        slog.Logger
-	transport     interface{} // Injected transport (stdio or http)
-	isInitialized bool        // Prevent mutation after creation
-	startTime     time.Time   // Server start time for uptime tracking
+	server           server.Server
+	config           GomcpConfig
+	logger           slog.Logger
+	transport        interface{}                        // Injected transport (stdio or http)
+	isInitialized    bool                               // Prevent mutation after creation
+	startTime        time.Time                          // Server start time for uptime tracking
+	toolOrchestrator *orchestration.MCPToolOrchestrator // Reference to tool orchestrator
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -88,6 +92,13 @@ func (gm *GomcpManager) Initialize() error {
 
 	gm.isInitialized = true
 	return nil
+}
+
+// SetToolOrchestrator sets the tool orchestrator reference
+func (gm *GomcpManager) SetToolOrchestrator(orchestrator interface{}) {
+	if orch, ok := orchestrator.(*orchestration.MCPToolOrchestrator); ok {
+		gm.toolOrchestrator = orch
+	}
 }
 
 // GetServer returns the underlying gomcp server
@@ -177,5 +188,93 @@ func (gm *GomcpManager) Shutdown(ctx context.Context) error {
 	}
 
 	gm.logger.Info("gomcp manager shutdown completed successfully")
+	return nil
+}
+
+// RegisterHTTPHandlers registers tool handlers with the HTTP transport
+func (gm *GomcpManager) RegisterHTTPHandlers(transportInstance interface{}) error {
+	if !gm.isInitialized {
+		return errors.Internal("core/gomcp-manager", "manager not initialized")
+	}
+
+	gm.logger.Info("attempting to register HTTP handlers for transport", "transport_type", fmt.Sprintf("%T", transportInstance))
+
+	// Check if transport is HTTP
+	httpTransport, ok := transportInstance.(*transport.HTTPTransport)
+	if !ok {
+		gm.logger.Info("transport is not HTTP, skipping HTTP handler registration")
+		return nil // Not an HTTP transport, skip registration
+	}
+
+	gm.logger.Info("registering HTTP handlers for core tools")
+
+	// Register analyze_repository redirect handler
+	analyzeHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		// Use the tool orchestrator to execute the tool
+		if gm.toolOrchestrator != nil {
+			gm.logger.Info("executing analyze_repository via orchestrator")
+			return gm.toolOrchestrator.ExecuteTool(ctx, "analyze_repository", args)
+		}
+		gm.logger.Error("tool orchestrator is nil")
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("analyze_repository", "Analyze a repository", analyzeHandler); err != nil {
+		gm.logger.Error("failed to register analyze_repository", "error", err)
+		return err
+	}
+	gm.logger.Info("registered analyze_repository HTTP handler")
+
+	// Register generate_dockerfile handler
+	dockerfileHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "generate_dockerfile", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("generate_dockerfile", "Generate a Dockerfile", dockerfileHandler); err != nil {
+		gm.logger.Error("failed to register generate_dockerfile", "error", err)
+		return err
+	}
+	gm.logger.Info("registered generate_dockerfile HTTP handler")
+
+	// Register build_image handler
+	buildHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "build_image_atomic", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("build_image", "Build a Docker image", buildHandler); err != nil {
+		gm.logger.Error("failed to register build_image", "error", err)
+		return err
+	}
+	gm.logger.Info("registered build_image HTTP handler")
+
+	// Register generate_manifests handler
+	manifestsHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "generate_manifests", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("generate_manifests", "Generate Kubernetes manifests", manifestsHandler); err != nil {
+		gm.logger.Error("failed to register generate_manifests", "error", err)
+		return err
+	}
+	gm.logger.Info("registered generate_manifests HTTP handler")
+
+	// Register scan_image handler
+	scanHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "atomic_scan_image_security", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("scan_image", "Scan a Docker image for vulnerabilities", scanHandler); err != nil {
+		gm.logger.Error("failed to register scan_image", "error", err)
+		return err
+	}
+	gm.logger.Info("registered scan_image HTTP handler")
+
 	return nil
 }

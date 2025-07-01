@@ -296,15 +296,15 @@ func (gm *GomcpManager) registerAtomicTools(deps *ToolDependencies) error {
 // registerAtomicToolsWithOrchestrator creates and registers atomic tools with the orchestrator
 func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependencies) error {
 	atomicTools := map[string]interface{}{
-		"analyze_repository": analyze.NewAtomicAnalyzeRepositoryTool(
+		"analyze_repository_atomic": analyze.NewAtomicAnalyzeRepositoryTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "analyze_repository").Logger(),
+			deps.Logger.With().Str("tool", "analyze_repository_atomic").Logger(),
 		),
-		"build_image": build.NewAtomicBuildImageTool(
+		"build_image_atomic": build.NewAtomicBuildImageTool(
 			deps.PipelineOperations,
 			deps.AtomicSessionMgr,
-			deps.Logger.With().Str("tool", "build_image").Logger(),
+			deps.Logger.With().Str("tool", "build_image_atomic").Logger(),
 		),
 		"generate_dockerfile": analyze.NewAtomicGenerateDockerfileTool(
 			deps.AtomicSessionMgr,
@@ -370,6 +370,18 @@ func (gm *GomcpManager) registerAtomicToolsWithOrchestrator(deps *ToolDependenci
 			deps.Logger.Info().Str("tool", name).Msg("Registered atomic tool successfully")
 		}
 	}
+
+	// Also register the redirect tool for analyze_repository
+	analyzeRedirect := analyze.NewAnalyzeRepositoryRedirectTool(
+		atomicTools["analyze_repository_atomic"].(*analyze.AtomicAnalyzeRepositoryTool),
+		deps.Logger.With().Str("tool", "analyze_repository_redirect").Logger(),
+	)
+	if err := deps.ToolRegistry.RegisterTool("analyze_repository", analyzeRedirect); err != nil {
+		deps.Logger.Error().Err(err).Str("tool", "analyze_repository").Msg("Failed to register redirect tool")
+	} else {
+		deps.Logger.Info().Str("tool", "analyze_repository").Msg("Registered redirect tool successfully")
+	}
+
 	return nil
 }
 

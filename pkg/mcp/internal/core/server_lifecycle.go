@@ -30,9 +30,17 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize gomcp manager: %w", err)
 	}
 
+	// Set the tool orchestrator reference
+	s.gomcpManager.SetToolOrchestrator(s.toolOrchestrator)
+
 	// Register all tools with gomcp
 	if err := s.gomcpManager.RegisterTools(s); err != nil {
 		return fmt.Errorf("failed to register tools with gomcp: %w", err)
+	}
+
+	// If using HTTP transport, register HTTP handlers
+	if err := s.gomcpManager.RegisterHTTPHandlers(s.transport); err != nil {
+		return fmt.Errorf("failed to register HTTP handlers: %w", err)
 	}
 
 	// Set the server as the request handler for the transport

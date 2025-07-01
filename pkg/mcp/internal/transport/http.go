@@ -246,7 +246,7 @@ func (t *HTTPTransport) RegisterTool(name, description string, handler interface
 	}
 
 	t.tools[name] = toolHandler
-	t.logger.Info().Str("tool", name).Msg("Registered tool")
+	t.logger.Info().Str("tool", name).Msg("Registered tool with HTTP transport")
 	return nil
 }
 
@@ -264,6 +264,11 @@ func (t *HTTPTransport) GetServer() interface{} {
 // GetPort returns the HTTP transport port
 func (t *HTTPTransport) GetPort() int {
 	return t.port
+}
+
+// GetRouter returns the HTTP router for testing
+func (t *HTTPTransport) GetRouter() http.Handler {
+	return t.router
 }
 
 func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
@@ -386,6 +391,8 @@ func (t *HTTPTransport) rateLimitMiddleware(next http.Handler) http.Handler {
 func (t *HTTPTransport) handleListTools(w http.ResponseWriter, r *http.Request) {
 	t.toolsMutex.RLock()
 	defer t.toolsMutex.RUnlock()
+
+	t.logger.Debug().Int("tool_count", len(t.tools)).Msg("Listing tools")
 
 	tools := make([]map[string]string, 0, len(t.tools))
 	for name := range t.tools {

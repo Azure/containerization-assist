@@ -75,7 +75,7 @@ func NewMCPTestClient(serverURL string) (MCPTestClient, error) {
 
 // ListTools retrieves available tools via MCP protocol
 func (c *httpMCPTestClient) ListTools(ctx context.Context) ([]ToolInfo, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/mcp/tools", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/v1/tools", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -91,27 +91,29 @@ func (c *httpMCPTestClient) ListTools(ctx context.Context) ([]ToolInfo, error) {
 		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var tools []ToolInfo
-	if err := json.NewDecoder(resp.Body).Decode(&tools); err != nil {
+	// The HTTP transport returns tools in a wrapper object
+	var response struct {
+		Tools []ToolInfo `json:"tools"`
+		Count int        `json:"count"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	return tools, nil
+	return response.Tools, nil
 }
 
 // CallTool executes a tool via MCP protocol
 func (c *httpMCPTestClient) CallTool(ctx context.Context, name string, args map[string]interface{}) (map[string]interface{}, error) {
-	payload := map[string]interface{}{
-		"name": name,
-		"args": args,
-	}
-
-	body, err := json.Marshal(payload)
+	// The HTTP transport expects the args directly, not wrapped
+	body, err := json.Marshal(args)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling payload: %w", err)
+		return nil, fmt.Errorf("marshaling args: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/mcp/tools/call", strings.NewReader(string(body)))
+	// Use the correct URL pattern for the HTTP transport
+	url := fmt.Sprintf("%s/api/v1/tools/%s", c.baseURL, name)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(body)))
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -138,7 +140,7 @@ func (c *httpMCPTestClient) CallTool(ctx context.Context, name string, args map[
 
 // GetHealth retrieves server health status
 func (c *httpMCPTestClient) GetHealth(ctx context.Context) (*HealthStatus, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/health", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/v1/health", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -163,7 +165,7 @@ func (c *httpMCPTestClient) GetHealth(ctx context.Context) (*HealthStatus, error
 
 // Ping tests basic connectivity to the MCP server
 func (c *httpMCPTestClient) Ping(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/ping", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/v1/status", nil)
 	if err != nil {
 		return fmt.Errorf("creating ping request: %w", err)
 	}
@@ -183,7 +185,7 @@ func (c *httpMCPTestClient) Ping(ctx context.Context) error {
 
 // GetSessionWorkspace retrieves the workspace directory for a session
 func (c *httpMCPTestClient) GetSessionWorkspace(sessionID string) (string, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/mcp/sessions/%s/workspace", c.baseURL, sessionID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/sessions/%s", c.baseURL, sessionID), nil)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
@@ -213,7 +215,7 @@ func (c *httpMCPTestClient) GetSessionWorkspace(sessionID string) (string, error
 
 // InspectSessionState retrieves detailed session state for validation
 func (c *httpMCPTestClient) InspectSessionState(sessionID string) (*SessionState, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/mcp/sessions/%s", c.baseURL, sessionID), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/sessions/%s", c.baseURL, sessionID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

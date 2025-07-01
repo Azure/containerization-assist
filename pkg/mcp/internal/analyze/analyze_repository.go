@@ -41,12 +41,22 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 		sessionID = fmt.Sprintf("session_%d", time.Now().Unix())
 	}
 
-	repoPath, ok := argsMap["repo_path"].(string)
+	// Try different parameter names for repository URL
+	repoPath, ok := argsMap["repo_url"].(string)
 	if !ok {
-		repoPath, ok = argsMap["path"].(string) // Try alternative field name
+		repoPath, ok = argsMap["repo_path"].(string)
 		if !ok {
-			return nil, fmt.Errorf("missing required parameter: 'repo_path' or 'path' must be provided")
+			repoPath, ok = argsMap["path"].(string) // Try alternative field name
+			if !ok {
+				return nil, fmt.Errorf("missing required parameter: 'repo_url', 'repo_path' or 'path' must be provided")
+			}
 		}
+	}
+
+	// Extract optional branch parameter
+	branch, _ := argsMap["branch"].(string)
+	if branch == "" {
+		branch = "main" // Default branch
 	}
 
 	// Create atomic tool args
@@ -55,6 +65,7 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 			SessionID: sessionID,
 		},
 		RepoURL: repoPath,
+		Branch:  branch,
 	}
 
 	// Call atomic tool
@@ -78,14 +89,27 @@ func (t *AnalyzeRepositoryRedirectTool) Execute(ctx context.Context, args interf
 		}, nil
 	}
 
-	// Return successful result
-	return map[string]interface{}{
+	// Return successful result with all necessary fields
+	response := map[string]interface{}{
 		"success":    result.Success,
 		"session_id": result.SessionID,
 		"repo_url":   result.RepoURL,
-		"analysis":   result.Analysis,
+		"branch":     result.Branch,
 		"workspace":  result.WorkspaceDir,
-	}, nil
+	}
+
+	// Add analysis data if available
+	if result.Analysis != nil {
+		response["analysis"] = result.Analysis
+		if result.Analysis.Language != "" {
+			response["language"] = result.Analysis.Language
+		}
+		if result.Analysis.Framework != "" {
+			response["framework"] = result.Analysis.Framework
+		}
+	}
+
+	return response, nil
 }
 
 // Validate validates the input arguments
@@ -100,10 +124,12 @@ func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args inter
 		t.logger.Debug().Msg("Session ID not provided, will be generated")
 	}
 
-	// Check for repo_path or path
-	if repoPath, ok := argsMap["repo_path"].(string); !ok || repoPath == "" {
-		if path, ok := argsMap["path"].(string); !ok || path == "" {
-			return fmt.Errorf("missing required parameter: 'repo_path' or 'path' must be provided")
+	// Check for repo_url, repo_path or path
+	if repoURL, ok := argsMap["repo_url"].(string); !ok || repoURL == "" {
+		if repoPath, ok := argsMap["repo_path"].(string); !ok || repoPath == "" {
+			if path, ok := argsMap["path"].(string); !ok || path == "" {
+				return fmt.Errorf("missing required parameter: 'repo_url', 'repo_path' or 'path' must be provided")
+			}
 		}
 	}
 
@@ -131,8 +157,10 @@ func (t *AnalyzeRepositoryRedirectTool) GetMetadata() core.ToolMetadata {
 		},
 		Parameters: map[string]string{
 			"session_id": "Session identifier (optional, will be generated if not provided)",
-			"repo_path":  "Path to the repository to analyze",
-			"path":       "Alternative field name for repo_path",
+			"repo_url":   "Repository URL or path to analyze",
+			"repo_path":  "Alternative field name for repo_url",
+			"path":       "Alternative field name for repo_url",
+			"branch":     "Git branch to analyze (default: main)",
 		},
 		Examples: []mcptypes.ToolExample{
 			{
@@ -140,7 +168,7 @@ func (t *AnalyzeRepositoryRedirectTool) GetMetadata() core.ToolMetadata {
 				Description: "Analyze a local repository for containerization",
 				Input: map[string]interface{}{
 					"session_id": "analysis-session",
-					"repo_path":  "/path/to/repository",
+					"repo_url":   "/path/to/repository",
 				},
 				Output: map[string]interface{}{
 					"success":    true,

@@ -124,6 +124,17 @@ func (o *NoReflectToolOrchestrator) ExecuteTool(
 	case "validate_deployment":
 		return o.executeValidateDeployment(ctx, argsMap)
 	default:
+		// Fall back to tool registry for registered tools
+		if o.toolRegistry != nil {
+			toolInterface, err := o.toolRegistry.GetTool(toolName)
+			if err == nil && toolInterface != nil {
+				o.logger.Debug().Str("tool", toolName).Msg("Executing tool from registry")
+				// Execute the tool through its core.Tool interface
+				if tool, ok := toolInterface.(core.Tool); ok {
+					return tool.Execute(ctx, args)
+				}
+			}
+		}
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
 }
