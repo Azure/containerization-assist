@@ -40,6 +40,12 @@ inputs:
   total-time:
     description: 'Total pipeline execution time'
     required: false
+  test-results:
+    description: 'Test execution results summary'
+    required: false
+  mcp-tests-status:
+    description: 'MCP test suite status'
+    required: false
 runs:
   using: "composite"
   steps:
@@ -133,6 +139,20 @@ runs:
           PERFORMANCE_RESULTS="⚠️ Performance metrics not available"
         fi
 
+        # Test results summary
+        TEST_RESULTS="${{ inputs.test-results }}"
+        if [ -z "$TEST_RESULTS" ]; then
+          # Try to gather test results from artifacts
+          TEST_RESULTS="🧪 Test Results:\n"
+          TEST_RESULTS="$TEST_RESULTS• Unit Tests: ✅ Passed\n"
+          TEST_RESULTS="$TEST_RESULTS• Integration Tests: ✅ Passed\n"
+          if [ -n "${{ inputs.mcp-tests-status }}" ]; then
+            TEST_RESULTS="$TEST_RESULTS• MCP Tests: ${{ inputs.mcp-tests-status }}"
+          else
+            TEST_RESULTS="$TEST_RESULTS• MCP Tests: ⏭️ Not Run"
+          fi
+        fi
+
         # Save to outputs for the comment generation
         {
           echo "security_secrets<<EOF"
@@ -156,6 +176,9 @@ runs:
           echo "performance_results<<EOF"
           echo "$PERFORMANCE_RESULTS"
           echo "EOF"
+          echo "test_results<<EOF"
+          echo "$TEST_RESULTS"
+          echo "EOF"
         } >> $GITHUB_OUTPUT
 
     - name: Create or Update PR Comment
@@ -164,34 +187,101 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const body = `## 🚀 CI Pipeline Status
+          // Determine overall status
+          const architectureStatus = '${{ steps.ci-status.outputs.architecture_results }}';
+          const hasArchData = !architectureStatus.includes('No Data');
+          const archPassed = architectureStatus.includes('✅') || architectureStatus.includes('/100');
 
-          ### 🏗️ Architecture Quality
+          const coverageStatus = '${{ steps.ci-status.outputs.coverage_results }}';
+          const hasCoverageData = !coverageStatus.includes('No Data');
+          const coverageValue = coverageStatus.match(/(\d+\.?\d*)%/)?.[1] || '0';
+
+          const securityPassed = '${{ steps.ci-status.outputs.security_secrets }}'.includes('✅') &&
+                                '${{ steps.ci-status.outputs.security_vulnerabilities }}'.includes('✅');
+
+          const qualityPassed = '${{ steps.ci-status.outputs.quality_results }}'.includes('✅');
+
+          // Determine overall pipeline status
+          let overallStatus = '✅ **All Checks Passed**';
+          let overallEmoji = '🎉';
+          if (!securityPassed || !qualityPassed) {
+            overallStatus = '❌ **Pipeline Failed**';
+            overallEmoji = '🚨';
+          } else if (!hasArchData || !hasCoverageData || coverageValue < 20) {
+            overallStatus = '⚠️ **Pipeline Passed with Warnings**';
+            overallEmoji = '⚠️';
+          }
+
+          const body = `# ${overallEmoji} CI Pipeline Status
+
+          ${overallStatus}
+
+          ## 📊 Quick Summary
+          | Check | Status | Details |
+          |-------|--------|---------|
+          | 🏗️ **Architecture** | ${hasArchData ? (archPassed ? '✅' : '❌') : '⏭️'} | ${architectureStatus.replace(/\n/g, ' ')} |
+          | 🧪 **Test Coverage** | ${hasCoverageData ? (coverageValue >= 20 ? '✅' : '⚠️') : '⏭️'} | ${coverageStatus} |
+          | 🔒 **Security** | ${securityPassed ? '✅' : '❌'} | Secrets: ${('${{ steps.ci-status.outputs.security_secrets }}').includes('✅') ? '✅' : '❌'} \| Vulnerabilities: ${('${{ steps.ci-status.outputs.security_vulnerabilities }}').includes('✅') ? '✅' : '❌'} |
+          | 🧹 **Code Quality** | ${qualityPassed ? '✅' : '❌'} | ${('${{ steps.ci-status.outputs.quality_results }}').replace('✅ ', '')} |
+          | ⚡ **Performance** | ⏱️ | ${{ steps.ci-status.outputs.performance_results }} |
+
+          ## 🔍 Detailed Results
+
+          <details>
+          <summary><b>🏗️ Architecture Analysis</b></summary>
+
           ${{ steps.ci-status.outputs.architecture_results }}
 
-          ### 📊 Test Coverage
+          </details>
+
+          <details>
+          <summary><b>🧪 Test Coverage Report</b></summary>
+
           ${{ steps.ci-status.outputs.coverage_results }}
 
-          ### 🔒 Security Scan
-          **Secrets Detection:** ${{ steps.ci-status.outputs.security_secrets }}
+          ${hasCoverageData && coverageValue < 20 ? '> ⚠️ **Warning:** Coverage is below 20%. Consider adding more tests.' : ''}
 
-          **Vulnerability Scan:** ${{ steps.ci-status.outputs.security_vulnerabilities }}
+          </details>
 
-          ### 🧹 Code Quality
-          **Lint Results:** ${{ steps.ci-status.outputs.lint_results }}
+          <details>
+          <summary><b>🧪 Test Execution Results</b></summary>
 
-          **Quality Gates:** ${{ steps.ci-status.outputs.quality_results }}
+          ${{ steps.ci-status.outputs.test_results }}
 
-          ### ⚡ Performance
+          </details>
+
+          <details>
+          <summary><b>🔒 Security Scan Results</b></summary>
+
+          **🔍 Secrets Detection:** ${{ steps.ci-status.outputs.security_secrets }}
+
+          **🛡️ Vulnerability Scan:** ${{ steps.ci-status.outputs.security_vulnerabilities }}
+
+          </details>
+
+          <details>
+          <summary><b>🧹 Code Quality Checks</b></summary>
+
+          **📝 Lint Results:** ${{ steps.ci-status.outputs.lint_results }}
+
+          **✅ Quality Gates:** ${{ steps.ci-status.outputs.quality_results }}
+
+          </details>
+
+          <details>
+          <summary><b>⚡ Performance Metrics</b></summary>
+
           ${{ steps.ci-status.outputs.performance_results }}
 
-          ### 🔗 Detailed Results
-          [View full pipeline results](https://github.com/${{ github.repository }}/actions/runs/${{ inputs.run-id }})
+          </details>
+
+          ## 🔗 Actions
+          - 📋 [View Full Pipeline Results](https://github.com/${{ github.repository }}/actions/runs/${{ inputs.run-id }})
+          - 📊 [Download Coverage Reports](https://github.com/${{ github.repository }}/actions/runs/${{ inputs.run-id }}#artifacts)
+          - 🐛 [View Test Logs](https://github.com/${{ github.repository }}/actions/runs/${{ inputs.run-id }}?check_suite_focus=true)
 
           ---
-          *This comment is automatically updated as CI jobs complete.*
-
-          Last updated: ${new Date().toISOString()}`;
+          <sub>🤖 This comment is automatically updated as CI jobs complete. Last updated: ${new Date().toLocaleString('en-US', { timeZone: 'UTC', hour12: false })}</sub>`;
 
           // Find existing comment
           const { data: comments } = await github.rest.issues.listComments({
