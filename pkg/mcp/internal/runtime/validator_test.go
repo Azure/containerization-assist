@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/validation/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,6 +38,24 @@ func (m *mockValidator) Validate(ctx context.Context, input interface{}, options
 
 func (m *mockValidator) GetName() string {
 	return m.name
+}
+
+func (m *mockValidator) ValidateUnified(ctx context.Context, input interface{}, options *core.ValidationOptions) (*core.ValidationResult, error) {
+	// Convert to legacy options and call regular validate
+	legacyOptions := ValidationOptions{
+		Severity:     "medium",
+		StrictMode:   options.StrictMode,
+		IgnoreRules:  make([]string, 0),
+		CustomParams: make(map[string]interface{}),
+	}
+
+	legacyResult, err := m.Validate(ctx, input, legacyOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert legacy result to unified format
+	return convertLegacyToUnified(legacyResult), nil
 }
 
 func TestNewBaseValidator(t *testing.T) {
