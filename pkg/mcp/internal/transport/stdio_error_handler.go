@@ -40,10 +40,7 @@ func (h *StdioErrorHandler) HandleToolError(ctx context.Context, toolName string
 	switch typedErr := err.(type) {
 	case *errors.CoreError:
 		return h.handleCoreError(typedErr, toolName), nil
-	case *types.RichError:
-		// Migrate RichError to CoreError
-		coreErr := errors.MigrateRichError(typedErr)
-		return h.handleCoreError(coreErr, toolName), nil
+	// Note: RichError has been removed from the system
 	case *types.ToolError:
 		return h.handleToolError(typedErr, toolName), nil
 	case *server.InvalidParametersError:
@@ -139,88 +136,7 @@ func (h *StdioErrorHandler) handleCoreError(coreErr *errors.CoreError, toolName 
 	return response
 }
 
-// handleRichError creates a comprehensive error response from RichError (legacy support)
-func (h *StdioErrorHandler) handleRichError(richErr *types.RichError, toolName string) interface{} {
-	// Create MCP-compatible error response
-	response := map[string]interface{}{
-		"content": []map[string]interface{}{
-			{
-				"type": "text",
-				"text": h.formatRichErrorMessage(richErr),
-			},
-		},
-		"isError": true,
-		"error": map[string]interface{}{
-			"code":      richErr.Code,
-			"type":      richErr.Type,
-			"severity":  richErr.Severity,
-			"message":   richErr.Message,
-			"tool":      toolName,
-			"timestamp": richErr.Timestamp,
-		},
-	}
-
-	// Add context information if available
-	if richErr.Context.Operation != "" {
-		if errorMap, ok := response["error"].(map[string]interface{}); ok {
-			errorMap["operation"] = richErr.Context.Operation
-			errorMap["stage"] = richErr.Context.Stage
-			errorMap["component"] = richErr.Context.Component
-		}
-	}
-
-	// Add resolution steps if available
-	if len(richErr.Resolution.ImmediateSteps) > 0 {
-		steps := make([]map[string]interface{}, len(richErr.Resolution.ImmediateSteps))
-		for i, step := range richErr.Resolution.ImmediateSteps {
-			steps[i] = map[string]interface{}{
-				"order":       step.Order,
-				"action":      step.Action,
-				"description": step.Description,
-				"command":     step.Command,
-				"expected":    step.Expected,
-			}
-		}
-		response["resolution_steps"] = steps
-	}
-
-	// Add alternatives if available
-	if len(richErr.Resolution.Alternatives) > 0 {
-		alternatives := make([]map[string]interface{}, len(richErr.Resolution.Alternatives))
-		for i, alt := range richErr.Resolution.Alternatives {
-			alternatives[i] = map[string]interface{}{
-				"name":        alt.Name,
-				"description": alt.Description,
-				"steps":       alt.Steps,
-				"confidence":  alt.Confidence,
-			}
-		}
-		response["alternatives"] = alternatives
-	}
-
-	// Add retry information
-	if richErr.Resolution.RetryStrategy.Recommended {
-		response["retry_strategy"] = map[string]interface{}{
-			"recommended":      richErr.Resolution.RetryStrategy.Recommended,
-			"wait_time":        richErr.Resolution.RetryStrategy.WaitTime.String(),
-			"max_attempts":     richErr.Resolution.RetryStrategy.MaxAttempts,
-			"backoff_strategy": richErr.Resolution.RetryStrategy.BackoffStrategy,
-			"conditions":       richErr.Resolution.RetryStrategy.Conditions,
-		}
-	}
-
-	// Add diagnostic information
-	if richErr.Diagnostics.RootCause != "" {
-		response["diagnostics"] = map[string]interface{}{
-			"root_cause":    richErr.Diagnostics.RootCause,
-			"error_pattern": richErr.Diagnostics.ErrorPattern,
-			"category":      richErr.Diagnostics.Category,
-			"symptoms":      richErr.Diagnostics.Symptoms,
-		}
-	}
-
-	return response
-}
+// handleRichError has been removed as RichError is no longer used
 
 // handleToolError creates an error response from ToolError
 func (h *StdioErrorHandler) handleToolError(toolErr *types.ToolError, toolName string) interface{} {
@@ -298,58 +214,7 @@ func (h *StdioErrorHandler) createInvalidParametersError(message string) error {
 	}
 }
 
-// formatRichErrorMessage creates a user-friendly error message from RichError
-func (h *StdioErrorHandler) formatRichErrorMessage(richErr *types.RichError) string {
-	var msg strings.Builder
-
-	// Start with the basic error
-	msg.WriteString(fmt.Sprintf("❌ %s: %s\n", richErr.Type, richErr.Message))
-
-	// Add context if available
-	if richErr.Context.Operation != "" {
-		msg.WriteString(fmt.Sprintf("\n🔍 Context: %s → %s → %s\n",
-			richErr.Context.Operation, richErr.Context.Stage, richErr.Context.Component))
-	}
-
-	// Add root cause if available
-	if richErr.Diagnostics.RootCause != "" {
-		msg.WriteString(fmt.Sprintf("\n🎯 Root Cause: %s\n", richErr.Diagnostics.RootCause))
-	}
-
-	// Add immediate resolution steps
-	if len(richErr.Resolution.ImmediateSteps) > 0 {
-		msg.WriteString("\n🔧 Immediate Steps:\n")
-		for _, step := range richErr.Resolution.ImmediateSteps {
-			msg.WriteString(fmt.Sprintf("  %d. %s\n", step.Order, step.Action))
-			if step.Command != "" {
-				msg.WriteString(fmt.Sprintf("     Command: %s\n", step.Command))
-			}
-		}
-	}
-
-	// Add alternatives if available
-	if len(richErr.Resolution.Alternatives) > 0 {
-		msg.WriteString("\n💡 Alternatives:\n")
-		// Limit to top 2 alternatives
-		limit := len(richErr.Resolution.Alternatives)
-		if limit > 2 {
-			limit = 2
-		}
-		for i := 0; i < limit; i++ {
-			alt := richErr.Resolution.Alternatives[i]
-			msg.WriteString(fmt.Sprintf("  %d. %s (confidence: %.0f%%)\n",
-				i+1, alt.Name, alt.Confidence*100))
-		}
-	}
-
-	// Add retry information if recommended
-	if richErr.Resolution.RetryStrategy.Recommended {
-		msg.WriteString(fmt.Sprintf("\n🔄 Retry: Wait %v, max %d attempts\n",
-			richErr.Resolution.RetryStrategy.WaitTime, richErr.Resolution.RetryStrategy.MaxAttempts))
-	}
-
-	return msg.String()
-}
+// formatRichErrorMessage has been removed as RichError is no longer used
 
 // formatToolErrorMessage creates a user-friendly error message from ToolError
 func (h *StdioErrorHandler) formatToolErrorMessage(toolErr *types.ToolError) string {

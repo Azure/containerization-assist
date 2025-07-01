@@ -2,16 +2,17 @@ package build
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	coredocker "github.com/Azure/container-kit/pkg/core/docker"
-	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+
+	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+
+	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/rs/zerolog"
 )
 
@@ -38,7 +39,6 @@ func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, 
 			WithField("dockerfilePath", dockerfilePath).
 			Build()
 	}
-
 	// Check if build context exists
 	if _, err := os.Stat(buildContext); os.IsNotExist(err) {
 		return types.NewErrorBuilder("invalid_arguments",
@@ -48,68 +48,12 @@ func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, 
 			WithField("buildContext", buildContext).
 			Build()
 	}
-
 	// Check if Docker is available
 	cmd := exec.Command("docker", "version")
 	if err := cmd.Run(); err != nil {
-		return types.NewErrorBuilder("internal_server_error",
-			"Docker is not available. Please ensure Docker is installed and running", "execution").
-			WithSeverity("critical").
-			WithOperation("ValidateBuildPrerequisites").
-			WithRootCause("Docker daemon not running").
-			Build()
+		return fmt.Errorf("Docker is not available. Please ensure Docker is installed and running")
 	}
-
 	return nil
-}
-
-// RunSecurityScan runs a security scan on the built image using Trivy
-func (bv *BuildValidatorImpl) RunSecurityScan(ctx context.Context, imageName string, imageTag string) (*coredocker.ScanResult, time.Duration, error) {
-	startTime := time.Now()
-
-	// Check if Trivy is installed
-	if !bv.isTrivyInstalled() {
-		bv.logger.Warn().Msg("Trivy not found, skipping security scan")
-		return nil, 0, nil
-	}
-
-	fullImageRef := fmt.Sprintf("%s:%s", imageName, imageTag)
-	bv.logger.Info().Str("image", fullImageRef).Msg("Running security scan with Trivy")
-
-	// Run Trivy scan
-	output, err := bv.executeTrivyScan(ctx, fullImageRef)
-	if err != nil {
-		return nil, time.Since(startTime), bv.createScanError(fullImageRef)
-	}
-
-	// Initialize scan result
-	scanResult := bv.initializeScanResult(fullImageRef, startTime)
-
-	// Parse Trivy JSON output
-	var trivyResult coredocker.TrivyResult
-	if err := json.Unmarshal(output, &trivyResult); err != nil {
-		bv.logger.Warn().
-			Err(err).
-			Str("output", string(output)).
-			Msg("Failed to parse Trivy JSON output, falling back to string matching")
-
-		// Fallback to string matching if JSON parsing fails
-		bv.countVulnerabilitiesFromString(string(output), scanResult)
-	} else {
-		// Process properly parsed JSON results
-		bv.processJSONResults(&trivyResult, scanResult)
-
-		// Add remediation recommendations
-		bv.addRemediationSteps(scanResult)
-	}
-
-	duration := time.Since(startTime)
-	bv.logger.Info().
-		Dur("duration", duration).
-		Interface("summary", scanResult.Summary).
-		Msg("Security scan completed")
-
-	return scanResult, duration, nil
 }
 
 // Helper method to check if Trivy is installed
@@ -133,12 +77,7 @@ func (bv *BuildValidatorImpl) executeTrivyScan(ctx context.Context, fullImageRef
 
 // Helper method to create scan error
 func (bv *BuildValidatorImpl) createScanError(fullImageRef string) error {
-	return types.NewErrorBuilder("internal_server_error",
-		"Security scan failed", "execution").
-		WithSeverity("medium").
-		WithOperation("RunSecurityScan").
-		WithField("image", fullImageRef).
-		Build()
+	return fmt.Errorf("security scan failed for image %s", fullImageRef)
 }
 
 // Helper method to initialize scan result
@@ -175,7 +114,6 @@ func (bv *BuildValidatorImpl) countVulnerabilitiesFromString(outputStr string, s
 		{"LOW", &scanResult.Summary.Low},
 		{"UNKNOWN", &scanResult.Summary.Unknown},
 	}
-
 	for _, severity := range severityLevels {
 		count := strings.Count(outputStr, severity.level)
 		if count > 0 {
@@ -200,13 +138,10 @@ func (bv *BuildValidatorImpl) processJSONResults(trivyResult *coredocker.TrivyRe
 				Description:      vuln.Description,
 				References:       vuln.References,
 			}
-
 			if vuln.Layer.DiffID != "" {
 				vulnerability.Layer = vuln.Layer.DiffID
 			}
-
 			scanResult.Vulnerabilities = append(scanResult.Vulnerabilities, vulnerability)
-
 			// Update summary counts
 			switch strings.ToUpper(vuln.Severity) {
 			case "CRITICAL":
@@ -221,7 +156,6 @@ func (bv *BuildValidatorImpl) processJSONResults(trivyResult *coredocker.TrivyRe
 				scanResult.Summary.Unknown++
 			}
 			scanResult.Summary.Total++
-
 			// Count fixable vulnerabilities
 			if vuln.FixedVersion != "" {
 				scanResult.Summary.Fixable++
@@ -235,14 +169,12 @@ func (bv *BuildValidatorImpl) addRemediationSteps(scanResult *coredocker.ScanRes
 	if scanResult.Summary.Critical == 0 && scanResult.Summary.High == 0 {
 		return
 	}
-
 	scanResult.Remediation = append(scanResult.Remediation, coresecurity.RemediationStep{
 		Priority:    1,
 		Action:      "update_base_image",
 		Description: "Update base image to latest version to fix known vulnerabilities",
 		Command:     "docker pull <base-image>:latest",
 	})
-
 	if scanResult.Summary.Fixable > 0 {
 		scanResult.Remediation = append(scanResult.Remediation, coresecurity.RemediationStep{
 			Priority:    2,
@@ -256,9 +188,7 @@ func (bv *BuildValidatorImpl) addRemediationSteps(scanResult *coredocker.ScanRes
 // AddPushTroubleshootingTips adds troubleshooting tips for push failures
 func (bv *BuildValidatorImpl) AddPushTroubleshootingTips(err error, registryURL string) []string {
 	tips := []string{}
-
 	errorMsg := err.Error()
-
 	if strings.Contains(errorMsg, "authentication required") ||
 		strings.Contains(errorMsg, "unauthorized") {
 		tips = append(tips,
@@ -266,7 +196,6 @@ func (bv *BuildValidatorImpl) AddPushTroubleshootingTips(err error, registryURL 
 			"Check if your credentials are correct",
 			"For private registries, ensure you have push permissions")
 	}
-
 	if strings.Contains(errorMsg, "connection refused") ||
 		strings.Contains(errorMsg, "no such host") {
 		tips = append(tips,
@@ -274,27 +203,22 @@ func (bv *BuildValidatorImpl) AddPushTroubleshootingTips(err error, registryURL 
 			"Verify network connectivity to "+registryURL,
 			"If using a private registry, ensure it's accessible from your network")
 	}
-
 	if strings.Contains(errorMsg, "denied") {
 		tips = append(tips,
 			"Access denied. Verify you have push permissions to this repository",
 			"Check if the repository exists and you have write access",
 			"For organization repositories, ensure your account is properly configured")
 	}
-
 	return tips
 }
 
 // AddTroubleshootingTips adds general troubleshooting tips based on the error
 func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 	tips := []string{}
-
 	if err == nil {
 		return tips
 	}
-
 	errorMsg := err.Error()
-
 	// Docker daemon issues
 	if strings.Contains(errorMsg, "Cannot connect to the Docker daemon") {
 		tips = append(tips,
@@ -302,7 +226,6 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 			"Try: sudo systemctl start docker (Linux)",
 			"Check Docker daemon logs for errors")
 	}
-
 	// Dockerfile syntax errors
 	if strings.Contains(errorMsg, "failed to parse Dockerfile") ||
 		strings.Contains(errorMsg, "unknown instruction") {
@@ -311,7 +234,6 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 			"Ensure all instructions are valid",
 			"Verify proper line endings (LF, not CRLF)")
 	}
-
 	// Build context issues
 	if strings.Contains(errorMsg, "no such file or directory") {
 		tips = append(tips,
@@ -319,7 +241,6 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 			"Check if build context includes all necessary files",
 			"Ensure relative paths are correct from build context")
 	}
-
 	// Network issues
 	if strings.Contains(errorMsg, "temporary failure resolving") ||
 		strings.Contains(errorMsg, "network is unreachable") {
@@ -328,7 +249,6 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 			"Verify DNS settings",
 			"Try using a different DNS server (e.g., 8.8.8.8)")
 	}
-
 	// Space issues
 	if strings.Contains(errorMsg, "no space left on device") {
 		tips = append(tips,
@@ -336,7 +256,6 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 			"Run: docker system prune -a",
 			"Check available space with: df -h")
 	}
-
 	return tips
 }
 
@@ -344,12 +263,8 @@ func (bv *BuildValidatorImpl) AddTroubleshootingTips(err error) []string {
 func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 	// Validate image name
 	if args.ImageName == "" {
-		return types.NewErrorBuilder("invalid_arguments", "image_name is required", "validation").
-			WithSeverity("high").
-			WithOperation("ValidateArgs").
-			Build()
+		return fmt.Errorf("image name is required")
 	}
-
 	// Validate platform if specified
 	if args.Platform != "" {
 		validPlatforms := []string{"linux/amd64", "linux/arm64", "linux/arm/v7"}
@@ -369,16 +284,9 @@ func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 				Build()
 		}
 	}
-
 	// Validate registry URL if push is requested
 	if args.PushAfterBuild && args.RegistryURL == "" {
-		return types.NewErrorBuilder("invalid_arguments",
-			"registry_url is required when push_after_build is true", "validation").
-			WithSeverity("high").
-			WithOperation("ValidateArgs").
-			WithField("push_after_build", args.PushAfterBuild).
-			Build()
+		return fmt.Errorf("registry URL is required when push_after_build is true")
 	}
-
 	return nil
 }

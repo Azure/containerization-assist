@@ -2,17 +2,29 @@ package mcp
 
 import (
 	"reflect"
+
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // FactoryBuilder helps build strongly-typed factories with less boilerplate
-type FactoryBuilder[T Tool] struct {
+type FactoryBuilder[T core.Tool] struct {
 	factoryFunc TypedFactoryFunc[T]
 	toolType    string
-	metadata    ToolMetadata
+	metadata    core.ToolMetadata
+}
+
+// TypedFactoryFunc represents typed factory function
+type TypedFactoryFunc[T core.Tool] func() T
+
+// StronglyTypedToolFactory creates typed tool instances
+type StronglyTypedToolFactory[T core.Tool] interface {
+	Create() T
+	GetType() string
+	GetMetadata() core.ToolMetadata
 }
 
 // NewFactoryBuilder creates a new factory builder for a specific tool type
-func NewFactoryBuilder[T Tool](factoryFunc TypedFactoryFunc[T]) *FactoryBuilder[T] {
+func NewFactoryBuilder[T core.Tool](factoryFunc TypedFactoryFunc[T]) *FactoryBuilder[T] {
 	return &FactoryBuilder[T]{
 		factoryFunc: factoryFunc,
 	}
@@ -25,14 +37,14 @@ func (b *FactoryBuilder[T]) WithType(toolType string) *FactoryBuilder[T] {
 }
 
 // WithMetadata sets the tool metadata
-func (b *FactoryBuilder[T]) WithMetadata(metadata ToolMetadata) *FactoryBuilder[T] {
+func (b *FactoryBuilder[T]) WithMetadata(metadata core.ToolMetadata) *FactoryBuilder[T] {
 	b.metadata = metadata
 	return b
 }
 
 // WithBasicMetadata sets basic metadata fields
 func (b *FactoryBuilder[T]) WithBasicMetadata(name, description, version, category string) *FactoryBuilder[T] {
-	b.metadata = ToolMetadata{
+	b.metadata = core.ToolMetadata{
 		Name:        name,
 		Description: description,
 		Version:     version,
@@ -56,24 +68,30 @@ func (b *FactoryBuilder[T]) Build() StronglyTypedToolFactory[T] {
 	return NewStronglyTypedFactory(b.factoryFunc, b.toolType, b.metadata)
 }
 
-// RegisterBuilder is a convenience function that builds and registers a factory
-func RegisterBuilder[T Tool](registry StronglyTypedToolRegistry, name string, builder *FactoryBuilder[T]) error {
-	factory := builder.Build()
-	return RegisterGeneric(registry, name, factory)
-}
-
-// SimpleFactory creates a basic factory with minimal configuration
-func SimpleFactory[T Tool](factoryFunc TypedFactoryFunc[T], name string) StronglyTypedToolFactory[T] {
-	return NewFactoryBuilder(factoryFunc).
-		WithType(name).
-		WithBasicMetadata(name, "Auto-generated tool", "1.0.0", "general").
-		Build()
-}
-
-// MustRegisterSimple registers a simple factory and panics on error (for init functions)
-func MustRegisterSimple[T Tool](registry StronglyTypedToolRegistry, name string, factoryFunc TypedFactoryFunc[T]) {
-	factory := SimpleFactory(factoryFunc, name)
-	if err := RegisterGeneric(registry, name, factory); err != nil {
-		panic(err)
+// NewStronglyTypedFactory creates typed factory
+func NewStronglyTypedFactory[T core.Tool](factoryFunc TypedFactoryFunc[T], toolType string, metadata core.ToolMetadata) StronglyTypedToolFactory[T] {
+	return &stronglyTypedFactory[T]{
+		factoryFunc: factoryFunc,
+		toolType:    toolType,
+		metadata:    metadata,
 	}
+}
+
+// stronglyTypedFactory implements StronglyTypedToolFactory
+type stronglyTypedFactory[T core.Tool] struct {
+	factoryFunc TypedFactoryFunc[T]
+	toolType    string
+	metadata    core.ToolMetadata
+}
+
+func (f *stronglyTypedFactory[T]) Create() T {
+	return f.factoryFunc()
+}
+
+func (f *stronglyTypedFactory[T]) GetType() string {
+	return f.toolType
+}
+
+func (f *stronglyTypedFactory[T]) GetMetadata() core.ToolMetadata {
+	return f.metadata
 }

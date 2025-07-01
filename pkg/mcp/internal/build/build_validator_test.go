@@ -30,13 +30,10 @@ func processJSONVulnerabilities(trivyResult *coredocker.TrivyResult, scanResult 
 				Description:      vuln.Description,
 				References:       vuln.References,
 			}
-
 			if vuln.Layer.DiffID != "" {
 				vulnerability.Layer = vuln.Layer.DiffID
 			}
-
 			scanResult.Vulnerabilities = append(scanResult.Vulnerabilities, vulnerability)
-
 			// Update summary counts
 			switch vuln.Severity {
 			case "CRITICAL":
@@ -51,7 +48,6 @@ func processJSONVulnerabilities(trivyResult *coredocker.TrivyResult, scanResult 
 				scanResult.Summary.Unknown++
 			}
 			scanResult.Summary.Total++
-
 			// Count fixable vulnerabilities
 			if vuln.FixedVersion != "" {
 				scanResult.Summary.Fixable++
@@ -72,7 +68,6 @@ func countVulnerabilitiesFromString(outputStr string, scanResult *coredocker.Sca
 		{"LOW", &scanResult.Summary.Low},
 		{"UNKNOWN", &scanResult.Summary.Unknown},
 	}
-
 	for _, severity := range severityLevels {
 		count := strings.Count(outputStr, severity.level)
 		if count > 0 {
@@ -101,11 +96,9 @@ func verifyScanResults(t *testing.T, tt struct {
 	assert.Equal(t, tt.expectedMedium, scanResult.Summary.Medium, "Medium vulnerabilities mismatch")
 	assert.Equal(t, tt.expectedLow, scanResult.Summary.Low, "Low vulnerabilities mismatch")
 	assert.Equal(t, tt.expectedFixable, scanResult.Summary.Fixable, "Fixable vulnerabilities mismatch")
-
 	// Verify vulnerability details for valid JSON
 	if !tt.shouldFallback && tt.expectedTotal > 0 {
 		assert.Len(t, scanResult.Vulnerabilities, tt.expectedTotal)
-
 		// Check first vulnerability details
 		if len(scanResult.Vulnerabilities) > 0 {
 			firstVuln := scanResult.Vulnerabilities[0]
@@ -116,9 +109,7 @@ func verifyScanResults(t *testing.T, tt struct {
 		}
 	}
 }
-
 func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
-
 	tests := []struct {
 		name            string
 		trivyOutput     string
@@ -265,7 +256,6 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 			shouldFallback:  false,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock scan result
@@ -277,15 +267,12 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 				Remediation:     []coresecurity.RemediationStep{},
 				Context:         make(map[string]interface{}),
 			}
-
 			// Test JSON parsing logic directly
 			var trivyResult coredocker.TrivyResult
 			err := json.Unmarshal([]byte(tt.trivyOutput), &trivyResult)
-
 			if err != nil && !tt.shouldFallback {
 				t.Fatalf("Expected valid JSON but got error: %v", err)
 			}
-
 			if err == nil {
 				// Process parsed JSON
 				processJSONVulnerabilities(&trivyResult, scanResult)
@@ -293,20 +280,16 @@ func TestBuildValidator_ParseTrivyJSON(t *testing.T) {
 				// Test fallback string matching
 				countVulnerabilitiesFromString(tt.trivyOutput, scanResult)
 			}
-
 			// Verify results
 			verifyScanResults(t, tt, scanResult)
 		})
 	}
 }
-
 func TestBuildValidator_ValidateBuildPrerequisites(t *testing.T) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	validator := NewBuildValidator(logger)
-
 	// Create temp directory for tests
 	tempDir := t.TempDir()
-
 	tests := []struct {
 		name          string
 		setupFunc     func() (dockerfilePath, buildContext string)
@@ -353,12 +336,10 @@ func TestBuildValidator_ValidateBuildPrerequisites(t *testing.T) {
 			expectedError: false, // Current implementation doesn't validate content
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dockerfilePath, buildContext := tt.setupFunc()
 			err := validator.ValidateBuildPrerequisites(dockerfilePath, buildContext)
-
 			if tt.expectedError {
 				assert.Error(t, err)
 				if tt.errorContains != "" {
@@ -370,11 +351,9 @@ func TestBuildValidator_ValidateBuildPrerequisites(t *testing.T) {
 		})
 	}
 }
-
 func TestBuildValidator_AddPushTroubleshootingTips(t *testing.T) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	validator := NewBuildValidator(logger)
-
 	tests := []struct {
 		name         string
 		errorMsg     string
@@ -412,16 +391,10 @@ func TestBuildValidator_AddPushTroubleshootingTips(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := fmt.Errorf("%s", tt.errorMsg)
-			tips := validator.AddPushTroubleshootingTips(err, tt.registryURL)
-
-			assert.Len(t, tips, len(tt.expectedTips))
-			for i, expectedTip := range tt.expectedTips {
-				assert.Equal(t, expectedTip, tips[i])
-			}
+			tips := validator.AddPushTroubleshootingTips(fmt.Errorf("%s", tt.errorMsg), tt.registryURL)
+			assert.Equal(t, tt.expectedTips, tips)
 		})
 	}
 }

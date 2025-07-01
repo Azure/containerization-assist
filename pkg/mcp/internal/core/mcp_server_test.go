@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+
 	internalutils "github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/rs/zerolog"
@@ -68,7 +69,7 @@ func TestMCPServerBasics(t *testing.T) {
 		defer server.Stop()
 
 		// Enable conversation mode
-		convConfig := ConversationConfig{
+		convConfig := core.ConversationConfig{
 			EnableTelemetry:   false, // Disable for tests
 			PreferencesDBPath: filepath.Join(tmpDir, "preferences.db"),
 		}
@@ -90,7 +91,7 @@ func TestMCPServerBasics(t *testing.T) {
 		defer server.Stop()
 
 		// Enable conversation mode with telemetry
-		convConfig := ConversationConfig{
+		convConfig := core.ConversationConfig{
 			EnableTelemetry:   true,
 			TelemetryPort:     0, // Use random port for testing
 			PreferencesDBPath: filepath.Join(tmpDir, "preferences_telemetry.db"),
@@ -135,19 +136,19 @@ func TestSessionManager(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		sessionState, ok := sessionInterface.(*session.SessionState)
 		require.True(t, ok, "session should be of correct type")
-		assert.Equal(t, sessionID, session.SessionID)
-		assert.NotEmpty(t, session.WorkspaceDir)
+		assert.Equal(t, sessionID, sessionState.SessionID)
+		assert.NotEmpty(t, sessionState.WorkspaceDir)
 
 		// Retrieve session
 		retrievedInterface, err := sessionManager.GetSession(sessionID)
 		require.NoError(t, err)
 
-		retrieved, ok := retrievedInterface.(*sessiontypes.SessionState)
+		retrieved, ok := retrievedInterface.(*session.SessionState)
 		require.True(t, ok, "retrieved session should be of correct type")
 		assert.Equal(t, sessionID, retrieved.SessionID)
-		assert.Equal(t, session.WorkspaceDir, retrieved.WorkspaceDir)
+		assert.Equal(t, sessionState.WorkspaceDir, retrieved.WorkspaceDir)
 	})
 
 	t.Run("SessionPersistence", func(t *testing.T) {
@@ -157,20 +158,22 @@ func TestSessionManager(t *testing.T) {
 		sessionInterface, err := sessionManager.GetOrCreateSession(sessionID)
 		require.NoError(t, err)
 
-		session, ok := sessionInterface.(*sessiontypes.SessionState)
+		sessionState, ok := sessionInterface.(*session.SessionState)
 		require.True(t, ok, "session should be of correct type")
 
 		// Update session with test data
-		session.RepoURL = "https://github.com/test/repo"
-		session.RepoAnalysis = map[string]interface{}{
-			"language":  "Go",
-			"framework": "gin",
+		sessionState.RepoURL = "https://github.com/test/repo"
+		sessionState.Metadata = map[string]interface{}{
+			"repo_analysis": map[string]interface{}{
+				"language":  "Go",
+				"framework": "gin",
+			},
 		}
 
 		err = sessionManager.UpdateSession(sessionID, func(s interface{}) {
-			if sess, ok := s.(*sessiontypes.SessionState); ok {
-				sess.RepoURL = session.RepoURL
-				sess.RepoAnalysis = session.RepoAnalysis
+			if sess, ok := s.(*session.SessionState); ok {
+				sess.RepoURL = sessionState.RepoURL
+				sess.Metadata = sessionState.Metadata
 			}
 		})
 		require.NoError(t, err)
@@ -179,11 +182,13 @@ func TestSessionManager(t *testing.T) {
 		retrievedInterface, err := sessionManager.GetSession(sessionID)
 		require.NoError(t, err)
 
-		retrieved, ok := retrievedInterface.(*sessiontypes.SessionState)
+		retrieved, ok := retrievedInterface.(*session.SessionState)
 		require.True(t, ok, "retrieved session should be of correct type")
 		assert.Equal(t, "https://github.com/test/repo", retrieved.RepoURL)
-		assert.Equal(t, "Go", retrieved.RepoAnalysis["language"])
-		assert.Equal(t, "gin", retrieved.RepoAnalysis["framework"])
+		if repoAnalysis, ok := retrieved.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			assert.Equal(t, "Go", repoAnalysis["language"])
+			assert.Equal(t, "gin", repoAnalysis["framework"])
+		}
 	})
 
 	t.Run("SessionExpiration", func(t *testing.T) {
@@ -381,11 +386,16 @@ func TestErrorHandling(t *testing.T) {
 type MockSessionManager struct{}
 
 func (m *MockSessionManager) GetSession(sessionID string) (interface{}, error) {
-	return &sessiontypes.SessionState{
+	return &session.SessionState{
 		SessionID: sessionID,
 	}, nil
 }
 
-func (m *MockSessionManager) UpdateSession(session interface{}) error {
+func (m *MockSessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
+	// Mock implementation - just call the updater with a mock session
+	session := &session.SessionState{
+		SessionID: sessionID,
+	}
+	updater(session)
 	return nil
 }

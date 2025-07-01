@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -129,27 +128,12 @@ func (rv *RegistryValidator) testConnectivity(ctx context.Context, registryURL s
 
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
-		return false, types.NewErrorBuilder("request_creation_failed", "Failed to create HTTP request for registry connectivity test", "network").
-			WithField("endpoint", endpoint).
-			WithOperation("test_connectivity").
-			WithStage("request_creation").
-			WithRootCause(fmt.Sprintf("Cannot create HTTP request for endpoint %s: %v", endpoint, err)).
-			WithImmediateStep(1, "Check URL", "Verify registry URL format is correct").
-			WithImmediateStep(2, "Check context", "Ensure context is valid and not cancelled").
-			Build()
+		return false, fmt.Errorf("failed to create HTTP request for registry connectivity test: %w", err)
 	}
 
 	resp, err := rv.httpClient.Do(req)
 	if err != nil {
-		return false, types.NewErrorBuilder("registry_connection_failed", "Failed to connect to registry", "network").
-			WithField("endpoint", endpoint).
-			WithOperation("test_connectivity").
-			WithStage("connection_attempt").
-			WithRootCause(fmt.Sprintf("Cannot establish connection to registry endpoint %s: %v", endpoint, err)).
-			WithImmediateStep(1, "Check network", "Verify network connectivity to registry").
-			WithImmediateStep(2, "Check DNS", "Ensure registry hostname resolves correctly").
-			WithImmediateStep(3, "Check firewall", "Verify no firewall rules block registry access").
-			Build()
+		return false, fmt.Errorf("failed to connect to registry %s: %w", endpoint, err)
 	}
 	defer resp.Body.Close()
 

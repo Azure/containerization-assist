@@ -4,7 +4,95 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 )
+
+// Local type definitions for testing to avoid import cycles
+
+type ProgressStage struct {
+	Name        string
+	Weight      float64
+	Description string
+}
+
+type SessionState struct {
+	ID                  string
+	SessionID           string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ExpiresAt           time.Time
+	WorkspaceDir        string
+	RepositoryAnalyzed  bool
+	RepositoryInfo      *RepositoryInfo
+	DockerfileGenerated bool
+	ImageBuilt          bool
+	CurrentStage        string
+	Status              string
+	Stage               string
+	Errors              []string
+	Metadata            map[string]interface{}
+	SecurityScan        *SecurityScanResult
+}
+
+type ToolExample struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Input       map[string]interface{} `json:"input"`
+	Output      map[string]interface{} `json:"output"`
+}
+
+type ToolMetadata struct {
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	Version      string            `json:"version"`
+	Category     string            `json:"category"`
+	Dependencies []string          `json:"dependencies"`
+	Capabilities []string          `json:"capabilities"`
+	Requirements []string          `json:"requirements"`
+	Parameters   map[string]string `json:"parameters"`
+	Examples     []ToolExample     `json:"examples"`
+}
+
+type FileStructure struct {
+	TotalFiles      int      `json:"total_files"`
+	ConfigFiles     []string `json:"config_files"`
+	EntryPoints     []string `json:"entry_points"`
+	TestFiles       []string `json:"test_files"`
+	BuildFiles      []string `json:"build_files"`
+	DockerFiles     []string `json:"docker_files"`
+	KubernetesFiles []string `json:"kubernetes_files"`
+	PackageManagers []string `json:"package_managers"`
+}
+
+type RepositoryInfo struct {
+	Language        string        `json:"language"`
+	Framework       string        `json:"framework"`
+	Port            int           `json:"port"`
+	Dependencies    []string      `json:"dependencies"`
+	Structure       FileStructure `json:"structure"`
+	Size            int64         `json:"size"`
+	HasCI           bool          `json:"has_ci"`
+	HasReadme       bool          `json:"has_readme"`
+	Recommendations []string      `json:"recommendations"`
+}
+
+type BuildResult struct {
+	ImageID  string      `json:"image_id"`
+	ImageRef string      `json:"image_ref"`
+	Success  bool        `json:"success"`
+	Error    *BuildError `json:"error,omitempty"`
+	Logs     string      `json:"logs,omitempty"`
+}
+
+type BuildError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+type SecurityScanResult struct {
+	Success   bool      `json:"success"`
+	ScannedAt time.Time `json:"scanned_at"`
+}
 
 // Test interface conformance by implementing mock types
 

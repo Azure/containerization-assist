@@ -30,32 +30,24 @@ func (fp *FailurePredictor) PredictFailures(ctx context.Context, buildContext *A
 		Str("session_id", buildContext.SessionID).
 		Str("project_type", buildContext.ProjectInfo.Language).
 		Msg("Starting failure prediction analysis")
-
 	// Analyze historical patterns
 	patterns, err := fp.patternAnalyzer.AnalyzeHistoricalPatterns(buildContext.BuildHistory)
 	if err != nil {
 		fp.logger.Warn().Err(err).Msg("Failed to analyze historical patterns")
 		patterns = []*HistoricalPattern{}
 	}
-
 	// Calculate base risk score
 	baseRiskScore := fp.riskCalculator.CalculateBaseRisk(buildContext)
-
 	// Predict specific failures
 	potentialFailures := fp.predictSpecificFailures(buildContext, patterns)
-
 	// Generate preventive actions
 	preventiveActions := fp.generatePreventiveActions(buildContext, potentialFailures)
-
 	// Identify monitoring points
 	monitoringPoints := fp.identifyMonitoringPoints(buildContext, potentialFailures)
-
 	// Calculate overall confidence
 	confidence := fp.calculatePredictionConfidence(buildContext, patterns, potentialFailures)
-
 	// Calculate final risk score considering all factors
 	finalRiskScore := fp.adjustRiskScore(baseRiskScore, potentialFailures, patterns)
-
 	prediction := &FailurePrediction{
 		PotentialFailures: potentialFailures,
 		RiskScore:         finalRiskScore,
@@ -63,44 +55,33 @@ func (fp *FailurePredictor) PredictFailures(ctx context.Context, buildContext *A
 		MonitoringPoints:  monitoringPoints,
 		ConfidenceLevel:   confidence,
 	}
-
 	fp.logger.Info().
 		Float64("risk_score", finalRiskScore).
 		Float64("confidence", confidence).
 		Int("potential_failures", len(potentialFailures)).
 		Msg("Failure prediction completed")
-
 	return prediction, nil
 }
 
 // predictSpecificFailures identifies specific potential failures
 func (fp *FailurePredictor) predictSpecificFailures(buildContext *AnalysisBuildContext, patterns []*HistoricalPattern) []*PredictedFailure {
 	failures := []*PredictedFailure{}
-
 	// Language-specific failure predictions
 	failures = append(failures, fp.predictLanguageSpecificFailures(buildContext.ProjectInfo)...)
-
 	// Environment-based failure predictions
 	failures = append(failures, fp.predictEnvironmentFailures(buildContext.Environment)...)
-
 	// Resource-based failure predictions
 	failures = append(failures, fp.predictResourceFailures(buildContext.CurrentState)...)
-
 	// Historical pattern-based predictions
 	failures = append(failures, fp.predictFromHistoricalPatterns(patterns)...)
-
 	// Dependency-based predictions
 	failures = append(failures, fp.predictDependencyFailures(buildContext.ProjectInfo)...)
-
 	// Remove duplicates and sort by probability
 	failures = fp.deduplicateAndSort(failures)
-
 	return failures
 }
-
 func (fp *FailurePredictor) predictLanguageSpecificFailures(projectInfo *ProjectMetadata) []*PredictedFailure {
 	failures := []*PredictedFailure{}
-
 	switch strings.ToLower(projectInfo.Language) {
 	case "go":
 		failures = append(failures, &PredictedFailure{
@@ -110,7 +91,6 @@ func (fp *FailurePredictor) predictLanguageSpecificFailures(projectInfo *Project
 			PreventiveActions: []string{"Pre-download dependencies", "Configure proxy properly", "Verify module paths"},
 			ImpactLevel:       "medium",
 		})
-
 		if strings.Contains(strings.ToLower(projectInfo.Framework), "cgo") {
 			failures = append(failures, &PredictedFailure{
 				FailureType:       "cgo_compilation_failure",
@@ -120,7 +100,6 @@ func (fp *FailurePredictor) predictLanguageSpecificFailures(projectInfo *Project
 				ImpactLevel:       "high",
 			})
 		}
-
 	case "python":
 		failures = append(failures, &PredictedFailure{
 			FailureType:       "dependency_conflict",
@@ -129,7 +108,6 @@ func (fp *FailurePredictor) predictLanguageSpecificFailures(projectInfo *Project
 			PreventiveActions: []string{"Use dependency lock files", "Create clean virtual environment", "Install system dependencies"},
 			ImpactLevel:       "high",
 		})
-
 	case "javascript", "typescript":
 		failures = append(failures, &PredictedFailure{
 			FailureType:       "node_modules_corruption",
@@ -138,7 +116,6 @@ func (fp *FailurePredictor) predictLanguageSpecificFailures(projectInfo *Project
 			PreventiveActions: []string{"Use npm ci instead of npm install", "Clear npm cache", "Ensure sufficient disk space"},
 			ImpactLevel:       "medium",
 		})
-
 	case "java":
 		failures = append(failures, &PredictedFailure{
 			FailureType:       "classpath_issues",
@@ -148,13 +125,10 @@ func (fp *FailurePredictor) predictLanguageSpecificFailures(projectInfo *Project
 			ImpactLevel:       "high",
 		})
 	}
-
 	return failures
 }
-
 func (fp *FailurePredictor) predictEnvironmentFailures(environment map[string]interface{}) []*PredictedFailure {
 	failures := []*PredictedFailure{}
-
 	// Check for common environment issues
 	if dockerVersion, exists := environment["docker_version"]; exists {
 		if version, ok := dockerVersion.(string); ok && version == "" {
@@ -167,7 +141,6 @@ func (fp *FailurePredictor) predictEnvironmentFailures(environment map[string]in
 			})
 		}
 	}
-
 	// Check resource availability
 	if memory, exists := environment["available_memory"]; exists {
 		if mem, ok := memory.(int64); ok && mem < 1024*1024*1024 { // Less than 1GB
@@ -180,21 +153,16 @@ func (fp *FailurePredictor) predictEnvironmentFailures(environment map[string]in
 			})
 		}
 	}
-
 	return failures
 }
-
 func (fp *FailurePredictor) predictResourceFailures(currentState *BuildState) []*PredictedFailure {
 	failures := []*PredictedFailure{}
-
 	if currentState == nil {
 		return failures
 	}
-
 	// Check current resource usage
 	if currentState.CurrentResources != nil {
 		resources := currentState.CurrentResources
-
 		// CPU usage prediction
 		if resources.CPU > 0.9 {
 			failures = append(failures, &PredictedFailure{
@@ -205,7 +173,6 @@ func (fp *FailurePredictor) predictResourceFailures(currentState *BuildState) []
 				ImpactLevel:       "medium",
 			})
 		}
-
 		// Memory usage prediction
 		if resources.Memory > 1024*1024*1024*8 { // More than 8GB
 			failures = append(failures, &PredictedFailure{
@@ -216,7 +183,6 @@ func (fp *FailurePredictor) predictResourceFailures(currentState *BuildState) []
 				ImpactLevel:       "high",
 			})
 		}
-
 		// Disk usage prediction
 		if resources.Disk > 1024*1024*1024*50 { // More than 50GB
 			failures = append(failures, &PredictedFailure{
@@ -228,7 +194,6 @@ func (fp *FailurePredictor) predictResourceFailures(currentState *BuildState) []
 			})
 		}
 	}
-
 	// Check for error patterns
 	if len(currentState.Errors) > 0 {
 		failures = append(failures, &PredictedFailure{
@@ -239,17 +204,13 @@ func (fp *FailurePredictor) predictResourceFailures(currentState *BuildState) []
 			ImpactLevel:       "high",
 		})
 	}
-
 	return failures
 }
-
 func (fp *FailurePredictor) predictFromHistoricalPatterns(patterns []*HistoricalPattern) []*PredictedFailure {
 	failures := []*PredictedFailure{}
-
 	for _, pattern := range patterns {
 		if pattern.Frequency > 2 && pattern.RecentOccurrences > 0 {
 			probability := fp.calculatePatternProbability(pattern)
-
 			failures = append(failures, &PredictedFailure{
 				FailureType:       pattern.FailureType,
 				Probability:       probability,
@@ -259,13 +220,10 @@ func (fp *FailurePredictor) predictFromHistoricalPatterns(patterns []*Historical
 			})
 		}
 	}
-
 	return failures
 }
-
 func (fp *FailurePredictor) predictDependencyFailures(projectInfo *ProjectMetadata) []*PredictedFailure {
 	failures := []*PredictedFailure{}
-
 	if len(projectInfo.Dependencies) > 50 {
 		failures = append(failures, &PredictedFailure{
 			FailureType:       "dependency_resolution_timeout",
@@ -275,7 +233,6 @@ func (fp *FailurePredictor) predictDependencyFailures(projectInfo *ProjectMetada
 			ImpactLevel:       "medium",
 		})
 	}
-
 	// Check for commonly problematic dependencies
 	problematicDeps := []string{"node-sass", "canvas", "sqlite3", "bcrypt"}
 	for _, dep := range projectInfo.Dependencies {
@@ -292,14 +249,11 @@ func (fp *FailurePredictor) predictDependencyFailures(projectInfo *ProjectMetada
 			}
 		}
 	}
-
 	return failures
 }
-
 func (fp *FailurePredictor) generatePreventiveActions(buildContext *AnalysisBuildContext, failures []*PredictedFailure) []string {
 	actions := []string{}
 	actionSet := make(map[string]bool) // For deduplication
-
 	// Add general preventive actions
 	generalActions := []string{
 		"Verify all prerequisites are installed",
@@ -308,14 +262,12 @@ func (fp *FailurePredictor) generatePreventiveActions(buildContext *AnalysisBuil
 		"Update build tools to latest versions",
 		"Run preliminary validation checks",
 	}
-
 	for _, action := range generalActions {
 		if !actionSet[action] {
 			actions = append(actions, action)
 			actionSet[action] = true
 		}
 	}
-
 	// Add failure-specific actions
 	for _, failure := range failures {
 		if failure.Probability > 0.3 { // Only include likely failures
@@ -327,14 +279,11 @@ func (fp *FailurePredictor) generatePreventiveActions(buildContext *AnalysisBuil
 			}
 		}
 	}
-
 	return actions
 }
-
 func (fp *FailurePredictor) identifyMonitoringPoints(buildContext *AnalysisBuildContext, failures []*PredictedFailure) []string {
 	points := []string{}
 	pointSet := make(map[string]bool) // For deduplication
-
 	// Add general monitoring points
 	generalPoints := []string{
 		"Build execution time",
@@ -344,14 +293,12 @@ func (fp *FailurePredictor) identifyMonitoringPoints(buildContext *AnalysisBuild
 		"Network activity",
 		"Error and warning counts",
 	}
-
 	for _, point := range generalPoints {
 		if !pointSet[point] {
 			points = append(points, point)
 			pointSet[point] = true
 		}
 	}
-
 	// Add failure-specific monitoring points
 	for _, failure := range failures {
 		if failure.Probability > 0.3 {
@@ -374,33 +321,26 @@ func (fp *FailurePredictor) identifyMonitoringPoints(buildContext *AnalysisBuild
 			}
 		}
 	}
-
 	return points
 }
-
 func (fp *FailurePredictor) calculatePredictionConfidence(buildContext *AnalysisBuildContext, patterns []*HistoricalPattern, failures []*PredictedFailure) float64 {
 	confidence := 0.5 // Base confidence
-
 	// Increase confidence based on historical data
 	if len(patterns) > 0 {
 		confidence += 0.2
 	}
-
 	// Increase confidence based on build history
 	if len(buildContext.BuildHistory) > 5 {
 		confidence += 0.1
 	}
-
 	// Increase confidence for known project types
 	if buildContext.ProjectInfo.Language != "" {
 		confidence += 0.1
 	}
-
 	// Decrease confidence for complex scenarios
 	if len(failures) > 10 {
 		confidence -= 0.1
 	}
-
 	// Ensure confidence stays within bounds
 	if confidence > 1.0 {
 		confidence = 1.0
@@ -408,34 +348,28 @@ func (fp *FailurePredictor) calculatePredictionConfidence(buildContext *Analysis
 	if confidence < 0.0 {
 		confidence = 0.0
 	}
-
 	return confidence
 }
-
 func (fp *FailurePredictor) adjustRiskScore(baseScore float64, failures []*PredictedFailure, patterns []*HistoricalPattern) float64 {
 	adjustedScore := baseScore
-
 	// Adjust based on high-probability failures
 	for _, failure := range failures {
 		if failure.Probability > 0.7 {
 			adjustedScore += 0.1
 		}
 	}
-
 	// Adjust based on critical impact failures
 	for _, failure := range failures {
 		if failure.ImpactLevel == "critical" {
 			adjustedScore += 0.15
 		}
 	}
-
 	// Adjust based on historical patterns
 	for _, pattern := range patterns {
 		if pattern.RecentOccurrences > 0 {
 			adjustedScore += 0.05
 		}
 	}
-
 	// Ensure score stays within bounds
 	if adjustedScore > 1.0 {
 		adjustedScore = 1.0
@@ -443,30 +377,24 @@ func (fp *FailurePredictor) adjustRiskScore(baseScore float64, failures []*Predi
 	if adjustedScore < 0.0 {
 		adjustedScore = 0.0
 	}
-
 	return adjustedScore
 }
-
 func (fp *FailurePredictor) calculatePatternProbability(pattern *HistoricalPattern) float64 {
 	// Base probability from frequency
 	baseProbability := float64(pattern.Frequency) / 100.0
 	if baseProbability > 0.8 {
 		baseProbability = 0.8 // Cap at 80%
 	}
-
 	// Adjust based on recent occurrences
 	if pattern.RecentOccurrences > 0 {
 		baseProbability += 0.1
 	}
-
 	// Adjust based on trend
 	if pattern.Trend > 0 {
 		baseProbability += 0.05
 	}
-
 	return baseProbability
 }
-
 func (fp *FailurePredictor) deduplicateAndSort(failures []*PredictedFailure) []*PredictedFailure {
 	// Deduplicate by failure type
 	seen := make(map[string]*PredictedFailure)
@@ -480,13 +408,11 @@ func (fp *FailurePredictor) deduplicateAndSort(failures []*PredictedFailure) []*
 			seen[failure.FailureType] = failure
 		}
 	}
-
 	// Convert back to slice
 	result := make([]*PredictedFailure, 0, len(seen))
 	for _, failure := range seen {
 		result = append(result, failure)
 	}
-
 	// Sort by probability (highest first)
 	for i := 0; i < len(result)-1; i++ {
 		for j := i + 1; j < len(result); j++ {
@@ -495,12 +421,10 @@ func (fp *FailurePredictor) deduplicateAndSort(failures []*PredictedFailure) []*
 			}
 		}
 	}
-
 	return result
 }
 
 // Supporting types and components
-
 type HistoricalPattern struct {
 	FailureType       string    `json:"failure_type"`
 	Frequency         int       `json:"frequency"`
@@ -511,7 +435,6 @@ type HistoricalPattern struct {
 	Trend             float64   `json:"trend"` // Positive for increasing, negative for decreasing
 	LastSeen          time.Time `json:"last_seen"`
 }
-
 type PatternAnalyzer struct {
 	logger zerolog.Logger
 }
@@ -521,13 +444,10 @@ func NewPatternAnalyzer(logger zerolog.Logger) *PatternAnalyzer {
 		logger: logger.With().Str("component", "pattern_analyzer").Logger(),
 	}
 }
-
 func (pa *PatternAnalyzer) AnalyzeHistoricalPatterns(history []*BuildHistoryEntry) ([]*HistoricalPattern, error) {
 	patterns := []*HistoricalPattern{}
-
 	// Group failures by type
 	failureGroups := make(map[string][]*BuildHistoryEntry)
-
 	for _, entry := range history {
 		if !entry.Success && entry.ErrorType != "" {
 			if failureGroups[entry.ErrorType] == nil {
@@ -536,7 +456,6 @@ func (pa *PatternAnalyzer) AnalyzeHistoricalPatterns(history []*BuildHistoryEntr
 			failureGroups[entry.ErrorType] = append(failureGroups[entry.ErrorType], entry)
 		}
 	}
-
 	// Analyze each group
 	for errorType, entries := range failureGroups {
 		pattern := &HistoricalPattern{
@@ -551,10 +470,8 @@ func (pa *PatternAnalyzer) AnalyzeHistoricalPatterns(history []*BuildHistoryEntr
 		}
 		patterns = append(patterns, pattern)
 	}
-
 	return patterns, nil
 }
-
 func (pa *PatternAnalyzer) countRecentOccurrences(entries []*BuildHistoryEntry, duration time.Duration) int {
 	cutoff := time.Now().Add(-duration)
 	count := 0
@@ -565,15 +482,12 @@ func (pa *PatternAnalyzer) countRecentOccurrences(entries []*BuildHistoryEntry, 
 	}
 	return count
 }
-
 func (pa *PatternAnalyzer) extractCommonTriggers(entries []*BuildHistoryEntry) []string {
 	// Simple implementation - could be enhanced with more sophisticated analysis
 	triggers := []string{}
-
 	if len(entries) > 3 {
 		triggers = append(triggers, "Recurring issue pattern")
 	}
-
 	// Check for time-based patterns
 	weekendCount := 0
 	for _, entry := range entries {
@@ -584,13 +498,10 @@ func (pa *PatternAnalyzer) extractCommonTriggers(entries []*BuildHistoryEntry) [
 	if float64(weekendCount)/float64(len(entries)) > 0.7 {
 		triggers = append(triggers, "Weekend deployment pattern")
 	}
-
 	return triggers
 }
-
 func (pa *PatternAnalyzer) generatePreventiveActions(errorType string) []string {
 	var actions []string
-
 	switch strings.ToLower(errorType) {
 	case "dependency_error":
 		actions = []string{
@@ -617,15 +528,12 @@ func (pa *PatternAnalyzer) generatePreventiveActions(errorType string) []string 
 			"Verify configuration",
 		}
 	}
-
 	return actions
 }
-
 func (pa *PatternAnalyzer) calculateAverageImpact(entries []*BuildHistoryEntry) string {
 	if len(entries) == 0 {
 		return "unknown"
 	}
-
 	// Simple heuristic based on failure frequency
 	if len(entries) > 10 {
 		return "high"
@@ -635,17 +543,14 @@ func (pa *PatternAnalyzer) calculateAverageImpact(entries []*BuildHistoryEntry) 
 		return "low"
 	}
 }
-
 func (pa *PatternAnalyzer) calculateTrend(entries []*BuildHistoryEntry) float64 {
 	if len(entries) < 2 {
 		return 0.0
 	}
-
 	// Simple trend calculation based on time distribution
 	now := time.Now()
 	recentWeight := 0.0
 	oldWeight := 0.0
-
 	for _, entry := range entries {
 		age := now.Sub(entry.Timestamp)
 		if age < 30*24*time.Hour { // Last 30 days
@@ -654,26 +559,21 @@ func (pa *PatternAnalyzer) calculateTrend(entries []*BuildHistoryEntry) float64 
 			oldWeight += 1.0
 		}
 	}
-
 	if oldWeight == 0 {
 		return 1.0 // All recent, positive trend
 	}
-
 	return (recentWeight - oldWeight) / (recentWeight + oldWeight)
 }
-
 func (pa *PatternAnalyzer) getLastOccurrence(entries []*BuildHistoryEntry) time.Time {
 	if len(entries) == 0 {
 		return time.Time{}
 	}
-
 	latest := entries[0].Timestamp
 	for _, entry := range entries {
 		if entry.Timestamp.After(latest) {
 			latest = entry.Timestamp
 		}
 	}
-
 	return latest
 }
 
@@ -686,17 +586,14 @@ func NewRiskCalculator(logger zerolog.Logger) *RiskCalculator {
 		logger: logger.With().Str("component", "risk_calculator").Logger(),
 	}
 }
-
 func (rc *RiskCalculator) CalculateBaseRisk(buildContext *AnalysisBuildContext) float64 {
 	risk := 0.1 // Base risk
-
 	// Project complexity factors
 	if buildContext.ProjectInfo.Complexity == "high" {
 		risk += 0.2
 	} else if buildContext.ProjectInfo.Complexity == "medium" {
 		risk += 0.1
 	}
-
 	// Dependency count factor
 	depCount := len(buildContext.ProjectInfo.Dependencies)
 	if depCount > 100 {
@@ -706,7 +603,6 @@ func (rc *RiskCalculator) CalculateBaseRisk(buildContext *AnalysisBuildContext) 
 	} else if depCount > 20 {
 		risk += 0.1
 	}
-
 	// Historical failure rate
 	if len(buildContext.BuildHistory) > 0 {
 		failureCount := 0
@@ -718,7 +614,6 @@ func (rc *RiskCalculator) CalculateBaseRisk(buildContext *AnalysisBuildContext) 
 		failureRate := float64(failureCount) / float64(len(buildContext.BuildHistory))
 		risk += failureRate * 0.3
 	}
-
 	// Current state factors
 	if buildContext.CurrentState != nil {
 		if len(buildContext.CurrentState.Errors) > 0 {
@@ -728,16 +623,13 @@ func (rc *RiskCalculator) CalculateBaseRisk(buildContext *AnalysisBuildContext) 
 			risk += 0.05
 		}
 	}
-
 	// Environment factors
 	if buildContext.Environment["unstable"] == true {
 		risk += 0.2
 	}
-
 	// Cap risk at 1.0
 	if risk > 1.0 {
 		risk = 1.0
 	}
-
 	return risk
 }

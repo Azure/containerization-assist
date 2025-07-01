@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -55,16 +54,13 @@ func (bca *BuildContextAnalyzer) AnalyzeBuildContext(dockerfilePath string, buil
 		LargeFilesFound:  []string{},
 		FilesInContext:   []string{},
 	}
-
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerfilePath); err == nil {
 		info.DockerfileExists = true
-
 		// Parse Dockerfile for base image and exposed ports
 		if content, err := os.ReadFile(dockerfilePath); err == nil {
 			lines := strings.Split(string(content), "\n")
 			info.DockerfileLines = len(lines)
-
 			for _, line := range lines {
 				trimmed := strings.TrimSpace(line)
 				if strings.HasPrefix(trimmed, "FROM ") {
@@ -83,10 +79,8 @@ func (bca *BuildContextAnalyzer) AnalyzeBuildContext(dockerfilePath string, buil
 			}
 		}
 	}
-
 	// Analyze build context directory
 	bca.analyzeBuildContextDirectory(buildContext, info)
-
 	// Add optimization suggestions based on analysis
 	if info.ContextSizeMB > 100 {
 		info.BuildOptimizations = append(info.BuildOptimizations, "Consider using .dockerignore to reduce build context size")
@@ -97,7 +91,6 @@ func (bca *BuildContextAnalyzer) AnalyzeBuildContext(dockerfilePath string, buil
 	if info.BuildStages == 1 && info.DockerfileLines > 50 {
 		info.BuildOptimizations = append(info.BuildOptimizations, "Consider using multi-stage builds to reduce final image size")
 	}
-
 	return info
 }
 
@@ -106,45 +99,35 @@ func (bca *BuildContextAnalyzer) analyzeBuildContextDirectory(contextPath string
 	var totalSize int64
 	var fileCount int
 	largeFileThreshold := int64(10 * 1024 * 1024) // 10MB
-
 	err := filepath.Walk(contextPath, func(path string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip files we can't access
 		}
-
 		// Skip directories
 		if fileInfo.IsDir() {
 			return nil
 		}
-
 		// Check for .dockerignore
 		if fileInfo.Name() == ".dockerignore" {
 			info.HasDockerIgnore = true
 		}
-
 		relPath, _ := filepath.Rel(contextPath, path)
 		info.FilesInContext = append(info.FilesInContext, relPath)
-
 		fileCount++
 		fileSize := fileInfo.Size()
 		totalSize += fileSize
-
 		// Track large files
 		if fileSize > largeFileThreshold {
 			info.LargeFilesFound = append(info.LargeFilesFound, fmt.Sprintf("%s (%.2fMB)", relPath, float64(fileSize)/(1024*1024)))
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		bca.logger.Warn().Err(err).Msg("Error walking build context directory")
 	}
-
 	info.FileCount = fileCount
 	info.ContextSize = totalSize
 	info.ContextSizeMB = float64(totalSize) / (1024 * 1024)
-
 	// Set cache efficiency based on context size
 	if info.ContextSizeMB < 50 {
 		info.CacheEfficiency = "excellent"
@@ -185,7 +168,6 @@ func (bca *BuildContextAnalyzer) GenerateBuildContext(
 			"registry_config":  "local", // Default to local
 		},
 	}
-
 	// Check if we're in a common project structure
 	if _, err := os.Stat(filepath.Join(workspaceDir, "package.json")); err == nil {
 		contextInfo["project_type"] = "node"
@@ -194,12 +176,10 @@ func (bca *BuildContextAnalyzer) GenerateBuildContext(
 	} else if _, err := os.Stat(filepath.Join(workspaceDir, "requirements.txt")); err == nil {
 		contextInfo["project_type"] = "python"
 	}
-
 	return contextInfo
 }
 
 // Helper methods for getting build configuration with defaults
-
 // GetImageTag returns the image tag with default
 func GetImageTag(tag string) string {
 	if tag == "" {
@@ -221,34 +201,13 @@ func GetBuildContext(buildContext string, workspaceDir string) (string, error) {
 	if buildContext == "" {
 		buildContext = workspaceDir
 	}
-
 	// Ensure absolute path
 	if !filepath.IsAbs(buildContext) {
 		buildContext = filepath.Join(workspaceDir, buildContext)
 	}
-
 	// Validate the path exists
 	if _, err := os.Stat(buildContext); err != nil {
-		return "", types.NewErrorBuilder("invalid_arguments", "build context directory does not exist", "validation").
-			WithSeverity("high").
-			WithOperation("GetBuildContext").
-			WithField("buildContext", buildContext).
-			Build()
+		return "", fmt.Errorf("build context path does not exist: %s", buildContext)
 	}
-
 	return buildContext, nil
-}
-
-// GetDockerfilePath returns the Dockerfile path with validation
-func GetDockerfilePath(dockerfilePath string, buildContext string) (string, error) {
-	if dockerfilePath == "" {
-		dockerfilePath = filepath.Join(buildContext, "Dockerfile")
-	}
-
-	// Ensure absolute path
-	if !filepath.IsAbs(dockerfilePath) {
-		dockerfilePath = filepath.Join(buildContext, dockerfilePath)
-	}
-
-	return dockerfilePath, nil
 }

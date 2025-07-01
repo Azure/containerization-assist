@@ -16,13 +16,13 @@ import (
 // startAnalysisWithFormData starts analysis after form data has been applied
 func (pm *PromptManager) startAnalysisWithFormData(ctx context.Context, state *ConversationState) *ConversationResponse {
 	pm.applyAnalysisFormDataToPreferences(state)
-	return pm.startAnalysis(ctx, state, state.RepoURL)
+	return pm.startAnalysis(ctx, state, state.SessionState.RepoURL)
 }
 
 // startAnalysis initiates repository analysis
 func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationState, repoURL string) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  types.StageAnalysis,
+		Stage:  convertFromTypesStage(types.StageAnalysis),
 		Status: ResponseStatusProcessing,
 	}
 
@@ -32,7 +32,7 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 	// Execute analysis tool
 	params := map[string]interface{}{
 		"repo_url":       repoURL,
-		"session_id":     state.SessionID,
+		"session_id":     state.SessionState.SessionID,
 		"skip_file_tree": state.Preferences.SkipFileTree,
 	}
 
@@ -44,7 +44,7 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 	}
 
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "analyze_repository", params, state.SessionState.SessionID)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "analyze_repository", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -66,13 +66,16 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse analysis results
-	if result != nil {
-		if analysis, ok := result.(map[string]interface{}); ok {
-			state.RepoAnalysis = analysis
+	if resultStruct != nil {
+		if analysis, ok := resultStruct.(map[string]interface{}); ok {
+			if state.SessionState.Metadata == nil {
+				state.SessionState.Metadata = make(map[string]interface{})
+			}
+			state.SessionState.Metadata["repo_analysis"] = analysis
 
 			// Extract key information
 			language := genericutils.MapGetWithDefault[string](analysis, "language", "")
@@ -117,12 +120,12 @@ func (pm *PromptManager) startAnalysis(ctx context.Context, state *ConversationS
 // generateDockerfile creates the Dockerfile
 func (pm *PromptManager) generateDockerfile(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  types.StageDockerfile,
+		Stage:  convertFromTypesStage(types.StageDockerfile),
 		Status: ResponseStatusProcessing,
 	}
 
 	params := map[string]interface{}{
-		"session_id":           state.SessionID,
+		"session_id":           state.SessionState.SessionID,
 		"optimization":         state.Preferences.Optimization,
 		"include_health_check": state.Preferences.IncludeHealthCheck,
 	}
@@ -132,7 +135,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 	}
 
 	startTime := time.Now()
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "generate_dockerfile", params, state.SessionState.SessionID)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "generate_dockerfile", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -154,20 +157,23 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 		return response
 	}
 
-	toolCall.Result = result
+	toolCall.Result = resultStruct
 	response.ToolCalls = []ToolCall{toolCall}
 
 	// Parse Dockerfile result
-	if result != nil {
-		if dockerResult, ok := result.(map[string]interface{}); ok {
+	if resultStruct != nil {
+		if dockerResult, ok := resultStruct.(map[string]interface{}); ok {
 			content := genericutils.MapGetWithDefault[string](dockerResult, "content", "")
 			if content != "" {
-				state.Dockerfile.Content = content
+				if state.SessionState.Metadata == nil {
+					state.SessionState.Metadata = make(map[string]interface{})
+				}
+				state.SessionState.Metadata["dockerfile_content"] = content
 				path := genericutils.MapGetWithDefault[string](dockerResult, "file_path", "")
 				if path == "" {
 					path = "Dockerfile"
 				}
-				state.Dockerfile.Path = path
+				state.SessionState.Metadata["dockerfile_path"] = path
 
 				// Check for validation results
 				if validationData, ok := dockerResult["validation"].(map[string]interface{}); ok {
@@ -202,7 +208,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 						}
 					}
 
-					state.Dockerfile.ValidationResult = validation
+					state.SessionState.Metadata["dockerfile_validation_result"] = validation
 				}
 
 				// Add Dockerfile artifact
@@ -210,7 +216,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 					Type:    "dockerfile",
 					Name:    path,
 					Content: content,
-					Stage:   types.StageDockerfile,
+					Stage:   convertFromTypesStage(types.StageDockerfile),
 				}
 				state.AddArtifact(artifact)
 
@@ -225,7 +231,7 @@ func (pm *PromptManager) generateDockerfile(ctx context.Context, state *Conversa
 				response.NextSteps = []string{"Build Docker image", "Review Dockerfile"}
 
 				// Move to next stage
-				state.SetStage(types.StageBuild)
+				state.SetStage(convertFromTypesStage(types.StageBuild))
 			}
 		}
 	}

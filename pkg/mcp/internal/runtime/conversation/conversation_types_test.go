@@ -10,7 +10,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	t.Run("WithAutoAdvance", func(t *testing.T) {
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   types.StageBuild,
+			Stage:   convertFromTypesStage(types.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -22,14 +22,14 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			DefaultAction: "proceed",
 		}
 
-		response.WithAutoAdvance(types.StagePush, config)
+		response.WithAutoAdvance(convertFromTypesStage(types.StagePush), config)
 
 		if response.RequiresInput {
 			t.Error("Expected RequiresInput to be false")
 		}
 
-		if response.NextStage == nil || *response.NextStage != types.StagePush {
-			t.Errorf("Expected NextStage to be %s, got %v", types.StagePush, response.NextStage)
+		if response.NextStage == nil || *response.NextStage != convertFromTypesStage(types.StagePush) {
+			t.Errorf("Expected NextStage to be %s, got %v", convertFromTypesStage(types.StagePush), response.NextStage)
 		}
 
 		if !response.CanAutoAdvance() {
@@ -40,7 +40,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	t.Run("WithUserInput", func(t *testing.T) {
 		response := &ConversationResponse{
 			Message: "Choose an option",
-			Stage:   types.StageBuild,
+			Stage:   convertFromTypesStage(types.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -62,7 +62,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	t.Run("ShouldAutoAdvance", func(t *testing.T) {
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   types.StageBuild,
+			Stage:   convertFromTypesStage(types.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -70,7 +70,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			Confidence: 0.9,
 		}
 
-		response.WithAutoAdvance(types.StagePush, config)
+		response.WithAutoAdvance(convertFromTypesStage(types.StagePush), config)
 
 		// Test with autopilot enabled
 		prefsAutopilot := types.UserPreferences{
@@ -94,7 +94,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	t.Run("ConfidenceThreshold", func(t *testing.T) {
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   types.StageBuild,
+			Stage:   convertFromTypesStage(types.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -103,7 +103,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			Confidence: 0.5,
 		}
 
-		response.WithAutoAdvance(types.StagePush, lowConfidenceConfig)
+		response.WithAutoAdvance(convertFromTypesStage(types.StagePush), lowConfidenceConfig)
 
 		prefs := types.UserPreferences{
 			SkipConfirmations: true,
@@ -118,7 +118,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			Confidence: 0.9,
 		}
 
-		response.WithAutoAdvance(types.StagePush, highConfidenceConfig)
+		response.WithAutoAdvance(convertFromTypesStage(types.StagePush), highConfidenceConfig)
 
 		if !response.ShouldAutoAdvance(prefs) {
 			t.Error("Expected ShouldAutoAdvance to return true with high confidence")
@@ -128,7 +128,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 	t.Run("AutoAdvanceMessage", func(t *testing.T) {
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   types.StageBuild,
+			Stage:   convertFromTypesStage(types.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -138,7 +138,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			CanCancel:    true,
 		}
 
-		response.WithAutoAdvance(types.StagePush, config)
+		response.WithAutoAdvance(convertFromTypesStage(types.StagePush), config)
 
 		message := response.GetAutoAdvanceMessage()
 

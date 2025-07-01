@@ -77,5 +77,32 @@
       "enforce": false,
       "track_only": true
     }
+  },
+  "architecture_quality": {
+    "adapter_elimination": {
+      "enforce": true,
+      "adapter_files_allowed": 0,
+      "wrapper_files_allowed": 0,
+      "wrapper_exceptions": ["docker_operation.go"]
+    },
+    "import_cycles": {
+      "enforce": true,
+      "cycles_allowed": 0
+    },
+    "interface_unification": {
+      "enforce": false,
+      "track_only": true,
+      "target_interfaces": 1,
+      "current_interfaces": 31
+    },
+    "build_performance": {
+      "target_seconds": 2,
+      "warn_threshold": 3,
+      "fail_threshold": 5
+    },
+    "lines_of_code": {
+      "track_trends": true,
+      "target_reduction_percent": 40
+    }
   }
 }

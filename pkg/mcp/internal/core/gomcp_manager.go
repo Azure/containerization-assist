@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/localrivet/gomcp/server"
@@ -21,8 +22,9 @@ type GomcpManager struct {
 	server        server.Server
 	config        GomcpConfig
 	logger        slog.Logger
-	transport     InternalTransport // Injected transport
-	isInitialized bool              // Prevent mutation after creation
+	transport     interface{} // Injected transport (stdio or http)
+	isInitialized bool        // Prevent mutation after creation
+	startTime     time.Time   // Server start time for uptime tracking
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -37,11 +39,12 @@ func NewGomcpManager(config GomcpConfig) *GomcpManager {
 		config:        config,
 		logger:        logger,
 		isInitialized: false,
+		startTime:     time.Now(),
 	}
 }
 
 // WithTransport sets the transport for the gomcp manager
-func (gm *GomcpManager) WithTransport(t InternalTransport) *GomcpManager {
+func (gm *GomcpManager) WithTransport(t interface{}) *GomcpManager {
 	if gm.isInitialized {
 		gm.logger.Error("cannot set transport: manager already initialized")
 		return gm
@@ -71,16 +74,17 @@ func (gm *GomcpManager) Initialize() error {
 		return errors.Config("core/gomcp-manager", "transport must be set before initialization")
 	}
 
-	// Create gomcp server
+	// Create gomcp server with stdio transport
+	// AsStdio() must be chained directly with NewServer() for proper initialization
 	gm.server = server.NewServer(gm.config.Name,
 		server.WithLogger(&gm.logger),
 		server.WithProtocolVersion(gm.config.ProtocolVersion),
-	)
+	).AsStdio()
 
-	// Configure transport - default to stdio
-	// Since InternalTransport interface doesn't have Name() method,
-	// we'll use stdio as the default transport type
-	gm.server = gm.server.AsStdio()
+	// Verify server was created successfully
+	if gm.server == nil {
+		return errors.Internal("core/gomcp-manager", "failed to create stdio server: NewServer().AsStdio() returned nil")
+	}
 
 	gm.isInitialized = true
 	return nil
@@ -92,7 +96,7 @@ func (gm *GomcpManager) GetServer() server.Server {
 }
 
 // GetTransport returns the configured transport
-func (gm *GomcpManager) GetTransport() InternalTransport {
+func (gm *GomcpManager) GetTransport() interface{} {
 	return gm.transport
 }
 
@@ -100,6 +104,9 @@ func (gm *GomcpManager) GetTransport() InternalTransport {
 func (gm *GomcpManager) StartServer() error {
 	if !gm.isInitialized {
 		return errors.Internal("core/gomcp-manager", "manager not initialized")
+	}
+	if gm.server == nil {
+		return errors.Internal("core/gomcp-manager", "server is nil - initialization may have failed")
 	}
 	gm.logger.Info("Starting gomcp server with all tools registered")
 	return gm.server.Run()
@@ -129,11 +136,15 @@ func (gm *GomcpManager) Shutdown(ctx context.Context) error {
 			shutdownErrors = append(shutdownErrors, ctx.Err())
 		default:
 			// Attempt graceful shutdown of the server
-			if err := gm.server.Shutdown(); err != nil {
-				gm.logger.Error("error shutting down gomcp server", "error", err)
-				shutdownErrors = append(shutdownErrors, err)
+			if gm.server != nil {
+				if err := gm.server.Shutdown(); err != nil {
+					gm.logger.Error("error shutting down gomcp server", "error", err)
+					shutdownErrors = append(shutdownErrors, err)
+				} else {
+					gm.logger.Info("gomcp server shut down successfully")
+				}
 			} else {
-				gm.logger.Info("gomcp server shut down successfully")
+				gm.logger.Warn("gomcp server is nil during shutdown")
 			}
 		}
 	}
@@ -146,11 +157,13 @@ func (gm *GomcpManager) Shutdown(ctx context.Context) error {
 			shutdownErrors = append(shutdownErrors, ctx.Err())
 		default:
 			// Stop the transport
-			if err := gm.transport.Stop(ctx); err != nil {
-				gm.logger.Error("error stopping transport", "error", err)
-				shutdownErrors = append(shutdownErrors, err)
-			} else {
-				gm.logger.Info("transport stopped successfully")
+			if stopper, ok := gm.transport.(interface{ Stop(context.Context) error }); ok {
+				if err := stopper.Stop(ctx); err != nil {
+					gm.logger.Error("error stopping transport", "error", err)
+					shutdownErrors = append(shutdownErrors, err)
+				} else {
+					gm.logger.Info("transport stopped successfully")
+				}
 			}
 		}
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -212,7 +211,7 @@ func (c *Coordinator) ExecuteWorkflow(
 	// Initialize or restore session
 	session, err := c.initializeSession(workflowSpec, options)
 	if err != nil {
-		return nil, types.NewRichError("SESSION_INITIALIZATION_FAILED", fmt.Sprintf("failed to initialize session: %v", err), "workflow_error")
+		return nil, fmt.Errorf("SESSION_INITIALIZATION_FAILED: %w", err)
 	}
 
 	c.logger.Info().
@@ -222,7 +221,7 @@ func (c *Coordinator) ExecuteWorkflow(
 
 	// Transition to running state
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusRunning); err != nil {
-		return nil, types.NewRichError("WORKFLOW_START_FAILED", fmt.Sprintf("failed to start workflow: %v", err), "workflow_error")
+		return nil, fmt.Errorf("WORKFLOW_START_FAILED: %w", err)
 	}
 
 	// Execute workflow
@@ -238,11 +237,11 @@ func (c *Coordinator) ExecuteWorkflow(
 func (c *Coordinator) PauseWorkflow(sessionID string) error {
 	session, err := c.sessionManager.GetSession(sessionID)
 	if err != nil {
-		return types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return fmt.Errorf("SESSION_NOT_FOUND: %w", err)
 	}
 
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusPaused); err != nil {
-		return types.NewRichError("WORKFLOW_PAUSE_FAILED", fmt.Sprintf("failed to pause workflow: %v", err), "workflow_error")
+		return fmt.Errorf("workflow operation failed: %w", err)
 	}
 
 	c.logger.Info().
@@ -260,11 +259,11 @@ func (c *Coordinator) ResumeWorkflow(ctx context.Context, sessionID string, work
 	}
 
 	if session.Status != WorkflowStatusPaused {
-		return nil, types.NewRichError("WORKFLOW_NOT_PAUSED", fmt.Sprintf("workflow is not paused (current status: %s)", session.Status), "workflow_error")
+		return nil, fmt.Errorf("WORKFLOW_NOT_PAUSED: workflow is not paused (current status: %s)", session.Status)
 	}
 
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusRunning); err != nil {
-		return nil, types.NewRichError("WORKFLOW_RESUME_FAILED", fmt.Sprintf("failed to resume workflow: %v", err), "workflow_error")
+		return nil, fmt.Errorf("workflow operation failed")
 	}
 
 	c.logger.Info().
@@ -287,15 +286,15 @@ func (c *Coordinator) ResumeWorkflow(ctx context.Context, sessionID string, work
 func (c *Coordinator) CancelWorkflow(sessionID string) error {
 	session, err := c.sessionManager.GetSession(sessionID)
 	if err != nil {
-		return types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get session: %v", err), "session_error")
+		return fmt.Errorf("workflow operation failed: %w", err)
 	}
 
 	if c.stateMachine.IsTerminalState(session.Status) {
-		return types.NewRichError("WORKFLOW_ALREADY_TERMINAL", fmt.Sprintf("cannot cancel workflow in terminal state: %s", session.Status), "workflow_error")
+		return fmt.Errorf("WORKFLOW_ALREADY_TERMINAL: workflow is already in terminal state %s", session.Status)
 	}
 
 	if err := c.stateMachine.TransitionState(session, WorkflowStatusCancelled); err != nil {
-		return types.NewRichError("WORKFLOW_CANCEL_FAILED", fmt.Sprintf("failed to cancel workflow: %v", err), "workflow_error")
+		return fmt.Errorf("workflow operation failed: %w", err)
 	}
 
 	c.logger.Info().
@@ -312,7 +311,7 @@ func (c *Coordinator) initializeSession(workflowSpec *WorkflowSpec, options *Exe
 	if options.ResumeFromCheckpoint != "" {
 		session, err := c.checkpointManager.RestoreFromCheckpoint(options.SessionID, options.ResumeFromCheckpoint)
 		if err != nil {
-			return nil, types.NewRichError("CHECKPOINT_RESTORE_FAILED", fmt.Sprintf("failed to restore from checkpoint: %v", err), "workflow_error")
+			return nil, fmt.Errorf("workflow operation failed")
 		}
 		c.logger.Info().
 			Str("session_id", session.ID).
@@ -325,7 +324,7 @@ func (c *Coordinator) initializeSession(workflowSpec *WorkflowSpec, options *Exe
 	if options.SessionID != "" {
 		session, err := c.sessionManager.GetSession(options.SessionID)
 		if err != nil {
-			return nil, types.NewRichError("SESSION_NOT_FOUND", fmt.Sprintf("failed to get existing session: %v", err), "session_error")
+			return nil, fmt.Errorf("workflow operation failed")
 		}
 		return session, nil
 	}
@@ -333,7 +332,7 @@ func (c *Coordinator) initializeSession(workflowSpec *WorkflowSpec, options *Exe
 	// Create new session
 	session, err := c.sessionManager.CreateSession(workflowSpec)
 	if err != nil {
-		return nil, types.NewRichError("SESSION_CREATION_FAILED", fmt.Sprintf("failed to create session: %v", err), "session_error")
+		return nil, fmt.Errorf("workflow operation failed")
 	}
 
 	// Store workflow variables for enhanced variable expansion
@@ -642,7 +641,7 @@ func (c *Coordinator) ResumeFromStage(ctx context.Context, sessionID, stageName 
 	}
 
 	if !stageExists {
-		return nil, types.NewRichError("STAGE_NOT_FOUND", fmt.Sprintf("stage '%s' not found in workflow", stageName), "workflow_error")
+		return nil, fmt.Errorf("workflow operation failed")
 	}
 
 	// Update session state for resume
@@ -665,7 +664,7 @@ func (c *Coordinator) ResumeFromStage(ctx context.Context, sessionID, stageName 
 	// Create checkpoint for this resume point
 	checkpoint, err := c.checkpointManager.CreateCheckpoint(session, stageName, fmt.Sprintf("Resume from stage: %s", stageName), workflowSpec)
 	if err != nil {
-		return nil, types.NewRichError("CHECKPOINT_CREATION_FAILED", fmt.Sprintf("failed to create resume checkpoint: %v", err), "workflow_error")
+		return nil, fmt.Errorf("workflow operation failed")
 	}
 
 	c.logger.Info().

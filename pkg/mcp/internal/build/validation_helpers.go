@@ -1,7 +1,8 @@
 package build
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"fmt"
+
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
@@ -13,15 +14,9 @@ func ValidateSessionID(sessionID string, toolName string, logger zerolog.Logger)
 		struct{ SessionID string }{SessionID: sessionID},
 		[]string{"SessionID"},
 	)
-
 	if result.HasErrors() {
-		return types.NewRichError(
-			"INVALID_ARGUMENTS",
-			"session_id is required and cannot be empty",
-			"validation_error",
-		)
+		return fmt.Errorf("session_id is required and cannot be empty for tool %s", toolName)
 	}
-
 	return nil
 }
 
@@ -29,15 +24,9 @@ func ValidateSessionID(sessionID string, toolName string, logger zerolog.Logger)
 func ValidateImageReference(imageRef, fieldName string, logger zerolog.Logger) error {
 	mixin := utils.NewStandardizedValidationMixin(logger)
 	result := mixin.StandardValidateImageRef(imageRef, fieldName)
-
 	if result.HasErrors() {
 		firstError := result.GetFirstError()
-		return types.NewRichError(
-			firstError.Code,
-			firstError.Message,
-			"validation_error",
-		)
+		return fmt.Errorf("invalid image reference for field %s: %s", fieldName, firstError.Message)
 	}
-
 	return nil
 }

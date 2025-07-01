@@ -6,25 +6,26 @@ import (
 	"os"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
-// LocalTransport interface for transport types (local interface to avoid import cycles)
+// LocalTransport interface for transport types
 type LocalTransport interface {
 	Serve(ctx context.Context) error
-	Stop() error
+	Stop(ctx context.Context) error
 	Name() string
 	SetHandler(handler LocalRequestHandler)
 }
 
-// StdioTransport implements Transport for stdio communication
+// StdioTransport implements core.Transport for stdio communication
 type StdioTransport struct {
 	server       server.Server
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
 	logger       zerolog.Logger
-	handler      LocalRequestHandler
+	handler      core.RequestHandler // Use core.RequestHandler instead of LocalRequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
@@ -51,6 +52,11 @@ func NewStdioTransportWithLogger(logger zerolog.Logger) *StdioTransport {
 	}
 }
 
+// NewCoreStdioTransport creates a new stdio transport that implements core.Transport
+func NewCoreStdioTransport(logger zerolog.Logger) core.Transport {
+	return NewStdioTransportWithLogger(logger)
+}
+
 // Serve starts the stdio transport and blocks until context cancellation
 func (s *StdioTransport) Serve(ctx context.Context) error {
 	if s.handler == nil {
@@ -58,20 +64,17 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 	}
 	s.logger.Info().Msg("Starting stdio transport")
 
-	// Prefer using GomcpManager if available, fallback to server
-	var runFunc func() error
-	if s.gomcpManager != nil {
-		if mgr, ok := s.gomcpManager.(interface{ StartServer() error }); ok {
-			runFunc = mgr.StartServer
-		}
+	// Use GomcpManager to start the server
+	if s.gomcpManager == nil {
+		return fmt.Errorf("stdio transport: gomcp manager not initialized")
 	}
 
-	if runFunc == nil {
-		if s.server == nil {
-			return fmt.Errorf("stdio transport: neither gomcp manager nor server initialized")
-		}
-		runFunc = s.server.Run
+	mgr, ok := s.gomcpManager.(interface{ StartServer() error })
+	if !ok {
+		return fmt.Errorf("stdio transport: gomcp manager does not implement StartServer")
 	}
+
+	runFunc := mgr.StartServer
 
 	// Run the server in a goroutine
 	serverDone := make(chan error, 1)
@@ -97,8 +100,8 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 	}
 }
 
-// SetHandler sets the request handler for this transport
-func (s *StdioTransport) SetHandler(handler LocalRequestHandler) {
+// SetHandler sets the request handler for this transport (implements core.Transport)
+func (s *StdioTransport) SetHandler(handler core.RequestHandler) {
 	s.handler = handler
 }
 
@@ -130,24 +133,21 @@ func (s *StdioTransport) ReceiveMessage() (interface{}, error) {
 func (s *StdioTransport) Close() error {
 	s.logger.Info().Msg("Closing stdio transport")
 
-	// Try to shutdown gracefully using the GomcpManager
-	if s.gomcpManager != nil {
-		if mgr, ok := s.gomcpManager.(interface{ Shutdown(context.Context) error }); ok {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := mgr.Shutdown(ctx); err != nil {
-				s.logger.Error().Err(err).Msg("Failed to shutdown gomcp manager")
-				return err
-			}
-		}
+	// Shutdown using the GomcpManager
+	if s.gomcpManager == nil {
+		return fmt.Errorf("stdio transport: gomcp manager not initialized")
 	}
 
-	// Fallback: try server shutdown if available
-	if s.server != nil {
-		if err := s.server.Shutdown(); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to shutdown server")
-			return err
-		}
+	mgr, ok := s.gomcpManager.(interface{ Shutdown(context.Context) error })
+	if !ok {
+		return fmt.Errorf("stdio transport: gomcp manager does not implement Shutdown")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := mgr.Shutdown(ctx); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to shutdown gomcp manager")
+		return err
 	}
 
 	s.logger.Info().Msg("Stdio transport closed successfully")

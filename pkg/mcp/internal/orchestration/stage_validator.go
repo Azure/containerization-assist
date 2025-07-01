@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // StageValidator handles validation of workflow stages
 type StageValidator struct {
-	toolRegistry InternalToolRegistry
+	toolRegistry core.ToolRegistry
 }
 
 // NewStageValidator creates a new stage validator
-func NewStageValidator(toolRegistry InternalToolRegistry) *StageValidator {
+func NewStageValidator(toolRegistry core.ToolRegistry) *StageValidator {
 	return &StageValidator{
 		toolRegistry: toolRegistry,
 	}
@@ -57,24 +57,11 @@ func (sv *StageValidator) Validate(ctx context.Context, stage *WorkflowStage) er
 // validateBasicRequirements checks basic stage requirements
 func (sv *StageValidator) validateBasicRequirements(ctx context.Context, stage *WorkflowStage) error {
 	if stage.Name == "" {
-		return types.NewValidationErrorBuilder("Stage name is required", "name", stage.Name).
-			WithOperation("validate_stage").
-			WithStage("basic_requirements").
-			WithRootCause("Stage name field is empty").
-			WithImmediateStep(1, "Set name", "Provide a descriptive name for the stage").
-			WithImmediateStep(2, "Check config", "Verify stage configuration includes name field").
-			Build()
+		return fmt.Errorf("validation error")
 	}
 
 	if len(stage.Tools) == 0 {
-		return types.NewValidationErrorBuilder("Stage must specify at least one tool", "tools", stage.Tools).
-			WithField("stage_name", stage.Name).
-			WithOperation("validate_stage").
-			WithStage("basic_requirements").
-			WithRootCause("Stage has no tools configured").
-			WithImmediateStep(1, "Add tools", "Specify at least one tool for the stage to execute").
-			WithImmediateStep(2, "Check requirements", "Verify stage requirements and add appropriate tools").
-			Build()
+		return fmt.Errorf("validation error")
 	}
 
 	return nil
@@ -84,15 +71,7 @@ func (sv *StageValidator) validateBasicRequirements(ctx context.Context, stage *
 func (sv *StageValidator) validateTools(stage *WorkflowStage) error {
 	for _, toolName := range stage.Tools {
 		if _, err := sv.toolRegistry.GetTool(toolName); err != nil {
-			return types.NewValidationErrorBuilder("Invalid tool in stage", "tool_name", toolName).
-				WithField("stage_name", stage.Name).
-				WithOperation("validate_stage").
-				WithStage("tool_validation").
-				WithRootCause(fmt.Sprintf("Tool %s is not available or invalid: %v", toolName, err)).
-				WithImmediateStep(1, "Check tool name", "Verify the tool name is spelled correctly").
-				WithImmediateStep(2, "Check registration", "Ensure the tool is properly registered").
-				WithImmediateStep(3, "Check availability", "Verify tool dependencies are available").
-				Build()
+			return fmt.Errorf("validation error")
 		}
 	}
 	return nil
@@ -101,14 +80,7 @@ func (sv *StageValidator) validateTools(stage *WorkflowStage) error {
 // validateTimeout validates timeout configuration
 func (sv *StageValidator) validateTimeout(stage *WorkflowStage) error {
 	if stage.Timeout != nil && *stage.Timeout <= 0 {
-		return types.NewValidationErrorBuilder("Stage timeout must be positive", "timeout", *stage.Timeout).
-			WithField("stage_name", stage.Name).
-			WithOperation("validate_stage").
-			WithStage("timeout_validation").
-			WithRootCause("Timeout value is zero or negative").
-			WithImmediateStep(1, "Set positive timeout", "Use a positive timeout value (e.g., 30s, 5m)").
-			WithImmediateStep(2, "Remove timeout", "Remove timeout to use default value").
-			Build()
+		return fmt.Errorf("validation error")
 	}
 	return nil
 }

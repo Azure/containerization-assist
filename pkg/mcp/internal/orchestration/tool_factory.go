@@ -3,12 +3,13 @@ package orchestration
 import (
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -16,7 +17,7 @@ import (
 type ToolFactory struct {
 	pipelineOperations mcptypes.PipelineOperations
 	sessionManager     *session.SessionManager
-	analyzer           mcptypes.AIAnalyzer
+	analyzer           core.AIAnalyzer
 	analyzerHelper     *AnalyzerHelper
 	logger             zerolog.Logger
 }
@@ -25,7 +26,7 @@ type ToolFactory struct {
 func NewToolFactory(
 	pipelineOperations mcptypes.PipelineOperations,
 	sessionManager *session.SessionManager,
-	analyzer mcptypes.AIAnalyzer,
+	analyzer core.AIAnalyzer,
 	logger zerolog.Logger,
 ) *ToolFactory {
 	factory := &ToolFactory{
@@ -163,9 +164,19 @@ func (f *ToolFactory) CreateTool(toolName string) (interface{}, error) {
 		return f.CreateGenerateDockerfileTool(), nil
 	case "validate_dockerfile":
 		return f.CreateValidateDockerfileTool(), nil
+	case "validate_deployment":
+		return f.CreateValidateDeploymentTool(), nil
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
+}
+
+// CreateValidateDeploymentTool creates an instance of AtomicValidateDeploymentTool
+func (f *ToolFactory) CreateValidateDeploymentTool() *deploy.AtomicValidateDeploymentTool {
+	tool := deploy.NewAtomicValidateDeploymentTool(f.logger, "", nil, nil)
+	initializer := NewDeployToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "validate_deployment")
+	return tool
 }
 
 // GetEnhancedBuildAnalyzer returns the enhanced build analyzer instance

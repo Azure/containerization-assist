@@ -82,7 +82,7 @@ func (s *ErrorService) HandleError(ctx context.Context, err error, context Error
 }
 
 func (s *ErrorService) enrichError(err error, context ErrorContext) error {
-	coreErr := errors.WrapError(err, context.Tool, context.Operation)
+	coreErr := errors.Wrap(err, context.Tool, fmt.Sprintf("operation: %s", context.Operation))
 
 	coreErr = coreErr.WithSession(context.SessionID, context.Tool, context.Stage, "")
 

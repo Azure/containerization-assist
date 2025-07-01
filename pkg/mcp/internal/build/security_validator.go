@@ -9,12 +9,29 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ComplianceResult represents the result of a compliance check
+type ComplianceResult struct {
+	Framework  string                        `json:"framework"`
+	Compliant  bool                          `json:"compliant"`
+	Score      float64                       `json:"score"`
+	Violations []SecurityComplianceViolation `json:"violations"`
+}
+
+// SecurityComplianceViolation represents a specific compliance violation
+type SecurityComplianceViolation struct {
+	Requirement string `json:"requirement"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+	Line        int    `json:"line,omitempty"`
+}
+
 // SecurityValidator handles Dockerfile security validation
 // Implements DockerfileValidator interface
 type SecurityValidator struct {
 	logger            zerolog.Logger
 	secretPatterns    []*regexp.Regexp
 	trustedRegistries []string
+	policies          []SecurityPolicy
 }
 
 // NewSecurityValidator creates a new security validator
@@ -23,6 +40,7 @@ func NewSecurityValidator(logger zerolog.Logger, trustedRegistries []string) *Se
 		logger:            logger.With().Str("component", "security_validator").Logger(),
 		trustedRegistries: trustedRegistries,
 		secretPatterns:    compileSecretPatterns(),
+		policies:          []SecurityPolicy{},
 	}
 }
 
@@ -32,18 +50,14 @@ func (v *SecurityValidator) Validate(content string, options ValidationOptions) 
 		v.logger.Debug().Msg("Security validation disabled")
 		return &ValidationResult{Valid: true}, nil
 	}
-
 	v.logger.Info().Msg("Starting Dockerfile security validation")
-
 	result := &ValidationResult{
 		Valid:    true,
 		Errors:   make([]ValidationError, 0),
 		Warnings: make([]ValidationWarning, 0),
 		Info:     make([]string, 0),
 	}
-
 	lines := strings.Split(content, "\n")
-
 	// Perform various security checks
 	v.checkForRootUser(lines, result)
 	v.checkForSecrets(lines, result)
@@ -52,24 +66,59 @@ func (v *SecurityValidator) Validate(content string, options ValidationOptions) 
 	v.checkForSUIDBindaries(lines, result)
 	v.checkBaseImageSecurity(lines, result)
 	v.checkForInsecureDownloads(lines, result)
-
 	// Update validation state
 	if len(result.Errors) > 0 {
 		result.Valid = false
 	}
-
 	return result, nil
+}
+
+// ValidateCompliance validates a Dockerfile against a specific compliance framework
+func (v *SecurityValidator) ValidateCompliance(dockerfile string, framework string) *ComplianceResult {
+	result := &ComplianceResult{
+		Framework:  framework,
+		Compliant:  true,
+		Score:      100.0,
+		Violations: []SecurityComplianceViolation{},
+	}
+
+	// Perform standard validation first
+	validationResult, _ := v.Validate(dockerfile, ValidationOptions{
+		CheckSecurity: true,
+	})
+
+	// Check framework-specific requirements
+	switch framework {
+	case "cis-docker":
+		v.checkCISDockerCompliance(dockerfile, validationResult, result)
+	case "nist-800-190":
+		v.checkNIST800190Compliance(dockerfile, validationResult, result)
+	case "pci-dss":
+		v.checkPCIDSSCompliance(dockerfile, validationResult, result)
+	case "hipaa":
+		v.checkHIPAACompliance(dockerfile, validationResult, result)
+	case "soc2":
+		v.checkSOC2Compliance(dockerfile, validationResult, result)
+	default:
+		result.Compliant = false
+		result.Score = 0
+		result.Violations = append(result.Violations, SecurityComplianceViolation{
+			Requirement: "framework",
+			Description: fmt.Sprintf("Unknown compliance framework: %s", framework),
+			Severity:    "critical",
+		})
+	}
+
+	return result
 }
 
 // checkForRootUser checks if the container runs as root
 func (v *SecurityValidator) checkForRootUser(lines []string, result *ValidationResult) {
 	hasUser := false
 	lastUserIsRoot := false
-
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
-
 		if strings.HasPrefix(upper, "USER") {
 			hasUser = true
 			parts := strings.Fields(trimmed)
@@ -89,7 +138,6 @@ func (v *SecurityValidator) checkForRootUser(lines []string, result *ValidationR
 			}
 		}
 	}
-
 	if !hasUser || lastUserIsRoot {
 		result.Errors = append(result.Errors, ValidationError{
 			Line:    0,
@@ -104,12 +152,10 @@ func (v *SecurityValidator) checkForRootUser(lines []string, result *ValidationR
 func (v *SecurityValidator) checkForSecrets(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Skip comments
 		if strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-
 		// Check for secret patterns
 		for _, pattern := range v.secretPatterns {
 			if pattern.MatchString(line) {
@@ -122,7 +168,6 @@ func (v *SecurityValidator) checkForSecrets(lines []string, result *ValidationRe
 				break
 			}
 		}
-
 		// Check for common secret keywords
 		upper := strings.ToUpper(line)
 		if strings.Contains(upper, "PASSWORD=") ||
@@ -151,11 +196,9 @@ func (v *SecurityValidator) checkForSensitivePorts(lines []string, result *Valid
 		6379:  "Redis",
 		27017: "MongoDB",
 	}
-
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
-
 		if strings.HasPrefix(upper, "EXPOSE") {
 			ports := extractPorts(trimmed)
 			for _, port := range ports {
@@ -176,7 +219,6 @@ func (v *SecurityValidator) checkForSensitivePorts(lines []string, result *Valid
 func (v *SecurityValidator) checkPackagePinning(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Check apt-get install without version pinning
 		if strings.Contains(trimmed, "apt-get install") &&
 			!strings.Contains(trimmed, "apt-get update") {
@@ -186,7 +228,6 @@ func (v *SecurityValidator) checkPackagePinning(lines []string, result *Validati
 				// Simple check for version pinning
 				hasVersionPin = true
 			}
-
 			if !hasVersionPin && !strings.Contains(trimmed, "-y") {
 				result.Errors = append(result.Errors, ValidationError{
 					Line:    i + 1,
@@ -196,7 +237,6 @@ func (v *SecurityValidator) checkPackagePinning(lines []string, result *Validati
 				})
 			}
 		}
-
 		// Check pip install without version pinning
 		if strings.Contains(trimmed, "pip install") &&
 			!strings.Contains(trimmed, "requirements") {
@@ -216,7 +256,6 @@ func (v *SecurityValidator) checkPackagePinning(lines []string, result *Validati
 func (v *SecurityValidator) checkForSUIDBindaries(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Check for chmod with SUID/SGID bits
 		if strings.Contains(trimmed, "chmod") {
 			if strings.Contains(trimmed, "+s") ||
@@ -239,12 +278,10 @@ func (v *SecurityValidator) checkBaseImageSecurity(lines []string, result *Valid
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		upper := strings.ToUpper(trimmed)
-
 		if strings.HasPrefix(upper, "FROM") {
 			parts := strings.Fields(trimmed)
 			if len(parts) >= 2 {
 				image := parts[1]
-
 				// Check for latest tag
 				if strings.Contains(image, ":latest") || !strings.Contains(image, ":") {
 					result.Errors = append(result.Errors, ValidationError{
@@ -254,7 +291,6 @@ func (v *SecurityValidator) checkBaseImageSecurity(lines []string, result *Valid
 						Rule:    "unpinned_base_image",
 					})
 				}
-
 				// Check trusted registries
 				if len(v.trustedRegistries) > 0 && !v.isFromTrustedRegistry(image) {
 					result.Errors = append(result.Errors, ValidationError{
@@ -273,7 +309,6 @@ func (v *SecurityValidator) checkBaseImageSecurity(lines []string, result *Valid
 func (v *SecurityValidator) checkForInsecureDownloads(lines []string, result *ValidationResult) {
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
 		// Check for wget/curl with http://
 		if (strings.Contains(trimmed, "wget") || strings.Contains(trimmed, "curl")) &&
 			strings.Contains(trimmed, "http://") &&
@@ -286,7 +321,6 @@ func (v *SecurityValidator) checkForInsecureDownloads(lines []string, result *Va
 				Rule:    "insecure_download",
 			})
 		}
-
 		// Check for ADD with remote URL
 		upper := strings.ToUpper(trimmed)
 		if strings.HasPrefix(upper, "ADD") && strings.Contains(trimmed, "http") {
@@ -301,7 +335,6 @@ func (v *SecurityValidator) checkForInsecureDownloads(lines []string, result *Va
 }
 
 // Helper functions
-
 func (v *SecurityValidator) containsSecret(line string) bool {
 	for _, pattern := range v.secretPatterns {
 		if pattern.MatchString(line) {
@@ -310,38 +343,30 @@ func (v *SecurityValidator) containsSecret(line string) bool {
 	}
 	return false
 }
-
 func (v *SecurityValidator) isFromTrustedRegistry(image string) bool {
 	for _, trusted := range v.trustedRegistries {
 		if strings.HasPrefix(image, trusted) {
 			return true
 		}
 	}
-
 	// Check if it's an official image (no registry prefix)
 	if !strings.Contains(image, "/") || strings.Count(image, "/") == 1 {
 		return true
 	}
-
 	return false
 }
-
 func extractPorts(exposeLine string) []int {
 	ports := make([]int, 0)
 	parts := strings.Fields(exposeLine)
-
 	for i := 1; i < len(parts); i++ {
 		portStr := strings.TrimSuffix(parts[i], "/tcp")
 		portStr = strings.TrimSuffix(portStr, "/udp")
-
 		if port, err := strconv.Atoi(portStr); err == nil {
 			ports = append(ports, port)
 		}
 	}
-
 	return ports
 }
-
 func compileSecretPatterns() []*regexp.Regexp {
 	patterns := []string{
 		`(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]\S+['"]`,
@@ -351,13 +376,960 @@ func compileSecretPatterns() []*regexp.Regexp {
 		`[a-zA-Z0-9]{32,}`, // Long random strings
 		`-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----`,
 	}
-
 	compiled := make([]*regexp.Regexp, 0, len(patterns))
 	for _, pattern := range patterns {
 		if re, err := regexp.Compile(pattern); err == nil {
 			compiled = append(compiled, re)
 		}
 	}
-
 	return compiled
+}
+
+// SecurityPolicy defines a security policy for container builds
+type SecurityPolicy struct {
+	Name                 string                `json:"name"`
+	Description          string                `json:"description"`
+	Version              string                `json:"version"`
+	EnforcementLevel     string                `json:"enforcement_level"` // strict, moderate, relaxed
+	Rules                []SecurityRule        `json:"rules"`
+	TrustedRegistries    []string              `json:"trusted_registries"`
+	ForbiddenPackages    []string              `json:"forbidden_packages"`
+	RequiredLabels       []string              `json:"required_labels"`
+	MaxImageSizeMB       int                   `json:"max_image_size_mb"`
+	AllowedBaseImages    []string              `json:"allowed_base_images"`
+	ComplianceFrameworks []ComplianceFramework `json:"compliance_frameworks"`
+}
+
+// SecurityRule defines a specific security rule
+type SecurityRule struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Severity    string   `json:"severity"` // critical, high, medium, low
+	Category    string   `json:"category"`
+	Enabled     bool     `json:"enabled"`
+	Action      string   `json:"action"` // block, warn, info
+	Patterns    []string `json:"patterns"`
+}
+
+// ComplianceFramework defines compliance requirements
+type ComplianceFramework struct {
+	Name         string                  `json:"name"` // CIS, NIST, PCI-DSS, etc.
+	Version      string                  `json:"version"`
+	Requirements []ComplianceRequirement `json:"requirements"`
+}
+
+// ComplianceRequirement defines a specific compliance requirement
+type ComplianceRequirement struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Check       string `json:"check"` // Function name or rule to check
+}
+
+// EnhancedSecurityValidator extends SecurityValidator with policy support
+type EnhancedSecurityValidator struct {
+	*SecurityValidator
+	policies         map[string]*SecurityPolicy
+	activePolicy     *SecurityPolicy
+	complianceEngine *ComplianceEngine
+	vulnerabilityDB  *VulnerabilityDatabase
+}
+
+// NewEnhancedSecurityValidator creates a new enhanced security validator
+func NewEnhancedSecurityValidator(logger zerolog.Logger, trustedRegistries []string) *EnhancedSecurityValidator {
+	return &EnhancedSecurityValidator{
+		SecurityValidator: NewSecurityValidator(logger, trustedRegistries),
+		policies:          make(map[string]*SecurityPolicy),
+		complianceEngine:  NewComplianceEngine(logger),
+		vulnerabilityDB:   NewVulnerabilityDatabase(logger),
+	}
+}
+
+// LoadPolicy loads a security policy
+func (v *EnhancedSecurityValidator) LoadPolicy(policy *SecurityPolicy) error {
+	if policy.Name == "" {
+		return fmt.Errorf("policy name is required")
+	}
+	v.policies[policy.Name] = policy
+	v.logger.Info().Str("policy", policy.Name).Msg("Loaded security policy")
+	return nil
+}
+
+// SetActivePolicy sets the active security policy
+func (v *EnhancedSecurityValidator) SetActivePolicy(policyName string) error {
+	policy, exists := v.policies[policyName]
+	if !exists {
+		return fmt.Errorf("policy not found: %s", policyName)
+	}
+	v.activePolicy = policy
+	v.logger.Info().Str("policy", policyName).Msg("Set active security policy")
+	return nil
+}
+
+// ValidateWithPolicy performs validation with the active security policy
+func (v *EnhancedSecurityValidator) ValidateWithPolicy(content string, options ValidationOptions) (*DetailedSecurityValidationResult, error) {
+	if v.activePolicy == nil {
+		return nil, fmt.Errorf("no active security policy set")
+	}
+
+	// Perform base validation
+	baseResult, err := v.Validate(content, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create enhanced result
+	result := &DetailedSecurityValidationResult{
+		ValidationResult: baseResult,
+		PolicyName:       v.activePolicy.Name,
+		PolicyVersion:    v.activePolicy.Version,
+		ComplianceStatus: make(map[string]bool),
+		PolicyViolations: []PolicyViolation{},
+		SecurityScore:    100, // Start with perfect score
+		RiskAssessment:   SecurityRiskAssessment{},
+	}
+
+	// Apply policy rules
+	lines := strings.Split(content, "\n")
+	v.applyPolicyRules(lines, result)
+
+	// Check compliance frameworks
+	v.checkCompliance(lines, result)
+
+	// Assess overall risk
+	v.assessRisk(result)
+
+	// Calculate security score
+	v.calculateSecurityScore(result)
+
+	return result, nil
+}
+
+// applyPolicyRules applies security policy rules
+func (v *EnhancedSecurityValidator) applyPolicyRules(lines []string, result *DetailedSecurityValidationResult) {
+	for _, rule := range v.activePolicy.Rules {
+		if !rule.Enabled {
+			continue
+		}
+
+		violations := v.checkRule(lines, rule)
+		for _, violation := range violations {
+			result.PolicyViolations = append(result.PolicyViolations, violation)
+
+			// Add to errors or warnings based on action
+			switch rule.Action {
+			case "block":
+				result.Errors = append(result.Errors, ValidationError{
+					Line:    violation.Line,
+					Column:  0,
+					Message: violation.Message,
+					Rule:    rule.ID,
+				})
+				result.Valid = false
+			case "warn":
+				result.Warnings = append(result.Warnings, ValidationWarning{
+					Line:    violation.Line,
+					Column:  0,
+					Message: violation.Message,
+					Rule:    rule.ID,
+				})
+			}
+		}
+	}
+}
+
+// checkRule checks a specific security rule
+func (v *EnhancedSecurityValidator) checkRule(lines []string, rule SecurityRule) []PolicyViolation {
+	violations := []PolicyViolation{}
+
+	// Compile patterns for this rule
+	patterns := make([]*regexp.Regexp, 0, len(rule.Patterns))
+	for _, pattern := range rule.Patterns {
+		if re, err := regexp.Compile(pattern); err == nil {
+			patterns = append(patterns, re)
+		}
+	}
+
+	// Check each line against patterns
+	for i, line := range lines {
+		for _, pattern := range patterns {
+			if pattern.MatchString(line) {
+				violations = append(violations, PolicyViolation{
+					RuleID:      rule.ID,
+					RuleName:    rule.Name,
+					Severity:    rule.Severity,
+					Line:        i + 1,
+					Message:     fmt.Sprintf("%s: %s", rule.Name, rule.Description),
+					Remediation: v.getRemediation(rule.ID),
+				})
+				break
+			}
+		}
+	}
+
+	return violations
+}
+
+// checkCompliance checks compliance with frameworks
+func (v *EnhancedSecurityValidator) checkCompliance(lines []string, result *DetailedSecurityValidationResult) {
+	for _, framework := range v.activePolicy.ComplianceFrameworks {
+		compliant := true
+		for _, req := range framework.Requirements {
+			if !v.checkComplianceRequirement(lines, req) {
+				compliant = false
+				result.PolicyViolations = append(result.PolicyViolations, PolicyViolation{
+					RuleID:      req.ID,
+					RuleName:    fmt.Sprintf("%s - %s", framework.Name, req.ID),
+					Severity:    "high",
+					Line:        0,
+					Message:     fmt.Sprintf("Non-compliant with %s: %s", framework.Name, req.Description),
+					Remediation: v.getComplianceRemediation(framework.Name, req.ID),
+				})
+			}
+		}
+		result.ComplianceStatus[framework.Name] = compliant
+	}
+}
+
+// checkComplianceRequirement checks a specific compliance requirement
+func (v *EnhancedSecurityValidator) checkComplianceRequirement(lines []string, req ComplianceRequirement) bool {
+	switch req.Check {
+	case "no_root_user":
+		return v.checkNoRootUser(lines)
+	case "minimal_base_image":
+		return v.checkMinimalBaseImage(lines)
+	case "no_sudo_install":
+		return v.checkNoSudoInstall(lines)
+	case "healthcheck_defined":
+		return v.checkHealthcheckDefined(lines)
+	case "no_ssh_server":
+		return v.checkNoSSHServer(lines)
+	case "secrets_management":
+		return v.checkSecretsManagement(lines)
+	case "logging_configured":
+		return v.checkLoggingConfigured(lines)
+	case "resource_limits":
+		return v.checkResourceLimits(lines)
+	case "no_privileged_ports":
+		return v.checkNoPrivilegedPorts(lines)
+	case "signed_images":
+		return v.checkSignedImages(lines)
+	default:
+		return true // Unknown check passes by default
+	}
+}
+
+// assessRisk performs risk assessment
+func (v *EnhancedSecurityValidator) assessRisk(result *DetailedSecurityValidationResult) {
+	risk := &result.RiskAssessment
+
+	// Count violations by severity
+	for _, violation := range result.PolicyViolations {
+		switch violation.Severity {
+		case "critical":
+			risk.CriticalRisks++
+		case "high":
+			risk.HighRisks++
+		case "medium":
+			risk.MediumRisks++
+		case "low":
+			risk.LowRisks++
+		}
+	}
+
+	// Determine overall risk level
+	if risk.CriticalRisks > 0 {
+		risk.OverallRisk = "critical"
+		risk.RiskScore = 100
+	} else if risk.HighRisks > 2 {
+		risk.OverallRisk = "high"
+		risk.RiskScore = 80
+	} else if risk.HighRisks > 0 || risk.MediumRisks > 5 {
+		risk.OverallRisk = "medium"
+		risk.RiskScore = 60
+	} else if risk.MediumRisks > 0 || risk.LowRisks > 10 {
+		risk.OverallRisk = "low"
+		risk.RiskScore = 40
+	} else {
+		risk.OverallRisk = "minimal"
+		risk.RiskScore = 20
+	}
+
+	// Add risk factors
+	if len(result.ValidationResult.Errors) > 0 {
+		risk.RiskFactors = append(risk.RiskFactors, fmt.Sprintf("%d security errors found", len(result.ValidationResult.Errors)))
+	}
+	if risk.CriticalRisks > 0 {
+		risk.RiskFactors = append(risk.RiskFactors, fmt.Sprintf("%d critical security risks identified", risk.CriticalRisks))
+	}
+
+	// Add mitigation recommendations
+	risk.Mitigations = v.generateMitigations(result)
+}
+
+// calculateSecurityScore calculates overall security score
+func (v *EnhancedSecurityValidator) calculateSecurityScore(result *DetailedSecurityValidationResult) {
+	score := 100
+
+	// Deduct points for violations
+	for _, violation := range result.PolicyViolations {
+		switch violation.Severity {
+		case "critical":
+			score -= 20
+		case "high":
+			score -= 10
+		case "medium":
+			score -= 5
+		case "low":
+			score -= 2
+		}
+	}
+
+	// Deduct for non-compliance
+	for framework, compliant := range result.ComplianceStatus {
+		if !compliant {
+			score -= 15
+			v.logger.Warn().Str("framework", framework).Msg("Non-compliant with framework")
+		}
+	}
+
+	// Ensure score doesn't go below 0
+	if score < 0 {
+		score = 0
+	}
+
+	result.SecurityScore = score
+}
+
+// Helper methods
+func (v *EnhancedSecurityValidator) getRemediation(ruleID string) string {
+	// This would return specific remediation steps for each rule
+	remediations := map[string]string{
+		"no-root-user": "Add 'USER <non-root-user>' instruction to run container as non-root",
+		"pin-versions": "Pin all package versions for reproducible builds",
+		"no-secrets":   "Use secrets management solution instead of hardcoding secrets",
+	}
+
+	if remediation, exists := remediations[ruleID]; exists {
+		return remediation
+	}
+	return "Review and fix the security issue"
+}
+
+func (v *EnhancedSecurityValidator) getComplianceRemediation(framework, reqID string) string {
+	// This would return specific compliance remediation steps
+	return fmt.Sprintf("Implement %s requirement %s", framework, reqID)
+}
+
+func (v *EnhancedSecurityValidator) generateMitigations(result *DetailedSecurityValidationResult) []string {
+	mitigations := []string{}
+
+	if result.RiskAssessment.CriticalRisks > 0 {
+		mitigations = append(mitigations, "Address all critical security issues immediately")
+	}
+	if result.RiskAssessment.HighRisks > 0 {
+		mitigations = append(mitigations, "Fix high-severity security issues before deployment")
+	}
+	if result.SecurityScore < 70 {
+		mitigations = append(mitigations, "Improve security practices to achieve minimum security score of 70")
+	}
+
+	return mitigations
+}
+
+// Additional types for enhanced security validation
+
+// DetailedSecurityValidationResult extends ValidationResult with security-specific information
+type DetailedSecurityValidationResult struct {
+	*ValidationResult
+	PolicyName       string                 `json:"policy_name"`
+	PolicyVersion    string                 `json:"policy_version"`
+	ComplianceStatus map[string]bool        `json:"compliance_status"`
+	PolicyViolations []PolicyViolation      `json:"policy_violations"`
+	SecurityScore    int                    `json:"security_score"`
+	RiskAssessment   SecurityRiskAssessment `json:"risk_assessment"`
+}
+
+// PolicyViolation represents a security policy violation
+type PolicyViolation struct {
+	RuleID      string `json:"rule_id"`
+	RuleName    string `json:"rule_name"`
+	Severity    string `json:"severity"`
+	Line        int    `json:"line"`
+	Message     string `json:"message"`
+	Remediation string `json:"remediation"`
+}
+
+// SecurityRiskAssessment contains risk analysis results for security validation
+type SecurityRiskAssessment struct {
+	OverallRisk   string   `json:"overall_risk"`
+	RiskScore     int      `json:"risk_score"`
+	CriticalRisks int      `json:"critical_risks"`
+	HighRisks     int      `json:"high_risks"`
+	MediumRisks   int      `json:"medium_risks"`
+	LowRisks      int      `json:"low_risks"`
+	RiskFactors   []string `json:"risk_factors"`
+	Mitigations   []string `json:"mitigations"`
+}
+
+// ComplianceEngine handles compliance checking
+type ComplianceEngine struct {
+	logger zerolog.Logger
+}
+
+func NewComplianceEngine(logger zerolog.Logger) *ComplianceEngine {
+	return &ComplianceEngine{
+		logger: logger.With().Str("component", "compliance_engine").Logger(),
+	}
+}
+
+// VulnerabilityDatabase handles vulnerability checking
+type VulnerabilityDatabase struct {
+	logger zerolog.Logger
+}
+
+func NewVulnerabilityDatabase(logger zerolog.Logger) *VulnerabilityDatabase {
+	return &VulnerabilityDatabase{
+		logger: logger.With().Str("component", "vulnerability_db").Logger(),
+	}
+}
+
+// Compliance check implementations
+
+// checkNoRootUser verifies container doesn't run as root
+func (v *EnhancedSecurityValidator) checkNoRootUser(lines []string) bool {
+	hasUser := false
+	lastUserIsRoot := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		upper := strings.ToUpper(trimmed)
+
+		if strings.HasPrefix(upper, "USER") {
+			hasUser = true
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 {
+				user := parts[1]
+				lastUserIsRoot = (user == "root" || user == "0")
+			}
+		}
+	}
+
+	return hasUser && !lastUserIsRoot
+}
+
+// checkMinimalBaseImage checks if using minimal base images
+func (v *EnhancedSecurityValidator) checkMinimalBaseImage(lines []string) bool {
+	minimalImages := []string{
+		"alpine", "scratch", "distroless", "busybox", "-slim", "-minimal",
+	}
+
+	for _, line := range lines {
+		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(line)), "FROM") {
+			for _, minimal := range minimalImages {
+				if strings.Contains(strings.ToLower(line), minimal) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// checkNoSudoInstall checks that sudo is not installed
+func (v *EnhancedSecurityValidator) checkNoSudoInstall(lines []string) bool {
+	for _, line := range lines {
+		if strings.Contains(line, "install") && strings.Contains(line, "sudo") {
+			return false
+		}
+	}
+	return true
+}
+
+// checkHealthcheckDefined verifies HEALTHCHECK instruction exists
+func (v *EnhancedSecurityValidator) checkHealthcheckDefined(lines []string) bool {
+	for _, line := range lines {
+		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(line)), "HEALTHCHECK") {
+			return true
+		}
+	}
+	return false
+}
+
+// checkNoSSHServer checks that SSH server is not installed
+func (v *EnhancedSecurityValidator) checkNoSSHServer(lines []string) bool {
+	sshPackages := []string{"openssh-server", "ssh-server", "sshd"}
+
+	for _, line := range lines {
+		for _, pkg := range sshPackages {
+			if strings.Contains(line, pkg) && strings.Contains(line, "install") {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// checkSecretsManagement verifies no hardcoded secrets
+func (v *EnhancedSecurityValidator) checkSecretsManagement(lines []string) bool {
+	for _, line := range lines {
+		upper := strings.ToUpper(line)
+		// Check for hardcoded secrets
+		if strings.Contains(upper, "PASSWORD=") ||
+			strings.Contains(upper, "API_KEY=") ||
+			strings.Contains(upper, "SECRET=") ||
+			strings.Contains(upper, "TOKEN=") {
+			// Allow if it's using ARG or ENV with placeholder
+			if strings.Contains(upper, "ARG ") ||
+				strings.Contains(line, "${") ||
+				strings.Contains(line, "$(") {
+				continue
+			}
+			return false
+		}
+	}
+	return true
+}
+
+// checkLoggingConfigured checks if logging is properly configured
+func (v *EnhancedSecurityValidator) checkLoggingConfigured(lines []string) bool {
+	// Check for logging configuration
+	loggingPatterns := []string{
+		"LOG_", "LOGGING_", "log4j", "logback", "winston", "morgan",
+		"/var/log", "stdout", "stderr",
+	}
+
+	for _, line := range lines {
+		for _, pattern := range loggingPatterns {
+			if strings.Contains(strings.ToLower(line), pattern) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// checkResourceLimits checks if resource limits are defined
+func (v *EnhancedSecurityValidator) checkResourceLimits(lines []string) bool {
+	// In Dockerfile, resource limits are typically set at runtime
+	// Check for documentation or labels indicating limits
+	for _, line := range lines {
+		if strings.Contains(line, "LABEL") &&
+			(strings.Contains(line, "memory") || strings.Contains(line, "cpu")) {
+			return true
+		}
+	}
+	return false
+}
+
+// checkNoPrivilegedPorts verifies no privileged ports (<1024) are exposed
+func (v *EnhancedSecurityValidator) checkNoPrivilegedPorts(lines []string) bool {
+	for _, line := range lines {
+		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(line)), "EXPOSE") {
+			ports := extractPorts(line)
+			for _, port := range ports {
+				if port < 1024 && port != 80 && port != 443 {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// checkSignedImages checks if base images use content trust
+func (v *EnhancedSecurityValidator) checkSignedImages(lines []string) bool {
+	for _, line := range lines {
+		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(line)), "FROM") {
+			// Check for digest reference (indicates signed image)
+			if strings.Contains(line, "@sha256:") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// GetDefaultCISDockerBenchmark returns CIS Docker Benchmark compliance framework
+func GetDefaultCISDockerBenchmark() *ComplianceFramework {
+	return &ComplianceFramework{
+		Name:    "CIS-Docker-Benchmark",
+		Version: "1.4.0",
+		Requirements: []ComplianceRequirement{
+			{
+				ID:          "4.1",
+				Description: "Ensure a user for the container has been created",
+				Category:    "Container Images and Build File",
+				Check:       "no_root_user",
+			},
+			{
+				ID:          "4.2",
+				Description: "Ensure that containers use only trusted base images",
+				Category:    "Container Images and Build File",
+				Check:       "signed_images",
+			},
+			{
+				ID:          "4.3",
+				Description: "Ensure unnecessary packages are not installed",
+				Category:    "Container Images and Build File",
+				Check:       "minimal_base_image",
+			},
+			{
+				ID:          "4.5",
+				Description: "Ensure Content trust for Docker is Enabled",
+				Category:    "Container Images and Build File",
+				Check:       "signed_images",
+			},
+			{
+				ID:          "4.6",
+				Description: "Ensure HEALTHCHECK instructions have been added",
+				Category:    "Container Images and Build File",
+				Check:       "healthcheck_defined",
+			},
+			{
+				ID:          "4.7",
+				Description: "Ensure update instructions are not used alone",
+				Category:    "Container Images and Build File",
+				Check:       "no_root_user",
+			},
+			{
+				ID:          "4.9",
+				Description: "Ensure COPY is used instead of ADD",
+				Category:    "Container Images and Build File",
+				Check:       "minimal_base_image",
+			},
+			{
+				ID:          "4.10",
+				Description: "Ensure secrets are not stored in images",
+				Category:    "Container Images and Build File",
+				Check:       "secrets_management",
+			},
+		},
+	}
+}
+
+// GetDefaultNISTFramework returns NIST 800-190 compliance framework
+func GetDefaultNISTFramework() *ComplianceFramework {
+	return &ComplianceFramework{
+		Name:    "NIST-800-190",
+		Version: "1.0",
+		Requirements: []ComplianceRequirement{
+			{
+				ID:          "CP-1",
+				Description: "Use minimal base images",
+				Category:    "Container Protection",
+				Check:       "minimal_base_image",
+			},
+			{
+				ID:          "CP-2",
+				Description: "Remove unnecessary tools and packages",
+				Category:    "Container Protection",
+				Check:       "no_sudo_install",
+			},
+			{
+				ID:          "CP-3",
+				Description: "Scan images for vulnerabilities",
+				Category:    "Container Protection",
+				Check:       "signed_images",
+			},
+			{
+				ID:          "AC-1",
+				Description: "Run containers with non-root users",
+				Category:    "Access Control",
+				Check:       "no_root_user",
+			},
+			{
+				ID:          "AC-2",
+				Description: "Limit container capabilities",
+				Category:    "Access Control",
+				Check:       "resource_limits",
+			},
+			{
+				ID:          "AU-1",
+				Description: "Enable logging for containers",
+				Category:    "Audit and Accountability",
+				Check:       "logging_configured",
+			},
+			{
+				ID:          "SC-1",
+				Description: "Protect sensitive data in containers",
+				Category:    "System and Communications Protection",
+				Check:       "secrets_management",
+			},
+			{
+				ID:          "SC-2",
+				Description: "Use secure communication channels",
+				Category:    "System and Communications Protection",
+				Check:       "no_ssh_server",
+			},
+		},
+	}
+}
+
+// GetDefaultPCIDSSFramework returns PCI-DSS compliance framework
+func GetDefaultPCIDSSFramework() *ComplianceFramework {
+	return &ComplianceFramework{
+		Name:    "PCI-DSS",
+		Version: "4.0",
+		Requirements: []ComplianceRequirement{
+			{
+				ID:          "2.2.2",
+				Description: "Enable only necessary services",
+				Category:    "Secure Configuration",
+				Check:       "no_ssh_server",
+			},
+			{
+				ID:          "2.2.5",
+				Description: "Remove unnecessary functionality",
+				Category:    "Secure Configuration",
+				Check:       "minimal_base_image",
+			},
+			{
+				ID:          "2.3",
+				Description: "Encrypt all non-console administrative access",
+				Category:    "Secure Configuration",
+				Check:       "no_ssh_server",
+			},
+			{
+				ID:          "6.2",
+				Description: "Ensure all components are protected from known vulnerabilities",
+				Category:    "Vulnerability Management",
+				Check:       "signed_images",
+			},
+			{
+				ID:          "7.1",
+				Description: "Limit access to system components",
+				Category:    "Access Control",
+				Check:       "no_root_user",
+			},
+			{
+				ID:          "8.2.1",
+				Description: "Strong cryptography for authentication",
+				Category:    "Authentication",
+				Check:       "secrets_management",
+			},
+			{
+				ID:          "10.1",
+				Description: "Implement audit trails",
+				Category:    "Logging and Monitoring",
+				Check:       "logging_configured",
+			},
+			{
+				ID:          "11.5",
+				Description: "Deploy change detection mechanisms",
+				Category:    "Security Testing",
+				Check:       "signed_images",
+			},
+		},
+	}
+}
+
+// LoadDefaultComplianceFrameworks loads all default compliance frameworks
+func (v *EnhancedSecurityValidator) LoadDefaultComplianceFrameworks() {
+	// Create default security policy with all frameworks
+	defaultPolicy := &SecurityPolicy{
+		Name:             "default-compliance",
+		Description:      "Default compliance policy with CIS, NIST, and PCI-DSS",
+		Version:          "1.0",
+		EnforcementLevel: "strict",
+		Rules: []SecurityRule{
+			{
+				ID:          "no-root",
+				Name:        "No Root User",
+				Description: "Containers must not run as root",
+				Severity:    "high",
+				Category:    "access-control",
+				Enabled:     true,
+				Action:      "block",
+				Patterns:    []string{`USER\s+(root|0)`},
+			},
+			{
+				ID:          "no-secrets",
+				Name:        "No Hardcoded Secrets",
+				Description: "No hardcoded passwords or API keys",
+				Severity:    "critical",
+				Category:    "secrets",
+				Enabled:     true,
+				Action:      "block",
+				Patterns: []string{
+					`(?i)(password|pwd|passwd)\s*=\s*['"][^'"]+['"]`,
+					`(?i)(api[_-]?key|apikey)\s*=\s*['"][^'"]+['"]`,
+					`(?i)(secret|token)\s*=\s*['"][^'"]+['"]`,
+				},
+			},
+			{
+				ID:          "use-minimal-base",
+				Name:        "Use Minimal Base Images",
+				Description: "Use minimal base images like alpine or distroless",
+				Severity:    "medium",
+				Category:    "image-security",
+				Enabled:     true,
+				Action:      "warn",
+				Patterns:    []string{`FROM\s+(ubuntu|debian|centos)(?!.*slim|.*minimal)`},
+			},
+		},
+		TrustedRegistries: []string{
+			"docker.io",
+			"gcr.io",
+			"quay.io",
+			"registry.hub.docker.com",
+		},
+		ComplianceFrameworks: []ComplianceFramework{
+			*GetDefaultCISDockerBenchmark(),
+			*GetDefaultNISTFramework(),
+			*GetDefaultPCIDSSFramework(),
+		},
+	}
+
+	// Load the default policy
+	v.LoadPolicy(defaultPolicy)
+	v.SetActivePolicy("default-compliance")
+}
+
+// Compliance check method implementations
+
+func (v *SecurityValidator) checkCISDockerCompliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for root user
+	if len(validationResult.Errors) > 0 {
+		for _, err := range validationResult.Errors {
+			if err.Rule == "root_user" {
+				result.Compliant = false
+				result.Score -= 20
+				result.Violations = append(result.Violations, SecurityComplianceViolation{
+					Requirement: "CIS 4.1",
+					Description: "Container running as root user",
+					Severity:    "high",
+					Line:        err.Line,
+				})
+			}
+		}
+	}
+
+	// Check for health check
+	if !strings.Contains(dockerfile, "HEALTHCHECK") {
+		result.Compliant = false
+		result.Score -= 10
+		result.Violations = append(result.Violations, SecurityComplianceViolation{
+			Requirement: "CIS 4.6",
+			Description: "No HEALTHCHECK instruction defined",
+			Severity:    "medium",
+		})
+	}
+}
+
+func (v *SecurityValidator) checkNIST800190Compliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for insecure downloads
+	for _, err := range validationResult.Errors {
+		if err.Rule == "insecure_download" {
+			result.Compliant = false
+			result.Score -= 15
+			result.Violations = append(result.Violations, SecurityComplianceViolation{
+				Requirement: "NIST 800-190 4.3.3",
+				Description: "Insecure download detected",
+				Severity:    "high",
+				Line:        err.Line,
+			})
+		}
+	}
+}
+
+func (v *SecurityValidator) checkPCIDSSCompliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for hardcoded secrets
+	for _, err := range validationResult.Errors {
+		if err.Rule == "hardcoded_secret" {
+			result.Compliant = false
+			result.Score -= 30
+			result.Violations = append(result.Violations, SecurityComplianceViolation{
+				Requirement: "PCI-DSS 8.2.1",
+				Description: "Hardcoded credentials detected",
+				Severity:    "critical",
+				Line:        err.Line,
+			})
+		}
+	}
+}
+
+func (v *SecurityValidator) checkHIPAACompliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for telnet/unencrypted services
+	for _, warn := range validationResult.Warnings {
+		if warn.Rule == "sensitive_port" && strings.Contains(warn.Message, "23") {
+			result.Compliant = false
+			result.Score -= 25
+			result.Violations = append(result.Violations, SecurityComplianceViolation{
+				Requirement: "HIPAA 164.312(e)(1)",
+				Description: "Unencrypted transmission protocol (telnet) exposed",
+				Severity:    "high",
+				Line:        warn.Line,
+			})
+		}
+	}
+}
+
+func (v *SecurityValidator) checkSOC2Compliance(dockerfile string, validationResult *ValidationResult, result *ComplianceResult) {
+	// Check for permission issues
+	if strings.Contains(dockerfile, "chmod 777") {
+		result.Compliant = false
+		result.Score -= 20
+		result.Violations = append(result.Violations, SecurityComplianceViolation{
+			Requirement: "SOC 2 CC6.3",
+			Description: "Overly permissive file permissions detected",
+			Severity:    "high",
+		})
+	}
+}
+
+// AddPolicy adds a custom security policy to the validator
+func (v *SecurityValidator) AddPolicy(policy SecurityPolicy) {
+	v.policies = append(v.policies, policy)
+	v.logger.Info().Str("policy", policy.Name).Msg("Policy added to validator")
+}
+
+// VulnerabilityScanResult represents the result of a vulnerability scan
+type VulnerabilityScanResult struct {
+	Critical int `json:"critical"`
+	High     int `json:"high"`
+	Medium   int `json:"medium"`
+	Low      int `json:"low"`
+}
+
+// ProcessVulnerabilityScan processes vulnerability scan results
+func (v *SecurityValidator) ProcessVulnerabilityScan(scanResult *VulnerabilityScanResult) *ValidationResult {
+	result := &ValidationResult{
+		Valid:    true,
+		Errors:   []ValidationError{},
+		Warnings: []ValidationWarning{},
+	}
+
+	if scanResult.Critical > 0 {
+		result.Valid = false
+		result.Errors = append(result.Errors, ValidationError{
+			Line:    0,
+			Column:  0,
+			Message: fmt.Sprintf("Found %d critical vulnerabilities that must be fixed", scanResult.Critical),
+			Rule:    "critical_vulnerabilities",
+		})
+	}
+
+	if scanResult.High > 0 {
+		result.Warnings = append(result.Warnings, ValidationWarning{
+			Line:    0,
+			Column:  0,
+			Message: fmt.Sprintf("Found %d high severity vulnerabilities", scanResult.High),
+			Rule:    "high_vulnerabilities",
+		})
+	}
+
+	if scanResult.Medium > 0 {
+		result.Warnings = append(result.Warnings, ValidationWarning{
+			Line:    0,
+			Column:  0,
+			Message: fmt.Sprintf("Found %d medium severity vulnerabilities", scanResult.Medium),
+			Rule:    "medium_vulnerabilities",
+		})
+	}
+
+	return result
 }

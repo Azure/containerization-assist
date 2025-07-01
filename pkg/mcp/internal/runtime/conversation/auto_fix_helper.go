@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -22,12 +23,12 @@ func NewAutoFixHelper(handler *ConversationHandler) *AutoFixHelper {
 
 // AttemptAutoFix attempts to automatically fix an error and updates the response accordingly
 // Returns true if the response was modified (either success or with fallback options)
-func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *ConversationResponse, stage types.ConversationStage, err error, state *ConversationState) bool {
+func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *ConversationResponse, stage core.ConversationStage, err error, state *ConversationState) bool {
 	if h.conversationHandler == nil {
 		return false
 	}
 
-	autoFixResult, autoFixErr := h.conversationHandler.attemptAutoFix(ctx, response.SessionID, stage, err, state)
+	autoFixResult, autoFixErr := h.conversationHandler.attemptAutoFix(ctx, response.SessionID, types.ConversationStage(stage), err, state)
 	if autoFixErr != nil || autoFixResult == nil {
 		return false
 	}
@@ -50,30 +51,37 @@ func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *Conversati
 	return true
 }
 
+// convertToMCPStage converts internal types.ConversationStage to core.ConversationStage
+// This function is deprecated - use convertFromTypesStage instead
+func convertToMCPStage(stage types.ConversationStage) core.ConversationStage {
+	return convertFromTypesStage(stage)
+}
+
 // getSuccessOptions returns appropriate options for successful auto-fix based on stage
-func (h *AutoFixHelper) getSuccessOptions(stage types.ConversationStage) []Option {
+func (h *AutoFixHelper) getSuccessOptions(stage core.ConversationStage) []Option {
 	switch stage {
-	case types.StageBuild:
+	case core.ConversationStageBuild:
 		return []Option{
 			{ID: "continue", Label: "Continue to next stage", Recommended: true},
 			{ID: "review", Label: "Review changes"},
 		}
-	case types.StagePush:
+	case core.ConversationStagePush:
 		return []Option{
 			{ID: "continue", Label: "Continue to manifest generation", Recommended: true},
 			{ID: "review", Label: "Review changes"},
 		}
-	case types.StageManifests:
+	case core.ConversationStageManifests:
 		return []Option{
 			{ID: "continue", Label: "Continue to deployment", Recommended: true},
-			{ID: "review", Label: "Review generated manifests"},
+			{ID: "review", Label: "Review changes"},
 		}
-	case types.StageDeployment:
+	case core.ConversationStageDeploy:
 		return []Option{
 			{ID: "continue", Label: "Continue to completion", Recommended: true},
 			{ID: "review", Label: "Review deployment status"},
 		}
 	default:
+		// All other stages (PreFlight, Analyze, Dockerfile, Scan, Completed, etc.) use default behavior
 		return []Option{
 			{ID: "continue", Label: "Continue", Recommended: true},
 			{ID: "review", Label: "Review changes"},
@@ -82,33 +90,35 @@ func (h *AutoFixHelper) getSuccessOptions(stage types.ConversationStage) []Optio
 }
 
 // getStageDisplayName returns a display name for the stage
-func getStageDisplayName(stage types.ConversationStage) string {
+func getStageDisplayName(stage core.ConversationStage) string {
 	switch stage {
-	case types.StageBuild:
+	case core.ConversationStageBuild:
 		return "Build"
-	case types.StagePush:
+	case core.ConversationStagePush:
 		return "Push"
-	case types.StageManifests:
+	case core.ConversationStageManifests:
 		return "Manifest generation"
-	case types.StageDeployment:
+	case core.ConversationStageDeploy:
 		return "Deployment"
 	default:
+		// All other stages (PreFlight, Analyze, Dockerfile, Scan, Completed, etc.) return "Operation"
 		return "Operation"
 	}
 }
 
 // getStageErrorPrefix returns an error message prefix for the stage
-func getStageErrorPrefix(stage types.ConversationStage) string {
+func getStageErrorPrefix(stage core.ConversationStage) string {
 	switch stage {
-	case types.StageBuild:
+	case core.ConversationStageBuild:
 		return "Build"
-	case types.StagePush:
+	case core.ConversationStagePush:
 		return "Failed to push Docker image"
-	case types.StageManifests:
+	case core.ConversationStageManifests:
 		return "Failed to generate Kubernetes manifests"
-	case types.StageDeployment:
+	case core.ConversationStageDeploy:
 		return "Deployment"
 	default:
+		// All other stages (PreFlight, Analyze, Dockerfile, Scan, Completed, etc.) return "Operation"
 		return "Operation"
 	}
 }

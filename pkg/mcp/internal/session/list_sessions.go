@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -55,8 +56,8 @@ type ListSessionsResult struct {
 // ListSessionsManager interface for listing sessions
 type ListSessionsManager interface {
 	GetAllSessions() ([]*SessionData, error)
-	GetSession(sessionID string) (*SessionData, error)
-	GetStats() *SessionManagerStats
+	GetSessionData(sessionID string) (*SessionData, error)
+	GetStats() *core.SessionManagerStats
 }
 
 // SessionData represents the session data structure
@@ -173,16 +174,35 @@ func (t *ListSessionsTool) ExecuteTyped(ctx context.Context, args ListSessionsAr
 		sessionInfos = append(sessionInfos, info)
 	}
 
-	// Calculate server uptime
-	uptime := time.Since(stats.ServerStartTime)
+	// Get additional stats from the concrete session manager
+	sm, ok := t.sessionManager.(*SessionManager)
+	var uptime time.Duration
+	var expiredCount int
+	var totalDiskUsed int64
+
+	if ok {
+		uptime = time.Since(sm.startTime)
+		// Calculate expired sessions
+		for _, session := range sessionInfos {
+			if session.Status == "expired" {
+				expiredCount++
+			}
+		}
+		// Calculate total disk usage
+		sm.mutex.RLock()
+		for _, usage := range sm.diskUsage {
+			totalDiskUsed += usage
+		}
+		sm.mutex.RUnlock()
+	}
 
 	result := &ListSessionsResult{
 		BaseToolResponse: types.NewBaseResponse("list_sessions", args.SessionID, args.DryRun),
 		Sessions:         sessionInfos,
 		TotalSessions:    stats.TotalSessions,
 		ActiveCount:      stats.ActiveSessions,
-		ExpiredCount:     stats.ExpiredSessions,
-		TotalDiskUsed:    stats.TotalDiskUsage,
+		ExpiredCount:     expiredCount,
+		TotalDiskUsed:    totalDiskUsed,
 		ServerUptime:     uptime.String(),
 		Metadata: map[string]string{
 			"filter_status": args.Status,
@@ -195,7 +215,7 @@ func (t *ListSessionsTool) ExecuteTyped(ctx context.Context, args ListSessionsAr
 	t.logger.Info().
 		Int("total_sessions", len(sessionInfos)).
 		Int("active_count", stats.ActiveSessions).
-		Int64("total_disk_bytes", stats.TotalDiskUsage).
+		Int64("total_disk_bytes", totalDiskUsed).
 		Msg("Sessions listed successfully")
 
 	return result, nil
@@ -325,8 +345,8 @@ func (t *ListSessionsTool) sortSessions(sessions []*SessionData, sortBy, sortOrd
 }
 
 // GetMetadata returns comprehensive metadata about the list sessions tool
-func (t *ListSessionsTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *ListSessionsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "list_sessions",
 		Description: "List and filter active sessions with detailed statistics and sorting options",
 		Version:     "1.0.0",

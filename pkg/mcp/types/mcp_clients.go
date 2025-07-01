@@ -10,6 +10,24 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Local interface definitions to avoid import cycles
+
+// AIAnalyzer interface for AI analysis (local copy to avoid import cycle)
+type AIAnalyzer interface {
+	Analyze(ctx context.Context, prompt string) (string, error)
+	AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error)
+	AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error)
+	GetTokenUsage() TokenUsage
+	ResetTokenUsage()
+}
+
+// TokenUsage token usage tracking (local copy to avoid import cycle)
+type TokenUsage struct {
+	CompletionTokens int `json:"completion_tokens"`
+	PromptTokens     int `json:"prompt_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
 // MCPClients provides MCP-specific clients without external AI dependencies
 // This replaces pkg/clients.Clients for MCP usage to ensure no AI dependencies
 type MCPClients struct {

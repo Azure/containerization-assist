@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -117,6 +118,8 @@ type JobInfo struct {
 	Tool      string           `json:"tool"`
 	Status    JobStatus        `json:"status"`
 	StartTime time.Time        `json:"start_time"`
+	EndTime   *time.Time       `json:"end_time,omitempty"`
+	Duration  *time.Duration   `json:"duration,omitempty"`
 	Progress  *JobProgress     `json:"progress,omitempty"`
 	Result    interface{}      `json:"result,omitempty"`
 	Error     *types.ToolError `json:"error,omitempty"`
@@ -510,4 +513,22 @@ func contains(s, substr string) bool {
 	s = strings.ToLower(s)
 	substr = strings.ToLower(substr)
 	return strings.Contains(s, substr)
+}
+
+// ToCoreSessionState converts internal SessionState to core.SessionState
+func (s *SessionState) ToCoreSessionState() *core.SessionState {
+	return &core.SessionState{
+		SessionID:    s.SessionID,
+		CreatedAt:    s.CreatedAt,
+		ExpiresAt:    s.ExpiresAt,
+		UpdatedAt:    s.LastAccessed,
+		WorkspaceDir: s.WorkspaceDir,
+		// Map other commonly used fields
+		RepoURL:             s.RepoURL,
+		RepositoryAnalyzed:  len(s.RepoAnalysis) > 0,
+		DockerfileGenerated: len(s.Dockerfile.Content) > 0,
+		DockerfilePath:      s.Dockerfile.Path,
+		ImageBuilt:          s.Dockerfile.Built,
+		ImageRef:            s.ImageRef.Repository,
+	}
 }

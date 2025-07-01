@@ -7,9 +7,13 @@ import (
 	"strings"
 	"time"
 
+	// mcp import removed - using mcptypes
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/prometheus/client_golang/prometheus"
+
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/rs/zerolog"
@@ -89,11 +93,7 @@ func (t *GetTelemetryMetricsTool) ExecuteTyped(ctx context.Context, args GetTele
 	}
 
 	if args.Format != "prometheus" && args.Format != "json" {
-		return nil, types.NewRichError(
-			"INVALID_ARGUMENTS",
-			fmt.Sprintf("unsupported format: %s (supported: prometheus, json)", args.Format),
-			"validation_error",
-		)
+		return nil, fmt.Errorf("unsupported format: %s (supported: prometheus, json)", args.Format)
 	}
 
 	var startTime *time.Time
@@ -286,11 +286,7 @@ func (t *GetTelemetryMetricsTool) parseTimeRange(timeRange string) (time.Time, e
 		return time.Now().Add(-duration), nil
 	}
 
-	return time.Time{}, types.NewRichError(
-		"INVALID_ARGUMENTS",
-		"time range must be either a duration (e.g., '1h', '24h') or RFC3339 timestamp",
-		"validation_error",
-	)
+	return time.Time{}, fmt.Errorf("time range must be either a duration (e.g., '1h', '24h') or RFC3339 timestamp")
 }
 
 func (t *GetTelemetryMetricsTool) parsePrometheusText(text string) ([]*dto.MetricFamily, error) {
@@ -391,8 +387,8 @@ func (t *GetTelemetryMetricsTool) countMetricFamilies(families []*dto.MetricFami
 	return count
 }
 
-func (t *GetTelemetryMetricsTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *GetTelemetryMetricsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "get_telemetry_metrics",
 		Description: "Export telemetry metrics in Prometheus format with filtering and analysis",
 		Version:     "1.0.0",

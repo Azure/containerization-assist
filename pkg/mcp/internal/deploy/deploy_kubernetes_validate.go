@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 )
 
 // performHealthCheck verifies deployment health
-func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *sessiontypes.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
+func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, session *core.SessionState, args AtomicDeployKubernetesArgs, result *AtomicDeployKubernetesResult, _ interface{}) error {
 	// Progress reporting removed
 
 	healthStart := time.Now()
@@ -22,55 +21,40 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 	}
 
 	// Check deployment health using pipeline adapter
-	healthResult, err := t.pipelineAdapter.CheckApplicationHealth(
-		session.SessionID,
-		args.Namespace,
-		"app="+args.AppName, // label selector
-		timeout,
-	)
+	healthArgs := map[string]interface{}{
+		"namespace":     args.Namespace,
+		"labelSelector": "app=" + args.AppName,
+		"timeout":       timeout,
+	}
+	healthResult, err := t.pipelineAdapter.CheckHealth(ctx, session.SessionID, healthArgs)
 	result.HealthCheckDuration = time.Since(healthStart)
 
-	// Convert from mcptypes.HealthCheckResult to kubernetes.HealthCheckResult
+	// Convert from interface{} to kubernetes.HealthCheckResult
 	if healthResult != nil {
-		result.HealthResult = &kubernetes.HealthCheckResult{
-			Success:   healthResult.Healthy,
-			Namespace: args.Namespace,
-			Duration:  result.HealthCheckDuration,
-		}
-		if healthResult.Error != nil {
-			result.HealthResult.Error = &kubernetes.HealthCheckError{
-				Type:    healthResult.Error.Type,
-				Message: healthResult.Error.Message,
-			}
-		}
-		// Convert pod statuses
-		for _, ps := range healthResult.PodStatuses {
-			podStatus := kubernetes.DetailedPodStatus{
-				Name:      ps.Name,
+		// Convert interface{} to expected structure
+		if healthMap, ok := healthResult.(map[string]interface{}); ok {
+			result.HealthResult = &kubernetes.HealthCheckResult{
+				Success:   getBoolFromMap(healthMap, "healthy", false),
 				Namespace: args.Namespace,
-				Status:    ps.Status,
-				Ready:     ps.Ready,
+				Duration:  result.HealthCheckDuration,
 			}
-			result.HealthResult.Pods = append(result.HealthResult.Pods, podStatus)
-		}
-		// Update summary
-		result.HealthResult.Summary = kubernetes.HealthSummary{
-			TotalPods:   len(result.HealthResult.Pods),
-			ReadyPods:   0,
-			FailedPods:  0,
-			PendingPods: 0,
-		}
-		for _, pod := range result.HealthResult.Pods {
-			if pod.Ready {
-				result.HealthResult.Summary.ReadyPods++
-			} else if pod.Status == "Failed" || pod.Phase == "Failed" {
-				result.HealthResult.Summary.FailedPods++
-			} else if pod.Status == "Pending" || pod.Phase == "Pending" {
-				result.HealthResult.Summary.PendingPods++
+
+			// Handle error if present
+			if errorData, exists := healthMap["error"]; exists && errorData != nil {
+				if errorMap, ok := errorData.(map[string]interface{}); ok {
+					result.HealthResult.Error = &kubernetes.HealthCheckError{
+						Type:    getStringFromMap(errorMap, "type", "unknown"),
+						Message: getStringFromMap(errorMap, "message", "unknown error"),
+					}
+				}
 			}
-		}
-		if result.HealthResult.Summary.TotalPods > 0 {
-			result.HealthResult.Summary.HealthyRatio = float64(result.HealthResult.Summary.ReadyPods) / float64(result.HealthResult.Summary.TotalPods)
+		} else {
+			// Fallback for unexpected result type
+			result.HealthResult = &kubernetes.HealthCheckResult{
+				Success:   false,
+				Namespace: args.Namespace,
+				Duration:  result.HealthCheckDuration,
+			}
 		}
 	}
 
@@ -79,15 +63,18 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 		return err
 	}
 
-	if healthResult != nil && !healthResult.Healthy {
-		var readyPods, totalPods int
-		if result.HealthResult != nil {
-			readyPods = result.HealthResult.Summary.ReadyPods
-			totalPods = result.HealthResult.Summary.TotalPods
+	// Check health result success through type assertion
+	if healthResult != nil {
+		if healthMap, ok := healthResult.(map[string]interface{}); ok && !getBoolFromMap(healthMap, "healthy", false) {
+			var readyPods, totalPods int
+			if result.HealthResult != nil {
+				readyPods = result.HealthResult.Summary.ReadyPods
+				totalPods = result.HealthResult.Summary.TotalPods
+			}
+			healthErr := fmt.Errorf("application health check failed: %d/%d pods ready", readyPods, totalPods)
+			_ = t.handleHealthCheckError(ctx, healthErr, result.HealthResult, result)
+			return healthErr
 		}
-		healthErr := types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("deployment health check failed: %d/%d pods ready", readyPods, totalPods), "health_check_error")
-		_ = t.handleHealthCheckError(ctx, healthErr, result.HealthResult, result)
-		return healthErr
 	}
 
 	t.logger.Info().
@@ -103,11 +90,11 @@ func (t *AtomicDeployKubernetesTool) performHealthCheck(ctx context.Context, ses
 
 // handleHealthCheckError creates an error for health check failures
 func (t *AtomicDeployKubernetesTool) handleHealthCheckError(_ context.Context, err error, _ *kubernetes.HealthCheckResult, _ *AtomicDeployKubernetesResult) error {
-	return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("health check failed: %v", err), "health_check_error")
+	return fmt.Errorf("error")
 }
 
 // updateSessionState updates session with deployment results
-func (t *AtomicDeployKubernetesTool) updateSessionState(session *sessiontypes.SessionState, result *AtomicDeployKubernetesResult) error {
+func (t *AtomicDeployKubernetesTool) updateSessionState(session *core.SessionState, result *AtomicDeployKubernetesResult) error {
 	// Update session with deployment results
 	if session.Metadata == nil {
 		session.Metadata = make(map[string]interface{})
@@ -141,12 +128,11 @@ func (t *AtomicDeployKubernetesTool) updateSessionState(session *sessiontypes.Se
 		}
 	}
 
-	session.UpdateLastAccessed()
+	session.UpdatedAt = time.Now()
 
-	return t.sessionManager.UpdateSession(session.SessionID, func(s interface{}) {
-		if sess, ok := s.(*sessiontypes.SessionState); ok {
-			*sess = *session
-		}
+	// Use pipeline adapter to update session state
+	return t.pipelineAdapter.UpdateSessionState(session.SessionID, func(s *core.SessionState) {
+		*s = *session
 	})
 }
 

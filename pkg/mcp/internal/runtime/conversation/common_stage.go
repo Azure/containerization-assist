@@ -32,17 +32,17 @@ func (pm *PromptManager) generateImageTag(state *ConversationState) string {
 // performSecurityScan performs a security scan on the built image
 func (pm *PromptManager) performSecurityScan(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StagePush,
+		Stage:   convertFromTypesStage(types.StagePush),
 		Status:  ResponseStatusProcessing,
 		Message: "Running security scan on image...",
 	}
 
 	params := map[string]interface{}{
-		"session_id": state.SessionID,
-		"image_ref":  state.Dockerfile.ImageID,
+		"session_id": state.SessionState.SessionID,
+		"image_ref":  getDockerfileImageID(state.SessionState),
 	}
 
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "scan_image_security", params, state.SessionState.SessionID)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "scan_image_security", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Security scan failed: %v\n\nContinue anyway?", err)
@@ -54,7 +54,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 	}
 
 	// Format scan results
-	if scanResult, ok := result.(map[string]interface{}); ok {
+	if scanResult, ok := resultStruct.(map[string]interface{}); ok {
 		vulnerabilities := extractVulnerabilities(scanResult)
 		if len(vulnerabilities) > 0 {
 			response.Status = ResponseStatusWarning
@@ -81,13 +81,21 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 	if strings.Contains(strings.ToLower(input), "show") || strings.Contains(strings.ToLower(input), "full") {
 		// Show full manifests
 		var manifestsText strings.Builder
-		for name, manifest := range state.K8sManifests {
-			manifestsText.WriteString(fmt.Sprintf("# %s\n---\n%s\n\n", name, manifest.Content))
+		if state.SessionState.Metadata != nil {
+			if k8sManifests, ok := state.SessionState.Metadata["k8s_manifests"].(map[string]interface{}); ok {
+				for name, manifestData := range k8sManifests {
+					if manifestMap, ok := manifestData.(map[string]interface{}); ok {
+						if content, ok := manifestMap["content"].(string); ok {
+							manifestsText.WriteString(fmt.Sprintf("# %s\n---\n%s\n\n", name, content))
+						}
+					}
+				}
+			}
 		}
 
 		return &ConversationResponse{
 			Message: fmt.Sprintf("Full Kubernetes manifests:\n\n```yaml\n%s```\n\nReady to deploy?", manifestsText.String()),
-			Stage:   types.StageManifests,
+			Stage:   convertFromTypesStage(types.StageManifests),
 			Status:  ResponseStatusSuccess,
 			Options: []Option{
 				{ID: "deploy", Label: "Deploy to Kubernetes", Recommended: true},
@@ -97,10 +105,10 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 	}
 
 	// Already have manifests, ask about deployment
-	state.SetStage(types.StageDeployment)
+	state.SetStage(convertFromTypesStage(types.StageDeployment))
 	return &ConversationResponse{
 		Message: "Manifests are ready. Shall we deploy to Kubernetes?",
-		Stage:   types.StageDeployment,
+		Stage:   convertFromTypesStage(types.StageDeployment),
 		Status:  ResponseStatusSuccess,
 		Options: []Option{
 			{ID: "deploy", Label: "Yes, deploy", Recommended: true},
@@ -113,8 +121,8 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 // suggestAppName suggests an application name based on repository info
 func (pm *PromptManager) suggestAppName(state *ConversationState) string {
 	// Try to extract from repo URL
-	if state.RepoURL != "" {
-		parts := strings.Split(state.RepoURL, "/")
+	if state.SessionState.RepoURL != "" {
+		parts := strings.Split(state.SessionState.RepoURL, "/")
 		if len(parts) > 0 {
 			name := parts[len(parts)-1]
 			name = strings.TrimSuffix(name, ".git")
@@ -125,8 +133,12 @@ func (pm *PromptManager) suggestAppName(state *ConversationState) string {
 	}
 
 	// Try to extract from repo analysis
-	if projectName, ok := state.RepoAnalysis["project_name"].(string); ok {
-		return strings.ToLower(strings.ReplaceAll(projectName, "_", "-"))
+	if state.SessionState.Metadata != nil {
+		if repoAnalysis, ok := state.SessionState.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			if projectName, ok := repoAnalysis["project_name"].(string); ok {
+				return strings.ToLower(strings.ReplaceAll(projectName, "_", "-"))
+			}
+		}
 	}
 
 	return "my-app"
@@ -160,8 +172,16 @@ func (pm *PromptManager) formatDeploymentSuccess(state *ConversationState, durat
 	sb.WriteString(fmt.Sprintf("Deployment time: %s\n", duration.Round(time.Second)))
 	sb.WriteString("\nResources created:\n")
 
-	for name, manifest := range state.K8sManifests {
-		sb.WriteString(fmt.Sprintf("- %s (%s)\n", name, manifest.Kind))
+	if state.SessionState.Metadata != nil {
+		if k8sManifests, ok := state.SessionState.Metadata["k8s_manifests"].(map[string]interface{}); ok {
+			for name, manifestData := range k8sManifests {
+				if manifestMap, ok := manifestData.(map[string]interface{}); ok {
+					if kind, ok := manifestMap["kind"].(string); ok {
+						sb.WriteString(fmt.Sprintf("- %s (%s)\n", name, kind))
+					}
+				}
+			}
+		}
 	}
 
 	sb.WriteString("\nTo access your application:\n")
@@ -176,20 +196,20 @@ func (pm *PromptManager) formatDeploymentSuccess(state *ConversationState, durat
 // showDeploymentLogs shows logs from failed deployment
 func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   types.StageDeployment,
+		Stage:   convertFromTypesStage(types.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Fetching deployment logs...",
 	}
 
 	params := map[string]interface{}{
-		"session_id":   state.SessionID,
+		"session_id":   state.SessionState.SessionID,
 		"app_name":     state.Context["app_name"],
 		"namespace":    state.Preferences.Namespace,
 		"include_logs": true,
 		"log_lines":    100,
 	}
 
-	result, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params, state.SessionState.SessionID)
+	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Failed to fetch logs: %v", err)
@@ -197,7 +217,7 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 	}
 
 	// Extract logs from result
-	if healthResult, ok := result.(map[string]interface{}); ok {
+	if healthResult, ok := resultStruct.(map[string]interface{}); ok {
 		if logs, ok := healthResult["logs"].(string); ok && logs != "" {
 			response.Status = ResponseStatusSuccess
 			response.Message = fmt.Sprintf("Pod logs:\n\n```\n%s\n```\n\nBased on these logs, what would you like to do?", logs)

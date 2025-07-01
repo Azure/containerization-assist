@@ -3,6 +3,7 @@ package transport
 import (
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -77,6 +78,11 @@ func NewDefaultStdioTransport(baseLogger zerolog.Logger) *StdioTransport {
 		return NewStdioTransportWithLogger(baseLogger)
 	}
 	return stdioTransport
+}
+
+// NewDefaultCoreStdioTransport creates a stdio transport that implements core.Transport
+func NewDefaultCoreStdioTransport(baseLogger zerolog.Logger) core.Transport {
+	return NewDefaultStdioTransport(baseLogger)
 }
 
 // NewDefaultLLMTransport creates an LLM transport with default configuration

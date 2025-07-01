@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
+	coreinterfaces "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/pipeline"
@@ -20,20 +21,20 @@ import (
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
-// llmTransportAdapter adapts types.LLMTransport to analyze.LLMTransport
-type llmTransportAdapter struct {
+// directLLMTransport implements analyze.LLMTransport using types.LLMTransport
+type directLLMTransport struct {
 	transport types.LLMTransport
 }
 
 // SendPrompt implements analyze.LLMTransport by converting to InvokeTool call
-func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
+func (d *directLLMTransport) SendPrompt(prompt string) (string, error) {
 	ctx := context.Background()
 	payload := map[string]any{
 		"prompt": prompt,
 	}
 
 	// Call the chat tool with the prompt
-	ch, err := a.transport.InvokeTool(ctx, "chat", payload, false)
+	ch, err := d.transport.InvokeTool(ctx, "chat", payload, false)
 	if err != nil {
 		return "", err
 	}
@@ -51,22 +52,7 @@ func (a *llmTransportAdapter) SendPrompt(prompt string) (string, error) {
 	return "", nil
 }
 
-// ConversationConfig holds configuration for conversation mode
-type ConversationConfig struct {
-	EnableTelemetry          bool
-	TelemetryPort            int
-	PreferencesDBPath        string
-	PreferencesEncryptionKey string // Optional encryption key for preference store
-
-	// OpenTelemetry configuration
-	EnableOTEL      bool
-	OTELEndpoint    string
-	OTELHeaders     map[string]string
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
-	TraceSampleRate float64
-}
+// Use ConversationConfig from core package to avoid type mismatch
 
 // ConversationComponents holds the conversation mode components
 type ConversationComponents struct {
@@ -76,7 +62,7 @@ type ConversationComponents struct {
 }
 
 // EnableConversationMode integrates the conversation components into the server
-func (s *Server) EnableConversationMode(config ConversationConfig) error {
+func (s *Server) EnableConversationMode(config coreinterfaces.ConversationConfig) error {
 	s.logger.Info().Msg("Enabling conversation mode")
 
 	// Initialize preference store
@@ -171,18 +157,23 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 	// In conversation mode, use CallerAnalyzer instead of StubAnalyzer
 	// This requires the transport to be able to forward prompts to the LLM
 	if transport, ok := s.transport.(types.LLMTransport); ok {
-		// Create adapter to bridge types.LLMTransport to analyze.LLMTransport
-		adapter := &llmTransportAdapter{transport: transport}
-		callerAnalyzer := analyze.NewCallerAnalyzer(adapter, analyze.CallerAnalyzerOpts{
+		// Create direct implementation of analyze.LLMTransport using the existing transport
+		llmTransport := &directLLMTransport{transport: transport}
+
+		// Create core analyzer for orchestrator and MCPClients
+		coreAnalyzer := analyze.NewCallerAnalyzer(llmTransport, analyze.CallerAnalyzerOpts{
 			ToolName:       "chat",
 			SystemPrompt:   "You are an AI assistant helping with code analysis and fixing.",
 			PerCallTimeout: 60 * time.Second,
 		})
-		mcpClients.SetAnalyzer(callerAnalyzer)
 
-		// Also set the analyzer on the tool orchestrator for fixing capabilities
+		// Use analyzer directly - CallerAnalyzer now implements mcptypes.AIAnalyzer correctly
+		mcpClients.Analyzer = coreAnalyzer
+
+		// For tool orchestrator, create minimal bridge to handle TokenUsage type difference
+		bridgeAnalyzer := &coreAnalyzerBridge{analyzer: coreAnalyzer}
 		if s.toolOrchestrator != nil {
-			s.toolOrchestrator.SetAnalyzer(callerAnalyzer)
+			s.toolOrchestrator.SetAnalyzer(bridgeAnalyzer)
 		}
 
 		s.logger.Info().Msg("CallerAnalyzer enabled for conversation mode")
@@ -198,13 +189,11 @@ func (s *Server) EnableConversationMode(config ConversationConfig) error {
 	)
 
 	// Use session manager directly - no adapter needed
-	sessionAdapter := s.sessionManager
 
 	// Use the server's canonical orchestrator instead of creating parallel orchestration
 	// This eliminates the tool registration conflicts and ensures single orchestration path
 	conversationHandler, err := conversation.NewConversationHandler(conversation.ConversationHandlerConfig{
 		SessionManager:     s.sessionManager,
-		SessionAdapter:     sessionAdapter,
 		PreferenceStore:    preferenceStore,
 		PipelineOperations: pipelineOps,
 		ToolOrchestrator:   s.toolOrchestrator, // Use canonical orchestrator

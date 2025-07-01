@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -39,19 +38,25 @@ type DefaultContextSharer struct {
 	mutex        sync.RWMutex
 	logger       zerolog.Logger
 	defaultTTL   time.Duration
+	ctx          context.Context
+	cancel       context.CancelFunc
+	errorRouter  *ErrorRouter // Advanced error routing
 }
 
 // NewDefaultContextSharer creates a new context sharer
 func NewDefaultContextSharer(logger zerolog.Logger) *DefaultContextSharer {
+	ctx, cancel := context.WithCancel(context.Background())
 	sharer := &DefaultContextSharer{
 		contextStore: make(map[string]map[string]*SharedContext),
 		routingRules: getDefaultRoutingRules(),
 		logger:       logger.With().Str("component", "context_sharer").Logger(),
 		defaultTTL:   time.Hour, // Default 1-hour TTL for shared context
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 
 	// Start cleanup goroutine
-	go sharer.cleanupExpiredContext()
+	go sharer.cleanupExpiredContext(ctx)
 
 	return sharer
 }
@@ -60,11 +65,9 @@ func NewDefaultContextSharer(logger zerolog.Logger) *DefaultContextSharer {
 func (c *DefaultContextSharer) ShareContext(ctx context.Context, sessionID string, contextType string, data interface{}) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
 	if c.contextStore[sessionID] == nil {
 		c.contextStore[sessionID] = make(map[string]*SharedContext)
 	}
-
 	sharedCtx := &SharedContext{
 		SessionID:     sessionID,
 		ContextType:   contextType,
@@ -74,15 +77,12 @@ func (c *DefaultContextSharer) ShareContext(ctx context.Context, sessionID strin
 		ExpiresAt:     time.Now().Add(c.defaultTTL),
 		Metadata:      make(map[string]interface{}),
 	}
-
 	c.contextStore[sessionID][contextType] = sharedCtx
-
 	c.logger.Debug().
 		Str("session_id", sessionID).
 		Str("context_type", contextType).
 		Str("created_by", sharedCtx.CreatedByTool).
 		Msg("Shared context saved")
-
 	return nil
 }
 
@@ -90,216 +90,177 @@ func (c *DefaultContextSharer) ShareContext(ctx context.Context, sessionID strin
 func (c *DefaultContextSharer) GetSharedContext(ctx context.Context, sessionID string, contextType string) (interface{}, error) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-
 	sessionStore := c.contextStore[sessionID]
 	if sessionStore == nil {
 		return nil, fmt.Errorf("no shared context found for session %s", sessionID)
 	}
-
-	sharedCtx := sessionStore[contextType]
-	if sharedCtx == nil {
+	sharedCtx, exists := sessionStore[contextType]
+	if !exists {
 		return nil, fmt.Errorf("no shared context of type %s found for session %s", contextType, sessionID)
 	}
-
 	// Check if context has expired
 	if time.Now().After(sharedCtx.ExpiresAt) {
 		delete(sessionStore, contextType)
 		return nil, fmt.Errorf("shared context of type %s has expired for session %s", contextType, sessionID)
 	}
-
-	c.logger.Debug().
-		Str("session_id", sessionID).
-		Str("context_type", contextType).
-		Str("created_by", sharedCtx.CreatedByTool).
-		Msg("Retrieved shared context")
-
 	return sharedCtx.Data, nil
 }
 
-// GetFailureRouting determines which tool should handle a specific failure
-func (c *DefaultContextSharer) GetFailureRouting(ctx context.Context, sessionID string, failure *types.RichError) (string, error) {
-	currentTool := getToolFromContext(ctx)
-
-	c.logger.Debug().
-		Str("session_id", sessionID).
-		Str("current_tool", currentTool).
-		Str("error_code", failure.Code).
-		Str("error_type", failure.Type).
-		Msg("Determining failure routing")
-
-	// Find matching routing rules
-	var bestMatch *FailureRoutingRule
-	bestPriority := 999
-
-	for _, rule := range c.routingRules {
-		if rule.FromTool != currentTool {
-			continue
-		}
-
-		// Check error type match
-		if len(rule.ErrorTypes) > 0 && !contains(rule.ErrorTypes, failure.Type) {
-			continue
-		}
-
-		// Check error code match
-		if len(rule.ErrorCodes) > 0 && !contains(rule.ErrorCodes, failure.Code) {
-			continue
-		}
-
-		// Check additional conditions
-		if !c.matchesConditions(ctx, sessionID, failure, rule.Conditions) {
-			continue
-		}
-
-		// Select rule with highest priority (lowest number)
-		if rule.Priority < bestPriority {
-			bestPriority = rule.Priority
-			bestMatch = &rule
-		}
+// ClearContext clears all shared context for a session
+func (c *DefaultContextSharer) ClearContext(ctx context.Context, sessionID string) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	if _, exists := c.contextStore[sessionID]; exists {
+		delete(c.contextStore, sessionID)
+		c.logger.Debug().
+			Str("session_id", sessionID).
+			Msg("Cleared all shared context for session")
 	}
-
-	if bestMatch == nil {
-		return "", fmt.Errorf("no routing rule found for error type %s code %s from tool %s",
-			failure.Type, failure.Code, currentTool)
-	}
-
-	c.logger.Info().
-		Str("session_id", sessionID).
-		Str("from_tool", currentTool).
-		Str("to_tool", bestMatch.ToTool).
-		Str("rule_description", bestMatch.Description).
-		Int("priority", bestMatch.Priority).
-		Msg("Found failure routing")
-
-	return bestMatch.ToTool, nil
+	return nil
 }
 
-// matchesConditions checks if additional routing conditions are met
-func (c *DefaultContextSharer) matchesConditions(ctx context.Context, sessionID string, failure *types.RichError, conditions map[string]interface{}) bool {
-	if len(conditions) == 0 {
-		return true
+// Close gracefully shuts down the context sharer
+func (c *DefaultContextSharer) Close() error {
+	c.cancel()
+	return nil
+}
+
+// SetErrorRouter sets the error router for advanced routing
+func (c *DefaultContextSharer) SetErrorRouter(router *ErrorRouter) {
+	c.errorRouter = router
+}
+
+// RouteError routes an error using the error router
+func (c *DefaultContextSharer) RouteError(ctx context.Context, sessionID, sourceTool, errorType, errorCode, errorMessage string) (*RoutingDecision, error) {
+	if c.errorRouter == nil {
+		return nil, fmt.Errorf("error router not configured")
 	}
 
-	// Check severity condition
-	if requiredSeverity, ok := conditions["min_severity"]; ok {
-		if !c.severityMeetsThreshold(failure.Severity, requiredSeverity.(string)) {
-			return false
+	errorCtx := &ErrorContext{
+		SessionID:      sessionID,
+		SourceTool:     sourceTool,
+		ErrorType:      errorType,
+		ErrorCode:      errorCode,
+		ErrorMessage:   errorMessage,
+		Timestamp:      time.Now(),
+		ExecutionTrace: []string{sourceTool},
+	}
+
+	// Get tool context from shared context
+	if toolData, err := c.GetSharedContext(ctx, sessionID, fmt.Sprintf("tool_%s", sourceTool)); err == nil {
+		if toolContext, ok := toolData.(map[string]interface{}); ok {
+			errorCtx.ToolContext = toolContext
 		}
 	}
 
-	// Check if specific shared context is available
-	if requiredContext, ok := conditions["requires_context"]; ok {
-		_, err := c.GetSharedContext(ctx, sessionID, requiredContext.(string))
-		if err != nil {
-			return false
+	return c.errorRouter.RouteError(ctx, errorCtx)
+}
+
+// getToolFromContext extracts tool name from context
+func getToolFromContext(ctx context.Context) string {
+	// Check for tool name in context values
+	if toolName := ctx.Value("tool_name"); toolName != nil {
+		if name, ok := toolName.(string); ok {
+			return name
 		}
 	}
 
-	return true
-}
-
-// severityMeetsThreshold checks if error severity meets minimum threshold
-func (c *DefaultContextSharer) severityMeetsThreshold(severity, threshold string) bool {
-	severityLevels := map[string]int{
-		"Critical": 4,
-		"High":     3,
-		"Medium":   2,
-		"Low":      1,
+	// Check for operation name in context values
+	if opName := ctx.Value("operation"); opName != nil {
+		if name, ok := opName.(string); ok {
+			return name
+		}
 	}
 
-	currentLevel := severityLevels[severity]
-	thresholdLevel := severityLevels[threshold]
+	// Check for MCP tool identifier
+	if mcpTool := ctx.Value("mcp_tool"); mcpTool != nil {
+		if name, ok := mcpTool.(string); ok {
+			return name
+		}
+	}
 
-	return currentLevel >= thresholdLevel
+	return "unknown"
 }
 
-// cleanupExpiredContext periodically removes expired context
-func (c *DefaultContextSharer) cleanupExpiredContext() {
-	ticker := time.NewTicker(5 * time.Minute)
+// getDefaultRoutingRules returns default failure routing rules
+func getDefaultRoutingRules() []FailureRoutingRule {
+	return []FailureRoutingRule{
+		{
+			FromTool:    "build",
+			ErrorTypes:  []string{"dockerfile_error", "dependency_error"},
+			ErrorCodes:  []string{"BUILD_FAILED", "DEPENDENCY_RESOLUTION_FAILED"},
+			ToTool:      "analyze",
+			Priority:    1,
+			Description: "Route build failures to analyzer for deeper inspection",
+			Conditions:  map[string]interface{}{"retry_count": 0},
+		},
+		{
+			FromTool:    "deploy",
+			ErrorTypes:  []string{"resource_error", "validation_error"},
+			ErrorCodes:  []string{"DEPLOY_FAILED", "VALIDATION_FAILED"},
+			ToTool:      "generate",
+			Priority:    1,
+			Description: "Route deployment failures back to manifest generation",
+			Conditions:  map[string]interface{}{"can_regenerate": true},
+		},
+		{
+			FromTool:    "scan",
+			ErrorTypes:  []string{"security_issue"},
+			ErrorCodes:  []string{"VULNERABILITY_FOUND"},
+			ToTool:      "build",
+			Priority:    2,
+			Description: "Route security issues to build for base image updates",
+			Conditions:  map[string]interface{}{"severity": "high"},
+		},
+	}
+}
+
+// cleanupExpiredContext periodically removes expired shared context
+func (c *DefaultContextSharer) cleanupExpiredContext(ctx context.Context) {
+	ticker := time.NewTicker(time.Minute * 15) // Cleanup every 15 minutes
 	defer ticker.Stop()
 
-	for range ticker.C {
-		c.mutex.Lock()
-		now := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.mutex.Lock()
+			now := time.Now()
+			expiredSessions := []string{}
 
-		for sessionID, sessionStore := range c.contextStore {
-			for contextType, sharedCtx := range sessionStore {
-				if now.After(sharedCtx.ExpiresAt) {
+			for sessionID, sessionStore := range c.contextStore {
+				expiredTypes := []string{}
+				for contextType, sharedCtx := range sessionStore {
+					if now.After(sharedCtx.ExpiresAt) {
+						expiredTypes = append(expiredTypes, contextType)
+					}
+				}
+
+				// Remove expired context types
+				for _, contextType := range expiredTypes {
 					delete(sessionStore, contextType)
 					c.logger.Debug().
 						Str("session_id", sessionID).
 						Str("context_type", contextType).
 						Msg("Cleaned up expired shared context")
 				}
+
+				// If session has no remaining context, mark for removal
+				if len(sessionStore) == 0 {
+					expiredSessions = append(expiredSessions, sessionID)
+				}
 			}
 
-			// Remove empty session stores
-			if len(sessionStore) == 0 {
+			// Remove empty sessions
+			for _, sessionID := range expiredSessions {
 				delete(c.contextStore, sessionID)
+				c.logger.Debug().
+					Str("session_id", sessionID).
+					Msg("Cleaned up empty session context store")
 			}
-		}
 
-		c.mutex.Unlock()
-	}
-}
-
-// getDefaultRoutingRules returns the default failure routing rules
-func getDefaultRoutingRules() []FailureRoutingRule {
-	return []FailureRoutingRule{
-		{
-			FromTool:    "atomic_build_image",
-			ErrorTypes:  []string{"dockerfile_error", "dependency_error"},
-			ToTool:      "generate_dockerfile",
-			Priority:    1,
-			Description: "Route Dockerfile build failures to Dockerfile generation",
-		},
-		{
-			FromTool:    "atomic_deploy_kubernetes",
-			ErrorTypes:  []string{"manifest_error", "validation_error"},
-			ToTool:      "generate_manifests_atomic",
-			Priority:    1,
-			Description: "Route manifest deployment failures to manifest generation",
-		},
-		{
-			FromTool:    "atomic_deploy_kubernetes",
-			ErrorTypes:  []string{"image_pull_error"},
-			ToTool:      "atomic_build_image",
-			Priority:    2,
-			Description: "Route image pull failures back to image building",
-		},
-		{
-			FromTool:    "atomic_push_image",
-			ErrorTypes:  []string{"registry_error", "authentication_error"},
-			ErrorCodes:  []string{"REGISTRY_AUTH_FAILED", "REGISTRY_UNREACHABLE"},
-			ToTool:      "atomic_build_image",
-			Priority:    2,
-			Description: "Route registry push failures back to build for retry",
-		},
-		{
-			FromTool:    "scan_image_security_atomic",
-			ErrorTypes:  []string{"vulnerability_error"},
-			ToTool:      "atomic_build_image",
-			Priority:    3,
-			Description: "Route critical security failures back to rebuilding",
-			Conditions:  map[string]interface{}{"min_severity": "High"},
-		},
-	}
-}
-
-// getToolFromContext extracts tool name from context
-func getToolFromContext(ctx context.Context) string {
-	if tool := ctx.Value("tool_name"); tool != nil {
-		return tool.(string)
-	}
-	return "unknown"
-}
-
-// contains checks if a slice contains a string
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
+			c.mutex.Unlock()
 		}
 	}
-	return false
 }

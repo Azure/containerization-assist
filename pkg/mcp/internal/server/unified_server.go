@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"go.etcd.io/bbolt"
 )
@@ -93,15 +94,10 @@ func NewUnifiedMCPServer(
 			return nil, fmt.Errorf("failed to create preference store: %w", err)
 		}
 
-		// Create conversation adapter for MCP tool orchestrator
-		conversationOrchestrator := &ConversationOrchestratorAdapter{
-			toolOrchestrator: toolOrchestrator,
-			logger:           logger,
-		}
-
+		// Use the tool orchestrator directly (no adapter needed with simplified interface)
 		server.promptManager = conversation.NewPromptManager(conversation.PromptManagerConfig{
 			SessionManager:   sessionManager,
-			ToolOrchestrator: conversationOrchestrator,
+			ToolOrchestrator: toolOrchestrator, // Direct use - implements core.Orchestrator
 			PreferenceStore:  preferenceStore,
 			Logger:           logger,
 		})
@@ -204,7 +200,7 @@ func (s *UnifiedMCPServer) ExecuteTool(
 
 	case s.isAtomicTool(toolName):
 		// Atomic tools are available in all modes
-		return s.toolOrchestrator.ExecuteTool(ctx, toolName, args, nil)
+		return s.toolOrchestrator.ExecuteTool(ctx, toolName, args)
 
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
@@ -469,10 +465,14 @@ func (s *UnifiedMCPServer) buildInputSchema(metadata *orchestration.ToolMetadata
 	}
 
 	// Add tool-specific properties from metadata
-	if params, ok := metadata.Parameters["fields"].(map[string]interface{}); ok {
-		properties := schema["properties"].(map[string]interface{})
-		for fieldName, fieldInfo := range params {
-			properties[fieldName] = fieldInfo
+	// Since Parameters is now map[string]string, we need to handle it differently
+	if fieldsJSON, ok := metadata.Parameters["fields"]; ok {
+		var fields map[string]interface{}
+		if err := json.Unmarshal([]byte(fieldsJSON), &fields); err == nil {
+			properties := schema["properties"].(map[string]interface{})
+			for fieldName, fieldInfo := range fields {
+				properties[fieldName] = fieldInfo
+			}
 		}
 	}
 
@@ -496,37 +496,11 @@ func (dsm *directSessionManager) GetSession(sessionID string) (interface{}, erro
 	return dsm.sessionManager.GetOrCreateSession(sessionID)
 }
 
-func (dsm *directSessionManager) UpdateSession(session interface{}) error {
-	// Direct session updates are handled internally by the session manager
-	// The orchestration layer doesn't need to explicitly update sessions
-	return nil
+func (dsm *directSessionManager) UpdateSession(sessionID string, updater func(interface{})) error {
+	return dsm.sessionManager.UpdateSession(sessionID, updater)
 }
 
-// ConversationOrchestratorAdapter adapts MCPToolOrchestrator to conversation.ToolOrchestrator interface
-type ConversationOrchestratorAdapter struct {
-	toolOrchestrator *orchestration.MCPToolOrchestrator
-	logger           zerolog.Logger
-}
-
-func (adapter *ConversationOrchestratorAdapter) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
-	// Execute tool using MCP orchestrator
-	// The session can be either a string sessionID or a session object
-	result, err := adapter.toolOrchestrator.ExecuteTool(ctx, toolName, args, session)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return result directly
-	return result, nil
-}
-
-func (adapter *ConversationOrchestratorAdapter) ValidateToolArgs(toolName string, args interface{}) error {
-	return adapter.toolOrchestrator.ValidateToolArgs(toolName, args)
-}
-
-func (adapter *ConversationOrchestratorAdapter) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
-	return adapter.toolOrchestrator.GetToolMetadata(toolName)
-}
+// ConversationOrchestratorAdapter removed - no longer needed with simplified interface
 
 // RegistryAdapter adapts MCPToolRegistry to the types.ToolRegistry interface
 type RegistryAdapter struct {
@@ -575,14 +549,14 @@ func (adapter *RegistryAdapter) List() []string {
 	return adapter.registry.ListTools()
 }
 
-func (adapter *RegistryAdapter) GetMetadata() map[string]mcptypes.ToolMetadata {
+func (adapter *RegistryAdapter) GetMetadata() map[string]core.ToolMetadata {
 	toolNames := adapter.registry.ListTools()
-	metadata := make(map[string]mcptypes.ToolMetadata)
+	metadata := make(map[string]core.ToolMetadata)
 
 	for _, name := range toolNames {
 		if meta, err := adapter.registry.GetToolMetadata(name); err == nil {
-			// Convert from orchestration.ToolMetadata to mcptypes.ToolMetadata
-			metadata[name] = mcptypes.ToolMetadata{
+			// Convert from orchestration.ToolMetadata to core.ToolMetadata
+			metadata[name] = core.ToolMetadata{
 				Name:         meta.Name,
 				Description:  meta.Description,
 				Version:      meta.Version,
@@ -590,7 +564,7 @@ func (adapter *RegistryAdapter) GetMetadata() map[string]mcptypes.ToolMetadata {
 				Dependencies: meta.Dependencies,
 				Capabilities: meta.Capabilities,
 				Requirements: meta.Requirements,
-				Parameters:   convertParametersMapToString(meta.Parameters),
+				Parameters:   meta.Parameters,
 				Examples:     convertExamplesToTypes(meta.Examples),
 			}
 		}

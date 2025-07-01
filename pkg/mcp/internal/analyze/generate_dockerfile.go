@@ -8,9 +8,10 @@ import (
 	"strings"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -91,11 +92,11 @@ type AtomicGenerateDockerfileTool struct {
 	logger              zerolog.Logger
 	validator           *coredocker.Validator
 	hadolintValidator   *coredocker.HadolintValidator
-	sessionManager      mcptypes.ToolSessionManager
+	sessionManager      core.ToolSessionManager
 	templateIntegration *TemplateIntegration
 }
 
-func NewAtomicGenerateDockerfileTool(sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateDockerfileTool {
+func NewAtomicGenerateDockerfileTool(sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateDockerfileTool {
 	return &AtomicGenerateDockerfileTool{
 		logger:              logger,
 		validator:           coredocker.NewValidator(logger),
@@ -145,21 +146,23 @@ func (t *AtomicGenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Ge
 	return response, nil
 }
 
-func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileArgs) (*sessiontypes.SessionState, error) {
+// getSessionState retrieves and validates the session state
+func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileArgs) (*core.SessionState, error) {
 	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
-		return nil, types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("failed to get session %s: %v", args.SessionID, err), "session_error")
+		return nil, fmt.Errorf("failed to get session %s: %w", args.SessionID, err)
 	}
 
-	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	sessionState, ok := sessionInterface.(*sessiontypes.SessionState)
 	if !ok {
-		return nil, types.NewRichError("INTERNAL_ERROR", "session type assertion failed", "type_error")
+		return nil, fmt.Errorf("invalid session type: expected *session.SessionState, got %T", sessionInterface)
 	}
 
-	return session, nil
+	return sessionState.ToCoreSessionState(), nil
 }
 
-func (t *AtomicGenerateDockerfileTool) selectTemplateFromSession(args GenerateDockerfileArgs, session *sessiontypes.SessionState) string {
+// selectTemplateFromSession determines template name from session analysis or user input
+func (t *AtomicGenerateDockerfileTool) selectTemplateFromSession(args GenerateDockerfileArgs, session *core.SessionState) string {
 	templateName := args.Template
 
 	if templateName == "" {
@@ -171,10 +174,13 @@ func (t *AtomicGenerateDockerfileTool) selectTemplateFromSession(args GenerateDo
 	return templateName
 }
 
-func (t *AtomicGenerateDockerfileTool) autoSelectTemplate(session *sessiontypes.SessionState) string {
+// autoSelectTemplate automatically selects template based on repository analysis
+func (t *AtomicGenerateDockerfileTool) autoSelectTemplate(session *core.SessionState) string {
 	var repositoryData map[string]interface{}
-	if session.ScanSummary != nil {
-		repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
+	if session.Metadata != nil {
+		if scanSummary, exists := session.Metadata["scan_summary"].(map[string]interface{}); exists {
+			repositoryData = scanSummary
+		}
 	}
 
 	if len(repositoryData) > 0 {
@@ -190,16 +196,18 @@ func (t *AtomicGenerateDockerfileTool) autoSelectTemplate(session *sessiontypes.
 	return "dockerfile-python"
 }
 
-// handleDryRun processes dry-run mode
-func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args GenerateDockerfileArgs, session *sessiontypes.SessionState, response *GenerateDockerfileResult) (*GenerateDockerfileResult, error) {
+// handleDryRun processes dry-run mode and returns the preview response
+func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args GenerateDockerfileArgs, session *core.SessionState, response *GenerateDockerfileResult) (*GenerateDockerfileResult, error) {
 	var repositoryData map[string]interface{}
-	if session.ScanSummary != nil {
-		repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
+	if session.Metadata != nil {
+		if scanSummary, exists := session.Metadata["scan_summary"].(map[string]interface{}); exists {
+			repositoryData = scanSummary
+		}
 	}
 
 	content, err := t.previewDockerfile(templateName, args, repositoryData)
 	if err != nil {
-		return nil, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to preview Dockerfile: %v", err), "generation_error")
+		return nil, fmt.Errorf("failed to preview Dockerfile with template %s: %w", templateName, err)
 	}
 
 	response.Content = content
@@ -211,17 +219,20 @@ func (t *AtomicGenerateDockerfileTool) handleDryRun(templateName string, args Ge
 	return response, nil
 }
 
-func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName string, args GenerateDockerfileArgs, session *sessiontypes.SessionState, response *GenerateDockerfileResult) error {
-	// Write Dockerfile to session workspace directory
+// generateDockerfileContent generates the actual Dockerfile content and metadata
+func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName string, args GenerateDockerfileArgs, session *core.SessionState, response *GenerateDockerfileResult) error {
+	// Use session workspace directory for Dockerfile
 	dockerfilePath := filepath.Join(session.WorkspaceDir, "Dockerfile")
 	repositoryData := make(map[string]interface{})
-	if session.ScanSummary != nil {
-		repositoryData = sessiontypes.ConvertScanSummaryToRepositoryInfo(session.ScanSummary)
+	if session.Metadata != nil {
+		if scanSummary, exists := session.Metadata["scan_summary"].(map[string]interface{}); exists {
+			repositoryData = scanSummary
+		}
 	}
 
 	content, err := t.generateDockerfile(templateName, dockerfilePath, args, repositoryData)
 	if err != nil {
-		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to generate Dockerfile: %v", err), "generation_error")
+		return fmt.Errorf("failed to generate Dockerfile with template %s at path %s: %w", templateName, dockerfilePath, err)
 	}
 
 	response.Content = content
@@ -324,7 +335,7 @@ func (t *AtomicGenerateDockerfileTool) ExecuteWithContext(serverCtx *server.Cont
 func (t *AtomicGenerateDockerfileTool) selectTemplate(repoAnalysis map[string]interface{}) (string, error) {
 	language, ok := repoAnalysis["language"].(string)
 	if !ok {
-		return "", types.NewRichError("INVALID_ARGUMENTS", "no language detected in repository analysis", "missing_language")
+		return "", fmt.Errorf("error")
 	}
 
 	var configFiles []string
@@ -359,7 +370,7 @@ func (t *AtomicGenerateDockerfileTool) selectTemplate(repoAnalysis map[string]in
 	templateEngine := coredocker.NewTemplateEngine(t.logger)
 	templateName, _, err := templateEngine.SuggestTemplate(language, framework, dependencies, configFiles)
 	if err != nil {
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("template selection failed: %v", err), "template_error")
+		return "", fmt.Errorf("error")
 	}
 
 	t.logger.Info().
@@ -483,7 +494,7 @@ func (t *AtomicGenerateDockerfileTool) previewDockerfile(templateName string, ar
 	// Create a temporary directory for preview
 	tempDir, err := os.MkdirTemp("", "dockerfile-preview-*")
 	if err != nil {
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create temp directory: %v", err), "filesystem_error")
+		return "", fmt.Errorf("error")
 	}
 	defer func() {
 		if err := os.RemoveAll(tempDir); err != nil {
@@ -495,14 +506,14 @@ func (t *AtomicGenerateDockerfileTool) previewDockerfile(templateName string, ar
 	// Generate from template
 	result, err := templateEngine.GenerateFromTemplate(templateName, tempDir)
 	if err != nil {
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to generate from template: %v", err), "template_error")
+		return "", fmt.Errorf("error")
 	}
 
 	if !result.Success {
 		if result.Error != nil {
-			return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("template generation failed: %s - %s", result.Error.Type, result.Error.Message), "template_error")
+			return "", fmt.Errorf("error")
 		}
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", "template generation failed with unknown error", "template_error")
+		return "", fmt.Errorf("error")
 	}
 
 	dockerfileContent := result.Dockerfile
@@ -517,26 +528,26 @@ func (t *AtomicGenerateDockerfileTool) generateDockerfile(templateName, dockerfi
 
 	result, err := templateEngine.GenerateFromTemplate(templateName, targetDir)
 	if err != nil {
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to generate from template: %v", err), "template_error")
+		return "", fmt.Errorf("error")
 	}
 
 	if !result.Success {
 		if result.Error != nil {
-			return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("template generation failed: %s - %s", result.Error.Type, result.Error.Message), "template_error")
+			return "", fmt.Errorf("error")
 		}
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", "template generation failed with unknown error", "template_error")
+		return "", fmt.Errorf("error")
 	}
 
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to read generated Dockerfile: %v", err), "file_error")
+		return "", fmt.Errorf("error")
 	}
 
 	dockerfileContent := string(content)
 	dockerfileContent = t.applyCustomizations(dockerfileContent, args, repoAnalysis)
 
 	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0o644); err != nil {
-		return "", types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to write customized Dockerfile: %v", err), "file_error")
+		return "", fmt.Errorf("error")
 	}
 
 	return dockerfileContent, nil
@@ -1113,8 +1124,8 @@ func (t *AtomicGenerateDockerfileTool) generateOptimizationContext(content strin
 	return ctx
 }
 
-func (t *AtomicGenerateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicGenerateDockerfileTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "generate_dockerfile_atomic",
 		Description: "Generates optimized Dockerfiles based on repository analysis with language-specific templates and best practices",
 		Version:     "1.0.0",
@@ -1145,7 +1156,7 @@ func (t *AtomicGenerateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 			"port":           "int - Application port (default: language-specific)",
 			"dry_run":        "bool - Generate preview without creating files",
 		},
-		Examples: []mcptypes.ToolExample{
+		Examples: []core.ToolExample{
 			{
 				Name:        "Auto-detected Node.js Application",
 				Description: "Generate Dockerfile for a Node.js application with auto-detection",
@@ -1190,16 +1201,14 @@ func (t *AtomicGenerateDockerfileTool) Validate(ctx context.Context, args interf
 			var err error
 			dockerfileArgs, err = convertToGenerateDockerfileArgs(mapArgs)
 			if err != nil {
-				return types.NewRichError("CONVERSION_ERROR", fmt.Sprintf("failed to convert arguments: %v", err), types.ErrTypeValidation)
+				return fmt.Errorf("failed to convert arguments to GenerateDockerfileArgs: %w", err)
 			}
 		} else {
-			return types.NewRichError("INVALID_ARGUMENTS", "invalid argument type for generate_dockerfile_atomic", types.ErrTypeValidation)
+			return fmt.Errorf("invalid argument type: expected GenerateDockerfileArgs or map[string]interface{}, got %T", args)
 		}
 	}
 
-	if dockerfileArgs.SessionID == "" {
-		return types.NewRichError("MISSING_REQUIRED_FIELD", "session_id is required", types.ErrTypeValidation)
-	}
+	// Session ID is now optional - will be auto-generated if empty
 
 	if dockerfileArgs.Optimization != "" {
 		validOptimizations := []string{"size", "security", "speed", "balanced"}
@@ -1211,7 +1220,7 @@ func (t *AtomicGenerateDockerfileTool) Validate(ctx context.Context, args interf
 			}
 		}
 		if !valid {
-			return types.NewRichError("INVALID_OPTIMIZATION", fmt.Sprintf("optimization must be one of: %v, got: %s", validOptimizations, dockerfileArgs.Optimization), types.ErrTypeValidation)
+			return fmt.Errorf("invalid optimization parameter '%s': must be one of [size, security, speed, balanced]", dockerfileArgs.Optimization)
 		}
 	}
 
@@ -1228,10 +1237,10 @@ func (t *AtomicGenerateDockerfileTool) Execute(ctx context.Context, args interfa
 	case map[string]interface{}:
 		dockerfileArgs, err = convertToGenerateDockerfileArgs(a)
 		if err != nil {
-			return nil, types.NewRichError("CONVERSION_ERROR", fmt.Sprintf("failed to convert arguments: %v", err), types.ErrTypeValidation)
+			return nil, fmt.Errorf("error")
 		}
 	default:
-		return nil, types.NewRichError("INVALID_ARGUMENTS", "invalid argument type for generate_dockerfile_atomic", types.ErrTypeValidation)
+		return nil, fmt.Errorf("error")
 	}
 
 	return t.ExecuteTyped(ctx, dockerfileArgs)

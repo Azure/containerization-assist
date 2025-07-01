@@ -3,8 +3,8 @@ package core
 import (
 	"time"
 
+	coreinterfaces "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 )
@@ -12,42 +12,65 @@ import (
 // ServerStats provides comprehensive server statistics
 type ServerStats struct {
 	Uptime          time.Duration                                 `json:"uptime"`
-	Sessions        *session.SessionManagerStats                  `json:"sessions"`
+	Sessions        *coreinterfaces.SessionManagerStats           `json:"sessions"`
 	Workspace       *utils.WorkspaceStats                         `json:"workspace"`
 	CircuitBreakers map[string]*orchestration.CircuitBreakerStats `json:"circuit_breakers"`
 	Transport       string                                        `json:"transport"`
 }
 
 // GetStats returns server statistics
-func (s *Server) GetStats() *ServerStats {
+func (s *Server) GetStats() *coreinterfaces.ServerStats {
 	sessionStats := s.sessionManager.GetStats()
 	workspaceStats := s.workspaceManager.GetStats()
-	circuitStats := s.circuitBreakers.GetStats()
 
-	return &ServerStats{
-		Uptime:          time.Since(s.startTime),
-		Sessions:        sessionStats,
-		Workspace:       workspaceStats,
-		CircuitBreakers: circuitStats,
-		Transport:       s.config.TransportType,
+	return &coreinterfaces.ServerStats{
+		Transport: s.config.TransportType,
+		Sessions: &coreinterfaces.SessionManagerStats{
+			ActiveSessions:    sessionStats.ActiveSessions,
+			TotalSessions:     sessionStats.TotalSessions,
+			FailedSessions:    sessionStats.FailedSessions,
+			ExpiredSessions:   sessionStats.ExpiredSessions,
+			SessionsWithJobs:  sessionStats.SessionsWithJobs,
+			AverageSessionAge: sessionStats.AverageSessionAge,
+			SessionErrors:     sessionStats.SessionErrors,
+			TotalDiskUsage:    sessionStats.TotalDiskUsage,
+			ServerStartTime:   sessionStats.ServerStartTime,
+		},
+		Workspace: &coreinterfaces.WorkspaceStats{
+			TotalDiskUsage: workspaceStats.TotalDiskUsage,
+			SessionCount:   workspaceStats.TotalSessions,
+			TotalFiles:     0, // Not available in utils.WorkspaceStats
+			DiskLimit:      workspaceStats.TotalDiskLimit,
+		},
+		Uptime:    time.Since(s.startTime),
+		StartTime: s.startTime,
 	}
 }
 
 // GetWorkspaceStats returns workspace statistics
-func (s *Server) GetWorkspaceStats() types.WorkspaceStats {
+func (s *Server) GetWorkspaceStats() *coreinterfaces.WorkspaceStats {
 	stats := s.workspaceManager.GetStats()
-	return types.WorkspaceStats{
+	return &coreinterfaces.WorkspaceStats{
 		TotalDiskUsage: stats.TotalDiskUsage,
 		SessionCount:   stats.TotalSessions,
+		TotalFiles:     0, // Not available in utils.WorkspaceStats
+		DiskLimit:      stats.TotalDiskLimit,
 	}
 }
 
 // GetSessionManagerStats returns session manager statistics
-func (s *Server) GetSessionManagerStats() types.SessionManagerStats {
+func (s *Server) GetSessionManagerStats() *coreinterfaces.SessionManagerStats {
 	stats := s.sessionManager.GetStats()
-	return types.SessionManagerStats{
-		ActiveSessions: stats.ActiveSessions,
-		TotalSessions:  stats.TotalSessions,
+	return &coreinterfaces.SessionManagerStats{
+		ActiveSessions:    stats.ActiveSessions,
+		TotalSessions:     stats.TotalSessions,
+		FailedSessions:    stats.FailedSessions,
+		ExpiredSessions:   stats.ExpiredSessions,
+		SessionsWithJobs:  stats.SessionsWithJobs,
+		AverageSessionAge: stats.AverageSessionAge,
+		SessionErrors:     stats.SessionErrors,
+		TotalDiskUsage:    stats.TotalDiskUsage,
+		ServerStartTime:   stats.ServerStartTime,
 	}
 }
 

@@ -7,26 +7,20 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"
 )
+
+// mcp import removed - using mcptypes
 
 ///////////////////////////////////////////////////////////////////////////////
 // Contracts
 ///////////////////////////////////////////////////////////////////////////////
 
-// UnifiedTool represents the unified interface for all MCP tools (matches mcp.Tool)
-type UnifiedTool interface {
-	Execute(ctx context.Context, args interface{}) (interface{}, error)
-	GetMetadata() mcptypes.ToolMetadata
-	Validate(ctx context.Context, args interface{}) error
-}
-
 type ExecutableTool[TArgs, TResult any] interface {
-	UnifiedTool
+	core.Tool
 	PreValidate(ctx context.Context, args TArgs) error
 }
 
@@ -35,7 +29,7 @@ type ExecutableTool[TArgs, TResult any] interface {
 ///////////////////////////////////////////////////////////////////////////////
 
 type ToolRegistration struct {
-	Tool         UnifiedTool
+	Tool         core.Tool
 	InputSchema  map[string]any
 	OutputSchema map[string]any
 	Handler      func(ctx context.Context, args json.RawMessage) (interface{}, error)
@@ -64,11 +58,11 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	defer reg.mu.Unlock()
 
 	if reg.frozen {
-		return types.NewRichError("INVALID_REQUEST", "tool registry frozen", "system_error")
+		return fmt.Errorf("registry operation failed")
 	}
 	metadata := t.GetMetadata()
 	if _, dup := reg.tools[metadata.Name]; dup {
-		return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("tool %s already registered", metadata.Name), "validation_error")
+		return fmt.Errorf("registry operation failed")
 	}
 
 	// Use invopop/jsonschema which properly handles array items
@@ -106,7 +100,7 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 		Handler: func(ctx context.Context, raw json.RawMessage) (interface{}, error) {
 			var args TArgs
 			if err := json.Unmarshal(raw, &args); err != nil {
-				return nil, types.NewRichError("INVALID_ARGUMENTS", "unmarshal args: "+err.Error(), "validation_error")
+				return nil, fmt.Errorf("registry operation failed")
 			}
 			if err := t.PreValidate(ctx, args); err != nil {
 				return nil, err
@@ -184,19 +178,19 @@ func (r *ToolRegistry) IsFrozen() bool {
 	return r.frozen
 }
 
-type ProgressCallback func(stage string, percent float64, message string)
+type ToolProgressCallback func(stage string, percent float64, message string)
 
 // LongRunningTool indicates a tool can stream progress updates.
 type LongRunningTool interface {
 	ExecuteWithProgress(ctx context.Context, args interface{},
-		cb ProgressCallback) (interface{}, error)
+		cb ToolProgressCallback) (interface{}, error)
 }
 
 // ExecuteTool runs a registered tool by name with raw JSON arguments.
 func (r *ToolRegistry) ExecuteTool(ctx context.Context, name string, raw json.RawMessage) (interface{}, error) {
 	reg, ok := r.GetTool(name)
 	if !ok {
-		return nil, types.NewRichError("INVALID_REQUEST", fmt.Sprintf("tool %s not found", name), "validation_error")
+		return nil, fmt.Errorf("registry operation failed")
 	}
 
 	r.logger.Debug().Str("tool", name).Msg("executing tool")

@@ -43,13 +43,6 @@ func TestAtomicAnalyzeRepositoryTool_ErrorHandling(t *testing.T) {
 			errorMsg string
 		}{
 			{
-				name: "missing_session_id",
-				args: AtomicAnalyzeRepositoryArgs{
-					RepoURL: "https://github.com/example/repo",
-				},
-				errorMsg: "SessionID is required",
-			},
-			{
 				name: "missing_repo_url",
 				args: AtomicAnalyzeRepositoryArgs{
 					BaseToolArgs: types.BaseToolArgs{
@@ -57,16 +50,6 @@ func TestAtomicAnalyzeRepositoryTool_ErrorHandling(t *testing.T) {
 					},
 				},
 				errorMsg: "RepoURL is required",
-			},
-			{
-				name: "empty_session_id",
-				args: AtomicAnalyzeRepositoryArgs{
-					BaseToolArgs: types.BaseToolArgs{
-						SessionID: "",
-					},
-					RepoURL: "https://github.com/example/repo",
-				},
-				errorMsg: "SessionID is required",
 			},
 			{
 				name: "empty_repo_url",

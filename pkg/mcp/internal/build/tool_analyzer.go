@@ -4,13 +4,10 @@ package build
 type ToolAnalyzer interface {
 	// AnalyzeBuildFailure analyzes build operation failures
 	AnalyzeBuildFailure(sessionID, imageName string) error
-
 	// AnalyzePushFailure analyzes push operation failures
 	AnalyzePushFailure(imageRef, sessionID string) error
-
 	// AnalyzePullFailure analyzes pull operation failures
 	AnalyzePullFailure(imageRef, sessionID string) error
-
 	// AnalyzeTagFailure analyzes tag operation failures
 	AnalyzeTagFailure(sourceImage, targetImage, sessionID string) error
 }

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ func TestNewPromptManager(t *testing.T) {
 	defer sessionMgr.Stop()
 
 	// Create mock tool orchestrator
-	toolOrchestrator := &MockInternalToolOrchestrator{}
+	toolOrchestrator := &MockToolExecutor{}
 
 	config := PromptManagerConfig{
 		SessionManager:   sessionMgr,
@@ -80,7 +80,7 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 	defer sessionMgr.Stop()
 
 	// Create mock tool orchestrator
-	toolOrchestrator := &MockInternalToolOrchestrator{}
+	toolOrchestrator := &MockToolExecutor{}
 
 	config := PromptManagerConfig{
 		SessionManager:   sessionMgr,
@@ -105,10 +105,10 @@ func TestPromptManagerProcessPrompt(t *testing.T) {
 	assert.NotEmpty(t, response.Message)
 }
 
-// MockInternalToolOrchestrator implements InternalToolOrchestrator interface for testing
-type MockInternalToolOrchestrator struct{}
+// MockToolExecutor implements core.ToolOrchestrationExecutor interface for testing
+type MockToolExecutor struct{}
 
-func (m *MockInternalToolOrchestrator) ExecuteTool(ctx context.Context, toolName string, args interface{}, session interface{}) (interface{}, error) {
+func (m *MockToolExecutor) ExecuteTool(ctx context.Context, toolName string, args interface{}) (interface{}, error) {
 	return map[string]interface{}{
 		"tool":     toolName,
 		"success":  true,
@@ -117,12 +117,16 @@ func (m *MockInternalToolOrchestrator) ExecuteTool(ctx context.Context, toolName
 	}, nil
 }
 
-func (m *MockInternalToolOrchestrator) ValidateToolArgs(toolName string, args interface{}) error {
+func (m *MockToolExecutor) RegisterTool(name string, tool core.Tool) error {
 	return nil
 }
 
-func (m *MockInternalToolOrchestrator) GetToolMetadata(toolName string) (*mcptypes.ToolMetadata, error) {
-	return &mcptypes.ToolMetadata{
+func (m *MockToolExecutor) ValidateToolArgs(toolName string, args interface{}) error {
+	return nil
+}
+
+func (m *MockToolExecutor) GetToolMetadata(toolName string) (*core.ToolMetadata, error) {
+	return &core.ToolMetadata{
 		Name:        toolName,
 		Description: "Mock tool for testing",
 		Version:     "1.0.0",
@@ -153,7 +157,7 @@ func TestPromptManagerErrorHandling(t *testing.T) {
 	defer sessionMgr.Stop()
 
 	// Create mock tool orchestrator
-	toolOrchestrator := &MockInternalToolOrchestrator{}
+	toolOrchestrator := &MockToolExecutor{}
 
 	config := PromptManagerConfig{
 		SessionManager:   sessionMgr,

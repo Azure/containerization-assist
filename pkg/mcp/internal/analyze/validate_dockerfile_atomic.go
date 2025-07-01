@@ -10,12 +10,13 @@ import (
 	"time"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
-	"github.com/Azure/container-kit/pkg/mcp/internal/config"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	constants "github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -41,7 +42,7 @@ type AtomicValidateDockerfileArgs struct {
 
 type AtomicValidateDockerfileResult struct {
 	types.BaseToolResponse
-	mcptypes.BaseAIContextResult
+	core.BaseAIContextResult
 
 	SessionID      string        `json:"session_id"`
 	DockerfilePath string        `json:"dockerfile_path"`
@@ -167,14 +168,14 @@ type SecurityAnalysis struct {
 }
 
 type AtomicValidateDockerfileTool struct {
-	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  mcptypes.ToolSessionManager
+	pipelineAdapter core.PipelineOperations
+	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
 	analyzer        ToolAnalyzer
 	fixingMixin     *build.AtomicToolFixingMixin
 }
 
-func NewAtomicValidateDockerfileTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
+func NewAtomicValidateDockerfileTool(adapter core.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicValidateDockerfileTool {
 	toolLogger := logger.With().Str("tool", "atomic_validate_dockerfile").Logger()
 	return &AtomicValidateDockerfileTool{
 		pipelineAdapter: adapter,
@@ -196,7 +197,7 @@ func (t *AtomicValidateDockerfileTool) ExecuteValidation(ctx context.Context, ar
 }
 
 func (t *AtomicValidateDockerfileTool) ExecuteWithContext(serverCtx *server.Context, args AtomicValidateDockerfileArgs) (*AtomicValidateDockerfileResult, error) {
-	_ = mcptypes.NewGoMCPProgressAdapter(serverCtx, []mcptypes.LocalProgressStage{{Name: "Initialize", Weight: 0.10, Description: "Loading session"}, {Name: "Validate", Weight: 0.80, Description: "Validating"}, {Name: "Finalize", Weight: 0.10, Description: "Updating state"}})
+	// Progress tracking removed for simplification
 
 	ctx := context.Background()
 	result, err := t.performValidation(ctx, args, nil)
@@ -222,14 +223,15 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 	if err != nil {
 		result := &AtomicValidateDockerfileResult{
 			BaseToolResponse:    types.NewBaseResponse("atomic_validate_dockerfile", args.SessionID, args.DryRun),
-			BaseAIContextResult: mcptypes.NewBaseAIContextResult("validate", false, 0), // Will be updated later
+			BaseAIContextResult: core.NewBaseAIContextResult("validate", false, 0), // Will be updated later
 			Duration:            time.Since(startTime),
 		}
 
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		return result, nil
 	}
-	session := sessionInterface.(*sessiontypes.SessionState)
+	sessionState := sessionInterface.(*sessiontypes.SessionState)
+	session := sessionState.ToCoreSessionState()
 
 	t.logger.Info().
 		Str("session_id", session.SessionID).
@@ -239,7 +241,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 	result := &AtomicValidateDockerfileResult{
 		BaseToolResponse:    types.NewBaseResponse("atomic_validate_dockerfile", session.SessionID, args.DryRun),
-		BaseAIContextResult: mcptypes.NewBaseAIContextResult("validate", false, 0),
+		BaseAIContextResult: core.NewBaseAIContextResult("validate", false, 0),
 		ValidationContext:   make(map[string]interface{}),
 	}
 	var dockerfilePath string
@@ -267,17 +269,7 @@ func (t *AtomicValidateDockerfileTool) performValidation(ctx context.Context, ar
 
 	result.DockerfilePath = dockerfilePath
 
-	useRefactoredModules := false
-	if cfg, err := config.GetAnalyzer(); err == nil {
-		useRefactoredModules = cfg.UseRefactoredDockerfile
-	} else {
-		useRefactoredModules = os.Getenv("USE_REFACTORED_DOCKERFILE") == "true"
-	}
-	if useRefactoredModules {
-		t.logger.Info().Msg("Using refactored Dockerfile validation modules")
-		return nil, types.NewRichError("FEATURE_NOT_IMPLEMENTED", "refactored Dockerfile validation not implemented without adapter", types.ErrTypeSystem)
-	}
-
+	// Direct validation implementation (adapter removed)
 	var validationResult *coredocker.ValidationResult
 	var validatorUsed string
 
@@ -855,8 +847,8 @@ func (t *AtomicValidateDockerfileTool) GetCapabilities() types.ToolCapabilities 
 	}
 }
 
-func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicValidateDockerfileTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "atomic_validate_dockerfile",
 		Description: "Validates Dockerfiles against best practices, security standards, and optimization guidelines with automatic fix generation",
 		Version:     "1.0.0",
@@ -896,7 +888,7 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 			"generate_fixes":       "bool - Generate corrected Dockerfile",
 			"dry_run":              "bool - Validate without making changes",
 		},
-		Examples: []mcptypes.ToolExample{
+		Examples: []core.ToolExample{
 			{
 				Name:        "Basic Dockerfile Validation",
 				Description: "Validate a Dockerfile for syntax and basic issues",
@@ -967,29 +959,24 @@ func (t *AtomicValidateDockerfileTool) GetMetadata() mcptypes.ToolMetadata {
 func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interface{}) error {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
-		return types.NewValidationErrorBuilder("Invalid argument type for atomic_validate_dockerfile", "args", args).
-			WithField("expected", "AtomicValidateDockerfileArgs").
-			WithField("received", fmt.Sprintf("%T", args)).
-			Build()
+		return fmt.Errorf("invalid argument type for dockerfile validation")
 	}
 
 	if validateArgs.SessionID == "" {
-		return types.NewValidationErrorBuilder("SessionID is required", "session_id", validateArgs.SessionID).
-			WithField("field", "session_id").
-			Build()
+		return fmt.Errorf("session ID is required for dockerfile validation")
 	}
 
-	// Note: DockerfilePath will be resolved to session workspace in Execute if empty
-	// We don't set a default here to allow proper workspace resolution
+	// Must provide either path or content
+	if validateArgs.DockerfilePath == "" && validateArgs.DockerfileContent == "" {
+		return fmt.Errorf("either dockerfile_path or dockerfile_content is required")
+	}
 
 	if validateArgs.Severity != "" {
 		validSeverities := map[string]bool{
 			"info": true, "warning": true, "error": true,
 		}
 		if !validSeverities[strings.ToLower(validateArgs.Severity)] {
-			return types.NewValidationErrorBuilder("Invalid severity level", "severity", validateArgs.Severity).
-				WithField("valid_values", "info, warning, error").
-				Build()
+			return fmt.Errorf("invalid severity level: %s, valid options are info, warning, error", validateArgs.Severity)
 		}
 	}
 
@@ -999,10 +986,7 @@ func (t *AtomicValidateDockerfileTool) Validate(ctx context.Context, args interf
 func (t *AtomicValidateDockerfileTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
 	validateArgs, ok := args.(AtomicValidateDockerfileArgs)
 	if !ok {
-		return nil, types.NewValidationErrorBuilder("Invalid argument type for atomic_validate_dockerfile", "args", args).
-			WithField("expected", "AtomicValidateDockerfileArgs").
-			WithField("received", fmt.Sprintf("%T", args)).
-			Build()
+		return nil, fmt.Errorf("invalid argument type for typed dockerfile validation")
 	}
 
 	return t.ExecuteTyped(ctx, validateArgs)

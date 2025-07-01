@@ -245,3 +245,23 @@ func (c *AzOpenAIClient) GetChatCompletionWithFormat(ctx context.Context, prompt
 	promptText = fmt.Sprintf(promptText, args...)
 	return c.GetChatCompletion(ctx, promptText)
 }
+
+// Methods to implement mcptypes.AIAnalyzer interface directly
+
+// Analyze implements mcptypes.AIAnalyzer
+func (c *AzOpenAIClient) Analyze(ctx context.Context, prompt string) (string, error) {
+	response, _, err := c.GetChatCompletion(ctx, prompt)
+	return response, err
+}
+
+// AnalyzeWithFileTools implements mcptypes.AIAnalyzer
+func (c *AzOpenAIClient) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+	response, _, err := c.GetChatCompletionWithFileTools(ctx, prompt, baseDir)
+	return response, err
+}
+
+// AnalyzeWithFormat implements mcptypes.AIAnalyzer
+func (c *AzOpenAIClient) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
+	response, _, err := c.GetChatCompletionWithFormat(ctx, promptTemplate, args...)
+	return response, err
+}

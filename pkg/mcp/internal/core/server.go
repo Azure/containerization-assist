@@ -14,47 +14,10 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
-
-// sessionManagerAdapterImpl adapts the core session manager to orchestration.SessionManager interface
-type sessionManagerAdapterImpl struct {
-	sessionManager *session.SessionManager
-}
-
-func (s *sessionManagerAdapterImpl) GetSession(sessionID string) (interface{}, error) {
-	return s.sessionManager.GetSession(sessionID)
-}
-
-func (s *sessionManagerAdapterImpl) UpdateSession(session interface{}) error {
-	// Convert interface{} back to the concrete session type and update
-	switch sess := session.(type) {
-	case *sessiontypes.SessionState:
-		if sess.SessionID == "" {
-			return errors.Validation("core/server", "session ID is required for updates")
-		}
-		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
-				*existingState = *sess
-			}
-		})
-	case sessiontypes.SessionState:
-		if sess.SessionID == "" {
-			return errors.Validation("core/server", "session ID is required for updates")
-		}
-		return s.sessionManager.UpdateSession(sess.SessionID, func(existing interface{}) {
-			if existingState, ok := existing.(*sessiontypes.SessionState); ok {
-				*existingState = sess
-			}
-		})
-	default:
-		// If we can't convert, just succeed silently to maintain compatibility
-		return nil
-	}
-}
 
 // Server represents the MCP server
 type Server struct {
@@ -63,7 +26,7 @@ type Server struct {
 	workspaceManager *utils.WorkspaceManager
 	circuitBreakers  *orchestration.CircuitBreakerRegistry
 	jobManager       *orchestration.JobManager
-	transport        InternalTransport
+	transport        interface{} // stdio or http transport
 	logger           zerolog.Logger
 	startTime        time.Time
 
@@ -153,7 +116,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	})
 
 	// Initialize transport
-	var mcpTransport InternalTransport
+	var transportInstance interface{}
 	switch config.TransportType {
 	case "http":
 		httpConfig := transport.HTTPTransportConfig{
@@ -166,13 +129,12 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 			MaxBodyLogSize: config.MaxBodyLogSize,
 			LogLevel:       config.LogLevel,
 		}
-		httpTransport := transport.NewHTTPTransport(httpConfig)
-		mcpTransport = NewTransportAdapter(httpTransport)
+		transportInstance = transport.NewHTTPTransport(httpConfig)
 	case "stdio":
 		fallthrough
 	default:
-		// Use factory for consistent stdio transport creation
-		mcpTransport = transport.NewDefaultStdioTransport(logger)
+		// Create stdio transport
+		transportInstance = transport.NewStdioTransportWithLogger(logger)
 	}
 
 	// Create gomcp manager with builder pattern
@@ -182,14 +144,14 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		LogLevel:        convertZerologToSlog(logger.GetLevel()),
 	}
 	gomcpManager := NewGomcpManager(gomcpConfig).
-		WithTransport(mcpTransport).
+		WithTransport(transportInstance).
 		WithLogger(*slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 			Level: convertZerologToSlog(logger.GetLevel()),
 		})))
 
 	// Set GomcpManager on transport for proper lifecycle management
-	// Use type assertion since InternalTransport interface doesn't have Name() method
-	if setter, ok := mcpTransport.(interface{ SetGomcpManager(interface{}) }); ok {
+	// Use type assertion
+	if setter, ok := transportInstance.(interface{ SetGomcpManager(interface{}) }); ok {
 		setter.SetGomcpManager(gomcpManager)
 	}
 
@@ -242,12 +204,10 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	// Initialize canonical tool orchestrator
 	toolRegistry := orchestration.NewMCPToolRegistry(logger.With().Str("component", "tool_registry").Logger())
 
-	// Create session manager adapter for orchestrator
-	sessionManagerAdapter := &sessionManagerAdapterImpl{sessionManager: sessionManager}
-
+	// Use session manager directly with orchestrator
 	toolOrchestrator := orchestration.NewMCPToolOrchestrator(
 		toolRegistry,
-		sessionManagerAdapter,
+		sessionManager,
 		logger.With().Str("component", "tool_orchestrator").Logger(),
 	)
 
@@ -257,7 +217,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		workspaceManager: workspaceManager,
 		circuitBreakers:  circuitBreakers,
 		jobManager:       jobManager,
-		transport:        mcpTransport,
+		transport:        transportInstance,
 		logger:           logger,
 		startTime:        time.Now(),
 		toolOrchestrator: toolOrchestrator,
@@ -292,7 +252,7 @@ func (s *Server) IsConversationModeEnabled() bool {
 }
 
 // GetTransport returns the server's transport
-func (s *Server) GetTransport() InternalTransport {
+func (s *Server) GetTransport() interface{} {
 	return s.transport
 }
 
@@ -390,7 +350,7 @@ func (s *Server) getAvailableToolSchemas() map[string]interface{} {
 }
 
 // GetLogger returns the server's logger
-func (s *Server) GetLogger() zerolog.Logger {
+func (s *Server) GetLogger() interface{} {
 	return s.logger
 }
 

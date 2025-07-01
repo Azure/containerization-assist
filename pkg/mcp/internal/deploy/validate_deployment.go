@@ -9,8 +9,12 @@ import (
 
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+
+	// mcp import removed - using mcptypes
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -151,7 +155,7 @@ func (t *AtomicValidateDeploymentTool) ExecuteTyped(ctx context.Context, args Va
 	timeout, err := time.ParseDuration(args.Timeout)
 	if err != nil {
 		t.logger.Error().Err(err).Str("timeout", args.Timeout).Msg("Invalid timeout format")
-		return response, types.NewRichError("INVALID_TIMEOUT", fmt.Sprintf("invalid timeout format: %s", args.Timeout), "validation_error")
+		return response, fmt.Errorf("invalid timeout format: %s", args.Timeout)
 	}
 
 	// Create context with timeout
@@ -419,13 +423,13 @@ func (t *AtomicValidateDeploymentTool) Execute(ctx context.Context, args interfa
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return nil, types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return nil, fmt.Errorf("failed to marshal arguments")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return nil, fmt.Errorf("invalid argument structure for validate_deployment")
 		}
 	default:
-		return nil, types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return nil, fmt.Errorf("invalid argument type for validate_deployment")
 	}
 
 	// Call the typed execute method
@@ -443,26 +447,26 @@ func (t *AtomicValidateDeploymentTool) Validate(ctx context.Context, args interf
 		// Convert from map to struct using JSON marshaling
 		jsonData, err := json.Marshal(a)
 		if err != nil {
-			return types.NewRichError("INVALID_ARGUMENTS", "Failed to marshal arguments", "validation_error")
+			return fmt.Errorf("failed to marshal arguments")
 		}
 		if err = json.Unmarshal(jsonData, &deployArgs); err != nil {
-			return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument structure for validate_deployment", "validation_error")
+			return fmt.Errorf("invalid argument structure for validate_deployment")
 		}
 	default:
-		return types.NewRichError("INVALID_ARGUMENTS", "Invalid argument type for validate_deployment", "validation_error")
+		return fmt.Errorf("invalid argument type for validate_deployment")
 	}
 
 	// Validate required fields
 	if deployArgs.SessionID == "" {
-		return types.NewRichError("INVALID_ARGUMENTS", "session_id is required", "validation_error")
+		return fmt.Errorf("session_id is required")
 	}
 
 	return nil
 }
 
 // GetMetadata implements the unified Tool interface
-func (t *AtomicValidateDeploymentTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *AtomicValidateDeploymentTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:         "validate_deployment",
 		Description:  "Validates Kubernetes deployments on Kind clusters with comprehensive health checks",
 		Version:      "1.0.0",

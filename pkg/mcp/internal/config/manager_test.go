@@ -140,14 +140,3 @@ func TestGlobalConfig(t *testing.T) {
 		t.Errorf("Expected default host 'localhost', got '%s'", serverCfg.Host)
 	}
 }
-
-func TestMigrationHelper(t *testing.T) {
-	// Create a test logger (you might need to adjust this based on your logger setup)
-	logger := struct{}{}
-
-	// For now, we'll skip the actual migration test since it requires zerolog
-	// In a real implementation, you would test the migration helper here
-
-	_ = logger // Avoid unused variable error
-	t.Log("Migration helper test placeholder - implement when logger is available")
-}

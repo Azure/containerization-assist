@@ -15,17 +15,35 @@ import (
 // handleServerStatus implements the server_status tool logic
 func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerStatusArgs) (*ServerStatusResult, error) {
 	// Use server health check mode if no session provided
-	sessionID := args.SessionID
+	sessionID := ""
+	if args.SessionID != nil {
+		sessionID = *args.SessionID
+	}
 	if sessionID == "" {
 		sessionID = "server-health-check"
 	}
 
+	// Get boolean values with defaults
+	detailedAnalysis := false
+	if args.DetailedAnalysis != nil {
+		detailedAnalysis = *args.DetailedAnalysis
+	}
+	includeDetails := false
+	if args.IncludeDetails != nil {
+		includeDetails = *args.IncludeDetails
+	}
+	dryRun := false
+	if args.DryRun != nil {
+		dryRun = *args.DryRun
+	}
+
 	// Fast path for basic health checks
-	if !args.DetailedAnalysis && !args.IncludeDetails {
+	if !detailedAnalysis && !includeDetails {
 		return &ServerStatusResult{
 			Healthy: true,
 			Status:  "operational",
 			Version: "1.0.0",
+			Uptime:  time.Since(gm.startTime).String(),
 		}, nil
 	}
 
@@ -39,9 +57,9 @@ func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerS
 	atomicArgs := deploy.AtomicCheckHealthArgs{
 		BaseToolArgs: types.BaseToolArgs{
 			SessionID: sessionID,
-			DryRun:    args.DryRun,
+			DryRun:    dryRun,
 		},
-		DetailedAnalysis: args.DetailedAnalysis || args.IncludeDetails,
+		DetailedAnalysis: detailedAnalysis || includeDetails,
 	}
 
 	stdCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -55,7 +73,9 @@ func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerS
 
 		return &ServerStatusResult{
 			Healthy: true,
+			Status:  "operational",
 			Version: "1.0.0",
+			Uptime:  time.Since(gm.startTime).String(),
 			Details: map[string]interface{}{
 				"services": map[string]interface{}{
 					"session_manager": map[string]interface{}{
@@ -83,8 +103,10 @@ func (gm *GomcpManager) handleServerStatus(deps *ToolDependencies, args *ServerS
 	// Convert atomic result to expected format
 	return &ServerStatusResult{
 		Healthy:   result.Success,
+		Status:    "operational",
 		SessionID: result.SessionID,
 		Version:   "1.0.0",
+		Uptime:    time.Since(gm.startTime).String(),
 		DryRun:    result.DryRun,
 	}, nil
 }

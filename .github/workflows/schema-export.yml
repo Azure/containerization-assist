@@ -165,12 +165,37 @@ jobs:
               **Note**: Tools are automatically registered with GoMCP`;
             }
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            // Find existing schema update comment and update it, or create new one
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: comment
+              issue_number: context.issue.number,
             });
+
+            const existingComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('🔧 Tool Schema Update')
+            );
+
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: comment
+              });
+              console.log('Updated existing schema comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+              console.log('Created new schema comment');
+            }
 
       - name: Upload schema as artifact
         uses: actions/upload-artifact@v4

@@ -61,13 +61,13 @@ type ToolExecutionSpan struct {
 
 // StartToolSpan starts a new span for tool execution
 func (m *OTELMiddleware) StartToolSpan(ctx context.Context, toolName string, attributes map[string]interface{}) *ToolExecutionSpan {
-	spanName := fmt.Sprintf("mcp.tool.%s", toolName)
+	spanName := fmt.Sprintf("mcptypes.tool.%s", toolName)
 
 	ctx, span := m.tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindServer),
 		trace.WithAttributes(
-			attribute.String("mcp.tool.name", toolName),
-			attribute.String("mcp.operation.type", "tool_execution"),
+			attribute.String("mcptypes.tool.name", toolName),
+			attribute.String("mcptypes.operation.type", "tool_execution"),
 		),
 	)
 
@@ -172,8 +172,8 @@ func (s *ToolExecutionSpan) RecordError(err error, description string) {
 func (s *ToolExecutionSpan) Finish(success bool, resultSize int) {
 	// Set final attributes
 	s.span.SetAttributes(
-		attribute.Bool("mcp.tool.success", success),
-		attribute.Int("mcp.tool.result_size", resultSize),
+		attribute.Bool("mcptypes.tool.success", success),
+		attribute.Int("mcptypes.tool.result_size", resultSize),
 	)
 
 	// Set status
@@ -200,13 +200,13 @@ type RequestSpan struct {
 
 // StartRequestSpan starts a new span for MCP request processing
 func (m *OTELMiddleware) StartRequestSpan(ctx context.Context, method string, attributes map[string]interface{}) *RequestSpan {
-	spanName := fmt.Sprintf("mcp.request.%s", method)
+	spanName := fmt.Sprintf("mcptypes.request.%s", method)
 
 	ctx, span := m.tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindServer),
 		trace.WithAttributes(
-			attribute.String("mcp.method", method),
-			attribute.String("mcp.operation.type", "request_processing"),
+			attribute.String("mcptypes.method", method),
+			attribute.String("mcptypes.operation.type", "request_processing"),
 		),
 	)
 
@@ -311,8 +311,8 @@ func (r *RequestSpan) RecordError(err error, description string) {
 func (r *RequestSpan) Finish(statusCode int, responseSize int) {
 	// Set final attributes
 	r.span.SetAttributes(
-		attribute.Int("mcp.response.status_code", statusCode),
-		attribute.Int("mcp.response.size", responseSize),
+		attribute.Int("mcptypes.response.status_code", statusCode),
+		attribute.Int("mcptypes.response.size", responseSize),
 	)
 
 	// Set status based on status code
@@ -341,14 +341,14 @@ type ConversationSpan struct {
 
 // StartConversationSpan starts a new span for conversation stage processing
 func (m *OTELMiddleware) StartConversationSpan(ctx context.Context, stage string, sessionID string) *ConversationSpan {
-	spanName := fmt.Sprintf("mcp.conversation.%s", stage)
+	spanName := fmt.Sprintf("mcptypes.conversation.%s", stage)
 
 	ctx, span := m.tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindInternal),
 		trace.WithAttributes(
-			attribute.String("mcp.conversation.stage", stage),
-			attribute.String("mcp.session.id", sessionID),
-			attribute.String("mcp.operation.type", "conversation_processing"),
+			attribute.String("mcptypes.conversation.stage", stage),
+			attribute.String("mcptypes.session.id", sessionID),
+			attribute.String("mcptypes.operation.type", "conversation_processing"),
 		),
 	)
 
@@ -387,8 +387,8 @@ func (c *ConversationSpan) AddEvent(name string, attributes map[string]interface
 func (c *ConversationSpan) Finish(success bool, nextStage string) {
 	// Set final attributes
 	c.span.SetAttributes(
-		attribute.Bool("mcp.conversation.success", success),
-		attribute.String("mcp.conversation.next_stage", nextStage),
+		attribute.Bool("mcptypes.conversation.success", success),
+		attribute.String("mcptypes.conversation.next_stage", nextStage),
 	)
 
 	// Set status
@@ -422,7 +422,7 @@ func NewMCPServerInstrumentation(serviceName string, logger zerolog.Logger) *MCP
 // InstrumentTool wraps tool execution with tracing
 func (msi *MCPServerInstrumentation) InstrumentTool(ctx context.Context, toolName string, fn func(context.Context) (interface{}, error)) (interface{}, error) {
 	span := msi.middleware.StartToolSpan(ctx, toolName, map[string]interface{}{
-		"mcp.tool.instrumented": true,
+		"mcptypes.tool.instrumented": true,
 	})
 	defer func() {
 		// We'll set success/failure in the deferred function
@@ -436,7 +436,7 @@ func (msi *MCPServerInstrumentation) InstrumentTool(ctx context.Context, toolNam
 
 	// Add performance metrics
 	span.SetAttributes(map[string]interface{}{
-		"mcp.tool.duration_ms": float64(duration.Nanoseconds()) / 1e6,
+		"mcptypes.tool.duration_ms": float64(duration.Nanoseconds()) / 1e6,
 	})
 
 	if err != nil {

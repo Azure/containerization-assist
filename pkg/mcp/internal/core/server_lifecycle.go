@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 )
 
 // Start starts the MCP server
@@ -22,6 +22,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.sessionManager.StartCleanupRoutine()
 
 	// Initialize and configure gomcp server
+	if s.gomcpManager == nil {
+		return fmt.Errorf("gomcp manager is nil - server initialization failed")
+	}
 	if err := s.gomcpManager.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize gomcp manager: %w", err)
 	}
@@ -32,7 +35,9 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Set the server as the request handler for the transport
-	s.transport.SetHandler(s)
+	if setter, ok := s.transport.(interface{ SetHandler(interface{}) }); ok {
+		setter.SetHandler(s)
+	}
 
 	// Start transport serving
 	transportDone := make(chan error, 1)
@@ -58,12 +63,12 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // HandleRequest implements the LocalRequestHandler interface
-func (s *Server) HandleRequest(ctx context.Context, req *mcptypes.MCPRequest) (*mcptypes.MCPResponse, error) {
+func (s *Server) HandleRequest(ctx context.Context, req *core.MCPRequest) (*core.MCPResponse, error) {
 	// This is handled by the underlying MCP library for stdio transport
 	// For HTTP transport, we would implement custom request routing here
-	return &mcptypes.MCPResponse{
+	return &core.MCPResponse{
 		ID: req.ID,
-		Error: &mcptypes.MCPError{
+		Error: &core.MCPError{
 			Code:    -32601,
 			Message: "direct request handling not implemented",
 		},
@@ -184,9 +189,11 @@ CONTINUE_SHUTDOWN:
 
 	// Step 9: Stop transport
 	s.logger.Info().Msg("Stopping transport")
-	if err := s.transport.Stop(context.Background()); err != nil {
-		s.logger.Error().Err(err).Msg("Error stopping transport")
-		shutdownErrors = append(shutdownErrors, fmt.Errorf("transport stop: %w", err))
+	if stopper, ok := s.transport.(interface{ Stop(context.Context) error }); ok {
+		if err := stopper.Stop(context.Background()); err != nil {
+			s.logger.Error().Err(err).Msg("Error stopping transport")
+			shutdownErrors = append(shutdownErrors, fmt.Errorf("transport stop: %w", err))
+		}
 	}
 
 	// Step 10: Shutdown OpenTelemetry provider

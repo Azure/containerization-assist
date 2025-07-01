@@ -9,18 +9,16 @@ import (
 type BuildStrategy interface {
 	// Name returns the strategy name
 	Name() string
-
 	// Description returns a human-readable description
 	Description() string
-
 	// Build executes the build using this strategy
 	Build(ctx BuildContext) (*BuildResult, error)
-
 	// SupportsFeature checks if the strategy supports a specific feature
 	SupportsFeature(feature string) bool
-
 	// Validate checks if the strategy can be used with the given context
 	Validate(ctx BuildContext) error
+	// ScoreCompatibility scores how well this strategy fits the given project info
+	ScoreCompatibility(projectInfo interface{}) int
 }
 
 // BuildContext contains all information needed for a build
@@ -54,10 +52,8 @@ type BuildResult struct {
 type BuildValidator interface {
 	// ValidateDockerfile checks if the Dockerfile is valid
 	ValidateDockerfile(dockerfilePath string) (*ValidationResult, error)
-
 	// ValidateBuildContext checks if the build context is valid
 	ValidateBuildContext(ctx BuildContext) (*ValidationResult, error)
-
 	// ValidateSecurityRequirements checks for security issues
 	ValidateSecurityRequirements(dockerfilePath string) (*SecurityValidationResult, error)
 }
@@ -118,13 +114,10 @@ type ComplianceViolation struct {
 type BuildExecutor interface {
 	// Execute runs the build with the selected strategy
 	Execute(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy) (*ExecutionResult, error)
-
 	// ExecuteWithProgress runs the build with progress reporting
 	ExecuteWithProgress(ctx context.Context, buildCtx BuildContext, strategy BuildStrategy, reporter ExtendedBuildReporter) (*ExecutionResult, error)
-
 	// Monitor monitors a running build
 	Monitor(buildID string) (*BuildStatus, error)
-
 	// Cancel cancels a running build
 	Cancel(buildID string) error
 }
@@ -192,8 +185,8 @@ type ExtendedBuildReporter interface {
 	ReportInfo(message string)
 }
 
-// BuildOptions contains additional options for builds
-type BuildOptions struct {
+// CommonBuildOptions contains additional options for builds
+type CommonBuildOptions struct {
 	Timeout          time.Duration
 	CPULimit         string
 	MemoryLimit      string
@@ -203,8 +196,8 @@ type BuildOptions struct {
 	ExperimentalOpts map[string]string
 }
 
-// BuildError represents a build-specific error
-type BuildError struct {
+// CommonBuildError represents a build-specific error
+type CommonBuildError struct {
 	Code    string
 	Message string
 	Stage   string
@@ -212,13 +205,13 @@ type BuildError struct {
 	Type    string
 }
 
-func (e *BuildError) Error() string {
+func (e *CommonBuildError) Error() string {
 	return e.Message
 }
 
-// NewBuildError creates a new build error
-func NewBuildError(code, message, stage string, errType string) *BuildError {
-	return &BuildError{
+// NewCommonBuildError creates a new build error
+func NewCommonBuildError(code, message, stage string, errType string) *CommonBuildError {
+	return &CommonBuildError{
 		Code:    code,
 		Message: message,
 		Stage:   stage,

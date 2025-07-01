@@ -4,50 +4,36 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // getStageProgress returns a formatted progress indicator for the current stage
-func getStageProgress(currentStage types.ConversationStage) string {
-	stages := []types.ConversationStage{
-		types.StageWelcome,
-		types.StagePreFlight,
-		types.StageInit,
-		types.StageAnalysis,
-		types.StageDockerfile,
-		types.StageBuild,
-		types.StagePush,
-		types.StageManifests,
-		types.StageDeployment,
-		types.StageCompleted,
+func getStageProgress(currentStage core.ConversationStage) string {
+	// Map the simplified mcp stages to detailed progress
+	progressMap := map[core.ConversationStage]int{
+		core.ConversationStageAnalyze: 4, // Maps to analysis stage
+		core.ConversationStageBuild:   6, // Maps to build stage
+		core.ConversationStageDeploy:  8, // Maps to deployment stage
+		core.ConversationStageScan:    9, // Maps to scan stage
 	}
 
 	currentStep := 1
-	totalSteps := len(stages)
+	totalSteps := 10
 
-	for i, stage := range stages {
-		if stage == currentStage {
-			currentStep = i + 1
-			break
-		}
+	if step, exists := progressMap[currentStage]; exists {
+		currentStep = step
 	}
 
 	return fmt.Sprintf("[Step %d/%d]", currentStep, totalSteps)
 }
 
 // getStageIntro returns a short introductory message for each stage
-func getStageIntro(stage types.ConversationStage) string {
-	intros := map[types.ConversationStage]string{
-		types.StageWelcome:    "Welcome! Let's containerize your application.",
-		types.StagePreFlight:  "Running pre-flight checks to ensure everything is ready.",
-		types.StageInit:       "Initializing session and gathering preferences.",
-		types.StageAnalysis:   "Analyzing your repository to understand the project structure.",
-		types.StageDockerfile: "Creating an optimized Dockerfile for your application.",
-		types.StageBuild:      "Building your Docker image with the generated Dockerfile.",
-		types.StagePush:       "Pushing the built image to your container registry.",
-		types.StageManifests:  "Generating Kubernetes manifests for deployment.",
-		types.StageDeployment: "Deploying your application to the Kubernetes cluster.",
-		types.StageCompleted:  "Containerization complete! Your application is ready.",
+func getStageIntro(stage core.ConversationStage) string {
+	intros := map[core.ConversationStage]string{
+		core.ConversationStageAnalyze: "Analyzing your repository to understand the project structure.",
+		core.ConversationStageBuild:   "Building your Docker image with the generated Dockerfile.",
+		core.ConversationStageDeploy:  "Deploying your application to the Kubernetes cluster.",
+		core.ConversationStageScan:    "Running security scans on your container image.",
 	}
 
 	if intro, exists := intros[stage]; exists {
@@ -76,13 +62,13 @@ func (pm *PromptManager) hasAutopilotEnabled(state *ConversationState) bool {
 // enableAutopilot enables autopilot mode for the conversation
 func (pm *PromptManager) enableAutopilot(state *ConversationState) {
 	state.Context["autopilot_enabled"] = true
-	pm.logger.Info().Str("session_id", state.SessionID).Msg("Autopilot mode enabled")
+	pm.logger.Info().Str("session_id", state.SessionState.SessionID).Msg("Autopilot mode enabled")
 }
 
 // disableAutopilot disables autopilot mode for the conversation
 func (pm *PromptManager) disableAutopilot(state *ConversationState) {
 	state.Context["autopilot_enabled"] = false
-	pm.logger.Info().Str("session_id", state.SessionID).Msg("Autopilot mode disabled")
+	pm.logger.Info().Str("session_id", state.SessionState.SessionID).Msg("Autopilot mode disabled")
 }
 
 // handleAutopilotCommands checks for autopilot control commands in user input

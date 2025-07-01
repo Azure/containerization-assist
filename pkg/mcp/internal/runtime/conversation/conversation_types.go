@@ -4,25 +4,26 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // ConversationResponse represents the response to a user prompt
 type ConversationResponse struct {
-	SessionID string                  `json:"session_id"`
-	Message   string                  `json:"message"`
-	Stage     types.ConversationStage `json:"stage"`
-	Status    ResponseStatus          `json:"status"`
-	Options   []Option                `json:"options,omitempty"`
-	Artifacts []ArtifactSummary       `json:"artifacts,omitempty"`
-	NextSteps []string                `json:"next_steps,omitempty"`
-	Progress  *StageProgress          `json:"progress,omitempty"`
-	ToolCalls []ToolCall              `json:"tool_calls,omitempty"`
+	SessionID string                 `json:"session_id"`
+	Message   string                 `json:"message"`
+	Stage     core.ConversationStage `json:"stage"`
+	Status    ResponseStatus         `json:"status"`
+	Options   []Option               `json:"options,omitempty"`
+	Artifacts []ArtifactSummary      `json:"artifacts,omitempty"`
+	NextSteps []string               `json:"next_steps,omitempty"`
+	Progress  *StageProgress         `json:"progress,omitempty"`
+	ToolCalls []ToolCall             `json:"tool_calls,omitempty"`
 
 	// Auto-advance support
-	RequiresInput bool                     `json:"requires_input"`         // If false, can auto-advance
-	NextStage     *types.ConversationStage `json:"next_stage,omitempty"`   // Stage to advance to
-	AutoAdvance   *AutoAdvanceConfig       `json:"auto_advance,omitempty"` // Auto-advance configuration
+	RequiresInput bool                    `json:"requires_input"`         // If false, can auto-advance
+	NextStage     *core.ConversationStage `json:"next_stage,omitempty"`   // Stage to advance to
+	AutoAdvance   *AutoAdvanceConfig      `json:"auto_advance,omitempty"` // Auto-advance configuration
 
 	// Structured forms support
 	Form *StructuredForm `json:"form,omitempty"` // Structured form for gathering input
@@ -57,14 +58,14 @@ type ArtifactSummary struct {
 	Size      int       `json:"size_bytes"`
 }
 
-// Note: InternalToolOrchestrator is imported from the orchestration package
+// Note: ToolOrchestrationExecutor is imported from the orchestration package
 
 // Note: UserPreferences and ResourceLimits are defined in conversation_state.go
 
 // Auto-advance helper methods
 
 // WithAutoAdvance configures the response for automatic progression to the next stage
-func (r *ConversationResponse) WithAutoAdvance(nextStage types.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
+func (r *ConversationResponse) WithAutoAdvance(nextStage core.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
 	r.RequiresInput = false
 	r.NextStage = &nextStage
 	r.AutoAdvance = &config
@@ -128,6 +129,60 @@ func (r *ConversationResponse) GetAutoAdvanceMessage() string {
 	return baseMsg
 }
 
+// convertFromTypesStage converts from types.ConversationStage to core.ConversationStage
+func convertFromTypesStage(stage types.ConversationStage) core.ConversationStage {
+	switch stage {
+	case types.StageWelcome:
+		return core.ConversationStagePreFlight // Map welcome to preflight in core
+	case types.StagePreFlight:
+		return core.ConversationStagePreFlight
+	case types.StageInit:
+		return core.ConversationStageAnalyze // Map init to analyze in core
+	case types.StageAnalysis:
+		return core.ConversationStageAnalyze
+	case types.StageDockerfile:
+		return core.ConversationStageDockerfile
+	case types.StageBuild:
+		return core.ConversationStageBuild
+	case types.StagePush:
+		return core.ConversationStagePush
+	case types.StageManifests:
+		return core.ConversationStageManifests
+	case types.StageDeployment:
+		return core.ConversationStageDeploy
+	case types.StageCompleted:
+		return core.ConversationStageCompleted
+	default:
+		return core.ConversationStageError
+	}
+}
+
+// mapMCPStageToDetailedStage converts from core.ConversationStage to types.ConversationStage
+func mapMCPStageToDetailedStage(stage core.ConversationStage, context map[string]interface{}) types.ConversationStage {
+	switch stage {
+	case core.ConversationStagePreFlight:
+		return types.StagePreFlight
+	case core.ConversationStageAnalyze:
+		return types.StageAnalysis
+	case core.ConversationStageDockerfile:
+		return types.StageDockerfile
+	case core.ConversationStageBuild:
+		return types.StageBuild
+	case core.ConversationStagePush:
+		return types.StagePush
+	case core.ConversationStageManifests:
+		return types.StageManifests
+	case core.ConversationStageDeploy:
+		return types.StageDeployment
+	case core.ConversationStageCompleted:
+		return types.StageCompleted
+	case core.ConversationStageError:
+		return types.StageCompleted // Map error to completed for now
+	default:
+		return types.StageWelcome
+	}
+}
+
 // Note: ErrorHandler is now in the errors package for centralized error management
 
-// Note: InternalToolOrchestrator is imported from the orchestration package
+// Note: ToolOrchestrationExecutor is imported from the orchestration package

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -112,15 +113,19 @@ func (pm *PromptManager) handlePendingDecision(ctx context.Context, state *Conve
 	}
 
 	// Continue with the stage
-	switch state.CurrentStage {
-	case types.StageDockerfile:
-		return pm.generateDockerfile(ctx, state)
-	default:
-		return &ConversationResponse{
-			Message: "Let's continue...",
-			Stage:   state.CurrentStage,
-			Status:  ResponseStatusSuccess,
+	// Check if current stage maps to dockerfile generation
+	if state.CurrentStage == core.ConversationStageBuild {
+		// Check detailed stage from context
+		if detailedStage, ok := state.Context["detailed_stage"].(string); ok &&
+			types.ConversationStage(detailedStage) == types.StageDockerfile {
+			return pm.generateDockerfile(ctx, state)
 		}
+	}
+
+	return &ConversationResponse{
+		Message: "Let's continue...",
+		Stage:   state.CurrentStage,
+		Status:  ResponseStatusSuccess,
 	}
 }
 
@@ -140,18 +145,19 @@ func (pm *PromptManager) generateSummary(ctx context.Context, state *Conversatio
 
 	// Docker details
 	summary.WriteString("**Docker Image**\n")
-	if state.Dockerfile.Pushed {
-		summary.WriteString(fmt.Sprintf("- Registry: %s\n", state.ImageRef.Registry))
-		summary.WriteString(fmt.Sprintf("- Tag: %s\n", state.ImageRef.Tag))
+	if getDockerfilePushed(state.SessionState) {
+		summary.WriteString(fmt.Sprintf("- Registry: %s\n", getImageRefRegistry(state.SessionState)))
+		summary.WriteString(fmt.Sprintf("- Tag: %s\n", getImageRefTag(state.SessionState)))
 	} else {
-		summary.WriteString(fmt.Sprintf("- Local image: %s\n", state.Dockerfile.ImageID))
+		summary.WriteString(fmt.Sprintf("- Local image: %s\n", getDockerfileImageID(state.SessionState)))
 	}
 	summary.WriteString(fmt.Sprintf("- Optimization: %s\n", state.Preferences.Optimization))
 	summary.WriteString(fmt.Sprintf("- Health check: %v\n\n", state.Preferences.IncludeHealthCheck))
 
 	// Kubernetes resources
 	summary.WriteString("**Kubernetes Resources**\n")
-	for name, manifest := range state.K8sManifests {
+	manifests := getK8sManifestsAsTypes(state.SessionState)
+	for name, manifest := range manifests {
 		summary.WriteString(fmt.Sprintf("- %s (%s)\n", name, manifest.Kind))
 	}
 
@@ -163,7 +169,7 @@ func (pm *PromptManager) generateSummary(ctx context.Context, state *Conversatio
 
 	return &ConversationResponse{
 		Message: summary.String(),
-		Stage:   types.StageCompleted,
+		Stage:   convertFromTypesStage(types.StageCompleted),
 		Status:  ResponseStatusSuccess,
 	}
 }
@@ -191,7 +197,7 @@ func (pm *PromptManager) exportArtifacts(ctx context.Context, state *Conversatio
 
 	return &ConversationResponse{
 		Message: exports.String(),
-		Stage:   types.StageCompleted,
+		Stage:   convertFromTypesStage(types.StageCompleted),
 		Status:  ResponseStatusSuccess,
 	}
 }

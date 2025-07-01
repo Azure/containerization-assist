@@ -11,7 +11,7 @@ import (
 type TelemetryService struct {
 	logger     zerolog.Logger
 	collectors []MetricsCollector
-	events     chan Event
+	events     chan TelemetryEvent
 	stopCh     chan struct{}
 	mu         sync.RWMutex
 	metrics    *SystemMetrics
@@ -21,7 +21,7 @@ func NewTelemetryService(logger zerolog.Logger) *TelemetryService {
 	service := &TelemetryService{
 		logger:     logger.With().Str("service", "telemetry").Logger(),
 		collectors: make([]MetricsCollector, 0),
-		events:     make(chan Event, 1000),
+		events:     make(chan TelemetryEvent, 1000),
 		stopCh:     make(chan struct{}),
 		metrics:    NewSystemMetrics(),
 	}
@@ -42,7 +42,7 @@ func (s *TelemetryService) RegisterCollector(collector MetricsCollector) {
 func (s *TelemetryService) TrackToolExecution(ctx context.Context, execution ToolExecution) {
 	s.metrics.RecordToolExecution(execution)
 
-	event := Event{
+	event := TelemetryEvent{
 		Type:      EventTypeToolExecution,
 		Timestamp: time.Now(),
 		Data:      execution,
@@ -51,14 +51,14 @@ func (s *TelemetryService) TrackToolExecution(ctx context.Context, execution Too
 	select {
 	case s.events <- event:
 	default:
-		s.logger.Warn().Msg("Event queue full, dropping event")
+		s.logger.Warn().Msg("TelemetryEvent queue full, dropping event")
 	}
 }
 
 func (s *TelemetryService) TrackPerformance(ctx context.Context, metric PerformanceMetric) {
 	s.metrics.RecordPerformance(metric)
 
-	event := Event{
+	event := TelemetryEvent{
 		Type:      EventTypePerformance,
 		Timestamp: time.Now(),
 		Data:      metric,
@@ -67,12 +67,12 @@ func (s *TelemetryService) TrackPerformance(ctx context.Context, metric Performa
 	select {
 	case s.events <- event:
 	default:
-		s.logger.Warn().Msg("Event queue full, dropping performance metric")
+		s.logger.Warn().Msg("TelemetryEvent queue full, dropping performance metric")
 	}
 }
 
 func (s *TelemetryService) TrackEvent(ctx context.Context, eventType string, data interface{}) {
-	event := Event{
+	event := TelemetryEvent{
 		Type:      eventType,
 		Timestamp: time.Now(),
 		Data:      data,
@@ -81,7 +81,7 @@ func (s *TelemetryService) TrackEvent(ctx context.Context, eventType string, dat
 	select {
 	case s.events <- event:
 	default:
-		s.logger.Warn().Msg("Event queue full, dropping custom event")
+		s.logger.Warn().Msg("TelemetryEvent queue full, dropping custom event")
 	}
 }
 
@@ -119,7 +119,7 @@ func (s *TelemetryService) processEvents() {
 	}
 }
 
-func (s *TelemetryService) processEvent(event Event) {
+func (s *TelemetryService) processEvent(event TelemetryEvent) {
 	s.mu.RLock()
 	collectors := make([]MetricsCollector, len(s.collectors))
 	copy(collectors, s.collectors)
@@ -132,7 +132,7 @@ func (s *TelemetryService) processEvent(event Event) {
 	}
 }
 
-type Event struct {
+type TelemetryEvent struct {
 	Type      string
 	Timestamp time.Time
 	Data      interface{}
@@ -169,7 +169,7 @@ type PerformanceMetric struct {
 
 type MetricsCollector interface {
 	GetName() string
-	Collect(event Event) error
+	Collect(event TelemetryEvent) error
 }
 
 type SystemMetrics struct {
@@ -378,7 +378,7 @@ func (c *LoggingCollector) GetName() string {
 	return "logging"
 }
 
-func (c *LoggingCollector) Collect(event Event) error {
+func (c *LoggingCollector) Collect(event TelemetryEvent) error {
 	switch event.Type {
 	case EventTypeToolExecution:
 		if exec, ok := event.Data.(ToolExecution); ok {
@@ -425,7 +425,7 @@ func (c *MetricsCollectorChain) GetName() string {
 	return "chain"
 }
 
-func (c *MetricsCollectorChain) Collect(event Event) error {
+func (c *MetricsCollectorChain) Collect(event TelemetryEvent) error {
 	for _, collector := range c.collectors {
 		if err := collector.Collect(event); err != nil {
 			continue

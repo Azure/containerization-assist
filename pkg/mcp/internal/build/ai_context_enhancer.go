@@ -3,10 +3,9 @@ package build
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -32,26 +31,19 @@ type AIToolContext struct {
 	StartTime     time.Time     `json:"start_time"`
 	Duration      time.Duration `json:"duration,omitempty"`
 	Success       bool          `json:"success"`
-
 	// Input and output analysis
 	InputAnalysis  *InputAnalysis  `json:"input_analysis"`
 	OutputAnalysis *OutputAnalysis `json:"output_analysis"`
-
 	// Error context
 	ErrorContext *ErrorContextInfo `json:"error_context,omitempty"`
-
 	// Performance insights
 	PerformanceMetrics *AIPerformanceMetrics `json:"performance_metrics"`
-
 	// Resource usage
 	ResourceUsage *ResourceUsageInfo `json:"resource_usage"`
-
 	// Workflow context
 	WorkflowPosition *WorkflowPosition `json:"workflow_position"`
-
 	// Previous attempts
 	PreviousAttempts []AttemptSummary `json:"previous_attempts"`
-
 	// AI recommendations
 	AIRecommendations *AIRecommendations `json:"ai_recommendations"`
 }
@@ -144,71 +136,60 @@ type AIValidationResult struct {
 	Status  string `json:"status"` // valid, invalid, warning
 	Message string `json:"message"`
 }
-
 type AIPatternMatch struct {
 	Pattern     string  `json:"pattern"`
 	Confidence  float64 `json:"confidence"`
 	Description string  `json:"description"`
 }
-
 type AIQualityMetric struct {
 	Name  string  `json:"name"`
 	Value float64 `json:"value"`
 	Unit  string  `json:"unit"`
 }
-
 type AISimilarError struct {
 	ErrorMessage string    `json:"error_message"`
 	Resolution   string    `json:"resolution"`
 	Success      bool      `json:"success"`
 	Timestamp    time.Time `json:"timestamp"`
 }
-
 type AIPerformanceIssue struct {
 	Type        string `json:"type"`
 	Severity    string `json:"severity"`
 	Description string `json:"description"`
 	Suggestion  string `json:"suggestion"`
 }
-
 type AIFileChange struct {
 	Path      string `json:"path"`
 	Operation string `json:"operation"` // create, modify, delete
 	Size      int64  `json:"size"`
 }
-
 type AIEnvChange struct {
 	Variable string `json:"variable"`
 	OldValue string `json:"old_value"`
 	NewValue string `json:"new_value"`
 }
-
 type AIActionRecommendation struct {
 	Action     string  `json:"action"`
 	Confidence float64 `json:"confidence"`
 	Reasoning  string  `json:"reasoning"`
 	Priority   int     `json:"priority"`
 }
-
 type AIOptimizationTip struct {
 	Area        string `json:"area"`
 	Suggestion  string `json:"suggestion"`
 	ImpactLevel string `json:"impact_level"` // high, medium, low
 }
-
 type AIRiskMitigation struct {
 	Risk       string `json:"risk"`
 	Mitigation string `json:"mitigation"`
 	Urgency    string `json:"urgency"` // immediate, soon, eventual
 }
-
 type AIQualityImprovement struct {
 	Aspect       string  `json:"aspect"`
 	CurrentScore float64 `json:"current_score"`
 	TargetScore  float64 `json:"target_score"`
 	Improvement  string  `json:"improvement"`
 }
-
 type AIContextualInsight struct {
 	Category string `json:"category"`
 	Insight  string `json:"insight"`
@@ -229,50 +210,39 @@ func (e *AIContextEnhancer) EnhanceContext(
 		Str("tool_name", toolName).
 		Str("operation_type", operationType).
 		Msg("Enhancing context for AI analysis")
-
 	aiContext := &AIToolContext{
 		ToolName:      toolName,
 		OperationType: operationType,
 		StartTime:     time.Now(),
 		Success:       toolError == nil,
 	}
-
 	// Analyze inputs if available
 	if inputData := e.extractInputData(ctx); inputData != nil {
 		aiContext.InputAnalysis = e.analyzeInput(inputData)
 	}
-
 	// Analyze outputs if available
 	if toolResult != nil {
 		aiContext.OutputAnalysis = e.analyzeOutput(toolResult)
 	}
-
 	// Analyze errors if present
 	if toolError != nil {
 		aiContext.ErrorContext = e.analyzeError(toolError, sessionID)
 	}
-
 	// Add performance metrics
 	aiContext.PerformanceMetrics = e.gatherPerformanceMetrics(toolName)
-
 	// Add resource usage
 	aiContext.ResourceUsage = e.gatherResourceUsage()
-
 	// Determine workflow position
 	aiContext.WorkflowPosition = e.analyzeWorkflowPosition(ctx, sessionID, toolName)
-
 	// Get previous attempts
 	aiContext.PreviousAttempts = e.getPreviousAttempts(sessionID, toolName)
-
 	// Generate AI recommendations
 	aiContext.AIRecommendations = e.generateRecommendations(aiContext)
-
 	// Share the enhanced context
 	contextType := fmt.Sprintf("ai_context_%s", toolName)
 	if err := e.contextSharer.ShareContext(ctx, sessionID, contextType, aiContext); err != nil {
 		e.logger.Warn().Err(err).Msg("Failed to share enhanced AI context")
 	}
-
 	return aiContext, nil
 }
 
@@ -285,7 +255,6 @@ func (e *AIContextEnhancer) analyzeInput(inputData interface{}) *InputAnalysis {
 		RiskFactors:       []string{},
 		InputMetadata:     make(map[string]interface{}),
 	}
-
 	// Analyze input complexity
 	if inputMap, ok := inputData.(map[string]interface{}); ok {
 		paramCount := len(inputMap)
@@ -296,12 +265,10 @@ func (e *AIContextEnhancer) analyzeInput(inputData interface{}) *InputAnalysis {
 		} else {
 			analysis.InputComplexity = "high"
 		}
-
 		// Extract key parameters
 		for key := range inputMap {
 			analysis.KeyParameters = append(analysis.KeyParameters, key)
 		}
-
 		// Identify common patterns
 		if _, hasImage := inputMap["image_ref"]; hasImage {
 			analysis.PatternMatches = append(analysis.PatternMatches, AIPatternMatch{
@@ -310,7 +277,6 @@ func (e *AIContextEnhancer) analyzeInput(inputData interface{}) *InputAnalysis {
 				Description: "Container image deployment pattern detected",
 			})
 		}
-
 		if _, hasNamespace := inputMap["namespace"]; hasNamespace {
 			analysis.PatternMatches = append(analysis.PatternMatches, AIPatternMatch{
 				Pattern:     "kubernetes_deployment",
@@ -319,7 +285,6 @@ func (e *AIContextEnhancer) analyzeInput(inputData interface{}) *InputAnalysis {
 			})
 		}
 	}
-
 	return analysis
 }
 
@@ -331,7 +296,6 @@ func (e *AIContextEnhancer) analyzeOutput(outputData interface{}) *OutputAnalysi
 		ImprovementAreas: []string{},
 		OutputMetadata:   make(map[string]interface{}),
 	}
-
 	// Analyze output structure and quality
 	if outputMap, ok := outputData.(map[string]interface{}); ok {
 		// Check for success indicators
@@ -342,16 +306,13 @@ func (e *AIContextEnhancer) analyzeOutput(outputData interface{}) *OutputAnalysi
 			analysis.OutputQuality = "poor"
 			analysis.CompletionStatus = "failed"
 		}
-
 		// Extract artifacts
 		if _, ok := outputMap["manifests"]; ok {
 			analysis.KeyArtifacts = append(analysis.KeyArtifacts, "kubernetes_manifests")
 		}
-
 		if imageRef, ok := outputMap["image_ref"].(string); ok && imageRef != "" {
 			analysis.KeyArtifacts = append(analysis.KeyArtifacts, "docker_image")
 		}
-
 		// Quality metrics
 		if duration, ok := outputMap["duration"].(time.Duration); ok {
 			analysis.QualityMetrics = append(analysis.QualityMetrics, AIQualityMetric{
@@ -361,7 +322,6 @@ func (e *AIContextEnhancer) analyzeOutput(outputData interface{}) *OutputAnalysi
 			})
 		}
 	}
-
 	return analysis
 }
 
@@ -372,19 +332,9 @@ func (e *AIContextEnhancer) analyzeError(err error, _ string) *ErrorContextInfo 
 		SimilarErrors:     []AISimilarError{},
 		ErrorMetadata:     make(map[string]interface{}),
 	}
-
 	// Analyze error type and severity
-	if richErr, ok := err.(*types.RichError); ok {
-		errorInfo.ErrorType = richErr.Type
-		errorInfo.ErrorSeverity = richErr.Severity
-	} else if mcpRichErr, ok := err.(*mcptypes.RichError); ok {
-		errorInfo.ErrorType = mcpRichErr.Type
-		errorInfo.ErrorSeverity = mcpRichErr.Severity
-	} else {
-		errorInfo.ErrorType = "unknown_error"
-		errorInfo.ErrorSeverity = "medium"
-	}
-
+	errorInfo.ErrorType = "build_error"
+	errorInfo.ErrorSeverity = "medium"
 	// Determine fix probability based on error type
 	switch errorInfo.ErrorType {
 	case "network_error", "timeout_error":
@@ -400,18 +350,15 @@ func (e *AIContextEnhancer) analyzeError(err error, _ string) *ErrorContextInfo 
 		errorInfo.FixProbability = "medium"
 		errorInfo.FixComplexity = "moderate"
 	}
-
 	// Root cause analysis
 	errorMsg := err.Error()
 	errorInfo.RootCauseAnalysis = e.performRootCauseAnalysis(errorMsg)
-
 	return errorInfo
 }
 
 // performRootCauseAnalysis analyzes error messages for root causes
 func (e *AIContextEnhancer) performRootCauseAnalysis(errorMsg string) []string {
 	causes := []string{}
-
 	// Common patterns
 	patterns := map[string]string{
 		"connection refused": "network_connectivity_issue",
@@ -422,17 +369,14 @@ func (e *AIContextEnhancer) performRootCauseAnalysis(errorMsg string) []string {
 		"image pull":         "image_accessibility_issue",
 		"resource quota":     "resource_limits_exceeded",
 	}
-
 	for pattern, cause := range patterns {
-		if contains([]string{errorMsg}, pattern) {
+		if strings.Contains(errorMsg, pattern) {
 			causes = append(causes, cause)
 		}
 	}
-
 	if len(causes) == 0 {
 		causes = append(causes, "unknown_root_cause")
 	}
-
 	return causes
 }
 
@@ -464,7 +408,6 @@ func (e *AIContextEnhancer) analyzeWorkflowPosition(_ context.Context, _ string,
 		Dependencies:   []string{},
 		DependentTools: []string{},
 	}
-
 	// Workflow mapping
 	switch toolName {
 	case "analyze_repository":
@@ -502,7 +445,6 @@ func (e *AIContextEnhancer) analyzeWorkflowPosition(_ context.Context, _ string,
 		position.Dependencies = []string{"generate_manifests"}
 		position.WorkflowProgress = 0.95
 	}
-
 	return position
 }
 
@@ -521,7 +463,6 @@ func (e *AIContextEnhancer) generateRecommendations(aiContext *AIToolContext) *A
 		QualityImprovements: []AIQualityImprovement{},
 		ContextualInsights:  []AIContextualInsight{},
 	}
-
 	// Generate recommendations based on context
 	if aiContext.Success {
 		recommendations.NextBestActions = append(recommendations.NextBestActions, AIActionRecommendation{
@@ -547,7 +488,6 @@ func (e *AIContextEnhancer) generateRecommendations(aiContext *AIToolContext) *A
 			})
 		}
 	}
-
 	return recommendations
 }
 
@@ -564,10 +504,8 @@ func (e *AIContextEnhancer) GetEnhancedContext(ctx context.Context, sessionID, t
 	if err != nil {
 		return nil, err
 	}
-
 	if aiContext, ok := data.(*AIToolContext); ok {
 		return aiContext, nil
 	}
-
-	return nil, fmt.Errorf("invalid AI context type for tool %s", toolName)
+	return nil, fmt.Errorf("invalid context type")
 }

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
@@ -14,7 +15,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// MCPToolRegistry implements InternalToolRegistry for MCP atomic tools
+// MCPToolRegistry implements ToolInstanceRegistry for MCP atomic tools
 type MCPToolRegistry struct {
 	tools    map[string]ToolInfo
 	metadata map[string]*ToolMetadata
@@ -25,7 +26,7 @@ type MCPToolRegistry struct {
 // ToolInfo contains information about a registered tool
 type ToolInfo struct {
 	Name         string       `json:"name"`
-	Instance     interface{}  `json:"-"`
+	Instance     core.Tool    `json:"-"` // Use core.Tool interface instead of interface{}
 	Type         reflect.Type `json:"-"`
 	Category     string       `json:"category"`
 	Description  string       `json:"description"`
@@ -49,7 +50,7 @@ func NewMCPToolRegistry(logger zerolog.Logger) *MCPToolRegistry {
 	return registry
 }
 
-// RegisterTool registers a tool in the registry
+// RegisterTool registers a tool in the registry using core.Tool interface
 func (r *MCPToolRegistry) RegisterTool(name string, tool interface{}) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -58,24 +59,33 @@ func (r *MCPToolRegistry) RegisterTool(name string, tool interface{}) error {
 		return fmt.Errorf("tool %s is already registered", name)
 	}
 
+	// Type-safe conversion to core.Tool
+	coreTool, ok := tool.(core.Tool)
+	if !ok {
+		return fmt.Errorf("tool %s does not implement core.Tool interface", name)
+	}
+
+	// Get metadata from the tool itself (no reflection needed)
+	toolMetadata := coreTool.GetMetadata()
+
 	toolType := reflect.TypeOf(tool)
 	if toolType.Kind() == reflect.Ptr {
 		toolType = toolType.Elem()
 	}
 
-	// Create tool info
+	// Create tool info using metadata from tool
 	toolInfo := ToolInfo{
 		Name:         name,
-		Instance:     tool,
+		Instance:     coreTool, // Use core.Tool interface
 		Type:         toolType,
-		Category:     r.inferCategory(name),
-		Description:  r.inferDescription(name),
-		Version:      "1.0.0",
-		Dependencies: r.inferDependencies(name),
-		Capabilities: r.inferCapabilities(name),
+		Category:     toolMetadata.Category,
+		Description:  toolMetadata.Description,
+		Version:      toolMetadata.Version,
+		Dependencies: toolMetadata.Dependencies,
+		Capabilities: toolMetadata.Capabilities,
 	}
 
-	// Create metadata
+	// Create internal metadata structure (using reflection for legacy compatibility)
 	metadata := &ToolMetadata{
 		Name:         name,
 		Description:  toolInfo.Description,
@@ -112,6 +122,19 @@ func (r *MCPToolRegistry) GetTool(name string) (interface{}, error) {
 	}
 
 	return toolInfo.Instance, nil
+}
+
+// GetCoreTool retrieves a tool as core.Tool interface
+func (r *MCPToolRegistry) GetCoreTool(name string) (core.Tool, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	toolInfo, exists := r.tools[name]
+	if !exists {
+		return nil, fmt.Errorf("tool %s not found", name)
+	}
+
+	return toolInfo.Instance, nil // Instance is now core.Tool
 }
 
 // ListTools returns a list of all registered tool names
@@ -351,7 +374,7 @@ func (r *MCPToolRegistry) inferRequirements(name string) []string {
 	return []string{}
 }
 
-func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface{} {
+func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]string {
 	// Use reflection to infer parameters from the tool's Execute method
 	toolValue := reflect.ValueOf(tool)
 	toolType := toolValue.Type()
@@ -369,7 +392,7 @@ func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface
 	}
 
 	if !found {
-		return map[string]interface{}{}
+		return map[string]string{}
 	}
 
 	// Analyze method parameters
@@ -391,22 +414,37 @@ func (r *MCPToolRegistry) inferParameters(tool interface{}) map[string]interface
 		schemaJSON, err := json.Marshal(schema)
 		if err != nil {
 			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to marshal schema")
-			return map[string]interface{}{}
+			return map[string]string{}
 		}
 
 		var schemaMap map[string]interface{}
 		if err := json.Unmarshal(schemaJSON, &schemaMap); err != nil {
 			r.logger.Error().Err(err).Str("type", argsType.Name()).Msg("Failed to unmarshal schema")
-			return map[string]interface{}{}
+			return map[string]string{}
 		}
 
 		// Sanitize the schema to ensure array types have items
 		r.sanitizeInvopopSchema(schemaMap)
 
-		return schemaMap
+		// Convert to map[string]string
+		result := make(map[string]string)
+		if properties, ok := schemaMap["properties"].(map[string]interface{}); ok {
+			for k, v := range properties {
+				if prop, ok := v.(map[string]interface{}); ok {
+					if desc, ok := prop["description"]; ok {
+						result[k] = fmt.Sprintf("%v", desc)
+					} else if typ, ok := prop["type"]; ok {
+						result[k] = fmt.Sprintf("%v", typ)
+					} else {
+						result[k] = "parameter"
+					}
+				}
+			}
+		}
+		return result
 	}
 
-	return map[string]interface{}{}
+	return map[string]string{}
 }
 
 func (r *MCPToolRegistry) inferOutputSchema(tool interface{}) map[string]interface{} {

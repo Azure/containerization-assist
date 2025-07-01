@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/config"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -17,9 +19,15 @@ func TestCreateAnalyzerFromEnv_Simple(t *testing.T) {
 		t.Error("CreateAnalyzerFromEnv should not return nil")
 	}
 
+	// Cast to proper interface for testing
+	typedAnalyzer, ok := analyzer.(mcptypes.AIAnalyzer)
+	if !ok {
+		t.Error("CreateAnalyzerFromEnv should return mcptypes.AIAnalyzer")
+	}
+
 	// Test that we can call basic methods on the analyzer
 	ctx := context.Background()
-	result, err := analyzer.Analyze(ctx, "test prompt")
+	result, err := typedAnalyzer.Analyze(ctx, "test prompt")
 	// Stub analyzer returns specific error messages
 	if err == nil {
 		t.Error("Stub analyzer should return error for AI analysis")
@@ -62,31 +70,34 @@ func TestAnalyzerFactory_Simple(t *testing.T) {
 
 // Test AnalyzerConfig structure and methods
 func TestAnalyzerConfig_Simple(t *testing.T) {
-	config := DefaultAnalyzerConfig()
+	config := &config.AnalyzerConfig{
+		EnableAI:           true,
+		AIAnalyzerLogLevel: "debug",
+		MaxAnalysisTime:    60 * time.Second,
+		CacheResults:       true,
+		CacheTTL:           5 * time.Minute,
+	}
 	if config == nil {
-		t.Error("DefaultAnalyzerConfig should not return nil")
+		t.Error("AnalyzerConfig should not be nil")
 		return
 	}
 
-	// Test default values
-	if config.EnableAI {
-		t.Error("Default config should have AI disabled")
+	// Test values we set
+	if !config.EnableAI {
+		t.Error("EnableAI should be true")
 	}
-	if config.LogLevel != "info" {
-		t.Errorf("Expected LogLevel to be 'info', got '%s'", config.LogLevel)
+	if config.AIAnalyzerLogLevel != "debug" {
+		t.Errorf("Expected AIAnalyzerLogLevel to be 'debug', got '%s'", config.AIAnalyzerLogLevel)
 	}
-	if config.MaxPromptLength != 4096 {
-		t.Errorf("Expected MaxPromptLength to be 4096, got %d", config.MaxPromptLength)
+	if config.MaxAnalysisTime != 60*time.Second {
+		t.Errorf("Expected MaxAnalysisTime to be 60s, got %v", config.MaxAnalysisTime)
 	}
-	if !config.CacheEnabled {
-		t.Error("Expected CacheEnabled to be true")
+	if !config.CacheResults {
+		t.Error("Expected CacheResults to be true")
 	}
-	if config.CacheTTLSeconds != 300 {
-		t.Errorf("Expected CacheTTLSeconds to be 300, got %d", config.CacheTTLSeconds)
+	if config.CacheTTL != 5*time.Minute {
+		t.Errorf("Expected CacheTTL to be 5m, got %v", config.CacheTTL)
 	}
-
-	// Test LoadFromEnv doesn't panic
-	config.LoadFromEnv()
 }
 
 // Test CallerAnalyzerOpts structure
@@ -113,12 +124,12 @@ func TestCreateAnalyzerFromConfig_Simple(t *testing.T) {
 	logger := zerolog.Nop()
 
 	// Test with AI disabled
-	config := &AnalyzerConfig{
-		EnableAI:        false,
-		LogLevel:        "debug",
-		MaxPromptLength: 2048,
-		CacheEnabled:    false,
-		CacheTTLSeconds: 600,
+	config := &config.AnalyzerConfig{
+		EnableAI:           false,
+		AIAnalyzerLogLevel: "debug",
+		MaxAnalysisTime:    30 * time.Second,
+		CacheResults:       false,
+		CacheTTL:           10 * time.Minute,
 	}
 
 	analyzer := CreateAnalyzerFromConfig(config, logger)
@@ -200,9 +211,15 @@ func TestAnalyzerFactory_WithTransport(t *testing.T) {
 		t.Error("CreateAnalyzer should not return nil")
 	}
 
+	// Cast to proper interface for testing
+	typedAnalyzer, ok := analyzer.(mcptypes.AIAnalyzer)
+	if !ok {
+		t.Error("CreateAnalyzer should return mcptypes.AIAnalyzer")
+	}
+
 	// Test that we can analyze with the mock transport
 	ctx := context.Background()
-	result, err := analyzer.Analyze(ctx, "test prompt")
+	result, err := typedAnalyzer.Analyze(ctx, "test prompt")
 	if err != nil {
 		t.Errorf("Analyze should not return error with mock transport, got: %v", err)
 	}

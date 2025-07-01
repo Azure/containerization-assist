@@ -3,7 +3,10 @@ package deploy
 import (
 	"context"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	// mcp import removed - using mcptypes
+
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -18,7 +21,7 @@ type AtomicGenerateManifestsTool struct {
 }
 
 // NewAtomicGenerateManifestsTool creates a basic atomic tool for compatibility
-func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, sessionManager mcptypes.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateManifestsTool {
+func NewAtomicGenerateManifestsTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicGenerateManifestsTool {
 	baseTool := NewGenerateManifestsTool(logger, "/tmp/container-kit")
 	return &AtomicGenerateManifestsTool{
 		logger:   logger.With().Str("tool", "atomic_generate_manifests").Logger(),
@@ -37,7 +40,7 @@ func (t *AtomicGenerateManifestsTool) Execute(ctx context.Context, args interfac
 }
 
 // GetMetadata delegates to the base tool
-func (t *AtomicGenerateManifestsTool) GetMetadata() mcptypes.ToolMetadata {
+func (t *AtomicGenerateManifestsTool) GetMetadata() core.ToolMetadata {
 	return t.baseTool.GetMetadata()
 }
 

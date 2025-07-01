@@ -9,22 +9,20 @@ import (
 
 // Test BuildError Error method
 func TestBuildErrorError(t *testing.T) {
-	err := &BuildError{
+	err := &CommonBuildError{
 		Code:    "BUILD_FAILED",
 		Message: "Docker build failed",
 		Stage:   "build",
 		Type:    "docker_error",
 	}
-
 	if err.Error() != "Docker build failed" {
 		t.Errorf("Expected Error() to return 'Docker build failed', got '%s'", err.Error())
 	}
 }
 
-// Test NewBuildError constructor
-func TestNewBuildError(t *testing.T) {
-	err := NewBuildError("BUILD_TIMEOUT", "Build operation timed out", "compilation", "timeout_error")
-
+// Test NewCommonBuildError constructor
+func TestNewCommonBuildError(t *testing.T) {
+	err := NewCommonBuildError("BUILD_TIMEOUT", "Build operation timed out", "compilation", "timeout_error")
 	if err == nil {
 		t.Error("NewBuildError should not return nil")
 	}
@@ -44,14 +42,13 @@ func TestNewBuildError(t *testing.T) {
 
 // Test BuildError struct fields
 func TestBuildErrorStruct(t *testing.T) {
-	err := BuildError{
+	err := CommonBuildError{
 		Code:    "VALIDATION_ERROR",
 		Message: "Invalid dockerfile syntax",
 		Stage:   "validation",
 		Type:    "syntax_error",
 		Line:    15,
 	}
-
 	if err.Code != "VALIDATION_ERROR" {
 		t.Errorf("Expected Code to be 'VALIDATION_ERROR', got '%s'", err.Code)
 	}
@@ -81,7 +78,6 @@ func TestDetermineImpact(t *testing.T) {
 		{"unknown", "performance"},
 		{"", "performance"},
 	}
-
 	for _, tc := range testCases {
 		result := determineImpact(tc.warningType)
 		if result != tc.expected {
@@ -111,9 +107,7 @@ func TestConvertCoreResult(t *testing.T) {
 			},
 		},
 	}
-
 	result := ConvertCoreResult(coreResult)
-
 	if result == nil {
 		t.Error("ConvertCoreResult should not return nil")
 	}
@@ -149,7 +143,6 @@ func TestValidationResult(t *testing.T) {
 		},
 		Info: []string{"Dockerfile validated successfully"},
 	}
-
 	if !result.Valid {
 		t.Error("Expected Valid to be true")
 	}
@@ -178,7 +171,6 @@ func TestValidationError(t *testing.T) {
 		Message: "Missing required instruction",
 		Rule:    "DL3001",
 	}
-
 	if error.Line != 20 {
 		t.Errorf("Expected Line to be 20, got %d", error.Line)
 	}
@@ -201,7 +193,6 @@ func TestValidationWarning(t *testing.T) {
 		Message: "Consider using specific version",
 		Rule:    "DL3006",
 	}
-
 	if warning.Line != 30 {
 		t.Errorf("Expected Line to be 30, got %d", warning.Line)
 	}
@@ -228,7 +219,6 @@ func TestBuildContext(t *testing.T) {
 		Platform:       "linux/amd64",
 		NoCache:        true,
 	}
-
 	if context.SessionID != "session-123" {
 		t.Errorf("Expected SessionID to be 'session-123', got '%s'", context.SessionID)
 	}
@@ -268,7 +258,6 @@ func TestBuildResult(t *testing.T) {
 		BuildLogs:      []string{"Step 1/5", "Step 2/5"},
 		CacheHits:      3,
 	}
-
 	if !result.Success {
 		t.Error("Expected Success to be true")
 	}
@@ -305,7 +294,6 @@ func TestSecurityIssue(t *testing.T) {
 		Line:        25,
 		Remediation: "Update to latest version",
 	}
-
 	if issue.Severity != "high" {
 		t.Errorf("Expected Severity to be 'high', got '%s'", issue.Severity)
 	}
@@ -331,7 +319,6 @@ func TestComplianceViolation(t *testing.T) {
 		Message:  "Do not use root user",
 		Line:     18,
 	}
-
 	if violation.Standard != "CIS Docker Benchmark" {
 		t.Errorf("Expected Standard to be 'CIS Docker Benchmark', got '%s'", violation.Standard)
 	}

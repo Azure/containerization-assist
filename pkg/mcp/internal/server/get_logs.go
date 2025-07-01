@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -203,8 +204,8 @@ func CreateGlobalLogProvider() *RingBufferLogProvider {
 }
 
 // GetMetadata returns comprehensive metadata about the get logs tool
-func (t *GetLogsTool) GetMetadata() mcptypes.ToolMetadata {
-	return mcptypes.ToolMetadata{
+func (t *GetLogsTool) GetMetadata() core.ToolMetadata {
+	return core.ToolMetadata{
 		Name:        "get_logs",
 		Description: "Retrieve server logs with filtering, pattern matching, and format options",
 		Version:     "1.0.0",

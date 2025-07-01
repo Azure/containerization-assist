@@ -4,20 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	obs "github.com/Azure/container-kit/pkg/mcp/internal/observability"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
 // PromptManager manages conversation flow and tool orchestration
 type PromptManager struct {
 	sessionManager      *session.SessionManager
-	toolOrchestrator    orchestration.InternalToolOrchestrator
+	toolOrchestrator    core.Orchestrator
 	preFlightChecker    *obs.PreFlightChecker
 	preferenceStore     *utils.PreferenceStore
 	retryManager        *SimpleRetryManager
@@ -28,7 +26,7 @@ type PromptManager struct {
 // PromptManagerConfig holds configuration for the prompt manager
 type PromptManagerConfig struct {
 	SessionManager   *session.SessionManager
-	ToolOrchestrator orchestration.InternalToolOrchestrator
+	ToolOrchestrator core.Orchestrator
 	PreferenceStore  *utils.PreferenceStore
 	Logger           zerolog.Logger
 }
@@ -53,7 +51,7 @@ func (pm *PromptManager) SetConversationHandler(handler *ConversationHandler) {
 // newResponse creates a new ConversationResponse with the session ID set
 func (pm *PromptManager) newResponse(state *ConversationState) *ConversationResponse {
 	return &ConversationResponse{
-		SessionID: state.SessionID,
+		SessionID: state.SessionState.SessionID,
 	}
 }
 
@@ -65,16 +63,16 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	// Type assert to concrete session type
-	session, ok := sessionInterface.(*sessiontypes.SessionState)
+	// Type assert to internal session type and work with it directly
+	internalSession, ok := sessionInterface.(*session.SessionState)
 	if !ok {
-		return nil, fmt.Errorf("session type assertion failed")
+		return nil, fmt.Errorf("session type assertion failed: expected *session.SessionState, got %T", sessionInterface)
 	}
 
-	// Create conversation state from session state
+	// Create conversation state from internal session state (no conversion needed)
 	convState := &ConversationState{
-		SessionState: session,
-		CurrentStage: types.StageInit,
+		SessionState: internalSession,
+		CurrentStage: core.ConversationStagePreFlight,
 		History:      make([]ConversationTurn, 0),
 		Preferences: types.UserPreferences{
 			Namespace:          "default",
@@ -87,9 +85,11 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Restore context from session if available
-	if session.RepoAnalysis != nil {
-		if ctx, ok := session.RepoAnalysis["_context"].(map[string]interface{}); ok {
-			convState.Context = ctx
+	if internalSession.Metadata != nil {
+		if repoAnalysis, ok := internalSession.Metadata["repo_analysis"].(map[string]interface{}); ok {
+			if ctx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
+				convState.Context = ctx
+			}
 		}
 	}
 
@@ -102,7 +102,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Check if pre-flight checks are needed
-	if convState.CurrentStage == types.StageInit && !pm.hasPassedPreFlightChecks(convState) {
+	if convState.CurrentStage == core.ConversationStagePreFlight && !pm.hasPassedPreFlightChecks(convState) {
 		response := pm.handlePreFlightChecks(ctx, convState, userInput)
 		return response, nil
 	}
@@ -131,7 +131,10 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	// Route based on current stage and input
 	var response *ConversationResponse
 
-	switch convState.CurrentStage {
+	// Convert core.ConversationStage to types.ConversationStage for internal use
+	internalStage := mapMCPStageToDetailedStage(convState.CurrentStage, convState.Context)
+
+	switch internalStage {
 	case types.StageWelcome:
 		response = pm.handleWelcomeStage(ctx, convState, userInput)
 	case types.StageInit:
@@ -153,10 +156,10 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	default:
 		response = &ConversationResponse{
 			Message: "I'm not sure what stage we're in. Let's start over. What would you like to containerize?",
-			Stage:   types.StageInit,
+			Stage:   convertFromTypesStage(types.StageInit),
 			Status:  ResponseStatusError,
 		}
-		convState.SetStage(types.StageInit)
+		convState.SetStage(convertFromTypesStage(types.StageInit))
 	}
 
 	// Add tool calls to turn if any were made
@@ -170,7 +173,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 
 	// Update session
 	err = pm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if sess, ok := s.(*mcptypes.SessionState); ok {
+		if sess, ok := s.(*core.SessionState); ok {
 			sess.CurrentStage = string(response.Stage)
 			sess.Status = string(response.Status)
 		}
@@ -180,7 +183,7 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 	}
 
 	// Ensure response has the session ID
-	response.SessionID = convState.SessionID
+	response.SessionID = convState.SessionState.SessionID
 
 	return response, nil
 }

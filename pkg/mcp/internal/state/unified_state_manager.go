@@ -2,6 +2,9 @@ package state
 
 import (
 	"context"
+
+	"github.com/Azure/container-kit/pkg/mcp/core"
+
 	crypto_rand "crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -9,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/rs/zerolog"
 )
 
@@ -52,7 +54,6 @@ const (
 	StateEventCreated   StateEventType = "created"
 	StateEventUpdated   StateEventType = "updated"
 	StateEventDeleted   StateEventType = "deleted"
-	StateEventMigrated  StateEventType = "migrated"
 	StateEventSynced    StateEventType = "synced"
 	StateEventValidated StateEventType = "validated"
 )
@@ -67,18 +68,12 @@ type StateValidator interface {
 	ValidateState(ctx context.Context, stateType StateType, state interface{}) error
 }
 
-// StateMigrator handles state migrations
-type StateMigrator interface {
-	MigrateState(ctx context.Context, stateType StateType, fromVersion, toVersion string, state interface{}) (interface{}, error)
-}
-
 // UnifiedStateManager manages all state in the system
 type UnifiedStateManager struct {
 	sessionManager  *session.SessionManager
 	stateProviders  map[StateType]StateProvider
 	observers       []StateObserver
 	validators      map[StateType]StateValidator
-	migrators       map[StateType]StateMigrator
 	eventStore      *StateEventStore
 	syncCoordinator *StateSyncCoordinator
 	mu              sync.RWMutex
@@ -99,7 +94,6 @@ func NewUnifiedStateManager(sessionManager *session.SessionManager, logger zerol
 		sessionManager:  sessionManager,
 		stateProviders:  make(map[StateType]StateProvider),
 		validators:      make(map[StateType]StateValidator),
-		migrators:       make(map[StateType]StateMigrator),
 		eventStore:      NewStateEventStore(logger),
 		syncCoordinator: NewStateSyncCoordinator(logger),
 		logger:          logger.With().Str("component", "unified_state_manager").Logger(),
@@ -128,14 +122,6 @@ func (m *UnifiedStateManager) RegisterValidator(stateType StateType, validator S
 	defer m.mu.Unlock()
 	m.validators[stateType] = validator
 	m.logger.Info().Str("state_type", string(stateType)).Msg("Registered state validator")
-}
-
-// RegisterMigrator registers a state migrator
-func (m *UnifiedStateManager) RegisterMigrator(stateType StateType, migrator StateMigrator) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.migrators[stateType] = migrator
-	m.logger.Info().Str("state_type", string(stateType)).Msg("Registered state migrator")
 }
 
 // GetState retrieves state of a specific type
@@ -228,22 +214,22 @@ func (m *UnifiedStateManager) DeleteState(ctx context.Context, stateType StateTy
 }
 
 // GetSessionState gets session state with type safety
-func (m *UnifiedStateManager) GetSessionState(_ context.Context, sessionID string) (*sessiontypes.SessionState, error) {
+func (m *UnifiedStateManager) GetSessionState(_ context.Context, sessionID string) (*core.SessionState, error) {
 	state, err := m.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	if sessionState, ok := state.(*sessiontypes.SessionState); ok {
+	if sessionState, ok := state.(*core.SessionState); ok {
 		return sessionState, nil
 	}
 	return nil, fmt.Errorf("state is not of type *SessionState")
 }
 
 // UpdateSessionState updates session state with validation
-func (m *UnifiedStateManager) UpdateSessionState(_ context.Context, sessionID string, updates func(*sessiontypes.SessionState) error) error {
+func (m *UnifiedStateManager) UpdateSessionState(_ context.Context, sessionID string, updates func(*core.SessionState) error) error {
 	// Use the session manager's UpdateSession method
 	return m.sessionManager.UpdateSession(sessionID, func(current interface{}) {
-		if sessionState, ok := current.(*sessiontypes.SessionState); ok {
+		if sessionState, ok := current.(*core.SessionState); ok {
 			// Apply updates - ignore error for now as the interface doesn't support returning errors
 			_ = updates(sessionState)
 		}
@@ -267,59 +253,6 @@ func (m *UnifiedStateManager) SyncStates(ctx context.Context, sourceType, target
 // GetStateHistory retrieves state change history
 func (m *UnifiedStateManager) GetStateHistory(_ context.Context, stateType StateType, stateID string, limit int) ([]*StateEvent, error) {
 	return m.eventStore.GetEvents(stateType, stateID, limit)
-}
-
-// MigrateState migrates state to a new version
-func (m *UnifiedStateManager) MigrateState(ctx context.Context, stateType StateType, id string, fromVersion, toVersion string) error {
-	m.mu.RLock()
-	provider := m.stateProviders[stateType]
-	migrator := m.migrators[stateType]
-	m.mu.RUnlock()
-
-	if provider == nil {
-		return fmt.Errorf("no provider registered for state type: %s", stateType)
-	}
-
-	if migrator == nil {
-		return fmt.Errorf("no migrator registered for state type: %s", stateType)
-	}
-
-	// Get current state
-	currentState, err := provider.GetState(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	// Migrate state
-	migratedState, err := migrator.MigrateState(ctx, stateType, fromVersion, toVersion, currentState)
-	if err != nil {
-		return fmt.Errorf("migration failed: %w", err)
-	}
-
-	// Save migrated state
-	if err := provider.SetState(ctx, id, migratedState); err != nil {
-		return err
-	}
-
-	// Notify observers
-	event := &StateEvent{
-		ID:        generateEventID(),
-		Type:      StateEventMigrated,
-		StateType: stateType,
-		StateID:   id,
-		OldValue:  currentState,
-		NewValue:  migratedState,
-		Metadata: map[string]interface{}{
-			"from_version": fromVersion,
-			"to_version":   toVersion,
-		},
-		Timestamp: time.Now(),
-	}
-
-	m.notifyObservers(event)
-	m.eventStore.StoreEvent(event)
-
-	return nil
 }
 
 // notifyObservers notifies all registered observers of a state change

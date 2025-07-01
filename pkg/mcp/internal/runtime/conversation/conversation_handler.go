@@ -6,14 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
 
@@ -22,7 +21,7 @@ import (
 type ConversationHandler struct {
 	promptManager    *PromptManager
 	sessionManager   *session.SessionManager
-	toolOrchestrator orchestration.InternalToolOrchestrator
+	toolOrchestrator core.Orchestrator
 	preferenceStore  *utils.PreferenceStore
 	logger           zerolog.Logger
 }
@@ -32,9 +31,9 @@ type ConversationHandlerConfig struct {
 	SessionManager     *session.SessionManager
 	SessionAdapter     *session.SessionManager // Pre-created session adapter for tools
 	PreferenceStore    *utils.PreferenceStore
-	PipelineOperations mcptypes.PipelineOperations        // Using interface instead of concrete adapter
+	PipelineOperations core.PipelineOperations            // Using interface instead of concrete adapter
 	ToolOrchestrator   *orchestration.MCPToolOrchestrator // Optional: use existing orchestrator
-	Transport          interface{}                        // Accept both mcptypes.Transport and internal transport.Transport
+	Transport          interface{}                        // Accept both core.Transport and internal transport.Transport
 	Logger             zerolog.Logger
 	Telemetry          *observability.TelemetryManager
 }
@@ -42,7 +41,7 @@ type ConversationHandlerConfig struct {
 // NewConversationHandler creates a new concrete conversation handler
 func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHandler, error) {
 	// Use provided orchestrator or create adapter
-	var toolOrchestrator orchestration.InternalToolOrchestrator
+	var toolOrchestrator core.Orchestrator
 	if config.ToolOrchestrator != nil {
 		// Use the provided canonical orchestrator directly
 		toolOrchestrator = config.ToolOrchestrator
@@ -150,11 +149,16 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 		sessionInterface, err := ch.sessionManager.GetSession(sessionID)
 		if err == nil && sessionInterface != nil {
 			// Type assert to concrete session type
-			if session, ok := sessionInterface.(*sessiontypes.SessionState); ok && session.RepoAnalysis != nil {
-				if sessionCtx, ok := session.RepoAnalysis["_context"].(map[string]interface{}); ok {
-					if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
-						// Override user preferences when autopilot is explicitly enabled
-						userPrefs.SkipConfirmations = true
+			if sessionState, ok := sessionInterface.(*session.SessionState); ok {
+				coreSession := sessionState.ToCoreSessionState()
+				if coreSession.Metadata != nil {
+					if repoAnalysis, ok := coreSession.Metadata["repo_analysis"].(map[string]interface{}); ok {
+						if sessionCtx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
+							if autopilotEnabled, exists := sessionCtx["autopilot_enabled"].(bool); exists && autopilotEnabled {
+								// Override user preferences when autopilot is explicitly enabled
+								userPrefs.SkipConfirmations = true
+							}
+						}
 					}
 				}
 			}

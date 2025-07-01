@@ -4,25 +4,21 @@ import (
 	"context"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // UnifiedAnalyzer combines AI and tool-specific analysis capabilities
 type UnifiedAnalyzer interface {
 	// Core AI capabilities from AIAnalyzer interface
-	mcptypes.AIAnalyzer
-
+	core.AIAnalyzer
 	// Enhanced analysis capabilities
 	AnalyzeFailure(ctx context.Context, failure *AnalysisRequest) (*AnalysisResult, error)
 	GetCapabilities() *AnalyzerCapabilities
-
 	// Repository integration
 	AnalyzeWithRepository(ctx context.Context, request *RepositoryAnalysisRequest) (*RepositoryAwareAnalysis, error)
-
 	// Cross-tool coordination
 	ShareInsights(ctx context.Context, insights *ToolInsights) error
 	GetSharedKnowledge(ctx context.Context, domain string) (*SharedKnowledge, error)
-
 	// Performance optimization
 	OptimizeBuildStrategy(ctx context.Context, request *BuildOptimizationRequest) (*OptimizedBuildStrategy, error)
 	PredictFailures(ctx context.Context, buildContext *AnalysisBuildContext) (*FailurePrediction, error)
@@ -69,7 +65,7 @@ type AnalysisResult struct {
 // RepositoryAnalysisRequest combines repository info with analysis context
 type RepositoryAnalysisRequest struct {
 	AnalysisRequest
-	RepositoryInfo  *RepositoryInfo      `json:"repository_info"`
+	RepositoryInfo  *core.RepositoryInfo `json:"repository_info"` // Use core interface
 	ProjectMetadata *ProjectMetadata     `json:"project_metadata"`
 	BuildHistory    []*BuildHistoryEntry `json:"build_history"`
 }
@@ -140,7 +136,6 @@ type FailurePrediction struct {
 }
 
 // Supporting types for comprehensive analysis
-
 type FixStrategy struct {
 	Name          string                 `json:"name"`
 	Description   string                 `json:"description"`
@@ -151,7 +146,6 @@ type FixStrategy struct {
 	Prerequisites []string               `json:"prerequisites"`
 	Metadata      map[string]interface{} `json:"metadata"`
 }
-
 type RelatedFailure struct {
 	FailureType  string    `json:"failure_type"`
 	Similarity   float64   `json:"similarity"`
@@ -159,7 +153,6 @@ type RelatedFailure struct {
 	LastOccurred time.Time `json:"last_occurred"`
 	Frequency    int       `json:"frequency"`
 }
-
 type ImpactAssessment struct {
 	BusinessImpact  string        `json:"business_impact"`
 	TechnicalImpact string        `json:"technical_impact"`
@@ -168,7 +161,6 @@ type ImpactAssessment struct {
 	CostEstimate    float64       `json:"cost_estimate"`
 	UrgencyScore    float64       `json:"urgency_score"`
 }
-
 type ProjectMetadata struct {
 	Language     string                 `json:"language"`
 	Framework    string                 `json:"framework"`
@@ -178,7 +170,6 @@ type ProjectMetadata struct {
 	Complexity   string                 `json:"complexity"`
 	Attributes   map[string]interface{} `json:"attributes"`
 }
-
 type BuildHistoryEntry struct {
 	Timestamp    time.Time      `json:"timestamp"`
 	Success      bool           `json:"success"`
@@ -187,7 +178,6 @@ type BuildHistoryEntry struct {
 	FixApplied   string         `json:"fix_applied,omitempty"`
 	ResourceUsed *ResourceUsage `json:"resource_used"`
 }
-
 type ProjectInsights struct {
 	CodeQuality     *QualityMetrics       `json:"code_quality"`
 	Architecture    *ArchitectureInsights `json:"architecture"`
@@ -195,14 +185,12 @@ type ProjectInsights struct {
 	Maintainability *MaintainabilityScore `json:"maintainability"`
 	TestCoverage    *TestCoverageInfo     `json:"test_coverage"`
 }
-
 type FrameworkOptimization struct {
 	Framework     string   `json:"framework"`
 	Optimizations []string `json:"optimizations"`
 	Impact        string   `json:"impact"`
 	Difficulty    string   `json:"difficulty"`
 }
-
 type DependencyAnalysis struct {
 	OutdatedDeps    []string            `json:"outdated_deps"`
 	SecurityIssues  []string            `json:"security_issues"`
@@ -210,14 +198,12 @@ type DependencyAnalysis struct {
 	SizeImpact      *SizeImpactAnalysis `json:"size_impact"`
 	Recommendations []string            `json:"recommendations"`
 }
-
 type GeneralSecurityAnalysis struct {
 	VulnerabilityCount int      `json:"vulnerability_count"`
 	RiskLevel          string   `json:"risk_level"`
 	CriticalIssues     []string `json:"critical_issues"`
 	Recommendations    []string `json:"recommendations"`
 }
-
 type SuccessPattern struct {
 	PatternName string                 `json:"pattern_name"`
 	Conditions  []string               `json:"conditions"`
@@ -225,7 +211,6 @@ type SuccessPattern struct {
 	SuccessRate float64                `json:"success_rate"`
 	Context     map[string]interface{} `json:"context"`
 }
-
 type FailurePattern struct {
 	PatternName      string                 `json:"pattern_name"`
 	FailureType      string                 `json:"failure_type"`
@@ -234,7 +219,6 @@ type FailurePattern struct {
 	Frequency        int                    `json:"frequency"`
 	Context          map[string]interface{} `json:"context"`
 }
-
 type GeneralOptimizationTip struct {
 	Category      string  `json:"category"`
 	Tip           string  `json:"tip"`
@@ -242,7 +226,6 @@ type GeneralOptimizationTip struct {
 	Difficulty    string  `json:"difficulty"`
 	Applicability float64 `json:"applicability"`
 }
-
 type AggregatedMetrics struct {
 	TotalOperations  int           `json:"total_operations"`
 	SuccessRate      float64       `json:"success_rate"`
@@ -250,47 +233,6 @@ type AggregatedMetrics struct {
 	ImprovementTrend float64       `json:"improvement_trend"`
 	CommonIssueTypes []string      `json:"common_issue_types"`
 }
-
-type BuildConstraints struct {
-	MaxDuration   time.Duration `json:"max_duration"`
-	MaxMemory     int64         `json:"max_memory"`
-	MaxCPU        float64       `json:"max_cpu"`
-	AllowedTools  []string      `json:"allowed_tools"`
-	SecurityLevel string        `json:"security_level"`
-}
-
-type OptimizationGoals struct {
-	PrimarGoal      string        `json:"primary_goal"` // speed, size, security, reliability
-	AcceptableRisk  string        `json:"acceptable_risk"`
-	TimeConstraints time.Duration `json:"time_constraints"`
-	QualityLevel    string        `json:"quality_level"`
-}
-
-type BuildStep struct {
-	Name         string            `json:"name"`
-	Command      string            `json:"command"`
-	Args         []string          `json:"args"`
-	WorkingDir   string            `json:"working_dir"`
-	Environment  map[string]string `json:"environment"`
-	ExpectedTime time.Duration     `json:"expected_time"`
-	CriticalPath bool              `json:"critical_path"`
-	Parallel     bool              `json:"parallel"`
-}
-
-type ResourceEstimate struct {
-	CPU     float64 `json:"cpu"`
-	Memory  int64   `json:"memory"`
-	Disk    int64   `json:"disk"`
-	Network int64   `json:"network"`
-}
-
-type RiskAssessment struct {
-	OverallRisk   string   `json:"overall_risk"`
-	RiskFactors   []string `json:"risk_factors"`
-	Mitigations   []string `json:"mitigations"`
-	FailurePoints []string `json:"failure_points"`
-}
-
 type PredictedFailure struct {
 	FailureType       string   `json:"failure_type"`
 	Probability       float64  `json:"probability"`
@@ -307,7 +249,6 @@ type QualityMetrics struct {
 	Security        float64 `json:"security"`
 	Performance     float64 `json:"performance"`
 }
-
 type ArchitectureInsights struct {
 	Pattern         string   `json:"pattern"`
 	Complexity      string   `json:"complexity"`
@@ -315,34 +256,29 @@ type ArchitectureInsights struct {
 	CouplingLevel   string   `json:"coupling_level"`
 	Recommendations []string `json:"recommendations"`
 }
-
 type TechDebtAnalysis struct {
 	DebtLevel        string        `json:"debt_level"`
 	CriticalAreas    []string      `json:"critical_areas"`
 	RefactoringNeeds []string      `json:"refactoring_needs"`
 	EstimatedCost    time.Duration `json:"estimated_cost"`
 }
-
 type MaintainabilityScore struct {
 	Score            float64  `json:"score"`
 	Factors          []string `json:"factors"`
 	ImprovementAreas []string `json:"improvement_areas"`
 }
-
 type TestCoverageInfo struct {
 	LineCoverage   float64  `json:"line_coverage"`
 	BranchCoverage float64  `json:"branch_coverage"`
 	UncoveredAreas []string `json:"uncovered_areas"`
 	TestQuality    string   `json:"test_quality"`
 }
-
 type SizeImpactAnalysis struct {
 	TotalSize       int64    `json:"total_size"`
 	LargestDeps     []string `json:"largest_deps"`
 	OptimizationOps []string `json:"optimization_opportunities"`
 	SizeReduction   int64    `json:"potential_size_reduction"`
 }
-
 type ResourceUsage struct {
 	CPU      float64       `json:"cpu"`
 	Memory   int64         `json:"memory"`
@@ -350,7 +286,6 @@ type ResourceUsage struct {
 	Network  int64         `json:"network"`
 	Duration time.Duration `json:"duration"`
 }
-
 type AnalysisBuildContext struct {
 	SessionID    string                 `json:"session_id"`
 	ProjectInfo  *ProjectMetadata       `json:"project_info"`
@@ -359,7 +294,6 @@ type AnalysisBuildContext struct {
 	Environment  map[string]interface{} `json:"environment"`
 	Constraints  *BuildConstraints      `json:"constraints"`
 }
-
 type BuildState struct {
 	Phase            string         `json:"phase"`
 	CompletedSteps   []string       `json:"completed_steps"`

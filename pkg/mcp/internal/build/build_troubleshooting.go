@@ -25,12 +25,9 @@ func (t *BuildTroubleshooter) AddPushTroubleshootingTips(result *AtomicBuildImag
 	if result.BuildContext_Info == nil {
 		result.BuildContext_Info = &BuildContextInfo{}
 	}
-
 	tips := []string{}
-
 	if err != nil {
 		errStr := err.Error()
-
 		if strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "authentication") {
 			tips = append(tips,
 				"Authentication failed - check registry credentials",
@@ -38,7 +35,6 @@ func (t *BuildTroubleshooter) AddPushTroubleshootingTips(result *AtomicBuildImag
 				"Verify username/password or access token is correct",
 			)
 		}
-
 		if strings.Contains(errStr, "denied") || strings.Contains(errStr, "forbidden") {
 			tips = append(tips,
 				"Access denied - check registry permissions",
@@ -46,7 +42,6 @@ func (t *BuildTroubleshooter) AddPushTroubleshootingTips(result *AtomicBuildImag
 				"Check if repository exists and you're a collaborator",
 			)
 		}
-
 		if strings.Contains(errStr, "network") || strings.Contains(errStr, "timeout") {
 			tips = append(tips,
 				"Network issue detected",
@@ -54,7 +49,6 @@ func (t *BuildTroubleshooter) AddPushTroubleshootingTips(result *AtomicBuildImag
 				"Consider retrying the push operation",
 			)
 		}
-
 		if strings.Contains(errStr, "manifest") {
 			tips = append(tips,
 				"Manifest-related error",
@@ -63,11 +57,9 @@ func (t *BuildTroubleshooter) AddPushTroubleshootingTips(result *AtomicBuildImag
 			)
 		}
 	}
-
 	if len(tips) == 0 {
 		tips = append(tips, "Push failed - check registry configuration and connectivity")
 	}
-
 	result.BuildContext_Info.NextStepSuggestions = append(result.BuildContext_Info.NextStepSuggestions, tips...)
 }
 
@@ -76,10 +68,8 @@ func (t *BuildTroubleshooter) AddTroubleshootingTips(result *AtomicBuildImageRes
 	if result.BuildContext_Info == nil {
 		result.BuildContext_Info = &BuildContextInfo{}
 	}
-
 	tips := []string{}
 	errStr := err.Error()
-
 	// Dockerfile syntax errors
 	if strings.Contains(errStr, "dockerfile parse error") || strings.Contains(errStr, "syntax error") {
 		tips = append(tips,
@@ -88,7 +78,6 @@ func (t *BuildTroubleshooter) AddTroubleshootingTips(result *AtomicBuildImageRes
 			"Validate all commands follow Docker syntax rules",
 		)
 	}
-
 	// Base image issues
 	if strings.Contains(errStr, "pull access denied") || strings.Contains(errStr, "repository does not exist") {
 		tips = append(tips,
@@ -97,7 +86,6 @@ func (t *BuildTroubleshooter) AddTroubleshootingTips(result *AtomicBuildImageRes
 			"Check if base image requires authentication",
 		)
 	}
-
 	// Build context issues
 	if strings.Contains(errStr, "no such file or directory") {
 		tips = append(tips,
@@ -106,7 +94,6 @@ func (t *BuildTroubleshooter) AddTroubleshootingTips(result *AtomicBuildImageRes
 			"Check .dockerignore isn't excluding required files",
 		)
 	}
-
 	// Permission issues
 	if strings.Contains(errStr, "permission denied") {
 		tips = append(tips,
@@ -115,7 +102,6 @@ func (t *BuildTroubleshooter) AddTroubleshootingTips(result *AtomicBuildImageRes
 			"Ensure Docker has access to required files",
 		)
 	}
-
 	// Network issues
 	if strings.Contains(errStr, "network") || strings.Contains(errStr, "timeout") {
 		tips = append(tips,
@@ -124,7 +110,6 @@ func (t *BuildTroubleshooter) AddTroubleshootingTips(result *AtomicBuildImageRes
 			"Verify proxy settings if behind corporate firewall",
 		)
 	}
-
 	// Space issues
 	if strings.Contains(errStr, "no space left") || strings.Contains(errStr, "disk full") {
 		tips = append(tips,
@@ -133,57 +118,47 @@ func (t *BuildTroubleshooter) AddTroubleshootingTips(result *AtomicBuildImageRes
 			"Check available disk space: df -h",
 		)
 	}
-
 	if len(tips) == 0 {
 		tips = append(tips, "Build failed - check Docker daemon logs for detailed error information")
 	}
-
 	result.BuildContext_Info.NextStepSuggestions = append(result.BuildContext_Info.NextStepSuggestions, tips...)
 }
 
 // GenerateBuildFailureAnalysis creates comprehensive failure analysis
 func (t *BuildTroubleshooter) GenerateBuildFailureAnalysis(err error, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) *BuildFailureAnalysis {
 	analysis := &BuildFailureAnalysis{}
-
 	errStr := err.Error()
 	analysis.FailureReason = errStr
 	analysis.FailureType, analysis.FailureStage = t.classifyFailure(errStr, buildResult)
-
 	// Convert causes to strings
 	causes := t.identifyFailureCauses(errStr, buildResult, result)
 	analysis.CommonCauses = make([]string, len(causes))
 	for i, cause := range causes {
 		analysis.CommonCauses[i] = cause.Description
 	}
-
 	// Convert fixes to strings
 	fixes := t.generateSuggestedFixes(errStr, buildResult, result)
 	analysis.SuggestedFixes = make([]string, len(fixes))
 	for i, fix := range fixes {
 		analysis.SuggestedFixes[i] = fix.Description
 	}
-
 	// Convert strategies to strings
 	strategies := t.generateAlternativeStrategies(errStr, buildResult, result)
 	analysis.AlternativeStrategies = make([]string, len(strategies))
 	for i, strategy := range strategies {
 		analysis.AlternativeStrategies[i] = strategy.Description
 	}
-
 	analysis.SecurityImplications = t.identifySecurityImplications(errStr, buildResult, result)
-
 	if buildResult != nil {
 		perfAnalysis := t.analyzePerformanceImpact(buildResult, result)
 		analysis.PerformanceImpact = perfAnalysis.CacheEfficiency
 	}
-
 	return analysis
 }
 
 // classifyFailure categorizes the build failure type and severity
 func (t *BuildTroubleshooter) classifyFailure(errStr string, buildResult *coredocker.BuildResult) (string, string) {
 	errLower := strings.ToLower(errStr)
-
 	// Determine failure type
 	failureType := "unknown"
 	if strings.Contains(errLower, "dockerfile") || strings.Contains(errLower, "syntax") {
@@ -199,7 +174,6 @@ func (t *BuildTroubleshooter) classifyFailure(errStr string, buildResult *coredo
 	} else if strings.Contains(errLower, "copy") || strings.Contains(errLower, "add") || strings.Contains(errLower, "no such file") {
 		failureType = "file_operations"
 	}
-
 	// Determine severity
 	severity := "medium"
 	if strings.Contains(errLower, "critical") || strings.Contains(errLower, "fatal") {
@@ -207,7 +181,6 @@ func (t *BuildTroubleshooter) classifyFailure(errStr string, buildResult *coredo
 	} else if strings.Contains(errLower, "warning") || strings.Contains(errLower, "deprecated") {
 		severity = "low"
 	}
-
 	return failureType, severity
 }
 
@@ -215,7 +188,6 @@ func (t *BuildTroubleshooter) classifyFailure(errStr string, buildResult *coredo
 func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []FailureCause {
 	causes := []FailureCause{}
 	errLower := strings.ToLower(errStr)
-
 	// Dockerfile-related causes
 	if strings.Contains(errLower, "dockerfile") || strings.Contains(errLower, "syntax") {
 		causes = append(causes, FailureCause{
@@ -225,7 +197,6 @@ func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *
 			Evidence:    []string{"Syntax error in Dockerfile", "Invalid instruction format"},
 		})
 	}
-
 	// Network-related causes
 	if strings.Contains(errLower, "network") || strings.Contains(errLower, "timeout") {
 		causes = append(causes, FailureCause{
@@ -235,7 +206,6 @@ func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *
 			Evidence:    []string{"Network timeout", "Connection refused", "DNS resolution failure"},
 		})
 	}
-
 	// Permission-related causes
 	if strings.Contains(errLower, "permission") || strings.Contains(errLower, "access denied") {
 		causes = append(causes, FailureCause{
@@ -245,7 +215,6 @@ func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *
 			Evidence:    []string{"Permission denied", "Access denied", "Unauthorized"},
 		})
 	}
-
 	// Base image issues
 	if strings.Contains(errLower, "pull") && strings.Contains(errLower, "denied") {
 		causes = append(causes, FailureCause{
@@ -255,7 +224,6 @@ func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *
 			Evidence:    []string{"Pull access denied", "Repository does not exist"},
 		})
 	}
-
 	// File operation issues
 	if strings.Contains(errLower, "no such file") || strings.Contains(errLower, "copy") {
 		causes = append(causes, FailureCause{
@@ -265,7 +233,6 @@ func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *
 			Evidence:    []string{"File not found", "Copy operation failed"},
 		})
 	}
-
 	// Resource constraints
 	if strings.Contains(errLower, "space") || strings.Contains(errLower, "memory") {
 		causes = append(causes, FailureCause{
@@ -275,7 +242,6 @@ func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *
 			Evidence:    []string{"No space left", "Out of memory", "Resource exhausted"},
 		})
 	}
-
 	return causes
 }
 
@@ -283,7 +249,6 @@ func (t *BuildTroubleshooter) identifyFailureCauses(errStr string, buildResult *
 func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildFix {
 	fixes := []BuildFix{}
 	errLower := strings.ToLower(errStr)
-
 	// Dockerfile syntax fixes
 	if strings.Contains(errLower, "dockerfile") || strings.Contains(errLower, "syntax") {
 		fixes = append(fixes, BuildFix{
@@ -294,7 +259,6 @@ func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult 
 			Validation:  "Should resolve build failure immediately",
 		})
 	}
-
 	// Network connectivity fixes
 	if strings.Contains(errLower, "network") || strings.Contains(errLower, "timeout") {
 		fixes = append(fixes, BuildFix{
@@ -305,7 +269,6 @@ func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult 
 			Validation:  "Will enable resource downloads and base image pulls",
 		})
 	}
-
 	// Permission fixes
 	if strings.Contains(errLower, "permission") {
 		fixes = append(fixes, BuildFix{
@@ -316,7 +279,6 @@ func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult 
 			Validation:  "Will allow Docker to access required files",
 		})
 	}
-
 	// Base image fixes
 	if strings.Contains(errLower, "pull") && strings.Contains(errLower, "denied") {
 		fixes = append(fixes, BuildFix{
@@ -327,7 +289,6 @@ func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult 
 			Validation:  "Will allow successful base image download",
 		})
 	}
-
 	// File operation fixes
 	if strings.Contains(errLower, "no such file") {
 		fixes = append(fixes, BuildFix{
@@ -338,7 +299,6 @@ func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult 
 			Validation:  "Will allow successful file operations in Dockerfile",
 		})
 	}
-
 	// Resource constraint fixes
 	if strings.Contains(errLower, "space") {
 		fixes = append(fixes, BuildFix{
@@ -349,7 +309,6 @@ func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult 
 			Validation:  "Will provide sufficient space for build operations",
 		})
 	}
-
 	return fixes
 }
 
@@ -357,7 +316,6 @@ func (t *BuildTroubleshooter) generateSuggestedFixes(errStr string, buildResult 
 func (t *BuildTroubleshooter) generateAlternativeStrategies(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []BuildStrategyRecommendation {
 	strategies := []BuildStrategyRecommendation{}
 	errLower := strings.ToLower(errStr)
-
 	// Multi-stage build strategy
 	if strings.Contains(errLower, "space") || strings.Contains(errLower, "size") {
 		strategies = append(strategies, BuildStrategyRecommendation{
@@ -368,7 +326,6 @@ func (t *BuildTroubleshooter) generateAlternativeStrategies(errStr string, build
 			Example:     "Requires Dockerfile restructuring",
 		})
 	}
-
 	// Alternative base image strategy
 	if strings.Contains(errLower, "pull") || strings.Contains(errLower, "base") {
 		strategies = append(strategies, BuildStrategyRecommendation{
@@ -379,7 +336,6 @@ func (t *BuildTroubleshooter) generateAlternativeStrategies(errStr string, build
 			Example:     "Update FROM instruction in Dockerfile",
 		})
 	}
-
 	// Buildkit strategy
 	if strings.Contains(errLower, "cache") || strings.Contains(errLower, "performance") {
 		strategies = append(strategies, BuildStrategyRecommendation{
@@ -390,13 +346,12 @@ func (t *BuildTroubleshooter) generateAlternativeStrategies(errStr string, build
 			Example:     "Set DOCKER_BUILDKIT=1 environment variable",
 		})
 	}
-
 	return strategies
 }
 
 // analyzePerformanceImpact analyzes how the failure impacts build performance
-func (t *BuildTroubleshooter) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) PerformanceAnalysis {
-	analysis := PerformanceAnalysis{
+func (t *BuildTroubleshooter) analyzePerformanceImpact(buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) BuildFixerPerformanceAnalysis {
+	analysis := BuildFixerPerformanceAnalysis{
 		BuildTime:       buildResult.Duration,
 		CacheEfficiency: "unknown",
 		CacheHitRate:    0.0,
@@ -404,10 +359,8 @@ func (t *BuildTroubleshooter) analyzePerformanceImpact(buildResult *coredocker.B
 		Optimizations:   []string{},
 		Bottlenecks:     []string{},
 	}
-
 	// Set default cache efficiency since Steps field is not available
 	analysis.CacheEfficiency = "unknown"
-
 	// Add optimization recommendations
 	if analysis.CacheEfficiency == "poor" {
 		analysis.Optimizations = []string{
@@ -416,33 +369,28 @@ func (t *BuildTroubleshooter) analyzePerformanceImpact(buildResult *coredocker.B
 			"Use .dockerignore to reduce build context size",
 		}
 	}
-
 	if result.BuildContext_Info != nil && result.BuildContext_Info.ContextSize > 100*1024*1024 {
 		analysis.Optimizations = append(analysis.Optimizations,
 			"Large build context detected - consider reducing context size")
 	}
-
 	return analysis
 }
 
 // identifySecurityImplications analyzes security aspects of the build failure
 func (t *BuildTroubleshooter) identifySecurityImplications(errStr string, buildResult *coredocker.BuildResult, result *AtomicBuildImageResult) []string {
 	implications := []string{}
-
 	// Permission-related security implications
 	if strings.Contains(errStr, "permission") {
 		implications = append(implications,
 			"Permission errors may indicate overly restrictive or permissive file access",
 			"Review file ownership and ensure principle of least privilege")
 	}
-
 	// Network-related security implications
 	if strings.Contains(errStr, "network") || strings.Contains(errStr, "download") {
 		implications = append(implications,
 			"Network failures during build may expose dependencies on external resources",
 			"Consider vendoring dependencies to reduce supply chain risks")
 	}
-
 	// Base image security implications
 	if result.BuildContext_Info != nil {
 		baseImage := strings.ToLower(result.BuildContext_Info.BaseImage)
@@ -451,26 +399,22 @@ func (t *BuildTroubleshooter) identifySecurityImplications(errStr string, buildR
 				"Using 'latest' tag creates unpredictable builds and potential security vulnerabilities",
 				"Pin to specific image versions for reproducible and secure builds")
 		}
-
 		if strings.Contains(baseImage, "ubuntu") || strings.Contains(baseImage, "centos") {
 			implications = append(implications,
 				"Full OS base images have larger attack surface",
 				"Consider minimal base images like alpine or distroless")
 		}
-
 		// Context-specific implications
 		if !result.BuildContext_Info.HasDockerIgnore {
 			implications = append(implications,
 				"Missing .dockerignore may include sensitive files in image layers",
 				"Create .dockerignore to prevent accidental inclusion of secrets")
 		}
-
 		if len(result.BuildContext_Info.LargeFilesFound) > 0 {
 			implications = append(implications,
 				"Large files in build context may contain sensitive data",
 				"Review and exclude unnecessary large files from image")
 		}
 	}
-
 	return implications
 }
