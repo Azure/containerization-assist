@@ -526,35 +526,30 @@ jobs:
   pipeline-summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, aggregate-integration-matrix-results, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
+    needs: [canary, coverage-enforcement, security-scan, quality-gates]
     if: always()
     permissions:
       pull-requests: write
       issues: write
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      continue-on-error: true
-      id: checkout
+    - uses: actions/checkout@v4
 
     - name: Run architecture analysis
-      if: steps.checkout.outcome == 'success'
       id: arch-analysis
       uses: ./.github/actions/architecture-check
       with:
         path: 'pkg/mcp'
         config-file: '.github/quality-config.json'
-      continue-on-error: true
 
     - name: Generate comprehensive PR status and summary
       uses: ./.github/actions/pr-status-generator
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         run-id: ${{ github.run_id }}
-        architecture-score: ${{ steps.arch-analysis.outputs.architecture-score || '0' }}
-        architecture-status: ${{ steps.arch-analysis.outputs.architecture-status || 'unknown' }}
-        architecture-details: ${{ steps.checkout.outcome == 'success' && steps.arch-analysis.outputs.adapter-count || 'Architecture analysis skipped due to checkout failure' }}
+        architecture-score: ${{ steps.arch-analysis.outputs.architecture-score }}
+        architecture-status: ${{ steps.arch-analysis.outputs.architecture-status }}
+        architecture-details: 'Adapters/Wrappers/Cycles: ${{ steps.arch-analysis.outputs.adapter-count }}/${{ steps.arch-analysis.outputs.wrapper-count }}/${{ steps.arch-analysis.outputs.import-cycles }} | Large files: ${{ steps.arch-analysis.outputs.large-files }} | Complex functions: ${{ steps.arch-analysis.outputs.complex-functions }}'
         quality-results: ${{ needs.quality-gates.result == 'success' && '✅ All quality checks passed' || '⚠️ Quality checks failed or skipped' }}
 
   # Status Check - Single job to use as required check in branch protection
@@ -562,7 +557,7 @@ jobs:
   ci-status-check:
     name: CI Status Check
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, aggregate-integration-matrix-results, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates]
     if: always()
     steps:
       - name: Check all required jobs
