@@ -46,11 +46,14 @@ type HealthStatus struct {
 
 // SessionState represents session state for inspection
 type SessionState struct {
-	ID           string                 `json:"id"`
+	ID           string                 `json:"session_id"`
 	WorkspaceDir string                 `json:"workspace_dir"`
 	Metadata     map[string]interface{} `json:"metadata"`
 	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
+	UpdatedAt    time.Time              `json:"last_accessed"`
+	Status       string                 `json:"status"`
+	RepoURL      string                 `json:"repo_url,omitempty"`
+	Labels       []string               `json:"labels,omitempty"`
 }
 
 // httpMCPTestClient implements MCPTestClient using HTTP transport

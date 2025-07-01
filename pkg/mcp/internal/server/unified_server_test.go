@@ -213,7 +213,7 @@ func TestUnifiedMCPServer_buildInputSchema(t *testing.T) {
 		logger: zerolog.New(nil).Level(zerolog.Disabled),
 	}
 
-	metadata := &orchestration.ToolMetadata{
+	metadata := &core.ToolMetadata{
 		Name:        "test_tool",
 		Description: "A test tool",
 		Parameters: map[string]string{
@@ -271,7 +271,7 @@ func TestConvertParametersMapToString(t *testing.T) {
 }
 
 func TestConvertExamplesToTypes(t *testing.T) {
-	input := []orchestration.ToolExample{
+	input := []core.ToolExample{
 		{
 			Name:        "test_example",
 			Description: "A test example",

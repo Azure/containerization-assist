@@ -177,7 +177,7 @@ func (t *securityScanToolImpl) GetName() string {
 
 // GetDescription implements tools.Tool
 func (t *securityScanToolImpl) GetDescription() string {
-	return "Performs comprehensive security scans on images, containers, and filesystems with strongly-typed parameters"
+	return "Performs comprehensive security scans on images, containers, and filesystems with strongly-typed parameters using session context"
 }
 
 // GetSchema implements tools.Tool

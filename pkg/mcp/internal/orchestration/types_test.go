@@ -2,11 +2,13 @@ package orchestration
 
 import (
 	"testing"
+
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // Test ToolMetadata type
 func TestToolMetadata(t *testing.T) {
-	metadata := ToolMetadata{
+	metadata := core.ToolMetadata{
 		Name:         "test-tool",
 		Description:  "A test tool for validation",
 		Version:      "1.0.0",
@@ -15,8 +17,7 @@ func TestToolMetadata(t *testing.T) {
 		Capabilities: []string{"build", "deploy"},
 		Requirements: []string{"docker_daemon"},
 		Parameters:   map[string]string{"image": "string", "tag": "string"},
-		OutputSchema: map[string]interface{}{"result": "boolean"},
-		Examples:     []ToolExample{{Name: "basic", Description: "Basic usage"}},
+		Examples:     []core.ToolExample{{Name: "basic", Description: "Basic usage"}},
 	}
 
 	if metadata.Name != "test-tool" {
@@ -53,7 +54,7 @@ func TestToolMetadata(t *testing.T) {
 
 // Test ToolExample type
 func TestToolExample(t *testing.T) {
-	example := ToolExample{
+	example := core.ToolExample{
 		Name:        "build-image",
 		Description: "Build a Docker image",
 		Input:       map[string]interface{}{"dockerfile": "Dockerfile", "context": "."},
@@ -73,23 +74,13 @@ func TestToolExample(t *testing.T) {
 		t.Error("Expected Output to not be nil")
 	}
 
-	// Test input map
-	inputMap, ok := example.Input.(map[string]interface{})
-	if !ok {
-		t.Error("Expected Input to be a map[string]interface{}")
-	} else {
-		if inputMap["dockerfile"] != "Dockerfile" {
-			t.Errorf("Expected Input['dockerfile'] to be 'Dockerfile', got '%v'", inputMap["dockerfile"])
-		}
+	// Test input map (Input is already map[string]interface{})
+	if example.Input["dockerfile"] != "Dockerfile" {
+		t.Errorf("Expected Input['dockerfile'] to be 'Dockerfile', got '%v'", example.Input["dockerfile"])
 	}
 
-	// Test output map
-	outputMap, ok := example.Output.(map[string]interface{})
-	if !ok {
-		t.Error("Expected Output to be a map[string]interface{}")
-	} else {
-		if outputMap["success"] != true {
-			t.Errorf("Expected Output['success'] to be true, got '%v'", outputMap["success"])
-		}
+	// Test output map (Output is already map[string]interface{})
+	if example.Output["success"] != true {
+		t.Errorf("Expected Output['success'] to be true, got '%v'", example.Output["success"])
 	}
 }

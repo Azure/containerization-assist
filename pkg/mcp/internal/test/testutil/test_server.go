@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -46,16 +47,35 @@ func NewTestServer() (*TestServer, error) {
 		return nil, err
 	}
 
-	// Start the MCP server in a goroutine to initialize all components
-	startCtx, cancel := context.WithCancel(ctx)
-	serverStarted := make(chan error, 1)
-	go func() {
-		err := mcpServer.Start(startCtx)
-		serverStarted <- err
-	}()
+	// Initialize the server components without starting the transport
+	// This allows tools to be registered before we create the HTTP test server
 
-	// Wait a moment for server initialization
-	time.Sleep(100 * time.Millisecond)
+	// Get gomcp manager and initialize it
+	gomcpManager := mcpServer.GetGomcpManager()
+	if gomcpManager == nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("gomcp manager is nil")
+	}
+
+	if err := gomcpManager.Initialize(); err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to initialize gomcp manager: %w", err)
+	}
+
+	// Set the tool orchestrator reference
+	gomcpManager.SetToolOrchestrator(mcpServer.GetToolOrchestrator())
+
+	// Register all tools with gomcp
+	if err := gomcpManager.RegisterTools(mcpServer); err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to register tools with gomcp: %w", err)
+	}
+
+	// Register HTTP handlers
+	if err := gomcpManager.RegisterHTTPHandlers(mcpServer.GetTransport()); err != nil {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to register HTTP handlers: %w", err)
+	}
 
 	// Get the transport from the MCP server to access its HTTP handler
 	var httpHandler http.Handler
@@ -80,14 +100,11 @@ func NewTestServer() (*TestServer, error) {
 	// Create HTTP test server with the actual MCP handler
 	httpServer := httptest.NewServer(httpHandler)
 
-	// Cancel the server's start context since we're using httptest.Server
-	cancel()
-
 	return &TestServer{
 		server:      httpServer,
 		mcpServer:   mcpServer,
 		tempDir:     tempDir,
-		cancelStart: cancel,
+		cancelStart: nil, // No cancel function since we're not using the start context
 	}, nil
 }
 

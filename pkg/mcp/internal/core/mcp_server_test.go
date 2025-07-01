@@ -399,3 +399,35 @@ func (m *MockSessionManager) UpdateSession(sessionID string, updater func(interf
 	updater(session)
 	return nil
 }
+
+// Implement missing methods required by core.ToolSessionManager interface
+
+func (m *MockSessionManager) GetOrCreateSession(sessionID string) (interface{}, error) {
+	return &session.SessionState{
+		SessionID: sessionID,
+	}, nil
+}
+
+func (m *MockSessionManager) CreateSession(userID string) (interface{}, error) {
+	return &session.SessionState{
+		SessionID: "mock-session-" + userID,
+	}, nil
+}
+
+func (m *MockSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+	// Mock implementation - always succeeds
+	return nil
+}
+
+func (m *MockSessionManager) ListSessions(ctx context.Context, filter map[string]interface{}) ([]interface{}, error) {
+	// Mock implementation - return empty list
+	return []interface{}{}, nil
+}
+
+func (m *MockSessionManager) GetStats() *core.SessionManagerStats {
+	// Mock implementation - return empty stats
+	return &core.SessionManagerStats{
+		ActiveSessions: 0,
+		TotalSessions:  0,
+	}
+}

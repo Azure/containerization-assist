@@ -35,6 +35,9 @@ type PerformanceMetrics struct {
 
 // TestSessionPerformance validates session operations meet performance targets
 func TestSessionPerformance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping performance tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -92,6 +95,9 @@ func TestSessionPerformance(t *testing.T) {
 
 // TestConcurrentSessionHandling validates performance under concurrent load
 func TestConcurrentSessionHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping concurrent session tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 

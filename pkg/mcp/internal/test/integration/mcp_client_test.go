@@ -172,5 +172,8 @@ func (suite *MCPIntegrationTestSuite) TestConcurrentClientAccess() {
 
 // TestMCPIntegrationSuite runs the integration test suite
 func TestMCPIntegrationSuite(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping MCP integration suite in short mode")
+	}
 	suite.Run(t, new(MCPIntegrationTestSuite))
 }

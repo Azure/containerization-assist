@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -46,7 +47,8 @@ func (t *AtomicGenerateDockerfileTool) ExecuteTyped(ctx context.Context, args Ge
 
 	// Prepare response
 	response := &GenerateDockerfileResult{
-		Template: templateName,
+		SessionID: args.SessionID,
+		Template:  templateName,
 	}
 
 	// Handle dry run
@@ -68,7 +70,7 @@ func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileAr
 		return nil, fmt.Errorf("session_id is required")
 	}
 
-	_, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
@@ -76,8 +78,16 @@ func (t *AtomicGenerateDockerfileTool) getSessionState(args GenerateDockerfileAr
 	// Convert to map for simplicity
 	sessionMap := make(map[string]interface{})
 	sessionMap["session_id"] = args.SessionID
-	sessionMap["work_dir"] = "/tmp"
-	sessionMap["repository_analysis"] = make(map[string]interface{})
+
+	// Extract workspace directory and repository analysis from session
+	if sessionState, ok := sessionInterface.(*session.SessionState); ok {
+		sessionMap["work_dir"] = sessionState.WorkspaceDir
+		sessionMap["repository_analysis"] = sessionState.RepoAnalysis
+	} else {
+		// Fallback for other session types
+		sessionMap["work_dir"] = "/tmp"
+		sessionMap["repository_analysis"] = make(map[string]interface{})
+	}
 
 	return sessionMap, nil
 }
@@ -150,6 +160,7 @@ func (t *AtomicGenerateDockerfileTool) generateDockerfileContent(templateName st
 	// Populate response
 	response.Content = content
 	response.FilePath = dockerfilePath
+	response.DockerfilePath = dockerfilePath
 	response.BaseImage = t.optimizer.ExtractBaseImage(content)
 	response.ExposedPorts = t.optimizer.ExtractExposedPorts(content)
 	response.BuildSteps = t.optimizer.ExtractBuildSteps(content)
@@ -304,7 +315,7 @@ func (t *AtomicGenerateDockerfileTool) generateDockerfile(templateName, dockerfi
 func (t *AtomicGenerateDockerfileTool) GetMetadata() core.ToolMetadata {
 	return core.ToolMetadata{
 		Name:        "generate_dockerfile",
-		Description: "Intelligently generates a Dockerfile based on repository analysis",
+		Description: "Intelligently generates a Dockerfile based on repository analysis stored in the session",
 		Category:    "containerization",
 		Version:     "2.0.0",
 		Parameters: map[string]string{

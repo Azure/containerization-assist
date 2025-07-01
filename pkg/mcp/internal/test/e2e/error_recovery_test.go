@@ -14,6 +14,9 @@ import (
 
 // TestWorkflowErrorRecovery tests workflow continuation after non-fatal errors
 func TestWorkflowErrorRecovery(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping error recovery tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -153,6 +156,9 @@ func TestSessionStateRecoveryAfterServerRestart(t *testing.T) {
 
 // TestInvalidSessionIDHandling tests handling of invalid session IDs
 func TestInvalidSessionIDHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping invalid session handling tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -211,6 +217,9 @@ func TestInvalidSessionIDHandling(t *testing.T) {
 
 // TestToolExecutionWithMissingDependencies tests tool behavior when dependencies are missing
 func TestToolExecutionWithMissingDependencies(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping missing dependencies tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -254,6 +263,9 @@ func TestToolExecutionWithMissingDependencies(t *testing.T) {
 
 // TestConcurrentErrorHandling tests error handling under concurrent access
 func TestConcurrentErrorHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping concurrent error handling tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -317,6 +329,9 @@ func TestConcurrentErrorHandling(t *testing.T) {
 
 // TestRichErrorContextIntegration validates RichError context helps with recovery
 func TestRichErrorContextIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping rich error context tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -381,6 +396,9 @@ func TestRichErrorContextIntegration(t *testing.T) {
 
 // TestSessionCleanupAfterFailures tests session cleanup after repeated failures
 func TestSessionCleanupAfterFailures(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping session cleanup tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -431,6 +449,9 @@ func TestSessionCleanupAfterFailures(t *testing.T) {
 
 // TestErrorPropagationAcrossTools tests how errors propagate through multi-tool workflows
 func TestErrorPropagationAcrossTools(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping error propagation tests in short mode")
+	}
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 

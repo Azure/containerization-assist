@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	// mcp import removed - using mcptypes
@@ -253,7 +254,7 @@ func (t *AtomicScanImageSecurityTool) Execute(ctx context.Context, args interfac
 func (t *AtomicScanImageSecurityTool) GetMetadata() core.ToolMetadata {
 	return core.ToolMetadata{
 		Name:        "atomic_scan_image_security",
-		Description: "Perform comprehensive security scanning of Docker images",
+		Description: "Perform comprehensive security scanning of Docker images using session-tracked build artifacts",
 		Version:     "1.0.0",
 	}
 }
@@ -813,6 +814,11 @@ func min(a, b int) int {
 	return b
 }
 
+var (
+	securityMetricsOnce     sync.Once
+	securityMetricsInstance *SecurityMetrics
+)
+
 // SecurityMetrics provides Prometheus metrics for security scanning
 type SecurityMetrics struct {
 	ScanDuration         *prometheus.HistogramVec
@@ -822,46 +828,49 @@ type SecurityMetrics struct {
 	RiskScore            *prometheus.GaugeVec
 }
 
-// NewSecurityMetrics creates new security metrics
+// NewSecurityMetrics creates new security metrics using singleton pattern
 func NewSecurityMetrics() *SecurityMetrics {
-	return &SecurityMetrics{
-		ScanDuration: promauto.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    "container_kit_security_scan_duration_seconds",
-				Help:    "Duration of security scan operations",
-				Buckets: prometheus.ExponentialBuckets(1, 2, 10),
-			},
-			[]string{"scanner", "status"},
-		),
-		VulnerabilitiesTotal: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "container_kit_vulnerabilities_total",
-				Help: "Total number of vulnerabilities found",
-			},
-			[]string{"image", "severity"},
-		),
-		ScanErrors: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "container_kit_security_scan_errors_total",
-				Help: "Total number of security scan errors",
-			},
-			[]string{"scanner", "error_type"},
-		),
-		ComplianceScore: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "container_kit_compliance_score",
-				Help: "Security compliance score (0-100)",
-			},
-			[]string{"image", "framework"},
-		),
-		RiskScore: promauto.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "container_kit_risk_score",
-				Help: "Security risk score (0-100)",
-			},
-			[]string{"image"},
-		),
-	}
+	securityMetricsOnce.Do(func() {
+		securityMetricsInstance = &SecurityMetrics{
+			ScanDuration: promauto.NewHistogramVec(
+				prometheus.HistogramOpts{
+					Name:    "container_kit_security_scan_duration_seconds",
+					Help:    "Duration of security scan operations",
+					Buckets: prometheus.ExponentialBuckets(1, 2, 10),
+				},
+				[]string{"scanner", "status"},
+			),
+			VulnerabilitiesTotal: promauto.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: "container_kit_vulnerabilities_total",
+					Help: "Total number of vulnerabilities found",
+				},
+				[]string{"image", "severity"},
+			),
+			ScanErrors: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "container_kit_security_scan_errors_total",
+					Help: "Total number of security scan errors",
+				},
+				[]string{"scanner", "error_type"},
+			),
+			ComplianceScore: promauto.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: "container_kit_compliance_score",
+					Help: "Security compliance score (0-100)",
+				},
+				[]string{"image", "framework"},
+			),
+			RiskScore: promauto.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: "container_kit_risk_score",
+					Help: "Security risk score (0-100)",
+				},
+				[]string{"image"},
+			),
+		}
+	})
+	return securityMetricsInstance
 }
 
 // RecordScanMetrics records security scan metrics

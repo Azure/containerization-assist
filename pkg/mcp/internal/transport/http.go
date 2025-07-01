@@ -481,8 +481,9 @@ func (t *HTTPTransport) handleListSessions(w http.ResponseWriter, r *http.Reques
 func (t *HTTPTransport) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := chi.URLParam(r, "sessionID")
 
-	if listTool, exists := t.tools["list_sessions"]; exists {
-		listResponse, err := listTool(r.Context(), map[string]interface{}{
+	// Get session details tool - this needs to be a specific tool for getting a single session
+	if getSessionTool, exists := t.tools["get_session"]; exists {
+		response, err := getSessionTool(r.Context(), map[string]interface{}{
 			"session_id": sessionID,
 		})
 		if err != nil {
@@ -490,9 +491,31 @@ func (t *HTTPTransport) handleGetSession(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(listResponse)
+		t.sendJSON(w, http.StatusOK, response)
+		return
+	}
+
+	// Fallback: try to use list_sessions and filter
+	if listTool, exists := t.tools["list_sessions"]; exists {
+		listResponse, err := listTool(r.Context(), map[string]interface{}{})
+		if err != nil {
+			t.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list sessions: %v", err))
+			return
+		}
+
+		// Extract sessions from response and find the one we want
+		if respMap, ok := listResponse.(map[string]interface{}); ok {
+			if sessions, ok := respMap["sessions"].([]map[string]interface{}); ok {
+				for _, session := range sessions {
+					if sid, ok := session["session_id"].(string); ok && sid == sessionID {
+						t.sendJSON(w, http.StatusOK, session)
+						return
+					}
+				}
+			}
+		}
+
+		t.sendError(w, http.StatusNotFound, fmt.Sprintf("Session %s not found", sessionID))
 		return
 	}
 

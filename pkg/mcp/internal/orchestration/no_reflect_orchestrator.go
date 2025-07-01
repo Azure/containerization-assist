@@ -26,7 +26,7 @@ type AtomicAnalyzeRepositoryArgs struct {
 // NoReflectToolOrchestrator provides type-safe tool execution without reflection
 type NoReflectToolOrchestrator struct {
 	toolRegistry       *MCPToolRegistry
-	sessionManager     SessionManager
+	sessionManager     core.ToolSessionManager
 	analyzer           core.AIAnalyzer
 	logger             zerolog.Logger
 	toolDependencies   *ToolDependencies
@@ -36,7 +36,7 @@ type NoReflectToolOrchestrator struct {
 // NewNoReflectToolOrchestrator creates a new orchestrator without reflection
 func NewNoReflectToolOrchestrator(
 	toolRegistry *MCPToolRegistry,
-	sessionManager SessionManager,
+	sessionManager core.ToolSessionManager,
 	logger zerolog.Logger,
 ) *NoReflectToolOrchestrator {
 	return &NoReflectToolOrchestrator{

@@ -413,6 +413,16 @@ func (s *Server) IsOTELEnabled() bool {
 	return s.otelProvider != nil && s.otelProvider.IsInitialized()
 }
 
+// GetGomcpManager returns the server's gomcp manager
+func (s *Server) GetGomcpManager() *GomcpManager {
+	return s.gomcpManager
+}
+
+// GetToolOrchestrator returns the server's tool orchestrator
+func (s *Server) GetToolOrchestrator() *orchestration.MCPToolOrchestrator {
+	return s.toolOrchestrator
+}
+
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.shutdownMutex.Lock()

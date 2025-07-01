@@ -861,12 +861,12 @@ type ValidateParams struct {
 }
 
 // ValidateResult represents the result of a validation operation
+// TODO: Migrate to pkg/mcp/validation/core.ValidationResult
 type ValidateResult struct {
 	BaseToolResponse
-	Violations  []ValidationIssue `json:"violations"`
-	Warnings    []ValidationIssue `json:"warnings"`
-	Score       float64           `json:"score"`
-	Suggestions []string          `json:"suggestions"`
+	Valid       bool     `json:"valid"`
+	Score       float64  `json:"score"`
+	Suggestions []string `json:"suggestions"`
 }
 
 // ScanParams represents parameters for security scan operations
@@ -946,15 +946,7 @@ type HealthCheckConfig struct {
 	FailureThreshold    int    `json:"failure_threshold"`
 }
 
-// ValidationIssue represents a validation issue
-type ValidationIssue struct {
-	Rule       string `json:"rule"`
-	Severity   string `json:"severity"`
-	Message    string `json:"message"`
-	Line       int    `json:"line"`
-	Column     int    `json:"column"`
-	Suggestion string `json:"suggestion"`
-}
+// ValidationIssue type removed - use pkg/mcp/validation/core.ValidationError instead
 
 // SecretFinding represents a detected secret
 type SecretFinding struct {

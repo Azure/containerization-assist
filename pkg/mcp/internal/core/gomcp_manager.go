@@ -270,11 +270,63 @@ func (gm *GomcpManager) RegisterHTTPHandlers(transportInstance interface{}) erro
 		}
 		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
 	})
-	if err := httpTransport.RegisterTool("scan_image", "Scan a Docker image for vulnerabilities", scanHandler); err != nil {
+	if err := httpTransport.RegisterTool("scan_image", "Scan a Docker image for vulnerabilities using session-tracked build artifacts", scanHandler); err != nil {
 		gm.logger.Error("failed to register scan_image", "error", err)
 		return err
 	}
 	gm.logger.Info("registered scan_image HTTP handler")
+
+	// Register list_sessions handler
+	listSessionsHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "list_sessions", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("list_sessions", "List all active sessions", listSessionsHandler); err != nil {
+		gm.logger.Error("failed to register list_sessions", "error", err)
+		return err
+	}
+	gm.logger.Info("registered list_sessions HTTP handler")
+
+	// Register get_session handler
+	getSessionHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "get_session", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("get_session", "Get session details", getSessionHandler); err != nil {
+		gm.logger.Error("failed to register get_session", "error", err)
+		return err
+	}
+	gm.logger.Info("registered get_session HTTP handler")
+
+	// Register delete_session handler
+	deleteSessionHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "delete_session", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("delete_session", "Delete a session", deleteSessionHandler); err != nil {
+		gm.logger.Error("failed to register delete_session", "error", err)
+		return err
+	}
+	gm.logger.Info("registered delete_session HTTP handler")
+
+	// Register server_status handler
+	serverStatusHandler := transport.ToolHandler(func(ctx context.Context, args interface{}) (interface{}, error) {
+		if gm.toolOrchestrator != nil {
+			return gm.toolOrchestrator.ExecuteTool(ctx, "server_status", args)
+		}
+		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
+	})
+	if err := httpTransport.RegisterTool("server_status", "Get server status", serverStatusHandler); err != nil {
+		gm.logger.Error("failed to register server_status", "error", err)
+		return err
+	}
+	gm.logger.Info("registered server_status HTTP handler")
 
 	return nil
 }

@@ -161,7 +161,7 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		Msg("Starting manifest generation")
 
 	result := &GenerateManifestsResult{
-		BaseToolResponse: types.BaseToolResponse{},
+		BaseToolResponse: types.NewBaseResponse("generate_manifests", args.SessionID, args.DryRun),
 		Manifests:        []ManifestInfo{},
 		ImageRef:         args.ImageRef,
 		Namespace:        args.Namespace,
@@ -170,8 +170,9 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 		Resources:        args.Resources,
 	}
 
-	// Create workspace for manifests - simplified
-	manifestDir := fmt.Sprintf("/tmp/manifests_%s", args.SessionID)
+	// Use workspace base directory for manifests
+	manifestDir := t.workspaceBase
+	// Ensure the directory exists
 	if err := os.MkdirAll(manifestDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create manifest directory: %w", err)
 	}
@@ -185,15 +186,13 @@ func (t *GenerateManifestsTool) ExecuteTyped(ctx context.Context, args GenerateM
 	}
 	result.Manifests = append(result.Manifests, *manifestInfo)
 
-	// Generate service manifest if needed
-	if args.ServiceType != "" {
-		serviceManifest := t.generateServiceManifest(args)
-		manifestInfo, err := t.writeManifestToFile(manifestDir, "service.yaml", serviceManifest)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write service manifest: %w", err)
-		}
-		result.Manifests = append(result.Manifests, *manifestInfo)
+	// Generate service manifest (always generate a default ClusterIP service)
+	serviceManifest := t.generateServiceManifest(args)
+	manifestInfo, err = t.writeManifestToFile(manifestDir, "service.yaml", serviceManifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write service manifest: %w", err)
 	}
+	result.Manifests = append(result.Manifests, *manifestInfo)
 
 	result.Duration = time.Since(startTime)
 
@@ -303,7 +302,7 @@ func (t *GenerateManifestsTool) GetName() string {
 
 // GetDescription returns the tool description
 func (t *GenerateManifestsTool) GetDescription() string {
-	return "Generate Kubernetes manifests for container deployment"
+	return "Generate Kubernetes manifests for container deployment using session-based configuration"
 }
 
 // GetVersion returns the tool version

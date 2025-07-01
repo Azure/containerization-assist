@@ -141,9 +141,4 @@ type ValidationMetadata struct {
 	Version     string
 }
 
-// BaseValidator defines the interface for validators
-type BaseValidator interface {
-	Validate(data interface{}, options ValidationOptions) *ValidationResult
-	GetName() string
-	GetVersion() string
-}
+// BaseValidator interface removed - use pkg/mcp/validation/core.Validator instead

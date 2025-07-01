@@ -126,7 +126,7 @@ func (t *dockerBuildToolImpl) GetName() string {
 
 // GetDescription implements tools.Tool
 func (t *dockerBuildToolImpl) GetDescription() string {
-	return "Builds Docker images with strongly-typed parameters and comprehensive error handling"
+	return "Builds Docker images with strongly-typed parameters and comprehensive error handling using session-based context"
 }
 
 // GetSchema implements tools.Tool

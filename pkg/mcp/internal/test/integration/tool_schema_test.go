@@ -12,6 +12,9 @@ import (
 
 // TestToolSchemaIntegration validates tool schema compliance through MCP protocol
 func TestToolSchemaIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping schema integration tests in short mode")
+	}
 	// Setup real MCP client
 	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
@@ -33,6 +36,9 @@ func TestToolSchemaIntegration(t *testing.T) {
 
 // TestToolDescriptionSessionManagement validates that tool descriptions contain session management instructions
 func TestToolDescriptionSessionManagement(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping session management tests in short mode")
+	}
 	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
@@ -81,6 +87,9 @@ func TestToolDescriptionSessionManagement(t *testing.T) {
 
 // TestToolParameterSchemaValidation validates parameter schemas match RichError types from BETA
 func TestToolParameterSchemaValidation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping parameter schema validation tests in short mode")
+	}
 	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
@@ -130,6 +139,9 @@ func TestToolParameterSchemaValidation(t *testing.T) {
 
 // TestToolDiscoveryThroughMCP validates tool discovery through MCP protocol
 func TestToolDiscoveryThroughMCP(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping tool discovery tests in short mode")
+	}
 	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
@@ -164,6 +176,9 @@ func TestToolDiscoveryThroughMCP(t *testing.T) {
 
 // TestToolSchemaRichErrorIntegration validates integration with BETA's RichError system
 func TestToolSchemaRichErrorIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping rich error integration tests in short mode")
+	}
 	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 

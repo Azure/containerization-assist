@@ -167,6 +167,10 @@ func TestRealRepositoryWorkflowValidation(t *testing.T) {
 
 // TestRealRepositoryErrorHandling tests error handling with problematic real repositories
 func TestRealRepositoryErrorHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping real repository error handling tests in short mode")
+	}
+
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
@@ -309,6 +313,10 @@ func TestRealRepositoryPerformance(t *testing.T) {
 
 // TestRealRepositoryLanguageDetection tests language detection accuracy
 func TestRealRepositoryLanguageDetection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping language detection tests in short mode")
+	}
+
 	client, _, cleanup := setupE2ETestEnvironment(t)
 	defer cleanup()
 
