@@ -587,7 +587,7 @@ func measureSessionCleanupPerformance(t *testing.T, client testutil.MCPTestClien
 
 	// Measure cleanup performance
 	start := time.Now()
-	for i, sessionID := range sessionIDs {
+	for _, sessionID := range sessionIDs {
 		opStart := time.Now()
 		// Note: Actual cleanup mechanism depends on implementation
 		// For now, we'll measure session state access as proxy

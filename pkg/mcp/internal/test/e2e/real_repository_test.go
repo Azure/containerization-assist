@@ -491,9 +491,8 @@ func validateSuccessfulBuild(t *testing.T, result map[string]interface{}, sessio
 	}
 
 	// Validate session continuity
-	buildSessionID, err := client.ExtractSessionID(result)
-	if err == nil {
-		assert.Equal(t, sessionID, buildSessionID, "Session should be preserved through build")
+	if resultSessionID, exists := result["session_id"]; exists {
+		assert.Equal(t, sessionID, resultSessionID, "Session should be preserved through build")
 	}
 
 	// Validate image reference is returned
