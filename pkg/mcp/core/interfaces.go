@@ -149,16 +149,6 @@ type RequestHandler interface {
 // Tool Registry Interface
 // ============================================================================
 
-// ToolRegistry provides simplified tool registration and retrieval.
-// This eliminates the need for complex auto-registration adapters.
-type ToolRegistry interface {
-	Register(tool Tool)
-	Get(name string) (Tool, bool)
-	GetTool(name string) (Tool, error) // Legacy compatibility method
-	List() []string
-	GetMetadata(name string) (ToolMetadata, bool)
-}
-
 // ============================================================================
 // Tool Orchestration Interface
 // ============================================================================
@@ -461,12 +451,6 @@ type TokenUsage struct {
 	CompletionTokens int `json:"completion_tokens"`
 	PromptTokens     int `json:"prompt_tokens"`
 	TotalTokens      int `json:"total_tokens"`
-}
-
-// IterativeFixer provides iterative fixing functionality
-type IterativeFixer interface {
-	// AttemptFix performs iterative fixing with retry logic
-	AttemptFix(ctx context.Context, sessionID string, toolName string, operationType string, err error, maxAttempts int, baseDir string) (*FixingResult, error)
 }
 
 // FixingResult represents the result of a fixing operation

@@ -27,7 +27,7 @@ type FixingContext struct {
 
 // AnalyzerIntegratedFixer combines IterativeFixer with CallerAnalyzer
 type AnalyzerIntegratedFixer struct {
-	fixer        mcptypes.IterativeFixer
+	fixer        *DefaultIterativeFixer
 	analyzer     core.AIAnalyzer
 	contextShare *DefaultContextSharer
 	logger       zerolog.Logger
