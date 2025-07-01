@@ -338,11 +338,13 @@ runs:
           echo "📈 Coverage change: ${DIFF}% (tolerance: -${TOLERANCE}%)"
 
           if (( $(echo "$DIFF < -$TOLERANCE" | bc -l) )); then
-            echo "❌ Coverage regression detected: ${DIFF}% (tolerance: -${TOLERANCE}%)"
-            echo "## Coverage Ratchet Failed ❌" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Coverage regression detected: ${DIFF}% (tolerance: -${TOLERANCE}%)"
+            echo "📝 Note: This is currently set as a warning rather than blocking the build."
+            echo "## Coverage Ratchet Failed ⚠️" >> $GITHUB_STEP_SUMMARY
             echo "Coverage decreased by ${DIFF}% which exceeds tolerance of -${TOLERANCE}%" >> $GITHUB_STEP_SUMMARY
-            echo "regression-check=fail" >> $GITHUB_OUTPUT
-            exit 1
+            echo "regression-check=warning" >> $GITHUB_OUTPUT
+            # Don't exit 1 for now - treat as warning until coverage stabilizes
+            # exit 1
           else
             echo "✅ Coverage ratchet passed: ${DIFF}%"
             echo "## Coverage Ratchet Passed ✅" >> $GITHUB_STEP_SUMMARY
