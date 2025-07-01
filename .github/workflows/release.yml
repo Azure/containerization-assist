@@ -42,6 +42,11 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Architecture validation for release
+        uses: ./.github/actions/architecture-check
+        with:
+          path: 'pkg/mcp'
+
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.out ./...
 

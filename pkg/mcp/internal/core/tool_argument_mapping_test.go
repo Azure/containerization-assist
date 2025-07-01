@@ -15,10 +15,8 @@ import (
 func TestGenerateDockerfileArgumentMapping(t *testing.T) {
 	// Test input arguments
 	testArgs := &analyze.GenerateDockerfileArgs{
-		BaseToolArgs: types.BaseToolArgs{
-			SessionID: "test-session-123",
-			DryRun:    false,
-		},
+		SessionID:          "test-session-123",
+		DryRun:             false,
 		BaseImage:          "tomcat:9-jdk11-openjdk",
 		Template:           "java",
 		Optimization:       "size",
@@ -306,7 +304,7 @@ func TestArgumentTypesPreservation(t *testing.T) {
 // TestEmptyAndNilHandling ensures that empty and nil values are handled correctly
 func TestEmptyAndNilHandling(t *testing.T) {
 	args := &analyze.GenerateDockerfileArgs{
-		BaseToolArgs: types.BaseToolArgs{SessionID: "test"},
+		SessionID: "test",
 		// Leave all other fields empty/default
 	}
 
@@ -335,7 +333,7 @@ func TestEmptyAndNilHandling(t *testing.T) {
 // Benchmark to ensure argument mapping doesn't introduce significant overhead
 func BenchmarkArgumentMapping(b *testing.B) {
 	testArgs := &analyze.GenerateDockerfileArgs{
-		BaseToolArgs: types.BaseToolArgs{SessionID: "test"},
+		SessionID:    "test",
 		BaseImage:    "nginx:latest",
 		Template:     "node",
 		Optimization: "speed",

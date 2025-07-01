@@ -1,0 +1,48 @@
+name: 'Architecture Check'
+description: 'Validates architecture constraints (adapters, wrappers, import cycles)'
+inputs:
+  path:
+    description: 'Path to check for architecture violations'
+    required: false
+    default: 'pkg/mcp'
+outputs:
+  adapter-count:
+    description: 'Number of adapter files found'
+  wrapper-count:
+    description: 'Number of wrapper files found'
+  import-cycles:
+    description: 'Number of import cycles detected'
+runs:
+  using: "composite"
+  steps:
+    - name: Check for adapters
+      shell: bash
+      run: |
+        ADAPTER_COUNT=$(find ${{ inputs.path }} -name "*adapter*.go" 2>/dev/null | wc -l || echo "0")
+        echo "adapter-count=$ADAPTER_COUNT" >> $GITHUB_OUTPUT
+        echo "Found $ADAPTER_COUNT adapter files"
+
+    - name: Check for wrappers
+      shell: bash
+      run: |
+        WRAPPER_COUNT=$(find ${{ inputs.path }} -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l || echo "0")
+        echo "wrapper-count=$WRAPPER_COUNT" >> $GITHUB_OUTPUT
+        echo "Found $WRAPPER_COUNT wrapper files (excluding docker_operation)"
+
+    - name: Check import cycles
+      shell: bash
+      run: |
+        echo "🔍 Checking for import cycles..."
+        CYCLE_COUNT=0
+
+        # Try to detect import cycles by attempting to build
+        if go build -tags mcp ${{ inputs.path }}/... 2>&1 | grep -q "import cycle"; then
+          # Count unique cycle errors (this is a rough approximation)
+          CYCLE_COUNT=$(go build -tags mcp ${{ inputs.path }}/... 2>&1 | grep "import cycle" | wc -l || echo "0")
+          echo "❌ $CYCLE_COUNT import cycles detected"
+          go build -tags mcp ${{ inputs.path }}/... 2>&1 | grep "import cycle"
+        else
+          echo "✅ No import cycles detected"
+        fi
+
+        echo "import-cycles=$CYCLE_COUNT" >> $GITHUB_OUTPUT

@@ -217,6 +217,20 @@ func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID str
 	// Initialize error router if not already available
 	errorRouter := orchestration.NewDefaultErrorRouter(ch.logger)
 
+	// Extract failure analysis if available from the latest tool result
+	var failureAnalysis map[string]interface{}
+	if latestTurn := state.GetLatestTurn(); latestTurn != nil && len(latestTurn.ToolCalls) > 0 {
+		lastToolCall := latestTurn.ToolCalls[len(latestTurn.ToolCalls)-1]
+		if lastToolCall.Result != nil {
+			// Check if the result contains failure analysis
+			if resultMap, ok := lastToolCall.Result.(map[string]interface{}); ok {
+				if fa, exists := resultMap["failure_analysis"]; exists && fa != nil {
+					failureAnalysis, _ = fa.(map[string]interface{})
+				}
+			}
+		}
+	}
+
 	// Create workflow error from the stage error
 	workflowError := &orchestration.WorkflowError{
 		ID:        fmt.Sprintf("%s_%d", sessionID, time.Now().Unix()),
@@ -235,6 +249,7 @@ func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID str
 		ErrorContext: map[string]interface{}{
 			"conversation_stage": string(stage),
 			"state":              state,
+			"failure_analysis":   failureAnalysis,
 		},
 	}
 
@@ -352,23 +367,338 @@ func (ch *ConversationHandler) getErrorSeverity(err error) string {
 	}
 }
 
-func (ch *ConversationHandler) attemptRetryFix(_ context.Context, sessionID string, stage types.ConversationStage, _ *orchestration.ErrorAction) bool {
-	// NOTE: Actual retry logic implementation deferred to tool orchestrator integration
+func (ch *ConversationHandler) attemptRetryFix(ctx context.Context, sessionID string, stage types.ConversationStage, action *orchestration.ErrorAction) bool {
+	// Get the session to retrieve the last tool call parameters
+	sessionInterface, err := ch.sessionManager.GetSession(sessionID)
+	if err != nil {
+		ch.logger.Error().Err(err).Msg("Failed to get session for retry")
+		return false
+	}
+
+	// Type assert to get the concrete session type
+	internalSession, ok := sessionInterface.(*session.SessionState)
+	if !ok {
+		ch.logger.Error().Msg("Session type assertion failed during retry")
+		return false
+	}
+
+	// Create conversation state to access tool call history
+	convState := &ConversationState{
+		SessionState: internalSession,
+		History:      make([]ConversationTurn, 0),
+		Context:      make(map[string]interface{}),
+	}
+
+	// Load conversation history from session metadata
+	if internalSession.Metadata != nil {
+		if history, ok := internalSession.Metadata["conversation_history"].([]interface{}); ok {
+			for _, turnData := range history {
+				if turnMap, ok := turnData.(map[string]interface{}); ok {
+					turn := ConversationTurn{}
+					if toolCallsData, ok := turnMap["tool_calls"].([]interface{}); ok {
+						for _, tcData := range toolCallsData {
+							if tcMap, ok := tcData.(map[string]interface{}); ok {
+								tc := ToolCall{
+									Tool: fmt.Sprintf("%v", tcMap["tool"]),
+								}
+								if params, ok := tcMap["parameters"].(map[string]interface{}); ok {
+									tc.Parameters = params
+								}
+								turn.ToolCalls = append(turn.ToolCalls, tc)
+							}
+						}
+					}
+					convState.History = append(convState.History, turn)
+				}
+			}
+		}
+	}
+
+	// Get the last conversation turn with tool calls
+	var lastToolCall *ToolCall
+	if len(convState.History) > 0 {
+		for i := len(convState.History) - 1; i >= 0; i-- {
+			turn := convState.History[i]
+			if len(turn.ToolCalls) > 0 {
+				// Find the tool call that matches our stage
+				toolName := ch.getToolNameForStage(stage)
+				for _, tc := range turn.ToolCalls {
+					if tc.Tool == toolName || strings.Contains(tc.Tool, strings.TrimSuffix(toolName, "_atomic")) {
+						lastToolCall = &tc
+						break
+					}
+				}
+				if lastToolCall != nil {
+					break
+				}
+			}
+		}
+	}
+
+	// If we couldn't find the tool call in history, check metadata for common parameters
+	if lastToolCall == nil {
+		// Build parameters from session metadata based on the stage
+		toolName := ch.getToolNameForStage(stage)
+		params := make(map[string]interface{})
+		params["session_id"] = sessionID
+
+		switch stage {
+		case types.StageBuild:
+			if internalSession.Metadata != nil {
+				if imageRef, ok := internalSession.Metadata["image_ref"].(string); ok {
+					params["image_ref"] = imageRef
+				}
+				if imageName, ok := internalSession.Metadata["image_name"].(string); ok {
+					params["image_name"] = imageName
+				}
+			}
+		case types.StageDeployment:
+			if internalSession.Metadata != nil {
+				if manifestPath, ok := internalSession.Metadata["manifest_path"].(string); ok {
+					params["manifest_path"] = manifestPath
+				}
+				if imageRef, ok := internalSession.Metadata["image_ref"].(string); ok {
+					params["image_ref"] = imageRef
+				}
+			}
+		}
+
+		lastToolCall = &ToolCall{
+			Tool:       toolName,
+			Parameters: params,
+		}
+	}
+
+	// Apply retry enhancements from the error action
+	enhancedParams := make(map[string]interface{})
+	for k, v := range lastToolCall.Parameters {
+		enhancedParams[k] = v
+	}
+
+	// Apply any retry-specific parameters from the action
+	if action != nil && action.Parameters != nil {
+		for k, v := range action.Parameters {
+			enhancedParams[k] = v
+		}
+	}
+
+	// Extract failure analysis from the last tool result if available
+	var failureAnalysisData map[string]interface{}
+	if len(convState.History) > 0 {
+		latestTurn := convState.History[len(convState.History)-1]
+		if len(latestTurn.ToolCalls) > 0 {
+			lastToolCall := latestTurn.ToolCalls[len(latestTurn.ToolCalls)-1]
+			if lastToolCall.Result != nil {
+				if resultMap, ok := lastToolCall.Result.(map[string]interface{}); ok {
+					if fa, exists := resultMap["build_failure_analysis"]; exists && fa != nil {
+						failureAnalysisData, _ = fa.(map[string]interface{})
+					}
+				}
+			}
+		}
+	}
+
+	if failureAnalysisData != nil {
+		// Apply specific fixes based on failure type
+		if failureType, ok := failureAnalysisData["failure_type"].(string); ok {
+			switch failureType {
+			case "network":
+				// Increase timeouts for network issues
+				enhancedParams["timeout"] = 300 // 5 minutes
+				enhancedParams["retry_count"] = 3
+			case "permissions":
+				// Force root user for permission issues
+				enhancedParams["force_root_user"] = true
+			case "resources":
+				// Enable cleanup for resource issues
+				enhancedParams["force_rm"] = true
+				enhancedParams["no_cache"] = true
+			case "dockerfile_syntax":
+				// Enable validation for dockerfile issues
+				enhancedParams["validate_dockerfile"] = true
+			}
+		}
+
+		// Apply suggested fixes if retry is recommended
+		if retryRecommended, ok := failureAnalysisData["retry_recommended"].(bool); ok && retryRecommended {
+			enhancedParams["apply_fixes"] = true
+		}
+	}
+
+	// Track retry state
+	if convState.RetryStates == nil {
+		convState.RetryStates = make(map[string]*RetryState)
+	}
+
+	retryKey := fmt.Sprintf("%s_%s", sessionID, stage)
+	retryState, exists := convState.RetryStates[retryKey]
+	if !exists {
+		retryState = &RetryState{
+			Attempts: 0,
+		}
+		convState.RetryStates[retryKey] = retryState
+	}
+
+	// Check retry limit
+	maxRetries := 3
+	if retryState.Attempts >= maxRetries {
+		ch.logger.Warn().
+			Int("attempts", retryState.Attempts).
+			Msg("Max retry attempts reached")
+		return false
+	}
+
+	// Update retry state
+	retryState.Attempts++
+	retryState.LastAttempt = time.Now()
+
 	ch.logger.Info().
 		Str("session_id", sessionID).
-		Str("stage", string(stage)).
-		Msg("Attempting retry fix")
-	return false // Placeholder - would implement actual retry
+		Str("tool", lastToolCall.Tool).
+		Int("attempt", retryState.Attempts).
+		Msg("Executing retry with enhanced parameters")
+
+	// Execute the tool with retry
+	result, err := ch.toolOrchestrator.ExecuteTool(ctx, lastToolCall.Tool, enhancedParams)
+
+	if err != nil {
+		retryState.LastError = err.Error()
+		ch.logger.Error().
+			Err(err).
+			Int("attempt", retryState.Attempts).
+			Msg("Retry attempt failed")
+		return false
+	}
+
+	// Update session with retry success
+	err = ch.sessionManager.UpdateSession(sessionID, func(s interface{}) {
+		if sess, ok := s.(*session.SessionState); ok {
+			if sess.Metadata == nil {
+				sess.Metadata = make(map[string]interface{})
+			}
+			sess.Metadata["last_retry_success"] = true
+			sess.Metadata["retry_result"] = result
+		}
+	})
+
+	ch.logger.Info().
+		Str("session_id", sessionID).
+		Str("tool", lastToolCall.Tool).
+		Int("attempt", retryState.Attempts).
+		Msg("Retry succeeded")
+
+	return true
 }
 
-func (ch *ConversationHandler) attemptRedirectFix(_ context.Context, sessionID string, redirectTo string, workflowError *orchestration.WorkflowError) bool {
-	// NOTE: Actual redirection logic implementation deferred to tool orchestrator integration
+func (ch *ConversationHandler) attemptRedirectFix(ctx context.Context, sessionID string, redirectTo string, workflowError *orchestration.WorkflowError) bool {
+	// Redirect means executing a different tool to handle the error
 	ch.logger.Info().
 		Str("session_id", sessionID).
 		Str("redirect_to", redirectTo).
 		Str("from_tool", workflowError.ToolName).
 		Msg("Attempting redirect fix")
-	return false // Placeholder - would implement actual redirection
+
+	// Get the session to access metadata
+	sessionInterface, err := ch.sessionManager.GetSession(sessionID)
+	if err != nil {
+		ch.logger.Error().Err(err).Msg("Failed to get session for redirect")
+		return false
+	}
+
+	// Type assert to get the concrete session type
+	internalSession, ok := sessionInterface.(*session.SessionState)
+	if !ok {
+		ch.logger.Error().Msg("Session type assertion failed during redirect")
+		return false
+	}
+
+	// Build parameters for the redirect tool based on the error context
+	redirectParams := make(map[string]interface{})
+	redirectParams["session_id"] = sessionID
+
+	// Add common parameters from session metadata
+	if internalSession.Metadata != nil {
+		// Common parameters that might be needed by redirect tools
+		if imageRef, ok := internalSession.Metadata["image_ref"].(string); ok {
+			redirectParams["image_ref"] = imageRef
+		}
+		if appName, ok := internalSession.Metadata["app_name"].(string); ok {
+			redirectParams["app_name"] = appName
+		}
+		if namespace, ok := internalSession.Metadata["namespace"].(string); ok {
+			redirectParams["namespace"] = namespace
+		}
+	}
+
+	// Handle specific redirect scenarios
+	switch redirectTo {
+	case "validate_dockerfile", "validate_dockerfile_atomic":
+		// Redirecting to dockerfile validation
+		if dockerfilePath, ok := internalSession.Metadata["dockerfile_path"].(string); ok {
+			redirectParams["dockerfile_path"] = dockerfilePath
+		}
+		redirectParams["generate_fixes"] = true
+
+	case "generate_dockerfile":
+		// Redirecting to dockerfile generation (regenerate)
+		redirectParams["force_regenerate"] = true
+		if optimization, ok := internalSession.Metadata["optimization"].(string); ok {
+			redirectParams["optimization"] = optimization
+		}
+
+	case "scan_image_security", "scan_image_security_atomic":
+		// Redirecting to security scan
+		redirectParams["fail_on_critical"] = false // Don't fail on redirect
+
+	case "check_health", "check_health_atomic":
+		// Redirecting to health check
+		redirectParams["include_logs"] = true
+		redirectParams["log_lines"] = 50
+	}
+
+	// Add error context to help the redirect tool
+	redirectParams["error_context"] = map[string]interface{}{
+		"original_tool": workflowError.ToolName,
+		"error_message": workflowError.Message,
+		"error_type":    workflowError.ErrorType,
+		"is_redirect":   true,
+	}
+
+	ch.logger.Info().
+		Str("redirect_tool", redirectTo).
+		Interface("params", redirectParams).
+		Msg("Executing redirect tool")
+
+	// Execute the redirect tool
+	result, err := ch.toolOrchestrator.ExecuteTool(ctx, redirectTo, redirectParams)
+
+	if err != nil {
+		ch.logger.Error().
+			Err(err).
+			Str("redirect_tool", redirectTo).
+			Msg("Redirect fix failed")
+		return false
+	}
+
+	// Update session with redirect result
+	err = ch.sessionManager.UpdateSession(sessionID, func(s interface{}) {
+		if sess, ok := s.(*session.SessionState); ok {
+			if sess.Metadata == nil {
+				sess.Metadata = make(map[string]interface{})
+			}
+			sess.Metadata["last_redirect_success"] = true
+			sess.Metadata["redirect_result"] = result
+			sess.Metadata["redirect_from"] = workflowError.ToolName
+			sess.Metadata["redirect_to"] = redirectTo
+		}
+	})
+
+	ch.logger.Info().
+		Str("session_id", sessionID).
+		Str("redirect_to", redirectTo).
+		Msg("Redirect fix succeeded")
+
+	return true
 }
 
 func (ch *ConversationHandler) generateFallbackOptions(stage types.ConversationStage, _ error, action *orchestration.ErrorAction) []Option {

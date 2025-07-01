@@ -1,9 +1,13 @@
-package runtime
+package errors
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 )
+
+// Runtime error types (from internal/runtime/errors.go)
 
 // ErrorType defines the type of error
 type ErrorType string
@@ -20,27 +24,6 @@ const (
 	ErrTypePermission ErrorType = "permission"
 )
 
-// ErrorSeverity defines the severity of an error
-type ErrorSeverity string
-
-const (
-	SeverityCritical ErrorSeverity = "critical"
-	SeverityHigh     ErrorSeverity = "high"
-	SeverityMedium   ErrorSeverity = "medium"
-	SeverityLow      ErrorSeverity = "low"
-)
-
-// ToolError represents a rich error with context
-type ToolError struct {
-	Code      string
-	Message   string
-	Type      ErrorType
-	Severity  ErrorSeverity
-	Context   ErrorContext
-	Cause     error
-	Timestamp string
-}
-
 // ErrorContext provides additional context for errors
 type ErrorContext struct {
 	Tool      string
@@ -48,6 +31,17 @@ type ErrorContext struct {
 	Stage     string
 	SessionID string
 	Fields    map[string]interface{}
+}
+
+// ToolError represents a rich error with context
+type ToolError struct {
+	Code      string
+	Message   string
+	Type      ErrorType
+	Severity  Severity
+	Context   ErrorContext
+	Cause     error
+	Timestamp string
 }
 
 // Error implements the error interface
@@ -99,7 +93,7 @@ func (b *ErrorBuilder) WithType(errType ErrorType) *ErrorBuilder {
 }
 
 // WithSeverity sets the error severity
-func (b *ErrorBuilder) WithSeverity(severity ErrorSeverity) *ErrorBuilder {
+func (b *ErrorBuilder) WithSeverity(severity Severity) *ErrorBuilder {
 	b.err.Severity = severity
 	return b
 }
@@ -315,4 +309,29 @@ func (h *ErrorHandler) isRetryableCode(code string) bool {
 	}
 
 	return retryableCodes[code]
+}
+
+// ToolErrorReporter provides reporting capabilities for tool errors
+type ToolErrorReporter struct {
+	sessionID string
+	toolName  string
+}
+
+// NewToolErrorReporter creates a new tool error reporter
+func NewToolErrorReporter(sessionID, toolName string) *ToolErrorReporter {
+	return &ToolErrorReporter{
+		sessionID: sessionID,
+		toolName:  toolName,
+	}
+}
+
+// ReportError reports a tool error with context
+func (r *ToolErrorReporter) ReportError(ctx context.Context, err error) {
+	// Tool-specific error reporting logic would go here
+	// This could include metrics collection, logging, or alerting
+}
+
+// ReportMetrics reports error metrics for tools
+func (r *ToolErrorReporter) ReportMetrics(ctx context.Context, errorType ErrorType, duration time.Duration) {
+	// Tool-specific metrics reporting logic would go here
 }

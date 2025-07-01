@@ -793,10 +793,18 @@ func (gm *GomcpManager) registerUtilityTools(deps *ToolDependencies) error {
 	return gm.registerResources(registrar, deps)
 }
 
+// LogProvider provides access to server logs
+type LogProvider struct {
+	logger zerolog.Logger
+}
+
 // registerResources registers GoMCP resources for streaming access to logs and telemetry
 func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistrar, deps *ToolDependencies) error {
 	// Logs Resource - provides streaming access to server logs
-	logProvider := mcpserver.CreateGlobalLogProvider()
+	// Create a simple log provider that can access server logs
+	logProvider := &LogProvider{
+		logger: deps.Logger.With().Str("component", "log_provider").Logger(),
+	}
 	runtime.RegisterResource(registrar, "logs/{level}", "Server logs filtered by level (trace, debug, info, warn, error)",
 		func(ctx *gomcpserver.Context, args struct {
 			Level     string `path:"level"`
@@ -825,11 +833,19 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				toolArgs.Limit = 100
 			}
 
-			logsTool := mcpserver.NewGetLogsTool(
-				deps.Logger.With().Str("resource", "logs").Logger(),
-				logProvider,
-			)
-			return logsTool.ExecuteTyped(context.Background(), toolArgs)
+			// Use the new consolidated GetLogs function directly
+			// Log that we're using the logProvider for this request
+			logProvider.logger.Debug().
+				Str("level", args.Level).
+				Str("pattern", args.Pattern).
+				Msg("Processing log request through log provider")
+
+			logsTool := &mcpserver.GetLogsTool{}
+			result, err := logsTool.Execute(context.Background(), toolArgs)
+			if err != nil {
+				return nil, err
+			}
+			return result, nil
 		})
 
 	// Simplified logs resource for direct access
@@ -855,11 +871,19 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 				toolArgs.Limit = 100
 			}
 
-			logsTool := mcpserver.NewGetLogsTool(
-				deps.Logger.With().Str("resource", "logs").Logger(),
-				logProvider,
-			)
-			return logsTool.ExecuteTyped(context.Background(), toolArgs)
+			// Use the new consolidated GetLogs function directly
+			// Log that we're using the logProvider for this request
+			logProvider.logger.Debug().
+				Str("level", "info").
+				Str("pattern", args.Pattern).
+				Msg("Processing simplified log request through log provider")
+
+			logsTool := &mcpserver.GetLogsTool{}
+			result, err := logsTool.Execute(context.Background(), toolArgs)
+			if err != nil {
+				return nil, err
+			}
+			return result, nil
 		})
 
 	// Session label management tools - using standardized utility registration
@@ -930,11 +954,13 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 					toolArgs.Format = "prometheus"
 				}
 
-				telemetryTool := mcpserver.NewGetTelemetryMetricsTool(
-					deps.Logger.With().Str("resource", "telemetry").Logger(),
-					deps.Server.conversationComponents.Telemetry,
-				)
-				return telemetryTool.ExecuteTyped(context.Background(), toolArgs)
+				// Use the new consolidated GetTelemetryMetrics function directly
+				telemetryTool := &mcpserver.GetTelemetryMetricsTool{}
+				result, err := telemetryTool.Execute(context.Background(), toolArgs)
+				if err != nil {
+					return nil, err
+				}
+				return result, nil
 			})
 
 		// Metrics by specific name pattern
@@ -956,11 +982,13 @@ func (gm *GomcpManager) registerResources(registrar *runtime.StandardToolRegistr
 					toolArgs.Format = "prometheus"
 				}
 
-				telemetryTool := mcpserver.NewGetTelemetryMetricsTool(
-					deps.Logger.With().Str("resource", "telemetry").Logger(),
-					deps.Server.conversationComponents.Telemetry,
-				)
-				return telemetryTool.ExecuteTyped(context.Background(), toolArgs)
+				// Use the new consolidated GetTelemetryMetrics function directly
+				telemetryTool := &mcpserver.GetTelemetryMetricsTool{}
+				result, err := telemetryTool.Execute(context.Background(), toolArgs)
+				if err != nil {
+					return nil, err
+				}
+				return result, nil
 			})
 	}
 

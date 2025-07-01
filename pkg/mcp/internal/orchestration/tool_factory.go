@@ -85,29 +85,32 @@ func (f *ToolFactory) CreateTagImageTool() *build.AtomicTagImageTool {
 // CreateScanImageSecurityTool creates an instance of AtomicScanImageSecurityTool
 func (f *ToolFactory) CreateScanImageSecurityTool() *scan.AtomicScanImageSecurityTool {
 	tool := scan.NewAtomicScanImageSecurityTool(f.pipelineOperations, f.sessionManager, f.logger)
-	// Note: Scan tools may need different analyzer interface
-	// TODO: Implement proper scan analyzer when scan integration is completed
+	initializer := NewScanToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "scan_image_security")
 	return tool
 }
 
 // CreateScanSecretsTool creates an instance of AtomicScanSecretsTool
 func (f *ToolFactory) CreateScanSecretsTool() *scan.AtomicScanSecretsTool {
-	return scan.NewAtomicScanSecretsTool(f.pipelineOperations, f.sessionManager, f.logger)
+	tool := scan.NewAtomicScanSecretsTool(f.pipelineOperations, f.sessionManager, f.logger)
+	initializer := NewScanToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "scan_secrets")
+	return tool
 }
 
 // CreateGenerateManifestsTool creates an instance of AtomicGenerateManifestsTool
 func (f *ToolFactory) CreateGenerateManifestsTool() *deploy.AtomicGenerateManifestsTool {
 	tool := deploy.NewAtomicGenerateManifestsTool(f.pipelineOperations, f.sessionManager, f.logger)
-	// Note: Deploy tools may need different analyzer interface
-	// TODO: Implement proper deploy analyzer when deploy integration is completed
+	initializer := NewDeployToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "generate_manifests")
 	return tool
 }
 
 // CreateDeployKubernetesTool creates an instance of AtomicDeployKubernetesTool
 func (f *ToolFactory) CreateDeployKubernetesTool() *deploy.AtomicDeployKubernetesTool {
 	tool := deploy.NewAtomicDeployKubernetesTool(f.pipelineOperations, f.sessionManager, f.logger)
-	// Note: Deploy tools may need different analyzer interface
-	// TODO: Implement proper deploy analyzer when deploy integration is completed
+	initializer := NewDeployToolInitializer(f.analyzerHelper)
+	initializer.SetupAnalyzer(tool, "deploy_kubernetes")
 	return tool
 }
 

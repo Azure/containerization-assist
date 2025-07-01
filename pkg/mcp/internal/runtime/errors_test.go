@@ -5,8 +5,49 @@ import (
 	"fmt"
 	"testing"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/internal/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+// Re-export error types for backwards compatibility with tests
+type (
+	ErrorType          = mcperrors.ErrorType
+	ErrorSeverity      = mcperrors.Severity
+	ToolError          = mcperrors.ToolError
+	ErrorBuilder       = mcperrors.ErrorBuilder
+	ErrorContext       = mcperrors.ErrorContext
+	ValidationErrorSet = mcperrors.ValidationErrorSet
+	ErrorHandler       = mcperrors.ErrorHandler
+)
+
+// Re-export error constants for backwards compatibility with tests
+const (
+	ErrTypeValidation = mcperrors.ErrTypeValidation
+	ErrTypeNotFound   = mcperrors.ErrTypeNotFound
+	ErrTypeSystem     = mcperrors.ErrTypeSystem
+	ErrTypeBuild      = mcperrors.ErrTypeBuild
+	ErrTypeDeployment = mcperrors.ErrTypeDeployment
+	ErrTypeSecurity   = mcperrors.ErrTypeSecurity
+	ErrTypeConfig     = mcperrors.ErrTypeConfig
+	ErrTypeNetwork    = mcperrors.ErrTypeNetwork
+	ErrTypePermission = mcperrors.ErrTypePermission
+
+	SeverityCritical = mcperrors.SeverityCritical
+	SeverityHigh     = mcperrors.SeverityHigh
+	SeverityMedium   = mcperrors.SeverityMedium
+	SeverityLow      = mcperrors.SeverityLow
+)
+
+// Re-export error constructor functions for backwards compatibility with tests
+var (
+	NewErrorBuilder       = mcperrors.NewErrorBuilder
+	NewValidationError    = mcperrors.NewValidationError
+	NewNotFoundError      = mcperrors.NewNotFoundError
+	NewSystemError        = mcperrors.NewSystemError
+	NewBuildError         = mcperrors.NewBuildError
+	NewValidationErrorSet = mcperrors.NewValidationErrorSet
+	NewErrorHandler       = mcperrors.NewErrorHandler
 )
 
 func TestErrorType_Constants(t *testing.T) {
@@ -100,14 +141,15 @@ func TestToolError_WithContext(t *testing.T) {
 
 func TestNewErrorBuilder(t *testing.T) {
 	builder := NewErrorBuilder("TEST_CODE", "test message")
+	err := builder.Build()
 
 	assert.NotNil(t, builder)
-	assert.NotNil(t, builder.err)
-	assert.Equal(t, "TEST_CODE", builder.err.Code)
-	assert.Equal(t, "test message", builder.err.Message)
-	assert.Equal(t, ErrTypeSystem, builder.err.Type)
-	assert.Equal(t, SeverityMedium, builder.err.Severity)
-	assert.NotNil(t, builder.err.Context.Fields)
+	assert.NotNil(t, err)
+	assert.Equal(t, "TEST_CODE", err.Code)
+	assert.Equal(t, "test message", err.Message)
+	assert.Equal(t, ErrTypeSystem, err.Type)
+	assert.Equal(t, SeverityMedium, err.Severity)
+	assert.NotNil(t, err.Context.Fields)
 }
 
 func TestErrorBuilder_FluentInterface(t *testing.T) {
@@ -230,7 +272,7 @@ func TestNewErrorHandler(t *testing.T) {
 	handler := NewErrorHandler(logger)
 
 	assert.NotNil(t, handler)
-	assert.Equal(t, logger, handler.logger)
+	// Note: logger field is unexported, so we can't test it directly
 }
 
 func TestErrorHandler_Handle(t *testing.T) {
@@ -380,9 +422,10 @@ func TestErrorHandler_IsRetryable(t *testing.T) {
 	}
 }
 
-func TestErrorHandler_isRetryableCode(t *testing.T) {
+func TestErrorHandler_CodeRetryBehavior(t *testing.T) {
 	handler := NewErrorHandler(nil)
 
+	// Test retryable codes indirectly through IsRetryable
 	retryableCodes := []string{
 		"TIMEOUT",
 		"CONNECTION_REFUSED",
@@ -398,11 +441,13 @@ func TestErrorHandler_isRetryableCode(t *testing.T) {
 	}
 
 	for _, code := range retryableCodes {
-		assert.True(t, handler.isRetryableCode(code), "Expected %s to be retryable", code)
+		err := &ToolError{Code: code, Type: ErrTypeBuild}
+		assert.True(t, handler.IsRetryable(err), "Expected %s to be retryable", code)
 	}
 
 	for _, code := range nonRetryableCodes {
-		assert.False(t, handler.isRetryableCode(code), "Expected %s to not be retryable", code)
+		err := &ToolError{Code: code, Type: ErrTypeBuild}
+		assert.False(t, handler.IsRetryable(err), "Expected %s to not be retryable", code)
 	}
 }
 

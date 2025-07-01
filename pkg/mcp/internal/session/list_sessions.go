@@ -7,13 +7,21 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
+)
+
+// Session constants
+const (
+	SessionStatusActive  = "active"
+	SessionStatusExpired = "expired"
+	SessionSortOrderAsc  = "asc"
 )
 
 // ListSessionsArgs represents the arguments for listing sessions
 type ListSessionsArgs struct {
-	types.BaseToolArgs
+	DryRun    bool   `json:"dry_run,omitempty"`    // Preview changes without executing
+	SessionID string `json:"session_id,omitempty"` // Session ID for state correlation
 	// Filter options
 	Status    string   `json:"status,omitempty"`     // Status filter: active, expired, all
 	Labels    []string `json:"labels,omitempty"`     // Sessions must have ALL these labels
@@ -43,7 +51,11 @@ type SessionInfo struct {
 
 // ListSessionsResult represents the result of listing sessions
 type ListSessionsResult struct {
-	types.BaseToolResponse
+	Version       string            `json:"version"`    // Schema version
+	Tool          string            `json:"tool"`       // Tool name for correlation
+	Timestamp     time.Time         `json:"timestamp"`  // Execution timestamp
+	SessionID     string            `json:"session_id"` // Session correlation
+	DryRun        bool              `json:"dry_run"`    // Whether this was a dry-run
 	Sessions      []SessionInfo     `json:"sessions"`
 	TotalSessions int               `json:"total_sessions"`
 	ActiveCount   int               `json:"active_count"`
@@ -130,13 +142,7 @@ func (t *ListSessionsTool) ExecuteTyped(ctx context.Context, args ListSessionsAr
 	// Get all sessions
 	sessions, err := t.sessionManager.GetAllSessions()
 	if err != nil {
-		return nil, types.NewSessionError("", "list_sessions").
-			WithStage("session_retrieval").
-			WithTool("list_sessions").
-			WithRootCause("Session manager is unavailable or database connection failed").
-			WithImmediateStep(1, "Check session storage", "Verify session storage backend is accessible").
-			WithCommand(2, "Restart session service", "Restart the session management service", "systemctl restart session-manager", "Session service restarted").
-			Build()
+		return nil, errors.Wrapf(err, "list_sessions", "Failed to retrieve sessions from session manager")
 	}
 
 	// Get stats
@@ -197,13 +203,17 @@ func (t *ListSessionsTool) ExecuteTyped(ctx context.Context, args ListSessionsAr
 	}
 
 	result := &ListSessionsResult{
-		BaseToolResponse: types.NewBaseResponse("list_sessions", args.SessionID, args.DryRun),
-		Sessions:         sessionInfos,
-		TotalSessions:    stats.TotalSessions,
-		ActiveCount:      stats.ActiveSessions,
-		ExpiredCount:     expiredCount,
-		TotalDiskUsed:    totalDiskUsed,
-		ServerUptime:     uptime.String(),
+		Version:       "v1.0.0",
+		Tool:          "list_sessions",
+		Timestamp:     time.Now(),
+		SessionID:     args.SessionID,
+		DryRun:        args.DryRun,
+		Sessions:      sessionInfos,
+		TotalSessions: stats.TotalSessions,
+		ActiveCount:   stats.ActiveSessions,
+		ExpiredCount:  expiredCount,
+		TotalDiskUsed: totalDiskUsed,
+		ServerUptime:  uptime.String(),
 		Metadata: map[string]string{
 			"filter_status": args.Status,
 			"sort_by":       args.SortBy,
@@ -288,11 +298,11 @@ func (t *ListSessionsTool) hasLabel(session *SessionData, label string) bool {
 // getSessionStatus determines the status of a session
 func (t *ListSessionsTool) getSessionStatus(session *SessionData) string {
 	if time.Now().After(session.ExpiresAt) {
-		return types.SessionStatusExpired
+		return SessionStatusExpired
 	}
 
 	if len(session.ActiveJobs) > 0 {
-		return types.SessionStatusActive
+		return SessionStatusActive
 	}
 
 	// Session is not expired and has no active jobs
@@ -309,19 +319,19 @@ func (t *ListSessionsTool) sortSessions(sessions []*SessionData, sortBy, sortOrd
 
 			switch sortBy {
 			case "created":
-				if sortOrder == types.SessionSortOrderAsc {
+				if sortOrder == SessionSortOrderAsc {
 					shouldSwap = sessions[j].CreatedAt.After(sessions[j+1].CreatedAt)
 				} else {
 					shouldSwap = sessions[j].CreatedAt.Before(sessions[j+1].CreatedAt)
 				}
 			case "updated":
-				if sortOrder == types.SessionSortOrderAsc {
+				if sortOrder == SessionSortOrderAsc {
 					shouldSwap = sessions[j].UpdatedAt.After(sessions[j+1].UpdatedAt)
 				} else {
 					shouldSwap = sessions[j].UpdatedAt.Before(sessions[j+1].UpdatedAt)
 				}
 			case "disk_usage":
-				if sortOrder == types.SessionSortOrderAsc {
+				if sortOrder == SessionSortOrderAsc {
 					shouldSwap = sessions[j].DiskUsage > sessions[j+1].DiskUsage
 				} else {
 					shouldSwap = sessions[j].DiskUsage < sessions[j+1].DiskUsage
@@ -330,7 +340,7 @@ func (t *ListSessionsTool) sortSessions(sessions []*SessionData, sortBy, sortOrd
 				// Sort by number of labels
 				labelCount1 := len(sessions[j].Labels)
 				labelCount2 := len(sessions[j+1].Labels)
-				if sortOrder == types.SessionSortOrderAsc {
+				if sortOrder == SessionSortOrderAsc {
 					shouldSwap = labelCount1 > labelCount2
 				} else {
 					shouldSwap = labelCount1 < labelCount2

@@ -1,69 +1,199 @@
 package analyze
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/rs/zerolog"
 )
 
-// TemplateIntegration handles template operations for Dockerfile generation
+// TemplateIntegration handles Dockerfile template integration
 type TemplateIntegration struct {
 	logger zerolog.Logger
 }
 
-// NewTemplateIntegration creates a new template integration
+// NewTemplateIntegration creates a new template integration handler
 func NewTemplateIntegration(logger zerolog.Logger) *TemplateIntegration {
 	return &TemplateIntegration{
 		logger: logger,
 	}
 }
 
-// SelectDockerfileTemplate selects the appropriate Dockerfile template
-func (t *TemplateIntegration) SelectDockerfileTemplate(repositoryData map[string]interface{}, templateName string) (*DockerfileTemplateContext, error) {
-	// Default implementation
-	ctx := &DockerfileTemplateContext{
-		SelectedTemplate:     templateName,
-		DetectedLanguage:     "go",
-		DetectedFramework:    "gin",
-		SelectionMethod:      "default",
-		SelectionConfidence:  0.8,
-		AvailableTemplates:   []TemplateOptionInternal{},
-		AlternativeOptions:   []AlternativeTemplateOption{},
-		SelectionReasoning:   []string{"Default template selected"},
-		CustomizationOptions: make(map[string]interface{}),
+// GetTemplateContent returns the content for a specific template
+func (ti *TemplateIntegration) GetTemplateContent(templateName string) (string, error) {
+	templates := map[string]string{
+		"go":      ti.getGoTemplate(),
+		"node":    ti.getNodeTemplate(),
+		"python":  ti.getPythonTemplate(),
+		"java":    ti.getJavaTemplate(),
+		"rust":    ti.getRustTemplate(),
+		"php":     ti.getPHPTemplate(),
+		"ruby":    ti.getRubyTemplate(),
+		"dotnet":  ti.getDotNetTemplate(),
+		"generic": ti.getGenericTemplate(),
 	}
 
-	if templateName == "" {
-		ctx.SelectedTemplate = "go"
+	if content, ok := templates[templateName]; ok {
+		return content, nil
 	}
 
-	return ctx, nil
+	return "", fmt.Errorf("template not found: %s", templateName)
 }
 
-// DockerfileTemplateContext provides context for template selection
-type DockerfileTemplateContext struct {
-	SelectedTemplate     string
-	DetectedLanguage     string
-	DetectedFramework    string
-	SelectionMethod      string
-	SelectionConfidence  float64
-	AvailableTemplates   []TemplateOptionInternal
-	AlternativeOptions   []AlternativeTemplateOption
-	SelectionReasoning   []string
-	CustomizationOptions map[string]interface{}
+// ApplyTemplate applies variables to a template
+func (ti *TemplateIntegration) ApplyTemplate(template string, vars map[string]string) string {
+	result := template
+
+	for key, value := range vars {
+		placeholder := fmt.Sprintf("{{%s}}", key)
+		result = strings.ReplaceAll(result, placeholder, value)
+	}
+
+	return result
 }
 
-// TemplateOptionInternal represents internal template option structure
-type TemplateOptionInternal struct {
-	Name        string
-	Description string
-	BestFor     []string
-	Limitations []string
-	MatchScore  float64
+// Template definitions
+
+func (ti *TemplateIntegration) getGoTemplate() string {
+	return `FROM {{BASE_IMAGE}}
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN go build -o main .
+
+EXPOSE 8080
+CMD ["./main"]`
 }
 
-// AlternativeTemplateOption represents alternative template options
-type AlternativeTemplateOption struct {
-	Template  string
-	Reason    string
-	TradeOffs []string
-	UseCases  []string
+func (ti *TemplateIntegration) getNodeTemplate() string {
+	return `FROM {{BASE_IMAGE}}
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 3000
+CMD ["node", "index.js"]`
+}
+
+func (ti *TemplateIntegration) getPythonTemplate() string {
+	return `FROM {{BASE_IMAGE}}
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+CMD ["python", "app.py"]`
+}
+
+func (ti *TemplateIntegration) getJavaTemplate() string {
+	return `FROM {{BASE_IMAGE}} AS build
+
+WORKDIR /app
+
+COPY pom.xml .
+RUN mvn dependency:go-offline
+
+COPY src ./src
+RUN mvn package
+
+FROM openjdk:17-jre-slim
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]`
+}
+
+func (ti *TemplateIntegration) getRustTemplate() string {
+	return `FROM {{BASE_IMAGE}} AS builder
+
+WORKDIR /app
+
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && rm -rf src
+
+COPY src ./src
+RUN cargo build --release
+
+FROM debian:bullseye-slim
+WORKDIR /app
+COPY --from=builder /app/target/release/app /app/
+
+EXPOSE 8080
+CMD ["./app"]`
+}
+
+func (ti *TemplateIntegration) getPHPTemplate() string {
+	return `FROM {{BASE_IMAGE}}
+
+RUN docker-php-ext-install pdo pdo_mysql
+
+WORKDIR /var/www/html
+
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader
+
+COPY . .
+RUN chown -R www-data:www-data /var/www/html
+
+EXPOSE 9000
+CMD ["php-fpm"]`
+}
+
+func (ti *TemplateIntegration) getRubyTemplate() string {
+	return `FROM {{BASE_IMAGE}}
+
+RUN apt-get update -qq && apt-get install -y nodejs postgresql-client
+
+WORKDIR /app
+
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+
+COPY . .
+
+EXPOSE 3000
+CMD ["rails", "server", "-b", "0.0.0.0"]`
+}
+
+func (ti *TemplateIntegration) getDotNetTemplate() string {
+	return `FROM {{BASE_IMAGE}} AS build
+
+WORKDIR /app
+
+COPY *.csproj ./
+RUN dotnet restore
+
+COPY . .
+RUN dotnet publish -c Release -o out
+
+FROM mcr.microsoft.com/dotnet/aspnet:7.0-alpine
+WORKDIR /app
+COPY --from=build /app/out .
+
+EXPOSE 80
+ENTRYPOINT ["dotnet", "App.dll"]`
+}
+
+func (ti *TemplateIntegration) getGenericTemplate() string {
+	return `FROM {{BASE_IMAGE}}
+
+WORKDIR /app
+
+COPY . .
+
+EXPOSE 8080
+CMD ["./run.sh"]`
 }

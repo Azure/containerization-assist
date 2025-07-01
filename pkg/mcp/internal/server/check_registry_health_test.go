@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/rs/zerolog"
 )
 
 // Test CheckRegistryHealthArgs type
@@ -88,32 +87,47 @@ func TestCheckRegistryHealthResult(t *testing.T) {
 	}
 }
 
-// Test NewCheckRegistryHealthTool constructor
-func TestNewCheckRegistryHealthTool(t *testing.T) {
-	logger := zerolog.Nop()
-
-	tool := NewCheckRegistryHealthTool(logger)
+// Test CheckRegistryHealthTool constructor (updated for consolidated API)
+func TestCheckRegistryHealthTool(t *testing.T) {
+	// Test that the tool struct can be created
+	tool := &CheckRegistryHealthTool{}
 
 	if tool == nil {
-		t.Error("NewCheckRegistryHealthTool should not return nil")
+		t.Error("CheckRegistryHealthTool should not be nil")
 	}
-	if tool.healthChecker == nil {
-		t.Error("Expected healthChecker to be set")
+
+	// Test metadata
+	metadata := tool.GetMetadata()
+	if metadata.Name != "check_registry_health" {
+		t.Errorf("Expected tool name to be 'check_registry_health', got '%s'", metadata.Name)
+	}
+	if metadata.Category != "registry" {
+		t.Errorf("Expected tool category to be 'registry', got '%s'", metadata.Category)
 	}
 }
 
-// Test CheckRegistryHealthTool struct
-func TestCheckRegistryHealthToolStruct(t *testing.T) {
-	logger := zerolog.Nop()
+// Test CheckRegistryHealthTool validation
+func TestCheckRegistryHealthToolValidation(t *testing.T) {
+	tool := &CheckRegistryHealthTool{}
 
-	tool := CheckRegistryHealthTool{
-		logger:        logger,
-		healthChecker: nil, // We don't have a real health checker for testing
+	// Test with valid args
+	validArgs := CheckRegistryHealthArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: "test-session",
+		},
+		Registries: []string{"docker.io"},
+		Timeout:    30,
 	}
 
-	// Just test that the struct can be created with the expected fields
-	if tool.logger.GetLevel() < 0 {
-		t.Log("Logger level is set to a specific value")
+	err := tool.Validate(nil, validArgs)
+	if err != nil {
+		t.Errorf("Validation should pass for valid args, got error: %v", err)
+	}
+
+	// Test with invalid args
+	err = tool.Validate(nil, "invalid")
+	if err == nil {
+		t.Error("Validation should fail for invalid args type")
 	}
 }
 

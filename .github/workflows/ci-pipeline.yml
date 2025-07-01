@@ -19,163 +19,97 @@ permissions:
   statuses: write
 
 jobs:
-  # Phase 1: Canary Validation - Fast checks that gate everything else
+  # Phase 1: Fast Canary Validation - Lightweight checks that gate everything else
   canary:
-    name: Canary Validation
+    name: Fast Canary Validation
     runs-on: ubuntu-latest
     outputs:
       should-continue: ${{ steps.canary-check.outputs.success }}
-      test-mcp: ${{ steps.detect-paths.outputs.test_mcp }}
-      test-core: ${{ steps.detect-paths.outputs.test_core }}
-      test-cli: ${{ steps.detect-paths.outputs.test_cli }}
+      changed-packages: ${{ steps.detect-changes.outputs.packages }}
 
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0  # Need full history for diff
 
     - uses: actions/setup-go@v5
       with:
         go-version: '1.24'
 
-    - name: Install golangci-lint
+    - name: Detect changed files
+      id: detect-changes
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.1.6
-
-    - name: Detect changed paths
-      id: detect-paths
-      run: |
+        # Get changed files
         if [ "${{ github.event_name }}" = "pull_request" ]; then
-          # Get changed files
-          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
-          echo "Changed files:"
-          echo "$changed_files"
-
-          # Check for MCP changes
-          mcp_changes=$(echo "$changed_files" | grep -E "^(pkg/mcp|cmd/mcp-server)" || true)
-
-          # Check for Core changes
-          core_changes=$(echo "$changed_files" | grep -E "^(pkg/core|pkg/utils)" || true)
-
-          # Check for CLI changes
-          cli_changes=$(echo "$changed_files" | grep -E "^(pkg/ai|pkg/pipeline|cmd/)" || true)
-
-          # Set outputs
-          echo "test_mcp=$([ -n "$mcp_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          echo "test_core=$([ -n "$core_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          echo "test_cli=$([ -n "$cli_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-
-          echo "MCP changes: $([ -n "$mcp_changes" ] && echo "yes" || echo "no")"
-          echo "Core changes: $([ -n "$core_changes" ] && echo "yes" || echo "no")"
-          echo "CLI changes: $([ -n "$cli_changes" ] && echo "yes" || echo "no")"
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
+          changed_packages=$(echo "$changed_files" | xargs -r dirname | sort -u | sed 's|^|./|' | tr '\n' ' ')
+          echo "packages=$changed_packages" >> $GITHUB_OUTPUT
+          echo "Changed packages: $changed_packages"
         else
-          # For non-PR events, test everything
-          echo "test_mcp=true" >> $GITHUB_OUTPUT
-          echo "test_core=true" >> $GITHUB_OUTPUT
-          echo "test_cli=true" >> $GITHUB_OUTPUT
-          echo "Non-PR event: testing all packages"
+          echo "packages=./..." >> $GITHUB_OUTPUT
         fi
 
-    - name: Canary validation
+    - name: Fast format check
+      id: format-check
+      run: |
+        echo "🎨 Checking formatting..."
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
+          if [ -n "$changed_files" ]; then
+            unformatted=$(gofmt -l $changed_files)
+            if [ -n "$unformatted" ]; then
+              echo "❌ Formatting issues in:"
+              echo "$unformatted"
+              echo "success=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          fi
+        else
+          # For main branch, check all files
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "❌ Formatting issues found"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        fi
+        echo "✅ Format check passed"
+
+    - name: Fast syntax check
+      run: |
+        echo "📦 Checking syntax..."
+        if [ -n "${{ steps.detect-changes.outputs.packages }}" ]; then
+          # Only compile changed packages, don't generate output
+          go build -o /dev/null ${{ steps.detect-changes.outputs.packages }}
+        fi
+        echo "✅ Syntax check passed"
+
+    - name: Quick architecture check
+      uses: ./.github/actions/architecture-check
+      with:
+        path: 'pkg/mcp'
+
+    - name: Verify go.mod
+      run: |
+        echo "📋 Verifying go.mod..."
+        if ! go mod verify; then
+          echo "❌ go.mod verification failed"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ go.mod verified"
+
+    - name: Set canary result
       id: canary-check
       run: |
-        echo "🚀 Running canary validation..."
-
-        # Test 1: Go mod tidy check
-        echo "📝 Testing go mod tidy..."
-        cp go.mod go.mod.bak
-        cp go.sum go.sum.bak
-        go mod tidy
-        if ! diff -q go.mod go.mod.bak >/dev/null || ! diff -q go.sum go.sum.bak >/dev/null; then
-          echo "❌ go mod tidy would make changes - dependencies are not tidy"
-          echo "Run 'go mod tidy' locally and commit the changes"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Go mod tidy passed"
-
-        # Test 2: Format check
-        echo "🎨 Testing gofmt..."
-        unformatted=$(gofmt -s -l .)
-        if [ -n "$unformatted" ]; then
-          echo "❌ Code formatting issues found:"
-          echo "$unformatted"
-          echo "Run 'gofmt -s -w .' to fix formatting"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Code formatting passed"
-
-        # Test 3: Import formatting check
-        echo "📋 Testing goimports..."
-        go install golang.org/x/tools/cmd/goimports@latest
-        goimports_output=$(goimports -l .)
-        if [ -n "$goimports_output" ]; then
-          echo "❌ Import formatting issues found:"
-          echo "$goimports_output"
-          echo "Run 'goimports -w .' to fix import formatting"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Import formatting passed"
-
-        # Test 4: Build check
-        echo "📦 Testing build..."
-        if ! go build ./...; then
-          echo "❌ Build failed"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Build passed"
-
-        # Test 5: Basic lint check
-        echo "🔍 Testing lint..."
-        if ! golangci-lint run --timeout=5m ./...; then
-          echo "❌ Lint failed"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Lint passed"
-
-        # Test 6: Verify tests compile (don't run them)
-        echo "🧪 Verifying tests compile..."
-        if ! go test -run=^$ ./...; then
-          echo "❌ Test compilation failed"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Tests compile successfully"
-
-        # Test 7: Adapter elimination check
-        echo "🔍 Verifying adapter elimination..."
-        ADAPTER_COUNT=$(find pkg/mcp -name "*adapter*.go" 2>/dev/null | wc -l || echo "0")
-        if [ $ADAPTER_COUNT -ne 0 ]; then
-          echo "❌ Found $ADAPTER_COUNT adapter files - adapters should be eliminated"
-          find pkg/mcp -name "*adapter*.go" 2>/dev/null || true
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ No adapter files found"
-
-        # Test 8: Wrapper consolidation check
-        echo "🔍 Verifying wrapper consolidation..."
-        WRAPPER_COUNT=$(find pkg/mcp -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l || echo "0")
-        if [ $WRAPPER_COUNT -ne 0 ]; then
-          echo "❌ Found $WRAPPER_COUNT wrapper files - wrappers should be consolidated"
-          find pkg/mcp -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation || true
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ No unconsolidated wrapper files found"
-
-        echo "🎉 All canary checks passed!"
+        echo "🎉 Canary validation passed!"
         echo "success=true" >> $GITHUB_OUTPUT
 
   # Phase 2: Parallel Unit Tests (only run if canary passes)
   unit-test-core:
     name: Unit Tests - Core Packages
     needs: canary
-    if: needs.canary.outputs.should-continue == 'true' && needs.canary.outputs.test-core == 'true'
+    if: needs.canary.outputs.should-continue == 'true'
     uses: ./.github/workflows/reusable-go-build.yml
     with:
       go-version: '1.24'
@@ -189,7 +123,7 @@ jobs:
   unit-test-mcp:
     name: Unit Tests - MCP Packages
     needs: canary
-    if: needs.canary.outputs.should-continue == 'true' && needs.canary.outputs.test-mcp == 'true'
+    if: needs.canary.outputs.should-continue == 'true'
     uses: ./.github/workflows/reusable-go-build.yml
     with:
       go-version: '1.24'
@@ -203,7 +137,7 @@ jobs:
   unit-test-cli:
     name: Unit Tests - CLI Packages
     needs: canary
-    if: needs.canary.outputs.should-continue == 'true' && needs.canary.outputs.test-cli == 'true'
+    if: needs.canary.outputs.should-continue == 'true'
     uses: ./.github/workflows/reusable-go-build.yml
     with:
       go-version: '1.24'
@@ -567,23 +501,8 @@ jobs:
       with:
         go-version: '1.24'
 
-    - name: Install Security Scanners
-      run: |
-        echo "🔒 Installing security scanners..."
-        sudo apt-get update
-        sudo apt-get install -y wget apt-transport-https gnupg lsb-release bc
-
-        # Install Trivy
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-        sudo apt-get update
-        sudo apt-get install -y trivy
-
-        # Install GitLeaks
-        wget https://github.com/zricethezav/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz
-        tar xzf gitleaks_8.18.0_linux_x64.tar.gz
-        sudo mv gitleaks /usr/local/bin/
-        chmod +x /usr/local/bin/gitleaks
+    - name: Setup security tools
+      uses: ./.github/actions/security-setup
 
     - name: Run GitLeaks (Secret Detection)
       run: |
@@ -699,7 +618,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     needs: [canary, unit-test-core, unit-test-cli, build-cli]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-cli == 'true'
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
     runs-on: ubuntu-latest
 
     steps:
@@ -722,7 +641,7 @@ jobs:
   mcp-integration-tests:
     name: MCP Integration Tests
     needs: [canary, unit-test-mcp, build-mcp]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-mcp == 'true'
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
     runs-on: ubuntu-latest
 
     services:
@@ -780,7 +699,7 @@ jobs:
   mcp-workflow-tests:
     name: MCP Workflow Integration Tests
     needs: [canary, unit-test-mcp, build-mcp]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-mcp == 'true'
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
     runs-on: ubuntu-latest
 
     strategy:

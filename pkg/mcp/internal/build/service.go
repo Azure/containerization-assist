@@ -2,7 +2,6 @@ package build
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/rs/zerolog"
 )
@@ -35,12 +34,8 @@ func (s *ValidationService) RegisterSchema(name string, schema interface{}) {
 	s.logger.Debug().Str("schema", name).Msg("Schema registered")
 }
 
-// ValidateSessionID validates a session ID
-// ValidateSessionID validates a session ID
-// TODO: Implement without runtime dependency
+// ValidateSessionID validates a session ID using standardized validation
 func (s *ValidationService) ValidateSessionID(ctx context.Context, sessionID string) error {
-	if sessionID == "" {
-		return fmt.Errorf("session ID cannot be empty")
-	}
-	return nil
+	// Use the standardized validation helper
+	return ValidateSessionID(sessionID, "validation_service", s.logger)
 }

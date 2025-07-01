@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/internal/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
@@ -29,13 +29,13 @@ func NewCollector(logger zerolog.Logger) *Collector {
 }
 
 // CollectSystemState gathers current system state information
-func (c *Collector) CollectSystemState(ctx context.Context) types.SystemState {
-	state := types.SystemState{
+func (c *Collector) CollectSystemState(ctx context.Context) errors.SystemState {
+	state := errors.SystemState{
 		DockerAvailable: c.checkDockerAvailable(),
 		K8sConnected:    c.checkK8sConnection(),
 		DiskSpaceMB:     c.getAvailableDiskSpace(),
-		WorkspaceQuota:  c.getWorkspaceQuota(),
-		NetworkStatus:   c.checkNetworkStatus(),
+		MemoryMB:        c.getMemoryUsage(),
+		LoadAverage:     0.0, // TODO: implement load average collection
 	}
 
 	c.logger.Debug().
@@ -48,12 +48,13 @@ func (c *Collector) CollectSystemState(ctx context.Context) types.SystemState {
 }
 
 // CollectResourceUsage gathers current resource usage
-func (c *Collector) CollectResourceUsage() types.ResourceUsage {
-	usage := types.ResourceUsage{
-		CPUPercent:       c.getCPUUsage(),
-		MemoryMB:         c.getMemoryUsage(),
-		DiskUsageMB:      c.getDiskUsage(),
-		NetworkBandwidth: c.getNetworkBandwidth(),
+func (c *Collector) CollectResourceUsage() errors.ResourceUsage {
+	usage := errors.ResourceUsage{
+		CPUPercent:     c.getCPUUsage(),
+		MemoryMB:       c.getMemoryUsage(),
+		DiskUsageMB:    c.getDiskUsage(),
+		NetworkBytesTx: 0, // TODO: implement network TX collection
+		NetworkBytesRx: 0, // TODO: implement network RX collection
 	}
 
 	c.logger.Debug().
@@ -285,36 +286,36 @@ func (c *Collector) getNamespaceQuota(namespace string) (map[string]interface{},
 }
 
 // DiagnosticCheck runs a specific diagnostic check
-func (c *Collector) RunDiagnosticCheck(name string, checkFunc func() error) types.DiagnosticCheck {
-	check := types.DiagnosticCheck{
+func (c *Collector) RunDiagnosticCheck(name string, checkFunc func() error) errors.DiagnosticCheck {
+	check := errors.DiagnosticCheck{
 		Name: name,
 	}
 
 	err := checkFunc()
 	if err != nil {
-		check.Passed = false
-		check.Message = fmt.Sprintf("Check failed: %v", err)
+		check.Status = "fail"
+		check.Details = fmt.Sprintf("Check failed: %v", err)
 	} else {
-		check.Passed = true
-		check.Message = "Check passed"
+		check.Status = "pass"
+		check.Details = "Check passed"
 	}
 
 	return check
 }
 
 // CollectLogs collects recent relevant logs
-func (c *Collector) CollectLogs(component string, lines int) []types.LogEntry {
-	logs := make([]types.LogEntry, 0)
+func (c *Collector) CollectLogs(component string, lines int) []errors.LogEntry {
+	logs := make([]errors.LogEntry, 0)
 
 	// Try to get logs from the global log buffer first
 	if globalBuffer := c.getGlobalLogBuffer(); globalBuffer != nil {
 		utilsLogs := c.extractRecentLogs(globalBuffer, component, lines)
-		// Convert utils.LogEntry to types.LogEntry
+		// Convert utils.LogEntry to errors.LogEntry
 		for _, utilsLog := range utilsLogs {
-			logs = append(logs, types.LogEntry{
+			logs = append(logs, errors.LogEntry{
 				Timestamp: utilsLog.Timestamp,
 				Level:     utilsLog.Level,
-				Component: c.extractComponent(utilsLog, component),
+				Source:    c.extractSource(utilsLog, component),
 				Message:   utilsLog.Message,
 			})
 		}
@@ -335,10 +336,10 @@ func (c *Collector) CollectLogs(component string, lines int) []types.LogEntry {
 
 	// If still no logs, provide helpful debug information
 	if len(logs) == 0 {
-		logs = append(logs, types.LogEntry{
+		logs = append(logs, errors.LogEntry{
 			Timestamp: time.Now(),
 			Level:     "info",
-			Component: component,
+			Source:    component,
 			Message:   fmt.Sprintf("No recent logs found for component '%s' - this may indicate the component is not actively logging or log capture is not configured", component),
 		})
 	}
@@ -364,7 +365,7 @@ func (c *Collector) extractRecentLogs(buffer *utils.RingBuffer, component string
 	// Filter by component if specified
 	var filteredLogs []utils.LogEntry
 	for _, log := range allLogs {
-		if component == "" || c.logMatchesComponent(log, component) {
+		if component == "" || c.logMatchesSource(log, component) {
 			filteredLogs = append(filteredLogs, log)
 		}
 	}
@@ -377,8 +378,8 @@ func (c *Collector) extractRecentLogs(buffer *utils.RingBuffer, component string
 	return filteredLogs
 }
 
-// logMatchesComponent checks if a log entry matches the requested component
-func (c *Collector) logMatchesComponent(log utils.LogEntry, component string) bool {
+// logMatchesSource checks if a log entry matches the requested component
+func (c *Collector) logMatchesSource(log utils.LogEntry, component string) bool {
 	// Check if component name appears in log fields or message
 	if log.Fields != nil {
 		if comp, exists := log.Fields["component"]; exists {
@@ -392,8 +393,8 @@ func (c *Collector) logMatchesComponent(log utils.LogEntry, component string) bo
 	return strings.Contains(strings.ToLower(log.Message), strings.ToLower(component))
 }
 
-// extractComponent extracts or derives the component name from a log entry
-func (c *Collector) extractComponent(log utils.LogEntry, requestedComponent string) string {
+// extractSource extracts or derives the component name from a log entry
+func (c *Collector) extractSource(log utils.LogEntry, requestedSource string) string {
 	// Try to get component from log fields first
 	if log.Fields != nil {
 		if comp, exists := log.Fields["component"]; exists {
@@ -404,8 +405,8 @@ func (c *Collector) extractComponent(log utils.LogEntry, requestedComponent stri
 	}
 
 	// Fallback to requested component
-	if requestedComponent != "" {
-		return requestedComponent
+	if requestedSource != "" {
+		return requestedSource
 	}
 
 	// Default to "unknown"
@@ -413,8 +414,8 @@ func (c *Collector) extractComponent(log utils.LogEntry, requestedComponent stri
 }
 
 // collectSystemLogs attempts to collect logs from system sources
-func (c *Collector) collectSystemLogs(component string, lines int) []types.LogEntry {
-	var logs []types.LogEntry
+func (c *Collector) collectSystemLogs(component string, lines int) []errors.LogEntry {
+	var logs []errors.LogEntry
 
 	// Try docker logs if component suggests it's a container
 	if strings.Contains(strings.ToLower(component), "docker") || strings.Contains(strings.ToLower(component), "container") {
@@ -432,8 +433,8 @@ func (c *Collector) collectSystemLogs(component string, lines int) []types.LogEn
 }
 
 // collectDockerLogs collects recent docker system logs
-func (c *Collector) collectDockerLogs(lines int) []types.LogEntry {
-	var logs []types.LogEntry
+func (c *Collector) collectDockerLogs(lines int) []errors.LogEntry {
+	var logs []errors.LogEntry
 
 	// Try to get docker system events
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -453,10 +454,10 @@ func (c *Collector) collectDockerLogs(lines int) []types.LogEntry {
 			break
 		}
 
-		logs = append(logs, types.LogEntry{
+		logs = append(logs, errors.LogEntry{
 			Timestamp: time.Now(),
 			Level:     "info",
-			Component: "docker",
+			Source:    "docker",
 			Message:   line,
 		})
 	}
@@ -465,8 +466,8 @@ func (c *Collector) collectDockerLogs(lines int) []types.LogEntry {
 }
 
 // collectK8sLogs collects recent kubernetes-related logs
-func (c *Collector) collectK8sLogs(lines int) []types.LogEntry {
-	var logs []types.LogEntry
+func (c *Collector) collectK8sLogs(lines int) []errors.LogEntry {
+	var logs []errors.LogEntry
 
 	// Try to get kubernetes events
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -486,10 +487,10 @@ func (c *Collector) collectK8sLogs(lines int) []types.LogEntry {
 			break
 		}
 
-		logs = append(logs, types.LogEntry{
+		logs = append(logs, errors.LogEntry{
 			Timestamp: time.Now(),
 			Level:     "info",
-			Component: "kubernetes",
+			Source:    "kubernetes",
 			Message:   line,
 		})
 	}

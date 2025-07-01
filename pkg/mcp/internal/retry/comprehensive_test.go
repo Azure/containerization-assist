@@ -186,6 +186,19 @@ func TestBackoffStrategies(t *testing.T) {
 func TestRetryCoordinator(t *testing.T) {
 	coordinator := New()
 
+	// Configure fast test policies to avoid long delays in tests
+	fastTestPolicy := &Policy{
+		MaxAttempts:     3,
+		InitialDelay:    time.Millisecond,
+		MaxDelay:        10 * time.Millisecond,
+		BackoffStrategy: BackoffFixed,
+		ErrorPatterns:   []string{"timeout"},
+	}
+
+	coordinator.SetPolicy("success_test", fastTestPolicy)
+	coordinator.SetPolicy("retry_success_test", fastTestPolicy)
+	coordinator.SetPolicy("always_fail_test", fastTestPolicy)
+
 	tests := []struct {
 		name        string
 		operation   string

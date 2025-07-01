@@ -6,14 +6,14 @@ import (
 	"context"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	internalcore "github.com/Azure/container-kit/pkg/mcp/internal/core"
+	internalserver "github.com/Azure/container-kit/pkg/mcp/internal/server"
 )
 
 // NewServer creates a new MCP server with the given configuration.
 // This function bridges the public API to the internal implementation.
 func NewServer(ctx context.Context, config core.ServerConfig) (core.Server, error) {
 	// Convert public config to internal config
-	internalConfig := internalcore.ServerConfig{
+	internalConfig := internalserver.ServerConfig{
 		WorkspaceDir:      config.WorkspaceDir,
 		MaxSessions:       config.MaxSessions,
 		SessionTTL:        config.SessionTTL,
@@ -42,5 +42,5 @@ func NewServer(ctx context.Context, config core.ServerConfig) (core.Server, erro
 	}
 
 	// Create the internal server and return it as the public interface
-	return internalcore.NewServer(ctx, internalConfig)
+	return internalserver.NewServer(ctx, internalConfig)
 }

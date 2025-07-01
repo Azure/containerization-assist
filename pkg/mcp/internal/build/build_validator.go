@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 
@@ -32,21 +32,11 @@ func NewBuildValidator(logger zerolog.Logger) *BuildValidatorImpl {
 func (bv *BuildValidatorImpl) ValidateBuildPrerequisites(dockerfilePath string, buildContext string) error {
 	// Check if Dockerfile exists
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
-		return types.NewErrorBuilder("invalid_arguments",
-			fmt.Sprintf("Dockerfile not found at %s", dockerfilePath), "validation").
-			WithSeverity("high").
-			WithOperation("ValidateBuildPrerequisites").
-			WithField("dockerfilePath", dockerfilePath).
-			Build()
+		return errors.Validationf("build_validator", "Dockerfile not found at %s", dockerfilePath)
 	}
 	// Check if build context exists
 	if _, err := os.Stat(buildContext); os.IsNotExist(err) {
-		return types.NewErrorBuilder("invalid_arguments",
-			fmt.Sprintf("Build context directory not found at %s", buildContext), "validation").
-			WithSeverity("high").
-			WithOperation("ValidateBuildPrerequisites").
-			WithField("buildContext", buildContext).
-			Build()
+		return errors.Validationf("build_validator", "Build context directory not found at %s", buildContext)
 	}
 	// Check if Docker is available
 	cmd := exec.Command("docker", "version")
@@ -276,12 +266,7 @@ func (bv *BuildValidatorImpl) ValidateArgs(args *AtomicBuildImageArgs) error {
 			}
 		}
 		if !valid {
-			return types.NewErrorBuilder("invalid_arguments",
-				fmt.Sprintf("invalid platform %s, must be one of: %v", args.Platform, validPlatforms), "validation").
-				WithSeverity("high").
-				WithOperation("ValidateArgs").
-				WithField("platform", args.Platform).
-				Build()
+			return errors.Validationf("build_validator", "invalid platform %s, must be one of: %v", args.Platform, validPlatforms)
 		}
 	}
 	// Validate registry URL if push is requested
