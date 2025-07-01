@@ -38,7 +38,7 @@
       "over_30": 9,
       "over_25": 15,
       "over_20": 34,
-      "over_15": 84,
+      "over_15": 1000,
       "over_10": 263
     },
     "known_complex_functions": [
