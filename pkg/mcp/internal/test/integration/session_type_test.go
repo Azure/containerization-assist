@@ -13,7 +13,7 @@ import (
 
 // TestSessionTypeConsistency validates that GetOrCreateSession returns correct types
 func TestSessionTypeConsistency(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -48,7 +48,7 @@ func TestSessionTypeConsistency(t *testing.T) {
 
 // TestSessionManagerIntegration validates session creation through MCP tools
 func TestSessionManagerIntegration(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -69,7 +69,7 @@ func TestSessionManagerIntegration(t *testing.T) {
 	initialUpdateTime := initialState.UpdatedAt
 
 	// Update session through tool call
-	updateResult, err := client.CallTool(ctx, "generate_dockerfile", map[string]interface{}{
+	_, err = client.CallTool(ctx, "generate_dockerfile", map[string]interface{}{
 		"session_id": sessionID,
 		"template":   "java",
 	})
@@ -89,7 +89,7 @@ func TestSessionManagerIntegration(t *testing.T) {
 
 // TestTypeImportConsistency validates cross-package type integration
 func TestTypeImportConsistency(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -153,7 +153,7 @@ func TestTypeImportConsistency(t *testing.T) {
 
 // TestSessionGenericTypeSupport validates generic type support from BETA workstream
 func TestSessionGenericTypeSupport(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -195,7 +195,7 @@ func TestSessionGenericTypeSupport(t *testing.T) {
 
 // TestSessionErrorTypeIntegration validates error type integration with BETA's RichError
 func TestSessionErrorTypeIntegration(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()

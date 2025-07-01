@@ -12,7 +12,7 @@ import (
 
 // TestSessionStateSharing validates that repository analysis results are available to dockerfile generation
 func TestSessionStateSharing(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -44,7 +44,7 @@ func TestSessionStateSharing(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate dockerfile generation uses analysis results
-	dockerfilePath, exists := dockerfileResult["dockerfile_path"]
+	_, exists = dockerfileResult["dockerfile_path"]
 	require.True(t, exists, "Should return dockerfile path")
 
 	// Read generated Dockerfile to verify it uses analysis results
@@ -86,7 +86,7 @@ func TestSessionStateSharing(t *testing.T) {
 
 // TestSessionWorkspaceManagement validates workspace lifecycle
 func TestSessionWorkspaceManagement(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -142,7 +142,7 @@ func TestSessionWorkspaceManagement(t *testing.T) {
 
 // TestSessionPersistenceAcrossTools validates session metadata persists across tool calls
 func TestSessionPersistenceAcrossTools(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -222,7 +222,7 @@ func TestSessionPersistenceAcrossTools(t *testing.T) {
 
 // TestSessionConcurrencyHandling validates concurrent access to the same session
 func TestSessionConcurrencyHandling(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -277,7 +277,7 @@ func TestSessionTimeout(t *testing.T) {
 		t.Skip("Skipping timeout test in short mode")
 	}
 
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -309,7 +309,7 @@ func TestSessionTimeout(t *testing.T) {
 
 // TestSessionErrorRecovery validates session state after errors
 func TestSessionErrorRecovery(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()

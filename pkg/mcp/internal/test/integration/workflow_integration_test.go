@@ -15,7 +15,7 @@ import (
 // TestCompleteContainerizationWorkflow validates the complete containerization workflow
 // This is the CRITICAL test for session continuity and multi-tool integration
 func TestCompleteContainerizationWorkflow(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -103,7 +103,7 @@ func TestCompleteContainerizationWorkflow(t *testing.T) {
 
 // TestWorkflowErrorRecovery tests workflow behavior when individual steps fail
 func TestWorkflowErrorRecovery(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -148,7 +148,7 @@ func TestWorkflowErrorRecovery(t *testing.T) {
 
 // TestConcurrentWorkflows validates multiple concurrent workflows don't interfere
 func TestConcurrentWorkflows(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -191,7 +191,7 @@ func TestConcurrentWorkflows(t *testing.T) {
 
 // TestWorkflowWithInvalidSession tests behavior with invalid session IDs
 func TestWorkflowWithInvalidSession(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -219,7 +219,7 @@ func TestWorkflowWithInvalidSession(t *testing.T) {
 
 // TestWorkflowStateIsolation ensures different workflows don't share state
 func TestWorkflowStateIsolation(t *testing.T) {
-	client, server, cleanup := setupMCPTestEnvironment(t)
+	client, _, cleanup := setupMCPTestEnvironment(t)
 	defer cleanup()
 
 	ctx := context.Background()
