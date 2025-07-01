@@ -64,10 +64,10 @@ const mcpContextKey contextKey = "mcp_context"
 
 // ServerStatusArgs represents server status arguments
 type ServerStatusArgs struct {
-	SessionID        string `json:"session_id,omitempty" description:"Session ID for detailed analysis"`
-	IncludeDetails   bool   `json:"include_details,omitempty" description:"Include detailed server information"`
-	DetailedAnalysis bool   `json:"detailed_analysis,omitempty" description:"Perform detailed health analysis"`
-	DryRun           bool   `json:"dry_run,omitempty" description:"Perform dry run without side effects"`
+	SessionID        *string `json:"session_id,omitempty" description:"Session ID for detailed analysis"`
+	IncludeDetails   *bool   `json:"include_details,omitempty" description:"Include detailed server information"`
+	DetailedAnalysis *bool   `json:"detailed_analysis,omitempty" description:"Perform detailed health analysis"`
+	DryRun           *bool   `json:"dry_run,omitempty" description:"Perform dry run without side effects"`
 }
 
 // ServerStatusResult represents server status result
@@ -75,6 +75,7 @@ type ServerStatusResult struct {
 	Healthy   bool                   `json:"healthy"`
 	Status    string                 `json:"status"`
 	Version   string                 `json:"version"`
+	Uptime    string                 `json:"uptime"`
 	SessionID string                 `json:"session_id,omitempty"`
 	DryRun    bool                   `json:"dry_run,omitempty"`
 	Details   map[string]interface{} `json:"details,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/localrivet/gomcp/server"
@@ -23,6 +24,7 @@ type GomcpManager struct {
 	logger        slog.Logger
 	transport     interface{} // Injected transport (stdio or http)
 	isInitialized bool        // Prevent mutation after creation
+	startTime     time.Time   // Server start time for uptime tracking
 }
 
 // NewGomcpManager creates a new gomcp manager with builder pattern
@@ -37,6 +39,7 @@ func NewGomcpManager(config GomcpConfig) *GomcpManager {
 		config:        config,
 		logger:        logger,
 		isInitialized: false,
+		startTime:     time.Now(),
 	}
 }
 
