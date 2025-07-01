@@ -191,16 +191,16 @@ runs:
           const architectureStatus = '${{ steps.ci-status.outputs.architecture_results }}';
           const hasArchData = !architectureStatus.includes('No Data');
           const archPassed = architectureStatus.includes('✅') || architectureStatus.includes('/100');
-          
+
           const coverageStatus = '${{ steps.ci-status.outputs.coverage_results }}';
           const hasCoverageData = !coverageStatus.includes('No Data');
           const coverageValue = coverageStatus.match(/(\d+\.?\d*)%/)?.[1] || '0';
-          
-          const securityPassed = '${{ steps.ci-status.outputs.security_secrets }}'.includes('✅') && 
+
+          const securityPassed = '${{ steps.ci-status.outputs.security_secrets }}'.includes('✅') &&
                                 '${{ steps.ci-status.outputs.security_vulnerabilities }}'.includes('✅');
-          
+
           const qualityPassed = '${{ steps.ci-status.outputs.quality_results }}'.includes('✅');
-          
+
           // Determine overall pipeline status
           let overallStatus = '✅ **All Checks Passed**';
           let overallEmoji = '🎉';

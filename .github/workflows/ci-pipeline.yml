@@ -596,11 +596,11 @@ jobs:
       run: |
         # Calculate canary time (assume canary is fast, ~30s)
         CANARY_TIME="~30s"
-        
+
         # Calculate total pipeline time (rough estimate based on job statuses)
         PIPELINE_START="${{ github.event.pull_request.created_at || github.event.head_commit.timestamp }}"
         CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        
+
         # Export metrics
         echo "canary-time=$CANARY_TIME" >> $GITHUB_OUTPUT
         echo "total-time=~${GITHUB_RUN_NUMBER}m" >> $GITHUB_OUTPUT
@@ -625,7 +625,7 @@ jobs:
         else
           MCP_STATUS="Integration: ❌"
         fi
-        
+
         if [ "${{ needs.mcp-e2e-tests.result }}" = "success" ]; then
           MCP_STATUS="$MCP_STATUS | E2E: ✅"
         elif [ "${{ needs.mcp-e2e-tests.result }}" = "skipped" ]; then
@@ -633,7 +633,7 @@ jobs:
         else
           MCP_STATUS="$MCP_STATUS | E2E: ❌"
         fi
-        
+
         if [ "${{ needs.mcp-performance-tests.result }}" = "success" ]; then
           MCP_STATUS="$MCP_STATUS | Performance: ✅"
         elif [ "${{ needs.mcp-performance-tests.result }}" = "skipped" ]; then
@@ -641,7 +641,7 @@ jobs:
         else
           MCP_STATUS="$MCP_STATUS | Performance: ❌"
         fi
-        
+
         echo "mcp-tests-status=$MCP_STATUS" >> $GITHUB_OUTPUT
 
     - name: Generate comprehensive PR status and summary
