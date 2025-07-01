@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
@@ -61,7 +62,16 @@ type SessionManagerConfig struct {
 func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 	if err := os.MkdirAll(config.WorkspaceDir, 0o750); err != nil {
 		config.Logger.Error().Err(err).Str("path", config.WorkspaceDir).Msg("Failed to create workspace directory")
-		return nil, fmt.Errorf("failed to create workspace directory %s: %w", config.WorkspaceDir, err)
+		return nil, rich.NewError().
+			Code("SESSION_WORKSPACE_CREATION_FAILED").
+			Message("Failed to create session workspace directory").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityHigh).
+			Cause(err).
+			Context("workspace_dir", config.WorkspaceDir).
+			Suggestion("Check directory permissions and available disk space").
+			WithLocation().
+			Build()
 	}
 
 	var store SessionStore
@@ -71,7 +81,17 @@ func NewSessionManager(config SessionManagerConfig) (*SessionManager, error) {
 		store, err = NewBoltSessionStore(context.Background(), config.StorePath)
 		if err != nil {
 			config.Logger.Error().Err(err).Str("store_path", config.StorePath).Msg("Failed to initialize bolt store")
-			return nil, fmt.Errorf("failed to initialize bolt store at %s: %w", config.StorePath, err)
+			return nil, rich.NewError().
+				Code("SESSION_STORE_INITIALIZATION_FAILED").
+				Message("Failed to initialize session persistence store").
+				Type(rich.ErrTypeSystem).
+				Severity(rich.SeverityHigh).
+				Cause(err).
+				Context("store_path", config.StorePath).
+				Context("store_type", "bolt").
+				Suggestion("Verify store path permissions and BoltDB installation").
+				WithLocation().
+				Build()
 		}
 	} else {
 		store = NewMemorySessionStore()
@@ -131,7 +151,17 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 	if len(sm.sessions) >= sm.maxSessions {
 		// Automatically clean up the oldest session to make room
 		if err := sm.cleanupOldestSession(); err != nil {
-			return nil, fmt.Errorf("maximum number of sessions (%d) reached and failed to cleanup oldest session: %w", sm.maxSessions, err)
+			return nil, rich.NewError().
+				Code("SESSION_LIMIT_EXCEEDED").
+				Message("Maximum session limit reached and cleanup failed").
+				Type(rich.ErrTypeResource).
+				Severity(rich.SeverityHigh).
+				Cause(err).
+				Context("max_sessions", sm.maxSessions).
+				Context("current_sessions", len(sm.sessions)).
+				Suggestion("Increase maxSessions limit or manually cleanup unused sessions").
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -141,7 +171,17 @@ func (sm *SessionManager) getOrCreateSessionConcrete(sessionID string) (*Session
 
 	workspaceDir := filepath.Join(sm.workspaceDir, sessionID)
 	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
-		return nil, fmt.Errorf("failed to create session workspace: %w", err)
+		return nil, rich.NewError().
+			Code("SESSION_WORKSPACE_CREATION_FAILED").
+			Message("Failed to create session-specific workspace directory").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Context("workspace_dir", workspaceDir).
+			Suggestion("Check directory permissions and available disk space for session workspace").
+			WithLocation().
+			Build()
 	}
 
 	session := NewSessionStateWithTTL(sessionID, workspaceDir, sm.sessionTTL)
@@ -164,7 +204,17 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 
 	session, exists := sm.sessions[sessionID]
 	if !exists {
-		return fmt.Errorf("session not found: %s", sessionID)
+		return rich.NewError().
+			Code("SESSION_NOT_FOUND").
+			Message("Cannot update non-existent session").
+			Type(rich.ErrTypeNotFound).
+			Severity(rich.SeverityMedium).
+			Context("session_id", sessionID).
+			Context("operation", "update").
+			Context("total_sessions", len(sm.sessions)).
+			Suggestion("Verify session ID or create a new session before updating").
+			WithLocation().
+			Build()
 	}
 
 	updater(session)
@@ -172,7 +222,17 @@ func (sm *SessionManager) UpdateSession(sessionID string, updater func(interface
 
 	if err := sm.store.Save(context.Background(), sessionID, session); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to persist session update")
-		return err
+		return rich.NewError().
+			Code("SESSION_PERSISTENCE_FAILED").
+			Message("Failed to save session to persistent store").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Context("operation", "update_save").
+			Suggestion("Check store connectivity and disk space availability").
+			WithLocation().
+			Build()
 	}
 
 	return nil
@@ -196,7 +256,16 @@ func (sm *SessionManager) GetSessionConcrete(sessionID string) (*SessionState, e
 		return session, nil
 	}
 
-	return nil, fmt.Errorf("session not found: %s", sessionID)
+	return nil, rich.NewError().
+		Code("SESSION_NOT_FOUND").
+		Message("Session does not exist in memory").
+		Type(rich.ErrTypeNotFound).
+		Severity(rich.SeverityLow).
+		Context("session_id", sessionID).
+		Context("active_sessions", len(sm.sessions)).
+		Suggestion("Session may have expired or never existed - create a new session").
+		WithLocation().
+		Build()
 }
 
 // GetSessionInterface implements ToolSessionManager interface
@@ -271,7 +340,16 @@ func (sm *SessionManager) DeleteSession(ctx context.Context, sessionID string) e
 
 	session, exists := sm.sessions[sessionID]
 	if !exists {
-		return fmt.Errorf("session not found: %s", sessionID)
+		return rich.NewError().
+			Code("SESSION_NOT_FOUND").
+			Message("Cannot delete non-existent session").
+			Type(rich.ErrTypeNotFound).
+			Severity(rich.SeverityMedium).
+			Context("session_id", sessionID).
+			Context("operation", "delete").
+			Suggestion("Verify session ID exists before attempting deletion").
+			WithLocation().
+			Build()
 	}
 
 	// Clean up workspace
@@ -285,7 +363,16 @@ func (sm *SessionManager) DeleteSession(ctx context.Context, sessionID string) e
 	// Remove from persistence
 	if err := sm.store.Delete(context.Background(), sessionID); err != nil {
 		sm.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to remove session from persistence")
-		return err
+		return rich.NewError().
+			Code("SESSION_PERSISTENCE_DELETE_FAILED").
+			Message("Failed to remove session from persistent store").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityMedium).
+			Cause(err).
+			Context("session_id", sessionID).
+			Suggestion("Session deleted from memory but may persist in store - check store connectivity").
+			WithLocation().
+			Build()
 	}
 
 	sm.logger.Info().Str("session_id", sessionID).Msg("Deleted session")
@@ -304,7 +391,16 @@ func (sm *SessionManager) FindSessionByRepo(ctx context.Context, repoURL string)
 		}
 	}
 
-	return nil, fmt.Errorf("no session found for repository URL: %s", repoURL)
+	return nil, rich.NewError().
+		Code("SESSION_NOT_FOUND_BY_REPO").
+		Message("No session found for repository URL").
+		Type(rich.ErrTypeNotFound).
+		Severity(rich.SeverityLow).
+		Context("repo_url", repoURL).
+		Context("total_sessions", len(sm.sessions)).
+		Suggestion("Create a new session or verify the repository URL is correct").
+		WithLocation().
+		Build()
 }
 
 // ListSessions (interface compatible) returns sessions with optional filtering

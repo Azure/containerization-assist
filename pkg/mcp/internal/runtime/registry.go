@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"
@@ -58,11 +59,30 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 	defer reg.mu.Unlock()
 
 	if reg.frozen {
-		return fmt.Errorf("registry operation failed")
+		return rich.NewError().
+			Code("REGISTRY_FROZEN").
+			Message("Cannot register tool on frozen registry").
+			Type(rich.ErrTypeBusiness).
+			Severity(rich.SeverityMedium).
+			Context("tool_name", t.GetMetadata().Name).
+			Context("registry_state", "frozen").
+			Suggestion("Registry is frozen after first tool execution - register all tools during initialization").
+			WithLocation().
+			Build()
 	}
 	metadata := t.GetMetadata()
 	if _, dup := reg.tools[metadata.Name]; dup {
-		return fmt.Errorf("registry operation failed")
+		return rich.NewError().
+			Code("TOOL_ALREADY_REGISTERED").
+			Message("Tool with this name is already registered").
+			Type(rich.ErrTypeBusiness).
+			Severity(rich.SeverityMedium).
+			Context("tool_name", metadata.Name).
+			Context("existing_version", reg.tools[metadata.Name].Tool.GetMetadata().Version).
+			Context("new_version", metadata.Version).
+			Suggestion("Use a different tool name or unregister the existing tool first").
+			WithLocation().
+			Build()
 	}
 
 	// Use invopop/jsonschema which properly handles array items
@@ -100,7 +120,17 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t ExecutableTool[TArgs,
 		Handler: func(ctx context.Context, raw json.RawMessage) (interface{}, error) {
 			var args TArgs
 			if err := json.Unmarshal(raw, &args); err != nil {
-				return nil, fmt.Errorf("registry operation failed")
+				return nil, rich.NewError().
+					Code("TOOL_PARAMETER_UNMARSHAL_FAILED").
+					Message("Failed to unmarshal tool parameters").
+					Type(rich.ErrTypeValidation).
+					Severity(rich.SeverityMedium).
+					Cause(err).
+					Context("tool_name", metadata.Name).
+					Context("raw_args", string(raw)).
+					Suggestion("Check parameter format matches the tool's expected schema").
+					WithLocation().
+					Build()
 			}
 			if err := t.PreValidate(ctx, args); err != nil {
 				return nil, err
