@@ -69,6 +69,8 @@ const (
 	ErrTypeBusiness      ErrorType = "BUSINESS"
 	ErrTypeConfiguration ErrorType = "CONFIGURATION"
 	ErrTypeInternal      ErrorType = "INTERNAL"
+	ErrTypeNotFound      ErrorType = "NOT_FOUND"
+	ErrTypeSystem        ErrorType = "SYSTEM"
 )
 
 // ErrorSeverity indicates the impact level of an error

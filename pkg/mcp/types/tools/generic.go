@@ -8,6 +8,7 @@ import (
 // ToolParams is a constraint for tool parameter types
 type ToolParams interface {
 	Validate() error
+	GetSessionID() string
 }
 
 // ToolResult is a constraint for tool result types

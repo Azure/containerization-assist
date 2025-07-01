@@ -30,6 +30,11 @@ func (p DockerBuildParams) Validate() error {
 	return nil
 }
 
+// GetSessionID implements tools.ToolParams
+func (p DockerBuildParams) GetSessionID() string {
+	return p.SessionID
+}
+
 // DockerBuildResult contains the result of a Docker build operation
 type DockerBuildResult struct {
 	Success     bool          `json:"success"`
@@ -64,6 +69,11 @@ func (p DockerPullParams) Validate() error {
 	return nil
 }
 
+// GetSessionID implements tools.ToolParams
+func (p DockerPullParams) GetSessionID() string {
+	return p.SessionID
+}
+
 // DockerPullResult contains the result of a Docker pull operation
 type DockerPullResult struct {
 	Success   bool          `json:"success"`
@@ -93,6 +103,11 @@ func (p DockerPushParams) Validate() error {
 		return validationError("image", "required")
 	}
 	return nil
+}
+
+// GetSessionID implements tools.ToolParams
+func (p DockerPushParams) GetSessionID() string {
+	return p.SessionID
 }
 
 // DockerPushResult contains the result of a Docker push operation
@@ -127,6 +142,11 @@ func (p DockerTagParams) Validate() error {
 		return validationError("target_image", "required")
 	}
 	return nil
+}
+
+// GetSessionID implements tools.ToolParams
+func (p DockerTagParams) GetSessionID() string {
+	return p.SessionID
 }
 
 // DockerTagResult contains the result of a Docker tag operation
