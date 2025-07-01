@@ -90,8 +90,9 @@ func (v *UnifiedSyntaxValidator) filterByRules(result *ValidationResult, ignoreR
 }
 
 // MigrateSyntaxValidatorToUnified provides a drop-in replacement for the old SyntaxValidator
-func MigrateSyntaxValidatorToUnified(v *SyntaxValidator) *UnifiedSyntaxValidator {
-	return NewUnifiedSyntaxValidator(v.logger)
+// Legacy function - kept for compatibility during migration period
+func MigrateSyntaxValidatorToUnified(logger zerolog.Logger) *UnifiedSyntaxValidator {
+	return NewUnifiedSyntaxValidator(logger)
 }
 
 // CreateSyntaxValidatorWithUnified creates a syntax validator using the unified framework

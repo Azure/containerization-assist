@@ -268,7 +268,7 @@ app.listen(3000, () => console.log('Server running on port 3000'));`
 	// Step 2: BuildSecBot - Build with security scanning
 	t.Run("Build and Security Scan", func(t *testing.T) {
 		// Test syntax validation
-		syntaxValidator := NewSyntaxValidator(logger)
+		syntaxValidator := NewUnifiedSyntaxValidator(logger)
 		validationResult, err := syntaxValidator.Validate(dockerfileContent, ValidationOptions{
 			CheckBestPractices: true,
 		})
