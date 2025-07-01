@@ -49,13 +49,13 @@ type Validatable[T any] interface {
 type TypedValidationResult struct {
 	Valid   bool
 	Errors  []TypedValidationError
-	context map[string]interface{}
+	Context map[string]string
 }
 
 // TypedValidationError represents a validation error with type information
 type TypedValidationError struct {
 	Field       string
-	Value       interface{}
+	Value       string // Convert interface{} to string for safety
 	Constraint  string
 	Message     string
 	Code        string
@@ -70,6 +70,22 @@ func (tve *TypedValidationError) Error() string {
 
 // AddError adds a validation error to the result
 func (tvr *TypedValidationResult) AddError(field, message, code string, value interface{}) {
+	tvr.Valid = false
+	// Convert interface{} value to string for type safety
+	valueStr := ""
+	if value != nil {
+		valueStr = fmt.Sprintf("%v", value)
+	}
+	tvr.Errors = append(tvr.Errors, TypedValidationError{
+		Field:   field,
+		Value:   valueStr,
+		Message: message,
+		Code:    code,
+	})
+}
+
+// AddStringError adds a validation error with a string value
+func (tvr *TypedValidationResult) AddStringError(field, message, code, value string) {
 	tvr.Valid = false
 	tvr.Errors = append(tvr.Errors, TypedValidationError{
 		Field:   field,

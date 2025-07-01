@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 	"github.com/Azure/container-kit/pkg/mcp/internal/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/localrivet/gomcp/server"
@@ -38,16 +39,18 @@ func (h *StdioErrorHandler) HandleToolError(ctx context.Context, toolName string
 
 	// Handle different error types
 	switch typedErr := err.(type) {
+	case *rich.RichError:
+		return h.handleRichError(typedErr, toolName), nil
 	case *errors.CoreError:
 		return h.handleCoreError(typedErr, toolName), nil
-	// Note: RichError has been removed from the system
 	case *types.ToolError:
 		return h.handleToolError(typedErr, toolName), nil
 	case *server.InvalidParametersError:
 		return nil, h.createInvalidParametersError(typedErr.Message)
 	default:
-		// Handle generic errors with categorization
-		return h.handleGenericError(err, toolName), nil
+		// Convert generic errors to RichError for better handling
+		richErr := h.enrichGenericError(err, toolName)
+		return h.handleRichError(richErr, toolName), nil
 	}
 }
 
@@ -136,7 +139,46 @@ func (h *StdioErrorHandler) handleCoreError(coreErr *errors.CoreError, toolName 
 	return response
 }
 
-// handleRichError has been removed as RichError is no longer used
+// handleRichError creates a comprehensive error response from RichError
+func (h *StdioErrorHandler) handleRichError(richErr *rich.RichError, toolName string) interface{} {
+	// Create MCP-compatible error response with rich context
+	response := map[string]interface{}{
+		"content": []map[string]interface{}{
+			{
+				"type": "text",
+				"text": h.formatRichErrorMessage(richErr),
+			},
+		},
+		"isError": true,
+		"error": map[string]interface{}{
+			"code":      string(richErr.Code),
+			"type":      string(richErr.Type),
+			"severity":  string(richErr.Severity),
+			"message":   richErr.Message,
+			"tool":      toolName,
+			"timestamp": richErr.Timestamp,
+			"context":   richErr.Context,
+			"location":  richErr.Location,
+		},
+	}
+
+	// Add suggestion if available
+	if richErr.Suggestion != "" {
+		response["suggestion"] = richErr.Suggestion
+	}
+
+	// Add cause chain if available
+	if richErr.Cause != nil {
+		response["cause"] = richErr.Cause.Error()
+	}
+
+	// Add stack trace if available
+	if len(richErr.Stack) > 0 {
+		response["stack"] = richErr.Stack
+	}
+
+	return response
+}
 
 // handleToolError creates an error response from ToolError
 func (h *StdioErrorHandler) handleToolError(toolErr *types.ToolError, toolName string) interface{} {
@@ -214,7 +256,40 @@ func (h *StdioErrorHandler) createInvalidParametersError(message string) error {
 	}
 }
 
-// formatRichErrorMessage has been removed as RichError is no longer used
+// formatRichErrorMessage creates a user-friendly error message from RichError
+func (h *StdioErrorHandler) formatRichErrorMessage(richErr *rich.RichError) string {
+	var msg strings.Builder
+
+	// Start with severity indicator and message
+	severityIcon := h.getSeverityIcon(richErr.Severity)
+	msg.WriteString(fmt.Sprintf("%s %s: %s\n", severityIcon, richErr.Type, richErr.Message))
+
+	// Add location context if available
+	if richErr.Location != nil {
+		msg.WriteString(fmt.Sprintf("\n📍 Location: %s:%d in %s\n",
+			richErr.Location.File, richErr.Location.Line, richErr.Location.Function))
+	}
+
+	// Add context information
+	if len(richErr.Context) > 0 {
+		msg.WriteString("\n🔍 Context:\n")
+		for key, value := range richErr.Context {
+			msg.WriteString(fmt.Sprintf("  • %s: %v\n", key, value))
+		}
+	}
+
+	// Add suggestion if available
+	if richErr.Suggestion != "" {
+		msg.WriteString(fmt.Sprintf("\n💡 Suggestion: %s\n", richErr.Suggestion))
+	}
+
+	// Add cause chain if available
+	if richErr.Cause != nil {
+		msg.WriteString(fmt.Sprintf("\n🔗 Caused by: %v\n", richErr.Cause))
+	}
+
+	return msg.String()
+}
 
 // formatToolErrorMessage creates a user-friendly error message from ToolError
 func (h *StdioErrorHandler) formatToolErrorMessage(toolErr *types.ToolError) string {
@@ -415,39 +490,176 @@ func (h *StdioErrorHandler) LogErrorMetrics(toolName, errorType string, duration
 		Msg("Tool error handled")
 }
 
-// CreateRecoveryResponse creates a response with recovery guidance
-func (h *StdioErrorHandler) CreateRecoveryResponse(originalError error, recoverySteps, alternatives []string) interface{} {
-	var msg strings.Builder
-	msg.WriteString(fmt.Sprintf("❌ Error: %v\n", originalError))
+// enrichGenericError converts a generic error to RichError with transport context
+func (h *StdioErrorHandler) enrichGenericError(err error, toolName string) *rich.RichError {
+	// Categorize the error type and severity
+	errorType := h.categorizeErrorType(err)
+	severity := h.determineSeverity(err)
+	retryable := h.isRetryableError(err)
 
+	// Build RichError with transport context
+	builder := rich.NewError().
+		Code(rich.ErrorCode(h.generateErrorCode(errorType))).
+		Message(err.Error()).
+		Type(errorType).
+		Severity(severity).
+		Context("transport", "stdio").
+		Context("tool_name", toolName).
+		Context("error_category", h.categorizeError(err)).
+		Context("retryable", retryable).
+		WithLocation()
+
+	// Add specific suggestion based on error type
+	suggestion := h.generateSuggestion(err, errorType)
+	builder = builder.Suggestion(suggestion)
+
+	return builder.Build()
+}
+
+// categorizeErrorType converts string categorization to RichError types
+func (h *StdioErrorHandler) categorizeErrorType(err error) rich.ErrorType {
+	errorCategory := h.categorizeError(err)
+	switch errorCategory {
+	case "network_error":
+		return rich.ErrTypeNetwork
+	case "timeout_error":
+		return rich.ErrTypeTimeout
+	case "permission_error":
+		return rich.ErrTypePermission
+	case "not_found_error":
+		return rich.ErrTypeNotFound
+	case "validation_error":
+		return rich.ErrTypeValidation
+	case "disk_error":
+		return rich.ErrTypeSystem
+	default:
+		return rich.ErrTypeBusiness
+	}
+}
+
+// determineSeverity determines error severity based on content
+func (h *StdioErrorHandler) determineSeverity(err error) rich.ErrorSeverity {
+	errMsg := strings.ToLower(err.Error())
+
+	// Critical errors that prevent further operation
+	if strings.Contains(errMsg, "fatal") || strings.Contains(errMsg, "panic") ||
+		strings.Contains(errMsg, "corrupted") || strings.Contains(errMsg, "critical") {
+		return rich.SeverityCritical
+	}
+
+	// High severity errors that significantly impact functionality
+	if strings.Contains(errMsg, "permission denied") || strings.Contains(errMsg, "unauthorized") ||
+		strings.Contains(errMsg, "disk full") || strings.Contains(errMsg, "out of memory") {
+		return rich.SeverityHigh
+	}
+
+	// Medium severity for operational issues
+	if strings.Contains(errMsg, "timeout") || strings.Contains(errMsg, "connection") ||
+		strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "invalid") {
+		return rich.SeverityMedium
+	}
+
+	// Low severity for minor issues
+	return rich.SeverityLow
+}
+
+// generateErrorCode creates a specific error code based on type
+func (h *StdioErrorHandler) generateErrorCode(errorType rich.ErrorType) string {
+	switch errorType {
+	case rich.ErrTypeNetwork:
+		return "STDIO_NETWORK_ERROR"
+	case rich.ErrTypeTimeout:
+		return "STDIO_TIMEOUT_ERROR"
+	case rich.ErrTypePermission:
+		return "STDIO_PERMISSION_ERROR"
+	case rich.ErrTypeNotFound:
+		return "STDIO_NOT_FOUND_ERROR"
+	case rich.ErrTypeValidation:
+		return "STDIO_VALIDATION_ERROR"
+	case rich.ErrTypeSystem:
+		return "STDIO_SYSTEM_ERROR"
+	default:
+		return "STDIO_GENERIC_ERROR"
+	}
+}
+
+// generateSuggestion provides contextual suggestion based on error type
+func (h *StdioErrorHandler) generateSuggestion(err error, errorType rich.ErrorType) string {
+	switch errorType {
+	case rich.ErrTypeNetwork:
+		return "Check network connectivity and verify proxy settings if behind a corporate firewall"
+	case rich.ErrTypeTimeout:
+		return "Increase timeout values in configuration or check system performance"
+	case rich.ErrTypePermission:
+		return "Check file and directory permissions or run with appropriate user privileges"
+	case rich.ErrTypeNotFound:
+		return "Verify the requested resource exists and check path spelling"
+	case rich.ErrTypeValidation:
+		return "Review input parameters for correctness and validate against expected schema"
+	default:
+		return "Check logs for additional error details or retry if the error is transient"
+	}
+}
+
+// getSeverityIcon returns an appropriate icon for error severity
+func (h *StdioErrorHandler) getSeverityIcon(severity rich.ErrorSeverity) string {
+	switch severity {
+	case rich.SeverityCritical:
+		return "🚨"
+	case rich.SeverityHigh:
+		return "❌"
+	case rich.SeverityMedium:
+		return "⚠️"
+	case rich.SeverityLow:
+		return "ℹ️"
+	default:
+		return "❓"
+	}
+}
+
+// CreateRecoveryResponse creates a response with recovery guidance using RichError
+func (h *StdioErrorHandler) CreateRecoveryResponse(originalError error, recoverySteps, alternatives []string) interface{} {
+	// Convert to RichError with recovery context
+	richErr := rich.NewError().
+		Code("STDIO_RECOVERY_AVAILABLE").
+		Message(originalError.Error()).
+		Type(rich.ErrTypeBusiness).
+		Severity(rich.SeverityMedium).
+		Context("transport", "stdio").
+		Context("recovery_available", true).
+		Context("recovery_steps_count", len(recoverySteps)).
+		Context("alternatives_count", len(alternatives)).
+		WithLocation()
+
+	// Create combined recovery suggestion
+	var suggestionBuilder strings.Builder
 	if len(recoverySteps) > 0 {
-		msg.WriteString("\n🔧 Recovery Steps:\n")
+		suggestionBuilder.WriteString("Recovery steps: ")
 		for i, step := range recoverySteps {
-			msg.WriteString(fmt.Sprintf("  %d. %s\n", i+1, step))
+			if i > 0 {
+				suggestionBuilder.WriteString("; ")
+			}
+			suggestionBuilder.WriteString(step)
 		}
 	}
 
 	if len(alternatives) > 0 {
-		msg.WriteString("\n💡 Alternatives:\n")
+		if suggestionBuilder.Len() > 0 {
+			suggestionBuilder.WriteString(". ")
+		}
+		suggestionBuilder.WriteString("Alternatives: ")
 		for i, alt := range alternatives {
-			msg.WriteString(fmt.Sprintf("  %d. %s\n", i+1, alt))
+			if i > 0 {
+				suggestionBuilder.WriteString("; ")
+			}
+			suggestionBuilder.WriteString(alt)
 		}
 	}
 
-	return map[string]interface{}{
-		"content": []map[string]interface{}{
-			{
-				"type": "text",
-				"text": msg.String(),
-			},
-		},
-		"isError":            true,
-		"recovery_available": true,
-		"error": map[string]interface{}{
-			"message":        originalError.Error(),
-			"recovery_steps": recoverySteps,
-			"alternatives":   alternatives,
-			"timestamp":      time.Now(),
-		},
+	if suggestionBuilder.Len() > 0 {
+		richErr = richErr.Suggestion(suggestionBuilder.String())
 	}
+
+	builtErr := richErr.Build()
+	return h.handleRichError(builtErr, "recovery")
 }

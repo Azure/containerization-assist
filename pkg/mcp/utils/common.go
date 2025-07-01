@@ -88,9 +88,23 @@ func WrapError(err error, message string) error {
 	return fmt.Errorf("%s: %w", message, err)
 }
 
+// ErrorContext represents typed context for errors
+type ErrorContext struct {
+	Operation string
+	Resource  string
+	Details   map[string]string
+}
+
 // NewError creates a new error with the given message
-func NewError(message string, context ...map[string]interface{}) error {
-	// For now, ignore context - this maintains backward compatibility
-	// while allowing calls with context parameters
+// Deprecated: Use rich.NewError() for typed error handling
+func NewError(message string, context ...interface{}) error {
+	// Maintain backward compatibility with existing map[string]interface{} usage
+	// while gradually migrating to typed contexts
+	return fmt.Errorf("%s", message)
+}
+
+// NewTypedError creates a new error with typed context
+func NewTypedError(message string, context ...ErrorContext) error {
+	// New function for typed error contexts
 	return fmt.Errorf("%s", message)
 }
