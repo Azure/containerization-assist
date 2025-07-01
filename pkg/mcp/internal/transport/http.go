@@ -19,10 +19,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// LocalRequestHandler processes MCP requests
-type LocalRequestHandler interface {
-	HandleRequest(ctx context.Context, req *core.MCPRequest) (*core.MCPResponse, error)
-}
 
 // HTTPTransport implements core.Transport for HTTP communication
 type HTTPTransport struct {
