@@ -204,15 +204,11 @@ jobs:
     if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Run Coverage Enforcement
-      uses: ./.github/actions/coverage-enforcement
+    - uses: ./.github/actions/coverage-enforcement
       with:
-        go-version: '1.24'
         config-file: '.github/quality-config.json'
 
   # Phase 5: Security Scanning (parallel with coverage)
@@ -223,27 +219,21 @@ jobs:
     if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Run Security Scanning
-      uses: ./.github/actions/security-scan
+    - uses: ./.github/actions/security-scan
       with:
-        upload-artifacts: true
         artifact-name: security-reports-${{ github.run_id }}
 
-  # Phase 6: Quality Gates (after coverage and security)
+  # Phase 6: Quality Gates (after coverage and security) 
   quality-gates:
     name: Quality Gate Checks
     runs-on: ubuntu-latest
     needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, coverage-enforcement, security-scan]
     if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
-
     steps:
-    - name: Quality gates summary
-      run: |
+    - run: |
         echo "🎯 Quality Gates Summary"
         echo "✅ All unit tests passed"
         echo "✅ All builds completed successfully"
@@ -443,11 +433,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Run MCP Integration Tests
-      uses: ./.github/actions/mcp-integration-tests
+    - uses: ./.github/actions/mcp-integration-tests
       with:
-        go-version: '1.24'
         test-scenario: 'basic'
         log-level: 'debug'
 
@@ -464,11 +451,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Run MCP Workflow Tests
-      uses: ./.github/actions/mcp-integration-tests
+    - uses: ./.github/actions/mcp-integration-tests
       with:
-        go-version: '1.24'
         test-scenario: ${{ matrix.test-scenario }}
         log-level: 'debug'
         timeout: '15m'
@@ -481,7 +465,6 @@ jobs:
     if: always() && needs.canary.outputs.should-continue == 'true'
 
     steps:
-
     - name: Generate testing dashboard
       timeout-minutes: 2
       run: |
