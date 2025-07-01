@@ -140,8 +140,9 @@ func (v *UnifiedImageValidator) SetTrustedRegistries(registries []string) {
 }
 
 // MigrateImageValidatorToUnified provides a drop-in replacement for the old ImageValidator
-func MigrateImageValidatorToUnified(v *ImageValidator) *UnifiedImageValidator {
-	return NewUnifiedImageValidator(v.logger, v.trustedRegistries)
+// Legacy function - kept for compatibility during migration period
+func MigrateImageValidatorToUnified(logger zerolog.Logger, trustedRegistries []string) *UnifiedImageValidator {
+	return NewUnifiedImageValidator(logger, trustedRegistries)
 }
 
 // CreateImageValidatorWithUnified creates an image validator using the unified framework
