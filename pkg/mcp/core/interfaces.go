@@ -167,18 +167,10 @@ type Orchestrator interface {
 
 // SessionManager provides session management functionality
 type SessionManager interface {
-	CreateSession(userID string) (Session, error)
-	GetSession(sessionID string) (Session, error)
+	CreateSession(userID string) (interface{}, error)
+	GetSession(sessionID string) (interface{}, error)
 	DeleteSession(sessionID string) error
-	ListSessions(userID string) ([]Session, error)
-}
-
-// Session represents a user session
-type Session interface {
-	ID() string
-	GetWorkspace() string
-	UpdateState(func(*SessionState))
-	GetState() *SessionState
+	ListSessions(userID string) ([]interface{}, error)
 }
 
 // SessionState represents session state information
