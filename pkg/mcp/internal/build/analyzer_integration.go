@@ -27,9 +27,9 @@ type FixingContext struct {
 
 // AnalyzerIntegratedFixer combines IterativeFixer with CallerAnalyzer
 type AnalyzerIntegratedFixer struct {
-	fixer        mcptypes.IterativeFixer
+	fixer        *DefaultIterativeFixer
 	analyzer     core.AIAnalyzer
-	contextShare mcptypes.ContextSharer
+	contextShare *DefaultContextSharer
 	logger       zerolog.Logger
 }
 
@@ -37,7 +37,7 @@ type AnalyzerIntegratedFixer struct {
 func NewAnalyzerIntegratedFixer(analyzer core.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
 	// Use real DefaultIterativeFixer implementation instead of mock
 	fixer := NewDefaultIterativeFixer(analyzer, logger)
-	contextSharer := &realContextSharer{context: make(map[string]interface{})}
+	contextSharer := NewDefaultContextSharer(logger)
 	return &AnalyzerIntegratedFixer{
 		fixer:        fixer,
 		analyzer:     analyzer,
@@ -266,45 +266,6 @@ func (m *mockIterativeFixer) GetFailureRouting() map[string]string {
 }
 func (m *mockIterativeFixer) GetFixStrategies() []string {
 	return []string{"dockerfile_fix", "dependency_fix", "config_fix"}
-}
-
-// realContextSharer provides proper context sharing implementation
-type realContextSharer struct {
-	context map[string]interface{}
-}
-
-func (r *realContextSharer) ShareContext(ctx context.Context, sessionID string, contextType string, data interface{}) error {
-	if r.context == nil {
-		r.context = make(map[string]interface{})
-	}
-	key := sessionID + ":" + contextType
-	r.context[key] = data
-	return nil
-}
-
-func (r *realContextSharer) GetSharedContext(ctx context.Context, sessionID string, contextType string) (interface{}, error) {
-	if r.context == nil {
-		return nil, fmt.Errorf("no context found")
-	}
-	key := sessionID + ":" + contextType
-	value, exists := r.context[key]
-	if !exists {
-		return nil, fmt.Errorf("context not found for %s", key)
-	}
-	return value, nil
-}
-
-func (r *realContextSharer) ClearContext(ctx context.Context, sessionID string) error {
-	if r.context == nil {
-		return nil
-	}
-	// Clear all contexts for the session
-	for key := range r.context {
-		if strings.HasPrefix(key, sessionID+":") {
-			delete(r.context, key)
-		}
-	}
-	return nil
 }
 
 // getStrategyType infers the strategy type from its name
