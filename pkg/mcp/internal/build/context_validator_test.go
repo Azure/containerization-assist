@@ -26,8 +26,8 @@ func TestNewContextValidator(t *testing.T) {
 func TestContextValidatorStruct(t *testing.T) {
 	logger := zerolog.Nop()
 	validator := UnifiedContextValidator{
-		BaseValidatorImpl: NewUnifiedContextValidator(logger).BaseValidatorImpl,
-		logger:            logger,
+		logger:  logger,
+		adapter: NewValidationAdapter(logger),
 	}
 	// Test that we can create the struct directly
 	if validator.logger.GetLevel() < 0 {

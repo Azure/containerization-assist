@@ -87,8 +87,9 @@ func (v *UnifiedContextValidator) ValidateWithContext(content string, contextPat
 }
 
 // MigrateContextValidatorToUnified provides a drop-in replacement for the old ContextValidator
-func MigrateContextValidatorToUnified(v *ContextValidator) *UnifiedContextValidator {
-	return NewUnifiedContextValidator(v.logger)
+// Legacy function - kept for compatibility during migration period
+func MigrateContextValidatorToUnified(logger zerolog.Logger) *UnifiedContextValidator {
+	return NewUnifiedContextValidator(logger)
 }
 
 // CreateContextValidatorWithUnified creates a context validator using the unified framework
