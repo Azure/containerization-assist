@@ -30,6 +30,10 @@ jobs:
       uses: ./.github/actions/architecture-check
       with:
         path: 'pkg/mcp'
+        complexity-threshold: '15'
+        complexity-budget: '50'
+        large-file-threshold: '800'
+        large-file-budget: '10'
 
     - name: Architecture status
       run: |

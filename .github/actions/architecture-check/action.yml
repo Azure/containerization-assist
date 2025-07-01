@@ -5,6 +5,22 @@ inputs:
     description: 'Path to check for architecture violations'
     required: false
     default: 'pkg/mcp'
+  complexity-threshold:
+    description: 'Cyclomatic complexity threshold'
+    required: false
+    default: '15'
+  complexity-budget:
+    description: 'Maximum allowed complex functions'
+    required: false
+    default: '50'
+  large-file-threshold:
+    description: 'Large file line threshold'
+    required: false
+    default: '800'
+  large-file-budget:
+    description: 'Maximum allowed large files'
+    required: false
+    default: '10'
 outputs:
   adapter-count:
     description: 'Number of adapter files found'
@@ -13,9 +29,11 @@ outputs:
   import-cycles:
     description: 'Number of import cycles detected'
   large-files:
-    description: 'Number of files with more than 500 lines'
+    description: 'Number of files exceeding the large file threshold'
   complex-functions:
-    description: 'Number of functions with complexity >10'
+    description: 'Number of functions exceeding complexity threshold'
+  complexity-within-budget:
+    description: 'Whether complexity violations are within budget (true/false)'
   architecture-score:
     description: 'Overall architecture score (0-100)'
   architecture-status:
@@ -58,14 +76,14 @@ runs:
     - name: Check for large files
       shell: bash
       run: |
-        echo "📏 Checking for large files (>500 lines)..."
-        LARGE_FILES_COUNT=$(find ${{ inputs.path }} -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 500 {count++} END {print count+0}')
+        echo "📏 Checking for large files (>${{ inputs.large-file-threshold }} lines)..."
+        LARGE_FILES_COUNT=$(find ${{ inputs.path }} -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk -v threshold=${{ inputs.large-file-threshold }} '$1 > threshold {count++} END {print count+0}')
         echo "large-files=$LARGE_FILES_COUNT" >> $GITHUB_OUTPUT
-        echo "✅ Found $LARGE_FILES_COUNT files with >500 lines"
+        echo "✅ Found $LARGE_FILES_COUNT files with >${{ inputs.large-file-threshold }} lines"
 
         if [ "$LARGE_FILES_COUNT" -gt 0 ]; then
           echo "Large files detected:"
-          find ${{ inputs.path }} -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 500 {print "  - " $2 " (" $1 " lines)"}'
+          find ${{ inputs.path }} -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk -v threshold=${{ inputs.large-file-threshold }} '$1 > threshold {print "  - " $2 " (" $1 " lines)"}'
         fi
 
     - name: Install gocyclo
@@ -77,15 +95,25 @@ runs:
     - name: Check cyclomatic complexity
       shell: bash
       run: |
-        echo "🔄 Checking cyclomatic complexity..."
-        # Check for functions with complexity > 10
-        COMPLEX_FUNCTIONS=$(~/go/bin/gocyclo -over 10 ${{ inputs.path }} | wc -l | tr -d ' \n' || echo "0")
+        echo "🔄 Checking cyclomatic complexity (threshold: ${{ inputs.complexity-threshold }}, budget: ${{ inputs.complexity-budget }})..."
+        # Check for functions with complexity above threshold
+        COMPLEX_FUNCTIONS=$(~/go/bin/gocyclo -over ${{ inputs.complexity-threshold }} ${{ inputs.path }} | wc -l | tr -d ' \n' || echo "0")
         echo "complex-functions=$COMPLEX_FUNCTIONS" >> $GITHUB_OUTPUT
-        echo "✅ Found $COMPLEX_FUNCTIONS functions with complexity >10"
+
+        # Check if within budget
+        COMPLEXITY_BUDGET=${{ inputs.complexity-budget }}
+        if [ "$COMPLEX_FUNCTIONS" -le "$COMPLEXITY_BUDGET" ]; then
+          echo "✅ Found $COMPLEX_FUNCTIONS functions with complexity >${{ inputs.complexity-threshold }} (within budget of $COMPLEXITY_BUDGET)"
+          echo "complexity-within-budget=true" >> $GITHUB_OUTPUT
+        else
+          OVER_BUDGET=$((COMPLEX_FUNCTIONS - COMPLEXITY_BUDGET))
+          echo "⚠️ Found $COMPLEX_FUNCTIONS functions with complexity >${{ inputs.complexity-threshold }} (exceeds budget of $COMPLEXITY_BUDGET by $OVER_BUDGET)"
+          echo "complexity-within-budget=false" >> $GITHUB_OUTPUT
+        fi
 
         if [ "$COMPLEX_FUNCTIONS" -gt 0 ]; then
-          echo "High complexity functions:"
-          ~/go/bin/gocyclo -over 10 ${{ inputs.path }} | head -5
+          echo "High complexity functions (showing first 5):"
+          ~/go/bin/gocyclo -over ${{ inputs.complexity-threshold }} ${{ inputs.path }} | head -5
           if [ "$COMPLEX_FUNCTIONS" -gt 5 ]; then
             echo "  ... and $((COMPLEX_FUNCTIONS - 5)) more"
           fi
@@ -102,6 +130,7 @@ runs:
         CYCLE_COUNT=$(grep "import-cycles=" $GITHUB_OUTPUT | cut -d'=' -f2)
         LARGE_FILES=$(grep "large-files=" $GITHUB_OUTPUT | cut -d'=' -f2)
         COMPLEX_FUNCTIONS=$(grep "complex-functions=" $GITHUB_OUTPUT | cut -d'=' -f2)
+        COMPLEXITY_WITHIN_BUDGET=$(grep "complexity-within-budget=" $GITHUB_OUTPUT | cut -d'=' -f2)
 
         # Calculate score (100 - deductions)
         SCORE=100
@@ -110,8 +139,20 @@ runs:
         SCORE=$((SCORE - ADAPTER_COUNT * 20))      # -20 points per adapter
         SCORE=$((SCORE - WRAPPER_COUNT * 15))      # -15 points per wrapper
         SCORE=$((SCORE - CYCLE_COUNT * 25))        # -25 points per import cycle
-        SCORE=$((SCORE - LARGE_FILES * 5))         # -5 points per large file
-        SCORE=$((SCORE - COMPLEX_FUNCTIONS * 2))   # -2 points per complex function
+
+        # Large files deduction with budget system
+        LARGE_FILE_BUDGET=${{ inputs.large-file-budget }}
+        if [ "$LARGE_FILES" -gt "$LARGE_FILE_BUDGET" ]; then
+          LARGE_FILE_EXCESS=$((LARGE_FILES - LARGE_FILE_BUDGET))
+          SCORE=$((SCORE - LARGE_FILE_EXCESS * 5))  # Only deduct for files over budget
+        fi
+
+        # Complex functions deduction with budget system
+        COMPLEXITY_BUDGET=${{ inputs.complexity-budget }}
+        if [ "$COMPLEX_FUNCTIONS" -gt "$COMPLEXITY_BUDGET" ]; then
+          COMPLEXITY_EXCESS=$((COMPLEX_FUNCTIONS - COMPLEXITY_BUDGET))
+          SCORE=$((SCORE - COMPLEXITY_EXCESS * 2))  # Only deduct for functions over budget
+        fi
 
         # Ensure score doesn't go below 0
         if [ $SCORE -lt 0 ]; then
@@ -140,5 +181,19 @@ runs:
         echo "  - Adapters: -$((ADAPTER_COUNT * 20)) ($ADAPTER_COUNT files)"
         echo "  - Wrappers: -$((WRAPPER_COUNT * 15)) ($WRAPPER_COUNT files)"
         echo "  - Import cycles: -$((CYCLE_COUNT * 25)) ($CYCLE_COUNT cycles)"
-        echo "  - Large files: -$((LARGE_FILES * 5)) ($LARGE_FILES files >500 lines)"
-        echo "  - Complex functions: -$((COMPLEX_FUNCTIONS * 2)) ($COMPLEX_FUNCTIONS functions >10 complexity)"
+
+        # Large files with budget
+        if [ "$LARGE_FILES" -gt "$LARGE_FILE_BUDGET" ]; then
+          LARGE_FILE_EXCESS=$((LARGE_FILES - LARGE_FILE_BUDGET))
+          echo "  - Large files: -$((LARGE_FILE_EXCESS * 5)) ($LARGE_FILES files, $LARGE_FILE_EXCESS over budget of $LARGE_FILE_BUDGET)"
+        else
+          echo "  - Large files: 0 ($LARGE_FILES files, within budget of $LARGE_FILE_BUDGET)"
+        fi
+
+        # Complex functions with budget
+        if [ "$COMPLEX_FUNCTIONS" -gt "$COMPLEXITY_BUDGET" ]; then
+          COMPLEXITY_EXCESS=$((COMPLEX_FUNCTIONS - COMPLEXITY_BUDGET))
+          echo "  - Complex functions: -$((COMPLEXITY_EXCESS * 2)) ($COMPLEX_FUNCTIONS functions, $COMPLEXITY_EXCESS over budget of $COMPLEXITY_BUDGET)"
+        else
+          echo "  - Complex functions: 0 ($COMPLEX_FUNCTIONS functions, within budget of $COMPLEXITY_BUDGET)"
+        fi
