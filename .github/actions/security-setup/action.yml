@@ -1,0 +1,70 @@
+name: 'Security Tools Setup'
+description: 'Installs and configures Trivy and GitLeaks'
+inputs:
+  trivy-version:
+    description: 'Trivy version to install'
+    required: false
+    default: 'latest'
+  gitleaks-version:
+    description: 'GitLeaks version to install'
+    required: false
+    default: '8.18.0'
+outputs:
+  trivy-version:
+    description: 'Installed Trivy version'
+  gitleaks-version:
+    description: 'Installed GitLeaks version'
+runs:
+  using: "composite"
+  steps:
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        echo "📦 Installing system dependencies..."
+        sudo apt-get update
+        sudo apt-get install -y wget apt-transport-https gnupg lsb-release bc
+
+    - name: Install Trivy
+      shell: bash
+      run: |
+        echo "🔒 Installing Trivy..."
+        # Check cache first
+        if command -v trivy &> /dev/null; then
+          echo "Trivy already installed"
+          TRIVY_VERSION=$(trivy --version | grep Version | awk '{print $2}' || echo "unknown")
+          echo "trivy-version=$TRIVY_VERSION" >> $GITHUB_OUTPUT
+        else
+          # Install Trivy
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+          TRIVY_VERSION=$(trivy --version | grep Version | awk '{print $2}' || echo "unknown")
+          echo "trivy-version=$TRIVY_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ Trivy installed successfully: $TRIVY_VERSION"
+        fi
+
+    - name: Install GitLeaks
+      shell: bash
+      run: |
+        echo "🔍 Installing GitLeaks..."
+        if command -v gitleaks &> /dev/null; then
+          echo "GitLeaks already installed"
+          GITLEAKS_VERSION=$(gitleaks version 2>/dev/null || echo "${{ inputs.gitleaks-version }}")
+          echo "gitleaks-version=$GITLEAKS_VERSION" >> $GITHUB_OUTPUT
+        else
+          wget https://github.com/zricethezav/gitleaks/releases/download/v${{ inputs.gitleaks-version }}/gitleaks_${{ inputs.gitleaks-version }}_linux_x64.tar.gz
+          tar xzf gitleaks_${{ inputs.gitleaks-version }}_linux_x64.tar.gz
+          sudo mv gitleaks /usr/local/bin/
+          chmod +x /usr/local/bin/gitleaks
+          echo "gitleaks-version=${{ inputs.gitleaks-version }}" >> $GITHUB_OUTPUT
+          echo "✅ GitLeaks installed successfully: ${{ inputs.gitleaks-version }}"
+        fi
+
+    - name: Verify installations
+      shell: bash
+      run: |
+        echo "🔍 Verifying security tools installation..."
+        echo "Trivy version: $(trivy --version | head -1)"
+        echo "GitLeaks version: $(gitleaks version)"
+        echo "✅ All security tools installed and verified"

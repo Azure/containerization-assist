@@ -1,0 +1,108 @@
+name: 'Coverage Merge and Analysis'
+description: 'Merges coverage reports from multiple test runs and analyzes coverage'
+inputs:
+  coverage-threshold:
+    description: 'Minimum coverage threshold percentage'
+    required: false
+    default: '10'
+  target-threshold:
+    description: 'Target coverage threshold percentage'
+    required: false
+    default: '25'
+  artifacts-pattern:
+    description: 'Pattern for coverage artifacts'
+    required: false
+    default: 'coverage-*'
+outputs:
+  total-coverage:
+    description: 'Total coverage percentage'
+  coverage-passed:
+    description: 'Whether coverage meets minimum threshold'
+runs:
+  using: "composite"
+  steps:
+    - name: Download coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: ${{ inputs.artifacts-pattern }}
+        path: coverage-artifacts
+      continue-on-error: true
+      shell: bash
+
+    - name: Install coverage tools
+      shell: bash
+      run: |
+        go install github.com/wadey/gocovmerge@latest
+        go install github.com/axw/gocov/gocov@latest
+        go install github.com/AlekSi/gocov-xml@latest
+
+    - name: Merge coverage reports
+      shell: bash
+      run: |
+        echo "📊 Merging coverage reports from unit tests..."
+
+        # Check if coverage-artifacts directory exists
+        if [ -d "coverage-artifacts" ]; then
+          # Find all coverage files and merge them
+          coverage_files=$(find coverage-artifacts -name "coverage.out" -type f)
+          if [ -n "$coverage_files" ]; then
+            echo "Found coverage files: $coverage_files"
+            ~/go/bin/gocovmerge $coverage_files > merged-coverage.out
+            cp merged-coverage.out coverage.out
+            echo "✅ Merged coverage reports successfully"
+          else
+            echo "⚠️ No coverage files found in artifacts, generating fresh coverage"
+            go test -coverprofile=coverage.out -covermode=atomic ./...
+          fi
+        else
+          echo "⚠️ No coverage artifacts directory found, generating fresh coverage"
+          go test -coverprofile=coverage.out -covermode=atomic ./...
+        fi
+
+    - name: Generate coverage reports
+      shell: bash
+      run: |
+        echo "📊 Generating coverage reports..."
+
+        # Generate HTML report
+        go tool cover -html=coverage.out -o coverage.html
+
+        # Convert coverage to XML
+        gocov convert coverage.out | gocov-xml > coverage.xml
+
+        # Generate coverage summary
+        go tool cover -func=coverage.out > coverage-summary.txt
+        echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat coverage-summary.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+    - name: Check coverage thresholds
+      shell: bash
+      run: |
+        # Extract total coverage
+        TOTAL_COV=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Total coverage: ${TOTAL_COV}%"
+        echo "total-coverage=$TOTAL_COV" >> $GITHUB_OUTPUT
+
+        MIN_THRESHOLD=${{ inputs.coverage-threshold }}
+        TARGET_THRESHOLD=${{ inputs.target-threshold }}
+
+        echo "Minimum threshold: ${MIN_THRESHOLD}%"
+        echo "Target threshold: ${TARGET_THRESHOLD}%"
+
+        # Check if coverage meets minimum
+        if (( $(echo "$TOTAL_COV < $MIN_THRESHOLD" | bc -l) )); then
+          echo "❌ Coverage ${TOTAL_COV}% is below minimum threshold ${MIN_THRESHOLD}%"
+          echo "coverage-passed=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        # Check if coverage meets target
+        if (( $(echo "$TOTAL_COV >= $TARGET_THRESHOLD" | bc -l) )); then
+          echo "✅ Coverage ${TOTAL_COV}% meets target threshold ${TARGET_THRESHOLD}%"
+        else
+          echo "⚠️ Coverage ${TOTAL_COV}% meets minimum but is below target ${TARGET_THRESHOLD}%"
+        fi
+
+        echo "coverage-passed=true" >> $GITHUB_OUTPUT

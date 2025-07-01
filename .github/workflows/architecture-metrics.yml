@@ -1,9 +1,9 @@
-name: Architecture Metrics
+name: Architecture Metrics & Validation
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
+    branches: [ main ]
+  push:
     branches: [ main ]
   workflow_dispatch:
 
@@ -14,47 +14,44 @@ permissions:
   statuses: write
 
 jobs:
-  track-metrics:
-    name: Track Architecture Metrics
+  architecture-analysis:
+    name: Architecture Analysis
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - uses: actions/setup-go@v5
       with:
         go-version: '1.24'
 
-    - name: Calculate Architecture Metrics
+    - name: Architecture validation
+      id: arch-check
+      uses: ./.github/actions/architecture-check
+      with:
+        path: 'pkg/mcp'
+        complexity-threshold: '15'
+        complexity-budget: '50'
+        large-file-threshold: '800'
+        large-file-budget: '10'
+
+    - name: Architecture status
+      run: |
+        echo "📊 Architecture Score: ${{ steps.arch-check.outputs.architecture-score }}/100"
+        echo "Status: ${{ steps.arch-check.outputs.architecture-status }}"
+
+    - name: Calculate additional metrics
       id: metrics
       run: |
-        echo "📊 Calculating architecture metrics..."
+        echo "📊 Calculating additional architecture metrics..."
 
         # Total lines of code in MCP
         TOTAL_LOC=$(find pkg/mcp -name "*.go" -exec wc -l {} + | awk '{sum+=$1} END {print sum}')
         echo "total_loc=$TOTAL_LOC" >> $GITHUB_OUTPUT
 
-        # Adapter files count
-        ADAPTER_COUNT=$(find pkg/mcp -name "*adapter*.go" 2>/dev/null | wc -l || echo "0")
-        echo "adapter_count=$ADAPTER_COUNT" >> $GITHUB_OUTPUT
-
-        # Wrapper files count (excluding docker_operation)
-        WRAPPER_COUNT=$(find pkg/mcp -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l || echo "0")
-        echo "wrapper_count=$WRAPPER_COUNT" >> $GITHUB_OUTPUT
-
         # Interface definitions count
         INTERFACE_COUNT=$(grep -r "type.*Tool.*interface" pkg/mcp/ 2>/dev/null | grep -v "//\|test" | wc -l || echo "0")
         echo "interface_count=$INTERFACE_COUNT" >> $GITHUB_OUTPUT
-
-        # Import cycle check
-        if go build -tags mcp ./pkg/mcp/... 2>&1 | grep -q "import cycle"; then
-          IMPORT_CYCLES=1
-        else
-          IMPORT_CYCLES=0
-        fi
-        echo "import_cycles=$IMPORT_CYCLES" >> $GITHUB_OUTPUT
 
         # Test coverage (if available)
         if [ -f coverage.out ]; then
@@ -75,55 +72,11 @@ jobs:
       run: |
         echo "=== 📊 Architecture Metrics Summary ==="
         echo ""
-        echo "**Code Volume:**"
-        echo "- Total Lines of Code: ${{ steps.metrics.outputs.total_loc }}"
+        echo "**Architecture Score:** ${{ steps.arch-check.outputs.architecture-score }}/100 (${{ steps.arch-check.outputs.architecture-status }})"
         echo ""
-        echo "**Architecture Quality:**"
-        echo "- Adapter Files: ${{ steps.metrics.outputs.adapter_count }} (target: 0) $([ "${{ steps.metrics.outputs.adapter_count }}" = "0" ] && echo "✅" || echo "❌")"
-        echo "- Wrapper Files: ${{ steps.metrics.outputs.wrapper_count }} (target: 0) $([ "${{ steps.metrics.outputs.wrapper_count }}" = "0" ] && echo "✅" || echo "❌")"
-        echo "- Tool Interfaces: ${{ steps.metrics.outputs.interface_count }} (target: 1) $([ "${{ steps.metrics.outputs.interface_count }}" = "1" ] && echo "✅" || echo "⚠️")"
-        echo "- Import Cycles: ${{ steps.metrics.outputs.import_cycles }} (target: 0) $([ "${{ steps.metrics.outputs.import_cycles }}" = "0" ] && echo "✅" || echo "❌")"
+        echo "**Quality Metrics:**"
+        echo "- Adapters/Wrappers/Cycles: ${{ steps.arch-check.outputs.adapter-count }}/${{ steps.arch-check.outputs.wrapper-count }}/${{ steps.arch-check.outputs.import-cycles }}"
+        echo "- Large Files (>500 lines): ${{ steps.arch-check.outputs.large-files }}"
+        echo "- Complex Functions (>10): ${{ steps.arch-check.outputs.complex-functions || 'N/A' }}"
         echo ""
-        echo "**Performance:**"
-        echo "- Build Time: ${{ steps.metrics.outputs.build_time }}s"
-        echo "- Test Coverage: ${{ steps.metrics.outputs.coverage }}%"
-
-    - name: Comment PR with Metrics
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const metrics = {
-            loc: '${{ steps.metrics.outputs.total_loc }}',
-            adapters: '${{ steps.metrics.outputs.adapter_count }}',
-            wrappers: '${{ steps.metrics.outputs.wrapper_count }}',
-            interfaces: '${{ steps.metrics.outputs.interface_count }}',
-            cycles: '${{ steps.metrics.outputs.import_cycles }}',
-            buildTime: '${{ steps.metrics.outputs.build_time }}',
-            coverage: '${{ steps.metrics.outputs.coverage }}'
-          };
-
-          const comment = `## 📊 Architecture Metrics Report
-
-          ### Code Quality Indicators
-          | Metric | Current | Target | Status |
-          |--------|---------|--------|--------|
-          | Adapter Files | ${metrics.adapters} | 0 | ${metrics.adapters === '0' ? '✅' : '❌'} |
-          | Wrapper Files | ${metrics.wrappers} | 0 | ${metrics.wrappers === '0' ? '✅' : '❌'} |
-          | Tool Interfaces | ${metrics.interfaces} | 1 | ${metrics.interfaces === '1' ? '✅' : '⚠️'} |
-          | Import Cycles | ${metrics.cycles} | 0 | ${metrics.cycles === '0' ? '✅' : '❌'} |
-
-          ### Performance Metrics
-          - **Build Time**: ${metrics.buildTime}s
-          - **Total Lines**: ${metrics.loc}
-          - **Test Coverage**: ${metrics.coverage}%
-
-          ---
-          *Generated by Architecture Metrics workflow*`;
-
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+        echo "✅ Architecture analysis complete!"
