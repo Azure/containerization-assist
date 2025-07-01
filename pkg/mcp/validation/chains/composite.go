@@ -139,10 +139,16 @@ func (c *CompositeValidator) Clear() {
 
 // Chain creates a new validator that runs this validator followed by the next
 func (c *CompositeValidator) Chain(next core.Validator) core.Validator {
-	newChain := NewCompositeValidator(
+	newChainInterface := NewCompositeValidator(
 		fmt.Sprintf("%s->%s", c.name, next.GetName()),
 		c.version,
-	).(*CompositeValidator)
+	)
+	newChain, ok := newChainInterface.(*CompositeValidator)
+	if !ok {
+		// This should never happen since NewCompositeValidator always returns *CompositeValidator
+		// Return current validator if type assertion fails
+		return c
+	}
 
 	// Add all current validators
 	for _, validator := range c.validators {

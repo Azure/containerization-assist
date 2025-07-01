@@ -28,6 +28,11 @@ func (p BuildToolParams) Validate() error {
 	return p.Config.Validate()
 }
 
+// GetSessionID implements ToolParams interface
+func (p BuildToolParams) GetSessionID() string {
+	return p.SessionID
+}
+
 // DeployToolParams represents parameters for Kubernetes deployment operations
 type DeployToolParams struct {
 	SessionID   string              `json:"session_id" validate:"required"`
@@ -48,6 +53,11 @@ func (p DeployToolParams) Validate() error {
 	return p.Config.Validate()
 }
 
+// GetSessionID implements ToolParams interface
+func (p DeployToolParams) GetSessionID() string {
+	return p.SessionID
+}
+
 // ScanToolParams represents parameters for security scanning operations
 type ScanToolParams struct {
 	SessionID     string            `json:"session_id" validate:"required"`
@@ -66,6 +76,11 @@ func (p ScanToolParams) Validate() error {
 		return NewValidationError("session_id", "required field cannot be empty")
 	}
 	return p.Config.Validate()
+}
+
+// GetSessionID implements ToolParams interface
+func (p ScanToolParams) GetSessionID() string {
+	return p.SessionID
 }
 
 // AnalyzeToolParams represents parameters for repository analysis operations
@@ -90,6 +105,11 @@ func (p AnalyzeToolParams) Validate() error {
 	return nil
 }
 
+// GetSessionID implements ToolParams interface
+func (p AnalyzeToolParams) GetSessionID() string {
+	return p.SessionID
+}
+
 // GenerateManifestsParams represents parameters for manifest generation
 type GenerateManifestsParams struct {
 	SessionID      string              `json:"session_id" validate:"required"`
@@ -112,6 +132,11 @@ func (p GenerateManifestsParams) Validate() error {
 	return p.Config.Validate()
 }
 
+// GetSessionID implements ToolParams interface
+func (p GenerateManifestsParams) GetSessionID() string {
+	return p.SessionID
+}
+
 // SessionParams represents basic session parameters
 type SessionParams struct {
 	SessionID string `json:"session_id" validate:"required"`
@@ -124,6 +149,11 @@ func (p SessionParams) Validate() error {
 		return NewValidationError("session_id", "required field cannot be empty")
 	}
 	return nil
+}
+
+// GetSessionID implements ToolParams interface
+func (p SessionParams) GetSessionID() string {
+	return p.SessionID
 }
 
 // Using ValidationError from validation.go
