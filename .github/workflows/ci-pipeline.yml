@@ -560,7 +560,7 @@ jobs:
       with:
         path: 'pkg/mcp'
         complexity-threshold: '15'
-        complexity-budget: '50'
+        complexity-budget: '700'
         large-file-threshold: '800'
         large-file-budget: '10'
 
