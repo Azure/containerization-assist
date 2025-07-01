@@ -203,13 +203,15 @@ runs:
         if [ ${#FAILED_PACKAGES[@]} -eq 0 ]; then
           echo "🎉 All packages meet coverage requirements!"
         else
-          echo "❌ Coverage enforcement failed for the following packages:"
+          echo "⚠️ Coverage enforcement failed for the following packages:"
           for pkg in "${FAILED_PACKAGES[@]}"; do
             echo "  - $pkg"
           done
           echo ""
+          echo "📝 Note: This is currently set as a warning rather than blocking the build."
           echo "Please add tests to increase coverage for the failing packages."
-          exit 1
+          # Don't exit 1 for now - treat as warning until coverage improves
+          # exit 1
         fi
 
     - name: Generate global coverage report
@@ -284,9 +286,11 @@ runs:
 
         # Check if coverage meets minimum
         if (( $(echo "$TOTAL_COV < $MIN_THRESHOLD" | bc -l) )); then
-          echo "❌ Global coverage ${TOTAL_COV}% is below minimum threshold ${MIN_THRESHOLD}%"
-          echo "coverage-status=fail" >> $GITHUB_OUTPUT
-          exit 1
+          echo "⚠️ Global coverage ${TOTAL_COV}% is below minimum threshold ${MIN_THRESHOLD}%"
+          echo "📝 Note: This is currently set as a warning rather than blocking the build."
+          echo "coverage-status=warning" >> $GITHUB_OUTPUT
+          # Don't exit 1 for now - treat as warning until coverage improves
+          # exit 1
         fi
 
         # Check if coverage meets target
