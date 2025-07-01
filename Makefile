@@ -34,8 +34,26 @@ test:
 test-mcp:
 	go test -tags mcp -race ./pkg/mcp/...
 
+.PHONY: test-integration
+test-integration:
+	@echo "Running MCP integration tests..."
+	go test -tags=integration ./pkg/mcp/internal/test/integration/... -v
+
+.PHONY: test-e2e
+test-e2e:
+	@echo "Running E2E tests..."
+	go test -tags=e2e ./pkg/mcp/internal/test/e2e/... -v -timeout=30m
+
+.PHONY: test-performance
+test-performance:
+	@echo "Running performance benchmarks..."
+	go test -tags=performance ./pkg/mcp/internal/test/e2e/... -v -bench=. -timeout=60m
+
+.PHONY: test-all-integration
+test-all-integration: test-integration test-e2e
+
 .PHONY: test-all
-test-all:
+test-all: test test-integration
 	go test -race ./...
 
 .PHONY: coverage
