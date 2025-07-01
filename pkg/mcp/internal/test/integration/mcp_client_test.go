@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -10,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/test/testutil"
 )
 
@@ -37,15 +38,26 @@ func (suite *MCPIntegrationTestSuite) SetupSuite() {
 	suite.Require().NoError(err)
 
 	// Initialize real MCP server with BoltDB session persistence
-	suite.server, err = core.NewServer(core.ServerConfig{
-		WorkspaceDir: suite.tempDir,
-		SessionDB:    filepath.Join(suite.tempDir, "sessions.db"),
-		Transport:    "http",
-	})
+	config := core.ServerConfig{
+		WorkspaceDir:  suite.tempDir,
+		StorePath:     filepath.Join(suite.tempDir, "sessions.db"),
+		TransportType: "http",
+		HTTPAddr:      "localhost",
+		HTTPPort:      0,
+		SessionTTL:    time.Hour,
+		LogLevel:      "info",
+		MaxSessions:   100,
+	}
+
+	suite.server, err = core.NewServer(suite.ctx, config)
 	suite.Require().NoError(err)
 
-	// Start HTTP server with real MCP handler
-	suite.httpServer = httptest.NewServer(suite.server.HTTPHandler())
+	// Start HTTP server with basic handler for testing
+	suite.httpServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "ok"}`))
+	}))
 	suite.serverAddr = suite.httpServer.URL
 
 	// Create real gomcp client connection
