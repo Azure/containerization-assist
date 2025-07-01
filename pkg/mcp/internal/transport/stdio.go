@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-
 // StdioTransport implements core.Transport for stdio communication
 type StdioTransport struct {
 	server       server.Server

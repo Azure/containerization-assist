@@ -17,7 +17,7 @@ import (
 // Performance targets from GAMMA workstream requirements
 const (
 	SessionOperationTargetP95 = 300 * time.Microsecond // <300μs P95 target
-	MaxConcurrentSessions     = 50                      // Concurrent session limit for testing
+	MaxConcurrentSessions     = 50                     // Concurrent session limit for testing
 	WorkflowTimeoutLimit      = 5 * time.Minute        // Maximum workflow execution time
 )
 
@@ -43,10 +43,10 @@ func TestSessionPerformance(t *testing.T) {
 	// Test session creation/retrieval performance (<300μs P95)
 	t.Run("session_creation_performance", func(t *testing.T) {
 		metrics := measureSessionCreationPerformance(t, client, ctx, 100)
-		
+
 		assert.True(t, metrics.P95 < SessionOperationTargetP95,
 			"Session creation P95 (%v) should be under %v", metrics.P95, SessionOperationTargetP95)
-		
+
 		t.Logf("Session Creation Performance:")
 		t.Logf("  P95: %v (target: <%v)", metrics.P95, SessionOperationTargetP95)
 		t.Logf("  P99: %v", metrics.P99)
@@ -67,10 +67,10 @@ func TestSessionPerformance(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics := measureSessionRetrievalPerformance(t, client, sessionID, 100)
-		
+
 		assert.True(t, metrics.P95 < SessionOperationTargetP95,
 			"Session retrieval P95 (%v) should be under %v", metrics.P95, SessionOperationTargetP95)
-		
+
 		t.Logf("Session Retrieval Performance:")
 		t.Logf("  P95: %v (target: <%v)", metrics.P95, SessionOperationTargetP95)
 		t.Logf("  P99: %v", metrics.P99)
@@ -80,7 +80,7 @@ func TestSessionPerformance(t *testing.T) {
 	// Test session cleanup performance
 	t.Run("session_cleanup_performance", func(t *testing.T) {
 		metrics := measureSessionCleanupPerformance(t, client, ctx, 50)
-		
+
 		// Cleanup should be reasonable (no hard target, but log for monitoring)
 		t.Logf("Session Cleanup Performance:")
 		t.Logf("  P95: %v", metrics.P95)
@@ -101,7 +101,7 @@ func TestConcurrentSessionHandling(t *testing.T) {
 	t.Run("concurrent_session_creation", func(t *testing.T) {
 		numConcurrent := MaxConcurrentSessions
 		startTime := time.Now()
-		
+
 		var wg sync.WaitGroup
 		results := make(chan error, numConcurrent)
 		sessionIDs := make(chan string, numConcurrent)
@@ -110,12 +110,12 @@ func TestConcurrentSessionHandling(t *testing.T) {
 			wg.Add(1)
 			go func(index int) {
 				defer wg.Done()
-				
+
 				analyzeResult, err := client.CallTool(ctx, "analyze_repository", map[string]interface{}{
 					"repo_url": fmt.Sprintf("https://github.com/example/repo-%d", index),
 					"branch":   "main",
 				})
-				
+
 				if err == nil {
 					if sessionID, extractErr := client.ExtractSessionID(analyzeResult); extractErr == nil {
 						sessionIDs <- sessionID
@@ -128,9 +128,9 @@ func TestConcurrentSessionHandling(t *testing.T) {
 		wg.Wait()
 		close(results)
 		close(sessionIDs)
-		
+
 		totalTime := time.Since(startTime)
-		
+
 		// Count successes and failures
 		successes := 0
 		failures := 0
@@ -151,7 +151,7 @@ func TestConcurrentSessionHandling(t *testing.T) {
 		// Performance validation
 		assert.True(t, totalTime < 30*time.Second, "Concurrent session creation should complete within 30s")
 		assert.True(t, float64(successes)/float64(numConcurrent) > 0.8, "At least 80%% of concurrent sessions should succeed")
-		
+
 		t.Logf("Concurrent Session Creation (%d sessions):", numConcurrent)
 		t.Logf("  Total Time: %v", totalTime)
 		t.Logf("  Successes: %d (%.1f%%)", successes, float64(successes)/float64(numConcurrent)*100)
@@ -181,7 +181,7 @@ func TestConcurrentSessionHandling(t *testing.T) {
 			wg.Add(1)
 			go func(index int) {
 				defer wg.Done()
-				
+
 				// Concurrent dockerfile generation
 				_, err := client.CallTool(ctx, "generate_dockerfile", map[string]interface{}{
 					"session_id": sessionID,
@@ -193,9 +193,9 @@ func TestConcurrentSessionHandling(t *testing.T) {
 
 		wg.Wait()
 		close(results)
-		
+
 		totalTime := time.Since(startTime)
-		
+
 		// Analyze results
 		successes := 0
 		for err := range results {
@@ -207,7 +207,7 @@ func TestConcurrentSessionHandling(t *testing.T) {
 		// At least one operation should succeed (others may fail due to concurrency)
 		assert.True(t, successes > 0, "At least one concurrent operation should succeed")
 		assert.True(t, totalTime < 10*time.Second, "Concurrent operations should complete quickly")
-		
+
 		t.Logf("Concurrent Operations on Same Session:")
 		t.Logf("  Total Time: %v", totalTime)
 		t.Logf("  Successes: %d/%d", successes, numConcurrent)
@@ -228,7 +228,7 @@ func TestLongRunningWorkflows(t *testing.T) {
 	// Test workflows with multiple tools over time
 	t.Run("extended_workflow_performance", func(t *testing.T) {
 		startTime := time.Now()
-		
+
 		// Step 1: Repository analysis
 		analyzeStart := time.Now()
 		analyzeResult, err := client.CallTool(ctx, "analyze_repository", map[string]interface{}{
@@ -273,7 +273,7 @@ func TestLongRunningWorkflows(t *testing.T) {
 		totalTime := time.Since(startTime)
 
 		// Performance validation
-		assert.True(t, totalTime < WorkflowTimeoutLimit, 
+		assert.True(t, totalTime < WorkflowTimeoutLimit,
 			"Complete workflow should finish within %v (took %v)", WorkflowTimeoutLimit, totalTime)
 
 		t.Logf("Extended Workflow Performance:")
@@ -301,11 +301,11 @@ func TestLongRunningWorkflows(t *testing.T) {
 		accessTimes := make([]time.Duration, 5)
 		for i := 0; i < 5; i++ {
 			time.Sleep(500 * time.Millisecond) // Wait between accesses
-			
+
 			start := time.Now()
 			_, err := client.InspectSessionState(sessionID)
 			accessTimes[i] = time.Since(start)
-			
+
 			if err != nil {
 				t.Logf("Session access %d failed after %v: %v", i+1, time.Duration(i)*500*time.Millisecond, err)
 				break
@@ -587,7 +587,7 @@ func measureSessionCleanupPerformance(t *testing.T, client testutil.MCPTestClien
 
 	// Measure cleanup performance
 	start := time.Now()
-	for i, sessionID := range sessionIDs {
+	for _, sessionID := range sessionIDs {
 		opStart := time.Now()
 		// Note: Actual cleanup mechanism depends on implementation
 		// For now, we'll measure session state access as proxy

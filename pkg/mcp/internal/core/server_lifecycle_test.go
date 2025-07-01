@@ -10,7 +10,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -302,7 +301,7 @@ func TestServerMetrics(t *testing.T) {
 type mockFailingTransport struct {
 	failOnServe bool
 	serveErr    error
-	handler     transport.LocalRequestHandler
+	handler     core.RequestHandler
 }
 
 func (m *mockFailingTransport) Serve(ctx context.Context) error {
@@ -333,7 +332,7 @@ func (m *mockFailingTransport) Name() string {
 	return "mock-failing-transport"
 }
 
-func (m *mockFailingTransport) SetHandler(handler transport.LocalRequestHandler) {
+func (m *mockFailingTransport) SetHandler(handler core.RequestHandler) {
 	m.handler = handler
 }
 

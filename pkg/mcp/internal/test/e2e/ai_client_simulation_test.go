@@ -419,7 +419,7 @@ func validateParameterConstraints(t *testing.T, tool testutil.ToolInfo) {
 
 	for paramName, paramDef := range properties {
 		paramObj, ok := paramDef.(map[string]interface{})
-		require.True(t, ok, "Parameter definition should be object")
+		require.True(t, ok, "Parameter %s definition should be object", paramName)
 
 		// Check for useful constraints
 		paramType, _ := paramObj["type"].(string)

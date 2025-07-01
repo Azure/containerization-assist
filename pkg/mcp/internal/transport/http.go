@@ -19,7 +19,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-
 // HTTPTransport implements core.Transport for HTTP communication
 type HTTPTransport struct {
 	server         *http.Server
