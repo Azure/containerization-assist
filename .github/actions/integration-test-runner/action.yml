@@ -1,33 +1,33 @@
-name: 'Integration Test Runner'
-description: 'Runs integration tests against a specific repository'
+name: "Integration Test Runner"
+description: "Runs integration tests against a specific repository"
 inputs:
   repository:
-    description: 'Repository to test against (e.g., konveyor-ecosystem/coolstore)'
+    description: "Repository to test against (e.g., konveyor-ecosystem/coolstore)"
     required: true
   test-number:
-    description: 'Test iteration number'
+    description: "Test iteration number"
     required: true
-    default: '1'
+    default: "1"
   binary-name:
-    description: 'Name of the binary to use'
+    description: "Name of the binary to use"
     required: false
-    default: 'container-kit'
+    default: "container-kit"
   azure-openai-key:
-    description: 'Azure OpenAI API key'
+    description: "Azure OpenAI API key"
     required: false
   azure-openai-endpoint:
-    description: 'Azure OpenAI endpoint'
+    description: "Azure OpenAI endpoint"
     required: false
   azure-openai-deployment-id:
-    description: 'Azure OpenAI deployment ID'
+    description: "Azure OpenAI deployment ID"
     required: false
 outputs:
   run-name:
-    description: 'Generated run name for this test'
+    description: "Generated run name for this test"
   result:
-    description: 'Test result (success/failure/timeout)'
+    description: "Test result (success/failure/timeout)"
   log-file:
-    description: 'Path to the test log file'
+    description: "Path to the test log file"
 runs:
   using: "composite"
   steps:
@@ -96,19 +96,26 @@ runs:
         fi
 
         # Determine test result
+        result="unknown"
         if grep -q "context deadline exceeded" "$LOG_FILE"; then
           echo "❌ Test Run $RUN_NAME: Operation timed out - context deadline exceeded"
-          echo "result=timeout" >> $GITHUB_OUTPUT
+          result="timeout"
         elif grep -q "$SUCCESS_MESSAGE" "$LOG_FILE"; then
           echo "✅ Test Run $RUN_NAME PASSED - Found '$SUCCESS_MESSAGE'"
-          echo "result=success" >> $GITHUB_OUTPUT
+          result="success"
         else
           echo "❌ Test Run $RUN_NAME: FAILED - Did not find '$SUCCESS_MESSAGE'"
-          echo "result=failure" >> $GITHUB_OUTPUT
+          result="failure"
         fi
 
+        echo "result=$result" >> $GITHUB_OUTPUT
+        echo "Test Run $RUN_NAME Result: $result"
+        echo "Test Run $RUN_NAME Log File: $LOG_FILE"
+        echo "Test Run $RUN_NAME Log File Size: $(du -sh "$LOG_FILE" | cut -f1)"
+
         # Save result to file for artifact collection
-        echo "${{ env.GITHUB_OUTPUT }}" | grep "result=" | cut -d'=' -f2 > artifacts/result.txt
+        echo "writing result to artifacts/result.txt"
+        echo "$result" > artifacts/result.txt
 
     - name: Check Artifact Directory Size
       shell: bash
