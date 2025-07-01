@@ -149,16 +149,6 @@ type RequestHandler interface {
 // Tool Registry Interface
 // ============================================================================
 
-// ToolRegistry provides simplified tool registration and retrieval.
-// This eliminates the need for complex auto-registration adapters.
-type ToolRegistry interface {
-	Register(tool Tool)
-	Get(name string) (Tool, bool)
-	GetTool(name string) (Tool, error) // Legacy compatibility method
-	List() []string
-	GetMetadata(name string) (ToolMetadata, bool)
-}
-
 // ============================================================================
 // Tool Orchestration Interface
 // ============================================================================
@@ -463,12 +453,6 @@ type TokenUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-// IterativeFixer provides iterative fixing functionality
-type IterativeFixer interface {
-	// AttemptFix performs iterative fixing with retry logic
-	AttemptFix(ctx context.Context, sessionID string, toolName string, operationType string, err error, maxAttempts int, baseDir string) (*FixingResult, error)
-}
-
 // FixingResult represents the result of a fixing operation
 type FixingResult struct {
 	Success         bool          `json:"success"`
@@ -481,16 +465,6 @@ type FixingResult struct {
 	TotalAttempts   int           `json:"total_attempts"`
 	Duration        time.Duration `json:"duration"`
 	LastAttemptTime time.Time     `json:"last_attempt_time"`
-}
-
-// ContextSharer provides context sharing functionality between tools
-type ContextSharer interface {
-	// ShareContext shares context between tools or operations
-	ShareContext(ctx context.Context, sessionID string, contextType string, data interface{}) error
-	// GetSharedContext retrieves shared context
-	GetSharedContext(ctx context.Context, sessionID string, contextType string) (interface{}, error)
-	// ClearContext clears shared context for a session
-	ClearContext(ctx context.Context, sessionID string) error
 }
 
 // BaseAIContextResult provides AI context result information
