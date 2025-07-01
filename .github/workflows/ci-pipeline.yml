@@ -91,7 +91,7 @@ jobs:
                 existing_files="$existing_files $file"
               fi
             done
-            
+
             if [ -n "$existing_files" ]; then
               unformatted=$(gofmt -l $existing_files)
               if [ -n "$unformatted" ]; then
