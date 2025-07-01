@@ -199,6 +199,49 @@ func (r *MCPToolRegistry) GetToolInfo(name string) (*ToolInfo, error) {
 	return &toolInfo, nil
 }
 
+// GetToolSchema returns the full JSON schema for a tool including parameters and output
+func (r *MCPToolRegistry) GetToolSchema(name string) (map[string]interface{}, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	toolInfo, exists := r.tools[name]
+	if !exists {
+		return nil, fmt.Errorf("tool %s not found", name)
+	}
+
+	// Build comprehensive schema
+	schema := map[string]interface{}{
+		"name":         name,
+		"description":  toolInfo.Description,
+		"category":     toolInfo.Category,
+		"version":      toolInfo.Version,
+		"dependencies": toolInfo.Dependencies,
+		"capabilities": toolInfo.Capabilities,
+	}
+
+	// Get parameter schema using reflection
+	if toolInfo.Instance != nil {
+		paramSchema := r.inferParameters(toolInfo.Instance)
+		if len(paramSchema) > 0 {
+			schema["parameters"] = paramSchema
+		}
+
+		// Get output schema
+		outputSchema := r.inferOutputSchema(toolInfo.Instance)
+		if len(outputSchema) > 0 {
+			schema["output"] = outputSchema
+		}
+	}
+
+	// Add metadata if available
+	if metadata, exists := r.metadata[name]; exists {
+		schema["requirements"] = metadata.Requirements
+		schema["examples"] = metadata.Examples
+	}
+
+	return schema, nil
+}
+
 // GetToolsByCategory returns all tools in a specific category
 func (r *MCPToolRegistry) GetToolsByCategory(category string) []string {
 	r.mutex.RLock()

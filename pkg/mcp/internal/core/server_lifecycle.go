@@ -43,6 +43,12 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to register HTTP handlers: %w", err)
 	}
 
+	// Set the server reference on HTTP transport for schema access
+	if httpTransport, ok := s.transport.(interface{ SetServer(interface{}) }); ok {
+		httpTransport.SetServer(s)
+		s.logger.Info().Msg("Set server reference on HTTP transport")
+	}
+
 	// Set the server as the request handler for the transport
 	if setter, ok := s.transport.(interface{ SetHandler(interface{}) }); ok {
 		setter.SetHandler(s)

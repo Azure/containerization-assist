@@ -19,12 +19,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ToolInfo stores tool metadata
+type ToolInfo struct {
+	Handler     ToolHandler
+	Description string
+}
+
 // HTTPTransport implements core.Transport for HTTP communication
 type HTTPTransport struct {
 	server         *http.Server
 	mcpServer      interface{}
 	router         chi.Router
-	tools          map[string]ToolHandler
+	tools          map[string]*ToolInfo
 	toolsMutex     sync.RWMutex
 	logger         zerolog.Logger
 	port           int
@@ -68,7 +74,7 @@ func NewHTTPTransport(config HTTPTransportConfig) *HTTPTransport {
 	}
 
 	transport := &HTTPTransport{
-		tools:          make(map[string]ToolHandler),
+		tools:          make(map[string]*ToolInfo),
 		logger:         config.Logger.With().Str("component", "http_transport").Logger(),
 		port:           config.Port,
 		corsOrigins:    config.CORSOrigins,
@@ -101,6 +107,10 @@ func (t *HTTPTransport) setupRouter() {
 	t.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/tools", t.handleListTools)
 		r.Options("/tools", t.handleOptions)
+		r.Get("/tools/schemas", t.handleGetAllToolSchemas)
+		r.Options("/tools/schemas", t.handleOptions)
+		r.Get("/tools/{tool}/schema", t.handleGetToolSchema)
+		r.Options("/tools/{tool}/schema", t.handleOptions)
 		r.Post("/tools/{tool}", t.handleExecuteTool)
 		r.Options("/tools/{tool}", t.handleOptions)
 
@@ -245,8 +255,11 @@ func (t *HTTPTransport) RegisterTool(name, description string, handler interface
 		return fmt.Errorf("handler must be of type ToolHandler")
 	}
 
-	t.tools[name] = toolHandler
-	t.logger.Info().Str("tool", name).Msg("Registered tool with HTTP transport")
+	t.tools[name] = &ToolInfo{
+		Handler:     toolHandler,
+		Description: description,
+	}
+	t.logger.Info().Str("tool", name).Str("description", description).Msg("Registered tool with HTTP transport")
 	return nil
 }
 
@@ -269,6 +282,194 @@ func (t *HTTPTransport) GetPort() int {
 // GetRouter returns the HTTP router for testing
 func (t *HTTPTransport) GetRouter() http.Handler {
 	return t.router
+}
+
+// getToolMetadata retrieves tool metadata from the MCP server if available
+func (t *HTTPTransport) getToolMetadata(toolName string) map[string]interface{} {
+	if t.mcpServer == nil {
+		return nil
+	}
+
+	// Try to get the tool registry which has full schema information
+	type serverWithRegistry interface {
+		GetToolRegistry() interface {
+			GetToolSchema(string) (map[string]interface{}, error)
+		}
+	}
+
+	if server, ok := t.mcpServer.(serverWithRegistry); ok {
+		if registry := server.GetToolRegistry(); registry != nil {
+			if schema, err := registry.GetToolSchema(toolName); err == nil {
+				// Ensure description is included from HTTP transport if missing
+				if desc, ok := schema["description"].(string); !ok || desc == "" {
+					t.toolsMutex.RLock()
+					if info, exists := t.tools[toolName]; exists && info.Description != "" {
+						schema["description"] = info.Description
+					}
+					t.toolsMutex.RUnlock()
+				}
+				// The schema already contains all metadata including parameters
+				return schema
+			}
+		}
+	}
+
+	// Fallback: Try to get the server instance
+	type serverInterface interface {
+		GetToolOrchestrator() interface {
+			GetToolMetadata(string) (interface{}, error)
+		}
+	}
+
+	if server, ok := t.mcpServer.(serverInterface); ok {
+		if orchestrator := server.GetToolOrchestrator(); orchestrator != nil {
+			if metadata, err := orchestrator.GetToolMetadata(toolName); err == nil {
+				// Convert metadata to a map for JSON serialization
+				if metaMap, ok := metadata.(map[string]interface{}); ok {
+					return metaMap
+				}
+				// If not already a map, try to marshal/unmarshal to convert
+				if jsonData, err := json.Marshal(metadata); err == nil {
+					var result map[string]interface{}
+					if err := json.Unmarshal(jsonData, &result); err == nil {
+						return result
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// handleGetToolSchema returns the schema for a specific tool
+func (t *HTTPTransport) handleGetToolSchema(w http.ResponseWriter, r *http.Request) {
+	toolName := chi.URLParam(r, "tool")
+
+	t.toolsMutex.RLock()
+	toolInfo, exists := t.tools[toolName]
+	t.toolsMutex.RUnlock()
+
+	if !exists {
+		t.sendError(w, http.StatusNotFound, fmt.Sprintf("Tool '%s' not found", toolName))
+		return
+	}
+
+	response := map[string]interface{}{
+		"name":        toolName,
+		"description": toolInfo.Description,
+	}
+
+	// Get detailed metadata from the MCP server
+	if metadata := t.getToolMetadata(toolName); metadata != nil {
+		response["metadata"] = metadata
+	}
+
+	// Try to get the tool registry directly for more detailed schema
+	if t.mcpServer != nil {
+		type serverWithRegistry interface {
+			GetToolRegistry() interface {
+				GetToolSchema(string) (map[string]interface{}, error)
+			}
+		}
+
+		if server, ok := t.mcpServer.(serverWithRegistry); ok {
+			if registry := server.GetToolRegistry(); registry != nil {
+				// Get full tool schema including parameters and output
+				if schema, err := registry.GetToolSchema(toolName); err == nil {
+					response["schema"] = schema
+				} else {
+					t.logger.Error().Err(err).Str("tool", toolName).Msg("Failed to get tool schema")
+				}
+			}
+		}
+	}
+
+	t.sendJSON(w, http.StatusOK, response)
+}
+
+// structToMap converts a struct to a map using JSON marshaling
+func (t *HTTPTransport) structToMap(v interface{}) (map[string]interface{}, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// handleGetAllToolSchemas returns schemas for all registered tools
+func (t *HTTPTransport) handleGetAllToolSchemas(w http.ResponseWriter, r *http.Request) {
+	t.toolsMutex.RLock()
+	toolNames := make([]string, 0, len(t.tools))
+	for name := range t.tools {
+		toolNames = append(toolNames, name)
+	}
+	t.toolsMutex.RUnlock()
+
+	schemas := make(map[string]interface{})
+
+	// Get schemas from the tool registry
+	if t.mcpServer != nil {
+		type serverWithRegistry interface {
+			GetToolRegistry() interface {
+				GetToolSchema(string) (map[string]interface{}, error)
+			}
+		}
+
+		if server, ok := t.mcpServer.(serverWithRegistry); ok {
+			if registry := server.GetToolRegistry(); registry != nil {
+				for _, toolName := range toolNames {
+					if schema, err := registry.GetToolSchema(toolName); err == nil {
+						// Ensure description is included from HTTP transport if missing
+						if desc, ok := schema["description"].(string); !ok || desc == "" {
+							t.toolsMutex.RLock()
+							if info, exists := t.tools[toolName]; exists && info.Description != "" {
+								schema["description"] = info.Description
+							}
+							t.toolsMutex.RUnlock()
+						}
+						schemas[toolName] = schema
+					} else {
+						t.logger.Error().Err(err).Str("tool", toolName).Msg("Failed to get tool schema")
+						// Add basic info even if schema fails
+						t.toolsMutex.RLock()
+						if info, exists := t.tools[toolName]; exists {
+							schemas[toolName] = map[string]interface{}{
+								"name":        toolName,
+								"description": info.Description,
+								"error":       "Schema unavailable",
+							}
+						}
+						t.toolsMutex.RUnlock()
+					}
+				}
+			}
+		}
+	}
+
+	// If no schemas were retrieved, return basic tool info
+	if len(schemas) == 0 {
+		t.toolsMutex.RLock()
+		for name, info := range t.tools {
+			schemas[name] = map[string]interface{}{
+				"name":        name,
+				"description": info.Description,
+				"endpoint":    fmt.Sprintf("/api/v1/tools/%s", name),
+			}
+		}
+		t.toolsMutex.RUnlock()
+	}
+
+	t.sendJSON(w, http.StatusOK, map[string]interface{}{
+		"schemas": schemas,
+		"count":   len(schemas),
+	})
 }
 
 func (t *HTTPTransport) loggingMiddleware(next http.Handler) http.Handler {
@@ -394,12 +595,49 @@ func (t *HTTPTransport) handleListTools(w http.ResponseWriter, r *http.Request) 
 
 	t.logger.Debug().Int("tool_count", len(t.tools)).Msg("Listing tools")
 
-	tools := make([]map[string]string, 0, len(t.tools))
-	for name := range t.tools {
-		tools = append(tools, map[string]string{
-			"name":     name,
-			"endpoint": fmt.Sprintf("/api/v1/tools/%s", name),
-		})
+	// Check if detailed schema is requested
+	includeSchema := r.URL.Query().Get("include_schema") == "true"
+
+	tools := make([]map[string]interface{}, 0, len(t.tools))
+	for name, info := range t.tools {
+		toolInfo := map[string]interface{}{
+			"name":        name,
+			"description": info.Description,
+			"endpoint":    fmt.Sprintf("/api/v1/tools/%s", name),
+		}
+
+		// Always include parameters for test compatibility
+		if t.mcpServer != nil {
+			if metadata := t.getToolMetadata(name); metadata != nil {
+				// metadata is a map[string]interface{}, so access fields via map
+				if params, ok := metadata["parameters"]; ok {
+					toolInfo["parameters"] = params
+				} else {
+					toolInfo["parameters"] = make(map[string]interface{})
+				}
+
+				// Include additional schema info if requested
+				if includeSchema {
+					if schema, ok := metadata["schema"]; ok {
+						toolInfo["schema"] = schema
+					}
+					if category, ok := metadata["category"]; ok {
+						toolInfo["category"] = category
+					}
+					if version, ok := metadata["version"]; ok {
+						toolInfo["version"] = version
+					}
+				}
+			} else {
+				// Provide empty parameters if metadata not available
+				toolInfo["parameters"] = make(map[string]interface{})
+			}
+		} else {
+			// Provide empty parameters if server not available
+			toolInfo["parameters"] = make(map[string]interface{})
+		}
+
+		tools = append(tools, toolInfo)
 	}
 
 	t.sendJSON(w, http.StatusOK, map[string]interface{}{
@@ -412,7 +650,7 @@ func (t *HTTPTransport) handleExecuteTool(w http.ResponseWriter, r *http.Request
 	toolName := chi.URLParam(r, "tool")
 
 	t.toolsMutex.RLock()
-	handler, exists := t.tools[toolName]
+	toolInfo, exists := t.tools[toolName]
 	t.toolsMutex.RUnlock()
 
 	if !exists {
@@ -427,7 +665,7 @@ func (t *HTTPTransport) handleExecuteTool(w http.ResponseWriter, r *http.Request
 	}
 
 	ctx := r.Context()
-	result, err := handler(ctx, args)
+	result, err := toolInfo.Handler(ctx, args)
 	if err != nil {
 		t.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Tool execution failed: %v", err))
 		return
@@ -469,7 +707,7 @@ func (t *HTTPTransport) handleListSessions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	result, err := handler(r.Context(), map[string]interface{}{})
+	result, err := handler.Handler(r.Context(), map[string]interface{}{})
 	if err != nil {
 		t.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list sessions: %v", err))
 		return
@@ -483,7 +721,7 @@ func (t *HTTPTransport) handleGetSession(w http.ResponseWriter, r *http.Request)
 
 	// Get session details tool - this needs to be a specific tool for getting a single session
 	if getSessionTool, exists := t.tools["get_session"]; exists {
-		response, err := getSessionTool(r.Context(), map[string]interface{}{
+		response, err := getSessionTool.Handler(r.Context(), map[string]interface{}{
 			"session_id": sessionID,
 		})
 		if err != nil {
@@ -497,7 +735,7 @@ func (t *HTTPTransport) handleGetSession(w http.ResponseWriter, r *http.Request)
 
 	// Fallback: try to use list_sessions and filter
 	if listTool, exists := t.tools["list_sessions"]; exists {
-		listResponse, err := listTool(r.Context(), map[string]interface{}{})
+		listResponse, err := listTool.Handler(r.Context(), map[string]interface{}{})
 		if err != nil {
 			t.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list sessions: %v", err))
 			return
@@ -534,7 +772,7 @@ func (t *HTTPTransport) handleDeleteSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	result, err := handler(r.Context(), map[string]interface{}{
+	result, err := handler.Handler(r.Context(), map[string]interface{}{
 		"session_id": sessionID,
 	})
 	if err != nil {

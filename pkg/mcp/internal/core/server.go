@@ -423,6 +423,11 @@ func (s *Server) GetToolOrchestrator() *orchestration.MCPToolOrchestrator {
 	return s.toolOrchestrator
 }
 
+// GetToolRegistry returns the server's tool registry
+func (s *Server) GetToolRegistry() *orchestration.MCPToolRegistry {
+	return s.toolRegistry
+}
+
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.shutdownMutex.Lock()

@@ -218,7 +218,7 @@ func (gm *GomcpManager) RegisterHTTPHandlers(transportInstance interface{}) erro
 		gm.logger.Error("tool orchestrator is nil")
 		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
 	})
-	if err := httpTransport.RegisterTool("analyze_repository", "Analyze a repository", analyzeHandler); err != nil {
+	if err := httpTransport.RegisterTool("analyze_repository", "Analyze a repository to detect language, framework, and containerization requirements. Creates a new session to track the analysis workflow", analyzeHandler); err != nil {
 		gm.logger.Error("failed to register analyze_repository", "error", err)
 		return err
 	}
@@ -231,7 +231,7 @@ func (gm *GomcpManager) RegisterHTTPHandlers(transportInstance interface{}) erro
 		}
 		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
 	})
-	if err := httpTransport.RegisterTool("generate_dockerfile", "Generate a Dockerfile", dockerfileHandler); err != nil {
+	if err := httpTransport.RegisterTool("generate_dockerfile", "Generate a Dockerfile for the analyzed repository using session-based configuration", dockerfileHandler); err != nil {
 		gm.logger.Error("failed to register generate_dockerfile", "error", err)
 		return err
 	}
@@ -244,7 +244,7 @@ func (gm *GomcpManager) RegisterHTTPHandlers(transportInstance interface{}) erro
 		}
 		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
 	})
-	if err := httpTransport.RegisterTool("build_image", "Build a Docker image", buildHandler); err != nil {
+	if err := httpTransport.RegisterTool("build_image", "Build a Docker image from the analyzed repository using generated Dockerfile and session context", buildHandler); err != nil {
 		gm.logger.Error("failed to register build_image", "error", err)
 		return err
 	}
@@ -257,7 +257,7 @@ func (gm *GomcpManager) RegisterHTTPHandlers(transportInstance interface{}) erro
 		}
 		return nil, errors.Internal("core/gomcp-manager", "tool orchestrator not available")
 	})
-	if err := httpTransport.RegisterTool("generate_manifests", "Generate Kubernetes manifests", manifestsHandler); err != nil {
+	if err := httpTransport.RegisterTool("generate_manifests", "Generate Kubernetes manifests for the containerized application using session-based configuration", manifestsHandler); err != nil {
 		gm.logger.Error("failed to register generate_manifests", "error", err)
 		return err
 	}

@@ -225,7 +225,7 @@ func TestSessionManager(t *testing.T) {
 		// Session should be gone after garbage collection
 		_, err = shortTTLManager.GetSession(sessionID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.Contains(t, err.Error(), "NOT_FOUND")
 	})
 }
 

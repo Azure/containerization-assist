@@ -292,7 +292,7 @@ runs:
 
           const botComment = comments.find(comment =>
             comment.user.type === 'Bot' &&
-            comment.body.includes('🚀 CI Pipeline Status')
+            comment.body.includes('CI Pipeline Status')
           );
 
           if (botComment) {

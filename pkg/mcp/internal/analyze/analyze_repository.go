@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/types/tools"
 	"github.com/rs/zerolog"
 )
 
@@ -134,6 +135,122 @@ func (t *AnalyzeRepositoryRedirectTool) Validate(ctx context.Context, args inter
 	}
 
 	return nil
+}
+
+// GetName returns the tool's name
+func (t *AnalyzeRepositoryRedirectTool) GetName() string {
+	return "analyze_repository"
+}
+
+// GetDescription returns the tool's description
+func (t *AnalyzeRepositoryRedirectTool) GetDescription() string {
+	return "Analyzes a repository to determine language, framework, dependencies, and containerization requirements. This tool manages session state automatically."
+}
+
+// RedirectToolParams represents the parameters for the redirect tool
+type RedirectToolParams struct {
+	SessionID string `json:"session_id,omitempty"`
+	RepoURL   string `json:"repo_url,omitempty"`
+	RepoPath  string `json:"repo_path,omitempty"`
+	Path      string `json:"path,omitempty"`
+	Branch    string `json:"branch,omitempty"`
+}
+
+// Validate validates the parameters
+func (p RedirectToolParams) Validate() error {
+	if p.RepoURL == "" && p.RepoPath == "" && p.Path == "" {
+		return fmt.Errorf("one of repo_url, repo_path, or path must be provided")
+	}
+	return nil
+}
+
+// GetSessionID returns the session ID
+func (p RedirectToolParams) GetSessionID() string {
+	return p.SessionID
+}
+
+// RedirectToolResult represents the result of the redirect tool
+type RedirectToolResult struct {
+	Success   bool                   `json:"success"`
+	SessionID string                 `json:"session_id,omitempty"`
+	RepoURL   string                 `json:"repo_url,omitempty"`
+	Branch    string                 `json:"branch,omitempty"`
+	Workspace string                 `json:"workspace,omitempty"`
+	Analysis  map[string]interface{} `json:"analysis,omitempty"`
+	Error     string                 `json:"error,omitempty"`
+}
+
+// IsSuccess returns whether the result was successful
+func (r RedirectToolResult) IsSuccess() bool {
+	return r.Success
+}
+
+// GetSchema returns the tool's schema
+func (t *AnalyzeRepositoryRedirectTool) GetSchema() tools.Schema[RedirectToolParams, RedirectToolResult] {
+	return tools.Schema[RedirectToolParams, RedirectToolResult]{
+		Name:        "analyze_repository",
+		Description: t.GetDescription(),
+		Version:     "1.0.0",
+		ParamsSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"session_id": map[string]interface{}{
+					"type":        "string",
+					"description": "Session identifier (optional, will be generated if not provided)",
+				},
+				"repo_url": map[string]interface{}{
+					"type":        "string",
+					"description": "Repository URL or path to analyze",
+				},
+				"repo_path": map[string]interface{}{
+					"type":        "string",
+					"description": "Alternative field name for repo_url",
+				},
+				"path": map[string]interface{}{
+					"type":        "string",
+					"description": "Alternative field name for repo_url",
+				},
+				"branch": map[string]interface{}{
+					"type":        "string",
+					"description": "Git branch to analyze (default: main)",
+				},
+			},
+			"anyOf": []interface{}{
+				map[string]interface{}{"required": []string{"repo_url"}},
+				map[string]interface{}{"required": []string{"repo_path"}},
+				map[string]interface{}{"required": []string{"path"}},
+			},
+		},
+		ResultSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"success": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether the analysis was successful",
+				},
+				"session_id": map[string]interface{}{
+					"type":        "string",
+					"description": "Session ID for the analysis",
+				},
+				"repo_url": map[string]interface{}{
+					"type":        "string",
+					"description": "Repository URL that was analyzed",
+				},
+				"branch": map[string]interface{}{
+					"type":        "string",
+					"description": "Branch that was analyzed",
+				},
+				"workspace": map[string]interface{}{
+					"type":        "string",
+					"description": "Workspace directory containing the analyzed repository",
+				},
+				"analysis": map[string]interface{}{
+					"type":        "object",
+					"description": "Analysis results",
+				},
+			},
+		},
+	}
 }
 
 // GetMetadata returns the tool metadata
