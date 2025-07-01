@@ -5,8 +5,8 @@
 
 You are the **Interface Architecture Specialist** responsible for consolidating 626 lines of interfaces down to ~200 lines (70% reduction) while maintaining backward compatibility. Your work runs parallel to other workstreams with careful coordination.
 
-**Duration**: Week 1-4 (parallel to all workstreams)  
-**Dependencies**: Coordination only (no blocking dependencies)  
+**Duration**: Week 1-4 (parallel to all workstreams)
+**Dependencies**: Coordination only (no blocking dependencies)
 **Critical Success**: Clean, consolidated interface hierarchy with zero breaking changes
 
 ## 📋 YOUR SPECIFIC RESPONSIBILITIES
@@ -38,7 +38,7 @@ rg "type.*interface" pkg/mcp/core/interfaces.go -A 10 | grep -E "(func|method)"
 touch docs/interface_consolidation_plan.md
 ```
 
-#### Day 3-4: Consolidation Planning & Documentation  
+#### Day 3-4: Consolidation Planning & Documentation
 ```bash
 # Plan interface consolidation (NO CODE CHANGES YET):
 
@@ -48,7 +48,7 @@ echo "# Interface Consolidation Plan
 ## Single Implementation Interfaces (SAFE TO REMOVE):
 - [List interfaces with only one implementation]
 
-## Function Wrapping Interfaces (SAFE TO MERGE):  
+## Function Wrapping Interfaces (SAFE TO MERGE):
 - [List trivial interfaces that just wrap functions]
 
 ## Related Interfaces (SAFE TO CONSOLIDATE):
@@ -73,7 +73,7 @@ echo "# Interface Consolidation Plan
 # Replace interface usage with direct type usage
 
 # Target 2: Merge trivial function-wrapping interfaces (SAFE):
-# Example: If ValidatorFunc interface just wraps a function type, 
+# Example: If ValidatorFunc interface just wraps a function type,
 # replace with function type directly
 
 # Target 3: Remove unused interfaces (SAFE):
@@ -93,7 +93,7 @@ git add .
 git commit -m "refactor(interfaces): begin safe interface consolidation
 
 - Removed 5+ single-implementation interfaces
-- Merged 3+ trivial function-wrapping interfaces  
+- Merged 3+ trivial function-wrapping interfaces
 - Removed 2+ unused interface definitions
 - Maintained full backward compatibility
 
@@ -124,7 +124,7 @@ Co-Authored-By: Claude <noreply@anthropic.com)"
 # Coordinate through daily summaries
 
 # Example consolidation after BETA completes Tool[T,P,R]:
-# Remove: BuildToolInterface, DeployToolInterface, ScanToolInterface  
+# Remove: BuildToolInterface, DeployToolInterface, ScanToolInterface
 # Replace with: Tool[BuildParams, BuildResult], etc.
 ```
 
@@ -157,7 +157,7 @@ go test -short ./pkg/mcp/internal/orchestration/... && echo "✅ Registry interf
 
 # Remove duplicate validation interfaces:
 # - Old ValidationResult interface definitions
-# - Legacy validator interfaces  
+# - Legacy validator interfaces
 # - Duplicate error interfaces (if not handled by BETA)
 
 # Update imports across codebase:
@@ -168,7 +168,7 @@ find pkg/mcp -name "*.go" -exec grep -l "ValidationInterface\|ValidatorInterface
 # Look for validation adapters that are no longer needed
 ```
 
-#### Day 14-15: Error Interface Integration  
+#### Day 14-15: Error Interface Integration
 ```bash
 # COORDINATE: Work with WORKSTREAM BETA's RichError system
 
@@ -192,7 +192,7 @@ go test -short ./pkg/mcp/validation/... ./pkg/mcp/errors/... && echo "✅ Error 
 # Transport interfaces:
 # Consolidate HTTP/gRPC interfaces if they're too granular
 
-# Session interfaces:  
+# Session interfaces:
 # Merge session management interfaces if appropriate
 
 # Configuration interfaces:
@@ -210,7 +210,7 @@ echo "# Container Kit MCP Interface Architecture
 
 ## Core Interfaces (Post-Consolidation):
 - Tool[TParams, TResult] - Generic tool interface (from BETA)
-- Validator - Unified validation interface (from ALPHA)  
+- Validator - Unified validation interface (from ALPHA)
 - Registry[T] - Generic registry interface (from BETA)
 - [List other essential interfaces]
 
@@ -240,7 +240,7 @@ git commit -m "refactor(interfaces): complete interface consolidation
 - Reduced core/interfaces.go from 626 to $(wc -l pkg/mcp/core/interfaces.go) lines (X% reduction)
 - Removed X+ redundant interfaces
 - Integrated with unified validation interfaces (ALPHA)
-- Integrated with generic tool interfaces (BETA)  
+- Integrated with generic tool interfaces (BETA)
 - Maintained full backward compatibility
 - Updated documentation and API references
 
@@ -266,7 +266,7 @@ Co-Authored-By: Claude <noreply@anthropic.com)"
 # REQUIRED before each commit:
 go test ./pkg/mcp/core/...                    # Core interfaces work
 go test -short ./pkg/mcp/...                  # No regressions
-go build ./pkg/mcp/...                        # Must compile  
+go build ./pkg/mcp/...                        # Must compile
 go fmt ./pkg/mcp/core/...                     # Code formatting
 
 # INTERFACE COUNT validation:
@@ -299,7 +299,7 @@ go test ./... && echo "✅ All systems functional with interface changes"
 
 ### Files You Coordinate On (DO NOT CONFLICT):
 - **Validation interfaces** - ALPHA owns migration, you clean up after
-- **Tool interfaces** - BETA owns generic design, you consolidate after  
+- **Tool interfaces** - BETA owns generic design, you consolidate after
 - **Error interfaces** - BETA owns RichError design, you remove redundant after
 
 ### Your Authority Areas:
@@ -311,7 +311,7 @@ go test ./... && echo "✅ All systems functional with interface changes"
 ### Daily Coordination Protocol:
 ```bash
 # Check other workstream progress:
-# - Has ALPHA completed validation interfaces? 
+# - Has ALPHA completed validation interfaces?
 # - Has BETA completed generic tool interfaces?
 # - Can you safely remove old interfaces?
 
@@ -340,7 +340,7 @@ echo "Function-wrapper interfaces remaining:"
 
 # Integration status:
 echo "Validation interfaces consolidated: [YES/NO]"
-echo "Tool interfaces consolidated: [YES/NO]" 
+echo "Tool interfaces consolidated: [YES/NO]"
 echo "Error interfaces consolidated: [YES/NO]"
 ```
 
@@ -384,7 +384,7 @@ Breaking changes: NONE ✅
 
 ### If Things Go Wrong:
 1. **Breaking changes introduced**: Revert interface changes, add compatibility layer
-2. **Compilation fails**: Check interface usage across packages  
+2. **Compilation fails**: Check interface usage across packages
 3. **Test failures**: Verify interface implementations still work
 4. **Coordination conflicts**: Resolve with other workstream before proceeding
 
@@ -409,12 +409,12 @@ type AnalyzerInterface interface {
     Analyze(data string) error
 }
 
-// 2. Find the single implementation  
+// 2. Find the single implementation
 type ConcreteAnalyzer struct{}
 func (c *ConcreteAnalyzer) Analyze(data string) error { /* implementation */ }
 
 // 3. Replace interface usage with concrete type
-// Before: func ProcessData(analyzer AnalyzerInterface) 
+// Before: func ProcessData(analyzer AnalyzerInterface)
 // After:  func ProcessData(analyzer *ConcreteAnalyzer)
 
 // 4. Remove interface definition
@@ -436,7 +436,7 @@ type Validator interface {
 
 ### Generic Interface Integration Pattern:
 ```go
-// Before: Specific tool interfaces  
+// Before: Specific tool interfaces
 type BuildToolInterface interface { Build(params BuildParams) BuildResult }
 type DeployToolInterface interface { Deploy(params DeployParams) DeployResult }
 

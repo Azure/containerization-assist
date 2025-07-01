@@ -5,8 +5,8 @@
 
 You are the **Error & Type Safety Specialist** responsible for implementing RichError system and strongly-typed generics throughout the Container Kit MCP codebase. Your work eliminates interface{} usage and creates compile-time type safety.
 
-**Duration**: Week 2-3 (10 days)  
-**Dependencies**: WORKSTREAM ALPHA completion (unified validation)  
+**Duration**: Week 2-3 (10 days)
+**Dependencies**: WORKSTREAM ALPHA completion (unified validation)
 **Critical Success**: Type-safe system with rich error context
 
 ## 📋 YOUR SPECIFIC RESPONSIBILITIES
@@ -23,7 +23,7 @@ mkdir -p pkg/mcp/errors/rich
 # File 1: pkg/mcp/errors/rich/types.go
 # Create comprehensive RichError struct:
 # - ErrorCode, ErrorType, ErrorSeverity enums
-# - ErrorContext, ErrorLocation types  
+# - ErrorContext, ErrorLocation types
 # - Stack trace capture functionality
 # - Builder pattern for fluent API
 
@@ -53,7 +53,7 @@ mkdir -p pkg/mcp/types/tools
 # File 1: pkg/mcp/types/tools/generic.go
 # Core Tool[TParams, TResult] interface:
 # - Tool[TParams, TResult] with Execute method
-# - ToolParams and ToolResult constraint interfaces  
+# - ToolParams and ToolResult constraint interfaces
 # - ConfigurableTool, StatefulTool, StreamingTool interfaces
 
 # File 2: pkg/mcp/types/tools/constraints.go
@@ -147,7 +147,7 @@ type DockerBuildResult struct {
 
 # Migrate these files to use strongly-typed interfaces:
 # - pkg/mcp/internal/build/build_image_atomic.go
-# - pkg/mcp/internal/build/pull_image_atomic.go  
+# - pkg/mcp/internal/build/pull_image_atomic.go
 # - pkg/mcp/internal/build/push_image_atomic.go
 # - pkg/mcp/internal/build/tag_image_atomic.go
 
@@ -217,7 +217,7 @@ func (r *GenericRegistry[T, TParams, TResult]) Execute(name string, params TPara
 # File 2: pkg/mcp/internal/orchestration/specialized_registries.go
 # Create specialized registries:
 type BuildRegistry = GenericRegistry[BuildTool, BuildParams, BuildResult]
-type DeployRegistry = GenericRegistry[DeployTool, DeployParams, DeployResult]  
+type DeployRegistry = GenericRegistry[DeployTool, DeployParams, DeployResult]
 type ScanRegistry = GenericRegistry[ScanTool, ScanParams, ScanResult]
 
 # File 3: pkg/mcp/internal/orchestration/federated_registry.go
@@ -252,7 +252,7 @@ Co-Authored-By: Claude <noreply@anthropic.com)"
 
 ### Must Achieve (100% Required):
 - ✅ **100% elimination of interface{}** in tool registry
-- ✅ **80% of errors use RichError** with context  
+- ✅ **80% of errors use RichError** with context
 - ✅ **95% of type errors** caught at compile time
 - ✅ **Type-safe tool execution** throughout system
 - ✅ **All tests pass** with improved error handling
@@ -262,7 +262,7 @@ Co-Authored-By: Claude <noreply@anthropic.com)"
 ```bash
 # REQUIRED before each commit:
 go test -short ./pkg/mcp/errors/...     # RichError tests
-go test -short ./pkg/mcp/types/tools/... # Generics tests  
+go test -short ./pkg/mcp/types/tools/... # Generics tests
 go test -short ./pkg/mcp/internal/*/...  # Tool integration tests
 go fmt ./pkg/mcp/...                     # Code formatting
 go build ./pkg/mcp/...                   # Must compile
@@ -283,7 +283,7 @@ go test -short ./pkg/mcp/... && echo "✅ Ready to work"
 # After RichError implementation:
 go test ./pkg/mcp/errors/rich/... && echo "✅ RichError system working"
 
-# After generics implementation:  
+# After generics implementation:
 go test ./pkg/mcp/types/tools/... && echo "✅ Generics system working"
 
 # After tool migration:
@@ -339,7 +339,7 @@ rg "type.*Result struct" pkg/mcp/internal/ | wc -l  # Should increase
 
 ### Daily Summary Format:
 ```
-WORKSTREAM BETA - DAY X SUMMARY  
+WORKSTREAM BETA - DAY X SUMMARY
 ===============================
 Progress: X% complete
 RichError implementation: X% of critical paths
@@ -421,10 +421,10 @@ func (t *dockerBuildToolImpl) Execute(ctx context.Context, params DockerBuildPar
             Cause(err).
             Build()
     }
-    
+
     // Type-safe implementation
     // ...
-    
+
     return DockerBuildResult{
         Success: true,
         ImageID: imageID,
@@ -441,7 +441,7 @@ func (r *GenericRegistry[T, TParams, TResult]) Execute(name string, params TPara
     r.mu.RLock()
     tool, exists := r.tools[name]
     r.mu.RUnlock()
-    
+
     if !exists {
         var zero TResult
         return zero, rich.NewError().
@@ -454,7 +454,7 @@ func (r *GenericRegistry[T, TParams, TResult]) Execute(name string, params TPara
             Suggestion("Check available tools with ListTools()").
             Build()
     }
-    
+
     return tool.Execute(ctx, params)
 }
 ```

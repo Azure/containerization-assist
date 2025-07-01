@@ -14,7 +14,7 @@ You are the **Lead Developer for Workstream Structural** in the Container Kit MC
 
 ### Codebase Metrics
 - **Production Files**: 301 Go files (excluding tests)
-- **Test Files**: 109 test files  
+- **Test Files**: 109 test files
 - **Large Files (>800 lines)**: 10 files requiring decomposition
 - **Interface{} Usage**: 2,157 instances (type safety concern)
 - **Error Handling Files**: 157 files with mixed error patterns
@@ -37,7 +37,7 @@ You are the **Lead Developer for Workstream Structural** in the Container Kit MC
 
 ### Must-Not-Do Items
 - ❌ **Do NOT modify auto-fixing logic** (that's Workstream Alpha)
-- ❌ **Do NOT resolve TODO items** (that's Workstream Beta) 
+- ❌ **Do NOT resolve TODO items** (that's Workstream Beta)
 - ❌ **Do NOT write new tests** (Workstream Gamma handles testing)
 - ❌ **Do NOT break existing functionality** (maintain backward compatibility during simplification)
 - ❌ **Do NOT add new TODO comments or placeholders** (simplify existing patterns only)
@@ -61,7 +61,7 @@ Based on plan.md Phase 1 objectives, focus on critical path simplification:
 ```
 PRIORITY 1 - Blocking Files:
 pkg/mcp/internal/observability/preflight_checker.go     (1,395 lines) → Split into 4 modules
-pkg/mcp/internal/analyze/generate_dockerfile.go        (1,286 lines) → Split into 3 modules  
+pkg/mcp/internal/analyze/generate_dockerfile.go        (1,286 lines) → Split into 3 modules
 pkg/mcp/interfaces.go                                   (1,212 lines) → Split into domain interfaces
 pkg/mcp/internal/scan/scan_secrets_atomic.go          (1,158 lines) → Split into scanner + processor
 pkg/mcp/internal/deploy/check_health_atomic.go        (1,063 lines) → Split into checker + validator
@@ -107,7 +107,7 @@ Error Handling Patterns:
 ```
 TYPE SAFETY IMPROVEMENTS:
 1. Tool Registry: 800+ interface{} casts → Strongly-typed generics
-2. Argument Validation: 500+ interface{} validations → Type-specific validators  
+2. Argument Validation: 500+ interface{} validations → Type-specific validators
 3. Result Processing: 400+ interface{} returns → Structured result types
 4. Context Sharing: 300+ interface{} mappings → Typed context objects
 5. Configuration: 200+ interface{} configs → Structured config types
@@ -172,7 +172,7 @@ golangci-lint run ./pkg/mcp/... # Ensure no new issues introduced
 
 ### Week 3-4: Type Safety & Interface Cleanup (Phase 2)
 ```bash
-# Interface Modernization  
+# Interface Modernization
 make reduce-interface-usage   # Target: 2,157 → <500 interface{} instances
 make implement-typed-registry # Target: 100% strongly-typed tool registry
 make standardize-validation   # Target: 10+ patterns → 3 patterns
@@ -198,14 +198,14 @@ make validate-performance     # Target: All performance benchmarks pass
 ```
 Current Structure:
 - Tool interfaces (300 lines)
-- Pipeline interfaces (400 lines)  
+- Pipeline interfaces (400 lines)
 - Session interfaces (250 lines)
 - Orchestration interfaces (262 lines)
 
 Target Structure:
 pkg/mcp/interfaces/
 ├── tools.go          # Tool-specific interfaces
-├── pipeline.go       # Pipeline operation interfaces  
+├── pipeline.go       # Pipeline operation interfaces
 ├── session.go        # Session management interfaces
 └── orchestration.go  # Workflow orchestration interfaces
 ```
@@ -226,7 +226,7 @@ Target Modules:
 ```
 Source Files:
 - pkg/mcp/utils/validation_utils.go
-- pkg/mcp/internal/utils/validation_standardizer.go  
+- pkg/mcp/internal/utils/validation_standardizer.go
 
 Target: pkg/mcp/internal/validation/
 ├── core.go           # Core validation functions
@@ -278,7 +278,7 @@ Benefits:
 - [ ] **RichError adoption**: 47% → 80% (S18 compliance)
 - [ ] **Test coverage**: Maintained or improved during refactoring
 
-### Phase 2 Metrics (Weeks 3-4)  
+### Phase 2 Metrics (Weeks 3-4)
 - [ ] **Interface{} usage**: 2,157 → <500 instances (77% reduction)
 - [ ] **Registry type safety**: 100% strongly-typed (S21 compliance)
 - [ ] **Dead code removal**: 100% deprecated patterns removed
@@ -297,7 +297,7 @@ Benefits:
 - **Interface**: Provide stable validation and error handling patterns for auto-fix logic
 - **Testing**: Ensure simplified code paths don't break auto-fix workflows
 
-### Workstream Beta (Technical Debt) Coordination  
+### Workstream Beta (Technical Debt) Coordination
 - **Overlap**: Large file decomposition supports TODO resolution efforts
 - **Timing**: Complete interface simplification before Beta tackles analyzer implementations
 - **Resources**: Share utility consolidation work between simplification and debt resolution

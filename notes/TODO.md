@@ -1,7 +1,7 @@
 # pkg/mcp Codebase Cleanup Analysis Report
 
-**Analysis Date:** July 2025  
-**Scope:** Complete pkg/mcp directory (479 Go files, ~153,017 lines of code)  
+**Analysis Date:** July 2025
+**Scope:** Complete pkg/mcp directory (479 Go files, ~153,017 lines of code)
 **Focus Areas:** Dead code, over-engineering, structural issues, legacy patterns, non-idiomatic Go
 
 ## 📊 **EXECUTIVE SUMMARY**
@@ -9,7 +9,7 @@
 This analysis identified significant cleanup opportunities in the Container Kit MCP codebase:
 
 - **6,000+ lines of dead code** can be safely removed
-- **65 files exceed 500 lines** indicating over-engineering  
+- **65 files exceed 500 lines** indicating over-engineering
 - **9 files exceed 1,000 lines** requiring architectural simplification
 - **40+ orphaned test files** with no corresponding implementations
 - **Enterprise patterns** used for simple containerization tasks
@@ -26,7 +26,7 @@ This analysis identified significant cleanup opportunities in the Container Kit 
   - Complex retry manager only used in tests
   - Enterprise circuit breaker pattern for local Docker commands
   - Adaptive learning and fallback chains that are overkill
-- **Delete** `pkg/mcp/internal/session/resource_monitor.go` (1,190 lines)  
+- **Delete** `pkg/mcp/internal/session/resource_monitor.go` (1,190 lines)
   - Resource monitoring system only used in tests
   - Sophisticated cleanup rules and alert thresholds for basic sessions
 - **Delete** `pkg/mcp/internal/orchestration/performance_optimizer.go` (1,179 lines)
@@ -36,7 +36,7 @@ This analysis identified significant cleanup opportunities in the Container Kit 
   - Full distributed transaction saga pattern for containerization
   - Event sourcing, compensation strategies for simple sequential operations
 
-**📁 CRITICAL: Orphaned Test Infrastructure (Est. 1,000+ lines)**  
+**📁 CRITICAL: Orphaned Test Infrastructure (Est. 1,000+ lines)**
 - **Delete 40+ orphaned test files** with no corresponding implementations
 - **Delete** `pkg/mcp/internal/testutil/profiling_profiling_test_suite.go` (400 lines)
 - **Delete** `pkg/mcp/internal/testutil/pipeline_pipeline_test_helpers.go` (498 lines)
@@ -50,7 +50,7 @@ This analysis identified significant cleanup opportunities in the Container Kit 
   - 13 factory methods that just wrap simple constructors
   - Remove factory pattern, use direct constructors
 
-**🔄 REMOVE: Enterprise Workflow Patterns**  
+**🔄 REMOVE: Enterprise Workflow Patterns**
 - **Delete** `pkg/mcp/internal/orchestration/workflow_orchestrator.go` (991 lines)
   - Enterprise workflow engine for linear container workflows
   - Dependency resolution, parallel execution, checkpoint persistence
@@ -72,7 +72,7 @@ This analysis identified significant cleanup opportunities in the Container Kit 
       }
       return b.clientFactory.CreateDockerClient()
   }
-  
+
   // With this:
   func (b *BaseInjectableClients) GetDockerClient() (docker.DockerClient, error) {
       if b.clientFactory == nil {
@@ -91,14 +91,14 @@ This analysis identified significant cleanup opportunities in the Container Kit 
   - Command binaries typically belong in `cmd/` at repository root
 - **Consolidate duplicate interface definitions**
   - Root: `pkg/mcp/interfaces.go`
-  - Core: `pkg/mcp/core/interfaces.go` 
+  - Core: `pkg/mcp/core/interfaces.go`
   - Types: `pkg/mcp/types/` validation interfaces
   - Potential interface duplication and confusion
 
 ### 5. Fix Naming Inconsistencies
 - **Rename files with `llm_llm_` prefix** to remove duplication:
   - `llm_llm_stdio.go`
-  - `llm_llm_http.go` 
+  - `llm_llm_http.go`
   - `llm_llm_mock.go`
 - **Fix repeated prefixes**:
   - `pipeline_pipeline_test_helpers.go`
@@ -185,7 +185,7 @@ This analysis identified significant cleanup opportunities in the Container Kit 
 ### 11. Complete Stubs and TODOs
 - **Implement TODOs** in `pkg/mcp/internal/observability/preflight_checker.go`
 - **Complete stubs** in `pkg/mcp/internal/session/resource_monitor.go`
-- **Finish implementations** in `pkg/mcp/internal/utils/sandbox_executor.go`  
+- **Finish implementations** in `pkg/mcp/internal/utils/sandbox_executor.go`
 - **Address 39 files with TODO/FIXME comments** indicating incomplete implementations
 
 ### 12. Standardize Error Handling
@@ -197,7 +197,7 @@ This analysis identified significant cleanup opportunities in the Container Kit 
 ## **📊 ESTIMATED IMPACT**
 
 - **Lines of Code Reduction**: 2,000-3,000 lines (dead code removal)
-- **Complexity Reduction**: 50%+ in over-engineered components  
+- **Complexity Reduction**: 50%+ in over-engineered components
 - **Maintainability**: Significant improvement from structural fixes
 - **Go Idioms**: Better alignment with Go best practices
 - **Performance**: Reduced interface overhead and simplified execution paths
@@ -208,12 +208,12 @@ This analysis identified significant cleanup opportunities in the Container Kit 
 1. Remove dead code (items 1-2) - Safe, high impact
 2. No functional changes, just cleanup
 
-### Phase 2: Structural Fixes (Medium Risk) 
+### Phase 2: Structural Fixes (Medium Risk)
 1. Fix structural issues (items 4-6) - Requires coordination
 2. May affect import paths and build processes
 
 ### Phase 3: Architectural Changes (High Risk)
-1. Simplify over-engineering (items 7-9) - Architectural changes  
+1. Simplify over-engineering (items 7-9) - Architectural changes
 2. Requires careful testing and validation
 
 ### Phase 4: Quality Improvements (Low Risk)
@@ -226,7 +226,7 @@ This cleanup analysis was conducted through:
 - Comprehensive directory structure mapping (446 Go files, 117 test files)
 - Dead code detection via import analysis and usage patterns
 - Complexity analysis of large files (>500 lines) and deep abstractions
-- Legacy pattern detection via keyword and comment analysis  
+- Legacy pattern detection via keyword and comment analysis
 - Go idiom compliance checking against best practices
 - Cross-reference validation for orphaned code
 
