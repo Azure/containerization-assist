@@ -71,6 +71,8 @@ const (
 	ErrTypeInternal      ErrorType = "INTERNAL"
 	ErrTypeNotFound      ErrorType = "NOT_FOUND"
 	ErrTypeSystem        ErrorType = "SYSTEM"
+	ErrTypeTimeout       ErrorType = "TIMEOUT"
+	ErrTypePermission    ErrorType = "PERMISSION"
 )
 
 // ErrorSeverity indicates the impact level of an error
