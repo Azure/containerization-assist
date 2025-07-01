@@ -57,7 +57,7 @@ func (base *AtomicToolBase) ValidateAndPrepareExecution(
 	if len(requiredFields) > 0 {
 		validationResult := base.validationMixin.StandardValidateRequiredFields(args, requiredFields)
 		if validationResult.HasErrors() {
-			base.logger.Error().Interface("validation_errors", validationResult.Errors).Msg("Input validation failed")
+			base.logger.Error().Interface("validation_errors", validationResult.GetErrors()).Msg("Input validation failed")
 			return nil, fmt.Errorf("atomic tool operation failed")
 		}
 	}
