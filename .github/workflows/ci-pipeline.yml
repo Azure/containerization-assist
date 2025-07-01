@@ -533,23 +533,28 @@ jobs:
       issues: write
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      continue-on-error: true
+      id: checkout
 
     - name: Run architecture analysis
+      if: steps.checkout.outcome == 'success'
       id: arch-analysis
       uses: ./.github/actions/architecture-check
       with:
         path: 'pkg/mcp'
         config-file: '.github/quality-config.json'
+      continue-on-error: true
 
     - name: Generate comprehensive PR status and summary
       uses: ./.github/actions/pr-status-generator
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         run-id: ${{ github.run_id }}
-        architecture-score: ${{ steps.arch-analysis.outputs.architecture-score }}
-        architecture-status: ${{ steps.arch-analysis.outputs.architecture-status }}
-        architecture-details: 'Adapters/Wrappers/Cycles: ${{ steps.arch-analysis.outputs.adapter-count }}/${{ steps.arch-analysis.outputs.wrapper-count }}/${{ steps.arch-analysis.outputs.import-cycles }} | Large files: ${{ steps.arch-analysis.outputs.large-files }} | Complex functions: ${{ steps.arch-analysis.outputs.complex-functions }}'
+        architecture-score: ${{ steps.arch-analysis.outputs.architecture-score || '0' }}
+        architecture-status: ${{ steps.arch-analysis.outputs.architecture-status || 'unknown' }}
+        architecture-details: ${{ steps.checkout.outcome == 'success' && format('Adapters/Wrappers/Cycles: {0}/{1}/{2} | Large files: {3} | Complex functions: {4}', steps.arch-analysis.outputs.adapter-count, steps.arch-analysis.outputs.wrapper-count, steps.arch-analysis.outputs.import-cycles, steps.arch-analysis.outputs.large-files, steps.arch-analysis.outputs.complex-functions) || 'Architecture analysis skipped due to checkout failure' }}
         quality-results: ${{ needs.quality-gates.result == 'success' && '✅ All quality checks passed' || '⚠️ Quality checks failed or skipped' }}
 
   # Status Check - Single job to use as required check in branch protection
