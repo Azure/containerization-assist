@@ -1,49 +1,62 @@
 package build
 
+import (
+	"context"
+
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
+	"github.com/rs/zerolog"
+)
+
 // ToolAnalyzer provides analysis capabilities for atomic tools
+// Deprecated: Use common.FailureAnalyzer for unified failure analysis
 type ToolAnalyzer interface {
-	// AnalyzeBuildFailure analyzes build operation failures
 	AnalyzeBuildFailure(sessionID, imageName string) error
-	// AnalyzePushFailure analyzes push operation failures
 	AnalyzePushFailure(imageRef, sessionID string) error
-	// AnalyzePullFailure analyzes pull operation failures
 	AnalyzePullFailure(imageRef, sessionID string) error
-	// AnalyzeTagFailure analyzes tag operation failures
 	AnalyzeTagFailure(sourceImage, targetImage, sessionID string) error
 }
 
-// DefaultToolAnalyzer provides a default implementation
+// DefaultToolAnalyzer provides a default implementation using the unified analyzer
 type DefaultToolAnalyzer struct {
-	toolName string
+	*common.DefaultFailureAnalyzer
 }
 
 // NewDefaultToolAnalyzer creates a new default tool analyzer
 func NewDefaultToolAnalyzer(toolName string) *DefaultToolAnalyzer {
 	return &DefaultToolAnalyzer{
-		toolName: toolName,
+		DefaultFailureAnalyzer: common.NewDefaultFailureAnalyzer(toolName, "build", zerolog.Nop()),
 	}
 }
 
-// AnalyzeBuildFailure analyzes build failures
+// AnalyzeBuildFailure analyzes build failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzeBuildFailure(sessionID, imageName string) error {
-	// Default implementation - could be enhanced with actual analysis
-	return nil
+	params := map[string]interface{}{
+		"image_name": imageName,
+	}
+	return a.AnalyzeFailure(context.Background(), "build", sessionID, params)
 }
 
-// AnalyzePushFailure analyzes push failures
+// AnalyzePushFailure analyzes push failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzePushFailure(imageRef, sessionID string) error {
-	// Default implementation - could be enhanced with actual analysis
-	return nil
+	params := map[string]interface{}{
+		"image_ref": imageRef,
+	}
+	return a.AnalyzeFailure(context.Background(), "push", sessionID, params)
 }
 
-// AnalyzePullFailure analyzes pull failures
+// AnalyzePullFailure analyzes pull failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzePullFailure(imageRef, sessionID string) error {
-	// Default implementation - could be enhanced with actual analysis
-	return nil
+	params := map[string]interface{}{
+		"image_ref": imageRef,
+	}
+	return a.AnalyzeFailure(context.Background(), "pull", sessionID, params)
 }
 
-// AnalyzeTagFailure analyzes tag failures
+// AnalyzeTagFailure analyzes tag failures (backward compatibility)
 func (a *DefaultToolAnalyzer) AnalyzeTagFailure(sourceImage, targetImage, sessionID string) error {
-	// Default implementation - could be enhanced with actual analysis
-	return nil
+	params := map[string]interface{}{
+		"source_image": sourceImage,
+		"target_image": targetImage,
+	}
+	return a.AnalyzeFailure(context.Background(), "tag", sessionID, params)
 }
