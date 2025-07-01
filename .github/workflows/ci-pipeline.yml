@@ -529,6 +529,7 @@ jobs:
     needs: [canary, coverage-enforcement, security-scan, quality-gates]
     if: always()
     permissions:
+      contents: read
       pull-requests: write
       issues: write
 
