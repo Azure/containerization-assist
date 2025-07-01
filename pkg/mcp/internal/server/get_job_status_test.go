@@ -1,10 +1,11 @@
 package server
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/rs/zerolog"
 )
 
 // Test GetJobStatusArgs type
@@ -28,199 +29,181 @@ func TestGetJobStatusArgs(t *testing.T) {
 	}
 }
 
-// Test GetJobStatusResult type
+// Test GetJobStatusResult type (updated for consolidated API)
 func TestGetJobStatusResult(t *testing.T) {
-	jobInfo := JobInfo{
-		JobID:     "job-789",
-		Type:      "build",
-		Status:    "running",
-		SessionID: "session-abc",
-		CreatedAt: "2024-01-01T10:00:00Z",
-		Progress:  0.5,
-		Message:   "Job in progress",
+	result := GetJobStatusResult{
+		BaseToolResponse: types.BaseToolResponse{},
+		JobID:            "job-789",
+		Status:           "running",
+		Progress:         50,
+		Output:           "Job in progress",
 	}
+
+	if result.JobID != "job-789" {
+		t.Errorf("Expected JobID to be 'job-789', got '%s'", result.JobID)
+	}
+	if result.Status != "running" {
+		t.Errorf("Expected Status to be 'running', got '%s'", result.Status)
+	}
+	if result.Progress != 50 {
+		t.Errorf("Expected Progress to be 50, got %d", result.Progress)
+	}
+	if result.Output != "Job in progress" {
+		t.Errorf("Expected Output to be 'Job in progress', got '%s'", result.Output)
+	}
+}
+
+// Test GetJobStatusResult extended fields
+func TestGetJobStatusResultExtended(t *testing.T) {
+	startTime := time.Now().Add(-30 * time.Minute)
+	endTime := time.Now()
 
 	result := GetJobStatusResult{
-		BaseToolResponse: types.BaseToolResponse{
-			SessionID: "session-abc",
-			Tool:      "get_job_status",
+		BaseToolResponse: types.BaseToolResponse{},
+		JobID:            "job-test-123",
+		Status:           "completed",
+		Progress:         100,
+		StartTime:        startTime,
+		EndTime:          &endTime,
+		Output:           "Job completed successfully",
+	}
+
+	if result.JobID != "job-test-123" {
+		t.Errorf("Expected JobID to be 'job-test-123', got '%s'", result.JobID)
+	}
+	if result.Status != "completed" {
+		t.Errorf("Expected Status to be 'completed', got '%s'", result.Status)
+	}
+	if result.Progress != 100 {
+		t.Errorf("Expected Progress to be 100, got %d", result.Progress)
+	}
+	if result.StartTime != startTime {
+		t.Errorf("Expected StartTime to match, got %v", result.StartTime)
+	}
+	if result.EndTime == nil {
+		t.Error("Expected EndTime to not be nil")
+	} else if *result.EndTime != endTime {
+		t.Errorf("Expected EndTime to match, got %v", *result.EndTime)
+	}
+	if result.Output != "Job completed successfully" {
+		t.Errorf("Expected Output to be 'Job completed successfully', got '%s'", result.Output)
+	}
+}
+
+// Test GetJobStatusTool tool metadata and execution
+func TestGetJobStatusToolExecution(t *testing.T) {
+	tool := &GetJobStatusTool{}
+
+	if tool == nil {
+		t.Error("GetJobStatusTool should not be nil")
+	}
+
+	// Test metadata
+	metadata := tool.GetMetadata()
+	if metadata.Name != "get_job_status" {
+		t.Errorf("Expected tool name to be 'get_job_status', got '%s'", metadata.Name)
+	}
+	if metadata.Category != "jobs" {
+		t.Errorf("Expected tool category to be 'jobs', got '%s'", metadata.Category)
+	}
+
+	// Test execution with valid args
+	args := GetJobStatusArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: "test-session",
 		},
-		JobInfo: jobInfo,
+		JobID: "test-job",
 	}
 
-	if result.SessionID != "session-abc" {
-		t.Errorf("Expected SessionID to be 'session-abc', got '%s'", result.SessionID)
-	}
-	if result.Tool != "get_job_status" {
-		t.Errorf("Expected Tool to be 'get_job_status', got '%s'", result.Tool)
-	}
-	if result.JobInfo.JobID != "job-789" {
-		t.Errorf("Expected JobInfo.JobID to be 'job-789', got '%s'", result.JobInfo.JobID)
-	}
-	if result.JobInfo.Status != "running" {
-		t.Errorf("Expected JobInfo.Status to be 'running', got '%s'", result.JobInfo.Status)
-	}
-}
-
-// Test JobInfo type
-func TestJobInfo(t *testing.T) {
-	startedAt := "2024-01-01T10:05:00Z"
-	completedAt := "2024-01-01T10:30:00Z"
-	duration := "25m"
-
-	jobInfo := JobInfo{
-		JobID:       "job-test-123",
-		Type:        "deployment",
-		Status:      "completed",
-		SessionID:   "session-xyz",
-		CreatedAt:   "2024-01-01T10:00:00Z",
-		StartedAt:   &startedAt,
-		CompletedAt: &completedAt,
-		Duration:    &duration,
-		Progress:    1.0,
-		Message:     "Deployment completed successfully",
-		Error:       "",
-		Result:      map[string]interface{}{"deployed": true, "replicas": 3},
-		Logs:        []string{"Starting deployment", "Scaling up", "Deployment complete"},
-		Metadata:    map[string]interface{}{"environment": "production", "region": "us-east-1"},
-	}
-
-	if jobInfo.JobID != "job-test-123" {
-		t.Errorf("Expected JobID to be 'job-test-123', got '%s'", jobInfo.JobID)
-	}
-	if jobInfo.Type != "deployment" {
-		t.Errorf("Expected Type to be 'deployment', got '%s'", jobInfo.Type)
-	}
-	if jobInfo.Status != "completed" {
-		t.Errorf("Expected Status to be 'completed', got '%s'", jobInfo.Status)
-	}
-	if jobInfo.SessionID != "session-xyz" {
-		t.Errorf("Expected SessionID to be 'session-xyz', got '%s'", jobInfo.SessionID)
-	}
-	if jobInfo.CreatedAt != "2024-01-01T10:00:00Z" {
-		t.Errorf("Expected CreatedAt to be '2024-01-01T10:00:00Z', got '%s'", jobInfo.CreatedAt)
-	}
-	if jobInfo.StartedAt == nil {
-		t.Error("Expected StartedAt to not be nil")
-	} else if *jobInfo.StartedAt != startedAt {
-		t.Errorf("Expected StartedAt to be '%s', got '%s'", startedAt, *jobInfo.StartedAt)
-	}
-	if jobInfo.CompletedAt == nil {
-		t.Error("Expected CompletedAt to not be nil")
-	} else if *jobInfo.CompletedAt != completedAt {
-		t.Errorf("Expected CompletedAt to be '%s', got '%s'", completedAt, *jobInfo.CompletedAt)
-	}
-	if jobInfo.Duration == nil {
-		t.Error("Expected Duration to not be nil")
-	} else if *jobInfo.Duration != duration {
-		t.Errorf("Expected Duration to be '%s', got '%s'", duration, *jobInfo.Duration)
-	}
-	if jobInfo.Progress != 1.0 {
-		t.Errorf("Expected Progress to be 1.0, got %f", jobInfo.Progress)
-	}
-	if jobInfo.Message != "Deployment completed successfully" {
-		t.Errorf("Expected Message to be 'Deployment completed successfully', got '%s'", jobInfo.Message)
-	}
-	if jobInfo.Error != "" {
-		t.Errorf("Expected Error to be empty, got '%s'", jobInfo.Error)
-	}
-	if jobInfo.Result["deployed"] != true {
-		t.Errorf("Expected Result['deployed'] to be true, got '%v'", jobInfo.Result["deployed"])
-	}
-	if len(jobInfo.Logs) != 3 {
-		t.Errorf("Expected 3 logs, got %d", len(jobInfo.Logs))
-	}
-	if jobInfo.Logs[0] != "Starting deployment" {
-		t.Errorf("Expected first log to be 'Starting deployment', got '%s'", jobInfo.Logs[0])
-	}
-	if jobInfo.Metadata["environment"] != "production" {
-		t.Errorf("Expected Metadata['environment'] to be 'production', got '%v'", jobInfo.Metadata["environment"])
-	}
-}
-
-// Test NewGetJobStatusTool constructor
-func TestNewGetJobStatusTool(t *testing.T) {
-	logger := zerolog.Nop()
-
-	// Define a simple getJobFunc
-	getJobFunc := func(jobID string) (*JobInfo, error) {
-		return &JobInfo{
-			JobID:  jobID,
-			Status: "completed",
-		}, nil
-	}
-
-	tool := NewGetJobStatusTool(logger, getJobFunc)
-
-	if tool == nil {
-		t.Error("NewGetJobStatusTool should not return nil")
-	}
-	if tool.getJobFunc == nil {
-		t.Error("Expected getJobFunc to be set")
-	}
-}
-
-// Test CreateMockJobStatusTool constructor
-func TestCreateMockJobStatusTool(t *testing.T) {
-	logger := zerolog.Nop()
-
-	tool := CreateMockJobStatusTool(logger)
-
-	if tool == nil {
-		t.Error("CreateMockJobStatusTool should not return nil")
-	}
-	if tool.getJobFunc == nil {
-		t.Error("Expected getJobFunc to be set in mock tool")
-	}
-
-	// Test the mock function
-	jobInfo, err := tool.getJobFunc("test-job")
+	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
-		t.Errorf("Mock getJobFunc should not return error, got %v", err)
+		t.Errorf("Execute should not return error, got %v", err)
 	}
-	if jobInfo == nil {
-		t.Error("Mock getJobFunc should return jobInfo")
+	if result == nil {
+		t.Error("Execute should return a result")
 	}
-	if jobInfo.JobID != "test-job" {
-		t.Errorf("Expected mock JobID to be 'test-job', got '%s'", jobInfo.JobID)
-	}
-	if jobInfo.Type != "build" {
-		t.Errorf("Expected mock Type to be 'build', got '%s'", jobInfo.Type)
-	}
-	if jobInfo.Status != "completed" {
-		t.Errorf("Expected mock Status to be 'completed', got '%s'", jobInfo.Status)
-	}
-	if jobInfo.Progress != 1.0 {
-		t.Errorf("Expected mock Progress to be 1.0, got %f", jobInfo.Progress)
-	}
-	if len(jobInfo.Logs) != 2 {
-		t.Errorf("Expected 2 mock logs, got %d", len(jobInfo.Logs))
+
+	// Verify result type
+	if statusResult, ok := result.(*GetJobStatusResult); ok {
+		if statusResult.JobID != "test-job" {
+			t.Errorf("Expected JobID to be 'test-job', got '%s'", statusResult.JobID)
+		}
+	} else {
+		t.Error("Expected result to be of type *GetJobStatusResult")
 	}
 }
 
-// Test GetJobStatusTool struct
-func TestGetJobStatusToolStruct(t *testing.T) {
-	logger := zerolog.Nop()
+// Test GetJobStatusTool validation
+func TestGetJobStatusToolValidation(t *testing.T) {
+	tool := &GetJobStatusTool{}
 
-	getJobFunc := func(jobID string) (*JobInfo, error) {
-		return &JobInfo{JobID: jobID, Status: "pending"}, nil
+	// Test with valid args
+	validArgs := GetJobStatusArgs{
+		BaseToolArgs: types.BaseToolArgs{
+			SessionID: "test-session",
+		},
+		JobID: "test-job",
 	}
 
-	tool := GetJobStatusTool{
-		logger:     logger,
-		getJobFunc: getJobFunc,
-	}
-
-	if tool.getJobFunc == nil {
-		t.Error("Expected getJobFunc to be set")
-	}
-
-	// Test that we can call the function
-	result, err := tool.getJobFunc("test")
+	err := tool.Validate(context.Background(), validArgs)
 	if err != nil {
-		t.Errorf("getJobFunc should not return error, got %v", err)
+		t.Errorf("Validation should pass for valid args, got error: %v", err)
 	}
-	if result.JobID != "test" {
-		t.Errorf("Expected result JobID to be 'test', got '%s'", result.JobID)
+
+	// Test with invalid args type
+	err = tool.Validate(context.Background(), "invalid")
+	if err == nil {
+		t.Error("Validation should fail for invalid args type")
+	}
+
+	// Test execution with invalid args type
+	result, err := tool.Execute(context.Background(), "invalid")
+	if err == nil {
+		t.Error("Execute should fail for invalid args type")
+	}
+	if result != nil {
+		t.Error("Execute should return nil for invalid args")
+	}
+}
+
+// Test GetJobStatusTool integration
+func TestGetJobStatusToolIntegration(t *testing.T) {
+	tool := &GetJobStatusTool{}
+
+	// Test multiple job status scenarios
+	testCases := []struct {
+		name        string
+		jobID       string
+		expectError bool
+	}{
+		{"valid job", "job-123", false},
+		{"another valid job", "job-456", false},
+		{"empty job ID", "", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			args := GetJobStatusArgs{
+				BaseToolArgs: types.BaseToolArgs{
+					SessionID: "test-session",
+				},
+				JobID: tc.jobID,
+			}
+
+			result, err := tool.Execute(context.Background(), args)
+			if tc.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+			if !tc.expectError && result != nil {
+				if statusResult, ok := result.(*GetJobStatusResult); ok {
+					if statusResult.JobID != tc.jobID {
+						t.Errorf("Expected JobID '%s', got '%s'", tc.jobID, statusResult.JobID)
+					}
+				}
+			}
+		})
 	}
 }

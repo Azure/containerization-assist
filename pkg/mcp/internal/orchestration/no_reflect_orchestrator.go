@@ -29,7 +29,7 @@ type NoReflectToolOrchestrator struct {
 	sessionManager     SessionManager
 	analyzer           core.AIAnalyzer
 	logger             zerolog.Logger
-	toolFactory        *ToolFactory
+	toolDependencies   *ToolDependencies
 	pipelineOperations interface{}
 }
 
@@ -71,16 +71,16 @@ func (o *NoReflectToolOrchestrator) extractConcreteSessionManager() interface{} 
 	return nil
 }
 
-// SetToolFactory sets the tool factory directly (for use when we have concrete types)
-func (o *NoReflectToolOrchestrator) SetToolFactory(factory *ToolFactory) {
-	o.toolFactory = factory
+// SetToolDependencies sets the tool dependencies directly (for use when we have concrete types)
+func (o *NoReflectToolOrchestrator) SetToolDependencies(deps *ToolDependencies) {
+	o.toolDependencies = deps
 }
 
 // SetAnalyzer sets the AI analyzer for tool fixing capabilities
 func (o *NoReflectToolOrchestrator) SetAnalyzer(analyzer core.AIAnalyzer) {
 	o.analyzer = analyzer
-	// Tool factory recreation disabled due to import cycle prevention
-	o.logger.Debug().Msg("Tool factory recreation disabled - analyzer set for future factory creation")
+	// Tool dependencies recreation disabled due to import cycle prevention
+	o.logger.Debug().Msg("Tool dependencies recreation disabled - analyzer set for future creation")
 }
 
 // ExecuteTool executes a tool using type-safe dispatch without reflection
@@ -201,8 +201,8 @@ func (o *NoReflectToolOrchestrator) ValidateToolArgs(toolName string, args inter
 // Tool-specific execution methods
 
 func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
 	// Convert args to typed struct
@@ -225,7 +225,7 @@ func (o *NoReflectToolOrchestrator) executeAnalyzeRepository(ctx context.Context
 	}
 
 	// Create and execute the tool
-	tool := o.toolFactory.CreateAnalyzeRepositoryTool()
+	tool := CreateAnalyzeRepositoryTool(o.toolDependencies)
 	return tool.Execute(ctx, args)
 }
 

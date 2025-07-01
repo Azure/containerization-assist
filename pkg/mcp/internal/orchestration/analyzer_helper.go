@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
+	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
 	"github.com/rs/zerolog"
 )
 
@@ -13,7 +14,6 @@ type AnalyzerHelper struct {
 	analyzer              core.AIAnalyzer
 	enhancedBuildAnalyzer *build.EnhancedBuildAnalyzer
 	repositoryAnalyzer    core.RepositoryAnalyzer // Use core interface directly
-	toolFactory           *ToolFactory
 	sessionManager        core.ToolSessionManager
 	logger                zerolog.Logger
 }
@@ -26,22 +26,21 @@ func NewAnalyzerHelper(analyzer core.AIAnalyzer, logger zerolog.Logger) *Analyze
 	}
 }
 
-// NewAnalyzerHelperWithFactory creates a new analyzer helper with tool factory support
-func NewAnalyzerHelperWithFactory(
+// NewAnalyzerHelperWithDependencies creates a new analyzer helper with tool dependencies support
+func NewAnalyzerHelperWithDependencies(
 	analyzer core.AIAnalyzer,
-	toolFactory *ToolFactory,
+	toolDeps *ToolDependencies,
 	sessionManager core.ToolSessionManager,
 	logger zerolog.Logger,
 ) *AnalyzerHelper {
 	helper := &AnalyzerHelper{
 		analyzer:       analyzer,
-		toolFactory:    toolFactory,
 		sessionManager: sessionManager,
 		logger:         logger,
 	}
 
 	// Create the core repository analyzer directly (no adapter needed)
-	if toolFactory != nil && sessionManager != nil {
+	if toolDeps != nil && sessionManager != nil {
 		helper.repositoryAnalyzer = analyze.NewCoreRepositoryAnalyzer(logger)
 	}
 
@@ -146,15 +145,46 @@ func NewDeployToolInitializer(helper *AnalyzerHelper) *DeployToolInitializer {
 
 // SetupAnalyzer sets up analyzer and fixing mixin on a deploy tool that supports them
 func (d *DeployToolInitializer) SetupAnalyzer(tool interface{}, toolName string) {
-	analyzer, fixingMixin := d.helper.SetupDeployToolAnalyzer(toolName)
+	// Deploy tools expect the core AI analyzer directly, not a tool-specific analyzer
+	if d.helper.analyzer == nil {
+		return
+	}
+
+	// Try to set analyzer if tool supports it
+	if setter, ok := tool.(interface{ SetAnalyzer(interface{}) }); ok {
+		setter.SetAnalyzer(d.helper.analyzer)
+	}
+
+	// Note: Deploy tools create their own fixing mixin internally when SetAnalyzer is called
+	// So we don't need to set it separately
+}
+
+// SetupScanToolAnalyzer sets up analyzer for scan tools
+func (h *AnalyzerHelper) SetupScanToolAnalyzer(toolName string) *scan.DefaultToolAnalyzer {
+	if h.analyzer == nil {
+		return nil
+	}
+
+	// Create a default analyzer for scan tools
+	return scan.NewDefaultToolAnalyzer(toolName)
+}
+
+// ScanToolInitializer provides a fluent interface for setting up scan tools
+type ScanToolInitializer struct {
+	helper *AnalyzerHelper
+}
+
+// NewScanToolInitializer creates a new scan tool initializer
+func NewScanToolInitializer(helper *AnalyzerHelper) *ScanToolInitializer {
+	return &ScanToolInitializer{helper: helper}
+}
+
+// SetupAnalyzer sets up analyzer on a scan tool that supports it
+func (s *ScanToolInitializer) SetupAnalyzer(tool interface{}, toolName string) {
+	analyzer := s.helper.SetupScanToolAnalyzer(toolName)
 
 	// Try to set analyzer if tool supports it
 	if setter, ok := tool.(interface{ SetAnalyzer(interface{}) }); ok && analyzer != nil {
 		setter.SetAnalyzer(analyzer)
-	}
-
-	// Try to set fixing mixin if tool supports it
-	if setter, ok := tool.(interface{ SetFixingMixin(interface{}) }); ok && fixingMixin != nil {
-		setter.SetFixingMixin(fixingMixin)
 	}
 }

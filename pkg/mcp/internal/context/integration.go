@@ -19,7 +19,6 @@ type AIContextIntegration struct {
 	stateManager   *state.UnifiedStateManager
 	sessionManager *session.SessionManager
 	knowledgeBase  *build.CrossToolKnowledgeBase
-	toolFactory    interface{} // Placeholder for removed orchestration.EnhancedToolFactory
 	logger         zerolog.Logger
 }
 
@@ -266,8 +265,7 @@ func (i *AIContextIntegration) CreateContextAwareTools(toolFactory interface{}) 
 	// Note: This method is retained for API compatibility but functionality is simplified
 	// since orchestration.EnhancedToolFactory has been removed
 
-	// Store for later use
-	i.toolFactory = toolFactory
+	// toolFactory parameter is no longer used but kept for API compatibility
 
 	i.logger.Info().Msg("Created context-aware tools (simplified)")
 	return nil

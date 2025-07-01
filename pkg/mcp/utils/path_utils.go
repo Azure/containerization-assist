@@ -1,12 +1,11 @@
 package utils
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // PathUtils provides centralized path validation and manipulation utilities
@@ -18,26 +17,26 @@ import (
 // - pkg/mcp/internal/analyze/analyze_simple.go
 func ValidateLocalPath(path string) error {
 	if path == "" {
-		return types.NewRichError("INVALID_ARGUMENTS", "path cannot be empty", "validation_error")
+		return errors.Validation("path_utils", "path cannot be empty")
 	}
 
 	// Resolve to absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return types.NewRichError("INVALID_PATH", fmt.Sprintf("failed to resolve absolute path for '%s': %v", path, err), types.ErrTypeValidation)
+		return errors.Wrapf(err, "path_utils", "failed to resolve absolute path for '%s'", path)
 	}
 
 	// Check for path traversal attacks
 	if strings.Contains(absPath, "..") {
-		return types.NewRichError("PATH_TRAVERSAL_DENIED", fmt.Sprintf("path traversal not allowed for '%s' (resolved to: %s)", path, absPath), types.ErrTypeSecurity)
+		return errors.Validationf("path_utils", "path traversal not allowed for '%s' (resolved to: %s)", path, absPath)
 	}
 
 	// Check if path exists
 	if _, err := os.Stat(absPath); err != nil {
 		if os.IsNotExist(err) {
-			return types.NewRichError("INVALID_ARGUMENTS", "path does not exist: "+absPath, "validation_error")
+			return errors.Validation("path_utils", "path does not exist: "+absPath)
 		}
-		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to stat path '%s': %v", absPath, err), "filesystem_error")
+		return errors.Wrapf(err, "path_utils", "failed to stat path '%s'", absPath)
 	}
 
 	return nil
@@ -86,20 +85,20 @@ func IsAbsolutePath(path string) bool {
 // EnsureDirectoryExists creates a directory if it doesn't exist
 func EnsureDirectoryExists(dirPath string) error {
 	if dirPath == "" {
-		return types.NewRichError("INVALID_ARGUMENTS", "directory path cannot be empty", "validation_error")
+		return errors.Validation("path_utils", "directory path cannot be empty")
 	}
 
 	// Check if directory already exists
 	if info, err := os.Stat(dirPath); err == nil {
 		if !info.IsDir() {
-			return types.NewRichError("INVALID_ARGUMENTS", fmt.Sprintf("path exists but is not a directory: %s", dirPath), "validation_error")
+			return errors.Validationf("path_utils", "path exists but is not a directory: %s", dirPath)
 		}
 		return nil // Directory already exists
 	}
 
 	// Create directory with proper permissions
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		return types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to create directory '%s': %v", dirPath, err), "filesystem_error")
+		return errors.Wrapf(err, "path_utils", "failed to create directory '%s'", dirPath)
 	}
 
 	return nil
@@ -151,7 +150,7 @@ func IsSubdirectory(parentPath, childPath string) (bool, error) {
 func ListFiles(dirPath string) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to read directory '%s': %v", dirPath, err), "filesystem_error")
+		return nil, errors.Wrapf(err, "path_utils", "failed to read directory '%s'", dirPath)
 	}
 
 	var files []string
@@ -168,7 +167,7 @@ func ListFiles(dirPath string) ([]string, error) {
 func ListDirectories(dirPath string) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to read directory '%s': %v", dirPath, err), "filesystem_error")
+		return nil, errors.Wrapf(err, "path_utils", "failed to read directory '%s'", dirPath)
 	}
 
 	var dirs []string
@@ -185,7 +184,7 @@ func ListDirectories(dirPath string) ([]string, error) {
 func GetFileSize(filePath string) (int64, error) {
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return 0, types.NewRichError("INTERNAL_SERVER_ERROR", fmt.Sprintf("failed to stat file '%s': %v", filePath, err), "filesystem_error")
+		return 0, errors.Wrapf(err, "path_utils", "failed to stat file '%s'", filePath)
 	}
 
 	return info.Size(), nil

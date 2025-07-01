@@ -3,6 +3,7 @@ package conversation
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	obs "github.com/Azure/container-kit/pkg/mcp/internal/observability"
@@ -84,12 +85,64 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 		Artifacts: make(map[string]Artifact),
 	}
 
-	// Restore context from session if available
+	// Restore context and history from session if available
 	if internalSession.Metadata != nil {
+		// Restore conversation context
 		if repoAnalysis, ok := internalSession.Metadata["repo_analysis"].(map[string]interface{}); ok {
 			if ctx, ok := repoAnalysis["_context"].(map[string]interface{}); ok {
 				convState.Context = ctx
 			}
+		}
+
+		// Restore conversation history
+		if history, ok := internalSession.Metadata["conversation_history"].([]interface{}); ok {
+			for _, turnData := range history {
+				if turnMap, ok := turnData.(map[string]interface{}); ok {
+					turn := ConversationTurn{
+						ID:        fmt.Sprintf("%v", turnMap["id"]),
+						UserInput: fmt.Sprintf("%v", turnMap["user_input"]),
+						Assistant: fmt.Sprintf("%v", turnMap["assistant"]),
+					}
+
+					// Parse stage
+					if stage, ok := turnMap["stage"].(string); ok {
+						turn.Stage = core.ConversationStage(stage)
+					}
+
+					// Parse timestamp
+					if ts, ok := turnMap["timestamp"].(string); ok {
+						turn.Timestamp, _ = time.Parse(time.RFC3339, ts)
+					}
+
+					// Parse tool calls
+					if toolCallsData, ok := turnMap["tool_calls"].([]interface{}); ok {
+						for _, tcData := range toolCallsData {
+							if tcMap, ok := tcData.(map[string]interface{}); ok {
+								tc := ToolCall{
+									Tool: fmt.Sprintf("%v", tcMap["tool"]),
+								}
+								if params, ok := tcMap["parameters"].(map[string]interface{}); ok {
+									tc.Parameters = params
+								}
+								if result := tcMap["result"]; result != nil {
+									tc.Result = result
+								}
+								if duration, ok := tcMap["duration"].(float64); ok {
+									tc.Duration = time.Duration(duration) * time.Millisecond
+								}
+								turn.ToolCalls = append(turn.ToolCalls, tc)
+							}
+						}
+					}
+
+					convState.History = append(convState.History, turn)
+				}
+			}
+		}
+
+		// Restore current stage from metadata if available
+		if stage, ok := internalSession.Metadata["current_stage"].(string); ok {
+			convState.CurrentStage = core.ConversationStage(stage)
 		}
 	}
 
@@ -173,9 +226,12 @@ func (pm *PromptManager) ProcessPrompt(ctx context.Context, sessionID, userInput
 
 	// Update session
 	err = pm.sessionManager.UpdateSession(sessionID, func(s interface{}) {
-		if sess, ok := s.(*core.SessionState); ok {
-			sess.CurrentStage = string(response.Stage)
-			sess.Status = string(response.Status)
+		if sess, ok := s.(*session.SessionState); ok {
+			if sess.Metadata == nil {
+				sess.Metadata = make(map[string]interface{})
+			}
+			sess.Metadata["current_stage"] = string(response.Stage)
+			sess.Metadata["current_status"] = string(response.Status)
 		}
 	})
 	if err != nil {

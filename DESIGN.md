@@ -55,15 +55,15 @@ Enable developers to containerize applications effortlessly through AI-guided au
 │  │ │ Tools       │ │              │ │ Stages          │ │   │
 │  │ └─────────────┘ │              │ └─────────────────┘ │   │
 │  │ ┌─────────────┐ │              │                     │   │
-│  │ │ Conversation│ │              │                     │   │
-│  │ │ Mode        │ │              │                     │   │
+│  │ │ Chat &      │ │              │                     │   │
+│  │ │ Workflow    │ │              │                     │   │
 │  │ └─────────────┘ │              │                     │   │
 │  └─────────────────┘              └─────────────────────┘   │
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
-│                 Unified Interface Layer                     │
+│              Unified Server Architecture                    │
 ├─────────────────────────────────────────────────────────────┤
-│  Session Mgmt │ Tool Registry │ Error Handling │ Security   │
+│  Session │ Registry │ Orchestration │ Observability │ Retry│
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -150,12 +150,17 @@ The system prioritizes safety and recoverability:
 - **Server Core** (`internal/core/`): Lifecycle management and protocol handling
 - **Transport Layer** (`internal/transport/`): stdio and HTTP communication
 - **Tool Orchestration** (`internal/orchestration/`): Tool dispatch and execution
-- **Session Management** (`internal/session/`): State persistence and recovery
+- **Session Management** (`internal/session/`): State persistence and recovery with label support
+- **Workflow Engine** (`internal/workflow/`): Complex multi-tool workflow orchestration
+- **Observability** (`internal/observability/`): Prometheus metrics and OpenTelemetry tracing
+- **Context Management** (`internal/context/`): AI context aggregation and caching
 
 **Design Decisions**:
 - Modular transport system allows multiple communication protocols
 - Stateless tool design with external session management
 - Event-driven architecture for scalability
+- Unified server supporting both chat and workflow modes
+- Built-in observability for production monitoring
 
 ### 2. Tool Domains
 
@@ -173,12 +178,12 @@ The system prioritizes safety and recoverability:
 **Purpose**: Container image operations
 
 **Tools**:
-- `build_image_atomic`: Docker image building with fixing
+- `build_image_atomic`: Docker image building with AI-driven fixing
 - `tag_image_atomic`: Image tagging operations
 - `push_image_atomic`: Registry push operations
 - `pull_image_atomic`: Registry pull operations
 
-**Design Pattern**: External system integration with retry logic
+**Design Pattern**: External system integration with retry logic and circuit breakers
 
 #### Deploy Domain (`pkg/mcp/internal/deploy/`)
 **Purpose**: Kubernetes deployment and management
@@ -194,10 +199,28 @@ The system prioritizes safety and recoverability:
 **Purpose**: Security analysis and vulnerability detection
 
 **Tools**:
-- `scan_image_security_atomic`: Vulnerability scanning
+- `scan_image_security_atomic`: Vulnerability scanning with Trivy/Grype
 - `scan_secrets_atomic`: Secret detection and remediation
 
 **Design Pattern**: Analysis operations with severity classification
+
+#### Conversation Domain (`pkg/mcp/internal/conversation/`)
+**Purpose**: Guided workflow management through conversational interface
+
+**Tools**:
+- `chat`: AI-guided containerization workflows
+
+**Design Pattern**: Stateless prompt management with stage-based routing
+
+#### Session Domain (`pkg/mcp/internal/session/`)
+**Purpose**: Session lifecycle and state management
+
+**Tools**:
+- `list_sessions`: View all active sessions
+- `delete_session`: Clean up sessions and workspaces
+- `manage_session_labels`: Add, remove, and list session labels
+
+**Design Pattern**: BoltDB-backed persistence with label-based organization
 
 ### 3. Interface System
 
@@ -216,17 +239,20 @@ type Tool interface {
 - Metadata-driven discovery enables dynamic tool registration
 - Validation separation allows early error detection
 
-#### Dual Interface Strategy
-To prevent import cycles while maintaining interface consistency:
+#### Unified Interface Strategy
+All interfaces are centralized in a single location:
 
-**Public Interfaces** (`pkg/mcp/interfaces.go`):
-- Used by external tools and consumers
+**Core Interfaces** (`pkg/mcp/core/interfaces.go`):
+- Single source of truth for all interface definitions
+- Used by both internal and external components
 - Complete feature set with rich metadata
+- No separate internal interfaces needed
 
-**Internal Interfaces** (`pkg/mcp/types/interfaces.go`):
-- Lightweight versions for internal packages
-- Identical method signatures for compatibility
-- Prevents circular import dependencies
+**Benefits**:
+- Eliminates interface duplication
+- Simplifies maintenance
+- Clear import hierarchy
+- Consistent API surface
 
 ### 4. Auto-Registration System
 
@@ -246,7 +272,7 @@ To prevent import cycles while maintaining interface consistency:
 
 ### 5. Session Management
 
-**Architecture**: Persistent sessions with workspace isolation
+**Architecture**: Persistent sessions with workspace isolation and label management
 
 **Storage**: BoltDB for lightweight, embedded persistence
 
@@ -254,9 +280,50 @@ To prevent import cycles while maintaining interface consistency:
 - Automatic session creation and cleanup
 - Cross-tool state sharing
 - Workspace file management
-- Session metadata and labeling
+- Session metadata and flexible labeling system
+- Label-based session organization and filtering
+- Session state synchronization across tools
 
 **Design Choice**: Embedded database reduces deployment complexity while providing ACID guarantees
+
+### 6. Supporting Infrastructure
+
+#### Configuration Management (`pkg/mcp/internal/config/`)
+**Purpose**: Centralized configuration handling
+- Environment variable management
+- Configuration validation
+- Default value provisioning
+
+#### Error Handling (`pkg/mcp/internal/errors/`)
+**Purpose**: Structured error management
+- Rich error types with recovery suggestions
+- Error classification and categorization
+- AI-friendly error formatting
+
+#### Monitoring (`pkg/mcp/internal/monitoring/`)
+**Purpose**: Health and status tracking
+- Server health checks
+- Resource usage monitoring
+- Tool execution metrics
+
+#### Registry Providers (`pkg/mcp/internal/registry/`)
+**Purpose**: Container registry integrations
+- AWS ECR support
+- Azure Container Registry support
+- Generic registry interface
+
+#### Retry Coordination (`pkg/mcp/internal/retry/`)
+**Purpose**: Intelligent retry mechanisms
+- Circuit breaker implementation
+- Fix provider coordination
+- Exponential backoff strategies
+
+#### Utilities (`pkg/mcp/internal/utils/`)
+**Purpose**: Common functionality
+- Security validation
+- Path handling
+- String manipulation
+- Type conversions
 
 ## Interface Design
 

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/runtime"
 	"github.com/rs/zerolog"
 )
 
@@ -187,7 +186,7 @@ func (a *ErrorAggregator) GetSummary() ErrorSummary {
 	for _, record := range a.errors {
 		summary.ByTool[record.Context.Tool]++
 
-		if toolErr, ok := record.Error.(*runtime.ToolError); ok {
+		if toolErr, ok := record.Error.(*errors.ToolError); ok {
 			summary.BySeverity[string(toolErr.Severity)]++
 			summary.ByType[string(toolErr.Type)]++
 		} else {
@@ -281,17 +280,17 @@ func NewLoggingErrorHandler(logger zerolog.Logger) *LoggingErrorHandler {
 }
 
 func (h *LoggingErrorHandler) Handle(ctx context.Context, err error, context ErrorContext) error {
-	if toolErr, ok := err.(*runtime.ToolError); ok {
+	if toolErr, ok := err.(*errors.ToolError); ok {
 		event := h.logger.Error()
 
 		switch toolErr.Severity {
-		case runtime.SeverityCritical:
+		case errors.SeverityCritical:
 			event = h.logger.Error()
-		case runtime.SeverityHigh:
+		case errors.SeverityHigh:
 			event = h.logger.Error()
-		case runtime.SeverityMedium:
+		case errors.SeverityMedium:
 			event = h.logger.Warn()
-		case runtime.SeverityLow:
+		case errors.SeverityLow:
 			event = h.logger.Info()
 		}
 
@@ -318,13 +317,13 @@ func (h *LoggingErrorHandler) Handle(ctx context.Context, err error, context Err
 
 type RetryableErrorHandler struct {
 	logger  zerolog.Logger
-	handler *runtime.ErrorHandler
+	handler *errors.ErrorHandler
 }
 
 func NewRetryableErrorHandler(logger zerolog.Logger) *RetryableErrorHandler {
 	return &RetryableErrorHandler{
 		logger:  logger.With().Str("handler", "retryable").Logger(),
-		handler: runtime.NewErrorHandler(logger),
+		handler: errors.NewErrorHandler(logger),
 	}
 }
 

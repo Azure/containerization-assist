@@ -14,12 +14,12 @@ import (
 // Implementation of all tool execution methods for NoReflectToolOrchestrator
 
 func (o *NoReflectToolOrchestrator) executeBuildImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
 	// Create tool instance
-	tool := o.toolFactory.CreateBuildImageTool()
+	tool := CreateBuildImageTool(o.toolDependencies)
 
 	// Build typed arguments
 	args := build.AtomicBuildImageArgs{}
@@ -77,11 +77,11 @@ func (o *NoReflectToolOrchestrator) executeBuildImage(ctx context.Context, argsM
 }
 
 func (o *NoReflectToolOrchestrator) executePushImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreatePushImageTool()
+	tool := CreatePushImageTool(o.toolDependencies)
 	args := build.AtomicPushImageArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -116,11 +116,11 @@ func (o *NoReflectToolOrchestrator) executePushImage(ctx context.Context, argsMa
 }
 
 func (o *NoReflectToolOrchestrator) executePullImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreatePullImageTool()
+	tool := CreatePullImageTool(o.toolDependencies)
 	args := build.AtomicPullImageArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -151,11 +151,11 @@ func (o *NoReflectToolOrchestrator) executePullImage(ctx context.Context, argsMa
 }
 
 func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateTagImageTool()
+	tool := CreateTagImageTool(o.toolDependencies)
 	args := build.AtomicTagImageArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -190,11 +190,11 @@ func (o *NoReflectToolOrchestrator) executeTagImage(ctx context.Context, argsMap
 }
 
 func (o *NoReflectToolOrchestrator) executeScanImageSecurity(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateScanImageSecurityTool()
+	tool := CreateScanImageSecurityTool(o.toolDependencies)
 	args := scan.AtomicScanImageSecurityArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -247,11 +247,11 @@ func (o *NoReflectToolOrchestrator) executeScanImageSecurity(ctx context.Context
 }
 
 func (o *NoReflectToolOrchestrator) executeScanSecrets(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateScanSecretsTool()
+	tool := CreateScanSecretsTool(o.toolDependencies)
 	args := scan.AtomicScanSecretsArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -306,11 +306,11 @@ func (o *NoReflectToolOrchestrator) executeScanSecrets(ctx context.Context, args
 }
 
 func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateGenerateManifestsTool()
+	tool := CreateGenerateManifestsTool(o.toolDependencies)
 	args := deploy.AtomicGenerateManifestsArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -381,11 +381,11 @@ func (o *NoReflectToolOrchestrator) executeGenerateManifests(ctx context.Context
 }
 
 func (o *NoReflectToolOrchestrator) executeDeployKubernetes(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateDeployKubernetesTool()
+	tool := CreateDeployKubernetesTool(o.toolDependencies)
 	args := deploy.AtomicDeployKubernetesArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -467,11 +467,11 @@ func (o *NoReflectToolOrchestrator) executeDeployKubernetes(ctx context.Context,
 }
 
 func (o *NoReflectToolOrchestrator) executeCheckHealth(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateCheckHealthTool()
+	tool := CreateCheckHealthTool(o.toolDependencies)
 	args := deploy.AtomicCheckHealthArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -524,11 +524,11 @@ func (o *NoReflectToolOrchestrator) executeCheckHealth(ctx context.Context, args
 }
 
 func (o *NoReflectToolOrchestrator) executeGenerateDockerfile(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateGenerateDockerfileTool()
+	tool := CreateGenerateDockerfileTool(o.toolDependencies)
 	args := analyze.GenerateDockerfileArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -568,11 +568,11 @@ func (o *NoReflectToolOrchestrator) executeGenerateDockerfile(ctx context.Contex
 }
 
 func (o *NoReflectToolOrchestrator) executeValidateDockerfile(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
-	tool := o.toolFactory.CreateValidateDockerfileTool()
+	tool := CreateValidateDockerfileTool(o.toolDependencies)
 	args := analyze.AtomicValidateDockerfileArgs{}
 
 	// Extract optional session_id - will be auto-generated if not provided
@@ -635,12 +635,12 @@ func (o *NoReflectToolOrchestrator) executeValidateDockerfile(ctx context.Contex
 }
 
 func (o *NoReflectToolOrchestrator) executeValidateDeployment(ctx context.Context, argsMap map[string]interface{}) (interface{}, error) {
-	if o.toolFactory == nil {
-		return nil, fmt.Errorf("tool factory not initialized")
+	if o.toolDependencies == nil {
+		return nil, fmt.Errorf("tool dependencies not initialized")
 	}
 
 	// Create tool instance
-	tool := o.toolFactory.CreateValidateDeploymentTool()
+	tool := CreateValidateDeploymentTool(o.toolDependencies)
 
 	// Build typed arguments
 	args := deploy.ValidateDeploymentArgs{}

@@ -81,14 +81,25 @@ jobs:
       run: |
         echo "🎨 Checking formatting..."
         if [ "${{ github.event_name }}" = "pull_request" ]; then
-          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
+          # Get changed files (excluding deleted files)
+          changed_files=$(git diff --name-only --diff-filter=ACMRTUXB origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
           if [ -n "$changed_files" ]; then
-            unformatted=$(gofmt -l $changed_files)
-            if [ -n "$unformatted" ]; then
-              echo "❌ Formatting issues in:"
-              echo "$unformatted"
-              echo "success=false" >> $GITHUB_OUTPUT
-              exit 1
+            # Filter out files that don't exist (extra safety check)
+            existing_files=""
+            for file in $changed_files; do
+              if [ -f "$file" ]; then
+                existing_files="$existing_files $file"
+              fi
+            done
+            
+            if [ -n "$existing_files" ]; then
+              unformatted=$(gofmt -l $existing_files)
+              if [ -n "$unformatted" ]; then
+                echo "❌ Formatting issues in:"
+                echo "$unformatted"
+                echo "success=false" >> $GITHUB_OUTPUT
+                exit 1
+              fi
             fi
           fi
         else
@@ -226,7 +237,7 @@ jobs:
       with:
         artifact-name: security-reports-${{ github.run_id }}
 
-  # Phase 6: Quality Gates (after coverage and security) 
+  # Phase 6: Quality Gates (after coverage and security)
   quality-gates:
     name: Quality Gate Checks
     runs-on: ubuntu-latest

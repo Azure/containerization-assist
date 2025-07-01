@@ -67,11 +67,11 @@ runs:
         if [ "${{ inputs.test-scenario }}" != "basic" ]; then
           TEST_WORKSPACE="${{ inputs.test-workspace }}-${{ inputs.test-scenario }}"
         fi
-        
+
         mkdir -p "$TEST_WORKSPACE"
         echo "CONTAINER_KIT_TEST_WORKSPACE=$TEST_WORKSPACE" >> $GITHUB_ENV
         echo "CONTAINER_KIT_LOG_LEVEL=${{ inputs.log-level }}" >> $GITHUB_ENV
-        
+
         echo "📁 Test workspace: $TEST_WORKSPACE"
         echo "📊 Log level: ${{ inputs.log-level }}"
 
@@ -103,11 +103,11 @@ runs:
       shell: bash
       run: |
         echo "🧪 Running MCP integration tests..."
-        
+
         # Set test environment variables
         export CONTAINER_KIT_TEST_WORKSPACE="$CONTAINER_KIT_TEST_WORKSPACE"
         export CONTAINER_KIT_LOG_LEVEL="$CONTAINER_KIT_LOG_LEVEL"
-        
+
         echo "🏗️ Test workspace: $CONTAINER_KIT_TEST_WORKSPACE"
         echo "📊 Log level: $CONTAINER_KIT_LOG_LEVEL"
 
@@ -120,7 +120,7 @@ runs:
       shell: bash
       run: |
         echo "🧪 Running MCP workflow integration test for: ${{ inputs.test-scenario }}"
-        
+
         export CONTAINER_KIT_LOG_LEVEL="$CONTAINER_KIT_LOG_LEVEL"
 
         if [ "${{ inputs.test-scenario }}" = "simple-go-service" ]; then
@@ -142,7 +142,7 @@ runs:
       run: |
         # This is a simplified result collection
         # In a real implementation, you'd parse go test output for detailed metrics
-        
+
         if [ -f "$CONTAINER_KIT_TEST_WORKSPACE/test-results.json" ]; then
           TESTS_RUN=$(jq -r '.tests_run // "unknown"' "$CONTAINER_KIT_TEST_WORKSPACE/test-results.json")
           TESTS_PASSED=$(jq -r '.tests_passed // "unknown"' "$CONTAINER_KIT_TEST_WORKSPACE/test-results.json")
@@ -153,11 +153,11 @@ runs:
           TESTS_PASSED="unknown"
           TEST_RESULT="pass"
         fi
-        
+
         echo "tests-run=$TESTS_RUN" >> $GITHUB_OUTPUT
         echo "tests-passed=$TESTS_PASSED" >> $GITHUB_OUTPUT
         echo "test-result=$TEST_RESULT" >> $GITHUB_OUTPUT
-        
+
         echo "📊 MCP Integration Test Summary:"
         echo "  - Tests run: $TESTS_RUN"
         echo "  - Tests passed: $TESTS_PASSED"

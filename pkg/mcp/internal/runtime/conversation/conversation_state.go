@@ -129,6 +129,50 @@ func (cs *ConversationState) AddConversationTurn(turn ConversationTurn) {
 	turn.Timestamp = time.Now()
 	cs.History = append(cs.History, turn)
 	cs.SessionState.LastAccessed = time.Now()
+
+	// Also persist to session metadata for retrieval across invocations
+	if cs.SessionState.Metadata == nil {
+		cs.SessionState.Metadata = make(map[string]interface{})
+	}
+
+	// Convert history to a format that can be persisted
+	historyData := make([]map[string]interface{}, 0, len(cs.History))
+	for _, t := range cs.History {
+		turnData := map[string]interface{}{
+			"id":         t.ID,
+			"timestamp":  t.Timestamp,
+			"user_input": t.UserInput,
+			"assistant":  t.Assistant,
+			"stage":      string(t.Stage),
+		}
+
+		if len(t.ToolCalls) > 0 {
+			toolCallsData := make([]map[string]interface{}, 0, len(t.ToolCalls))
+			for _, tc := range t.ToolCalls {
+				tcData := map[string]interface{}{
+					"tool":       tc.Tool,
+					"parameters": tc.Parameters,
+					"duration":   tc.Duration.Milliseconds(),
+				}
+				if tc.Result != nil {
+					tcData["result"] = tc.Result
+				}
+				if tc.Error != nil {
+					tcData["error"] = map[string]interface{}{
+						"type":      tc.Error.Type,
+						"message":   tc.Error.Message,
+						"retryable": tc.Error.Retryable,
+					}
+				}
+				toolCallsData = append(toolCallsData, tcData)
+			}
+			turnData["tool_calls"] = toolCallsData
+		}
+
+		historyData = append(historyData, turnData)
+	}
+
+	cs.SessionState.Metadata["conversation_history"] = historyData
 }
 
 // SetStage updates the current conversation stage

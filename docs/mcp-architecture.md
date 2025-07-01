@@ -43,7 +43,7 @@ The original CLI uses a three-stage iterative pipeline for direct execution.
 
 ### Core Interfaces
 
-All core interfaces are defined in `pkg/mcp/interfaces.go` as the single source of truth:
+All core interfaces are defined in `pkg/mcp/core/interfaces.go` as the single source of truth:
 
 ```go
 // Unified Tool interface for all tools
@@ -77,30 +77,19 @@ type Orchestrator interface {
 }
 ```
 
-### Internal Interface Strategy
+### Unified Interface Strategy
 
-To prevent import cycles between `pkg/mcp` and internal packages, lightweight "Internal" prefixed interfaces are maintained in `pkg/mcp/types/interfaces.go`:
+The codebase uses a unified interface approach where all interfaces are centralized in `pkg/mcp/core/interfaces.go`. This eliminates the need for separate internal interfaces:
 
 ```go
-// Internal lightweight interfaces for avoiding import cycles
-type InternalTool interface {
-    Execute(ctx context.Context, args interface{}) (interface{}, error)
-    GetMetadata() ToolMetadata
-    Validate(ctx context.Context, args interface{}) error
-}
-
-type InternalTransport interface {
-    Serve(ctx context.Context) error
-    Stop() error
-    Name() string
-    SetHandler(handler InternalRequestHandler)
-}
+// All interfaces are defined in pkg/mcp/core/interfaces.go
+// No separate internal interfaces needed
 ```
 
-This dual-interface strategy ensures:
-- **Single source of truth**: Main interfaces in `pkg/mcp/interfaces.go`
-- **No import cycles**: Internal packages use lightweight versions
-- **Type compatibility**: Both interfaces have identical method signatures
+This unified strategy ensures:
+- **Single source of truth**: All interfaces in `pkg/mcp/core/interfaces.go`
+- **No import cycles**: Clean import hierarchy with core package at the center
+- **Simplified maintenance**: No interface duplication
 - **Build success**: Clean compilation without circular dependencies
 
 ## System Architecture
@@ -109,27 +98,41 @@ This dual-interface strategy ensures:
 
 ```
 pkg/mcp/
-├── interfaces.go           # Unified public interfaces
-├── server.go              # Main MCP server
+├── core/
+│   └── interfaces.go      # All unified interfaces
 ├── internal/
 │   ├── core/              # Server lifecycle & management
 │   ├── transport/         # Transport implementations (stdio, http)
-│   ├── session/           # Session management
+│   ├── session/           # Session management with labels
 │   ├── orchestration/     # Tool orchestration & dispatch
-│   ├── build/             # Build domain tools
-│   ├── deploy/            # Deployment domain tools
-│   ├── scan/              # Security scanning tools
-│   ├── analyze/           # Analysis tools
-│   └── types/
-│       └── interfaces.go  # Internal lightweight interfaces
+│   ├── analyze/           # Repository analysis & Dockerfile generation
+│   ├── build/             # Docker operations (build, push, pull, tag)
+│   ├── deploy/            # Kubernetes deployment & management
+│   ├── scan/              # Security scanning (Trivy/Grype)
+│   ├── conversation/      # Chat tool & guided workflows
+│   ├── workflow/          # Multi-tool workflow orchestration
+│   ├── observability/     # Prometheus metrics & OpenTelemetry
+│   ├── context/           # AI context aggregation & caching
+│   ├── config/            # Configuration management
+│   ├── customizer/        # Docker/K8s customization helpers
+│   ├── errors/            # Structured error handling
+│   ├── monitoring/        # Health checks & metrics
+│   ├── pipeline/          # Pipeline operations
+│   ├── registry/          # Container registry providers (AWS ECR, Azure)
+│   ├── retry/             # Circuit breakers & retry coordination
+│   ├── runtime/           # Tool registration & validation
+│   ├── server/            # Unified server implementation
+│   ├── state/             # State management & synchronization
+│   ├── types/             # Common types & constants
+│   └── utils/             # Security validation & utilities
 ```
 
 ### Interface Implementation Flow
 
-1. **Tool Implementation**: Tools implement either the main `Tool` interface or `InternalTool` interface depending on their location
-2. **Registration**: Tools register with the orchestrator using the unified registration system
-3. **Execution**: Tool execution flows through the orchestrator which handles the interface conversions
-4. **Transport**: Communication flows through transport adapters that bridge internal and public interfaces
+1. **Tool Implementation**: All tools implement the unified `Tool` interface from `pkg/mcp/core/interfaces.go`
+2. **Auto-Registration**: Tools automatically register via naming convention (e.g., `AnalyzeRepositoryAtomicTool` → `analyze_repository_atomic`)
+3. **Execution**: Tool execution flows through the orchestrator with direct interface calls
+4. **Transport**: Communication flows through transport adapters implementing the unified interfaces
 
 ### Key Components
 
@@ -147,15 +150,18 @@ pkg/mcp/
 
 #### Tool Orchestration (`pkg/mcp/internal/orchestration/`)
 - **Dispatcher**: Type-safe tool dispatch without reflection
-- **Orchestrator**: Main orchestration logic
-- **Registry**: Tool registration and metadata management
-- Handles conversion between internal and public interfaces
+- **Orchestrator**: Main orchestration logic with workflow support
+- **Registry**: Automatic tool registration via code generation
+- **Workflow Engine**: Multi-tool workflow coordination
+- Direct interface calls without conversion overhead
 
 #### Session Management (`pkg/mcp/internal/session/`)
-- Session lifecycle management
+- Session lifecycle management with BoltDB persistence
 - State persistence and recovery
 - Session cleanup and garbage collection
 - Workspace management
+- Label-based session organization
+- Session metadata and filtering
 
 ### Domain-Specific Interfaces
 
@@ -199,9 +205,10 @@ type RuntimeAnalyzer interface {
 - Orchestration layer supports middleware and interceptors
 
 ### Compatibility Guidelines
-- Internal interfaces must maintain method signature compatibility with public interfaces
+- All interfaces use the unified definitions in `pkg/mcp/core/interfaces.go`
 - New methods should be added with sensible defaults or optional parameters
 - Interface contracts should be thoroughly documented with examples
+- Auto-registration ensures new tools are discovered automatically
 
 ## Benefits of This Architecture
 
@@ -262,5 +269,42 @@ func (t *CustomTransport) Stop() error {
     // cleanup logic
 }
 ```
+
+## Key Architectural Patterns
+
+### Auto-Registration System
+Tools are automatically discovered and registered at build time:
+- Naming convention: `StructNameTool` → `struct_name`
+- Code generation creates registration in `pkg/mcp/internal/registry/generated.go`
+- Zero manual registration required
+- Compile-time validation of tool implementations
+
+### Unified Server Architecture
+Single server implementation supporting multiple modes:
+- **Chat Mode**: Conversational workflows via `chat` tool
+- **Workflow Mode**: Multi-tool orchestration
+- **Atomic Mode**: Direct tool execution
+- Seamless mode switching based on tool selection
+
+### Observability Integration
+Built-in production-grade monitoring:
+- **Prometheus Metrics**: Tool execution, latency, errors
+- **OpenTelemetry Tracing**: Distributed request tracing
+- **Structured Logging**: Contextual log aggregation
+- **Health Endpoints**: Liveness and readiness probes
+
+### AI Context Management
+Intelligent context handling for AI assistants:
+- **Context Aggregation**: Combines relevant information
+- **Caching Layer**: Reduces redundant operations
+- **Token Optimization**: Manages context window efficiently
+- **Semantic Pruning**: Removes irrelevant context
+
+### Resilience Patterns
+Production-ready error handling:
+- **Circuit Breakers**: Prevent cascading failures
+- **Retry Coordination**: Intelligent retry with backoff
+- **Fix Providers**: AI-driven error remediation
+- **Graceful Degradation**: Partial functionality on failures
 
 This architecture provides a robust, scalable foundation for the MCP system while maintaining clean interfaces and preventing common Go architectural pitfalls like import cycles.

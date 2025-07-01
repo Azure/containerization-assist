@@ -28,11 +28,13 @@ The MCP server eliminates the need for external API keys by leveraging the calli
 
 ### Core Components
 
-- **MCP Server** (`pkg/mcp/core/server.go`) - Main server handling MCP protocol
-- **Tool Registry** (`pkg/mcp/tools/`) - Collection of atomic containerization tools
-- **Conversation Engine** (`pkg/mcp/engine/conversation/`) - Guided workflow management
-- **Session Management** (`pkg/mcp/store/session/`) - Persistent session state
-- **Transport Layer** (`pkg/mcp/transport/`) - Communication protocols (stdio, HTTP)
+- **MCP Server** (`pkg/mcp/internal/core/server.go`) - Main server handling MCP protocol
+- **Tool Registry** (`pkg/mcp/internal/runtime/`) - Automatic tool registration and discovery
+- **Conversation Engine** (`pkg/mcp/internal/conversation/`) - Guided workflow management
+- **Session Management** (`pkg/mcp/internal/session/`) - Persistent session state with label support
+- **Transport Layer** (`pkg/mcp/internal/transport/`) - Communication protocols (stdio, HTTP)
+- **Workflow Engine** (`pkg/mcp/internal/workflow/`) - Multi-tool workflow orchestration
+- **Observability** (`pkg/mcp/internal/observability/`) - Metrics and distributed tracing
 
 ### Operation Modes
 
@@ -310,6 +312,7 @@ Lists all active MCP sessions.
 **Returns:**
 - Array of session information
 - Session states and timestamps
+- Associated labels for each session
 
 #### `delete_session`
 Deletes a session and its workspace.
@@ -319,6 +322,24 @@ Deletes a session and its workspace.
 
 **Returns:**
 - Deletion confirmation
+
+#### `manage_session_labels`
+Manage labels for session organization and filtering.
+
+**Sub-commands:**
+- `add_session_label`: Add a label to a session
+  - `session_id` (string) - Session ID
+  - `key` (string) - Label key
+  - `value` (string) - Label value
+- `remove_session_label`: Remove a label from a session
+  - `session_id` (string) - Session ID
+  - `key` (string) - Label key to remove
+- `list_session_labels`: List all labels for a session
+  - `session_id` (string) - Session ID
+
+**Returns:**
+- Updated label information
+- Operation confirmation
 
 ### Monitoring and Observability Tools
 
@@ -424,9 +445,12 @@ See [docs/LINTING.md](docs/LINTING.md) for our quality strategy.
 
 ### Performance Considerations
 - Session persistence uses BoltDB for lightweight storage
-- Tool registration is performed at startup for optimal performance
+- Tool registration is automatic via build-time code generation
 - HTTP transport supports concurrent connections
 - Memory usage scales with active session count
+- Circuit breaker patterns prevent cascading failures
+- AI context caching reduces redundant operations
+- Distributed tracing enables performance monitoring
 
 ## Advanced Configuration
 
@@ -434,6 +458,9 @@ See [docs/LINTING.md](docs/LINTING.md) for our quality strategy.
 - `CONTAINER_KIT_LOG_LEVEL`: Set logging level (debug, info, warn, error)
 - `CONTAINER_KIT_SESSION_DIR`: Custom session storage directory
 - `CONTAINER_KIT_METRICS_PORT`: Metrics server port (default: 8080)
+- `CONTAINER_KIT_TRACE_ENABLED`: Enable OpenTelemetry tracing
+- `CONTAINER_KIT_TRACE_ENDPOINT`: OpenTelemetry collector endpoint
+- `CONTAINER_KIT_REGISTRY_PROVIDER`: Default registry provider (aws-ecr, azure, generic)
 
 ### Transport Configuration
 #### stdio Transport (Default)
@@ -454,6 +481,14 @@ Sessions are automatically created and persisted. You can manage them using:
 
 For detailed development information, see:
 - [Architecture Guide](docs/mcp-architecture.md) - Technical system design
-- [Tool Development Guide](docs/adding-new-tools.md) - Creating new tools
+- [Tool Development Guide](docs/adding-new-tools.md) - Creating new tools with auto-registration
 - [Contributing Guide](CONTRIBUTING.md) - Development workflow
 - [Development Guidelines](DEVELOPMENT_GUIDELINES.md) - Coding standards
+- [Design Document](DESIGN.md) - Comprehensive architectural design
+
+### Key Development Features
+- **Auto-Registration**: Tools automatically register via naming convention
+- **Unified Server**: Single server supporting multiple operation modes
+- **Built-in Observability**: Prometheus metrics and OpenTelemetry tracing
+- **AI Context Management**: Intelligent context caching and aggregation
+- **Registry Providers**: Extensible support for container registries
