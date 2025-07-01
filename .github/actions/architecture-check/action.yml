@@ -141,10 +141,13 @@ runs:
 
         if [ "$COMPLEX_FUNCTIONS" -gt 0 ]; then
           echo "High complexity functions (showing first 5):"
-          ~/go/bin/gocyclo -over $COMPLEXITY_THRESHOLD ${{ inputs.path }} | head -5
+          # Capture output to avoid SIGPIPE issues
+          ~/go/bin/gocyclo -over $COMPLEXITY_THRESHOLD ${{ inputs.path }} > /tmp/complexity_output.txt 2>/dev/null || true
+          head -5 /tmp/complexity_output.txt || true
           if [ "$COMPLEX_FUNCTIONS" -gt 5 ]; then
             echo "  ... and $((COMPLEX_FUNCTIONS - 5)) more"
           fi
+          rm -f /tmp/complexity_output.txt
         fi
 
     - name: Calculate architecture score
