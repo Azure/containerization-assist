@@ -24,10 +24,13 @@ inputs:
 outputs:
   run-name:
     description: "Generated run name for this test"
+    value: ${{ steps.run-itegration-test.outputs.random-number }}
   result:
     description: "Test result (success/failure/timeout)"
+    value: ${{ steps.result.outputs.random-number }}
   log-file:
     description: "Path to the test log file"
+    value: ${{ steps.log-file.outputs.random-number }}
 runs:
   using: "composite"
   steps:
@@ -52,6 +55,7 @@ runs:
         install_only: true
 
     - name: Run Integration Test
+      id: run-integration-test
       shell: bash
       env:
         AZURE_OPENAI_KEY: ${{ inputs.azure-openai-key }}
@@ -73,7 +77,9 @@ runs:
 
         # Generate run name
         REPO_NAME_WITHOUT_SLASH=$(echo "${{ inputs.repository }}" | sed 's|/|.|g' )
+      echo "replacing repo slashes with dots: $REPO_NAME_WITHOUT_SLASH"
         RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ inputs.test-number }}"
+        echo "writing run name to gh ouput: $RUN_NAME"
         echo "run-name=$RUN_NAME" >> $GITHUB_OUTPUT
 
         LOG_FILE="artifacts/logs/run-${RUN_NAME}.log"
@@ -112,8 +118,6 @@ runs:
         echo "Test Run $RUN_NAME Result: $result"
         echo "Test Run $RUN_NAME Log File: $LOG_FILE"
         echo "Test Run $RUN_NAME Log File Size: $(du -sh "$LOG_FILE" | cut -f1)"
-        # write run name output
-        echo "run-name=$RUN_NAME" >> "$GITHUB_OUTPUT"
 
         # Save result to file for artifact collection
         echo "writing result to artifacts/result.txt"
