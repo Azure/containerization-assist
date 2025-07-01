@@ -24,13 +24,13 @@ inputs:
 outputs:
   run-name:
     description: "Generated run name for this test"
-    value: ${{ steps.run-integration-test.outputs.random-number }}
+    value: ${{ steps.run-integration-test.outputs.run-name }}
   result:
     description: "Test result (success/failure/timeout)"
-    value: ${{ steps.result.outputs.random-number }}
+    value: ${{ steps.result.outputs.result }}
   log-file:
     description: "Path to the test log file"
-    value: ${{ steps.log-file.outputs.random-number }}
+    value: ${{ steps.log-file.outputs.log-file }}
 runs:
   using: "composite"
   steps:
