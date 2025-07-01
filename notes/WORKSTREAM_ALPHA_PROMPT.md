@@ -5,8 +5,8 @@
 
 You are the **Validation Migration Specialist** responsible for migrating 39+ scattered validation files to a unified validation framework. This is the **foundation workstream** that other workstreams depend on.
 
-**Duration**: Week 1-2 (10 days)  
-**Dependencies**: None (you are the foundation)  
+**Duration**: Week 1-2 (10 days)
+**Dependencies**: None (you are the foundation)
 **Critical Success**: Unified validation system enabling other workstreams
 
 ## 📋 YOUR SPECIFIC RESPONSIBILITIES
@@ -20,7 +20,7 @@ cd pkg/mcp/validation/
 
 # Create missing utility validators:
 touch validators/format.go      # email, URL, JSON, YAML validation
-touch validators/network.go     # IP, port, hostname validation  
+touch validators/network.go     # IP, port, hostname validation
 touch validators/security.go    # secrets, permissions validation
 
 # Create migration tooling:
@@ -40,7 +40,7 @@ go fmt ./pkg/mcp/validation/...
 # - Update all security validation calls
 # - Maintain backward compatibility
 
-# File 2: pkg/mcp/internal/build/syntax_validator.go  
+# File 2: pkg/mcp/internal/build/syntax_validator.go
 # - Replace with unified dockerfile validator
 # - Update syntax validation throughout build package
 # - Ensure all Dockerfile validation works
@@ -67,7 +67,7 @@ go test -short ./pkg/mcp/internal/build/... && echo "✅ Build file X migrated"
 # - Update health validation calls
 # - Test deployment health checks
 
-# File 2: pkg/mcp/internal/deploy/manifest_validator.go  
+# File 2: pkg/mcp/internal/deploy/manifest_validator.go
 # - Create unified manifest validator in validators/kubernetes.go
 # - Update manifest validation throughout deploy package
 # - Ensure K8s validation works
@@ -80,7 +80,7 @@ git add .
 git commit -m "feat(validation): complete build package migration and begin deploy
 
 - Completed foundation utility validators (format, network, security)
-- Migrated 4 build validators to unified framework  
+- Migrated 4 build validators to unified framework
 - Started deploy package migration (health, manifest)
 - Maintained all existing validation functionality
 
@@ -159,7 +159,7 @@ git commit -m "feat(validation): complete unified validation migration
 
 - Migrated all 39+ validation files to unified framework
 - Consolidated 4+ ValidationResult types into 1
-- Removed 30+ duplicate validation utilities  
+- Removed 30+ duplicate validation utilities
 - Updated all import statements across codebase
 - Maintained 100% functionality with unified system
 
@@ -175,8 +175,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ### Must Achieve (100% Required):
 - ✅ **39+ validation files migrated** to unified framework
 - ✅ **4+ ValidationResult types consolidated** into 1 type
-- ✅ **6+ validator interfaces replaced** with unified system  
-- ✅ **30+ duplicate validation files removed** 
+- ✅ **6+ validator interfaces replaced** with unified system
+- ✅ **30+ duplicate validation files removed**
 - ✅ **All tests pass** throughout migration
 - ✅ **Zero breaking changes** to existing functionality
 
@@ -200,7 +200,7 @@ go test -short ./pkg/mcp/... && echo "✅ Ready to work"
 
 # Throughout day after each major change:
 go test -short ./pkg/mcp/internal/build/...     # After build migration
-go test -short ./pkg/mcp/internal/deploy/...    # After deploy migration  
+go test -short ./pkg/mcp/internal/deploy/...    # After deploy migration
 go test -short ./pkg/mcp/internal/scan/...      # After scan migration
 go test -short ./pkg/mcp/internal/runtime/...   # After runtime migration
 
@@ -233,7 +233,7 @@ go test ./... && echo "✅ All systems functional"
 find pkg/mcp -path "*/validation/*" -name "*.go" | wc -l  # Should increase
 
 # Legacy validation files remaining:
-find pkg/mcp -name "*validation*" -not -path "*/validation/*" | wc -l  # Should decrease  
+find pkg/mcp -name "*validation*" -not -path "*/validation/*" | wc -l  # Should decrease
 
 # ValidationResult types remaining:
 rg "type.*ValidationResult" pkg/mcp/ | wc -l  # Should become 1
@@ -248,7 +248,7 @@ WORKSTREAM ALPHA - DAY X SUMMARY
 ================================
 Progress: X% complete (X/39 files migrated)
 Validation files migrated: X
-Legacy files removed: X  
+Legacy files removed: X
 ValidationResult types: X (target: 1)
 
 Files modified today:
@@ -272,7 +272,7 @@ Quality status: All tests passing ✅
 
 ### If Things Go Wrong:
 1. **Compilation fails**: Revert last change, fix imports
-2. **Tests fail**: Check validation logic compatibility  
+2. **Tests fail**: Check validation logic compatibility
 3. **Performance regression**: Review validation efficiency
 4. **Breaking changes**: Add compatibility layer
 
@@ -315,14 +315,14 @@ func NewSecurityValidator() *SecurityValidator {
 func (s *SecurityValidator) Validate(ctx context.Context, data interface{}, options *core.ValidationOptions) *core.ValidationResult {
     // Chain validators based on validation rules
     chain := chains.NewCompositeValidator("security-chain", "1.0.0")
-    
+
     if !options.ShouldSkipRule("secrets") {
         chain.Add(s.secretValidator)
     }
     if !options.ShouldSkipRule("compliance") {
         chain.Add(s.complianceValidator)
     }
-    
+
     return chain.Validate(ctx, data, options)
 }
 ```

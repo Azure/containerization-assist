@@ -74,7 +74,7 @@ pkg/mcp/internal/build/image_validator.go → Consolidate with docker validator
 
 #### 2.2 Deploy Package Migration
 - [ ] **TODO**: Health validation migration
-- [ ] **TODO**: Manifest validation migration 
+- [ ] **TODO**: Manifest validation migration
 - [ ] **TODO**: Deployment validation migration
 - [ ] **TODO**: Kubernetes resource validation
 
@@ -222,14 +222,14 @@ func NewSecurityValidator() *SecurityValidator {
 func (s *SecurityValidator) Validate(ctx context.Context, data interface{}, options *core.ValidationOptions) *core.ValidationResult {
     // Chain security validators based on data type
     chain := chains.NewCompositeValidator("security-chain", "1.0.0")
-    
+
     switch data.(type) {
     case string: // Dockerfile content
         chain.Add(s.dockerfileValidator)
     case map[string]interface{}: // Configuration
         chain.Add(s.secretValidator)
     }
-    
+
     return chain.Validate(ctx, data, options)
 }
 ```
@@ -262,7 +262,7 @@ func NewKubernetesValidator() *KubernetesValidator {
 func (k *KubernetesValidator) Validate(ctx context.Context, data interface{}, options *core.ValidationOptions) *core.ValidationResult {
     // Validate Kubernetes manifests, resources, and health configurations
     chain := chains.NewCompositeValidator("k8s-chain", "1.0.0")
-    
+
     // Add validators based on validation rules enabled
     if !options.ShouldSkipRule("manifest") {
         chain.Add(k.manifestValidator)
@@ -273,7 +273,7 @@ func (k *KubernetesValidator) Validate(ctx context.Context, data interface{}, op
     if !options.ShouldSkipRule("health") {
         chain.Add(k.healthValidator)
     }
-    
+
     return chain.Validate(ctx, data, options)
 }
 ```
@@ -306,7 +306,7 @@ func NewToolManager() *ToolManager {
     chain.Add(validators.NewConfigValidator())
     chain.Add(validators.NewSecurityValidator())
     chain.Add(validators.NewSchemaValidator())
-    
+
     return &ToolManager{
         validator: chain,
         registry:  core.GlobalRegistry,
@@ -316,11 +316,11 @@ func NewToolManager() *ToolManager {
 func (tm *ToolManager) ValidateTool(ctx context.Context, toolConfig interface{}) error {
     options := core.NewValidationOptions().WithStrictMode(true)
     result := tm.validator.Validate(ctx, toolConfig, options)
-    
+
     if !result.Valid {
         return fmt.Errorf("tool validation failed: %s", result.Error())
     }
-    
+
     return nil
 }
 ```
@@ -445,7 +445,7 @@ go test -bench=. ./pkg/mcp/validation/...
 find pkg/mcp/internal/runtime -name "*.go" -exec grep -l "ValidationResult" {} \; | \
 xargs sed -i 's|pkg/mcp/types|pkg/mcp/validation/core|g'
 
-# Update session package  
+# Update session package
 find pkg/mcp/internal/session -name "*.go" -exec grep -l "validation" {} \; | \
 xargs sed -i 's|pkg/mcp/types|pkg/mcp/validation/core|g'
 

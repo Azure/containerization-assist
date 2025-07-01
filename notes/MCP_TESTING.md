@@ -16,7 +16,7 @@ Our recent debugging revealed critical gaps in test coverage that allowed multip
 
 ### What We Have
 - Unit tests for individual tool components
-- Mocked dependencies and interfaces  
+- Mocked dependencies and interfaces
 - Basic server lifecycle tests
 - Session manager functionality tests
 
@@ -44,7 +44,7 @@ type MCPIntegrationTestSuite struct {
 
 func (suite *MCPIntegrationTestSuite) SetupSuite() {
     // Start real MCP server with HTTP transport
-    // Create real gomcp client 
+    // Create real gomcp client
     // Setup test workspace directories
 }
 ```
@@ -72,48 +72,48 @@ func TestToolSchemaIntegration(t *testing.T) {
 ```go
 func TestCompleteContainerizationWorkflow(t *testing.T) {
     client := setupMCPClient(t)
-    
+
     // Step 1: analyze_repository
     analyzeResult := client.CallTool("analyze_repository", map[string]interface{}{
         "repo_url": "https://github.com/example/java-app",
         "branch": "main",
     })
-    
+
     // Validate session_id is returned
     sessionID := analyzeResult["session_id"].(string)
     require.NotEmpty(t, sessionID)
-    
+
     // Step 2: generate_dockerfile with session continuity
     dockerfileResult := client.CallTool("generate_dockerfile", map[string]interface{}{
         "session_id": sessionID,  // Critical: use same session
         "template": "java",
     })
-    
+
     // Validate same session used
     assert.Equal(t, sessionID, dockerfileResult["session_id"])
-    
+
     // Step 3: build_image with session continuity
     buildResult := client.CallTool("build_image", map[string]interface{}{
         "session_id": sessionID,
         "image_name": "test-app",
         "tag": "latest",
     })
-    
+
     // Validate session continuity and state sharing
     assert.Equal(t, sessionID, buildResult["session_id"])
     assert.True(t, buildResult["success"].(bool))
-    
+
     // Validate workspace persistence
     workspace := getSessionWorkspace(t, sessionID)
     assert.FileExists(t, filepath.Join(workspace, "Dockerfile"))
-    
+
     // Step 4: generate_manifests
     manifestResult := client.CallTool("generate_manifests", map[string]interface{}{
         "session_id": sessionID,
         "app_name": "test-app",
         "port": 8080,
     })
-    
+
     // Validate full workflow state
     validateWorkflowCompletion(t, sessionID, manifestResult)
 }
@@ -229,7 +229,7 @@ func TestRealRepositoryIntegration(t *testing.T) {
         {"Python Flask", "https://github.com/pallets/flask", "python", "pip"},
         {"Go Module", "https://github.com/gin-gonic/gin", "go", "go-modules"},
     }
-    
+
     for _, tc := range testCases {
         t.Run(tc.name, func(t *testing.T) {
             // Run complete workflow on real repository
@@ -309,7 +309,7 @@ test: test-unit test-integration
 # Add to .github/workflows/test.yml
 - name: Run Integration Tests
   run: make test-integration
-  
+
 - name: Run E2E Tests (on main branch)
   if: github.ref == 'refs/heads/main'
   run: make test-e2e

@@ -106,7 +106,7 @@ This consolidated checklist coordinates the parallel implementation of both the 
       Tags           []string          `json:"tags,omitempty"`
       NoCache        bool              `json:"no_cache,omitempty"`
   }
-  
+
   func (p *DockerBuildParams) Validate() error { /* implementation */ }
   ```
 - [ ] **Define DockerBuildResult**
@@ -120,13 +120,13 @@ This consolidated checklist coordinates the parallel implementation of both the 
       CacheHits   int           `json:"cache_hits"`
       CacheMisses int           `json:"cache_misses"`
   }
-  
+
   func (r *DockerBuildResult) IsSuccess() bool { return r.Success }
   ```
 - [ ] **Implement DockerBuildTool**
   ```go
   type DockerBuildTool = tools.Tool[DockerBuildParams, DockerBuildResult]
-  
+
   func (t *dockerBuildToolImpl) Execute(ctx context.Context, params DockerBuildParams) (DockerBuildResult, error) {
       // Type-safe implementation with RichError
   }
@@ -243,11 +243,11 @@ This consolidated checklist coordinates the parallel implementation of both the 
       schemas map[string]tools.Schema[TParams, TResult]
       mu      sync.RWMutex
   }
-  
+
   func (r *GenericRegistry[T, TParams, TResult]) Register(name string, tool T) error {
       // Type-safe registration with RichError on conflicts
   }
-  
+
   func (r *GenericRegistry[T, TParams, TResult]) Execute(name string, params TParams) (TResult, error) {
       // Type-safe execution with RichError for failures
   }
@@ -267,7 +267,7 @@ This consolidated checklist coordinates the parallel implementation of both the 
       deployRegistry *DeployRegistry
       scanRegistry   *ScanRegistry
   }
-  
+
   func (f *FederatedRegistry) ExecuteAny(toolType string, name string, params interface{}) (interface{}, error) {
       // Type-safe dispatch with RichError for type mismatches
   }
@@ -329,7 +329,7 @@ This consolidated checklist coordinates the parallel implementation of both the 
               Suggestion("Check available tools with ListTools()").
               Build()
       }
-      
+
       return tool.Execute(ctx, params)
   }
   ```
@@ -341,7 +341,7 @@ This consolidated checklist coordinates the parallel implementation of both the 
       State    TState
       Metadata map[string]interface{}
   }
-  
+
   func (s *TypedSession[TState]) UpdateState(newState TState) error {
       // Type-safe state updates with RichError validation
   }
@@ -352,7 +352,7 @@ This consolidated checklist coordinates the parallel implementation of both the 
   type Workflow[TInput, TOutput any] struct {
       steps []WorkflowStep[TInput, TOutput]
   }
-  
+
   func (w *Workflow[TInput, TOutput]) Execute(ctx context.Context, input TInput) (TOutput, error) {
       // Type-safe workflow execution with rich error context
   }
@@ -374,17 +374,17 @@ This consolidated checklist coordinates the parallel implementation of both the 
                   Severity(rich.SeverityMedium).
                   Cause(err).
                   Build()
-              
+
               writeErrorResponse(w, richErr)
               return
           }
-          
+
           result, err := registry.Execute(toolName, params)
           if err != nil {
               writeErrorResponse(w, err)
               return
           }
-          
+
           writeSuccessResponse(w, result)
       }
   }
@@ -395,7 +395,7 @@ This consolidated checklist coordinates the parallel implementation of both the 
   type TypedToolService[TParams tools.ToolParams, TResult tools.ToolResult] struct {
       registry *GenericRegistry[tools.Tool[TParams, TResult], TParams, TResult]
   }
-  
+
   func (s *TypedToolService[TParams, TResult]) ExecuteTool(
       ctx context.Context,
       req *ExecuteRequest,
@@ -443,7 +443,7 @@ This consolidated checklist coordinates the parallel implementation of both the 
                   Str("error_severity", string(richErr.Severity))
           }
       }
-      
+
       logEvent.
           Str("tool_name", toolName).
           Str("params_type", reflect.TypeOf(params).String()).

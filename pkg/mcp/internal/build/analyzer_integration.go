@@ -268,7 +268,6 @@ func (m *mockIterativeFixer) GetFixStrategies() []string {
 	return []string{"dockerfile_fix", "dependency_fix", "config_fix"}
 }
 
-
 // getStrategyType infers the strategy type from its name
 func getStrategyType(strategyName string) string {
 	switch {

@@ -1,7 +1,7 @@
 # Interface Consolidation Plan
 
 ## Overview
-This document outlines the plan to consolidate interfaces in the Container Kit MCP codebase from **626 lines** in core/interfaces.go down to approximately **200 lines** (70% reduction). 
+This document outlines the plan to consolidate interfaces in the Container Kit MCP codebase from **626 lines** in core/interfaces.go down to approximately **200 lines** (70% reduction).
 
 **Current State:**
 - Total interfaces found: **163** across pkg/mcp/
@@ -100,7 +100,7 @@ This document outlines the plan to consolidate interfaces in the Container Kit M
 
 ### Phase 1: Safe Single-Implementation Removals (Days 1-5)
 1. Replace `ContextSharer` interface with `DefaultContextSharer` concrete type
-2. Replace `IterativeFixer` interface with `DefaultIterativeFixer` concrete type  
+2. Replace `IterativeFixer` interface with `DefaultIterativeFixer` concrete type
 3. Replace `PipelineOperations` interface with `Operations` concrete type
 4. Replace `ToolRegistry` interface with `MCPToolRegistry` concrete type
 
@@ -148,7 +148,7 @@ echo "Progress: $(((625 - $(wc -l pkg/mcp/core/interfaces.go | cut -d' ' -f1)) *
 
 **Conservative Estimate:**
 - Single-implementation interfaces: **-45 lines**
-- Function-wrapper interfaces: **-24 lines**  
+- Function-wrapper interfaces: **-24 lines**
 - Related interface consolidation: **-15 lines**
 - Additional cleanup: **-10 lines**
 - **Total reduction: ~94 lines** (15% reduction)

@@ -483,7 +483,6 @@ type FixingResult struct {
 	LastAttemptTime time.Time     `json:"last_attempt_time"`
 }
 
-
 // BaseAIContextResult provides AI context result information
 type BaseAIContextResult struct {
 	AIContextType     string        `json:"ai_context_type"`

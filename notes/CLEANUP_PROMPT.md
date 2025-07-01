@@ -28,7 +28,7 @@ rg "SagaManager" --type go pkg/mcp/ | grep -v "_test.go" | grep -v "saga_manager
 
 **Target Files for Removal (6,700+ lines):**
 - `pkg/mcp/internal/pipeline/docker_retry.go` (1,244 lines)
-- `pkg/mcp/internal/session/resource_monitor.go` (1,190 lines)  
+- `pkg/mcp/internal/session/resource_monitor.go` (1,190 lines)
 - `pkg/mcp/internal/orchestration/performance_optimizer.go` (1,179 lines)
 - `pkg/mcp/internal/orchestration/saga_manager.go` (1,091 lines)
 - `pkg/mcp/internal/orchestration/workflow_orchestrator.go` (991 lines)
@@ -72,7 +72,7 @@ rm -rf pkg/mcp/cmd/
 ```bash
 # In pkg/mcp/internal/transport/
 mv llm_llm_stdio.go llm_stdio.go
-mv llm_llm_http.go llm_http.go  
+mv llm_llm_http.go llm_http.go
 mv llm_llm_mock.go llm_mock.go
 mv llm_llm_stdio_test.go llm_stdio_test.go
 

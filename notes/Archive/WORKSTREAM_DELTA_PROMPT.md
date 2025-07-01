@@ -69,7 +69,7 @@ echo "4. pkg/mcp/internal/types/errors*.go - Type errors (3 files)"
 echo "Target structure:"
 echo "pkg/mcp/internal/errors/"
 echo "├── core.go        # Core system errors"
-echo "├── tool.go        # Tool-specific errors"  
+echo "├── tool.go        # Tool-specific errors"
 echo "├── validation.go  # Validation errors"
 echo "├── runtime.go     # Runtime errors"
 echo "└── types.go       # Error type definitions"
@@ -84,7 +84,7 @@ echo "=== CREATING UNIFIED ERROR STRUCTURE ==="
 # Target: pkg/mcp/internal/errors/
 
 # 1. Merge pkg/mcp/internal/runtime/errors.go → pkg/mcp/internal/errors/runtime.go
-# 2. Merge pkg/mcp/internal/types/errors*.go → pkg/mcp/internal/errors/types.go  
+# 2. Merge pkg/mcp/internal/types/errors*.go → pkg/mcp/internal/errors/types.go
 # 3. Consolidate pkg/mcp/internal/errors/core_error.go patterns
 # 4. Create pkg/mcp/internal/errors/tool.go for tool-specific errors
 # 5. Create pkg/mcp/internal/errors/validation.go for validation errors
@@ -436,7 +436,7 @@ echo "Ready for next workstream coordination"
 - **SHARE** consolidated error structure for their TODO resolution
 - **SEQUENCE** structural moves before their detailed TODO fixes
 
-### With Workstream Gamma (Quality Assurance)  
+### With Workstream Gamma (Quality Assurance)
 - **VALIDATE** all structural changes pass their quality gates
 - **REQUEST** approval before major structural reorganization
 - **COORDINATE** on test file movements and updates

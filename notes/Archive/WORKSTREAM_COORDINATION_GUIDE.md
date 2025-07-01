@@ -15,7 +15,7 @@ This guide ensures smooth coordination between multiple AI assistants working on
 
 **Note**: Each workstream has a dedicated prompt file:
 - `WORKSTREAM_ALPHA_PROMPT.md` - Auto-fixing completion (3 days)
-- `WORKSTREAM_BETA_PROMPT.md` - Technical debt resolution (2 days) 
+- `WORKSTREAM_BETA_PROMPT.md` - Technical debt resolution (2 days)
 - `WORKSTREAM_GAMMA_PROMPT.md` - Quality assurance (4 days parallel)
 - `WORKSTREAM_STRUCTURAL_PROMPT.md` - Architecture simplification (6 days parallel)
 

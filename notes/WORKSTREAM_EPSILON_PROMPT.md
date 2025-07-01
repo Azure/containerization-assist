@@ -5,15 +5,15 @@
 
 You are the **Go Idioms Specialist** responsible for eliminating 300+ interface{} instances (85% reduction), replacing panic() usage with proper error handling, and enforcing idiomatic Go patterns throughout the codebase.
 
-**Duration**: Week 2-4 (parallel, after BETA foundation)  
-**Dependencies**: WORKSTREAM BETA completion (type safety foundation)  
+**Duration**: Week 2-4 (parallel, after BETA foundation)
+**Dependencies**: WORKSTREAM BETA completion (type safety foundation)
 **Critical Success**: Idiomatic, type-safe Go code with compile-time checking
 
 ## 📋 YOUR SPECIFIC RESPONSIBILITIES
 
 ### Week 2 (Days 6-10): Foundation & Analysis
 
-#### Day 6-7: Interface{} Analysis & Planning  
+#### Day 6-7: Interface{} Analysis & Planning
 ```bash
 # WAIT: Until WORKSTREAM BETA RichError foundation complete
 
@@ -28,7 +28,7 @@ echo "# Interface{} Usage Analysis
 $(rg "interface{}" pkg/mcp/internal/orchestration/ --type go | wc -l) instances in orchestration
 $(rg "interface{}" pkg/mcp/internal/core/ --type go | wc -l) instances in core
 
-## Configuration Usage (MEDIUM PRIORITY):  
+## Configuration Usage (MEDIUM PRIORITY):
 $(rg "interface{}" pkg/mcp/internal/build/ --type go | wc -l) instances in build
 $(rg "interface{}" pkg/mcp/internal/deploy/ --type go | wc -l) instances in deploy
 
@@ -37,7 +37,7 @@ $(rg "interface{}" pkg/mcp/utils/ --type go | wc -l) instances in utils
 " > docs/interface_usage_analysis.md
 
 # Analyze type assertions:
-rg "\.(" pkg/mcp/ --type go > type_assertions_inventory.txt  
+rg "\.(" pkg/mcp/ --type go > type_assertions_inventory.txt
 echo "Type assertions found: $(wc -l < type_assertions_inventory.txt)"
 
 # Plan strongly-typed replacements using BETA's generic types
@@ -51,7 +51,7 @@ echo "Type assertions found: $(wc -l < type_assertions_inventory.txt)"
 # Example: Configuration maps that can be proper structs
 find pkg/mcp/utils -name "*.go" -exec grep -l "map\[string\]interface{}" {} \;
 
-# Target 2: Type assertions without error checking → safe assertions  
+# Target 2: Type assertions without error checking → safe assertions
 # Example: obj.(Type) → obj.(Type), ok
 find pkg/mcp/utils -name "*.go" -exec grep -l "\\.(" {} \;
 
@@ -61,7 +61,7 @@ find pkg/mcp/utils -name "*.go" -exec grep -l "\\.(" {} \;
 # CREATE: pkg/mcp/types/config/
 mkdir -p pkg/mcp/types/config
 touch pkg/mcp/types/config/build.go      # BuildConfig struct
-touch pkg/mcp/types/config/deploy.go     # DeployConfig struct  
+touch pkg/mcp/types/config/deploy.go     # DeployConfig struct
 touch pkg/mcp/types/config/scan.go       # ScanConfig struct
 
 # VALIDATION REQUIRED:
@@ -73,7 +73,7 @@ git add .
 git commit -m "refactor(types): begin interface{} elimination with safe replacements
 
 - Replaced 20+ simple map[string]interface{} with typed structs
-- Added error handling to 15+ type assertions  
+- Added error handling to 15+ type assertions
 - Created typed configuration structs
 - Improved type safety in utility packages
 
@@ -90,12 +90,12 @@ Co-Authored-By: Claude <noreply@anthropic.com)"
 
 # COORDINATE: Use BETA's strongly-typed registry system
 
-# Target: pkg/mcp/internal/orchestration/ 
+# Target: pkg/mcp/internal/orchestration/
 # Replace ALL interface{} with BETA's generic types
 
 # File 1: pkg/mcp/internal/orchestration/tool_orchestrator.go
 # - Replace interface{} parameters with TParams from BETA
-# - Replace interface{} results with TResult from BETA  
+# - Replace interface{} results with TResult from BETA
 # - Use BETA's Tool[TParams, TResult] interface
 # - Remove ALL type assertions from tool execution
 
@@ -121,10 +121,10 @@ echo "Type assertions in orchestration: $(rg "\.(" pkg/mcp/internal/orchestratio
 ```bash
 # HTTP/gRPC interface{} elimination:
 
-# File 1: pkg/mcp/internal/transport/http.go  
+# File 1: pkg/mcp/internal/transport/http.go
 # - Replace JSON interface{} with specific request/response types
 # - Define typed HTTP request structures
-# - Define typed HTTP response structures  
+# - Define typed HTTP response structures
 # - Remove runtime JSON type checking
 
 # File 2: pkg/mcp/internal/transport/stdio.go
@@ -132,7 +132,7 @@ echo "Type assertions in orchestration: $(rg "\.(" pkg/mcp/internal/orchestratio
 # - Use BETA's RichError for transport errors
 # - Add compile-time type checking for messages
 
-# File 3: pkg/mcp/internal/core/gomcp_tools.go  
+# File 3: pkg/mcp/internal/core/gomcp_tools.go
 # - Replace the massive interface{} usage (identified in analysis)
 # - Use BETA's strongly-typed tool definitions
 # - Remove type assertions from tool execution
@@ -156,7 +156,7 @@ go test -short ./pkg/mcp/internal/core/... && echo "✅ Core tools type-safe"
 
 # CREATE: pkg/mcp/constants/
 mkdir -p pkg/mcp/constants
-  
+
 # File 1: pkg/mcp/constants/timeouts.go
 # Define timeout constants:
 const (
@@ -166,7 +166,7 @@ const (
     ValidationTimeout    = 10 * time.Second  // Validation operations
 )
 
-# File 2: pkg/mcp/constants/limits.go  
+# File 2: pkg/mcp/constants/limits.go
 # Define limit constants:
 const (
     MaxErrors            = 100               // Validation error limit
@@ -181,7 +181,7 @@ const (
 # Define buffer size constants:
 const (
     SmallBufferSize      = 1024              // 1KB for small operations
-    MediumBufferSize     = 4096              // 4KB for medium operations  
+    MediumBufferSize     = 4096              // 4KB for medium operations
     LargeBufferSize      = 65536             // 64KB for large operations
 )
 
@@ -189,7 +189,7 @@ const (
 find pkg/mcp -name "*.go" -exec grep -l "30.*time\.Second" {} \; | head -5
 # Replace with constants.DefaultTimeout
 
-find pkg/mcp -name "*.go" -exec grep -l "100," {} \; | head -5  
+find pkg/mcp -name "*.go" -exec grep -l "100," {} \; | head -5
 # Replace with constants.MaxErrors where appropriate
 ```
 
@@ -262,7 +262,7 @@ echo "# Remaining Non-Idiomatic Patterns
 
 ## Acceptable interface{} Usage:
 - JSON marshaling/unmarshaling where type flexibility needed
-- Plugin systems requiring runtime type flexibility  
+- Plugin systems requiring runtime type flexibility
 - [Other justified cases]
 
 ## Acceptable Type Assertions:
@@ -335,7 +335,7 @@ echo "Unsafe type assertions: $(rg "\.(" pkg/mcp/ | grep -v ", ok" | wc -l) (tar
 echo "Panic usage: $(rg "panic(" pkg/mcp/ | wc -l) (target: 0 in library code)"
 
 # CONSTANTS validation:
-echo "Magic number 30: $(rg "30.*time\.Second" pkg/mcp/ | wc -l) (should be 0)"  
+echo "Magic number 30: $(rg "30.*time\.Second" pkg/mcp/ | wc -l) (should be 0)"
 echo "Magic number 100: $(rg "100," pkg/mcp/ | wc -l) (should be minimal)"
 ```
 
@@ -348,7 +348,7 @@ go test -short ./pkg/mcp/... && echo "✅ All systems working"
 echo "interface{} progress: $(rg "interface{}" pkg/mcp/ | wc -l) remaining"
 
 # After type assertion fixes:
-echo "Unsafe assertions: $(rg "\.(" pkg/mcp/ | grep -v ", ok" | wc -l) remaining" 
+echo "Unsafe assertions: $(rg "\.(" pkg/mcp/ | grep -v ", ok" | wc -l) remaining"
 
 # After constant creation:
 echo "Magic numbers replaced: checking common patterns..."
@@ -393,7 +393,7 @@ echo "Critical path interface{}: $(rg "interface{}" pkg/mcp/internal/orchestrati
 echo "Core interface{}: $(rg "interface{}" pkg/mcp/internal/core/ | wc -l)"
 
 # Type assertion safety:
-echo "Total type assertions: $(rg "\.(" pkg/mcp/ | wc -l)"  
+echo "Total type assertions: $(rg "\.(" pkg/mcp/ | wc -l)"
 echo "Unsafe type assertions: $(rg "\.(" pkg/mcp/ | grep -v ", ok" | wc -l)"
 
 # Constants replacement:
@@ -418,7 +418,7 @@ Magic numbers replaced: X instances
 Type safety improvements:
 - interface{} eliminated: X instances
 - Typed structs created: X
-- Safe type assertions: X  
+- Safe type assertions: X
 - Constants defined: X
 
 Breaking changes introduced:
@@ -497,7 +497,7 @@ config := BuildConfig{
 result := tool.Execute(params)
 buildResult := result.(BuildResult)  // Can panic!
 
-// AFTER: Safe type assertion with RichError  
+// AFTER: Safe type assertion with RichError
 result := tool.Execute(params)
 buildResult, ok := result.(BuildResult)
 if !ok {
@@ -521,7 +521,7 @@ func GetClient() Client {
     return factory.CreateClient()
 }
 
-// AFTER: Error return with RichError  
+// AFTER: Error return with RichError
 func GetClient() (Client, error) {
     if factory == nil {
         return nil, rich.NewError().
