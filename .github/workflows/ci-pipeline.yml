@@ -554,7 +554,7 @@ jobs:
         run-id: ${{ github.run_id }}
         architecture-score: ${{ steps.arch-analysis.outputs.architecture-score || '0' }}
         architecture-status: ${{ steps.arch-analysis.outputs.architecture-status || 'unknown' }}
-        architecture-details: ${{ steps.checkout.outcome == 'success' && format('Adapters/Wrappers/Cycles: {0}/{1}/{2} | Large files: {3} | Complex functions: {4}', steps.arch-analysis.outputs.adapter-count, steps.arch-analysis.outputs.wrapper-count, steps.arch-analysis.outputs.import-cycles, steps.arch-analysis.outputs.large-files, steps.arch-analysis.outputs.complex-functions) || 'Architecture analysis skipped due to checkout failure' }}
+        architecture-details: ${{ steps.checkout.outcome == 'success' && steps.arch-analysis.outputs.adapter-count || 'Architecture analysis skipped due to checkout failure' }}
         quality-results: ${{ needs.quality-gates.result == 'success' && '✅ All quality checks passed' || '⚠️ Quality checks failed or skipped' }}
 
   # Status Check - Single job to use as required check in branch protection
