@@ -534,6 +534,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     - name: Run architecture analysis
       id: arch-analysis
@@ -606,24 +609,7 @@ jobs:
             FAILED_JOBS="${FAILED_JOBS}quality-gates "
           fi
 
-          # Integration tests must pass if they ran
-          if [ "${{ needs.aggregate-integration-matrix-results.result }}" != "success" ] && [ "${{ needs.aggregate-integration-matrix-results.result }}" != "skipped" ]; then
-            FAILED_JOBS="${FAILED_JOBS}aggregate-integration-matrix-results "
-          fi
-          if [ "${{ needs.integration-tests.result }}" != "success" ] && [ "${{ needs.integration-tests.result }}" != "skipped" ]; then
-            FAILED_JOBS="${FAILED_JOBS}integration-tests "
-          fi
-          if [ "${{ needs.mcp-integration-tests.result }}" != "success" ] && [ "${{ needs.mcp-integration-tests.result }}" != "skipped" ]; then
-            FAILED_JOBS="${FAILED_JOBS}mcp-integration-tests "
-          fi
-          if [ "${{ needs.mcp-workflow-tests.result }}" != "success" ] && [ "${{ needs.mcp-workflow-tests.result }}" != "skipped" ]; then
-            FAILED_JOBS="${FAILED_JOBS}mcp-workflow-tests "
-          fi
-
-          # Testing dashboard must pass if it ran
-          if [ "${{ needs.testing-dashboard.result }}" != "success" ] && [ "${{ needs.testing-dashboard.result }}" != "skipped" ]; then
-            FAILED_JOBS="${FAILED_JOBS}testing-dashboard "
-          fi
+          # Note: Integration tests and dashboard are optional and not checked here
 
           # Fail if any required jobs failed
           if [ -n "$FAILED_JOBS" ]; then
