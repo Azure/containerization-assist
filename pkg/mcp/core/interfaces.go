@@ -483,15 +483,6 @@ type FixingResult struct {
 	LastAttemptTime time.Time     `json:"last_attempt_time"`
 }
 
-// ContextSharer provides context sharing functionality between tools
-type ContextSharer interface {
-	// ShareContext shares context between tools or operations
-	ShareContext(ctx context.Context, sessionID string, contextType string, data interface{}) error
-	// GetSharedContext retrieves shared context
-	GetSharedContext(ctx context.Context, sessionID string, contextType string) (interface{}, error)
-	// ClearContext clears shared context for a session
-	ClearContext(ctx context.Context, sessionID string) error
-}
 
 // BaseAIContextResult provides AI context result information
 type BaseAIContextResult struct {

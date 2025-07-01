@@ -29,7 +29,7 @@ type FixingContext struct {
 type AnalyzerIntegratedFixer struct {
 	fixer        mcptypes.IterativeFixer
 	analyzer     core.AIAnalyzer
-	contextShare mcptypes.ContextSharer
+	contextShare *DefaultContextSharer
 	logger       zerolog.Logger
 }
 
@@ -37,7 +37,7 @@ type AnalyzerIntegratedFixer struct {
 func NewAnalyzerIntegratedFixer(analyzer core.AIAnalyzer, logger zerolog.Logger) *AnalyzerIntegratedFixer {
 	// Use real DefaultIterativeFixer implementation instead of mock
 	fixer := NewDefaultIterativeFixer(analyzer, logger)
-	contextSharer := &realContextSharer{context: make(map[string]interface{})}
+	contextSharer := NewDefaultContextSharer(logger)
 	return &AnalyzerIntegratedFixer{
 		fixer:        fixer,
 		analyzer:     analyzer,
