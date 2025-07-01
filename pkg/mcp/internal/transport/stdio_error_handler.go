@@ -621,7 +621,7 @@ func (h *StdioErrorHandler) getSeverityIcon(severity rich.ErrorSeverity) string 
 func (h *StdioErrorHandler) CreateRecoveryResponse(originalError error, recoverySteps, alternatives []string) interface{} {
 	// Convert to RichError with recovery context
 	richErr := rich.NewError().
-		Code("STDIO_RECOVERY_AVAILABLE").
+		Code(rich.ErrorCode("STDIO_RECOVERY_AVAILABLE")).
 		Message(originalError.Error()).
 		Type(rich.ErrTypeBusiness).
 		Severity(rich.SeverityMedium).

@@ -47,7 +47,7 @@ func TestServerCreation(t *testing.T) {
 				config.StorePath = "/root/invalid/path/sessions.db"
 			},
 			wantErr: true,
-			errMsg:  "failed to create storage directory",
+			errMsg:  "SERVER_STORAGE_DIRECTORY_CREATION_FAILED",
 		},
 		{
 			name: "invalid workspace directory",
@@ -55,7 +55,7 @@ func TestServerCreation(t *testing.T) {
 				config.WorkspaceDir = "/root/invalid/workspace"
 			},
 			wantErr: true,
-			errMsg:  "failed to initialize session manager",
+			errMsg:  "SERVER_SESSION_MANAGER_INITIALIZATION_FAILED",
 		},
 		{
 			name: "http transport",
@@ -135,7 +135,7 @@ func TestServerComponentInitializationFailure(t *testing.T) {
 
 		_, err := NewServer(context.Background(), config)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to initialize session manager")
+		assert.Contains(t, err.Error(), "SESSION_WORKSPACE_CREATION_FAILED")
 	})
 
 	t.Run("storage directory creation failure", func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestServerComponentInitializationFailure(t *testing.T) {
 
 		_, err := NewServer(context.Background(), config)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to create storage directory")
+		assert.Contains(t, err.Error(), "SERVER_STORAGE_DIRECTORY_CREATION_FAILED")
 	})
 }
 

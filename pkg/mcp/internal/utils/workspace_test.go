@@ -42,7 +42,7 @@ func TestWorkspaceManager_CheckQuota(t *testing.T) {
 			totalMax:        50000,
 			expectError:     true,
 			errorCode:       "SESSION_QUOTA_EXCEEDED",
-			errorContains:   "session disk quota would be exceeded: 8000 + 3000 > 10000",
+			errorContains:   "Session disk quota would be exceeded",
 		},
 		{
 			name:            "within session but exceeds global quota",
@@ -57,7 +57,7 @@ func TestWorkspaceManager_CheckQuota(t *testing.T) {
 			},
 			expectError:   true,
 			errorCode:     "GLOBAL_QUOTA_EXCEEDED",
-			errorContains: "global disk quota would be exceeded",
+			errorContains: "Global disk quota would be exceeded",
 		},
 		{
 			name:            "exactly at session limit",

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/internal/session"
@@ -72,7 +73,18 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	if config.StorePath != "" {
 		if err := os.MkdirAll(filepath.Dir(config.StorePath), 0o755); err != nil {
 			logger.Error().Err(err).Str("path", config.StorePath).Msg("Failed to create storage directory")
-			return nil, errors.Wrapf(err, "core/server", "failed to create storage directory %s", config.StorePath)
+			return nil, rich.NewError().
+				Code("SERVER_STORAGE_DIRECTORY_CREATION_FAILED").
+				Message("Failed to create storage directory for server persistence").
+				Type(rich.ErrTypeSystem).
+				Severity(rich.SeverityHigh).
+				Cause(err).
+				Context("store_path", config.StorePath).
+				Context("directory", filepath.Dir(config.StorePath)).
+				Context("component", "server_initialization").
+				Suggestion("Check directory permissions and available disk space for storage").
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -88,7 +100,18 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize session manager")
-		return nil, errors.Wrap(err, "core/server", "failed to initialize session manager")
+		return nil, rich.NewError().
+			Code("SERVER_SESSION_MANAGER_INITIALIZATION_FAILED").
+			Message("Failed to initialize session management system").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityHigh).
+			Cause(err).
+			Context("component", "server_initialization").
+			Context("workspace_dir", config.WorkspaceDir).
+			Context("max_sessions", config.MaxSessions).
+			Suggestion("Check workspace directory permissions and session configuration").
+			WithLocation().
+			Build()
 	}
 
 	// Initialize workspace manager
@@ -102,7 +125,18 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize workspace manager")
-		return nil, errors.Wrap(err, "core/server", "failed to initialize workspace manager")
+		return nil, rich.NewError().
+			Code("SERVER_WORKSPACE_MANAGER_INITIALIZATION_FAILED").
+			Message("Failed to initialize workspace management system").
+			Type(rich.ErrTypeSystem).
+			Severity(rich.SeverityHigh).
+			Cause(err).
+			Context("component", "server_initialization").
+			Context("base_dir", config.WorkspaceDir).
+			Context("sandbox_enabled", config.SandboxEnabled).
+			Suggestion("Check workspace directory permissions and sandbox configuration").
+			WithLocation().
+			Build()
 	}
 
 	// Initialize circuit breakers
