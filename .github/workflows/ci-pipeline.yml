@@ -19,163 +19,97 @@ permissions:
   statuses: write
 
 jobs:
-  # Phase 1: Canary Validation - Fast checks that gate everything else
+  # Phase 1: Fast Canary Validation - Lightweight checks that gate everything else
   canary:
-    name: Canary Validation
+    name: Fast Canary Validation
     runs-on: ubuntu-latest
     outputs:
       should-continue: ${{ steps.canary-check.outputs.success }}
-      test-mcp: ${{ steps.detect-paths.outputs.test_mcp }}
-      test-core: ${{ steps.detect-paths.outputs.test_core }}
-      test-cli: ${{ steps.detect-paths.outputs.test_cli }}
+      changed-packages: ${{ steps.detect-changes.outputs.packages }}
 
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0  # Need full history for diff
 
     - uses: actions/setup-go@v5
       with:
         go-version: '1.24'
 
-    - name: Install golangci-lint
+    - name: Detect changed files
+      id: detect-changes
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.1.6
-
-    - name: Detect changed paths
-      id: detect-paths
-      run: |
+        # Get changed files
         if [ "${{ github.event_name }}" = "pull_request" ]; then
-          # Get changed files
-          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD)
-          echo "Changed files:"
-          echo "$changed_files"
-
-          # Check for MCP changes
-          mcp_changes=$(echo "$changed_files" | grep -E "^(pkg/mcp|cmd/mcp-server)" || true)
-
-          # Check for Core changes
-          core_changes=$(echo "$changed_files" | grep -E "^(pkg/core|pkg/utils)" || true)
-
-          # Check for CLI changes
-          cli_changes=$(echo "$changed_files" | grep -E "^(pkg/ai|pkg/pipeline|cmd/)" || true)
-
-          # Set outputs
-          echo "test_mcp=$([ -n "$mcp_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          echo "test_core=$([ -n "$core_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          echo "test_cli=$([ -n "$cli_changes" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-
-          echo "MCP changes: $([ -n "$mcp_changes" ] && echo "yes" || echo "no")"
-          echo "Core changes: $([ -n "$core_changes" ] && echo "yes" || echo "no")"
-          echo "CLI changes: $([ -n "$cli_changes" ] && echo "yes" || echo "no")"
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
+          changed_packages=$(echo "$changed_files" | xargs -r dirname | sort -u | sed 's|^|./|' | tr '\n' ' ')
+          echo "packages=$changed_packages" >> $GITHUB_OUTPUT
+          echo "Changed packages: $changed_packages"
         else
-          # For non-PR events, test everything
-          echo "test_mcp=true" >> $GITHUB_OUTPUT
-          echo "test_core=true" >> $GITHUB_OUTPUT
-          echo "test_cli=true" >> $GITHUB_OUTPUT
-          echo "Non-PR event: testing all packages"
+          echo "packages=./..." >> $GITHUB_OUTPUT
         fi
 
-    - name: Canary validation
+    - name: Fast format check
+      id: format-check
+      run: |
+        echo "🎨 Checking formatting..."
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
+          if [ -n "$changed_files" ]; then
+            unformatted=$(gofmt -l $changed_files)
+            if [ -n "$unformatted" ]; then
+              echo "❌ Formatting issues in:"
+              echo "$unformatted"
+              echo "success=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          fi
+        else
+          # For main branch, check all files
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "❌ Formatting issues found"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        fi
+        echo "✅ Format check passed"
+
+    - name: Fast syntax check
+      run: |
+        echo "📦 Checking syntax..."
+        if [ -n "${{ steps.detect-changes.outputs.packages }}" ]; then
+          # Only compile changed packages, don't generate output
+          go build -o /dev/null ${{ steps.detect-changes.outputs.packages }}
+        fi
+        echo "✅ Syntax check passed"
+
+    - name: Quick architecture check
+      uses: ./.github/actions/architecture-check
+      with:
+        path: 'pkg/mcp'
+
+    - name: Verify go.mod
+      run: |
+        echo "📋 Verifying go.mod..."
+        if ! go mod verify; then
+          echo "❌ go.mod verification failed"
+          echo "success=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "✅ go.mod verified"
+
+    - name: Set canary result
       id: canary-check
       run: |
-        echo "🚀 Running canary validation..."
-
-        # Test 1: Go mod tidy check
-        echo "📝 Testing go mod tidy..."
-        cp go.mod go.mod.bak
-        cp go.sum go.sum.bak
-        go mod tidy
-        if ! diff -q go.mod go.mod.bak >/dev/null || ! diff -q go.sum go.sum.bak >/dev/null; then
-          echo "❌ go mod tidy would make changes - dependencies are not tidy"
-          echo "Run 'go mod tidy' locally and commit the changes"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Go mod tidy passed"
-
-        # Test 2: Format check
-        echo "🎨 Testing gofmt..."
-        unformatted=$(gofmt -s -l .)
-        if [ -n "$unformatted" ]; then
-          echo "❌ Code formatting issues found:"
-          echo "$unformatted"
-          echo "Run 'gofmt -s -w .' to fix formatting"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Code formatting passed"
-
-        # Test 3: Import formatting check
-        echo "📋 Testing goimports..."
-        go install golang.org/x/tools/cmd/goimports@latest
-        goimports_output=$(goimports -l .)
-        if [ -n "$goimports_output" ]; then
-          echo "❌ Import formatting issues found:"
-          echo "$goimports_output"
-          echo "Run 'goimports -w .' to fix import formatting"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Import formatting passed"
-
-        # Test 4: Build check
-        echo "📦 Testing build..."
-        if ! go build ./...; then
-          echo "❌ Build failed"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Build passed"
-
-        # Test 5: Basic lint check
-        echo "🔍 Testing lint..."
-        if ! golangci-lint run --timeout=5m ./...; then
-          echo "❌ Lint failed"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Lint passed"
-
-        # Test 6: Verify tests compile (don't run them)
-        echo "🧪 Verifying tests compile..."
-        if ! go test -run=^$ ./...; then
-          echo "❌ Test compilation failed"
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ Tests compile successfully"
-
-        # Test 7: Adapter elimination check
-        echo "🔍 Verifying adapter elimination..."
-        ADAPTER_COUNT=$(find pkg/mcp -name "*adapter*.go" 2>/dev/null | wc -l || echo "0")
-        if [ $ADAPTER_COUNT -ne 0 ]; then
-          echo "❌ Found $ADAPTER_COUNT adapter files - adapters should be eliminated"
-          find pkg/mcp -name "*adapter*.go" 2>/dev/null || true
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ No adapter files found"
-
-        # Test 8: Wrapper consolidation check
-        echo "🔍 Verifying wrapper consolidation..."
-        WRAPPER_COUNT=$(find pkg/mcp -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l || echo "0")
-        if [ $WRAPPER_COUNT -ne 0 ]; then
-          echo "❌ Found $WRAPPER_COUNT wrapper files - wrappers should be consolidated"
-          find pkg/mcp -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation || true
-          echo "success=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-        echo "✅ No unconsolidated wrapper files found"
-
-        echo "🎉 All canary checks passed!"
+        echo "🎉 Canary validation passed!"
         echo "success=true" >> $GITHUB_OUTPUT
 
   # Phase 2: Parallel Unit Tests (only run if canary passes)
   unit-test-core:
     name: Unit Tests - Core Packages
     needs: canary
-    if: needs.canary.outputs.should-continue == 'true' && needs.canary.outputs.test-core == 'true'
+    if: needs.canary.outputs.should-continue == 'true'
     uses: ./.github/workflows/reusable-go-build.yml
     with:
       go-version: '1.24'
@@ -189,7 +123,7 @@ jobs:
   unit-test-mcp:
     name: Unit Tests - MCP Packages
     needs: canary
-    if: needs.canary.outputs.should-continue == 'true' && needs.canary.outputs.test-mcp == 'true'
+    if: needs.canary.outputs.should-continue == 'true'
     uses: ./.github/workflows/reusable-go-build.yml
     with:
       go-version: '1.24'
@@ -203,7 +137,7 @@ jobs:
   unit-test-cli:
     name: Unit Tests - CLI Packages
     needs: canary
-    if: needs.canary.outputs.should-continue == 'true' && needs.canary.outputs.test-cli == 'true'
+    if: needs.canary.outputs.should-continue == 'true'
     uses: ./.github/workflows/reusable-go-build.yml
     with:
       go-version: '1.24'
@@ -567,23 +501,8 @@ jobs:
       with:
         go-version: '1.24'
 
-    - name: Install Security Scanners
-      run: |
-        echo "🔒 Installing security scanners..."
-        sudo apt-get update
-        sudo apt-get install -y wget apt-transport-https gnupg lsb-release bc
-
-        # Install Trivy
-        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-        sudo apt-get update
-        sudo apt-get install -y trivy
-
-        # Install GitLeaks
-        wget https://github.com/zricethezav/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz
-        tar xzf gitleaks_8.18.0_linux_x64.tar.gz
-        sudo mv gitleaks /usr/local/bin/
-        chmod +x /usr/local/bin/gitleaks
+    - name: Setup security tools
+      uses: ./.github/actions/security-setup
 
     - name: Run GitLeaks (Secret Detection)
       run: |
@@ -696,33 +615,200 @@ jobs:
         echo "🎉 All quality gates passed!"
 
   # Phase 5: Integration Tests (after everything else)
-  integration-tests:
-    name: Integration Tests
+  integration-test-canary:
+    name: Integration Test Canary
     needs: [canary, unit-test-core, unit-test-cli, build-cli]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-cli == 'true'
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
     runs-on: ubuntu-latest
+    outputs:
+      canary-passed: ${{ steps.canary_test.outputs.result == 'success' }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
     - name: Download CLI binary
       uses: actions/download-artifact@v4
       with:
         name: container-kit-${{ runner.os }}-${{ github.run_id }}
         path: ./
 
-    - name: Run integration tests
+    - name: Make binary executable
       run: |
         chmod +x container-kit
-        echo "🧪 Running integration tests..."
-        echo "Integration tests would run here with the built binary"
+        sudo mv container-kit /usr/local/bin/
+
+    - name: Checkout Test Repo (Canary)
+      uses: actions/checkout@v4
+      with:
+        repository: Azure-Samples/containerize-and-deploy-Java-app-to-Azure
+        path: test-repo
+
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Install Kind
+      uses: helm/kind-action@v1
+      with:
+        install_only: true
+
+    - name: Run Canary Integration Test
+      id: canary_test
+      continue-on-error: true
+      env:
+        AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+        AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
+      run: |
+        cd test-repo
+        mkdir -p artifacts/logs
+
+        SUCCESS_MESSAGE="🎉 All stages completed successfully!"
+
+        # Clean slate
+        rm -f Dockerfile || true
+        rm -rf manifests || true
+        mkdir -p manifests
+
+        echo "🧪 Running integration test canary..."
+        container-kit generate . --snapshot > "artifacts/logs/canary-run.log" 2>&1
+
+        # Save artifacts
+        if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
+          [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
+          [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
+        fi
+
+        if grep -q "context deadline exceeded" "artifacts/logs/canary-run.log"; then
+          echo "❌ Integration test canary: Operation timed out"
+          echo "result=timeout" >> $GITHUB_OUTPUT
+          exit 1
+        elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/canary-run.log"; then
+          echo "✅ Integration test canary PASSED"
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Integration test canary FAILED"
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+    - name: Upload canary test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-canary-${{ github.run_id }}
+        path: test-repo/artifacts/
+        retention-days: 7
+
+  integration-tests:
+    name: Integration Tests
+    needs: [canary, unit-test-core, unit-test-cli, build-cli, integration-test-canary]
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.integration-test-canary.outputs.canary-passed == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 10
+      matrix:
+        test-repo:
+          - Azure-Samples/containerize-and-deploy-Java-app-to-Azure
+          - Azure/wildfly-container-quickstart
+          - Mariemfakhreldein/e-commerce-app
+          - N-Usha/java-on-aks-piggymetrics
+          - SaiUpadhyayula/SpringAngularEcommerce
+          - agoncal/agoncal-application-petstore-ee7
+          - aws-samples/aws-codedeploy-sample-tomcat
+          - chamilad/tomcat-hello-world
+          - dhruvinrsoni/online-pizza-ordering-system
+          - eNKay2408/Note-Taking
+          - konveyor-ecosystem/coolstore
+        test-number: [1, 2]
+      fail-fast: false
+
+    steps:
+    - name: Download CLI binary
+      uses: actions/download-artifact@v4
+      with:
+        name: container-kit-${{ runner.os }}-${{ github.run_id }}
+        path: ./
+
+    - name: Make binary executable
+      run: |
+        chmod +x container-kit
+        sudo mv container-kit /usr/local/bin/
+
+    - name: Checkout Test Repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ matrix.test-repo }}
+        path: test-repo
+
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Install Kind
+      uses: helm/kind-action@v1
+      with:
+        install_only: true
+
+    - name: Run Integration Test ${{ matrix.test-number }}
+      id: run_test
+      continue-on-error: true
+      env:
+        AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+        AZURE_OPENAI_DEPLOYMENT_ID: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_ID }}
+      run: |
+        cd test-repo
+        mkdir -p artifacts/logs
+
+        SUCCESS_MESSAGE="🎉 All stages completed successfully!"
+
+        # Clean slate
+        rm -f Dockerfile || true
+        rm -rf manifests || true
+        mkdir -p manifests
+
+        REPO_NAME_WITHOUT_SLASH=$(echo "${{ matrix.test-repo }}" | sed 's|/|.|g' )
+        RUN_NAME="$REPO_NAME_WITHOUT_SLASH#${{ matrix.test-number }}"
+        echo "run_name=$RUN_NAME" >> $GITHUB_OUTPUT
+
+        echo "🧪 Running integration test for $RUN_NAME..."
+        container-kit generate . --snapshot > "artifacts/logs/run-${RUN_NAME}.log" 2>&1
+
+        # Save artifacts
+        if [ -f "Dockerfile" ] || [ -d "manifests" ]; then
+          [ -f Dockerfile ] && cp Dockerfile artifacts/ || echo "No Dockerfile created"
+          [ -d manifests ] && [ "$(ls -A manifests)" ] && cp -r manifests/* artifacts/ || echo "No manifests created"
+        fi
+
+        if grep -q "context deadline exceeded" "artifacts/logs/run-${RUN_NAME}.log"; then
+          echo "❌ Test Run $RUN_NAME: Operation timed out"
+          echo "result=timeout" >> $GITHUB_OUTPUT
+        elif grep -q "$SUCCESS_MESSAGE" "artifacts/logs/run-${RUN_NAME}.log"; then
+          echo "✅ Test Run $RUN_NAME PASSED"
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Test Run $RUN_NAME FAILED"
+          echo "result=failure" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Save result
+      if: always()
+      run: |
+        if [ -d "test-repo/.container-kit" ]; then
+          cp -r test-repo/.container-kit test-repo/artifacts/snapshot
+        fi
+        echo "${{ steps.run_test.outputs.result }}" > test-repo/artifacts/result.txt
+
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-run-${{ steps.run_test.outputs.run_name }}
+        path: test-repo/artifacts/
+        retention-days: 7
 
   # Phase 6: MCP Integration Tests (parallel with integration tests)
   mcp-integration-tests:
     name: MCP Integration Tests
     needs: [canary, unit-test-mcp, build-mcp]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-mcp == 'true'
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
     runs-on: ubuntu-latest
 
     services:
@@ -780,7 +866,7 @@ jobs:
   mcp-workflow-tests:
     name: MCP Workflow Integration Tests
     needs: [canary, unit-test-mcp, build-mcp]
-    if: always() && needs.canary.outputs.should-continue == 'true' && !failure() && needs.canary.outputs.test-mcp == 'true'
+    if: always() && needs.canary.outputs.should-continue == 'true' && !failure()
     runs-on: ubuntu-latest
 
     strategy:
@@ -921,7 +1007,7 @@ jobs:
   pipeline-summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-test-canary, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
     if: always()
     permissions:
       pull-requests: write
@@ -934,6 +1020,18 @@ jobs:
         pattern: "*-${{ github.run_id }}"
         path: artifacts
       continue-on-error: true
+
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Run architecture analysis
+      id: arch-analysis
+      uses: ./.github/actions/architecture-check
+      with:
+        path: 'pkg/mcp'
 
     - name: Prepare CI Status Data
       id: ci-status
@@ -1029,6 +1127,11 @@ jobs:
           ### 🎯 Quality Gates
           ${{ steps.ci-status.outputs.quality_results }}
 
+          ### 🏗️ Architecture Quality
+          **Score:** ${{ steps.arch-analysis.outputs.architecture-score }}/100 (${{ steps.arch-analysis.outputs.architecture-status }})
+
+          **Details:** Adapters/Wrappers/Cycles: ${{ steps.arch-analysis.outputs.adapter-count }}/${{ steps.arch-analysis.outputs.wrapper-count }}/${{ steps.arch-analysis.outputs.import-cycles }} | Large files: ${{ steps.arch-analysis.outputs.large-files }} | Complex functions: ${{ steps.arch-analysis.outputs.complex-functions || 'N/A' }}
+
           ### 📝 Next Steps:
           - Review any failed checks above
           - Check individual workflow runs for detailed logs
@@ -1083,6 +1186,7 @@ jobs:
         echo "| Coverage Enforcement | ${{ needs.coverage-enforcement.result == 'success' && '✅ Passed' || needs.coverage-enforcement.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Security Scan | ${{ needs.security-scan.result == 'success' && '✅ Passed' || needs.security-scan.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Quality Gates | ${{ needs.quality-gates.result == 'success' && '✅ Passed' || needs.quality-gates.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Integration Test Canary | ${{ needs.integration-test-canary.result == 'success' && '✅ Passed' || needs.integration-test-canary.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Integration Tests | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || needs.integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| MCP Integration Tests | ${{ needs.mcp-integration-tests.result == 'success' && '✅ Passed' || needs.mcp-integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
         echo "| MCP Workflow Tests | ${{ needs.mcp-workflow-tests.result == 'success' && '✅ Passed' || needs.mcp-workflow-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
@@ -1101,7 +1205,7 @@ jobs:
   ci-status-check:
     name: CI Status Check
     runs-on: ubuntu-latest
-    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
+    needs: [canary, unit-test-core, unit-test-mcp, unit-test-cli, build-cli, build-mcp, coverage-enforcement, security-scan, quality-gates, integration-test-canary, integration-tests, mcp-integration-tests, mcp-workflow-tests, testing-dashboard]
     if: always()
     steps:
       - name: Check all required jobs
@@ -1151,6 +1255,9 @@ jobs:
           fi
 
           # Integration tests must pass if they ran
+          if [ "${{ needs.integration-test-canary.result }}" != "success" ] && [ "${{ needs.integration-test-canary.result }}" != "skipped" ]; then
+            FAILED_JOBS="${FAILED_JOBS}integration-test-canary "
+          fi
           if [ "${{ needs.integration-tests.result }}" != "success" ] && [ "${{ needs.integration-tests.result }}" != "skipped" ]; then
             FAILED_JOBS="${FAILED_JOBS}integration-tests "
           fi

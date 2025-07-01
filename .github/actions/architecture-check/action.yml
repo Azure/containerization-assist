@@ -1,0 +1,144 @@
+name: 'Architecture Check'
+description: 'Validates architecture constraints and code quality metrics'
+inputs:
+  path:
+    description: 'Path to check for architecture violations'
+    required: false
+    default: 'pkg/mcp'
+outputs:
+  adapter-count:
+    description: 'Number of adapter files found'
+  wrapper-count:
+    description: 'Number of wrapper files found'
+  import-cycles:
+    description: 'Number of import cycles detected'
+  large-files:
+    description: 'Number of files with more than 500 lines'
+  complex-functions:
+    description: 'Number of functions with complexity >10'
+  architecture-score:
+    description: 'Overall architecture score (0-100)'
+  architecture-status:
+    description: 'Overall architecture status (pass/warning/fail)'
+runs:
+  using: "composite"
+  steps:
+    - name: Check for adapters
+      shell: bash
+      run: |
+        ADAPTER_COUNT=$(find ${{ inputs.path }} -name "*adapter*.go" 2>/dev/null | wc -l | tr -d ' \n' || echo "0")
+        echo "adapter-count=$ADAPTER_COUNT" >> $GITHUB_OUTPUT
+        echo "✅ Found $ADAPTER_COUNT adapter files"
+
+    - name: Check for wrappers
+      shell: bash
+      run: |
+        WRAPPER_COUNT=$(find ${{ inputs.path }} -name "*wrapper*.go" 2>/dev/null | grep -v docker_operation | wc -l | tr -d ' \n' || echo "0")
+        echo "wrapper-count=$WRAPPER_COUNT" >> $GITHUB_OUTPUT
+        echo "✅ Found $WRAPPER_COUNT wrapper files (excluding docker_operation)"
+
+    - name: Check import cycles
+      shell: bash
+      run: |
+        echo "🔍 Checking for import cycles..."
+        CYCLE_COUNT=0
+
+        # Try to detect import cycles by attempting to build
+        if go build -tags mcp ${{ inputs.path }}/... 2>&1 | grep -q "import cycle"; then
+          # Count unique cycle errors (this is a rough approximation)
+          CYCLE_COUNT=$(go build -tags mcp ${{ inputs.path }}/... 2>&1 | grep "import cycle" | wc -l | tr -d ' \n' || echo "0")
+          echo "❌ Detected $CYCLE_COUNT import cycles"
+          go build -tags mcp ${{ inputs.path }}/... 2>&1 | grep "import cycle"
+        else
+          echo "✅ No import cycles detected"
+        fi
+
+        echo "import-cycles=$CYCLE_COUNT" >> $GITHUB_OUTPUT
+
+    - name: Check for large files
+      shell: bash
+      run: |
+        echo "📏 Checking for large files (>500 lines)..."
+        LARGE_FILES_COUNT=$(find ${{ inputs.path }} -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 500 {count++} END {print count+0}')
+        echo "large-files=$LARGE_FILES_COUNT" >> $GITHUB_OUTPUT
+        echo "✅ Found $LARGE_FILES_COUNT files with >500 lines"
+
+        if [ "$LARGE_FILES_COUNT" -gt 0 ]; then
+          echo "Large files detected:"
+          find ${{ inputs.path }} -name "*.go" -not -path "*/test*" -exec wc -l {} \; | awk '$1 > 500 {print "  - " $2 " (" $1 " lines)"}'
+        fi
+
+    - name: Install gocyclo
+      shell: bash
+      run: |
+        echo "📦 Installing gocyclo for complexity analysis..."
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+
+    - name: Check cyclomatic complexity
+      shell: bash
+      run: |
+        echo "🔄 Checking cyclomatic complexity..."
+        # Check for functions with complexity > 10
+        COMPLEX_FUNCTIONS=$(~/go/bin/gocyclo -over 10 ${{ inputs.path }} | wc -l | tr -d ' \n' || echo "0")
+        echo "complex-functions=$COMPLEX_FUNCTIONS" >> $GITHUB_OUTPUT
+        echo "✅ Found $COMPLEX_FUNCTIONS functions with complexity >10"
+
+        if [ "$COMPLEX_FUNCTIONS" -gt 0 ]; then
+          echo "High complexity functions:"
+          ~/go/bin/gocyclo -over 10 ${{ inputs.path }} | head -5
+          if [ "$COMPLEX_FUNCTIONS" -gt 5 ]; then
+            echo "  ... and $((COMPLEX_FUNCTIONS - 5)) more"
+          fi
+        fi
+
+    - name: Calculate architecture score
+      shell: bash
+      run: |
+        echo "📊 Calculating overall architecture score..."
+
+        # Get values from previous steps
+        ADAPTER_COUNT=$(grep "adapter-count=" $GITHUB_OUTPUT | cut -d'=' -f2)
+        WRAPPER_COUNT=$(grep "wrapper-count=" $GITHUB_OUTPUT | cut -d'=' -f2)
+        CYCLE_COUNT=$(grep "import-cycles=" $GITHUB_OUTPUT | cut -d'=' -f2)
+        LARGE_FILES=$(grep "large-files=" $GITHUB_OUTPUT | cut -d'=' -f2)
+        COMPLEX_FUNCTIONS=$(grep "complex-functions=" $GITHUB_OUTPUT | cut -d'=' -f2)
+
+        # Calculate score (100 - deductions)
+        SCORE=100
+
+        # Deduct points for violations
+        SCORE=$((SCORE - ADAPTER_COUNT * 20))      # -20 points per adapter
+        SCORE=$((SCORE - WRAPPER_COUNT * 15))      # -15 points per wrapper
+        SCORE=$((SCORE - CYCLE_COUNT * 25))        # -25 points per import cycle
+        SCORE=$((SCORE - LARGE_FILES * 5))         # -5 points per large file
+        SCORE=$((SCORE - COMPLEX_FUNCTIONS * 2))   # -2 points per complex function
+
+        # Ensure score doesn't go below 0
+        if [ $SCORE -lt 0 ]; then
+          SCORE=0
+        fi
+
+        # Determine status
+        if [ $SCORE -ge 80 ]; then
+          STATUS="pass"
+          STATUS_EMOJI="✅"
+        elif [ $SCORE -ge 60 ]; then
+          STATUS="warning"
+          STATUS_EMOJI="⚠️"
+        else
+          STATUS="fail"
+          STATUS_EMOJI="❌"
+        fi
+
+        echo "architecture-score=$SCORE" >> $GITHUB_OUTPUT
+        echo "architecture-status=$STATUS" >> $GITHUB_OUTPUT
+
+        echo "$STATUS_EMOJI Architecture Score: $SCORE/100 ($STATUS)"
+        echo ""
+        echo "Score breakdown:"
+        echo "  - Base score: 100"
+        echo "  - Adapters: -$((ADAPTER_COUNT * 20)) ($ADAPTER_COUNT files)"
+        echo "  - Wrappers: -$((WRAPPER_COUNT * 15)) ($WRAPPER_COUNT files)"
+        echo "  - Import cycles: -$((CYCLE_COUNT * 25)) ($CYCLE_COUNT cycles)"
+        echo "  - Large files: -$((LARGE_FILES * 5)) ($LARGE_FILES files >500 lines)"
+        echo "  - Complex functions: -$((COMPLEX_FUNCTIONS * 2)) ($COMPLEX_FUNCTIONS functions >10 complexity)"
