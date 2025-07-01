@@ -403,3 +403,79 @@ func (r *BaseRegistry[T, TParams, TResult]) Count() int {
 
 	return len(r.tools)
 }
+
+// Unregister implements Registry.Unregister
+func (r *BaseRegistry[T, TParams, TResult]) Unregister(name string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, exists := r.tools[name]; !exists {
+		return fmt.Errorf("tool not found: %s", name)
+	}
+
+	delete(r.tools, name)
+	delete(r.schemas, name)
+	delete(r.metadata, name)
+
+	return nil
+}
+
+// ListTools implements Registry.ListTools
+func (r *BaseRegistry[T, TParams, TResult]) ListTools() []ToolInfo[T, TParams, TResult] {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tools := make([]ToolInfo[T, TParams, TResult], 0, len(r.metadata))
+	for _, info := range r.metadata {
+		tools = append(tools, info)
+	}
+	return tools
+}
+
+// Clear implements Registry.Clear
+func (r *BaseRegistry[T, TParams, TResult]) Clear() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.tools = make(map[string]T)
+	r.schemas = make(map[string]Schema[TParams, TResult])
+	r.metadata = make(map[string]ToolInfo[T, TParams, TResult])
+
+	return nil
+}
+
+// GetSchema implements Registry.GetSchema
+func (r *BaseRegistry[T, TParams, TResult]) GetSchema(name string) (Schema[TParams, TResult], error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var zeroSchema Schema[TParams, TResult]
+	schema, exists := r.schemas[name]
+	if !exists {
+		return zeroSchema, fmt.Errorf("tool not found: %s", name)
+	}
+
+	return schema, nil
+}
+
+// ValidateParams implements Registry.ValidateParams
+func (r *BaseRegistry[T, TParams, TResult]) ValidateParams(name string, params TParams) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tool, exists := r.tools[name]
+	if !exists {
+		return fmt.Errorf("tool not found: %s", name)
+	}
+
+	// Use tool's schema validation if available
+	schema := tool.GetSchema()
+	if validator, ok := interface{}(schema).(interface {
+		ValidateParams(TParams) error
+	}); ok {
+		return validator.ValidateParams(params)
+	}
+
+	// Fall back to basic parameter validation
+	return params.Validate()
+}
