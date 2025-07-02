@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/invopop/jsonschema"
 	"github.com/rs/zerolog"
 )

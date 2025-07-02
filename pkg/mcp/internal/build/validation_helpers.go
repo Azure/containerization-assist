@@ -3,7 +3,7 @@ package build
 import (
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/rs/zerolog"
 )
 

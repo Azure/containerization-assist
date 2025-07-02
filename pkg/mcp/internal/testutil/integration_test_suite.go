@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	orchestrationtestutil "github.com/Azure/container-kit/pkg/mcp/internal/orchestration/testutil"
-	profilingtestutil "github.com/Azure/container-kit/pkg/mcp/internal/profiling/testutil"
+	orchestrationtestutil "github.com/Azure/container-kit/pkg/mcp/core/orchestration/testutil"
 	"github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )
@@ -20,7 +19,6 @@ type IntegrationTestSuite struct {
 	mockPipelineAdapter *MockPipelineAdapter
 	mockClients         *types.MCPClients
 	orchestratorCapture *orchestrationtestutil.ExecutionCapture
-	profilingTestSuite  *profilingtestutil.ProfiledTestSuite
 	testStartTime       time.Time
 	cleanupFunctions    []func()
 	mu                  sync.RWMutex
@@ -40,7 +38,6 @@ func NewIntegrationTestSuite(t *testing.T, logger zerolog.Logger) *IntegrationTe
 		mockPipelineAdapter: NewMockPipelineAdapter(testLogger),
 		mockClients:         NewTestClientSets(),
 		orchestratorCapture: orchestrationtestutil.NewExecutionCapture(testLogger),
-		profilingTestSuite:  profilingtestutil.NewProfiledTestSuite(t, testLogger),
 		testStartTime:       time.Now(),
 		cleanupFunctions:    make([]func(), 0),
 	}
@@ -66,9 +63,9 @@ func (its *IntegrationTestSuite) GetExecutionCapture() *orchestrationtestutil.Ex
 	return its.orchestratorCapture
 }
 
-// GetProfilingTestSuite returns profiling test suite
-func (its *IntegrationTestSuite) GetProfilingTestSuite() *profilingtestutil.ProfiledTestSuite {
-	return its.profilingTestSuite
+// GetLogger returns test logger
+func (its *IntegrationTestSuite) GetLogger() zerolog.Logger {
+	return its.logger
 }
 
 // CreateTestOrchestrator creates test orchestrator
@@ -106,9 +103,9 @@ func (its *IntegrationTestSuite) CreateTestOrchestrator() *orchestrationtestutil
 	return mockOrchestrator
 }
 
-// CreateProfiledOrchestrator creates profiled orchestrator
-func (its *IntegrationTestSuite) CreateProfiledOrchestrator() *profilingtestutil.MockProfiler {
-	mockProfiler := profilingtestutil.NewMockProfiler()
+// CreateMockProfiler creates a simple mock profiler for testing
+func (its *IntegrationTestSuite) CreateMockProfiler() *MockProfiler {
+	mockProfiler := NewMockProfiler()
 
 	its.AddCleanup(func() {
 		its.logger.Info().
@@ -122,7 +119,7 @@ func (its *IntegrationTestSuite) CreateProfiledOrchestrator() *profilingtestutil
 // SetupFullWorkflow sets up workflow testing
 func (its *IntegrationTestSuite) SetupFullWorkflow() *WorkflowTestContext {
 	orchestrator := its.CreateTestOrchestrator()
-	profiler := its.CreateProfiledOrchestrator()
+	profiler := its.CreateMockProfiler()
 
 	context := &WorkflowTestContext{
 		suite:             its,
@@ -176,7 +173,7 @@ func (its *IntegrationTestSuite) Cleanup() {
 type WorkflowTestContext struct {
 	suite             *IntegrationTestSuite
 	orchestrator      *orchestrationtestutil.MockToolOrchestrator
-	profiler          *profilingtestutil.MockProfiler
+	profiler          *MockProfiler
 	sessionID         string
 	workflowStartTime time.Time
 	currentStage      string
@@ -208,7 +205,7 @@ func (ctx *WorkflowTestContext) ExecuteToolWithProfiling(toolName string, args i
 }
 
 // BenchmarkTool runs a benchmark for a specific tool
-func (ctx *WorkflowTestContext) BenchmarkTool(toolName string, args interface{}, iterations int) profilingtestutil.MockBenchmark {
+func (ctx *WorkflowTestContext) BenchmarkTool(toolName string, args interface{}, iterations int) MockBenchmark {
 	ctx.currentStage = "benchmark_" + toolName
 
 	// Run mock benchmark

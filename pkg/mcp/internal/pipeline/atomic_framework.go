@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/rs/zerolog"
 )
 
@@ -90,19 +90,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 		return result, nil
 	}
 
-	// Start job tracking
-	jobID, err := af.sessionManager.StartJob(config.SessionID, "atomic_docker_pull")
-	if err != nil {
-		af.logger.Warn().Err(err).Msg("Failed to start job tracking")
-	} else {
-		result.JobID = jobID
-	}
-
-	// Track tool execution
-	af.sessionManager.TrackToolExecution(config.SessionID, "atomic_docker_pull", map[string]interface{}{
-		"image_ref": imageRef,
-		"timeout":   config.Timeout,
-	})
+	// Simplified: removed job tracking
 
 	// Execute the pull operation
 	err = af.operations.PullDockerImage(config.SessionID, imageRef)
@@ -112,13 +100,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 		result.Success = false
 		result.Error = err
 
-		// Update job status
-		if jobID != "" {
-			af.sessionManager.UpdateJobStatus(config.SessionID, jobID, "failed", nil, err)
-		}
-
-		// Complete tool execution with error
-		af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_pull", false, err, 0)
+		// Simplified: removed job tracking
 
 		af.logger.Error().Err(err).Str("image_ref", imageRef).Msg("Atomic Docker pull failed")
 		return result, err
@@ -131,13 +113,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 		"pulled":    true,
 	}
 
-	// Complete job
-	if jobID != "" {
-		af.sessionManager.CompleteJob(config.SessionID, jobID, result.Result)
-	}
-
-	// Complete tool execution
-	af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_pull", true, nil, 0)
+	// Simplified: removed job tracking
 
 	af.logger.Info().
 		Str("image_ref", imageRef).
@@ -184,19 +160,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 		return result, nil
 	}
 
-	// Start job tracking
-	jobID, err := af.sessionManager.StartJob(config.SessionID, "atomic_docker_push")
-	if err != nil {
-		af.logger.Warn().Err(err).Msg("Failed to start job tracking")
-	} else {
-		result.JobID = jobID
-	}
-
-	// Track tool execution
-	af.sessionManager.TrackToolExecution(config.SessionID, "atomic_docker_push", map[string]interface{}{
-		"image_ref": imageRef,
-		"timeout":   config.Timeout,
-	})
+	// Simplified: removed job tracking
 
 	// Execute the push operation
 	err = af.operations.PushDockerImage(config.SessionID, imageRef)
@@ -206,13 +170,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 		result.Success = false
 		result.Error = err
 
-		// Update job status
-		if jobID != "" {
-			af.sessionManager.UpdateJobStatus(config.SessionID, jobID, "failed", nil, err)
-		}
-
-		// Complete tool execution with error
-		af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_push", false, err, 0)
+		// Simplified: removed job tracking
 
 		af.logger.Error().Err(err).Str("image_ref", imageRef).Msg("Atomic Docker push failed")
 		return result, err
@@ -225,13 +183,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 		"pushed":    true,
 	}
 
-	// Complete job
-	if jobID != "" {
-		af.sessionManager.CompleteJob(config.SessionID, jobID, result.Result)
-	}
-
-	// Complete tool execution
-	af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_push", true, nil, 0)
+	// Simplified: removed job tracking
 
 	af.logger.Info().
 		Str("image_ref", imageRef).
@@ -279,19 +231,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 		return result, nil
 	}
 
-	// Start job tracking
-	jobID, err := af.sessionManager.StartJob(config.SessionID, "atomic_docker_tag")
-	if err != nil {
-		af.logger.Warn().Err(err).Msg("Failed to start job tracking")
-	} else {
-		result.JobID = jobID
-	}
-
-	// Track tool execution
-	af.sessionManager.TrackToolExecution(config.SessionID, "atomic_docker_tag", map[string]interface{}{
-		"source_ref": sourceRef,
-		"target_ref": targetRef,
-	})
+	// Simplified: removed job tracking
 
 	// Execute the tag operation
 	err = af.operations.TagDockerImage(config.SessionID, sourceRef, targetRef)
@@ -301,13 +241,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 		result.Success = false
 		result.Error = err
 
-		// Update job status
-		if jobID != "" {
-			af.sessionManager.UpdateJobStatus(config.SessionID, jobID, "failed", nil, err)
-		}
-
-		// Complete tool execution with error
-		af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_tag", false, err, 0)
+		// Simplified: removed job tracking
 
 		af.logger.Error().Err(err).
 			Str("source_ref", sourceRef).
@@ -324,13 +258,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 		"tagged":     true,
 	}
 
-	// Complete job
-	if jobID != "" {
-		af.sessionManager.CompleteJob(config.SessionID, jobID, result.Result)
-	}
-
-	// Complete tool execution
-	af.sessionManager.CompleteToolExecution(config.SessionID, "atomic_docker_tag", true, nil, 0)
+	// Simplified: removed job tracking
 
 	af.logger.Info().
 		Str("source_ref", sourceRef).

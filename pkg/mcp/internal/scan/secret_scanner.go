@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/rs/zerolog"
 )
 

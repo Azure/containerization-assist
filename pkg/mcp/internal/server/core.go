@@ -3,18 +3,30 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/kind"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
+	"github.com/Azure/container-kit/pkg/mcp/core/transport"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/pipeline"
+	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
+	"github.com/Azure/container-kit/pkg/runner"
+	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
 
@@ -38,7 +50,7 @@ type Server struct {
 	conversationComponents *ConversationComponents
 
 	// Gomcp manager for lean tool registration
-	gomcpManager *GomcpManager
+	gomcpManager GomcpManagerInterface
 
 	// OpenTelemetry components
 	otelProvider   *observability.OTELProvider
@@ -55,28 +67,231 @@ type ConversationComponents struct {
 	isEnabled bool
 }
 
-// GomcpManager represents the gomcp manager
-type GomcpManager struct {
-	// Add gomcp manager fields here
-	server interface{}
+// GomcpManagerInterface defines the interface for gomcp manager
+type GomcpManagerInterface interface {
+	Initialize() error
+	SetToolOrchestrator(orchestrator interface{})
+	RegisterTools(server *Server) error
+	StartServer() error
 }
 
-// Initialize initializes the gomcp manager
-func (g *GomcpManager) Initialize() error {
-	// Implementation would go here
+// simplifiedGomcpManager provides simple tool registration without over-engineering
+type simplifiedGomcpManager struct {
+	server        server.Server
+	isInitialized bool
+	logger        zerolog.Logger
+	startTime     time.Time
+}
+
+// createRealGomcpManager creates a simplified gomcp manager
+func createRealGomcpManager(transport interface{}, slogLevel slog.Level, serviceName string, logger zerolog.Logger) GomcpManagerInterface {
+	return &simplifiedGomcpManager{
+		logger:    logger.With().Str("component", "simplified_gomcp_manager").Logger(),
+		startTime: time.Now(),
+	}
+}
+
+// Initialize creates the simplified gomcp server
+func (s *simplifiedGomcpManager) Initialize() error {
+	s.logger.Info().Msg("Initializing simplified gomcp server")
+
+	// Create slog logger for gomcp
+	slogHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	slogger := *slog.New(slogHandler)
+
+	// Create the gomcp server directly
+	s.server = server.NewServer("Container Kit MCP Server",
+		server.WithLogger(&slogger),
+		server.WithProtocolVersion("1.0.0"),
+	).AsStdio()
+
+	if s.server == nil {
+		return fmt.Errorf("failed to create gomcp stdio server")
+	}
+
+	s.isInitialized = true
+	s.logger.Info().Msg("Simplified gomcp server initialized successfully")
 	return nil
 }
 
-// RegisterTools registers tools with gomcp
-func (g *GomcpManager) RegisterTools(server *Server) error {
-	// Implementation would go here
+// SetToolOrchestrator is a no-op in simplified manager
+func (s *simplifiedGomcpManager) SetToolOrchestrator(orchestrator interface{}) {
+	// Simplified approach - no orchestrator dependency
+	s.logger.Debug().Msg("SetToolOrchestrator called on simplified manager (no-op)")
+}
+
+// RegisterTools registers essential containerization tools
+func (s *simplifiedGomcpManager) RegisterTools(srv *Server) error {
+	if !s.isInitialized {
+		return fmt.Errorf("gomcp manager not initialized")
+	}
+
+	s.logger.Info().Msg("Registering essential containerization tools")
+
+	// Create dependencies needed for tools
+	cmdRunner := &runner.DefaultCommandRunner{}
+	mcpClients := mcptypes.NewMCPClients(
+		docker.NewDockerCmdRunner(cmdRunner),
+		kind.NewKindCmdRunner(cmdRunner),
+		k8s.NewKubeCmdRunner(cmdRunner),
+	)
+
+	pipelineOps := pipeline.NewOperations(
+		srv.sessionManager,
+		mcpClients,
+		srv.logger,
+	)
+
+	// Create tools
+	analyzeRepoTool := analyze.NewAtomicAnalyzeRepositoryTool(pipelineOps, srv.sessionManager, srv.logger)
+	buildImageTool := build.NewAtomicBuildImageTool(pipelineOps, srv.sessionManager, srv.logger)
+	pushImageTool := build.NewAtomicPushImageTool(pipelineOps, srv.sessionManager, srv.logger)
+	generateManifestsTool := deploy.NewAtomicGenerateManifestsTool(pipelineOps, srv.sessionManager, srv.logger)
+	scanImageTool := scan.NewAtomicScanImageSecurityTool(pipelineOps, srv.sessionManager, srv.logger)
+
+	// Register analyze_repository tool
+	s.server.Tool("analyze_repository", "Analyze repository structure and generate Dockerfile recommendations. Creates a new session for tracking analysis workflow",
+		func(ctx *server.Context, args *analyze.AtomicAnalyzeRepositoryArgs) (*analyze.AtomicAnalysisResult, error) {
+			return analyzeRepoTool.ExecuteWithContext(ctx, args)
+		})
+
+	// Register build_image tool
+	s.server.Tool("build_image", "Build Docker images from Dockerfile. Uses session context for build configuration",
+		func(ctx *server.Context, args *build.AtomicBuildImageArgs) (*build.AtomicBuildImageResult, error) {
+			return buildImageTool.ExecuteWithContext(ctx, args)
+		})
+
+	// Register push_image tool
+	s.server.Tool("push_image", "Push Docker images to container registries",
+		func(ctx *server.Context, args *build.AtomicPushImageArgs) (*build.AtomicPushImageResult, error) {
+			return pushImageTool.ExecuteWithFixes(context.Background(), *args)
+		})
+
+	// Register generate_manifests tool
+	s.server.Tool("generate_manifests", "Generate Kubernetes manifests for containerized applications. Uses session context for manifest generation",
+		func(ctx *server.Context, args *deploy.GenerateManifestsArgs) (*deploy.GenerateManifestsResult, error) {
+			result, err := generateManifestsTool.Execute(context.Background(), *args)
+			if err != nil {
+				return nil, err
+			}
+			if typed, ok := result.(*deploy.GenerateManifestsResult); ok {
+				return typed, nil
+			}
+			return nil, fmt.Errorf("unexpected result type: %T", result)
+		})
+
+	// Register generate_dockerfile tool
+	generateDockerfileTool := analyze.NewAtomicGenerateDockerfileTool(srv.sessionManager, srv.logger)
+	s.server.Tool("generate_dockerfile", "Generate optimized Dockerfile based on repository analysis. Uses session context for Dockerfile generation",
+		func(ctx *server.Context, args *analyze.GenerateDockerfileArgs) (*analyze.GenerateDockerfileResult, error) {
+			return generateDockerfileTool.ExecuteTyped(context.Background(), *args)
+		})
+
+	// Register scan_image tool
+	s.server.Tool("scan_image", "Scan Docker images for security vulnerabilities. Uses session context for vulnerability scanning",
+		func(ctx *server.Context, args *scan.AtomicScanImageSecurityArgs) (*scan.AtomicScanImageSecurityResult, error) {
+			return scanImageTool.ExecuteWithContext(ctx, args)
+		})
+
+	// Register list_sessions tool
+	s.server.Tool("list_sessions", "List all active and recent sessions with their status",
+		func(ctx *server.Context, args *struct {
+			Limit *int `json:"limit,omitempty"`
+		}) (*struct {
+			Sessions []map[string]interface{} `json:"sessions"`
+			Total    int                      `json:"total"`
+		}, error) {
+			sessions := srv.sessionManager.ListSessionSummaries()
+			limit := 50 // default limit
+			if args.Limit != nil && *args.Limit > 0 {
+				limit = *args.Limit
+			}
+
+			sessionData := make([]map[string]interface{}, 0)
+			for i, session := range sessions {
+				if i >= limit {
+					break
+				}
+				sessionInfo := map[string]interface{}{
+					"session_id":    session.SessionID,
+					"created_at":    session.CreatedAt,
+					"last_accessed": session.LastAccessed,
+					"status":        session.Status,
+					"disk_usage":    session.DiskUsage,
+					"active_jobs":   session.ActiveJobs,
+				}
+				if session.RepoURL != "" {
+					sessionInfo["repo_url"] = session.RepoURL
+				}
+				sessionData = append(sessionData, sessionInfo)
+			}
+
+			return &struct {
+				Sessions []map[string]interface{} `json:"sessions"`
+				Total    int                      `json:"total"`
+			}{
+				Sessions: sessionData,
+				Total:    len(sessions),
+			}, nil
+		})
+
+	// Register diagnostic tools
+	s.server.Tool("ping", "Simple ping tool to test MCP connectivity",
+		func(ctx *server.Context, args struct {
+			Message string `json:"message,omitempty"`
+		}) (interface{}, error) {
+			response := "pong"
+			if args.Message != "" {
+				response = "pong: " + args.Message
+			}
+			return map[string]interface{}{
+				"response":  response,
+				"timestamp": time.Now().Format(time.RFC3339),
+			}, nil
+		})
+
+	s.server.Tool("server_status", "Get basic server status information",
+		func(ctx *server.Context, args *struct {
+			Details bool `json:"details,omitempty"`
+		}) (*struct {
+			Status  string `json:"status"`
+			Version string `json:"version"`
+			Uptime  string `json:"uptime"`
+		}, error) {
+			return &struct {
+				Status  string `json:"status"`
+				Version string `json:"version"`
+				Uptime  string `json:"uptime"`
+			}{
+				Status:  "running",
+				Version: "dev",
+				Uptime:  time.Since(s.startTime).String(),
+			}, nil
+		})
+
+	s.logger.Info().Msg("Essential containerization tools registered successfully")
 	return nil
 }
 
-// StartServer starts the gomcp server
-func (g *GomcpManager) StartServer() error {
-	// Implementation would go here
-	return nil
+// StartServer starts the simplified gomcp server
+func (s *simplifiedGomcpManager) StartServer() error {
+	if !s.isInitialized {
+		return fmt.Errorf("gomcp manager not initialized")
+	}
+	if s.server == nil {
+		return fmt.Errorf("gomcp server is nil")
+	}
+
+	s.logger.Info().Msg("Starting simplified gomcp server")
+
+	// Cast to the gomcp server interface and run
+	if mcpServer, ok := s.server.(interface{ Run() error }); ok {
+		return mcpServer.Run()
+	}
+
+	return fmt.Errorf("server does not implement Run() method")
 }
 
 // NewServer creates a new consolidated MCP server
@@ -123,12 +338,8 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 
 	// Initialize workspace manager
 	workspaceManager, err := utils.NewWorkspaceManager(ctx, utils.WorkspaceConfig{
-		BaseDir:           config.WorkspaceDir,
-		MaxSizePerSession: config.MaxDiskPerSession,
-		TotalMaxSize:      config.TotalDiskLimit,
-		Cleanup:           true,
-		SandboxEnabled:    config.SandboxEnabled,
-		Logger:            logger.With().Str("component", "workspace_manager").Logger(),
+		BaseDir: config.WorkspaceDir,
+		Logger:  logger.With().Str("component", "workspace_manager").Logger(),
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to initialize workspace manager")
@@ -194,6 +405,24 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		return nil, fmt.Errorf("unsupported transport type: %s", config.TransportType)
 	}
 
+	// Convert zerolog to slog level
+	var slogLevel slog.Level
+	switch logLevel {
+	case zerolog.DebugLevel:
+		slogLevel = slog.LevelDebug
+	case zerolog.InfoLevel:
+		slogLevel = slog.LevelInfo
+	case zerolog.WarnLevel:
+		slogLevel = slog.LevelWarn
+	case zerolog.ErrorLevel:
+		slogLevel = slog.LevelError
+	default:
+		slogLevel = slog.LevelInfo
+	}
+
+	// Create a simplified tool manager
+	gomcpManager := createRealGomcpManager(mcpTransport, slogLevel, config.ServiceName, logger)
+
 	server := &Server{
 		config:           config,
 		sessionManager:   sessionManager,
@@ -207,7 +436,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		toolRegistry:     toolRegistry,
 		otelProvider:     otelProvider,
 		otelMiddleware:   otelMiddleware,
-		gomcpManager:     &GomcpManager{},
+		gomcpManager:     gomcpManager,
 		conversationComponents: &ConversationComponents{
 			isEnabled: false,
 		},
@@ -241,7 +470,10 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize gomcp manager: %w", err)
 	}
 
-	// Register all tools with gomcp
+	// Set tool orchestrator reference for the gomcp manager
+	s.gomcpManager.SetToolOrchestrator(s.toolOrchestrator)
+
+	// Register tools with gomcp
 	if err := s.gomcpManager.RegisterTools(s); err != nil {
 		return fmt.Errorf("failed to register tools with gomcp: %w", err)
 	}
@@ -320,4 +552,12 @@ func (s *Server) EnableConversationMode(config core.ConversationConfig) error {
 		s.conversationComponents.isEnabled = true
 	}
 	return nil
+}
+
+// IsConversationModeEnabled returns whether conversation mode is enabled
+func (s *Server) IsConversationModeEnabled() bool {
+	if s.conversationComponents != nil {
+		return s.conversationComponents.isEnabled
+	}
+	return false
 }

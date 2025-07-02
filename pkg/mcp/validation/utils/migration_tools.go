@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 )
 
 // MigrationTool provides utilities for automated migration detection and conversion
@@ -186,7 +188,7 @@ func (m *MigrationTool) findValidationPatterns(node *ast.File, content string) [
 
 	// Also check for string patterns in content
 	for pattern := range m.patternMap {
-		if strings.Contains(content, pattern) && !contains(patterns, pattern) {
+		if strings.Contains(content, pattern) && !commonUtils.ContainsString(patterns, pattern) {
 			patterns = append(patterns, pattern)
 		}
 	}
@@ -334,7 +336,7 @@ func (m *MigrationTool) GenerateMigrationScript() string {
 
 		// Generate sed commands for simple replacements
 		for oldPattern, newPattern := range m.patternMap {
-			if contains(candidate.OldPatterns, oldPattern) {
+			if commonUtils.ContainsString(candidate.OldPatterns, oldPattern) {
 				script += fmt.Sprintf("sed -i 's/%s/%s/g' %s\n", oldPattern, newPattern, candidate.FilePath)
 			}
 		}
@@ -347,15 +349,6 @@ func (m *MigrationTool) GenerateMigrationScript() string {
 }
 
 // Helper functions
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
 
 func unique(slice []string) []string {
 	seen := make(map[string]bool)

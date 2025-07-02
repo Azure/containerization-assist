@@ -1,6 +1,10 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
+)
 
 // ValidationError represents a configuration validation error
 type ValidationError struct {
@@ -14,9 +18,15 @@ func (ve *ValidationError) Error() string {
 }
 
 // NewValidationError creates a new validation error
+// Deprecated: Use NewRichValidationError instead for better error context
 func NewValidationError(field, message string) *ValidationError {
 	return &ValidationError{
 		Field:   field,
 		Message: message,
 	}
+}
+
+// NewRichValidationError creates a new rich validation error (preferred)
+func NewRichValidationError(field, message string) *rich.RichError {
+	return NewRichConfigValidationError(field, message)
 }

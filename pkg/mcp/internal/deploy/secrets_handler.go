@@ -7,8 +7,9 @@ import (
 	"regexp"
 	"strings"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -239,7 +240,7 @@ func (h *SecretsHandler) analyzeSecret(name, value string) SecretInfo {
 	// Set pattern if detected
 	if pattern := h.detectPattern(value); pattern != "" {
 		info.Pattern = pattern
-		info.Confidence = min(info.Confidence+0.1, 1.0)
+		info.Confidence = commonUtils.MinFloat(info.Confidence+0.1, 1.0)
 	}
 
 	return info
@@ -354,12 +355,4 @@ func (h *SecretsHandler) generateSecretManifest(secretName string, secrets []Sec
 		IsSecret:   true,
 		SecretInfo: infoBuilder.String(),
 	}, nil
-}
-
-// min returns the minimum of two float64 values
-func min(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
 }

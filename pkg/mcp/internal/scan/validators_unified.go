@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	"github.com/Azure/container-kit/pkg/mcp/validation/core"
 	"github.com/Azure/container-kit/pkg/mcp/validation/validators"
 )
@@ -189,7 +190,7 @@ func convertVulnerabilities(result AtomicScanImageSecurityResult) []validators.V
 			vulnerability := validators.Vulnerability{
 				ID:           vuln.VulnerabilityID,
 				Severity:     vuln.Severity,
-				Score:        0.0, // TODO: Extract score from CVSS
+				Score:        estimateScoreFromSeverity(vuln.Severity),
 				Package:      vuln.PkgName,
 				Version:      vuln.InstalledVersion,
 				FixedVersion: vuln.FixedVersion,
@@ -231,6 +232,22 @@ func convertVulnerabilitySummary(summary VulnerabilityAnalysisSummary) validator
 	}
 }
 
+// estimateScoreFromSeverity provides a CVSS-like score estimate based on severity
+func estimateScoreFromSeverity(severity string) float64 {
+	switch severity {
+	case "CRITICAL":
+		return 9.5
+	case "HIGH":
+		return 7.5
+	case "MEDIUM":
+		return 5.0
+	case "LOW":
+		return 2.5
+	default:
+		return 0.0
+	}
+}
+
 // ValidateSecretScanConfigUnified validates secret scan configuration
 func ValidateSecretScanConfigUnified(config map[string]interface{}) *core.ValidationResult {
 	return validators.ValidateSecretScanArgs(config)
@@ -266,7 +283,7 @@ func GetSecretScanValidationMetrics(result AtomicScanSecretsResult) map[string]i
 	// Add risk assessment
 	if result.SecretsFound > 0 {
 		metrics["has_secrets"] = true
-		metrics["secrets_per_file"] = float64(result.SecretsFound) / float64(max(result.FilesScanned, 1))
+		metrics["secrets_per_file"] = float64(result.SecretsFound) / float64(commonUtils.Max(result.FilesScanned, 1))
 	} else {
 		metrics["has_secrets"] = false
 	}
@@ -383,12 +400,4 @@ func ValidateScanPipeline(config map[string]interface{}) *core.ValidationResult 
 	}
 
 	return overallResult
-}
-
-// max returns the maximum of two integers
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

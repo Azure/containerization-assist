@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

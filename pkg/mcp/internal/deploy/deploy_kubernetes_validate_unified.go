@@ -7,7 +7,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	validationCore "github.com/Azure/container-kit/pkg/mcp/validation/core"
 	"github.com/Azure/container-kit/pkg/mcp/validation/validators"
 )
@@ -113,10 +113,10 @@ func (t *AtomicDeployKubernetesTool) ValidateUnified(ctx context.Context, args i
 		Namespace:       deployArgs.Namespace,
 		AppName:         deployArgs.AppName,
 		WaitTimeout:     deployArgs.WaitTimeout,
-		SkipHealthCheck: false, // TODO: Add field to AtomicDeployKubernetesArgs
-		ManifestPath:    "",    // TODO: Add field to AtomicDeployKubernetesArgs
+		SkipHealthCheck: deployArgs.SkipHealthCheck,
+		ManifestPath:    deployArgs.ManifestPath,
 		DryRun:          deployArgs.DryRun,
-		Force:           false, // TODO: Add field to AtomicDeployKubernetesArgs
+		Force:           deployArgs.Force,
 	}
 
 	// If WaitTimeout is specified, convert to Duration
@@ -215,10 +215,10 @@ func ValidateDeploymentArgsUnified(args AtomicDeployKubernetesArgs) *validationC
 		Namespace:       args.Namespace,
 		AppName:         args.AppName,
 		WaitTimeout:     args.WaitTimeout,
-		SkipHealthCheck: false, // TODO: Add field to AtomicDeployKubernetesArgs
-		ManifestPath:    "",    // TODO: Add field to AtomicDeployKubernetesArgs
+		SkipHealthCheck: args.SkipHealthCheck,
+		ManifestPath:    args.ManifestPath,
 		DryRun:          args.DryRun,
-		Force:           false, // TODO: Add field to AtomicDeployKubernetesArgs
+		Force:           args.Force,
 	}
 
 	if args.WaitTimeout > 0 {

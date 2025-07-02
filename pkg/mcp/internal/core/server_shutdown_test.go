@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

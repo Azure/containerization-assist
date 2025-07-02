@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/genericutils"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 

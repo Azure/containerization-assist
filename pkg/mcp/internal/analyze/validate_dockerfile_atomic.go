@@ -12,9 +12,10 @@ import (
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	constants "github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	"github.com/localrivet/gomcp/server"
@@ -171,7 +172,7 @@ type AtomicValidateDockerfileTool struct {
 	pipelineAdapter core.PipelineOperations
 	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
-	analyzer        ToolAnalyzer
+	analyzer        common.FailureAnalyzer
 	fixingMixin     *build.AtomicToolFixingMixin
 }
 
@@ -184,7 +185,7 @@ func NewAtomicValidateDockerfileTool(adapter core.PipelineOperations, sessionMan
 	}
 }
 
-func (t *AtomicValidateDockerfileTool) SetAnalyzer(analyzer ToolAnalyzer) {
+func (t *AtomicValidateDockerfileTool) SetAnalyzer(analyzer common.FailureAnalyzer) {
 	t.analyzer = analyzer
 }
 

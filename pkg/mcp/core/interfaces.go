@@ -393,23 +393,6 @@ type ServerConfig struct {
 	TraceSampleRate float64
 }
 
-// ConversationConfig holds configuration for conversation mode
-type ConversationConfig struct {
-	EnableTelemetry          bool
-	TelemetryPort            int
-	PreferencesDBPath        string
-	PreferencesEncryptionKey string // Optional encryption key for preference store
-
-	// OpenTelemetry configuration
-	EnableOTEL      bool
-	OTELEndpoint    string
-	OTELHeaders     map[string]string
-	ServiceName     string
-	ServiceVersion  string
-	Environment     string
-	TraceSampleRate float64
-}
-
 // ServerStats represents overall server statistics
 type ServerStats struct {
 	Transport string               `json:"transport"`
@@ -439,22 +422,6 @@ type WorkspaceStats struct {
 	TotalFiles     int   `json:"total_files"`
 	DiskLimit      int64 `json:"disk_limit"`
 }
-
-// ConversationStage represents different stages of conversation
-type ConversationStage string
-
-const (
-	ConversationStagePreFlight  ConversationStage = "preflight"
-	ConversationStageAnalyze    ConversationStage = "analyze"
-	ConversationStageDockerfile ConversationStage = "dockerfile"
-	ConversationStageBuild      ConversationStage = "build"
-	ConversationStagePush       ConversationStage = "push"
-	ConversationStageManifests  ConversationStage = "manifests"
-	ConversationStageDeploy     ConversationStage = "deploy"
-	ConversationStageScan       ConversationStage = "scan"
-	ConversationStageCompleted  ConversationStage = "completed"
-	ConversationStageError      ConversationStage = "error"
-)
 
 // ============================================================================
 // AI and Fixing Interfaces
@@ -612,57 +579,6 @@ type SessionFilter struct {
 // ============================================================================
 // Additional Operation Types
 // ============================================================================
-
-// FixableOperation represents an operation that can be fixed when it fails
-type FixableOperation interface {
-	// Execute performs the operation
-	Execute(ctx context.Context) error
-	// ExecuteOnce runs the operation once
-	ExecuteOnce(ctx context.Context) error
-	// CanRetry determines if the operation can be retried after failure
-	CanRetry(err error) bool
-	// GetFailureAnalysis analyzes the failure for potential fixes
-	GetFailureAnalysis(ctx context.Context, err error) (*FailureAnalysis, error)
-	// PrepareForRetry prepares the operation for retry (e.g., cleanup, state reset)
-	PrepareForRetry(ctx context.Context, fixAttempt interface{}) error
-}
-
-// FailureAnalysis represents analysis of an operation failure
-type FailureAnalysis struct {
-	FailureType    string   `json:"failure_type"`
-	IsCritical     bool     `json:"is_critical"`
-	IsRetryable    bool     `json:"is_retryable"`
-	RootCauses     []string `json:"root_causes"`
-	SuggestedFixes []string `json:"suggested_fixes"`
-	ErrorContext   string   `json:"error_context"`
-}
-
-// Error implements the error interface for FailureAnalysis
-func (fa *FailureAnalysis) Error() string {
-	if fa == nil {
-		return "failure analysis: <nil>"
-	}
-	return fmt.Sprintf("failure analysis: %s (%s)", fa.FailureType, fa.ErrorContext)
-}
-
-// ErrorContext provides contextual information about errors
-type ErrorContext struct {
-	SessionID     string            `json:"session_id"`
-	OperationType string            `json:"operation_type"`
-	Phase         string            `json:"phase"`
-	ErrorCode     string            `json:"error_code"`
-	Metadata      map[string]string `json:"metadata"` // Changed to map[string]string for type safety
-	Timestamp     time.Time         `json:"timestamp"`
-}
-
-// LocalProgressStage represents a local progress stage
-type LocalProgressStage struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Progress    int     `json:"progress"`
-	Status      string  `json:"status"`
-	Weight      float64 `json:"weight"`
-}
 
 // Recommendation represents an AI recommendation
 type Recommendation struct {
@@ -860,25 +776,6 @@ type ValidateParams struct {
 	StrictMode     bool     `json:"strict_mode"`
 }
 
-// ValidateResult represents the result of a validation operation
-// TODO: Migrate to pkg/mcp/validation/core.ValidationResult
-type ValidateResult struct {
-	BaseToolResponse
-	Valid       bool     `json:"valid"`
-	Score       float64  `json:"score"`
-	Suggestions []string `json:"suggestions"`
-}
-
-// ScanParams represents parameters for security scan operations
-type ScanParams struct {
-	SessionID   string   `json:"session_id"`
-	ImageRef    string   `json:"image_ref"`
-	ScanType    string   `json:"scan_type"` // "vulnerability", "compliance", "both"
-	Severity    []string `json:"severity"`  // ["critical", "high", "medium", "low"]
-	Format      string   `json:"format"`    // "json", "sarif", "table"
-	ExitOnError bool     `json:"exit_on_error"`
-}
-
 // Validate implements ToolParams interface
 func (p ScanParams) Validate() error {
 	if p.SessionID == "" {
@@ -947,13 +844,3 @@ type HealthCheckConfig struct {
 }
 
 // ValidationIssue type removed - use pkg/mcp/validation/core.ValidationError instead
-
-// SecretFinding represents a detected secret
-type SecretFinding struct {
-	Type        string `json:"type"`
-	File        string `json:"file"`
-	Line        int    `json:"line"`
-	Description string `json:"description"`
-	Confidence  string `json:"confidence"`
-	RuleID      string `json:"rule_id"`
-}

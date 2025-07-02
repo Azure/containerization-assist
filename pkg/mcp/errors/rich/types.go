@@ -51,6 +51,7 @@ const (
 	CodeToolNotFound          ErrorCode = "TOOL_NOT_FOUND"
 	CodeToolExecutionFailed   ErrorCode = "TOOL_EXECUTION_FAILED"
 	CodeToolAlreadyRegistered ErrorCode = "TOOL_ALREADY_REGISTERED"
+	CodeVersionMismatch       ErrorCode = "VERSION_MISMATCH"
 
 	// Generic errors
 	CodeUnknownError   ErrorCode = "UNKNOWN_ERROR"
@@ -73,6 +74,7 @@ const (
 	ErrTypeSystem        ErrorType = "SYSTEM"
 	ErrTypeTimeout       ErrorType = "TIMEOUT"
 	ErrTypePermission    ErrorType = "PERMISSION"
+	ErrTypeCompatibility ErrorType = "COMPATIBILITY"
 )
 
 // ErrorSeverity indicates the impact level of an error

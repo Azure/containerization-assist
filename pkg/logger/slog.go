@@ -5,7 +5,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"strings"
+
+	"github.com/Azure/container-kit/pkg/commonutils"
 )
 
 // SlogConfig holds configuration for structured logging
@@ -85,11 +86,7 @@ func containsLevel(msg, level string) bool {
 	// Check both slog text format and JSON format patterns
 	textPattern := "level=" + level
 	jsonPattern := `"level":"` + level + `"`
-	return contains(msg, textPattern) || contains(msg, jsonPattern)
-}
-
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
+	return commonutils.Contains(msg, textPattern) || commonutils.Contains(msg, jsonPattern)
 }
 
 // Global structured logger instance

@@ -7,7 +7,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 )
 
 // performHealthCheck verifies deployment health

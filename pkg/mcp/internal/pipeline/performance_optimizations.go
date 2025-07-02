@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/rs/zerolog"
 )
 
@@ -140,7 +141,7 @@ func (po *PerformanceOptimizer) BatchOptimizeOperations(ctx context.Context, ope
 	errors := make([]error, len(operations))
 
 	// Use worker pool for parallel execution
-	workerCount := min(len(operations), 5) // Limit concurrent operations
+	workerCount := commonUtils.Min(len(operations), 5) // Limit concurrent operations
 	jobs := make(chan int, len(operations))
 
 	var wg sync.WaitGroup
@@ -373,12 +374,4 @@ type BatchOperation struct {
 	Type      string                 `json:"type"`
 	SessionID string                 `json:"session_id"`
 	Args      map[string]interface{} `json:"args"`
-}
-
-// min returns the smaller of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

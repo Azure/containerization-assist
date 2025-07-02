@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )

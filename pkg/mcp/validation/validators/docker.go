@@ -56,8 +56,8 @@ func (d *DockerfileValidator) Validate(ctx context.Context, data interface{}, op
 		Warnings: make([]*core.ValidationWarning, 0),
 		Metadata: core.ValidationMetadata{
 			ValidatedAt:      startTime,
-			ValidatorName:    d.name,
-			ValidatorVersion: d.version,
+			ValidatorName:    d.Name,
+			ValidatorVersion: d.Version,
 			RulesApplied:     make([]string, 0),
 			Context:          make(map[string]interface{}),
 		},

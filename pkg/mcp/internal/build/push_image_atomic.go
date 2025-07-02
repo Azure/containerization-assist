@@ -10,10 +10,11 @@ import (
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// "github.com/Azure/container-kit/pkg/mcp/internal/runtime" // Temporarily commented to avoid import cycle
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
@@ -78,35 +79,28 @@ type PushContext struct {
 
 // AtomicPushImageTool implements atomic Docker image push using core operations
 type AtomicPushImageTool struct {
-	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  core.ToolSessionManager
-	logger          zerolog.Logger
-	analyzer        ToolAnalyzer
-	fixingMixin     *AtomicToolFixingMixin
+	PipelineAdapter mcptypes.PipelineOperations // Exported for direct access
+	SessionManager  core.ToolSessionManager     // Exported for direct access
+	Logger          zerolog.Logger              // Exported for direct access
+	Analyzer        common.FailureAnalyzer      // Exported for direct access
+	FixingMixin     *AtomicToolFixingMixin      // Exported for direct access
 }
 
 // NewAtomicPushImageTool creates a new atomic push image tool
 func NewAtomicPushImageTool(adapter mcptypes.PipelineOperations, sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicPushImageTool {
 	return &AtomicPushImageTool{
-		pipelineAdapter: adapter,
-		sessionManager:  sessionManager,
-		logger:          logger.With().Str("tool", "atomic_push_image").Logger(),
+		PipelineAdapter: adapter,
+		SessionManager:  sessionManager,
+		Logger:          logger.With().Str("tool", "atomic_push_image").Logger(),
 	}
 }
 
-// SetAnalyzer sets the analyzer for failure analysis
-func (t *AtomicPushImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
-	t.analyzer = analyzer
-}
-
-// SetFixingMixin sets the fixing mixin for automatic error recovery
-func (t *AtomicPushImageTool) SetFixingMixin(mixin *AtomicToolFixingMixin) {
-	t.fixingMixin = mixin
-}
+// Note: Analyzer and FixingMixin fields are exported for direct access
+// Use tool.Analyzer = analyzer and tool.FixingMixin = mixin directly
 
 // ExecuteWithFixes runs the atomic Docker image push with automatic fixes
 func (t *AtomicPushImageTool) ExecuteWithFixes(ctx context.Context, args AtomicPushImageArgs) (*AtomicPushImageResult, error) {
-	if t.fixingMixin != nil && !args.DryRun {
+	if t.FixingMixin != nil && !args.DryRun {
 		// Use fixing mixin to handle retries
 		var result *AtomicPushImageResult
 		startTime := time.Now()
@@ -127,7 +121,7 @@ func (t *AtomicPushImageTool) ExecuteWithFixes(ctx context.Context, args AtomicP
 				return nil
 			},
 		}, observability.NewUnifiedProgressReporter(nil))
-		err := t.fixingMixin.ExecuteWithRetry(ctx, args.SessionID, "/workspace", operation)
+		err := t.FixingMixin.ExecuteWithRetry(ctx, args.SessionID, "/workspace", operation)
 		if err != nil {
 			if result == nil {
 				result = &AtomicPushImageResult{
@@ -159,9 +153,9 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 	}
 
 	// Get session
-	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.SessionManager.GetSession(args.SessionID)
 	if err != nil {
-		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
+		t.Logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get session")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
 		return result, fmt.Errorf("session not found: %s", args.SessionID)
@@ -170,9 +164,9 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 	sessionState := sessionInterface.(*sessiontypes.SessionState)
 	session := sessionState.ToCoreSessionState()
 	result.SessionID = session.SessionID
-	result.WorkspaceDir = t.pipelineAdapter.GetSessionWorkspace(session.SessionID)
+	result.WorkspaceDir = t.PipelineAdapter.GetSessionWorkspace(session.SessionID)
 
-	t.logger.Info().
+	t.Logger.Info().
 		Str("session_id", session.SessionID).
 		Str("image_ref", args.ImageRef).
 		Msg("Starting atomic Docker push")
@@ -193,7 +187,7 @@ func (t *AtomicPushImageTool) executeWithoutProgress(ctx context.Context, args A
 
 	// Validate prerequisites
 	if err := t.validatePushPrerequisites(result, args); err != nil {
-		t.logger.Error().Err(err).
+		t.Logger.Error().Err(err).
 			Str("session_id", session.SessionID).
 			Str("image_ref", result.ImageRef).
 			Msg("Push prerequisites validation failed")
@@ -262,7 +256,7 @@ type ProgressCallback func(progress float64, message string)
 
 func (t *AtomicPushImageTool) executePushWithCallback(ctx context.Context, args AtomicPushImageArgs, result *AtomicPushImageResult, progress ProgressCallback) error {
 	// Get session
-	sessionInterface, err := t.sessionManager.GetSession(args.SessionID)
+	sessionInterface, err := t.SessionManager.GetSession(args.SessionID)
 	if err != nil {
 		return fmt.Errorf("session not found: %s", args.SessionID)
 	}
@@ -343,7 +337,7 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 	}
 
 	// Use the pipeline adapter to push the image
-	pushResult, err := t.pipelineAdapter.PushImage(ctx, session.SessionID, pushArgs)
+	pushResult, err := t.PipelineAdapter.PushImage(ctx, session.SessionID, pushArgs)
 	result.PushDuration = time.Since(pushStartTime)
 
 	if err != nil {
@@ -356,7 +350,7 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 			"Verify image exists locally",
 			"Check network connectivity to registry",
 		}
-		t.logger.Error().Err(err).Str("image_ref", args.ImageRef).Msg("Failed to push image")
+		t.Logger.Error().Err(err).Str("image_ref", args.ImageRef).Msg("Failed to push image")
 		return fmt.Errorf("failed to push image: %w", err)
 	}
 
@@ -401,7 +395,7 @@ func (t *AtomicPushImageTool) performPush(ctx context.Context, session *core.Ses
 		"Image is now available for deployment or sharing",
 	}
 
-	t.logger.Info().
+	t.Logger.Info().
 		Str("image_ref", args.ImageRef).
 		Str("registry", result.RegistryURL).
 		Dur("push_duration", result.PushDuration).

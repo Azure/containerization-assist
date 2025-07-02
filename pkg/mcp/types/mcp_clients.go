@@ -57,10 +57,8 @@ func NewMCPClientsWithAnalyzer(docker docker.DockerClient, kind kind.KindRunner,
 	}
 }
 
-// SetAnalyzer allows dependency injection of the analyzer implementation
-func (mc *MCPClients) SetAnalyzer(analyzer AIAnalyzer) {
-	mc.Analyzer = analyzer
-}
+// Note: Analyzer field is exported for direct access
+// Use mc.Analyzer = analyzer instead of SetAnalyzer(analyzer)
 
 // ValidateAnalyzerForProduction ensures the analyzer is appropriate for production
 func (mc *MCPClients) ValidateAnalyzerForProduction(logger zerolog.Logger) error {

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	"github.com/rs/zerolog"
 )
 
@@ -284,7 +285,7 @@ func (cm *CommunicationManager) isRetryableError(err error) bool {
 	retryableErrors := []string{"timeout", "connection", "temporary", "unavailable"}
 
 	for _, retryable := range retryableErrors {
-		if contains(errStr, retryable) {
+		if commonUtils.Contains(errStr, retryable) {
 			return true
 		}
 	}
@@ -497,22 +498,4 @@ func (cb *CircuitBreaker) GetState() CircuitBreakerState {
 	cb.mutex.RLock()
 	defer cb.mutex.RUnlock()
 	return cb.state
-}
-
-// Helper function
-func contains(str, substr string) bool {
-	return len(str) >= len(substr) && (str == substr ||
-		(len(str) > len(substr) &&
-			(str[:len(substr)] == substr ||
-				str[len(str)-len(substr):] == substr ||
-				containsSubstring(str, substr))))
-}
-
-func containsSubstring(str, substr string) bool {
-	for i := 0; i <= len(str)-len(substr); i++ {
-		if str[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

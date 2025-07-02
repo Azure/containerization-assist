@@ -2,8 +2,9 @@ package types
 
 import (
 	"fmt"
-	"strings"
 	"testing"
+
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 )
 
 // Test ToolError type
@@ -114,7 +115,7 @@ func TestValidationErrorSet(t *testing.T) {
 	}
 
 	expectedMsg := "Field 'username': cannot be empty"
-	if !contains(errorSet.Error(), expectedMsg) {
+	if !commonUtils.Contains(errorSet.Error(), expectedMsg) {
 		t.Errorf("Error message should contain '%s', got '%s'", expectedMsg, errorSet.Error())
 	}
 
@@ -133,7 +134,7 @@ func TestValidationErrorSet(t *testing.T) {
 
 	// Test error string contains both messages
 	errorStr := errorSet.Error()
-	if !contains(errorStr, "username") || !contains(errorStr, "CUSTOM_ERROR") {
+	if !commonUtils.Contains(errorStr, "username") || !commonUtils.Contains(errorStr, "CUSTOM_ERROR") {
 		t.Errorf("Error string should contain both errors: %s", errorStr)
 	}
 }
@@ -153,7 +154,7 @@ func TestNewValidationError(t *testing.T) {
 	}
 
 	expectedMsg := "Field 'email': invalid format"
-	if !contains(err.Message, expectedMsg) {
+	if !commonUtils.Contains(err.Message, expectedMsg) {
 		t.Errorf("Expected message to contain '%s', got '%s'", expectedMsg, err.Message)
 	}
 
@@ -246,9 +247,4 @@ func TestErrorContext(t *testing.T) {
 	if context.Fields["field1"] != "value1" {
 		t.Errorf("Expected field1 to be 'value1', got %v", context.Fields["field1"])
 	}
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
 }

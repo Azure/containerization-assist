@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 )
 
@@ -143,7 +144,7 @@ func (op *DockerOperation) CanRetry(err error) bool {
 	}
 
 	for _, nonRetryable := range nonRetryableErrors {
-		if contains(errStr, nonRetryable) {
+		if commonUtils.Contains(strings.ToLower(errStr), strings.ToLower(nonRetryable)) {
 			return false
 		}
 	}
@@ -160,7 +161,7 @@ func (op *DockerOperation) CanRetry(err error) bool {
 	}
 
 	for _, retryable := range retryableErrors {
-		if contains(errStr, retryable) {
+		if commonUtils.Contains(strings.ToLower(errStr), strings.ToLower(retryable)) {
 			return true
 		}
 	}
@@ -183,20 +184,20 @@ func (op *DockerOperation) GetFailureAnalysis(ctx context.Context, err error) (*
 	suggestedFixes := []string{}
 
 	// Analyze different error types
-	if contains(errStr, "timeout") {
+	if commonUtils.Contains(strings.ToLower(errStr), "timeout") {
 		failureType = "timeout"
 		rootCauses = []string{"Network timeout", "Operation took too long"}
 		suggestedFixes = []string{"Increase timeout duration", "Check network connectivity", "Retry with backoff"}
-	} else if contains(errStr, "permission denied") {
+	} else if commonUtils.Contains(strings.ToLower(errStr), "permission denied") {
 		failureType = "permission_error"
 		isCritical = true
 		rootCauses = []string{"Insufficient permissions"}
 		suggestedFixes = []string{"Check Docker daemon permissions", "Run with appropriate privileges", "Check file permissions"}
-	} else if contains(errStr, "not found") {
+	} else if commonUtils.Contains(strings.ToLower(errStr), "not found") {
 		failureType = "resource_not_found"
 		rootCauses = []string{"Missing resource or dependency"}
 		suggestedFixes = []string{"Verify resource exists", "Check spelling and path", "Ensure prerequisites are met"}
-	} else if contains(errStr, "network") || contains(errStr, "connection") {
+	} else if commonUtils.Contains(strings.ToLower(errStr), "network") || commonUtils.Contains(strings.ToLower(errStr), "connection") {
 		failureType = "network_error"
 		rootCauses = []string{"Network connectivity issues"}
 		suggestedFixes = []string{"Check network connection", "Verify proxy settings", "Retry after network stabilizes"}
@@ -227,9 +228,4 @@ func (op *DockerOperation) PrepareForRetry(ctx context.Context, fixAttempt inter
 	}
 
 	return nil
-}
-
-// Helper function to check if string contains substring (case insensitive)
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

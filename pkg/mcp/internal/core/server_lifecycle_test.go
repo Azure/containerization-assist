@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -135,7 +135,7 @@ func TestServerComponentInitializationFailure(t *testing.T) {
 
 		_, err := NewServer(context.Background(), config)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "SESSION_WORKSPACE_CREATION_FAILED")
+		assert.Contains(t, err.Error(), "SERVER_SESSION_MANAGER_INITIALIZATION_FAILED")
 	})
 
 	t.Run("storage directory creation failure", func(t *testing.T) {

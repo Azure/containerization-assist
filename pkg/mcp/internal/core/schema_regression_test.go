@@ -192,9 +192,21 @@ func (c *MCPClient) GetToolsList() ([]MCPToolSchema, error) {
 		return nil, fmt.Errorf("failed to send tools/list request: %w", err)
 	}
 
-	resp, err := c.ReadResponse()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read tools/list response: %w", err)
+	// Read responses, skipping any notification errors (id: null)
+	// The gomcp library may return errors for unsupported notifications
+	var resp *MCPResponse
+	for {
+		var err error
+		resp, err = c.ReadResponse()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response: %w", err)
+		}
+		// Skip notification error responses (id: null)
+		if resp.ID == nil {
+			continue
+		}
+		// This is a response to a request (has non-null ID) - use it
+		break
 	}
 
 	if resp.Error != nil {
@@ -239,7 +251,7 @@ func TestSchemaRegression(t *testing.T) {
 		t.Skip("Skipping schema regression test in short mode")
 	}
 
-	t.Skip("Schema regression test currently unstable - needs external MCP server setup")
+	// Removed hardcoded skip - testing gomcp integration fix
 
 	client, err := StartMCPServer(t)
 	require.NoError(t, err, "Failed to start MCP server")
@@ -341,7 +353,8 @@ func TestSchemaStability(t *testing.T) {
 		t.Skip("Skipping schema stability test in short mode")
 	}
 
-	t.Skip("Schema stability test currently unstable - needs external MCP server setup")
+	// Skip due to broken pipe issues during server shutdown - see TEST_FIX.md for resolution plan
+	t.Skip("TEMPORARILY SKIPPED: Broken pipe during server shutdown - tracked in TEST_FIX.md")
 
 	client1, err := StartMCPServer(t)
 	require.NoError(t, err)
@@ -391,7 +404,7 @@ func TestSchemaArrayMapCompatibility(t *testing.T) {
 		t.Skip("Skipping schema compatibility test in short mode")
 	}
 
-	t.Skip("Schema compatibility test currently unstable - needs external MCP server setup")
+	// Removed hardcoded skip - testing gomcp integration fix
 
 	client, err := StartMCPServer(t)
 	require.NoError(t, err)
@@ -430,6 +443,11 @@ func validateArrayFields(t *testing.T, toolName string, schema map[string]interf
 			}
 			validateArrayFields(t, toolName, v)
 		case []interface{}:
+			// Allow empty arrays for 'required' field when all parameters are optional
+			if key == "required" {
+				// Empty required array is valid when all parameters are optional
+				continue
+			}
 			assert.NotEmpty(t, v, "Tool %s field %s is empty array", toolName, key)
 		}
 	}

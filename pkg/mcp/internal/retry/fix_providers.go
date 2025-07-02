@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 )
 
 // DockerFixProvider provides fixes for Docker-related issues
@@ -87,13 +88,34 @@ func (dfp *DockerFixProvider) ApplyFix(ctx context.Context, strategy FixStrategy
 			return dfp.fixPortConflict(ctx, strategy, context)
 		}
 	}
-	return errors.Internal("retry/fix-provider", "unsupported fix strategy")
+	return rich.NewError().
+		Code(rich.CodeNotImplemented).
+		Type(rich.ErrTypeValidation).
+		Severity(rich.SeverityMedium).
+		Message("unsupported fix strategy").
+		Context("module", "retry/fix-provider").
+		Context("component", "DockerFixProvider").
+		Context("strategy_name", strategy.Name).
+		Suggestion("Use a supported fix strategy like 'Fix Syntax', 'Change Base Image', or 'Change Port'").
+		WithLocation().
+		Build()
 }
 
 func (dfp *DockerFixProvider) fixDockerfileSyntax(_ context.Context, strategy FixStrategy, _ map[string]interface{}) error {
 	dockerfilePath, ok := strategy.Parameters["dockerfile_path"].(string)
 	if !ok || dockerfilePath == "" {
-		return errors.Validation("retry/fix-provider", "dockerfile path not provided")
+		return rich.NewError().
+			Code(rich.CodeMissingParameter).
+			Type(rich.ErrTypeValidation).
+			Severity(rich.SeverityMedium).
+			Message("dockerfile path not provided").
+			Context("module", "retry/fix-provider").
+			Context("component", "DockerFixProvider").
+			Context("method", "fixDockerfileSyntax").
+			Context("strategy_name", strategy.Name).
+			Suggestion("Provide a valid dockerfile_path parameter in the strategy").
+			WithLocation().
+			Build()
 	}
 
 	// Read the Dockerfile

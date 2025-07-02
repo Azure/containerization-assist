@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	"github.com/rs/zerolog"
 )
 
@@ -15,9 +16,9 @@ func TestMCPClientsAnalyzerOperations(t *testing.T) {
 	// Create a minimal MCPClients struct for testing analyzer operations
 	clients := &MCPClients{}
 
-	// Test SetAnalyzer
+	// Test direct analyzer assignment (replaces SetAnalyzer)
 	analyzer := &MockAIAnalyzer{}
-	clients.SetAnalyzer(analyzer)
+	clients.Analyzer = analyzer
 
 	if clients.Analyzer != analyzer {
 		t.Error("Analyzer not set correctly")
@@ -37,17 +38,17 @@ func TestMCPClientsAnalyzerOperations(t *testing.T) {
 	}
 
 	// Test with unknown analyzer type (should fail)
-	clients.SetAnalyzer(&MockAIAnalyzer{})
+	clients.Analyzer = (&MockAIAnalyzer{})
 	err = clients.ValidateAnalyzerForProduction(logger)
 	if err == nil {
 		t.Error("Unknown analyzer type should fail validation")
 	}
-	if !contains(err.Error(), "may not be safe for production") {
+	if !commonUtils.Contains(err.Error(), "may not be safe for production") {
 		t.Errorf("Error should mention production safety: %s", err.Error())
 	}
 
 	// Test with stub analyzer (should pass)
-	clients.SetAnalyzer(&stubAnalyzer{})
+	clients.Analyzer = (&stubAnalyzer{})
 	err = clients.ValidateAnalyzerForProduction(logger)
 	if err != nil {
 		t.Errorf("Stub analyzer should be valid for production: %v", err)

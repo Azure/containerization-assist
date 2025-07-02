@@ -219,30 +219,8 @@ func (cm *ConfigManager) IsLoaded() bool {
 	return cm.loaded
 }
 
-// GetServerConfig returns the server configuration
-func (cm *ConfigManager) GetServerConfig() *ServerConfig {
-	return cm.Server
-}
-
-// GetAnalyzerConfig returns the analyzer configuration
-func (cm *ConfigManager) GetAnalyzerConfig() *AnalyzerConfig {
-	return cm.Analyzer
-}
-
-// GetTransportConfig returns the transport configuration
-func (cm *ConfigManager) GetTransportConfig() *TransportConfig {
-	return cm.Transport
-}
-
-// GetObservabilityConfig returns the observability configuration
-func (cm *ConfigManager) GetObservabilityConfig() *ObservabilityConfig {
-	return cm.Observability
-}
-
-// GetDockerConfig returns the Docker configuration
-func (cm *ConfigManager) GetDockerConfig() *DockerConfig {
-	return cm.Docker
-}
+// Note: Configuration fields are exported for direct access
+// Use cm.Server, cm.Analyzer, cm.Transport, cm.Observability, cm.Docker directly
 
 // Default configuration functions
 

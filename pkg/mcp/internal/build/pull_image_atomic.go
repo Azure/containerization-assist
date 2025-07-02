@@ -8,12 +8,13 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// mcp import removed - using mcptypes
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
@@ -89,7 +90,7 @@ type AtomicPullImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
-	analyzer        ToolAnalyzer
+	analyzer        common.FailureAnalyzer
 	fixingMixin     *AtomicToolFixingMixin
 }
 
@@ -103,7 +104,7 @@ func NewAtomicPullImageTool(adapter mcptypes.PipelineOperations, sessionManager 
 }
 
 // SetAnalyzer sets the analyzer for failure analysis
-func (t *AtomicPullImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
+func (t *AtomicPullImageTool) SetAnalyzer(analyzer common.FailureAnalyzer) {
 	t.analyzer = analyzer
 }
 
