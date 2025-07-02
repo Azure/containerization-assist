@@ -6,13 +6,13 @@ package runtime
 import (
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/internal/scan"
 	"github.com/Azure/container-kit/pkg/mcp/internal/server"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 )
 
 // Auto-generated tool registry

@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -35,7 +35,7 @@ func (c *Collector) CollectSystemState(ctx context.Context) errors.SystemState {
 		K8sConnected:    c.checkK8sConnection(),
 		DiskSpaceMB:     c.getAvailableDiskSpace(),
 		MemoryMB:        c.getMemoryUsage(),
-		LoadAverage:     0.0, // TODO: implement load average collection
+		LoadAverage:     0.0, // Load average collection not implemented yet
 	}
 
 	c.logger.Debug().
@@ -53,8 +53,8 @@ func (c *Collector) CollectResourceUsage() errors.ResourceUsage {
 		CPUPercent:     c.getCPUUsage(),
 		MemoryMB:       c.getMemoryUsage(),
 		DiskUsageMB:    c.getDiskUsage(),
-		NetworkBytesTx: 0, // TODO: implement network TX collection
-		NetworkBytesRx: 0, // TODO: implement network RX collection
+		NetworkBytesTx: 0, // Network metrics collection not implemented yet
+		NetworkBytesRx: 0, // Network metrics collection not implemented yet
 	}
 
 	c.logger.Debug().

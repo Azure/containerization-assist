@@ -9,37 +9,28 @@ import (
 
 // BaseValidatorImpl provides a base implementation of the Validator interface
 type BaseValidatorImpl struct {
-	name              string
-	version           string
-	supportedTypes    []string
-	config            map[string]interface{}
-	validationContext *core.ValidationContext
+	Name              string                  // Validator name (exported for direct access)
+	Version           string                  // Validator version (exported for direct access)
+	SupportedTypes    []string                // Types this validator can handle (exported for direct access)
+	ValidationContext *core.ValidationContext // Validation context (exported for direct access)
+	config            map[string]interface{}  // Internal configuration (kept private)
 }
 
 // NewBaseValidator creates a new base validator
 func NewBaseValidator(name, version string, supportedTypes []string) *BaseValidatorImpl {
 	return &BaseValidatorImpl{
-		name:           name,
-		version:        version,
-		supportedTypes: supportedTypes,
+		Name:           name,
+		Version:        version,
+		SupportedTypes: supportedTypes,
 		config:         make(map[string]interface{}),
 	}
 }
 
-// GetName returns the name of the validator
-func (b *BaseValidatorImpl) GetName() string {
-	return b.name
-}
-
-// GetVersion returns the version of the validator
-func (b *BaseValidatorImpl) GetVersion() string {
-	return b.version
-}
-
-// GetSupportedTypes returns the types this validator can handle
+// GetSupportedTypes returns a copy of the supported types for safety
+// Note: For performance-critical code, access SupportedTypes field directly
 func (b *BaseValidatorImpl) GetSupportedTypes() []string {
-	result := make([]string, len(b.supportedTypes))
-	copy(result, b.supportedTypes)
+	result := make([]string, len(b.SupportedTypes))
+	copy(result, b.SupportedTypes)
 	return result
 }
 
@@ -53,8 +44,8 @@ func (b *BaseValidatorImpl) Validate(ctx context.Context, data interface{}, opti
 		Warnings: make([]*core.ValidationWarning, 0),
 		Metadata: core.ValidationMetadata{
 			ValidatedAt:      startTime,
-			ValidatorName:    b.name,
-			ValidatorVersion: b.version,
+			ValidatorName:    b.Name,
+			ValidatorVersion: b.Version,
 			RulesApplied:     []string{},
 			Context:          make(map[string]interface{}),
 		},
@@ -62,25 +53,31 @@ func (b *BaseValidatorImpl) Validate(ctx context.Context, data interface{}, opti
 	}
 
 	// Add validation context if available
-	if b.validationContext != nil {
-		result.Metadata.Context["session_id"] = b.validationContext.SessionID
-		result.Metadata.Context["tool"] = b.validationContext.Tool
-		result.Metadata.Context["operation"] = b.validationContext.Operation
+	if b.ValidationContext != nil {
+		result.Metadata.Context["session_id"] = b.ValidationContext.SessionID
+		result.Metadata.Context["tool"] = b.ValidationContext.Tool
+		result.Metadata.Context["operation"] = b.ValidationContext.Operation
 	}
 
 	result.Duration = time.Since(startTime)
 	return result
 }
 
-// SetContext sets the validation context (implements ContextAware)
-func (b *BaseValidatorImpl) SetContext(ctx *core.ValidationContext) {
-	b.validationContext = ctx
+// Interface compliance methods (required by core.Validator interface)
+// Note: Direct field access is preferred when not constrained by interfaces
+
+// GetName returns the validator name (required by core.Validator interface)
+func (b *BaseValidatorImpl) GetName() string {
+	return b.Name
 }
 
-// GetContext returns the validation context (implements ContextAware)
-func (b *BaseValidatorImpl) GetContext() *core.ValidationContext {
-	return b.validationContext
+// GetVersion returns the validator version (required by core.Validator interface)
+func (b *BaseValidatorImpl) GetVersion() string {
+	return b.Version
 }
+
+// Note: ValidationContext field is now exported for direct access
+// Use validator.ValidationContext = ctx instead of SetContext(ctx) when not constrained by interfaces
 
 // Configure configures the validator (implements Configurable)
 func (b *BaseValidatorImpl) Configure(config map[string]interface{}) error {

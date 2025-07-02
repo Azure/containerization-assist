@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
 
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"

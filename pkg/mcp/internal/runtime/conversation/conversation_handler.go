@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
 

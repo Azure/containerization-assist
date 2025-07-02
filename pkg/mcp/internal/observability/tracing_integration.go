@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -375,26 +376,17 @@ func (ti *TracingIntegration) TraceHTTPClient(ctx context.Context, method, url s
 func categorizeToolName(toolName string) string {
 	// Categorize tools based on name patterns
 	switch {
-	case contains(toolName, []string{"build", "compile", "package"}):
+	case commonUtils.ContainsAny(toolName, []string{"build", "compile", "package"}):
 		return "build"
-	case contains(toolName, []string{"test", "validate", "check"}):
+	case commonUtils.ContainsAny(toolName, []string{"test", "validate", "check"}):
 		return "validation"
-	case contains(toolName, []string{"deploy", "release", "publish"}):
+	case commonUtils.ContainsAny(toolName, []string{"deploy", "release", "publish"}):
 		return "deployment"
-	case contains(toolName, []string{"monitor", "metric", "log"}):
+	case commonUtils.ContainsAny(toolName, []string{"monitor", "metric", "log"}):
 		return "observability"
 	default:
 		return "general"
 	}
-}
-
-func contains(str string, substrs []string) bool {
-	for _, substr := range substrs {
-		if len(str) >= len(substr) && str[:len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // TracingExamples provides example usage patterns

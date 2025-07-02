@@ -10,15 +10,23 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
+	"github.com/Azure/container-kit/pkg/mcp/core/transport"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
+
+// GomcpManagerInterface defines the interface for gomcp manager
+type GomcpManagerInterface interface {
+	Initialize() error
+	SetToolOrchestrator(orchestrator interface{})
+	RegisterTools(server *Server) error
+	StartServer() error
+}
 
 // Server represents the MCP server
 type Server struct {
@@ -39,7 +47,7 @@ type Server struct {
 	conversationComponents *ConversationComponents
 
 	// Gomcp manager for lean tool registration
-	gomcpManager *GomcpManager
+	gomcpManager GomcpManagerInterface
 
 	// OpenTelemetry components
 	otelProvider   *observability.OTELProvider
@@ -119,7 +127,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		BaseDir:           config.WorkspaceDir,
 		MaxSizePerSession: config.MaxDiskPerSession,
 		TotalMaxSize:      config.TotalDiskLimit,
-		Cleanup:           true,
+		Cleanup:           true, // Enable auto-cleanup
 		SandboxEnabled:    config.SandboxEnabled,
 		Logger:            logger.With().Str("component", "workspace_manager").Logger(),
 	})
@@ -303,7 +311,7 @@ func (s *Server) GetWorkspaceManager() interface{} {
 // ExportToolSchemas exports tool schemas to a file
 func (s *Server) ExportToolSchemas(outputPath string) error {
 	// Get the tool registry from gomcp manager
-	if s.gomcpManager == nil || !s.gomcpManager.isInitialized {
+	if s.gomcpManager == nil {
 		return errors.Internal("core/server", "server not properly initialized")
 	}
 
@@ -321,7 +329,7 @@ func (s *Server) ExportToolSchemas(outputPath string) error {
 		"metadata": map[string]interface{}{
 			"export_method": "server_direct",
 			"has_gomcp":     s.gomcpManager != nil,
-			"initialized":   s.gomcpManager != nil && s.gomcpManager.isInitialized,
+			"initialized":   s.gomcpManager != nil,
 		},
 	}
 
@@ -414,7 +422,7 @@ func (s *Server) IsOTELEnabled() bool {
 }
 
 // GetGomcpManager returns the server's gomcp manager
-func (s *Server) GetGomcpManager() *GomcpManager {
+func (s *Server) GetGomcpManager() GomcpManagerInterface {
 	return s.gomcpManager
 }
 

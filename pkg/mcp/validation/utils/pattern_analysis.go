@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 )
 
 // PatternAnalyzer analyzes validation patterns across the codebase
@@ -225,11 +227,11 @@ func (p *PatternAnalyzer) analyzeFunctions(node *ast.File, filePath string, fset
 
 				// Extract function signature
 				sig := p.extractFunctionSignature(x)
-				if !contains(stat.Signatures, sig) {
+				if !commonUtils.ContainsString(stat.Signatures, sig) {
 					stat.Signatures = append(stat.Signatures, sig)
 				}
 
-				if !contains(stat.Files, filePath) {
+				if !commonUtils.ContainsString(stat.Files, filePath) {
 					stat.Files = append(stat.Files, filePath)
 				}
 			}
@@ -368,7 +370,7 @@ func (p *PatternAnalyzer) analyzePatterns(content, filePath string) {
 			stat := p.patternStats[patternName]
 			stat.Count += len(matches)
 
-			if !contains(stat.Files, filePath) {
+			if !commonUtils.ContainsString(stat.Files, filePath) {
 				stat.Files = append(stat.Files, filePath)
 			}
 

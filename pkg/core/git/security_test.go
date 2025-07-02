@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/Azure/container-kit/pkg/commonutils"
 )
 
 func TestFilesystemJail_ValidatePath(t *testing.T) {
@@ -79,7 +81,7 @@ func TestFilesystemJail_ValidatePath(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidatePath() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if err != nil && tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+			if err != nil && tt.errMsg != "" && !commonutils.Contains(err.Error(), tt.errMsg) {
 				t.Errorf("ValidatePath() error = %v, want error containing %v", err, tt.errMsg)
 			}
 		})
@@ -274,17 +276,12 @@ func TestFilesystemJail_SecureTargetPath(t *testing.T) {
 			}
 
 			if !tt.wantErr && tt.wantPrefix != "" {
-				if !contains(secured, tt.wantPrefix) {
+				if !commonutils.Contains(secured, tt.wantPrefix) {
 					t.Errorf("SecureTargetPath() = %v, want path containing %v", secured, tt.wantPrefix)
 				}
 			}
 		})
 	}
-}
-
-// Helper function for string contains check
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsSubstring(s, substr))
 }
 
 func containsSubstring(s, substr string) bool {

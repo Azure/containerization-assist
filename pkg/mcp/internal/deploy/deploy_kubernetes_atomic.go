@@ -10,11 +10,11 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 
 	// mcp import removed - using mcptypes
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/localrivet/gomcp/server"
@@ -40,10 +40,13 @@ type AtomicDeployKubernetesArgs struct {
 	CPULimit      string `json:"cpu_limit,omitempty" jsonschema:"pattern=^[0-9]+(m|[kMGT])?$" description:"CPU limit (e.g., 500m)"`
 	MemoryLimit   string `json:"memory_limit,omitempty" jsonschema:"pattern=^[0-9]+([kMGT]i?)?$" description:"Memory limit (e.g., 512Mi)"`
 
-	GenerateOnly bool `json:"generate_only,omitempty" description:"Only generate manifests, don't deploy"`
-	WaitForReady bool `json:"wait_for_ready,omitempty" description:"Wait for pods to become ready (default: true)"`
-	WaitTimeout  int  `json:"wait_timeout,omitempty" jsonschema:"minimum=30,maximum=3600" description:"Wait timeout in seconds (default: 300)"`
-	DryRun       bool `json:"dry_run,omitempty" description:"Preview changes without applying (shows kubectl diff output)"`
+	GenerateOnly    bool   `json:"generate_only,omitempty" description:"Only generate manifests, don't deploy"`
+	WaitForReady    bool   `json:"wait_for_ready,omitempty" description:"Wait for pods to become ready (default: true)"`
+	WaitTimeout     int    `json:"wait_timeout,omitempty" jsonschema:"minimum=30,maximum=3600" description:"Wait timeout in seconds (default: 300)"`
+	SkipHealthCheck bool   `json:"skip_health_check,omitempty" description:"Skip health check validation after deployment"`
+	ManifestPath    string `json:"manifest_path,omitempty" description:"Custom path for generated manifests"`
+	Force           bool   `json:"force,omitempty" description:"Force deployment even if validation fails"`
+	DryRun          bool   `json:"dry_run,omitempty" description:"Preview changes without applying (shows kubectl diff output)"`
 }
 
 // AtomicDeployKubernetesResult defines the response from atomic Kubernetes deployment

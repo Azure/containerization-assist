@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )

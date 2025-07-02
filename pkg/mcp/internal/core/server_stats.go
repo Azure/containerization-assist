@@ -1,12 +1,14 @@
 package core
 
 import (
+	"context"
+	"os"
 	"time"
 
 	coreinterfaces "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 )
 
 // ServerStats provides comprehensive server statistics
@@ -21,7 +23,32 @@ type ServerStats struct {
 // GetStats returns server statistics
 func (s *Server) GetStats() *coreinterfaces.ServerStats {
 	sessionStats := s.sessionManager.GetStats()
-	workspaceStats := s.workspaceManager.GetStats()
+
+	// Get workspace stats if workspace manager is available
+	var workspaceStats *coreinterfaces.WorkspaceStats
+	if s.workspaceManager != nil {
+		// Refresh disk usage by scanning actual workspace directories
+		ctx := context.Background()
+		if err := s.refreshWorkspaceDiskUsage(ctx); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to refresh workspace disk usage")
+		}
+
+		wsStats := s.workspaceManager.GetStats()
+		workspaceStats = &coreinterfaces.WorkspaceStats{
+			TotalDiskUsage: wsStats.TotalDiskUsage,
+			SessionCount:   wsStats.TotalSessions,
+			TotalFiles:     0, // Not available in simplified WorkspaceStats
+			DiskLimit:      wsStats.TotalDiskLimit,
+		}
+	} else {
+		// Fallback to zeros if workspace manager not available
+		workspaceStats = &coreinterfaces.WorkspaceStats{
+			TotalDiskUsage: 0,
+			SessionCount:   0,
+			TotalFiles:     0,
+			DiskLimit:      0,
+		}
+	}
 
 	return &coreinterfaces.ServerStats{
 		Transport: s.config.TransportType,
@@ -36,12 +63,7 @@ func (s *Server) GetStats() *coreinterfaces.ServerStats {
 			TotalDiskUsage:    sessionStats.TotalDiskUsage,
 			ServerStartTime:   sessionStats.ServerStartTime,
 		},
-		Workspace: &coreinterfaces.WorkspaceStats{
-			TotalDiskUsage: workspaceStats.TotalDiskUsage,
-			SessionCount:   workspaceStats.TotalSessions,
-			TotalFiles:     0, // Not available in utils.WorkspaceStats
-			DiskLimit:      workspaceStats.TotalDiskLimit,
-		},
+		Workspace: workspaceStats,
 		Uptime:    time.Since(s.startTime),
 		StartTime: s.startTime,
 	}
@@ -49,12 +71,28 @@ func (s *Server) GetStats() *coreinterfaces.ServerStats {
 
 // GetWorkspaceStats returns workspace statistics
 func (s *Server) GetWorkspaceStats() *coreinterfaces.WorkspaceStats {
-	stats := s.workspaceManager.GetStats()
+	if s.workspaceManager != nil {
+		// Refresh disk usage by scanning actual workspace directories
+		ctx := context.Background()
+		if err := s.refreshWorkspaceDiskUsage(ctx); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to refresh workspace disk usage")
+		}
+
+		wsStats := s.workspaceManager.GetStats()
+		return &coreinterfaces.WorkspaceStats{
+			TotalDiskUsage: wsStats.TotalDiskUsage,
+			SessionCount:   wsStats.TotalSessions,
+			TotalFiles:     0, // Not available in simplified WorkspaceStats
+			DiskLimit:      wsStats.TotalDiskLimit,
+		}
+	}
+
+	// Fallback to zeros if workspace manager not available
 	return &coreinterfaces.WorkspaceStats{
-		TotalDiskUsage: stats.TotalDiskUsage,
-		SessionCount:   stats.TotalSessions,
-		TotalFiles:     0, // Not available in utils.WorkspaceStats
-		DiskLimit:      stats.TotalDiskLimit,
+		TotalDiskUsage: 0,
+		SessionCount:   0,
+		TotalFiles:     0,
+		DiskLimit:      0,
 	}
 }
 
@@ -118,5 +156,32 @@ func (s *Server) GetTelemetry() interface{} {
 	if s.conversationComponents != nil {
 		return s.conversationComponents.Telemetry
 	}
+	return nil
+}
+
+// refreshWorkspaceDiskUsage scans all session directories and updates disk usage
+func (s *Server) refreshWorkspaceDiskUsage(ctx context.Context) error {
+	// Get all session directories
+	entries, err := os.ReadDir(s.config.WorkspaceDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // Workspace directory doesn't exist yet
+		}
+		return err
+	}
+
+	// Update disk usage for each session directory
+	for _, entry := range entries {
+		if entry.IsDir() {
+			sessionID := entry.Name()
+			if err := s.workspaceManager.UpdateDiskUsage(ctx, sessionID); err != nil {
+				s.logger.Warn().
+					Err(err).
+					Str("session_id", sessionID).
+					Msg("Failed to update disk usage for session")
+			}
+		}
+	}
+
 	return nil
 }

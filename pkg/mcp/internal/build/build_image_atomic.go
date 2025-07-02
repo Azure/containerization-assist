@@ -112,7 +112,7 @@ func (t *AtomicBuildImageTool) ExecuteWithFixes(ctx context.Context, args Atomic
 }
 
 // ExecuteWithContext executes the tool with GoMCP server context for native progress tracking
-func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, args AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
+func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, args *AtomicBuildImageArgs) (*AtomicBuildImageResult, error) {
 	startTime := time.Now()
 	// Create result object early for error handling
 	result := &AtomicBuildImageResult{
@@ -129,7 +129,7 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(serverCtx *server.Context, arg
 
 	// Delegate to executor with progress tracking
 	ctx := context.Background()
-	err := t.executor.executeWithProgress(ctx, args, result, startTime, progress)
+	err := t.executor.executeWithProgress(ctx, *args, result, startTime, progress)
 	// Always set total duration
 	result.TotalDuration = time.Since(startTime)
 	// Complete progress tracking
@@ -210,5 +210,5 @@ func (t *AtomicBuildImageTool) Execute(ctx context.Context, args interface{}) (i
 		return nil, fmt.Errorf("invalid argument type for atomic_build_image: expected AtomicBuildImageArgs, got %T", args)
 	}
 	// Execute with nil server context (no progress tracking)
-	return t.ExecuteWithContext(nil, buildArgs)
+	return t.ExecuteWithContext(nil, &buildArgs)
 }

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 	"github.com/rs/zerolog"
 )
 
@@ -69,6 +69,7 @@ func (tve *TypedValidationError) Error() string {
 }
 
 // AddError adds a validation error to the result
+// Deprecated: Use AddTypedError with specific types instead
 func (tvr *TypedValidationResult) AddError(field, message, code string, value interface{}) {
 	tvr.Valid = false
 	// Convert interface{} value to string for type safety
@@ -95,15 +96,51 @@ func (tvr *TypedValidationResult) AddStringError(field, message, code, value str
 	})
 }
 
+// AddTypedError adds a validation error with typed value (preferred)
+func (tvr *TypedValidationResult) AddTypedError(field, message, code, value string) {
+	tvr.AddStringError(field, message, code, value)
+}
+
+// AddIntError adds a validation error with an integer value
+func (tvr *TypedValidationResult) AddIntError(field, message, code string, value int) {
+	tvr.AddStringError(field, message, code, fmt.Sprintf("%d", value))
+}
+
+// AddBoolError adds a validation error with a boolean value
+func (tvr *TypedValidationResult) AddBoolError(field, message, code string, value bool) {
+	tvr.AddStringError(field, message, code, fmt.Sprintf("%t", value))
+}
+
 // ValidateString validates string fields with type safety
 func (tv *TypedValidator) ValidateString(value, fieldName string, required bool, validators ...func(string) error) error {
 	if required && IsEmpty(value) {
-		return errors.Validationf("validator", "Required field '%s' cannot be empty", fieldName)
+		return rich.NewError().
+			Code(rich.CodeMissingParameter).
+			Type(rich.ErrTypeValidation).
+			Severity(rich.SeverityMedium).
+			Messagef("Required field '%s' cannot be empty", fieldName).
+			Context("module", "typed_validator").
+			Context("field", fieldName).
+			Context("field_type", "string").
+			Suggestion(fmt.Sprintf("Provide a non-empty value for field '%s'", fieldName)).
+			WithLocation().
+			Build()
 	}
 
 	for _, validator := range validators {
 		if err := validator(value); err != nil {
-			return errors.Wrapf(err, "validator", "Validation failed for field '%s'", fieldName)
+			return rich.NewError().
+				Code(rich.CodeValidationFailed).
+				Type(rich.ErrTypeValidation).
+				Severity(rich.SeverityMedium).
+				Messagef("Validation failed for field '%s': %v", fieldName, err).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("field_type", "string").
+				Context("field_value", value).
+				Cause(err).
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -113,12 +150,34 @@ func (tv *TypedValidator) ValidateString(value, fieldName string, required bool,
 // ValidateInt validates integer fields with type safety
 func (tv *TypedValidator) ValidateInt(value int, fieldName string, required bool, validators ...func(int) error) error {
 	if required && value == 0 {
-		return errors.Validationf("validator", "Required field '%s' cannot be zero", fieldName)
+		return rich.NewError().
+			Code(rich.CodeMissingParameter).
+			Type(rich.ErrTypeValidation).
+			Severity(rich.SeverityMedium).
+			Messagef("Required field '%s' cannot be zero", fieldName).
+			Context("module", "typed_validator").
+			Context("field", fieldName).
+			Context("field_type", "int").
+			Context("field_value", value).
+			Suggestion(fmt.Sprintf("Provide a non-zero value for field '%s'", fieldName)).
+			WithLocation().
+			Build()
 	}
 
 	for _, validator := range validators {
 		if err := validator(value); err != nil {
-			return errors.Wrapf(err, "validator", "Validation failed for field '%s'", fieldName)
+			return rich.NewError().
+				Code(rich.CodeValidationFailed).
+				Type(rich.ErrTypeValidation).
+				Severity(rich.SeverityMedium).
+				Messagef("Validation failed for field '%s': %v", fieldName, err).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("field_type", "int").
+				Context("field_value", value).
+				Cause(err).
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -128,12 +187,34 @@ func (tv *TypedValidator) ValidateInt(value int, fieldName string, required bool
 // ValidateStringSlice validates string slice fields with type safety
 func (tv *TypedValidator) ValidateStringSlice(value []string, fieldName string, required bool, validators ...func([]string) error) error {
 	if required && len(value) == 0 {
-		return errors.Validationf("validator", "Required field '%s' cannot be empty", fieldName)
+		return rich.NewError().
+			Code(rich.CodeMissingParameter).
+			Type(rich.ErrTypeValidation).
+			Severity(rich.SeverityMedium).
+			Messagef("Required field '%s' cannot be empty", fieldName).
+			Context("module", "typed_validator").
+			Context("field", fieldName).
+			Context("field_type", "[]string").
+			Context("field_length", len(value)).
+			Suggestion(fmt.Sprintf("Provide at least one item for field '%s'", fieldName)).
+			WithLocation().
+			Build()
 	}
 
 	for _, validator := range validators {
 		if err := validator(value); err != nil {
-			return errors.Wrapf(err, "validator", "Validation failed for field '%s'", fieldName)
+			return rich.NewError().
+				Code(rich.CodeValidationFailed).
+				Type(rich.ErrTypeValidation).
+				Severity(rich.SeverityMedium).
+				Messagef("Validation failed for field '%s': %v", fieldName, err).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("field_type", "[]string").
+				Context("field_length", len(value)).
+				Cause(err).
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -144,38 +225,103 @@ func (tv *TypedValidator) ValidateStringSlice(value []string, fieldName string, 
 func (tv *TypedValidator) ValidatePath(path, fieldName string, requirements PathRequirements) error {
 	if path == "" {
 		if requirements.Required {
-			return errors.Validationf("validator", "Required path field '%s' cannot be empty", fieldName)
+			return rich.NewError().
+				Code(rich.CodeMissingParameter).
+				Type(rich.ErrTypeValidation).
+				Severity(rich.SeverityMedium).
+				Messagef("Required path field '%s' cannot be empty", fieldName).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("field_type", "path").
+				Suggestion(fmt.Sprintf("Provide a valid file or directory path for field '%s'", fieldName)).
+				WithLocation().
+				Build()
 		}
 		return nil
 	}
 
 	// Use centralized path validation
 	if err := ValidateLocalPath(path); err != nil {
-		return errors.Wrapf(err, "validator", "Path validation failed for field '%s'", fieldName)
+		return rich.NewError().
+			Code(rich.CodeValidationFailed).
+			Type(rich.ErrTypeValidation).
+			Severity(rich.SeverityMedium).
+			Messagef("Path validation failed for field '%s'", fieldName).
+			Context("module", "typed_validator").
+			Context("field", fieldName).
+			Context("field_type", "path").
+			Context("path_value", path).
+			Cause(err).
+			WithLocation().
+			Build()
 	}
 
 	// Check specific requirements
 	if requirements.MustExist {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return errors.Validationf("validator", "Path '%s' in field '%s' does not exist", path, fieldName)
+			return rich.NewError().
+				Code(rich.CodeResourceNotFound).
+				Type(rich.ErrTypeResource).
+				Severity(rich.SeverityMedium).
+				Messagef("Path '%s' in field '%s' does not exist", path, fieldName).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("path_value", path).
+				Suggestion("Ensure the path exists and is accessible").
+				WithLocation().
+				Build()
 		}
 	}
 
 	if requirements.MustBeDirectory {
 		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			return errors.Validationf("validator", "Path '%s' in field '%s' must be a directory", path, fieldName)
+			return rich.NewError().
+				Code(rich.CodeInvalidParameter).
+				Type(rich.ErrTypeValidation).
+				Severity(rich.SeverityMedium).
+				Messagef("Path '%s' in field '%s' must be a directory", path, fieldName).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("path_value", path).
+				Context("is_directory", false).
+				Suggestion("Provide a directory path, not a file path").
+				WithLocation().
+				Build()
 		}
 	}
 
 	if requirements.MustBeFile {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return errors.Validationf("validator", "Path '%s' in field '%s' must be a file", path, fieldName)
+			return rich.NewError().
+				Code(rich.CodeInvalidParameter).
+				Type(rich.ErrTypeValidation).
+				Severity(rich.SeverityMedium).
+				Messagef("Path '%s' in field '%s' must be a file", path, fieldName).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("path_value", path).
+				Context("is_file", false).
+				Suggestion("Provide a file path, not a directory path").
+				WithLocation().
+				Build()
 		}
 	}
 
 	if requirements.MustBeReadable {
 		if err := tv.checkReadPermission(path); err != nil {
-			return errors.Wrapf(err, "validator", "Path '%s' in field '%s' is not readable", path, fieldName)
+			return rich.NewError().
+				Code(rich.CodeResourceNotFound).
+				Type(rich.ErrTypePermission).
+				Severity(rich.SeverityMedium).
+				Messagef("Path '%s' in field '%s' is not readable", path, fieldName).
+				Context("module", "typed_validator").
+				Context("field", fieldName).
+				Context("path_value", path).
+				Context("readable", false).
+				Cause(err).
+				Suggestion("Check file permissions and ensure the path is accessible").
+				WithLocation().
+				Build()
 		}
 	}
 

@@ -113,6 +113,7 @@ func (c *Cloner) isURL(path string) bool {
 	return strings.HasPrefix(path, "http://") ||
 		strings.HasPrefix(path, "https://") ||
 		strings.HasPrefix(path, "git@") ||
+		strings.HasPrefix(path, "ssh://") ||
 		strings.Contains(path, "github.com") ||
 		strings.Contains(path, "gitlab.com")
 }

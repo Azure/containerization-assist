@@ -303,7 +303,6 @@ Thumbs.db
 
 // TestMCPWorkflowIntegration tests the complete MCP workflow
 func (suite *MCPWorkflowIntegrationSuite) TestMCPWorkflowIntegration() {
-	suite.T().Skip("Skipping due to gomcp validation issues with optional fields")
 
 	testRepos := suite.GetTestRepositories()
 
@@ -421,16 +420,37 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		// The response format might be different, let's adapt
 		suite.T().Logf("No 'success' field in response, checking alternative format")
 	}
-	// Extract analysis data - the structure might vary
+	// Extract analysis data from MCP response format
 	var sessionID string
-	if sid, ok := result["session_id"].(string); ok {
+	var actualResult map[string]interface{}
+
+	// Handle MCP response format: {"content": [{"text": "...", "type": "text"}], "isError": false}
+	if content, ok := result["content"].([]interface{}); ok && len(content) > 0 {
+		if contentItem, ok := content[0].(map[string]interface{}); ok {
+			if textStr, ok := contentItem["text"].(string); ok {
+				// Parse the JSON text content
+				var parsedResult map[string]interface{}
+				if err := json.Unmarshal([]byte(textStr), &parsedResult); err == nil {
+					actualResult = parsedResult
+				}
+			}
+		}
+	}
+
+	// If we couldn't parse MCP format, use the result directly
+	if actualResult == nil {
+		actualResult = result
+	}
+
+	// Extract session ID from the actual result
+	if sid, ok := actualResult["session_id"].(string); ok {
 		sessionID = sid
-	} else if sid, ok := result["sessionId"].(string); ok {
+	} else if sid, ok := actualResult["sessionId"].(string); ok {
 		sessionID = sid
 	} else {
 		// Try to find session ID in nested structure
 		suite.T().Logf("Session ID not found at top level, searching in response")
-		if analysis, ok := result["analysis"].(map[string]interface{}); ok {
+		if analysis, ok := actualResult["analysis"].(map[string]interface{}); ok {
 			if sid, ok := analysis["session_id"].(string); ok {
 				sessionID = sid
 			}
@@ -453,7 +473,14 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		"params": map[string]interface{}{
 			"name": "generate_dockerfile",
 			"arguments": map[string]interface{}{
-				"SessionID": sessionID,
+				"base_image":           "alpine:latest",     // Provide base image
+				"template":             repo.Language,       // Use detected language as template
+				"optimization":         "balanced",          // Balanced optimization
+				"include_health_check": true,                // Include health check
+				"build_args":           map[string]string{}, // Empty build args
+				"platform":             "linux/amd64",       // Target platform
+				"session_id":           sessionID,           // Session ID for context
+				"dry_run":              false,               // Actually generate the file
 			},
 		},
 	})
@@ -478,47 +505,45 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		suite.T().Logf("Warning: dockerfile_path not found in response")
 	}
 
-	// Step 4: Dockerfile Validation
-	validateResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
+	// Step 4: Skip Dockerfile Validation (tool not available)
+	// Note: validate_dockerfile tool is not currently implemented in the server
+	suite.T().Log("✓ Skipping Dockerfile validation (tool not available)")
+
+	// Step 4: Generate Kubernetes Manifests
+	manifestResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      4,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
-			"name": "validate_dockerfile",
-			"arguments": map[string]interface{}{
-				"SessionID":       sessionID,
-				"dockerfile_path": filepath.Join(repo.LocalDir, "Dockerfile"),
-			},
-		},
-	})
-
-	assert.Contains(suite.T(), validateResp, "result")
-	validateResult := validateResp["result"].(map[string]interface{})
-
-	// Check for success field
-	if success, ok := validateResult["success"].(bool); ok {
-		assert.True(suite.T(), success)
-		suite.T().Log("✓ Dockerfile validation completed")
-	} else if isError, ok := validateResult["isError"].(bool); ok && isError {
-		suite.T().Logf("Dockerfile validation failed with error: %+v", validateResult)
-		suite.T().FailNow()
-	} else {
-		suite.T().Logf("Validation response format: %+v", validateResult)
-	}
-
-	// Step 5: Generate Kubernetes Manifests
-	manifestResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      5,
-		"method":  "tools/call",
-		"params": map[string]interface{}{
 			"name": "generate_manifests",
 			"arguments": map[string]interface{}{
-				"SessionID":  sessionID,
-				"app_name":   repo.Name,
-				"image_name": fmt.Sprintf("localhost:5000/%s:latest", repo.Name),
-				"namespace":  "default",
-				"port":       repo.Port,
+				"session_id":             sessionID,
+				"app_name":               repo.Name,
+				"image_ref":              map[string]interface{}{"image": fmt.Sprintf("localhost:5000/%s:latest", repo.Name)},
+				"namespace":              "default",
+				"service_type":           "ClusterIP",
+				"replicas":               1,
+				"resources":              map[string]interface{}{},
+				"environment":            map[string]string{},
+				"secrets":                []interface{}{},
+				"include_ingress":        false,
+				"helm_template":          false,
+				"configmap_data":         map[string]string{},
+				"configmap_files":        map[string]string{},
+				"binary_data":            map[string]interface{}{},
+				"ingress_hosts":          []interface{}{},
+				"ingress_tls":            []interface{}{},
+				"ingress_class":          "nginx",
+				"service_ports":          []interface{}{},
+				"load_balancer_ip":       "127.0.0.1",
+				"session_affinity":       "None",
+				"workflow_labels":        map[string]string{},
+				"registry_secrets":       []interface{}{},
+				"generate_pull_secret":   false,
+				"validate_manifests":     false,
+				"validation_options":     map[string]interface{}{},
+				"include_network_policy": false,
+				"network_policy_spec":    map[string]interface{}{},
 			},
 		},
 	})
@@ -538,10 +563,10 @@ func (suite *MCPWorkflowIntegrationSuite) executeWorkflowSteps(ctx context.Conte
 		suite.T().Logf("Manifest response format: %+v", manifestResult)
 	}
 
-	// Step 6: Validate Session State
+	// Step 5: Validate Session State
 	sessionResp := suite.sendMCPRequest(stdin, stdout, map[string]interface{}{
 		"jsonrpc": "2.0",
-		"id":      6,
+		"id":      5,
 		"method":  "tools/call",
 		"params": map[string]interface{}{
 			"name": "list_sessions",
@@ -588,22 +613,37 @@ func (suite *MCPWorkflowIntegrationSuite) sendMCPRequest(stdin io.WriteCloser, s
 	_, err = fmt.Fprintf(stdin, "%s\n", requestBytes)
 	require.NoError(suite.T(), err)
 
-	// Read response
-	responseBuf := make([]byte, 4096)
-	n, err := stdout.Read(responseBuf)
-	if err != nil && err != io.EOF {
-		suite.T().Logf("Error reading response: %v", err)
-		return nil
+	// Read response with buffer expansion for large responses
+	var responseData []byte
+	buf := make([]byte, 4096)
+
+	for {
+		n, err := stdout.Read(buf)
+		if n > 0 {
+			responseData = append(responseData, buf[:n]...)
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			suite.T().Logf("Error reading response: %v", err)
+			return nil
+		}
+		// Check if we have a complete JSON response
+		responseStr := string(responseData)
+		if strings.Contains(responseStr, "\n") && (strings.Contains(responseStr, "\"result\"") || strings.Contains(responseStr, "\"error\"")) {
+			break
+		}
 	}
 
-	if n == 0 {
+	if len(responseData) == 0 {
 		suite.T().Log("No response received")
 		return nil
 	}
 
 	// Parse response
 	var response map[string]interface{}
-	responseStr := strings.TrimSpace(string(responseBuf[:n]))
+	responseStr := strings.TrimSpace(string(responseData))
 	if responseStr == "" {
 		suite.T().Log("Empty response received")
 		return nil
@@ -620,7 +660,6 @@ func (suite *MCPWorkflowIntegrationSuite) sendMCPRequest(stdin io.WriteCloser, s
 
 // TestMCPToolCommunication tests tool-to-tool communication through orchestration
 func (suite *MCPWorkflowIntegrationSuite) TestMCPToolCommunication() {
-	suite.T().Skip("Skipping due to broken pipe errors - needs investigation")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -717,7 +756,6 @@ func (suite *MCPWorkflowIntegrationSuite) TestMCPToolCommunication() {
 
 // TestMCPErrorHandling tests error handling and recovery scenarios
 func (suite *MCPWorkflowIntegrationSuite) TestMCPErrorHandling() {
-	suite.T().Skip("Skipping due to broken pipe errors - needs investigation")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 

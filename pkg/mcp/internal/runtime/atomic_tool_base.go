@@ -6,19 +6,19 @@ import (
 	"time"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 )
 
 // AtomicToolBase provides common functionality for all atomic tools
 type AtomicToolBase struct {
-	pipelineAdapter mcptypes.PipelineOperations
-	sessionManager  *session.SessionManager
-	validationMixin *utils.StandardizedValidationMixin
-	logger          zerolog.Logger
-	name            string // Tool name for logging
+	PipelineAdapter mcptypes.PipelineOperations        // Pipeline adapter (exported for direct access)
+	SessionManager  *session.SessionManager            // Session manager (exported for direct access)
+	ValidationMixin *utils.StandardizedValidationMixin // Validation mixin (exported for direct access)
+	Logger          zerolog.Logger                     // Tool logger (exported for direct access)
+	Name            string                             // Tool name (exported for direct access)
 }
 
 // NewAtomicToolBase creates a new atomic tool base
@@ -30,11 +30,11 @@ func NewAtomicToolBase(
 ) *AtomicToolBase {
 	toolLogger := logger.With().Str("tool", name).Logger()
 	return &AtomicToolBase{
-		pipelineAdapter: adapter,
-		sessionManager:  sessionManager,
-		validationMixin: utils.NewStandardizedValidationMixin(toolLogger),
-		logger:          toolLogger,
-		name:            name,
+		PipelineAdapter: adapter,
+		SessionManager:  sessionManager,
+		ValidationMixin: utils.NewStandardizedValidationMixin(toolLogger),
+		Logger:          toolLogger,
+		Name:            name,
 	}
 }
 
@@ -55,70 +55,48 @@ func (base *AtomicToolBase) ValidateAndPrepareExecution(
 ) (*ValidatedExecution, error) {
 	// Validate required fields if specified
 	if len(requiredFields) > 0 {
-		validationResult := base.validationMixin.StandardValidateRequiredFields(args, requiredFields)
+		validationResult := base.ValidationMixin.StandardValidateRequiredFields(args, requiredFields)
 		if validationResult.HasErrors() {
-			base.logger.Error().Interface("validation_errors", validationResult.GetErrors()).Msg("Input validation failed")
+			base.Logger.Error().Interface("validation_errors", validationResult.GetErrors()).Msg("Input validation failed")
 			return nil, fmt.Errorf("atomic tool operation failed")
 		}
 	}
 
 	// Get or create session - sessionID can be empty for auto-creation
-	session, err := base.sessionManager.GetOrCreateSession(sessionID)
+	session, err := base.SessionManager.GetOrCreateSession(sessionID)
 	if err != nil {
-		base.logger.Error().Err(err).Str("session_id", sessionID).Msg("Failed to get session")
+		base.Logger.Error().Err(err).Str("session_id", sessionID).Msg("Failed to get session")
 		return nil, fmt.Errorf("atomic tool operation failed")
 	}
 
 	// Get workspace directory - use pipeline adapter method
-	workspaceDir := base.pipelineAdapter.GetSessionWorkspace(sessionID)
+	workspaceDir := base.PipelineAdapter.GetSessionWorkspace(sessionID)
 
 	// Create execution context
 	execution := &ValidatedExecution{
 		Session:      session,
 		SessionID:    sessionID,
 		WorkspaceDir: workspaceDir,
-		Logger: base.logger.With().
+		Logger: base.Logger.With().
 			Str("session_id", sessionID).
 			Str("workspace", workspaceDir).
 			Logger(),
 	}
 
-	base.logger.Info().
+	base.Logger.Info().
 		Str("session_id", execution.SessionID).
 		Str("workspace_dir", execution.WorkspaceDir).
-		Msgf("Starting %s operation", base.name)
+		Msgf("Starting %s operation", base.Name)
 
 	return execution, nil
 }
 
-// GetPipelineAdapter returns the pipeline adapter
-func (base *AtomicToolBase) GetPipelineAdapter() mcptypes.PipelineOperations {
-	return base.pipelineAdapter
-}
-
-// GetSessionManager returns the session manager
-func (base *AtomicToolBase) GetSessionManager() *session.SessionManager {
-	return base.sessionManager
-}
-
-// GetValidationMixin returns the validation mixin
-func (base *AtomicToolBase) GetValidationMixin() *utils.StandardizedValidationMixin {
-	return base.validationMixin
-}
-
-// GetLogger returns the tool logger
-func (base *AtomicToolBase) GetLogger() zerolog.Logger {
-	return base.logger
-}
-
-// GetName returns the tool name
-func (base *AtomicToolBase) GetName() string {
-	return base.name
-}
+// Note: All fields are now exported for direct access
+// Use base.PipelineAdapter, base.SessionManager, base.ValidationMixin, base.Logger, base.Name directly
 
 // LogOperationStart logs the start of a tool operation with standard fields
 func (base *AtomicToolBase) LogOperationStart(operation string, details map[string]interface{}) {
-	event := base.logger.Info().Str("operation", operation)
+	event := base.Logger.Info().Str("operation", operation)
 	for key, value := range details {
 		switch v := value.(type) {
 		case string:
@@ -138,7 +116,7 @@ func (base *AtomicToolBase) LogOperationStart(operation string, details map[stri
 
 // LogOperationComplete logs the completion of a tool operation
 func (base *AtomicToolBase) LogOperationComplete(operation string, success bool, duration interface{}) {
-	event := base.logger.Info().
+	event := base.Logger.Info().
 		Str("operation", operation).
 		Bool("success", success)
 
@@ -159,53 +137,47 @@ func (base *AtomicToolBase) LogOperationComplete(operation string, success bool,
 // This is the base method that BuildSecBot's atomic tools can use
 func (base *AtomicToolBase) ExecuteWithoutProgress(ctx context.Context, sessionID string, operation func() error) error {
 	// Start tracking the tool execution
-	if base.sessionManager != nil {
-		if err := base.sessionManager.TrackToolExecution(sessionID, base.name, nil); err != nil {
-			base.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to track tool execution start")
+	if base.SessionManager != nil {
+		if err := base.SessionManager.TrackToolExecution(sessionID, base.Name, nil); err != nil {
+			base.Logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to track tool execution start")
 		}
 	}
 
-	base.logger.Info().
+	base.Logger.Info().
 		Str("session_id", sessionID).
-		Str("tool", base.name).
+		Str("tool", base.Name).
 		Msg("Starting atomic tool execution without progress")
 
 	startTime := time.Now()
 	err := operation()
 	duration := time.Since(startTime)
 
-	// Complete the tool execution tracking
-	if base.sessionManager != nil {
-		success := err == nil
-		if trackErr := base.sessionManager.CompleteToolExecution(sessionID, base.name, success, err, 0); trackErr != nil {
-			base.logger.Warn().Err(trackErr).Str("session_id", sessionID).Msg("Failed to complete tool execution tracking")
-		}
-	}
+	// Simplified: removed job tracking
 
 	if err != nil {
-		base.logger.Error().
+		base.Logger.Error().
 			Err(err).
 			Str("session_id", sessionID).
-			Str("tool", base.name).
+			Str("tool", base.Name).
 			Dur("duration", duration).
 			Msg("Atomic tool execution failed")
 
 		// Track the error
-		if base.sessionManager != nil {
-			if trackErr := base.sessionManager.TrackError(sessionID, err, map[string]interface{}{
-				"tool":     base.name,
+		if base.SessionManager != nil {
+			if trackErr := base.SessionManager.TrackError(sessionID, err, map[string]interface{}{
+				"tool":     base.Name,
 				"duration": duration.String(),
 			}); trackErr != nil {
-				base.logger.Warn().Err(trackErr).Msg("Failed to track error")
+				base.Logger.Warn().Err(trackErr).Msg("Failed to track error")
 			}
 		}
 
 		return err
 	}
 
-	base.logger.Info().
+	base.Logger.Info().
 		Str("session_id", sessionID).
-		Str("tool", base.name).
+		Str("tool", base.Name).
 		Dur("duration", duration).
 		Msg("Atomic tool execution completed successfully")
 
@@ -215,23 +187,23 @@ func (base *AtomicToolBase) ExecuteWithoutProgress(ctx context.Context, sessionI
 // ExecuteWithProgress executes an operation with progress tracking
 func (base *AtomicToolBase) ExecuteWithProgress(ctx context.Context, sessionID string, operation func(observability.ProgressCallback) error) error {
 	// Start tracking the tool execution
-	if base.sessionManager != nil {
-		if err := base.sessionManager.TrackToolExecution(sessionID, base.name, nil); err != nil {
-			base.logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to track tool execution start")
+	if base.SessionManager != nil {
+		if err := base.SessionManager.TrackToolExecution(sessionID, base.Name, nil); err != nil {
+			base.Logger.Warn().Err(err).Str("session_id", sessionID).Msg("Failed to track tool execution start")
 		}
 	}
 
-	base.logger.Info().
+	base.Logger.Info().
 		Str("session_id", sessionID).
-		Str("tool", base.name).
+		Str("tool", base.Name).
 		Msg("Starting atomic tool execution with progress tracking")
 
 	// Create a progress callback that logs to the session
 	progressCallback := func(percent float64, message string) {
-		base.logger.Debug().
+		base.Logger.Debug().
 			Float64("percent", percent).
 			Str("message", message).
-			Str("tool", base.name).
+			Str("tool", base.Name).
 			Str("session_id", sessionID).
 			Msg("Tool progress update")
 	}
@@ -240,102 +212,36 @@ func (base *AtomicToolBase) ExecuteWithProgress(ctx context.Context, sessionID s
 	err := operation(progressCallback)
 	duration := time.Since(startTime)
 
-	// Complete the tool execution tracking
-	if base.sessionManager != nil {
-		success := err == nil
-		if trackErr := base.sessionManager.CompleteToolExecution(sessionID, base.name, success, err, 0); trackErr != nil {
-			base.logger.Warn().Err(trackErr).Str("session_id", sessionID).Msg("Failed to complete tool execution tracking")
-		}
-	}
+	// Simplified: removed job tracking
 
 	if err != nil {
-		base.logger.Error().
+		base.Logger.Error().
 			Err(err).
 			Str("session_id", sessionID).
-			Str("tool", base.name).
+			Str("tool", base.Name).
 			Dur("duration", duration).
 			Msg("Atomic tool execution with progress failed")
 
 		// Track the error
-		if base.sessionManager != nil {
-			if trackErr := base.sessionManager.TrackError(sessionID, err, map[string]interface{}{
-				"tool":     base.name,
+		if base.SessionManager != nil {
+			if trackErr := base.SessionManager.TrackError(sessionID, err, map[string]interface{}{
+				"tool":     base.Name,
 				"duration": duration.String(),
 			}); trackErr != nil {
-				base.logger.Warn().Err(trackErr).Msg("Failed to track error")
+				base.Logger.Warn().Err(trackErr).Msg("Failed to track error")
 			}
 		}
 
 		return err
 	}
 
-	base.logger.Info().
+	base.Logger.Info().
 		Str("session_id", sessionID).
-		Str("tool", base.name).
+		Str("tool", base.Name).
 		Dur("duration", duration).
 		Msg("Atomic tool execution with progress completed successfully")
 
 	return nil
 }
 
-// StartJob starts a background job for long-running operations
-func (base *AtomicToolBase) StartJob(sessionID, jobType string) (string, error) {
-	if base.sessionManager == nil {
-		return "", nil // Gracefully handle missing session manager
-	}
-
-	jobID, err := base.sessionManager.StartJob(sessionID, jobType)
-	if err != nil {
-		base.logger.Error().Err(err).Str("session_id", sessionID).Str("job_type", jobType).Msg("Failed to start job")
-		return "", err
-	}
-
-	base.logger.Info().
-		Str("session_id", sessionID).
-		Str("job_id", jobID).
-		Str("job_type", jobType).
-		Msg("Started background job")
-
-	return jobID, nil
-}
-
-// CompleteJob marks a job as completed
-func (base *AtomicToolBase) CompleteJob(sessionID, jobID string, result interface{}) error {
-	if base.sessionManager == nil {
-		return nil // Gracefully handle missing session manager
-	}
-
-	err := base.sessionManager.CompleteJob(sessionID, jobID, result)
-	if err != nil {
-		base.logger.Error().Err(err).Str("session_id", sessionID).Str("job_id", jobID).Msg("Failed to complete job")
-		return err
-	}
-
-	base.logger.Info().
-		Str("session_id", sessionID).
-		Str("job_id", jobID).
-		Msg("Completed background job")
-
-	return nil
-}
-
-// UpdateJobStatus updates the status of a running job
-func (base *AtomicToolBase) UpdateJobStatus(sessionID, jobID string, status session.JobStatus, result interface{}, err error) error {
-	if base.sessionManager == nil {
-		return nil // Gracefully handle missing session manager
-	}
-
-	updateErr := base.sessionManager.UpdateJobStatus(sessionID, jobID, status, result, err)
-	if updateErr != nil {
-		base.logger.Error().Err(updateErr).Str("session_id", sessionID).Str("job_id", jobID).Msg("Failed to update job status")
-		return updateErr
-	}
-
-	base.logger.Debug().
-		Str("session_id", sessionID).
-		Str("job_id", jobID).
-		Str("status", string(status)).
-		Msg("Updated job status")
-
-	return nil
-}
+// Removed job management methods - simplified implementation

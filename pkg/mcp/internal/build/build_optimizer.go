@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	"github.com/rs/zerolog"
 )
 
@@ -504,7 +505,7 @@ coverage
 			Type:        "context_size",
 			Priority:    "medium",
 			Title:       "Large files in build context",
-			Description: fmt.Sprintf("Found %d large files: %s", len(largeFiles), strings.Join(largeFiles[:min(3, len(largeFiles))], ", ")),
+			Description: fmt.Sprintf("Found %d large files: %s", len(largeFiles), strings.Join(largeFiles[:commonUtils.Min(3, len(largeFiles))], ", ")),
 			Impact:      "Moderate impact on build time",
 			Solution:    "Exclude large files not needed for build or use .dockerignore",
 		})
@@ -592,9 +593,3 @@ type EstimatedImprovements struct {
 }
 
 // Helper function
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

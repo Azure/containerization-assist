@@ -10,9 +10,11 @@ import (
 
 	// mcp import removed - using mcptypes
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
@@ -26,7 +28,7 @@ import (
 type AtomicScanImageSecurityTool struct {
 	pipelineAdapter interface{}
 	sessionManager  interface{}
-	analyzer        ToolAnalyzer
+	analyzer        common.FailureAnalyzer
 	// fixingMixin removed - functionality will be integrated directly
 	logger  zerolog.Logger
 	metrics *SecurityMetrics
@@ -44,10 +46,8 @@ func NewAtomicScanImageSecurityTool(adapter interface{}, sessionManager interfac
 }
 
 // SetAnalyzer sets the analyzer for failure analysis
-func (t *AtomicScanImageSecurityTool) SetAnalyzer(analyzer interface{}) {
-	if a, ok := analyzer.(ToolAnalyzer); ok {
-		t.analyzer = a
-	}
+func (t *AtomicScanImageSecurityTool) SetAnalyzer(analyzer common.FailureAnalyzer) {
+	t.analyzer = analyzer
 }
 
 // ExecuteScan runs the atomic security scanning
@@ -57,13 +57,13 @@ func (t *AtomicScanImageSecurityTool) ExecuteScan(ctx context.Context, args Atom
 }
 
 // ExecuteWithContext runs the atomic security scan with GoMCP progress tracking
-func (t *AtomicScanImageSecurityTool) ExecuteWithContext(serverCtx *server.Context, args AtomicScanImageSecurityArgs) (*AtomicScanImageSecurityResult, error) {
+func (t *AtomicScanImageSecurityTool) ExecuteWithContext(serverCtx *server.Context, args *AtomicScanImageSecurityArgs) (*AtomicScanImageSecurityResult, error) {
 	// Create progress adapter for GoMCP using standard scan stages
 	progress := observability.NewUnifiedProgressReporter(serverCtx)
 
 	// Execute with progress tracking
 	ctx := context.Background()
-	result, err := t.performSecurityScan(ctx, args, progress)
+	result, err := t.performSecurityScan(ctx, *args, progress)
 
 	// Complete progress tracking
 	if err != nil {
@@ -595,7 +595,7 @@ func (t *AtomicScanImageSecurityTool) extractLayerID(vuln coresecurity.Vulnerabi
 
 	// Try to extract from data source or other metadata
 	if vuln.DataSource.Name != "" {
-		return fmt.Sprintf("layer_%s", vuln.DataSource.Name[:min(8, len(vuln.DataSource.Name))])
+		return fmt.Sprintf("layer_%s", vuln.DataSource.Name[:commonUtils.Min(8, len(vuln.DataSource.Name))])
 	}
 
 	return "unknown_layer"
@@ -804,14 +804,6 @@ func (t *AtomicScanImageSecurityTool) calculateSecurityScore(summary *Vulnerabil
 	}
 
 	return score
-}
-
-// min helper function
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 var (

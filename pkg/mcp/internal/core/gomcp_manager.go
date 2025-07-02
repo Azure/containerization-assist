@@ -7,9 +7,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/transport"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/transport"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -70,12 +71,32 @@ func (gm *GomcpManager) WithLogger(logger slog.Logger) *GomcpManager {
 // Initialize creates and configures the gomcp server
 func (gm *GomcpManager) Initialize() error {
 	if gm.isInitialized {
-		return errors.Internal("core/gomcp-manager", "manager already initialized")
+		return rich.NewError().
+			Code(rich.CodeResourceAlreadyExists).
+			Type(rich.ErrTypeInternal).
+			Severity(rich.SeverityMedium).
+			Message("manager already initialized").
+			Context("module", "core/gomcp-manager").
+			Context("component", "GomcpManager").
+			Context("is_initialized", gm.isInitialized).
+			Suggestion("Use an existing manager instance or create a new one").
+			WithLocation().
+			Build()
 	}
 
 	// Validate transport is set
 	if gm.transport == nil {
-		return errors.Config("core/gomcp-manager", "transport must be set before initialization")
+		return rich.NewError().
+			Code(rich.CodeMissingParameter).
+			Type(rich.ErrTypeConfiguration).
+			Severity(rich.SeverityHigh).
+			Message("transport must be set before initialization").
+			Context("module", "core/gomcp-manager").
+			Context("component", "GomcpManager").
+			Context("transport_set", false).
+			Suggestion("Call SetTransport() with a valid transport before Initialize()").
+			WithLocation().
+			Build()
 	}
 
 	// Create gomcp server with stdio transport
@@ -87,7 +108,18 @@ func (gm *GomcpManager) Initialize() error {
 
 	// Verify server was created successfully
 	if gm.server == nil {
-		return errors.Internal("core/gomcp-manager", "failed to create stdio server: NewServer().AsStdio() returned nil")
+		return rich.NewError().
+			Code(rich.CodeInternalError).
+			Type(rich.ErrTypeInternal).
+			Severity(rich.SeverityCritical).
+			Message("failed to create stdio server: NewServer().AsStdio() returned nil").
+			Context("module", "core/gomcp-manager").
+			Context("component", "GomcpManager").
+			Context("server_name", gm.config.Name).
+			Context("protocol_version", gm.config.ProtocolVersion).
+			Suggestion("Check server configuration and ensure all dependencies are available").
+			WithLocation().
+			Build()
 	}
 
 	gm.isInitialized = true
@@ -111,13 +143,41 @@ func (gm *GomcpManager) GetTransport() interface{} {
 	return gm.transport
 }
 
+// RegisterTools registers tools (simplified stub for compatibility)
+func (gm *GomcpManager) RegisterTools(server *Server) error {
+	// Simplified approach - tools are registered directly with server
+	// This is a compatibility stub for the old architecture
+	return nil
+}
+
 // StartServer starts the gomcp server after all tools are registered
 func (gm *GomcpManager) StartServer() error {
 	if !gm.isInitialized {
-		return errors.Internal("core/gomcp-manager", "manager not initialized")
+		return rich.NewError().
+			Code(rich.CodeInternalError).
+			Type(rich.ErrTypeInternal).
+			Severity(rich.SeverityHigh).
+			Message("manager not initialized").
+			Context("module", "core/gomcp-manager").
+			Context("component", "GomcpManager").
+			Context("is_initialized", false).
+			Suggestion("Call Initialize() before StartServer()").
+			WithLocation().
+			Build()
 	}
 	if gm.server == nil {
-		return errors.Internal("core/gomcp-manager", "server is nil - initialization may have failed")
+		return rich.NewError().
+			Code(rich.CodeInternalError).
+			Type(rich.ErrTypeInternal).
+			Severity(rich.SeverityCritical).
+			Message("server is nil - initialization may have failed").
+			Context("module", "core/gomcp-manager").
+			Context("component", "GomcpManager").
+			Context("is_initialized", gm.isInitialized).
+			Context("server_nil", true).
+			Suggestion("Re-run Initialize() or check for initialization errors").
+			WithLocation().
+			Build()
 	}
 	gm.logger.Info("Starting gomcp server with all tools registered")
 	return gm.server.Run()

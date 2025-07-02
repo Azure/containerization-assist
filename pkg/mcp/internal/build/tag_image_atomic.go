@@ -8,12 +8,13 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
 	// "github.com/Azure/container-kit/pkg/mcp/internal/runtime" // Temporarily commented to avoid import cycle
 
 	// mcp import removed - using mcptypes
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
@@ -87,7 +88,7 @@ type AtomicTagImageTool struct {
 	pipelineAdapter mcptypes.PipelineOperations
 	sessionManager  core.ToolSessionManager
 	logger          zerolog.Logger
-	analyzer        ToolAnalyzer
+	analyzer        common.FailureAnalyzer
 	fixingMixin     *AtomicToolFixingMixin
 }
 
@@ -102,7 +103,7 @@ func NewAtomicTagImageTool(adapter mcptypes.PipelineOperations, sessionManager c
 }
 
 // SetAnalyzer sets the analyzer for failure analysis
-func (t *AtomicTagImageTool) SetAnalyzer(analyzer ToolAnalyzer) {
+func (t *AtomicTagImageTool) SetAnalyzer(analyzer common.FailureAnalyzer) {
 	t.analyzer = analyzer
 }
 

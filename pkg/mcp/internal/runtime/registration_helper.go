@@ -21,7 +21,7 @@ func NewStandardToolRegistrar(s server.Server, logger zerolog.Logger) *StandardT
 
 // AtomicTool represents a standardized atomic tool interface
 type AtomicTool[TArgs, TResult any] interface {
-	ExecuteWithContext(ctx *server.Context, args TArgs) (*TResult, error)
+	ExecuteWithContext(ctx *server.Context, args *TArgs) (*TResult, error)
 }
 
 // RegisterAtomicTool registers an atomic tool with consistent patterns
@@ -33,7 +33,7 @@ func RegisterAtomicTool[TArgs, TResult any](
 	r.logger.Debug().Str("tool", name).Msg("Registering atomic tool")
 
 	r.server.Tool(name, description, func(ctx *server.Context, args *TArgs) (*TResult, error) {
-		return tool.ExecuteWithContext(ctx, *args)
+		return tool.ExecuteWithContext(ctx, args)
 	})
 
 	r.logger.Info().Str("tool", name).Msg("Atomic tool registered successfully")

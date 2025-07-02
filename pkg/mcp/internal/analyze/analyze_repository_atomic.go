@@ -13,12 +13,12 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
-	mcperror "github.com/Azure/container-kit/pkg/mcp/internal/utils"
-
-	"github.com/Azure/container-kit/pkg/mcp/utils"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
+	utils "github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
+	mcputils "github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )
@@ -83,11 +83,11 @@ func (t *AtomicAnalyzeRepositoryTool) ExecuteRepositoryAnalysis(ctx context.Cont
 	return t.executeWithoutProgress(ctx, args)
 }
 
-func (t *AtomicAnalyzeRepositoryTool) ExecuteWithContext(serverCtx *server.Context, args AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
+func (t *AtomicAnalyzeRepositoryTool) ExecuteWithContext(serverCtx *server.Context, args *AtomicAnalyzeRepositoryArgs) (*AtomicAnalysisResult, error) {
 	progress := observability.NewUnifiedProgressReporter(serverCtx)
 
 	ctx := context.Background()
-	result, err := t.performAnalysis(ctx, args, progress)
+	result, err := t.performAnalysis(ctx, *args, progress)
 
 	if err != nil {
 		t.logger.Info().Msg("Analysis failed")
@@ -125,7 +125,7 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 
 		t.logger.Error().Err(err).Str("session_id", args.SessionID).Msg("Failed to get/create session")
 		result.Success = false
-		return result, mcperror.NewSessionNotFound(args.SessionID)
+		return result, utils.NewRichSessionError(args.SessionID, "Failed to get or create session")
 	}
 
 	t.logger.Info().
@@ -178,7 +178,17 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 		return result, nil
 	}
 
-	if t.isURL(args.RepoURL) {
+	// Handle file:// URLs by converting to local paths
+	localPath := args.RepoURL
+	if strings.HasPrefix(args.RepoURL, "file://") {
+		localPath = strings.TrimPrefix(args.RepoURL, "file://")
+		t.logger.Info().
+			Str("original_url", args.RepoURL).
+			Str("local_path", localPath).
+			Msg("Converting file:// URL to local path")
+	}
+
+	if t.isURL(args.RepoURL) && !strings.HasPrefix(args.RepoURL, "file://") {
 
 		cloneResult, err := t.cloneRepository(ctx, session.SessionID, args)
 		result.CloneResult = cloneResult
@@ -193,11 +203,19 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 				Msg("Repository clone failed")
 			result.Success = false
 			result.TotalDuration = time.Since(startTime)
-			return result, mcperror.NewWithData(mcperror.CodeAnalysisRequired, "Failed to clone repository", map[string]interface{}{
-				"repo_url":   args.RepoURL,
-				"branch":     args.Branch,
-				"session_id": session.SessionID,
-			})
+			return result, rich.NewError().
+				Code(rich.CodeResourceNotFound).
+				Type(rich.ErrTypeResource).
+				Severity(rich.SeverityHigh).
+				Message("Failed to clone repository").
+				Context("module", "analyze/repository-atomic").
+				Context("repo_url", args.RepoURL).
+				Context("branch", args.Branch).
+				Context("session_id", session.SessionID).
+				Cause(err).
+				Suggestion("Check repository URL and network connectivity").
+				WithLocation().
+				Build()
 		}
 
 		result.CloneDir = cloneResult.RepoPath
@@ -208,16 +226,17 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 			Msg("Repository cloned successfully")
 
 	} else {
-		if err := utils.ValidateLocalPath(args.RepoURL); err != nil {
+		// Handle local paths (including converted file:// URLs)
+		if err := mcputils.ValidateLocalPath(localPath); err != nil {
 			t.logger.Error().Err(err).
-				Str("local_path", args.RepoURL).
+				Str("local_path", localPath).
 				Str("session_id", session.SessionID).
 				Msg("Invalid local path for repository")
 			result.Success = false
 			result.TotalDuration = time.Since(startTime)
 			return result, nil
 		}
-		result.CloneDir = args.RepoURL
+		result.CloneDir = localPath
 
 	}
 
@@ -236,56 +255,72 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 							Time("cached_at", cachedAt).
 							Msg("Using cached repository analysis results")
 
-						// Build analysis result from cache
-						result.Analysis = &analysis.AnalysisResult{
-							Language:     scanSummary["language"].(string),
-							Framework:    scanSummary["framework"].(string),
-							Port:         int(scanSummary["port"].(float64)),
-							Dependencies: []analysis.Dependency{},
-						}
+						// Build analysis result from cache with safe type assertions
+						lang, langOK := scanSummary["language"].(string)
+						framework, frameworkOK := scanSummary["framework"].(string)
+						portFloat, portOK := scanSummary["port"].(float64)
 
-						// Convert dependencies back
-						if deps, ok := scanSummary["dependencies"].([]interface{}); ok {
-							for _, dep := range deps {
-								result.Analysis.Dependencies = append(result.Analysis.Dependencies, analysis.Dependency{Name: dep.(string)})
+						if !langOK || !frameworkOK || !portOK {
+							t.logger.Error().
+								Interface("scan_summary", scanSummary).
+								Msg("Invalid cached scan summary format - falling back to fresh analysis")
+							// Invalid cached data - skip cache and perform fresh analysis
+							// Note: cache clearing would require knowing the cache key generation logic
+						} else {
+							result.Analysis = &analysis.AnalysisResult{
+								Language:     lang,
+								Framework:    framework,
+								Port:         int(portFloat),
+								Dependencies: []analysis.Dependency{},
 							}
+
+							// Convert dependencies back with safe type assertions
+							if deps, ok := scanSummary["dependencies"].([]interface{}); ok {
+								for _, dep := range deps {
+									if depName, ok := dep.(string); ok {
+										result.Analysis.Dependencies = append(result.Analysis.Dependencies, analysis.Dependency{Name: depName})
+									} else {
+										t.logger.Warn().Msgf("Skipping invalid dependency: expected string, got %T", dep)
+									}
+								}
+							}
+
+							// Populate analysis context from cache
+							result.AnalysisContext = &AnalysisContext{
+								FilesAnalyzed:               getIntFromSummary(scanSummary, "files_analyzed"),
+								ConfigFilesFound:            getStringSliceFromSummary(scanSummary, "config_files_found"),
+								EntryPointsFound:            getStringSliceFromSummary(scanSummary, "entry_points_found"),
+								TestFilesFound:              getStringSliceFromSummary(scanSummary, "test_files_found"),
+								BuildFilesFound:             getStringSliceFromSummary(scanSummary, "build_files_found"),
+								PackageManagers:             getStringSliceFromSummary(scanSummary, "package_managers"),
+								DatabaseFiles:               getStringSliceFromSummary(scanSummary, "database_files"),
+								DockerFiles:                 getStringSliceFromSummary(scanSummary, "docker_files"),
+								K8sFiles:                    getStringSliceFromSummary(scanSummary, "k8s_files"),
+								HasGitIgnore:                getBoolFromSummary(scanSummary, "has_git_ignore"),
+								HasReadme:                   getBoolFromSummary(scanSummary, "has_readme"),
+								HasLicense:                  getBoolFromSummary(scanSummary, "has_license"),
+								HasCI:                       getBoolFromSummary(scanSummary, "has_ci"),
+								RepositorySize:              getInt64FromSummary(scanSummary, "repository_size"),
+								ContainerizationSuggestions: getStringSliceFromSummary(scanSummary, "containerization_suggestions"),
+								NextStepSuggestions:         getStringSliceFromSummary(scanSummary, "next_step_suggestions"),
+							}
+
+							result.AnalysisDuration = time.Duration(getFloat64FromSummary(scanSummary, "analysis_duration") * float64(time.Second))
+							result.TotalDuration = time.Since(startTime)
+							result.Success = true
+							result.IsSuccessful = true
+							result.Duration = result.TotalDuration
+
+							t.logger.Info().
+								Str("session_id", session.SessionID).
+								Str("language", result.Analysis.Language).
+								Str("framework", result.Analysis.Framework).
+								Dur("cached_analysis_duration", result.AnalysisDuration).
+								Dur("total_duration", result.TotalDuration).
+								Msg("Repository analysis completed using cached results")
+
+							return result, nil
 						}
-
-						// Populate analysis context from cache
-						result.AnalysisContext = &AnalysisContext{
-							FilesAnalyzed:               getIntFromSummary(scanSummary, "files_analyzed"),
-							ConfigFilesFound:            getStringSliceFromSummary(scanSummary, "config_files_found"),
-							EntryPointsFound:            getStringSliceFromSummary(scanSummary, "entry_points_found"),
-							TestFilesFound:              getStringSliceFromSummary(scanSummary, "test_files_found"),
-							BuildFilesFound:             getStringSliceFromSummary(scanSummary, "build_files_found"),
-							PackageManagers:             getStringSliceFromSummary(scanSummary, "package_managers"),
-							DatabaseFiles:               getStringSliceFromSummary(scanSummary, "database_files"),
-							DockerFiles:                 getStringSliceFromSummary(scanSummary, "docker_files"),
-							K8sFiles:                    getStringSliceFromSummary(scanSummary, "k8s_files"),
-							HasGitIgnore:                getBoolFromSummary(scanSummary, "has_git_ignore"),
-							HasReadme:                   getBoolFromSummary(scanSummary, "has_readme"),
-							HasLicense:                  getBoolFromSummary(scanSummary, "has_license"),
-							HasCI:                       getBoolFromSummary(scanSummary, "has_ci"),
-							RepositorySize:              getInt64FromSummary(scanSummary, "repository_size"),
-							ContainerizationSuggestions: getStringSliceFromSummary(scanSummary, "containerization_suggestions"),
-							NextStepSuggestions:         getStringSliceFromSummary(scanSummary, "next_step_suggestions"),
-						}
-
-						result.AnalysisDuration = time.Duration(getFloat64FromSummary(scanSummary, "analysis_duration") * float64(time.Second))
-						result.TotalDuration = time.Since(startTime)
-						result.Success = true
-						result.IsSuccessful = true
-						result.Duration = result.TotalDuration
-
-						t.logger.Info().
-							Str("session_id", session.SessionID).
-							Str("language", result.Analysis.Language).
-							Str("framework", result.Analysis.Framework).
-							Dur("cached_analysis_duration", result.AnalysisDuration).
-							Dur("total_duration", result.TotalDuration).
-							Msg("Repository analysis completed using cached results")
-
-						return result, nil
 					} else {
 						t.logger.Info().
 							Str("session_id", session.SessionID).
@@ -326,12 +361,20 @@ func (t *AtomicAnalyzeRepositoryTool) performAnalysis(ctx context.Context, args 
 			Msg("Repository analysis failed")
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
-		return result, mcperror.NewWithData(mcperror.CodeAnalysisRequired, "Failed to analyze repository", map[string]interface{}{
-			"repo_url":   args.RepoURL,
-			"clone_dir":  result.CloneDir,
-			"session_id": session.SessionID,
-			"is_local":   !t.isURL(args.RepoURL),
-		})
+		return result, rich.NewError().
+			Code(rich.CodeValidationFailed).
+			Type(rich.ErrTypeBusiness).
+			Severity(rich.SeverityHigh).
+			Message("Failed to analyze repository").
+			Context("module", "analyze/repository-atomic").
+			Context("repo_url", args.RepoURL).
+			Context("clone_dir", result.CloneDir).
+			Context("session_id", session.SessionID).
+			Context("is_local", !t.isURL(args.RepoURL)).
+			Cause(err).
+			Suggestion("Check repository structure and ensure it contains valid source code").
+			WithLocation().
+			Build()
 	}
 
 	result.Analysis = repoAnalysisResult.AnalysisResult
@@ -401,7 +444,7 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*cor
 				}
 				newSessionInterface, err := t.sessionManager.GetOrCreateSession("")
 				if err != nil {
-					return nil, mcperror.NewSessionNotFound("replacement_session")
+					return nil, utils.NewRichSessionError("replacement_session", "Failed to create replacement session")
 				}
 				newSessionState := newSessionInterface.(*sessiontypes.SessionState)
 				newSession := newSessionState.ToCoreSessionState()
@@ -428,7 +471,7 @@ func (t *AtomicAnalyzeRepositoryTool) getOrCreateSession(sessionID string) (*cor
 
 	sessionInterface, err := t.sessionManager.GetOrCreateSession("")
 	if err != nil {
-		return nil, mcperror.NewSessionNotFound("new_session")
+		return nil, utils.NewRichSessionError("new_session", "Failed to create new session")
 	}
 	sessionState := sessionInterface.(*sessiontypes.SessionState)
 	session := sessionState.ToCoreSessionState()
@@ -567,7 +610,8 @@ func (t *AtomicAnalyzeRepositoryTool) isURL(path string) bool {
 	return strings.HasPrefix(path, "http://") ||
 		strings.HasPrefix(path, "https://") ||
 		strings.HasPrefix(path, "git@") ||
-		strings.HasPrefix(path, "ssh://")
+		strings.HasPrefix(path, "ssh://") ||
+		strings.HasPrefix(path, "file://")
 }
 
 func (t *AtomicAnalyzeRepositoryTool) generateAnalysisContext(repoPath string, analysis *analysis.AnalysisResult) *AnalysisContext {
@@ -639,16 +683,11 @@ func (t *AtomicAnalyzeRepositoryTool) Validate(ctx context.Context, args interfa
 	case *AtomicAnalyzeRepositoryArgs:
 		analyzeArgs = *v
 	default:
-		return mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_analyze_repository", map[string]interface{}{
-			"expected": "AtomicAnalyzeRepositoryArgs or *AtomicAnalyzeRepositoryArgs",
-			"received": fmt.Sprintf("%T", args),
-		})
+		return utils.NewRichValidationError("args", fmt.Sprintf("Invalid argument type for atomic_analyze_repository: expected AtomicAnalyzeRepositoryArgs, received %T", args))
 	}
 
 	if analyzeArgs.RepoURL == "" {
-		return mcperror.NewWithData("missing_required_field", "RepoURL is required", map[string]interface{}{
-			"field": "repo_url",
-		})
+		return utils.NewRichValidationError("repo_url", "RepoURL is required")
 	}
 
 	// SessionID is optional - will be auto-generated if empty
@@ -669,10 +708,7 @@ func (t *AtomicAnalyzeRepositoryTool) Execute(ctx context.Context, args interfac
 			analyzeArgs = *converted
 		} else {
 			t.logger.Error().Str("received_type", fmt.Sprintf("%T", args)).Msg("Invalid argument type received")
-			return nil, mcperror.NewWithData("invalid_arguments", "Invalid argument type for atomic_analyze_repository", map[string]interface{}{
-				"expected": "AtomicAnalyzeRepositoryArgs, *AtomicAnalyzeRepositoryArgs, or orchestration types",
-				"received": fmt.Sprintf("%T", args),
-			})
+			return nil, utils.NewRichValidationError("args", fmt.Sprintf("Invalid argument type for atomic_analyze_repository: expected AtomicAnalyzeRepositoryArgs or orchestration types, received %T", args))
 		}
 	}
 

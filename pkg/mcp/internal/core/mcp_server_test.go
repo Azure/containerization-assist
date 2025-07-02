@@ -9,11 +9,11 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 
-	internalutils "github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	internalutils "github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -225,7 +225,7 @@ func TestSessionManager(t *testing.T) {
 		// Session should be gone after garbage collection
 		_, err = shortTTLManager.GetSession(sessionID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "NOT_FOUND")
+		assert.Contains(t, err.Error(), "session not found")
 	})
 }
 

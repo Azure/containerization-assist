@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	sessionsvc "github.com/Azure/container-kit/pkg/mcp/internal/session"
+	sessionsvc "github.com/Azure/container-kit/pkg/mcp/core/session"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/rs/zerolog"
 )

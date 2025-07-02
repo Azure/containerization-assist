@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/build"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/localrivet/gomcp/server"
@@ -23,7 +24,7 @@ type AtomicCheckHealthTool struct {
 	validator       *HealthValidator
 
 	// Optional components for enhanced functionality
-	analyzer    build.ToolAnalyzer
+	analyzer    common.FailureAnalyzer
 	fixingMixin *build.AtomicToolFixingMixin
 }
 
@@ -41,7 +42,7 @@ func newAtomicCheckHealthToolImpl(adapter core.PipelineOperations, sessionManage
 }
 
 // SetAnalyzer sets the tool analyzer for enhanced analysis capabilities
-func (t *AtomicCheckHealthTool) SetAnalyzer(analyzer build.ToolAnalyzer) {
+func (t *AtomicCheckHealthTool) SetAnalyzer(analyzer common.FailureAnalyzer) {
 	t.analyzer = analyzer
 }
 

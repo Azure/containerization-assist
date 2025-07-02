@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 )
 
 // Telemetry and stats functionality consolidated from server_stats.go + get_telemetry_metrics.go
@@ -27,7 +27,6 @@ type ServerStats struct {
 // GetStats returns server statistics (implementation for core.Server interface)
 func (s *Server) GetStats() *core.ServerStats {
 	sessionStats := s.sessionManager.GetStats()
-	workspaceStats := s.workspaceManager.GetStats()
 
 	return &core.ServerStats{
 		Transport: s.config.TransportType,
@@ -43,10 +42,10 @@ func (s *Server) GetStats() *core.ServerStats {
 			ServerStartTime:   sessionStats.ServerStartTime,
 		},
 		Workspace: &core.WorkspaceStats{
-			TotalDiskUsage: workspaceStats.TotalDiskUsage,
-			SessionCount:   workspaceStats.TotalSessions,
-			TotalFiles:     0, // Not available in utils.WorkspaceStats
-			DiskLimit:      workspaceStats.TotalDiskLimit,
+			TotalDiskUsage: 0, // Not available in simplified WorkspaceStats
+			SessionCount:   0, // Not available in simplified WorkspaceStats
+			TotalFiles:     0, // Not available in simplified WorkspaceStats
+			DiskLimit:      0, // Not available in simplified WorkspaceStats
 		},
 		Uptime:    time.Since(s.startTime),
 		StartTime: s.startTime,
@@ -71,12 +70,11 @@ func (s *Server) GetSessionManagerStats() *core.SessionManagerStats {
 
 // GetWorkspaceStats returns workspace statistics (interface implementation)
 func (s *Server) GetWorkspaceStats() *core.WorkspaceStats {
-	workspaceStats := s.workspaceManager.GetStats()
 	return &core.WorkspaceStats{
-		TotalDiskUsage: workspaceStats.TotalDiskUsage,
-		SessionCount:   workspaceStats.TotalSessions,
-		TotalFiles:     0, // Not available in utils.WorkspaceStats
-		DiskLimit:      workspaceStats.TotalDiskLimit,
+		TotalDiskUsage: 0, // Not available in simplified WorkspaceStats
+		SessionCount:   0, // Not available in simplified WorkspaceStats
+		TotalFiles:     0, // Not available in simplified WorkspaceStats
+		DiskLimit:      0, // Not available in simplified WorkspaceStats
 	}
 }
 

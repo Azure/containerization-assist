@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/conversation"
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -484,7 +484,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 
 		// Verify
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "SESSION_NOT_FOUND")
+		assert.Contains(t, err.Error(), "session not found")
 	})
 
 	t.Run("error on missing session ID", func(t *testing.T) {
@@ -499,7 +499,7 @@ func TestSessionManagerAdapter(t *testing.T) {
 
 		// Verify
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "SESSION_NOT_FOUND")
+		assert.Contains(t, err.Error(), "session not found")
 	})
 }
 

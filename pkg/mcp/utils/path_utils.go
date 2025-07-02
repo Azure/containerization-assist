@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/errors/rich"
 )
 
 // PathUtils provides centralized path validation and manipulation utilities
@@ -17,26 +18,46 @@ import (
 // - pkg/mcp/internal/analyze/analyze_simple.go
 func ValidateLocalPath(path string) error {
 	if path == "" {
-		return errors.Validation("path_utils", "path cannot be empty")
+		return rich.MissingParameterError("path")
 	}
 
 	// Resolve to absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return errors.Wrapf(err, "path_utils", "failed to resolve absolute path for '%s'", path)
+		return errors.WrapRichf(err, "path_utils", "failed to resolve absolute path for '%s'", path)
 	}
 
 	// Check for path traversal attacks
 	if strings.Contains(absPath, "..") {
-		return errors.Validationf("path_utils", "path traversal not allowed for '%s' (resolved to: %s)", path, absPath)
+		return rich.NewError().
+			Code(rich.CodeInvalidParameter).
+			Type(rich.ErrTypeSecurity).
+			Severity(rich.SeverityHigh).
+			Messagef("path traversal not allowed for '%s' (resolved to: %s)", path, absPath).
+			Context("module", "path_utils").
+			Context("original_path", path).
+			Context("resolved_path", absPath).
+			Suggestion("Use a valid file path without '..' components").
+			WithLocation().
+			Build()
 	}
 
 	// Check if path exists
 	if _, err := os.Stat(absPath); err != nil {
 		if os.IsNotExist(err) {
-			return errors.Validation("path_utils", "path does not exist: "+absPath)
+			return rich.NewError().
+				Code(rich.CodeResourceNotFound).
+				Type(rich.ErrTypeResource).
+				Severity(rich.SeverityMedium).
+				Messagef("file not found: %s", absPath).
+				Context("module", "path_utils").
+				Context("original_path", path).
+				Context("resolved_path", absPath).
+				Suggestion("Ensure the file exists at the specified path").
+				WithLocation().
+				Build()
 		}
-		return errors.Wrapf(err, "path_utils", "failed to stat path '%s'", absPath)
+		return errors.WrapRichf(err, "path_utils", "failed to stat path '%s'", absPath)
 	}
 
 	return nil
@@ -85,20 +106,30 @@ func IsAbsolutePath(path string) bool {
 // EnsureDirectoryExists creates a directory if it doesn't exist
 func EnsureDirectoryExists(dirPath string) error {
 	if dirPath == "" {
-		return errors.Validation("path_utils", "directory path cannot be empty")
+		return rich.MissingParameterError("dirPath")
 	}
 
 	// Check if directory already exists
 	if info, err := os.Stat(dirPath); err == nil {
 		if !info.IsDir() {
-			return errors.Validationf("path_utils", "path exists but is not a directory: %s", dirPath)
+			return rich.NewError().
+				Code(rich.CodeInvalidParameter).
+				Type(rich.ErrTypeValidation).
+				Severity(rich.SeverityMedium).
+				Messagef("path exists but is not a directory: %s", dirPath).
+				Context("module", "path_utils").
+				Context("path", dirPath).
+				Context("is_file", true).
+				Suggestion("Use a different path or remove the existing file").
+				WithLocation().
+				Build()
 		}
 		return nil // Directory already exists
 	}
 
 	// Create directory with proper permissions
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		return errors.Wrapf(err, "path_utils", "failed to create directory '%s'", dirPath)
+		return errors.WrapRichf(err, "path_utils", "failed to create directory '%s'", dirPath)
 	}
 
 	return nil
@@ -150,7 +181,7 @@ func IsSubdirectory(parentPath, childPath string) (bool, error) {
 func ListFiles(dirPath string) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "path_utils", "failed to read directory '%s'", dirPath)
+		return nil, errors.WrapRichf(err, "path_utils", "failed to read directory '%s'", dirPath)
 	}
 
 	var files []string
@@ -167,7 +198,7 @@ func ListFiles(dirPath string) ([]string, error) {
 func ListDirectories(dirPath string) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "path_utils", "failed to read directory '%s'", dirPath)
+		return nil, errors.WrapRichf(err, "path_utils", "failed to read directory '%s'", dirPath)
 	}
 
 	var dirs []string
@@ -184,7 +215,7 @@ func ListDirectories(dirPath string) ([]string, error) {
 func GetFileSize(filePath string) (int64, error) {
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return 0, errors.Wrapf(err, "path_utils", "failed to stat file '%s'", filePath)
+		return 0, errors.WrapRichf(err, "path_utils", "failed to stat file '%s'", filePath)
 	}
 
 	return info.Size(), nil

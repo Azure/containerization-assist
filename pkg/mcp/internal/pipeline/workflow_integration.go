@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration"
-	"github.com/Azure/container-kit/pkg/mcp/internal/session"
+	"github.com/Azure/container-kit/pkg/mcp/core/orchestration"
+	"github.com/Azure/container-kit/pkg/mcp/core/session"
 	"github.com/rs/zerolog"
 )
 

@@ -346,3 +346,79 @@ func ResourceExhaustedError(resourceType string, limit, used int) *RichError {
 		WithLocation().
 		Build()
 }
+
+// Enhanced Tool-Specific Validation Errors
+
+// ToolValidationError creates a comprehensive tool validation error
+func ToolValidationError(toolName, field, message, code string, value interface{}) *RichError {
+	return NewError().
+		Code(CodeInvalidParameter).
+		Type(ErrTypeValidation).
+		Severity(SeverityMedium).
+		Messagef("Tool '%s' validation error on field '%s': %s", toolName, field, message).
+		Context("tool_name", toolName).
+		Context("field", field).
+		Context("validation_code", code).
+		Context("value", value).
+		Suggestion(fmt.Sprintf("Fix validation error for field '%s'", field)).
+		WithLocation().
+		Build()
+}
+
+// ToolConfigValidationError creates a configuration validation error for tools
+func ToolConfigValidationError(field, message string, value interface{}) *RichError {
+	return NewError().
+		Code(CodeInvalidParameter).
+		Type(ErrTypeConfiguration).
+		Severity(SeverityMedium).
+		Messagef("Configuration validation error for field '%s': %s", field, message).
+		Context("field", field).
+		Context("value", value).
+		Suggestion(fmt.Sprintf("Check configuration format for field '%s'", field)).
+		WithLocation().
+		Build()
+}
+
+// ToolConstraintViolationError creates an error for constraint violations
+func ToolConstraintViolationError(field, constraint, message string, value interface{}) *RichError {
+	return NewError().
+		Code(CodeInvalidParameter).
+		Type(ErrTypeValidation).
+		Severity(SeverityMedium).
+		Messagef("Constraint violation on field '%s': %s", field, message).
+		Context("field", field).
+		Context("constraint", constraint).
+		Context("value", value).
+		Suggestion(fmt.Sprintf("Ensure field '%s' meets constraint: %s", field, constraint)).
+		WithLocation().
+		Build()
+}
+
+// ToolSchemaValidationError creates an error for JSON schema validation failures
+func ToolSchemaValidationError(schemaPath, message string, value interface{}) *RichError {
+	return NewError().
+		Code(CodeInvalidParameter).
+		Type(ErrTypeValidation).
+		Severity(SeverityMedium).
+		Messagef("Schema validation error at path '%s': %s", schemaPath, message).
+		Context("schema_path", schemaPath).
+		Context("value", value).
+		Suggestion("Check input format against tool schema requirements").
+		WithLocation().
+		Build()
+}
+
+// ToolVersionCompatibilityError creates an error for version compatibility issues
+func ToolVersionCompatibilityError(toolName, currentVersion, requiredVersion string) *RichError {
+	return NewError().
+		Code(CodeVersionMismatch).
+		Type(ErrTypeCompatibility).
+		Severity(SeverityHigh).
+		Messagef("Tool '%s' version %s is incompatible with required version %s", toolName, currentVersion, requiredVersion).
+		Context("tool_name", toolName).
+		Context("current_version", currentVersion).
+		Context("required_version", requiredVersion).
+		Suggestion(fmt.Sprintf("Upgrade tool to version %s or adjust version requirements", requiredVersion)).
+		WithLocation().
+		Build()
+}

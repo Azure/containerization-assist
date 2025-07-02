@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	commonUtils "github.com/Azure/container-kit/pkg/commonutils"
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/core/git"
 	"github.com/Azure/container-kit/pkg/mcp/core"
@@ -282,7 +283,7 @@ func (r *CoreRepositoryAnalyzer) determineBuildTools(analysisResult *analysis.An
 	}
 
 	// Check for generic build tools
-	if r.hasFile(analysisResult, "Makefile") && !contains(buildTools, "make") {
+	if r.hasFile(analysisResult, "Makefile") && !commonUtils.ContainsString(buildTools, "make") {
 		buildTools = append(buildTools, "make")
 	}
 
@@ -316,14 +317,4 @@ func (r *CoreRepositoryAnalyzer) extractPortFromLanguage(language string) int {
 	default:
 		return 8080
 	}
-}
-
-// Helper function
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

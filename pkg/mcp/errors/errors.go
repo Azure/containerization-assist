@@ -68,6 +68,7 @@ func (e *MCPError) WithContext(key string, value interface{}) *MCPError {
 }
 
 // New creates a new MCPError with the standard format
+// Deprecated: Use NewRichValidation, NewRichNetwork, etc. from the migration package instead
 func New(module, message string, category ErrorCategory) *MCPError {
 	return &MCPError{
 		Module:   module,
@@ -88,6 +89,7 @@ func Newf(module string, category ErrorCategory, format string, args ...interfac
 }
 
 // Wrap wraps an existing error with additional context
+// Deprecated: Use WrapRich from the migration package instead
 func Wrap(err error, module, message string) *MCPError {
 	if err == nil {
 		return nil
@@ -123,6 +125,7 @@ func Wrapf(err error, module, format string, args ...interface{}) *MCPError {
 }
 
 // Validation creates a validation error
+// Deprecated: Use NewRichValidation from the migration package instead
 func Validation(module, message string) *MCPError {
 	return New(module, message, CategoryValidation)
 }
@@ -133,6 +136,7 @@ func Validationf(module, format string, args ...interface{}) *MCPError {
 }
 
 // Network creates a network error
+// Deprecated: Use NewRichNetwork from the migration package instead
 func Network(module, message string) *MCPError {
 	return &MCPError{
 		Module:    module,

@@ -35,7 +35,8 @@ type MCPTestClient interface {
 type ToolInfo struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
-	Parameters  map[string]interface{} `json:"parameters"`
+	Parameters  map[string]interface{} `json:"parameters"`  // Legacy field name
+	InputSchema map[string]interface{} `json:"inputSchema"` // MCP spec field name
 }
 
 // HealthStatus represents server health information

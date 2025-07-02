@@ -12,14 +12,44 @@ import (
 	"github.com/Azure/container-kit/pkg/kind"
 	coreinterfaces "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/analyze"
+	"github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
 	"github.com/Azure/container-kit/pkg/mcp/internal/observability"
 	"github.com/Azure/container-kit/pkg/mcp/internal/pipeline"
 	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/types"
 	"github.com/Azure/container-kit/pkg/runner"
 )
+
+// simpleAnalyzerBridge bridges mcptypes.AIAnalyzer to coreinterfaces.AIAnalyzer for TokenUsage type compatibility
+type simpleAnalyzerBridge struct {
+	analyzer mcptypes.AIAnalyzer
+}
+
+func (b *simpleAnalyzerBridge) Analyze(ctx context.Context, prompt string) (string, error) {
+	return b.analyzer.Analyze(ctx, prompt)
+}
+
+func (b *simpleAnalyzerBridge) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
+	return b.analyzer.AnalyzeWithFileTools(ctx, prompt, baseDir)
+}
+
+func (b *simpleAnalyzerBridge) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
+	return b.analyzer.AnalyzeWithFormat(ctx, promptTemplate, args...)
+}
+
+func (b *simpleAnalyzerBridge) GetTokenUsage() coreinterfaces.TokenUsage {
+	usage := b.analyzer.GetTokenUsage()
+	return coreinterfaces.TokenUsage{
+		CompletionTokens: usage.CompletionTokens,
+		PromptTokens:     usage.PromptTokens,
+		TotalTokens:      usage.TotalTokens,
+	}
+}
+
+func (b *simpleAnalyzerBridge) ResetTokenUsage() {
+	b.analyzer.ResetTokenUsage()
+}
 
 // directLLMTransport implements analyze.LLMTransport using types.LLMTransport
 type directLLMTransport struct {
@@ -170,9 +200,9 @@ func (s *Server) EnableConversationMode(config coreinterfaces.ConversationConfig
 		// Use analyzer directly - CallerAnalyzer now implements mcptypes.AIAnalyzer correctly
 		mcpClients.Analyzer = coreAnalyzer
 
-		// For tool orchestrator, create minimal bridge to handle TokenUsage type difference
-		bridgeAnalyzer := &coreAnalyzerBridge{analyzer: coreAnalyzer}
+		// Create bridge for tool orchestrator (handles TokenUsage type compatibility)
 		if s.toolOrchestrator != nil {
+			bridgeAnalyzer := &simpleAnalyzerBridge{analyzer: coreAnalyzer}
 			s.toolOrchestrator.SetAnalyzer(bridgeAnalyzer)
 		}
 

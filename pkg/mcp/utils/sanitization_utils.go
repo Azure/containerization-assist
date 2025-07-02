@@ -96,26 +96,6 @@ type JSONSchemaDefinition struct {
 	Definitions          map[string]*JSONSchemaDefinition `json:"definitions,omitempty"`
 }
 
-// SanitizeJSONSchema sanitizes JSON schemas for compatibility
-// Consolidates sanitizeInvopopSchema functions from tool_registry.go and registry.go
-// Deprecated: Consider using JSONSchemaDefinition for type safety
-func SanitizeJSONSchema(schema map[string]interface{}) map[string]interface{} {
-	if schema == nil {
-		return make(map[string]interface{})
-	}
-
-	// Create a deep copy to avoid modifying the original
-	result := make(map[string]interface{})
-	for k, v := range schema {
-		result[k] = v
-	}
-
-	// Apply schema fixes
-	sanitizeSchemaRecursive(result)
-
-	return result
-}
-
 // SanitizeTypedJSONSchema provides type-safe JSON schema sanitization
 func SanitizeTypedJSONSchema(schema *JSONSchemaDefinition) *JSONSchemaDefinition {
 	if schema == nil {
@@ -336,33 +316,6 @@ func SanitizeLogMessage(message string) string {
 	}
 
 	return result
-}
-
-// SanitizeJSONValue sanitizes a value before JSON encoding
-// Deprecated: Use type-safe alternatives like SanitizeStringMap, SanitizeStringSlice
-func SanitizeJSONValue(value interface{}) interface{} {
-	if value == nil {
-		return nil
-	}
-
-	switch v := value.(type) {
-	case string:
-		return SanitizeLogMessage(v)
-	case map[string]interface{}:
-		sanitized := make(map[string]interface{})
-		for k, val := range v {
-			sanitized[k] = SanitizeJSONValue(val)
-		}
-		return sanitized
-	case []interface{}:
-		sanitized := make([]interface{}, len(v))
-		for i, val := range v {
-			sanitized[i] = SanitizeJSONValue(val)
-		}
-		return sanitized
-	default:
-		return value
-	}
 }
 
 // SanitizeStringMap provides type-safe sanitization for string maps

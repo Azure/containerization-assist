@@ -198,20 +198,6 @@ func (b BaseAIContextResult) GetChallenges() []string {
 	return challenges
 }
 
-// GetMetadataForAI returns basic metadata for AI context
-// Deprecated: Use GetTypedMetadataForAI for type-safe metadata
-func (b BaseAIContextResult) GetMetadataForAI() map[string]interface{} {
-	return map[string]interface{}{
-		"operation_type": b.OperationType,
-		"success":        b.IsSuccessful,
-		"duration_ms":    b.Duration.Milliseconds(),
-		"error_count":    b.ErrorCount,
-		"warning_count":  b.WarningCount,
-		"score":          b.CalculateScore(),
-		"risk_level":     b.DetermineRiskLevel(),
-	}
-}
-
 // AIMetadata represents structured metadata for AI context
 type AIMetadata struct {
 	OperationType string `json:"operation_type"`

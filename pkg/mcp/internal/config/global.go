@@ -55,8 +55,8 @@ func Get() (*ConfigManager, error) {
 func MustGet() *ConfigManager {
 	cfg, err := Get()
 	if err != nil {
-		// TODO: Replace panic with proper error handling
-		panic(fmt.Sprintf("configuration not available: %v", err))
+		// Return default configuration instead of panicking
+		return NewConfigManager()
 	}
 	return cfg
 }
@@ -77,18 +77,12 @@ func GetServer() (*ServerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cfg.GetServerConfig(), nil
-}
-
-// MustGetServer returns the server configuration or panics
-// DEPRECATED: Use GetServer() error handling instead
-func MustGetServer() *ServerConfig {
-	return MustGet().GetServerConfig()
+	return cfg.Server, nil
 }
 
 // GetServerWithDefault returns the server configuration or a default if not available
 func GetServerWithDefault() *ServerConfig {
-	return GetWithDefault().GetServerConfig()
+	return GetWithDefault().Server
 }
 
 // GetAnalyzer returns the analyzer configuration
@@ -97,18 +91,12 @@ func GetAnalyzer() (*AnalyzerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cfg.GetAnalyzerConfig(), nil
-}
-
-// MustGetAnalyzer returns the analyzer configuration or panics
-// DEPRECATED: Use GetAnalyzer() error handling instead
-func MustGetAnalyzer() *AnalyzerConfig {
-	return MustGet().GetAnalyzerConfig()
+	return cfg.Analyzer, nil
 }
 
 // GetAnalyzerWithDefault returns the analyzer configuration or a default if not available
 func GetAnalyzerWithDefault() *AnalyzerConfig {
-	return GetWithDefault().GetAnalyzerConfig()
+	return GetWithDefault().Analyzer
 }
 
 // GetTransport returns the transport configuration
@@ -117,18 +105,12 @@ func GetTransport() (*TransportConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cfg.GetTransportConfig(), nil
-}
-
-// MustGetTransport returns the transport configuration or panics
-// DEPRECATED: Use GetTransport() error handling instead
-func MustGetTransport() *TransportConfig {
-	return MustGet().GetTransportConfig()
+	return cfg.Transport, nil
 }
 
 // GetTransportWithDefault returns the transport configuration or a default if not available
 func GetTransportWithDefault() *TransportConfig {
-	return GetWithDefault().GetTransportConfig()
+	return GetWithDefault().Transport
 }
 
 // GetObservability returns the observability configuration
@@ -137,18 +119,12 @@ func GetObservability() (*ObservabilityConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cfg.GetObservabilityConfig(), nil
-}
-
-// MustGetObservability returns the observability configuration or panics
-// DEPRECATED: Use GetObservability() error handling instead
-func MustGetObservability() *ObservabilityConfig {
-	return MustGet().GetObservabilityConfig()
+	return cfg.Observability, nil
 }
 
 // GetObservabilityWithDefault returns the observability configuration or a default if not available
 func GetObservabilityWithDefault() *ObservabilityConfig {
-	return GetWithDefault().GetObservabilityConfig()
+	return GetWithDefault().Observability
 }
 
 // GetDocker returns the Docker configuration
@@ -157,18 +133,12 @@ func GetDocker() (*DockerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cfg.GetDockerConfig(), nil
-}
-
-// MustGetDocker returns the Docker configuration or panics
-// DEPRECATED: Use GetDocker() error handling instead
-func MustGetDocker() *DockerConfig {
-	return MustGet().GetDockerConfig()
+	return cfg.Docker, nil
 }
 
 // GetDockerWithDefault returns the Docker configuration or a default if not available
 func GetDockerWithDefault() *DockerConfig {
-	return GetWithDefault().GetDockerConfig()
+	return GetWithDefault().Docker
 }
 
 // IsInitialized returns true if the global configuration has been initialized
