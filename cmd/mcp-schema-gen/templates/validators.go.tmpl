@@ -1,0 +1,176 @@
+package {{.Domain}}
+
+import (
+	"context"
+	"regexp"
+
+	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
+)
+
+// {{.ToolName | pascalCase}}Validator implements validation for {{.ToolName}} tool input
+type {{.ToolName | pascalCase}}Validator struct {
+	patterns map[string]*regexp.Regexp
+}
+
+// New{{.ToolName | pascalCase}}Validator creates a new validator instance
+func New{{.ToolName | pascalCase}}Validator() *{{.ToolName | pascalCase}}Validator {
+	patterns := make(map[string]*regexp.Regexp)
+
+	{{range .InputFields}}
+	{{range .Validation}}
+	{{if eq .Type "pattern"}}
+	patterns["{{$.Name}}"] = regexp.MustCompile(`{{.Value}}`)
+	{{end}}
+	{{end}}
+	{{end}}
+
+	return &{{.ToolName | pascalCase}}Validator{
+		patterns: patterns,
+	}
+}
+
+// Validate implements comprehensive input validation
+func (v *{{.ToolName | pascalCase}}Validator) Validate(ctx context.Context, input api.ToolInput) error {
+	{{range .InputFields}}
+	// Validate {{.Name}}
+	if err := v.validate{{.Name | pascalCase}}(input); err != nil {
+		return errors.NewRichError("FIELD_VALIDATION_FAILED", "Field validation failed").
+			WithCause(err).
+			WithContext("field", "{{.Name}}").
+			WithContext("tool", "{{$.Domain}}_{{$.Action}}_{{$.Object}}")
+	}
+	{{end}}
+
+	// Cross-field validation
+	if err := v.validateCrossFields(input); err != nil {
+		return errors.NewRichError("CROSS_FIELD_VALIDATION_FAILED", "Cross-field validation failed").
+			WithCause(err).
+			WithContext("tool", "{{.Domain}}_{{.Action}}_{{.Object}}")
+	}
+
+	return nil
+}
+
+{{range .InputFields}}
+// validate{{.Name | pascalCase}} validates the {{.Name}} field
+func (v *{{$.ToolName | pascalCase}}Validator) validate{{.Name | pascalCase}}(input api.ToolInput) error {
+	value, exists := input.Data["{{.Name}}"]
+
+	{{if .Required}}
+	// Required field validation
+	if !exists {
+		return errors.NewRichError("MISSING_REQUIRED_FIELD", "Required field is missing").
+			WithContext("field", "{{.Name}}")
+	}
+	{{else}}
+	// Optional field - skip validation if not present
+	if !exists {
+		return nil
+	}
+	{{end}}
+
+	// Type validation
+	{{if eq .Type "string"}}
+	stringValue, ok := value.(string)
+	if !ok {
+		return errors.NewRichError("INVALID_TYPE", "Field must be a string").
+			WithContext("field", "{{.Name}}").
+			WithContext("expected_type", "string")
+	}
+	{{else if eq .Type "int"}}
+	switch v := value.(type) {
+	case int:
+		// Valid int
+	case float64:
+		// JSON numbers come as float64, check if it's a whole number
+		if v != float64(int(v)) {
+			return errors.NewRichError("INVALID_TYPE", "Field must be an integer").
+				WithContext("field", "{{.Name}}")
+		}
+	default:
+		return errors.NewRichError("INVALID_TYPE", "Field must be an integer").
+			WithContext("field", "{{.Name}}").
+			WithContext("expected_type", "int")
+	}
+	{{else if eq .Type "bool"}}
+	_, ok := value.(bool)
+	if !ok {
+		return errors.NewRichError("INVALID_TYPE", "Field must be a boolean").
+			WithContext("field", "{{.Name}}").
+			WithContext("expected_type", "bool")
+	}
+	{{end}}
+
+	{{range .Validation}}
+	{{if eq .Type "required"}}
+	// Required validation (already handled above)
+	{{else if eq .Type "minLength"}}
+	{{if eq $.Type "string"}}
+	if len(stringValue) < {{.Value}} {
+		return errors.NewRichError("MIN_LENGTH_VIOLATION", "{{.Message}}").
+			WithContext("field", "{{$.Name}}").
+			WithContext("min_length", {{.Value}}).
+			WithContext("actual_length", len(stringValue))
+	}
+	{{end}}
+	{{else if eq .Type "maxLength"}}
+	{{if eq $.Type "string"}}
+	if len(stringValue) > {{.Value}} {
+		return errors.NewRichError("MAX_LENGTH_VIOLATION", "{{.Message}}").
+			WithContext("field", "{{$.Name}}").
+			WithContext("max_length", {{.Value}}).
+			WithContext("actual_length", len(stringValue))
+	}
+	{{end}}
+	{{else if eq .Type "pattern"}}
+	{{if eq $.Type "string"}}
+	if pattern, exists := v.patterns["{{$.Name}}"]; exists {
+		if !pattern.MatchString(stringValue) {
+			return errors.NewRichError("PATTERN_VIOLATION", "{{.Message}}").
+				WithContext("field", "{{$.Name}}").
+				WithContext("pattern", "{{.Value}}").
+				WithContext("value", stringValue)
+		}
+	}
+	{{end}}
+	{{end}}
+	{{end}}
+
+	return nil
+}
+{{end}}
+
+// validateCrossFields performs validation that depends on multiple fields
+func (v *{{.ToolName | pascalCase}}Validator) validateCrossFields(input api.ToolInput) error {
+	// TODO: Implement cross-field validation logic specific to {{.ToolName}}
+	// Examples:
+	// - Ensure mutually exclusive fields are not both set
+	// - Validate field combinations make business sense
+	// - Check dependencies between fields
+
+	return nil
+}
+
+// ValidateBusinessRules performs domain-specific business rule validation
+func (v *{{.ToolName | pascalCase}}Validator) ValidateBusinessRules(ctx context.Context, input api.ToolInput) error {
+	// TODO: Implement {{.Domain}}-specific business rule validation
+	// Examples for {{.Domain}} domain:
+	{{if eq .Domain "security"}}
+	// - Validate image references are accessible
+	// - Check scan type compatibility
+	// - Verify security policy compliance
+	{{else if eq .Domain "build"}}
+	// - Validate Dockerfile exists and is readable
+	// - Check build context accessibility
+	// - Verify image name format compliance
+	{{else if eq .Domain "deploy"}}
+	// - Validate Kubernetes manifest syntax
+	// - Check namespace accessibility
+	// - Verify resource quotas and limits
+	{{else}}
+	// - Add domain-specific validation rules
+	{{end}}
+
+	return nil
+}

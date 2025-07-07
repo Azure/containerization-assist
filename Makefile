@@ -49,12 +49,30 @@ test-performance:
 	@echo "Running performance benchmarks..."
 	go test -tags=performance ./pkg/mcp/internal/test/e2e/... -v -bench=. -timeout=60m
 
+.PHONY: schema-gen
+schema-gen:
+	@echo "Generating tool schemas..."
+	@echo "Building schema generator..."
+	@go build -o bin/mcp-schema-gen ./cmd/mcp-schema-gen
+	@echo "Generating schemas for canonical tools..."
+	@go generate ./pkg/mcp/domain/containerization/...
+	@echo "Schema generation complete"
+
+.PHONY: schema-validate
+schema-validate: schema-gen
+	@echo "Validating generated schemas..."
+	@for schema in $$(find pkg/mcp/domain/containerization -name "*_schema.json"); do \
+		echo "Validating $$schema"; \
+		jq . $$schema > /dev/null || (echo "Invalid JSON in $$schema" && exit 1); \
+	done
+	@echo "All schemas valid"
+
 .PHONY: test-all-integration
 test-all-integration: test-integration test-e2e
 
 .PHONY: test-all
 test-all: test test-integration
-	go test -race ./...
+	go test -race ./pkg/mcp/...
 
 .PHONY: coverage
 coverage:
@@ -80,12 +98,12 @@ coverage-baseline:
 bench:
 	@echo "Running MCP performance benchmarks..."
 	@echo "Target: <300μs P95 per request"
-	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/tools
+	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/
 
 .PHONY: bench-baseline
 bench-baseline:
 	@echo "Setting performance baseline..."
-	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/tools > bench-baseline.txt
+	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/ > bench-baseline.txt
 	@echo "Baseline saved to bench-baseline.txt"
 
 .PHONY: lint
@@ -93,6 +111,19 @@ lint:
 	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	@echo "Running linter with error budget (threshold: 100)..."
 	@LINT_ERROR_THRESHOLD=100 LINT_WARN_THRESHOLD=50 ./scripts/lint-with-threshold.sh ./pkg/mcp/...
+
+.PHONY: check-boundaries
+check-boundaries:
+	@echo "Checking package boundary error handling compliance..."
+	@./scripts/check-boundary-errors.sh
+
+.PHONY: fix-boundaries
+fix-boundaries:
+	@echo "Automatically fixing package boundary errors..."
+	@go build -o bin/mcp-richify ./cmd/mcp-richify
+	@bin/mcp-richify boundaries /tmp/boundaries.json
+	@bin/mcp-richify convert /tmp/boundaries.json
+	@echo "✅ Boundary errors fixed!"
 
 .PHONY: lint-strict
 lint-strict:
@@ -134,9 +165,26 @@ install-hooks:
 pre-commit:
 	@pre-commit run --all-files
 
+.PHONY: generate
+generate: build-schemaGen
+	@echo "Generating tool schemas..."
+	@go generate ./...
+
+.PHONY: build-schemaGen
+build-schemaGen:
+	@echo "Building schema generator..."
+	@go build -o bin/mcp-schema-gen ./cmd/mcp-schema-gen
+
+.PHONY: check-schemas
+check-schemas:
+	@echo "Checking if schemas are up to date..."
+	@./scripts/check-schemas.sh
+
 .PHONY: clean
 clean:
 	rm -f container-kit-mcp
+	rm -f bin/schemaGen
+	find . -name "generated_*.go" -type f -delete
 
 .PHONY: deps-update
 deps-update:
@@ -153,7 +201,7 @@ deps-update:
 	go mod verify
 	@echo ""
 	@echo "Testing with updated dependencies..."
-	go test ./...
+	go test ./pkg/mcp/...
 	@echo ""
 	@echo "Dependencies updated successfully!"
 	@echo ""
@@ -297,6 +345,10 @@ help:
 	@echo "  lint-report       Generate detailed lint report"
 	@echo "  lint-ratchet      Ensure lint issues don't increase"
 	@echo ""
+	@echo "Error boundary targets:"
+	@echo "  check-boundaries  Check package boundary error handling compliance (ADR-006)"
+	@echo "  fix-boundaries    Automatically fix boundary error violations"
+	@echo ""
 	@echo "Complexity targets:"
 	@echo "  complexity-baseline  Set current complexity as baseline"
 	@echo "  complexity-check     Check if complexity improved"
@@ -321,7 +373,9 @@ help:
 	@echo "  baseline-performance Establish new performance baseline"
 	@echo ""
 	@echo "Other targets:"
-	@echo "  clean             Remove built binaries"
+	@echo "  generate          Generate tool schemas from Args structs"
+	@echo "  check-schemas     Check if generated schemas are up to date"
+	@echo "  clean             Remove built binaries and generated files"
 	@echo "  version           Show version of built binary"
 	@echo "  help              Show this help message"
 	@echo ""

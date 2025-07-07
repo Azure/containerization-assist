@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/k8s"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/validation"
 	"github.com/rs/zerolog"
 	"sigs.k8s.io/yaml"
 )
@@ -29,13 +31,14 @@ func NewManifestManager(logger zerolog.Logger) *ManifestManager {
 
 // ManifestGenerationResult contains the result of manifest generation
 type ManifestGenerationResult struct {
-	Success   bool                   `json:"success"`
-	Manifests []GeneratedManifest    `json:"manifests"`
-	Template  string                 `json:"template"`
-	OutputDir string                 `json:"output_dir"`
-	Duration  time.Duration          `json:"duration"`
-	Context   map[string]interface{} `json:"context"`
-	Error     *ManifestError         `json:"error,omitempty"`
+	Success      bool                   `json:"success"`
+	Manifests    []GeneratedManifest    `json:"manifests"`
+	Template     string                 `json:"template"`
+	OutputDir    string                 `json:"output_dir"`
+	ManifestPath string                 `json:"manifest_path"` // Path to generated manifests
+	Duration     time.Duration          `json:"duration"`
+	Context      map[string]interface{} `json:"context"`
+	Error        *ManifestError         `json:"error,omitempty"`
 }
 
 // GeneratedManifest represents a generated Kubernetes manifest
@@ -266,58 +269,70 @@ func (mm *ManifestManager) DiscoverManifests(ctx context.Context, directory stri
 // ValidateManifest validates a single Kubernetes manifest
 func (mm *ManifestManager) ValidateManifest(manifestPath string) (*ManifestValidationResult, error) {
 	result := &ManifestValidationResult{
-		Path:   manifestPath,
-		Errors: make([]ValidationError, 0),
+		Valid:    true,
+		Errors:   make([]api.ValidationError, 0),
+		Warnings: make([]api.ValidationWarning, 0),
+		Metadata: api.ValidationMetadata{
+			ValidatedAt:      time.Now(),
+			ValidatorName:    "k8s-manifest-validator",
+			ValidatorVersion: "1.0.0",
+			Context:          make(map[string]string),
+		},
+		Details: make(map[string]interface{}),
+		Context: make(map[string]string),
 	}
 
 	// Read manifest file
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:    "file_error",
-			Message: fmt.Sprintf("Cannot read manifest file: %v", err),
-		})
+		fileError := api.NewError(
+			"MANIFEST_FILE_READ_ERROR",
+			fmt.Sprintf("Cannot read manifest file: %v", err),
+			validation.ErrTypeCustom,
+			validation.SeverityHigh,
+		)
+		result.Errors = append(result.Errors, *fileError)
 		return result, nil
 	}
 
 	// Parse as YAML
 	var manifest map[string]interface{}
 	if err := yaml.Unmarshal(content, &manifest); err != nil {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:    "yaml_error",
-			Message: fmt.Sprintf("Invalid YAML format: %v", err),
-		})
+		yamlError := api.NewError(
+			"MANIFEST_YAML_PARSE_ERROR",
+			fmt.Sprintf("Invalid YAML format: %v", err),
+			validation.ErrTypeValidation,
+			validation.SeverityHigh,
+		)
+		result.Errors = append(result.Errors, *yamlError)
 		return result, nil
 	}
 
 	// Basic Kubernetes resource validation
 	if err := mm.validateK8sResource(manifest); err != nil {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:    "k8s_error",
-			Message: err.Error(),
-		})
+		k8sError := api.NewError(
+			"MANIFEST_K8S_VALIDATION_ERROR",
+			err.Error(),
+			validation.ErrTypeValidation,
+			validation.SeverityHigh,
+		)
+		result.Errors = append(result.Errors, *k8sError)
 	}
 
 	result.Valid = len(result.Errors) == 0
-	result.Content = string(content)
+
+	// Store content in validation metadata
+	result.Metadata.Context["manifest_path"] = manifestPath
+	result.Metadata.Context["content"] = string(content)
 
 	return result, nil
 }
 
-// ManifestValidationResult contains manifest validation results
-type ManifestValidationResult struct {
-	Valid   bool              `json:"valid"`
-	Path    string            `json:"path"`
-	Content string            `json:"content"`
-	Errors  []ValidationError `json:"errors"`
-}
+// ManifestValidationResult now uses the unified validation framework for deploy domain
+type ManifestValidationResult = api.ManifestValidationResult
 
-// ValidationError represents a manifest validation error
-type ValidationError struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
-	Field   string `json:"field,omitempty"`
-}
+// ValidationError now uses the unified validation framework
+type ValidationError = api.ValidationError
 
 // GetAvailableTemplates returns available manifest templates
 func (mm *ManifestManager) GetAvailableTemplates() ([]TemplateInfo, error) {

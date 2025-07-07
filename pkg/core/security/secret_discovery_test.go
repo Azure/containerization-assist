@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,7 +89,7 @@ func TestSecretDiscovery_PatternDetection(t *testing.T) {
 			if tt.shouldFind {
 				assert.Len(t, findings, tt.expectedCount)
 				if len(findings) > 0 {
-					assert.Equal(t, tt.expectedType, findings[0].SecretType)
+					assert.Equal(t, tt.expectedType, findings[0].Type)
 
 					// Test false positive detection if enabled
 					if strings.Contains(tt.content, "example") {
@@ -170,48 +171,58 @@ func TestSecretDiscovery_FalsePositiveDetection(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		finding  SecretFinding
+		finding  ExtendedSecretFinding
 		expected bool
 	}{
 		{
 			name: "Example Key",
-			finding: SecretFinding{
-				Match:      "example-api-key",
-				SecretType: "api_key",
+			finding: ExtendedSecretFinding{
+				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+					Type: "api_key",
+				},
+				Match: "example-api-key",
 			},
 			expected: true,
 		},
 		{
 			name: "Placeholder",
-			finding: SecretFinding{
-				Match:      "your-secret-here",
-				SecretType: "generic_secret",
+			finding: ExtendedSecretFinding{
+				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+					Type: "generic_secret",
+				},
+				Match: "your-secret-here",
 			},
 			expected: true,
 		},
 		{
 			name: "Low Entropy Generic",
-			finding: SecretFinding{
-				Match:      "password123",
-				SecretType: "generic_secret",
-				Entropy:    2.0, // Lower entropy to trigger false positive
+			finding: ExtendedSecretFinding{
+				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+					Type: "generic_secret",
+				},
+				Match:   "password123",
+				Entropy: 2.0, // Lower entropy to trigger false positive
 			},
 			expected: true,
 		},
 		{
 			name: "Real Looking Key",
-			finding: SecretFinding{
-				Match:      "sk-1234567890abcdef1234567890abcdef",
-				SecretType: "api_key",
-				Entropy:    4.5,
+			finding: ExtendedSecretFinding{
+				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+					Type: "api_key",
+				},
+				Match:   "sk-1234567890abcdef1234567890abcdef",
+				Entropy: 4.5,
 			},
 			expected: false,
 		},
 		{
 			name: "Repeated Characters",
-			finding: SecretFinding{
-				Match:      "aaaaaaaaaaaaaaaa",
-				SecretType: "generic_secret",
+			finding: ExtendedSecretFinding{
+				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+					Type: "generic_secret",
+				},
+				Match: "aaaaaaaaaaaaaaaa",
 			},
 			expected: true,
 		},
@@ -348,7 +359,7 @@ MIIEpAIBAAKCAQEA...
 	foundGitHub := false
 	foundPrivateKey := false
 	for _, finding := range result.Findings {
-		switch finding.SecretType {
+		switch finding.Type {
 		case "aws_access_key":
 			foundAWS = true
 			// Verification may work depending on the exact pattern match

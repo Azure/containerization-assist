@@ -25,7 +25,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https:/
 container-kit --version
 ```
 
-For detailed installation options and troubleshooting, see the [Quickstart Guide](docs/quickstart.md).
+For detailed usage and troubleshooting, see the [Tool Guide](docs/TOOL_GUIDE.md).
 
 ## 🏃 Quick Start
 
@@ -81,7 +81,7 @@ Container Kit provides atomic tools and conversational workflows through a unifi
 - **Conversation Mode**: Guided AI workflows for complete containerization
 - **Unified Interface**: Consistent tool patterns with auto-registration
 
-> **📖 Technical Details**: See [Architecture Guide](docs/mcp-architecture.md) for complete system design.
+> **📖 Technical Details**: See [Architecture Guide](docs/ARCHITECTURE.md) for complete system design.
 
 ## 🛠️ Key Features
 
@@ -122,4 +122,4 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Complete User Guide](MCP_DOCUMENTATION.md)
+- **Documentation**: Check the [Tool Guide](docs/TOOL_GUIDE.md) and [Architecture Guide](docs/ARCHITECTURE.md)

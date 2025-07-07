@@ -1,0 +1,10 @@
+{
+  "Results": [
+    {
+      "Target": "alpine:latest",
+      "Class": "os-pkgs",
+      "Type": "alpine",
+      "Vulnerabilities": null
+    }
+  ]
+}

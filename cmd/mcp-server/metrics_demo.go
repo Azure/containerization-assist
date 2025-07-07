@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/rs/zerolog/log"
 )
 

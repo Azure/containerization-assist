@@ -1,0 +1,127 @@
+graph TD
+    Client[Client Applications] --> Transport[Transport Layer]
+    Transport --> Server[MCP Server]
+    Server --> Container[DI Container]
+    Container --> Services[Service Layer]
+
+    Services --> Tools[Unified Tools]
+    Services --> Session[Session Services]
+    Services --> Validation[Validation Services]
+
+    subgraph "3-Bounded Context Architecture (ALPHA)"
+        Domain[domain/ - Business Logic & Types]
+        Application[application/ - Use Cases & Orchestration]
+        Infra[infra/ - External Integrations]
+    end
+
+    subgraph "Domain Layer"
+        DomainTools[containerization/ - Domain Tools]
+        DomainErrors[errors/ - Unified Error System]
+        DomainTypes[types/ - Domain Types]
+        DomainSession[session/ - Session Logic]
+    end
+
+    subgraph "Application Layer"
+        AppAPI[api/ - Public Interfaces]
+        AppCore[core/ - Application Services]
+        AppWorkflows[workflows/ - Business Workflows]
+        AppOrchestration[orchestration/ - Tool Coordination]
+    end
+
+    subgraph "Infrastructure Layer"
+        InfraTransport[transport/ - HTTP/stdio]
+        InfraPersistence[persistence/ - BoltDB]
+        InfraRegistry[registry/ - Tool Registry]
+    end
+
+    subgraph "Service-Based Architecture (EPSILON)"
+        SessionStore[SessionStore Service]
+        BuildExecutor[BuildExecutor Service]
+        ConfigValidator[ConfigValidator Service]
+        Scanner[Scanner Service]
+        ToolRegistry[ToolRegistry Service]
+        WorkflowExecutor[WorkflowExecutor Service]
+        ErrorReporter[ErrorReporter Service]
+    end
+
+    subgraph "Unified Tool Interface (GAMMA)"
+        APITool[api.Tool - Canonical Interface]
+        ToolImplementations[
+            BuildTool
+            TagTool
+            PullTool
+            PushTool
+            ScanTool
+            DeployTool
+            AnalyzeTool
+        ]
+    end
+
+    subgraph "Validation Framework (BETA)"
+        RichErrors[Rich Error System]
+        TagBasedValidation[Tag-Based Validation DSL]
+        UnifiedValidators[5 Core Validators]
+    end
+
+    Domain --> DomainTools
+    Domain --> DomainErrors
+    Domain --> DomainTypes
+    Domain --> DomainSession
+
+    Application --> AppAPI
+    Application --> AppCore
+    Application --> AppWorkflows
+    Application --> AppOrchestration
+
+    Infra --> InfraTransport
+    Infra --> InfraPersistence
+    Infra --> InfraRegistry
+
+    Container --> SessionStore
+    Container --> BuildExecutor
+    Container --> ConfigValidator
+    Container --> Scanner
+    Container --> ToolRegistry
+    Container --> WorkflowExecutor
+    Container --> ErrorReporter
+
+    Tools --> APITool
+    APITool --> ToolImplementations
+
+    Validation --> RichErrors
+    Validation --> TagBasedValidation
+    Validation --> UnifiedValidators
+
+    subgraph "External Systems"
+        Docker[Docker Engine]
+        Kubernetes[Kubernetes API]
+        OpenAI[Azure OpenAI]
+        Storage[BoltDB Storage]
+    end
+
+    BuildExecutor --> Docker
+    WorkflowExecutor --> Kubernetes
+    AppWorkflows --> OpenAI
+    SessionStore --> Storage
+
+    subgraph "Transport Options"
+        STDIO[stdio - Claude Desktop]
+        HTTP[HTTP - Production]
+    end
+
+    Transport --> STDIO
+    Transport --> HTTP
+
+    classDef primaryFlow fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef domainLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef applicationLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef infraLayer fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef serviceLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef externalSys fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
+
+    class Client,Transport,Server,Container primaryFlow
+    class Domain,DomainTools,DomainErrors,DomainTypes,DomainSession domainLayer
+    class Application,AppAPI,AppCore,AppWorkflows,AppOrchestration applicationLayer
+    class Infra,InfraTransport,InfraPersistence,InfraRegistry infraLayer
+    class Services,SessionStore,BuildExecutor,ConfigValidator,Scanner,ToolRegistry,WorkflowExecutor,ErrorReporter serviceLayer
+    class Docker,Kubernetes,OpenAI,Storage externalSys

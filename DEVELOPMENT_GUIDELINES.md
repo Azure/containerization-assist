@@ -292,13 +292,16 @@ return &RichError{
 
 ### Directory Structure
 ```
-pkg/mcp/internal/
-├── tools/           # Tool implementations
-├── core/           # Core server functionality
-├── types/          # Shared type definitions
-├── utils/          # Shared utilities
-├── transport/      # Transport layer
-└── orchestration/  # Workflow orchestration
+pkg/mcp/domain/
+├── containerization/   # Container operations (analyze, build, deploy, scan)
+│   ├── analyze/       # Repository analysis & Dockerfile generation
+│   ├── build/         # Docker build operations (not yet implemented)
+│   ├── deploy/        # Kubernetes deployment & manifest generation
+│   └── scan/          # Security scanning & secret detection
+├── session/           # Session management & lifecycle
+├── types/             # Core type definitions
+├── validation/        # Input validation framework
+└── common/           # Shared utilities
 ```
 
 ### Import Organization
@@ -360,6 +363,51 @@ make bench                 # Performance benchmarks
 4. **Maintainability**: Is the code easy to understand and modify?
 5. **Testing**: Are all scenarios adequately tested?
 
+## Architecture Patterns
+
+### 1. Template Method Pattern
+Use when multiple implementations share common algorithm structure but differ in specific steps.
+
+**Example**: Database detectors with shared detection logic
+```go
+// Base template
+type BaseDetector struct {
+    config    DatabaseDetectorConfig
+    extractor ConnectionInfoExtractor
+}
+
+func (d *BaseDetector) Detect(repoPath string) ([]DetectedDatabase, error) {
+    // Template method defining algorithm skeleton
+    databases := d.detectFromDocker(repoPath, databases)
+    databases = d.detectFromEnvironment(repoPath, databases)
+    databases = d.detectFromConfigFiles(repoPath, databases)
+    return databases, nil
+}
+```
+
+### 2. Factory Pattern
+Use for complex object creation with multiple variants.
+
+### 3. Pipeline Pattern
+Use for sequential processing steps where each step transforms data.
+
+### 4. Predicate Pattern
+Use for complex conditional logic with multiple criteria.
+
+## Function Design Principles
+
+### 1. Single Responsibility
+Each function should have one clear purpose.
+
+### 2. Cyclomatic Complexity < 10
+Keep functions simple with minimal branching.
+
+### 3. Parameter Limits
+Use options pattern for functions with >5 parameters.
+
+### 4. Safe Type Assertions
+Always check type assertions to prevent panics.
+
 ## Enforcement
 
 ### Automated Checks
@@ -383,11 +431,10 @@ make bench                 # Performance benchmarks
 
 - For clarification on guidelines: Open an issue with label `guidelines`
 - For tool setup: See `.devcontainer/README.md`
-- For linting issues: See `docs/LINTING.md`
-- For architecture questions: See `ARCHITECTURE.md`
+- For architecture questions: See `docs/ARCHITECTURE.md`
 
 ---
 
-**Version**: 1.0
-**Last Updated**: 2025-06-24
-**Next Review**: Quarterly (2025-09-24)
+**Version**: 1.1
+**Last Updated**: 2025-07-07
+**Next Review**: Quarterly (2025-10-07)

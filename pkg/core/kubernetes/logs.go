@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -57,7 +58,7 @@ func (lc *LogCollector) CollectPodLogs(ctx context.Context, namespace, labelSele
 	// Get pods matching the label selector
 	pods, err := lc.getPodsWithStatus(ctx, namespace, labelSelector)
 	if err != nil {
-		return result, fmt.Errorf("failed to get pods: %w", err)
+		return result, mcperrors.NewError().Messagef("failed to get pods: %w", err).WithLocation().Build()
 	}
 
 	result.TotalPods = len(pods)
@@ -113,10 +114,12 @@ func (lc *LogCollector) CollectCrashingPodLogs(ctx context.Context, namespace, l
 	// Get pods matching the label selector
 	pods, err := lc.getPodsWithStatus(ctx, namespace, labelSelector)
 	if err != nil {
-		return result, fmt.Errorf("failed to get pods: %w", err)
+		return result, mcperrors.NewError().Messagef("failed to get pods: %w", err).WithLocation(
+
+		// Filter for crashing/error pods
+		).Build()
 	}
 
-	// Filter for crashing/error pods
 	for _, podInfo := range pods {
 		if lc.isPodUnhealthy(podInfo) {
 			podLog := PodLogs{

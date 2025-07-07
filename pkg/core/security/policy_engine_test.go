@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,19 +27,22 @@ func TestLoadDefaultPolicies(t *testing.T) {
 	require.NoError(t, err)
 
 	policies := engine.GetPolicies()
-	assert.Len(t, policies, 5) // Expected default policies
+	assert.Len(t, policies, 8) // Expected default policies
 
 	// Check specific policies exist
-	policyMap := make(map[string]SecurityPolicy)
+	policyMap := make(map[string]Policy)
 	for _, policy := range policies {
 		policyMap[policy.ID] = policy
 	}
 
 	assert.Contains(t, policyMap, "critical-vulns-block")
 	assert.Contains(t, policyMap, "high-vulns-warn")
-	assert.Contains(t, policyMap, "cvss-threshold")
-	assert.Contains(t, policyMap, "secrets-block")
-	assert.Contains(t, policyMap, "outdated-packages")
+	assert.Contains(t, policyMap, "cvss-score-limit")
+	assert.Contains(t, policyMap, "no-secrets")
+	assert.Contains(t, policyMap, "image-age-limit")
+	assert.Contains(t, policyMap, "image-size-limit")
+	assert.Contains(t, policyMap, "approved-licenses")
+	assert.Contains(t, policyMap, "package-version-ban")
 }
 
 func TestEvaluateVulnerabilityCountRule(t *testing.T) {
@@ -48,7 +52,7 @@ func TestEvaluateVulnerabilityCountRule(t *testing.T) {
 	tests := []struct {
 		name            string
 		rule            PolicyRule
-		scanCtx         *SecurityScanContext
+		scanCtx         *ScanContext
 		expectError     bool
 		expectViolation bool
 	}{
@@ -61,7 +65,7 @@ func TestEvaluateVulnerabilityCountRule(t *testing.T) {
 				Operator: OperatorGreaterThan,
 				Value:    float64(0),
 			},
-			scanCtx: &SecurityScanContext{
+			scanCtx: &ScanContext{
 				VulnSummary: VulnerabilitySummary{
 					Critical: 2,
 					High:     1,
@@ -79,7 +83,7 @@ func TestEvaluateVulnerabilityCountRule(t *testing.T) {
 				Operator: OperatorGreaterThan,
 				Value:    float64(0),
 			},
-			scanCtx: &SecurityScanContext{
+			scanCtx: &ScanContext{
 				VulnSummary: VulnerabilitySummary{
 					Critical: 0,
 					High:     2,
@@ -97,7 +101,7 @@ func TestEvaluateVulnerabilityCountRule(t *testing.T) {
 				Operator: OperatorGreaterThan,
 				Value:    float64(5),
 			},
-			scanCtx: &SecurityScanContext{
+			scanCtx: &ScanContext{
 				VulnSummary: VulnerabilitySummary{
 					High:  3,
 					Total: 3,
@@ -185,7 +189,7 @@ func TestEvaluateCVSSScoreRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			scanCtx := &SecurityScanContext{
+			scanCtx := &ScanContext{
 				Vulnerabilities: tt.vulnerabilities,
 			}
 
@@ -216,19 +220,23 @@ func TestEvaluateSecretPresenceRule(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		secretFindings  []SecretFinding
+		secretFindings  []ExtendedSecretFinding
 		secretSummary   *DiscoverySummary
 		expectViolation bool
 	}{
 		{
 			name: "secrets found triggers violation",
-			secretFindings: []SecretFinding{
+			secretFindings: []ExtendedSecretFinding{
 				{
-					SecretType:    "api_key",
+					ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+						Type: "api_key",
+					},
 					FalsePositive: false,
 				},
 				{
-					SecretType:    "password",
+					ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+						Type: "password",
+					},
 					FalsePositive: true, // This should be excluded
 				},
 			},
@@ -240,9 +248,11 @@ func TestEvaluateSecretPresenceRule(t *testing.T) {
 		},
 		{
 			name: "only false positives no violation",
-			secretFindings: []SecretFinding{
+			secretFindings: []ExtendedSecretFinding{
 				{
-					SecretType:    "password",
+					ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+						Type: "password",
+					},
 					FalsePositive: true,
 				},
 			},
@@ -256,7 +266,7 @@ func TestEvaluateSecretPresenceRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			scanCtx := &SecurityScanContext{
+			scanCtx := &ScanContext{
 				SecretFindings: tt.secretFindings,
 				SecretSummary:  tt.secretSummary,
 			}
@@ -283,7 +293,7 @@ func TestEvaluatePolicies(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	scanCtx := &SecurityScanContext{
+	scanCtx := &ScanContext{
 		ImageRef: "test:latest",
 		ScanTime: time.Now(),
 		VulnSummary: VulnerabilitySummary{
@@ -307,9 +317,11 @@ func TestEvaluatePolicies(t *testing.T) {
 			TotalFindings:  1,
 			FalsePositives: 0,
 		},
-		SecretFindings: []SecretFinding{
+		SecretFindings: []ExtendedSecretFinding{
 			{
-				SecretType:    "api_key",
+				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+					Type: "api_key",
+				},
 				FalsePositive: false,
 			},
 		},
@@ -465,7 +477,7 @@ func TestPolicyManagement(t *testing.T) {
 	engine := NewPolicyEngine(logger)
 
 	// Test adding a policy
-	policy := SecurityPolicy{
+	policy := Policy{
 		ID:          "test-policy",
 		Name:        "Test Policy",
 		Description: "A test policy",

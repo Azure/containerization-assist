@@ -229,7 +229,7 @@ func checkFileImports(filePath string, rule BoundaryRule) ([]BoundaryViolation, 
 			importPath := strings.Trim(importSpec.Path.Value, `"`)
 
 			// Skip standard library and external dependencies
-			if !strings.Contains(importPath, "github.com/tng/workspace/prod/pkg/mcp") {
+			if !strings.Contains(importPath, "github.com/Azure/container-kit/pkg/mcp") {
 				continue
 			}
 
@@ -269,7 +269,7 @@ func checkImportViolation(filePath, importPath string, rule BoundaryRule, lineNu
 		}
 
 		// Also allow standard library and external deps
-		if !allowed && strings.Contains(importPath, "github.com/tng/workspace/prod/pkg/mcp") {
+		if !allowed && strings.Contains(importPath, "github.com/Azure/container-kit/pkg/mcp") {
 			return &BoundaryViolation{
 				Package:    rule.Package,
 				File:       filePath,
@@ -324,9 +324,9 @@ func checkCircularDependencies() ([]BoundaryViolation, error) {
 				importPath := strings.Trim(importSpec.Path.Value, `"`)
 
 				// Only consider internal MCP imports
-				if strings.Contains(importPath, "github.com/tng/workspace/prod/pkg/mcp/internal") {
+				if strings.Contains(importPath, "github.com/Azure/container-kit/pkg/mcp/internal") {
 					// Convert import path to local package path
-					localPath := strings.Replace(importPath, "github.com/tng/workspace/prod/", "", 1)
+					localPath := strings.Replace(importPath, "github.com/Azure/container-kit/", "", 1)
 					depGraph[packagePath] = append(depGraph[packagePath], localPath)
 				}
 			}

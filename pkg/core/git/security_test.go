@@ -3,9 +3,8 @@ package git
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-
-	"github.com/Azure/container-kit/pkg/commonutils"
 )
 
 func TestFilesystemJail_ValidatePath(t *testing.T) {
@@ -81,7 +80,7 @@ func TestFilesystemJail_ValidatePath(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidatePath() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if err != nil && tt.errMsg != "" && !commonutils.Contains(err.Error(), tt.errMsg) {
+			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
 				t.Errorf("ValidatePath() error = %v, want error containing %v", err, tt.errMsg)
 			}
 		})
@@ -276,19 +275,10 @@ func TestFilesystemJail_SecureTargetPath(t *testing.T) {
 			}
 
 			if !tt.wantErr && tt.wantPrefix != "" {
-				if !commonutils.Contains(secured, tt.wantPrefix) {
+				if !strings.Contains(secured, tt.wantPrefix) {
 					t.Errorf("SecureTargetPath() = %v, want path containing %v", secured, tt.wantPrefix)
 				}
 			}
 		})
 	}
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

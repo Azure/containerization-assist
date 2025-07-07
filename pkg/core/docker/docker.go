@@ -5,10 +5,11 @@ package docker
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // Manager provides a unified interface to all Docker operations
@@ -17,17 +18,17 @@ type Manager struct {
 	TemplateEngine  *TemplateEngine
 	RegistryManager *RegistryManager
 	Validator       *Validator
-	logger          zerolog.Logger
+	logger          *slog.Logger
 }
 
 // NewManager creates a new Docker operations manager
-func NewManager(clients *clients.Clients, logger zerolog.Logger) *Manager {
+func NewManager(clients *clients.Clients, logger *slog.Logger) *Manager {
 	return &Manager{
 		Builder:         NewBuilder(clients, logger),
 		TemplateEngine:  NewTemplateEngine(logger),
 		RegistryManager: NewRegistryManager(clients, logger),
 		Validator:       NewValidator(logger),
-		logger:          logger.With().Str("component", "docker_manager").Logger(),
+		logger:          logger.With("component", "docker_manager"),
 	}
 }
 
@@ -62,7 +63,7 @@ type ContainerizationResult struct {
 	Template *GenerateResult `json:"template,omitempty"`
 
 	// Validation results
-	Validation *ValidationResult `json:"validation,omitempty"`
+	Validation *types.BuildValidationResult `json:"validation,omitempty"`
 
 	// Build results
 	Build *BuildResult `json:"build,omitempty"`
@@ -85,11 +86,10 @@ func (m *Manager) Containerize(ctx context.Context, targetDir string, options Co
 		Context: make(map[string]interface{}),
 	}
 
-	m.logger.Info().
-		Str("target_dir", targetDir).
-		Str("template", options.TemplateName).
-		Str("image_name", options.ImageName).
-		Msg("Starting containerization workflow")
+	m.logger.Info("Starting containerization workflow",
+		"target_dir", targetDir,
+		"template", options.TemplateName,
+		"image_name", options.ImageName)
 
 	// Step 1: Generate Dockerfile from template
 	if options.TemplateName == "" {
@@ -129,9 +129,8 @@ func (m *Manager) Containerize(ctx context.Context, targetDir string, options Co
 	result.Validation = validationResult
 
 	if !validationResult.Valid {
-		m.logger.Warn().
-			Int("errors", len(validationResult.Errors)).
-			Msg("Generated Dockerfile has validation errors")
+		m.logger.Warn("Generated Dockerfile has validation errors",
+			"errors", len(validationResult.Errors))
 		// Continue anyway - let external AI handle the errors
 	}
 
@@ -190,11 +189,10 @@ func (m *Manager) Containerize(ctx context.Context, targetDir string, options Co
 		result.Context["pushed_to_registry"] = true
 	}
 
-	m.logger.Info().
-		Str("image_ref", buildResult.ImageRef).
-		Dur("duration", result.Duration).
-		Bool("pushed", result.Push != nil && result.Push.Success).
-		Msg("Containerization workflow completed successfully")
+	m.logger.Info("Containerization workflow completed successfully",
+		"image_ref", buildResult.ImageRef,
+		"duration", result.Duration,
+		"pushed", result.Push != nil && result.Push.Success)
 
 	return result, nil
 }

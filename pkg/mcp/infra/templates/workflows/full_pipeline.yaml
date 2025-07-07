@@ -1,0 +1,77 @@
+name: full_pipeline
+description: Complete containerization pipeline
+version: 1.0.0
+parameters:
+  - name: repository_url
+    type: string
+    description: Repository URL to containerize
+    required: true
+  - name: registry
+    type: string
+    description: Container registry URL
+    required: true
+  - name: namespace
+    type: string
+    description: Kubernetes namespace
+    default: default
+
+stages:
+  - id: clone
+    name: Clone repository
+    tool: git
+    parameters:
+      url: "{{ .repository_url }}"
+
+  - id: analyze
+    name: Analyze codebase
+    tool: analyze
+    parameters:
+      auto_detect: true
+    depends_on:
+      - clone
+
+  - id: generate_dockerfile
+    name: Generate Dockerfile
+    tool: dockerfile
+    parameters:
+      based_on_analysis: true
+    depends_on:
+      - analyze
+
+  - id: build
+    name: Build container
+    tool: build
+    parameters:
+      use_cache: true
+    depends_on:
+      - generate_dockerfile
+
+  - id: scan
+    name: Security scan
+    tool: scan
+    parameters:
+      scan_type: comprehensive
+    depends_on:
+      - build
+
+  - id: push
+    name: Push to registry
+    tool: push
+    parameters:
+      registry: "{{ .registry }}"
+    depends_on:
+      - scan
+
+  - id: generate_manifests
+    name: Generate K8s manifests
+    tool: manifests
+    parameters:
+      namespace: "{{ .namespace }}"
+    depends_on:
+      - push
+
+  - id: validate
+    name: Validate deployment
+    tool: validate
+    depends_on:
+      - generate_manifests

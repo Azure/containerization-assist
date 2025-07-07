@@ -1,261 +1,382 @@
-# Developer Guide: Adding New Tools to the MCP Server
+# Developer Guide: Adding New MCP Tools
 
-This guide provides a comprehensive walkthrough for developers adding new tools to the Container Kit MCP server. The MCP server uses a zero-configuration auto-registration system that simplifies tool integration.
+This guide provides a comprehensive walkthrough for adding new tools to the Container Kit MCP server using our standardized architecture and patterns.
 
 ## Table of Contents
-1. [Architecture Overview](#architecture-overview)
-2. [Tool Interface Requirements](#tool-interface-requirements)
-3. [Step-by-Step Implementation](#step-by-step-implementation)
-4. [Testing Your Tool](#testing-your-tool)
-5. [Advanced Topics](#advanced-topics)
-6. [Troubleshooting](#troubleshooting)
+1. [Quick Start](#quick-start)
+2. [Architecture Overview](#architecture-overview)
+3. [Tool Standards Reference](#tool-standards-reference)
+4. [Step-by-Step Implementation](#step-by-step-implementation)
+5. [Session Management](#session-management)
+6. [Testing Your Tool](#testing-your-tool)
+7. [Registration Process](#registration-process)
+8. [Best Practices](#best-practices)
+9. [Troubleshooting](#troubleshooting)
+
+## Quick Start
+
+For experienced developers, here's the minimal checklist:
+
+1. ✅ Read [MCP Tool Standards](./MCP_TOOL_STANDARDS.md) for canonical patterns
+2. ✅ Create tool in appropriate domain package under `pkg/mcp/domain/`
+3. ✅ Implement `ExecuteWithContext()` method with proper signatures
+4. ✅ Use `types.BaseToolArgs` and `types.BaseToolResponse`
+5. ✅ Return actual errors (never use `success=false` patterns)
+6. ✅ Integrate `StandardizedSessionValidationMixin` for session management
+7. ✅ Register tool in `pkg/mcp/internal/server/core.go` using `ExecuteWithContext` pattern
+8. ✅ Add unit tests and run integration tests
+
+> **📖 Important**: All patterns in this guide follow the canonical standards defined in [MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md). When in doubt, reference that document.
 
 ## Architecture Overview
 
-The MCP server uses an auto-registration system that discovers tools at build time and generates registration code. This eliminates manual registration steps and ensures all tools are consistently integrated.
+The MCP server uses a **unified interface system** with standardized patterns:
 
 ### Key Components
 
-- **Tool Interface** (`pkg/mcp/core/interfaces.go`): Defines the contract all tools must implement
-- **Auto-Registration** (`pkg/mcp/internal/runtime/auto_registration.go`): Generated file mapping tool names to factories
-- **Tool Registry** (`pkg/mcp/internal/runtime/registry.go`): Type-safe registry using Go generics
-- **Orchestrator** (`pkg/mcp/internal/orchestration/`): Manages tool execution and workflows
+- **Standard Interface**: All tools implement `ExecuteWithContext(*server.Context, *Args) (*Result, error)`
+- **Session Management**: `StandardizedSessionValidationMixin` provides consistent session handling
+- **Error Handling**: Actual Go errors instead of result-based error handling
+- **Auto-Registration**: Zero-configuration tool discovery in `core.go`
+- **Progress Tracking**: Unified progress reporting through `observability.NewUnifiedProgressReporter`
 
-## Tool Interface Requirements
+### Current Tool Registry
 
-Every tool must implement the `core.Tool` interface:
+Our current tools follow the domain-based structure:
+- **Analyze domain**: `analyze_repository_atomic`, `generate_dockerfile`, `validate_dockerfile_atomic`
+- **Deploy domain**: `generate_manifests_atomic`, `deploy_kubernetes_atomic`, `check_health_atomic`
+- **Scan domain**: `scan_image_security_atomic`, `scan_secrets_atomic`
+- **Session domain**: `list_sessions`, `delete_session`, `manage_session_labels`
+
+## Tool Standards Reference
+
+**⚠️ Critical**: All new tools MUST follow the patterns defined in [MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md).
+
+### Required Method Signature
 
 ```go
-type Tool interface {
-    Execute(ctx context.Context, args interface{}) (interface{}, error)
-    GetMetadata() ToolMetadata
-    Validate(ctx context.Context, args interface{}) error
+func (t *YourTool) ExecuteWithContext(ctx *server.Context, args *YourArgs) (*YourResult, error)
+```
+
+### Required Argument Structure
+
+```go
+type YourToolArgs struct {
+    types.BaseToolArgs                    // REQUIRED: Embedded base args
+    ToolSpecificField string `json:"tool_specific_field" jsonschema:"required"`
+    OptionalField     string `json:"optional_field,omitempty"`
 }
 ```
 
-### Method Descriptions
+### Required Result Structure
 
-1. **Execute**: Performs the tool's primary operation
-   - Accepts a context and arguments (typically a struct)
-   - Returns results and/or error
-   - Should handle timeouts via context
-
-2. **GetMetadata**: Returns tool metadata including:
-   - Name (unique identifier)
-   - Description (user-facing documentation)
-   - InputSchema (JSON schema for arguments)
-   - OutputSchema (JSON schema for results)
-
-3. **Validate**: Pre-execution validation
-   - Validates input arguments
-   - Checks prerequisites
-   - Returns error if validation fails
+```go
+type YourToolResult struct {
+    types.BaseToolResponse              // REQUIRED: Embedded base response
+    core.BaseAIContextResult           // REQUIRED: For AI context methods
+    Success         bool   `json:"success"`          // REQUIRED: Success indicator
+    ToolSpecificData string `json:"tool_specific_data"`
+}
+```
 
 ## Step-by-Step Implementation
 
-### 1. Define Your Tool Structure
+### 1. Create Tool Structure
 
-Create a new file in the appropriate domain package under `pkg/mcp/internal/`:
+Create your tool in the appropriate domain package:
 
 ```go
-// pkg/mcp/internal/myfeature/my_tool.go
-package myfeature
+// pkg/mcp/domain/yourdomain/your_tool_atomic.go
+package yourdomain
 
 import (
     "context"
+    "fmt"
+    "time"
+
+    "github.com/Azure/container-kit/pkg/mcp/core"
+    "github.com/Azure/container-kit/pkg/mcp/internal/common/utils"
+    "github.com/Azure/container-kit/pkg/mcp/internal/types"
+    "github.com/localrivet/gomcp/server"
     "github.com/rs/zerolog"
-    "container-kit/pkg/mcp/core"
 )
 
-type MyToolArgs struct {
-    // Define your input parameters with json tags
-    ProjectPath string `json:"projectPath" jsonschema:"required,description=Path to the project"`
-    Options     MyToolOptions `json:"options,omitempty"`
+// AtomicYourToolArgs defines arguments for your tool
+type AtomicYourToolArgs struct {
+    types.BaseToolArgs                           // REQUIRED: Embedded base args
+    ResourcePath string `json:"resource_path" jsonschema:"required,description=Path to the resource"`
+    Options      string `json:"options,omitempty" description:"Optional tool-specific options"`
 }
 
-type MyToolOptions struct {
-    Verbose bool `json:"verbose,omitempty" jsonschema:"description=Enable verbose output"`
+// AtomicYourToolResult defines the response from your tool
+type AtomicYourToolResult struct {
+    types.BaseToolResponse                       // REQUIRED: Embedded base response
+    core.BaseAIContextResult                     // REQUIRED: For AI context methods
+    Success      bool   `json:"success"`                 // REQUIRED: Success indicator
+    SessionID    string `json:"session_id"`             // Session context
+    WorkspaceDir string `json:"workspace_dir"`          // Workspace directory
+    ResultData   string `json:"result_data"`            // Tool-specific results
+    Duration     time.Duration `json:"duration"`        // Execution duration
 }
 
-type MyToolResult struct {
-    // Define your output structure
-    Status  string   `json:"status"`
-    Details []string `json:"details"`
-}
-
-type MyTool struct {
-    // Add dependencies your tool needs
-    logger zerolog.Logger
-    // Add other dependencies like sessionManager, pipelineAdapter, etc.
+// AtomicYourTool implements your tool with standardized patterns
+type AtomicYourTool struct {
+    sessionManager core.ToolSessionManager               // Session management
+    logger         zerolog.Logger                       // Structured logging
+    sessionMixin   *utils.StandardizedSessionValidationMixin // REQUIRED: Session validation
 }
 ```
 
 ### 2. Implement Constructor
 
 ```go
-func NewMyTool(logger zerolog.Logger) *MyTool {
-    return &MyTool{
-        logger: logger.With().Str("component", "my-tool").Logger(),
+// NewAtomicYourTool creates a new tool instance
+func NewAtomicYourTool(sessionManager core.ToolSessionManager, logger zerolog.Logger) *AtomicYourTool {
+    toolLogger := logger.With().Str("tool", "atomic_your_tool").Logger()
+
+    // REQUIRED: Initialize standardized session management
+    sessionMixin := utils.NewStandardizedSessionValidationMixin(sessionManager, toolLogger, "atomic_your_tool")
+
+    return &AtomicYourTool{
+        sessionManager: sessionManager,
+        logger:         toolLogger,
+        sessionMixin:   sessionMixin,
     }
 }
 ```
 
-### 3. Implement Tool Interface Methods
+### 3. Implement ExecuteWithContext Method
 
 ```go
-func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-    // Type assert the arguments
-    typedArgs, ok := args.(*MyToolArgs)
-    if !ok {
-        return nil, core.NewExecutionError(
-            core.ErrCodeInvalidInput,
-            "invalid argument type",
-            map[string]interface{}{"expected": "*MyToolArgs", "got": fmt.Sprintf("%T", args)},
-        )
+// ExecuteWithContext executes the tool with standardized patterns
+func (t *AtomicYourTool) ExecuteWithContext(ctx *server.Context, args *AtomicYourToolArgs) (*AtomicYourToolResult, error) {
+    startTime := time.Now()
+
+    t.logger.Info().
+        Str("resource_path", args.ResourcePath).
+        Str("session_id", args.SessionID).
+        Msg("Starting tool execution")
+
+    // Step 1: Handle session management using standardized pattern
+    sessionResult, err := t.sessionMixin.GetOrCreateSessionForTool(args.SessionID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get or create session: %w", err)
+    }
+
+    session := sessionResult.Session
+    if sessionResult.IsNew {
+        t.logger.Info().
+            Str("session_id", session.SessionID).
+            Bool("is_resumed", sessionResult.IsResumed).
+            Msg("Created new session for tool execution")
+    }
+
+    // Step 2: Create result object early for consistent response
+    result := &AtomicYourToolResult{
+        BaseToolResponse:    types.NewBaseResponse("atomic_your_tool", session.SessionID, args.DryRun),
+        BaseAIContextResult: core.NewBaseAIContextResult("your_operation", false, 0), // Duration updated later
+        SessionID:           session.SessionID,
+        WorkspaceDir:        session.WorkspaceDir,
+        Success:             false, // Will be set to true on success
+    }
+
+    // Step 3: Implement your tool logic here
+    toolResult, err := t.performYourOperation(args, session)
+    if err != nil {
+        t.logger.Error().Err(err).
+            Str("session_id", session.SessionID).
+            Dur("duration", time.Since(startTime)).
+            Msg("Tool execution failed")
+        // IMPORTANT: Return actual error, not success=false
+        return result, err
+    }
+
+    // Step 4: Update result with success data
+    result.Success = true
+    result.ResultData = toolResult
+    result.Duration = time.Since(startTime)
+
+    // Step 5: Update session metadata with execution result
+    if err := t.sessionMixin.UpdateToolExecutionMetadata(session, result); err != nil {
+        t.logger.Warn().Err(err).Msg("Failed to update session metadata")
     }
 
     t.logger.Info().
-        Str("projectPath", typedArgs.ProjectPath).
-        Msg("executing my tool")
-
-    // Implement your tool logic here
-    result := &MyToolResult{
-        Status: "success",
-        Details: []string{"Operation completed"},
-    }
+        Str("session_id", session.SessionID).
+        Dur("duration", result.Duration).
+        Msg("Tool execution completed successfully")
 
     return result, nil
 }
+```
 
-func (t *MyTool) GetMetadata() core.ToolMetadata {
+### 4. Implement Standard Interface Methods
+
+```go
+// GetMetadata returns comprehensive tool metadata
+func (t *AtomicYourTool) GetMetadata() core.ToolMetadata {
     return core.ToolMetadata{
-        Name:        "my_tool",
-        Description: "Brief description of what your tool does",
-        InputSchema: core.GenerateSchema(&MyToolArgs{}),
-        OutputSchema: core.GenerateSchema(&MyToolResult{}),
+        Name:         "atomic_your_tool",
+        Description:  "Your tool description mentioning session context management",
+        Version:      "1.0.0",
+        Category:     "your_category",
+        Dependencies: []string{"dependency1", "dependency2"},
+        Capabilities: []string{"supports_dry_run", "supports_streaming"},
+        Parameters: map[string]string{
+            "resource_path": "required - Path to the resource",
+            "options":       "optional - Tool-specific options",
+        },
         Examples: []core.ToolExample{
             {
+                Name:        "basic_usage",
                 Description: "Basic usage example",
-                Input: &MyToolArgs{
-                    ProjectPath: "/path/to/project",
+                Input: map[string]interface{}{
+                    "session_id":    "session-123",
+                    "resource_path": "/path/to/resource",
                 },
-                Output: &MyToolResult{
-                    Status: "success",
-                    Details: []string{"Operation completed"},
+                Output: map[string]interface{}{
+                    "success":     true,
+                    "result_data": "operation completed",
                 },
             },
         },
     }
 }
 
-func (t *MyTool) Validate(ctx context.Context, args interface{}) error {
-    typedArgs, ok := args.(*MyToolArgs)
+// Validate validates the tool arguments using standardized patterns
+func (t *AtomicYourTool) Validate(ctx context.Context, args interface{}) error {
+    toolArgs, ok := args.(AtomicYourToolArgs)
     if !ok {
-        return core.NewValidationError("invalid argument type")
+        return fmt.Errorf("invalid argument type for atomic_your_tool: expected AtomicYourToolArgs, got %T", args)
     }
 
     // Validate required fields
-    if typedArgs.ProjectPath == "" {
-        return core.NewValidationError("projectPath is required")
+    if toolArgs.ResourcePath == "" {
+        return fmt.Errorf("validation error for field resource_path: resource path is required")
     }
 
-    // Add additional validation logic
-    if !isValidPath(typedArgs.ProjectPath) {
-        return core.NewValidationError("invalid project path")
+    // REQUIRED: Use standardized session validation
+    if err := t.sessionMixin.ValidateSessionInArgs(toolArgs.SessionID, true); err != nil {
+        return err
     }
 
     return nil
 }
+
+// Execute implements unified Tool interface (delegates to ExecuteWithContext)
+func (t *AtomicYourTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
+    toolArgs, ok := args.(AtomicYourToolArgs)
+    if !ok {
+        return nil, fmt.Errorf("invalid argument type for atomic_your_tool: expected AtomicYourToolArgs, got %T", args)
+    }
+    // Execute with nil server context (no progress tracking)
+    return t.ExecuteWithContext(nil, &toolArgs)
+}
 ```
 
-### 4. Register Your Tool
-
-Add your tool to the registration process in `pkg/mcp/internal/core/gomcp_tools.go`:
+### 5. Implement Tool-Specific Logic
 
 ```go
-func registerAtomicToolsWithOrchestrator(
-    orchestrator *orchestration.Orchestrator,
-    pipelineAdapter core.PipelineOperations,
-    sessionManager core.ToolSessionManager,
-    logger zerolog.Logger,
-) error {
-    // ... existing registrations ...
+// performYourOperation implements your core tool logic
+func (t *AtomicYourTool) performYourOperation(args *AtomicYourToolArgs, session *core.SessionState) (string, error) {
+    // Implement your specific tool logic here
+    // Use session.WorkspaceDir for file operations
+    // Respect args.DryRun flag for testing
 
-    // Register your new tool
-    myTool := myfeature.NewMyTool(logger)
-    if err := orchestrator.RegisterTool("my_tool", myTool); err != nil {
-        return fmt.Errorf("failed to register my_tool: %w", err)
+    if args.DryRun {
+        t.logger.Info().Msg("Dry run mode - skipping actual operations")
+        return "dry run completed", nil
     }
 
-    return nil
+    // Your actual implementation here
+    result := "operation completed successfully"
+
+    return result, nil
 }
 ```
 
-### 5. Build and Test
+## Session Management
 
-```bash
-# Build the MCP server with your new tool
-make mcp
+All tools MUST use standardized session management:
 
-# Run tests
-make test-mcp
+### Required Session Integration
 
-# Test your tool interactively
-./bin/mcp server
+```go
+// REQUIRED: Include in your tool struct
+sessionMixin *utils.StandardizedSessionValidationMixin
+
+// REQUIRED: Initialize in constructor
+sessionMixin := utils.NewStandardizedSessionValidationMixin(sessionManager, toolLogger, "your_tool_name")
+
+// REQUIRED: Use in ExecuteWithContext
+sessionResult, err := t.sessionMixin.GetOrCreateSessionForTool(args.SessionID)
+if err != nil {
+    return nil, fmt.Errorf("failed to get or create session: %w", err)
+}
+
+// REQUIRED: Update session metadata
+if err := t.sessionMixin.UpdateToolExecutionMetadata(session, result); err != nil {
+    t.logger.Warn().Err(err).Msg("Failed to update session metadata")
+}
+
+// REQUIRED: Validate session in Validate method
+if err := t.sessionMixin.ValidateSessionInArgs(toolArgs.SessionID, true); err != nil {
+    return err
+}
 ```
 
 ## Testing Your Tool
 
 ### 1. Unit Tests
 
-Create a test file alongside your tool:
-
 ```go
-// pkg/mcp/internal/myfeature/my_tool_test.go
-package myfeature
+// pkg/mcp/internal/yourdomain/your_tool_test.go
+package yourdomain
 
 import (
-    "context"
     "testing"
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/require"
     "github.com/rs/zerolog"
 )
 
-func TestMyTool_Execute(t *testing.T) {
+func TestAtomicYourTool_ExecuteWithContext(t *testing.T) {
+    // Create test logger
     logger := zerolog.New(zerolog.NewTestWriter(t))
-    tool := NewMyTool(logger)
+
+    // Create mock session manager
+    sessionManager := &MockSessionManager{} // Implement mock
+
+    // Create tool instance
+    tool := NewAtomicYourTool(sessionManager, logger)
 
     tests := []struct {
         name    string
-        args    *MyToolArgs
+        args    *AtomicYourToolArgs
         wantErr bool
     }{
         {
             name: "successful execution",
-            args: &MyToolArgs{
-                ProjectPath: "/valid/path",
+            args: &AtomicYourToolArgs{
+                BaseToolArgs: types.BaseToolArgs{
+                    SessionID: "test-session",
+                },
+                ResourcePath: "/valid/path",
             },
             wantErr: false,
         },
-        {
-            name: "invalid path",
-            args: &MyToolArgs{
-                ProjectPath: "",
-            },
-            wantErr: true,
-        },
+        // Add more test cases...
     }
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            result, err := tool.Execute(context.Background(), tt.args)
+            result, err := tool.ExecuteWithContext(nil, tt.args)
             if tt.wantErr {
                 assert.Error(t, err)
                 return
             }
             require.NoError(t, err)
-            assert.NotNil(t, result)
+            assert.True(t, result.Success)
         })
     }
 }
@@ -263,184 +384,143 @@ func TestMyTool_Execute(t *testing.T) {
 
 ### 2. Integration Tests
 
-Test your tool with the MCP server:
+Add your tool to the integration test suite:
 
 ```go
-func TestMyToolIntegration(t *testing.T) {
-    // Set up test MCP server
-    server := setupTestServer(t)
+func TestYourToolIntegration(t *testing.T) {
+    // Test your tool through the MCP protocol
+    client := setupMCPTestClient(t)
 
-    // Execute tool through MCP protocol
-    result, err := server.CallTool(context.Background(), "my_tool", map[string]interface{}{
-        "projectPath": "/test/path",
+    result, err := client.CallTool("atomic_your_tool", map[string]interface{}{
+        "session_id":    "test-session",
+        "resource_path": "/test/path",
     })
 
     require.NoError(t, err)
-    assert.Equal(t, "success", result["status"])
+    assert.Equal(t, true, result["success"])
 }
 ```
 
-## Advanced Topics
+## Registration Process
 
-### 1. Session Management
-
-If your tool needs to maintain state across invocations:
+Register your tool in `pkg/mcp/internal/server/core.go`:
 
 ```go
-type MyTool struct {
-    sessionManager core.ToolSessionManager
-    // ... other fields
-}
+// In registerEssentialContainerizationTools function
+func (s *SimplifiedGoMCPManager) registerEssentialContainerizationTools() error {
+    // ... existing tool registrations ...
 
-func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-    // Get or create session
-    session, err := t.sessionManager.GetOrCreateSession(ctx, "my-tool-session")
-    if err != nil {
-        return nil, err
-    }
+    // Register your new tool using ExecuteWithContext pattern
+    yourTool := yourdomain.NewAtomicYourTool(s.sessionManager, s.logger)
+    s.server.Tool("atomic_your_tool", "Your tool description mentioning session context management",
+        func(ctx *server.Context, args *yourdomain.AtomicYourToolArgs) (*yourdomain.AtomicYourToolResult, error) {
+            return yourTool.ExecuteWithContext(ctx, args)
+        })
 
-    // Store state
-    session.Set("lastRun", time.Now())
-
-    // Retrieve state
-    if lastRun, ok := session.Get("lastRun").(time.Time); ok {
-        t.logger.Info().Time("lastRun", lastRun).Msg("previous run detected")
-    }
+    s.logger.Debug().Msg("Registered atomic_your_tool")
+    return nil
 }
 ```
 
-### 2. Pipeline Integration
+## Best Practices
 
-For tools that need to interact with the containerization pipeline:
+### 1. Follow Standards Document
+- **Always** reference [MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md) for canonical patterns
+- Use `ExecuteWithContext` method signature
+- Include `types.BaseToolArgs` and `types.BaseToolResponse`
+- Return actual errors, never use `success=false` patterns
 
-```go
-type MyTool struct {
-    pipelineAdapter core.PipelineOperations
-    // ... other fields
-}
-
-func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-    // Use pipeline operations
-    config := &pipeline.Config{
-        ProjectPath: typedArgs.ProjectPath,
-    }
-
-    result, err := t.pipelineAdapter.ExecutePipeline(ctx, config)
-    if err != nil {
-        return nil, core.NewExecutionError(
-            core.ErrCodePipelineFailure,
-            "pipeline execution failed",
-            map[string]interface{}{"error": err.Error()},
-        )
-    }
-
-    return result, nil
-}
-```
+### 2. Session Management
+- Always use `StandardizedSessionValidationMixin`
+- Update session metadata after execution
+- Validate session IDs in the `Validate` method
+- Use session workspace directory for file operations
 
 ### 3. Error Handling
+- Return actual Go errors from `ExecuteWithContext`
+- Provide meaningful error messages with context
+- Log errors with structured information
+- Never use result-based error patterns
 
-Use structured errors for better debugging:
+### 4. Testing
+- Include comprehensive unit tests
+- Test both success and error scenarios
+- Mock dependencies properly
+- Add integration tests through MCP protocol
 
-```go
-func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-    if err := someOperation(); err != nil {
-        // Wrap errors with context
-        return nil, core.NewExecutionError(
-            core.ErrCodeOperationFailed,
-            "failed to perform operation",
-            map[string]interface{}{
-                "operation": "someOperation",
-                "error": err.Error(),
-                "context": typedArgs,
-            },
-        )
-    }
-}
-```
-
-### 4. Metrics and Monitoring
-
-Add metrics to your tool:
-
-```go
-func (t *MyTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-    start := time.Now()
-    defer func() {
-        duration := time.Since(start)
-        t.logger.Info().
-            Dur("duration", duration).
-            Msg("tool execution completed")
-
-        // Record metrics
-        metrics.RecordToolDuration("my_tool", duration)
-    }()
-
-    // Tool logic...
-}
-```
+### 5. Performance
+- Keep execution time under 300μs for simple operations
+- Use progress reporting for long-running operations
+- Log execution duration
+- Monitor resource usage
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Tool Not Appearing in MCP Server**
-   - Ensure you've registered the tool in `gomcp_tools.go`
-   - Rebuild with `make mcp`
-   - Check logs for registration errors
+1. **Tool Not Registered**
+   - Ensure you added registration in `core.go`
+   - Check for compilation errors
+   - Verify the `ExecuteWithContext` signature matches exactly
 
-2. **Schema Validation Errors**
-   - Ensure all struct fields have proper JSON tags
-   - Use `jsonschema` tags for validation rules
-   - Test schemas with `core.GenerateSchema()`
+2. **Session Management Errors**
+   - Ensure `StandardizedSessionValidationMixin` is properly initialized
+   - Check session validation in the `Validate` method
+   - Verify session ID handling in arguments
 
-3. **Type Assertion Failures**
-   - Always check type assertions in Execute()
+3. **Schema Validation Failures**
+   - Use proper JSON tags with `omitempty` for optional fields
+   - Include `jsonschema` tags for validation rules
+   - Test with `types.BaseToolArgs` embedding
+
+4. **Type Assertion Errors**
+   - Ensure argument types match exactly
    - Use pointer types for argument structs
-   - Return appropriate error messages
+   - Check the registration signature in `core.go`
 
-4. **Context Cancellation**
-   - Always respect context cancellation
-   - Use `select` with `ctx.Done()` for long operations
-   - Clean up resources on cancellation
+### Testing Commands
+
+```bash
+# Build with new tool
+make mcp
+
+# Run MCP tests
+make test-mcp
+
+# Run integration tests
+go test -tags mcp -race ./pkg/mcp/internal/test/integration/... -v
+
+# Test tool discovery
+go test -tags mcp -race ./pkg/mcp/internal/test/integration/... -v -run="Schema"
+```
 
 ### Debugging Tips
 
-1. **Enable Debug Logging**
+1. **Check Tool Registration**
    ```bash
-   export LOG_LEVEL=debug
-   ./bin/mcp server
+   # Verify your tool is discovered
+   ./container-kit-mcp &
+   # Tool should appear in logs: "Registered atomic_your_tool"
    ```
 
-2. **Test with MCP Client**
-   ```bash
-   # Use the MCP test client
-   ./bin/mcp-test-client call my_tool '{"projectPath": "/test"}'
-   ```
-
-3. **Inspect Generated Schemas**
+2. **Test Schema Generation**
    ```go
-   // Add temporary debug code
-   schema := core.GenerateSchema(&MyToolArgs{})
-   fmt.Printf("Input Schema: %s\n", schema)
+   // Temporarily add to your test
+   schema := core.GenerateSchema(&AtomicYourToolArgs{})
+   t.Logf("Schema: %s", schema)
    ```
 
-## Best Practices
-
-1. **Keep Tools Focused**: Each tool should do one thing well
-2. **Use Structured Logging**: Include relevant context in logs
-3. **Handle Errors Gracefully**: Provide meaningful error messages
-4. **Document Examples**: Include realistic examples in metadata
-5. **Test Edge Cases**: Cover error conditions in tests
-6. **Monitor Performance**: Keep execution time under 300μs for simple operations
-7. **Use Dependency Injection**: Accept dependencies through constructor
-8. **Follow Naming Conventions**: Use snake_case for tool names, CamelCase for types
+3. **Validate MCP Protocol**
+   ```bash
+   # Use MCP test client to verify protocol compliance
+   echo '{"method":"tools/list"}' | ./container-kit-mcp
+   ```
 
 ## Next Steps
 
-- Review existing tools in `pkg/mcp/internal/` for more examples
-- Check the orchestration package for workflow integration
-- Read the MCP protocol documentation for advanced features
-- Join the development discussions for guidance
+1. Review [MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md) for complete reference
+2. Study existing tools in `pkg/mcp/internal/` for examples
+3. Check integration tests for MCP protocol patterns
+4. Run the complete test suite to ensure compliance
 
-Remember: The auto-registration system handles most of the complexity. Focus on implementing clean, well-tested tool logic, and the framework will handle the rest.
+Remember: Our standardized patterns handle complexity and ensure consistency. Focus on implementing clean tool logic, and the framework provides session management, error handling, and MCP protocol integration automatically.

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -84,7 +85,7 @@ func (u *Updater) CheckUpdates(ctx context.Context) (*UpdateResult, error) {
 	// Get current dependencies
 	currentDeps, err := u.getCurrentDependencies(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current dependencies: %w", err)
+		return nil, mcperrors.NewError().Messagef("failed to get current dependencies: %w", err).WithLocation().Build()
 	}
 
 	u.logger.Info().Int("count", len(currentDeps)).Msg("Found dependencies")
@@ -149,7 +150,7 @@ func (u *Updater) ApplyUpdates(ctx context.Context, updates []DependencyInfo) er
 	for _, dep := range updates {
 		if err := u.updateDependency(ctx, dep); err != nil {
 			u.logger.Error().Err(err).Str("dep", dep.Name).Msg("Failed to update dependency")
-			return fmt.Errorf("failed to update %s: %w", dep.Name, err)
+			return mcperrors.NewError().Messagef("failed to update %s: %w", dep.Name, err).WithLocation().Build()
 		}
 
 		u.logger.Info().

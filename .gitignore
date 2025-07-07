@@ -42,6 +42,7 @@ coverage/
 /mcp-wrapper
 /http-client
 /docker.test
+/mcp-schema-gen
 
 # Binaries in source directories
 /cmd/mcp-server/mcp-server
@@ -60,6 +61,10 @@ coverage/
 
 # Test binaries
 /test-mcp/test-mcp
+
+# Linter binaries
+/tools/linters/*/richerror-boundary
+/tools/linters/richerror-boundary/richerror-boundary
 
 ################################################################################
 # IDE and Editor files
@@ -438,3 +443,4 @@ FodyWeavers.xsd
 
 # MCP configuration (contains local paths)
 .vscode/mcp.json
+bin/

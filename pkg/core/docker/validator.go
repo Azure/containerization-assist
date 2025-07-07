@@ -2,80 +2,57 @@ package docker
 
 import (
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"regexp"
 	"strings"
 
-	"github.com/rs/zerolog"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // Validator provides mechanical Dockerfile validation operations
 type Validator struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 }
 
 // NewValidator creates a new Dockerfile validator
-func NewValidator(logger zerolog.Logger) *Validator {
+func NewValidator(logger *slog.Logger) *Validator {
 	return &Validator{
-		logger: logger.With().Str("component", "dockerfile_validator").Logger(),
+		logger: logger.With("component", "dockerfile_validator"),
 	}
 }
 
-// ValidationResult contains the result of Dockerfile validation
-type ValidationResult struct {
-	Valid       bool                   `json:"valid"`
-	Errors      []ValidationError      `json:"errors"`
-	Warnings    []ValidationWarning    `json:"warnings"`
-	Suggestions []string               `json:"suggestions"`
-	Context     map[string]interface{} `json:"context"`
-}
-
-// ValidationError represents a validation error
-type ValidationError struct {
-	Type        string `json:"type"` // "syntax", "instruction", "security", "best_practice"
-	Line        int    `json:"line"`
-	Column      int    `json:"column,omitempty"`
-	Message     string `json:"message"`
-	Instruction string `json:"instruction,omitempty"`
-	Severity    string `json:"severity"` // "error", "warning", "info"
-}
-
-// ValidationWarning represents a validation warning
-type ValidationWarning struct {
-	Type        string `json:"type"`
-	Line        int    `json:"line"`
-	Message     string `json:"message"`
-	Instruction string `json:"instruction,omitempty"`
-	Suggestion  string `json:"suggestion,omitempty"`
-}
+// Type aliases are defined in hadolint.go to avoid redeclaration
 
 // ValidateDockerfile performs comprehensive validation of Dockerfile content
-func (v *Validator) ValidateDockerfile(dockerfileContent string) *ValidationResult {
-	result := &ValidationResult{
-		Valid:       true,
-		Errors:      make([]ValidationError, 0),
-		Warnings:    make([]ValidationWarning, 0),
-		Suggestions: make([]string, 0),
-		Context:     make(map[string]interface{}),
+func (v *Validator) ValidateDockerfile(dockerfileContent string) *types.BuildValidationResult {
+	// Use factory function from unified validation framework
+	result := types.NewBuildResult()
+	if result.Metadata.Context == nil {
+		result.Metadata.Context = make(map[string]string)
 	}
+	result.Metadata.ValidatorName = "dockerfile-validator"
+	result.Metadata.ValidatorVersion = "1.0.0"
 
-	v.logger.Debug().Msg("Starting Dockerfile validation")
+	v.logger.Debug("Starting Dockerfile validation")
 
 	// Basic validation
 	if strings.TrimSpace(dockerfileContent) == "" {
 		result.Valid = false
-		result.Errors = append(result.Errors, ValidationError{
-			Type:     "content",
-			Line:     0,
+		emptyError := &types.ValidationError{
+			Code:     "DOCKERFILE_EMPTY",
 			Message:  "Dockerfile is empty",
-			Severity: "error",
-		})
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{"line": "0"},
+		}
+		result.Errors = append(result.Errors, *emptyError)
 		return result
 	}
 
 	lines := strings.Split(dockerfileContent, "\n")
-	result.Context["line_count"] = len(lines)
-	result.Context["total_size"] = len(dockerfileContent)
+	result.Metadata.Context["line_count"] = fmt.Sprintf("%d", len(lines))
+	result.Metadata.Context["total_size"] = fmt.Sprintf("%d", len(dockerfileContent))
 
 	// Parse and validate each line, handling line continuations
 	var instructions []string
@@ -149,11 +126,10 @@ func (v *Validator) ValidateDockerfile(dockerfileContent string) *ValidationResu
 	// Set overall validity
 	result.Valid = len(result.Errors) == 0
 
-	v.logger.Debug().
-		Bool("valid", result.Valid).
-		Int("errors", len(result.Errors)).
-		Int("warnings", len(result.Warnings)).
-		Msg("Dockerfile validation completed")
+	v.logger.Debug("Dockerfile validation completed",
+		"valid", result.Valid,
+		"errors", len(result.Errors),
+		"warnings", len(result.Warnings))
 
 	return result
 }
@@ -162,20 +138,25 @@ func (v *Validator) ValidateDockerfile(dockerfileContent string) *ValidationResu
 func (v *Validator) CheckDockerInstallation() error {
 	// Check if docker executable exists
 	if _, err := exec.LookPath("docker"); err != nil {
-		return fmt.Errorf("docker executable not found in PATH. Please install Docker")
+		return mcperrors.NewError().
+			Message("docker executable not found in PATH. Please install Docker").
+			WithLocation().
+			Build()
 	}
 
 	// Check if docker daemon is accessible
 	cmd := exec.Command("docker", "version", "--format", "{{.Server.Version}}")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker daemon is not running or not accessible. Please start Docker")
+		return mcperrors.NewError().
+			Message("docker daemon is not running or not accessible. Please start Docker").
+			WithLocation().
+			Build()
 	}
 
 	return nil
 }
 
-// validateInstruction validates individual Dockerfile instructions
-func (v *Validator) validateInstruction(instruction, line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateInstruction(instruction, line string, lineNum int, result *types.BuildValidationResult) {
 	switch instruction {
 	case "FROM":
 		v.validateFromInstruction(line, lineNum, result)
@@ -208,28 +189,30 @@ func (v *Validator) validateInstruction(instruction, line string, lineNum int, r
 		}
 
 		if !found {
-			result.Errors = append(result.Errors, ValidationError{
-				Type:        "instruction",
-				Line:        lineNum,
-				Message:     fmt.Sprintf("Unknown instruction: %s", instruction),
-				Instruction: instruction,
-				Severity:    "error",
-			})
+			unknownError := &types.ValidationError{
+				Code:     "UNKNOWN_INSTRUCTION",
+				Message:  fmt.Sprintf("Unknown instruction: %s", instruction),
+				Field:    "instruction",
+				Severity: types.SeverityHigh,
+				Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+			}
+			result.Errors = append(result.Errors, *unknownError)
 		}
 	}
 }
 
 // validateFromInstruction validates FROM instructions
-func (v *Validator) validateFromInstruction(line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateFromInstruction(line string, lineNum int, result *types.BuildValidationResult) {
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:        "syntax",
-			Line:        lineNum,
-			Message:     "FROM instruction requires an image name",
-			Instruction: "FROM",
-			Severity:    "error",
-		})
+		fromError := &types.ValidationError{
+			Code:     "FROM_MISSING_IMAGE",
+			Message:  "FROM instruction requires an image name",
+			Field:    "FROM",
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+		}
+		result.Errors = append(result.Errors, *fromError)
 		return
 	}
 
@@ -237,78 +220,80 @@ func (v *Validator) validateFromInstruction(line string, lineNum int, result *Va
 
 	// Check for latest tag usage
 	if strings.HasSuffix(imageName, ":latest") || !strings.Contains(imageName, ":") {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:        "best_practice",
-			Line:        lineNum,
-			Message:     "Using 'latest' tag or no tag is not recommended for production",
-			Instruction: "FROM",
-			Suggestion:  "Use specific version tags for reproducible builds",
-		})
+		latestWarning := &types.ValidationWarning{
+			Code:       "FROM_LATEST_TAG",
+			Message:    "Using 'latest' tag or no tag is not recommended for production",
+			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+			Suggestion: "Use specific version tags for reproducible builds",
+		}
+		result.Warnings = append(result.Warnings, *latestWarning)
 	}
 }
 
 // validateRunInstruction validates RUN instructions
-func (v *Validator) validateRunInstruction(line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateRunInstruction(line string, lineNum int, result *types.BuildValidationResult) {
 	// Check for apt-get without update
 	if strings.Contains(line, "apt-get install") && !strings.Contains(line, "apt-get update") {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:        "best_practice",
-			Line:        lineNum,
-			Message:     "apt-get install should be preceded by apt-get update",
-			Instruction: "RUN",
-			Suggestion:  "Combine 'apt-get update && apt-get install' in a single RUN instruction",
-		})
+		aptWarning := &types.ValidationWarning{
+			Code:       "RUN_APT_UPDATE",
+			Message:    "apt-get install should be preceded by apt-get update",
+			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+			Suggestion: "Combine 'apt-get update && apt-get install' in a single RUN instruction",
+		}
+		result.Warnings = append(result.Warnings, *aptWarning)
 	}
 
 	// Check for package manager cache cleanup
 	if strings.Contains(line, "apt-get install") && !strings.Contains(line, "rm -rf /var/lib/apt/lists/*") {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:        "best_practice",
-			Line:        lineNum,
-			Message:     "Consider cleaning package manager cache to reduce image size",
-			Instruction: "RUN",
-			Suggestion:  "Add '&& rm -rf /var/lib/apt/lists/*' to clean up after apt-get",
-		})
+		cacheWarning := &types.ValidationWarning{
+			Code:       "RUN_CACHE_CLEANUP",
+			Message:    "Consider cleaning package manager cache to reduce image size",
+			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+			Suggestion: "Add '&& rm -rf /var/lib/apt/lists/*' to clean up after apt-get",
+		}
+		result.Warnings = append(result.Warnings, *cacheWarning)
 	}
 }
 
 // validateCopyAddInstruction validates COPY and ADD instructions
-func (v *Validator) validateCopyAddInstruction(instruction, line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateCopyAddInstruction(instruction, line string, lineNum int, result *types.BuildValidationResult) {
 	parts := strings.Fields(line)
 	if len(parts) < 3 {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:        "syntax",
-			Line:        lineNum,
-			Message:     fmt.Sprintf("%s instruction requires source and destination", instruction),
-			Instruction: instruction,
-			Severity:    "error",
-		})
+		copyError := &types.ValidationError{
+			Code:     fmt.Sprintf("%s_MISSING_ARGS", instruction),
+			Message:  fmt.Sprintf("%s instruction requires source and destination", instruction),
+			Field:    instruction,
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+		}
+		result.Errors = append(result.Errors, *copyError)
 		return
 	}
 
 	// Warn about ADD vs COPY
 	if instruction == "ADD" && !strings.Contains(line, "http") && !strings.HasSuffix(parts[1], ".tar") {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:        "best_practice",
-			Line:        lineNum,
-			Message:     "COPY is preferred over ADD for simple file copying",
-			Instruction: "ADD",
-			Suggestion:  "Use COPY instead of ADD unless you need URL download or tar extraction",
-		})
+		addWarning := &types.ValidationWarning{
+			Code:       "ADD_VS_COPY",
+			Message:    "COPY is preferred over ADD for simple file copying",
+			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+			Suggestion: "Use COPY instead of ADD unless you need URL download or tar extraction",
+		}
+		result.Warnings = append(result.Warnings, *addWarning)
 	}
 }
 
 // validateExposeInstruction validates EXPOSE instructions
-func (v *Validator) validateExposeInstruction(line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateExposeInstruction(line string, lineNum int, result *types.BuildValidationResult) {
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:        "syntax",
-			Line:        lineNum,
-			Message:     "EXPOSE instruction requires a port number",
-			Instruction: "EXPOSE",
-			Severity:    "error",
-		})
+		exposeError := &types.ValidationError{
+			Code:     "EXPOSE_MISSING_PORT",
+			Message:  "EXPOSE instruction requires a port number",
+			Field:    "EXPOSE",
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+		}
+		result.Errors = append(result.Errors, *exposeError)
 		return
 	}
 
@@ -316,103 +301,111 @@ func (v *Validator) validateExposeInstruction(line string, lineNum int, result *
 	portRegex := regexp.MustCompile(`^\d+(/tcp|/udp)?$`)
 	for _, port := range parts[1:] {
 		if !portRegex.MatchString(port) {
-			result.Errors = append(result.Errors, ValidationError{
-				Type:        "syntax",
-				Line:        lineNum,
-				Message:     fmt.Sprintf("Invalid port format: %s", port),
-				Instruction: "EXPOSE",
-				Severity:    "error",
-			})
+			portError := &types.ValidationError{
+				Code:     "EXPOSE_INVALID_PORT",
+				Message:  fmt.Sprintf("Invalid port format: %s", port),
+				Field:    "EXPOSE",
+				Severity: types.SeverityHigh,
+				Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum), "port": port},
+			}
+			result.Errors = append(result.Errors, *portError)
 		}
 	}
 }
 
 // validateUserInstruction validates USER instructions
-func (v *Validator) validateUserInstruction(line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateUserInstruction(line string, lineNum int, result *types.BuildValidationResult) {
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:        "syntax",
-			Line:        lineNum,
-			Message:     "USER instruction requires a username or UID",
-			Instruction: "USER",
-			Severity:    "error",
-		})
+		userError := &types.ValidationError{
+			Code:     "USER_MISSING_NAME",
+			Message:  "USER instruction requires a username or UID",
+			Field:    "USER",
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+		}
+		result.Errors = append(result.Errors, *userError)
 		return
 	}
 
 	user := parts[1]
 	if user == "root" {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:        "security",
-			Line:        lineNum,
-			Message:     "Running as root user is a security risk",
-			Instruction: "USER",
-			Suggestion:  "Create and use a non-root user for better security",
-		})
+		rootWarning := &types.ValidationWarning{
+			Code:       "USER_ROOT_SECURITY",
+			Message:    "Running as root user is a security risk",
+			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+			Suggestion: "Create and use a non-root user for better security",
+		}
+		result.Warnings = append(result.Warnings, *rootWarning)
 	}
 }
 
 // validateWorkdirInstruction validates WORKDIR instructions
-func (v *Validator) validateWorkdirInstruction(line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateWorkdirInstruction(line string, lineNum int, result *types.BuildValidationResult) {
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:        "syntax",
-			Line:        lineNum,
-			Message:     "WORKDIR instruction requires a directory path",
-			Instruction: "WORKDIR",
-			Severity:    "error",
-		})
+		workdirError := &types.ValidationError{
+			Code:     "WORKDIR_MISSING_PATH",
+			Message:  "WORKDIR instruction requires a directory path",
+			Field:    "WORKDIR",
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+		}
+		result.Errors = append(result.Errors, *workdirError)
 		return
 	}
 
 	workdir := parts[1]
 	if !strings.HasPrefix(workdir, "/") {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:        "best_practice",
-			Line:        lineNum,
-			Message:     "WORKDIR should use absolute paths",
-			Instruction: "WORKDIR",
-			Suggestion:  "Use absolute paths starting with '/' for WORKDIR",
-		})
+		pathWarning := &types.ValidationWarning{
+			Code:       "WORKDIR_RELATIVE_PATH",
+			Message:    "WORKDIR should use absolute paths",
+			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+			Suggestion: "Use absolute paths starting with '/' for WORKDIR",
+		}
+		result.Warnings = append(result.Warnings, *pathWarning)
 	}
 }
 
 // validateCmdEntrypointInstruction validates CMD and ENTRYPOINT instructions
-func (v *Validator) validateCmdEntrypointInstruction(instruction, line string, lineNum int, result *ValidationResult) {
+func (v *Validator) validateCmdEntrypointInstruction(instruction, line string, lineNum int, result *types.BuildValidationResult) {
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:        "syntax",
-			Line:        lineNum,
-			Message:     fmt.Sprintf("%s instruction requires a command", instruction),
-			Instruction: instruction,
-			Severity:    "error",
-		})
+		cmdError := &types.ValidationError{
+			Code:     fmt.Sprintf("%s_MISSING_COMMAND", instruction),
+			Message:  fmt.Sprintf("%s instruction requires a command", instruction),
+			Field:    instruction,
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{"line": fmt.Sprintf("%d", lineNum)},
+		}
+		result.Errors = append(result.Errors, *cmdError)
 	}
 }
 
 // validateStructure validates overall Dockerfile structure
-func (v *Validator) validateStructure(instructions []string, result *ValidationResult) {
+func (v *Validator) validateStructure(instructions []string, result *types.BuildValidationResult) {
 	if len(instructions) == 0 {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:     "structure",
-			Line:     0,
+		emptyError := &types.ValidationError{
+			Code:     "DOCKERFILE_NO_INSTRUCTIONS",
 			Message:  "Dockerfile contains no instructions",
-			Severity: "error",
-		})
+			Field:    "structure",
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{},
+		}
+		result.Errors = append(result.Errors, *emptyError)
 		return
 	}
 
 	// Must start with FROM
 	if instructions[0] != "FROM" {
-		result.Errors = append(result.Errors, ValidationError{
-			Type:     "structure",
-			Line:     1,
+		fromError := &types.ValidationError{
+			Code:     "DOCKERFILE_NO_FROM",
 			Message:  "Dockerfile must start with FROM instruction",
-			Severity: "error",
-		})
+			Field:    "structure",
+			Severity: types.SeverityHigh,
+			Context:  map[string]string{},
+		}
+		result.Errors = append(result.Errors, *fromError)
 	}
 
 	// Check for multiple CMD or ENTRYPOINT
@@ -428,50 +421,63 @@ func (v *Validator) validateStructure(instructions []string, result *ValidationR
 	}
 
 	if cmdCount > 1 {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:       "structure",
-			Line:       0,
+		cmdWarning := &types.ValidationWarning{
+			Code:       "MULTIPLE_CMD",
 			Message:    "Multiple CMD instructions found, only the last one will be effective",
+			Context:    map[string]string{"count": fmt.Sprintf("%d", cmdCount)},
 			Suggestion: "Use only one CMD instruction",
-		})
+		}
+		result.Warnings = append(result.Warnings, *cmdWarning)
 	}
 
 	if entrypointCount > 1 {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:       "structure",
-			Line:       0,
+		entrypointWarning := &types.ValidationWarning{
+			Code:       "MULTIPLE_ENTRYPOINT",
 			Message:    "Multiple ENTRYPOINT instructions found, only the last one will be effective",
+			Context:    map[string]string{"count": fmt.Sprintf("%d", entrypointCount)},
 			Suggestion: "Use only one ENTRYPOINT instruction",
-		})
+		}
+		result.Warnings = append(result.Warnings, *entrypointWarning)
 	}
 
 	// Warn about ENTRYPOINT + CMD combination (informational) - only if exactly one of each
 	if entrypointCount == 1 && cmdCount == 1 {
-		result.Warnings = append(result.Warnings, ValidationWarning{
-			Type:       "structure",
-			Line:       0,
+		comboWarning := &types.ValidationWarning{
+			Code:       "ENTRYPOINT_CMD_COMBO",
 			Message:    "Using both ENTRYPOINT and CMD - CMD will be passed as arguments to ENTRYPOINT",
+			Context:    map[string]string{},
 			Suggestion: "Ensure this is the intended behavior",
-		})
+		}
+		result.Warnings = append(result.Warnings, *comboWarning)
 	}
 }
 
 // addGeneralSuggestions adds general best practice suggestions
-func (v *Validator) addGeneralSuggestions(dockerfileContent string, result *ValidationResult) {
+func (v *Validator) addGeneralSuggestions(dockerfileContent string, result *types.BuildValidationResult) {
+	// Initialize Details map if needed
+	if result.Details == nil {
+		result.Details = make(map[string]interface{})
+	}
+
+	suggestions := []string{}
+
 	// Check for health check
 	if !strings.Contains(dockerfileContent, "HEALTHCHECK") {
-		result.Suggestions = append(result.Suggestions, "Consider adding a HEALTHCHECK instruction for better container monitoring")
+		suggestions = append(suggestions, "Consider adding a HEALTHCHECK instruction for better container monitoring")
 	}
 
 	// Check for .dockerignore reference
-	result.Suggestions = append(result.Suggestions, "Ensure you have a .dockerignore file to exclude unnecessary files")
+	suggestions = append(suggestions, "Ensure you have a .dockerignore file to exclude unnecessary files")
 
 	// Check for multi-stage build opportunities
 	if strings.Count(dockerfileContent, "FROM") == 1 && (strings.Contains(dockerfileContent, "npm install") || strings.Contains(dockerfileContent, "go build") || strings.Contains(dockerfileContent, "mvn package")) {
-		result.Suggestions = append(result.Suggestions, "Consider using multi-stage builds to reduce final image size")
+		suggestions = append(suggestions, "Consider using multi-stage builds to reduce final image size")
 	}
 
 	// Security suggestions
-	result.Suggestions = append(result.Suggestions, "Review file permissions and avoid running as root user")
-	result.Suggestions = append(result.Suggestions, "Use specific version tags for base images to ensure reproducible builds")
+	suggestions = append(suggestions, "Review file permissions and avoid running as root user")
+	suggestions = append(suggestions, "Use specific version tags for base images to ensure reproducible builds")
+
+	// Store suggestions in Details map
+	result.Details["suggestions"] = suggestions
 }

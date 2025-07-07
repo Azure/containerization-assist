@@ -2,9 +2,9 @@ package k8s
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
@@ -56,7 +56,7 @@ func (k *KubeCmdRunner) DeleteDeployment(ctx context.Context, manifestPath strin
 
 func CheckKubectlInstalled() error {
 	if _, err := exec.LookPath("kubectl"); err != nil {
-		return fmt.Errorf("kubectl executable not found in PATH. Please install kubectl or ensure it's available in your PATH")
+		return mcperrors.NewError().Messagef("kubectl executable not found in PATH. Please install kubectl or ensure it's available in your PATH").WithLocation().Build()
 	}
 	return nil
 }

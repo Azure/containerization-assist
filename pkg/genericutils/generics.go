@@ -1,8 +1,9 @@
 package genericutils
 
 import (
-	"fmt"
 	"reflect"
+
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // MapGet safely retrieves a value from a map with the specified type.
@@ -42,17 +43,19 @@ func SafeCast[T any](value interface{}) (T, error) {
 	var zero T
 
 	if value == nil {
-		return zero, fmt.Errorf("cannot cast nil to %T", zero)
+		return zero, mcperrors.NewError().Messagef("cannot cast nil to %T", zero).WithLocation().Build()
 	}
 
 	if casted, ok := value.(T); ok {
 		return casted, nil
 	}
 
-	return zero, fmt.Errorf("cannot cast %T to %T", value, zero)
+	return zero, mcperrors.NewError().Messagef("cannot cast %T to %T", value, zero).WithLocation(
+
+	// TypedMap is a generic wrapper around map[string]interface{} that provides type-safe access.
+	).Build()
 }
 
-// TypedMap is a generic wrapper around map[string]interface{} that provides type-safe access.
 type TypedMap[K comparable, V any] struct {
 	data map[K]V
 }
@@ -228,7 +231,7 @@ func (r Result[T]) Get() (T, bool) {
 // Prefer this over Unwrap() when you want to provide context.
 func (r Result[T]) Expect(msg string) T {
 	if r.err != nil {
-		panic(fmt.Errorf("%s: %w", msg, r.err))
+		panic(mcperrors.NewError().Messagef("%s: %w", msg, r.err).WithLocation().Build())
 	}
 	return r.value
 }
@@ -244,7 +247,7 @@ func (r Result[T]) UnwrapOr(defaultValue T) T {
 // ExpectErr returns the error or panics with a custom message if there's no error.
 func (r Result[T]) ExpectErr(msg string) error {
 	if r.err == nil {
-		panic(fmt.Errorf("%s: called ExpectErr on ok Result", msg))
+		panic(mcperrors.NewError().Messagef("%s: called ExpectErr on ok Result", msg).WithLocation().Build())
 	}
 	return r.err
 }

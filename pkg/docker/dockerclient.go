@@ -2,11 +2,11 @@ package docker
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 	"time"
 
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/runner"
 )
 
@@ -78,10 +78,12 @@ func (d *DockerCmdRunner) Login(ctx context.Context, registry, username, passwor
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker login failed: %w", err)
+		return string(output), mcperrors.NewError().Messagef("docker login failed: %w", err).WithLocation(
+
+		// Cache successful authentication
+		).Build()
 	}
 
-	// Cache successful authentication
 	registryKey := registry
 	if registryKey == "" {
 		registryKey = "docker.io"
@@ -105,10 +107,12 @@ func (d *DockerCmdRunner) LoginWithToken(ctx context.Context, registry, token st
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker login with token failed: %w", err)
+		return string(output), mcperrors.NewError().Messagef("docker login with token failed: %w", err).WithLocation(
+
+		// Cache successful authentication
+		).Build()
 	}
 
-	// Cache successful authentication
 	registryKey := registry
 	if registryKey == "" {
 		registryKey = "docker.io"
@@ -129,10 +133,12 @@ func (d *DockerCmdRunner) Logout(ctx context.Context, registry string) (string, 
 	}
 
 	if err != nil {
-		return output, fmt.Errorf("docker logout failed: %w", err)
+		return output, mcperrors.NewError().Messagef("docker logout failed: %w", err).WithLocation(
+
+		// Remove from auth cache
+		).Build()
 	}
 
-	// Remove from auth cache
 	registryKey := registry
 	if registryKey == "" {
 		registryKey = "docker.io"
@@ -171,7 +177,7 @@ func (d *DockerCmdRunner) IsLoggedIn(ctx context.Context, registry string) (bool
 
 func CheckDockerInstalled() error {
 	if _, err := exec.LookPath("docker"); err != nil {
-		return fmt.Errorf("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH")
+		return mcperrors.NewError().Messagef("docker executable not found in PATH. Please install Docker or ensure it's available in your PATH").WithLocation().Build()
 	}
 	return nil
 }

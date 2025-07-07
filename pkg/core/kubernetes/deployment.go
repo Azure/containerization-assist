@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 	"sigs.k8s.io/yaml"
 )
@@ -369,12 +370,14 @@ func (dm *DeploymentManager) CheckClusterConnection(ctx context.Context) error {
 	// Try a simple kubectl command to verify cluster connection
 	output, err := dm.clients.Kube.GetPods(ctx, "kube-system", "")
 	if err != nil {
-		return fmt.Errorf("cannot connect to Kubernetes cluster: %v (output: %s)", err, output)
+		return mcperrors.NewError().Messagef("cannot connect to Kubernetes cluster: %v (output: %s)", err, output).WithLocation().Build(
+
+		// PreviewChanges runs kubectl diff to preview what would change
+		)
 	}
 	return nil
 }
 
-// PreviewChanges runs kubectl diff to preview what would change
 func (dm *DeploymentManager) PreviewChanges(ctx context.Context, manifestPath string, namespace string) (string, error) {
 	dm.logger.Info().
 		Str("manifest_path", manifestPath).
@@ -388,7 +391,7 @@ func (dm *DeploymentManager) PreviewChanges(ctx context.Context, manifestPath st
 	// Only log as error if output is empty (real failure)
 	if err != nil && output == "" {
 		dm.logger.Error().Err(err).Msg("kubectl diff failed")
-		return "", fmt.Errorf("failed to preview changes: %w", err)
+		return "", mcperrors.NewError().Messagef("failed to preview changes: %w", err).WithLocation().Build()
 	}
 
 	if output == "" {

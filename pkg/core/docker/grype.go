@@ -9,6 +9,7 @@ import (
 	"time"
 
 	coresecurity "github.com/Azure/container-kit/pkg/core/security"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -139,7 +140,7 @@ func (gs *GrypeScanner) ScanImage(ctx context.Context, imageRef string, severity
 	grypePath, err := gs.findGrype()
 	if err != nil {
 		gs.logger.Warn().Err(err).Msg("Grype not found")
-		return nil, fmt.Errorf("grype not available: %w", err)
+		return nil, mcperrors.NewError().Messagef("grype not available: %w", err).WithLocation().Build()
 	}
 	gs.grypePath = grypePath
 
@@ -189,17 +190,21 @@ func (gs *GrypeScanner) ScanImage(ctx context.Context, imageRef string, severity
 			// Grype returns non-zero exit code when vulnerabilities matching threshold are found
 			gs.logger.Debug().Int("exit_code", exitErr.ExitCode()).Msg("Grype found vulnerabilities")
 		} else {
-			return result, fmt.Errorf("grype scan failed: %w", err)
+			return result, mcperrors.NewError().Messagef("grype scan failed: %w", err).WithLocation(
+
+			// Parse Grype JSON output
+			).Build()
 		}
 	}
 
-	// Parse Grype JSON output
 	var grypeResult GrypeResult
 	if err := json.Unmarshal(output, &grypeResult); err != nil {
-		return result, fmt.Errorf("failed to parse grype output: %w", err)
+		return result, mcperrors.NewError().Messagef("failed to parse grype output: %w", err).WithLocation(
+
+		// Store additional metadata
+		).Build()
 	}
 
-	// Store additional metadata
 	if grypeResult.Source.Target.ImageID != "" {
 		result.Context["image_id"] = grypeResult.Source.Target.ImageID
 	}

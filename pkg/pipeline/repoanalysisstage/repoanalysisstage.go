@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/ai"
 	"github.com/Azure/container-kit/pkg/logger"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/pipeline"
 )
 
@@ -88,10 +89,12 @@ func (p *RepoAnalysisStage) Run(ctx context.Context, state *pipeline.PipelineSta
 
 	if err != nil {
 		state.Metadata[pipeline.RepoAnalysisErrorKey] = fmt.Sprintf("repository analysis failed: %v", err)
-		return fmt.Errorf("repository analysis failed: %v", err)
+		return mcperrors.NewError().Messagef("repository analysis failed: %v", err).WithLocation(
+
+		// Store the analysis results in the pipeline state metadata
+		).Build()
 	}
 
-	// Store the analysis results in the pipeline state metadata
 	state.Metadata[pipeline.RepoAnalysisResultKey] = repoAnalysis
 
 	// Print out the LLM function call summary

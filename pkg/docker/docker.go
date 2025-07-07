@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/ai"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/templates"
 )
 
@@ -57,7 +58,7 @@ Keep the tone neutral and factual, but feel free to raise a flag if something ne
 func GetDockerfileTemplateName(ctx context.Context, client ai.LLMClient, projectDir string, repoStructure string) (string, ai.TokenUsage, error) {
 	dockerfileTemplateNames, err := listEmbeddedSubdirNames("dockerfiles")
 	if err != nil {
-		return "", ai.TokenUsage{}, fmt.Errorf("failed to list dockerfile template names: %w", err)
+		return "", ai.TokenUsage{}, mcperrors.NewError().Messagef("failed to list dockerfile template names: %w", err).WithLocation().Build()
 	}
 
 	promptText := fmt.Sprintf(dockerTemplatePrompt, strings.Join(dockerfileTemplateNames, "\n"), repoStructure)
@@ -69,7 +70,7 @@ func GetDockerfileTemplateName(ctx context.Context, client ai.LLMClient, project
 
 	templateName := strings.TrimSpace(content)
 	if !slices.Contains(dockerfileTemplateNames, templateName) {
-		return "", tokenUsage, fmt.Errorf("invalid template name: %s", templateName)
+		return "", tokenUsage, mcperrors.NewError().Messagef("invalid template name: %s", templateName).WithLocation().Build()
 	}
 
 	return templateName, tokenUsage, nil
@@ -99,11 +100,11 @@ func WriteDockerfileFromTemplate(templateName, targetDir string) error {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return fmt.Errorf("reading embedded file %q: %w", embeddedPath, err)
+			return mcperrors.NewError().Messagef("reading embedded file %q: %w", embeddedPath, err).WithLocation().Build()
 		}
 		destPath := filepath.Join(targetDir, filename)
 		if err := os.WriteFile(destPath, data, 0644); err != nil {
-			return fmt.Errorf("writing file %q: %w", destPath, err)
+			return mcperrors.NewError().Messagef("writing file %q: %w", destPath, err).WithLocation().Build()
 		}
 	}
 	return nil

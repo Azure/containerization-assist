@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,18 +15,17 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/utils"
-	"github.com/rs/zerolog"
 )
 
 // RepositoryAnalyzer provides mechanical repository analysis without AI
 type RepositoryAnalyzer struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 }
 
 // NewRepositoryAnalyzer creates a new repository analyzer
-func NewRepositoryAnalyzer(logger zerolog.Logger) *RepositoryAnalyzer {
+func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer {
 	return &RepositoryAnalyzer{
-		logger: logger.With().Str("component", "repository_analyzer").Logger(),
+		logger: logger.With("component", "repository_analyzer"),
 	}
 }
 
@@ -91,7 +91,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 		Context:      make(map[string]interface{}),
 	}
 
-	ra.logger.Info().Str("repo_path", repoPath).Msg("Starting repository analysis")
+	ra.logger.Info("Starting repository analysis", "repo_path", repoPath)
 
 	// Validate input
 	if err := ra.validateInput(repoPath); err != nil {
@@ -118,7 +118,7 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 
 	// Parse file tree structure
 	if err := json.Unmarshal([]byte(fileTree), &result.Structure); err != nil {
-		ra.logger.Warn().Err(err).Msg("Failed to parse file tree as JSON, using raw string")
+		ra.logger.Warn("Failed to parse file tree as JSON, using raw string", "error", err)
 		result.Structure = map[string]interface{}{"raw": fileTree}
 	}
 
@@ -157,12 +157,11 @@ func (ra *RepositoryAnalyzer) AnalyzeRepository(repoPath string) (*AnalysisResul
 
 	result.Success = true
 
-	ra.logger.Info().
-		Str("language", result.Language).
-		Str("framework", result.Framework).
-		Int("dependencies", len(result.Dependencies)).
-		Bool("database", result.DatabaseInfo.Detected).
-		Msg("Repository analysis completed")
+	ra.logger.Info("Repository analysis completed",
+		"language", result.Language,
+		"framework", result.Framework,
+		"dependencies", len(result.Dependencies),
+		"database", result.DatabaseInfo.Detected)
 
 	return result, nil
 }
@@ -670,7 +669,7 @@ func (ra *RepositoryAnalyzer) extractPipDependencies(filePath string) []Dependen
 func (ra *RepositoryAnalyzer) extractMavenDependencies(filePath string) []Dependency {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		ra.logger.Debug().Err(err).Str("file", filePath).Msg("Failed to read Maven POM file")
+		ra.logger.Debug("Failed to read Maven POM file", "error", err, "file", filePath)
 		return nil
 	}
 
@@ -686,7 +685,7 @@ func (ra *RepositoryAnalyzer) extractMavenDependencies(filePath string) []Depend
 	}
 
 	if err := xml.Unmarshal(content, &pom); err != nil {
-		ra.logger.Debug().Err(err).Str("file", filePath).Msg("Failed to parse Maven POM XML")
+		ra.logger.Debug("Failed to parse Maven POM XML", "error", err, "file", filePath)
 		return nil
 	}
 
@@ -709,7 +708,7 @@ func (ra *RepositoryAnalyzer) extractMavenDependencies(filePath string) []Depend
 func (ra *RepositoryAnalyzer) extractGoDependencies(filePath string) []Dependency {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		ra.logger.Debug().Err(err).Str("file", filePath).Msg("Failed to read Go mod file")
+		ra.logger.Debug("Failed to read Go mod file", "error", err, "file", filePath)
 		return nil
 	}
 
@@ -788,7 +787,7 @@ func (ra *RepositoryAnalyzer) extractPortFromFile(filePath string) int {
 func (ra *RepositoryAnalyzer) extractPortFromPackageJson(filePath string) int {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		ra.logger.Debug().Err(err).Str("file", filePath).Msg("Failed to read package.json file")
+		ra.logger.Debug("Failed to read package.json file", "error", err, "file", filePath)
 		return 0
 	}
 
@@ -798,7 +797,7 @@ func (ra *RepositoryAnalyzer) extractPortFromPackageJson(filePath string) int {
 	}
 
 	if err := json.Unmarshal(content, &pkg); err != nil {
-		ra.logger.Debug().Err(err).Str("file", filePath).Msg("Failed to parse package.json")
+		ra.logger.Debug("Failed to parse package.json", "error", err, "file", filePath)
 		return 0
 	}
 
