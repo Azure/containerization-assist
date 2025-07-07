@@ -240,16 +240,16 @@ func (t *MyNewTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolO
     if err := t.validator.ValidateInput(input); err != nil {
         return api.ToolOutput{}, err
     }
-    
+
     // Get session
     session, err := t.sessionStore.GetSession(ctx, input.SessionID)
     if err != nil {
         return api.ToolOutput{}, err
     }
-    
+
     // Perform operation
     result := performOperation(input.Data)
-    
+
     // Return structured output
     return api.ToolOutput{
         Success: true,
@@ -270,13 +270,13 @@ func TestMyNewTool(t *testing.T) {
     // Create mock services
     mockSessionStore := &MockSessionStore{}
     mockValidator := &MockConfigValidator{}
-    
+
     // Create tool instance
     tool := &MyNewTool{
         sessionStore: mockSessionStore,
         validator: mockValidator,
     }
-    
+
     // Test execution
     output, err := tool.Execute(ctx, api.ToolInput{
         SessionID: "test-session",
@@ -284,7 +284,7 @@ func TestMyNewTool(t *testing.T) {
             "input_param": "test-value",
         },
     })
-    
+
     assert.NoError(t, err)
     assert.True(t, output.Success)
 }
@@ -352,14 +352,14 @@ func (t *Tool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput
     if err != nil {
         return api.ToolOutput{}, err
     }
-    
+
     // Use session workspace for file operations
     workspacePath := session.WorkspacePath
-    
+
     // Update session state
     session.State["last_operation"] = "analyze"
     err = t.sessionStore.UpdateSession(ctx, session)
-    
+
     return api.ToolOutput{Success: true}, nil
 }
 ```
