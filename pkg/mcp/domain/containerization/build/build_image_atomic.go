@@ -61,7 +61,6 @@ type AtomicBuildImageResult struct {
 	BuildContext_Info    *BuildContextInfo              `json:"build_context_info"`
 	BuildFailureAnalysis *BuildFailureAnalysis          `json:"build_failure_analysis,omitempty"`
 	OptimizationResult   *OptimizationResult            `json:"optimization_result,omitempty"`
-	PerformanceReport    *BuildPerformanceReport        `json:"performance_report,omitempty"`
 }
 
 // AtomicBuildImageTool is the main tool for atomic Docker image building

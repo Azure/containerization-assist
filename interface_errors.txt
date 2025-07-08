@@ -1,0 +1,6 @@
+pkg/mcp/infra/transport/stdio_error_handler.go:func (h *StdioErrorHandler) handleToolError(toolErr *types.ToolError, toolName string) interface{} {
+pkg/mcp/domain/errors/rich.go:type ConsolidatedErrorContext map[string]interface{}
+pkg/mcp/application/orchestration/errors/handler.go:type ErrorClassifier interface {
+pkg/mcp/application/orchestration/errors/handler.go:type ErrorRouter interface {
+pkg/mcp/application/services/core/error_service.go:type ErrorHandler interface {
+pkg/mcp/services/interfaces.go:type ErrorReporter interface {

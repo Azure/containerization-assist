@@ -9,7 +9,7 @@ import (
 )
 
 type IntelligentRetrySystem struct {
-	promptBuilder *ErrorRecoveryPromptBuilder
+	// Simplified: removed complex recovery prompt system
 	logger        *slog.Logger
 }
 type RetryContext struct {
@@ -18,7 +18,7 @@ type RetryContext struct {
 	AttemptCount     int
 	PreviousAttempts []RetryAttempt
 	LastResponse     string
-	ProjectContext   *RepositoryContext
+	// Simplified: removed complex repository context
 	TimeSpent        time.Duration
 }
 type RetryAttempt struct {
@@ -42,7 +42,7 @@ type RetryGuidance struct {
 
 func NewIntelligentRetrySystem(logger *slog.Logger) *IntelligentRetrySystem {
 	return &IntelligentRetrySystem{
-		promptBuilder: NewErrorRecoveryPromptBuilder(logger),
+		// Simplified: removed complex prompt builder
 		logger:        logger.With("component", "intelligent_retry"),
 	}
 }

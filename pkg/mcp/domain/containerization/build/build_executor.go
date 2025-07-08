@@ -29,7 +29,6 @@ type BuildExecutorService struct {
 	troubleshooter  *BuildTroubleshooter
 	securityScanner *BuildSecurityScanner
 	optimizer       *BuildOptimizer
-	perfMonitor     *PerformanceMonitor
 }
 
 // NewBuildExecutor creates a new build executor - DEPRECATED: use NewBuildExecutorWithServices
@@ -44,7 +43,6 @@ func NewBuildExecutor(adapter mcptypes.TypedPipelineOperations, sessionManager s
 		troubleshooter:  NewBuildTroubleshooter(logger),
 		securityScanner: NewBuildSecurityScanner(logger),
 		optimizer:       NewBuildOptimizer(logger),
-		perfMonitor:     NewPerformanceMonitor(logger),
 	}
 }
 
@@ -61,7 +59,6 @@ func NewBuildExecutorWithServices(adapter mcptypes.TypedPipelineOperations, sess
 		troubleshooter:  NewBuildTroubleshooter(logger),
 		securityScanner: NewBuildSecurityScanner(logger),
 		optimizer:       NewBuildOptimizer(logger),
-		perfMonitor:     NewPerformanceMonitor(logger),
 	}
 }
 
@@ -169,7 +166,6 @@ func (e *BuildExecutorService) getDockerfilePath(dockerfilePath, buildContext st
 type buildExecutionContext struct {
 	sessionState       *sessiontypes.SessionState
 	optimizationResult *OptimizationResult
-	buildMonitor       *BuildMonitor
 	args               AtomicBuildImageArgs
 	result             *AtomicBuildImageResult
 	startTime          time.Time
@@ -188,7 +184,6 @@ func (e *BuildExecutorService) executeWithoutProgress(ctx context.Context, args 
 		e.analyzeBuildContext,
 		e.validateBuildPrerequisites,
 		e.optimizeBuild,
-		e.setupPerformanceMonitoring,
 		e.executeBuild,
 		e.handlePushIfRequested,
 	}
@@ -257,21 +252,6 @@ func (e *BuildExecutorService) optimizeBuild(ctx context.Context, buildCtx *buil
 	return nil
 }
 
-// setupPerformanceMonitoring initializes performance monitoring
-func (e *BuildExecutorService) setupPerformanceMonitoring(ctx context.Context, buildCtx *buildExecutionContext) error {
-	if e.perfMonitor != nil {
-		buildOp := &BuildOperation{
-			Name:        fmt.Sprintf("build-%s:%s", buildCtx.args.ImageName, buildCtx.result.ImageTag),
-			Tool:        "atomic_build_image",
-			Type:        "docker",
-			Strategy:    "standard",
-			SessionID:   buildCtx.args.SessionID,
-			ContextSize: buildCtx.result.BuildContext_Info.ContextSize,
-		}
-		buildCtx.buildMonitor = e.perfMonitor.StartBuildMonitoring(ctx, buildOp)
-	}
-	return nil
-}
 
 // executeBuild performs the actual Docker build
 func (e *BuildExecutorService) executeBuild(ctx context.Context, buildCtx *buildExecutionContext) error {
@@ -377,16 +357,6 @@ func (e *BuildExecutorService) finalizeBuild(buildCtx *buildExecutionContext) *A
 	buildCtx.result.BaseAIContextResult = core.NewBaseAIContextResult("build", buildCtx.result.Success, buildCtx.result.TotalDuration)
 
 	// Complete performance monitoring
-	if buildCtx.buildMonitor != nil {
-		imageInfo := &BuiltImageInfo{
-			Name:       buildCtx.args.ImageName,
-			Tag:        buildCtx.result.ImageTag,
-			Size:       0,
-			LayerCount: 0,
-		}
-		buildCtx.buildMonitor.Complete(buildCtx.result.Success, "", imageInfo)
-		buildCtx.result.PerformanceReport = buildCtx.buildMonitor.GetReport()
-	}
 
 	// Add optimization result to response
 	if buildCtx.optimizationResult != nil && len(buildCtx.optimizationResult.Recommendations) > 0 {

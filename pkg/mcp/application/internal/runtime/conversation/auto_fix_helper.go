@@ -190,7 +190,7 @@ func (h *AutoFixHelper) buildRetryContext(sessionID string, err error, autoFixRe
 		OriginalError:    err.Error(),
 		AttemptCount:     attemptCount,
 		PreviousAttempts: previousAttempts,
-		ProjectContext:   h.buildRepositoryContext(state),
+		// ProjectContext removed - simplified
 	}
 }
 
@@ -218,9 +218,9 @@ func (h *AutoFixHelper) classifyError(err error, stage core.ConsolidatedConversa
 	}
 }
 
-func (h *AutoFixHelper) buildRepositoryContext(state *ConversationState) *RepositoryContext {
-	ctx := &RepositoryContext{
-		WorkspaceDir: "/workspace",
+func (h *AutoFixHelper) buildRepositoryContext(state *ConversationState) interface{} {
+	ctx := map[string]interface{}{
+		"workspace_dir": "/workspace",
 	}
 
 	for _, artifact := range state.Artifacts {

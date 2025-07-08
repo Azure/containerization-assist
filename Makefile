@@ -37,7 +37,7 @@ test-mcp:
 .PHONY: test-integration
 test-integration:
 	@echo "Running MCP integration tests..."
-	go test -tags=integration ./pkg/mcp/internal/test/integration/... -v
+	go test -tags=integration ./test/integration/... -v
 
 .PHONY: test-e2e
 test-e2e:

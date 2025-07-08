@@ -33,11 +33,8 @@ func NewAdvancedBuildFixerWithDefaultsUnified(logger zerolog.Logger, analyzer co
 // setupDefaultStrategies registers default recovery strategies
 func setupDefaultStrategies(fixer *AdvancedBuildFixer, logger zerolog.Logger) *AdvancedBuildFixer {
 
-	// Register all default recovery strategies
-	fixer.RegisterStrategy("network", NewNetworkErrorRecoveryStrategy(logger))
-	fixer.RegisterStrategy("permission", NewPermissionErrorRecoveryStrategy(logger))
-	fixer.RegisterStrategy("dockerfile", NewDockerfileErrorRecoveryStrategy(logger))
-	fixer.RegisterStrategy("dependency", NewDependencyErrorRecoveryStrategy(logger))
+	// Register basic recovery strategies
+	// Note: Simplified from complex distributed recovery system
 	fixer.RegisterStrategy("disk_space", NewDiskSpaceRecoveryStrategy(logger))
 
 	logger.Info().Msg("Advanced build fixer initialized with default strategies")

@@ -205,7 +205,7 @@ func (e *InsightEnricher) generateMitigations(issueType string) []string {
 		"resource_exhaustion": {
 			"Increase resource quotas",
 			"Implement resource cleanup policies",
-			"Enable auto-scaling",
+			"Monitor resource usage",
 			"Optimize resource usage",
 		},
 		"build_failure": {
