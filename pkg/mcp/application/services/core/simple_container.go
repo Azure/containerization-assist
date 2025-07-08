@@ -1,4 +1,4 @@
-package containerization
+package core
 
 import (
 	"context"
@@ -10,62 +10,63 @@ import (
 	"github.com/google/uuid"
 )
 
-// SessionManagerAdapter adapts UnifiedSessionManager to ServiceContainer
-type SessionManagerAdapter struct {
+// SimpleServiceContainer provides a minimal implementation of services.ServiceContainer
+// that only implements the services actually used by the atomic tools
+type SimpleServiceContainer struct {
 	sessionManager session.UnifiedSessionManager
 	logger         *slog.Logger
 }
 
-// NewSessionManagerAdapter creates a new adapter
-func NewSessionManagerAdapter(sessionManager session.UnifiedSessionManager, logger *slog.Logger) services.ServiceContainer {
-	return &SessionManagerAdapter{
+// NewSimpleServiceContainer creates a new minimal service container
+func NewSimpleServiceContainer(sessionManager session.UnifiedSessionManager, logger *slog.Logger) services.ServiceContainer {
+	return &SimpleServiceContainer{
 		sessionManager: sessionManager,
 		logger:         logger,
 	}
 }
 
-// SessionStore returns a SessionStore implementation
-func (a *SessionManagerAdapter) SessionStore() services.SessionStore {
-	return &sessionStoreAdapter{manager: a.sessionManager, logger: a.logger}
+// SessionStore returns a session store implementation by delegating to the session manager
+func (c *SimpleServiceContainer) SessionStore() services.SessionStore {
+	return &sessionStoreAdapter{manager: c.sessionManager, logger: c.logger}
 }
 
-// SessionState returns a SessionState implementation
-func (a *SessionManagerAdapter) SessionState() services.SessionState {
-	return &sessionStateAdapter{manager: a.sessionManager, logger: a.logger}
+// SessionState returns a session state implementation by delegating to the session manager
+func (c *SimpleServiceContainer) SessionState() services.SessionState {
+	return &sessionStateAdapter{manager: c.sessionManager, logger: c.logger}
 }
 
-// BuildExecutor returns nil as it's not available in this adapter
-func (a *SessionManagerAdapter) BuildExecutor() services.BuildExecutor {
+// BuildExecutor returns nil - not used by current tools
+func (c *SimpleServiceContainer) BuildExecutor() services.BuildExecutor {
 	return nil
 }
 
-// ToolRegistry returns nil as it's not available in this adapter
-func (a *SessionManagerAdapter) ToolRegistry() services.ToolRegistry {
+// ToolRegistry returns nil - not used by current tools
+func (c *SimpleServiceContainer) ToolRegistry() services.ToolRegistry {
 	return nil
 }
 
-// WorkflowExecutor returns nil as it's not available in this adapter
-func (a *SessionManagerAdapter) WorkflowExecutor() services.WorkflowExecutor {
+// WorkflowExecutor returns nil - not used by current tools
+func (c *SimpleServiceContainer) WorkflowExecutor() services.WorkflowExecutor {
 	return nil
 }
 
-// Scanner returns nil as it's not available in this adapter
-func (a *SessionManagerAdapter) Scanner() services.Scanner {
+// Scanner returns nil - not used by current tools
+func (c *SimpleServiceContainer) Scanner() services.Scanner {
 	return nil
 }
 
-// ConfigValidator returns nil as it's not available in this adapter
-func (a *SessionManagerAdapter) ConfigValidator() services.ConfigValidator {
+// ConfigValidator returns nil - not used by current tools
+func (c *SimpleServiceContainer) ConfigValidator() services.ConfigValidator {
 	return nil
 }
 
-// ErrorReporter returns nil as it's not available in this adapter
-func (a *SessionManagerAdapter) ErrorReporter() services.ErrorReporter {
+// ErrorReporter returns nil - not used by current tools
+func (c *SimpleServiceContainer) ErrorReporter() services.ErrorReporter {
 	return nil
 }
 
-// Close closes the adapter (no-op in this implementation)
-func (a *SessionManagerAdapter) Close() error {
+// Close implements the Closer interface
+func (c *SimpleServiceContainer) Close() error {
 	return nil
 }
 

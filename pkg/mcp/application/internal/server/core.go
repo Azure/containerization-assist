@@ -18,7 +18,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/execution"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/registry"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/workflow"
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization"
+	servicecore "github.com/Azure/container-kit/pkg/mcp/application/services/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/database_detectors"
@@ -170,8 +170,8 @@ func (s *simplifiedGomcpManager) RegisterTools(srv *Server) error {
 
 	var unifiedSessionMgr session.UnifiedSessionManager = srv.sessionManager
 
-	// Create service container adapter
-	serviceContainer := containerization.NewSessionManagerAdapter(unifiedSessionMgr, srv.logger)
+	// Create service container with minimal implementation
+	serviceContainer := servicecore.NewSimpleServiceContainer(unifiedSessionMgr, srv.logger)
 
 	analyzeRepoTool := analyze.NewAtomicAnalyzeRepositoryToolWithServices(pipelineOps, serviceContainer, srv.logger)
 	detectDatabasesTool := analyze.NewAtomicDetectDatabasesTool(srv.logger)
