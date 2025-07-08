@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // FieldValidator provides generic field validation without reflection

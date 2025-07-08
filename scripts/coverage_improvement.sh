@@ -18,13 +18,13 @@ first=true
 go list ./pkg/mcp/... | while read package; do
     # Get coverage for this package
     coverage=$(go test -cover "$package" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+%' | tr -d '%' || echo "0")
-    
+
     if [ "$first" = true ]; then
         first=false
     else
         echo "," >> current_coverage.json
     fi
-    
+
     echo "  \"$package\": $coverage" >> current_coverage.json
 done
 
@@ -33,23 +33,23 @@ echo "}" >> current_coverage.json
 # If baseline exists, compare
 if [ -f "$baseline_file" ]; then
     echo "Comparing with baseline..."
-    
+
     # Read baseline and current coverage
     packages_improved=0
     packages_total=0
-    
+
     go list ./pkg/mcp/... | while read package; do
         packages_total=$((packages_total + 1))
-        
+
         # Get baseline coverage
         baseline=$(grep "\"$package\":" "$baseline_file" 2>/dev/null | sed 's/.*: \([0-9.]*\).*/\1/' || echo "0")
-        
+
         # Get current coverage
         current=$(grep "\"$package\":" current_coverage.json | sed 's/.*: \([0-9.]*\).*/\1/' || echo "0")
-        
+
         # Calculate improvement
         improvement=$(echo "$current - $baseline" | bc -l)
-        
+
         if (( $(echo "$improvement >= $improvement_target" | bc -l) )); then
             echo "✅ $package: +${improvement}% improvement (baseline: ${baseline}%, current: ${current}%)"
             packages_improved=$((packages_improved + 1))
@@ -59,10 +59,10 @@ if [ -f "$baseline_file" ]; then
             echo "❌ $package: ${improvement}% change (needs +${improvement_target}% improvement)"
         fi
     done
-    
+
     echo ""
     echo "Summary: $packages_improved/$packages_total packages achieved +${improvement_target}% improvement"
-    
+
     # Update baseline if requested
     if [ "$1" = "--update-baseline" ]; then
         echo "Updating baseline..."

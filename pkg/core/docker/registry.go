@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/utils"
+	"github.com/Azure/container-kit/pkg/common/utils"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // RegistryManager provides mechanical Docker registry operations

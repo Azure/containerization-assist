@@ -1,45 +1,45 @@
 graph TD
     %% Container Kit MCP - Simplified 10-Package Architecture
     %% Result of GAMMA workstream: 86 packages → 10 focused packages
-    
+
     Client[MCP Client] --> Transport[transport/]
     Transport --> Core[core/]
     Core --> API[api/]
-    
+
     subgraph "Layer 1: Interface Definitions"
         API[api/<br/>Pure Interfaces<br/>Zero Dependencies]
     end
-    
+
     subgraph "Layer 2: Core Services"
         Core[core/<br/>Server & Registry]
         Session[session/<br/>State Management]
         Core --> Session
     end
-    
+
     subgraph "Layer 3: Business Logic"
         Tools[tools/<br/>Container Operations]
         Workflow[workflow/<br/>Orchestration]
-        
+
         subgraph "Tool Implementations"
             Analyze[tools/analyze]
             Build[tools/build]
             Deploy[tools/deploy]
             Scan[tools/scan]
         end
-        
+
         Workflow --> Tools
     end
-    
+
     subgraph "Layer 4: Infrastructure"
         Transport[transport/<br/>MCP Protocol]
         Storage[storage/<br/>Persistence]
         Security[security/<br/>Validation]
         Templates[templates/<br/>K8s Manifests]
     end
-    
+
     subgraph "Layer 5: Internal Utilities"
         Internal[internal/<br/>Shared Utilities]
-        
+
         subgraph "Utility Packages"
             Errors[internal/errors]
             Types[internal/types]
@@ -47,7 +47,7 @@ graph TD
             Retry[internal/retry]
         end
     end
-    
+
     %% Dependencies (allowed)
     Core --> API
     Tools --> API
@@ -57,7 +57,7 @@ graph TD
     Workflow --> Session
     Transport --> Core
     Session --> Storage
-    
+
     %% All packages can use internal
     Core --> Internal
     Tools --> Internal
@@ -66,25 +66,25 @@ graph TD
     Transport --> Internal
     Storage --> Internal
     Security --> Internal
-    
+
     %% External Systems
     Tools --> Docker[Docker Engine]
     Workflow --> K8s[Kubernetes]
     Session --> BoltDB[BoltDB Storage]
-    
+
     %% Forbidden Dependencies (NOT shown but enforced)
     %% - API depends on nothing
     %% - Tools cannot depend on Core
     %% - Core cannot depend on Tools
     %% - Internal cannot depend on any higher layer
-    
+
     classDef interfaceLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
     classDef coreLayer fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
     classDef businessLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
     classDef infraLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
     classDef internalLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
     classDef externalSys fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
-    
+
     class API interfaceLayer
     class Core,Session coreLayer
     class Tools,Workflow,Analyze,Build,Deploy,Scan businessLayer

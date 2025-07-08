@@ -10,9 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/types"
-	"github.com/Azure/container-kit/pkg/mcp/domain/validation"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 
 // HadolintValidator provides Hadolint-based Dockerfile validation

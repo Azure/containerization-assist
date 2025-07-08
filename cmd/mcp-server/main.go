@@ -13,9 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/core"
-	containerPkg "github.com/Azure/container-kit/pkg/mcp/container"
-	"github.com/Azure/container-kit/pkg/mcp/infra/server"
+	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/server"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -254,34 +253,32 @@ func createAndConfigureServer(config core.ServerConfig, flags *FlagConfig) (core
 		Str("workspace_dir", config.WorkspaceDir).
 		Msg("Starting Container Kit MCP Server")
 
-	// Create DI container for service-based architecture
-	diConfig := &containerPkg.Config{
-		DatabasePath: config.StorePath,
-		LogLevel:     config.LogLevel,
-		Environment:  config.Environment,
+	// Convert core config to server config format
+	serverConfig := server.ServerConfig{
+		WorkspaceDir:      config.WorkspaceDir,
+		MaxSessions:       config.MaxSessions,
+		SessionTTL:        config.SessionTTL,
+		MaxDiskPerSession: config.MaxDiskPerSession,
+		TotalDiskLimit:    config.TotalDiskLimit,
+		StorePath:         config.StorePath,
+		TransportType:     config.TransportType,
+		HTTPAddr:          config.HTTPAddr,
+		HTTPPort:          config.HTTPPort,
+		CORSOrigins:       config.CORSOrigins,
 	}
 
-	containerInstance, err := containerPkg.NewContainer(diConfig)
+	// Create server using converted configuration
+	mcpServer, err := server.NewServer(context.Background(), serverConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DI container: %w", err)
-	}
-
-	// Create server using the service container
-	mcpServer, err := server.NewServerWithServices(context.Background(), config, containerInstance)
-	if err != nil {
-		// Clean up container if server creation fails
-		containerInstance.Close()
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
 	if mcpServer == nil {
-		containerInstance.Close()
 		return nil, fmt.Errorf("server is nil despite no error")
 	}
 
 	// Enable conversation mode if requested
 	if *flags.conversationMode {
 		if err := enableConversationMode(mcpServer, flags); err != nil {
-			containerInstance.Close()
 			return nil, fmt.Errorf("failed to enable conversation mode: %w", err)
 		}
 	}

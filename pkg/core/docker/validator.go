@@ -7,8 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/types"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Validator provides mechanical Dockerfile validation operations

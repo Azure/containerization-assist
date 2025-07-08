@@ -8,7 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/common/validation-core/utils"
-	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // DockerfileValidator validates Dockerfile content and structure

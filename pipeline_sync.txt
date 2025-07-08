@@ -1,0 +1,1 @@
+pkg/mcp/internal/pipeline/background_workers.go:	var wg sync.WaitGroup

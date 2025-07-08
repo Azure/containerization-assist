@@ -161,7 +161,7 @@ tools/check-boundaries/check-boundaries -strict ./pkg/mcp
 
 **Problem**: `import cycle not allowed`
 
-**Solution**: 
+**Solution**:
 - Check if you're importing implementation instead of interface
 - Use interfaces from `pkg/mcp/api`
 - Move shared types to `pkg/mcp/internal/types`

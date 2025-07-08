@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -53,14 +54,5 @@ func BenchmarkErrorHandling(b *testing.B) {
 
 func createTestError(component, message string) error {
 	// Simple error creation for benchmark
-	return &testError{component: component, message: message}
-}
-
-type testError struct {
-	component string
-	message   string
-}
-
-func (e *testError) Error() string {
-	return e.component + ": " + e.message
+	return fmt.Errorf("%s: %s", component, message)
 }

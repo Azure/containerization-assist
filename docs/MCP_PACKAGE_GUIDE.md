@@ -225,7 +225,7 @@ import "github.com/Azure/container-kit/pkg/mcp/application/api"
 import "github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
 import "github.com/Azure/container-kit/pkg/mcp/infra/transport"
 
-// New structure  
+// New structure
 import "github.com/Azure/container-kit/pkg/mcp/api"
 import "github.com/Azure/container-kit/pkg/mcp/tools/build"
 import "github.com/Azure/container-kit/pkg/mcp/transport"
@@ -279,7 +279,7 @@ import "github.com/Azure/container-kit/pkg/mcp/transport"
 
 #### Import Cycle Detected
 **Problem**: Circular dependency between packages
-**Solution**: 
+**Solution**:
 - Use interfaces from api/ package
 - Move shared code to internal/
 - Refactor to break the cycle

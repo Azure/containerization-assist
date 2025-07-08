@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/templates"
 )
 

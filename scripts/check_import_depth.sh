@@ -12,20 +12,20 @@ echo "Checking for imports exceeding $max_depth levels..."
 find pkg/mcp -name "*.go" | while read file; do
     # Extract imports from the file
     imports=$(grep -E '^\s*"github\.com/Azure/container-kit/pkg/mcp/' "$file" 2>/dev/null || true)
-    
+
     if [ -n "$imports" ]; then
         echo "$imports" | while read -r import; do
             # Clean up the import string
             import_path=$(echo "$import" | sed 's/.*"\(.*\)".*/\1/')
-            
+
             # Count depth after pkg/mcp/
             if [[ "$import_path" =~ pkg/mcp/ ]]; then
                 # Extract the part after pkg/mcp/
                 after_mcp=$(echo "$import_path" | sed 's|.*pkg/mcp/||')
-                
+
                 # Count slashes (depth)
                 depth=$(echo "$after_mcp" | awk -F/ '{print NF}')
-                
+
                 if [ "$depth" -gt "$max_depth" ]; then
                     echo "❌ $file imports $import_path (depth: $depth, exceeds $max_depth)"
                     violations=$((violations + 1))

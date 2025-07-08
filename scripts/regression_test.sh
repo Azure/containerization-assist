@@ -11,7 +11,7 @@ go test -bench=. -benchmem -run=^$ ./pkg/mcp/... > current_performance.txt 2>&1 
 echo "Comparing with baseline..."
 if [ -f performance_baseline.txt ]; then
     echo "Performance comparison available"
-    
+
     # Simple check - if we have benchmarks running, that's a good start
     if grep -q "Benchmark" current_performance.txt; then
         echo "✅ PASS: Benchmarks are running successfully"

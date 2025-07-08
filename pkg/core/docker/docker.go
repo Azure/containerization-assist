@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
-	"github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // Manager provides a unified interface to all Docker operations

@@ -7,7 +7,6 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

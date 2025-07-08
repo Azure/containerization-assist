@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // validateKindInstalled checks if 'kind' is installed, installs it if missing based on OS.

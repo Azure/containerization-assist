@@ -16,7 +16,7 @@ if [ -f performance_baseline.txt ]; then
         benchmark=$(echo "$line" | awk '{print $1}')
         ops_per_sec=$(echo "$line" | awk '{print $3}')
         ns_per_op=$(echo "$line" | awk '{print $2}')
-        
+
         echo "$benchmark: $ops_per_sec ops/sec ($ns_per_op ns/op)"
     done
 else

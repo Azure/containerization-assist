@@ -1,7 +1,7 @@
 package validation
 
 import (
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // Example of migrating from reflection-based to generic validation

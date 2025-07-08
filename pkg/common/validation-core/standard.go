@@ -16,7 +16,7 @@ import (
 	"reflect"
 	"strings"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // ValidateOptionalFields validates that fields marked with omitempty are truly optional

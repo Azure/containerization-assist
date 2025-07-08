@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // validateRegistryReachable checks if the local Docker registry is reachable.

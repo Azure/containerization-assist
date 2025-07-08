@@ -4,7 +4,7 @@
 ```
 pkg/mcp/
 ├── api/          # Interface definitions (single source of truth)
-├── core/         # Server & registry core  
+├── core/         # Server & registry core
 ├── tools/        # Container operations (analyze, build, deploy, scan)
 ├── session/      # Session management and persistence
 ├── workflow/     # Multi-step operation orchestration
@@ -21,7 +21,7 @@ pkg/mcp/
 - `application/api/*` → `api/`
 - All interface definitions consolidated here
 
-### 2. Core Package  
+### 2. Core Package
 - `application/core/*` → `core/`
 - `app/registry/*` → `core/registry/`
 - `application/orchestration/registry/*` → `core/registry/`

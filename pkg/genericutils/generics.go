@@ -3,7 +3,7 @@ package genericutils
 import (
 	"reflect"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // MapGet safely retrieves a value from a map with the specified type.

@@ -1,0 +1,31 @@
+pkg/mcp/errors/root_errors.go:var (
+pkg/mcp/errors/root_errors.go:var (
+pkg/mcp/errors/root_errors.go:var (
+pkg/mcp/errors/root_errors.go:var (
+pkg/mcp/errors/root_errors.go:var (
+pkg/mcp/session/session_core.go:var DefaultStoreFactory StoreFactory
+pkg/mcp/api/interfaces.go:var (
+pkg/mcp/internal/example/generated_schemas.go:var (
+pkg/mcp/internal/runtime/validator.go:var DefaultRuntimeRegistry = NewRuntimeValidatorRegistry()
+pkg/mcp/internal/conversation/generated_chat_schemas.go:var (
+pkg/mcp/transport/llm_stdio.go:var _ types.LLMTransport = (*StdioLLMTransport)(nil)
+pkg/mcp/transport/llm_http.go:var _ types.LLMTransport = (*HTTPLLMTransport)(nil)
+pkg/mcp/security/fields.go:var (
+pkg/mcp/tools/scan/generated_security_schemas.go:var (
+pkg/mcp/tools/scan/generated_secrets_schemas.go:var (
+pkg/mcp/tools/analyze/template_selector.go:var languageCompatibilityMap = map[string][]string{
+pkg/mcp/tools/analyze/template_selector.go:var configFileScores = map[string]map[string]int{
+pkg/mcp/tools/analyze/generated_simple_schemas.go:var (
+pkg/mcp/tools/analyze/generated_dockerfile_schemas.go:var (
+pkg/mcp/tools/analyze/generated_schemas.go:var (
+pkg/mcp/tools/build/enhanced_build_analyzer.go:var failurePatterns = map[string][]string{
+pkg/mcp/tools/build/generated_build_schemas.go:var (
+pkg/mcp/tools/build/generated_push_schemas.go:var (
+pkg/mcp/tools/build/generated_tag_schemas.go:var (
+pkg/mcp/tools/build/generated_pull_schemas.go:var (
+pkg/mcp/tools/deploy/generated_deploy_schemas.go:var (
+pkg/mcp/tools/deploy/generated_health_schemas.go:var (
+pkg/mcp/tools/deploy/generated_manifest_schemas.go:var (
+pkg/mcp/core/transport.go:var (
+pkg/mcp/core/interfaces.go:var (
+pkg/mcp/core/core.go:var KnownRegistries = []string{

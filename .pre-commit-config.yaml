@@ -5,7 +5,7 @@ repos:
   - id: trailing-whitespace
   - id: end-of-file-fixer
   - id: check-yaml
-    exclude: '^(pkg/mcp/infra/templates/|resources/templates/|templates/).*\.yaml$'  # Exclude Go template files
+    exclude: '^(pkg/mcp/infra/templates/|pkg/mcp/templates/|resources/templates/|templates/).*\.yaml$'  # Exclude Go template files
   - id: check-added-large-files
     args: ['--maxkb=1000']
 

@@ -1,0 +1,7 @@
+pkg/mcp/core/tools/schema.go:var ChatInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
+pkg/mcp/core/tools/schema.go:var ConversationHistoryInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
+pkg/mcp/core/tools/schema.go:var WorkflowExecuteInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
+pkg/mcp/core/tools/schema.go:var WorkflowListInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
+pkg/mcp/core/tools/schema.go:var WorkflowStatusInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
+pkg/mcp/templates/loader.go:var templateFS embed.FS
+pkg/mcp/templates/manifest_loader.go:var manifestFS embed.FS

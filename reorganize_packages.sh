@@ -5,8 +5,8 @@ echo "=== CAREFUL PACKAGE REORGANIZATION ==="
 
 # First, remove the hastily copied files to start fresh
 echo "Cleaning up initial migration..."
-rm -rf pkg/mcp/api/* pkg/mcp/core/* pkg/mcp/tools/* pkg/mcp/session/* 
-rm -rf pkg/mcp/workflow/* pkg/mcp/transport/* pkg/mcp/storage/* 
+rm -rf pkg/mcp/api/* pkg/mcp/core/* pkg/mcp/tools/* pkg/mcp/session/*
+rm -rf pkg/mcp/workflow/* pkg/mcp/transport/* pkg/mcp/storage/*
 rm -rf pkg/mcp/security/* pkg/mcp/templates/* pkg/mcp/internal/*
 
 # Create proper subdirectory structure
@@ -16,13 +16,13 @@ echo "Creating proper subdirectory structure..."
 mkdir -p pkg/mcp/api
 cp pkg/mcp/application/api/*.go pkg/mcp/api/ 2>/dev/null || true
 
-# Core - Server and registry 
+# Core - Server and registry
 mkdir -p pkg/mcp/core
 cp pkg/mcp/application/core/*.go pkg/mcp/core/ 2>/dev/null || true
 # Move state and types to subdirs
 mkdir -p pkg/mcp/core/state
 cp -r pkg/mcp/application/core/state/* pkg/mcp/core/state/ 2>/dev/null || true
-mkdir -p pkg/mcp/core/types  
+mkdir -p pkg/mcp/core/types
 cp -r pkg/mcp/application/core/types/* pkg/mcp/core/types/ 2>/dev/null || true
 
 # Core registry consolidation

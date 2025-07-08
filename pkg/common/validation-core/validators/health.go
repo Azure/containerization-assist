@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // HealthValidator validates health check results and pod/container states

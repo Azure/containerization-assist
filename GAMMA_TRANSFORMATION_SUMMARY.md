@@ -31,7 +31,7 @@ The GAMMA workstream has successfully transformed Container Kit MCP from an over
 ```
 pkg/mcp/
 ├── api/          # Interface definitions (single source of truth)
-├── core/         # Server & registry core  
+├── core/         # Server & registry core
 ├── tools/        # Container operations (analyze, build, deploy, scan)
 ├── session/      # Session management and persistence
 ├── workflow/     # Multi-step operation orchestration
