@@ -27,65 +27,72 @@ type BoundaryRule struct {
 }
 
 var boundaryRules = []BoundaryRule{
+	// API layer - pure interfaces only
 	{
-		Package:     "pkg/mcp/internal/runtime",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/session", "pkg/mcp/internal/transport", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/build", "pkg/mcp/internal/deploy", "pkg/mcp/internal/scan", "pkg/mcp/internal/analyze"},
-		Description: "Runtime core should not depend on specific tool domains",
-	},
-	{
-		Package:     "pkg/mcp/internal/build",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/validate", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/deploy", "pkg/mcp/internal/scan", "pkg/mcp/internal/analyze", "pkg/mcp/internal/runtime"},
-		Description: "Build tools should be independent of other tool domains",
-	},
-	{
-		Package:     "pkg/mcp/internal/deploy",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/validate", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/build", "pkg/mcp/internal/scan", "pkg/mcp/internal/analyze", "pkg/mcp/internal/runtime"},
-		Description: "Deploy tools should be independent of other tool domains",
-	},
-	{
-		Package:     "pkg/mcp/internal/scan",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/validate", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/build", "pkg/mcp/internal/deploy", "pkg/mcp/internal/analyze", "pkg/mcp/internal/runtime"},
-		Description: "Security scanning tools should be independent of other tool domains",
-	},
-	{
-		Package:     "pkg/mcp/internal/analyze",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/validate", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/build", "pkg/mcp/internal/deploy", "pkg/mcp/internal/scan", "pkg/mcp/internal/runtime"},
-		Description: "Analysis tools should be independent of other tool domains",
-	},
-	{
-		Package:     "pkg/mcp/internal/session",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/build", "pkg/mcp/internal/deploy", "pkg/mcp/internal/scan", "pkg/mcp/internal/analyze"},
-		Description: "Session management should not depend on tool domains",
-	},
-	{
-		Package:     "pkg/mcp/internal/transport",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/build", "pkg/mcp/internal/deploy", "pkg/mcp/internal/scan", "pkg/mcp/internal/analyze", "pkg/mcp/internal/session"},
-		Description: "Transport layer should be independent of business logic",
-	},
-	{
-		Package:     "pkg/mcp/internal/workflow",
-		AllowedDeps: []string{"pkg/mcp", "pkg/mcp/internal/session", "pkg/mcp/internal/observability"},
-		Forbidden:   []string{"pkg/mcp/internal/build", "pkg/mcp/internal/deploy", "pkg/mcp/internal/scan", "pkg/mcp/internal/analyze"},
-		Description: "Workflow orchestration should not depend on specific tool domains",
-	},
-	{
-		Package:     "pkg/mcp/internal/validate",
-		AllowedDeps: []string{"pkg/mcp"},
-		Forbidden:   []string{},
-		Description: "Validation package should be minimal and reusable",
-	},
-	{
-		Package:     "pkg/mcp/internal/observability",
+		Package:     "pkg/mcp/api",
 		AllowedDeps: []string{},
-		Forbidden:   []string{},
-		Description: "Observability should have minimal dependencies",
+		Forbidden:   []string{"pkg/mcp/core", "pkg/mcp/tools", "pkg/mcp/internal", "pkg/mcp/workflow"},
+		Description: "API should only contain interface definitions, no implementations",
+	},
+	// Core layer - server and registry
+	{
+		Package:     "pkg/mcp/core",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/session", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/tools", "pkg/mcp/workflow"},
+		Description: "Core manages server lifecycle and registry, no direct tool dependencies",
+	},
+	// Tools layer - container operations
+	{
+		Package:     "pkg/mcp/tools",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/session", "pkg/mcp/security", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/core", "pkg/mcp/workflow"},
+		Description: "Tools implement container operations independently",
+	},
+	// Session layer
+	{
+		Package:     "pkg/mcp/session",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/storage", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/tools", "pkg/mcp/core", "pkg/mcp/workflow"},
+		Description: "Session management should be independent",
+	},
+	// Workflow layer
+	{
+		Package:     "pkg/mcp/workflow",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/tools", "pkg/mcp/session", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/core"},
+		Description: "Workflow orchestrates tools but doesn't depend on core",
+	},
+	// Infrastructure layers
+	{
+		Package:     "pkg/mcp/transport",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/core", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/tools", "pkg/mcp/workflow"},
+		Description: "Transport handles protocol communication only",
+	},
+	{
+		Package:     "pkg/mcp/storage",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/tools", "pkg/mcp/core", "pkg/mcp/session", "pkg/mcp/workflow"},
+		Description: "Storage is a low-level service used by others",
+	},
+	{
+		Package:     "pkg/mcp/security",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/tools", "pkg/mcp/core", "pkg/mcp/session", "pkg/mcp/workflow"},
+		Description: "Security provides validation services independently",
+	},
+	{
+		Package:     "pkg/mcp/templates",
+		AllowedDeps: []string{"pkg/mcp/api", "pkg/mcp/internal"},
+		Forbidden:   []string{"pkg/mcp/tools", "pkg/mcp/core", "pkg/mcp/session", "pkg/mcp/workflow"},
+		Description: "Templates are pure data/configuration",
+	},
+	// Internal layer
+	{
+		Package:     "pkg/mcp/internal",
+		AllowedDeps: []string{},
+		Forbidden:   []string{"pkg/mcp/api", "pkg/mcp/core", "pkg/mcp/tools", "pkg/mcp/session", "pkg/mcp/workflow"},
+		Description: "Internal utilities should not depend on higher layers",
 	},
 }
 

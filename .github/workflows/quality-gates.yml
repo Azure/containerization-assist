@@ -64,20 +64,22 @@ jobs:
     - name: Interface Count Check
       run: |
         echo "🔍 Checking interface count..."
-        scripts/interface-counter pkg/mcp/
-        echo "✅ Interface count check completed"
+        scripts/interface-counter pkg/mcp/ || exit 1
     
     - name: File Size Check
       run: |
         echo "📏 Checking file sizes..."
-        scripts/check_file_size.sh
-        echo "✅ File size check completed"
+        scripts/check_file_size.sh || exit 1
     
     - name: Complexity Check
       run: |
         echo "🧠 Checking function complexity..."
-        scripts/complexity-checker pkg/mcp/
-        echo "✅ Complexity check completed"
+        scripts/complexity-checker pkg/mcp/ || exit 1
+    
+    - name: Import Depth Check
+      run: |
+        echo "📦 Checking import depth..."
+        scripts/check_import_depth.sh || exit 1
     
     - name: Test Coverage Check
       run: |
@@ -106,12 +108,11 @@ jobs:
         make test-mcp
         echo "✅ Test suite completed"
     
-    - name: Run All Quality Gates
+    - name: Run All Quality Gates (Enforced)
       run: |
-        echo "🎯 Running comprehensive quality gates..."
+        echo "🎯 Running comprehensive quality gates with enforcement..."
         alias make='/usr/bin/make'
-        scripts/quality_gates.sh
-        echo "✅ All quality gates passed"
+        scripts/quality_gates_enforced.sh || exit 1
     
     - name: Upload Coverage Reports
       if: always()

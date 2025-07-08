@@ -3,253 +3,259 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestSchedulerBasicOperations(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger)
+type testJob struct {
+	id       string
+	execFunc func(ctx context.Context) error
+	timeout  time.Duration
+}
 
-	// Test start
-	if err := s.Start(); err != nil {
-		t.Fatalf("Failed to start scheduler: %v", err)
+func (t *testJob) Execute(ctx context.Context) error {
+	if t.execFunc != nil {
+		return t.execFunc(ctx)
 	}
+	return nil
+}
 
-	// Test job submission
-	jobExecuted := false
-	job := Job{
-		ID: "test-job",
-		Run: func(ctx context.Context) error {
-			jobExecuted = true
+func (t *testJob) ID() string {
+	return t.id
+}
+
+func (t *testJob) Timeout() time.Duration {
+	if t.timeout > 0 {
+		return t.timeout
+	}
+	return 1 * time.Second
+}
+
+func TestSchedulerBasicOperations(t *testing.T) {
+	log := zerolog.Nop()
+	scheduler := NewScheduler(2, 10, log)
+
+	// Test Start
+	err := scheduler.Start()
+	require.NoError(t, err)
+
+	// Test Submit
+	executed := atomic.Bool{}
+	job := &testJob{
+		id: "test-job-1",
+		execFunc: func(ctx context.Context) error {
+			executed.Store(true)
 			return nil
 		},
-		Timeout: time.Second,
 	}
 
-	if err := s.Submit(job); err != nil {
-		t.Fatalf("Failed to submit job: %v", err)
-	}
+	err = scheduler.Submit(job)
+	require.NoError(t, err)
 
-	// Give time for job execution
+	// Wait for execution
 	time.Sleep(100 * time.Millisecond)
+	assert.True(t, executed.Load())
 
-	// Test stop
-	if err := s.Stop(); err != nil {
-		t.Fatalf("Failed to stop scheduler: %v", err)
-	}
-
-	if !jobExecuted {
-		t.Error("Job was not executed")
-	}
+	// Test Stop
+	err = scheduler.Stop()
+	require.NoError(t, err)
 }
 
-func TestSchedulerOptions(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger, WithWorkers(8), WithQueueSize(200))
+func TestSchedulerConcurrentJobs(t *testing.T) {
+	log := zerolog.Nop()
+	scheduler := NewScheduler(4, 20, log)
+	require.NoError(t, scheduler.Start())
+	defer scheduler.Stop()
 
-	if s.workers != 8 {
-		t.Errorf("Expected 8 workers, got %d", s.workers)
-	}
+	var wg sync.WaitGroup
+	executed := atomic.Int32{}
 
-	if cap(s.queue) != 200 {
-		t.Errorf("Expected queue size 200, got %d", cap(s.queue))
-	}
-}
-
-func TestSchedulerMultipleJobs(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger, WithWorkers(2))
-
-	if err := s.Start(); err != nil {
-		t.Fatalf("Failed to start scheduler: %v", err)
-	}
-	defer s.Stop()
-
-	var counter int32
-	jobCount := 10
-
-	for i := 0; i < jobCount; i++ {
-		job := Job{
-			ID: "job-" + string(rune(i)),
-			Run: func(ctx context.Context) error {
-				atomic.AddInt32(&counter, 1)
+	// Submit 10 concurrent jobs
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		job := &testJob{
+			id: "test-job-" + string(rune(i)),
+			execFunc: func(ctx context.Context) error {
+				executed.Add(1)
+				wg.Done()
 				return nil
 			},
 		}
-		if err := s.Submit(job); err != nil {
-			t.Fatalf("Failed to submit job %d: %v", i, err)
-		}
+		err := scheduler.Submit(job)
+		require.NoError(t, err)
 	}
 
-	// Wait for all jobs to complete
-	time.Sleep(200 * time.Millisecond)
-
-	finalCount := atomic.LoadInt32(&counter)
-	if finalCount != int32(jobCount) {
-		t.Errorf("Expected %d jobs executed, got %d", jobCount, finalCount)
-	}
+	wg.Wait()
+	assert.Equal(t, int32(10), executed.Load())
 }
 
 func TestSchedulerJobTimeout(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger)
+	log := zerolog.Nop()
+	scheduler := NewScheduler(1, 5, log)
+	require.NoError(t, scheduler.Start())
+	defer scheduler.Stop()
 
-	if err := s.Start(); err != nil {
-		t.Fatalf("Failed to start scheduler: %v", err)
-	}
-	defer s.Stop()
-
-	jobCompleted := false
-	job := Job{
-		ID: "timeout-job",
-		Run: func(ctx context.Context) error {
+	done := make(chan bool)
+	job := &testJob{
+		id:      "timeout-job",
+		timeout: 50 * time.Millisecond,
+		execFunc: func(ctx context.Context) error {
 			select {
-			case <-time.After(2 * time.Second):
-				jobCompleted = true
-				return nil
 			case <-ctx.Done():
+				done <- true
 				return ctx.Err()
+			case <-time.After(1 * time.Second):
+				done <- false
+				return nil
 			}
 		},
-		Timeout: 100 * time.Millisecond,
 	}
 
-	if err := s.Submit(job); err != nil {
-		t.Fatalf("Failed to submit job: %v", err)
-	}
+	err := scheduler.Submit(job)
+	require.NoError(t, err)
 
-	// Wait for timeout
-	time.Sleep(300 * time.Millisecond)
-
-	if jobCompleted {
-		t.Error("Job should have timed out")
-	}
+	// Job should timeout
+	timedOut := <-done
+	assert.True(t, timedOut)
 }
 
-func TestSchedulerErrorHandling(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger)
+func TestSchedulerQueueFull(t *testing.T) {
+	log := zerolog.Nop()
+	scheduler := NewScheduler(1, 2, log) // Small queue
+	require.NoError(t, scheduler.Start())
+	defer scheduler.Stop()
 
-	if err := s.Start(); err != nil {
-		t.Fatalf("Failed to start scheduler: %v", err)
-	}
-	defer s.Stop()
-
-	job := Job{
-		ID: "error-job",
-		Run: func(ctx context.Context) error {
-			return errors.New("intentional error")
-		},
-	}
-
-	// Should not return error on submission
-	if err := s.Submit(job); err != nil {
-		t.Fatalf("Failed to submit job: %v", err)
-	}
-
-	// Give time for job execution
-	time.Sleep(100 * time.Millisecond)
-	// Test passes if no panic occurs
-}
-
-func TestSchedulerGracefulShutdown(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger, WithWorkers(4))
-
-	if err := s.Start(); err != nil {
-		t.Fatalf("Failed to start scheduler: %v", err)
-	}
-
-	// Submit jobs that take some time
-	for i := 0; i < 10; i++ {
-		job := Job{
-			ID: "slow-job",
-			Run: func(ctx context.Context) error {
-				select {
-				case <-time.After(50 * time.Millisecond):
-					return nil
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			},
-		}
-		if err := s.Submit(job); err != nil {
-			t.Fatalf("Failed to submit job: %v", err)
-		}
-	}
-
-	// Stop should wait for all jobs to complete
-	if err := s.Stop(); err != nil {
-		t.Fatalf("Failed to stop scheduler: %v", err)
-	}
-
-	// Try to submit after stop
-	job := Job{
-		ID: "post-stop-job",
-		Run: func(ctx context.Context) error {
+	// Block the worker
+	blockCh := make(chan struct{})
+	job1 := &testJob{
+		id: "blocker",
+		execFunc: func(ctx context.Context) error {
+			<-blockCh
 			return nil
 		},
 	}
+	scheduler.Submit(job1)
 
-	err := s.Submit(job)
-	if err == nil {
-		t.Error("Expected error when submitting after stop")
-	}
+	// Fill the queue
+	scheduler.Submit(&testJob{id: "job2"})
+	scheduler.Submit(&testJob{id: "job3"})
+
+	// This should fail - queue full
+	err := scheduler.Submit(&testJob{id: "job4"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "queue is full")
+
+	close(blockCh)
 }
 
-func TestSchedulerStartOnce(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger)
+func TestSchedulerStopSubmit(t *testing.T) {
+	log := zerolog.Nop()
+	scheduler := NewScheduler(2, 10, log)
+	require.NoError(t, scheduler.Start())
+	require.NoError(t, scheduler.Stop())
 
-	// Start multiple times should be idempotent
-	for i := 0; i < 3; i++ {
-		if err := s.Start(); err != nil {
-			t.Fatalf("Failed to start scheduler on attempt %d: %v", i+1, err)
+	// Submit after stop should fail
+	err := scheduler.Submit(&testJob{id: "late-job"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "scheduler is stopped")
+}
+
+func TestSchedulerJobError(t *testing.T) {
+	log := zerolog.Nop()
+	scheduler := NewScheduler(1, 5, log)
+	require.NoError(t, scheduler.Start())
+	defer scheduler.Stop()
+
+	executed := atomic.Bool{}
+	job := &testJob{
+		id: "error-job",
+		execFunc: func(ctx context.Context) error {
+			executed.Store(true)
+			return errors.New("job failed")
+		},
+	}
+
+	err := scheduler.Submit(job)
+	require.NoError(t, err)
+
+	// Wait for execution
+	time.Sleep(100 * time.Millisecond)
+	assert.True(t, executed.Load())
+}
+
+func TestSchedulerGracefulShutdown(t *testing.T) {
+	log := zerolog.Nop()
+	scheduler := NewScheduler(2, 10, log)
+	require.NoError(t, scheduler.Start())
+
+	var wg sync.WaitGroup
+	completed := atomic.Int32{}
+
+	// Submit jobs that take some time
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		job := &testJob{
+			id: "slow-job-" + string(rune(i)),
+			execFunc: func(ctx context.Context) error {
+				time.Sleep(50 * time.Millisecond)
+				completed.Add(1)
+				wg.Done()
+				return nil
+			},
 		}
+		scheduler.Submit(job)
 	}
 
-	if err := s.Stop(); err != nil {
-		t.Fatalf("Failed to stop scheduler: %v", err)
-	}
+	// Stop should wait for all jobs to complete
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		scheduler.Stop()
+	}()
+
+	wg.Wait()
+	assert.Equal(t, int32(5), completed.Load())
 }
 
-func TestSchedulerStopOnce(t *testing.T) {
-	logger := zerolog.Nop()
-	s := NewScheduler(logger)
+func TestSchedulerMultipleStartStop(t *testing.T) {
+	log := zerolog.Nop()
+	scheduler := NewScheduler(2, 10, log)
 
-	if err := s.Start(); err != nil {
-		t.Fatalf("Failed to start scheduler: %v", err)
-	}
+	// Multiple starts should be safe
+	err1 := scheduler.Start()
+	err2 := scheduler.Start()
+	assert.NoError(t, err1)
+	assert.NoError(t, err2)
 
-	// Stop multiple times should be idempotent
-	for i := 0; i < 3; i++ {
-		if err := s.Stop(); err != nil {
-			t.Fatalf("Failed to stop scheduler on attempt %d: %v", i+1, err)
-		}
-	}
+	// Multiple stops should be safe
+	err1 = scheduler.Stop()
+	err2 = scheduler.Stop()
+	assert.NoError(t, err1)
+	assert.NoError(t, err2)
 }
 
-func TestLegacyManagerCompatibility(t *testing.T) {
-	logger := zerolog.Nop()
-	
-	// Test that legacy constructor works
-	m := NewManager(logger)
-	
-	// Test that it's actually a Scheduler
-	if _, ok := interface{}(m).(*Scheduler); !ok {
-		t.Error("NewManager should return a *Scheduler")
-	}
-	
-	// Test basic operations work
-	if err := m.Start(); err != nil {
-		t.Fatalf("Failed to start legacy manager: %v", err)
-	}
-	
-	if err := m.Stop(); err != nil {
-		t.Fatalf("Failed to stop legacy manager: %v", err)
-	}
+func TestJobFuncAdapter(t *testing.T) {
+	executed := false
+	f := JobFunc(func() error {
+		executed = true
+		return nil
+	})
+
+	// Test Execute
+	err := f.Execute(context.Background())
+	assert.NoError(t, err)
+	assert.True(t, executed)
+
+	// Test ID generation
+	id := f.ID()
+	assert.Contains(t, id, "job-")
+
+	// Test default timeout
+	timeout := f.Timeout()
+	assert.Equal(t, 5*time.Minute, timeout)
 }
