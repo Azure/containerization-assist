@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/interfaces"
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 

@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	securityTypes "github.com/Azure/container-kit/pkg/mcp/core/types"
 	"github.com/Azure/container-kit/pkg/mcp/session"

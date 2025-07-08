@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 	"github.com/Azure/container-kit/pkg/mcp/services"

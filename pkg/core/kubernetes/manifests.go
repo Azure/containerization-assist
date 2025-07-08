@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/k8s"
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 	"github.com/rs/zerolog"
 	"sigs.k8s.io/yaml"

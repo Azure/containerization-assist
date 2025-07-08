@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 

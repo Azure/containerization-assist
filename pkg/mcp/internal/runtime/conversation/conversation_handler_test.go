@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 
 	// "github.com/Azure/container-kit/pkg/mcp/domain/processing" // TODO: Fix import after package reorganization

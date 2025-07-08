@@ -29,6 +29,7 @@ type ServiceContainer interface {
 	KnowledgeBase() KnowledgeBase
 	K8sClient() K8sClient
 	Analyzer() Analyzer
+	Persistence() Persistence
 	Logger() *slog.Logger
 }
 
@@ -328,4 +329,22 @@ type AnalysisResult struct {
 	Port         int
 	BuildCommand string
 	RunCommand   string
+}
+
+// Persistence handles persistent storage operations
+type Persistence interface {
+	// Put stores a key-value pair
+	Put(ctx context.Context, bucket string, key string, value interface{}) error
+	
+	// Get retrieves a value by key
+	Get(ctx context.Context, bucket string, key string, result interface{}) error
+	
+	// Delete removes a key-value pair
+	Delete(ctx context.Context, bucket string, key string) error
+	
+	// List returns all key-value pairs in a bucket
+	List(ctx context.Context, bucket string) (map[string]interface{}, error)
+	
+	// Close closes the persistence layer
+	Close() error
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/interfaces"
 	"github.com/Azure/container-kit/pkg/common/pools"
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 

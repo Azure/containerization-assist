@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/core/tools"
 	toolstypes "github.com/Azure/container-kit/pkg/mcp/core/tools"

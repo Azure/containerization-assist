@@ -13,8 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/server"
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -254,7 +253,7 @@ func createAndConfigureServer(config core.ServerConfig, flags *FlagConfig) (core
 		Msg("Starting Container Kit MCP Server")
 
 	// Convert core config to server config format
-	serverConfig := server.ServerConfig{
+	serverConfig := core.ServerConfig{
 		WorkspaceDir:      config.WorkspaceDir,
 		MaxSessions:       config.MaxSessions,
 		SessionTTL:        config.SessionTTL,
@@ -268,7 +267,7 @@ func createAndConfigureServer(config core.ServerConfig, flags *FlagConfig) (core
 	}
 
 	// Create server using converted configuration
-	mcpServer, err := server.NewServer(context.Background(), serverConfig)
+	mcpServer, err := core.NewServer(context.Background(), serverConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}

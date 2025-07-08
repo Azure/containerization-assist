@@ -11,7 +11,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/common/validation-core/validators"
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/core/tools"
 	core "github.com/Azure/container-kit/pkg/mcp/core/tools"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"

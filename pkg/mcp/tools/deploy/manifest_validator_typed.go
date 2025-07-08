@@ -7,7 +7,7 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 	"gopkg.in/yaml.v3"

@@ -37,7 +37,7 @@
 //     tool := core.Tool
 //
 //     // New
-//     import "github.com/Azure/container-kit/pkg/mcp/api"
+//     import "github.com/Azure/container-kit/pkg/mcp/application/api"
 //     tool := api.Tool
 //
 //  2. Use type aliases during transition:
