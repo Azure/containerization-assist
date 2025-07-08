@@ -14,7 +14,7 @@ import (
 	coreinterfaces "github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/execution"
-	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/registry"
+	appregistry "github.com/Azure/container-kit/pkg/mcp/app/registry"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/workflow"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
@@ -55,7 +55,7 @@ type Server struct {
 
 	// Canonical orchestration system
 	toolOrchestrator api.Orchestrator
-	toolRegistry     *registry.ToolRegistry
+	toolRegistry     *appregistry.ToolRegistry
 
 	// Conversation mode components
 	conversationComponents *ConversationComponents
@@ -236,7 +236,7 @@ func createServer(ctx context.Context, config ServerConfig, unifiedSessionManage
 	// Telemetry disabled - using standard logging
 
 	// Initialize canonical tool orchestrator
-	toolRegistry := registry.NewToolRegistry(logger.With("component", "tool_registry"))
+	toolRegistry := appregistry.NewToolRegistry()
 
 	// Use session manager directly with orchestrator, with unified session manager support if available
 	// Use unified orchestrator for tool coordination
@@ -340,7 +340,7 @@ func createServerWithServices(ctx context.Context, config ServerConfig, serviceC
 
 	// Create facade infrastructure components (still use zerolog for now)
 	// TODO: Migrate these to use slog and service container services directly
-	toolRegistry := registry.NewToolRegistry(logger.With("component", "tool_registry"))
+	toolRegistry := appregistry.NewToolRegistry()
 	toolOrchestrator := orchestration.NewOrchestrator(
 		orchestration.WithLogger(logger.With("component", "tool_orchestrator")),
 		orchestration.WithTimeout(10*time.Minute),
@@ -534,7 +534,7 @@ func (s *Server) GetToolOrchestrator() api.Orchestrator {
 }
 
 // GetToolRegistry returns the server's tool registry
-func (s *Server) GetToolRegistry() *registry.ToolRegistry {
+func (s *Server) GetToolRegistry() *appregistry.ToolRegistry {
 	return s.toolRegistry
 }
 

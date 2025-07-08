@@ -16,7 +16,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/internal/pipeline"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/execution"
-	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/registry"
+	appregistry "github.com/Azure/container-kit/pkg/mcp/app/registry"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/workflow"
 	servicecore "github.com/Azure/container-kit/pkg/mcp/application/services/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze"
@@ -61,7 +61,7 @@ type Server struct {
 	startTime        time.Time
 
 	toolOrchestrator api.Orchestrator
-	toolRegistry     *registry.ToolRegistry
+	toolRegistry     *appregistry.ToolRegistry
 
 	conversationComponents *ConversationComponents
 
@@ -351,7 +351,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		Logger:     logger.With("component", "job_manager"),
 	})
 
-	toolRegistry := registry.NewToolRegistry(logger.With("component", "tool_registry"))
+	toolRegistry := appregistry.NewToolRegistry()
 
 	toolOrchestrator := orchestration.NewOrchestrator(
 		orchestration.WithLogger(logger.With("component", "tool_orchestrator")),

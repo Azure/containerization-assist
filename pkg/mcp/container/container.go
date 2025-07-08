@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/services"
 	"github.com/Azure/container-kit/pkg/mcp/services/build"
 	serviceerrors "github.com/Azure/container-kit/pkg/mcp/services/errors"
-	"github.com/Azure/container-kit/pkg/mcp/services/registry"
+	appregistry "github.com/Azure/container-kit/pkg/mcp/app/registry"
 	"github.com/Azure/container-kit/pkg/mcp/services/scanner"
 	"github.com/Azure/container-kit/pkg/mcp/services/session"
 	"github.com/Azure/container-kit/pkg/mcp/services/validation"
@@ -103,7 +103,7 @@ func (c *Container) initializeServices() error {
 	}
 	c.sessionState = sessionState
 
-	c.toolRegistry = registry.NewMemoryToolRegistry()
+	c.toolRegistry = appregistry.NewMemoryToolRegistry()
 
 	c.scanner = scanner.NewSecurityScanner()
 
@@ -199,7 +199,7 @@ func (c *Container) Close() error {
 	}
 
 	if c.toolRegistry != nil {
-		if closer, ok := c.toolRegistry.(*registry.MemoryToolRegistry); ok {
+		if closer, ok := c.toolRegistry.(*appregistry.MemoryToolRegistry); ok {
 			if err := closer.Close(); err != nil {
 				c.logger.Error().Err(err).Msg("Failed to close tool registry")
 				lastError = err
