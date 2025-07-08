@@ -29,6 +29,12 @@ func (s *MultiStageBuildStrategy) Description() string {
 	return "Optimized multi-stage build strategy with advanced layer caching and minimal final image size"
 }
 
+// CanHandle determines if this strategy can handle the given build context
+func (s *MultiStageBuildStrategy) CanHandle(context BuildContext) bool {
+	// Multi-stage strategy prefers contexts with target specified or when optimization is beneficial
+	return context.DockerfilePath != "" && (context.Target != "" || context.Platform != "")
+}
+
 // Build executes the build using multi-stage optimization
 func (s *MultiStageBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 	s.logger.Info().
@@ -60,6 +66,11 @@ func (s *MultiStageBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) 
 		Msg("Multi-stage build completed successfully")
 
 	return result, nil
+}
+
+// Execute is an alias for Build for interface compatibility
+func (s *MultiStageBuildStrategy) Execute(ctx BuildContext) (*BuildResult, error) {
+	return s.Build(ctx)
 }
 
 // SupportsFeature checks if the strategy supports a specific feature

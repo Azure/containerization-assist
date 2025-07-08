@@ -157,7 +157,7 @@ func (c *DefaultContextSharer) RouteError(ctx context.Context, config opstypes.E
 		}
 	}
 
-	return c.errorRouter.RouteError(ctx, errorCtx)
+	return c.errorRouter.RouteError(errorCtx)
 }
 
 // getToolFromContext extracts tool name from context

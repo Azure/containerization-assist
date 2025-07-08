@@ -8,21 +8,20 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/services"
+
+	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	validation "github.com/Azure/container-kit/pkg/mcp/security"
-
-	// mcp import removed - using mcptypes
-	internaltypes "github.com/Azure/container-kit/pkg/mcp/core"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/common"
-	"log/slog"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 
 // AtomicPullImageArgs defines arguments for atomic Docker image pull
 type AtomicPullImageArgs struct {
-	internaltypes.BaseToolArgs
+	core.BaseToolArgs
 	// Image information
 	ImageRef string `json:"image_ref" validate:"required,docker_image" description:"The full image reference to pull (e.g. nginx:latest, myregistry.com/app:v1.0.0)"`
 	// Pull configuration
@@ -77,7 +76,7 @@ type PullContext struct {
 
 // AtomicPullImageTool implements atomic Docker image pull using core operations
 type AtomicPullImageTool struct {
-	pipelineAdapter mcptypes.TypedPipelineOperations
+	pipelineAdapter core.TypedPipelineOperations
 	sessionStore    services.SessionStore // Focused service interface
 	sessionState    services.SessionState // Focused service interface
 	logger          *slog.Logger
@@ -86,7 +85,7 @@ type AtomicPullImageTool struct {
 }
 
 // NewAtomicPullImageToolWithServices creates a new atomic pull image tool using service container
-func NewAtomicPullImageToolWithServices(adapter mcptypes.TypedPipelineOperations, serviceContainer services.ServiceContainer, logger *slog.Logger) *AtomicPullImageTool {
+func NewAtomicPullImageToolWithServices(adapter core.TypedPipelineOperations, serviceContainer services.ServiceContainer, logger *slog.Logger) *AtomicPullImageTool {
 	toolLogger := logger.With("tool", "atomic_pull_image")
 
 	// Use focused services directly - no wrapper needed!
@@ -94,7 +93,7 @@ func NewAtomicPullImageToolWithServices(adapter mcptypes.TypedPipelineOperations
 }
 
 // createAtomicPullImageTool is the common creation logic
-func createAtomicPullImageTool(adapter mcptypes.TypedPipelineOperations, sessionStore services.SessionStore, sessionState services.SessionState, logger *slog.Logger) *AtomicPullImageTool {
+func createAtomicPullImageTool(adapter core.TypedPipelineOperations, sessionStore services.SessionStore, sessionState services.SessionState, logger *slog.Logger) *AtomicPullImageTool {
 	return &AtomicPullImageTool{
 		pipelineAdapter: adapter,
 		sessionStore:    sessionStore,
@@ -152,7 +151,7 @@ func (t *AtomicPullImageTool) executeWithoutProgress(ctx context.Context, args A
 		t.logger.Error("Failed to get session", "error", err, "session_id", args.SessionID)
 		result.Success = false
 		result.TotalDuration = time.Since(startTime)
-		return result, common.NewSessionNotFound(args.SessionID)
+		return result, fmt.Errorf("session not found: %s", args.SessionID)
 	}
 	session := sessionData
 	// Set session details
@@ -216,8 +215,8 @@ func (t *AtomicPullImageTool) performPull(ctx context.Context, session *core.Ses
 	pullStartTime := time.Now()
 	// Convert to typed parameters for PullImageTyped
 	pullParams := core.PullImageParams{
-		ImageRef: args.ImageRef,
-		Platform: "", // Default platform
+		ImageName: args.ImageRef,
+		Registry:  "", // Default registry
 	}
 	_, err := t.pipelineAdapter.PullImageTyped(ctx, session.SessionID, pullParams)
 	result.PullDuration = time.Since(pullStartTime)
@@ -330,12 +329,12 @@ func (t *AtomicPullImageTool) updateSessionState(session *core.SessionState, res
 }
 
 // GenerateRecommendations implements ai_context.Recommendable
-func (r *AtomicPullImageResult) GenerateRecommendations() []types.Recommendation {
-	var recommendations []types.Recommendation
+func (r *AtomicPullImageResult) GenerateRecommendations() []Recommendation {
+	var recommendations []Recommendation
 
 	// Add recommendations based on pull result
 	if !r.Success {
-		recommendations = append(recommendations, types.Recommendation{
+		recommendations = append(recommendations, Recommendation{
 			Type:        "error",
 			Title:       "Pull Failed",
 			Description: "Image pull failed - consider checking image name and registry credentials",
@@ -346,7 +345,7 @@ func (r *AtomicPullImageResult) GenerateRecommendations() []types.Recommendation
 
 	// Add performance recommendations
 	if r.PullDuration > 0 && r.PullDuration.Minutes() > 2 {
-		recommendations = append(recommendations, types.Recommendation{
+		recommendations = append(recommendations, Recommendation{
 			Type:        "performance",
 			Title:       "Slow Pull Performance",
 			Description: "Image pull took longer than expected - consider using a local registry",
@@ -366,12 +365,12 @@ func (r *AtomicPullImageResult) CreateRemediationPlan() interface{} {
 }
 
 // GetAlternativeStrategies implements ai_context.Recommendable
-func (r *AtomicPullImageResult) GetAlternativeStrategies() []types.AlternativeStrategy {
-	var strategies []types.AlternativeStrategy
+func (r *AtomicPullImageResult) GetAlternativeStrategies() []AlternativeStrategy {
+	var strategies []AlternativeStrategy
 
 	// Add alternative strategies based on pull failure
 	if !r.Success {
-		strategies = append(strategies, types.AlternativeStrategy{
+		strategies = append(strategies, AlternativeStrategy{
 			Name:        "Use Different Registry",
 			Description: "Try pulling from an alternative container registry",
 			Priority:    1, // high priority
@@ -379,7 +378,7 @@ func (r *AtomicPullImageResult) GetAlternativeStrategies() []types.AlternativeSt
 			Cons:        []string{"May require different authentication", "Image might be different version"},
 		})
 
-		strategies = append(strategies, types.AlternativeStrategy{
+		strategies = append(strategies, AlternativeStrategy{
 			Name:        "Build Locally",
 			Description: "Build the image locally instead of pulling",
 			Priority:    2, // medium priority

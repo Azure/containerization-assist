@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
@@ -25,11 +26,49 @@ func (m *MockAIAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate s
 	return "mock formatted analysis", nil
 }
 
-func (m *MockAIAnalyzer) GetTokenUsage() TokenUsage {
-	return TokenUsage{}
+func (m *MockAIAnalyzer) GetTokenUsage() types.TokenUsage {
+	return types.TokenUsage{}
 }
 
 func (m *MockAIAnalyzer) ResetTokenUsage() {}
+
+// AnalysisService interface methods
+func (m *MockAIAnalyzer) AnalyzeRepository(ctx context.Context, path string, callback ProgressCallback) (*RepositoryAnalysis, error) {
+	if callback != nil {
+		callback("mock analyzing", 50, 100)
+		callback("mock completed", 100, 100)
+	}
+	return &RepositoryAnalysis{
+		Language:     "go",
+		Framework:    "test",
+		Dependencies: []string{"test-dep"},
+		Structure:    map[string]interface{}{"test": true},
+		Metrics:      map[string]float64{"coverage": 80.0},
+		Issues:       []AnalysisIssue{},
+		Suggestions:  []string{"Mock suggestion"},
+	}, nil
+}
+
+func (m *MockAIAnalyzer) AnalyzeWithAI(ctx context.Context, content string) (*AIAnalysis, error) {
+	return &AIAnalysis{
+		Summary:         "Mock AI analysis",
+		Recommendations: []string{"Test recommendation"},
+		Confidence:      0.9,
+		Analysis:        map[string]interface{}{"mock": true},
+		Metadata:        map[string]interface{}{"test": true},
+	}, nil
+}
+
+func (m *MockAIAnalyzer) GetAnalysisProgress(ctx context.Context, analysisID string) (*AnalysisProgress, error) {
+	return &AnalysisProgress{
+		ID:       analysisID,
+		Stage:    "completed",
+		Progress: 100,
+		Total:    100,
+		Complete: true,
+		Messages: []string{"Mock analysis completed"},
+	}, nil
+}
 
 // Test SetAnalyzer and ValidateAnalyzerForProduction (avoiding constructor tests due to complex dependencies)
 func TestMCPClientsAnalyzerOperations(t *testing.T) {
@@ -125,20 +164,64 @@ func TestStubAnalyzer(t *testing.T) {
 
 // Test stubAnalyzer interface conformance
 func TestStubAnalyzerInterface(t *testing.T) {
-	var analyzer AIAnalyzer = &stubAnalyzer{}
+	var analyzer AnalysisService = &stubAnalyzer{}
 
-	// Verify it implements the interface correctly
-	result, err := analyzer.Analyze(context.Background(), "test")
-	if err != nil || result != "stub analysis result" {
-		t.Error("stubAnalyzer does not properly implement AIAnalyzer interface")
+	// Verify it implements the AnalysisService interface correctly
+	result, err := analyzer.AnalyzeRepository(context.Background(), "/tmp", nil)
+	if err != nil {
+		t.Errorf("stubAnalyzer should not return error: %v", err)
+	}
+	if result == nil {
+		t.Error("stubAnalyzer should return analysis result")
 	}
 
-	usage := analyzer.GetTokenUsage()
-	if usage.TotalTokens != 0 {
-		t.Error("stubAnalyzer should return empty token usage")
+	aiResult, err := analyzer.AnalyzeWithAI(context.Background(), "test content")
+	if err != nil {
+		t.Errorf("stubAnalyzer should not return error: %v", err)
+	}
+	if aiResult == nil {
+		t.Error("stubAnalyzer should return AI analysis result")
 	}
 
-	analyzer.ResetTokenUsage() // Should not panic
+	progress, err := analyzer.GetAnalysisProgress(context.Background(), "test-id")
+	if err != nil {
+		t.Errorf("stubAnalyzer should not return error: %v", err)
+	}
+	if progress == nil {
+		t.Error("stubAnalyzer should return analysis progress")
+	}
+}
+
+// Test MockAIAnalyzer interface conformance
+func TestMockAnalyzerInterface(t *testing.T) {
+	var analyzer AnalysisService = &MockAIAnalyzer{}
+
+	// Test AnalyzeRepository
+	result, err := analyzer.AnalyzeRepository(context.Background(), "/tmp", nil)
+	if err != nil {
+		t.Errorf("MockAIAnalyzer should not return error: %v", err)
+	}
+	if result == nil || result.Language != "go" {
+		t.Error("MockAIAnalyzer should return valid analysis result")
+	}
+
+	// Test AnalyzeWithAI
+	aiResult, err := analyzer.AnalyzeWithAI(context.Background(), "test content")
+	if err != nil {
+		t.Errorf("MockAIAnalyzer should not return error: %v", err)
+	}
+	if aiResult == nil || aiResult.Summary != "Mock AI analysis" {
+		t.Error("MockAIAnalyzer should return valid AI analysis result")
+	}
+
+	// Test GetAnalysisProgress
+	progress, err := analyzer.GetAnalysisProgress(context.Background(), "test-id")
+	if err != nil {
+		t.Errorf("MockAIAnalyzer should not return error: %v", err)
+	}
+	if progress == nil || progress.Stage != "completed" {
+		t.Error("MockAIAnalyzer should return valid analysis progress")
+	}
 }
 
 // Test MCPClients struct creation and field access

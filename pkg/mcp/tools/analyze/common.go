@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -44,7 +45,7 @@ type AnalysisEngine interface {
 type AnalysisConfig struct {
 	RepositoryPath string
 	RepoData       *RepoData
-	Options        AnalysisOptions
+	Options        core.AnalysisOptions
 	Logger         zerolog.Logger
 }
 
@@ -237,3 +238,5 @@ func (o *AnalysisOrchestrator) GetEngine(name string) AnalysisEngine {
 	}
 	return nil
 }
+
+// AtomicAnalysisResult is defined in analyze_tool.go

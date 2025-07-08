@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/clients"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 
 	// mcp import removed - using mcptypes
@@ -34,15 +35,15 @@ type ValidateDeploymentArgs struct {
 // ValidateDeploymentResult represents the result of deployment validation
 type ValidateDeploymentResult struct {
 	types.BaseToolResponse
-	Success       bool                `json:"success"`
-	JobID         string              `json:"job_id,omitempty"` // For async validation
-	PodStatus     []PodStatusInfo     `json:"pod_status"`
-	ServiceStatus []ServiceStatusInfo `json:"service_status"`
-	HealthCheck   HealthCheckResult   `json:"health_check"`
-	ClusterInfo   KindClusterInfo     `json:"cluster_info"`
-	Logs          []string            `json:"logs"`
-	Duration      time.Duration       `json:"duration"`
-	Error         *types.ToolError    `json:"error,omitempty"`
+	Success       bool                   `json:"success"`
+	JobID         string                 `json:"job_id,omitempty"` // For async validation
+	PodStatus     []PodStatusInfo        `json:"pod_status"`
+	ServiceStatus []ServiceStatusInfo    `json:"service_status"`
+	HealthCheck   core.HealthCheckResult `json:"health_check"`
+	ClusterInfo   KindClusterInfo        `json:"cluster_info"`
+	Logs          []string               `json:"logs"`
+	Duration      time.Duration          `json:"duration"`
+	Error         *types.ToolError       `json:"error,omitempty"`
 }
 
 // PodStatusInfo represents pod status information
@@ -77,14 +78,8 @@ type ServiceStatusInfo struct {
 	Endpoints int      `json:"endpoints"`
 }
 
-// HealthCheckResult represents health check results
-type HealthCheckResult struct {
-	Checked    bool   `json:"checked"`
-	Healthy    bool   `json:"healthy"`
-	Endpoint   string `json:"endpoint,omitempty"`
-	StatusCode int    `json:"status_code,omitempty"`
-	Error      string `json:"error,omitempty"`
-}
+// Use core.HealthCheckResult instead of local definition
+type HealthCheckResult = core.HealthCheckResult
 
 // KindClusterInfo represents Kind cluster information
 type KindClusterInfo struct {
@@ -361,10 +356,11 @@ func (t *AtomicValidateDeploymentTool) getServiceStatus(ctx context.Context, cli
 }
 
 // performHealthCheck performs HTTP health check
-func (t *AtomicValidateDeploymentTool) performHealthCheck(ctx context.Context, service ServiceStatusInfo, path string) HealthCheckResult {
-	result := HealthCheckResult{
-		Checked:  true,
-		Endpoint: fmt.Sprintf("http://%s%s", service.ClusterIP, path),
+func (t *AtomicValidateDeploymentTool) performHealthCheck(ctx context.Context, service ServiceStatusInfo, path string) core.HealthCheckResult {
+	result := core.HealthCheckResult{
+		BaseToolResponse: core.NewToolResponse("health_check", "", false),
+		Checked:          true,
+		Endpoint:         fmt.Sprintf("http://%s%s", service.ClusterIP, path),
 	}
 
 	// In production, would use port-forward and actual HTTP request

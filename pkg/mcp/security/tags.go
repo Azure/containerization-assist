@@ -1,5 +1,5 @@
 // Package validation - Tag-based validation DSL for struct validation
-package validation
+package security
 
 import (
 	"regexp"
@@ -912,12 +912,13 @@ func validateVulnType(value interface{}, fieldName string, params map[string]int
 	return NewValidationError(fieldName, "must be one of: os, library, application, config, secret, malware, all")
 }
 
-// Helper function to create validation errors
+// NewValidationError creates a validation error
 func NewValidationError(field, message string) error {
 	return &Error{
 		Field:    field,
 		Message:  message,
 		Code:     "VALIDATION_FAILED",
 		Severity: SeverityHigh,
+		Context:  make(map[string]string),
 	}
 }

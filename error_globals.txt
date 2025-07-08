@@ -1,4 +1,0 @@
-pkg/mcp/transport/llm_stdio.go:var _ types.LLMTransport = (*StdioLLMTransport)(nil)
-pkg/mcp/transport/llm_http.go:var _ types.LLMTransport = (*HTTPLLMTransport)(nil)
-pkg/mcp/templates/loader.go:var templateFS embed.FS
-pkg/mcp/templates/manifest_loader.go:var manifestFS embed.FS

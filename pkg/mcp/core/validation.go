@@ -7,20 +7,26 @@ import (
 
 // Re-export validation types for backward compatibility
 type ValidationResult = validation.Result
-type ValidationError = validation.Error
 type ValidationWarning = validation.Warning
+type ValidationError = validation.Error
+type Error = validation.Error
+type Warning = validation.Warning
+type ValidationMetadata = validation.Metadata
 
 // NewValidationResult creates a new validation result
 func NewValidationResult() *ValidationResult {
 	return validation.NewResult()
 }
 
+// Re-export ErrorSeverity type
+type ErrorSeverity = validation.ErrorSeverity
+
 // Severity levels
 const (
-	SeverityLow      = validation.SeverityLow
-	SeverityMedium   = validation.SeverityMedium
-	SeverityHigh     = validation.SeverityHigh
-	SeverityCritical = validation.SeverityCritical
+	SeverityLow      ErrorSeverity = validation.SeverityLow
+	SeverityMedium   ErrorSeverity = validation.SeverityMedium
+	SeverityHigh     ErrorSeverity = validation.SeverityHigh
+	SeverityCritical ErrorSeverity = validation.SeverityCritical
 )
 
 // Build-specific validation types

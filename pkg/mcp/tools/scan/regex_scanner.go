@@ -76,7 +76,7 @@ func (r *RegexBasedScanner) Scan(ctx context.Context, config ScanConfig) (*ScanR
 		Scanner:  r.GetName(),
 		Secrets:  make([]Secret, 0),
 		Metadata: make(map[string]interface{}),
-		Errors:   make([]error, 0),
+		Errors:   make([]string, 0),
 	}
 
 	// Split content into lines for line-by-line analysis
@@ -85,7 +85,7 @@ func (r *RegexBasedScanner) Scan(ctx context.Context, config ScanConfig) (*ScanR
 	for lineNum, line := range lines {
 		secrets, err := r.scanLine(line, lineNum+1, config)
 		if err != nil {
-			result.Errors = append(result.Errors, err)
+			result.Errors = append(result.Errors, err.Error())
 			continue
 		}
 		result.Secrets = append(result.Secrets, secrets...)

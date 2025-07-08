@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/internal/server"
+	"github.com/Azure/container-kit/pkg/mcp/server"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

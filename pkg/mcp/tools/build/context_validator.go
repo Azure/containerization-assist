@@ -3,7 +3,7 @@ package build
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/common/validation-core/core"
+	validationcore "github.com/Azure/container-kit/pkg/common/validation-core/core" // For validation options
 	"github.com/Azure/container-kit/pkg/common/validation-core/validators"
 	"github.com/rs/zerolog"
 )
@@ -78,7 +78,7 @@ func (v *UnifiedContextValidator) ValidateWithContext(content string, contextPat
 		filesResult := v.contextValidator.Validate(
 			context.Background(),
 			buildFiles,
-			&core.ValidationOptions{
+			&validationcore.ValidationOptions{
 				Context: map[string]interface{}{
 					"validation_type": "build_files",
 				},
@@ -91,8 +91,7 @@ func (v *UnifiedContextValidator) ValidateWithContext(content string, contextPat
 			result.Errors = append(result.Errors, mergedResult.Errors...)
 			result.Warnings = append(result.Warnings, mergedResult.Warnings...)
 			// Note: Info field is no longer available in unified validation result
-			// Suggestions are used instead of info messages
-			result.Suggestions = append(result.Suggestions, mergedResult.Suggestions...)
+			// Context can be used for additional information
 		}
 	}
 

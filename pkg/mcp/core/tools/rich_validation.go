@@ -1,4 +1,4 @@
-package core
+package tools
 
 import (
 	"github.com/Azure/container-kit/pkg/mcp/errors"

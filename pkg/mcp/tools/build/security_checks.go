@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/core/config"
 	"github.com/rs/zerolog"
@@ -45,7 +44,7 @@ func (c *DefaultSecurityChecks) CheckForRootUser(lines []string, result *BuildVa
 						core.ErrTypeSecurity,
 						core.SeverityHigh,
 					).WithLine(i + 1).WithRule("root_user")
-					result.AddError(error)
+					result.AddError(&error.Error)
 				} else {
 					lastUserIsRoot = false
 				}
@@ -60,7 +59,7 @@ func (c *DefaultSecurityChecks) CheckForRootUser(lines []string, result *BuildVa
 			core.ErrTypeSecurity,
 			core.SeverityHigh,
 		).WithRule("root_user")
-		result.AddError(error)
+		result.AddError(&error.Error)
 	}
 }
 
@@ -83,7 +82,7 @@ func (c *DefaultSecurityChecks) CheckForSecrets(lines []string, result *BuildVal
 					core.ErrTypeSecurity,
 					core.SeverityCritical,
 				).WithLine(i + 1).WithRule("exposed_secret")
-				result.AddError(error)
+				result.AddError(&error.Error)
 				break
 			}
 		}
@@ -100,7 +99,7 @@ func (c *DefaultSecurityChecks) CheckForSecrets(lines []string, result *BuildVal
 				core.ErrTypeSecurity,
 				core.SeverityCritical,
 			).WithLine(i + 1).WithRule("exposed_secret")
-			result.AddError(error)
+			result.AddError(&error.Error)
 		}
 	}
 }
@@ -136,7 +135,7 @@ func (c *DefaultSecurityChecks) CheckForSensitivePorts(lines []string, result *B
 						core.ErrTypeSecurity,
 						core.SeverityHigh,
 					).WithLine(i + 1).WithRule("sensitive_port")
-					result.AddError(error)
+					result.AddError(&error.Error)
 				}
 			}
 		}
@@ -159,7 +158,7 @@ func (c *DefaultSecurityChecks) CheckPackagePinning(lines []string, result *Buil
 					"Package installation without version pinning. Pin package versions for reproducible builds (e.g., package=1.2.3)",
 				)
 				warning.Error.WithLine(i + 1).WithRule("unpinned_packages")
-				result.AddWarning(warning)
+				wrapAddWarning(result, warning)
 			}
 		}
 
@@ -171,7 +170,7 @@ func (c *DefaultSecurityChecks) CheckPackagePinning(lines []string, result *Buil
 				"Package installation without version pinning. Pin package versions for reproducible builds (e.g., package-1.2.3)",
 			)
 			warning.Error.WithLine(i + 1).WithRule("unpinned_packages")
-			result.AddWarning(warning)
+			wrapAddWarning(result, warning)
 		}
 
 		// Check pip install without version pinning
@@ -183,7 +182,7 @@ func (c *DefaultSecurityChecks) CheckPackagePinning(lines []string, result *Buil
 					"Python package installation without version pinning. Pin package versions (e.g., package==1.2.3)",
 				)
 				warning.Error.WithLine(i + 1).WithRule("unpinned_packages")
-				result.AddWarning(warning)
+				wrapAddWarning(result, warning)
 			}
 		}
 
@@ -195,7 +194,7 @@ func (c *DefaultSecurityChecks) CheckPackagePinning(lines []string, result *Buil
 					"Node.js package installation without version pinning. Pin package versions (e.g., package@1.2.3)",
 				)
 				warning.Error.WithLine(i + 1).WithRule("unpinned_packages")
-				result.AddWarning(warning)
+				wrapAddWarning(result, warning)
 			}
 		}
 	}
@@ -219,7 +218,7 @@ func (c *DefaultSecurityChecks) CheckForSUIDBindaries(lines []string, result *Bu
 					core.ErrTypeSecurity,
 					core.SeverityHigh,
 				).WithLine(i + 1).WithRule("suid_binary")
-				result.AddError(error)
+				result.AddError(&error.Error)
 			}
 		}
 
@@ -230,7 +229,7 @@ func (c *DefaultSecurityChecks) CheckForSUIDBindaries(lines []string, result *Bu
 				"Installing sudo in container. Consider if elevated privileges are really necessary",
 			)
 			warning.Error.WithLine(i + 1).WithRule("sudo_installation")
-			result.AddWarning(warning)
+			wrapAddWarning(result, warning)
 		}
 	}
 }
@@ -254,7 +253,7 @@ func (c *DefaultSecurityChecks) CheckBaseImageSecurity(lines []string, result *B
 						core.ErrTypeBuild,
 						core.SeverityHigh,
 					).WithLine(i + 1).WithRule("unpinned_base_image")
-					result.AddError(error)
+					result.AddError(&error.Error)
 				}
 
 				// Check for trusted registries
@@ -264,7 +263,7 @@ func (c *DefaultSecurityChecks) CheckBaseImageSecurity(lines []string, result *B
 						"Base image from untrusted registry. Consider using base images from trusted registries",
 					)
 					warning.Error.WithLine(i + 1).WithRule("untrusted_base_image")
-					result.AddWarning(warning)
+					wrapAddWarning(result, warning)
 				}
 
 				// Check for vulnerable base images
@@ -293,7 +292,7 @@ func (c *DefaultSecurityChecks) CheckForInsecureDownloads(lines []string, result
 				core.ErrTypeSecurity,
 				core.SeverityHigh,
 			).WithLine(i + 1).WithRule("insecure_download")
-			result.AddError(error)
+			result.AddError(&error.Error)
 		}
 
 		// Check for ADD with remote URL
@@ -304,7 +303,7 @@ func (c *DefaultSecurityChecks) CheckForInsecureDownloads(lines []string, result
 				"Using ADD for remote file download. Use RUN with curl/wget for better control and verification",
 			)
 			warning.Error.WithLine(i + 1).WithRule("add_remote_file")
-			result.AddWarning(warning)
+			wrapAddWarning(result, warning)
 		}
 
 		// Check for downloads without signature verification
@@ -318,7 +317,7 @@ func (c *DefaultSecurityChecks) CheckForInsecureDownloads(lines []string, result
 				"Downloading files without signature or checksum verification. Verify file integrity",
 			)
 			warning.Error.WithLine(i + 1).WithRule("unverified_download")
-			result.AddWarning(warning)
+			wrapAddWarning(result, warning)
 		}
 	}
 }
@@ -342,7 +341,7 @@ func (c *DefaultSecurityChecks) checkVulnerableBaseImages(image string, line int
 				core.ErrTypeSecurity,
 				core.SeverityCritical,
 			).WithLine(line).WithRule("vulnerable_base_image")
-			result.AddError(error)
+			result.AddError(&error.Error)
 		}
 	}
 }
@@ -364,9 +363,28 @@ func (c *DefaultSecurityChecks) checkOverlyPermissiveBaseImages(image string, li
 				fmt.Sprintf("Using full base image. %s", suggestion),
 			)
 			warning.Error.WithLine(line).WithRule("overly_permissive_base_image")
-			result.AddWarning(warning)
+			wrapAddWarning(result, warning)
 		}
 	}
+}
+
+// Helper function to check if image is from trusted registry
+func isFromTrustedRegistry(image string, trustedRegistries []string) bool {
+	for _, registry := range trustedRegistries {
+		if strings.HasPrefix(image, registry+"/") || strings.HasPrefix(image, registry+":") {
+			return true
+		}
+	}
+	// Check default registries
+	if !strings.Contains(image, "/") {
+		// No registry specified, it's from Docker Hub
+		for _, registry := range trustedRegistries {
+			if registry == "docker.io" || registry == "hub.docker.com" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Additional security check methods
@@ -385,7 +403,7 @@ func (c *DefaultSecurityChecks) CheckForShellInjection(lines []string, result *B
 					"Potential shell injection vulnerability. Be careful with variable substitution in shell commands",
 				)
 				warning.Error.WithLine(i + 1).WithRule("shell_injection_risk")
-				result.AddWarning(warning)
+				wrapAddWarning(result, warning)
 			}
 		}
 	}
@@ -403,7 +421,7 @@ func (c *DefaultSecurityChecks) CheckForTempFileHandling(lines []string, result 
 				"Using /tmp directory without cleanup. Ensure temporary files are cleaned up to reduce attack surface",
 			)
 			warning.Error.WithLine(i + 1).WithRule("temp_file_cleanup")
-			result.AddWarning(warning)
+			wrapAddWarning(result, warning)
 		}
 
 		// Check for world-writable directories
@@ -414,7 +432,7 @@ func (c *DefaultSecurityChecks) CheckForTempFileHandling(lines []string, result 
 				core.ErrTypeSecurity,
 				core.SeverityHigh,
 			).WithLine(i + 1).WithRule("world_writable")
-			result.AddError(error)
+			result.AddError(&error.Error)
 		}
 	}
 }
@@ -450,7 +468,7 @@ func (c *DefaultSecurityChecks) CheckForCopySecrets(lines []string, result *Buil
 						core.ErrTypeSecurity,
 						core.SeverityCritical,
 					).WithLine(i + 1).WithRule("copy_secret_file")
-					result.AddError(error)
+					result.AddError(&error.Error)
 				}
 			}
 		}

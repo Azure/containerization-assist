@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	sessionsvc "github.com/Azure/container-kit/pkg/mcp/session"
 )
 

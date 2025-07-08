@@ -312,7 +312,7 @@ func TestScanResult_Structure(t *testing.T) {
 		Secrets:    []Secret{},
 		Metadata:   map[string]interface{}{"lines_scanned": 10},
 		Confidence: 0.9,
-		Errors:     []error{},
+		Errors:     []string{},
 	}
 
 	assert.Equal(t, "test_scanner", result.Scanner)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	internalcommon "github.com/Azure/container-kit/pkg/mcp/internal/common"
@@ -17,16 +18,14 @@ import (
 
 	// "github.com/Azure/container-kit/pkg/mcp/internal/runtime" // Temporarily commented to avoid import cycle
 	// mcp import removed - using mcptypes
-	"github.com/Azure/container-kit/pkg/mcp/core"
-
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"log/slog"
+
+	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 // standardTagStages provides common stages for tag operations
-func standardTagStages() []mcptypes.ConsolidatedLocalProgressStage {
-	return []mcptypes.ConsolidatedLocalProgressStage{
+func standardTagStages() []ConsolidatedLocalProgressStage {
+	return []ConsolidatedLocalProgressStage{
 		{Name: "Initialize", Weight: 0.10, Description: "Loading session and validating inputs"},
 		{Name: "Check", Weight: 0.30, Description: "Checking source image availability"},
 		{Name: "Tag", Weight: 0.40, Description: "Tagging Docker image"},
@@ -88,27 +87,27 @@ type TagContext struct {
 
 // AtomicTagImageTool implements atomic Docker image tagging using core operations
 type AtomicTagImageTool struct {
-	pipelineAdapter mcptypes.TypedPipelineOperations
+	pipelineAdapter TypedPipelineOperations
 	sessionManager  session.UnifiedSessionManager
 	logger          *slog.Logger
-	analyzer        *internalcommon.FailureAnalyzer
+	analyzer        internalcommon.FailureAnalyzer
 	fixingMixin     *AtomicToolFixingMixin
 }
 
 // NewAtomicTagImageToolWithServices creates a new atomic tag image tool using service interfaces
-func NewAtomicTagImageToolWithServices(adapter mcptypes.TypedPipelineOperations, serviceContainer services.ServiceContainer, logger *slog.Logger) *AtomicTagImageTool {
+func NewAtomicTagImageToolWithServices(adapter TypedPipelineOperations, serviceContainer services.ServiceContainer, logger *slog.Logger) *AtomicTagImageTool {
 	toolLogger := logger.With("tool", "atomic_tag_image")
 
 	return &AtomicTagImageTool{
 		pipelineAdapter: adapter,
 		sessionManager:  nil, // TODO: Update to use services directly
 		logger:          toolLogger,
-		analyzer:        internalcommon.NewFailureAnalyzer(),
+		analyzer:        internalcommon.NewDefaultFailureAnalyzer("tag_image", "build", toolLogger),
 	}
 }
 
 // SetAnalyzer sets the analyzer for failure analysis
-func (t *AtomicTagImageTool) SetAnalyzer(analyzer *internalcommon.FailureAnalyzer) {
+func (t *AtomicTagImageTool) SetAnalyzer(analyzer internalcommon.FailureAnalyzer) {
 	t.analyzer = analyzer
 }
 

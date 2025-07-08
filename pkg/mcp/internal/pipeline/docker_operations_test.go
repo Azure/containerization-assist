@@ -54,7 +54,7 @@ func TestOperations_BuildImageTyped(t *testing.T) {
 				DockerfilePath: "Dockerfile",
 			},
 			expectError: true,
-			errorMsg:    "context path is required",
+			errorMsg:    "dockerfile_path is required",
 		},
 		{
 			name:      "empty_session_id",
@@ -181,8 +181,8 @@ func TestOperations_PushImageTyped(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
-				assert.NotEmpty(t, result.ImageRef)
-				assert.Greater(t, result.PushTime, float64(0))
+				assert.NotEmpty(t, result.ImageName)
+				assert.NotEmpty(t, result.Registry)
 			}
 		})
 	}

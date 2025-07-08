@@ -120,3 +120,6 @@ type Operations struct {
 	dockerClient   docker.DockerClient
 	logger         *slog.Logger
 }
+
+// Ensure Operations implements the required interfaces
+var _ mcptypes.TypedPipelineOperations = (*Operations)(nil)

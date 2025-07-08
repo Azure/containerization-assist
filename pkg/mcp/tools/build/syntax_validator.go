@@ -3,8 +3,8 @@ package build
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/common/validation-core/validators"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -72,8 +72,8 @@ func (v *UnifiedSyntaxValidator) filterBySeverity(result *BuildValidationResult,
 
 // filterByRules filters out specified rules from the results
 func (v *UnifiedSyntaxValidator) filterByRules(result *BuildValidationResult, ignoreRules []string) {
-	filteredErrors := make([]*core.Error, 0, len(result.Errors))
-	filteredWarnings := make([]*core.Warning, 0, len(result.Warnings))
+	filteredErrors := make([]core.Error, 0, len(result.Errors))
+	filteredWarnings := make([]core.Warning, 0, len(result.Warnings))
 
 	// Create a map for faster lookup
 	ignoreMap := make(map[string]bool)
@@ -81,16 +81,57 @@ func (v *UnifiedSyntaxValidator) filterByRules(result *BuildValidationResult, ig
 		ignoreMap[rule] = true
 	}
 
-	// Filter errors
+	// Filter errors - check if the error has a rule in the Path field or Context
 	for _, err := range result.Errors {
-		if !ignoreMap[err.Rule] {
+		// Check if rule is in Path field (used for Dockerfile errors)
+		shouldIgnore := false
+		if err.Path != "" && ignoreMap[err.Path] {
+			shouldIgnore = true
+		}
+		// Check if rule is in Context
+		if !shouldIgnore {
+			if rule, ok := err.Context["rule"]; ok && ignoreMap[rule] {
+				shouldIgnore = true
+			}
+		}
+		// Check Code field
+		if !shouldIgnore && err.Code != "" && ignoreMap[err.Code] {
+			shouldIgnore = true
+		}
+
+		if !shouldIgnore {
 			filteredErrors = append(filteredErrors, err)
 		}
 	}
 
-	// Filter warnings
+	// Filter warnings - similar logic
 	for _, warn := range result.Warnings {
-		if !ignoreMap[warn.Error.Rule] {
+		// Check various fields where rule might be stored
+		shouldIgnore := false
+
+		// Check Path
+		if warn.Path != "" && ignoreMap[warn.Path] {
+			shouldIgnore = true
+		}
+
+		// Check Context
+		if !shouldIgnore {
+			if rule, ok := warn.Context["rule"]; ok && ignoreMap[rule] {
+				shouldIgnore = true
+			}
+		}
+
+		// Check Field (sometimes used for rules)
+		if !shouldIgnore && warn.Field != "" && ignoreMap[warn.Field] {
+			shouldIgnore = true
+		}
+
+		// Check Code
+		if !shouldIgnore && warn.Code != "" && ignoreMap[warn.Code] {
+			shouldIgnore = true
+		}
+
+		if !shouldIgnore {
 			filteredWarnings = append(filteredWarnings, warn)
 		}
 	}

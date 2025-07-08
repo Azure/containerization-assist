@@ -7,8 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	coretypes "github.com/Azure/container-kit/pkg/mcp/core"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/internal/retry"
 )
 
@@ -32,7 +30,7 @@ func NewDefaultIterativeFixer(analyzer core.AIAnalyzer, logger *slog.Logger) *De
 
 // attemptFixInternal tries to fix a failure using AI analysis with iterative loops
 // AttemptFix implements the IterativeFixer interface
-func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, request types.FixRequest) (*coretypes.FixingResult, error) {
+func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, request FixRequest) (*FixingResult, error) {
 	fixingCtx := &FixingContext{
 		SessionID:       request.SessionID,
 		ToolName:        request.ToolName,
@@ -50,9 +48,9 @@ func (f *DefaultIterativeFixer) AttemptFix(ctx context.Context, request types.Fi
 	return f.attemptFixInternal(ctx, fixingCtx)
 }
 
-func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCtx *FixingContext) (*mcptypes.FixingResult, error) {
+func (f *DefaultIterativeFixer) attemptFixInternal(ctx context.Context, fixingCtx *FixingContext) (*FixingResult, error) {
 	startTime := time.Now()
-	result := &mcptypes.FixingResult{
+	result := &FixingResult{
 		AllAttempts:   []interface{}{},
 		TotalAttempts: 0,
 	}

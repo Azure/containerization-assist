@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"log/slog"
+
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/templates"
-	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 )
 
@@ -44,41 +45,51 @@ type SimpleTemplateStage struct {
 
 // SimpleTemplateManager manages workflow templates from external files
 type SimpleTemplateManager struct {
-	logger    zerolog.Logger
+	logger    *slog.Logger
 	templates map[string]*SimpleWorkflowTemplate
 }
 
 // NewSimpleTemplateManager creates a new template manager
-func NewSimpleTemplateManager(logger zerolog.Logger) *SimpleTemplateManager {
+func NewSimpleTemplateManager(logger *slog.Logger) *SimpleTemplateManager {
 	return &SimpleTemplateManager{
-		logger:    logger.With().Str("component", "template_manager").Logger(),
+		logger:    logger.With("component", "template_manager"),
 		templates: make(map[string]*SimpleWorkflowTemplate),
 	}
 }
 
 // LoadTemplate loads a template from the embedded filesystem
-func (tm *SimpleTemplateManager) LoadTemplate(name string) (*WorkflowTemplate, error) {
+func (tm *SimpleTemplateManager) LoadTemplate(name string) (*SimpleWorkflowTemplate, error) {
 	// Check cache first
 	if template, exists := tm.templates[name]; exists {
-		return tm.convertToWorkflowTemplate(template), nil
+		return template, nil
 	}
 
 	// Load from filesystem
 	path := fmt.Sprintf("workflows/%s.yaml", name)
 	content, err := templates.LoadTemplate(path)
 	if err != nil {
-		return nil, errors.NewError().Message("failed to load template " + name).Cause(err).WithLocation(
-
-		// Parse YAML
-		).Build()
+		return nil, errors.NewError().
+			Message("failed to load template "+name).
+			Code(errors.CodeResourceNotFound).
+			Type(errors.ErrTypeNotFound).
+			Cause(err).
+			Context("template_name", name).
+			Context("path", path).
+			WithLocation().
+			Build()
 	}
 
 	var template SimpleWorkflowTemplate
 	if err := yaml.Unmarshal([]byte(content), &template); err != nil {
-		return nil, errors.NewError().Message("failed to parse template " + name).Cause(err).WithLocation(
-
-		// Set ID if not specified
-		).Build()
+		return nil, errors.NewError().
+			Message("failed to parse template "+name).
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Cause(err).
+			Context("template_name", name).
+			Context("path", path).
+			WithLocation().
+			Build()
 	}
 
 	if template.ID == "" {
@@ -88,12 +99,11 @@ func (tm *SimpleTemplateManager) LoadTemplate(name string) (*WorkflowTemplate, e
 	// Cache for future use
 	tm.templates[name] = &template
 
-	tm.logger.Debug().
-		Str("template", name).
-		Str("version", template.Version).
-		Msg("Template loaded successfully")
+	tm.logger.Debug("Template loaded successfully",
+		"template", name,
+		"version", template.Version)
 
-	return tm.convertToWorkflowTemplate(&template), nil
+	return &template, nil
 }
 
 // ListTemplates lists available templates
@@ -131,9 +141,14 @@ func (tm *SimpleTemplateManager) InstantiateWorkflow(
 	for _, param := range template.Parameters {
 		if param.Required {
 			if _, exists := parameters[param.Name]; !exists {
-				return nil, errors.NewError().Messagef("required parameter %s not provided", param.Name).WithLocation().
-
-					// Apply defaults
+				return nil, errors.NewError().
+					Messagef("required parameter %s not provided", param.Name).
+					Code(errors.CodeMissingParameter).
+					Type(errors.ErrTypeValidation).
+					Context("parameter_name", param.Name).
+					Context("template_name", templateName).
+					Suggestion(fmt.Sprintf("Provide a value for the required parameter '%s'", param.Name)).
+					WithLocation().
 					Build()
 			}
 		}
@@ -146,15 +161,14 @@ func (tm *SimpleTemplateManager) InstantiateWorkflow(
 	}
 
 	// Create workflow spec
-	stages := make([]ExecutionStage, 0, len(template.Stages))
+	stages := make([]WorkflowStage, 0, len(template.Stages))
 	for _, ts := range template.Stages {
-		stage := ExecutionStage{
-			ID:        ts.ID,
-			Name:      ts.Name,
-			Type:      "tool",
-			Tools:     []string{ts.ToolName},
-			Variables: ts.Parameters,
-			DependsOn: ts.DependsOn,
+		stage := WorkflowStage{
+			ID:           ts.ID,
+			Name:         ts.Name,
+			Tools:        []string{ts.Tool},
+			Parameters:   ts.Parameters,
+			Dependencies: ts.DependsOn,
 		}
 		stages = append(stages, stage)
 	}
@@ -179,14 +193,14 @@ func (tm *SimpleTemplateManager) InstantiateWorkflow(
 }
 
 // GetTemplate retrieves a cached template
-func (tm *SimpleTemplateManager) GetTemplate(name string) (*WorkflowTemplate, error) {
+func (tm *SimpleTemplateManager) GetTemplate(name string) (*SimpleWorkflowTemplate, error) {
 	return tm.LoadTemplate(name)
 }
 
 // ClearCache clears the template cache
 func (tm *SimpleTemplateManager) ClearCache() {
 	tm.templates = make(map[string]*SimpleWorkflowTemplate)
-	tm.logger.Debug().Msg("Template cache cleared")
+	tm.logger.Debug("Template cache cleared")
 }
 
 // convertToWorkflowTemplate converts a SimpleWorkflowTemplate to WorkflowTemplate

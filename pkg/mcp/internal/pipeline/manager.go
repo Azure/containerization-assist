@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core/config"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 

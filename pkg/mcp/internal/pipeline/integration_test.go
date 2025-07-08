@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	mcpconfig "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/core/config"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,18 +106,18 @@ func TestJobOrchestrator(t *testing.T) {
 	}
 
 	// Create configuration
-	config := DefaultPipelineConfig()
-	config.WorkerPoolSize = 2
-	config.MaxConcurrentJobs = 5
+	pipelineConfig := DefaultPipelineConfig()
+	pipelineConfig.WorkerPoolSize = 2
+	pipelineConfig.MaxConcurrentJobs = 5
 
 	// Create a simple worker manager with config
-	wc := &mcpconfig.WorkerConfig{
+	wc := &config.WorkerConfig{
 		ShutdownTimeout: 30 * time.Second,
 	}
 	workerManager := NewBackgroundWorkerManager(wc)
 
 	// Create job orchestrator
-	orchestrator := NewJobOrchestrator(workerManager, config)
+	orchestrator := NewJobOrchestrator(workerManager, pipelineConfig)
 	require.NotNil(t, orchestrator)
 
 	// Start orchestrator

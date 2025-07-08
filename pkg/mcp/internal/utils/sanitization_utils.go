@@ -145,9 +145,8 @@ func sanitizeSchemaRecursive(schema map[string]interface{}) {
 		}
 	}
 
-	// Remove GitHub Copilot incompatible fields (if needed)
-	// Note: This would call the existing RemoveCopilotIncompatible function
-	// from error_sanitizer.go if available
+	// Remove GitHub Copilot incompatible fields
+	RemoveCopilotIncompatible(schema)
 
 	// Recursively process properties
 	if properties, ok := schema["properties"].(map[string]interface{}); ok {
@@ -367,6 +366,68 @@ func SanitizeStringInterfaceMap(data map[string]interface{}) map[string]interfac
 		}
 	}
 	return sanitized
+}
+
+// RemoveCopilotIncompatible removes JSON schema fields that are incompatible with GitHub Copilot
+// This includes fields like additionalProperties, patternProperties, allOf, anyOf, oneOf
+func RemoveCopilotIncompatible(schema map[string]interface{}) {
+	if schema == nil {
+		return
+	}
+
+	// Remove fields that GitHub Copilot doesn't handle well
+	incompatibleFields := []string{
+		"additionalProperties",
+		"patternProperties",
+		"allOf",
+		"anyOf",
+		"oneOf",
+		"not",
+		"$ref",
+		"$schema",
+		"$id",
+		"$comment",
+		"const",
+		"contentMediaType",
+		"contentEncoding",
+		"if",
+		"then",
+		"else",
+		"dependentSchemas",
+		"dependentRequired",
+		"unevaluatedProperties",
+		"unevaluatedItems",
+		"propertyNames",
+		"minProperties",
+		"maxProperties",
+	}
+
+	for _, field := range incompatibleFields {
+		delete(schema, field)
+	}
+
+	// Recursively process nested schemas
+	if properties, ok := schema["properties"].(map[string]interface{}); ok {
+		for _, prop := range properties {
+			if propMap, ok := prop.(map[string]interface{}); ok {
+				RemoveCopilotIncompatible(propMap)
+			}
+		}
+	}
+
+	// Process items for array schemas
+	if items, ok := schema["items"].(map[string]interface{}); ok {
+		RemoveCopilotIncompatible(items)
+	}
+
+	// Process definitions
+	if definitions, ok := schema["definitions"].(map[string]interface{}); ok {
+		for _, def := range definitions {
+			if defMap, ok := def.(map[string]interface{}); ok {
+				RemoveCopilotIncompatible(defMap)
+			}
+		}
+	}
 }
 
 // RemoveSensitiveData removes potentially sensitive data from strings

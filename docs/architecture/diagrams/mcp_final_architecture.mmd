@@ -1,64 +1,106 @@
 graph TD
-    %% Container Kit MCP - Simplified 10-Package Architecture
-    %% Result of GAMMA workstream: 86 packages → 10 focused packages
+    %% Container Kit MCP - Actual Current Architecture
+    %% Reflects the real codebase structure after GAMMA workstream completion
 
     Client[MCP Client] --> Transport[transport/]
     Transport --> Core[core/]
     Core --> API[api/]
 
     subgraph "Layer 1: Interface Definitions"
-        API[api/<br/>Pure Interfaces<br/>Zero Dependencies]
+        API[api/<br/>Single Source of Truth<br/>All Canonical Interfaces]
     end
 
     subgraph "Layer 2: Core Services"
         Core[core/<br/>Server & Registry]
-        Session[session/<br/>State Management]
+        CoreSub[core/config<br/>core/conversation<br/>core/registry<br/>core/state<br/>core/tools<br/>core/types]
+        Session[session/<br/>State & Persistence]
+
+        Core --> CoreSub
         Core --> Session
     end
 
     subgraph "Layer 3: Business Logic"
-        Tools[tools/<br/>Container Operations]
+        Tools[tools/<br/>Domain Operations]
         Workflow[workflow/<br/>Orchestration]
 
-        subgraph "Tool Implementations"
-            Analyze[tools/analyze]
-            Build[tools/build]
-            Deploy[tools/deploy]
-            Scan[tools/scan]
+        subgraph "Tool Domains"
+            Analyze[tools/analyze<br/>Repository Analysis]
+            Build[tools/build<br/>Docker Operations]
+            Deploy[tools/deploy<br/>Kubernetes Deploy]
+            Scan[tools/scan<br/>Security Scanning]
+            Detectors[tools/detectors<br/>Framework Detection]
         end
 
+        Tools --> Analyze
+        Tools --> Build
+        Tools --> Deploy
+        Tools --> Scan
+        Tools --> Detectors
         Workflow --> Tools
     end
 
     subgraph "Layer 4: Infrastructure"
-        Transport[transport/<br/>MCP Protocol]
-        Storage[storage/<br/>Persistence]
-        Security[security/<br/>Validation]
+        Transport[transport/<br/>MCP Protocol<br/>HTTP & stdio]
+        Storage[storage/<br/>BoltDB Persistence]
+        Security[security/<br/>Validation & Scanning]
+        SecuritySub[security/scanner<br/>security/validators]
         Templates[templates/<br/>K8s Manifests]
+        Server[server/<br/>MCP Server Impl]
+
+        Security --> SecuritySub
     end
 
-    subgraph "Layer 5: Internal Utilities"
-        Internal[internal/<br/>Shared Utilities]
+    subgraph "Layer 5: Support Systems"
+        Errors[errors/<br/>Unified Error System]
+        ErrorCodes[errors/codes<br/>Domain Error Codes]
 
-        subgraph "Utility Packages"
-            Errors[internal/errors]
+        Errors --> ErrorCodes
+    end
+
+    subgraph "Layer 6: Internal Utilities"
+        Internal[internal/<br/>Shared Components]
+
+        subgraph "Internal Packages"
+            Common[internal/common]
+            Config[internal/config]
+            Constants[internal/constants]
+            Conversation[internal/conversation]
+            Logging[internal/logging]
+            Pipeline[internal/pipeline]
+            Processing[internal/processing]
+            Retry[internal/retry]
+            Runtime[internal/runtime]
             Types[internal/types]
             Utils[internal/utils]
-            Retry[internal/retry]
         end
+
+        Internal --> Common
+        Internal --> Config
+        Internal --> Constants
+        Internal --> Conversation
+        Internal --> Logging
+        Internal --> Pipeline
+        Internal --> Processing
+        Internal --> Retry
+        Internal --> Runtime
+        Internal --> Types
+        Internal --> Utils
     end
 
-    %% Dependencies (allowed)
+    %% Layer Dependencies (allowed)
     Core --> API
     Tools --> API
     Tools --> Session
     Tools --> Security
+    Tools --> Errors
     Workflow --> API
     Workflow --> Session
     Transport --> Core
+    Transport --> Server
     Session --> Storage
+    Security --> Errors
 
-    %% All packages can use internal
+    %% All packages can use internal utilities
     Core --> Internal
     Tools --> Internal
     Session --> Internal
@@ -66,28 +108,48 @@ graph TD
     Transport --> Internal
     Storage --> Internal
     Security --> Internal
+    Server --> Internal
+    Errors --> Internal
 
-    %% External Systems
+    %% External Systems Integration
     Tools --> Docker[Docker Engine]
-    Workflow --> K8s[Kubernetes]
-    Session --> BoltDB[BoltDB Storage]
+    Tools --> Registry[Container Registry]
+    Deploy --> K8s[Kubernetes API]
+    Storage --> BoltDB[BoltDB Files]
+    Scan --> Trivy[Trivy Scanner]
+    Scan --> Grype[Grype Scanner]
 
-    %% Forbidden Dependencies (NOT shown but enforced)
-    %% - API depends on nothing
-    %% - Tools cannot depend on Core
-    %% - Core cannot depend on Tools
+    %% Service Container Pattern
+    Server --> ServiceContainer[Service Container<br/>Dependency Injection]
+    ServiceContainer --> SessionStore[SessionStore]
+    ServiceContainer --> SessionState[SessionState]
+    ServiceContainer --> BuildExecutor[BuildExecutor]
+    ServiceContainer --> ToolRegistry[ToolRegistry]
+    ServiceContainer --> WorkflowExecutor[WorkflowExecutor]
+    ServiceContainer --> Scanner[Scanner]
+    ServiceContainer --> ConfigValidator[ConfigValidator]
+    ServiceContainer --> ErrorReporter[ErrorReporter]
+
+    %% Forbidden Dependencies (enforced by architecture boundaries)
+    %% - API depends on nothing (pure interfaces)
+    %% - Tools cannot depend on Core directly (use API)
+    %% - Core cannot depend on Tools directly (use API)
     %% - Internal cannot depend on any higher layer
 
     classDef interfaceLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
     classDef coreLayer fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
     classDef businessLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
     classDef infraLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
-    classDef internalLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef supportLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef internalLayer fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef serviceLayer fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
     classDef externalSys fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
 
     class API interfaceLayer
-    class Core,Session coreLayer
-    class Tools,Workflow,Analyze,Build,Deploy,Scan businessLayer
-    class Transport,Storage,Security,Templates infraLayer
-    class Internal,Errors,Types,Utils,Retry internalLayer
-    class Docker,K8s,BoltDB externalSys
+    class Core,CoreSub,Session coreLayer
+    class Tools,Workflow,Analyze,Build,Deploy,Scan,Detectors businessLayer
+    class Transport,Storage,Security,SecuritySub,Templates,Server infraLayer
+    class Errors,ErrorCodes supportLayer
+    class Internal,Common,Config,Constants,Conversation,Logging,Pipeline,Processing,Retry,Runtime,Types,Utils internalLayer
+    class ServiceContainer,SessionStore,SessionState,BuildExecutor,ToolRegistry,WorkflowExecutor,Scanner,ConfigValidator,ErrorReporter serviceLayer
+    class Docker,Registry,K8s,BoltDB,Trivy,Grype externalSys

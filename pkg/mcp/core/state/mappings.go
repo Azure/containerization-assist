@@ -1,4 +1,4 @@
-package core
+package state
 
 import (
 	"fmt"
@@ -14,6 +14,11 @@ type SessionToConversationMapping struct{}
 // NewSessionToConversationMapping creates a new session to conversation mapping
 func NewSessionToConversationMapping() StateMapping {
 	return &SessionToConversationMapping{}
+}
+
+// SupportsReverse returns whether this mapping supports reverse mapping
+func (m *SessionToConversationMapping) SupportsReverse() bool {
+	return true
 }
 
 // MapState maps session state to conversation state
@@ -41,11 +46,6 @@ func (m *SessionToConversationMapping) MapState(source interface{}) (interface{}
 	return conversationState, nil
 }
 
-// SupportsReverse indicates if reverse mapping is supported
-func (m *SessionToConversationMapping) SupportsReverse() bool {
-	return true
-}
-
 // ReverseMap maps conversation state back to session state
 func (m *SessionToConversationMapping) ReverseMap(target interface{}) (interface{}, error) {
 	conversationState, ok := target.(*BasicConversationState)
@@ -70,6 +70,20 @@ func NewWorkflowToSessionMapping() StateMapping {
 	return &WorkflowToSessionMapping{}
 }
 
+// SupportsReverse returns whether this mapping supports reverse mapping
+func (m *WorkflowToSessionMapping) SupportsReverse() bool {
+	return false
+}
+
+// ReverseMap is not supported for workflow to session mapping
+func (m *WorkflowToSessionMapping) ReverseMap(target interface{}) (interface{}, error) {
+	return nil, errors.NewError().
+		Code(codes.VALIDATION_FAILED).
+		Message("Reverse mapping not supported for workflow to session mapping").
+		Context("component", "workflow_to_session_mapping").
+		Build()
+}
+
 // MapState maps workflow state to session state updates
 func (m *WorkflowToSessionMapping) MapState(source interface{}) (interface{}, error) {
 	workflowSession, ok := source.(WorkflowSessionInterface)
@@ -85,16 +99,6 @@ func (m *WorkflowToSessionMapping) MapState(source interface{}) (interface{}, er
 	}
 
 	return updates, nil
-}
-
-// SupportsReverse indicates if reverse mapping is supported
-func (m *WorkflowToSessionMapping) SupportsReverse() bool {
-	return false
-}
-
-// ReverseMap is not supported for this mapping
-func (m *WorkflowToSessionMapping) ReverseMap(target interface{}) (interface{}, error) {
-	return nil, errors.NewError().Messagef("reverse mapping not supported for WorkflowToSessionMapping").WithLocation().Build()
 }
 
 // ToolStateMapping provides generic tool state mapping

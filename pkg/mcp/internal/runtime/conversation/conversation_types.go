@@ -9,20 +9,20 @@ import (
 )
 
 type ConversationResponse struct {
-	SessionID     string                              `json:"session_id"`
-	Message       string                              `json:"message"`
-	Stage         core.ConsolidatedConversationStage  `json:"stage"`
-	Status        ResponseStatus                      `json:"status"`
-	Options       []Option                            `json:"options,omitempty"`
-	Artifacts     []ArtifactSummary                   `json:"artifacts,omitempty"`
-	NextSteps     []string                            `json:"next_steps,omitempty"`
-	Progress      *StageProgress                      `json:"progress,omitempty"`
-	ToolCalls     []ToolCall                          `json:"tool_calls,omitempty"`
-	RequiresInput bool                                `json:"requires_input"`
-	NextStage     *core.ConsolidatedConversationStage `json:"next_stage,omitempty"`
-	AutoAdvance   *AutoAdvanceConfig                  `json:"auto_advance,omitempty"`
-	Form          *StructuredForm                     `json:"form,omitempty"`
-	ErrorRecovery *ErrorRecoveryGuidance              `json:"error_recovery,omitempty"`
+	SessionID     string                  `json:"session_id"`
+	Message       string                  `json:"message"`
+	Stage         core.ConversationStage  `json:"stage"`
+	Status        ResponseStatus          `json:"status"`
+	Options       []Option                `json:"options,omitempty"`
+	Artifacts     []ArtifactSummary       `json:"artifacts,omitempty"`
+	NextSteps     []string                `json:"next_steps,omitempty"`
+	Progress      *StageProgress          `json:"progress,omitempty"`
+	ToolCalls     []ToolCall              `json:"tool_calls,omitempty"`
+	RequiresInput bool                    `json:"requires_input"`
+	NextStage     *core.ConversationStage `json:"next_stage,omitempty"`
+	AutoAdvance   *AutoAdvanceConfig      `json:"auto_advance,omitempty"`
+	Form          *StructuredForm         `json:"form,omitempty"`
+	ErrorRecovery *ErrorRecoveryGuidance  `json:"error_recovery,omitempty"`
 }
 type ResponseStatus string
 
@@ -60,7 +60,7 @@ type ErrorRecoveryGuidance struct {
 	IsProgressive      bool     `json:"is_progressive"`
 }
 
-func (r *ConversationResponse) WithAutoAdvance(nextStage core.ConsolidatedConversationStage, config AutoAdvanceConfig) *ConversationResponse {
+func (r *ConversationResponse) WithAutoAdvance(nextStage core.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
 	r.RequiresInput = false
 	r.NextStage = &nextStage
 	r.AutoAdvance = &config
@@ -119,7 +119,7 @@ func (r *ConversationResponse) GetAutoAdvanceMessage() string {
 
 	return baseMsg
 }
-func convertFromTypesStage(stage types.ConsolidatedConversationStage) core.ConsolidatedConversationStage {
+func convertFromTypesStage(stage types.ConversationStage) core.ConversationStage {
 	switch stage {
 	case types.StageWelcome:
 		return core.ConversationStagePreFlight
@@ -145,7 +145,7 @@ func convertFromTypesStage(stage types.ConsolidatedConversationStage) core.Conso
 		return core.ConversationStageError
 	}
 }
-func mapMCPStageToDetailedStage(stage core.ConsolidatedConversationStage, context map[string]interface{}) types.ConsolidatedConversationStage {
+func mapMCPStageToDetailedStage(stage core.ConversationStage, context map[string]interface{}) types.ConversationStage {
 	switch stage {
 	case core.ConversationStagePreFlight:
 		return types.StagePreFlight

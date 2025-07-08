@@ -7,7 +7,19 @@ import (
 	"strings"
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
+
+// GenerateDockerfileArgs is defined in generate_dockerfile.go
+
+// OptimizationContext represents context for Dockerfile optimization
+type OptimizationContext struct {
+	Language     string                 `json:"language"`
+	Framework    string                 `json:"framework"`
+	Dependencies []string               `json:"dependencies"`
+	BuildType    string                 `json:"build_type"`
+	Metadata     map[string]interface{} `json:"metadata"`
+}
 
 // DockerfileOptimizer handles Dockerfile optimization and validation
 type DockerfileOptimizer struct {
@@ -201,9 +213,9 @@ func (do *DockerfileOptimizer) ExtractHealthCheck(content string) string {
 }
 
 // ValidateDockerfile validates Dockerfile content
-func (do *DockerfileOptimizer) ValidateDockerfile(_ context.Context, content string) *types.BuildValidationResult {
-	// Basic validation - create a simple result using the types unified types
-	result := types.NewBuildResult()
+func (do *DockerfileOptimizer) ValidateDockerfile(_ context.Context, content string) *core.BuildValidationResult {
+	// Basic validation - create a simple result using the core unified types
+	result := core.NewBuildResult()
 	if result.Metadata.Context == nil {
 		result.Metadata.Context = make(map[string]string)
 	}
@@ -213,11 +225,11 @@ func (do *DockerfileOptimizer) ValidateDockerfile(_ context.Context, content str
 	// Simple validation checks
 	if !strings.Contains(content, "FROM") {
 		result.Valid = false
-		fromError := &types.ValidationError{
+		fromError := &core.ValidationError{
 			Code:     "DOCKERFILE_MISSING_FROM",
 			Message:  "Dockerfile must contain a FROM instruction",
 			Field:    "FROM",
-			Severity: types.SeverityHigh,
+			Severity: core.SeverityHigh,
 			Context:  map[string]string{"line": "1"},
 		}
 		result.Errors = append(result.Errors, *fromError)

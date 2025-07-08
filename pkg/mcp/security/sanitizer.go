@@ -1,6 +1,6 @@
 // Package validation - Data sanitization utilities
 // This file consolidates security sanitization functionality from across pkg/mcp
-package validation
+package security
 
 import (
 	"fmt"

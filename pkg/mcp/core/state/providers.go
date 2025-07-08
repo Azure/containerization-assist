@@ -1,4 +1,4 @@
-package core
+package state
 
 import (
 	"context"
@@ -64,6 +64,11 @@ func (p *SessionStateProvider) ListStates(ctx context.Context) ([]string, error)
 		ids[i] = sessionState.SessionID
 	}
 	return ids, nil
+}
+
+// GetType returns the state type
+func (p *SessionStateProvider) GetType() StateType {
+	return StateTypeSession
 }
 
 // ConversationStateProvider provides access to conversation state
@@ -136,6 +141,11 @@ func (p *ConversationStateProvider) ListStates(ctx context.Context) ([]string, e
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+// GetType returns the state type
+func (p *ConversationStateProvider) GetType() StateType {
+	return StateTypeConversation
 }
 
 // WorkflowStateProvider provides access to workflow state
@@ -217,6 +227,11 @@ func (p *WorkflowStateProvider) ListStates(ctx context.Context) ([]string, error
 	return ids, nil
 }
 
+// GetType returns the state type
+func (p *WorkflowStateProvider) GetType() StateType {
+	return StateTypeWorkflow
+}
+
 // ToolStateProvider provides access to tool-specific state
 type ToolStateProvider struct {
 	states map[string]interface{}
@@ -277,6 +292,11 @@ func (p *ToolStateProvider) ListStates(ctx context.Context) ([]string, error) {
 	return ids, nil
 }
 
+// GetType returns the state type
+func (p *ToolStateProvider) GetType() StateType {
+	return StateTypeTool
+}
+
 // GlobalStateProvider provides access to global application state
 type GlobalStateProvider struct {
 	states map[string]interface{}
@@ -335,4 +355,9 @@ func (p *GlobalStateProvider) ListStates(ctx context.Context) ([]string, error) 
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+// GetType returns the state type
+func (p *GlobalStateProvider) GetType() StateType {
+	return StateTypeGlobal
 }

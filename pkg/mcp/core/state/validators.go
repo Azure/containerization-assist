@@ -1,4 +1,4 @@
-package core
+package state
 
 import (
 	"context"
@@ -16,6 +16,11 @@ type SessionStateValidator struct{}
 // NewSessionStateValidator creates a new session state validator
 func NewSessionStateValidator() StateValidator {
 	return &SessionStateValidator{}
+}
+
+// Validate validates session state
+func (v *SessionStateValidator) Validate(state interface{}) error {
+	return v.ValidateState(context.Background(), StateTypeSession, state)
 }
 
 // ValidateState validates session state
@@ -77,12 +82,33 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 	return nil
 }
 
+// GetRules returns validation rules
+func (v *SessionStateValidator) GetRules() []ValidationRule {
+	return []ValidationRule{
+		{
+			Name:     "session_id_required",
+			Message:  "Session ID must be provided and non-empty",
+			Severity: "error",
+		},
+		{
+			Name:     "disk_usage_limit",
+			Message:  "Disk usage must not exceed maximum limit",
+			Severity: "error",
+		},
+	}
+}
+
 // ConversationStateValidator validates conversation state
 type ConversationStateValidator struct{}
 
 // NewConversationStateValidator creates a new conversation state validator
 func NewConversationStateValidator() StateValidator {
 	return &ConversationStateValidator{}
+}
+
+// Validate validates conversation state
+func (v *ConversationStateValidator) Validate(state interface{}) error {
+	return v.ValidateState(context.Background(), StateTypeConversation, state)
 }
 
 // ValidateState validates conversation state
@@ -99,7 +125,7 @@ func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateT
 	}
 
 	sessionValidator := NewSessionStateValidator()
-	if err := sessionValidator.ValidateState(ctx, StateTypeSession, &conversationState.SessionState); err != nil {
+	if err := sessionValidator.Validate(&conversationState.SessionState); err != nil {
 		return errors.NewError().
 			Code(codes.VALIDATION_FAILED).
 			Message("Embedded session state validation failed").
@@ -123,12 +149,33 @@ func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateT
 	return nil
 }
 
+// GetRules returns validation rules
+func (v *ConversationStateValidator) GetRules() []ValidationRule {
+	return []ValidationRule{
+		{
+			Name:     "conversation_id_required",
+			Message:  "Conversation ID must be provided and non-empty",
+			Severity: "error",
+		},
+		{
+			Name:     "session_state_valid",
+			Message:  "Embedded session state must be valid",
+			Severity: "error",
+		},
+	}
+}
+
 // WorkflowStateValidator validates workflow state
 type WorkflowStateValidator struct{}
 
 // NewWorkflowStateValidator creates a new workflow state validator
 func NewWorkflowStateValidator() StateValidator {
 	return &WorkflowStateValidator{}
+}
+
+// Validate validates workflow state
+func (v *WorkflowStateValidator) Validate(state interface{}) error {
+	return v.ValidateState(context.Background(), StateTypeWorkflow, state)
 }
 
 // ValidateState validates workflow state
@@ -143,6 +190,17 @@ func (v *WorkflowStateValidator) ValidateState(ctx context.Context, stateType St
 	}
 
 	return nil
+}
+
+// GetRules returns validation rules
+func (v *WorkflowStateValidator) GetRules() []ValidationRule {
+	return []ValidationRule{
+		{
+			Name:     "state_not_nil",
+			Message:  "State must not be nil",
+			Severity: "error",
+		},
+	}
 }
 
 // StateValidationData represents data for state validation

@@ -101,8 +101,8 @@ const (
 	SeverityCritical ErrorSeverity = "critical"
 )
 
-// ConsolidatedErrorContext provides additional error context
-type ConsolidatedErrorContext map[string]interface{}
+// ErrorContext provides additional error context
+type ErrorContext map[string]interface{}
 
 // RichError provides comprehensive error information
 type RichError struct {
@@ -113,9 +113,9 @@ type RichError struct {
 	Severity ErrorSeverity `json:"severity"`
 
 	// Context and metadata
-	Context   ConsolidatedErrorContext `json:"context,omitempty"`
-	Timestamp time.Time                `json:"timestamp"`
-	Location  *SourceLocation          `json:"location,omitempty"`
+	Context   ErrorContext    `json:"context,omitempty"`
+	Timestamp time.Time       `json:"timestamp"`
+	Location  *SourceLocation `json:"location,omitempty"`
 
 	// Error chain
 	Cause error `json:"-"`
@@ -236,7 +236,7 @@ func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
 // Context adds a context key-value pair
 func (b *ErrorBuilder) Context(key string, value interface{}) *ErrorBuilder {
 	if b.err.Context == nil {
-		b.err.Context = make(ConsolidatedErrorContext)
+		b.err.Context = make(ErrorContext)
 	}
 	b.err.Context[key] = value
 	return b

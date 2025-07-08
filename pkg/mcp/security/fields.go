@@ -1,6 +1,6 @@
 // Package validation - Field validation utilities
 // This file consolidates scattered field validation functions from across pkg/mcp
-package validation
+package security
 
 import (
 	"fmt"

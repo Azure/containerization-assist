@@ -133,22 +133,13 @@ func (t *BuildTroubleshooter) GenerateBuildFailureAnalysis(err error, buildResul
 	analysis.FailureType, analysis.FailureStage = t.classifyFailure(errStr, buildResult)
 	// Convert causes to strings
 	causes := t.identifyFailureCauses(errStr, buildResult, result)
-	analysis.CommonCauses = make([]string, len(causes))
-	for i, cause := range causes {
-		analysis.CommonCauses[i] = cause.Description
-	}
+	analysis.CommonCauses = causes
 	// Convert fixes to strings
 	fixes := t.generateSuggestedFixes(errStr, buildResult, result)
-	analysis.SuggestedFixes = make([]string, len(fixes))
-	for i, fix := range fixes {
-		analysis.SuggestedFixes[i] = fix.Description
-	}
+	analysis.SuggestedFixes = fixes
 	// Convert strategies to strings
 	strategies := t.generateAlternativeStrategies(errStr, buildResult, result)
-	analysis.AlternativeStrategies = make([]string, len(strategies))
-	for i, strategy := range strategies {
-		analysis.AlternativeStrategies[i] = strategy.Description
-	}
+	analysis.AlternativeStrategies = strategies
 	analysis.SecurityImplications = t.identifySecurityImplications(errStr, buildResult, result)
 	if buildResult != nil {
 		perfAnalysis := t.analyzePerformanceImpact(buildResult, result)
@@ -356,9 +347,13 @@ func (t *BuildTroubleshooter) analyzePerformanceImpact(buildResult *coredocker.B
 		BuildTime:       buildResult.Duration,
 		CacheEfficiency: "unknown",
 		CacheHitRate:    0.0,
-		ImageSize:       "unknown",
+		ImageSize:       int64(0),
 		Optimizations:   []string{},
 		Bottlenecks:     []string{},
+		FixTime:         buildResult.Duration,
+		SuccessRate:     0.0,
+		CommonFixes:     []string{},
+		Metrics:         make(map[string]interface{}),
 	}
 	// Set default cache efficiency since Steps field is not available
 	analysis.CacheEfficiency = "unknown"

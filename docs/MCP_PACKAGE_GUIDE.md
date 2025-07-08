@@ -1,22 +1,10 @@
 # Container Kit MCP Package Organization Guide
 
-## Package Structure
+> **📖 For Complete Architecture**: See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full architectural overview and current package structure.
 
-The Container Kit MCP package follows a clean 3-layer architecture with 10 focused packages:
+## Package Organization Principles
 
-```
-pkg/mcp/
-├── api/          # Interface definitions (single source of truth)
-├── core/         # Server & registry core
-├── tools/        # Container operations (analyze, build, deploy, scan)
-├── session/      # Session management and persistence
-├── workflow/     # Multi-step operation orchestration
-├── transport/    # MCP protocol transports (stdio, HTTP)
-├── storage/      # Persistence implementations (BoltDB)
-├── security/     # Validation and security scanning
-├── templates/    # Kubernetes manifest templates
-└── internal/     # Implementation details and utilities
-```
+The Container Kit MCP package follows a layered architecture with clear separation of concerns:
 
 ### API Layer
 - **api/**: Interface definitions and contracts (single source of truth)

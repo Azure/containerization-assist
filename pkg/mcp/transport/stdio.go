@@ -129,16 +129,35 @@ func (s *StdioTransport) HandleRequest(ctx context.Context, request *core.MCPReq
 	if s.handler == nil {
 		return nil, errors.NewError().Messagef("no request handler configured").Build()
 	}
-	return s.handler.HandleRequest(ctx, request)
+	result, err := s.handler.HandleRequest(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	// Type assert the result to MCPResponse
+	response, ok := result.(*core.MCPResponse)
+	if !ok {
+		return nil, errors.NewError().Messagef("handler returned unexpected type: expected *core.MCPResponse, got %T", result).Build()
+	}
+	return response, nil
 }
 
 // Start starts the stdio transport - alias for Serve
-func (s *StdioTransport) Start(ctx context.Context) error {
+func (s *StdioTransport) Start() error {
+	return s.Serve(context.Background())
+}
+
+// StartWithContext starts the stdio transport with context
+func (s *StdioTransport) StartWithContext(ctx context.Context) error {
 	return s.Serve(ctx)
 }
 
 // Stop gracefully shuts down the stdio transport (alias for Close for interface compatibility)
-func (s *StdioTransport) Stop(ctx context.Context) error {
+func (s *StdioTransport) Stop() error {
+	return s.Close()
+}
+
+// StopWithContext gracefully shuts down the stdio transport with context
+func (s *StdioTransport) StopWithContext(ctx context.Context) error {
 	return s.Close()
 }
 
@@ -156,6 +175,11 @@ func (s *StdioTransport) SendMessage(message interface{}) error {
 	return systemErr
 }
 
+// Send implements core.Transport interface
+func (s *StdioTransport) Send(ctx context.Context, message interface{}) error {
+	return s.SendMessage(message)
+}
+
 // ReceiveMessage receives a message via stdio (delegated to gomcp server)
 func (s *StdioTransport) ReceiveMessage() (interface{}, error) {
 	// For stdio transport, message receiving is handled by the gomcp server
@@ -168,6 +192,11 @@ func (s *StdioTransport) ReceiveMessage() (interface{}, error) {
 	systemErr.Context["method"] = "ReceiveMessage"
 	systemErr.Context["transport"] = "stdio"
 	return nil, systemErr
+}
+
+// Receive implements core.Transport interface
+func (s *StdioTransport) Receive(ctx context.Context) (interface{}, error) {
+	return s.ReceiveMessage()
 }
 
 // Close shuts down the transport

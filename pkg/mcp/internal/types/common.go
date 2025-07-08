@@ -13,17 +13,27 @@ const (
 
 // BaseToolResponse provides common response structure for all tools
 type BaseToolResponse struct {
-	Version   string    `json:"version"`
-	Tool      string    `json:"tool"`
-	Timestamp time.Time `json:"timestamp"`
-	SessionID string    `json:"session_id"`
-	DryRun    bool      `json:"dry_run"`
+	Version   string            `json:"version"`
+	Tool      string            `json:"tool"`
+	Timestamp time.Time         `json:"timestamp"`
+	SessionID string            `json:"session_id"`
+	DryRun    bool              `json:"dry_run"`
+	Success   bool              `json:"success"`
+	Message   string            `json:"message,omitempty"`
+	Error     string            `json:"error,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
 // BaseToolArgs provides common arguments for all tools
 type BaseToolArgs struct {
 	DryRun    bool   `json:"dry_run,omitempty" description:"Preview changes without executing"`
 	SessionID string `json:"session_id,omitempty" description:"Session ID for state correlation"`
+}
+
+// Validate validates the base tool arguments
+func (args *BaseToolArgs) Validate() error {
+	// Base validation can be empty or add common validation logic
+	return nil
 }
 
 // NewBaseResponse creates a base response with current metadata
@@ -34,8 +44,19 @@ func NewBaseResponse(tool, sessionID string, dryRun bool) BaseToolResponse {
 		Timestamp: time.Now(),
 		SessionID: sessionID,
 		DryRun:    dryRun,
+		Success:   true,
+		Metadata:  make(map[string]string),
 	}
 }
+
+// ProgressStage represents a stage in a progress workflow
+type ProgressStage struct {
+	Name        string  `json:"name"`
+	Weight      float64 `json:"weight"`
+	Description string  `json:"description"`
+}
+
+// ToolCapabilities is defined in capabilities.go
 
 // ImageReference provides normalized image referencing across tools
 type ImageReference struct {
@@ -43,6 +64,17 @@ type ImageReference struct {
 	Repository string `json:"repository"`
 	Tag        string `json:"tag"`
 	Digest     string `json:"digest,omitempty"`
+	FullRef    string `json:"full_ref,omitempty"`
+}
+
+// ToolError is defined later in this file with enhanced functionality
+
+// ExecutionResult represents the result of an execution
+type ExecutionResult struct {
+	Success bool                   `json:"success"`
+	Data    interface{}            `json:"data,omitempty"`
+	Error   string                 `json:"error,omitempty"` // Will be updated after ToolError is defined
+	Metrics map[string]interface{} `json:"metrics,omitempty"`
 }
 
 func (ir ImageReference) String() string {
@@ -143,20 +175,22 @@ type RepositoryScanSummary struct {
 	NextStepSuggestions         []string `json:"next_step_suggestions"`
 }
 
-// ConsolidatedConversationStage represents the current stage in the containerization workflow
-type ConsolidatedConversationStage string
+// ConversationStage represents the current stage in the containerization workflow
+type ConversationStage string
 
 const (
-	StageWelcome    ConsolidatedConversationStage = "welcome"
-	StagePreFlight  ConsolidatedConversationStage = "preflight"
-	StageInit       ConsolidatedConversationStage = "init"
-	StageAnalysis   ConsolidatedConversationStage = "analysis"
-	StageDockerfile ConsolidatedConversationStage = "dockerfile"
-	StageBuild      ConsolidatedConversationStage = "build"
-	StagePush       ConsolidatedConversationStage = "push"
-	StageManifests  ConsolidatedConversationStage = "manifests"
-	StageDeployment ConsolidatedConversationStage = "deployment"
-	StageCompleted  ConsolidatedConversationStage = "completed"
+	StageWelcome    ConversationStage = "welcome"
+	StagePreFlight  ConversationStage = "preflight"
+	StageInit       ConversationStage = "init"
+	StageAnalysis   ConversationStage = "analysis"
+	StageDockerfile ConversationStage = "dockerfile"
+	StageBuild      ConversationStage = "build"
+	StagePush       ConversationStage = "push"
+	StageManifests  ConversationStage = "manifests"
+	StageDeployment ConversationStage = "deployment"
+	StageScan       ConversationStage = "scan"
+	StageCompleted  ConversationStage = "completed"
+	StageError      ConversationStage = "error"
 )
 
 // UserPreferences stores user's choices throughout the conversation
@@ -231,4 +265,25 @@ type ToolError struct {
 // Error implements the error interface
 func (e *ToolError) Error() string {
 	return fmt.Sprintf("[%s] %s", e.Type, e.Message)
+}
+
+// BaseAIContextResult provides common AI context fields for results that include AI analysis
+type BaseAIContextResult struct {
+	AIAnalysisTime time.Duration `json:"ai_analysis_time,omitempty"`
+	TokensUsed     int           `json:"tokens_used,omitempty"`
+	ModelUsed      string        `json:"model_used,omitempty"`
+	Confidence     float64       `json:"confidence,omitempty"`
+}
+
+// ValidationWarning represents a validation warning
+type ValidationWarning struct {
+	Code       string                 `json:"code"`
+	Severity   string                 `json:"severity"`
+	Message    string                 `json:"message"`
+	Line       int                    `json:"line,omitempty"`
+	Column     int                    `json:"column,omitempty"`
+	File       string                 `json:"file,omitempty"`
+	Rule       string                 `json:"rule,omitempty"`
+	Suggestion string                 `json:"suggestion,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }

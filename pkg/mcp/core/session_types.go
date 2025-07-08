@@ -2,6 +2,8 @@ package core
 
 import (
 	"time"
+
+	"github.com/Azure/container-kit/pkg/core/git"
 )
 
 // SessionState represents session state information
@@ -14,9 +16,9 @@ type SessionState struct {
 
 	WorkspaceDir string `json:"workspace_dir"`
 
-	RepositoryAnalyzed bool            `json:"repository_analyzed"`
-	RepositoryInfo     *RepositoryInfo `json:"repository_info,omitempty"`
-	RepoURL            string          `json:"repo_url"`
+	RepositoryAnalyzed bool                `json:"repository_analyzed"`
+	RepositoryInfo     *git.RepositoryInfo `json:"repository_info,omitempty"`
+	RepoURL            string              `json:"repo_url"`
 
 	DockerfileGenerated bool   `json:"dockerfile_generated"`
 	DockerfilePath      string `json:"dockerfile_path"`

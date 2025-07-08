@@ -3,20 +3,20 @@ package core
 import (
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 
-// Test ValidationError type
+// Test ValidationError type (now an alias to RichError)
 func TestValidationError(t *testing.T) {
 	t.Parallel()
-	// Test basic error
-	err := &ValidationError{
-		Code:     "TEST_ERROR",
-		Message:  "This is a test error",
-		Field:    "test_field",
-		Severity: SeverityHigh,
-		Context:  make(map[string]string),
-	}
+	// Test basic error using RichError builder
+	err := errors.NewError().
+		Code("TEST_ERROR").
+		Message("This is a test error").
+		Context("field", "test_field").
+		Severity(errors.SeverityHigh).
+		Build()
 
 	// Test that Error() method works
 	errorMsg := err.Error()
@@ -31,8 +31,8 @@ func TestValidationError(t *testing.T) {
 	if err.Message != "This is a test error" {
 		t.Errorf("Expected Message 'This is a test error', got %s", err.Message)
 	}
-	if err.Severity != SeverityHigh {
-		t.Errorf("Expected Severity %v, got %v", SeverityHigh, err.Severity)
+	if err.Severity != errors.SeverityHigh {
+		t.Errorf("Expected Severity %v, got %v", errors.SeverityHigh, err.Severity)
 	}
 }
 

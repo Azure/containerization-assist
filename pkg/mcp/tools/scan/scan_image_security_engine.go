@@ -2,7 +2,9 @@ package scan
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -690,29 +692,68 @@ func (s *SecurityScannerImpl) ScanImage(ctx context.Context, imageName string, s
 	return s.performInternalSecurityChecks(ctx, imageName, severityThreshold, startTime)
 }
 
-// isTrivyAvailable checks if trivy scanner is available
-func (s *SecurityScannerImpl) isTrivyAvailable() bool {
-	// In a real implementation, this would check for trivy executable
-	// For now, return false to use fallback
-	return false
-}
-
-// isDockerScanAvailable checks if docker scan is available
-func (s *SecurityScannerImpl) isDockerScanAvailable() bool {
-	// In a real implementation, this would check for docker scan capability
-	return false
-}
+// These functions are now implemented below with proper scanner detection
 
 // scanWithTrivy performs scanning using trivy
 func (s *SecurityScannerImpl) scanWithTrivy(ctx context.Context, imageName, severityThreshold string, startTime time.Time) (*coredocker.ScanResult, error) {
-	// TODO: Implement actual trivy integration when available
-	return nil, fmt.Errorf("trivy scanner not available")
+	s.logger.Info("Starting Trivy scan", "image", imageName, "severity_threshold", severityThreshold)
+
+	// Check if trivy is available
+	if !s.isTrivyAvailable() {
+		return nil, fmt.Errorf("trivy scanner not available - install trivy to enable vulnerability scanning")
+	}
+
+	// Execute trivy scan
+	cmd := exec.CommandContext(ctx, "trivy", "image", "--format", "json", "--severity", severityThreshold, imageName)
+	output, err := cmd.Output()
+	if err != nil {
+		s.logger.Error("Trivy scan failed", "error", err)
+		return nil, fmt.Errorf("trivy scan failed: %w", err)
+	}
+
+	// Parse trivy output
+	var trivyResult TrivyResult
+	if err := json.Unmarshal(output, &trivyResult); err != nil {
+		s.logger.Error("Failed to parse trivy output", "error", err)
+		return nil, fmt.Errorf("failed to parse trivy output: %w", err)
+	}
+
+	// Convert to our scan result format
+	result := s.convertTrivyResult(trivyResult, imageName, startTime)
+	s.logger.Info("Trivy scan completed", "vulnerabilities", result.Summary.Total, "duration", result.Duration)
+
+	return result, nil
 }
 
 // scanWithDockerScan performs scanning using docker scan
 func (s *SecurityScannerImpl) scanWithDockerScan(ctx context.Context, imageName, severityThreshold string, startTime time.Time) (*coredocker.ScanResult, error) {
-	// TODO: Implement docker scan integration
-	return nil, fmt.Errorf("docker scan not available")
+	s.logger.Info("Starting Docker scan", "image", imageName, "severity_threshold", severityThreshold)
+
+	// Check if docker scan is available
+	if !s.isDockerScanAvailable() {
+		return nil, fmt.Errorf("docker scan not available - enable docker scan or install trivy")
+	}
+
+	// Execute docker scan
+	cmd := exec.CommandContext(ctx, "docker", "scan", "--json", "--severity", severityThreshold, imageName)
+	output, err := cmd.Output()
+	if err != nil {
+		s.logger.Error("Docker scan failed", "error", err)
+		return nil, fmt.Errorf("docker scan failed: %w", err)
+	}
+
+	// Parse docker scan output
+	var dockerResult DockerScanResult
+	if err := json.Unmarshal(output, &dockerResult); err != nil {
+		s.logger.Error("Failed to parse docker scan output", "error", err)
+		return nil, fmt.Errorf("failed to parse docker scan output: %w", err)
+	}
+
+	// Convert to our scan result format
+	result := s.convertDockerScanResult(dockerResult, imageName, startTime)
+	s.logger.Info("Docker scan completed", "vulnerabilities", result.Summary.Total, "duration", result.Duration)
+
+	return result, nil
 }
 
 // performInternalSecurityChecks performs basic security analysis
@@ -802,4 +843,154 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// TrivyResult represents the structure of Trivy scan output
+type TrivyResult struct {
+	Results []struct {
+		Target          string `json:"Target"`
+		Vulnerabilities []struct {
+			VulnerabilityID  string   `json:"VulnerabilityID"`
+			PkgName          string   `json:"PkgName"`
+			InstalledVersion string   `json:"InstalledVersion"`
+			FixedVersion     string   `json:"FixedVersion"`
+			Severity         string   `json:"Severity"`
+			Title            string   `json:"Title"`
+			Description      string   `json:"Description"`
+			References       []string `json:"References"`
+			PublishedDate    string   `json:"PublishedDate"`
+			Layer            string   `json:"Layer"`
+		} `json:"Vulnerabilities"`
+	} `json:"Results"`
+}
+
+// DockerScanResult represents the structure of Docker scan output
+type DockerScanResult struct {
+	Vulnerabilities []struct {
+		ID              string   `json:"id"`
+		Package         string   `json:"package"`
+		Version         string   `json:"version"`
+		Fix             string   `json:"fix"`
+		Severity        string   `json:"severity"`
+		Title           string   `json:"title"`
+		Description     string   `json:"description"`
+		References      []string `json:"references"`
+		PublicationDate string   `json:"publicationDate"`
+		DisclosureDate  string   `json:"disclosureDate"`
+	} `json:"vulnerabilities"`
+}
+
+// isTrivyAvailable checks if trivy scanner is available
+func (s *SecurityScannerImpl) isTrivyAvailable() bool {
+	_, err := exec.LookPath("trivy")
+	return err == nil
+}
+
+// isDockerScanAvailable checks if docker scan is available
+func (s *SecurityScannerImpl) isDockerScanAvailable() bool {
+	// Check if docker command is available
+	if _, err := exec.LookPath("docker"); err != nil {
+		return false
+	}
+
+	// Check if docker scan plugin is available
+	cmd := exec.Command("docker", "scan", "--help")
+	err := cmd.Run()
+	return err == nil
+}
+
+// convertTrivyResult converts Trivy scan results to our internal format
+func (s *SecurityScannerImpl) convertTrivyResult(trivyResult TrivyResult, imageName string, startTime time.Time) *coredocker.ScanResult {
+	var vulnerabilities []coresecurity.Vulnerability
+	var summary coresecurity.VulnerabilitySummary
+
+	for _, result := range trivyResult.Results {
+		for _, vuln := range result.Vulnerabilities {
+			vulnerabilities = append(vulnerabilities, coresecurity.Vulnerability{
+				VulnerabilityID:  vuln.VulnerabilityID,
+				PkgName:          vuln.PkgName,
+				InstalledVersion: vuln.InstalledVersion,
+				FixedVersion:     vuln.FixedVersion,
+				Severity:         vuln.Severity,
+				Title:            vuln.Title,
+				Description:      vuln.Description,
+				References:       vuln.References,
+				PublishedDate:    vuln.PublishedDate,
+				Layer:            vuln.Layer,
+			})
+
+			// Count by severity
+			switch strings.ToUpper(vuln.Severity) {
+			case "CRITICAL":
+				summary.Critical++
+			case "HIGH":
+				summary.High++
+			case "MEDIUM":
+				summary.Medium++
+			case "LOW":
+				summary.Low++
+			}
+			summary.Total++
+		}
+	}
+
+	return &coredocker.ScanResult{
+		Success:         true,
+		ImageRef:        imageName,
+		ScanTime:        startTime,
+		Duration:        time.Since(startTime),
+		Vulnerabilities: vulnerabilities,
+		Summary:         summary,
+		Context: map[string]interface{}{
+			"scanner": "trivy",
+			"results": len(trivyResult.Results),
+		},
+	}
+}
+
+// convertDockerScanResult converts Docker scan results to our internal format
+func (s *SecurityScannerImpl) convertDockerScanResult(dockerResult DockerScanResult, imageName string, startTime time.Time) *coredocker.ScanResult {
+	var vulnerabilities []coresecurity.Vulnerability
+	var summary coresecurity.VulnerabilitySummary
+
+	for _, vuln := range dockerResult.Vulnerabilities {
+		vulnerabilities = append(vulnerabilities, coresecurity.Vulnerability{
+			VulnerabilityID:  vuln.ID,
+			PkgName:          vuln.Package,
+			InstalledVersion: vuln.Version,
+			FixedVersion:     vuln.Fix,
+			Severity:         vuln.Severity,
+			Title:            vuln.Title,
+			Description:      vuln.Description,
+			References:       vuln.References,
+			PublishedDate:    vuln.PublicationDate,
+			Layer:            "", // Docker scan doesn't provide layer info
+		})
+
+		// Count by severity
+		switch strings.ToUpper(vuln.Severity) {
+		case "CRITICAL":
+			summary.Critical++
+		case "HIGH":
+			summary.High++
+		case "MEDIUM":
+			summary.Medium++
+		case "LOW":
+			summary.Low++
+		}
+		summary.Total++
+	}
+
+	return &coredocker.ScanResult{
+		Success:         true,
+		ImageRef:        imageName,
+		ScanTime:        startTime,
+		Duration:        time.Since(startTime),
+		Vulnerabilities: vulnerabilities,
+		Summary:         summary,
+		Context: map[string]interface{}{
+			"scanner":         "docker-scan",
+			"vulnerabilities": len(dockerResult.Vulnerabilities),
+		},
+	}
 }

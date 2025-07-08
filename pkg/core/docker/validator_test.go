@@ -7,6 +7,7 @@ import (
 
 	"log/slog"
 
+	validation "github.com/Azure/container-kit/pkg/mcp/security"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,8 +22,8 @@ func TestValidateDockerfile(t *testing.T) {
 		expectedValid  bool
 		expectedErrors int
 		expectedWarns  int
-		checkError     func(t *testing.T, errors []*types.BuildError)
-		checkWarning   func(t *testing.T, warnings []*types.BuildWarning)
+		checkError     func(t *testing.T, errors []validation.Error)
+		checkWarning   func(t *testing.T, warnings []validation.Warning)
 	}{
 		{
 			name:           "empty dockerfile",
@@ -30,7 +31,7 @@ func TestValidateDockerfile(t *testing.T) {
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				assert.Equal(t, "DOCKERFILE_EMPTY", errors[0].Code)
 				assert.Contains(t, errors[0].Message, "empty")
 			},
@@ -61,7 +62,7 @@ RUN npm install`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				assert.Equal(t, "DOCKERFILE_NO_FROM", errors[0].Code)
 				assert.Contains(t, errors[0].Message, "must start with FROM")
 			},
@@ -73,7 +74,7 @@ INVALID_INSTRUCTION something`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				assert.Equal(t, "UNKNOWN_INSTRUCTION", errors[0].Code)
 				assert.Contains(t, errors[0].Message, "Unknown instruction")
 			},
@@ -85,7 +86,7 @@ WORKDIR /app`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				assert.Equal(t, "FROM_MISSING_IMAGE", errors[0].Code)
 				assert.Equal(t, "FROM", errors[0].Field)
 				assert.Contains(t, errors[0].Message, "requires an image name")
@@ -97,7 +98,7 @@ WORKDIR /app`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				assert.Equal(t, "FROM_LATEST_TAG", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "latest")
 			},
@@ -108,7 +109,7 @@ WORKDIR /app`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				assert.Equal(t, "FROM_LATEST_TAG", warnings[0].Code)
 				assert.Contains(t, warnings[0].Suggestion, "specific version")
 			},
@@ -120,7 +121,7 @@ RUN apt-get install -y curl`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  2, // apt-get update + cache cleanup warnings
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				foundUpdate := false
 				foundCleanup := false
 				for _, w := range warnings {
@@ -142,7 +143,7 @@ RUN apt-get update && apt-get install -y curl`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1, // Only cache cleanup warning
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				assert.Contains(t, warnings[0].Message, "cache")
 			},
 		},
@@ -161,7 +162,7 @@ COPY`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				assert.Equal(t, "COPY_MISSING_ARGS", errors[0].Code)
 				assert.Equal(t, "COPY", errors[0].Field)
 			},
@@ -173,7 +174,7 @@ ADD package.json /app/`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				if warnings[0].Field != "" {
 					assert.Equal(t, "ADD", warnings[0].Field)
 				}
@@ -203,7 +204,7 @@ EXPOSE`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				if errors[0].Field != "" {
 					assert.Equal(t, "EXPOSE", errors[0].Field)
 				}
@@ -228,7 +229,7 @@ EXPOSE 80/invalid`,
 			expectedValid:  false,
 			expectedErrors: 2,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				for _, err := range errors {
 					if err.Field != "" {
 						assert.Equal(t, "EXPOSE", err.Field)
@@ -244,7 +245,7 @@ USER`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				if errors[0].Field != "" {
 					assert.Equal(t, "USER", errors[0].Field)
 				}
@@ -257,7 +258,7 @@ USER root`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				assert.Equal(t, "USER_ROOT_SECURITY", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "root user")
 			},
@@ -277,7 +278,7 @@ WORKDIR`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				if errors[0].Field != "" {
 					assert.Equal(t, "WORKDIR", errors[0].Field)
 				}
@@ -290,7 +291,7 @@ WORKDIR app`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				if warnings[0].Field != "" {
 					assert.Equal(t, "WORKDIR", warnings[0].Field)
 				}
@@ -312,7 +313,7 @@ CMD`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				if errors[0].Field != "" {
 					assert.Equal(t, "CMD", errors[0].Field)
 				}
@@ -325,7 +326,7 @@ ENTRYPOINT`,
 			expectedValid:  false,
 			expectedErrors: 1,
 			expectedWarns:  0,
-			checkError: func(t *testing.T, errors []*types.BuildError) {
+			checkError: func(t *testing.T, errors []validation.Error) {
 				if errors[0].Field != "" {
 					assert.Equal(t, "ENTRYPOINT", errors[0].Field)
 				}
@@ -339,7 +340,7 @@ CMD ["node", "app2.js"]`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				assert.Equal(t, "MULTIPLE_CMD", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "Multiple CMD")
 			},
@@ -352,7 +353,7 @@ ENTRYPOINT ["npm", "start"]`,
 			expectedValid:  true,
 			expectedErrors: 0,
 			expectedWarns:  1,
-			checkWarning: func(t *testing.T, warnings []*types.BuildWarning) {
+			checkWarning: func(t *testing.T, warnings []validation.Warning) {
 				assert.Equal(t, "MULTIPLE_ENTRYPOINT", warnings[0].Code)
 				assert.Contains(t, warnings[0].Message, "Multiple ENTRYPOINT")
 			},
@@ -408,21 +409,11 @@ CMD ["node", "server.js"]`,
 			assert.Len(t, result.Warnings, tt.expectedWarns, "Warning count mismatch")
 
 			if tt.checkError != nil && len(result.Errors) > 0 {
-				// Convert []ValidationError to []*ValidationError
-				errorPtrs := make([]*types.BuildError, len(result.Errors))
-				for i := range result.Errors {
-					errorPtrs[i] = &result.Errors[i]
-				}
-				tt.checkError(t, errorPtrs)
+				tt.checkError(t, result.Errors)
 			}
 
 			if tt.checkWarning != nil && len(result.Warnings) > 0 {
-				// Convert []ValidationWarning to []*ValidationWarning
-				warningPtrs := make([]*types.BuildWarning, len(result.Warnings))
-				for i := range result.Warnings {
-					warningPtrs[i] = &result.Warnings[i]
-				}
-				tt.checkWarning(t, warningPtrs)
+				tt.checkWarning(t, result.Warnings)
 			}
 		})
 	}
@@ -478,10 +469,10 @@ func TestValidateStructure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &types.BuildValidationResult{
+			result := &BuildValidationResult{
 				Valid:    true,
-				Errors:   make([]types.BuildError, 0),
-				Warnings: make([]types.BuildWarning, 0),
+				Errors:   make([]validation.Error, 0),
+				Warnings: make([]validation.Warning, 0),
 			}
 
 			validator.validateStructure(tt.instructions, result)
@@ -555,7 +546,7 @@ CMD ["node", "app.js"]`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &types.BuildValidationResult{
+			result := &BuildValidationResult{
 				Details: make(map[string]interface{}),
 			}
 

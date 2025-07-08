@@ -1,6 +1,6 @@
-// Package validation - Unified validation framework for pkg/mcp
+// Package security - Unified security and validation framework for pkg/mcp
 // This package consolidates scattered validation utilities and provides a unified interface
-package validation
+package security
 
 import (
 	"context"

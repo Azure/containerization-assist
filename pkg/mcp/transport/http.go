@@ -182,16 +182,42 @@ func (t *HTTPTransport) HandleRequest(ctx context.Context, request *core.MCPRequ
 	if t.handler == nil {
 		return nil, errors.NewError().Messagef("no request handler configured").Build()
 	}
-	return t.handler.HandleRequest(ctx, request)
+	result, err := t.handler.HandleRequest(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	// Type assert the result to MCPResponse
+	response, ok := result.(*core.MCPResponse)
+	if !ok {
+		return nil, errors.NewError().Messagef("handler returned unexpected type: expected *core.MCPResponse, got %T", result).Build()
+	}
+	return response, nil
 }
 
 // Start starts the HTTP transport
-func (t *HTTPTransport) Start(ctx context.Context) error {
+func (t *HTTPTransport) Start() error {
+	return t.Serve(context.Background())
+}
+
+// StartWithContext starts the HTTP transport with context
+func (t *HTTPTransport) StartWithContext(ctx context.Context) error {
 	return t.Serve(ctx)
 }
 
 // Stop gracefully shuts down the HTTP transport
-func (t *HTTPTransport) Stop(ctx context.Context) error {
+func (t *HTTPTransport) Stop() error {
+	if t.server == nil {
+		return nil
+	}
+
+	t.logger.Info("Stopping HTTP transport")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return t.server.Shutdown(ctx)
+}
+
+// StopWithContext gracefully shuts down the HTTP transport with context
+func (t *HTTPTransport) StopWithContext(ctx context.Context) error {
 	if t.server == nil {
 		return nil
 	}
@@ -210,6 +236,11 @@ func (t *HTTPTransport) SendMessage(message interface{}) error {
 	systemErr.Context["component"] = "http_transport"
 	systemErr.Suggestions = append(systemErr.Suggestions, "HTTP transport uses request/response pattern")
 	return systemErr
+}
+
+// Send implements core.Transport interface
+func (t *HTTPTransport) Send(ctx context.Context, message interface{}) error {
+	return t.SendMessage(message)
 }
 
 // SendTypedMessage provides typed alternative to SendMessage
@@ -234,6 +265,11 @@ func (t *HTTPTransport) ReceiveMessage() (interface{}, error) {
 	systemErr.Context["component"] = "http_transport"
 	systemErr.Suggestions = append(systemErr.Suggestions, "HTTP transport uses request/response pattern")
 	return nil, systemErr
+}
+
+// Receive implements core.Transport interface
+func (t *HTTPTransport) Receive(ctx context.Context) (interface{}, error) {
+	return t.ReceiveMessage()
 }
 
 // ReceiveTypedMessage provides typed alternative to ReceiveMessage

@@ -10,15 +10,15 @@ import (
 
 	coredocker "github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/session"
 )
 
 // BuildExecutorService handles the execution of Docker builds with progress reporting
 type BuildExecutorService struct {
-	pipelineAdapter mcptypes.TypedPipelineOperations
+	pipelineAdapter TypedPipelineOperations
 	sessionManager  sessiontypes.UnifiedSessionManager // DEPRECATED: use sessionStore and sessionState
 	sessionStore    services.SessionStore
 	sessionState    services.SessionState
@@ -32,7 +32,7 @@ type BuildExecutorService struct {
 }
 
 // NewBuildExecutor creates a new build executor - DEPRECATED: use NewBuildExecutorWithServices
-func NewBuildExecutor(adapter mcptypes.TypedPipelineOperations, sessionManager sessiontypes.UnifiedSessionManager, logger *slog.Logger) *BuildExecutorService {
+func NewBuildExecutor(adapter TypedPipelineOperations, sessionManager sessiontypes.UnifiedSessionManager, logger *slog.Logger) *BuildExecutorService {
 	executorLogger := logger.With("component", "build_executor")
 	return &BuildExecutorService{
 		pipelineAdapter: adapter,
@@ -48,7 +48,7 @@ func NewBuildExecutor(adapter mcptypes.TypedPipelineOperations, sessionManager s
 }
 
 // NewBuildExecutorWithServices creates a new build executor using focused services
-func NewBuildExecutorWithServices(adapter mcptypes.TypedPipelineOperations, sessionStore services.SessionStore, sessionState services.SessionState, logger *slog.Logger) *BuildExecutorService {
+func NewBuildExecutorWithServices(adapter TypedPipelineOperations, sessionStore services.SessionStore, sessionState services.SessionState, logger *slog.Logger) *BuildExecutorService {
 	executorLogger := logger.With("component", "build_executor")
 	return &BuildExecutorService{
 		pipelineAdapter: adapter,
@@ -302,10 +302,9 @@ func (e *BuildExecutorService) handlePushIfRequested(ctx context.Context, buildC
 	}()
 
 	pushParams := core.PushImageParams{
-		ImageRef:   buildCtx.result.FullImageRef,
+		ImageName:  buildCtx.result.FullImageRef,
 		Registry:   buildCtx.args.RegistryURL,
 		Repository: "",
-		Tag:        "",
 	}
 
 	_, err := e.pipelineAdapter.PushImageTyped(ctx, buildCtx.sessionState.SessionID, pushParams)
@@ -324,12 +323,9 @@ func (e *BuildExecutorService) createBuildParams(buildCtx *buildExecutionContext
 	buildParams := core.BuildImageParams{
 		SessionID:      buildCtx.sessionState.SessionID,
 		DockerfilePath: buildCtx.args.DockerfilePath,
-		ContextPath:    buildCtx.args.BuildContext,
 		ImageName:      buildCtx.args.ImageName,
-		Tags:           []string{buildCtx.args.ImageName},
 		BuildArgs:      make(map[string]string),
 		NoCache:        false,
-		Pull:           true,
 	}
 
 	if buildCtx.args.BuildArgs != nil {

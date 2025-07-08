@@ -1,35 +1,44 @@
-package core
+package state
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 // LoggingObserver logs all state changes
 type LoggingObserver struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 }
 
 // NewLoggingObserver creates a new logging observer
-func NewLoggingObserver(logger zerolog.Logger) StateObserver {
+func NewLoggingObserver(logger *slog.Logger) StateObserver {
 	return &LoggingObserver{
-		logger: logger.With().Str("component", "state_observer").Logger(),
+		logger: logger.With("component", "state_observer"),
 	}
 }
 
 // OnStateChange logs state changes
-func (o *LoggingObserver) OnStateChange(event *StateEvent) {
-	o.logger.Info().
-		Str("event_id", event.ID).
-		Str("event_type", string(event.Type)).
-		Str("state_type", string(event.StateType)).
-		Str("state_id", event.StateID).
-		Time("timestamp", event.Timestamp).
-		Interface("metadata", event.Metadata).
-		Msg("State changed")
+func (o *LoggingObserver) OnStateChange(event *StateEvent) error {
+	o.logger.Info("State changed",
+		slog.String("event_id", event.ID),
+		slog.String("event_type", string(event.Type)),
+		slog.String("state_type", string(event.StateType)),
+		slog.String("state_id", event.StateID),
+		slog.Time("timestamp", event.Timestamp),
+		slog.Any("metadata", event.Metadata))
+	return nil
+}
+
+// GetID returns the observer ID
+func (o *LoggingObserver) GetID() string {
+	return "logging_observer"
+}
+
+// IsActive returns whether the observer is active
+func (o *LoggingObserver) IsActive() bool {
+	return true
 }
 
 // MetricsObserver collects state change metrics
@@ -59,7 +68,7 @@ func NewMetricsObserver(windowSize time.Duration) *MetricsObserver {
 }
 
 // OnStateChange updates metrics based on state changes
-func (o *MetricsObserver) OnStateChange(event *StateEvent) {
+func (o *MetricsObserver) OnStateChange(event *StateEvent) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
@@ -100,6 +109,17 @@ func (o *MetricsObserver) OnStateChange(event *StateEvent) {
 			metrics.ChangeRate = float64(len(validChanges)) / duration.Minutes()
 		}
 	}
+	return nil
+}
+
+// GetID returns the observer ID
+func (o *MetricsObserver) GetID() string {
+	return "metrics_observer"
+}
+
+// IsActive returns whether the observer is active
+func (o *MetricsObserver) IsActive() bool {
+	return true
 }
 
 // GetMetrics returns metrics for a state type
@@ -133,17 +153,17 @@ func (o *MetricsObserver) GetAllMetrics() map[string]*StateMetrics {
 type AlertingObserver struct {
 	alertHandlers map[string]AlertHandler
 	mu            sync.RWMutex
-	logger        zerolog.Logger
+	logger        *slog.Logger
 }
 
 // AlertHandler handles alerts for state changes
 type AlertHandler func(event *StateEvent) error
 
 // NewAlertingObserver creates a new alerting observer
-func NewAlertingObserver(logger zerolog.Logger) *AlertingObserver {
+func NewAlertingObserver(logger *slog.Logger) *AlertingObserver {
 	return &AlertingObserver{
 		alertHandlers: make(map[string]AlertHandler),
-		logger:        logger.With().Str("component", "alerting_observer").Logger(),
+		logger:        logger.With("component", "alerting_observer"),
 	}
 }
 
@@ -155,7 +175,7 @@ func (o *AlertingObserver) RegisterAlert(name string, handler AlertHandler) {
 }
 
 // OnStateChange checks for alert conditions
-func (o *AlertingObserver) OnStateChange(event *StateEvent) {
+func (o *AlertingObserver) OnStateChange(event *StateEvent) error {
 	o.mu.RLock()
 	handlers := make(map[string]AlertHandler)
 	for k, v := range o.alertHandlers {
@@ -166,14 +186,24 @@ func (o *AlertingObserver) OnStateChange(event *StateEvent) {
 	for name, handler := range handlers {
 		go func(n string, h AlertHandler) {
 			if err := h(event); err != nil {
-				o.logger.Error().
-					Err(err).
-					Str("alert_name", n).
-					Str("event_id", event.ID).
-					Msg("Alert handler failed")
+				o.logger.Error("Alert handler failed",
+					slog.String("error", err.Error()),
+					slog.String("alert_name", n),
+					slog.String("event_id", event.ID))
 			}
 		}(name, handler)
 	}
+	return nil
+}
+
+// GetID returns the observer ID
+func (o *AlertingObserver) GetID() string {
+	return "alerting_observer"
+}
+
+// IsActive returns whether the observer is active
+func (o *AlertingObserver) IsActive() bool {
+	return true
 }
 
 // AuditObserver maintains an audit trail of state changes
@@ -181,7 +211,7 @@ type AuditObserver struct {
 	auditLog []AuditEntry
 	maxSize  int
 	mu       sync.RWMutex
-	logger   zerolog.Logger
+	logger   *slog.Logger
 }
 
 // AuditEntry represents an audit log entry
@@ -198,16 +228,16 @@ type AuditEntry struct {
 }
 
 // NewAuditObserver creates a new audit observer
-func NewAuditObserver(maxSize int, logger zerolog.Logger) *AuditObserver {
+func NewAuditObserver(maxSize int, logger *slog.Logger) *AuditObserver {
 	return &AuditObserver{
 		auditLog: make([]AuditEntry, 0),
 		maxSize:  maxSize,
-		logger:   logger.With().Str("component", "audit_observer").Logger(),
+		logger:   logger.With("component", "audit_observer"),
 	}
 }
 
 // OnStateChange adds an audit entry for the state change
-func (o *AuditObserver) OnStateChange(event *StateEvent) {
+func (o *AuditObserver) OnStateChange(event *StateEvent) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
@@ -239,11 +269,21 @@ func (o *AuditObserver) OnStateChange(event *StateEvent) {
 		o.auditLog = o.auditLog[len(o.auditLog)-o.maxSize:]
 	}
 
-	o.logger.Debug().
-		Str("event_id", entry.EventID).
-		Str("state_type", string(entry.StateType)).
-		Str("state_id", entry.StateID).
-		Msg("Audit entry created")
+	o.logger.Debug("Audit entry created",
+		slog.String("event_id", entry.EventID),
+		slog.String("state_type", string(entry.StateType)),
+		slog.String("state_id", entry.StateID))
+	return nil
+}
+
+// GetID returns the observer ID
+func (o *AuditObserver) GetID() string {
+	return "audit_observer"
+}
+
+// IsActive returns whether the observer is active
+func (o *AuditObserver) IsActive() bool {
+	return true
 }
 
 // GetAuditLog returns the audit log
@@ -281,8 +321,21 @@ func NewCompositeObserver(observers ...StateObserver) StateObserver {
 }
 
 // OnStateChange notifies all observers
-func (o *CompositeObserver) OnStateChange(event *StateEvent) {
+func (o *CompositeObserver) OnStateChange(event *StateEvent) error {
 	for _, observer := range o.observers {
-		observer.OnStateChange(event)
+		if err := observer.OnStateChange(event); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+// GetID returns the observer ID
+func (o *CompositeObserver) GetID() string {
+	return "composite_observer"
+}
+
+// IsActive returns whether the observer is active
+func (o *CompositeObserver) IsActive() bool {
+	return true
 }

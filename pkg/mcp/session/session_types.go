@@ -10,9 +10,7 @@ import (
 )
 
 // SessionManager manages MCP sessions
-// Deprecated: This implementation will be replaced by UnifiedSessionManager in v2.0.0.
-// For new code, use session.UnifiedSessionManager for type-safe, context-aware session management.
-// For migration guidance, see docs/migration/SESSION_MANAGER_MIGRATION_GUIDE.md
+// This implementation provides type-safe, context-aware session management with persistent storage support.
 type SessionManager struct {
 	sessions     map[string]*SessionState
 	workspaceDir string

@@ -4,6 +4,8 @@ package core
 
 import (
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // ============================================================================
@@ -212,15 +214,15 @@ type BuildResult struct {
 type DeployArgs struct {
 	BaseToolArgs
 
-	Image       string            `json:"image" description:"Container image to deploy"`
-	Name        string            `json:"name" description:"Deployment name"`
-	Namespace   string            `json:"namespace,omitempty" description:"Kubernetes namespace"`
-	Replicas    int               `json:"replicas,omitempty" description:"Number of replicas"`
-	Ports       []ContainerPort   `json:"ports,omitempty" description:"Exposed ports"`
-	Environment map[string]string `json:"environment,omitempty" description:"Environment variables"`
-	Resources   ResourceLimits    `json:"resources,omitempty" description:"Resource limits"`
-	HealthCheck HealthCheck       `json:"health_check,omitempty" description:"Health check configuration"`
-	Strategy    string            `json:"strategy,omitempty" description:"Deployment strategy"`
+	Image       string               `json:"image" description:"Container image to deploy"`
+	Name        string               `json:"name" description:"Deployment name"`
+	Namespace   string               `json:"namespace,omitempty" description:"Kubernetes namespace"`
+	Replicas    int                  `json:"replicas,omitempty" description:"Number of replicas"`
+	Ports       []ContainerPort      `json:"ports,omitempty" description:"Exposed ports"`
+	Environment map[string]string    `json:"environment,omitempty" description:"Environment variables"`
+	Resources   types.ResourceLimits `json:"resources,omitempty" description:"Resource limits"`
+	HealthCheck HealthCheck          `json:"health_check,omitempty" description:"Health check configuration"`
+	Strategy    string               `json:"strategy,omitempty" description:"Deployment strategy"`
 }
 
 // ContainerPort represents a container port configuration

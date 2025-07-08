@@ -3,6 +3,7 @@ package scan
 import (
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 

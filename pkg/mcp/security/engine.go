@@ -1,6 +1,6 @@
-// Package validation - Validation engine and rule processing
+// Package security - Validation engine and rule processing
 // This file provides a rule-based validation engine for complex validation scenarios
-package validation
+package security
 
 import (
 	"context"

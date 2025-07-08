@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
@@ -26,7 +27,7 @@ func NewAnalyzer(logger *slog.Logger) *Analyzer {
 }
 
 // Analyze performs analysis on a repository
-func (a *Analyzer) Analyze(ctx context.Context, opts AnalysisOptions) (*AnalysisResult, error) {
+func (a *Analyzer) Analyze(ctx context.Context, opts core.AnalysisOptions) (*core.AnalysisResult, error) {
 	startTime := time.Now()
 
 	if err := a.validateAnalysisOptions(opts); err != nil {
@@ -51,15 +52,25 @@ func (a *Analyzer) Analyze(ctx context.Context, opts AnalysisOptions) (*Analysis
 	analysisContext.ContainerizationSuggestions = a.generateContainerizationSuggestions(coreResult)
 	analysisContext.NextStepSuggestions = a.generateNextStepSuggestions(coreResult, analysisContext)
 
-	return &AnalysisResult{
-		AnalysisResult: coreResult,
-		Duration:       time.Since(startTime),
-		Context:        analysisContext,
-	}, nil
+	result := &core.AnalysisResult{
+		Success:      coreResult.Success,
+		Language:     coreResult.Language,
+		Framework:    coreResult.Framework,
+		Dependencies: convertDeps(coreResult.Dependencies),
+		Duration:     time.Since(startTime),
+	}
+
+	// Add additional context in metadata
+	if result.Metadata == nil {
+		result.Metadata = make(map[string]interface{})
+	}
+	result.Metadata["analysis_context"] = analysisContext
+
+	return result, nil
 }
 
 // validateAnalysisOptions validates the analysis options
-func (a *Analyzer) validateAnalysisOptions(opts AnalysisOptions) error {
+func (a *Analyzer) validateAnalysisOptions(opts core.AnalysisOptions) error {
 	if opts.RepoPath == "" {
 		return errors.NewError().Messagef("repository path is required").WithLocation().Build()
 	}
@@ -304,4 +315,13 @@ func (a *Analyzer) calculateDirectorySize(path string) (int64, error) {
 		return nil
 	})
 	return size, err
+}
+
+// convertDeps converts analysis.Dependency to strings for core.AnalysisResult
+func convertDeps(deps []analysis.Dependency) []string {
+	result := make([]string, len(deps))
+	for i, dep := range deps {
+		result[i] = dep.Name
+	}
+	return result
 }

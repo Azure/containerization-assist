@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/validation"
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/session"
 	"github.com/rs/zerolog"
 )

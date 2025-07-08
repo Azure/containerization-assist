@@ -5,42 +5,43 @@ import (
 	"fmt"
 	"time"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"log/slog"
+
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/session"
-	"github.com/rs/zerolog"
 )
 
 // SimpleWorkflowExecutor replaces the over-engineered WorkflowOrchestrator
 // with a simple tool execution system
 type SimpleWorkflowExecutor struct {
-	logger         zerolog.Logger
+	logger         *slog.Logger
 	sessionManager session.UnifiedSessionManager
 	toolRegistry   *ToolRegistry
 }
 
 // NewSimpleWorkflowExecutor creates a simple workflow executor
-func NewSimpleWorkflowExecutor(sessionManager session.UnifiedSessionManager, toolRegistry *ToolRegistry, logger zerolog.Logger) *SimpleWorkflowExecutor {
+func NewSimpleWorkflowExecutor(sessionManager session.UnifiedSessionManager, toolRegistry *ToolRegistry, logger *slog.Logger) *SimpleWorkflowExecutor {
 	return createSimpleWorkflowExecutor(sessionManager, toolRegistry, logger)
 }
 
 // NewSimpleWorkflowExecutorUnified creates a simple workflow executor using unified session manager
 // Deprecated: Use NewSimpleWorkflowExecutor directly. This function will be removed in v2.0.0
-func NewSimpleWorkflowExecutorUnified(sessionManager session.UnifiedSessionManager, toolRegistry *ToolRegistry, logger zerolog.Logger) *SimpleWorkflowExecutor {
+func NewSimpleWorkflowExecutorUnified(sessionManager session.UnifiedSessionManager, toolRegistry *ToolRegistry, logger *slog.Logger) *SimpleWorkflowExecutor {
 	return createSimpleWorkflowExecutor(sessionManager, toolRegistry, logger)
 }
 
 // createSimpleWorkflowExecutor is the common creation logic
-func createSimpleWorkflowExecutor(sessionManager session.UnifiedSessionManager, toolRegistry *ToolRegistry, logger zerolog.Logger) *SimpleWorkflowExecutor {
+func createSimpleWorkflowExecutor(sessionManager session.UnifiedSessionManager, toolRegistry *ToolRegistry, logger *slog.Logger) *SimpleWorkflowExecutor {
 	return &SimpleWorkflowExecutor{
-		logger:         logger.With().Str("component", "simple_workflow").Logger(),
+		logger:         logger.With("component", "simple_workflow"),
 		sessionManager: sessionManager,
 		toolRegistry:   toolRegistry,
 	}
 }
 
 // ExecuteWorkflow executes a predefined workflow by calling tools sequentially
-func (swe *SimpleWorkflowExecutor) ExecuteWorkflow(ctx context.Context, workflowID string, options ...execution.ExecutionOption) (interface{}, error) {
-	swe.logger.Info().Str("workflow_id", workflowID).Msg("Starting simple workflow execution")
+func (swe *SimpleWorkflowExecutor) ExecuteWorkflow(ctx context.Context, workflowID string, options ...ExecutionOption) (interface{}, error) {
+	swe.logger.Info("Starting simple workflow execution", "workflow_id", workflowID)
 
 	// Parse options for variables
 	variables := make(map[string]interface{})
@@ -69,28 +70,40 @@ func (swe *SimpleWorkflowExecutor) ExecuteWorkflow(ctx context.Context, workflow
 	case "security_audit":
 		return swe.executeSecurityAudit(ctx, sessionID, variables)
 	default:
-		return nil, errors.NewError().Messagef("unknown workflow: %s", workflowID).WithLocation(
-
-		// ExecuteCustomWorkflow executes a custom workflow specification
-		).Build()
+		return nil, errors.NewError().
+			Messagef("unknown workflow: %s", workflowID).
+			Code(errors.CodeResourceNotFound).
+			Type(errors.ErrTypeNotFound).
+			Context("workflow_id", workflowID).
+			WithLocation().
+			Build()
 	}
 }
 
-func (swe *SimpleWorkflowExecutor) ExecuteCustomWorkflow(ctx context.Context, spec *execution.WorkflowSpec) (interface{}, error) {
-	swe.logger.Info().Str("workflow_name", spec.Name).Msg("Starting custom workflow execution")
+func (swe *SimpleWorkflowExecutor) ExecuteCustomWorkflow(ctx context.Context, spec *WorkflowSpec) (interface{}, error) {
+	swe.logger.Info("Starting custom workflow execution", "workflow_name", spec.Name)
 
 	sessionID := fmt.Sprintf("custom_%d", time.Now().UnixNano())
 	results := make(map[string]interface{})
 
 	// Execute stages sequentially
 	for _, stage := range spec.Stages {
-		swe.logger.Info().Str("stage", stage.ID).Str("stage_name", stage.Name).Msg("Executing stage")
+		swe.logger.Info("Executing stage", "stage", stage.ID, "stage_name", stage.Name)
 
 		for _, toolName := range stage.Tools {
 			result, err := swe.executeTool(ctx, sessionID, toolName, spec.Variables)
 			if err != nil {
-				swe.logger.Error().Err(err).Str("tool", toolName).Str("stage", stage.ID).Msg("Tool execution failed")
-				return nil, errors.Wrapf(err, "orchestration", "stage %s failed", stage.ID)
+				swe.logger.Error("Tool execution failed", "error", err, "tool", toolName, "stage", stage.ID)
+				return nil, errors.NewError().
+					Messagef("stage %s failed: %s", stage.ID, stage.Name).
+					Code(errors.CodeToolExecutionFailed).
+					Type(errors.ErrTypeTool).
+					Cause(err).
+					Context("stage_id", stage.ID).
+					Context("stage_name", stage.Name).
+					Context("tool", toolName).
+					WithLocation().
+					Build()
 			}
 			results[fmt.Sprintf("%s_%s", stage.ID, toolName)] = result
 		}
@@ -120,7 +133,15 @@ func (swe *SimpleWorkflowExecutor) executeAnalyzeAndBuild(ctx context.Context, s
 	// Step 1: Analyze repository
 	analyzeResult, err := swe.executeTool(ctx, sessionID, "analyze_repository", variables)
 	if err != nil {
-		return nil, errors.NewError().Message("analysis failed").Cause(err).Build()
+		return nil, errors.NewError().
+			Message("repository analysis failed").
+			Code(errors.CodeToolExecutionFailed).
+			Type(errors.ErrTypeTool).
+			Cause(err).
+			Context("operation", "analyze_repository").
+			Context("session_id", sessionID).
+			WithLocation().
+			Build()
 	}
 	results["analyze"] = analyzeResult
 
@@ -128,7 +149,7 @@ func (swe *SimpleWorkflowExecutor) executeAnalyzeAndBuild(ctx context.Context, s
 	detectResult, err := swe.executeTool(ctx, sessionID, "detect_databases", variables)
 	if err != nil {
 		// Database detection is optional, log warning but continue
-		swe.logger.Warn().Err(err).Msg("Database detection failed, continuing without database configuration")
+		swe.logger.Warn("Database detection failed, continuing without database configuration", "error", err)
 		results["detect_databases"] = map[string]interface{}{"skipped": true, "reason": err.Error()}
 	} else {
 		results["detect_databases"] = detectResult
@@ -137,7 +158,15 @@ func (swe *SimpleWorkflowExecutor) executeAnalyzeAndBuild(ctx context.Context, s
 	// Step 3: Build image
 	buildResult, err := swe.executeTool(ctx, sessionID, "build_image", variables)
 	if err != nil {
-		return nil, errors.NewError().Message("build failed").Cause(err).Build()
+		return nil, errors.NewError().
+			Message("image build failed").
+			Code(errors.CodeImageBuildFailed).
+			Type(errors.ErrTypeContainer).
+			Cause(err).
+			Context("operation", "build_image").
+			Context("session_id", sessionID).
+			WithLocation().
+			Build()
 	}
 	results["build"] = buildResult
 
@@ -155,7 +184,7 @@ func (swe *SimpleWorkflowExecutor) executeDeployApplication(ctx context.Context,
 	detectResult, err := swe.executeTool(ctx, sessionID, "detect_databases", variables)
 	if err != nil {
 		// Database detection is optional, log warning but continue
-		swe.logger.Warn().Err(err).Msg("Database detection failed, continuing without automatic database configuration")
+		swe.logger.Warn("Database detection failed, continuing without automatic database configuration", "error", err)
 		results["detect_databases"] = map[string]interface{}{"skipped": true, "reason": err.Error()}
 	} else {
 		results["detect_databases"] = detectResult
@@ -164,14 +193,30 @@ func (swe *SimpleWorkflowExecutor) executeDeployApplication(ctx context.Context,
 	// Step 2: Generate manifests (will use detected databases if available)
 	manifestResult, err := swe.executeTool(ctx, sessionID, "generate_manifests", variables)
 	if err != nil {
-		return nil, errors.NewError().Message("manifest generation failed").Cause(err).Build()
+		return nil, errors.NewError().
+			Message("Kubernetes manifest generation failed").
+			Code(errors.CodeManifestInvalid).
+			Type(errors.ErrTypeKubernetes).
+			Cause(err).
+			Context("operation", "generate_manifests").
+			Context("session_id", sessionID).
+			WithLocation().
+			Build()
 	}
 	results["generate_manifests"] = manifestResult
 
 	// Step 3: Deploy to Kubernetes
 	deployResult, err := swe.executeTool(ctx, sessionID, "deploy_kubernetes", variables)
 	if err != nil {
-		return nil, errors.NewError().Message("deployment failed").Cause(err).Build()
+		return nil, errors.NewError().
+			Message("Kubernetes deployment failed").
+			Code(errors.CodeDeploymentFailed).
+			Type(errors.ErrTypeKubernetes).
+			Cause(err).
+			Context("operation", "deploy_kubernetes").
+			Context("session_id", sessionID).
+			WithLocation().
+			Build()
 	}
 	results["deploy"] = deployResult
 
@@ -188,7 +233,15 @@ func (swe *SimpleWorkflowExecutor) executeScanAndFix(ctx context.Context, sessio
 	// Simple security scan workflow
 	scanResult, err := swe.executeTool(ctx, sessionID, "scan_security", variables)
 	if err != nil {
-		return nil, errors.NewError().Message("security scan failed").Cause(err).Build()
+		return nil, errors.NewError().
+			Message("security scan failed").
+			Code(errors.CodeSecurity).
+			Type(errors.ErrTypeSecurity).
+			Cause(err).
+			Context("operation", "scan_security").
+			Context("session_id", sessionID).
+			WithLocation().
+			Build()
 	}
 	results["scan"] = scanResult
 
@@ -237,7 +290,7 @@ func (swe *SimpleWorkflowExecutor) executeSecurityAudit(ctx context.Context, ses
 
 // Helper to execute individual tools
 func (swe *SimpleWorkflowExecutor) executeTool(ctx context.Context, sessionID, toolName string, variables map[string]interface{}) (interface{}, error) {
-	swe.logger.Debug().Str("tool", toolName).Str("session_id", sessionID).Msg("Executing tool")
+	swe.logger.Debug("Executing tool", "tool", toolName, "session_id", sessionID)
 
 	// For now, return a simple success result
 	// Real implementation would call actual tools through the registry
@@ -269,7 +322,7 @@ func NewWorkflowOrchestrator(deps ...interface{}) *WorkflowOrchestrator {
 	// Extract session manager, tool registry, and logger from deps
 	var sessionManager session.UnifiedSessionManager
 	var toolRegistry *ToolRegistry
-	var logger zerolog.Logger
+	var logger *slog.Logger
 
 	for _, dep := range deps {
 		switch d := dep.(type) {
@@ -277,14 +330,14 @@ func NewWorkflowOrchestrator(deps ...interface{}) *WorkflowOrchestrator {
 			sessionManager = d
 		case *ToolRegistry:
 			toolRegistry = d
-		case zerolog.Logger:
+		case *slog.Logger:
 			logger = d
 		}
 	}
 
 	// Provide defaults if needed
-	if logger.GetLevel() == zerolog.Disabled {
-		logger = zerolog.Nop()
+	if logger == nil {
+		logger = slog.Default()
 	}
 
 	return NewSimpleWorkflowExecutor(sessionManager, toolRegistry, logger)

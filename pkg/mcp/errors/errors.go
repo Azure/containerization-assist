@@ -180,7 +180,7 @@ func WrapTyped(err error, module, message string) *TypedMCPError {
 		return typedErr
 	}
 
-	// If it's a legacy MCPError, preserve its category
+	// If it is a legacy MCPError, preserve its category
 	if mcpErr, ok := err.(*MCPError); ok {
 		typedErr.Category = mcpErr.Category
 		typedErr.Operation = mcpErr.Operation

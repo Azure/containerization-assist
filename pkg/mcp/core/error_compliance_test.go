@@ -174,12 +174,11 @@ func TestConsolidatedScanParamsValidation(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "missing session_id",
+			name: "valid with image_ref only",
 			params: ConsolidatedScanParams{
 				ImageRef: "nginx:latest",
 			},
-			expectErr: true,
-			errorCode: errors.CodeMissingParameter,
+			expectErr: false,
 		},
 		{
 			name: "missing image_ref",

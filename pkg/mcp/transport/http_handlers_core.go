@@ -69,7 +69,7 @@ func (t *HTTPTransport) handleGetToolSchema(w http.ResponseWriter, r *http.Reque
 	if t.mcpServer != nil {
 		// Use a local type assertion instead of defining an interface
 
-		if server, ok := t.mcpServer.(serverWithRegistry); ok {
+		if server, ok := t.mcpServer.(serverWithCapabilities); ok {
 			if registry := server.GetToolRegistry(); registry != nil {
 				// Get full tool schema including parameters and output
 				if schema, err := registry.GetToolSchema(toolName); err == nil {

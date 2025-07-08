@@ -2,11 +2,11 @@ package pipeline
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // AnalyzeRepository implements the legacy analysis interface
@@ -53,11 +53,11 @@ func (o *Operations) AnalyzeRepositoryTyped(_ context.Context, sessionID string,
 	if sessionID == "" {
 		return nil, errors.NewError().Messagef("session ID is required").WithLocation().Build()
 	}
-	if params.RepositoryPath == "" {
+	if params.Path == "" {
 		return nil, errors.NewError().Messagef("repository path is required").WithLocation().Build()
 	}
 
-	o.logger.Info("Analyzing repository", "session_id", sessionID, "repository_path", params.RepositoryPath)
+	o.logger.Info("Analyzing repository", "session_id", sessionID, "repository_path", params.Path)
 
 	return &core.AnalyzeResult{
 		BaseToolResponse: types.BaseToolResponse{
@@ -65,17 +65,16 @@ func (o *Operations) AnalyzeRepositoryTyped(_ context.Context, sessionID string,
 			Message:   "Repository analysis completed successfully",
 			Timestamp: time.Now(),
 		},
-		RepositoryInfo: &core.RepositoryInfo{
-			Path:      params.RepositoryPath,
-			Type:      "git",
+		RepositoryInfo: core.RepositoryInfo{
+			Path:      params.Path,
 			Language:  "detected",
 			Framework: "unknown",
 		},
-		Recommendations: []types.Recommendation{
-			{Type: "info", Title: "Repository analysis completed", Description: "Delegate to atomic analyzer for detailed results"},
+		BuildRecommendations: core.BuildRecommendations{
+			OptimizationSuggestions: []core.Recommendation{
+				{Type: "info", Title: "Repository analysis completed", Description: "Delegate to atomic analyzer for detailed results"},
+			},
 		},
-		SecurityIssues:   []string{"Analysis delegated to security scanner"},
-		PerformanceHints: []string{"Use atomic analyzer for performance recommendations"},
 	}, nil
 }
 
@@ -96,9 +95,11 @@ func (o *Operations) ValidateDockerfileTyped(_ context.Context, sessionID string
 			Message:   "Dockerfile validation completed successfully",
 			Timestamp: time.Now(),
 		},
-		Valid:       true,  // Validation passed
-		Score:       100.0, // High score for successful validation
-		Suggestions: []string{},
+		Valid:         true, // Validation passed
+		Score:         85.0, // Default score for successful validation
+		Errors:        []string{},
+		Warnings:      []string{},
+		BestPractices: []string{},
 	}, nil
 }
 
@@ -122,17 +123,14 @@ func (o *Operations) ScanSecurityTyped(_ context.Context, sessionID string, para
 			Message:   "Security scan completed successfully",
 			Timestamp: time.Now(),
 		},
-		ScanReport: &core.SecurityScanResult{
-			Success:   true,
-			ImageRef:  params.ImageRef,
-			ScannedAt: time.Now(),
-			Scanner:   "delegated",
-		},
-		VulnerabilityDetails: []core.SecurityFinding{
-			{Severity: "info", Title: "Delegated Scan", Description: "Security scan delegated to specialized scanner"},
-		},
-		ComplianceIssues: []string{"Scan delegated to compliance checker"},
-		ReportPath:       fmt.Sprintf("/tmp/security-scan-%s.json", sessionID),
+		VulnerabilityCount:   0,
+		CriticalCount:        0,
+		HighCount:            0,
+		MediumCount:          0,
+		LowCount:             0,
+		Vulnerabilities:      []string{},
+		ScanReport:           make(map[string]interface{}),
+		VulnerabilityDetails: []interface{}{},
 	}, nil
 }
 
@@ -153,11 +151,8 @@ func (o *Operations) ScanSecretsTyped(_ context.Context, sessionID string, param
 			Message:   "Secrets scan completed successfully",
 			Timestamp: time.Now(),
 		},
-		SecretsFound: []core.ConsolidatedSecretFinding{
-			{Type: "info", Description: "Secret scan delegated to specialized scanner", Confidence: "low"},
-		},
-		FilesScanned: 1,
-		SecretTypes:  []string{"delegated"},
-		RiskLevel:    "low",
+		SecretsFound: 0,
+		Files:        []string{},
+		Secrets:      []string{},
 	}, nil
 }

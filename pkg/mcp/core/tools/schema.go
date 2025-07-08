@@ -1,4 +1,4 @@
-package core
+package tools
 
 import (
 	"encoding/json"
@@ -792,11 +792,13 @@ func ArraySchemaLegacy(itemSchema any, minItems, maxItems int) map[string]any {
 }
 
 // ArraySchemaTyped creates a type-safe array schema
-func ArraySchemaTyped[T SchemaValue](itemSchema *TypedJSONSchema[T], minItems, maxItems int) *TypedJSONSchema[[]any] {
-	schema := NewTypedSchema[[]any]()
-	schema.Type = "array"
-	schema.Items = itemSchema.JSONSchema
-	// Note: minItems and maxItems not yet supported in TypedJSONSchema, would need to add fields
+// Note: This returns untyped JSONSchema since arrays don't satisfy SchemaValue constraint
+func ArraySchemaTyped(itemSchema *JSONSchema, minItems, maxItems int) *JSONSchema {
+	schema := &JSONSchema{
+		Type:  "array",
+		Items: itemSchema,
+	}
+	// Note: minItems and maxItems not yet supported in JSONSchema, would need to add fields
 	return schema
 }
 
@@ -845,11 +847,13 @@ func ObjectSchemaLegacy(properties map[string]any, required []string) map[string
 type TypedSchemaProperty = JSONSchema
 
 // ObjectSchemaTyped creates a type-safe object schema
-func ObjectSchemaTyped(properties map[string]*TypedSchemaProperty, required []string) *TypedJSONSchema[map[string]any] {
-	schema := NewTypedSchema[map[string]any]()
-	schema.Type = "object"
-	schema.Properties = properties
-	schema.Required = required
+// Note: This returns untyped JSONSchema since objects don't satisfy SchemaValue constraint
+func ObjectSchemaTyped(properties map[string]*TypedSchemaProperty, required []string) *JSONSchema {
+	schema := &JSONSchema{
+		Type:       "object",
+		Properties: properties,
+		Required:   required,
+	}
 	return schema
 }
 

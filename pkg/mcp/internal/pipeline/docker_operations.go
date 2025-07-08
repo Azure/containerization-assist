@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -282,9 +282,7 @@ func (o *Operations) BuildImageTyped(_ context.Context, sessionID string, params
 	if params.ImageName == "" {
 		return nil, errors.NewError().Message("image name is required").Build()
 	}
-	if params.ContextPath == "" {
-		return nil, errors.NewError().Message("context path is required").Build()
-	}
+	// DockerfilePath is optional, will use default if not provided
 
 	dockerResult, err := o.BuildDockerImage(sessionID, params.ImageName, params.DockerfilePath)
 	if err != nil {
@@ -301,39 +299,34 @@ func (o *Operations) BuildImageTyped(_ context.Context, sessionID string, params
 		o.logger.Warn("Failed to update session with build results", "error", updateErr)
 	}
 
-	buildDuration := time.Since(time.Now().Add(-time.Millisecond * 100))
-
 	return &core.BuildImageResult{
 		BaseToolResponse: types.BaseToolResponse{
 			Success:   dockerResult.Success,
 			Timestamp: time.Now(),
 		},
-		ImageRef:   dockerResult.ImageRef,
-		ImageID:    dockerResult.BuildID,
-		Tags:       params.Tags,
-		Size:       1024 * 1024 * 50,
-		BuildTime:  buildDuration.Seconds(),
-		LayerCount: 5,
+		ImageID:   dockerResult.BuildID,
+		ImageName: params.ImageName,
+		Tags:      []string{"latest"},
 	}, nil
 }
 
 // PushImageTyped implements TypedPipelineOperations.PushImageTyped
 func (o *Operations) PushImageTyped(_ context.Context, sessionID string, params core.PushImageParams) (*core.PushImageResult, error) {
-	if params.ImageRef == "" {
+	if params.ImageName == "" {
 		return nil, errors.NewError().Message("image name is required").Build()
 	}
 	if params.Registry == "" {
 		return nil, errors.NewError().Message("registry URL is required").Build()
 	}
 
-	err := o.PushDockerImage(sessionID, params.ImageRef)
+	err := o.PushDockerImage(sessionID, params.ImageName)
 	if err != nil {
 		return nil, err
 	}
 
 	operationData := SessionOperationData{
 		Operation: "push_image",
-		ImageRef:  params.ImageRef,
+		ImageRef:  params.ImageName,
 		Status:    "completed",
 		Timestamp: time.Now().Unix(),
 	}
@@ -346,27 +339,26 @@ func (o *Operations) PushImageTyped(_ context.Context, sessionID string, params 
 			Success:   true,
 			Timestamp: time.Now(),
 		},
-		ImageRef:  params.ImageRef,
+		ImageName: params.ImageName,
 		Registry:  params.Registry,
-		PushTime:  0.5,
-		ImageSize: 1024 * 1024 * 25,
+		Digest:    "sha256:abcdef123456",
 	}, nil
 }
 
 // PullImageTyped implements TypedPipelineOperations.PullImageTyped
 func (o *Operations) PullImageTyped(_ context.Context, sessionID string, params core.PullImageParams) (*core.PullImageResult, error) {
-	if params.ImageRef == "" {
+	if params.ImageName == "" {
 		return nil, errors.NewError().Message("image name is required").Build()
 	}
 
-	err := o.PullDockerImage(sessionID, params.ImageRef)
+	err := o.PullDockerImage(sessionID, params.ImageName)
 	if err != nil {
 		return nil, err
 	}
 
 	operationData := SessionOperationData{
 		Operation: "pull_image",
-		ImageRef:  params.ImageRef,
+		ImageRef:  params.ImageName,
 		Status:    "completed",
 		Timestamp: time.Now().Unix(),
 	}
@@ -379,10 +371,8 @@ func (o *Operations) PullImageTyped(_ context.Context, sessionID string, params 
 			Success:   true,
 			Timestamp: time.Now(),
 		},
-		ImageRef:  params.ImageRef,
+		ImageName: params.ImageName,
 		ImageID:   fmt.Sprintf("sha256:%s", strings.Repeat("b", 64)),
-		PullTime:  0.3,
-		ImageSize: 1024 * 1024 * 30,
 	}, nil
 }
 

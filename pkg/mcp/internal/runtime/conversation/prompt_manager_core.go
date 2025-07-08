@@ -123,7 +123,7 @@ func (pm *PromptManager) restoreStateFromSession(convState *ConversationState, i
 					Assistant: fmt.Sprintf("%v", turnMap["assistant"]),
 				}
 				if stage, ok := turnMap["stage"].(string); ok {
-					turn.Stage = core.ConsolidatedConversationStage(stage)
+					turn.Stage = core.ConversationStage(stage)
 				}
 				if ts, ok := turnMap["timestamp"].(string); ok {
 					turn.Timestamp, _ = time.Parse(time.RFC3339, ts)
@@ -153,7 +153,7 @@ func (pm *PromptManager) restoreStateFromSession(convState *ConversationState, i
 		}
 	}
 	if stage, ok := internalSession.Metadata["current_stage"].(string); ok {
-		convState.CurrentStage = core.ConsolidatedConversationStage(stage)
+		convState.CurrentStage = core.ConversationStage(stage)
 	}
 }
 func (pm *PromptManager) applyUserPreferences(ctx context.Context, convState *ConversationState) {

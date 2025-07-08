@@ -1,69 +1,19 @@
-# Complete Tool Guide - Container Kit MCP
+# Container Kit MCP Tool Guide
 
-This guide provides comprehensive information about Container Kit's MCP tools, including implementation standards, HTTP access patterns, and usage examples.
+This guide provides comprehensive information about Container Kit's MCP tools, HTTP access, and usage examples.
+
+> **📖 For Implementation**: See [MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md) for canonical implementation patterns and [adding-new-tools.md](./adding-new-tools.md) for step-by-step development guide.
 
 ## Table of Contents
-1. [Tool Standards](#tool-standards)
-2. [HTTP API Access](#http-api-access)
-3. [Available Tools](#available-tools)
-4. [Usage Examples](#usage-examples)
-5. [Implementation Guide](#implementation-guide)
+1. [HTTP API Access](#http-api-access)
+2. [Available Tools](#available-tools)
+3. [Usage Examples](#usage-examples)
 
-## Tool Standards
+## Reference Documentation
 
-All MCP tools follow canonical patterns defined for consistency and reliability.
-
-### Required Interface
-
-All tools implement the `api.Tool` interface:
-
-```go
-type Tool interface {
-    Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error)
-    Name() string
-    Description() string
-    Schema() api.ToolSchema
-}
-```
-
-### Standard Input/Output
-
-Tools use unified input and output structures:
-
-```go
-type ToolInput struct {
-    SessionID string                 `json:"session_id,omitempty"`
-    Data      map[string]interface{} `json:"data"`
-}
-
-type ToolOutput struct {
-    Success bool                   `json:"success"`
-    Data    map[string]interface{} `json:"data,omitempty"`
-    Error   string                 `json:"error,omitempty"`
-}
-```
-
-### Error Handling Standard
-
-Tools MUST return both `ToolOutput` and error consistently:
-
-```go
-func (t *Tool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
-    // Validation errors
-    if err := validateInput(input); err != nil {
-        return api.ToolOutput{
-            Success: false,
-            Error:   err.Error(),
-        }, err
-    }
-
-    // Success case
-    return api.ToolOutput{
-        Success: true,
-        Data:    map[string]interface{}{"result": result},
-    }, nil
-}
-```
+- **[MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md)** - Canonical implementation patterns and standards
+- **[adding-new-tools.md](./adding-new-tools.md)** - Step-by-step tool development guide
+- **[TAG_BASED_VALIDATION.md](./TAG_BASED_VALIDATION.md)** - Validation system documentation
 
 ## HTTP API Access
 
@@ -297,59 +247,9 @@ curl -X POST "http://localhost:8080/api/v1/tools/delete_session" \
 
 ## Implementation Guide
 
-### Adding New Tools
-
-1. **Choose Domain**: Place in appropriate domain package (`pkg/mcp/domain/`)
-2. **Implement Interface**: Follow `api.Tool` interface
-3. **Standard Patterns**: Use `ToolInput`/`ToolOutput` structures
-4. **Validation**: Add comprehensive input validation
-5. **Testing**: Include unit and integration tests
-
-### Example Tool Implementation
-
-```go
-package mydomain
-
-type MyTool struct {
-    sessionManager session.Manager
-    logger         zerolog.Logger
-}
-
-func (t *MyTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
-    // Extract parameters
-    var params MyToolParams
-    if err := mapstructure.Decode(input.Data, &params); err != nil {
-        return api.ToolOutput{
-            Success: false,
-            Error:   "Invalid input parameters",
-        }, err
-    }
-
-    // Perform operation
-    result, err := t.performOperation(params)
-    if err != nil {
-        return api.ToolOutput{
-            Success: false,
-            Error:   err.Error(),
-        }, err
-    }
-
-    return api.ToolOutput{
-        Success: true,
-        Data:    map[string]interface{}{"result": result},
-    }, nil
-}
-```
-
-### Compliance Checklist
-
-- [ ] Tool implements `api.Tool` interface
-- [ ] Uses standard `ToolInput`/`ToolOutput` structures
-- [ ] Returns both ToolOutput and error consistently
-- [ ] Has comprehensive input validation
-- [ ] Includes session management integration
-- [ ] Has unit and integration tests
-- [ ] Documentation includes usage examples
+**For detailed implementation guidance, see:**
+- **[adding-new-tools.md](./adding-new-tools.md)** - Complete step-by-step development guide
+- **[MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md)** - Canonical patterns and compliance requirements
 
 ## Testing
 

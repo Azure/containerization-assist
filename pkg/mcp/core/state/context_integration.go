@@ -1,34 +1,44 @@
-package core
+package state
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/knowledge"
 	"github.com/Azure/container-kit/pkg/mcp/session"
-	"github.com/Azure/container-kit/pkg/mcp/tools/build"
-	"github.com/rs/zerolog"
 )
+
+// AIAnalyzer interface for AI analysis operations
+// This interface represents the minimal contract that an AI analyzer must implement
+type AIAnalyzer interface {
+	Analyze(ctx context.Context, prompt string) (string, error)
+	AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error)
+	AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error)
+	GetTokenUsage() core.TokenUsage
+	ResetTokenUsage()
+}
 
 // AIContextIntegration provides comprehensive AI context integration
 type AIContextIntegration struct {
 	aggregator     *AIContextAggregator
 	stateManager   *UnifiedStateManager
 	sessionManager *session.SessionManager
-	knowledgeBase  *build.CrossToolKnowledgeBase
-	logger         zerolog.Logger
+	knowledgeBase  *knowledge.CrossToolKnowledgeBase
+	logger         *slog.Logger
 }
 
 // NewAIContextIntegration creates a new AI context integration
 func NewAIContextIntegration(
 	stateManager *UnifiedStateManager,
 	sessionManager *session.SessionManager,
-	knowledgeBase *build.CrossToolKnowledgeBase,
-	logger zerolog.Logger,
+	knowledgeBase *knowledge.CrossToolKnowledgeBase,
+	logger *slog.Logger,
 ) *AIContextIntegration {
-	aggregator := NewAIContextAggregator(stateManager, sessionManager, logger)
+	aggregator := NewAIContextAggregator()
 
 	aggregator.RegisterContextProvider("build", NewBuildContextProvider(
 		stateManager, sessionManager, knowledgeBase, logger))
@@ -51,7 +61,7 @@ func NewAIContextIntegration(
 		stateManager:   stateManager,
 		sessionManager: sessionManager,
 		knowledgeBase:  knowledgeBase,
-		logger:         logger.With().Str("component", "ai_context_integration").Logger(),
+		logger:         logger.With(slog.String("component", "ai_context_integration")),
 	}
 }
 
@@ -59,7 +69,7 @@ func (i *AIContextIntegration) GetAggregator() *AIContextAggregator {
 	return i.aggregator
 }
 
-func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer core.AIAnalyzer) core.AIAnalyzer {
+func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer AIAnalyzer) AIAnalyzer {
 	return &AIAwareAnalyzer{
 		baseAnalyzer: baseAnalyzer,
 		integration:  i,
@@ -68,51 +78,57 @@ func (i *AIContextIntegration) CreateAIAwareAnalyzer(baseAnalyzer core.AIAnalyze
 }
 
 type AIAwareAnalyzer struct {
-	baseAnalyzer core.AIAnalyzer
+	baseAnalyzer AIAnalyzer
 	integration  *AIContextIntegration
-	logger       zerolog.Logger
+	logger       *slog.Logger
 }
 
-func (a *AIAwareAnalyzer) Analyze(ctx context.Context, prompt string) (string, error) {
-	sessionID := a.extractSessionID(ctx)
-
-	compContext, err := a.integration.aggregator.GetComprehensiveContext(ctx, sessionID)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("Failed to get comprehensive context")
+// AnalyzeWithContext analyzes with context awareness
+func (a *AIAwareAnalyzer) AnalyzeWithContext(ctx context.Context, prompt string) (string, error) {
+	// Extract session ID from context
+	sessionID := extractSessionID(ctx)
+	if sessionID == "" {
+		// No session context, use base analyzer
 		return a.baseAnalyzer.Analyze(ctx, prompt)
 	}
 
+	// Get comprehensive context
+	compContext, err := a.integration.aggregator.GetComprehensiveContext(ctx, sessionID)
+	if err != nil {
+		a.integration.logger.Warn("Failed to get comprehensive context",
+			slog.String("error", err.Error()))
+		return a.baseAnalyzer.Analyze(ctx, prompt)
+	}
+
+	// Enhance prompt with context
 	enhancedPrompt := a.enhancePromptWithContext(prompt, compContext)
 
+	// Analyze with enhanced prompt
 	result, err := a.baseAnalyzer.Analyze(ctx, enhancedPrompt)
 	if err != nil {
 		return "", err
 	}
 
-	a.storeAnalysisResult(ctx, sessionID, prompt, result, compContext)
+	// Post-process result with context awareness
+	return a.postProcessWithContext(result, compContext), nil
+}
 
-	return result, nil
+func (a *AIAwareAnalyzer) Analyze(ctx context.Context, prompt string) (string, error) {
+	// Delegate to context-aware version
+	return a.AnalyzeWithContext(ctx, prompt)
 }
 
 func (a *AIAwareAnalyzer) AnalyzeWithFileTools(ctx context.Context, prompt, baseDir string) (string, error) {
-	sessionID := a.extractSessionID(ctx)
-
-	compContext, err := a.integration.aggregator.GetComprehensiveContext(ctx, sessionID)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("Failed to get comprehensive context")
-		return a.baseAnalyzer.AnalyzeWithFileTools(ctx, prompt, baseDir)
+	// Get session context if available
+	sessionID := extractSessionID(ctx)
+	if sessionID != "" {
+		compContext, _ := a.integration.aggregator.GetComprehensiveContext(ctx, sessionID)
+		if compContext != nil {
+			prompt = a.enhancePromptWithContext(prompt, compContext)
+		}
 	}
 
-	enhancedPrompt := a.enhancePromptWithContext(prompt, compContext)
-
-	result, err := a.baseAnalyzer.AnalyzeWithFileTools(ctx, enhancedPrompt, baseDir)
-	if err != nil {
-		return "", err
-	}
-
-	a.storeAnalysisResult(ctx, sessionID, prompt, result, compContext)
-
-	return result, nil
+	return a.baseAnalyzer.AnalyzeWithFileTools(ctx, prompt, baseDir)
 }
 
 func (a *AIAwareAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate string, args ...interface{}) (string, error) {
@@ -120,7 +136,7 @@ func (a *AIAwareAnalyzer) AnalyzeWithFormat(ctx context.Context, promptTemplate 
 	return a.Analyze(ctx, formattedPrompt)
 }
 
-func (a *AIAwareAnalyzer) GetTokenUsage() mcptypes.TokenUsage {
+func (a *AIAwareAnalyzer) GetTokenUsage() core.TokenUsage {
 	return a.baseAnalyzer.GetTokenUsage()
 }
 
@@ -194,7 +210,7 @@ func (a *AIAwareAnalyzer) enhancePromptWithContext(prompt string, context *Compr
 			maxRecs = len(context.Recommendations)
 		}
 		for i, rec := range context.Recommendations[:maxRecs] {
-			contextSummary += fmt.Sprintf("  %d. [%s] %s\n",
+			contextSummary += fmt.Sprintf("  %d. [%d] %s\n",
 				i+1, rec.Priority, rec.Title)
 		}
 	}
@@ -225,7 +241,7 @@ func (a *AIAwareAnalyzer) enhanceErrorAnalysis(analysis *ErrorAnalysis, context 
 	}
 
 	for _, rec := range context.Recommendations {
-		if rec.Priority == "high" || rec.Priority == "critical" {
+		if rec.Priority <= 2 { // 1 = critical, 2 = high
 			analysis.Recommendations = append(analysis.Recommendations, rec.Description)
 		}
 	}
@@ -255,14 +271,15 @@ func (a *AIAwareAnalyzer) storeAnalysisResult(ctx context.Context, sessionID, pr
 
 	recordID := fmt.Sprintf("analysis_%s_%d", sessionID, time.Now().UnixNano())
 	if err := a.integration.stateManager.SetState(ctx, StateTypeGlobal, recordID, analysisRecord); err != nil {
-		a.logger.Error().Err(err).Msg("Failed to store analysis result")
+		a.logger.Error("Failed to store analysis result",
+			slog.String("error", err.Error()))
 	}
 }
 
 // CreateContextAwareTools creates tools with full context awareness
 func (i *AIContextIntegration) CreateContextAwareTools(toolFactory interface{}) error {
 
-	i.logger.Info().Msg("Created context-aware tools (simplified)")
+	i.logger.Info("Created context-aware tools (simplified)")
 	return nil
 }
 
@@ -370,9 +387,9 @@ func (i *AIContextIntegration) calculateOverallHealth(context *ComprehensiveCont
 	health := 1.0
 
 	for _, rec := range context.Recommendations {
-		if rec.Priority == "critical" {
+		if rec.Priority == 1 { // critical
 			health -= 0.2
-		} else if rec.Priority == "high" {
+		} else if rec.Priority == 2 { // high
 			health -= 0.1
 		}
 	}
@@ -416,7 +433,7 @@ func (i *AIContextIntegration) extractActionItems(context *ComprehensiveContext)
 	actions := make([]string, 0)
 
 	for _, rec := range context.Recommendations {
-		if rec.Priority == "critical" || rec.Priority == "high" {
+		if rec.Priority <= 2 { // critical (1) or high (2)
 			actions = append(actions, rec.Actions...)
 		}
 	}
@@ -439,4 +456,28 @@ func (i *AIContextIntegration) extractActionItems(context *ComprehensiveContext)
 	}
 
 	return result
+}
+
+// postProcessWithContext post-processes result with context awareness
+func (a *AIAwareAnalyzer) postProcessWithContext(result string, context *ComprehensiveContext) string {
+	// Add context-aware enhancements to the result
+	if len(context.Recommendations) > 0 {
+		result += "\n\n--- Context-Aware Recommendations ---\n"
+		for i, rec := range context.Recommendations {
+			if i >= 3 {
+				break // Limit to top 3
+			}
+			result += fmt.Sprintf("• %s\n", rec.Title)
+		}
+	}
+
+	return result
+}
+
+// extractSessionID extracts session ID from context
+func extractSessionID(ctx context.Context) string {
+	if sessionID, ok := ctx.Value("session_id").(string); ok {
+		return sessionID
+	}
+	return ""
 }

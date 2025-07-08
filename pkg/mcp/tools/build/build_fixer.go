@@ -23,7 +23,7 @@ func NewAdvancedBuildFixerWithDefaults(logger zerolog.Logger, analyzer core.AIAn
 // NewAdvancedBuildFixerWithDefaultsUnified creates a new advanced build fixer with unified session manager
 func NewAdvancedBuildFixerWithDefaultsUnified(logger zerolog.Logger, analyzer core.AIAnalyzer, sessionManager session.UnifiedSessionManager) *AdvancedBuildFixer {
 	// Create the core fixer
-	fixer := NewAdvancedBuildFixerUnified(logger, analyzer, sessionManager)
+	fixer := NewAdvancedBuildFixerUnified(logger)
 
 	return setupDefaultStrategies(fixer, logger)
 }

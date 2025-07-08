@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -113,9 +113,96 @@ func (t *CanonicalChatTool) InputSchema() *json.RawMessage {
 	return &schema
 }
 
+// Schema implements api.Tool
+func (t *CanonicalChatTool) Schema() api.ToolSchema {
+	// Convert the RawMessage to a map for the schema
+	var inputSchema map[string]interface{}
+	if schemaBytes := t.InputSchema(); schemaBytes != nil {
+		json.Unmarshal(*schemaBytes, &inputSchema)
+	}
+
+	return api.ToolSchema{
+		Name:        t.Name(),
+		Description: t.Description(),
+		InputSchema: inputSchema,
+		OutputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"success": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether the operation was successful",
+				},
+				"data": map[string]interface{}{
+					"type":        "object",
+					"description": "Operation result data",
+					"properties": map[string]interface{}{
+						"response": map[string]interface{}{
+							"type":        "string",
+							"description": "AI assistant response",
+						},
+						"session_id": map[string]interface{}{
+							"type":        "string",
+							"description": "Session ID for conversation continuity",
+						},
+						"stage": map[string]interface{}{
+							"type":        "string",
+							"description": "Current conversation stage",
+						},
+						"options": map[string]interface{}{
+							"type":        "array",
+							"description": "Available user options",
+							"items": map[string]interface{}{
+								"type": "object",
+								"properties": map[string]interface{}{
+									"id":          map[string]interface{}{"type": "string"},
+									"label":       map[string]interface{}{"type": "string"},
+									"description": map[string]interface{}{"type": "string"},
+								},
+							},
+						},
+						"next_steps": map[string]interface{}{
+							"type":        "array",
+							"description": "Suggested next steps",
+							"items":       map[string]interface{}{"type": "string"},
+						},
+					},
+				},
+				"error": map[string]interface{}{
+					"type":        "string",
+					"description": "Error message if success is false",
+				},
+			},
+			"required": []string{"success"},
+		},
+		Examples: []api.ToolExample{
+			{
+				Name:        "Simple Chat",
+				Description: "Basic chat interaction",
+				Input: api.ToolInput{
+					SessionID: "session_123",
+					Data: map[string]interface{}{
+						"message": "Hello, can you help me with Docker?",
+					},
+				},
+				Output: api.ToolOutput{
+					Success: true,
+					Data: map[string]interface{}{
+						"response":   "I can help you with Docker-related tasks...",
+						"session_id": "session_123",
+						"stage":      "initial",
+						"next_steps": []string{"Analyze your repository", "Generate Dockerfile"},
+					},
+				},
+			},
+		},
+		Tags:    []string{"chat", "conversation", "ai", "assistant"},
+		Version: t.Version(),
+	}
+}
+
 // Execute implements api.Tool
-func (t *CanonicalChatTool) Execute(ctx context.Context, input json.RawMessage) (*tools.ExecutionResult, error) {
-	// Parse input JSON
+func (t *CanonicalChatTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
+	// Extract parameters from input data
 	var params struct {
 		Message   string                   `json:"message"`
 		SessionID string                   `json:"session_id,omitempty"`
@@ -125,35 +212,39 @@ func (t *CanonicalChatTool) Execute(ctx context.Context, input json.RawMessage) 
 		DryRun    bool                     `json:"dry_run,omitempty"`
 	}
 
-	if err := json.Unmarshal(input, &params); err != nil {
-		return &tools.ExecutionResult{
-			Content: []tools.ContentBlock{{
-				Type: "text",
-				Text: fmt.Sprintf("Failed to parse input: %v", err),
-			}},
-			IsError: true,
-		}, err
+	// Convert input.Data to params
+	if input.Data != nil {
+		if inputBytes, err := json.Marshal(input.Data); err != nil {
+			return api.ToolOutput{
+				Success: false,
+				Error:   fmt.Sprintf("Failed to marshal input data: %v", err),
+			}, err
+		} else if err := json.Unmarshal(inputBytes, &params); err != nil {
+			return api.ToolOutput{
+				Success: false,
+				Error:   fmt.Sprintf("Failed to parse input: %v", err),
+			}, err
+		}
+	}
+
+	// Use session ID from input if not provided in params
+	if params.SessionID == "" {
+		params.SessionID = input.SessionID
 	}
 
 	// Validate required parameters
 	if params.Message == "" {
-		return &tools.ExecutionResult{
-			Content: []tools.ContentBlock{{
-				Type: "text",
-				Text: "message is required",
-			}},
-			IsError: true,
+		return api.ToolOutput{
+			Success: false,
+			Error:   "message is required",
 		}, errors.NewError().Messagef("message is required").WithLocation().Build()
 	}
 
 	// Validate message length
 	if len(params.Message) > 10000 {
-		return &tools.ExecutionResult{
-			Content: []tools.ContentBlock{{
-				Type: "text",
-				Text: "message is too long (max 10,000 characters)",
-			}},
-			IsError: true,
+		return api.ToolOutput{
+			Success: false,
+			Error:   "message is too long (max 10,000 characters)",
 		}, errors.NewError().Messagef("message is too long").WithLocation().Build()
 	}
 
@@ -188,40 +279,35 @@ func (t *CanonicalChatTool) Execute(ctx context.Context, input json.RawMessage) 
 	}
 
 	// Create successful result
-	result := &tools.ExecutionResult{
-		Content: []tools.ContentBlock{
-			{
-				Type: "text",
-				Text: chatResult.Response,
-			},
-			{
-				Type: "data",
-				Data: map[string]interface{}{
-					"session_id":  chatResult.SessionID,
-					"stage":       chatResult.Stage,
-					"status":      chatResult.Status,
-					"response":    chatResult.Response,
-					"options":     chatResult.Options,
-					"next_steps":  chatResult.NextSteps,
-					"progress":    chatResult.Progress,
-					"success":     chatResult.Success,
-					"duration_ms": int64(time.Since(startTime).Milliseconds()),
-					"message_context": map[string]interface{}{
-						"original_message":  params.Message,
-						"context_provided":  params.Context,
-						"stage":             params.Stage,
-						"options_available": len(params.Options),
-					},
-				},
+	result := api.ToolOutput{
+		Success: chatResult.Success,
+		Data: map[string]interface{}{
+			"session_id":  chatResult.SessionID,
+			"stage":       chatResult.Stage,
+			"status":      chatResult.Status,
+			"response":    chatResult.Response,
+			"options":     chatResult.Options,
+			"next_steps":  chatResult.NextSteps,
+			"progress":    chatResult.Progress,
+			"success":     chatResult.Success,
+			"duration_ms": int64(time.Since(startTime).Milliseconds()),
+			"message_context": map[string]interface{}{
+				"original_message":  params.Message,
+				"context_provided":  params.Context,
+				"stage":             params.Stage,
+				"options_available": len(params.Options),
 			},
 		},
-		IsError: !chatResult.Success,
-		Metadata: map[string]any{
+		Metadata: map[string]interface{}{
 			"execution_time_ms": int64(time.Since(startTime).Milliseconds()),
 			"session_id":        chatResult.SessionID,
 			"tool_version":      t.Version(),
 			"dry_run":           params.DryRun,
 		},
+	}
+
+	if !chatResult.Success {
+		result.Error = "Chat interaction failed"
 	}
 
 	t.logger.Info().
@@ -242,33 +328,30 @@ func (t *CanonicalChatTool) handleChatDryRun(params struct {
 	Stage     string                   `json:"stage,omitempty"`
 	Options   []map[string]interface{} `json:"options,omitempty"`
 	DryRun    bool                     `json:"dry_run,omitempty"`
-}, startTime time.Time) *tools.ExecutionResult {
-	return &tools.ExecutionResult{
-		Content: []tools.ContentBlock{
-			{
-				Type: "text",
-				Text: "Dry run: Chat interaction would be performed",
-			},
-			{
-				Type: "data",
-				Data: map[string]interface{}{
-					"session_id": params.SessionID,
-					"dry_run":    true,
-					"preview": map[string]interface{}{
-						"would_process_message": params.Message[:min(50, len(params.Message))] + "...",
-						"would_use_session":     params.SessionID != "",
-						"would_apply_context":   params.Context != "",
-						"conversation_stage":    params.Stage,
-						"available_options":     len(params.Options),
-						"estimated_duration_s":  3,
-						"ai_capabilities":       []string{"understanding", "reasoning", "assistance", "conversation continuity"},
-						"response_types":        []string{"answer", "clarification", "options", "next_steps"},
-					},
-				},
+}, startTime time.Time) api.ToolOutput {
+	messagePreview := params.Message
+	if len(messagePreview) > 50 {
+		messagePreview = messagePreview[:50] + "..."
+	}
+
+	return api.ToolOutput{
+		Success: true,
+		Data: map[string]interface{}{
+			"session_id": params.SessionID,
+			"dry_run":    true,
+			"response":   "Dry run: Chat interaction would be performed",
+			"preview": map[string]interface{}{
+				"would_process_message": messagePreview,
+				"would_use_session":     params.SessionID != "",
+				"would_apply_context":   params.Context != "",
+				"conversation_stage":    params.Stage,
+				"available_options":     len(params.Options),
+				"estimated_duration_s":  3,
+				"ai_capabilities":       []string{"understanding", "reasoning", "assistance", "conversation continuity"},
+				"response_types":        []string{"answer", "clarification", "options", "next_steps"},
 			},
 		},
-		IsError: false,
-		Metadata: map[string]any{
+		Metadata: map[string]interface{}{
 			"execution_time_ms": int64(time.Since(startTime).Milliseconds()),
 			"session_id":        params.SessionID,
 			"tool_version":      t.Version(),
@@ -507,14 +590,15 @@ func containsWord(text, word string) bool {
 	return fmt.Sprintf("%s", text) != text || fmt.Sprintf("%s", word) != word // Simplified check
 }
 
-func (t *CanonicalChatTool) createChatErrorResult(sessionID, message string, err error, startTime time.Time) *tools.ExecutionResult {
-	return &tools.ExecutionResult{
-		Content: []tools.ContentBlock{{
-			Type: "text",
-			Text: message + ": " + err.Error(),
-		}},
-		IsError: true,
-		Metadata: map[string]any{
+func (t *CanonicalChatTool) createChatErrorResult(sessionID, message string, err error, startTime time.Time) api.ToolOutput {
+	return api.ToolOutput{
+		Success: false,
+		Error:   message + ": " + err.Error(),
+		Data: map[string]interface{}{
+			"session_id": sessionID,
+			"error":      true,
+		},
+		Metadata: map[string]interface{}{
 			"execution_time_ms": int64(time.Since(startTime).Milliseconds()),
 			"session_id":        sessionID,
 			"tool_version":      t.Version(),

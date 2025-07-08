@@ -82,13 +82,13 @@ func (c *CertificateScanner) Scan(ctx context.Context, config ScanConfig) (*Scan
 		Scanner:  c.GetName(),
 		Secrets:  make([]Secret, 0),
 		Metadata: make(map[string]interface{}),
-		Errors:   make([]error, 0),
+		Errors:   make([]string, 0),
 	}
 
 	// Scan for multi-line certificate blocks
 	secrets, err := c.scanForCertificateBlocks(config)
 	if err != nil {
-		result.Errors = append(result.Errors, err)
+		result.Errors = append(result.Errors, err.Error())
 	} else {
 		result.Secrets = append(result.Secrets, secrets...)
 	}
@@ -98,7 +98,7 @@ func (c *CertificateScanner) Scan(ctx context.Context, config ScanConfig) (*Scan
 	for lineNum, line := range lines {
 		lineSecrets, err := c.scanLineForCertificates(line, lineNum+1, config)
 		if err != nil {
-			result.Errors = append(result.Errors, err)
+			result.Errors = append(result.Errors, err.Error())
 			continue
 		}
 		result.Secrets = append(result.Secrets, lineSecrets...)

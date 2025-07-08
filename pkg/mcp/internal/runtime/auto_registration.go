@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
 func RegisterAllTools(registry interface{}) error {

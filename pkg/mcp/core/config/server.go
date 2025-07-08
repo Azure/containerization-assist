@@ -74,11 +74,12 @@ type ServerConfig struct {
 	HealthCheckTimeout  time.Duration `json:"health_check_timeout" yaml:"health_check_timeout" env:"MCP_HEALTH_CHECK_TIMEOUT" default:"5s"`
 
 	// Metrics configuration
-	MetricsEnabled   bool   `json:"metrics_enabled" yaml:"metrics_enabled" env:"MCP_METRICS_ENABLED" default:"true"`
-	MetricsPath      string `json:"metrics_path" yaml:"metrics_path" env:"MCP_METRICS_PATH" default:"/metrics"`
-	MetricsPort      int    `json:"metrics_port" yaml:"metrics_port" env:"MCP_METRICS_PORT" default:"9090"`
-	ProfilingPort    int    `json:"profiling_port" yaml:"profiling_port" env:"MCP_PROFILING_PORT" default:"6060"`
-	ProfilingEnabled bool   `json:"profiling_enabled" yaml:"profiling_enabled" env:"MCP_PROFILING_ENABLED" default:"false"`
+	MetricsEnabled   bool    `json:"metrics_enabled" yaml:"metrics_enabled" env:"MCP_METRICS_ENABLED" default:"true"`
+	MetricsPath      string  `json:"metrics_path" yaml:"metrics_path" env:"MCP_METRICS_PATH" default:"/metrics"`
+	MetricsPort      int     `json:"metrics_port" yaml:"metrics_port" env:"MCP_METRICS_PORT" default:"9090"`
+	ProfilingPort    int     `json:"profiling_port" yaml:"profiling_port" env:"MCP_PROFILING_PORT" default:"6060"`
+	ProfilingEnabled bool    `json:"profiling_enabled" yaml:"profiling_enabled" env:"MCP_PROFILING_ENABLED" default:"false"`
+	TraceSampleRate  float64 `json:"trace_sample_rate" yaml:"trace_sample_rate" env:"MCP_TRACE_SAMPLE_RATE" default:"1.0"`
 }
 
 // DefaultServerConfig returns a server configuration with sensible defaults
@@ -126,6 +127,7 @@ func DefaultServerConfig() *ServerConfig {
 		MetricsPort:           9090,
 		ProfilingPort:         6060,
 		ProfilingEnabled:      false,
+		TraceSampleRate:       1.0,
 	}
 }
 

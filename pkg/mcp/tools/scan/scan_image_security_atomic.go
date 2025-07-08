@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 	"github.com/Azure/container-kit/pkg/mcp/session"
 
 	"log/slog"
@@ -57,7 +58,7 @@ type AtomicScanImageSecurityTool struct {
 	logger          *slog.Logger
 	metrics         *SecurityMetrics
 	// Scan engine for core scanning functionality
-	scanEngine ScanEngine
+	scanEngine *ScanEngineImpl
 }
 
 // NewAtomicScanImageSecurityTool creates a new atomic security scanning tool using services
@@ -158,15 +159,19 @@ func (t *AtomicScanImageSecurityTool) handleSessionManagement(ctx context.Contex
 	session, err := t.sessionStore.Get(ctx, args.SessionID)
 	if err != nil {
 		// If session doesn't exist, create a new one
-		sessionID, createErr := t.sessionStore.Create(ctx, map[string]interface{}{
-			"tool_name": "atomic_scan_image_security",
-			"scan_type": "security",
-		})
+		newSession := &api.Session{
+			ID: args.SessionID,
+			Metadata: map[string]interface{}{
+				"tool_name": "atomic_scan_image_security",
+				"scan_type": "security",
+			},
+		}
+		createErr := t.sessionStore.Create(ctx, newSession)
 		if createErr != nil {
 			return nil, errors.NewError().Message("failed to create session").Cause(createErr).WithLocation().Build()
 		}
 
-		session, err = t.sessionStore.Get(ctx, sessionID)
+		session, err = t.sessionStore.Get(ctx, args.SessionID)
 		if err != nil {
 			return nil, errors.NewError().Message("failed to get created session").Cause(err).WithLocation().Build()
 		}
@@ -285,18 +290,13 @@ func (t *AtomicScanImageSecurityTool) ExecuteTypedInterface(ctx context.Context,
 		BaseToolResponse: mcptypes.BaseToolResponse{
 			Success: result.Success,
 		},
-		BaseAIContextResult: mcptypes.BaseAIContextResult{
-			IsSuccessful:  result.BaseAIContextResult.IsSuccessful,
-			Duration:      result.BaseAIContextResult.Duration,
-			OperationType: result.BaseAIContextResult.AIContextType,
-			ErrorCount:    len(result.BaseAIContextResult.EnhancementErrors),
-			WarningCount:  0, // No warning info in core version
+		BaseAIContextResult: types.BaseAIContextResult{
+			AIAnalysisTime: result.Duration,
+			Confidence:     0.9,
 		},
-		SessionID:    result.SessionID,
-		WorkspaceDir: "", // Not available in internal result
-		ImageRef:     result.ImageName,
-		ScanTime:     result.Duration,
-		HasSecrets:   false, // Default value
+		SessionID: result.SessionID,
+		ImageRef:  result.ImageName,
+		ScanTime:  result.Duration,
 	}
 
 	if result.ScanResult != nil {

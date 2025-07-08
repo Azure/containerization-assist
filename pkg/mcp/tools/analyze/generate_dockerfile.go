@@ -9,11 +9,49 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 	"github.com/localrivet/gomcp/server"
 )
+
+// GenerateDockerfileArgs represents arguments for Dockerfile generation
+type GenerateDockerfileArgs struct {
+	SessionID          string                 `json:"session_id"`
+	BaseImage          string                 `json:"base_image,omitempty"`
+	Template           string                 `json:"template,omitempty"`
+	Optimization       string                 `json:"optimization,omitempty"`
+	IncludeHealthCheck bool                   `json:"include_health_check,omitempty"`
+	Platform           string                 `json:"platform,omitempty"`
+	DryRun             bool                   `json:"dry_run,omitempty"`
+	BuildArgs          map[string]string      `json:"build_args,omitempty"`
+	RepoPath           string                 `json:"repo_path,omitempty"`
+	Language           string                 `json:"language,omitempty"`
+	Framework          string                 `json:"framework,omitempty"`
+	Port               int                    `json:"port,omitempty"`
+	BuildCommand       string                 `json:"build_command,omitempty"`
+	RunCommand         string                 `json:"run_command,omitempty"`
+	Dependencies       []string               `json:"dependencies,omitempty"`
+	Customizations     map[string]interface{} `json:"customizations,omitempty"`
+}
+
+// GenerateDockerfileResult represents the result of Dockerfile generation
+type GenerateDockerfileResult struct {
+	SessionID         string               `json:"session_id"`
+	Template          string               `json:"template"`
+	Content           string               `json:"content"`
+	FilePath          string               `json:"file_path"`
+	DockerfilePath    string               `json:"dockerfile_path"`
+	BaseImage         string               `json:"base_image"`
+	ExposedPorts      []int                `json:"exposed_ports"`
+	BuildSteps        []string             `json:"build_steps"`
+	HealthCheck       string               `json:"health_check"`
+	Message           string               `json:"message"`
+	TemplateSelection interface{}          `json:"template_selection"`
+	OptimizationHints *OptimizationContext `json:"optimization_hints"`
+	Validation        interface{}          `json:"validation"`
+}
 
 // AtomicGenerateDockerfileTool handles Dockerfile generation
 type AtomicGenerateDockerfileTool struct {

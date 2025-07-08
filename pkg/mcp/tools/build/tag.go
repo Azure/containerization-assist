@@ -1,7 +1,7 @@
 package build
 
 // getImageTag returns the image tag, defaulting to "latest" if not specified
-func (t *AtomicBuildImageTool) getImageTag(tag string) string {
+func getImageTag(tag string) string {
 	if tag == "" {
 		return "latest"
 	}
@@ -9,7 +9,7 @@ func (t *AtomicBuildImageTool) getImageTag(tag string) string {
 }
 
 // getPlatform returns the target platform, defaulting to "linux/amd64" if not specified
-func (t *AtomicBuildImageTool) getPlatform(platform string) string {
+func getPlatform(platform string) string {
 	if platform == "" {
 		return "linux/amd64"
 	}

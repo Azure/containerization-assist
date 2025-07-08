@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/common/validation-core/validators"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/rs/zerolog"
 )
 
@@ -46,7 +46,8 @@ func (v *UnifiedImageValidator) Validate(content string, options ValidationOptio
 	images := extractBaseImages(content)
 
 	// Initialize result
-	result := core.NewBuildResult("unified-image-validator", "1.0.0")
+	result := core.NewBuildResult()
+	result.Valid = true
 
 	// Validate each image using unified framework
 	ctx := context.Background()
@@ -66,13 +67,14 @@ func (v *UnifiedImageValidator) Validate(content string, options ValidationOptio
 		result.Valid = result.Valid && convertedResult.Valid
 		result.Errors = append(result.Errors, convertedResult.Errors...)
 		result.Warnings = append(result.Warnings, convertedResult.Warnings...)
-		result.Suggestions = append(result.Suggestions, convertedResult.Suggestions...)
 	}
 
 	// Add multi-stage build info if applicable
 	if len(images) > 1 {
-		result.AddSuggestion(
-			fmt.Sprintf("Multi-stage build detected with %d stages", len(images)))
+		if result.Details == nil {
+			result.Details = make(map[string]interface{})
+		}
+		result.Details["multi_stage_info"] = fmt.Sprintf("Multi-stage build detected with %d stages", len(images))
 		v.validateMultiStageConsistency(images, result)
 	}
 
@@ -101,13 +103,15 @@ func (v *UnifiedImageValidator) validateMultiStageConsistency(images []string, r
 
 	// Check for too many different base images
 	if len(baseImageMap) > 3 {
-		warning := core.NewWarning(
-			"MULTI_STAGE_CONSISTENCY",
-			"Using many different base images may impact build cache efficiency",
-		)
-		warning.Error.WithRule("multi_stage_consistency")
-		result.AddWarning(warning)
-		result.AddSuggestion("Consider using fewer distinct base images for better layer caching")
+		result.Warnings = append(result.Warnings, core.ValidationWarning{
+			Code:    "MULTI_STAGE_CONSISTENCY",
+			Message: "Using many different base images may impact build cache efficiency",
+			Context: make(map[string]string),
+		})
+		if result.Details == nil {
+			result.Details = make(map[string]interface{})
+		}
+		result.Details["suggestion"] = "Consider using fewer distinct base images for better layer caching"
 	}
 
 	// Check for consistent registry usage
@@ -118,7 +122,14 @@ func (v *UnifiedImageValidator) validateMultiStageConsistency(images []string, r
 	}
 
 	if len(registryMap) > 1 {
-		result.AddSuggestion("Multiple registries detected. Consider using a single registry for consistency")
+		if result.Details == nil {
+			result.Details = make(map[string]interface{})
+		}
+		if existing, ok := result.Details["suggestion"].(string); ok {
+			result.Details["suggestion"] = existing + "; Multiple registries detected. Consider using a single registry for consistency"
+		} else {
+			result.Details["suggestion"] = "Multiple registries detected. Consider using a single registry for consistency"
+		}
 	}
 }
 

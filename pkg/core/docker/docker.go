@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/clients"
+	"github.com/Azure/container-kit/pkg/mcp/api"
 )
 
 // Manager provides a unified interface to all Docker operations
@@ -62,7 +63,7 @@ type ContainerizationResult struct {
 	Template *GenerateResult `json:"template,omitempty"`
 
 	// Validation results
-	Validation *types.BuildValidationResult `json:"validation,omitempty"`
+	Validation *api.ManifestValidationResult `json:"validation,omitempty"`
 
 	// Build results
 	Build *BuildResult `json:"build,omitempty"`

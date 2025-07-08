@@ -29,8 +29,7 @@ func NewBuildStrategizer(logger *slog.Logger) *BuildStrategizer {
 func (bs *BuildStrategizer) OptimizeStrategy(ctx context.Context, request *BuildOptimizationRequest) (*BuildStrategyResponse, error) {
 	bs.logger.Info("Starting build strategy optimization",
 		"session_id", request.SessionID,
-		"project_type", request.ProjectType,
-		"primary_goal", request.Goals.PrimarGoal)
+		"project_type", request.ProjectType)
 	// Get base strategies for the project type
 	baseStrategies := bs.strategyDatabase.GetStrategiesForProjectType(request.ProjectType)
 	// Filter strategies based on constraints

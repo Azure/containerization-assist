@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
+	validation "github.com/Azure/container-kit/pkg/mcp/security"
 	"github.com/Azure/container-kit/pkg/mcp/session"
 	"github.com/rs/zerolog"
 )
@@ -34,7 +35,7 @@ func NewProductionValidator(
 }
 
 // ValidateProduction performs production validation without stress testing
-func (pv *ProductionValidator) ValidateProduction(ctx context.Context, target interface{}) (*types.ValidationResult, error) {
+func (pv *ProductionValidator) ValidateProduction(ctx context.Context, target interface{}) (*validation.Result, error) {
 	if pv.config.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, pv.config.Timeout)
@@ -57,7 +58,7 @@ func (pv *ProductionValidator) ValidateProduction(ctx context.Context, target in
 }
 
 // ValidateDeploymentReadiness checks if deployment is ready
-func (pv *ProductionValidator) ValidateDeploymentReadiness(ctx context.Context, deployment interface{}) (*types.ValidationResult, error) {
+func (pv *ProductionValidator) ValidateDeploymentReadiness(ctx context.Context, deployment interface{}) (*validation.Result, error) {
 	rules := []ValidationRule{
 		{
 			Name:        "deployment_structure",
@@ -118,9 +119,9 @@ type ComponentHealth struct {
 }
 
 // GetValidationResult retrieves a validation result (simplified)
-func (pv *ProductionValidator) GetValidationResult(testID string) (*types.ValidationResult, error) {
+func (pv *ProductionValidator) GetValidationResult(testID string) (*validation.Result, error) {
 	// In the simplified version, we don't store complex test results
-	result := &types.ValidationResult{
+	result := &validation.Result{
 		Valid: true,
 		Details: map[string]interface{}{
 			"test_id":    testID,

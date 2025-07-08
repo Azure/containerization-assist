@@ -1,3 +1,0 @@
-pkg/mcp/internal/pipeline/background_workers.go:	var wg sync.WaitGroup
-pkg/mcp/tools/analyze/detect_databases_atomic.go:	var wg sync.WaitGroup
-pkg/mcp/core/state/context_ai_context_aggregator.go:	var wg sync.WaitGroup

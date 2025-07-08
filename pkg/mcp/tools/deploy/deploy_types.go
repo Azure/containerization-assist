@@ -2,6 +2,8 @@ package deploy
 
 import (
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/core/tools"
 )
 
 // GenerationOptions contains options for manifest generation

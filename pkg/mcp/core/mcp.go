@@ -9,15 +9,17 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/core/config"
 )
 
 // DefaultServerConfig returns the default server configuration
-func DefaultServerConfig() ServerConfig {
+func DefaultServerConfig() config.ServerConfig {
 	homeDir, _ := os.UserHomeDir()
 	defaultWorkspace := filepath.Join(homeDir, ".container-kit", "workspace")
 	defaultStore := filepath.Join(homeDir, ".container-kit", "sessions.db")
 
-	return ServerConfig{
+	return config.ServerConfig{
 		WorkspaceDir:      defaultWorkspace,
 		MaxSessions:       100,
 		SessionTTL:        24 * time.Hour,

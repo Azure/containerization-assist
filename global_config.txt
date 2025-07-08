@@ -1,6 +1,0 @@
-pkg/mcp/infra/registry/docker_helper.go:	var config DockerConfig
-pkg/mcp/domain/processing/sanitizer_preferences.go:	var config PreferenceConfig
-pkg/mcp/domain/containerization/analyze/configuration_analyzer_test.go:	var engine AnalysisEngine = NewConfigurationAnalyzer(logger)
-pkg/mcp/domain/containerization/analyze/context.go:			Mitigation: "Use environment variables or ConfigMaps for configuration",
-pkg/mcp/domain/containerization/database_detectors/common_detector.go:	var configFiles []ConfigFile
-pkg/mcp/domain/security/validator.go:	// Add non-sensitive vars to ConfigMap

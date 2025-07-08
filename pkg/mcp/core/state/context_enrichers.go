@@ -1,46 +1,52 @@
-package core
+package state
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/knowledge"
 	"github.com/Azure/container-kit/pkg/mcp/session"
-	"github.com/Azure/container-kit/pkg/mcp/tools/build"
-	"github.com/rs/zerolog"
 )
 
 // RelationshipEnricher enriches context with additional relationship information
 type RelationshipEnricher struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 }
 
 // NewRelationshipEnricher creates a new relationship enricher
-func NewRelationshipEnricher(logger zerolog.Logger) ContextEnricher {
+func NewRelationshipEnricher(logger *slog.Logger) ContextEnricher {
 	return &RelationshipEnricher{
-		logger: logger.With().Str("enricher", "relationship").Logger(),
+		logger: logger.With(slog.String("enricher", "relationship")),
 	}
 }
 
-// Name returns the enricher name
-func (e *RelationshipEnricher) Name() string {
+// GetName returns the enricher name
+func (e *RelationshipEnricher) GetName() string {
 	return "relationship_enricher"
 }
 
-// EnrichContext enriches context with relationship information
-func (e *RelationshipEnricher) EnrichContext(ctx context.Context, data *ComprehensiveContext) error {
+// Enrich enriches context with relationship information
+func (e *RelationshipEnricher) Enrich(ctx context.Context, data *ComprehensiveContext) error {
+	e.logger.Debug("Enriching context with relationships")
+
+	// Add temporal relationships
 	temporalRelationships := e.analyzeTemporalRelationships(data)
 	data.Relationships = append(data.Relationships, temporalRelationships...)
 
+	// Add causal relationships
 	causalRelationships := e.analyzeCausalRelationships(data)
 	data.Relationships = append(data.Relationships, causalRelationships...)
 
+	// Update metadata
+	if data.Metadata == nil {
+		data.Metadata = make(map[string]interface{})
+	}
 	data.Metadata["relationship_count"] = len(data.Relationships)
 	data.Metadata["relationship_types"] = e.getRelationshipTypes(data.Relationships)
 
-	e.logger.Debug().
-		Int("relationships_added", len(temporalRelationships)+len(causalRelationships)).
-		Msg("Context enriched with relationships")
+	e.logger.Info("Added relationships to context", slog.Int("count", len(data.Relationships)))
 
 	return nil
 }
@@ -112,37 +118,54 @@ func (e *RelationshipEnricher) getRelationshipTypes(relationships []*ContextRela
 
 // InsightEnricher enriches context with additional insights
 type InsightEnricher struct {
-	knowledgeBase *build.CrossToolKnowledgeBase
-	logger        zerolog.Logger
+	knowledgeBase *knowledge.CrossToolKnowledgeBase
+	logger        *slog.Logger
 }
 
 // NewInsightEnricher creates a new insight enricher
-func NewInsightEnricher(knowledgeBase *build.CrossToolKnowledgeBase, logger zerolog.Logger) ContextEnricher {
+func NewInsightEnricher(knowledgeBase *knowledge.CrossToolKnowledgeBase, logger *slog.Logger) ContextEnricher {
 	return &InsightEnricher{
 		knowledgeBase: knowledgeBase,
-		logger:        logger.With().Str("enricher", "insight").Logger(),
+		logger:        logger.With(slog.String("enricher", "insight")),
 	}
 }
 
-// Name returns the enricher name
-func (e *InsightEnricher) Name() string {
+// GetName returns the enricher name
+func (e *InsightEnricher) GetName() string {
 	return "insight_enricher"
 }
 
-// EnrichContext enriches context with insights
-func (e *InsightEnricher) EnrichContext(ctx context.Context, data *ComprehensiveContext) error {
+// Enrich enriches context with insights
+func (e *InsightEnricher) Enrich(ctx context.Context, data *ComprehensiveContext) error {
+	e.logger.Debug("Enriching context with insights")
+	//
+	// Generate insights based on current data
+	insights := e.generateInsights(data)
+	//
+	// Enhance existing insights if present
 	if data.AnalysisInsights != nil {
 		e.enhancePatterns(data.AnalysisInsights.Patterns)
 		e.enhanceAnomalies(data.AnalysisInsights.Anomalies)
 		e.enhancePredictions(data.AnalysisInsights.PredictedIssues)
+	} else {
+		data.AnalysisInsights = insights
 	}
-
+	//
+	// Generate recommendations based on insights
+	recommendations := e.generateRecommendations(data)
+	data.Recommendations = append(data.Recommendations, recommendations...)
+	//
+	// Add cross-tool insights to metadata
 	crossToolInsights := e.generateCrossToolInsights(data)
 	if len(crossToolInsights) > 0 {
+		if data.Metadata == nil {
+			data.Metadata = make(map[string]interface{})
+		}
 		data.Metadata["cross_tool_insights"] = crossToolInsights
 	}
-
-	e.logger.Debug().Msg("Context enriched with insights")
+	//
+	e.logger.Info("Generated insights and recommendations", slog.Int("recommendations", len(recommendations)))
+	//
 	return nil
 }
 
@@ -150,7 +173,7 @@ func (e *InsightEnricher) EnrichContext(ctx context.Context, data *Comprehensive
 func (e *InsightEnricher) enhancePatterns(patterns []*Pattern) {
 	for _, pattern := range patterns {
 		pattern.Type = e.categorizePattern(pattern)
-
+		//
 		if pattern.Occurrences > 10 {
 			pattern.Confidence = min(pattern.Confidence*1.2, 1.0)
 		}
@@ -221,22 +244,184 @@ func (e *InsightEnricher) generateMitigations(issueType string) []string {
 			"Implement rollback strategy",
 		},
 	}
-
+	//
 	if m, exists := mitigations[issueType]; exists {
 		return m
 	}
 	return []string{"Review logs", "Contact support", "Check documentation"}
 }
 
+// generateInsights generates initial insights from context data
+func (e *InsightEnricher) generateInsights(data *ComprehensiveContext) *AnalysisInsights {
+	insights := &AnalysisInsights{
+		Patterns:        make([]*Pattern, 0),
+		Anomalies:       make([]*Anomaly, 0),
+		PredictedIssues: make([]*PredictedIssue, 0),
+	}
+	//
+	// Analyze patterns in recent events
+	if len(data.RecentEvents) > 5 {
+		patterns := e.detectPatterns(data.RecentEvents)
+		insights.Patterns = append(insights.Patterns, patterns...)
+	}
+	//
+	// Detect anomalies
+	anomalies := e.detectAnomalies(data)
+	insights.Anomalies = append(insights.Anomalies, anomalies...)
+	//
+	// Predict potential issues
+	predictions := e.predictIssues(data)
+	insights.PredictedIssues = append(insights.PredictedIssues, predictions...)
+	//
+	return insights
+}
+
+// generateRecommendations generates recommendations based on insights
+func (e *InsightEnricher) generateRecommendations(data *ComprehensiveContext) []*Recommendation {
+	recommendations := make([]*Recommendation, 0)
+	//
+	// Generate recommendations from analysis insights
+	if data.AnalysisInsights != nil {
+		// From patterns
+		for _, pattern := range data.AnalysisInsights.Patterns {
+			if pattern.Confidence > 0.7 {
+				rec := &Recommendation{
+					ID:          fmt.Sprintf("pattern-%s-%d", pattern.Type, time.Now().UnixNano()),
+					Title:       fmt.Sprintf("Pattern Detected: %s", pattern.Type),
+					Description: pattern.Description,
+					Priority:    e.calculatePatternPriority(pattern),
+					Category:    "pattern",
+					Actions:     e.getPatternActions(pattern.Type),
+					Confidence:  pattern.Confidence,
+					CreatedAt:   time.Now(),
+				}
+				recommendations = append(recommendations, rec)
+			}
+		}
+		//
+		// From anomalies
+		for _, anomaly := range data.AnalysisInsights.Anomalies {
+			if anomaly.Severity == "high" || anomaly.Severity == "critical" {
+				rec := &Recommendation{
+					ID:          fmt.Sprintf("anomaly-%s-%d", anomaly.Type, time.Now().UnixNano()),
+					Title:       fmt.Sprintf("Anomaly: %s", anomaly.Type),
+					Description: anomaly.Description,
+					Priority:    e.anomalySeverityToPriority(anomaly.Severity),
+					Category:    "anomaly",
+					Actions:     e.getAnomalyActions(anomaly.Type),
+					Confidence:  0.85,
+					CreatedAt:   time.Now(),
+				}
+				recommendations = append(recommendations, rec)
+			}
+		}
+		//
+		// From predicted issues
+		for _, prediction := range data.AnalysisInsights.PredictedIssues {
+			if prediction.Probability > 0.6 {
+				rec := &Recommendation{
+					ID:          fmt.Sprintf("predict-%s-%d", prediction.Type, time.Now().UnixNano()),
+					Title:       fmt.Sprintf("Potential Issue: %s", prediction.Type),
+					Description: prediction.Description,
+					Priority:    e.calculatePredictionPriority(prediction),
+					Category:    "prediction",
+					Actions:     prediction.Mitigations,
+					Confidence:  prediction.Probability,
+					CreatedAt:   time.Now(),
+				}
+				recommendations = append(recommendations, rec)
+			}
+		}
+	}
+	//
+	return recommendations
+}
+
+// Helper methods for InsightEnricher
+func (e *InsightEnricher) detectPatterns(events []*Event) []*Pattern {
+	patterns := make([]*Pattern, 0)
+	// Simple pattern detection logic
+	typeCount := make(map[string]int)
+	for _, event := range events {
+		typeCount[event.Type]++
+	}
+	//
+	for eventType, count := range typeCount {
+		if count > 3 {
+			patterns = append(patterns, &Pattern{
+				Type:        eventType,
+				Description: fmt.Sprintf("Repeated %s events detected", eventType),
+				Occurrences: count,
+				Confidence:  float64(count) / float64(len(events)),
+			})
+		}
+	}
+	//
+	return patterns
+}
+
+func (e *InsightEnricher) detectAnomalies(data *ComprehensiveContext) []*Anomaly {
+	anomalies := make([]*Anomaly, 0)
+	// Simple anomaly detection
+	return anomalies
+}
+
+func (e *InsightEnricher) predictIssues(data *ComprehensiveContext) []*PredictedIssue {
+	predictions := make([]*PredictedIssue, 0)
+	// Simple prediction logic
+	return predictions
+}
+
+func (e *InsightEnricher) calculatePatternPriority(pattern *Pattern) int {
+	if pattern.Occurrences > 10 {
+		return 1
+	} else if pattern.Occurrences > 5 {
+		return 2
+	}
+	return 3
+}
+
+func (e *InsightEnricher) anomalySeverityToPriority(severity string) int {
+	switch severity {
+	case "critical":
+		return 1
+	case "high":
+		return 2
+	case "medium":
+		return 3
+	default:
+		return 4
+	}
+}
+
+func (e *InsightEnricher) calculatePredictionPriority(prediction *PredictedIssue) int {
+	if prediction.Probability > 0.8 {
+		return 1
+	} else if prediction.Probability > 0.6 {
+		return 2
+	}
+	return 3
+}
+
+func (e *InsightEnricher) getPatternActions(patternType string) []string {
+	// Return appropriate actions based on pattern type
+	return []string{"Review pattern occurrences", "Monitor for escalation", "Consider automation"}
+}
+
+func (e *InsightEnricher) getAnomalyActions(anomalyType string) []string {
+	// Return appropriate actions based on anomaly type
+	return []string{"Investigate anomaly", "Review system logs", "Check for security issues"}
+}
+
 // generateCrossToolInsights generates insights across tools
 func (e *InsightEnricher) generateCrossToolInsights(data *ComprehensiveContext) []map[string]interface{} {
 	insights := make([]map[string]interface{}, 0)
-
+	//
 	if buildCtx, hasBuild := data.ToolContexts["build"]; hasBuild {
 		if deployCtx, hasDeploy := data.ToolContexts["deployment"]; hasDeploy {
 			buildData := buildCtx.Data
 			deployData := deployCtx.Data
-
+			//
 			if dockerBuild, ok := buildData["docker_build"].(map[string]interface{}); ok {
 				if buildImages, ok := dockerBuild["images_built"].(int); ok {
 					if kubernetesData, ok := deployData["kubernetes"].(map[string]interface{}); ok {
@@ -255,53 +440,58 @@ func (e *InsightEnricher) generateCrossToolInsights(data *ComprehensiveContext) 
 			}
 		}
 	}
-
+	//
 	return insights
 }
 
 // SecurityEnricher enriches context with security information
 type SecurityEnricher struct {
 	sessionManager *session.SessionManager
-	logger         zerolog.Logger
+	logger         *slog.Logger
 }
 
 // NewSecurityEnricher creates a new security enricher
-func NewSecurityEnricher(sessionManager *session.SessionManager, logger zerolog.Logger) ContextEnricher {
+func NewSecurityEnricher(sessionManager *session.SessionManager, logger *slog.Logger) ContextEnricher {
 	return &SecurityEnricher{
 		sessionManager: sessionManager,
-		logger:         logger.With().Str("enricher", "security").Logger(),
+		logger:         logger.With(slog.String("enricher", "security")),
 	}
 }
 
-// Name returns the enricher name
-func (e *SecurityEnricher) Name() string {
+// GetName returns the enricher name
+func (e *SecurityEnricher) GetName() string {
 	return "security_enricher"
 }
 
-// EnrichContext enriches context with security information
-func (e *SecurityEnricher) EnrichContext(ctx context.Context, data *ComprehensiveContext) error {
-	riskAssessment := e.assessSecurityRisk(data)
-	data.Metadata["security_risk_level"] = riskAssessment.Level
-	data.Metadata["security_risk_score"] = riskAssessment.Score
-
-	if riskAssessment.Level == "high" || riskAssessment.Level == "critical" {
-		securityRec := &Recommendation{
-			ID:          fmt.Sprintf("sec_rec_%d", time.Now().UnixNano()),
-			Type:        "security",
-			Priority:    "high",
-			Title:       "Security Risk Detected",
-			Description: fmt.Sprintf("Security risk level: %s (score: %.2f)", riskAssessment.Level, riskAssessment.Score),
-			Actions:     riskAssessment.Recommendations,
+// Enrich enriches context with security information
+func (e *SecurityEnricher) Enrich(ctx context.Context, data *ComprehensiveContext) error {
+	e.logger.Debug("Enriching context with security analysis")
+	//
+	// Perform security assessment
+	riskAssessment := e.assessSecurityRisks(data)
+	//
+	// Create security recommendations
+	for _, risk := range riskAssessment.HighRisks {
+		rec := &Recommendation{
+			ID:          fmt.Sprintf("sec-%s", risk.ID),
+			Title:       fmt.Sprintf("Security: %s", risk.Title),
+			Description: risk.Description,
+			Priority:    1, // High priority (int, not string)
+			Category:    "security",
+			Actions:     risk.Mitigations,
 			Confidence:  0.9,
+			CreatedAt:   time.Now(),
 		}
-		data.Recommendations = append(data.Recommendations, securityRec)
+		data.Recommendations = append(data.Recommendations, rec)
 	}
-
-	e.logger.Debug().
-		Str("risk_level", riskAssessment.Level).
-		Float64("risk_score", riskAssessment.Score).
-		Msg("Context enriched with security assessment")
-
+	//
+	// Add security metadata
+	if data.Metadata == nil {
+		data.Metadata = make(map[string]interface{})
+	}
+	data.Metadata["security_score"] = riskAssessment.Score
+	data.Metadata["security_risks"] = len(riskAssessment.HighRisks)
+	//
 	return nil
 }
 
@@ -311,15 +501,26 @@ type SecurityRiskAssessment struct {
 	Score           float64
 	Factors         []string
 	Recommendations []string
+	HighRisks       []*SecurityRisk
 }
 
-// assessSecurityRisk assesses security risk from context
-func (e *SecurityEnricher) assessSecurityRisk(data *ComprehensiveContext) *SecurityRiskAssessment {
+// SecurityRisk represents a specific security risk
+type SecurityRisk struct {
+	ID          string
+	Title       string
+	Description string
+	Severity    string
+	Mitigations []string
+}
+
+// assessSecurityRisks assesses security risks from context
+func (e *SecurityEnricher) assessSecurityRisks(data *ComprehensiveContext) *SecurityRiskAssessment {
 	assessment := &SecurityRiskAssessment{
 		Level:           "low",
 		Score:           0.0,
 		Factors:         make([]string, 0),
 		Recommendations: make([]string, 0),
+		HighRisks:       make([]*SecurityRisk, 0),
 	}
 
 	if secContext, exists := data.ToolContexts["security"]; exists {
@@ -328,12 +529,40 @@ func (e *SecurityEnricher) assessSecurityRisk(data *ComprehensiveContext) *Secur
 				assessment.Score += float64(critical) * 0.3
 				assessment.Factors = append(assessment.Factors, fmt.Sprintf("%d critical vulnerabilities", critical))
 				assessment.Recommendations = append(assessment.Recommendations, "Address critical vulnerabilities immediately")
+
+				// Add high risk for critical issues
+				risk := &SecurityRisk{
+					ID:          fmt.Sprintf("vuln-critical-%d", time.Now().UnixNano()),
+					Title:       "Critical Vulnerabilities Detected",
+					Description: fmt.Sprintf("Found %d critical security vulnerabilities", critical),
+					Severity:    "critical",
+					Mitigations: []string{
+						"Update vulnerable dependencies",
+						"Apply security patches",
+						"Review security configuration",
+					},
+				}
+				assessment.HighRisks = append(assessment.HighRisks, risk)
 			}
 
 			if high, ok := secData["high_issues"].(int); ok && high > 0 {
 				assessment.Score += float64(high) * 0.1
 				assessment.Factors = append(assessment.Factors, fmt.Sprintf("%d high severity issues", high))
 				assessment.Recommendations = append(assessment.Recommendations, "Review and fix high severity issues")
+
+				// Add high risk for high severity issues
+				risk := &SecurityRisk{
+					ID:          fmt.Sprintf("vuln-high-%d", time.Now().UnixNano()),
+					Title:       "High Severity Issues Found",
+					Description: fmt.Sprintf("Found %d high severity security issues", high),
+					Severity:    "high",
+					Mitigations: []string{
+						"Review security findings",
+						"Implement security best practices",
+						"Enable security monitoring",
+					},
+				}
+				assessment.HighRisks = append(assessment.HighRisks, risk)
 			}
 		}
 	}
@@ -368,47 +597,51 @@ func (e *SecurityEnricher) assessSecurityRisk(data *ComprehensiveContext) *Secur
 
 // PerformanceEnricher enriches context with performance insights
 type PerformanceEnricher struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 }
 
 // NewPerformanceEnricher creates a new performance enricher
-func NewPerformanceEnricher(logger zerolog.Logger) ContextEnricher {
+func NewPerformanceEnricher(logger *slog.Logger) ContextEnricher {
 	return &PerformanceEnricher{
-		logger: logger.With().Str("enricher", "performance").Logger(),
+		logger: logger.With("enricher", "performance"),
 	}
 }
 
-// Name returns the enricher name
-func (e *PerformanceEnricher) Name() string {
+// GetName returns the enricher name
+func (e *PerformanceEnricher) GetName() string {
 	return "performance_enricher"
 }
 
-// EnrichContext enriches context with performance insights
-func (e *PerformanceEnricher) EnrichContext(ctx context.Context, data *ComprehensiveContext) error {
-	perfAnalysis := e.analyzePerformance(data)
+// Enrich enriches context with performance insights
+func (e *PerformanceEnricher) Enrich(ctx context.Context, data *ComprehensiveContext) error {
+	e.logger.Debug("Enriching context with performance analysis")
 
-	data.Metadata["performance_score"] = perfAnalysis.Score
-	data.Metadata["performance_bottlenecks"] = perfAnalysis.Bottlenecks
+	// Analyze performance bottlenecks
+	bottlenecks := e.identifyBottlenecks(data)
 
-	if perfAnalysis.Score < 0.7 {
-		for _, bottleneck := range perfAnalysis.Bottlenecks {
-			rec := &Recommendation{
-				ID:          fmt.Sprintf("perf_rec_%s_%d", bottleneck.Type, time.Now().UnixNano()),
-				Type:        "performance",
-				Priority:    bottleneck.Priority,
-				Title:       fmt.Sprintf("Performance Bottleneck: %s", bottleneck.Name),
-				Description: bottleneck.Description,
-				Actions:     bottleneck.Recommendations,
-				Confidence:  bottleneck.Confidence,
-			}
-			data.Recommendations = append(data.Recommendations, rec)
+	// Create performance recommendations
+	for _, bottleneck := range bottlenecks {
+		rec := &Recommendation{
+			ID:          fmt.Sprintf("perf-%s", bottleneck.ID),
+			Title:       bottleneck.Title,
+			Description: bottleneck.Description,
+			Priority:    e.calculatePriority(bottleneck),
+			Category:    "performance",
+			Actions:     bottleneck.Recommendations,
+			Confidence:  bottleneck.Confidence,
+			CreatedAt:   time.Now(),
 		}
+		data.Recommendations = append(data.Recommendations, rec)
 	}
 
-	e.logger.Debug().
-		Float64("performance_score", perfAnalysis.Score).
-		Int("bottlenecks", len(perfAnalysis.Bottlenecks)).
-		Msg("Context enriched with performance analysis")
+	// Add performance metrics
+	metrics := e.calculateMetrics(data)
+	if data.Metrics == nil {
+		data.Metrics = make(map[string]float64)
+	}
+	for k, v := range metrics {
+		data.Metrics[k] = v
+	}
 
 	return nil
 }
@@ -421,7 +654,9 @@ type PerformanceAnalysis struct {
 
 // PerformanceBottleneck represents a performance bottleneck
 type PerformanceBottleneck struct {
+	ID              string
 	Type            string
+	Title           string
 	Name            string
 	Description     string
 	Priority        string
@@ -497,4 +732,112 @@ func (e *PerformanceEnricher) analyzePerformance(data *ComprehensiveContext) *Pe
 	}
 
 	return analysis
+}
+
+// identifyBottlenecks identifies performance bottlenecks from context
+func (e *PerformanceEnricher) identifyBottlenecks(data *ComprehensiveContext) []*PerformanceBottleneck {
+	bottlenecks := make([]*PerformanceBottleneck, 0)
+
+	// Analyze performance context
+	if perfContext, exists := data.ToolContexts["performance"]; exists {
+		if perfData, ok := perfContext.Data["performance_metrics"].(map[string]interface{}); ok {
+			// Check CPU usage
+			if cpu, ok := perfData["cpu_usage"].(float64); ok && cpu > 80 {
+				bottleneck := &PerformanceBottleneck{
+					ID:          fmt.Sprintf("cpu-%d", time.Now().UnixNano()),
+					Type:        "cpu",
+					Title:       "High CPU Usage",
+					Name:        "CPU Bottleneck",
+					Description: fmt.Sprintf("CPU usage at %.1f%% exceeds threshold", cpu),
+					Priority:    "high",
+					Impact:      0.8,
+					Confidence:  0.9,
+					Recommendations: []string{
+						"Profile CPU usage to identify hot spots",
+						"Optimize compute-intensive operations",
+						"Consider horizontal scaling",
+					},
+				}
+				bottlenecks = append(bottlenecks, bottleneck)
+			}
+
+			// Check memory usage
+			if memory, ok := perfData["memory_usage"].(float64); ok && memory > 85 {
+				bottleneck := &PerformanceBottleneck{
+					ID:          fmt.Sprintf("memory-%d", time.Now().UnixNano()),
+					Type:        "memory",
+					Title:       "High Memory Usage",
+					Name:        "Memory Pressure",
+					Description: fmt.Sprintf("Memory usage at %.1f%% indicates pressure", memory),
+					Priority:    "high",
+					Impact:      0.7,
+					Confidence:  0.9,
+					Recommendations: []string{
+						"Analyze memory allocation patterns",
+						"Check for memory leaks",
+						"Optimize data structures",
+					},
+				}
+				bottlenecks = append(bottlenecks, bottleneck)
+			}
+		}
+	}
+
+	return bottlenecks
+}
+
+// calculatePriority converts string priority to int
+func (e *PerformanceEnricher) calculatePriority(bottleneck *PerformanceBottleneck) int {
+	switch bottleneck.Priority {
+	case "critical":
+		return 1
+	case "high":
+		return 2
+	case "medium":
+		return 3
+	case "low":
+		return 4
+	default:
+		return 5
+	}
+}
+
+// calculateMetrics calculates performance metrics from context
+func (e *PerformanceEnricher) calculateMetrics(data *ComprehensiveContext) map[string]float64 {
+	metrics := make(map[string]float64)
+
+	// Extract metrics from performance context
+	if perfContext, exists := data.ToolContexts["performance"]; exists {
+		if perfData, ok := perfContext.Data["performance_metrics"].(map[string]interface{}); ok {
+			// Add CPU metrics
+			if cpu, ok := perfData["cpu_usage"].(float64); ok {
+				metrics["cpu_usage_percent"] = cpu
+			}
+
+			// Add memory metrics
+			if memory, ok := perfData["memory_usage"].(float64); ok {
+				metrics["memory_usage_percent"] = memory
+			}
+
+			// Add error rate metrics
+			if errorRate, ok := perfData["error_rate"].(float64); ok {
+				metrics["error_rate"] = errorRate
+			}
+
+			// Add response time metrics
+			if responseTime, ok := perfData["response_time_ms"].(float64); ok {
+				metrics["response_time_ms"] = responseTime
+			}
+		}
+	}
+
+	// Calculate derived metrics
+	if cpuUsage, hasCPU := metrics["cpu_usage_percent"]; hasCPU {
+		if memUsage, hasMem := metrics["memory_usage_percent"]; hasMem {
+			// Overall resource utilization
+			metrics["resource_utilization"] = (cpuUsage + memUsage) / 2.0
+		}
+	}
+
+	return metrics
 }

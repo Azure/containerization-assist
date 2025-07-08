@@ -23,12 +23,8 @@ type CoreRepositoryAnalyzer struct {
 }
 
 // NewCoreRepositoryAnalyzer creates a new core repository analyzer
-func NewCoreRepositoryAnalyzer(logger *slog.Logger) core.RepositoryAnalyzer {
-	return &CoreRepositoryAnalyzer{
-		repoAnalyzer: analysis.NewRepositoryAnalyzer(logger),
-		gitManager:   git.NewManager(logger),
-		logger:       logger.With("component", "core_repository_analyzer"),
-	}
+func NewCoreRepositoryAnalyzer(logger *slog.Logger) *analysis.RepositoryAnalyzer {
+	return analysis.NewRepositoryAnalyzer(logger)
 
 }
 

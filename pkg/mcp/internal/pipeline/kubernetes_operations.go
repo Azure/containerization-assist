@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
@@ -108,10 +108,10 @@ func (o *Operations) GenerateManifestsTyped(_ context.Context, sessionID string,
 	if sessionID == "" {
 		return nil, errors.NewError().Message("session ID is required").Build()
 	}
-	if params.AppName == "" {
-		return nil, errors.NewError().Message("app name is required").Build()
+	if params.ServiceName == "" {
+		return nil, errors.NewError().Message("service name is required").Build()
 	}
-	if params.ImageRef == "" {
+	if params.ImageName == "" {
 		return nil, errors.NewError().Message("image name is required").Build()
 	}
 	if params.Replicas <= 0 {
@@ -125,8 +125,8 @@ func (o *Operations) GenerateManifestsTyped(_ context.Context, sessionID string,
 
 	manifestResult, err := o.GenerateKubernetesManifests(TypedGenerateManifestsArgs{
 		SessionID:     sessionID,
-		ImageRef:      params.ImageRef,
-		AppName:       params.AppName,
+		ImageRef:      params.ImageName,
+		AppName:       params.ServiceName,
 		Port:          port,
 		CPURequest:    "100m",
 		MemoryRequest: "128Mi",
@@ -148,7 +148,7 @@ func (o *Operations) GenerateManifestsTyped(_ context.Context, sessionID string,
 			Timestamp: time.Now(),
 		},
 		ManifestPaths: manifestPaths,
-		ManifestCount: len(manifestResult.Manifests),
+		Namespace:     "default",
 	}, nil
 }
 
@@ -163,9 +163,6 @@ func (o *Operations) DeployKubernetesTyped(_ context.Context, sessionID string, 
 	if params.Namespace == "" {
 		return nil, errors.NewError().Message("namespace is required").Build()
 	}
-	if params.Timeout < 0 {
-		return nil, errors.NewError().Message("timeout must be positive").Build()
-	}
 
 	deployResult, err := o.DeployToKubernetes(sessionID, params.ManifestPaths)
 	if err != nil {
@@ -178,10 +175,10 @@ func (o *Operations) DeployKubernetesTyped(_ context.Context, sessionID string, 
 			Message:   "Deployment completed successfully",
 			Timestamp: time.Now(),
 		},
-		DeployedResources: append(deployResult.Deployments, deployResult.Services...),
-		Namespace:         deployResult.Namespace,
-		Status:            "deployed",
-		Warnings:          []string{},
+		DeploymentName: "app-deployment",
+		ServiceName:    "app-service",
+		Namespace:      deployResult.Namespace,
+		Endpoints:      []string{},
 	}, nil
 }
 
@@ -190,31 +187,20 @@ func (o *Operations) CheckHealthTyped(_ context.Context, sessionID string, param
 	if sessionID == "" {
 		return nil, errors.NewError().Message("session ID is required").Build()
 	}
-	if params.AppName == "" {
-		return nil, errors.NewError().Message("app name is required").Build()
+	if params.DeploymentName == "" {
+		return nil, errors.NewError().Message("deployment name is required").Build()
 	}
 	if params.Namespace == "" {
 		return nil, errors.NewError().Message("namespace is required").Build()
 	}
-	if params.WaitTimeout <= 0 {
+	if params.Timeout <= 0 {
 		return nil, errors.NewError().Message("timeout must be positive").Build()
 	}
 
-	timeout := time.Duration(params.WaitTimeout) * time.Second
-	healthResult, err := o.CheckApplicationHealth(sessionID, params.Namespace, params.AppName, timeout)
+	timeout := time.Duration(params.Timeout) * time.Second
+	healthResult, err := o.CheckApplicationHealth(sessionID, params.Namespace, params.DeploymentName, timeout)
 	if err != nil {
 		return nil, err
-	}
-
-	var healthyResources, unhealthyResources []string
-	resourceStatuses := make(map[string]string)
-
-	if healthResult.Healthy {
-		healthyResources = []string{params.AppName}
-		resourceStatuses[params.AppName] = healthResult.Status
-	} else {
-		unhealthyResources = []string{params.AppName}
-		resourceStatuses[params.AppName] = healthResult.Status
 	}
 
 	return &core.HealthCheckResult{
@@ -223,9 +209,9 @@ func (o *Operations) CheckHealthTyped(_ context.Context, sessionID string, param
 			Message:   fmt.Sprintf("Health check completed: %s", healthResult.Status),
 			Timestamp: time.Now(),
 		},
-		HealthyResources:   healthyResources,
-		UnhealthyResources: unhealthyResources,
-		ResourceStatuses:   resourceStatuses,
-		OverallHealth:      healthResult.Status,
+		Healthy:       healthResult.Healthy,
+		ReadyReplicas: 1,
+		TotalReplicas: 1,
+		Status:        healthResult.Status,
 	}, nil
 }

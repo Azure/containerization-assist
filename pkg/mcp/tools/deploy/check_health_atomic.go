@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 	"github.com/Azure/container-kit/pkg/mcp/session"
 	"github.com/localrivet/gomcp/server"
 )

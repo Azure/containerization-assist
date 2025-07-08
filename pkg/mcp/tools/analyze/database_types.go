@@ -15,8 +15,12 @@ const (
 	Redis      DatabaseType = "redis"
 )
 
-// NOTE: DatabaseDetector has been merged into AnalysisEngine for simplicity.
-// Use AnalysisEngine.DetectDatabases() instead.
+// DatabaseDetector provides database detection functionality
+// Note: New implementations should use AnalysisEngine.DetectDatabases() directly
+type DatabaseDetector interface {
+	Type() DatabaseType
+	Detect(path string) ([]DetectedDatabase, error)
+}
 
 // DetectedDatabase represents a detected database instance
 type DetectedDatabase struct {

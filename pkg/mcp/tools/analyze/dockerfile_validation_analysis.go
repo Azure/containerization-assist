@@ -5,7 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/container-kit/pkg/mcp/core"
 	constants "github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 )
 
 // calculateValidationScore computes an overall validation score (0-100) based on
@@ -268,7 +270,7 @@ func (t *AtomicValidateDockerfileTool) generateOptimizationTips(lines []string, 
 
 // generateCorrectedDockerfile creates a corrected version of the Dockerfile
 // by applying common fixes for validation errors and best practices.
-func (t *AtomicValidateDockerfileTool) generateCorrectedDockerfile(dockerfileContent string, _ *types.BuildValidationResult) (string, []string) {
+func (t *AtomicValidateDockerfileTool) generateCorrectedDockerfile(dockerfileContent string, _ *core.BuildValidationResult) (string, []string) {
 	fixes := make([]string, 0)
 	lines := strings.Split(dockerfileContent, "\n")
 	corrected := make([]string, len(lines))

@@ -1,2 +1,0 @@
-pkg/mcp/internal/runtime/validator.go:var DefaultRuntimeRegistry = NewRuntimeValidatorRegistry()
-pkg/mcp/internal/retry/integration.go:var GlobalCoordinator *Coordinator

@@ -1,4 +1,4 @@
-package validation_test
+package security_test
 
 import (
 	"go/ast"

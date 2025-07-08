@@ -15,6 +15,7 @@ import (
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 	"github.com/Azure/container-kit/pkg/mcp/session"
 	"github.com/Azure/container-kit/pkg/mcp/tools/analyze"
 	"github.com/localrivet/gomcp/server"

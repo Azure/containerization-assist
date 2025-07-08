@@ -12,6 +12,7 @@ import (
 	internalcommon "github.com/Azure/container-kit/pkg/mcp/internal/common"
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 	"github.com/Azure/container-kit/pkg/mcp/session"
 	"github.com/Azure/container-kit/pkg/mcp/tools/build"
 	"github.com/localrivet/gomcp/server"

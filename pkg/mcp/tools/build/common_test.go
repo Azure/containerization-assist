@@ -4,8 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/validation-core/core"
-	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // Test BuildError Error method
@@ -94,16 +93,18 @@ func TestDetermineImpact(t *testing.T) {
 // Test ConvertCoreResult function
 func TestConvertCoreResult(t *testing.T) {
 	t.Parallel()
-	// Create a mock docker.BuildResult
-	coreResult := &docker.BuildResult{
-		Success: false, // false because we have errors
-		Error: &docker.BuildError{
-			Message: "Missing FROM instruction",
-			Type:    "dockerfile_error",
-		},
-		// Note: docker.BuildResult doesn't have a Warnings field
-		// Warnings would be in the logs or error context
+	// Create a mock core.BuildValidationResult
+	coreResult := core.NewBuildResult()
+
+	// Add test error directly to the structure
+	error := core.ValidationError{
+		Message: "Missing FROM instruction",
+		Code:    "dockerfile_error",
+		Field:   "FROM",
 	}
+	coreResult.Errors = append(coreResult.Errors, error)
+	coreResult.Valid = false // Set to false because we have errors
+
 	result := ConvertCoreResult(coreResult)
 	if result == nil {
 		t.Error("ConvertCoreResult should not return nil")
@@ -125,27 +126,35 @@ func TestConvertCoreResult(t *testing.T) {
 // Test ValidationResult type
 func TestValidationResult(t *testing.T) {
 	t.Parallel()
-	result := core.NewBuildResult("test-validator", "1.0.0")
+	result := core.NewBuildResult()
 
-	// Add test error
-	error := core.NewError(
-		"SYNTAX_ERROR",
-		"Syntax error",
-		core.ErrTypeSyntax,
-		core.SeverityHigh,
-	).WithLine(5).WithColumn(10).WithRule("DL3000")
-	result.AddError(error)
+	// Add test error directly to the structure
+	error := core.ValidationError{
+		Message: "Syntax error",
+		Code:    "SYNTAX_ERROR",
+		Field:   "RUN",
+		Context: map[string]string{
+			"line":   "5",
+			"column": "10",
+			"rule":   "DL3000",
+		},
+	}
+	result.Errors = append(result.Errors, error)
+	result.Valid = false // Set to false because we have errors
 
-	// Add test warning
-	warning := core.NewWarning(
-		"BEST_PRACTICE_WARNING",
-		"Best practice warning",
-	)
-	warning.Error.WithLine(15).WithColumn(0).WithRule("DL3008")
-	result.AddWarning(warning)
+	// Add test warning directly to the structure
+	warning := core.ValidationWarning{
+		Message: "Best practice warning",
+		Code:    "BEST_PRACTICE_WARNING",
+		Field:   "VERSION",
+		Context: map[string]string{
+			"line":   "15",
+			"column": "0",
+			"rule":   "DL3008",
+		},
+	}
+	result.Warnings = append(result.Warnings, warning)
 
-	// Add info
-	result.Suggestions = append(result.Suggestions, "Dockerfile validated successfully")
 	// Note: Unified validation framework sets Valid=false when errors are present
 	if result.Valid {
 		t.Error("Expected Valid to be false when errors are present")
@@ -153,17 +162,14 @@ func TestValidationResult(t *testing.T) {
 	if len(result.Errors) != 1 {
 		t.Errorf("Expected 1 error, got %d", len(result.Errors))
 	}
-	if result.Errors[0].Line != 5 {
-		t.Errorf("Expected error line to be 5, got %d", result.Errors[0].Line)
+	if result.Errors[0].Context["line"] != "5" {
+		t.Errorf("Expected error line to be '5', got '%s'", result.Errors[0].Context["line"])
 	}
 	if result.Errors[0].Message != "Syntax error" {
 		t.Errorf("Expected error message to be 'Syntax error', got '%s'", result.Errors[0].Message)
 	}
 	if len(result.Warnings) != 1 {
 		t.Errorf("Expected 1 warning, got %d", len(result.Warnings))
-	}
-	if len(result.Suggestions) != 1 {
-		t.Errorf("Expected 1 suggestion, got %d", len(result.Suggestions))
 	}
 }
 
@@ -193,22 +199,27 @@ func TestValidationError(t *testing.T) {
 // Test ValidationWarning type
 func TestValidationWarning(t *testing.T) {
 	t.Parallel()
-	warning := core.NewWarning(
-		"VERSION_WARNING",
-		"Consider using specific version",
-	)
-	warning.Error.WithLine(30).WithColumn(8).WithRule("DL3006")
-	if warning.Error.Line != 30 {
-		t.Errorf("Expected Line to be 30, got %d", warning.Error.Line)
+	warning := core.ValidationWarning{
+		Message: "Consider using specific version",
+		Code:    "VERSION_WARNING",
+		Field:   "VERSION",
+		Context: map[string]string{
+			"line":   "30",
+			"column": "8",
+			"rule":   "DL3006",
+		},
 	}
-	if warning.Error.Column != 8 {
-		t.Errorf("Expected Column to be 8, got %d", warning.Error.Column)
+	if warning.Context["line"] != "30" {
+		t.Errorf("Expected Line to be '30', got '%s'", warning.Context["line"])
+	}
+	if warning.Context["column"] != "8" {
+		t.Errorf("Expected Column to be '8', got '%s'", warning.Context["column"])
 	}
 	if warning.Message != "Consider using specific version" {
 		t.Errorf("Expected Message to be 'Consider using specific version', got '%s'", warning.Message)
 	}
-	if warning.Error.Rule != "DL3006" {
-		t.Errorf("Expected Rule to be 'DL3006', got '%s'", warning.Error.Rule)
+	if warning.Context["rule"] != "DL3006" {
+		t.Errorf("Expected Rule to be 'DL3006', got '%s'", warning.Context["rule"])
 	}
 }
 

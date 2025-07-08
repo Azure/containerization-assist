@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/common/validation-core/core"
+	security "github.com/Azure/container-kit/pkg/mcp/security"
 	"github.com/rs/zerolog"
 )
 
@@ -226,14 +226,14 @@ func (p *ComplianceFrameworkProvider) CheckCISDockerCompliance(dockerfile string
 	// Check for root user
 	if len(validationResult.Errors) > 0 {
 		for _, err := range validationResult.Errors {
-			if err.Rule == "root_user" {
+			if err.Code == "root_user" {
 				result.Compliant = false
 				result.Score -= 20
 				result.Violations = append(result.Violations, SecurityComplianceViolation{
 					Requirement: "CIS 4.1",
 					Description: "Container running as root user",
 					Severity:    "high",
-					Line:        err.Line,
+					Rule:        err.Code,
 				})
 			}
 		}
@@ -255,14 +255,14 @@ func (p *ComplianceFrameworkProvider) CheckCISDockerCompliance(dockerfile string
 func (p *ComplianceFrameworkProvider) CheckNIST800190Compliance(dockerfile string, validationResult *BuildValidationResult, result *ComplianceResult) {
 	// Check for insecure downloads
 	for _, err := range validationResult.Errors {
-		if err.Rule == "insecure_download" {
+		if err.Code == "insecure_download" {
 			result.Compliant = false
 			result.Score -= 15
 			result.Violations = append(result.Violations, SecurityComplianceViolation{
 				Requirement: "NIST 800-190 4.3.3",
 				Description: "Insecure download detected",
 				Severity:    "high",
-				Line:        err.Line,
+				Rule:        err.Code,
 			})
 		}
 	}
@@ -272,14 +272,14 @@ func (p *ComplianceFrameworkProvider) CheckNIST800190Compliance(dockerfile strin
 func (p *ComplianceFrameworkProvider) CheckPCIDSSCompliance(dockerfile string, validationResult *BuildValidationResult, result *ComplianceResult) {
 	// Check for hardcoded secrets
 	for _, err := range validationResult.Errors {
-		if err.Rule == "hardcoded_secret" {
+		if err.Code == "hardcoded_secret" {
 			result.Compliant = false
 			result.Score -= 30
 			result.Violations = append(result.Violations, SecurityComplianceViolation{
 				Requirement: "PCI-DSS 8.2.1",
 				Description: "Hardcoded credentials detected",
 				Severity:    "critical",
-				Line:        err.Line,
+				Rule:        err.Code,
 			})
 		}
 	}
@@ -289,14 +289,14 @@ func (p *ComplianceFrameworkProvider) CheckPCIDSSCompliance(dockerfile string, v
 func (p *ComplianceFrameworkProvider) CheckHIPAACompliance(dockerfile string, validationResult *BuildValidationResult, result *ComplianceResult) {
 	// Check for telnet/unencrypted services
 	for _, warn := range validationResult.Warnings {
-		if warn.Rule == "sensitive_port" && strings.Contains(warn.Message, "23") {
+		if warn.Code == "sensitive_port" && strings.Contains(warn.Message, "23") {
 			result.Compliant = false
 			result.Score -= 25
 			result.Violations = append(result.Violations, SecurityComplianceViolation{
 				Requirement: "HIPAA 164.312(e)(1)",
 				Description: "Unencrypted transmission protocol (telnet) exposed",
 				Severity:    "high",
-				Line:        warn.Line,
+				Rule:        warn.Code,
 			})
 		}
 	}
@@ -388,34 +388,41 @@ type VulnerabilityScanResult struct {
 
 // ProcessVulnerabilityScan processes vulnerability scan results
 func ProcessVulnerabilityScan(scanResult *VulnerabilityScanResult) *BuildValidationResult {
-	result := core.NewBuildResult("vulnerability-scanner", "1.0.0")
+	// Create a new BuildValidationResult using the security type
+	result := &security.Result{
+		Valid: true,
+		Metadata: security.Metadata{
+			ValidatorName:    "vulnerability-scanner",
+			ValidatorVersion: "1.0.0",
+			Context:          make(map[string]string),
+		},
+		Details: make(map[string]interface{}),
+	}
 
 	if scanResult.Critical > 0 {
 		result.Valid = false
-		result.AddError(core.NewError(
-			"CRITICAL_VULNERABILITIES",
-			fmt.Sprintf("Found %d critical vulnerabilities that must be fixed", scanResult.Critical),
-			core.ErrTypeSecurity,
-			core.SeverityCritical,
-		).WithRule("critical_vulnerabilities"))
+		result.Errors = append(result.Errors, security.Error{
+			Code:     "CRITICAL_VULNERABILITIES",
+			Message:  fmt.Sprintf("Found %d critical vulnerabilities that must be fixed", scanResult.Critical),
+			Severity: security.SeverityCritical,
+			Context:  make(map[string]string),
+		})
 	}
 
 	if scanResult.High > 0 {
-		warning := core.NewWarning(
-			"HIGH_VULNERABILITIES",
-			fmt.Sprintf("Found %d high severity vulnerabilities", scanResult.High),
-		)
-		warning.Error.WithRule("high_vulnerabilities")
-		result.AddWarning(warning)
+		result.Warnings = append(result.Warnings, security.Warning{
+			Code:    "HIGH_VULNERABILITIES",
+			Message: fmt.Sprintf("Found %d high severity vulnerabilities", scanResult.High),
+			Context: make(map[string]string),
+		})
 	}
 
 	if scanResult.Medium > 0 {
-		warning := core.NewWarning(
-			"MEDIUM_VULNERABILITIES",
-			fmt.Sprintf("Found %d medium severity vulnerabilities", scanResult.Medium),
-		)
-		warning.Error.WithRule("medium_vulnerabilities")
-		result.AddWarning(warning)
+		result.Warnings = append(result.Warnings, security.Warning{
+			Code:    "MEDIUM_VULNERABILITIES",
+			Message: fmt.Sprintf("Found %d medium severity vulnerabilities", scanResult.Medium),
+			Context: make(map[string]string),
+		})
 	}
 
 	return result

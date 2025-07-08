@@ -33,7 +33,7 @@ func TestConversationStateAddToHistory(t *testing.T) {
 	turns := []struct {
 		input    string
 		response string
-		stage    core.ConsolidatedConversationStage
+		stage    core.ConversationStage
 	}{
 		{"hello", "Welcome!", convertFromTypesStage(types.StageWelcome)},
 		{"analyze", "Starting analysis...", convertFromTypesStage(types.StageAnalysis)},
@@ -189,7 +189,7 @@ func TestConversationStateErrorTracking(t *testing.T) {
 func TestConversationStateStageTransitions(t *testing.T) {
 	t.Parallel()
 	state := NewConversationState("test-session", "/tmp/workspace")
-	stages := []core.ConsolidatedConversationStage{
+	stages := []core.ConversationStage{
 		convertFromTypesStage(types.StageWelcome),
 		convertFromTypesStage(types.StagePreFlight),
 		convertFromTypesStage(types.StageInit),

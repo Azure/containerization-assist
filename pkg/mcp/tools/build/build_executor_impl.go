@@ -48,8 +48,9 @@ func (e *BuildExecutorImpl) Execute(ctx context.Context, buildCtx BuildContext, 
 		Msg("Starting build execution")
 	// Initialize result
 	result := &ExecutionResult{
-		Performance: &PerformanceMetrics{
-			TotalDuration: 0,
+		Success: false,
+		Metrics: map[string]interface{}{
+			"total_duration": 0,
 		},
 	}
 	// Phase 1: Validation
@@ -60,7 +61,7 @@ func (e *BuildExecutorImpl) Execute(ctx context.Context, buildCtx BuildContext, 
 		).Build()
 	}
 
-	result.Performance.TotalDuration = time.Since(startTime)
+	result.Metrics["total_duration"] = time.Since(startTime)
 
 	return result, nil
 }

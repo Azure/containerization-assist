@@ -3,7 +3,7 @@ package scan
 import (
 	"context"
 
-	coresecurity "github.com/Azure/container-kit/pkg/core/security"
+	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // NOTE: The following interfaces have been consolidated into ScanService
@@ -25,7 +25,7 @@ import (
 // This interface remains as it provides the main tool functionality
 type ScanImageSecurityTool interface {
 	// Main scanning operations
-	ScanImageSecurity(ctx context.Context, imageRef string) (*coresecurity.ScanResult, error)
+	ScanImageSecurity(ctx context.Context, imageRef string) (*core.ScanResult, error)
 
 	// Configuration and lifecycle
 	Configure(config map[string]interface{}) error

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/internal"
+	"github.com/Azure/container-kit/pkg/mcp/errors"
 	sessiontypes "github.com/Azure/container-kit/pkg/mcp/session"
 )
 
@@ -84,8 +84,8 @@ func NewJobManager(config JobManagerConfig) *JobManager {
 	return jm
 }
 
-// NewJobManagerWithServices creates a new job manager using service container
-func NewJobManagerWithServices(serviceContainer services.ServiceContainer, logger *slog.Logger) (*JobManager, error) {
+// NewJobManagerWithServices creates a new job manager
+func NewJobManagerWithServices(logger *slog.Logger) (*JobManager, error) {
 	// Default configuration
 	config := JobManagerConfig{
 		MaxWorkers: 5,
@@ -142,10 +142,13 @@ func (jm *JobManager) GetJob(jobID string) (*AsyncJobInfo, error) {
 
 	job, exists := jm.jobs[jobID]
 	if !exists {
-		return nil, errors.NewError().Messagef("job not found: %s", jobID).WithLocation(
-
-		// Return a copy to avoid race conditions
-		).Build()
+		return nil, errors.NewError().
+			Messagef("job not found: %s", jobID).
+			Code(errors.CodeResourceNotFound).
+			Type(errors.ErrTypeNotFound).
+			Context("job_id", jobID).
+			WithLocation().
+			Build()
 	}
 
 	jobCopy := *job
@@ -176,10 +179,13 @@ func (jm *JobManager) UpdateJob(jobID string, updater func(*AsyncJobInfo)) error
 
 	job, exists := jm.jobs[jobID]
 	if !exists {
-		return errors.NewError().Messagef("job not found: %s", jobID).Build(
-
-		// Update duration if job is completed
-		)
+		return errors.NewError().
+			Messagef("job not found: %s", jobID).
+			Code(errors.CodeResourceNotFound).
+			Type(errors.ErrTypeNotFound).
+			Context("job_id", jobID).
+			WithLocation().
+			Build()
 	}
 
 	updater(job)

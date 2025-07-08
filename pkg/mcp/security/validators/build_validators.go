@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 
 // BuildValidator provides validation specific to build operations
@@ -423,13 +423,12 @@ func (dv *DockerfileValidator) validateFromInstruction(line string, lineNum int,
 
 	// Check for latest tag usage
 	if strings.HasSuffix(imageName, ":latest") || !strings.Contains(imageName, ":") {
-		latestWarning := &types.ValidationWarning{
-			Code:       "FROM_LATEST_TAG",
-			Message:    "Using 'latest' tag or no tag is not recommended for production",
-			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
-			Suggestion: "Use specific version tags for reproducible builds",
+		latestWarning := validation.Warning{
+			Code:    "FROM_LATEST_TAG",
+			Message: "Using 'latest' tag or no tag is not recommended for production",
+			Field:   "FROM",
 		}
-		result.Warnings = append(result.Warnings, *latestWarning)
+		result.Warnings = append(result.Warnings, latestWarning)
 	}
 }
 
@@ -437,24 +436,22 @@ func (dv *DockerfileValidator) validateFromInstruction(line string, lineNum int,
 func (dv *DockerfileValidator) validateRunInstruction(line string, lineNum int, result *core.BuildValidationResult) {
 	// Check for apt-get without update
 	if strings.Contains(line, "apt-get install") && !strings.Contains(line, "apt-get update") {
-		aptWarning := &types.ValidationWarning{
-			Code:       "RUN_APT_UPDATE",
-			Message:    "apt-get install should be preceded by apt-get update",
-			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
-			Suggestion: "Combine 'apt-get update && apt-get install' in a single RUN instruction",
+		aptWarning := validation.Warning{
+			Code:    "RUN_APT_UPDATE",
+			Message: "apt-get install should be preceded by apt-get update",
+			Field:   "RUN",
 		}
-		result.Warnings = append(result.Warnings, *aptWarning)
+		result.Warnings = append(result.Warnings, aptWarning)
 	}
 
 	// Check for package manager cache cleanup
 	if strings.Contains(line, "apt-get install") && !strings.Contains(line, "rm -rf /var/lib/apt/lists/*") {
-		cacheWarning := &types.ValidationWarning{
-			Code:       "RUN_CACHE_CLEANUP",
-			Message:    "Consider cleaning package manager cache to reduce image size",
-			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
-			Suggestion: "Add '&& rm -rf /var/lib/apt/lists/*' to clean up after apt-get",
+		cacheWarning := validation.Warning{
+			Code:    "RUN_CACHE_CLEANUP",
+			Message: "Consider cleaning package manager cache to reduce image size",
+			Field:   "RUN",
 		}
-		result.Warnings = append(result.Warnings, *cacheWarning)
+		result.Warnings = append(result.Warnings, cacheWarning)
 	}
 }
 
@@ -475,13 +472,12 @@ func (dv *DockerfileValidator) validateCopyAddInstruction(instruction, line stri
 
 	// Warn about ADD vs COPY
 	if instruction == "ADD" && !strings.Contains(line, "http") && !strings.HasSuffix(parts[1], ".tar") {
-		addWarning := &types.ValidationWarning{
-			Code:       "ADD_VS_COPY",
-			Message:    "COPY is preferred over ADD for simple file copying",
-			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
-			Suggestion: "Use COPY instead of ADD unless you need URL download or tar extraction",
+		addWarning := validation.Warning{
+			Code:    "ADD_VS_COPY",
+			Message: "COPY is preferred over ADD for simple file copying",
+			Field:   "ADD",
 		}
-		result.Warnings = append(result.Warnings, *addWarning)
+		result.Warnings = append(result.Warnings, addWarning)
 	}
 }
 
@@ -533,13 +529,12 @@ func (dv *DockerfileValidator) validateUserInstruction(line string, lineNum int,
 
 	user := parts[1]
 	if user == "root" {
-		rootWarning := &types.ValidationWarning{
-			Code:       "USER_ROOT_SECURITY",
-			Message:    "Running as root user is a security risk",
-			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
-			Suggestion: "Create and use a non-root user for better security",
+		rootWarning := validation.Warning{
+			Code:    "USER_ROOT_SECURITY",
+			Message: "Running as root user is a security risk",
+			Field:   "USER",
 		}
-		result.Warnings = append(result.Warnings, *rootWarning)
+		result.Warnings = append(result.Warnings, rootWarning)
 	}
 }
 
@@ -560,13 +555,12 @@ func (dv *DockerfileValidator) validateWorkdirInstruction(line string, lineNum i
 
 	workdir := parts[1]
 	if !strings.HasPrefix(workdir, "/") {
-		pathWarning := &types.ValidationWarning{
-			Code:       "WORKDIR_RELATIVE_PATH",
-			Message:    "WORKDIR should use absolute paths",
-			Context:    map[string]string{"line": fmt.Sprintf("%d", lineNum)},
-			Suggestion: "Use absolute paths starting with '/' for WORKDIR",
+		pathWarning := validation.Warning{
+			Code:    "WORKDIR_RELATIVE_PATH",
+			Message: "WORKDIR should use absolute paths",
+			Field:   "WORKDIR",
 		}
-		result.Warnings = append(result.Warnings, *pathWarning)
+		result.Warnings = append(result.Warnings, pathWarning)
 	}
 }
 
@@ -624,34 +618,31 @@ func (dv *DockerfileValidator) validateStructure(instructions []string, result *
 	}
 
 	if cmdCount > 1 {
-		cmdWarning := &types.ValidationWarning{
-			Code:       "MULTIPLE_CMD",
-			Message:    "Multiple CMD instructions found, only the last one will be effective",
-			Context:    map[string]string{"count": fmt.Sprintf("%d", cmdCount)},
-			Suggestion: "Use only one CMD instruction",
+		cmdWarning := validation.Warning{
+			Code:    "MULTIPLE_CMD",
+			Message: "Multiple CMD instructions found, only the last one will be effective",
+			Field:   "CMD",
 		}
-		result.Warnings = append(result.Warnings, *cmdWarning)
+		result.Warnings = append(result.Warnings, cmdWarning)
 	}
 
 	if entrypointCount > 1 {
-		entrypointWarning := &types.ValidationWarning{
-			Code:       "MULTIPLE_ENTRYPOINT",
-			Message:    "Multiple ENTRYPOINT instructions found, only the last one will be effective",
-			Context:    map[string]string{"count": fmt.Sprintf("%d", entrypointCount)},
-			Suggestion: "Use only one ENTRYPOINT instruction",
+		entrypointWarning := validation.Warning{
+			Code:    "MULTIPLE_ENTRYPOINT",
+			Message: "Multiple ENTRYPOINT instructions found, only the last one will be effective",
+			Field:   "ENTRYPOINT",
 		}
-		result.Warnings = append(result.Warnings, *entrypointWarning)
+		result.Warnings = append(result.Warnings, entrypointWarning)
 	}
 
 	// Warn about ENTRYPOINT + CMD combination (informational) - only if exactly one of each
 	if entrypointCount == 1 && cmdCount == 1 {
-		comboWarning := &types.ValidationWarning{
-			Code:       "ENTRYPOINT_CMD_COMBO",
-			Message:    "Using both ENTRYPOINT and CMD - CMD will be passed as arguments to ENTRYPOINT",
-			Context:    map[string]string{},
-			Suggestion: "Ensure this is the intended behavior",
+		comboWarning := validation.Warning{
+			Code:    "ENTRYPOINT_CMD_COMBO",
+			Message: "Using both ENTRYPOINT and CMD - CMD will be passed as arguments to ENTRYPOINT",
+			Field:   "ENTRYPOINT",
 		}
-		result.Warnings = append(result.Warnings, *comboWarning)
+		result.Warnings = append(result.Warnings, comboWarning)
 	}
 }
 

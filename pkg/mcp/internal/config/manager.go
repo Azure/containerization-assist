@@ -72,6 +72,17 @@ type DockerConfig struct {
 	MaxConcurrent int           `yaml:"max_concurrent" json:"max_concurrent" env:"MCP_DOCKER_MAX_CONCURRENT"`
 }
 
+// WorkerConfig contains worker-related configuration for background processing
+type WorkerConfig struct {
+	MaxWorkers      int           `yaml:"max_workers" json:"max_workers" env:"MCP_WORKER_MAX_WORKERS"`
+	WorkerTimeout   time.Duration `yaml:"worker_timeout" json:"worker_timeout" env:"MCP_WORKER_TIMEOUT"`
+	QueueSize       int           `yaml:"queue_size" json:"queue_size" env:"MCP_WORKER_QUEUE_SIZE"`
+	RetryAttempts   int           `yaml:"retry_attempts" json:"retry_attempts" env:"MCP_WORKER_RETRY_ATTEMPTS"`
+	RetryDelay      time.Duration `yaml:"retry_delay" json:"retry_delay" env:"MCP_WORKER_RETRY_DELAY"`
+	EnableMetrics   bool          `yaml:"enable_metrics" json:"enable_metrics" env:"MCP_WORKER_ENABLE_METRICS"`
+	ShutdownTimeout time.Duration `yaml:"shutdown_timeout" json:"shutdown_timeout" env:"MCP_WORKER_SHUTDOWN_TIMEOUT"`
+}
+
 // NewConfigManager creates a new configuration manager with default values
 func NewConfigManager() *ConfigManager {
 	return &ConfigManager{

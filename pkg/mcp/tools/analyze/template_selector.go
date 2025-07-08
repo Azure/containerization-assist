@@ -6,6 +6,33 @@ import (
 	"strings"
 )
 
+// TemplateSelectionContext represents context for template selection
+type TemplateSelectionContext struct {
+	DetectedLanguage    string                `json:"detected_language"`
+	DetectedFramework   string                `json:"detected_framework"`
+	AvailableTemplates  []TemplateOption      `json:"available_templates"`
+	RecommendedTemplate string                `json:"recommended_template"`
+	SelectionReasoning  []string              `json:"selection_reasoning"`
+	AlternativeOptions  []AlternativeTemplate `json:"alternative_options"`
+}
+
+// TemplateOption represents a template option with scoring
+type TemplateOption struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	BestFor     []string `json:"best_for"`
+	Limitations []string `json:"limitations"`
+	MatchScore  float64  `json:"match_score"`
+}
+
+// AlternativeTemplate represents an alternative template option
+type AlternativeTemplate struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Score       float64 `json:"score"`
+	Reason      string  `json:"reason"`
+}
+
 // TemplateSelector handles Dockerfile template selection and scoring
 type TemplateSelector struct {
 	logger *slog.Logger

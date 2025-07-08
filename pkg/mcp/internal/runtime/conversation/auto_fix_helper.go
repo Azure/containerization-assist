@@ -25,7 +25,7 @@ func NewAutoFixHelper(handler *ConversationHandler) *AutoFixHelper {
 
 	return helper
 }
-func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *ConversationResponse, stage core.ConsolidatedConversationStage, err error, state *ConversationState) bool {
+func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *ConversationResponse, stage core.ConversationStage, err error, state *ConversationState) bool {
 	if h.conversationHandler == nil {
 		return false
 	}
@@ -54,11 +54,11 @@ func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *Conversati
 	return true
 }
 
-func convertToMCPStage(stage types.ConsolidatedConversationStage) core.ConsolidatedConversationStage {
+func convertToMCPStage(stage types.ConversationStage) core.ConversationStage {
 	return convertFromTypesStage(stage)
 }
 
-func (h *AutoFixHelper) getSuccessOptions(stage core.ConsolidatedConversationStage) []Option {
+func (h *AutoFixHelper) getSuccessOptions(stage core.ConversationStage) []Option {
 	switch stage {
 	case core.ConversationStageBuild:
 		return []Option{
@@ -88,7 +88,7 @@ func (h *AutoFixHelper) getSuccessOptions(stage core.ConsolidatedConversationSta
 	}
 }
 
-func getStageDisplayName(stage core.ConsolidatedConversationStage) string {
+func getStageDisplayName(stage core.ConversationStage) string {
 	switch stage {
 	case core.ConversationStageBuild:
 		return "Build"
@@ -103,7 +103,7 @@ func getStageDisplayName(stage core.ConsolidatedConversationStage) string {
 	}
 }
 
-func getStageErrorPrefix(stage core.ConsolidatedConversationStage) string {
+func getStageErrorPrefix(stage core.ConversationStage) string {
 	switch stage {
 	case core.ConversationStageBuild:
 		return "Build"
@@ -120,7 +120,7 @@ func getStageErrorPrefix(stage core.ConsolidatedConversationStage) string {
 
 type RetryGuidanceInput struct {
 	Response      *ConversationResponse
-	Stage         core.ConsolidatedConversationStage
+	Stage         core.ConversationStage
 	Error         error
 	AutoFixResult *AutoFixResult
 	State         *ConversationState
@@ -194,7 +194,7 @@ func (h *AutoFixHelper) buildRetryContext(sessionID string, err error, autoFixRe
 	}
 }
 
-func (h *AutoFixHelper) classifyError(err error, stage core.ConsolidatedConversationStage) string {
+func (h *AutoFixHelper) classifyError(err error, stage core.ConversationStage) string {
 	errorMsg := strings.ToLower(err.Error())
 
 	switch stage {

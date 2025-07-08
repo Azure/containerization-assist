@@ -14,13 +14,13 @@ func (pm *PromptManager) hasPassedPreFlightChecks(state *ConversationState) bool
 	return false
 }
 
-func (pm *PromptManager) hasPassedStagePreFlightChecks(state *ConversationState, stage core.ConsolidatedConversationStage) bool {
+func (pm *PromptManager) hasPassedStagePreFlightChecks(state *ConversationState, stage core.ConversationStage) bool {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	_, passed := state.Context[key]
 	return passed
 }
 
-func (pm *PromptManager) markStagePreFlightPassed(state *ConversationState, stage core.ConsolidatedConversationStage) {
+func (pm *PromptManager) markStagePreFlightPassed(state *ConversationState, stage core.ConversationStage) {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	state.Context[key] = true
 }

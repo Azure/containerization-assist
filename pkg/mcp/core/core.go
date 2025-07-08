@@ -5,6 +5,8 @@ package core
 import (
 	"sync"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/core/config"
 )
 
 // Workflow Stage Constants
@@ -16,6 +18,15 @@ const (
 	StageComplete = "complete"
 )
 
+// ProgressReporter provides progress reporting capabilities for operations
+type ProgressReporter interface {
+	ReportProgress(current, total int, message string)
+	ReportError(err error)
+	ReportComplete(message string)
+}
+
+// TypedPipelineOperations is defined in interfaces.go
+
 // Common string constants
 const (
 	UnknownString     = "unknown"
@@ -23,10 +34,29 @@ const (
 	AtomicToolVersion = "1.0.0"
 )
 
+// Note: ScanResult type is defined in base_types.go to avoid duplication
+
 // Validation constants
 const (
 	ValidationModeInline = "inline"
 )
+
+// Type aliases for external access
+type ServerConfig = config.ServerConfig
+
+// ConsolidatedConversationConfig represents conversation mode configuration
+type ConsolidatedConversationConfig struct {
+	EnableTelemetry   bool              `json:"enable_telemetry"`
+	TelemetryPort     int               `json:"telemetry_port"`
+	PreferencesDBPath string            `json:"preferences_db_path"`
+	EnableOTEL        bool              `json:"enable_otel"`
+	OTELEndpoint      string            `json:"otel_endpoint"`
+	OTELHeaders       map[string]string `json:"otel_headers"`
+	ServiceName       string            `json:"service_name"`
+	ServiceVersion    string            `json:"service_version"`
+	Environment       string            `json:"environment"`
+	TraceSampleRate   float64           `json:"trace_sample_rate"`
+}
 
 // KnownRegistries is deprecated - use RegistryService instead
 // var KnownRegistries = []string{ ... } // REMOVED: Global state eliminated

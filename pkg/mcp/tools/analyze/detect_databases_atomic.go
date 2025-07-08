@@ -17,19 +17,14 @@ import (
 // AtomicDetectDatabasesTool implements database detection with CLI parity
 // It uses session context for database detection workflow management.
 type AtomicDetectDatabasesTool struct {
-	detectors map[DatabaseType]DatabaseDetector
-	logger    *slog.Logger
+	engine AnalysisEngine
+	logger *slog.Logger
 }
 
 // NewAtomicDetectDatabasesTool creates a new database detection tool with the specified dependencies.
-func NewAtomicDetectDatabasesTool(logger *slog.Logger) *AtomicDetectDatabasesTool {
+func NewAtomicDetectDatabasesTool(engine AnalysisEngine, logger *slog.Logger) *AtomicDetectDatabasesTool {
 	return &AtomicDetectDatabasesTool{
-		detectors: map[DatabaseType]DatabaseDetector{
-			PostgreSQL: NewPostgreSQLDetector(),
-			MySQL:      NewMySQLDetector(),
-			MongoDB:    NewMongoDBDetector(),
-			Redis:      NewRedisDetector(),
-		},
+		engine: engine,
 		logger: logger.With("tool", "atomic_detect_databases"),
 	}
 }
@@ -83,12 +78,10 @@ func (t *AtomicDetectDatabasesTool) ExecuteWithContext(ctx *server.Context, args
 	// If dry run, return early with success
 	if args.DryRun {
 		result := &DatabaseDetectionResult{
-			BaseToolResponse:    types.BaseToolResponse{Success: false, Timestamp: time.Now()},
-			BaseAIContextResult: core.NewBaseAIContextResult("database_detection", true, time.Since(startTime)),
-			Success:             true,
-			DatabasesFound:      []DetectedDatabase{},
-			ConfigFiles:         []DatabaseConfigFile{},
-			Suggestions:         []string{"Dry run mode - no actual detection performed"},
+			Success:        true,
+			DatabasesFound: []DetectedDatabase{},
+			ConfigFiles:    []DatabaseConfigFile{},
+			Suggestions:    []string{"Dry run mode - no actual detection performed"},
 			Metadata: DatabaseMetadata{
 				ScanStarted:  startTime,
 				ScanPath:     args.RepositoryPath,

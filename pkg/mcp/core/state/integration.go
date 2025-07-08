@@ -1,13 +1,13 @@
-package core
+package state
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/Azure/container-kit/pkg/mcp/session"
-	"github.com/rs/zerolog"
 )
 
 // StateManagementIntegration provides high-level state management integration
@@ -15,14 +15,14 @@ type StateManagementIntegration struct {
 	manager         *UnifiedStateManager
 	metricsObserver *MetricsObserver
 	auditObserver   *AuditObserver
-	logger          zerolog.Logger
+	logger          *slog.Logger
 }
 
 // NewStateManagementIntegration creates a new state management integration
 func NewStateManagementIntegration(
 	sessionManager *session.SessionManager,
 	checkpointManager CheckpointManagerInterface,
-	logger zerolog.Logger,
+	logger *slog.Logger,
 ) *StateManagementIntegration {
 	manager := NewUnifiedStateManager(sessionManager, logger)
 
@@ -48,7 +48,7 @@ func NewStateManagementIntegration(
 		manager:         manager,
 		metricsObserver: metricsObserver,
 		auditObserver:   auditObserver,
-		logger:          logger.With().Str("component", "state_integration").Logger(),
+		logger:          logger.With("component", "state_integration"),
 	}
 }
 
@@ -74,7 +74,7 @@ func (i *StateManagementIntegration) StartSessionWorkflowSync(ctx context.Contex
 		return err
 	}
 
-	i.logger.Info().Str("sync_session", sessionID).Msg("Started session-workflow synchronization")
+	i.logger.Info("Started session-workflow synchronization", slog.String("sync_session", sessionID))
 	return nil
 }
 
@@ -96,10 +96,9 @@ func (i *StateManagementIntegration) CreateConversationFromSession(ctx context.C
 		return "", err
 	}
 
-	i.logger.Info().
-		Str("session_id", sessionID).
-		Str("conversation_id", conversationID).
-		Msg("Created conversation from session")
+	i.logger.Info("Created conversation from session",
+		slog.String("session_id", sessionID),
+		slog.String("conversation_id", conversationID))
 
 	return conversationID, nil
 }
@@ -117,7 +116,7 @@ func (i *StateManagementIntegration) CreateToolStateTransaction(ctx context.Cont
 type ToolStateTransaction struct {
 	transaction *StateTransaction
 	toolName    string
-	logger      zerolog.Logger
+	logger      *slog.Logger
 }
 
 // SetToolConfig sets tool configuration in the transaction
@@ -141,16 +140,14 @@ func (t *ToolStateTransaction) SetToolMetrics(metrics interface{}) *ToolStateTra
 // Commit commits the tool state transaction
 func (t *ToolStateTransaction) Commit() error {
 	if err := t.transaction.Commit(); err != nil {
-		t.logger.Error().
-			Err(err).
-			Str("tool_name", t.toolName).
-			Msg("Tool state transaction failed")
+		t.logger.Error("Tool state transaction failed",
+			slog.String("error", err.Error()),
+			slog.String("tool_name", t.toolName))
 		return err
 	}
 
-	t.logger.Info().
-		Str("tool_name", t.toolName).
-		Msg("Tool state transaction committed")
+	t.logger.Info("Tool state transaction committed",
+		slog.String("tool_name", t.toolName))
 	return nil
 }
 
@@ -173,10 +170,9 @@ func (i *StateManagementIntegration) RegisterStateChangeAlert(name string, handl
 
 // EnableStateReplication enables state replication to a remote system
 func (i *StateManagementIntegration) EnableStateReplication(ctx context.Context, config ReplicationConfig) error {
-	i.logger.Info().
-		Str("target", config.TargetURL).
-		Str("mode", string(config.Mode)).
-		Msg("State replication would be enabled")
+	i.logger.Info("State replication would be enabled",
+		slog.String("target", config.TargetURL),
+		slog.String("mode", string(config.Mode)))
 	return nil
 }
 

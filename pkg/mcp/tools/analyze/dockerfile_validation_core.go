@@ -14,7 +14,9 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	internalcommon "github.com/Azure/container-kit/pkg/mcp/internal/common"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	validationcore "github.com/Azure/container-kit/pkg/mcp/security"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 	"github.com/Azure/container-kit/pkg/mcp/tools/build"
 
 	constants "github.com/Azure/container-kit/pkg/mcp/core"
@@ -329,8 +331,8 @@ func (t *AtomicValidateDockerfileTool) resolveDockerfileContent(args AtomicValid
 // ============================================================================
 
 // performCoreValidation executes the primary validation logic using the appropriate validator.
-func (t *AtomicValidateDockerfileTool) performCoreValidation(ctx context.Context, dockerfileContent string, args AtomicValidateDockerfileArgs) (*types.BuildValidationResult, string, error) {
-	var validationResult *types.BuildValidationResult
+func (t *AtomicValidateDockerfileTool) performCoreValidation(ctx context.Context, dockerfileContent string, args AtomicValidateDockerfileArgs) (*core.BuildValidationResult, string, error) {
+	var validationResult *core.BuildValidationResult
 	var validatorUsed string
 	var err error
 
@@ -363,7 +365,7 @@ func (t *AtomicValidateDockerfileTool) performCoreValidation(ctx context.Context
 // ============================================================================
 
 // processValidationResults converts core validation results to the result structure.
-func (t *AtomicValidateDockerfileTool) processValidationResults(result *ExtendedValidationResult, validationResult *types.BuildValidationResult, _ AtomicValidateDockerfileArgs) {
+func (t *AtomicValidateDockerfileTool) processValidationResults(result *ExtendedValidationResult, validationResult *core.BuildValidationResult, _ AtomicValidateDockerfileArgs) {
 	// Process validation errors
 	for _, err := range validationResult.Errors {
 		// Extract line and column from context if available

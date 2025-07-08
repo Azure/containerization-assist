@@ -590,3 +590,27 @@ func (r *registryAdapter) SetStatus(name string, status api.ToolStatus) error {
 func (r *registryAdapter) Close() error {
 	return r.registry.Close()
 }
+
+// GetMetrics returns registry metrics
+func (r *registryAdapter) GetMetrics() api.RegistryMetrics {
+	// Return basic metrics - can be enhanced with actual metrics tracking
+	tools := r.registry.List()
+	return api.RegistryMetrics{
+		TotalTools:       len(tools),
+		ActiveTools:      len(tools), // Assume all tools are active for now
+		TotalExecutions:  0,          // Would need to track this
+		FailedExecutions: 0,          // Would need to track this
+	}
+}
+
+// Subscribe registers a callback for registry events
+func (r *registryAdapter) Subscribe(event api.RegistryEventType, callback api.RegistryEventCallback) error {
+	// Basic implementation - would need to be enhanced with actual event system
+	return nil
+}
+
+// Unsubscribe removes a callback for registry events
+func (r *registryAdapter) Unsubscribe(event api.RegistryEventType, callback api.RegistryEventCallback) error {
+	// Basic implementation - would need to be enhanced with actual event system
+	return nil
+}

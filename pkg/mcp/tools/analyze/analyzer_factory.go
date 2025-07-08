@@ -3,16 +3,18 @@ package analyze
 import (
 	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/mcp/core"
+	"github.com/Azure/container-kit/pkg/mcp/services"
 )
 
 // CreateAnalyzer creates the appropriate Analyzer implementation based on available components
 // This factory function handles all possible combinations of repository and AI analyzers
 func CreateAnalyzer(
-	repoAnalyzer core.RepositoryAnalyzer,
+	repoAnalyzer *analysis.RepositoryAnalyzer,
 	aiAnalyzer core.AIAnalyzer,
 	logger *slog.Logger,
-) core.Analyzer {
+) services.Analyzer {
 	// Both available - create unified analyzer
 	if repoAnalyzer != nil && aiAnalyzer != nil {
 		return NewUnifiedAnalyzer(repoAnalyzer, aiAnalyzer, logger)
@@ -34,15 +36,15 @@ func CreateAnalyzer(
 
 // CreateAnalyzerFromInterface creates an Analyzer from any analyzer interface
 // This is useful during the migration period when you might receive either type
-func CreateAnalyzerFromInterface(analyzer interface{}, logger *slog.Logger) core.Analyzer {
+func CreateAnalyzerFromInterface(analyzer interface{}, logger *slog.Logger) services.Analyzer {
 	switch a := analyzer.(type) {
-	case core.Analyzer:
+	case services.Analyzer:
 		// Already unified
 		return a
 	case core.AIAnalyzer:
 		// Wrap in partial implementation
 		return NewPartialAIAnalyzer(a)
-	case core.RepositoryAnalyzer:
+	case *analysis.RepositoryAnalyzer:
 		// Wrap in partial implementation
 		return NewPartialRepositoryAnalyzer(a)
 	default:
@@ -55,10 +57,10 @@ func CreateAnalyzerFromInterface(analyzer interface{}, logger *slog.Logger) core
 // MigrateToUnified helps migrate existing code that uses separate analyzers
 // This is a helper function for the migration period
 func MigrateToUnified(
-	repoAnalyzer core.RepositoryAnalyzer,
+	repoAnalyzer *analysis.RepositoryAnalyzer,
 	aiAnalyzer core.AIAnalyzer,
 	logger *slog.Logger,
-) (core.Analyzer, core.RepositoryAnalyzer, core.AIAnalyzer) {
+) (services.Analyzer, *analysis.RepositoryAnalyzer, core.AIAnalyzer) {
 	// Create unified analyzer
 	unified := CreateAnalyzer(repoAnalyzer, aiAnalyzer, logger)
 
@@ -72,7 +74,7 @@ func MigrateToUnified(
 
 // ValidateAnalyzer checks if an analyzer has specific capabilities
 // This helps with graceful degradation when features aren't available
-func ValidateAnalyzer(analyzer core.Analyzer) AnalyzerCapabilities {
+func ValidateAnalyzer(analyzer services.Analyzer) AnalyzerCapabilities {
 	capabilities := AnalyzerCapabilities{}
 
 	if analyzer == nil {

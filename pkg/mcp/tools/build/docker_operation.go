@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
 )
 
@@ -32,7 +31,7 @@ type DockerOperation struct {
 	Timeout       time.Duration
 
 	// Dependencies
-	Progress mcptypes.ProgressReporter
+	Progress ProgressReporter
 
 	// Operation-specific functions (configurable)
 	ExecuteFunc  func(ctx context.Context) error
@@ -59,7 +58,7 @@ type DockerOperationConfig struct {
 }
 
 // NewDockerOperation creates a new generic Docker operation with the specified configuration
-func NewDockerOperation(config DockerOperationConfig, progress mcptypes.ProgressReporter) mcptypes.ConsolidatedFixableOperation {
+func NewDockerOperation(config DockerOperationConfig, progress ProgressReporter) ConsolidatedFixableOperation {
 	// Set default values
 	if config.RetryAttempts == 0 {
 		config.RetryAttempts = 3
@@ -173,7 +172,7 @@ func (op *DockerOperation) CanRetry(err error) bool {
 }
 
 // GetFailureAnalysis analyzes the failure for potential fixes
-func (op *DockerOperation) GetFailureAnalysis(ctx context.Context, err error) (*mcptypes.ConsolidatedFailureAnalysis, error) {
+func (op *DockerOperation) GetFailureAnalysis(ctx context.Context, err error) (*ConsolidatedFailureAnalysis, error) {
 	if err == nil {
 		return nil, errors.NewError().Messagef("no error to analyze").Build()
 	}
@@ -209,7 +208,7 @@ func (op *DockerOperation) GetFailureAnalysis(ctx context.Context, err error) (*
 		suggestedFixes = []string{"Check logs for more details", "Retry operation", "Contact support if issue persists"}
 	}
 
-	return &mcptypes.ConsolidatedFailureAnalysis{
+	return &ConsolidatedFailureAnalysis{
 		FailureType:              failureType,
 		IsCritical:               isCritical,
 		IsRetryable:              isRetryable,

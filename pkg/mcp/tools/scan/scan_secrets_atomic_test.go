@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/Azure/container-kit/pkg/mcp/internal/types"
-	"github.com/localrivet/gomcp/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,7 +62,7 @@ func TestExecuteScanSecrets_CompatibilityFunction(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	result, err := ExecuteScanSecrets(ctx, args, execCtx)
+	result, err := ExecuteScanSecrets(ctx, execCtx, args.BaseToolArgs)
 
 	// Should delegate to the main tool implementation
 	if err != nil || result == nil {
@@ -88,8 +87,8 @@ func TestExecuteWithContext_CompatibilityFunction(t *testing.T) {
 		ScanPath:     "/test/path",
 	}
 
-	serverCtx := &server.Context{}
-	result, err := ExecuteWithContext(serverCtx, args, execCtx)
+	ctx := context.Background()
+	result, err := ExecuteWithContext(ctx, execCtx, args)
 
 	// Should delegate to the main tool implementation
 	if err != nil || result == nil {
@@ -114,7 +113,7 @@ func TestExecuteScanSecrets_EmptyArgs(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	result, err := ExecuteScanSecrets(ctx, args, execCtx)
+	result, err := ExecuteScanSecrets(ctx, execCtx, args.BaseToolArgs)
 
 	// Should handle empty args gracefully
 	assert.Error(t, err)
@@ -136,8 +135,8 @@ func TestExecuteWithContext_EmptyArgs(t *testing.T) {
 		BaseToolArgs: types.BaseToolArgs{},
 	}
 
-	serverCtx := &server.Context{}
-	result, err := ExecuteWithContext(serverCtx, args, execCtx)
+	ctx := context.Background()
+	result, err := ExecuteWithContext(ctx, execCtx, args)
 
 	// Should handle empty args gracefully
 	assert.Error(t, err)
@@ -160,7 +159,7 @@ func TestExecuteScanSecrets_NilContext(t *testing.T) {
 		ScanPath:     "/test/path",
 	}
 
-	result, err := ExecuteScanSecrets(nil, args, execCtx)
+	result, err := ExecuteScanSecrets(nil, execCtx, args.BaseToolArgs)
 
 	// Should handle nil context gracefully
 	assert.Error(t, err)
@@ -183,7 +182,7 @@ func TestExecuteWithContext_NilServerContext(t *testing.T) {
 		ScanPath:     "/test/path",
 	}
 
-	result, err := ExecuteWithContext(nil, args, execCtx)
+	result, err := ExecuteWithContext(nil, execCtx, args)
 
 	// Should handle nil server context gracefully
 	assert.Error(t, err)
@@ -212,7 +211,7 @@ func BenchmarkExecuteScanSecrets(b *testing.B) {
 	ctx := context.Background()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result, err := ExecuteScanSecrets(ctx, args, execCtx)
+		result, err := ExecuteScanSecrets(ctx, execCtx, args.BaseToolArgs)
 		require.NoError(b, err)
 		require.NotNil(b, result)
 	}
@@ -235,10 +234,10 @@ func BenchmarkExecuteWithContext(b *testing.B) {
 		ScanPath:     "/test/path",
 	}
 
-	serverCtx := &server.Context{}
+	ctx := context.Background()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result, err := ExecuteWithContext(serverCtx, args, execCtx)
+		result, err := ExecuteWithContext(ctx, execCtx, args)
 		require.NoError(b, err)
 		require.NotNil(b, result)
 	}

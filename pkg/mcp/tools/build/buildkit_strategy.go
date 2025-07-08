@@ -7,6 +7,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Feature constants for BuildKit capabilities
+const (
+	FeatureMultiStage    = "multi-stage"
+	FeatureBuildKit      = "buildkit"
+	FeatureSecrets       = "secrets"
+	FeatureMultiPlatform = "multi-platform"
+	FeatureBuildCache    = "build-cache"
+	FeatureSBOM          = "sbom"
+	FeatureProvenance    = "provenance"
+	FeatureCrossCompile  = "cross-compile"
+)
+
 // BuildKitStrategy implements BuildStrategy for BuildKit builds
 type BuildKitStrategy struct {
 	logger zerolog.Logger
@@ -22,6 +34,17 @@ func NewBuildKitStrategy(logger zerolog.Logger) BuildStrategy {
 // Name returns the strategy name
 func (s *BuildKitStrategy) Name() string {
 	return "buildkit"
+}
+
+// CanHandle determines if this strategy can handle the given build context
+func (s *BuildKitStrategy) CanHandle(context BuildContext) bool {
+	// BuildKit can handle most build contexts
+	return context.DockerfilePath != "" && context.ImageName != ""
+}
+
+// Execute implements BuildStrategy interface by delegating to Build
+func (s *BuildKitStrategy) Execute(context BuildContext) (*BuildResult, error) {
+	return s.Build(context)
 }
 
 // Description returns a human-readable description

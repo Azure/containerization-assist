@@ -14,6 +14,14 @@ import (
 	validation "github.com/Azure/container-kit/pkg/mcp/security"
 )
 
+// BuildValidationResult is a local type to avoid import cycles
+type BuildValidationResult = validation.Result
+
+// NewBuildResult creates a new BuildValidationResult
+func NewBuildResult() *BuildValidationResult {
+	return validation.NewResult()
+}
+
 // HadolintValidator provides Hadolint-based Dockerfile validation
 type HadolintValidator struct {
 	logger       *slog.Logger
@@ -38,7 +46,7 @@ type HadolintResult struct {
 }
 
 // ValidateWithHadolint validates a Dockerfile using Hadolint
-func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfileContent string) (*types.BuildValidationResult, error) {
+func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfileContent string) (*BuildValidationResult, error) {
 	// Check if Hadolint is installed
 	hadolintPath, err := hv.findHadolint()
 	if err != nil {
@@ -87,7 +95,7 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 	}
 
 	// Convert Hadolint results to ValidationResult using factory function
-	result := types.NewBuildResult()
+	result := NewBuildResult()
 	result.Metadata.ValidatorName = "hadolint"
 	result.Metadata.ValidatorVersion = hv.getHadolintVersion()
 
@@ -232,7 +240,7 @@ func (hv *HadolintValidator) getSuggestionForCode(code string) string {
 }
 
 // addHadolintSuggestions adds general suggestions based on Hadolint findings
-func (hv *HadolintValidator) addHadolintSuggestions(results []HadolintResult, validation *types.BuildValidationResult) {
+func (hv *HadolintValidator) addHadolintSuggestions(results []HadolintResult, validation *BuildValidationResult) {
 	hasSecurityIssues := false
 	hasVersionPinning := false
 	hasRootUser := false

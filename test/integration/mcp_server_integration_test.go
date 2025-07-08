@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/core"
-	"github.com/Azure/container-kit/pkg/mcp/infra/server"
+	"github.com/Azure/container-kit/pkg/mcp/core/config"
+	"github.com/Azure/container-kit/pkg/mcp/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +64,7 @@ func testServerLifecycle(t *testing.T, workspaceDir, storeDir string) {
 	defer cancel()
 
 	// Create server configuration
-	config := core.DefaultServerConfig()
+	config := config.DefaultServerConfig()
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 	config.MaxSessions = 10
@@ -97,12 +97,12 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 
 	tests := []struct {
 		name           string
-		configModifier func(*core.ServerConfig)
+		configModifier func(*config.ServerConfig)
 		expectError    bool
 	}{
 		{
 			name: "default_config",
-			configModifier: func(config *core.ServerConfig) {
+			configModifier: func(config *config.ServerConfig) {
 				config.WorkspaceDir = workspaceDir
 				config.StorePath = filepath.Join(storeDir, "sessions.db")
 			},
@@ -110,7 +110,7 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 		},
 		{
 			name: "sandbox_enabled",
-			configModifier: func(config *core.ServerConfig) {
+			configModifier: func(config *config.ServerConfig) {
 				config.WorkspaceDir = workspaceDir
 				config.StorePath = filepath.Join(storeDir, "sessions.db")
 				config.SandboxEnabled = true
@@ -119,7 +119,7 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 		},
 		{
 			name: "invalid_workspace_dir",
-			configModifier: func(config *core.ServerConfig) {
+			configModifier: func(config *config.ServerConfig) {
 				config.WorkspaceDir = "/nonexistent/invalid/path"
 				config.StorePath = filepath.Join(storeDir, "sessions.db")
 			},
@@ -129,8 +129,8 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := core.DefaultServerConfig()
-			tt.configModifier(&config)
+			config := config.DefaultServerConfig()
+			tt.configModifier(config)
 
 			mcpServer, err := server.NewServer(ctx, config)
 
@@ -156,7 +156,7 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 func testWorkspaceManagement(t *testing.T, workspaceDir, storeDir string) {
 	ctx := context.Background()
 
-	config := core.DefaultServerConfig()
+	config := config.DefaultServerConfig()
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
@@ -191,7 +191,7 @@ func testWorkspaceManagement(t *testing.T, workspaceDir, storeDir string) {
 func testSessionHandling(t *testing.T, workspaceDir, storeDir string) {
 	ctx := context.Background()
 
-	config := core.DefaultServerConfig()
+	config := config.DefaultServerConfig()
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 	config.MaxSessions = 5
@@ -248,7 +248,7 @@ func testSessionHandling(t *testing.T, workspaceDir, storeDir string) {
 func testToolRegistration(t *testing.T, workspaceDir, storeDir string) {
 	ctx := context.Background()
 
-	config := core.DefaultServerConfig()
+	config := config.DefaultServerConfig()
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
@@ -296,7 +296,7 @@ func TestMCPServerStressTest(t *testing.T) {
 	storeDir := t.TempDir()
 	ctx := context.Background()
 
-	config := core.DefaultServerConfig()
+	config := config.DefaultServerConfig()
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 	config.MaxSessions = 100

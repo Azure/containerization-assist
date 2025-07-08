@@ -35,45 +35,17 @@ When you use Container Kit with Claude Desktop or other MCP clients, you're usin
 - `deploy_kubernetes_atomic` - Deploy to Kubernetes
 - `scan_image_security_atomic` - Scan images for vulnerabilities
 
-## Understanding the Three-Layer Architecture
+## Understanding the Architecture
 
-Container Kit follows a **three-context architecture** as defined in [ADR-001](architecture/adr/2025-07-07-three-context-architecture.md). Here's why:
+Container Kit follows a **three-context architecture** as defined in [ADR-001](architecture/adr/2025-07-07-three-context-architecture.md). For detailed architecture information, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-### The Problem We Solved
-Originally, Container Kit had 30+ packages with deep nesting and import cycles. This made it difficult to:
-- Understand the codebase structure
-- Add new features without breaking existing code
-- Test components in isolation
-- Maintain clear boundaries between different concerns
+### Key Architectural Layers
 
-### The Solution: Three Bounded Contexts
-
-```
-pkg/mcp/
-├── application/    # How we orchestrate and coordinate
-├── domain/         # What we do (business logic)
-└── infra/          # How we connect to external systems
-```
-
-#### Application Layer (`pkg/mcp/application/`)
-**Purpose**: Orchestration and coordination
-- **api/**: Single source of truth for all interfaces
-- **core/**: Server lifecycle and registry management
-- **orchestration/**: Tool coordination and workflow execution
-- **services/**: Service interfaces for dependency injection
-
-#### Domain Layer (`pkg/mcp/domain/`)
-**Purpose**: Business logic and domain concepts
-- **containerization/**: Core container operations (analyze, build, deploy, scan)
-- **session/**: Session management and persistence
-- **errors/**: Rich error handling system
-- **types/**: Domain-specific types and models
-
-#### Infrastructure Layer (`pkg/mcp/infra/`)
-**Purpose**: External integrations and technical concerns
-- **transport/**: MCP protocol transports (stdio, HTTP)
-- **persistence/**: Database and storage implementations
-- **templates/**: External templates and resources
+1. **API Layer**: Single source of truth for interfaces (`pkg/mcp/api/`)
+2. **Core Layer**: Server lifecycle and registry management (`pkg/mcp/core/`)
+3. **Tools Layer**: Domain-specific business logic (`pkg/mcp/tools/`)
+4. **Infrastructure Layer**: External integrations (`pkg/mcp/transport/`, `pkg/mcp/storage/`)
+5. **Internal Layer**: Shared utilities (`pkg/mcp/internal/`)
 
 ### Why This Organization Works
 

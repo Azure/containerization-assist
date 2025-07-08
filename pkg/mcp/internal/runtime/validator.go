@@ -42,9 +42,9 @@ type ValidationMetadata struct {
 	Parameters       map[string]interface{}
 }
 type BaseValidatorImpl struct {
-	Name             string
-	Version          string
-	unifiedValidator core.Validator
+	Name              string
+	Version           string
+	standardValidator core.Validator
 }
 
 func NewBaseValidator(name, version string) *BaseValidatorImpl {
@@ -52,14 +52,14 @@ func NewBaseValidator(name, version string) *BaseValidatorImpl {
 		Name:    name,
 		Version: version,
 
-		unifiedValidator: validators.NewBaseValidator(name, version, []string{"runtime"}),
+		standardValidator: validators.NewBaseValidator(name, version, []string{"runtime"}),
 	}
 }
-func NewBaseValidatorWithUnified(name, version string, unified core.Validator) *BaseValidatorImpl {
+func NewBaseValidatorWithStandard(name, version string, standard core.Validator) *BaseValidatorImpl {
 	return &BaseValidatorImpl{
-		Name:             name,
-		Version:          version,
-		unifiedValidator: unified,
+		Name:              name,
+		Version:           version,
+		standardValidator: standard,
 	}
 }
 
@@ -67,8 +67,8 @@ func (v *BaseValidatorImpl) GetName() string {
 	return v.Name
 }
 func (v *BaseValidatorImpl) ValidateUnified(ctx context.Context, input interface{}, options *core.ValidationOptions) (*core.NonGenericResult, error) {
-	if v.unifiedValidator != nil {
-		return v.unifiedValidator.Validate(ctx, input, options), nil
+	if v.standardValidator != nil {
+		return v.standardValidator.Validate(ctx, input, options), nil
 	}
 	result := &core.NonGenericResult{
 		Valid:    true,
@@ -201,8 +201,8 @@ func (c *ValidatorChain) ValidateUnified(ctx context.Context, input interface{},
 			if err != nil {
 				return nil, errors.Wrapf(err, "runtime/validator", "legacy validator %s failed", validator.GetName())
 			}
-			unifiedResult := convertLegacyToUnified(legacyResult)
-			combinedResult.Merge(unifiedResult)
+			standardResult := convertLegacyToStandard(legacyResult)
+			combinedResult.Merge(standardResult)
 		}
 	}
 	combinedResult.Duration = time.Since(combinedResult.Metadata.ValidatedAt)
@@ -213,7 +213,7 @@ func (c *ValidatorChain) ValidateUnified(ctx context.Context, input interface{},
 func (c *ValidatorChain) GetName() string {
 	return "ValidatorChain"
 }
-func convertLegacyToUnified(legacy *RuntimeValidationResult) *core.NonGenericResult {
+func convertLegacyToStandard(legacy *RuntimeValidationResult) *core.NonGenericResult {
 	if legacy == nil {
 		return &core.NonGenericResult{
 			Valid:       true,
@@ -375,29 +375,4 @@ func (w *runtimeValidatorWrapper) GetSupportedTypes() []string {
 	return []string{"runtime", "wrapper"}
 }
 
-// DefaultRuntimeRegistry is deprecated - use ValidatorService instead
-// var DefaultRuntimeRegistry = NewRuntimeValidatorRegistry() // REMOVED: Global state eliminated
-
-// Deprecated: Use ValidatorService.RegisterValidator instead
-func RegisterRuntimeValidator(name string, validator BaseValidator) {
-	// NOTE: This function is deprecated. Use ValidatorService for validator management without global state.
-	panic("RegisterRuntimeValidator is deprecated - use ValidatorService.RegisterValidator instead")
-}
-
-// Deprecated: Use ValidatorService.GetValidator instead
-func GetRuntimeValidator(name string) (BaseValidator, bool) {
-	// NOTE: This function is deprecated. Use ValidatorService for validator management without global state.
-	panic("GetRuntimeValidator is deprecated - use ValidatorService.GetValidator instead")
-}
-
-// Deprecated: Use ValidatorService.ValidateWithRuntime instead
-func ValidateRuntime(ctx context.Context, validatorName string, input interface{}, options ValidationOptions) (*RuntimeValidationResult, error) {
-	// NOTE: This function is deprecated. Use ValidatorService for validator management without global state.
-	panic("ValidateRuntime is deprecated - use ValidatorService.ValidateWithRuntime instead")
-}
-
-// Deprecated: Use ValidatorService.ValidateWithUnified instead
-func ValidateRuntimeUnified(ctx context.Context, validatorName string, input interface{}, options *core.ValidationOptions) (*core.NonGenericResult, error) {
-	// NOTE: This function is deprecated. Use ValidatorService for validator management without global state.
-	panic("ValidateRuntimeUnified is deprecated - use ValidatorService.ValidateWithUnified instead")
-}
+// Legacy validator functions have been removed. Use ValidatorService instead.

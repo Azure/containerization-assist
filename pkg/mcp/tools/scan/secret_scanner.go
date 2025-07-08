@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,87 +9,91 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/security"
+	"github.com/Azure/container-kit/pkg/core/security"
+	"github.com/rs/zerolog"
 )
 
 // FileSecretScanner handles the actual scanning of files for secrets
 type FileSecretScanner struct {
-	logger *slog.Logger
+	logger          *slog.Logger
+	secretDiscovery *security.SecretDiscovery
 }
 
 // NewFileSecretScanner creates a new file secret scanner
 func NewFileSecretScanner(logger *slog.Logger) *FileSecretScanner {
+	// Convert slog.Logger to zerolog.Logger for SecretDiscovery
+	zerologLogger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+
 	return &FileSecretScanner{
-		logger: logger,
+		logger:          logger,
+		secretDiscovery: security.NewSecretDiscovery(zerologLogger),
 	}
 }
 
 // PerformSecretScan scans a directory for secrets
 func (s *FileSecretScanner) PerformSecretScan(scanPath string, filePatterns, excludePatterns []string, reporter interface{}) ([]ScannedSecret, []FileSecretScanResult, int, error) {
-	scanner := security.NewSecretScanner()
 	var allSecrets []ScannedSecret
 	var fileResults []FileSecretScanResult
 	filesScanned := 0
 
-	totalFiles := 0
-	err := filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() && s.shouldScanFile(path, filePatterns, excludePatterns) {
-			totalFiles++
-		}
-		return nil
-	})
+	// Use SecretDiscovery to scan the directory
+	ctx := context.Background()
+	scanOptions := security.DefaultScanOptions()
+	scanOptions.FileTypes = s.convertPatternsToExtensions(filePatterns)
+
+	discoveryResult, err := s.secretDiscovery.ScanDirectory(ctx, scanPath, scanOptions)
 	if err != nil {
-		s.logger.Warn("Failed to count files for progress", "error", err)
+		return nil, nil, 0, fmt.Errorf("secret discovery scan failed: %w", err)
 	}
 
-	err = filepath.Walk(scanPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	filesScanned = discoveryResult.FilesScanned
+
+	// Convert ExtendedSecretFinding to ScannedSecret
+	for _, finding := range discoveryResult.Findings {
+		if !s.shouldIncludeFinding(finding, filePatterns, excludePatterns) {
+			continue
 		}
 
-		if info.IsDir() {
-			return nil
+		secret := ScannedSecret{
+			File:       finding.File,
+			Type:       s.classifySecretType(finding.Type),
+			Pattern:    finding.Pattern,
+			Value:      finding.Redacted,
+			Severity:   s.mapSeverity(finding.Severity),
+			Confidence: s.parseConfidence(finding.Confidence),
+		}
+		allSecrets = append(allSecrets, secret)
+
+		// Group by file for file results
+		if len(fileResults) == 0 || fileResults[len(fileResults)-1].FilePath != finding.File {
+			fileResult := FileSecretScanResult{
+				FilePath:     finding.File,
+				FileType:     s.getFileType(finding.File),
+				SecretsFound: 0,
+				Secrets:      make([]ScannedSecret, 0),
+				CleanStatus:  "clean",
+			}
+			fileResults = append(fileResults, fileResult)
 		}
 
-		if !s.shouldScanFile(path, filePatterns, excludePatterns) {
-			return nil
-		}
+		// Add secret to current file result
+		currentFile := &fileResults[len(fileResults)-1]
+		currentFile.Secrets = append(currentFile.Secrets, secret)
+		currentFile.SecretsFound = len(currentFile.Secrets)
+		currentFile.CleanStatus = s.determineCleanStatus(currentFile.Secrets)
 
-		fileSecrets, err := s.scanFileForSecrets(path, scanner)
-		if err != nil {
-			s.logger.Warn("Failed to scan file", "error", err, "file", path)
-			return nil // Continue with other files
-		}
-
-		filesScanned++
-
-		if reporter != nil && totalFiles > 0 {
-			progress := float64(filesScanned) / float64(totalFiles)
+		// Report progress
+		if reporter != nil {
 			if progressReporter, ok := reporter.(interface {
 				ReportStage(float64, string)
 			}); ok {
-				progressReporter.ReportStage(progress, fmt.Sprintf("Scanned %d/%d files", filesScanned, totalFiles))
+				progress := float64(len(allSecrets)) / float64(len(discoveryResult.Findings))
+				progressReporter.ReportStage(progress, fmt.Sprintf("Processed %d/%d findings", len(allSecrets), len(discoveryResult.Findings)))
 			}
 		}
+	}
 
-		fileResult := FileSecretScanResult{
-			FilePath:     path,
-			FileType:     s.getFileType(path),
-			SecretsFound: len(fileSecrets),
-			Secrets:      fileSecrets,
-			CleanStatus:  s.determineCleanStatus(fileSecrets),
-		}
-
-		fileResults = append(fileResults, fileResult)
-		allSecrets = append(allSecrets, fileSecrets...)
-
-		return nil
-	})
-
-	return allSecrets, fileResults, filesScanned, err
+	return allSecrets, fileResults, filesScanned, nil
 }
 
 // GetDefaultFilePatterns returns default file patterns based on scan options
@@ -145,29 +150,82 @@ func (s *FileSecretScanner) shouldScanFile(path string, includePatterns, exclude
 	return false
 }
 
-// scanFileForSecrets scans a single file for secrets
-func (s *FileSecretScanner) scanFileForSecrets(filePath string, scanner *security.SecretScanner) ([]ScannedSecret, error) {
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	sensitiveVars := scanner.ScanContent(string(content))
-
-	var secrets []ScannedSecret
-	for _, sensitiveVar := range sensitiveVars {
-		secret := ScannedSecret{
-			File:       filePath,
-			Type:       s.classifySecretType(sensitiveVar.Pattern),
-			Pattern:    sensitiveVar.Pattern,
-			Value:      sensitiveVar.Redacted,
-			Severity:   s.determineSeverity(sensitiveVar.Pattern, sensitiveVar.Value),
-			Confidence: s.calculateConfidence(sensitiveVar.Pattern),
+// convertPatternsToExtensions converts file patterns to extensions for SecretDiscovery
+func (s *FileSecretScanner) convertPatternsToExtensions(patterns []string) []string {
+	extensions := make([]string, 0)
+	for _, pattern := range patterns {
+		// Convert glob patterns to extensions
+		if strings.HasPrefix(pattern, "*.") {
+			extensions = append(extensions, pattern[1:]) // Remove *
+		} else if strings.Contains(pattern, ".") {
+			// Extract extension from pattern
+			parts := strings.Split(pattern, ".")
+			if len(parts) > 1 {
+				extensions = append(extensions, "."+parts[len(parts)-1])
+			}
 		}
-		secrets = append(secrets, secret)
+	}
+	return extensions
+}
+
+// shouldIncludeFinding determines if a finding should be included based on patterns
+func (s *FileSecretScanner) shouldIncludeFinding(finding security.ExtendedSecretFinding, filePatterns, excludePatterns []string) bool {
+	filename := filepath.Base(finding.File)
+
+	// Check exclude patterns first
+	for _, pattern := range excludePatterns {
+		matched, err := filepath.Match(pattern, filename)
+		if err != nil {
+			continue
+		}
+		if matched {
+			return false
+		}
 	}
 
-	return secrets, nil
+	// If no include patterns specified, include all
+	if len(filePatterns) == 0 {
+		return true
+	}
+
+	// Check include patterns
+	for _, pattern := range filePatterns {
+		matched, err := filepath.Match(pattern, filename)
+		if err != nil {
+			continue
+		}
+		if matched {
+			return true
+		}
+	}
+
+	return false
+}
+
+// mapSeverity maps SecretDiscovery severity to scanner severity
+func (s *FileSecretScanner) mapSeverity(severity string) string {
+	switch strings.ToLower(severity) {
+	case "critical":
+		return "critical"
+	case "high":
+		return "high"
+	case "medium":
+		return "medium"
+	case "low":
+		return "low"
+	default:
+		return "medium"
+	}
+}
+
+// parseConfidence parses confidence string to int
+func (s *FileSecretScanner) parseConfidence(confidence string) int {
+	// Convert confidence string (e.g., "0.85") to percentage
+	var conf float64
+	if _, err := fmt.Sscanf(confidence, "%f", &conf); err == nil {
+		return int(conf * 100)
+	}
+	return 50 // Default confidence
 }
 
 // getFileType determines the type of file being scanned

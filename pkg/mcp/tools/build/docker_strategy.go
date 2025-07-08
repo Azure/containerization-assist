@@ -29,6 +29,12 @@ func (s *DockerBuildStrategy) Description() string {
 	return "Standard Docker build strategy using docker build command"
 }
 
+// CanHandle determines if this strategy can handle the given build context
+func (s *DockerBuildStrategy) CanHandle(context BuildContext) bool {
+	// Docker strategy can handle any context with a valid Dockerfile path
+	return context.DockerfilePath != ""
+}
+
 // Build executes the build using standard Docker
 func (s *DockerBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 	s.logger.Info().
@@ -55,6 +61,11 @@ func (s *DockerBuildStrategy) Build(ctx BuildContext) (*BuildResult, error) {
 		Msg("Docker build completed successfully")
 
 	return result, nil
+}
+
+// Execute is an alias for Build for interface compatibility
+func (s *DockerBuildStrategy) Execute(ctx BuildContext) (*BuildResult, error) {
+	return s.Build(ctx)
 }
 
 // SupportsFeature checks if the strategy supports a specific feature

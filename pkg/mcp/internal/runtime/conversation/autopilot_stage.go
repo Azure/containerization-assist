@@ -7,8 +7,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/core"
 )
 
-func getStageProgress(currentStage core.ConsolidatedConversationStage) string {
-	progressMap := map[core.ConsolidatedConversationStage]int{
+func getStageProgress(currentStage core.ConversationStage) string {
+	progressMap := map[core.ConversationStage]int{
 		core.ConversationStageAnalyze: 4,
 		core.ConversationStageBuild:   6,
 		core.ConversationStageDeploy:  8,
@@ -25,8 +25,8 @@ func getStageProgress(currentStage core.ConsolidatedConversationStage) string {
 	return fmt.Sprintf("[Step %d/%d]", currentStep, totalSteps)
 }
 
-func getStageIntro(stage core.ConsolidatedConversationStage) string {
-	intros := map[core.ConsolidatedConversationStage]string{
+func getStageIntro(stage core.ConversationStage) string {
+	intros := map[core.ConversationStage]string{
 		core.ConversationStageAnalyze: "Analyzing your repository to understand the project structure.",
 		core.ConversationStageBuild:   "Building your Docker image with the generated Dockerfile.",
 		core.ConversationStageDeploy:  "Deploying your application to the Kubernetes cluster.",

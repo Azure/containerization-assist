@@ -15,7 +15,7 @@ func BuildError(code ErrorCode, message string, cause error) *RichError {
 		Message:   message,
 		Type:      ErrTypeContainer,
 		Severity:  SeverityMedium,
-		Context:   make(ConsolidatedErrorContext),
+		Context:   make(ErrorContext),
 		Timestamp: time.Now(),
 		Cause:     cause,
 		Suggestions: []string{
@@ -27,7 +27,7 @@ func BuildError(code ErrorCode, message string, cause error) *RichError {
 }
 
 // BuildErrorWithContext creates a build error with additional context
-func BuildErrorWithContext(code ErrorCode, message string, cause error, context ConsolidatedErrorContext) *RichError {
+func BuildErrorWithContext(code ErrorCode, message string, cause error, context ErrorContext) *RichError {
 	err := BuildError(code, message, cause)
 	for k, v := range context {
 		err.Context[k] = v
@@ -43,7 +43,7 @@ func DeployError(code ErrorCode, message string, cause error) *RichError {
 		Message:   message,
 		Type:      ErrTypeKubernetes,
 		Severity:  SeverityMedium,
-		Context:   make(ConsolidatedErrorContext),
+		Context:   make(ErrorContext),
 		Timestamp: time.Now(),
 		Cause:     cause,
 		Suggestions: []string{
@@ -55,7 +55,7 @@ func DeployError(code ErrorCode, message string, cause error) *RichError {
 }
 
 // DeployErrorWithContext creates a deployment error with additional context
-func DeployErrorWithContext(code ErrorCode, message string, cause error, context ConsolidatedErrorContext) *RichError {
+func DeployErrorWithContext(code ErrorCode, message string, cause error, context ErrorContext) *RichError {
 	err := DeployError(code, message, cause)
 	for k, v := range context {
 		err.Context[k] = v
@@ -103,7 +103,7 @@ func SecurityError(code ErrorCode, message string, cause error) *RichError {
 		Message:     message,
 		Type:        ErrTypeSecurity,
 		Severity:    severity,
-		Context:     make(ConsolidatedErrorContext),
+		Context:     make(ErrorContext),
 		Timestamp:   time.Now(),
 		Cause:       cause,
 		Suggestions: suggestions,
@@ -111,7 +111,7 @@ func SecurityError(code ErrorCode, message string, cause error) *RichError {
 }
 
 // SecurityErrorWithContext creates a security error with additional context
-func SecurityErrorWithContext(code ErrorCode, message string, cause error, context ConsolidatedErrorContext) *RichError {
+func SecurityErrorWithContext(code ErrorCode, message string, cause error, context ErrorContext) *RichError {
 	err := SecurityError(code, message, cause)
 	for k, v := range context {
 		err.Context[k] = v
@@ -127,7 +127,7 @@ func ValidationError(code ErrorCode, message string, cause error) *RichError {
 		Message:   message,
 		Type:      ErrTypeValidation,
 		Severity:  SeverityMedium,
-		Context:   make(ConsolidatedErrorContext),
+		Context:   make(ErrorContext),
 		Timestamp: time.Now(),
 		Cause:     cause,
 		Suggestions: []string{
@@ -145,7 +145,7 @@ func NetworkError(code ErrorCode, message string, cause error) *RichError {
 		Message:   message,
 		Type:      ErrTypeNetwork,
 		Severity:  SeverityMedium,
-		Context:   make(ConsolidatedErrorContext),
+		Context:   make(ErrorContext),
 		Timestamp: time.Now(),
 		Cause:     cause,
 		Suggestions: []string{
@@ -163,7 +163,7 @@ func SystemError(code ErrorCode, message string, cause error) *RichError {
 		Message:   message,
 		Type:      ErrTypeSystem,
 		Severity:  SeverityHigh,
-		Context:   make(ConsolidatedErrorContext),
+		Context:   make(ErrorContext),
 		Timestamp: time.Now(),
 		Cause:     cause,
 		Suggestions: []string{
@@ -218,7 +218,7 @@ func SecurityPolicyError(message string, cause error) *RichError {
 // WithContext adds context to a RichError
 func (e *RichError) WithContext(key string, value interface{}) *RichError {
 	if e.Context == nil {
-		e.Context = make(ConsolidatedErrorContext)
+		e.Context = make(ErrorContext)
 	}
 	e.Context[key] = value
 	return e
@@ -242,7 +242,7 @@ func (e *RichError) WithType(errType ErrorType) *RichError {
 	return e
 }
 
-// Tool-specific error constructors migrated from legacy system
+// Tool-specific error constructors
 
 // BuildFailedError creates a build failure error
 func BuildFailedError(stage, reason string) *RichError {
@@ -399,7 +399,7 @@ func ToolExecutionError(toolName, errorType, message string) *RichError {
 }
 
 // ToolExecutionErrorWithContext creates a tool execution error with additional context
-func ToolExecutionErrorWithContext(toolName, errorType, message string, context ConsolidatedErrorContext) *RichError {
+func ToolExecutionErrorWithContext(toolName, errorType, message string, context ErrorContext) *RichError {
 	err := ToolExecutionError(toolName, errorType, message)
 	for k, v := range context {
 		err.Context[k] = v

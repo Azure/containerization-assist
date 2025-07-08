@@ -103,7 +103,7 @@ func (pm *PromptManager) handlePendingDecision(ctx context.Context, state *Conve
 	if state.CurrentStage == core.ConversationStageBuild {
 
 		if detailedStage, ok := state.Context["detailed_stage"].(string); ok &&
-			types.ConsolidatedConversationStage(detailedStage) == types.StageDockerfile {
+			types.ConversationStage(detailedStage) == types.StageDockerfile {
 			return pm.generateDockerfile(ctx, state)
 		}
 	}

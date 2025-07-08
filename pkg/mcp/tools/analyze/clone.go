@@ -26,74 +26,66 @@ func NewCloner(logger *slog.Logger) *Cloner {
 }
 
 // Clone clones a repository with the given options
-func (c *Cloner) Clone(ctx context.Context, opts CloneOptions) (*CloneResult, error) {
+func (c *Cloner) Clone(ctx context.Context, opts git.CloneOptions) (*git.CloneResult, error) {
 	startTime := time.Now()
 
 	if err := c.validateCloneOptions(opts); err != nil {
 		return nil, errors.NewError().Message("invalid clone options").Cause(err).WithLocation().Build()
 	}
 
-	isURL := c.isURL(opts.RepoURL)
+	isURL := c.isURL(opts.URL)
 
 	var result *git.CloneResult
 	var err error
 
 	if isURL {
 		// Clone from URL
-		cloneOpts := git.CloneOptions{
-			URL:    opts.RepoURL,
-			Branch: opts.Branch,
-		}
-
-		if opts.Shallow {
-			cloneOpts.Depth = 1
+		if opts.Depth == 0 && opts.SingleBranch {
+			opts.Depth = 1 // Set shallow clone for single branch
 		}
 
 		c.logger.Info("Cloning repository from URL",
-			"url", opts.RepoURL,
+			"url", opts.URL,
 			"branch", opts.Branch,
 			"target_dir", opts.TargetDir,
-			"shallow", opts.Shallow)
+			"depth", opts.Depth)
 
 		gitManager := git.NewManager(c.logger)
 
-		result, err = gitManager.CloneRepository(ctx, opts.TargetDir, cloneOpts)
+		result, err = gitManager.CloneRepository(ctx, opts.TargetDir, opts)
 		if err != nil {
 			return nil, errors.NewError().Message("failed to clone repository").Cause(err).Build()
 		}
 	} else {
 
-		if err := c.validateLocalPath(opts.RepoURL); err != nil {
+		if err := c.validateLocalPath(opts.URL); err != nil {
 			return nil, errors.NewError().Message("invalid local path").Cause(err).Build()
 		}
 
 		c.logger.Info("Using local repository path",
-			"path", opts.RepoURL,
+			"path", opts.URL,
 			"target_dir", opts.TargetDir)
 
 		result = &git.CloneResult{
 			Success:    true,
-			RepoPath:   opts.RepoURL,
+			RepoPath:   opts.URL,
 			Branch:     "local",
 			CommitHash: "local",
-			RemoteURL:  opts.RepoURL,
+			RemoteURL:  opts.URL,
 			Duration:   time.Since(startTime),
 		}
 	}
 
-	return &CloneResult{
-		CloneResult: result,
-		Duration:    time.Since(startTime),
-	}, nil
+	return result, nil
 }
 
 // validateCloneOptions validates the clone options
-func (c *Cloner) validateCloneOptions(opts CloneOptions) error {
-	if opts.RepoURL == "" {
+func (c *Cloner) validateCloneOptions(opts git.CloneOptions) error {
+	if opts.URL == "" {
 		return errors.NewError().Messagef("repository URL or path is required").WithLocation().Build()
 	}
 
-	if opts.TargetDir == "" && c.isURL(opts.RepoURL) {
+	if opts.TargetDir == "" && c.isURL(opts.URL) {
 		return errors.NewError().Messagef("target directory is required for URL cloning").WithLocation().Build()
 	}
 

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/core"
-	coretypes "github.com/Azure/container-kit/pkg/mcp/core"
 )
 
 // FixingContext holds context for fixing operations
@@ -47,7 +46,7 @@ func NewAnalyzerIntegratedFixer(analyzer core.AIAnalyzer, logger *slog.Logger) *
 }
 
 // FixWithAnalyzer performs AI-driven fixing using CallerAnalyzer
-func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, request types.FixRequest) (*coretypes.FixingResult, error) {
+func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, request FixRequest) (*FixingResult, error) {
 	// Create fixing context
 	fixingCtx := &FixingContext{
 		SessionID:       request.SessionID,
@@ -95,12 +94,12 @@ func (a *AnalyzerIntegratedFixer) FixWithAnalyzer(ctx context.Context, request t
 		}
 	}
 	// Attempt the fix
-	var result *coretypes.FixingResult
+	var result *FixingResult
 	var fixErr error
 	if a.fixer != nil {
 		result, fixErr = a.fixer.AttemptFix(ctx, request)
 	} else {
-		result = &coretypes.FixingResult{
+		result = &FixingResult{
 			Success: false,
 		}
 	}
@@ -143,7 +142,10 @@ Please provide:
 4. Alternative strategies if the primary approach fails
 Use the file reading tools to examine the workspace at: %s
 `, err.Error(), fmt.Sprintf("%v", contextInfo), baseDir)
-	return a.analyzer.AnalyzeWithFileTools(ctx, prompt, baseDir)
+	return a.analyzer.AnalyzeWithContext(ctx, prompt, map[string]interface{}{
+		"base_dir":     baseDir,
+		"context_info": contextInfo,
+	})
 }
 
 // EnhancedFixingConfiguration provides tool-specific fixing configuration

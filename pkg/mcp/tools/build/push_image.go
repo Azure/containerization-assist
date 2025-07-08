@@ -6,24 +6,25 @@ import (
 	"strings"
 	"time"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
 	errors "github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 
 // PushImageArgs defines the arguments for pushing a Docker image to a registry
 type PushImageArgs struct {
-	mcptypes.BaseToolArgs
-	ImageRef    mcptypes.ImageReference `json:"image_ref" description:"Image reference to push (required)"`
-	PushTimeout time.Duration           `json:"push_timeout,omitempty" description:"Push timeout (default: 10m)"`
-	RetryCount  int                     `json:"retry_count,omitempty" description:"Number of retry attempts (default: 3)"`
-	AsyncPush   bool                    `json:"async_push,omitempty" description:"Run push asynchronously"`
-	DryRun      bool                    `json:"dry_run,omitempty" description:"Preview changes without executing"`
+	types.BaseToolArgs
+	ImageRef    types.ImageReference `json:"image_ref" description:"Image reference to push (required)"`
+	PushTimeout time.Duration        `json:"push_timeout,omitempty" description:"Push timeout (default: 10m)"`
+	RetryCount  int                  `json:"retry_count,omitempty" description:"Number of retry attempts (default: 3)"`
+	AsyncPush   bool                 `json:"async_push,omitempty" description:"Run push asynchronously"`
+	DryRun      bool                 `json:"dry_run,omitempty" description:"Preview changes without executing"`
 }
 
 // PushImageResult represents the result of a Docker image push
 type PushImageResult struct {
-	mcptypes.BaseToolResponse
+	types.BaseToolResponse
 	Success       bool                `json:"success"`
 	JobID         string              `json:"job_id,omitempty"` // For async pushes
 	ImageRef      string              `json:"image_ref"`
@@ -63,7 +64,7 @@ func (t *PushImageTool) ExecuteTyped(ctx context.Context, args PushImageArgs) (*
 	startTime := time.Now()
 	// Create base response
 	response := &PushImageResult{
-		BaseToolResponse: mcptypes.BaseToolResponse{Success: false, Timestamp: time.Now()},
+		BaseToolResponse: types.BaseToolResponse{Success: false, Timestamp: time.Now()},
 		ImageRef:         t.normalizeImageRef(args),
 		Logs:             make([]string, 0),
 	}
@@ -132,7 +133,6 @@ func (t *PushImageTool) ExecuteTyped(ctx context.Context, args PushImageArgs) (*
 	pushResult, err := t.performPush(ctx, response.ImageRef, retryCount)
 	if err != nil {
 		response.Error = &mcptypes.ToolError{
-			Code:        "PUSH_ERROR",
 			Type:        "push_error",
 			Message:     fmt.Sprintf("Push failed: %v", err),
 			Timestamp:   time.Now(),
@@ -234,17 +234,11 @@ func (t *PushImageTool) validateImageRef(imageRef string) error {
 		return errors.NewError().Messagef("invalid arguments: image reference cannot be empty").WithLocation().Build()
 	}
 	if !strings.Contains(imageRef, ":") {
-		return errors.NewError().Messagef("invalid arguments: image reference missing tag").WithLocation(
-
-		// Basic validation - in real implementation, this would be more thorough
-		).Build()
+		return errors.NewError().Messagef("invalid arguments: image reference missing tag").WithLocation().Build()
 	}
 
 	if strings.Contains(imageRef, " ") {
-		return errors.NewError().Messagef("invalid arguments: image reference cannot contain spaces").WithLocation().Build(
-
-		// isRetryableError determines if an error is retryable
-		)
+		return errors.NewError().Messagef("invalid arguments: image reference cannot contain spaces").WithLocation().Build()
 	}
 	return nil
 }

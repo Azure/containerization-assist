@@ -53,6 +53,7 @@ type CloneOptions struct {
 	AuthToken    string
 	AuthUsername string
 	AuthPassword string
+	TargetDir    string
 }
 
 // CloneResult contains the result of a clone operation

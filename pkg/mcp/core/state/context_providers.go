@@ -1,42 +1,46 @@
-package core
+package state
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/errors/codes"
+	"github.com/Azure/container-kit/pkg/mcp/knowledge"
 	"github.com/Azure/container-kit/pkg/mcp/session"
-	"github.com/Azure/container-kit/pkg/mcp/tools/build"
-	"github.com/rs/zerolog"
 )
 
 // BuildContextProvider provides build-related context
 type BuildContextProvider struct {
 	stateManager   *UnifiedStateManager
 	sessionManager *session.SessionManager
-	knowledgeBase  *build.CrossToolKnowledgeBase
-	logger         zerolog.Logger
+	knowledgeBase  *knowledge.CrossToolKnowledgeBase
+	logger         *slog.Logger
 }
 
 // NewBuildContextProvider creates a new build context provider
 func NewBuildContextProvider(
 	stateManager *UnifiedStateManager,
 	sessionManager *session.SessionManager,
-	knowledgeBase *build.CrossToolKnowledgeBase,
-	logger zerolog.Logger,
+	knowledgeBase *knowledge.CrossToolKnowledgeBase,
+	logger *slog.Logger,
 ) ContextProvider {
 	return &BuildContextProvider{
 		stateManager:   stateManager,
 		sessionManager: sessionManager,
 		knowledgeBase:  knowledgeBase,
-		logger:         logger.With().Str("provider", "build_context").Logger(),
+		logger:         logger.With(slog.String("provider", "build_context")),
 	}
 }
 
-// GetContextData retrieves build context data
-func (p *BuildContextProvider) GetContextData(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+// GetContext retrieves build context data
+func (p *BuildContextProvider) GetContext(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+	p.logger.Debug("Getting build context",
+		slog.String("session_id", request.SessionID),
+		slog.String("request_type", string(request.Type)))
+
 	data := &ContextData{
 		Provider:   "build",
 		Type:       ContextTypeBuild,
@@ -72,7 +76,7 @@ func (p *BuildContextProvider) GetContextData(ctx context.Context, request *Cont
 	}
 
 	if p.knowledgeBase != nil {
-		buildRequest := &build.AnalysisRequest{
+		buildRequest := &knowledge.AnalysisRequest{
 			Error: errors.NewError().Messagef("build analysis request").Build(),
 		}
 
@@ -97,6 +101,10 @@ func (p *BuildContextProvider) GetContextData(ctx context.Context, request *Cont
 		data.Data["recent_builds"] = recentBuilds
 	}
 
+	p.logger.Info("Build context retrieved successfully",
+		slog.String("session_id", request.SessionID),
+		slog.Int("data_keys", len(data.Data)))
+
 	return data, nil
 }
 
@@ -110,28 +118,37 @@ func (p *BuildContextProvider) GetCapabilities() *ContextProviderCapabilities {
 	}
 }
 
+// GetName returns the provider name
+func (p *BuildContextProvider) GetName() string {
+	return "build"
+}
+
 // DeploymentContextProvider provides deployment-related context
 type DeploymentContextProvider struct {
 	stateManager   *UnifiedStateManager
 	sessionManager *session.SessionManager
-	logger         zerolog.Logger
+	logger         *slog.Logger
 }
 
 // NewDeploymentContextProvider creates a new deployment context provider
 func NewDeploymentContextProvider(
 	stateManager *UnifiedStateManager,
 	sessionManager *session.SessionManager,
-	logger zerolog.Logger,
+	logger *slog.Logger,
 ) ContextProvider {
 	return &DeploymentContextProvider{
 		stateManager:   stateManager,
 		sessionManager: sessionManager,
-		logger:         logger.With().Str("provider", "deployment_context").Logger(),
+		logger:         logger.With(slog.String("provider", "deployment_context")),
 	}
 }
 
-// GetContextData retrieves deployment context data
-func (p *DeploymentContextProvider) GetContextData(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+// GetContext retrieves deployment context data
+func (p *DeploymentContextProvider) GetContext(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+	p.logger.Debug("Getting deployment context",
+		slog.String("session_id", request.SessionID),
+		slog.String("request_type", string(request.Type)))
+
 	data := &ContextData{
 		Provider:   "deployment",
 		Type:       ContextTypeDeployment,
@@ -183,6 +200,10 @@ func (p *DeploymentContextProvider) GetContextData(ctx context.Context, request 
 		data.Data["recent_deployments"] = deployments
 	}
 
+	p.logger.Info("Deployment context retrieved successfully",
+		slog.String("session_id", request.SessionID),
+		slog.Int("manifest_count", 0))
+
 	return data, nil
 }
 
@@ -194,6 +215,11 @@ func (p *DeploymentContextProvider) GetCapabilities() *ContextProviderCapabiliti
 		MaxHistoryDays:  30,
 		RealTimeUpdates: false,
 	}
+}
+
+// GetName returns the provider name
+func (p *DeploymentContextProvider) GetName() string {
+	return "deployment"
 }
 
 // extractNamespaces extracts unique namespaces from manifests
@@ -210,24 +236,28 @@ func (p *DeploymentContextProvider) extractResourceTypes(manifests []string) []s
 type SecurityContextProvider struct {
 	stateManager   *UnifiedStateManager
 	sessionManager *session.SessionManager
-	logger         zerolog.Logger
+	logger         *slog.Logger
 }
 
 // NewSecurityContextProvider creates a new security context provider
 func NewSecurityContextProvider(
 	stateManager *UnifiedStateManager,
 	sessionManager *session.SessionManager,
-	logger zerolog.Logger,
+	logger *slog.Logger,
 ) ContextProvider {
 	return &SecurityContextProvider{
 		stateManager:   stateManager,
 		sessionManager: sessionManager,
-		logger:         logger.With().Str("provider", "security_context").Logger(),
+		logger:         logger.With(slog.String("provider", "security_context")),
 	}
 }
 
-// GetContextData retrieves security context data
-func (p *SecurityContextProvider) GetContextData(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+// GetContext retrieves security context data
+func (p *SecurityContextProvider) GetContext(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+	p.logger.Debug("Getting security context",
+		slog.String("session_id", request.SessionID),
+		slog.String("request_type", string(request.Type)))
+
 	data := &ContextData{
 		Provider:   "security",
 		Type:       ContextTypeSecurity,
@@ -271,6 +301,10 @@ func (p *SecurityContextProvider) GetContextData(ctx context.Context, request *C
 		}
 	}
 
+	p.logger.Info("Security context retrieved successfully",
+		slog.String("session_id", request.SessionID),
+		slog.Float64("relevance", data.Relevance))
+
 	return data, nil
 }
 
@@ -284,12 +318,17 @@ func (p *SecurityContextProvider) GetCapabilities() *ContextProviderCapabilities
 	}
 }
 
+// GetName returns the provider name
+func (p *SecurityContextProvider) GetName() string {
+	return "security"
+}
+
 // PerformanceContextProvider provides performance-related context
 type PerformanceContextProvider struct {
 	stateManager     *UnifiedStateManager
 	sessionManager   *session.SessionManager
 	metricsCollector *MetricsCollector
-	logger           zerolog.Logger
+	logger           *slog.Logger
 }
 
 // MetricsCollector collects performance metrics
@@ -314,18 +353,22 @@ type PerformanceMetrics struct {
 func NewPerformanceContextProvider(
 	stateManager *UnifiedStateManager,
 	sessionManager *session.SessionManager,
-	logger zerolog.Logger,
+	logger *slog.Logger,
 ) ContextProvider {
 	return &PerformanceContextProvider{
 		stateManager:     stateManager,
 		sessionManager:   sessionManager,
 		metricsCollector: &MetricsCollector{metrics: make(map[string]*PerformanceMetrics)},
-		logger:           logger.With().Str("provider", "performance_context").Logger(),
+		logger:           logger.With(slog.String("provider", "performance_context")),
 	}
 }
 
-// GetContextData retrieves performance context data
-func (p *PerformanceContextProvider) GetContextData(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+// GetContext retrieves performance context data
+func (p *PerformanceContextProvider) GetContext(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+	p.logger.Debug("Getting performance context",
+		slog.String("session_id", request.SessionID),
+		slog.String("request_type", string(request.Type)))
+
 	data := &ContextData{
 		Provider:   "performance",
 		Type:       ContextTypePerformance,
@@ -384,6 +427,10 @@ func (p *PerformanceContextProvider) GetContextData(ctx context.Context, request
 	}
 	p.metricsCollector.mu.RUnlock()
 
+	p.logger.Info("Performance context retrieved successfully",
+		slog.String("session_id", request.SessionID),
+		slog.Float64("relevance", data.Relevance))
+
 	return data, nil
 }
 
@@ -397,25 +444,34 @@ func (p *PerformanceContextProvider) GetCapabilities() *ContextProviderCapabilit
 	}
 }
 
+// GetName returns the provider name
+func (p *PerformanceContextProvider) GetName() string {
+	return "performance"
+}
+
 // StateContextProvider provides state-related context
 type StateContextProvider struct {
 	stateManager *UnifiedStateManager
-	logger       zerolog.Logger
+	logger       *slog.Logger
 }
 
 // NewStateContextProvider creates a new state context provider
 func NewStateContextProvider(
 	stateManager *UnifiedStateManager,
-	logger zerolog.Logger,
+	logger *slog.Logger,
 ) ContextProvider {
 	return &StateContextProvider{
 		stateManager: stateManager,
-		logger:       logger.With().Str("provider", "state_context").Logger(),
+		logger:       logger.With(slog.String("provider", "state_context")),
 	}
 }
 
-// GetContextData retrieves state context data
-func (p *StateContextProvider) GetContextData(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+// GetContext retrieves state context data
+func (p *StateContextProvider) GetContext(ctx context.Context, request *ContextRequest) (*ContextData, error) {
+	p.logger.Debug("Getting state context",
+		slog.String("session_id", request.SessionID),
+		slog.String("request_type", string(request.Type)))
+
 	data := &ContextData{
 		Provider:   "state",
 		Type:       ContextTypeState,
@@ -462,6 +518,10 @@ func (p *StateContextProvider) GetContextData(ctx context.Context, request *Cont
 	}
 	data.Data["recent_changes"] = recentChanges
 
+	p.logger.Info("State context retrieved successfully",
+		slog.String("session_id", request.SessionID),
+		slog.Int("recent_changes", len(recentChanges)))
+
 	return data, nil
 }
 
@@ -473,4 +533,9 @@ func (p *StateContextProvider) GetCapabilities() *ContextProviderCapabilities {
 		MaxHistoryDays:  7,
 		RealTimeUpdates: true,
 	}
+}
+
+// GetName returns the provider name
+func (p *StateContextProvider) GetName() string {
+	return "state"
 }

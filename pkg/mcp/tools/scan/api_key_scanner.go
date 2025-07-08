@@ -64,7 +64,7 @@ func (a *APIKeyScanner) Scan(ctx context.Context, config ScanConfig) (*ScanResul
 		Scanner:  a.GetName(),
 		Secrets:  make([]Secret, 0),
 		Metadata: make(map[string]interface{}),
-		Errors:   make([]error, 0),
+		Errors:   make([]string, 0),
 	}
 
 	lines := strings.Split(config.Content, "\n")
@@ -72,7 +72,7 @@ func (a *APIKeyScanner) Scan(ctx context.Context, config ScanConfig) (*ScanResul
 	for lineNum, line := range lines {
 		secrets, err := a.scanLineForAPIKeys(line, lineNum+1, config)
 		if err != nil {
-			result.Errors = append(result.Errors, err)
+			result.Errors = append(result.Errors, err.Error())
 			continue
 		}
 		result.Secrets = append(result.Secrets, secrets...)

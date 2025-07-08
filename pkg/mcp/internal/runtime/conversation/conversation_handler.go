@@ -192,7 +192,7 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 
 	return currentResponse, nil
 }
-func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID string, stage core.ConsolidatedConversationStage, err error, state *ConversationState) (*AutoFixResult, error) {
+func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID string, stage core.ConversationStage, err error, state *ConversationState) (*AutoFixResult, error) {
 	ch.logger.Info("Attempting automatic fix before manual intervention",
 		"session_id", sessionID,
 		"stage", string(stage),
@@ -284,7 +284,7 @@ type AutoFixResult struct {
 	Message         string   `json:"message"`
 }
 
-func (ch *ConversationHandler) getToolNameForStage(stage core.ConsolidatedConversationStage) string {
+func (ch *ConversationHandler) getToolNameForStage(stage core.ConversationStage) string {
 	switch stage {
 	case core.ConversationStageDockerfile, core.ConversationStageBuild:
 		return "build_image"
@@ -337,7 +337,7 @@ func (ch *ConversationHandler) getErrorSeverity(err error) string {
 	}
 }
 
-func (ch *ConversationHandler) attemptRetryFix(ctx context.Context, sessionID string, stage core.ConsolidatedConversationStage, action *ErrorAction) bool {
+func (ch *ConversationHandler) attemptRetryFix(ctx context.Context, sessionID string, stage core.ConversationStage, action *ErrorAction) bool {
 
 	convState, err := ch.prepareRetrySession(sessionID)
 	if err != nil {
@@ -416,14 +416,14 @@ func (ch *ConversationHandler) loadConversationHistory(convState *ConversationSt
 	}
 	return convState
 }
-func (ch *ConversationHandler) findOrBuildLastToolCall(convState *ConversationState, stage core.ConsolidatedConversationStage) *ToolCall {
+func (ch *ConversationHandler) findOrBuildLastToolCall(convState *ConversationState, stage core.ConversationStage) *ToolCall {
 
 	if lastToolCall := ch.findLastToolCallInHistory(convState, stage); lastToolCall != nil {
 		return lastToolCall
 	}
 	return ch.buildToolCallFromMetadata(convState.SessionState, stage)
 }
-func (ch *ConversationHandler) findLastToolCallInHistory(convState *ConversationState, stage core.ConsolidatedConversationStage) *ToolCall {
+func (ch *ConversationHandler) findLastToolCallInHistory(convState *ConversationState, stage core.ConversationStage) *ToolCall {
 	if len(convState.History) == 0 {
 		return nil
 	}
@@ -442,7 +442,7 @@ func (ch *ConversationHandler) findLastToolCallInHistory(convState *Conversation
 	}
 	return nil
 }
-func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *session.SessionState, stage core.ConsolidatedConversationStage) *ToolCall {
+func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *session.SessionState, stage core.ConversationStage) *ToolCall {
 	toolName := ch.getToolNameForStage(stage)
 	params := make(map[string]interface{})
 	params["session_id"] = internalSession.SessionID
@@ -607,7 +607,7 @@ func (ch *ConversationHandler) attemptRedirectFix(ctx context.Context, sessionID
 	return true
 }
 
-func (ch *ConversationHandler) generateFallbackOptions(stage core.ConsolidatedConversationStage, _ error, action *ErrorAction) []Option {
+func (ch *ConversationHandler) generateFallbackOptions(stage core.ConversationStage, _ error, action *ErrorAction) []Option {
 	var options []Option
 	options = append(options, Option{
 		ID:    "retry",

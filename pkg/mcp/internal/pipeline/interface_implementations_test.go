@@ -74,7 +74,7 @@ func TestOperations_AnalyzeRepositoryTyped(t *testing.T) {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
 				assert.NotNil(t, result.RepositoryInfo)
-				assert.NotEmpty(t, result.Recommendations)
+				assert.NotEmpty(t, result.BuildRecommendations)
 			}
 		})
 	}
@@ -296,7 +296,7 @@ func TestOperations_ScanSecretsTyped(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
-				assert.GreaterOrEqual(t, len(result.SecretsFound), 0)
+				assert.GreaterOrEqual(t, result.SecretsFound, 0)
 				assert.Greater(t, result.FilesScanned, 0)
 			}
 		})

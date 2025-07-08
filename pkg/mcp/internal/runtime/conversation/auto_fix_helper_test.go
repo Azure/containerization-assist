@@ -37,7 +37,7 @@ func TestAutoFixHelper(t *testing.T) {
 		helper := &AutoFixHelper{}
 
 		testCases := []struct {
-			stage    core.ConsolidatedConversationStage
+			stage    core.ConversationStage
 			expected string
 		}{
 			{convertFromTypesStage(types.StageBuild), "Continue to next stage"},
@@ -58,7 +58,7 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageDisplayName", func(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
-			stage    core.ConsolidatedConversationStage
+			stage    core.ConversationStage
 			expected string
 		}{
 			{convertFromTypesStage(types.StageBuild), "Build"},
@@ -77,7 +77,7 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageErrorPrefix", func(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
-			stage    core.ConsolidatedConversationStage
+			stage    core.ConversationStage
 			expected string
 		}{
 			{convertFromTypesStage(types.StageBuild), "Build"},
@@ -96,7 +96,7 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getSuccessOptions coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 		helper := &AutoFixHelper{}
-		allStages := []core.ConsolidatedConversationStage{
+		allStages := []core.ConversationStage{
 			convertFromTypesStage(types.StageBuild),
 			convertFromTypesStage(types.StagePush),
 			convertFromTypesStage(types.StageManifests),
@@ -117,7 +117,7 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageDisplayName coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 
-		allStages := []core.ConsolidatedConversationStage{
+		allStages := []core.ConversationStage{
 			convertFromTypesStage(types.StageBuild),
 			convertFromTypesStage(types.StagePush),
 			convertFromTypesStage(types.StageManifests),
@@ -135,7 +135,7 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageErrorPrefix coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 
-		allStages := []core.ConsolidatedConversationStage{
+		allStages := []core.ConversationStage{
 			convertFromTypesStage(types.StageBuild),
 			convertFromTypesStage(types.StagePush),
 			convertFromTypesStage(types.StageManifests),
