@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"testing"
-	"time"
 )
 
 func BenchmarkRegistryOperations(b *testing.B) {

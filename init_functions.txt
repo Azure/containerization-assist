@@ -1,0 +1,1 @@
+pkg/mcp/domain/containerization/analyze/analyze_repository_atomic.go:func init() {
