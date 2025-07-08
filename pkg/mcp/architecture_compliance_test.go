@@ -12,7 +12,7 @@ import (
 
 func TestArchitectureBoundaries(t *testing.T) {
 	t.Parallel()
-	
+
 	// Test that no package violates layer boundaries
 	violations := checkBoundaryViolations()
 	if len(violations) > 0 {
@@ -23,7 +23,7 @@ func TestArchitectureBoundaries(t *testing.T) {
 
 func TestImportDepth(t *testing.T) {
 	t.Parallel()
-	
+
 	// Test that all imports are ≤3 levels deep
 	deepImports := findDeepImports()
 	if len(deepImports) > 0 {
@@ -34,7 +34,7 @@ func TestImportDepth(t *testing.T) {
 
 func TestCircularDependencies(t *testing.T) {
 	t.Parallel()
-	
+
 	// Test for circular dependencies
 	cycles := detectCircularDependencies()
 	if len(cycles) > 0 {
@@ -45,10 +45,10 @@ func TestCircularDependencies(t *testing.T) {
 
 func TestPackageCoherence(t *testing.T) {
 	t.Parallel()
-	
+
 	// Test that packages have coherent responsibilities
 	packages := []string{"api", "core", "tools", "session", "workflow", "transport", "storage", "security", "templates", "internal"}
-	
+
 	for _, pkg := range packages {
 		t.Run(pkg, func(t *testing.T) {
 			coherenceIssues := checkPackageCoherence(pkg)
@@ -68,18 +68,18 @@ func checkBoundaryViolations() []string {
 
 func findDeepImports() []string {
 	var deepImports []string
-	
+
 	err := filepath.Walk("pkg/mcp", func(path string, info os.FileInfo, err error) error {
 		if err != nil || !strings.HasSuffix(path, ".go") {
 			return err
 		}
-		
+
 		fset := token.NewFileSet()
 		node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
 			return err
 		}
-		
+
 		for _, imp := range node.Imports {
 			importPath := strings.Trim(imp.Path.Value, `"`)
 			if strings.HasPrefix(importPath, "github.com/Azure/container-kit/pkg/mcp/") {
@@ -92,20 +92,20 @@ func findDeepImports() []string {
 						break
 					}
 				}
-				
+
 				if mcpIndex != -1 && len(parts)-mcpIndex > 3 {
 					deepImports = append(deepImports, fmt.Sprintf("%s: %s", path, importPath))
 				}
 			}
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return []string{fmt.Sprintf("Error walking directory: %v", err)}
 	}
-	
+
 	return deepImports
 }
 

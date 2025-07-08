@@ -1,33 +1,31 @@
-# Container Kit Architecture
+# Container Kit MCP Architecture
 
-## Executive Summary
+## Overview
 
-Container Kit is an AI-powered containerization platform with a **domain-driven architecture** optimized for MCP (Model Context Protocol) integration. The system provides atomic tools for precise containerization operations organized by functional domain.
+Container Kit MCP has been dramatically simplified from 86 packages to just 10 focused packages, with strict architectural boundaries and maximum 3-level import paths. This transformation eliminates over-engineered distributed system complexity while preserving all core functionality.
 
-### Key Achievements
-- ✅ **Domain-driven organization** with clear separation of concerns
-- ✅ **Atomic tool pattern** for composable operations
-- ✅ **Unified session management** across all tools
-- ✅ **Type-safe interfaces** with comprehensive validation
-- ✅ **Extensible architecture** for easy addition of new domains and tools
+## Architectural Principles
 
-## System Overview
+1. **Simplicity First**: Single-node container tool, not a distributed system
+2. **Clear Boundaries**: Enforced layer separation with automated checking
+3. **Shallow Imports**: Maximum 3-level depth for all imports
+4. **Interface Segregation**: Small, focused interfaces in api/ package
+5. **Dependency Injection**: Manual DI through service containers
 
-### Core Architecture Pattern
-
-Container Kit follows a **domain-driven design** with the following structure:
+## Package Structure
 
 ```
-pkg/mcp/domain/
-├── containerization/          # Core containerization operations
-│   ├── analyze/              # Repository analysis & Dockerfile generation
-│   ├── build/                # Docker build operations (placeholder)
-│   ├── deploy/               # Kubernetes deployment & manifest generation
-│   └── scan/                 # Security scanning & secret detection
-├── session/                  # Session management & lifecycle
-├── types/                    # Core type definitions & interfaces
-├── validation/               # Input validation framework
-└── common/                   # Shared utilities
+pkg/mcp/
+├── api/          # Interface definitions (zero dependencies)
+├── core/         # Server & registry core
+├── tools/        # Container operations (analyze, build, deploy, scan)
+├── session/      # Session management and persistence
+├── workflow/     # Multi-step operation orchestration
+├── transport/    # MCP protocol transports (stdio, HTTP)
+├── storage/      # Persistence implementations (BoltDB)
+├── security/     # Validation and security scanning
+├── templates/    # Kubernetes manifest templates
+└── internal/     # Implementation details and utilities
 ```
 
 ### Tool Categories

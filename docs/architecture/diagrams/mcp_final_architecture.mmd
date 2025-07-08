@@ -1,127 +1,93 @@
 graph TD
-    Client[Client Applications] --> Transport[Transport Layer]
-    Transport --> Server[MCP Server]
-    Server --> Container[DI Container]
-    Container --> Services[Service Layer]
-
-    Services --> Tools[Unified Tools]
-    Services --> Session[Session Services]
-    Services --> Validation[Validation Services]
-
-    subgraph "3-Bounded Context Architecture (ALPHA)"
-        Domain[domain/ - Business Logic & Types]
-        Application[application/ - Use Cases & Orchestration]
-        Infra[infra/ - External Integrations]
+    %% Container Kit MCP - Simplified 10-Package Architecture
+    %% Result of GAMMA workstream: 86 packages → 10 focused packages
+    
+    Client[MCP Client] --> Transport[transport/]
+    Transport --> Core[core/]
+    Core --> API[api/]
+    
+    subgraph "Layer 1: Interface Definitions"
+        API[api/<br/>Pure Interfaces<br/>Zero Dependencies]
     end
-
-    subgraph "Domain Layer"
-        DomainTools[containerization/ - Domain Tools]
-        DomainErrors[errors/ - Unified Error System]
-        DomainTypes[types/ - Domain Types]
-        DomainSession[session/ - Session Logic]
+    
+    subgraph "Layer 2: Core Services"
+        Core[core/<br/>Server & Registry]
+        Session[session/<br/>State Management]
+        Core --> Session
     end
-
-    subgraph "Application Layer"
-        AppAPI[api/ - Public Interfaces]
-        AppCore[core/ - Application Services]
-        AppWorkflows[workflows/ - Business Workflows]
-        AppOrchestration[orchestration/ - Tool Coordination]
+    
+    subgraph "Layer 3: Business Logic"
+        Tools[tools/<br/>Container Operations]
+        Workflow[workflow/<br/>Orchestration]
+        
+        subgraph "Tool Implementations"
+            Analyze[tools/analyze]
+            Build[tools/build]
+            Deploy[tools/deploy]
+            Scan[tools/scan]
+        end
+        
+        Workflow --> Tools
     end
-
-    subgraph "Infrastructure Layer"
-        InfraTransport[transport/ - HTTP/stdio]
-        InfraPersistence[persistence/ - BoltDB]
-        InfraRegistry[registry/ - Tool Registry]
+    
+    subgraph "Layer 4: Infrastructure"
+        Transport[transport/<br/>MCP Protocol]
+        Storage[storage/<br/>Persistence]
+        Security[security/<br/>Validation]
+        Templates[templates/<br/>K8s Manifests]
     end
-
-    subgraph "Service-Based Architecture (EPSILON)"
-        SessionStore[SessionStore Service]
-        BuildExecutor[BuildExecutor Service]
-        ConfigValidator[ConfigValidator Service]
-        Scanner[Scanner Service]
-        ToolRegistry[ToolRegistry Service]
-        WorkflowExecutor[WorkflowExecutor Service]
-        ErrorReporter[ErrorReporter Service]
+    
+    subgraph "Layer 5: Internal Utilities"
+        Internal[internal/<br/>Shared Utilities]
+        
+        subgraph "Utility Packages"
+            Errors[internal/errors]
+            Types[internal/types]
+            Utils[internal/utils]
+            Retry[internal/retry]
+        end
     end
-
-    subgraph "Unified Tool Interface (GAMMA)"
-        APITool[api.Tool - Canonical Interface]
-        ToolImplementations[
-            BuildTool
-            TagTool
-            PullTool
-            PushTool
-            ScanTool
-            DeployTool
-            AnalyzeTool
-        ]
-    end
-
-    subgraph "Validation Framework (BETA)"
-        RichErrors[Rich Error System]
-        TagBasedValidation[Tag-Based Validation DSL]
-        UnifiedValidators[5 Core Validators]
-    end
-
-    Domain --> DomainTools
-    Domain --> DomainErrors
-    Domain --> DomainTypes
-    Domain --> DomainSession
-
-    Application --> AppAPI
-    Application --> AppCore
-    Application --> AppWorkflows
-    Application --> AppOrchestration
-
-    Infra --> InfraTransport
-    Infra --> InfraPersistence
-    Infra --> InfraRegistry
-
-    Container --> SessionStore
-    Container --> BuildExecutor
-    Container --> ConfigValidator
-    Container --> Scanner
-    Container --> ToolRegistry
-    Container --> WorkflowExecutor
-    Container --> ErrorReporter
-
-    Tools --> APITool
-    APITool --> ToolImplementations
-
-    Validation --> RichErrors
-    Validation --> TagBasedValidation
-    Validation --> UnifiedValidators
-
-    subgraph "External Systems"
-        Docker[Docker Engine]
-        Kubernetes[Kubernetes API]
-        OpenAI[Azure OpenAI]
-        Storage[BoltDB Storage]
-    end
-
-    BuildExecutor --> Docker
-    WorkflowExecutor --> Kubernetes
-    AppWorkflows --> OpenAI
-    SessionStore --> Storage
-
-    subgraph "Transport Options"
-        STDIO[stdio - Claude Desktop]
-        HTTP[HTTP - Production]
-    end
-
-    Transport --> STDIO
-    Transport --> HTTP
-
-    classDef primaryFlow fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    classDef domainLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef applicationLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
-    classDef infraLayer fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    classDef serviceLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef externalSys fill:#f1f8e9,stroke:#558b2f,stroke-width:2px
-
-    class Client,Transport,Server,Container primaryFlow
-    class Domain,DomainTools,DomainErrors,DomainTypes,DomainSession domainLayer
-    class Application,AppAPI,AppCore,AppWorkflows,AppOrchestration applicationLayer
-    class Infra,InfraTransport,InfraPersistence,InfraRegistry infraLayer
-    class Services,SessionStore,BuildExecutor,ConfigValidator,Scanner,ToolRegistry,WorkflowExecutor,ErrorReporter serviceLayer
-    class Docker,Kubernetes,OpenAI,Storage externalSys
+    
+    %% Dependencies (allowed)
+    Core --> API
+    Tools --> API
+    Tools --> Session
+    Tools --> Security
+    Workflow --> API
+    Workflow --> Session
+    Transport --> Core
+    Session --> Storage
+    
+    %% All packages can use internal
+    Core --> Internal
+    Tools --> Internal
+    Session --> Internal
+    Workflow --> Internal
+    Transport --> Internal
+    Storage --> Internal
+    Security --> Internal
+    
+    %% External Systems
+    Tools --> Docker[Docker Engine]
+    Workflow --> K8s[Kubernetes]
+    Session --> BoltDB[BoltDB Storage]
+    
+    %% Forbidden Dependencies (NOT shown but enforced)
+    %% - API depends on nothing
+    %% - Tools cannot depend on Core
+    %% - Core cannot depend on Tools
+    %% - Internal cannot depend on any higher layer
+    
+    classDef interfaceLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
+    classDef coreLayer fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    classDef businessLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef infraLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef internalLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef externalSys fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
+    
+    class API interfaceLayer
+    class Core,Session coreLayer
+    class Tools,Workflow,Analyze,Build,Deploy,Scan businessLayer
+    class Transport,Storage,Security,Templates infraLayer
+    class Internal,Errors,Types,Utils,Retry internalLayer
+    class Docker,K8s,BoltDB externalSys

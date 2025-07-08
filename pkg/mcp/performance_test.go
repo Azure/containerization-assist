@@ -18,7 +18,7 @@ func BenchmarkRegistryOperations(b *testing.B) {
 
 func BenchmarkSessionOperations(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate session creation/deletion
@@ -30,7 +30,7 @@ func BenchmarkSessionOperations(b *testing.B) {
 
 func BenchmarkWorkflowExecution(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate workflow execution
