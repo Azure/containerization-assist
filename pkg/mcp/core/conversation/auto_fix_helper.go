@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/Azure/container-kit/pkg/mcp/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 )
 
 // AutoFixHelper provides automatic error recovery and fixing capabilities

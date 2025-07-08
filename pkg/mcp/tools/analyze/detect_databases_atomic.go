@@ -102,10 +102,8 @@ func (t *AtomicDetectDatabasesTool) ExecuteWithContext(ctx *server.Context, args
 		return nil, err
 	}
 
-	// Convert to pointer and update with session context
+	// Convert to pointer - no need to set base responses as they don't exist in the struct
 	result := &execResult
-	result.BaseToolResponse = types.BaseToolResponse{Success: false, Timestamp: time.Now()}
-	result.BaseAIContextResult = core.NewBaseAIContextResult("database_detection", true, time.Since(startTime))
 
 	t.logger.Info("Database detection completed",
 		"session_id", args.SessionID,
@@ -127,13 +125,6 @@ func (t *AtomicDetectDatabasesTool) Execute(ctx context.Context, params Database
 
 	// Initialize result
 	result := DatabaseDetectionResult{
-		BaseToolResponse: types.BaseToolResponse{
-			Timestamp: startTime,
-		},
-		BaseAIContextResult: core.BaseAIContextResult{
-			AIContextType: "database_detection",
-			IsSuccessful:  false,
-		},
 		Success:        false,
 		DatabasesFound: []DetectedDatabase{},
 		ConfigFiles:    []DatabaseConfigFile{},
@@ -150,13 +141,10 @@ func (t *AtomicDetectDatabasesTool) Execute(ctx context.Context, params Database
 	}
 
 	// Set default scan depth
-	scanDepth := params.ScanDepth
-	if scanDepth == 0 {
-		scanDepth = 5
-	}
+	scanDepth := 5 // Default scan depth since params doesn't have this field
 
-	// Determine which detectors to run
-	detectorsToRun := t.getDetectorsToRun(params.DetectTypes)
+	// Determine which detectors to run - use all detectors since params doesn't specify
+	detectorsToRun := t.getDetectorsToRun([]string{})
 
 	// Run detection in parallel with controlled concurrency
 	var wg sync.WaitGroup

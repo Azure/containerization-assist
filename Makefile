@@ -117,6 +117,10 @@ check-boundaries:
 	@echo "Checking package boundary error handling compliance..."
 	@./scripts/check-boundary-errors.sh
 
+.PHONY: check-architecture
+check-architecture: validate-architecture
+	@echo "Architecture validation complete"
+
 .PHONY: fix-boundaries
 fix-boundaries:
 	@echo "Automatically fixing package boundary errors..."
@@ -161,8 +165,13 @@ fmt-check:
 install-hooks:
 	@./scripts/install-precommit-hooks.sh
 
+.PHONY: validate-architecture
+validate-architecture:
+	@echo "Validating three-layer architecture..."
+	@./scripts/validate-architecture.sh
+
 .PHONY: pre-commit
-pre-commit:
+pre-commit: validate-architecture
 	@pre-commit run --all-files
 
 .PHONY: generate
@@ -336,8 +345,9 @@ help:
 	@echo "Code quality targets:"
 	@echo "  fmt               Format all Go code"
 	@echo "  fmt-check         Check if code is formatted"
-	@echo "  install-hooks     Install pre-commit hooks"
-	@echo "  pre-commit        Run pre-commit checks manually"
+	@echo "  install-hooks        Install pre-commit hooks"
+	@echo "  validate-architecture Validate three-layer architecture"
+	@echo "  pre-commit           Run pre-commit checks manually"
 	@echo ""
 	@echo "Linting targets:"
 	@echo "  lint              Run linting with error budget (threshold: 100 issues)"
@@ -346,8 +356,9 @@ help:
 	@echo "  lint-ratchet      Ensure lint issues don't increase"
 	@echo ""
 	@echo "Error boundary targets:"
-	@echo "  check-boundaries  Check package boundary error handling compliance (ADR-006)"
-	@echo "  fix-boundaries    Automatically fix boundary error violations"
+	@echo "  check-boundaries     Check package boundary error handling compliance (ADR-006)"
+	@echo "  check-architecture   Validate three-layer architecture (domain/application/infra)"
+	@echo "  fix-boundaries       Automatically fix boundary error violations"
 	@echo ""
 	@echo "Complexity targets:"
 	@echo "  complexity-baseline  Set current complexity as baseline"
