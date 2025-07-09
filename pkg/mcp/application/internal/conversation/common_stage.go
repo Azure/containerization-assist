@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
-func (pm *PromptManager) hasRunBuildDryRun(state *ConversationState) bool {
+func (ps *PromptServiceImpl) hasRunBuildDryRun(state *ConversationState) bool {
 	_, ok := state.Context["build_dry_run_complete"].(bool)
 	return ok
 }
 
-func (pm *PromptManager) generateImageTag(state *ConversationState) string {
+func (ps *PromptServiceImpl) generateImageTag(state *ConversationState) string {
 	appName, _ := state.Context["app_name"].(string)
 	if appName == "" {
 		appName = "app"
@@ -22,9 +24,9 @@ func (pm *PromptManager) generateImageTag(state *ConversationState) string {
 	return fmt.Sprintf("%s:%s", appName, timestamp)
 }
 
-func (pm *PromptManager) performSecurityScan(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) performSecurityScan(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(types.StagePush),
+		Stage:   convertFromTypesStage(shared.StagePush),
 		Status:  ResponseStatusProcessing,
 		Message: "Running security scan on image...",
 	}
@@ -34,7 +36,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 		"image_ref":  getDockerfileImageID(state.SessionState),
 	}
 
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "scan_image_security", params)
+	resultStruct, err := ps.toolOrchestrator.ExecuteTool(ctx, "scan_image_security", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Security scan failed: %v\n\nContinue anyway?", err)
@@ -67,7 +69,7 @@ func (pm *PromptManager) performSecurityScan(ctx context.Context, state *Convers
 	return response
 }
 
-func (pm *PromptManager) reviewManifests(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+func (ps *PromptServiceImpl) reviewManifests(_ context.Context, state *ConversationState, input string) *ConversationResponse {
 	if strings.Contains(strings.ToLower(input), "show") || strings.Contains(strings.ToLower(input), "full") {
 		var manifestsText strings.Builder
 		if state.SessionState.Metadata != nil {
@@ -84,7 +86,7 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 
 		return &ConversationResponse{
 			Message: fmt.Sprintf("Full Kubernetes manifests:\n\n```yaml\n%s```\n\nReady to deploy?", manifestsText.String()),
-			Stage:   convertFromTypesStage(types.StageManifests),
+			Stage:   convertFromTypesStage(shared.StageManifests),
 			Status:  ResponseStatusSuccess,
 			Options: []Option{
 				{ID: "deploy", Label: "Deploy to Kubernetes", Recommended: true},
@@ -93,10 +95,10 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 		}
 	}
 
-	state.SetStage(convertFromTypesStage(types.StageDeployment))
+	state.SetStage(convertFromTypesStage(shared.StageDeployment))
 	return &ConversationResponse{
 		Message: "Manifests are ready. Shall we deploy to Kubernetes?",
-		Stage:   convertFromTypesStage(types.StageDeployment),
+		Stage:   convertFromTypesStage(shared.StageDeployment),
 		Status:  ResponseStatusSuccess,
 		Options: []Option{
 			{ID: "deploy", Label: "Yes, deploy", Recommended: true},
@@ -106,7 +108,7 @@ func (pm *PromptManager) reviewManifests(ctx context.Context, state *Conversatio
 	}
 }
 
-func (pm *PromptManager) suggestAppName(state *ConversationState) string {
+func (ps *PromptServiceImpl) suggestAppName(state *ConversationState) string {
 	if state.SessionState.RepoURL != "" {
 		parts := strings.Split(state.SessionState.RepoURL, "/")
 		if len(parts) > 0 {
@@ -129,7 +131,7 @@ func (pm *PromptManager) suggestAppName(state *ConversationState) string {
 	return "my-app"
 }
 
-func (pm *PromptManager) formatManifestSummary(manifests map[string]types.K8sManifest) string {
+func (ps *PromptServiceImpl) formatManifestSummary(manifests map[string]shared.K8sManifest) string {
 	var sb strings.Builder
 	sb.WriteString("✅ Kubernetes manifests generated:\n\n")
 
@@ -146,7 +148,7 @@ func (pm *PromptManager) formatManifestSummary(manifests map[string]types.K8sMan
 	return sb.String()
 }
 
-func (pm *PromptManager) formatDeploymentSuccess(state *ConversationState, duration time.Duration) string {
+func (ps *PromptServiceImpl) formatDeploymentSuccess(state *ConversationState, duration time.Duration) string {
 	var sb strings.Builder
 
 	sb.WriteString("🎉 Deployment completed successfully!\n\n")
@@ -176,9 +178,9 @@ func (pm *PromptManager) formatDeploymentSuccess(state *ConversationState, durat
 	return sb.String()
 }
 
-func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) showDeploymentLogs(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(types.StageDeployment),
+		Stage:   convertFromTypesStage(shared.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Fetching deployment logs...",
 	}
@@ -191,7 +193,7 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 		"log_lines":    100,
 	}
 
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params)
+	resultStruct, err := ps.toolOrchestrator.ExecuteTool(ctx, "check_health", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Failed to fetch logs: %v", err)
@@ -217,8 +219,8 @@ func (pm *PromptManager) showDeploymentLogs(ctx context.Context, state *Conversa
 }
 
 func extractRegistry(input string) string {
-	if strings.Contains(input, types.DefaultRegistry) || strings.Contains(input, "dockerhub") {
-		return types.DefaultRegistry
+	if strings.Contains(input, shared.DefaultRegistry) || strings.Contains(input, "dockerhub") {
+		return shared.DefaultRegistry
 	}
 	if strings.Contains(input, "gcr.io") {
 		return "gcr.io"
@@ -234,7 +236,7 @@ func extractRegistry(input string) string {
 		return strings.Split(input, "/")[0]
 	}
 
-	return types.DefaultRegistry
+	return shared.DefaultRegistry
 }
 
 func extractTag(imageRef string) string {

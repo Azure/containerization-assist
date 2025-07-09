@@ -71,8 +71,34 @@ type StateMapping interface {
 	ReverseMap(target interface{}) (interface{}, error)
 }
 
-// UnifiedStateManager manages all state operations
-type UnifiedStateManager struct {
+// UnifiedStateService defines the interface for unified state management
+type UnifiedStateService interface {
+	// State operations
+	GetState(ctx context.Context, stateType StateType, key string) (interface{}, error)
+	SetState(ctx context.Context, stateType StateType, key string, value interface{}) error
+	DeleteState(ctx context.Context, stateType StateType, key string) error
+
+	// Session state operations
+	GetSessionState(ctx context.Context, sessionID string) (interface{}, error)
+
+	// State history
+	GetStateHistory(ctx context.Context, stateType StateType, key string, limit int) ([]*StateEvent, error)
+
+	// State transactions
+	CreateStateTransaction(ctx context.Context) *StateTransaction
+
+	// Observer management
+	RegisterObserver(observer StateObserver)
+
+	// Validator management
+	RegisterValidator(stateType StateType, validator StateValidator)
+
+	// Provider management
+	RegisterStateProvider(stateType StateType, provider StateProvider)
+}
+
+// UnifiedStateServiceImpl implements UnifiedStateService
+type UnifiedStateServiceImpl struct {
 	conversationStates map[string]*BasicConversationState
 	workflowSessions   map[string]WorkflowSessionInterface
 	stateObservers     []StateObserver
@@ -85,6 +111,9 @@ type UnifiedStateManager struct {
 	logger             interface{} // Using interface{} to avoid circular deps
 	mu                 sync.RWMutex
 }
+
+// Type alias for backward compatibility
+type UnifiedStateManager = UnifiedStateServiceImpl
 
 // ComprehensiveContext represents comprehensive context information
 type ComprehensiveContext struct {
@@ -516,9 +545,25 @@ type Trend struct {
 	Data        map[string]interface{} `json:"data,omitempty"`
 }
 
-// NewUnifiedStateManager creates a new unified state manager
+// NewUnifiedStateService creates a new unified state service
+func NewUnifiedStateService(sessionManager interface{}, logger interface{}) UnifiedStateService {
+	return &UnifiedStateServiceImpl{
+		conversationStates: make(map[string]*BasicConversationState),
+		workflowSessions:   make(map[string]WorkflowSessionInterface),
+		stateObservers:     make([]StateObserver, 0),
+		stateValidators:    make(map[StateType]StateValidator),
+		eventStore:         &StateEventStore{events: make(map[string][]*StateEvent), eventsByID: make(map[string]*StateEvent), maxEvents: 1000},
+		stateProviders:     make(map[StateType]StateProvider),
+		stateHistory:       make(map[string][]StateHistoryEntry),
+		syncCoordinator:    &SyncCoordinator{},
+		sessionManager:     sessionManager,
+		logger:             logger,
+	}
+}
+
+// NewUnifiedStateManager creates a new unified state manager (backward compatibility)
 func NewUnifiedStateManager(sessionManager interface{}, logger interface{}) *UnifiedStateManager {
-	return &UnifiedStateManager{
+	return &UnifiedStateServiceImpl{
 		conversationStates: make(map[string]*BasicConversationState),
 		workflowSessions:   make(map[string]WorkflowSessionInterface),
 		stateObservers:     make([]StateObserver, 0),
@@ -533,14 +578,14 @@ func NewUnifiedStateManager(sessionManager interface{}, logger interface{}) *Uni
 }
 
 // RegisterObserver registers a state observer
-func (m *UnifiedStateManager) RegisterObserver(observer StateObserver) {
+func (m *UnifiedStateServiceImpl) RegisterObserver(observer StateObserver) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.stateObservers = append(m.stateObservers, observer)
 }
 
 // GetState gets state by key
-func (m *UnifiedStateManager) GetState(ctx context.Context, stateType StateType, key string) (interface{}, error) {
+func (m *UnifiedStateServiceImpl) GetState(ctx context.Context, stateType StateType, key string) (interface{}, error) {
 	m.mu.RLock()
 	provider, exists := m.stateProviders[stateType]
 	m.mu.RUnlock()
@@ -553,7 +598,7 @@ func (m *UnifiedStateManager) GetState(ctx context.Context, stateType StateType,
 }
 
 // SetState sets state by key
-func (m *UnifiedStateManager) SetState(ctx context.Context, stateType StateType, key string, value interface{}) error {
+func (m *UnifiedStateServiceImpl) SetState(ctx context.Context, stateType StateType, key string, value interface{}) error {
 	m.mu.RLock()
 	provider, exists := m.stateProviders[stateType]
 	m.mu.RUnlock()
@@ -580,7 +625,7 @@ func (m *UnifiedStateManager) SetState(ctx context.Context, stateType StateType,
 }
 
 // DeleteState deletes state by key
-func (m *UnifiedStateManager) DeleteState(ctx context.Context, stateType StateType, key string) error {
+func (m *UnifiedStateServiceImpl) DeleteState(ctx context.Context, stateType StateType, key string) error {
 	m.mu.RLock()
 	provider, exists := m.stateProviders[stateType]
 	m.mu.RUnlock()
@@ -603,7 +648,7 @@ func (m *UnifiedStateManager) DeleteState(ctx context.Context, stateType StateTy
 }
 
 // GetStateHistory gets state history
-func (m *UnifiedStateManager) GetStateHistory(ctx context.Context, stateType StateType, key string, limit int) ([]*StateEvent, error) {
+func (m *UnifiedStateServiceImpl) GetStateHistory(_ context.Context, stateType StateType, key string, limit int) ([]*StateEvent, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -630,7 +675,7 @@ func (m *UnifiedStateManager) GetStateHistory(ctx context.Context, stateType Sta
 }
 
 // GetSessionState gets session state
-func (m *UnifiedStateManager) GetSessionState(ctx context.Context, sessionID string) (interface{}, error) {
+func (m *UnifiedStateServiceImpl) GetSessionState(ctx context.Context, sessionID string) (interface{}, error) {
 	return m.GetState(ctx, StateTypeSession, sessionID)
 }
 
@@ -653,7 +698,7 @@ const (
 )
 
 // CreateStateTransaction creates a new state transaction
-func (m *UnifiedStateManager) CreateStateTransaction(ctx context.Context) *StateTransaction {
+func (m *UnifiedStateServiceImpl) CreateStateTransaction(ctx context.Context) *StateTransaction {
 	return &StateTransaction{
 		manager:    m,
 		ctx:        ctx,
@@ -663,7 +708,7 @@ func (m *UnifiedStateManager) CreateStateTransaction(ctx context.Context) *State
 }
 
 // addToHistory adds an entry to state history
-func (m *UnifiedStateManager) addToHistory(stateType StateType, key string, value interface{}) {
+func (m *UnifiedStateServiceImpl) addToHistory(stateType StateType, key string, value interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -683,7 +728,7 @@ func (m *UnifiedStateManager) addToHistory(stateType StateType, key string, valu
 }
 
 // notifyObservers notifies all observers of a state event
-func (m *UnifiedStateManager) notifyObservers(event *StateEvent) {
+func (m *UnifiedStateServiceImpl) notifyObservers(event *StateEvent) {
 	for _, observer := range m.stateObservers {
 		if observer.IsActive() {
 			go observer.OnStateChange(event)
@@ -892,7 +937,7 @@ func (p *BasicStateProvider) GetType() StateType {
 }
 
 // RegisterValidator registers a validator for a state type
-func (m *UnifiedStateManager) RegisterValidator(stateType StateType, validator StateValidator) {
+func (m *UnifiedStateServiceImpl) RegisterValidator(stateType StateType, validator StateValidator) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.stateValidators == nil {
@@ -902,7 +947,7 @@ func (m *UnifiedStateManager) RegisterValidator(stateType StateType, validator S
 }
 
 // RegisterStateProvider registers a state provider for a state type
-func (m *UnifiedStateManager) RegisterStateProvider(stateType StateType, provider StateProvider) {
+func (m *UnifiedStateServiceImpl) RegisterStateProvider(stateType StateType, provider StateProvider) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.stateProviders == nil {

@@ -8,6 +8,20 @@ import (
 	sessionsvc "github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
+// SessionState represents the state of a session - local definition to avoid circular import
+type SessionState struct {
+	SessionID           string
+	UserID              string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ExpiresAt           time.Time
+	WorkspaceDir        string
+	RepositoryAnalyzed  bool
+	RepoURL             string
+	DockerfileGenerated bool
+	DockerfilePath      string
+}
+
 // GetSessionWorkspace retrieves the workspace directory for a given session ID
 func (o *Operations) GetSessionWorkspace(sessionID string) string {
 	if sessionID == "" {
@@ -33,7 +47,7 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, data Sessi
 	}
 
 	return o.sessionManager.UpdateSession(context.Background(), sessionID, func(sess *sessionsvc.SessionState) error {
-		sess.LastAccessed = time.Now()
+		sess.UpdatedAt = time.Now()
 		if sess.Metadata == nil {
 			sess.Metadata = make(map[string]interface{})
 		}
@@ -43,19 +57,19 @@ func (o *Operations) UpdateSessionFromDockerResults(sessionID string, data Sessi
 }
 
 // UpdateSessionState updates session state using a callback function
-func (o *Operations) UpdateSessionState(sessionID string, updateFunc func(*core.SessionState)) error {
+func (o *Operations) UpdateSessionState(sessionID string, updateFunc func(*SessionState)) error {
 	return o.sessionManager.UpdateSession(context.Background(), sessionID, func(sessionState *sessionsvc.SessionState) error {
-		coreState := &core.SessionState{
+		coreState := &SessionState{
 			SessionID:           sessionState.SessionID,
 			UserID:              "",
 			CreatedAt:           sessionState.CreatedAt,
-			UpdatedAt:           sessionState.LastAccessed,
+			UpdatedAt:           sessionState.UpdatedAt,
 			ExpiresAt:           sessionState.ExpiresAt,
 			WorkspaceDir:        sessionState.WorkspaceDir,
 			RepositoryAnalyzed:  false,
 			RepoURL:             sessionState.RepoURL,
-			DockerfileGenerated: sessionState.Dockerfile.Built,
-			DockerfilePath:      sessionState.Dockerfile.Path,
+			DockerfileGenerated: sessionState.DockerfileGenerated,
+			DockerfilePath:      sessionState.DockerfilePath,
 		}
 		updateFunc(coreState)
 		return nil
@@ -74,7 +88,12 @@ func (o *Operations) startJobTracking(sessionID, jobType string) (string, error)
 
 // updateJobStatus updates the status of a tracked job
 func (o *Operations) updateJobStatus(sessionID, jobID string, status interface{}, result interface{}, err error) error {
-	updateErr := o.sessionManager.UpdateJobStatus(sessionID, jobID, status, result, err)
+	// Convert status to session.JobStatus
+	jobStatus, ok := status.(sessionsvc.JobStatus)
+	if !ok {
+		jobStatus = sessionsvc.JobStatusFailed // default fallback
+	}
+	updateErr := o.sessionManager.UpdateJobStatus(sessionID, jobID, jobStatus, result, err)
 	if updateErr != nil {
 		o.logger.Warn("Failed to update job status", "session_id", sessionID, "job_id", jobID, "error", updateErr)
 	}

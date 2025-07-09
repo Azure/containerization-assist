@@ -15,12 +15,12 @@ import (
 func validateUnifiedInterfaces() []ValidationResult {
 	var results []ValidationResult
 
-	// Check if pkg/mcp/interfaces.go exists
-	interfacesFile := "pkg/mcp/interfaces.go"
+	// Check if pkg/mcp/application/api/interfaces.go exists
+	interfacesFile := "pkg/mcp/application/api/interfaces.go"
 	if _, err := os.Stat(interfacesFile); os.IsNotExist(err) {
 		results = append(results, ValidationResult{
 			File:     interfacesFile,
-			Issue:    "Unified interfaces file does not exist - Team A work not complete",
+			Issue:    "Unified interfaces file does not exist",
 			Severity: "error",
 		})
 		return results
@@ -285,24 +285,41 @@ func validateMethods(interfaceName string, expected []string, actual []string) e
 func findToolImplementations() ([]string, error) {
 	var toolFiles []string
 
-	err := filepath.WalkDir("pkg/mcp/internal", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	// Search in the application layer for tool implementations
+	searchDirs := []string{
+		"pkg/mcp/application/tools",
+		"pkg/mcp/application/commands",
+		"pkg/mcp/application/internal",
+	}
+
+	for _, dir := range searchDirs {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
 		}
 
-		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if d.IsDir() || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+
+			// Look for files that likely contain tool implementations
+			if strings.Contains(path, "tool") || strings.Contains(path, "command") || strings.Contains(path, "implementation") {
+				toolFiles = append(toolFiles, path)
+			}
+
 			return nil
+		})
+
+		if err != nil {
+			return toolFiles, err
 		}
+	}
 
-		// Look for files that likely contain tool implementations
-		if strings.Contains(path, "tool") || strings.Contains(path, "atomic") {
-			toolFiles = append(toolFiles, path)
-		}
-
-		return nil
-	})
-
-	return toolFiles, err
+	return toolFiles, nil
 }
 
 func hasRequiredMethods(file *ast.File, structName string, requiredMethods []string) bool {

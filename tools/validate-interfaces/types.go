@@ -2,25 +2,56 @@ package main
 
 import "time"
 
-// Expected unified interfaces that should exist after Team A's work
+// Expected unified interfaces that should exist in pkg/mcp/application/api/interfaces.go
 var expectedInterfaces = map[string][]string{
 	"Tool": {
-		"Execute(ctx context.Context, args interface{}) (interface{}, error)",
-		"GetMetadata() ToolMetadata",
-		"Validate(ctx context.Context, args interface{}) error",
+		"Name",
+		"Description",
+		"Execute",
+		"Schema",
 	},
-	"Session": {
-		"ID() string",
-		"GetWorkspace() string",
-		"UpdateState(func(*SessionState))",
+	"Registry": {
+		"Register",
+		"Unregister",
+		"Get",
+		"List",
+		"ListByCategory",
+		"ListByTags",
+		"Execute",
+		"ExecuteWithRetry",
+		"GetMetadata",
+		"GetStatus",
+		"SetStatus",
+		"Close",
+		"GetMetrics",
+		"Subscribe",
+		"Unsubscribe",
 	},
 	"Transport": {
-		"Serve(ctx context.Context) error",
-		"Stop() error",
+		"Start",
+		"Stop",
+		"Send",
+		"Receive",
+		"IsConnected",
 	},
 	"Orchestrator": {
-		"ExecuteTool(ctx context.Context, name string, args interface{}) (interface{}, error)",
-		"RegisterTool(name string, tool Tool) error",
+		"RegisterTool",
+		"ExecuteTool",
+		"GetTool",
+		"ListTools",
+		"GetStats",
+		"ValidateToolArgs",
+		"GetToolMetadata",
+		"RegisterGenericTool",
+		"GetTypedToolMetadata",
+	},
+	"MCPServer": {
+		"Start",
+		"Stop",
+		"RegisterTool",
+		"GetRegistry",
+		"GetSessionManager",
+		"GetOrchestrator",
 	},
 }
 

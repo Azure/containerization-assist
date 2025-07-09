@@ -2,44 +2,50 @@ package persistence
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain"
 )
 
 // MemoryStore is a simple in-memory implementation of SessionStore
 type MemoryStore struct {
-	sessions map[string]*domain.SessionState
+	sessions map[string]*api.Session
 	mu       sync.RWMutex
 }
 
 // NewMemoryStore creates a new in-memory session store
 func NewMemoryStore() services.SessionStore {
 	return &MemoryStore{
-		sessions: make(map[string]*domain.SessionState),
+		sessions: make(map[string]*api.Session),
 	}
 }
 
-// Save stores a session in memory
-func (m *MemoryStore) Save(ctx context.Context, sessionID string, session *domain.SessionState) error {
+// Create creates a new session
+func (m *MemoryStore) Create(_ context.Context, session *api.Session) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if _, exists := m.sessions[session.ID]; exists {
+		return fmt.Errorf("session already exists: %s", session.ID)
+	}
+
 	// Deep copy the session to avoid external modifications
 	sessionCopy := *session
-	m.sessions[sessionID] = &sessionCopy
+	m.sessions[session.ID] = &sessionCopy
 	return nil
 }
 
-// Load retrieves a session from memory
-func (m *MemoryStore) Load(ctx context.Context, sessionID string) (*domain.SessionState, error) {
+// Get retrieves a session by ID
+func (m *MemoryStore) Get(_ context.Context, sessionID string) (*api.Session, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	session, exists := m.sessions[sessionID]
 	if !exists {
-		return nil, nil
+		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 
 	// Return a copy to avoid external modifications
@@ -56,16 +62,56 @@ func (m *MemoryStore) Delete(ctx context.Context, sessionID string) error {
 	return nil
 }
 
-// List returns all session IDs
-func (m *MemoryStore) List(ctx context.Context) ([]string, error) {
+// Update updates an existing session
+func (m *MemoryStore) Update(_ context.Context, session *api.Session) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.sessions[session.ID]; !exists {
+		return fmt.Errorf("session not found: %s", session.ID)
+	}
+
+	// Deep copy the session to avoid external modifications
+	sessionCopy := *session
+	m.sessions[session.ID] = &sessionCopy
+	return nil
+}
+
+// List returns all sessions
+func (m *MemoryStore) List(_ context.Context) ([]*api.Session, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	ids := make([]string, 0, len(m.sessions))
-	for id := range m.sessions {
-		ids = append(ids, id)
+	sessions := make([]*api.Session, 0, len(m.sessions))
+	for _, session := range m.sessions {
+		// Return copies to avoid external modifications
+		sessionCopy := *session
+		sessions = append(sessions, &sessionCopy)
 	}
-	return ids, nil
+	return sessions, nil
+}
+
+// Save stores a session in memory (legacy method for backward compatibility)
+func (m *MemoryStore) Save(ctx context.Context, sessionID string, _ *domain.SessionState) error {
+	// Convert domain.SessionState to api.Session
+	apiSession := &api.Session{
+		ID: sessionID,
+		// Add other field mappings as needed
+	}
+	return m.Update(ctx, apiSession)
+}
+
+// Load retrieves a session from memory (legacy method for backward compatibility)
+func (m *MemoryStore) Load(ctx context.Context, sessionID string) (*domain.SessionState, error) {
+	apiSession, err := m.Get(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	// Convert api.Session to domain.SessionState
+	return &domain.SessionState{
+		SessionID: apiSession.ID,
+		// Add other field mappings as needed
+	}, nil
 }
 
 // Close is a no-op for memory store

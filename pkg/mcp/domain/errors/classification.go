@@ -211,3 +211,11 @@ func HasTag(err error, tag string) bool {
 	}
 	return false
 }
+
+// IsErrorType checks if an error message contains a specific type/message pattern
+func IsErrorType(err error, message string) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), message)
+}

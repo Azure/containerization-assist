@@ -6,21 +6,29 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
+// ServiceContainer defines the interface for service container to avoid circular dependency
+type ServiceContainer interface {
+	SessionStore() SessionStore
+	Logger() *slog.Logger
+}
+
 // StateManagementIntegration provides high-level state management integration
 type StateManagementIntegration struct {
-	manager         *UnifiedStateManager
-	metricsObserver *MetricsObserver
-	auditObserver   *AuditObserver
-	logger          *slog.Logger
+	manager          *UnifiedStateManager
+	serviceContainer ServiceContainer
+	metricsObserver  *MetricsObserver
+	auditObserver    *AuditObserver
+	logger           *slog.Logger
 }
 
 // NewStateManagementIntegration creates a new state management integration
 func NewStateManagementIntegration(
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	checkpointManager CheckpointManagerInterface,
 	logger *slog.Logger,
 ) *StateManagementIntegration {
@@ -49,6 +57,42 @@ func NewStateManagementIntegration(
 		metricsObserver: metricsObserver,
 		auditObserver:   auditObserver,
 		logger:          logger.With("component", "state_integration"),
+	}
+}
+
+// NewStateManagementIntegrationWithContainer creates a new state management integration with service container
+func NewStateManagementIntegrationWithContainer(
+	serviceContainer ServiceContainer,
+	logger *slog.Logger,
+) *StateManagementIntegration {
+	// Create a simple unified state manager that uses the service container
+	manager := NewUnifiedStateManager(nil, logger) // TODO: Convert SessionStore to SessionManager
+
+	// Register state providers using service container
+	manager.RegisterStateProvider(StateTypeSession, NewSessionStateProviderFromContainer(serviceContainer))
+	manager.RegisterStateProvider(StateTypeConversation, NewConversationStateProvider())
+	manager.RegisterStateProvider(StateTypeWorkflow, NewWorkflowStateProvider(nil)) // TODO: Get checkpoint manager from container
+	manager.RegisterStateProvider(StateTypeTool, NewToolStateProvider())
+	manager.RegisterStateProvider(StateTypeGlobal, NewGlobalStateProvider())
+
+	manager.RegisterValidator(StateTypeSession, NewSessionStateValidator())
+	manager.RegisterValidator(StateTypeConversation, NewConversationStateValidator())
+	manager.RegisterValidator(StateTypeWorkflow, NewWorkflowStateValidator())
+
+	loggingObserver := NewLoggingObserver(logger)
+	metricsObserver := NewMetricsObserver(5 * time.Minute)
+	auditObserver := NewAuditObserver(10000, logger)
+
+	manager.RegisterObserver(loggingObserver)
+	manager.RegisterObserver(metricsObserver)
+	manager.RegisterObserver(auditObserver)
+
+	return &StateManagementIntegration{
+		manager:          manager,
+		serviceContainer: serviceContainer,
+		metricsObserver:  metricsObserver,
+		auditObserver:    auditObserver,
+		logger:           logger.With("component", "state_integration"),
 	}
 }
 
@@ -174,6 +218,45 @@ func (i *StateManagementIntegration) EnableStateReplication(ctx context.Context,
 		slog.String("target", config.TargetURL),
 		slog.String("mode", string(config.Mode)))
 	return nil
+}
+
+// GetServiceContainer returns the service container if available
+func (i *StateManagementIntegration) GetServiceContainer() ServiceContainer {
+	return i.serviceContainer
+}
+
+// CreateSessionFromServices creates a session using the service container
+func (i *StateManagementIntegration) CreateSessionFromServices(ctx context.Context, sessionID string) error {
+	if i.serviceContainer == nil {
+		return fmt.Errorf("service container not available")
+	}
+
+	sessionStore := i.serviceContainer.SessionStore()
+	session := &api.Session{
+		ID:        sessionID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Metadata:  make(map[string]interface{}),
+		State:     make(map[string]interface{}),
+	}
+
+	if err := sessionStore.Create(ctx, session); err != nil {
+		return err
+	}
+
+	i.logger.Info("Created session using service container",
+		slog.String("session_id", sessionID))
+	return nil
+}
+
+// GetSessionFromServices retrieves a session using the service container
+func (i *StateManagementIntegration) GetSessionFromServices(ctx context.Context, sessionID string) (interface{}, error) {
+	if i.serviceContainer == nil {
+		return nil, fmt.Errorf("service container not available")
+	}
+
+	sessionStore := i.serviceContainer.SessionStore()
+	return sessionStore.Get(ctx, sessionID)
 }
 
 // ReplicationConfig configures state replication

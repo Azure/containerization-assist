@@ -16,7 +16,7 @@ trap "rm -rf $TEMP_DIR" EXIT
 
 # Find all generated schema files and copy them to temp
 echo "📁 Backing up current generated schemas..."
-find pkg/mcp/internal -name "generated_*.go" -type f | while read -r file; do
+find pkg/mcp/application/internal -name "generated_*.go" -type f | while read -r file; do
     mkdir -p "$TEMP_DIR/$(dirname "$file")"
     cp "$file" "$TEMP_DIR/$file"
 done
@@ -28,7 +28,7 @@ make generate > /dev/null 2>&1
 # Compare with saved versions
 echo "📊 Comparing schemas..."
 CHANGES_FOUND=false
-find pkg/mcp/internal -name "generated_*.go" -type f | while read -r file; do
+find pkg/mcp/application/internal -name "generated_*.go" -type f | while read -r file; do
     if [ -f "$TEMP_DIR/$file" ]; then
         if ! diff -q "$file" "$TEMP_DIR/$file" > /dev/null; then
             echo "❌ Schema out of date: $file"
@@ -45,7 +45,7 @@ find pkg/mcp/internal -name "generated_*.go" -type f | while read -r file; do
 done
 
 # Check for deleted schemas
-find "$TEMP_DIR/pkg/mcp/internal" -name "generated_*.go" -type f 2>/dev/null | while read -r temp_file; do
+find "$TEMP_DIR/pkg/mcp/application/internal" -name "generated_*.go" -type f 2>/dev/null | while read -r temp_file; do
     original_file="${temp_file#$TEMP_DIR/}"
     if [ ! -f "$original_file" ]; then
         echo "❌ Schema file deleted: $original_file"
@@ -55,8 +55,8 @@ done
 
 # Restore original schemas for now
 echo "🔄 Restoring original schemas..."
-find pkg/mcp/internal -name "generated_*.go" -type f -delete
-find "$TEMP_DIR/pkg/mcp/internal" -name "generated_*.go" -type f 2>/dev/null | while read -r temp_file; do
+find pkg/mcp/application/internal -name "generated_*.go" -type f -delete
+find "$TEMP_DIR/pkg/mcp/application/internal" -name "generated_*.go" -type f 2>/dev/null | while read -r temp_file; do
     original_file="${temp_file#$TEMP_DIR/}"
     mkdir -p "$(dirname "$original_file")"
     cp "$temp_file" "$original_file"
@@ -70,7 +70,7 @@ if [ "$CHANGES_FOUND" = true ]; then
     echo ""
     echo "To fix this, run:"
     echo "  make generate"
-    echo "  git add pkg/mcp/internal/**/generated_*.go"
+    echo "  git add pkg/mcp/application/internal/**/generated_*.go"
     echo "  git commit -m 'chore: update generated schemas'"
     exit 1
 else

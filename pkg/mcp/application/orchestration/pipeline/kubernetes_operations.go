@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
@@ -102,14 +103,14 @@ func (o *Operations) CheckHealth(_ context.Context, sessionID string, args inter
 }
 
 // GenerateManifestsTyped implements TypedPipelineOperations.GenerateManifestsTyped
-func (o *Operations) GenerateManifestsTyped(_ context.Context, sessionID string, params core.GenerateManifestsParams) (*core.GenerateManifestsResult, error) {
+func (o *Operations) GenerateManifestsTyped(_ context.Context, sessionID string, params domain.GenerateManifestsParams) (*domain.GenerateManifestsResult, error) {
 	if sessionID == "" {
 		return nil, errors.NewError().Message("session ID is required").Build()
 	}
-	if params.ServiceName == "" {
-		return nil, errors.NewError().Message("service name is required").Build()
+	if params.AppName == "" {
+		return nil, errors.NewError().Message("app name is required").Build()
 	}
-	if params.ImageName == "" {
+	if params.ImageRef == "" {
 		return nil, errors.NewError().Message("image name is required").Build()
 	}
 	if params.Replicas <= 0 {
@@ -123,8 +124,8 @@ func (o *Operations) GenerateManifestsTyped(_ context.Context, sessionID string,
 
 	manifestResult, err := o.GenerateKubernetesManifests(TypedGenerateManifestsArgs{
 		SessionID:     sessionID,
-		ImageRef:      params.ImageName,
-		AppName:       params.ServiceName,
+		ImageRef:      params.ImageRef,
+		AppName:       params.AppName,
 		Port:          port,
 		CPURequest:    "100m",
 		MemoryRequest: "128Mi",
@@ -140,18 +141,19 @@ func (o *Operations) GenerateManifestsTyped(_ context.Context, sessionID string,
 		manifestPaths = append(manifestPaths, manifest.Path)
 	}
 
-	return &core.GenerateManifestsResult{
-		BaseToolResponse: types.BaseToolResponse{
+	return &domain.GenerateManifestsResult{
+		BaseToolResponse: domain.BaseToolResponse{
 			Success:   manifestResult.Success,
 			Timestamp: time.Now(),
 		},
 		ManifestPaths: manifestPaths,
+		ManifestCount: len(manifestPaths),
 		Namespace:     "default",
 	}, nil
 }
 
 // DeployKubernetesTyped implements TypedPipelineOperations.DeployKubernetesTyped
-func (o *Operations) DeployKubernetesTyped(_ context.Context, sessionID string, params core.DeployParams) (*core.DeployResult, error) {
+func (o *Operations) DeployKubernetesTyped(_ context.Context, sessionID string, params domain.DeployParams) (*domain.DeployResult, error) {
 	if sessionID == "" {
 		return nil, errors.NewError().Message("session ID is required").Build()
 	}
@@ -161,14 +163,17 @@ func (o *Operations) DeployKubernetesTyped(_ context.Context, sessionID string, 
 	if params.Namespace == "" {
 		return nil, errors.NewError().Message("namespace is required").Build()
 	}
+	if params.Timeout < 0 {
+		return nil, errors.NewError().Message("timeout must be positive").Build()
+	}
 
 	deployResult, err := o.DeployToKubernetes(sessionID, params.ManifestPaths)
 	if err != nil {
 		return nil, err
 	}
 
-	return &core.DeployResult{
-		BaseToolResponse: types.BaseToolResponse{
+	return &domain.DeployResult{
+		BaseToolResponse: domain.BaseToolResponse{
 			Success:   true,
 			Message:   "Deployment completed successfully",
 			Timestamp: time.Now(),
@@ -176,12 +181,13 @@ func (o *Operations) DeployKubernetesTyped(_ context.Context, sessionID string, 
 		DeploymentName: "app-deployment",
 		ServiceName:    "app-service",
 		Namespace:      deployResult.Namespace,
+		Status:         "deployed",
 		Endpoints:      []string{},
 	}, nil
 }
 
 // CheckHealthTyped implements TypedPipelineOperations.CheckHealthTyped
-func (o *Operations) CheckHealthTyped(_ context.Context, sessionID string, params core.HealthCheckParams) (*core.HealthCheckResult, error) {
+func (o *Operations) CheckHealthTyped(_ context.Context, sessionID string, params domain.HealthCheckParams) (*domain.HealthCheckResult, error) {
 	if sessionID == "" {
 		return nil, errors.NewError().Message("session ID is required").Build()
 	}
@@ -201,8 +207,8 @@ func (o *Operations) CheckHealthTyped(_ context.Context, sessionID string, param
 		return nil, err
 	}
 
-	return &core.HealthCheckResult{
-		BaseToolResponse: types.BaseToolResponse{
+	return &domain.HealthCheckResult{
+		BaseToolResponse: domain.BaseToolResponse{
 			Success:   healthResult.Healthy,
 			Message:   fmt.Sprintf("Health check completed: %s", healthResult.Status),
 			Timestamp: time.Now(),
@@ -211,5 +217,10 @@ func (o *Operations) CheckHealthTyped(_ context.Context, sessionID string, param
 		ReadyReplicas: 1,
 		TotalReplicas: 1,
 		Status:        healthResult.Status,
+		OverallHealth: healthResult.Status,
+		ResourceStatuses: []string{
+			fmt.Sprintf("deployment/%s: %s", params.DeploymentName, healthResult.Status),
+			fmt.Sprintf("pods: %d ready", healthResult.Ready),
+		},
 	}, nil
 }

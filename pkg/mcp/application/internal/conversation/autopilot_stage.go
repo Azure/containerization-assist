@@ -3,14 +3,16 @@ package conversation
 import (
 	"fmt"
 	"strings"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
-func getStageProgress(currentStage core.ConversationStage) string {
-	progressMap := map[core.ConversationStage]int{
-		core.ConversationStageAnalyze: 4,
-		core.ConversationStageBuild:   6,
-		core.ConversationStageDeploy:  8,
-		core.ConversationStageScan:    9,
+func getStageProgress(currentStage shared.ConversationStage) string {
+	progressMap := map[shared.ConversationStage]int{
+		shared.StageAnalysis:   4,
+		shared.StageBuild:      6,
+		shared.StageDeployment: 8,
+		shared.StageScan:       9,
 	}
 
 	currentStep := 1
@@ -23,12 +25,12 @@ func getStageProgress(currentStage core.ConversationStage) string {
 	return fmt.Sprintf("[Step %d/%d]", currentStep, totalSteps)
 }
 
-func getStageIntro(stage core.ConversationStage) string {
-	intros := map[core.ConversationStage]string{
-		core.ConversationStageAnalyze: "Analyzing your repository to understand the project structure.",
-		core.ConversationStageBuild:   "Building your Docker image with the generated Dockerfile.",
-		core.ConversationStageDeploy:  "Deploying your application to the Kubernetes cluster.",
-		core.ConversationStageScan:    "Running security scans on your container image.",
+func getStageIntro(stage shared.ConversationStage) string {
+	intros := map[shared.ConversationStage]string{
+		shared.StageAnalysis:   "Analyzing your repository to understand the project structure.",
+		shared.StageBuild:      "Building your Docker image with the generated Dockerfile.",
+		shared.StageDeployment: "Deploying your application to the Kubernetes cluster.",
+		shared.StageScan:       "Running security scans on your container image.",
 	}
 
 	if intro, exists := intros[stage]; exists {
@@ -37,7 +39,7 @@ func getStageIntro(stage core.ConversationStage) string {
 	return "Processing your request..."
 }
 
-func (pm *PromptManager) hasAutopilotEnabled(state *ConversationState) bool {
+func (ps *PromptServiceImpl) hasAutopilotEnabled(state *ConversationState) bool {
 	if autopilot, ok := state.Context["autopilot_enabled"].(bool); ok && autopilot {
 		return true
 	}
@@ -49,22 +51,22 @@ func (pm *PromptManager) hasAutopilotEnabled(state *ConversationState) bool {
 	return false
 }
 
-func (pm *PromptManager) enableAutopilot(state *ConversationState) {
+func (ps *PromptServiceImpl) enableAutopilot(state *ConversationState) {
 	state.Context["autopilot_enabled"] = true
-	pm.logger.Info("Autopilot mode enabled", "session_id", state.SessionState.SessionID)
+	ps.logger.Info("Autopilot mode enabled", "session_id", state.SessionState.SessionID)
 }
 
-func (pm *PromptManager) disableAutopilot(state *ConversationState) {
+func (ps *PromptServiceImpl) disableAutopilot(state *ConversationState) {
 	state.Context["autopilot_enabled"] = false
-	pm.logger.Info("Autopilot mode disabled", "session_id", state.SessionState.SessionID)
+	ps.logger.Info("Autopilot mode disabled", "session_id", state.SessionState.SessionID)
 }
 
-func (pm *PromptManager) handleAutopilotCommands(input string, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) handleAutopilotCommands(input string, state *ConversationState) *ConversationResponse {
 	lowerInput := strings.ToLower(strings.TrimSpace(input))
 
 	switch {
 	case lowerInput == "autopilot on" || lowerInput == "enable autopilot":
-		pm.enableAutopilot(state)
+		ps.enableAutopilot(state)
 		return &ConversationResponse{
 			Message: "✅ Autopilot mode enabled! I'll proceed through the stages automatically with minimal confirmations.\n\nYou can disable it anytime by typing 'autopilot off'.",
 			Stage:   state.CurrentStage,
@@ -72,7 +74,7 @@ func (pm *PromptManager) handleAutopilotCommands(input string, state *Conversati
 		}
 
 	case lowerInput == "autopilot off" || lowerInput == "disable autopilot":
-		pm.disableAutopilot(state)
+		ps.disableAutopilot(state)
 		return &ConversationResponse{
 			Message: "✅ Autopilot mode disabled. I'll ask for confirmation at each stage.",
 			Stage:   state.CurrentStage,
@@ -80,7 +82,7 @@ func (pm *PromptManager) handleAutopilotCommands(input string, state *Conversati
 		}
 
 	case lowerInput == "autopilot status":
-		enabled := pm.hasAutopilotEnabled(state)
+		enabled := ps.hasAutopilotEnabled(state)
 		status := "disabled"
 		if enabled {
 			status = "enabled"
@@ -92,7 +94,7 @@ func (pm *PromptManager) handleAutopilotCommands(input string, state *Conversati
 		}
 
 	case lowerInput == "stop":
-		pm.disableAutopilot(state)
+		ps.disableAutopilot(state)
 		return &ConversationResponse{
 			Message: "⏸️ Autopilot paused. I'll wait for your confirmation before proceeding to the next stage.",
 			Stage:   state.CurrentStage,

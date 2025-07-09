@@ -30,13 +30,50 @@ var componentTemplates embed.FS
 //go:embed templates/*.tmpl templates/Dockerfile
 var dockerfileTemplates embed.FS
 
+// TemplateRenderer handles template rendering operations
+type TemplateRenderer interface {
+	// RenderTemplate renders a template with variables
+	RenderTemplate(params TemplateRenderParams) (*TemplateRenderResult, error)
+}
+
+// TemplateProvider handles template retrieval and metadata
+type TemplateProvider interface {
+	// ListTemplates lists available templates by type
+	ListTemplates(templateType TemplateType) ([]string, error)
+
+	// GetTemplateMetadata gets metadata about a template
+	GetTemplateMetadata(templateType TemplateType, name string) (*TemplateMetadata, error)
+}
+
+// TemplateService combines rendering and provider capabilities
+type TemplateService interface {
+	TemplateRenderer
+	TemplateProvider
+}
+
+// templateService implements TemplateService
+type templateService struct {
+	logger *slog.Logger
+	cache  map[string]*template.Template
+}
+
+// NewTemplateService creates a new template service
+func NewTemplateService(logger *slog.Logger) TemplateService {
+	return &templateService{
+		logger: logger,
+		cache:  make(map[string]*template.Template),
+	}
+}
+
 // TemplateManager manages template operations for infrastructure
+// DEPRECATED: Use TemplateService instead
 type TemplateManager struct {
 	logger *slog.Logger
 	cache  map[string]*template.Template
 }
 
 // NewTemplateManager creates a new template manager
+// DEPRECATED: Use NewTemplateService instead
 func NewTemplateManager(logger *slog.Logger) *TemplateManager {
 	return &TemplateManager{
 		logger: logger,
@@ -75,13 +112,13 @@ type TemplateRenderResult struct {
 }
 
 // RenderTemplate renders a template with variables
-func (tm *TemplateManager) RenderTemplate(params TemplateRenderParams) (*TemplateRenderResult, error) {
-	tm.logger.Info("Rendering template",
+func (ts *templateService) RenderTemplate(params TemplateRenderParams) (*TemplateRenderResult, error) {
+	ts.logger.Info("Rendering template",
 		"name", params.Name,
 		"type", params.Type)
 
 	// Get template content
-	templateContent, err := tm.getTemplateContent(params.Type, params.Name)
+	templateContent, err := ts.getTemplateContent(params.Type, params.Name)
 	if err != nil {
 		return &TemplateRenderResult{
 			Name:    params.Name,
@@ -121,7 +158,7 @@ func (tm *TemplateManager) RenderTemplate(params TemplateRenderParams) (*Templat
 		Success:  true,
 	}
 
-	tm.logger.Info("Template rendered successfully",
+	ts.logger.Info("Template rendered successfully",
 		"name", result.Name,
 		"type", result.Type,
 		"size", len(result.Content))
@@ -130,7 +167,7 @@ func (tm *TemplateManager) RenderTemplate(params TemplateRenderParams) (*Templat
 }
 
 // getTemplateContent gets template content from embedded filesystem
-func (tm *TemplateManager) getTemplateContent(templateType TemplateType, name string) (string, error) {
+func (ts *templateService) getTemplateContent(templateType TemplateType, name string) (string, error) {
 	var fs embed.FS
 	var basePath string
 
@@ -173,7 +210,7 @@ func (tm *TemplateManager) getTemplateContent(templateType TemplateType, name st
 }
 
 // ListTemplates lists available templates by type
-func (tm *TemplateManager) ListTemplates(templateType TemplateType) ([]string, error) {
+func (ts *templateService) ListTemplates(templateType TemplateType) ([]string, error) {
 	var fs embed.FS
 	var basePath string
 
@@ -223,8 +260,8 @@ func (tm *TemplateManager) ListTemplates(templateType TemplateType) ([]string, e
 }
 
 // GetTemplateMetadata gets metadata about a template
-func (tm *TemplateManager) GetTemplateMetadata(templateType TemplateType, name string) (*TemplateMetadata, error) {
-	content, err := tm.getTemplateContent(templateType, name)
+func (ts *templateService) GetTemplateMetadata(templateType TemplateType, name string) (*TemplateMetadata, error) {
+	content, err := ts.getTemplateContent(templateType, name)
 	if err != nil {
 		return nil, err
 	}
@@ -233,8 +270,8 @@ func (tm *TemplateManager) GetTemplateMetadata(templateType TemplateType, name s
 		Name:        name,
 		Type:        templateType,
 		Size:        len(content),
-		Variables:   tm.extractTemplateVariables(content),
-		Description: tm.extractTemplateDescription(content),
+		Variables:   ts.extractTemplateVariables(content),
+		Description: ts.extractTemplateDescription(content),
 	}
 
 	return metadata, nil
@@ -253,7 +290,7 @@ type TemplateMetadata struct {
 }
 
 // extractTemplateVariables extracts template variables from content
-func (tm *TemplateManager) extractTemplateVariables(content string) []string {
+func (ts *templateService) extractTemplateVariables(content string) []string {
 	var variables []string
 
 	// Simple regex-based extraction for Go template variables
@@ -280,7 +317,7 @@ func (tm *TemplateManager) extractTemplateVariables(content string) []string {
 }
 
 // extractTemplateDescription extracts description from template comments
-func (tm *TemplateManager) extractTemplateDescription(content string) string {
+func (ts *templateService) extractTemplateDescription(content string) string {
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -296,14 +333,14 @@ func (tm *TemplateManager) extractTemplateDescription(content string) string {
 
 // DockerfileGenerator generates Dockerfiles using language-specific templates
 type DockerfileGenerator struct {
-	templateManager *TemplateManager
+	templateService TemplateService
 	logger          *slog.Logger
 }
 
 // NewDockerfileGenerator creates a new Dockerfile generator
 func NewDockerfileGenerator(logger *slog.Logger) *DockerfileGenerator {
 	return &DockerfileGenerator{
-		templateManager: NewTemplateManager(logger),
+		templateService: NewTemplateService(logger),
 		logger:          logger,
 	}
 }
@@ -356,7 +393,7 @@ func (dg *DockerfileGenerator) GenerateDockerfile(params GenerateDockerfileParam
 	}
 
 	// Render template
-	renderResult, err := dg.templateManager.RenderTemplate(TemplateRenderParams{
+	renderResult, err := dg.templateService.RenderTemplate(TemplateRenderParams{
 		Name:       templateName,
 		Type:       TemplateTypeDockerfile,
 		Variables:  templateVars,
@@ -445,14 +482,14 @@ func (dg *DockerfileGenerator) getDockerfileTemplateName(language, framework str
 
 // ManifestGenerator generates Kubernetes manifests using templates
 type ManifestGenerator struct {
-	templateManager *TemplateManager
+	templateService TemplateService
 	logger          *slog.Logger
 }
 
 // NewManifestGenerator creates a new manifest generator
 func NewManifestGenerator(logger *slog.Logger) *ManifestGenerator {
 	return &ManifestGenerator{
-		templateManager: NewTemplateManager(logger),
+		templateService: NewTemplateService(logger),
 		logger:          logger,
 	}
 }
@@ -496,7 +533,7 @@ func (mg *ManifestGenerator) GenerateManifest(params GenerateManifestParams) (*G
 	}
 
 	// Render template
-	renderResult, err := mg.templateManager.RenderTemplate(TemplateRenderParams{
+	renderResult, err := mg.templateService.RenderTemplate(TemplateRenderParams{
 		Name:       params.Type,
 		Type:       TemplateTypeManifest,
 		Variables:  templateVars,
@@ -543,4 +580,24 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// Backward compatibility methods for TemplateManager
+
+// RenderTemplate renders a template with variables
+func (tm *TemplateManager) RenderTemplate(params TemplateRenderParams) (*TemplateRenderResult, error) {
+	service := NewTemplateService(tm.logger)
+	return service.RenderTemplate(params)
+}
+
+// ListTemplates lists available templates by type
+func (tm *TemplateManager) ListTemplates(templateType TemplateType) ([]string, error) {
+	service := NewTemplateService(tm.logger)
+	return service.ListTemplates(templateType)
+}
+
+// GetTemplateMetadata gets metadata about a template
+func (tm *TemplateManager) GetTemplateMetadata(templateType TemplateType, name string) (*TemplateMetadata, error) {
+	service := NewTemplateService(tm.logger)
+	return service.GetTemplateMetadata(templateType, name)
 }

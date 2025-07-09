@@ -31,13 +31,13 @@ echo "================================================"
 # Function to report violation
 violation() {
     echo -e "${RED}❌ VIOLATION:${NC} $1"
-    ((VIOLATIONS++))
+    VIOLATIONS=$((VIOLATIONS + 1))
 }
 
 # Function to report warning
 warning() {
     echo -e "${YELLOW}⚠️  WARNING:${NC} $1"
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS + 1))
 }
 
 # Function to report success
@@ -188,20 +188,25 @@ echo ""
 echo -e "${BLUE}6. Interface Organization Validation${NC}"
 echo "-------------------------------------"
 
-# Check that interfaces are in ports package (not scattered)
-if [[ -f "$PKG_MCP_DIR/application/ports/interfaces.go" ]]; then
-    success "Canonical interfaces in application/ports/"
+# Check that interfaces are in api package (canonical location)
+if [[ -f "$PKG_MCP_DIR/application/api/interfaces.go" ]]; then
+    success "Canonical interfaces in application/api/"
 else
     if [[ -d "$PKG_MCP_DIR/application" ]]; then
-        warning "Interfaces not found in application/ports/ (may not be migrated yet)"
+        warning "Interfaces not found in application/api/ (may not be migrated yet)"
     fi
 fi
 
-# Check for scattered interface definitions
-INTERFACE_FILES=$(find "$PKG_MCP_DIR" -name "*interface*.go" ! -path "*/ports/*" 2>/dev/null | wc -l || echo "0")
+# Check for service interfaces in services package (dependency injection)
+if [[ -f "$PKG_MCP_DIR/application/services/interfaces.go" ]]; then
+    success "Service interfaces in application/services/ (dependency injection)"
+fi
+
+# Check for scattered interface definitions (excluding test files, implementation files, and service interfaces)
+INTERFACE_FILES=$(find "$PKG_MCP_DIR" -name "*interface*.go" ! -path "*/api/*" ! -path "*/services/*" ! -name "*_test.go" ! -name "*_implementation*.go" ! -name "*implementations*.go" 2>/dev/null | wc -l || echo "0")
 if [[ $INTERFACE_FILES -gt 0 ]]; then
-    warning "$INTERFACE_FILES interface files outside ports package"
-    find "$PKG_MCP_DIR" -name "*interface*.go" ! -path "*/ports/*" 2>/dev/null | head -3 | sed 's/^/    /'
+    warning "$INTERFACE_FILES interface files outside api package"
+    find "$PKG_MCP_DIR" -name "*interface*.go" ! -path "*/api/*" ! -path "*/services/*" ! -name "*_test.go" ! -name "*_implementation*.go" ! -name "*implementations*.go" 2>/dev/null | head -3 | sed 's/^/    /'
 fi
 
 # 7. BUILD TAG VALIDATION

@@ -23,6 +23,9 @@ type Server interface {
 	Stop() error
 	GetName() string
 	EnableConversationMode(config ConsolidatedConversationConfig) error
+	GetStats() (interface{}, error)
+	Shutdown(ctx context.Context) error
+	GetSessionManagerStats() (interface{}, error)
 }
 
 // RequestHandler interface for backward compatibility

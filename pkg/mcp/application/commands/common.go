@@ -10,6 +10,7 @@ import (
 type ValidationError struct {
 	Field   string
 	Message string
+	Code    string `json:"code,omitempty"`
 }
 
 func (e ValidationError) Error() string {

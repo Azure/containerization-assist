@@ -20,7 +20,7 @@ type ValidationRule struct {
 
 // NewBasicValidator creates a new unified basic validator for backward compatibility
 func NewBasicValidator(
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	logger zerolog.Logger,
 ) *BasicValidator {
 	unified := NewUnifiedBasicValidator(sessionManager, logger)
@@ -52,7 +52,7 @@ func makeDefaultRules() []ValidationRule {
 
 // UnifiedBasicValidator implements the unified validation framework
 type UnifiedBasicValidator struct {
-	sessionManager *session.SessionManager
+	sessionManager session.SessionManager
 	logger         zerolog.Logger
 	rules          []ValidationRule
 	name           string
@@ -60,7 +60,7 @@ type UnifiedBasicValidator struct {
 }
 
 // NewUnifiedBasicValidator creates a new unified basic validator
-func NewUnifiedBasicValidator(sessionManager *session.SessionManager, logger zerolog.Logger) *UnifiedBasicValidator {
+func NewUnifiedBasicValidator(sessionManager session.SessionManager, logger zerolog.Logger) *UnifiedBasicValidator {
 	return &UnifiedBasicValidator{
 		sessionManager: sessionManager,
 		logger:         logger.With().Str("component", "unified_basic_validator").Logger(),

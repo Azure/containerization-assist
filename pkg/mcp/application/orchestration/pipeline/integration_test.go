@@ -3,12 +3,13 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/config"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func TestPipelineIntegration(t *testing.T) {
 	}
 
 	// Create a test logger
-	logger := zerolog.New(zerolog.NewTestWriter(t))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// Create a pipeline manager
 	manager := NewManager(logger)
@@ -195,7 +196,7 @@ func TestWorkerLifecycle(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	logger := zerolog.New(zerolog.NewTestWriter(t))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// Create a test worker that tracks execution
 	var executionCount int64
@@ -249,4 +250,64 @@ func TestWorkerLifecycle(t *testing.T) {
 	// Allow stopped, stopping, or failed as all are valid end states
 	// Failed can happen if there are shutdown timeout issues
 	assert.Contains(t, []WorkerStatus{WorkerStatusStopped, WorkerStatusStopping, WorkerStatusFailed}, status)
+}
+
+// TestPipelineServiceContainerIntegration demonstrates the new service container approach
+func TestPipelineServiceContainerIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Create pipeline services using the new approach
+	pipelineServices := NewPipelineServices(slog.New(slog.NewTextHandler(nil, nil)))
+	require.NotNil(t, pipelineServices)
+
+	// Get the lifecycle service
+	lifecycle := pipelineServices.Lifecycle()
+	require.NotNil(t, lifecycle)
+
+	// Get worker registry
+	workerRegistry := pipelineServices.WorkerRegistry()
+	require.NotNil(t, workerRegistry)
+
+	// Get worker health monitor
+	workerHealth := pipelineServices.WorkerHealth()
+	require.NotNil(t, workerHealth)
+
+	// Get job scheduler
+	jobScheduler := pipelineServices.JobScheduler()
+	require.NotNil(t, jobScheduler)
+
+	// Get monitor
+	monitor := pipelineServices.Monitor()
+	require.NotNil(t, monitor)
+
+	// Get the underlying pipeline service directly
+	pipelineService := NewPipelineService(slog.Default())
+	require.NotNil(t, pipelineService)
+
+	// Test that the pipeline service can be started
+	err := pipelineService.Start()
+	require.NoError(t, err)
+
+	// Test that it reports as running
+	assert.True(t, pipelineService.IsRunning())
+
+	// Test configuration access
+	config := pipelineService.GetConfig()
+	require.NotNil(t, config)
+
+	// Test status access
+	status := pipelineService.GetStatus()
+	assert.True(t, status.IsRunning)
+
+	// Test health check
+	assert.True(t, pipelineService.IsHealthy())
+
+	// Stop the service
+	err = pipelineService.Stop()
+	require.NoError(t, err)
+
+	// Verify it's stopped
+	assert.False(t, pipelineService.IsRunning())
 }

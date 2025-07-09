@@ -19,6 +19,20 @@ type TrivyScanner struct {
 	trivyPath string
 }
 
+// Vulnerability represents a general security vulnerability
+type Vulnerability struct {
+	ID          string                 `json:"id"`
+	Severity    string                 `json:"severity"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Package     string                 `json:"package"`
+	Version     string                 `json:"version"`
+	FixedIn     string                 `json:"fixed_in,omitempty"`
+	CVSS        map[string]interface{} `json:"cvss,omitempty"`
+	References  []string               `json:"references,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+}
+
 // TrivyVulnerability represents a vulnerability from Trivy scan results
 type TrivyVulnerability = struct {
 	VulnerabilityID  string   `json:"VulnerabilityID"`

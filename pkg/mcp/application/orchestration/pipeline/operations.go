@@ -4,14 +4,14 @@ package pipeline
 import (
 	"log/slog"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
+	"github.com/Azure/container-kit/pkg/mcp/application"
 	sessionsvc "github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // NewOperations creates a new pipeline operations implementation
 func NewOperations(
-	sessionManager *sessionsvc.SessionManager,
-	clients *mcptypes.MCPClients,
+	sessionManager sessionsvc.SessionManager,
+	clients *application.MCPClients,
 	logger *slog.Logger,
 ) *Operations {
 	return createOperations(sessionManager, clients, logger)
@@ -19,8 +19,8 @@ func NewOperations(
 
 // createOperations is the common creation logic that initializes the Operations struct
 func createOperations(
-	sessionManager *sessionsvc.SessionManager,
-	clients *mcptypes.MCPClients,
+	sessionManager sessionsvc.SessionManager,
+	clients *application.MCPClients,
 	logger *slog.Logger,
 ) *Operations {
 	ops := &Operations{

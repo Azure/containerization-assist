@@ -268,7 +268,9 @@ func (h *HTTPLLMTransport) processHTTPResponse(ctx context.Context, resp *http.R
 
 // sendErrorResponse sends an error response through the channel
 func (h *HTTPLLMTransport) sendErrorResponse(ctx context.Context, responseCh chan<- json.RawMessage, errorMsg string) {
-	errorResponse := types.ToolInvocationResponse{
+	errorResponse := struct {
+		Error string `json:"error"`
+	}{
 		Error: errorMsg,
 	}
 
@@ -320,5 +322,5 @@ func (h *HTTPLLMTransport) IsConnected() bool {
 	return h.connected
 }
 
-// Ensure interface compliance
-var _ types.LLMTransport = (*HTTPLLMTransport)(nil)
+// TODO: Interface compliance check disabled due to internal package restriction
+// var _ types.LLMTransport = (*HTTPLLMTransport)(nil)

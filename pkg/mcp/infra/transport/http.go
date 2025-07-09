@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 	"github.com/go-chi/chi/v5"
@@ -18,10 +19,10 @@ import (
 // NewHTTPTransport creates a new HTTP transport
 func NewHTTPTransport(config HTTPTransportConfig) *HTTPTransport {
 	if config.Port == 0 {
-		config.Port = types.DefaultHTTPPort
+		config.Port = 8080
 	}
 	if config.RateLimit == 0 {
-		config.RateLimit = types.DefaultRateLimitPerMinute
+		config.RateLimit = 100 // Default rate limit per minute
 	}
 
 	transport := &HTTPTransport{
@@ -38,7 +39,7 @@ func NewHTTPTransport(config HTTPTransportConfig) *HTTPTransport {
 	}
 
 	if transport.maxBodyLogSize == 0 {
-		transport.maxBodyLogSize = types.DefaultMaxBodyLogSize
+		transport.maxBodyLogSize = 1024 * 1024 // 1MB default max body log size
 	}
 
 	transport.setupRouter()
@@ -92,7 +93,7 @@ func (t *HTTPTransport) setupMiddlewareChain() {
 
 	t.router.Use(t.loggingMiddleware)
 
-	t.router.Use(middleware.Timeout(types.HTTPTimeoutSeconds))
+	t.router.Use(middleware.Timeout(30 * time.Second))
 }
 
 // setupCORS creates CORS middleware
@@ -103,7 +104,7 @@ func (t *HTTPTransport) setupCORS() func(http.Handler) http.Handler {
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-API-Key"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
-		MaxAge:           int(types.CORSMaxAgeSeconds.Seconds()),
+		MaxAge:           300, // 5 minutes
 	}
 
 	if len(t.corsOrigins) == 0 || (len(t.corsOrigins) == 1 && t.corsOrigins[0] == "*") {
@@ -128,9 +129,9 @@ func (t *HTTPTransport) Serve(ctx context.Context) error {
 	t.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", t.port),
 		Handler:      t.router,
-		ReadTimeout:  types.HTTPTimeoutSeconds,
-		WriteTimeout: types.HTTPTimeoutSeconds,
-		IdleTimeout:  types.HTTPIdleTimeoutSeconds,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	errCh := make(chan error, 1)
@@ -162,7 +163,7 @@ func (t *HTTPTransport) Close() error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), types.HTTPTimeoutSeconds)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	t.logger.Info("Stopping HTTP transport")
@@ -176,21 +177,22 @@ func (t *HTTPTransport) SetHandler(handler core.RequestHandler) {
 }
 
 // HandleRequest handles MCP requests directly (consolidated from RequestHandler)
-func (t *HTTPTransport) HandleRequest(ctx context.Context, request *core.MCPRequest) (*core.MCPResponse, error) {
-	if t.handler == nil {
-		return nil, errors.NewError().Messagef("no request handler configured").Build()
-	}
-	result, err := t.handler.HandleRequest(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	// Type assert the result to MCPResponse
-	response, ok := result.(*core.MCPResponse)
-	if !ok {
-		return nil, errors.NewError().Messagef("handler returned unexpected type: expected *core.MCPResponse, got %T", result).Build()
-	}
-	return response, nil
-}
+// TODO: Fix MCPRequest and MCPResponse types
+// func (t *HTTPTransport) HandleRequest(ctx context.Context, request *core.MCPRequest) (*core.MCPResponse, error) {
+// 	if t.handler == nil {
+// 		return nil, errors.NewError().Messagef("no request handler configured").Build()
+// 	}
+// 	result, err := t.handler.HandleRequest(ctx, request)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	// Type assert the result to MCPResponse
+// 	response, ok := result.(*core.MCPResponse)
+// 	if !ok {
+// 		return nil, errors.NewError().Messagef("handler returned unexpected type: expected *core.MCPResponse, got %T", result).Build()
+// 	}
+// 	return response, nil
+// }
 
 // Start starts the HTTP transport
 func (t *HTTPTransport) Start() error {

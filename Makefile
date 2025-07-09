@@ -259,7 +259,7 @@ validate-structure:
 .PHONY: validate-interfaces
 validate-interfaces:
 	@echo "Running interface validation..."
-	@go run tools/validate-interfaces/main.go
+	@go run tools/validate-interfaces/*.go
 
 .PHONY: check-hygiene
 check-hygiene:

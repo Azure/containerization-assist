@@ -12,14 +12,14 @@ import (
 
 // AtomicOperationFramework provides foundation for atomic tool operations
 type AtomicOperationFramework struct {
-	sessionManager *session.SessionManager
+	sessionManager session.SessionManager
 	operations     *Operations
 	logger         zerolog.Logger
 }
 
 // NewAtomicOperationFramework creates a new atomic operation framework
 func NewAtomicOperationFramework(
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	operations *Operations,
 	logger zerolog.Logger,
 ) *AtomicOperationFramework {
@@ -241,7 +241,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 }
 
 // GetSessionManager returns the session manager for external access
-func (af *AtomicOperationFramework) GetSessionManager() *session.SessionManager {
+func (af *AtomicOperationFramework) GetSessionManager() session.SessionManager {
 	return af.sessionManager
 }
 

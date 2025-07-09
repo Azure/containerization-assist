@@ -354,7 +354,7 @@ type ToolInfo struct {
 	Description string
 }
 
-// HTTPTransport implements core.Transport for HTTP communication
+// HTTPTransport implements Transport for HTTP communication
 type HTTPTransport struct {
 	server         *http.Server
 	mcpServer      core.Server

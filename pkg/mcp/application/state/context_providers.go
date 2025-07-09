@@ -15,7 +15,7 @@ import (
 // BuildContextProvider provides build-related context
 type BuildContextProvider struct {
 	stateManager   *UnifiedStateManager
-	sessionManager *session.SessionManager
+	sessionManager session.SessionManager
 	knowledgeBase  *knowledge.CrossToolKnowledgeBase
 	logger         *slog.Logger
 }
@@ -23,7 +23,7 @@ type BuildContextProvider struct {
 // NewBuildContextProvider creates a new build context provider
 func NewBuildContextProvider(
 	stateManager *UnifiedStateManager,
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	knowledgeBase *knowledge.CrossToolKnowledgeBase,
 	logger *slog.Logger,
 ) ContextProvider {
@@ -51,7 +51,7 @@ func (p *BuildContextProvider) GetContext(ctx context.Context, request *ContextR
 		Confidence: 0.9,
 	}
 
-	sessionState, err := p.sessionManager.GetSessionConcrete(request.SessionID)
+	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
 			codes.SYSTEM_ERROR,
@@ -65,12 +65,12 @@ func (p *BuildContextProvider) GetContext(ctx context.Context, request *ContextR
 	}
 
 	if sessionState != nil {
-		if sessionState.Dockerfile.Content != "" {
+		if sessionState.DockerfileGenerated {
 			data.Data["docker_build"] = map[string]interface{}{
-				"dockerfile_generated": true,
-				"dockerfile_path":      sessionState.Dockerfile.Path,
-				"image_built":          sessionState.Dockerfile.Built,
-				"image_ref":            sessionState.ImageRef.String(),
+				"dockerfile_generated": sessionState.DockerfileGenerated,
+				"dockerfile_path":      sessionState.DockerfilePath,
+				"image_built":          sessionState.ImageBuilt,
+				"image_ref":            sessionState.ImageRef,
 			}
 		}
 	}
@@ -126,14 +126,14 @@ func (p *BuildContextProvider) GetName() string {
 // DeploymentContextProvider provides deployment-related context
 type DeploymentContextProvider struct {
 	stateManager   *UnifiedStateManager
-	sessionManager *session.SessionManager
+	sessionManager session.SessionManager
 	logger         *slog.Logger
 }
 
 // NewDeploymentContextProvider creates a new deployment context provider
 func NewDeploymentContextProvider(
 	stateManager *UnifiedStateManager,
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	logger *slog.Logger,
 ) ContextProvider {
 	return &DeploymentContextProvider{
@@ -159,7 +159,7 @@ func (p *DeploymentContextProvider) GetContext(ctx context.Context, request *Con
 		Confidence: 0.85,
 	}
 
-	sessionState, err := p.sessionManager.GetSessionConcrete(request.SessionID)
+	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
 			codes.SYSTEM_ERROR,
@@ -173,15 +173,11 @@ func (p *DeploymentContextProvider) GetContext(ctx context.Context, request *Con
 	}
 
 	if sessionState != nil {
-		if len(sessionState.K8sManifests) > 0 {
-			manifestNames := make([]string, 0, len(sessionState.K8sManifests))
-			for name := range sessionState.K8sManifests {
-				manifestNames = append(manifestNames, name)
-			}
+		if len(sessionState.ManifestPaths) > 0 {
 			data.Data["kubernetes"] = map[string]interface{}{
-				"manifests_count": len(sessionState.K8sManifests),
-				"namespaces":      p.extractNamespaces(manifestNames),
-				"resource_types":  p.extractResourceTypes(manifestNames),
+				"manifests_count": len(sessionState.ManifestPaths),
+				"namespaces":      p.extractNamespaces(sessionState.ManifestPaths),
+				"resource_types":  p.extractResourceTypes(sessionState.ManifestPaths),
 			}
 		}
 	}
@@ -235,14 +231,14 @@ func (p *DeploymentContextProvider) extractResourceTypes(manifests []string) []s
 // SecurityContextProvider provides security-related context
 type SecurityContextProvider struct {
 	stateManager   *UnifiedStateManager
-	sessionManager *session.SessionManager
+	sessionManager session.SessionManager
 	logger         *slog.Logger
 }
 
 // NewSecurityContextProvider creates a new security context provider
 func NewSecurityContextProvider(
 	stateManager *UnifiedStateManager,
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	logger *slog.Logger,
 ) ContextProvider {
 	return &SecurityContextProvider{
@@ -268,7 +264,7 @@ func (p *SecurityContextProvider) GetContext(ctx context.Context, request *Conte
 		Confidence: 0.8,
 	}
 
-	sessionState, err := p.sessionManager.GetSessionConcrete(request.SessionID)
+	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
 			codes.SYSTEM_ERROR,
@@ -287,15 +283,14 @@ func (p *SecurityContextProvider) GetContext(ctx context.Context, request *Conte
 				"success":         sessionState.SecurityScan.Success,
 				"scanned_at":      sessionState.SecurityScan.ScannedAt,
 				"scanner":         sessionState.SecurityScan.Scanner,
-				"critical_issues": sessionState.SecurityScan.Summary.Critical,
-				"high_issues":     sessionState.SecurityScan.Summary.High,
-				"total_issues":    sessionState.SecurityScan.Summary.Total,
-				"fixable_count":   sessionState.SecurityScan.Fixable,
+				"critical_issues": sessionState.SecurityScan.CriticalCount,
+				"high_issues":     sessionState.SecurityScan.HighCount,
+				"total_issues":    len(sessionState.SecurityScan.VulnerabilityList),
 			}
 
-			if sessionState.SecurityScan.Summary.Critical > 0 {
+			if sessionState.SecurityScan.CriticalCount > 0 {
 				data.Relevance = 1.0
-			} else if sessionState.SecurityScan.Summary.High > 0 {
+			} else if sessionState.SecurityScan.HighCount > 0 {
 				data.Relevance = 0.9
 			}
 		}
@@ -326,7 +321,7 @@ func (p *SecurityContextProvider) GetName() string {
 // PerformanceContextProvider provides performance-related context
 type PerformanceContextProvider struct {
 	stateManager     *UnifiedStateManager
-	sessionManager   *session.SessionManager
+	sessionManager   session.SessionManager
 	metricsCollector *MetricsCollector
 	logger           *slog.Logger
 }
@@ -352,7 +347,7 @@ type PerformanceMetrics struct {
 // NewPerformanceContextProvider creates a new performance context provider
 func NewPerformanceContextProvider(
 	stateManager *UnifiedStateManager,
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	logger *slog.Logger,
 ) ContextProvider {
 	return &PerformanceContextProvider{
@@ -379,7 +374,7 @@ func (p *PerformanceContextProvider) GetContext(ctx context.Context, request *Co
 		Confidence: 0.9,
 	}
 
-	sessionState, err := p.sessionManager.GetSessionConcrete(request.SessionID)
+	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
 			codes.SYSTEM_ERROR,
@@ -394,21 +389,15 @@ func (p *PerformanceContextProvider) GetContext(ctx context.Context, request *Co
 
 	if sessionState != nil {
 		data.Data["resource_usage"] = map[string]interface{}{
-			"token_usage":      sessionState.TokenUsage,
-			"disk_space_bytes": sessionState.DiskUsage,
-			"max_disk_usage":   sessionState.MaxDiskUsage,
-			"jobs_active":      sessionState.GetActiveJobCount(),
+			"session_id":    sessionState.SessionID,
+			"status":        sessionState.Status,
+			"current_stage": sessionState.CurrentStage,
+			"errors_count":  len(sessionState.Errors),
 		}
 
-		if sessionState.MaxDiskUsage > 0 {
-			diskUsagePercent := float64(sessionState.DiskUsage) / float64(sessionState.MaxDiskUsage)
-			data.Data["usage_percentages"] = map[string]float64{
-				"disk_usage": diskUsagePercent,
-			}
-
-			if diskUsagePercent > 0.8 {
-				data.Relevance = 0.95
-			}
+		// Basic relevance based on session state
+		if len(sessionState.Errors) > 0 {
+			data.Relevance = 0.95
 		}
 	}
 

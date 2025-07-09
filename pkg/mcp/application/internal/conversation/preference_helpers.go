@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
-func (pm *PromptManager) extractRepositoryReference(input string) string {
+func (ps *PromptServiceImpl) extractRepositoryReference(input string) string {
 
 	patterns := []string{
 		`https?://github\.com/[\w-]+/[\w-]+`,
@@ -25,7 +27,7 @@ func (pm *PromptManager) extractRepositoryReference(input string) string {
 	return ""
 }
 
-func (pm *PromptManager) extractDockerfilePreferences(state *ConversationState, input string) {
+func (ps *PromptServiceImpl) extractDockerfilePreferences(state *ConversationState, input string) {
 	lower := strings.ToLower(input)
 
 	if strings.Contains(lower, "size") || strings.Contains(lower, "small") {
@@ -41,7 +43,7 @@ func (pm *PromptManager) extractDockerfilePreferences(state *ConversationState, 
 	}
 }
 
-func (pm *PromptManager) getStringSliceFromMap(m map[string]interface{}, key string, defaultValue []string) []string {
+func (ps *PromptServiceImpl) getStringSliceFromMap(m map[string]interface{}, key string, defaultValue []string) []string {
 	if val, ok := m[key].([]interface{}); ok {
 		result := make([]string, 0, len(val))
 		for _, v := range val {
@@ -53,7 +55,7 @@ func (pm *PromptManager) getStringSliceFromMap(m map[string]interface{}, key str
 	}
 	return defaultValue
 }
-func (pm *PromptManager) handlePendingDecision(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+func (ps *PromptServiceImpl) handlePendingDecision(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 	decision := state.PendingDecision
 	var selectedOption *Option
 	lower := strings.ToLower(input)
@@ -97,11 +99,11 @@ func (pm *PromptManager) handlePendingDecision(ctx context.Context, state *Conve
 		state.ResolvePendingDecision(userDecision)
 	}
 
-	if state.CurrentStage == core.ConversationStageBuild {
+	if state.CurrentStage == shared.StageBuild {
 
 		if detailedStage, ok := state.Context["detailed_stage"].(string); ok &&
-			types.ConversationStage(detailedStage) == types.StageDockerfile {
-			return pm.generateDockerfile(ctx, state)
+			shared.ConversationStage(detailedStage) == shared.StageDockerfile {
+			return ps.generateDockerfile(ctx, state)
 		}
 	}
 
@@ -112,7 +114,7 @@ func (pm *PromptManager) handlePendingDecision(ctx context.Context, state *Conve
 	}
 }
 
-func (pm *PromptManager) generateSummary(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) generateSummary(_ context.Context, state *ConversationState) *ConversationResponse {
 	var summary strings.Builder
 	summary.WriteString("📊 Deployment Summary\n")
 	summary.WriteString("===================\n\n")
@@ -142,12 +144,12 @@ func (pm *PromptManager) generateSummary(ctx context.Context, state *Conversatio
 
 	return &ConversationResponse{
 		Message: summary.String(),
-		Stage:   convertFromTypesStage(types.StageCompleted),
+		Stage:   shared.StageCompleted,
 		Status:  ResponseStatusSuccess,
 	}
 }
 
-func (pm *PromptManager) exportArtifacts(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) exportArtifacts(_ context.Context, state *ConversationState) *ConversationResponse {
 	var exports strings.Builder
 	exports.WriteString("📦 Exportable Artifacts\n")
 	exports.WriteString("=====================\n\n")
@@ -168,7 +170,7 @@ func (pm *PromptManager) exportArtifacts(ctx context.Context, state *Conversatio
 
 	return &ConversationResponse{
 		Message: exports.String(),
-		Stage:   convertFromTypesStage(types.StageCompleted),
+		Stage:   shared.StageCompleted,
 		Status:  ResponseStatusSuccess,
 	}
 }

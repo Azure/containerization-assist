@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 	"github.com/localrivet/gomcp/server"
@@ -124,21 +125,22 @@ func (s *StdioTransport) SetHandler(handler core.RequestHandler) {
 }
 
 // HandleRequest handles MCP requests directly (consolidated from RequestHandler)
-func (s *StdioTransport) HandleRequest(ctx context.Context, request *core.MCPRequest) (*core.MCPResponse, error) {
-	if s.handler == nil {
-		return nil, errors.NewError().Messagef("no request handler configured").Build()
-	}
-	result, err := s.handler.HandleRequest(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	// Type assert the result to MCPResponse
-	response, ok := result.(*core.MCPResponse)
-	if !ok {
-		return nil, errors.NewError().Messagef("handler returned unexpected type: expected *core.MCPResponse, got %T", result).Build()
-	}
-	return response, nil
-}
+// TODO: Fix MCPRequest and MCPResponse types
+// func (s *StdioTransport) HandleRequest(ctx context.Context, request *core.MCPRequest) (*core.MCPResponse, error) {
+// 	if s.handler == nil {
+// 		return nil, errors.NewError().Messagef("no request handler configured").Build()
+// 	}
+// 	result, err := s.handler.HandleRequest(ctx, request)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	// Type assert the result to MCPResponse
+// 	response, ok := result.(*core.MCPResponse)
+// 	if !ok {
+// 		return nil, errors.NewError().Messagef("handler returned unexpected type: expected *core.MCPResponse, got %T", result).Build()
+// 	}
+// 	return response, nil
+// }
 
 // Start starts the stdio transport - alias for Serve
 func (s *StdioTransport) Start() error {

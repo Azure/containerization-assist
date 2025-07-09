@@ -70,7 +70,7 @@ func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatT
 		}
 
 		return &ChatToolResult{
-			BaseToolResponse: types.NewBaseResponse("chat", args.SessionID, args.DryRun),
+			BaseToolResponse: shared.NewBaseResponse("chat", args.SessionID, args.DryRun),
 			Success:          false,
 			Message:          errorMessage,
 			Status:           "validation_error",
@@ -81,7 +81,7 @@ func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatT
 	if err != nil {
 		ct.Logger.Error().Err(err).Msg("Chat handler error")
 		return &ChatToolResult{
-			BaseToolResponse: types.NewBaseResponse("chat", args.SessionID, args.DryRun),
+			BaseToolResponse: shared.NewBaseResponse("chat", args.SessionID, args.DryRun),
 			Success:          false,
 			Message:          fmt.Sprintf("Error: %v", err),
 		}, nil

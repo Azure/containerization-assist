@@ -1,155 +1,151 @@
 graph TD
-    %% Container Kit MCP - Actual Current Architecture
-    %% Reflects the real codebase structure after GAMMA workstream completion
+    %% Container Kit MCP - Three-Layer Architecture
+    %% Updated to reflect actual codebase structure per ADR-001
 
-    Client[MCP Client] --> Transport[transport/]
-    Transport --> Core[core/]
-    Core --> API[api/]
+    Client[MCP Client] --> Transport[infra/transport/]
+    Transport --> Server[application/core/]
+    Server --> API[application/api/]
 
-    subgraph "Layer 1: Interface Definitions"
-        API[api/<br/>Single Source of Truth<br/>All Canonical Interfaces]
-    end
+    subgraph "Domain Layer (Business Logic)"
+        Domain[domain/]
 
-    subgraph "Layer 2: Core Services"
-        Core[core/<br/>Server & Registry]
-        CoreSub[core/config<br/>core/conversation<br/>core/registry<br/>core/state<br/>core/tools<br/>core/types]
-        Session[session/<br/>State & Persistence]
-
-        Core --> CoreSub
-        Core --> Session
-    end
-
-    subgraph "Layer 3: Business Logic"
-        Tools[tools/<br/>Domain Operations]
-        Workflow[workflow/<br/>Orchestration]
-
-        subgraph "Tool Domains"
-            Analyze[tools/analyze<br/>Repository Analysis]
-            Build[tools/build<br/>Docker Operations]
-            Deploy[tools/deploy<br/>Kubernetes Deploy]
-            Scan[tools/scan<br/>Security Scanning]
-            Detectors[tools/detectors<br/>Framework Detection]
+        subgraph "Domain Packages"
+            Config[domain/config/<br/>Configuration Rules]
+            Containerization[domain/containerization/<br/>analyze/, build/, deploy/, scan/]
+            Errors[domain/errors/<br/>Rich Error System]
+            Security[domain/security/<br/>Validation & Policies]
+            Session[domain/session/<br/>Session Rules]
+            Types[domain/types/<br/>Core Types]
+            Workflow[domain/workflow/<br/>Workflow Logic]
+            Internal[domain/internal/<br/>common/, utils/, types/]
         end
 
-        Tools --> Analyze
-        Tools --> Build
-        Tools --> Deploy
-        Tools --> Scan
-        Tools --> Detectors
-        Workflow --> Tools
+        Domain --> Config
+        Domain --> Containerization
+        Domain --> Errors
+        Domain --> Security
+        Domain --> Session
+        Domain --> Types
+        Domain --> Workflow
+        Domain --> Internal
     end
 
-    subgraph "Layer 4: Infrastructure"
-        Transport[transport/<br/>MCP Protocol<br/>HTTP & stdio]
-        Storage[storage/<br/>BoltDB Persistence]
-        Security[security/<br/>Validation & Scanning]
-        SecuritySub[security/scanner<br/>security/validators]
-        Templates[templates/<br/>K8s Manifests]
-        Server[server/<br/>MCP Server Impl]
+    subgraph "Application Layer (Use Cases & Orchestration)"
+        Application[application/]
 
-        Security --> SecuritySub
-    end
-
-    subgraph "Layer 5: Support Systems"
-        Errors[errors/<br/>Unified Error System]
-        ErrorCodes[errors/codes<br/>Domain Error Codes]
-
-        Errors --> ErrorCodes
-    end
-
-    subgraph "Layer 6: Internal Utilities"
-        Internal[internal/<br/>Shared Components]
-
-        subgraph "Internal Packages"
-            Common[internal/common]
-            Config[internal/config]
-            Constants[internal/constants]
-            Conversation[internal/conversation]
-            Logging[internal/logging]
-            Pipeline[internal/pipeline]
-            Processing[internal/processing]
-            Retry[internal/retry]
-            Runtime[internal/runtime]
-            Types[internal/types]
-            Utils[internal/utils]
+        subgraph "Application Packages"
+            API[application/api/<br/>Canonical Interfaces<br/>Single Source of Truth]
+            Commands[application/commands/<br/>Command Implementations]
+            Core[application/core/<br/>Server & Registry]
+            Orchestration[application/orchestration/<br/>Pipeline & Workflow]
+            Services[application/services/<br/>Service Interfaces]
+            State[application/state/<br/>State Management]
+            Tools[application/tools/<br/>Tool Implementations]
+            Workflows[application/workflows/<br/>Workflow Engine]
+            AppInternal[application/internal/<br/>conversation/, runtime/, retry/]
         end
 
-        Internal --> Common
-        Internal --> Config
-        Internal --> Constants
-        Internal --> Conversation
-        Internal --> Logging
-        Internal --> Pipeline
-        Internal --> Processing
-        Internal --> Retry
-        Internal --> Runtime
-        Internal --> Types
-        Internal --> Utils
+        Application --> API
+        Application --> Commands
+        Application --> Core
+        Application --> Orchestration
+        Application --> Services
+        Application --> State
+        Application --> Tools
+        Application --> Workflows
+        Application --> AppInternal
     end
 
-    %% Layer Dependencies (allowed)
-    Core --> API
-    Tools --> API
-    Tools --> Session
-    Tools --> Security
-    Tools --> Errors
-    Workflow --> API
-    Workflow --> Session
-    Transport --> Core
-    Transport --> Server
-    Session --> Storage
-    Security --> Errors
+    subgraph "Infrastructure Layer (External Integrations)"
+        Infrastructure[infra/]
 
-    %% All packages can use internal utilities
-    Core --> Internal
-    Tools --> Internal
-    Session --> Internal
-    Workflow --> Internal
-    Transport --> Internal
-    Storage --> Internal
-    Security --> Internal
-    Server --> Internal
-    Errors --> Internal
+        subgraph "Infrastructure Packages"
+            Adapters[infra/adapters/<br/>Interface Adapters]
+            Docker[infra/docker/<br/>Docker Integration]
+            K8s[infra/k8s/<br/>Kubernetes Integration]
+            Persistence[infra/persistence/<br/>BoltDB Storage]
+            Telemetry[infra/telemetry/<br/>Monitoring]
+            Templates[infra/templates/<br/>YAML Templates]
+            Transport[infra/transport/<br/>MCP Protocol]
+            InfraInternal[infra/internal/<br/>logging/, migration/]
+        end
+
+        Infrastructure --> Adapters
+        Infrastructure --> Docker
+        Infrastructure --> K8s
+        Infrastructure --> Persistence
+        Infrastructure --> Telemetry
+        Infrastructure --> Templates
+        Infrastructure --> Transport
+        Infrastructure --> InfraInternal
+    end
+
+    %% Dependency Rules (per ADR-001)
+    %% Application can depend on Domain
+    API --> Domain
+    Commands --> Domain
+    Core --> Domain
+    Orchestration --> Domain
+    Services --> Domain
+    State --> Domain
+    Tools --> Domain
+    Workflows --> Domain
+    AppInternal --> Domain
+
+    %% Infrastructure can depend on Application and Domain
+    Adapters --> Application
+    Adapters --> Domain
+    Docker --> Application
+    K8s --> Application
+    Persistence --> Application
+    Telemetry --> Application
+    Templates --> Application
+    Transport --> Application
+    InfraInternal --> Domain
+
+    %% Service Container Pattern (ADR-006)
+    subgraph "Service Container (Dependency Injection)"
+        ServiceContainer[ServiceContainer]
+        SessionStore[SessionStore]
+        SessionState[SessionState]
+        BuildExecutor[BuildExecutor]
+        ToolRegistry[ToolRegistry]
+        WorkflowExecutor[WorkflowExecutor]
+        Scanner[Scanner]
+        ConfigValidator[ConfigValidator]
+        ErrorReporter[ErrorReporter]
+    end
+
+    Core --> ServiceContainer
+    ServiceContainer --> SessionStore
+    ServiceContainer --> SessionState
+    ServiceContainer --> BuildExecutor
+    ServiceContainer --> ToolRegistry
+    ServiceContainer --> WorkflowExecutor
+    ServiceContainer --> Scanner
+    ServiceContainer --> ConfigValidator
+    ServiceContainer --> ErrorReporter
 
     %% External Systems Integration
-    Tools --> Docker[Docker Engine]
-    Tools --> Registry[Container Registry]
-    Deploy --> K8s[Kubernetes API]
-    Storage --> BoltDB[BoltDB Files]
-    Scan --> Trivy[Trivy Scanner]
-    Scan --> Grype[Grype Scanner]
+    Docker --> DockerEngine[Docker Engine]
+    K8s --> KubernetesAPI[Kubernetes API]
+    Persistence --> BoltDB[BoltDB Files]
+    Scanner --> Trivy[Trivy Scanner]
+    Scanner --> Grype[Grype Scanner]
 
-    %% Service Container Pattern
-    Server --> ServiceContainer[Service Container<br/>Dependency Injection]
-    ServiceContainer --> SessionStore[SessionStore]
-    ServiceContainer --> SessionState[SessionState]
-    ServiceContainer --> BuildExecutor[BuildExecutor]
-    ServiceContainer --> ToolRegistry[ToolRegistry]
-    ServiceContainer --> WorkflowExecutor[WorkflowExecutor]
-    ServiceContainer --> Scanner[Scanner]
-    ServiceContainer --> ConfigValidator[ConfigValidator]
-    ServiceContainer --> ErrorReporter[ErrorReporter]
+    %% Architecture Validation
+    %% - Domain depends on nothing
+    %% - Application depends only on Domain
+    %% - Infrastructure depends on Application and Domain
 
-    %% Forbidden Dependencies (enforced by architecture boundaries)
-    %% - API depends on nothing (pure interfaces)
-    %% - Tools cannot depend on Core directly (use API)
-    %% - Core cannot depend on Tools directly (use API)
-    %% - Internal cannot depend on any higher layer
-
-    classDef interfaceLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
-    classDef coreLayer fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    classDef businessLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    classDef infraLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
-    classDef supportLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef internalLayer fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef domainLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
+    classDef applicationLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
+    classDef infraLayer fill:#fff3e0,stroke:#ef6c00,stroke-width:3px
     classDef serviceLayer fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
     classDef externalSys fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
 
-    class API interfaceLayer
-    class Core,CoreSub,Session coreLayer
-    class Tools,Workflow,Analyze,Build,Deploy,Scan,Detectors businessLayer
-    class Transport,Storage,Security,SecuritySub,Templates,Server infraLayer
-    class Errors,ErrorCodes supportLayer
-    class Internal,Common,Config,Constants,Conversation,Logging,Pipeline,Processing,Retry,Runtime,Types,Utils internalLayer
+    class Domain,Config,Containerization,Errors,Security,Session,Types,Workflow,Internal domainLayer
+    class Application,API,Commands,Core,Orchestration,Services,State,Tools,Workflows,AppInternal applicationLayer
+    class Infrastructure,Adapters,Docker,K8s,Persistence,Telemetry,Templates,Transport,InfraInternal infraLayer
     class ServiceContainer,SessionStore,SessionState,BuildExecutor,ToolRegistry,WorkflowExecutor,Scanner,ConfigValidator,ErrorReporter serviceLayer
-    class Docker,Registry,K8s,BoltDB,Trivy,Grype externalSys
+    class DockerEngine,KubernetesAPI,BoltDB,Trivy,Grype externalSys

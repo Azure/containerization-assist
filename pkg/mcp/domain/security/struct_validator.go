@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
@@ -19,6 +20,7 @@ type StructValidator struct {
 	parser     *TagParser
 	validators map[reflect.Type]StructValidatorFunc
 	options    StructValidationOptions
+	mutex      sync.RWMutex
 }
 
 // UnifiedStructValidator implements the unified validation framework for struct validation
@@ -123,7 +125,10 @@ func (sv *StructValidator) ValidateStruct(ctx context.Context, structPtr interfa
 func (sv *StructValidator) getValidatorFunc(structType reflect.Type) (StructValidatorFunc, error) {
 	// Check cache if enabled
 	if sv.options.CacheRules {
-		if validator, exists := sv.validators[structType]; exists {
+		sv.mutex.RLock()
+		validator, exists := sv.validators[structType]
+		sv.mutex.RUnlock()
+		if exists {
 			return validator, nil
 		}
 	}
@@ -139,7 +144,9 @@ func (sv *StructValidator) getValidatorFunc(structType reflect.Type) (StructVali
 
 	// Cache if enabled
 	if sv.options.CacheRules {
+		sv.mutex.Lock()
 		sv.validators[structType] = validator
+		sv.mutex.Unlock()
 	}
 
 	return validator, nil

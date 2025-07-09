@@ -41,8 +41,9 @@ func (h *StdioErrorHandler) HandleToolError(ctx context.Context, toolName string
 		return h.handleRichError(typedErr, toolName), nil
 	case *errors.CoreError:
 		return h.handleCoreError(typedErr, toolName), nil
-	case *types.ToolError:
-		return h.handleToolError(typedErr, toolName), nil
+	// TODO: Fix types.ToolError reference
+	// case *types.ToolError:
+	// 	return h.handleToolError(typedErr, toolName), nil
 	case *server.InvalidParametersError:
 		return nil, h.createInvalidParametersError(typedErr.Message)
 	default:
@@ -117,28 +118,29 @@ func (h *StdioErrorHandler) handleRichError(richErr *errors.RichError, toolName 
 }
 
 // handleToolError creates an error response from ToolError
-func (h *StdioErrorHandler) handleToolError(toolErr *types.ToolError, toolName string) interface{} {
-	return map[string]interface{}{
-		"content": []map[string]interface{}{
-			{
-				"type": "text",
-				"text": h.formatToolErrorMessage(toolErr),
-			},
-		},
-		"isError": true,
-		"error": map[string]interface{}{
-			"type":        toolErr.Type,
-			"message":     toolErr.Message,
-			"retryable":   toolErr.Retryable,
-			"retry_count": toolErr.RetryCount,
-			"max_retries": toolErr.MaxRetries,
-			"suggestions": toolErr.Suggestions,
-			"tool":        toolName,
-			"timestamp":   toolErr.Timestamp,
-			"context":     toolErr.Context,
-		},
-	}
-}
+// TODO: Fix types.ToolError reference
+// func (h *StdioErrorHandler) handleToolError(toolErr *types.ToolError, toolName string) interface{} {
+// 	return map[string]interface{}{
+// 		"content": []map[string]interface{}{
+// 			{
+// 				"type": "text",
+// 				"text": h.formatToolErrorMessage(toolErr),
+// 			},
+// 		},
+// 		"isError": true,
+// 		"error": map[string]interface{}{
+// 			"type":        toolErr.Type,
+// 			"message":     toolErr.Message,
+// 			"retryable":   toolErr.Retryable,
+// 			"retry_count": toolErr.RetryCount,
+// 			"max_retries": toolErr.MaxRetries,
+// 			"suggestions": toolErr.Suggestions,
+// 			"tool":        toolName,
+// 			"timestamp":   toolErr.Timestamp,
+// 			"context":     toolErr.Context,
+// 		},
+// 	}
+// }
 
 // createCancellationResponse creates a response for cancelled operations
 func (h *StdioErrorHandler) createCancellationResponse(ctxErr error, toolName string) interface{} {
@@ -204,30 +206,31 @@ func (h *StdioErrorHandler) formatRichErrorMessage(richErr *errors.RichError) st
 }
 
 // formatToolErrorMessage creates a user-friendly error message from ToolError
-func (h *StdioErrorHandler) formatToolErrorMessage(toolErr *types.ToolError) string {
-	var msg strings.Builder
+// TODO: Fix types.ToolError reference
+// func (h *StdioErrorHandler) formatToolErrorMessage(toolErr *types.ToolError) string {
+// 	var msg strings.Builder
 
-	// Start with the basic error
-	msg.WriteString(fmt.Sprintf("❌ %s: %s\n", toolErr.Type, toolErr.Message))
+// 	// Start with the basic error
+// 	msg.WriteString(fmt.Sprintf("❌ %s: %s\n", toolErr.Type, toolErr.Message))
 
-	// Add retry information
-	if toolErr.Retryable {
-		msg.WriteString(fmt.Sprintf("\n🔄 Retryable: %d/%d attempts\n",
-			toolErr.RetryCount, toolErr.MaxRetries))
-	}
+// 	// Add retry information
+// 	if toolErr.Retryable {
+// 		msg.WriteString(fmt.Sprintf("\n🔄 Retryable: %d/%d attempts\n",
+// 			toolErr.RetryCount, toolErr.MaxRetries))
+// 	}
 
-	// Add suggestions
-	if len(toolErr.Suggestions) > 0 {
-		msg.WriteString("\n💡 Suggestions:\n")
-		for i, suggestion := range toolErr.Suggestions {
-			if i < 3 { // Limit to top 3 suggestions
-				msg.WriteString(fmt.Sprintf("  • %s\n", suggestion))
-			}
-		}
-	}
+// 	// Add suggestions
+// 	if len(toolErr.Suggestions) > 0 {
+// 		msg.WriteString("\n💡 Suggestions:\n")
+// 		for i, suggestion := range toolErr.Suggestions {
+// 			if i < 3 { // Limit to top 3 suggestions
+// 				msg.WriteString(fmt.Sprintf("  • %s\n", suggestion))
+// 			}
+// 		}
+// 	}
 
-	return msg.String()
-}
+// 	return msg.String()
+// }
 
 // formatCoreErrorMessage creates a user-friendly error message from CoreError
 func (h *StdioErrorHandler) formatCoreErrorMessage(coreErr *errors.CoreError) string {

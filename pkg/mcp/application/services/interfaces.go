@@ -8,8 +8,22 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
+
+// PipelineService defines the interface for pipeline orchestration without importing the concrete type
+type PipelineService interface {
+	// Lifecycle management
+	Start() error
+	Stop() error
+	IsRunning() bool
+
+	// Job management
+	CancelJob(jobID string) error
+}
 
 // ServiceContainer provides access to all services through dependency injection.
 // This is the central interface for wiring services together.
@@ -31,6 +45,149 @@ type ServiceContainer interface {
 	Analyzer() Analyzer
 	Persistence() Persistence
 	Logger() *slog.Logger
+
+	// Conversation services
+	ConversationService() ConversationService
+	PromptService() PromptService
+
+	// Infrastructure services
+	DockerService() docker.Service
+	ManifestService() kubernetes.ManifestService
+	DeploymentService() kubernetes.Service
+	PipelineService() PipelineService
+}
+
+// ConversationService handles chat-based interactions per ADR-006
+type ConversationService interface {
+	// ProcessMessage handles a user message in a conversation
+	ProcessMessage(ctx context.Context, sessionID, message string) (*ConversationResponse, error)
+
+	// GetConversationState returns the current conversation state
+	GetConversationState(sessionID string) (*ConversationState, error)
+
+	// UpdateConversationStage updates the conversation stage
+	UpdateConversationStage(sessionID string, stage shared.ConversationStage) error
+
+	// GetConversationHistory returns conversation history
+	GetConversationHistory(sessionID string, limit int) ([]ConversationTurn, error)
+
+	// ClearConversationContext clears conversation context
+	ClearConversationContext(sessionID string) error
+}
+
+// PromptService manages AI prompt interactions per ADR-006
+type PromptService interface {
+	// BuildPrompt creates a prompt for the given stage and context
+	BuildPrompt(stage shared.ConversationStage, context map[string]interface{}) (string, error)
+
+	// ProcessPromptResponse processes AI response and updates state
+	ProcessPromptResponse(response string, state *ConversationState) error
+
+	// DetectWorkflowIntent detects if message indicates workflow intent
+	DetectWorkflowIntent(message string) (*WorkflowIntent, error)
+
+	// ShouldAutoAdvance determines if conversation should auto-advance
+	ShouldAutoAdvance(state *ConversationState) (bool, *AutoAdvanceConfig)
+}
+
+// ConversationResponse represents a response from the conversation service
+type ConversationResponse struct {
+	SessionID     string                    `json:"session_id"`
+	Message       string                    `json:"message"`
+	Stage         shared.ConversationStage  `json:"stage"`
+	Status        string                    `json:"status"`
+	Options       []Option                  `json:"options,omitempty"`
+	Artifacts     []ArtifactSummary         `json:"artifacts,omitempty"`
+	NextSteps     []string                  `json:"next_steps,omitempty"`
+	Progress      *StageProgress            `json:"progress,omitempty"`
+	ToolCalls     []ToolCall                `json:"tool_calls,omitempty"`
+	RequiresInput bool                      `json:"requires_input"`
+	NextStage     *shared.ConversationStage `json:"next_stage,omitempty"`
+	AutoAdvance   *AutoAdvanceConfig        `json:"auto_advance,omitempty"`
+}
+
+// ConversationState represents the state of a conversation
+type ConversationState struct {
+	SessionID        string                   `json:"session_id"`
+	CurrentStage     shared.ConversationStage `json:"current_stage"`
+	History          []ConversationTurn       `json:"conversation_history"`
+	Preferences      shared.UserPreferences   `json:"user_preferences"`
+	PendingDecision  *DecisionPoint           `json:"pending_decision,omitempty"`
+	WorkflowSession  *WorkflowSession         `json:"workflow_session,omitempty"`
+	LastActivity     time.Time                `json:"last_activity"`
+	RetryState       *RetryState              `json:"retry_state,omitempty"`
+	AutoAdvanceState *AutoAdvanceState        `json:"auto_advance_state,omitempty"`
+}
+
+// ConversationTurn represents a single turn in a conversation
+type ConversationTurn struct {
+	ID        string                   `json:"id"`
+	Timestamp time.Time                `json:"timestamp"`
+	Role      string                   `json:"role"`
+	Content   string                   `json:"content"`
+	Stage     shared.ConversationStage `json:"stage"`
+	Metadata  map[string]interface{}   `json:"metadata,omitempty"`
+}
+
+// Supporting types for the conversation service
+type Option struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
+}
+
+type ArtifactSummary struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Description string `json:"description,omitempty"`
+}
+
+type StageProgress struct {
+	Current int    `json:"current"`
+	Total   int    `json:"total"`
+	Message string `json:"message"`
+}
+
+type ToolCall struct {
+	ID     string      `json:"id"`
+	Name   string      `json:"name"`
+	Args   interface{} `json:"args"`
+	Result interface{} `json:"result,omitempty"`
+	Error  string      `json:"error,omitempty"`
+}
+
+type DecisionPoint struct {
+	ID      string   `json:"id"`
+	Prompt  string   `json:"prompt"`
+	Options []Option `json:"options"`
+}
+
+type WorkflowSession struct {
+	SessionID string                 `json:"session_id"`
+	Context   map[string]interface{} `json:"context"`
+}
+
+type RetryState struct {
+	Attempts    int       `json:"attempts"`
+	LastAttempt time.Time `json:"last_attempt"`
+	LastError   string    `json:"last_error,omitempty"`
+}
+
+type AutoAdvanceConfig struct {
+	Enabled bool          `json:"enabled"`
+	Delay   time.Duration `json:"delay"`
+}
+
+type AutoAdvanceState struct {
+	Scheduled bool      `json:"scheduled"`
+	NextTime  time.Time `json:"next_time"`
+}
+
+type WorkflowIntent struct {
+	Detected   bool                   `json:"detected"`
+	Workflow   string                 `json:"workflow"`
+	Parameters map[string]interface{} `json:"parameters"`
 }
 
 // SessionStore handles session persistence operations

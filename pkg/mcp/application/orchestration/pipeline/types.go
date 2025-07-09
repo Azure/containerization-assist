@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/mcp/application"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
 	sessionsvc "github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
@@ -115,11 +116,11 @@ type JobCompletionData struct {
 
 // Operations implements TypedPipelineOperations directly without adapter pattern
 type Operations struct {
-	sessionManager *sessionsvc.SessionManager
-	clients        *mcptypes.MCPClients
+	sessionManager sessionsvc.SessionManager
+	clients        *application.MCPClients
 	dockerClient   docker.DockerClient
 	logger         *slog.Logger
 }
 
-// Ensure Operations implements the required interfaces
-var _ mcptypes.TypedPipelineOperations = (*Operations)(nil)
+// TODO: TypedPipelineOperations interface is not defined in domain package
+// var _ mcptypes.TypedPipelineOperations = (*Operations)(nil)

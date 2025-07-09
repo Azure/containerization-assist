@@ -55,12 +55,12 @@ type DiscoveryResult struct {
 
 // SecretFinding represents a discovered secret
 type SecretFinding struct {
-	Type        string `json:"type"`
-	File        string `json:"file"`
-	Line        int    `json:"line"`
-	Description string `json:"description"`
-	Confidence  string `json:"confidence"`
-	RuleID      string `json:"rule_id"`
+	Type        string  `json:"type"`
+	File        string  `json:"file"`
+	Line        int     `json:"line"`
+	Description string  `json:"description"`
+	Confidence  float64 `json:"confidence"`
+	RuleID      string  `json:"rule_id"`
 }
 
 // ExtendedSecretFinding provides additional fields for rich secret detection
@@ -108,6 +108,11 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 		},
 	}
 
+	// Check if path exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, mcperrors.NewError().Messagef("directory does not exist: %s", path).WithLocation().Build()
+	}
+
 	sd.logger.Info().
 		Str("path", path).
 		Bool("recursive", options.Recursive).
@@ -122,6 +127,13 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 	err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip files with errors
+		}
+
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
 
 		// Check if we should process this file
@@ -153,10 +165,7 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 	})
 
 	if err != nil {
-		return nil, mcperrors.NewError().Messagef("failed to walk directory: %w", err).WithLocation().Build(
-
-		// Process results
-		)
+		return nil, mcperrors.NewError().Messagef("failed to walk directory: %w", err).WithLocation().Build()
 	}
 
 	wg.Wait()
@@ -276,9 +285,7 @@ func (sd *SecretDiscovery) filterFindings(findings []ExtendedSecretFinding, opti
 		seen[key] = true
 
 		// Check confidence threshold
-		var confidenceFloat float64
-		fmt.Sscanf(finding.Confidence, "%f", &confidenceFloat)
-		if confidenceFloat < options.MinConfidence {
+		if finding.Confidence < options.MinConfidence {
 			continue
 		}
 
@@ -314,9 +321,7 @@ func (sd *SecretDiscovery) verifyFindings(findings []ExtendedSecretFinding) {
 			findings[i].Verified = sd.verifyJWT(findings[i].Match)
 		default:
 			// For other types, use entropy and pattern matching confidence
-			var confidenceFloat float64
-			fmt.Sscanf(findings[i].Confidence, "%f", &confidenceFloat)
-			findings[i].Verified = confidenceFloat > 0.8 && findings[i].Entropy > 4.5
+			findings[i].Verified = findings[i].Confidence > 0.8 && findings[i].Entropy > 4.5
 		}
 	}
 }
@@ -544,7 +549,7 @@ func (pd *PatternDetector) addBuiltInPatterns() {
 		// GitHub
 		{
 			Name:       "github_token",
-			Pattern:    regexp.MustCompile(`\b(gh[pousr]_[A-Za-z0-9_]{36})\b`),
+			Pattern:    regexp.MustCompile(`\b(gh[pousr]_[A-Za-z0-9_]{30,40})\b`),
 			Severity:   "high",
 			Confidence: 0.95,
 			SecretType: "github_token",
@@ -620,7 +625,7 @@ func (pd *PatternDetector) Scan(line, filePath string, lineNumber int) []Extende
 						File:        filePath,
 						Line:        lineNumber,
 						Description: pattern.Name,
-						Confidence:  fmt.Sprintf("%.2f", pattern.Confidence),
+						Confidence:  pattern.Confidence,
 						RuleID:      pattern.Name,
 					},
 					ID:       fmt.Sprintf("%s:%d:%s", filePath, lineNumber, pattern.Name),
@@ -684,7 +689,7 @@ func (ed *EntropyDetector) Scan(line, filePath string, lineNumber int) []Extende
 					File:        filePath,
 					Line:        lineNumber,
 					Description: "High entropy string detected",
-					Confidence:  fmt.Sprintf("%.2f", ed.getConfidenceByEntropy(entropy)),
+					Confidence:  ed.getConfidenceByEntropy(entropy),
 					RuleID:      "entropy_detection",
 				},
 				ID:       fmt.Sprintf("%s:%d:entropy:%s", filePath, lineNumber, token[:10]),

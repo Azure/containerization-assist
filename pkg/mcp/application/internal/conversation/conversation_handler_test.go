@@ -9,9 +9,13 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
+	workflow "github.com/Azure/container-kit/pkg/mcp/application/workflows"
+	"github.com/Azure/container-kit/pkg/mcp/domain"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 
 	// "github.com/Azure/container-kit/pkg/mcp/domain/processing" // TODO: Fix import after package reorganization
-	"github.com/Azure/container-kit/pkg/mcp/application/internal/conversation"
+	// "github.com/Azure/container-kit/pkg/mcp/domain/internal/utils" // Removed: violates package boundaries
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,6 +51,21 @@ func (m *mockToolOrchestrator) GetTypedToolMetadata(toolName string) (*api.ToolM
 	return m.GetToolMetadata(toolName)
 }
 
+func (m *mockToolOrchestrator) GetTool(_ string) (api.Tool, bool) {
+	return nil, false
+}
+
+func (m *mockToolOrchestrator) ListTools() []string {
+	return []string{}
+}
+
+func (m *mockToolOrchestrator) GetStats() interface{} {
+	return map[string]interface{}{
+		"tools_registered": 0,
+		"executions":       0,
+	}
+}
+
 type mockUnifiedSessionManager struct {
 	sessions map[string]*session.SessionState
 }
@@ -57,7 +76,7 @@ func newMockUnifiedSessionManager() *mockUnifiedSessionManager {
 	}
 }
 
-func (m *mockUnifiedSessionManager) GetSession(ctx context.Context, sessionID string) (*session.SessionState, error) {
+func (m *mockUnifiedSessionManager) GetSession(sessionID string) (*session.SessionState, error) {
 	if sess, exists := m.sessions[sessionID]; exists {
 		return sess, nil
 	}
@@ -70,27 +89,26 @@ func (m *mockUnifiedSessionManager) CreateSession(ctx context.Context, userID st
 		SessionID:    sessionID,
 		WorkspaceDir: "/tmp/test",
 		CreatedAt:    time.Now(),
-		LastAccessed: time.Now(),
+		UpdatedAt:    time.Now(),
 		ExpiresAt:    time.Now().Add(24 * time.Hour),
 	}
 	m.sessions[sessionID] = sess
 	return sess, nil
 }
 
-func (m *mockUnifiedSessionManager) UpdateSession(ctx context.Context, sessionID string, updater func(*session.SessionState)) error {
+func (m *mockUnifiedSessionManager) UpdateSession(_ context.Context, sessionID string, updater func(*session.SessionState) error) error {
 	if sess, exists := m.sessions[sessionID]; exists {
-		updater(sess)
-		return nil
+		return updater(sess)
 	}
 	return fmt.Errorf("session not found: %s", sessionID)
 }
 
-func (m *mockUnifiedSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+func (m *mockUnifiedSessionManager) DeleteSession(sessionID string) error {
 	delete(m.sessions, sessionID)
 	return nil
 }
 
-func (m *mockUnifiedSessionManager) ListSessions(ctx context.Context, filter core.SessionFilter) ([]*session.SessionState, error) {
+func (m *mockUnifiedSessionManager) ListSessions(_ context.Context, _ domain.SessionFilter) ([]*session.SessionState, error) {
 	var sessions []*session.SessionState
 	for _, sess := range m.sessions {
 		sessions = append(sessions, sess)
@@ -98,7 +116,7 @@ func (m *mockUnifiedSessionManager) ListSessions(ctx context.Context, filter cor
 	return sessions, nil
 }
 
-func (m *mockUnifiedSessionManager) GetOrCreateSession(ctx context.Context, sessionID string) (*session.SessionState, error) {
+func (m *mockUnifiedSessionManager) GetOrCreateSession(sessionID string) (*session.SessionState, error) {
 	if sess, exists := m.sessions[sessionID]; exists {
 		return sess, nil
 	}
@@ -106,35 +124,98 @@ func (m *mockUnifiedSessionManager) GetOrCreateSession(ctx context.Context, sess
 		SessionID:    sessionID,
 		WorkspaceDir: "/tmp/test",
 		CreatedAt:    time.Now(),
-		LastAccessed: time.Now(),
+		UpdatedAt:    time.Now(),
 		ExpiresAt:    time.Now().Add(24 * time.Hour),
 	}
 	m.sessions[sessionID] = sess
 	return sess, nil
 }
 
-func (m *mockUnifiedSessionManager) GetStats(ctx context.Context) (*core.SessionManagerStats, error) {
-	return &core.SessionManagerStats{
+func (m *mockUnifiedSessionManager) GetStats(_ context.Context) (*shared.SessionManagerStats, error) {
+	return &shared.SessionManagerStats{
 		ActiveSessions: len(m.sessions),
 		TotalSessions:  len(m.sessions),
 	}, nil
 }
-func (m *mockUnifiedSessionManager) CreateWorkflowSession(ctx context.Context, spec *session.WorkflowSpec) (*session.SessionState, error) {
-	return m.CreateSession(ctx, "workflow-user")
+
+// Additional SessionManager interface methods
+func (m *mockUnifiedSessionManager) GetSessionTyped(sessionID string) (*session.SessionState, error) {
+	return m.GetSession(sessionID)
 }
 
-func (m *mockUnifiedSessionManager) GetWorkflowSession(ctx context.Context, sessionID string) (*session.WorkflowSession, error) {
-	sess, err := m.GetSession(ctx, sessionID)
+func (m *mockUnifiedSessionManager) GetSessionConcrete(sessionID string) (*session.SessionState, error) {
+	return m.GetSession(sessionID)
+}
+
+func (m *mockUnifiedSessionManager) GetSessionData(_ context.Context, sessionID string) (map[string]interface{}, error) {
+	sess, err := m.GetSession(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	return &session.WorkflowSession{SessionState: sess}, nil
+	return sess.Metadata, nil
 }
 
-func (m *mockUnifiedSessionManager) UpdateWorkflowSession(ctx context.Context, workflowSession *session.WorkflowSession) error {
-	return m.UpdateSession(ctx, workflowSession.SessionID, func(sess *session.SessionState) {
-		*sess = *workflowSession.SessionState
-	})
+func (m *mockUnifiedSessionManager) GetOrCreateSessionTyped(sessionID string) (*session.SessionState, error) {
+	return m.GetOrCreateSession(sessionID)
+}
+
+func (m *mockUnifiedSessionManager) ListSessionsTyped() ([]*session.SessionState, error) {
+	return m.ListSessions(context.Background(), domain.SessionFilter{})
+}
+
+func (m *mockUnifiedSessionManager) ListSessionSummaries() ([]*session.SessionSummary, error) {
+	return []*session.SessionSummary{}, nil
+}
+
+func (m *mockUnifiedSessionManager) StartJob(_ string, _ string) (string, error) {
+	return "job-123", nil
+}
+
+func (m *mockUnifiedSessionManager) UpdateJobStatus(_ string, _ string, _ session.JobStatus, _ interface{}, _ error) error {
+	return nil
+}
+
+func (m *mockUnifiedSessionManager) CompleteJob(_ string, _ string, _ interface{}) error {
+	return nil
+}
+
+func (m *mockUnifiedSessionManager) TrackToolExecution(_ string, _ string, _ interface{}) error {
+	return nil
+}
+
+func (m *mockUnifiedSessionManager) CompleteToolExecution(_ string, _ string, _ bool, _ error, _ int) error {
+	return nil
+}
+
+func (m *mockUnifiedSessionManager) TrackError(_ string, _ error, _ interface{}) error {
+	return nil
+}
+
+func (m *mockUnifiedSessionManager) StartCleanupRoutine() {
+	// No-op
+}
+
+func (m *mockUnifiedSessionManager) Stop() error {
+	return nil
+}
+func (m *mockUnifiedSessionManager) CreateWorkflowSession(ctx context.Context, _ *workflow.WorkflowSpec) (*session.SessionState, error) {
+	return m.CreateSession(ctx, "workflow-user")
+}
+
+func (m *mockUnifiedSessionManager) GetWorkflowSession(_ context.Context, sessionID string) (*services.WorkflowSession, error) {
+	sess, err := m.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return &services.WorkflowSession{
+		SessionID: sess.SessionID,
+		Context:   make(map[string]interface{}),
+	}, nil
+}
+
+func (m *mockUnifiedSessionManager) UpdateWorkflowSession(_ context.Context, _ *services.WorkflowSession) error {
+	// No-op for mock
+	return nil
 }
 
 func (m *mockUnifiedSessionManager) GarbageCollect(ctx context.Context) error {
@@ -149,7 +230,7 @@ func TestNewConversationHandler(t *testing.T) {
 		sessionMgr := createTestSessionManager(t)
 		// TODO: Fix after package reorganization
 		// For now, use nil preference store
-		var prefStore *utils.PreferenceStore = nil
+		var prefStore *shared.PreferenceStore
 
 		config := ConversationHandlerConfig{
 			SessionManager:   sessionMgr,
@@ -187,7 +268,7 @@ func TestHandleConversation(t *testing.T) {
 		t.Parallel()
 		handler := createTestHandler(t, logger)
 
-		args := conversation.ChatToolArgs{
+		args := ChatToolArgs{
 			Message:   "Hello, test message",
 			SessionID: "test-session-123",
 		}
@@ -202,7 +283,7 @@ func TestHandleConversation(t *testing.T) {
 		t.Parallel()
 		handler := createTestHandler(t, logger)
 
-		args := conversation.ChatToolArgs{
+		args := ChatToolArgs{
 			Message:   "",
 			SessionID: "test-session-123",
 		}
@@ -216,7 +297,7 @@ func TestHandleConversation(t *testing.T) {
 	t.Run("handles normal conversation flow", func(t *testing.T) {
 		t.Parallel()
 		handler := createTestHandler(t, logger)
-		args := conversation.ChatToolArgs{
+		args := ChatToolArgs{
 			Message:   "hello",
 			SessionID: "test-session-123",
 		}
@@ -252,7 +333,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		require.NoError(t, err)
 		response := &ConversationResponse{
 			SessionID: "auto-advance-test",
-			Stage:     core.ConversationStageAnalyze,
+			Stage:     shared.StageAnalysis,
 			Status:    ResponseStatusSuccess,
 			Message:   "Ready to proceed",
 			AutoAdvance: &AutoAdvanceConfig{
@@ -272,7 +353,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		handler := createTestHandler(t, logger)
 		response := &ConversationResponse{
 			SessionID:     "no-auto-advance",
-			Stage:         core.ConversationStagePreFlight,
+			Stage:         shared.StagePreFlight,
 			Status:        ResponseStatusWaitingInput,
 			Message:       "Welcome",
 			RequiresInput: true,
@@ -288,7 +369,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		handler := createTestHandler(t, logger)
 		response := &ConversationResponse{
 			SessionID: "infinite-loop-test",
-			Stage:     core.ConversationStageAnalyze,
+			Stage:     shared.StageAnalysis,
 			Status:    ResponseStatusSuccess,
 			AutoAdvance: &AutoAdvanceConfig{
 				DefaultAction: "continue",
@@ -309,7 +390,7 @@ func TestSessionManagement(t *testing.T) {
 		t.Parallel()
 		handler := createTestHandler(t, logger)
 
-		args := conversation.ChatToolArgs{
+		args := ChatToolArgs{
 			Message:   "Create new session",
 			SessionID: "",
 		}
@@ -326,7 +407,7 @@ func TestSessionManagement(t *testing.T) {
 		_, err := sessionMgr.GetOrCreateSessionTyped("existing-session")
 		require.NoError(t, err)
 
-		args := conversation.ChatToolArgs{
+		args := ChatToolArgs{
 			Message:   "Use existing session",
 			SessionID: "existing-session",
 		}
@@ -348,7 +429,7 @@ func TestPreferenceIntegration(t *testing.T) {
 		_, err := sessionMgr.GetOrCreateSessionTyped("pref-test")
 		require.NoError(t, err)
 
-		args := conversation.ChatToolArgs{
+		args := ChatToolArgs{
 			Message:   "Test with preferences",
 			SessionID: "pref-test",
 		}
@@ -363,7 +444,7 @@ func TestPreferenceIntegration(t *testing.T) {
 func createTestHandler(t *testing.T, logger *slog.Logger) *ConversationHandler {
 	sessionMgr := createTestSessionManager(t)
 	// TODO: Fix after package reorganization
-	var prefStore *utils.PreferenceStore = nil // createTestPreferenceStore(t)
+	var prefStore *shared.PreferenceStore // createTestPreferenceStore(t)
 	orchestrator := &mockToolOrchestrator{}
 
 	config := ConversationHandlerConfig{
@@ -378,26 +459,9 @@ func createTestHandler(t *testing.T, logger *slog.Logger) *ConversationHandler {
 	return handler
 }
 
-func createTestSessionManager(t *testing.T) *session.SessionManager {
-	tempDir := t.TempDir()
-	logger := slog.Default()
-
-	mgr, err := session.NewSessionManager(session.SessionManagerConfig{
-		WorkspaceDir:      tempDir,
-		StorePath:         "",
-		SessionTTL:        24 * time.Hour,
-		MaxSessions:       10,
-		MaxDiskPerSession: 100 * 1024 * 1024,
-		TotalDiskLimit:    1024 * 1024 * 1024,
-		Logger:            logger,
-	})
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		mgr.Stop()
-	})
-
-	return mgr
+func createTestSessionManager(_ *testing.T) session.SessionManager {
+	// Return the mock implementation
+	return newMockUnifiedSessionManager()
 }
 
 // TODO: Fix after package reorganization
@@ -429,14 +493,15 @@ func TestMockUnifiedSessionManager(t *testing.T) {
 		sess, err := mock.CreateSession(ctx, "test-user")
 		require.NoError(t, err)
 		assert.NotEmpty(t, sess.SessionID)
-		retrieved, err := mock.GetSession(ctx, sess.SessionID)
+		retrieved, err := mock.GetSession(sess.SessionID)
 		require.NoError(t, err)
 		assert.Equal(t, sess.SessionID, retrieved.SessionID)
-		err = mock.UpdateSession(ctx, sess.SessionID, func(s *session.SessionState) {
+		err = mock.UpdateSession(ctx, sess.SessionID, func(s *session.SessionState) error {
 			s.WorkspaceDir = "/updated/path"
+			return nil
 		})
 		require.NoError(t, err)
-		updated, err := mock.GetSession(ctx, sess.SessionID)
+		updated, err := mock.GetSession(sess.SessionID)
 		require.NoError(t, err)
 		assert.Equal(t, "/updated/path", updated.WorkspaceDir)
 	})
@@ -444,8 +509,7 @@ func TestMockUnifiedSessionManager(t *testing.T) {
 	t.Run("error on missing session", func(t *testing.T) {
 		t.Parallel()
 		mock := newMockUnifiedSessionManager()
-		ctx := context.Background()
-		_, err := mock.GetSession(ctx, "nonexistent")
+		_, err := mock.GetSession("nonexistent")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "session not found")
 	})
@@ -454,7 +518,7 @@ func BenchmarkHandleConversation(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	handler := createTestHandler(&testing.T{}, logger)
 
-	args := conversation.ChatToolArgs{
+	args := ChatToolArgs{
 		Message:   "Benchmark test message",
 		SessionID: "bench-session",
 	}

@@ -825,14 +825,14 @@ func (cmd *ConsolidatedBuildCommand) performDockerPush(ctx context.Context, requ
 	}
 
 	// Use Docker client to push image
-	pushOptions := docker.PushOptions{
-		Registry: request.Registry,
-		Tag:      request.Tag,
-	}
-
 	fullImageRef := fmt.Sprintf("%s:%s", request.ImageName, request.Tag)
 	if request.Registry != "" {
-		fullImageRef = fmt.Sprintf("%s/%s:%s", request.Registry, request.ImageName, request.Tag)
+		fullImageRef = fmt.Sprintf("%s/%s", request.Registry, fullImageRef)
+	}
+
+	pushOptions := services.DockerPushOptions{
+		Registry: request.Registry,
+		Tag:      request.Tag,
 	}
 
 	err := cmd.dockerClient.Push(ctx, fullImageRef, pushOptions)
@@ -877,7 +877,7 @@ func (cmd *ConsolidatedBuildCommand) performDockerPull(ctx context.Context, imag
 	}
 
 	// Use Docker client to pull image
-	pullOptions := docker.PullOptions{
+	pullOptions := services.DockerPullOptions{
 		Registry: registry,
 		Tag:      tag,
 	}

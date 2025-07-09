@@ -13,6 +13,7 @@ import (
 )
 
 // Manager provides a unified interface to all Docker operations
+// Deprecated: Use ServiceImpl instead
 type Manager struct {
 	Builder         *Builder
 	TemplateEngine  *TemplateEngine
@@ -22,6 +23,7 @@ type Manager struct {
 }
 
 // NewManager creates a new Docker operations manager
+// Deprecated: Use NewService instead for new code
 func NewManager(clients *clients.Clients, logger *slog.Logger) *Manager {
 	return &Manager{
 		Builder:         NewBuilder(clients, logger),
@@ -217,3 +219,5 @@ func (m *Manager) QuickBuild(ctx context.Context, dockerfileContent string, targ
 func (m *Manager) QuickPush(ctx context.Context, imageRef string, options PushOptions) (*RegistryPushResult, error) {
 	return m.RegistryManager.PushImage(ctx, imageRef, options)
 }
+
+// ServiceImpl methods are implemented in service.go

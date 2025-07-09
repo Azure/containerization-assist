@@ -22,11 +22,19 @@ type RepositoryAnalyzer struct {
 	logger *slog.Logger
 }
 
+// Engine is an alias for RepositoryAnalyzer for compatibility
+type Engine = RepositoryAnalyzer
+
 // NewRepositoryAnalyzer creates a new repository analyzer
 func NewRepositoryAnalyzer(logger *slog.Logger) *RepositoryAnalyzer {
 	return &RepositoryAnalyzer{
 		logger: logger.With("component", "repository_analyzer"),
 	}
+}
+
+// NewEngine creates a new analysis engine (alias for NewRepositoryAnalyzer)
+func NewEngine(logger *slog.Logger) *Engine {
+	return NewRepositoryAnalyzer(logger)
 }
 
 // AnalysisResult contains the result of repository analysis

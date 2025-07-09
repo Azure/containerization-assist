@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,14 +14,14 @@ func TestOperations_GenerateManifestsTyped(t *testing.T) {
 	tests := []struct {
 		name        string
 		sessionID   string
-		params      core.GenerateManifestsParams
+		params      domain.GenerateManifestsParams
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name:      "valid_generate_parameters",
 			sessionID: "test-session-123",
-			params: core.GenerateManifestsParams{
+			params: domain.GenerateManifestsParams{
 				AppName:     "test-app",
 				ImageRef:    "test-image:latest",
 				Namespace:   "default",
@@ -28,17 +29,17 @@ func TestOperations_GenerateManifestsTyped(t *testing.T) {
 				Port:        8080,
 				Labels:      map[string]string{"app": "test-app"},
 				Annotations: map[string]string{"env": "test"},
-				Resources: core.ResourceLimits{
-					Requests: core.ResourceSpec{
+				Resources: domain.ResourceLimits{
+					Requests: domain.ResourceSpec{
 						CPU:    "100m",
 						Memory: "128Mi",
 					},
-					Limits: core.ResourceSpec{
+					Limits: domain.ResourceSpec{
 						CPU:    "200m",
 						Memory: "256Mi",
 					},
 				},
-				HealthCheck: core.HealthCheckConfig{
+				HealthCheck: domain.HealthCheckConfig{
 					Enabled:             true,
 					Path:                "/health",
 					Port:                8080,
@@ -53,7 +54,7 @@ func TestOperations_GenerateManifestsTyped(t *testing.T) {
 		{
 			name:      "missing_app_name",
 			sessionID: "test-session-456",
-			params: core.GenerateManifestsParams{
+			params: domain.GenerateManifestsParams{
 				ImageRef:  "test-image:latest",
 				Namespace: "default",
 				Replicas:  1,
@@ -64,7 +65,7 @@ func TestOperations_GenerateManifestsTyped(t *testing.T) {
 		{
 			name:      "missing_image_name",
 			sessionID: "test-session-789",
-			params: core.GenerateManifestsParams{
+			params: domain.GenerateManifestsParams{
 				AppName:   "test-app",
 				Namespace: "default",
 				Replicas:  1,
@@ -75,7 +76,7 @@ func TestOperations_GenerateManifestsTyped(t *testing.T) {
 		{
 			name:      "invalid_replicas",
 			sessionID: "test-session-101",
-			params: core.GenerateManifestsParams{
+			params: domain.GenerateManifestsParams{
 				AppName:   "test-app",
 				ImageRef:  "test-image:latest",
 				Namespace: "default",
@@ -87,7 +88,7 @@ func TestOperations_GenerateManifestsTyped(t *testing.T) {
 		{
 			name:      "empty_session_id",
 			sessionID: "",
-			params: core.GenerateManifestsParams{
+			params: domain.GenerateManifestsParams{
 				AppName:   "test-app",
 				ImageRef:  "test-image:latest",
 				Namespace: "default",
@@ -106,7 +107,7 @@ func TestOperations_GenerateManifestsTyped(t *testing.T) {
 
 			// Create session if needed for non-error cases
 			if tt.sessionID != "" && !tt.expectError {
-				_, err := ops.sessionManager.GetOrCreateSession(context.Background(), tt.sessionID)
+				_, err := ops.sessionManager.GetOrCreateSession(tt.sessionID)
 				require.NoError(t, err, "Failed to create test session")
 			}
 
@@ -135,14 +136,14 @@ func TestOperations_DeployKubernetesTyped(t *testing.T) {
 	tests := []struct {
 		name        string
 		sessionID   string
-		params      core.DeployParams
+		params      domain.DeployParams
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name:      "valid_deploy_parameters",
 			sessionID: "test-session-123",
-			params: core.DeployParams{
+			params: domain.DeployParams{
 				SessionID:     "test-session-123",
 				ManifestPaths: []string{"/workspace/k8s/manifests.yaml"},
 				Namespace:     "default",
@@ -155,7 +156,7 @@ func TestOperations_DeployKubernetesTyped(t *testing.T) {
 		{
 			name:      "missing_manifest_path",
 			sessionID: "test-session-456",
-			params: core.DeployParams{
+			params: domain.DeployParams{
 				SessionID: "test-session-456",
 				Namespace: "default",
 			},
@@ -165,7 +166,7 @@ func TestOperations_DeployKubernetesTyped(t *testing.T) {
 		{
 			name:      "missing_namespace",
 			sessionID: "test-session-789",
-			params: core.DeployParams{
+			params: domain.DeployParams{
 				SessionID:     "test-session-789",
 				ManifestPaths: []string{"/workspace/k8s/manifests.yaml"},
 			},
@@ -175,7 +176,7 @@ func TestOperations_DeployKubernetesTyped(t *testing.T) {
 		{
 			name:      "invalid_timeout",
 			sessionID: "test-session-101",
-			params: core.DeployParams{
+			params: domain.DeployParams{
 				SessionID:     "test-session-101",
 				ManifestPaths: []string{"/workspace/k8s/manifests.yaml"},
 				Namespace:     "default",
@@ -187,7 +188,7 @@ func TestOperations_DeployKubernetesTyped(t *testing.T) {
 		{
 			name:      "empty_session_id",
 			sessionID: "",
-			params: core.DeployParams{
+			params: domain.DeployParams{
 				SessionID:     "",
 				ManifestPaths: []string{"/workspace/k8s/manifests.yaml"},
 				Namespace:     "default",
@@ -230,36 +231,39 @@ func TestOperations_CheckHealthTyped(t *testing.T) {
 	tests := []struct {
 		name        string
 		sessionID   string
-		params      core.HealthCheckParams
+		params      domain.HealthCheckParams
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name:      "valid_health_check_parameters",
 			sessionID: "test-session-123",
-			params: core.HealthCheckParams{
-				AppName:     "test-app",
-				Namespace:   "default",
-				WaitTimeout: 60,
+			params: domain.HealthCheckParams{
+				DeploymentName: "test-app",
+				AppName:        "test-app",
+				Namespace:      "default",
+				Timeout:        60,
+				WaitTimeout:    60,
 			},
 			expectError: false,
 		},
 		{
 			name:      "missing_app_name",
 			sessionID: "test-session-456",
-			params: core.HealthCheckParams{
+			params: domain.HealthCheckParams{
 				Namespace:   "default",
 				WaitTimeout: 30,
 			},
 			expectError: true,
-			errorMsg:    "app name is required",
+			errorMsg:    "deployment name is required",
 		},
 		{
 			name:      "missing_namespace",
 			sessionID: "test-session-789",
-			params: core.HealthCheckParams{
-				AppName:     "test-app",
-				WaitTimeout: 30,
+			params: domain.HealthCheckParams{
+				DeploymentName: "test-app",
+				AppName:        "test-app",
+				WaitTimeout:    30,
 			},
 			expectError: true,
 			errorMsg:    "namespace is required",
@@ -267,10 +271,12 @@ func TestOperations_CheckHealthTyped(t *testing.T) {
 		{
 			name:      "invalid_timeout",
 			sessionID: "test-session-101",
-			params: core.HealthCheckParams{
-				AppName:     "test-app",
-				Namespace:   "default",
-				WaitTimeout: 0,
+			params: domain.HealthCheckParams{
+				DeploymentName: "test-app",
+				AppName:        "test-app",
+				Namespace:      "default",
+				Timeout:        0,
+				WaitTimeout:    0,
 			},
 			expectError: true,
 			errorMsg:    "timeout must be positive",
@@ -278,7 +284,7 @@ func TestOperations_CheckHealthTyped(t *testing.T) {
 		{
 			name:      "empty_session_id",
 			sessionID: "",
-			params: core.HealthCheckParams{
+			params: domain.HealthCheckParams{
 				AppName:     "test-app",
 				Namespace:   "default",
 				WaitTimeout: 30,
@@ -328,7 +334,7 @@ func BenchmarkGenerateManifestsTyped(b *testing.B) {
 		logger: logger,
 	}
 
-	params := core.GenerateManifestsParams{
+	params := domain.GenerateManifestsParams{
 		AppName:   "benchmark-app",
 		ImageRef:  "benchmark-image:latest",
 		Namespace: "default",
@@ -349,7 +355,7 @@ func BenchmarkDeployKubernetesTyped(b *testing.B) {
 		logger: logger,
 	}
 
-	params := core.DeployParams{
+	params := domain.DeployParams{
 		SessionID:     "benchmark-session",
 		ManifestPaths: []string{"/tmp/benchmark/manifests.yaml"},
 		Namespace:     "default",

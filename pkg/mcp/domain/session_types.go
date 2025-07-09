@@ -162,6 +162,15 @@ type SecurityFinding struct {
 	FixedIn     string `json:"fixed_in,omitempty"`
 }
 
+// SessionInfo represents basic session information
+type SessionInfo struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // SessionFilter represents filters for session listing
 type SessionFilter struct {
 	UserID        string     `json:"user_id,omitempty"`

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/config"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 // BackgroundWorker represents a managed background worker
@@ -38,13 +39,36 @@ const (
 	WorkerStatusStopping WorkerStatus = "stopping"
 	WorkerStatusStopped  WorkerStatus = "stopped"
 	WorkerStatusFailed   WorkerStatus = "failed"
+	WorkerStatusUnknown  WorkerStatus = "unknown"
 )
 
-// BackgroundWorkerManager manages multiple background workers with lifecycle support
-type BackgroundWorkerManager struct {
+// BackgroundWorkerService defines the interface for background worker management
+type BackgroundWorkerService interface {
+	// Worker lifecycle operations
+	RegisterWorker(worker BackgroundWorker) error
+	UnregisterWorker(name string) error
+	StartAll() error
+	StartWorker(name string) error
+	StopWorker(name string) error
+	StopAll() error
+	RestartWorker(name string) error
+	RestartAllWorkers() error
+
+	// Worker status and health
+	GetWorkerHealth(name string) (WorkerHealth, error)
+	GetAllWorkerHealth() map[string]WorkerHealth
+	GetWorkerStatus(name string) (WorkerStatus, error)
+	GetAllWorkerStatuses() map[string]WorkerStatus
+	IsHealthy() bool
+	GetWorkerNames() []string
+	GetManagerStats() ManagerStats
+}
+
+// BackgroundWorkerServiceImpl implements BackgroundWorkerService
+type BackgroundWorkerServiceImpl struct {
 	workers         map[string]BackgroundWorker
 	workerStates    map[string]WorkerStatus
-	lifecycle       *common.Lifecycle
+	lifecycle       *shared.Lifecycle
 	config          *config.WorkerConfig
 	healthTicker    *time.Ticker
 	mu              sync.RWMutex
@@ -53,12 +77,28 @@ type BackgroundWorkerManager struct {
 	shutdownTimeout time.Duration
 }
 
-// NewBackgroundWorkerManager creates a new background worker manager
+// Type alias for backward compatibility
+type BackgroundWorkerManager = BackgroundWorkerServiceImpl
+
+// NewBackgroundWorkerService creates a new background worker service
+func NewBackgroundWorkerService(cfg *config.WorkerConfig) BackgroundWorkerService {
+	return &BackgroundWorkerServiceImpl{
+		workers:         make(map[string]BackgroundWorker),
+		workerStates:    make(map[string]WorkerStatus),
+		lifecycle:       shared.NewLifecycle(),
+		config:          cfg,
+		startTime:       time.Now(),
+		healthMetrics:   make(map[string]WorkerHealth),
+		shutdownTimeout: cfg.ShutdownTimeout,
+	}
+}
+
+// NewBackgroundWorkerManager creates a new background worker manager (backward compatibility)
 func NewBackgroundWorkerManager(cfg *config.WorkerConfig) *BackgroundWorkerManager {
 	return &BackgroundWorkerManager{
 		workers:         make(map[string]BackgroundWorker),
 		workerStates:    make(map[string]WorkerStatus),
-		lifecycle:       common.NewLifecycle(),
+		lifecycle:       shared.NewLifecycle(),
 		config:          cfg,
 		startTime:       time.Now(),
 		healthMetrics:   make(map[string]WorkerHealth),
@@ -67,54 +107,54 @@ func NewBackgroundWorkerManager(cfg *config.WorkerConfig) *BackgroundWorkerManag
 }
 
 // RegisterWorker registers a new background worker
-func (m *BackgroundWorkerManager) RegisterWorker(worker BackgroundWorker) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (s *BackgroundWorkerServiceImpl) RegisterWorker(worker BackgroundWorker) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	name := worker.Name()
-	if _, exists := m.workers[name]; exists {
+	if _, exists := s.workers[name]; exists {
 		return errors.NewError().Messagef("worker %s already registered", name).WithLocation().Build()
 	}
 
-	m.workers[name] = worker
-	m.workerStates[name] = WorkerStatusStopped
+	s.workers[name] = worker
+	s.workerStates[name] = WorkerStatusStopped
 	return nil
 }
 
 // UnregisterWorker removes a worker from management
-func (m *BackgroundWorkerManager) UnregisterWorker(name string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (s *BackgroundWorkerServiceImpl) UnregisterWorker(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	worker, exists := m.workers[name]
+	worker, exists := s.workers[name]
 	if !exists {
 		return errors.NewError().Messagef("worker %s not found", name).WithLocation().Build()
 	}
 
-	if m.workerStates[name] == WorkerStatusRunning {
+	if s.workerStates[name] == WorkerStatusRunning {
 		if err := worker.Stop(); err != nil {
 			return errors.NewError().Message("failed to stop worker " + name).Cause(err).WithLocation().Build()
 		}
 	}
 
-	delete(m.workers, name)
-	delete(m.workerStates, name)
-	delete(m.healthMetrics, name)
+	delete(s.workers, name)
+	delete(s.workerStates, name)
+	delete(s.healthMetrics, name)
 	return nil
 }
 
 // StartAll starts all registered workers
-func (m *BackgroundWorkerManager) StartAll() error {
-	m.mu.Lock()
+func (s *BackgroundWorkerServiceImpl) StartAll() error {
+	s.mu.Lock()
 	workers := make(map[string]BackgroundWorker)
-	for name, worker := range m.workers {
+	for name, worker := range s.workers {
 		workers[name] = worker
-		m.workerStates[name] = WorkerStatusStarting
+		s.workerStates[name] = WorkerStatusStarting
 	}
-	m.mu.Unlock()
+	s.mu.Unlock()
 
-	m.healthTicker = time.NewTicker(m.config.HealthCheckPeriod)
-	if err := m.lifecycle.Go(m.healthMonitor); err != nil {
+	s.healthTicker = time.NewTicker(s.config.HealthCheckPeriod)
+	if err := s.lifecycle.Go(s.healthMonitor); err != nil {
 		return errors.NewError().Message("failed to start health monitor").Cause(err).WithLocation().Build()
 	}
 
@@ -122,8 +162,8 @@ func (m *BackgroundWorkerManager) StartAll() error {
 		workerName := name
 		workerInstance := worker
 
-		if err := m.lifecycle.Go(func(ctx context.Context) {
-			m.startWorker(ctx, workerName, workerInstance)
+		if err := s.lifecycle.Go(func(ctx context.Context) {
+			s.startWorker(ctx, workerName, workerInstance)
 		}); err != nil {
 			return errors.NewError().Message("failed to start worker " + name).Cause(err).WithLocation().Build()
 		}
@@ -133,63 +173,63 @@ func (m *BackgroundWorkerManager) StartAll() error {
 }
 
 // StartWorker starts a specific worker by name
-func (m *BackgroundWorkerManager) StartWorker(name string) error {
-	m.mu.Lock()
-	worker, exists := m.workers[name]
+func (s *BackgroundWorkerServiceImpl) StartWorker(name string) error {
+	s.mu.Lock()
+	worker, exists := s.workers[name]
 	if !exists {
-		m.mu.Unlock()
+		s.mu.Unlock()
 		return errors.NewError().Messagef("worker %s not found", name).WithLocation().Build()
 	}
 
-	if m.workerStates[name] == WorkerStatusRunning {
-		m.mu.Unlock()
+	if s.workerStates[name] == WorkerStatusRunning {
+		s.mu.Unlock()
 		return errors.NewError().Messagef("worker %s is already running", name).WithLocation().Build()
 	}
 
-	m.workerStates[name] = WorkerStatusStarting
-	m.mu.Unlock()
+	s.workerStates[name] = WorkerStatusStarting
+	s.mu.Unlock()
 
-	return m.lifecycle.Go(func(ctx context.Context) {
-		m.startWorker(ctx, name, worker)
+	return s.lifecycle.Go(func(ctx context.Context) {
+		s.startWorker(ctx, name, worker)
 	})
 }
 
 // StopWorker stops a specific worker by name
-func (m *BackgroundWorkerManager) StopWorker(name string) error {
-	m.mu.Lock()
-	worker, exists := m.workers[name]
+func (s *BackgroundWorkerServiceImpl) StopWorker(name string) error {
+	s.mu.Lock()
+	worker, exists := s.workers[name]
 	if !exists {
-		m.mu.Unlock()
+		s.mu.Unlock()
 		return errors.NewError().Messagef("worker %s not found", name).WithLocation().Build()
 	}
 
-	if m.workerStates[name] != WorkerStatusRunning {
-		m.mu.Unlock()
+	if s.workerStates[name] != WorkerStatusRunning {
+		s.mu.Unlock()
 		return errors.NewError().Messagef("worker %s is not running", name).WithLocation().Build()
 	}
 
-	m.workerStates[name] = WorkerStatusStopping
-	m.mu.Unlock()
+	s.workerStates[name] = WorkerStatusStopping
+	s.mu.Unlock()
 
 	return worker.Stop()
 }
 
 // StopAll stops all workers gracefully
-func (m *BackgroundWorkerManager) StopAll() error {
-	if m.healthTicker != nil {
-		m.healthTicker.Stop()
+func (s *BackgroundWorkerServiceImpl) StopAll() error {
+	if s.healthTicker != nil {
+		s.healthTicker.Stop()
 	}
 
-	m.mu.RLock()
-	workers := make([]BackgroundWorker, 0, len(m.workers))
-	names := make([]string, 0, len(m.workers))
-	for name, worker := range m.workers {
-		if m.workerStates[name] == WorkerStatusRunning {
+	s.mu.RLock()
+	workers := make([]BackgroundWorker, 0, len(s.workers))
+	names := make([]string, 0, len(s.workers))
+	for name, worker := range s.workers {
+		if s.workerStates[name] == WorkerStatusRunning {
 			workers = append(workers, worker)
 			names = append(names, name)
 		}
 	}
-	m.mu.RUnlock()
+	s.mu.RUnlock()
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(workers))
@@ -199,19 +239,19 @@ func (m *BackgroundWorkerManager) StopAll() error {
 		go func(w BackgroundWorker, name string) {
 			defer wg.Done()
 
-			m.mu.Lock()
-			m.workerStates[name] = WorkerStatusStopping
-			m.mu.Unlock()
+			s.mu.Lock()
+			s.workerStates[name] = WorkerStatusStopping
+			s.mu.Unlock()
 
 			if err := w.Stop(); err != nil {
-				m.mu.Lock()
-				m.workerStates[name] = WorkerStatusFailed
-				m.mu.Unlock()
+				s.mu.Lock()
+				s.workerStates[name] = WorkerStatusFailed
+				s.mu.Unlock()
 				errChan <- errors.NewError().Message("failed to stop worker " + name).Cause(err).WithLocation().Build()
 			} else {
-				m.mu.Lock()
-				m.workerStates[name] = WorkerStatusStopped
-				m.mu.Unlock()
+				s.mu.Lock()
+				s.workerStates[name] = WorkerStatusStopped
+				s.mu.Unlock()
 			}
 		}(worker, names[i])
 	}
@@ -224,8 +264,8 @@ func (m *BackgroundWorkerManager) StopAll() error {
 
 	select {
 	case <-done:
-	case <-time.After(m.shutdownTimeout):
-		return errors.NewError().Messagef("worker shutdown timeout after %v", m.shutdownTimeout).WithLocation().Build()
+	case <-time.After(s.shutdownTimeout):
+		return errors.NewError().Messagef("worker shutdown timeout after %v", s.shutdownTimeout).WithLocation().Build()
 	}
 
 	close(errChan)
@@ -238,51 +278,51 @@ func (m *BackgroundWorkerManager) StopAll() error {
 		return fmt.Errorf("errors stopping workers: %v", errors)
 	}
 
-	return m.lifecycle.Shutdown(m.shutdownTimeout)
+	return s.lifecycle.Shutdown(s.shutdownTimeout)
 }
 
 // GetWorkerHealth returns health status for a specific worker
-func (m *BackgroundWorkerManager) GetWorkerHealth(name string) (WorkerHealth, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (s *BackgroundWorkerServiceImpl) GetWorkerHealth(name string) (WorkerHealth, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	// First check if worker exists
-	worker, workerExists := m.workers[name]
+	worker, workerExists := s.workers[name]
 	if !workerExists {
 		return WorkerHealth{}, errors.NewError().Messagef("worker %s not found", name).WithLocation().Build()
 	}
 
 	// Check if health metrics are available
-	if health, exists := m.healthMetrics[name]; exists {
+	if health, exists := s.healthMetrics[name]; exists {
 		return health, nil
 	}
 
 	// If health metrics haven't been populated yet, get current health from worker
 	health := worker.Health()
 	health.LastCheck = time.Now()
-	health.Uptime = time.Since(m.startTime)
+	health.Uptime = time.Since(s.startTime)
 
 	return health, nil
 }
 
 // GetAllWorkerHealth returns health status for all workers
-func (m *BackgroundWorkerManager) GetAllWorkerHealth() map[string]WorkerHealth {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (s *BackgroundWorkerServiceImpl) GetAllWorkerHealth() map[string]WorkerHealth {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	result := make(map[string]WorkerHealth)
 
 	// First add any health metrics we have
-	for name, health := range m.healthMetrics {
+	for name, health := range s.healthMetrics {
 		result[name] = health
 	}
 
 	// For workers without health metrics yet, get their current health
-	for name, worker := range m.workers {
+	for name, worker := range s.workers {
 		if _, exists := result[name]; !exists {
 			health := worker.Health()
 			health.LastCheck = time.Now()
-			health.Uptime = time.Since(m.startTime)
+			health.Uptime = time.Since(s.startTime)
 			result[name] = health
 		}
 	}
@@ -291,11 +331,11 @@ func (m *BackgroundWorkerManager) GetAllWorkerHealth() map[string]WorkerHealth {
 }
 
 // GetWorkerStatus returns the current status of a worker
-func (m *BackgroundWorkerManager) GetWorkerStatus(name string) (WorkerStatus, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (s *BackgroundWorkerServiceImpl) GetWorkerStatus(name string) (WorkerStatus, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	status, exists := m.workerStates[name]
+	status, exists := s.workerStates[name]
 	if !exists {
 		return "", errors.NewError().Messagef("worker %s not found", name).WithLocation().Build()
 	}
@@ -304,23 +344,23 @@ func (m *BackgroundWorkerManager) GetWorkerStatus(name string) (WorkerStatus, er
 }
 
 // GetAllWorkerStatuses returns status for all workers
-func (m *BackgroundWorkerManager) GetAllWorkerStatuses() map[string]WorkerStatus {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (s *BackgroundWorkerServiceImpl) GetAllWorkerStatuses() map[string]WorkerStatus {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	result := make(map[string]WorkerStatus)
-	for name, status := range m.workerStates {
+	for name, status := range s.workerStates {
 		result[name] = status
 	}
 	return result
 }
 
 // IsHealthy returns true if all workers are healthy
-func (m *BackgroundWorkerManager) IsHealthy() bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (s *BackgroundWorkerServiceImpl) IsHealthy() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	for _, health := range m.healthMetrics {
+	for _, health := range s.healthMetrics {
 		if health.Status != "healthy" {
 			return false
 		}
@@ -329,18 +369,18 @@ func (m *BackgroundWorkerManager) IsHealthy() bool {
 }
 
 // GetManagerStats returns statistics about the worker manager
-func (m *BackgroundWorkerManager) GetManagerStats() ManagerStats {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (s *BackgroundWorkerServiceImpl) GetManagerStats() ManagerStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	stats := ManagerStats{
-		TotalWorkers:   len(m.workers),
+		TotalWorkers:   len(s.workers),
 		RunningWorkers: 0,
 		FailedWorkers:  0,
-		Uptime:         time.Since(m.startTime),
+		Uptime:         time.Since(s.startTime),
 	}
 
-	for _, status := range m.workerStates {
+	for _, status := range s.workerStates {
 		switch status {
 		case WorkerStatusRunning:
 			stats.RunningWorkers++
@@ -361,129 +401,129 @@ type ManagerStats struct {
 }
 
 // startWorker starts an individual worker with error handling
-func (m *BackgroundWorkerManager) startWorker(ctx context.Context, name string, worker BackgroundWorker) {
+func (s *BackgroundWorkerServiceImpl) startWorker(ctx context.Context, name string, worker BackgroundWorker) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.mu.Lock()
-			m.workerStates[name] = WorkerStatusFailed
-			m.healthMetrics[name] = WorkerHealth{
+			s.mu.Lock()
+			s.workerStates[name] = WorkerStatusFailed
+			s.healthMetrics[name] = WorkerHealth{
 				Status:    "failed",
 				LastCheck: time.Now(),
 				Error:     fmt.Errorf("worker panicked: %v", r),
 			}
-			m.mu.Unlock()
+			s.mu.Unlock()
 		}
 	}()
 
 	if err := worker.Start(ctx); err != nil {
-		m.mu.Lock()
-		m.workerStates[name] = WorkerStatusFailed
-		m.healthMetrics[name] = WorkerHealth{
+		s.mu.Lock()
+		s.workerStates[name] = WorkerStatusFailed
+		s.healthMetrics[name] = WorkerHealth{
 			Status:    "failed",
 			LastCheck: time.Now(),
 			Error:     err,
 		}
-		m.mu.Unlock()
+		s.mu.Unlock()
 		return
 	}
 
-	m.mu.Lock()
-	m.workerStates[name] = WorkerStatusRunning
-	m.mu.Unlock()
+	s.mu.Lock()
+	s.workerStates[name] = WorkerStatusRunning
+	s.mu.Unlock()
 
 	<-ctx.Done()
 
-	m.mu.Lock()
-	m.workerStates[name] = WorkerStatusStopping
-	m.mu.Unlock()
+	s.mu.Lock()
+	s.workerStates[name] = WorkerStatusStopping
+	s.mu.Unlock()
 
 	if err := worker.Stop(); err != nil {
-		m.mu.Lock()
-		m.workerStates[name] = WorkerStatusFailed
-		m.healthMetrics[name] = WorkerHealth{
+		s.mu.Lock()
+		s.workerStates[name] = WorkerStatusFailed
+		s.healthMetrics[name] = WorkerHealth{
 			Status:    "failed",
 			LastCheck: time.Now(),
 			Error:     fmt.Errorf("failed to stop: %w", err),
 		}
-		m.mu.Unlock()
+		s.mu.Unlock()
 	} else {
-		m.mu.Lock()
-		m.workerStates[name] = WorkerStatusStopped
-		m.mu.Unlock()
+		s.mu.Lock()
+		s.workerStates[name] = WorkerStatusStopped
+		s.mu.Unlock()
 	}
 }
 
 // healthMonitor periodically checks the health of all workers
-func (m *BackgroundWorkerManager) healthMonitor(ctx context.Context) {
+func (s *BackgroundWorkerServiceImpl) healthMonitor(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-m.healthTicker.C:
-			m.checkAllWorkerHealth()
+		case <-s.healthTicker.C:
+			s.checkAllWorkerHealth()
 		}
 	}
 }
 
 // checkAllWorkerHealth checks the health of all registered workers
-func (m *BackgroundWorkerManager) checkAllWorkerHealth() {
-	m.mu.Lock()
+func (s *BackgroundWorkerServiceImpl) checkAllWorkerHealth() {
+	s.mu.Lock()
 	workers := make(map[string]BackgroundWorker)
-	for name, worker := range m.workers {
+	for name, worker := range s.workers {
 		workers[name] = worker
 	}
-	m.mu.Unlock()
+	s.mu.Unlock()
 
 	for name, worker := range workers {
 		health := worker.Health()
 		health.LastCheck = time.Now()
-		health.Uptime = time.Since(m.startTime)
+		health.Uptime = time.Since(s.startTime)
 
-		m.mu.Lock()
-		m.healthMetrics[name] = health
+		s.mu.Lock()
+		s.healthMetrics[name] = health
 
-		if health.Error != nil && m.workerStates[name] == WorkerStatusRunning {
-			m.workerStates[name] = WorkerStatusFailed
+		if health.Error != nil && s.workerStates[name] == WorkerStatusRunning {
+			s.workerStates[name] = WorkerStatusFailed
 		}
-		m.mu.Unlock()
+		s.mu.Unlock()
 	}
 }
 
 // RestartWorker stops and starts a worker
-func (m *BackgroundWorkerManager) RestartWorker(name string) error {
-	if err := m.StopWorker(name); err != nil {
+func (s *BackgroundWorkerServiceImpl) RestartWorker(name string) error {
+	if err := s.StopWorker(name); err != nil {
 		return errors.NewError().Message("failed to stop worker for restart").Cause(err).WithLocation().Build()
 	}
 
 	time.Sleep(100 * time.Millisecond)
 
-	if err := m.StartWorker(name); err != nil {
+	if err := s.StartWorker(name); err != nil {
 		return errors.NewError().Message("failed to start worker after restart").Cause(err).WithLocation().Build()
 	}
 
 	return nil
 }
 
-func (m *BackgroundWorkerManager) RestartAllWorkers() error {
-	if err := m.StopAll(); err != nil {
+func (s *BackgroundWorkerServiceImpl) RestartAllWorkers() error {
+	if err := s.StopAll(); err != nil {
 		return errors.NewError().Message("failed to stop all workers for restart").Cause(err).WithLocation().Build()
 	}
 
 	time.Sleep(500 * time.Millisecond)
 
-	if err := m.StartAll(); err != nil {
+	if err := s.StartAll(); err != nil {
 		return errors.NewError().Message("failed to start all workers after restart").Cause(err).WithLocation().Build()
 	}
 
 	return nil
 }
 
-func (m *BackgroundWorkerManager) GetWorkerNames() []string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (s *BackgroundWorkerServiceImpl) GetWorkerNames() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	names := make([]string, 0, len(m.workers))
-	for name := range m.workers {
+	names := make([]string, 0, len(s.workers))
+	for name := range s.workers {
 		names = append(names, name)
 	}
 	return names
@@ -494,7 +534,7 @@ type SimpleBackgroundWorker struct {
 	name        string
 	taskFunc    func(ctx context.Context) error
 	interval    time.Duration
-	lifecycle   *common.Lifecycle
+	lifecycle   *shared.Lifecycle
 	lastError   error
 	tasksTotal  int64
 	tasksFailed int64
@@ -507,7 +547,7 @@ func NewSimpleBackgroundWorker(name string, taskFunc func(ctx context.Context) e
 		name:      name,
 		taskFunc:  taskFunc,
 		interval:  interval,
-		lifecycle: common.NewLifecycle(),
+		lifecycle: shared.NewLifecycle(),
 		startTime: time.Now(),
 	}
 }
@@ -565,3 +605,10 @@ func (w *SimpleBackgroundWorker) Health() WorkerHealth {
 		},
 	}
 }
+
+// Backward compatibility methods for BackgroundWorkerManager
+// All methods now delegate to the new WorkerManagementService
+
+// Deprecated: Use WorkerManagementService instead
+// These methods provide backward compatibility but create new service instances
+// In production, you should use a single WorkerManagementService instance

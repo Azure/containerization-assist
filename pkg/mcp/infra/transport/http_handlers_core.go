@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -343,11 +342,6 @@ func (t *HTTPTransport) getToolMetadata(toolName string) *HTTPToolMetadata {
 		if orchestrator := server.GetToolOrchestrator(); orchestrator != nil {
 			if metadata, err := orchestrator.GetToolMetadata(toolName); err == nil {
 				// Convert to HTTPToolMetadata
-				if coreMetadata, ok := metadata.(api.ToolMetadata); ok {
-					converted := ConvertCoreMetadata(coreMetadata)
-					return &converted
-				}
-				// If not core.ToolMetadata, try map conversion
 				if metaMap, ok := metadata.(map[string]interface{}); ok {
 					return t.convertMapToHTTPMetadata(metaMap, toolName)
 				}

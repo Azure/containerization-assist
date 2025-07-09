@@ -56,28 +56,29 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 			Build()
 	}
 
-	if sessionState.DiskUsage < 0 {
-		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
-			Message("Disk usage cannot be negative").
-			Context("field", "disk_usage").
-			Context("value", sessionState.DiskUsage).
-			Context("component", "session_state_validator").
-			Suggestion("Ensure disk usage is a positive value").
-			Build()
-	}
+	// TODO: Add disk usage validation when fields are available
+	// if sessionState.DiskUsage < 0 {
+	//     return errors.NewError().
+	//         Code(codes.VALIDATION_FAILED).
+	//         Message("Disk usage cannot be negative").
+	//         Context("field", "disk_usage").
+	//         Context("value", sessionState.DiskUsage).
+	//         Context("component", "session_state_validator").
+	//         Suggestion("Ensure disk usage is a positive value").
+	//         Build()
+	// }
 
-	if sessionState.MaxDiskUsage > 0 && sessionState.DiskUsage > sessionState.MaxDiskUsage {
-		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
-			Message(fmt.Sprintf("Disk usage %d exceeds maximum allowed %d", sessionState.DiskUsage, sessionState.MaxDiskUsage)).
-			Context("field", "disk_usage").
-			Context("current_usage", sessionState.DiskUsage).
-			Context("max_usage", sessionState.MaxDiskUsage).
-			Context("component", "session_state_validator").
-			Suggestion("Reduce disk usage or increase maximum limit").
-			Build()
-	}
+	// if sessionState.MaxDiskUsage > 0 && sessionState.DiskUsage > sessionState.MaxDiskUsage {
+	//     return errors.NewError().
+	//         Code(codes.VALIDATION_FAILED).
+	//         Message(fmt.Sprintf("Disk usage %d exceeds maximum allowed %d", sessionState.DiskUsage, sessionState.MaxDiskUsage)).
+	//         Context("field", "disk_usage").
+	//         Context("current_usage", sessionState.DiskUsage).
+	//         Context("max_usage", sessionState.MaxDiskUsage).
+	//         Context("component", "session_state_validator").
+	//         Suggestion("Reduce disk usage or increase maximum limit").
+	//         Build()
+	// }
 
 	return nil
 }

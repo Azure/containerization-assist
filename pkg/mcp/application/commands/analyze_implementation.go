@@ -544,7 +544,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
 					Name:    name,
 					Version: version,
 					Type:    analyze.DependencyTypeDirect,
-					Manager: "go",
+					Source:  "go.mod",
 				})
 			}
 		}
@@ -588,7 +588,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir stri
 				Name:    name,
 				Version: version,
 				Type:    analyze.DependencyTypeDirect,
-				Manager: "npm",
+				Source:  "package.json",
 			})
 		}
 	}
@@ -630,7 +630,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir st
 				Name:    name,
 				Version: version,
 				Type:    analyze.DependencyTypeDirect,
-				Manager: "pip",
+				Source:  "requirements.txt",
 			})
 		}
 	}
@@ -688,7 +688,7 @@ func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([
 				Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
 				Version: version,
 				Type:    analyze.DependencyTypeDirect,
-				Manager: "maven",
+				Source:  "pom.xml",
 			})
 		}
 	}
@@ -725,7 +725,7 @@ func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string
 					Name:    name,
 					Version: version,
 					Type:    analyze.DependencyTypeDirect,
-					Manager: "gradle",
+					Source:  "build.gradle",
 				})
 			}
 		}
@@ -768,7 +768,6 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeSecrets(ctx context.Context, resul
 		}
 
 		contentStr := string(content)
-		lines := strings.Split(contentStr, "\n")
 
 		for secretType, pattern := range secretPatterns {
 			matches := pattern.FindAllStringIndex(contentStr, -1)
@@ -783,7 +782,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeSecrets(ctx context.Context, resul
 					Description: fmt.Sprintf("Potential secret detected in %s", path),
 					File:        path,
 					Line:        lineNum,
-					Rule:        secretType,
+					// Rule: secretType (stored in Type field)
 				})
 			}
 		}
@@ -845,7 +844,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeVulnerabilities(ctx context.Contex
 					Title:       vulnType,
 					Description: vuln.desc,
 					File:        path,
-					Rule:        vulnType,
+					// Rule: vulnType (stored in Type field)
 				})
 			}
 		}
@@ -884,7 +883,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, re
 			Severity:    analyze.SeverityMedium,
 			Title:       "Missing License File",
 			Description: "Repository should include a license file",
-			Rule:        "LICENSE_REQUIRED",
+			// Rule: "LICENSE_REQUIRED" (compliance check)
 		})
 	}
 
@@ -904,7 +903,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, re
 			Severity:    analyze.SeverityLow,
 			Title:       "Missing Security Policy",
 			Description: "Repository should include a security policy",
-			Rule:        "SECURITY_POLICY_REQUIRED",
+			// Rule: "SECURITY_POLICY_REQUIRED" (compliance check)
 		})
 	}
 
@@ -922,10 +921,9 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeTests(ctx context.Context, result 
 	case "go":
 		if cmd.hasGoTests(workspaceDir) {
 			testFrameworks = append(testFrameworks, analyze.TestFramework{
-				Name:     "go test",
-				Type:     analyze.TestFrameworkTypeUnit,
-				Version:  "builtin",
-				Coverage: cmd.calculateGoCoverage(workspaceDir),
+				Name:       "go test",
+				Type:       analyze.TestTypeUnit,
+				Confidence: analyze.ConfidenceHigh,
 			})
 		}
 	case "javascript", "typescript":
@@ -971,15 +969,18 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeMetrics(ctx context.Context, resul
 	}
 
 	// Store metrics in analysis metadata
-	result.AnalysisMetadata.Metrics = map[string]interface{}{
-		"total_files": totalFiles,
-		"total_lines": totalLines,
-		"avg_lines_per_file": func() float64 {
-			if totalFiles == 0 {
-				return 0
-			}
-			return float64(totalLines) / float64(totalFiles)
-		}(),
+	// Store metrics in options field
+	result.AnalysisMetadata.Options = map[string]interface{}{
+		"metrics": map[string]interface{}{
+			"total_files": totalFiles,
+			"total_lines": totalLines,
+			"avg_lines_per_file": func() float64 {
+				if totalFiles == 0 {
+					return 0
+				}
+				return float64(totalLines) / float64(totalFiles)
+			}(),
+		},
 	}
 
 	return nil
@@ -1036,37 +1037,37 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeDockerfileSecurity(dockerfile *Doc
 		case "USER":
 			if instruction.Args == "root" || instruction.Args == "0" {
 				issues = append(issues, analyze.SecurityIssue{
-					Type:        analyze.SecurityIssueTypeConfiguration,
+					Type:        analyze.SecurityTypePermission,
 					Severity:    analyze.SeverityHigh,
 					Title:       "Running as root user",
 					Description: "Container should not run as root user",
 					File:        dockerfile.Path,
 					Line:        instruction.Line,
-					Rule:        "DOCKERFILE_USER_ROOT",
+					// Rule: "DOCKERFILE_USER_ROOT" (security best practice)
 				})
 			}
 		case "ADD":
 			if strings.Contains(instruction.Args, "http://") {
 				issues = append(issues, analyze.SecurityIssue{
-					Type:        analyze.SecurityIssueTypeConfiguration,
+					Type:        analyze.SecurityTypePermission,
 					Severity:    analyze.SeverityMedium,
 					Title:       "Using HTTP in ADD instruction",
 					Description: "ADD instruction should use HTTPS instead of HTTP",
 					File:        dockerfile.Path,
 					Line:        instruction.Line,
-					Rule:        "DOCKERFILE_ADD_HTTP",
+					// Rule: "DOCKERFILE_ADD_HTTP" (security best practice)
 				})
 			}
 		case "RUN":
 			if strings.Contains(instruction.Args, "curl") && strings.Contains(instruction.Args, "sudo") {
 				issues = append(issues, analyze.SecurityIssue{
-					Type:        analyze.SecurityIssueTypeConfiguration,
+					Type:        analyze.SecurityTypePermission,
 					Severity:    analyze.SeverityMedium,
 					Title:       "Using sudo in RUN instruction",
 					Description: "Avoid using sudo in RUN instructions",
 					File:        dockerfile.Path,
 					Line:        instruction.Line,
-					Rule:        "DOCKERFILE_RUN_SUDO",
+					// Rule: "DOCKERFILE_RUN_SUDO" (security best practice)
 				})
 			}
 		}
@@ -1097,17 +1098,19 @@ func (cmd *ConsolidatedAnalyzeCommand) generateDockerfileRecommendations(dockerf
 			Priority:    analyze.PriorityHigh,
 			Title:       "Add USER instruction",
 			Description: "Add USER instruction to run container as non-root user",
-			Category:    "dockerfile",
+			Action:      "Add 'USER <non-root-user>' instruction to Dockerfile",
+			// Category: "dockerfile",
 		})
 	}
 
 	if !hasHealthcheck {
 		recommendations = append(recommendations, analyze.Recommendation{
-			Type:        analyze.RecommendationTypeOperational,
+			Type:        analyze.RecommendationTypePerformance,
 			Priority:    analyze.PriorityMedium,
 			Title:       "Add HEALTHCHECK instruction",
 			Description: "Add HEALTHCHECK instruction to monitor container health",
-			Category:    "dockerfile",
+			Action:      "Add 'HEALTHCHECK' instruction to Dockerfile",
+			// Category: "dockerfile",
 		})
 	}
 
@@ -1121,7 +1124,18 @@ func (cmd *ConsolidatedAnalyzeCommand) calculateConfidence(result *analyze.Analy
 	// Calculate confidence based on various factors
 	factors := []float64{
 		result.Language.Confidence,
-		float64(result.Framework.Confidence) / 3.0, // Convert to 0-1 scale
+		func() float64 {
+			switch result.Framework.Confidence {
+			case analyze.ConfidenceHigh:
+				return 1.0
+			case analyze.ConfidenceMedium:
+				return 0.66
+			case analyze.ConfidenceLow:
+				return 0.33
+			default:
+				return 0.5
+			}
+		}(),
 	}
 
 	// Add factors for completeness
@@ -1163,7 +1177,8 @@ func (cmd *ConsolidatedAnalyzeCommand) generateRecommendations(result *analyze.A
 			Priority:    analyze.PriorityMedium,
 			Title:       "Consider using a Go web framework",
 			Description: "For web applications, consider using Gin, Echo, or Fiber",
-			Category:    "framework",
+			Action:      "Add a web framework dependency to go.mod",
+			// Category: "framework",
 		})
 	}
 
@@ -1174,18 +1189,20 @@ func (cmd *ConsolidatedAnalyzeCommand) generateRecommendations(result *analyze.A
 			Priority:    analyze.PriorityHigh,
 			Title:       "Address security issues",
 			Description: fmt.Sprintf("Found %d security issues that should be addressed", len(result.SecurityIssues)),
-			Category:    "security",
+			Action:      "Review and fix identified security issues",
+			// Category: "security",
 		})
 	}
 
 	// Testing recommendations
 	if len(result.TestFrameworks) == 0 {
 		result.Recommendations = append(result.Recommendations, analyze.Recommendation{
-			Type:        analyze.RecommendationTypeQuality,
+			Type:        analyze.RecommendationTypeMaintenance,
 			Priority:    analyze.PriorityMedium,
 			Title:       "Add automated tests",
 			Description: "Consider adding unit tests and integration tests",
-			Category:    "testing",
+			Action:      "Implement test coverage for critical functionality",
+			// Category: "testing",
 		})
 	}
 }
@@ -1310,23 +1327,22 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSTestFrameworks(workspaceDir strin
 	testFrameworks := []struct {
 		name    string
 		pattern string
-		ftype   analyze.TestFrameworkType
+		ftype   analyze.TestType
 	}{
-		{"jest", "\"jest\":", analyze.TestFrameworkTypeUnit},
-		{"mocha", "\"mocha\":", analyze.TestFrameworkTypeUnit},
-		{"jasmine", "\"jasmine\":", analyze.TestFrameworkTypeUnit},
-		{"cypress", "\"cypress\":", analyze.TestFrameworkTypeE2E},
-		{"playwright", "\"playwright\":", analyze.TestFrameworkTypeE2E},
-		{"puppeteer", "\"puppeteer\":", analyze.TestFrameworkTypeE2E},
+		{"jest", "\"jest\":", analyze.TestTypeUnit},
+		{"mocha", "\"mocha\":", analyze.TestTypeUnit},
+		{"jasmine", "\"jasmine\":", analyze.TestTypeUnit},
+		{"cypress", "\"cypress\":", analyze.TestTypeEnd2End},
+		{"playwright", "\"playwright\":", analyze.TestTypeEnd2End},
+		{"puppeteer", "\"puppeteer\":", analyze.TestTypeEnd2End},
 	}
 
 	for _, fw := range testFrameworks {
 		if strings.Contains(contentStr, fw.pattern) {
 			frameworks = append(frameworks, analyze.TestFramework{
-				Name:     fw.name,
-				Type:     fw.ftype,
-				Version:  "unknown",
-				Coverage: 0.0,
+				Name:       fw.name,
+				Type:       fw.ftype,
+				Confidence: analyze.ConfidenceMedium,
 			})
 		}
 	}
@@ -1348,21 +1364,20 @@ func (cmd *ConsolidatedAnalyzeCommand) detectPythonTestFrameworks(workspaceDir s
 			testFrameworks := []struct {
 				name    string
 				pattern string
-				ftype   analyze.TestFrameworkType
+				ftype   analyze.TestType
 			}{
-				{"pytest", "pytest", analyze.TestFrameworkTypeUnit},
-				{"unittest", "unittest", analyze.TestFrameworkTypeUnit},
-				{"nose", "nose", analyze.TestFrameworkTypeUnit},
-				{"selenium", "selenium", analyze.TestFrameworkTypeE2E},
+				{"pytest", "pytest", analyze.TestTypeUnit},
+				{"unittest", "unittest", analyze.TestTypeUnit},
+				{"nose", "nose", analyze.TestTypeUnit},
+				{"selenium", "selenium", analyze.TestTypeEnd2End},
 			}
 
 			for _, fw := range testFrameworks {
 				if strings.Contains(contentStr, fw.pattern) {
 					frameworks = append(frameworks, analyze.TestFramework{
-						Name:     fw.name,
-						Type:     fw.ftype,
-						Version:  "unknown",
-						Coverage: 0.0,
+						Name:       fw.name,
+						Type:       fw.ftype,
+						Confidence: analyze.ConfidenceMedium,
 					})
 				}
 			}
@@ -1392,21 +1407,20 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJavaTestFrameworks(workspaceDir str
 			testFrameworks := []struct {
 				name    string
 				pattern string
-				ftype   analyze.TestFrameworkType
+				ftype   analyze.TestType
 			}{
-				{"junit", "junit", analyze.TestFrameworkTypeUnit},
-				{"testng", "testng", analyze.TestFrameworkTypeUnit},
-				{"mockito", "mockito", analyze.TestFrameworkTypeUnit},
-				{"selenium", "selenium", analyze.TestFrameworkTypeE2E},
+				{"junit", "junit", analyze.TestTypeUnit},
+				{"testng", "testng", analyze.TestTypeUnit},
+				{"mockito", "mockito", analyze.TestTypeUnit},
+				{"selenium", "selenium", analyze.TestTypeEnd2End},
 			}
 
 			for _, fw := range testFrameworks {
 				if strings.Contains(contentStr, fw.pattern) {
 					frameworks = append(frameworks, analyze.TestFramework{
-						Name:     fw.name,
-						Type:     fw.ftype,
-						Version:  "unknown",
-						Coverage: 0.0,
+						Name:       fw.name,
+						Type:       fw.ftype,
+						Confidence: analyze.ConfidenceMedium,
 					})
 				}
 			}

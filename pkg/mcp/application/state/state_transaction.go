@@ -27,7 +27,7 @@ const (
 
 // StateTransaction provides atomic state updates across multiple state types
 type StateTransaction struct {
-	manager    *UnifiedStateManager
+	manager    UnifiedStateService
 	operations []StateOperation
 	ctx        context.Context
 	committed  bool

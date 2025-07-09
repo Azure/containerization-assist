@@ -53,15 +53,13 @@ func (c Config) Validate() error {
 	}
 
 	if c.BufferSize < 0 {
-		return errors.NewError().Messagef("buffer size cannot be negative").Build(
-
-		// CreateLogger creates a properly configured logger for stdio transport
-		)
+		return errors.NewError().Messagef("buffer size cannot be negative").Build()
 	}
 
 	return nil
 }
 
+// CreateLogger creates a properly configured logger for stdio transport
 func (c Config) CreateLogger() zerolog.Logger {
 	logger := c.Logger.With().
 		Str("transport", "stdio").

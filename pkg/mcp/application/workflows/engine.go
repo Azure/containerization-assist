@@ -119,7 +119,7 @@ func (swe *SimpleWorkflowExecutor) ExecuteCustomWorkflow(ctx context.Context, sp
 // GetWorkflowStatus returns workflow status (simplified)
 func (swe *SimpleWorkflowExecutor) GetWorkflowStatus(sessionID string) (string, error) {
 	// Simple implementation - check if session exists
-	_, err := swe.sessionManager.GetSession(context.Background(), sessionID)
+	_, err := swe.sessionManager.GetSession(sessionID)
 	if err != nil {
 		return "not_found", err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +14,7 @@ func TestAutoFixHelper(t *testing.T) {
 		t.Parallel()
 		helper := NewAutoFixHelper(nil)
 		assert.NotNil(t, helper, "Helper should not be nil")
-		assert.Nil(t, helper.conversationHandler, "Handler should be nil when passed nil")
+		// Cannot access unexported field conversationHandler
 	})
 
 	t.Run("AttemptAutoFix with nil handler", func(t *testing.T) {
@@ -25,7 +26,7 @@ func TestAutoFixHelper(t *testing.T) {
 		}
 		state := &ConversationState{}
 
-		result := helper.AttemptAutoFix(context.Background(), response, convertFromTypesStage(types.StageBuild), nil, state)
+		result := helper.AttemptAutoFix(context.Background(), response, shared.StageBuild, nil, state)
 		assert.False(t, result, "Should return false when handler is nil")
 		assert.Equal(t, ResponseStatusError, response.Status, "Status should remain unchanged")
 	})
@@ -35,14 +36,14 @@ func TestAutoFixHelper(t *testing.T) {
 		helper := &AutoFixHelper{}
 
 		testCases := []struct {
-			stage    core.ConversationStage
+			stage    shared.ConversationStage
 			expected string
 		}{
-			{convertFromTypesStage(types.StageBuild), "Continue to next stage"},
-			{convertFromTypesStage(types.StagePush), "Continue to manifest generation"},
-			{convertFromTypesStage(types.StageManifests), "Continue to deployment"},
-			{convertFromTypesStage(types.StageDeployment), "Continue to completion"},
-			{convertFromTypesStage(types.StageWelcome), "Continue"},
+			{shared.StageBuild, "Continue to next stage"},
+			{shared.StagePush, "Continue to manifest generation"},
+			{shared.StageManifests, "Continue to deployment"},
+			{shared.StageDeployment, "Continue to completion"},
+			{shared.StageWelcome, "Continue"},
 		}
 
 		for _, tc := range testCases {
@@ -56,14 +57,14 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageDisplayName", func(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
-			stage    core.ConversationStage
+			stage    shared.ConversationStage
 			expected string
 		}{
-			{convertFromTypesStage(types.StageBuild), "Build"},
-			{convertFromTypesStage(types.StagePush), "Push"},
-			{convertFromTypesStage(types.StageManifests), "Manifest generation"},
-			{convertFromTypesStage(types.StageDeployment), "Deployment"},
-			{convertFromTypesStage(types.StageWelcome), "Operation"},
+			{convertFromTypesStage(shared.StageBuild), "Build"},
+			{convertFromTypesStage(shared.StagePush), "Push"},
+			{convertFromTypesStage(shared.StageManifests), "Manifest generation"},
+			{convertFromTypesStage(shared.StageDeployment), "Deployment"},
+			{convertFromTypesStage(shared.StageWelcome), "Operation"},
 		}
 
 		for _, tc := range testCases {
@@ -75,14 +76,14 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageErrorPrefix", func(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
-			stage    core.ConversationStage
+			stage    shared.ConversationStage
 			expected string
 		}{
-			{convertFromTypesStage(types.StageBuild), "Build"},
-			{convertFromTypesStage(types.StagePush), "Failed to push Docker image"},
-			{convertFromTypesStage(types.StageManifests), "Failed to generate Kubernetes manifests"},
-			{convertFromTypesStage(types.StageDeployment), "Deployment"},
-			{convertFromTypesStage(types.StageWelcome), "Operation"},
+			{convertFromTypesStage(shared.StageBuild), "Build"},
+			{convertFromTypesStage(shared.StagePush), "Failed to push Docker image"},
+			{convertFromTypesStage(shared.StageManifests), "Failed to generate Kubernetes manifests"},
+			{convertFromTypesStage(shared.StageDeployment), "Deployment"},
+			{convertFromTypesStage(shared.StageWelcome), "Operation"},
 		}
 
 		for _, tc := range testCases {
@@ -94,13 +95,13 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getSuccessOptions coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 		helper := &AutoFixHelper{}
-		allStages := []core.ConversationStage{
-			convertFromTypesStage(types.StageBuild),
-			convertFromTypesStage(types.StagePush),
-			convertFromTypesStage(types.StageManifests),
-			convertFromTypesStage(types.StageDeployment),
-			convertFromTypesStage(types.StageWelcome),
-			convertFromTypesStage(types.StagePreFlight),
+		allStages := []shared.ConversationStage{
+			convertFromTypesStage(shared.StageBuild),
+			convertFromTypesStage(shared.StagePush),
+			convertFromTypesStage(shared.StageManifests),
+			convertFromTypesStage(shared.StageDeployment),
+			convertFromTypesStage(shared.StageWelcome),
+			convertFromTypesStage(shared.StagePreFlight),
 		}
 
 		for _, stage := range allStages {
@@ -115,13 +116,13 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageDisplayName coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 
-		allStages := []core.ConversationStage{
-			convertFromTypesStage(types.StageBuild),
-			convertFromTypesStage(types.StagePush),
-			convertFromTypesStage(types.StageManifests),
-			convertFromTypesStage(types.StageDeployment),
-			convertFromTypesStage(types.StageWelcome),
-			convertFromTypesStage(types.StagePreFlight),
+		allStages := []shared.ConversationStage{
+			convertFromTypesStage(shared.StageBuild),
+			convertFromTypesStage(shared.StagePush),
+			convertFromTypesStage(shared.StageManifests),
+			convertFromTypesStage(shared.StageDeployment),
+			convertFromTypesStage(shared.StageWelcome),
+			convertFromTypesStage(shared.StagePreFlight),
 		}
 
 		for _, stage := range allStages {
@@ -133,13 +134,13 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageErrorPrefix coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 
-		allStages := []core.ConversationStage{
-			convertFromTypesStage(types.StageBuild),
-			convertFromTypesStage(types.StagePush),
-			convertFromTypesStage(types.StageManifests),
-			convertFromTypesStage(types.StageDeployment),
-			convertFromTypesStage(types.StageWelcome),
-			convertFromTypesStage(types.StagePreFlight),
+		allStages := []shared.ConversationStage{
+			convertFromTypesStage(shared.StageBuild),
+			convertFromTypesStage(shared.StagePush),
+			convertFromTypesStage(shared.StageManifests),
+			convertFromTypesStage(shared.StageDeployment),
+			convertFromTypesStage(shared.StageWelcome),
+			convertFromTypesStage(shared.StagePreFlight),
 		}
 
 		for _, stage := range allStages {

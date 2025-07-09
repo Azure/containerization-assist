@@ -89,12 +89,21 @@ type Framework struct {
 type FrameworkType string
 
 const (
-	FrameworkTypeWeb     FrameworkType = "web"
-	FrameworkTypeAPI     FrameworkType = "api"
-	FrameworkTypeCLI     FrameworkType = "cli"
-	FrameworkTypeLibrary FrameworkType = "library"
-	FrameworkTypeTest    FrameworkType = "test"
-	FrameworkTypeORM     FrameworkType = "orm"
+	FrameworkTypeWeb      FrameworkType = "web"
+	FrameworkTypeAPI      FrameworkType = "api"
+	FrameworkTypeCLI      FrameworkType = "cli"
+	FrameworkTypeLibrary  FrameworkType = "library"
+	FrameworkTypeTest     FrameworkType = "test"
+	FrameworkTypeORM      FrameworkType = "orm"
+	FrameworkTypeUnknown  FrameworkType = "unknown"
+	FrameworkTypeNone     FrameworkType = "none"
+	FrameworkTypeConfig   FrameworkType = "config"
+	FrameworkTypeStandard FrameworkType = "standard"
+	FrameworkTypeDesktop  FrameworkType = "desktop"
+	FrameworkTypeRuntime  FrameworkType = "runtime"
+	FrameworkTypeData     FrameworkType = "data"
+	FrameworkTypeML       FrameworkType = "ml"
+	FrameworkTypeMobile   FrameworkType = "mobile"
 )
 
 // Dependency represents a project dependency
@@ -212,6 +221,13 @@ const (
 	SecurityTypeEncryption    SecurityType = "encryption"
 )
 
+// Alternative naming for backward compatibility
+const (
+	SecurityIssueTypeSecret        = SecurityTypeSecret
+	SecurityIssueTypeVulnerability = SecurityTypeVulnerability
+	SecurityIssueTypeCompliance    = SecurityTypePermission // Using permission as closest match
+)
+
 // Recommendation represents an analysis recommendation
 type Recommendation struct {
 	Type        RecommendationType `json:"type"`
@@ -267,6 +283,7 @@ type AnalysisMetadata struct {
 	FilesAnalyzed int           `json:"files_analyzed"`
 	ErrorCount    int           `json:"error_count,omitempty"`
 	Warnings      []string      `json:"warnings,omitempty"`
+	Options       interface{}   `json:"options,omitempty"`
 }
 
 // Confidence and priority levels

@@ -67,7 +67,7 @@ func (b *BaseCommand) createErrorOutput(code string, message string, cause error
 		Success: false,
 		Data: map[string]interface{}{
 			"error": errors.NewError().
-				Code(code).
+				Code(errors.ErrorCode(code)).
 				Message(message).
 				Cause(cause).
 				Build(),
@@ -171,7 +171,7 @@ func InitializeCommands(
 	logger *slog.Logger,
 ) {
 	// Initialize consolidated commands
-	analyzeCmd := NewConsolidatedAnalyzeCommand(sessionStore, sessionState, nil, nil, logger)
+	analyzeCmd := NewConsolidatedAnalyzeCommand(sessionStore, sessionState, logger, nil)
 	buildCmd := NewConsolidatedBuildCommand(sessionStore, sessionState, nil, logger)
 	deployCmd := NewConsolidatedDeployCommand(sessionStore, sessionState, nil, logger)
 	scanCmd := NewConsolidatedScanCommand(sessionStore, sessionState, nil, logger)

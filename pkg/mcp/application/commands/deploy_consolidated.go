@@ -147,9 +147,8 @@ func (cmd *ConsolidatedDeployCommand) parseDeployInput(input api.ToolInput) (*De
 			CPULimit:    getStringParam(input.Data, "cpu_limit", "500m"),
 			MemoryLimit: getStringParam(input.Data, "memory_limit", "512Mi"),
 		},
-		Ports:       cmd.parsePortsFromInput(input.Data),
-		Environment: deploy.Environment(getStringParam(input.Data, "environment", "development")),
-		CreatedAt:   time.Now(),
+		Ports:     cmd.parsePortsFromInput(input.Data),
+		CreatedAt: time.Now(),
 	}
 
 	// Validate required fields based on operation

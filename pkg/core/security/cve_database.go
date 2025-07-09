@@ -798,6 +798,8 @@ func (db *CVEDatabase) GetCacheStats() map[string]interface{} {
 	return map[string]interface{}{
 		"total_entries": len(db.cache.cache),
 		"ttl_hours":     db.cache.ttl.Hours(),
+		"hit_count":     0, // TODO: Add hit counter to cache
+		"miss_count":    0, // TODO: Add miss counter to cache
 	}
 }
 

@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 type WorkflowError struct {
@@ -32,28 +34,28 @@ type ErrorAction struct {
 	Metadata   map[string]interface{} `json:"metadata"`
 	Parameters map[string]interface{} `json:"parameters"`
 }
-type UserPreferences = types.UserPreferences
+type UserPreferences = shared.UserPreferences
 
 type ConversationHandler struct {
 	promptManager    *PromptManager
-	sessionManager   *session.SessionManager
-	toolOrchestrator core.ToolOrchestrator
-	preferenceStore  *utils.PreferenceStore
+	sessionManager   session.SessionManager
+	toolOrchestrator api.Orchestrator
+	preferenceStore  *shared.PreferenceStore
 	logger           *slog.Logger
 }
 type ConversationHandlerConfig struct {
-	SessionManager     *session.SessionManager
-	SessionAdapter     *session.SessionManager
-	PreferenceStore    *utils.PreferenceStore
-	PipelineOperations core.TypedPipelineOperations
-	ToolOrchestrator   core.ToolOrchestrator
+	SessionManager     session.SessionManager
+	SessionAdapter     session.SessionManager
+	PreferenceStore    *shared.PreferenceStore
+	PipelineOperations interface{} // TypedPipelineOperations - not used, keeping for compatibility
+	ToolOrchestrator   api.Orchestrator
 	Transport          interface{}
 	Logger             *slog.Logger
 }
 
 func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHandler, error) {
 
-	var toolOrchestrator core.ToolOrchestrator
+	var toolOrchestrator api.Orchestrator
 	if config.ToolOrchestrator != nil {
 
 		toolOrchestrator = config.ToolOrchestrator
@@ -80,14 +82,14 @@ func NewConversationHandler(config ConversationHandlerConfig) (*ConversationHand
 
 	return handler, nil
 }
-func (ch *ConversationHandler) HandleConversation(ctx context.Context, args conversation.ChatToolArgs) (*conversation.ChatToolResult, error) {
+func (ch *ConversationHandler) HandleConversation(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 	if args.Message == "" {
 		return nil, errors.NewError().Messagef("message parameter is required").WithLocation().Build()
 	}
 
 	response, err := ch.promptManager.ProcessPrompt(ctx, args.SessionID, args.Message)
 	if err != nil {
-		return &conversation.ChatToolResult{
+		return &ChatToolResult{
 			Success: false,
 			Message: fmt.Sprintf("Failed to process prompt: %v", err),
 		}, nil
@@ -98,7 +100,7 @@ func (ch *ConversationHandler) HandleConversation(ctx context.Context, args conv
 
 		finalResponse = response
 	}
-	result := &conversation.ChatToolResult{
+	result := &ChatToolResult{
 		Success:   true,
 		SessionID: finalResponse.SessionID,
 		Message:   finalResponse.Message,
@@ -138,7 +140,7 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 	if response == nil {
 		return response, nil
 	}
-	var userPrefs types.UserPreferences = types.UserPreferences{
+	var userPrefs shared.UserPreferences = shared.UserPreferences{
 		SkipConfirmations: false,
 	}
 	if sessionID := response.SessionID; sessionID != "" {
@@ -188,7 +190,7 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 
 	return currentResponse, nil
 }
-func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID string, stage core.ConversationStage, err error, state *ConversationState) (*AutoFixResult, error) {
+func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID string, stage shared.ConversationStage, err error, state *ConversationState) (*AutoFixResult, error) {
 	ch.logger.Info("Attempting automatic fix before manual intervention",
 		"session_id", sessionID,
 		"stage", string(stage),
@@ -280,15 +282,15 @@ type AutoFixResult struct {
 	Message         string   `json:"message"`
 }
 
-func (ch *ConversationHandler) getToolNameForStage(stage core.ConversationStage) string {
+func (ch *ConversationHandler) getToolNameForStage(stage shared.ConversationStage) string {
 	switch stage {
-	case core.ConversationStageDockerfile, core.ConversationStageBuild:
+	case shared.StageDockerfile, shared.StageBuild:
 		return "build_image"
-	case core.ConversationStagePush:
+	case shared.StagePush:
 		return "push_image"
-	case core.ConversationStageDeploy:
+	case shared.StageDeployment:
 		return "deploy_kubernetes"
-	case core.ConversationStageManifests:
+	case shared.StageManifests:
 		return "generate_manifests"
 	default:
 		return "unknown"
@@ -333,7 +335,7 @@ func (ch *ConversationHandler) getErrorSeverity(err error) string {
 	}
 }
 
-func (ch *ConversationHandler) attemptRetryFix(ctx context.Context, sessionID string, stage core.ConversationStage, action *ErrorAction) bool {
+func (ch *ConversationHandler) attemptRetryFix(ctx context.Context, sessionID string, stage shared.ConversationStage, action *ErrorAction) bool {
 
 	convState, err := ch.prepareRetrySession(sessionID)
 	if err != nil {
@@ -412,14 +414,14 @@ func (ch *ConversationHandler) loadConversationHistory(convState *ConversationSt
 	}
 	return convState
 }
-func (ch *ConversationHandler) findOrBuildLastToolCall(convState *ConversationState, stage core.ConversationStage) *ToolCall {
+func (ch *ConversationHandler) findOrBuildLastToolCall(convState *ConversationState, stage shared.ConversationStage) *ToolCall {
 
 	if lastToolCall := ch.findLastToolCallInHistory(convState, stage); lastToolCall != nil {
 		return lastToolCall
 	}
 	return ch.buildToolCallFromMetadata(convState.SessionState, stage)
 }
-func (ch *ConversationHandler) findLastToolCallInHistory(convState *ConversationState, stage core.ConversationStage) *ToolCall {
+func (ch *ConversationHandler) findLastToolCallInHistory(convState *ConversationState, stage shared.ConversationStage) *ToolCall {
 	if len(convState.History) == 0 {
 		return nil
 	}
@@ -438,7 +440,7 @@ func (ch *ConversationHandler) findLastToolCallInHistory(convState *Conversation
 	}
 	return nil
 }
-func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *session.SessionState, stage core.ConversationStage) *ToolCall {
+func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *session.SessionState, stage shared.ConversationStage) *ToolCall {
 	toolName := ch.getToolNameForStage(stage)
 	params := make(map[string]interface{})
 	params["session_id"] = internalSession.SessionID
@@ -447,9 +449,9 @@ func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *sessio
 		return &ToolCall{Tool: toolName, Parameters: params}
 	}
 	switch stage {
-	case core.ConversationStageBuild:
+	case shared.StageBuild:
 		ch.addBuildParameters(params, internalSession.Metadata)
-	case core.ConversationStageDeploy:
+	case shared.StageDeployment:
 		ch.addDeploymentParameters(params, internalSession.Metadata)
 	}
 
@@ -603,14 +605,14 @@ func (ch *ConversationHandler) attemptRedirectFix(ctx context.Context, sessionID
 	return true
 }
 
-func (ch *ConversationHandler) generateFallbackOptions(stage core.ConversationStage, _ error, action *ErrorAction) []Option {
+func (ch *ConversationHandler) generateFallbackOptions(stage shared.ConversationStage, _ error, action *ErrorAction) []Option {
 	var options []Option
 	options = append(options, Option{
 		ID:    "retry",
 		Label: "Retry operation",
 	})
 	switch stage {
-	case core.ConversationStageBuild:
+	case shared.StageBuild:
 		options = append(options, Option{
 			ID:    "logs",
 			Label: "Show build logs",
@@ -620,7 +622,7 @@ func (ch *ConversationHandler) generateFallbackOptions(stage core.ConversationSt
 			Label: "Modify Dockerfile",
 		})
 
-	case core.ConversationStageDeploy:
+	case shared.StageDeployment:
 		options = append(options, Option{
 			ID:    "manifests",
 			Label: "Review manifests",
@@ -630,7 +632,7 @@ func (ch *ConversationHandler) generateFallbackOptions(stage core.ConversationSt
 			Label: "Rebuild image",
 		})
 
-	case core.ConversationStageManifests:
+	case shared.StageManifests:
 		options = append(options, Option{
 			ID:    "regenerate",
 			Label: "Regenerate manifests",

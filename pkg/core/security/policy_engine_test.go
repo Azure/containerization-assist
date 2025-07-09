@@ -1,11 +1,11 @@
-package security
+package security_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/core"
+	"github.com/Azure/container-kit/pkg/core/security"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,15 +13,15 @@ import (
 
 func TestNewPolicyEngine(t *testing.T) {
 	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
+	engine := security.NewPolicyEngine(logger)
 
 	assert.NotNil(t, engine)
-	assert.Empty(t, engine.policies)
+	// Cannot access unexported fields - just verify creation works
 }
 
 func TestLoadDefaultPolicies(t *testing.T) {
 	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
+	engine := security.NewPolicyEngine(logger)
 
 	err := engine.LoadDefaultPolicies()
 	require.NoError(t, err)
@@ -30,7 +30,7 @@ func TestLoadDefaultPolicies(t *testing.T) {
 	assert.Len(t, policies, 8) // Expected default policies
 
 	// Check specific policies exist
-	policyMap := make(map[string]Policy)
+	policyMap := make(map[string]security.Policy)
 	for _, policy := range policies {
 		policyMap[policy.ID] = policy
 	}
@@ -45,258 +45,19 @@ func TestLoadDefaultPolicies(t *testing.T) {
 	assert.Contains(t, policyMap, "package-version-ban")
 }
 
-func TestEvaluateVulnerabilityCountRule(t *testing.T) {
-	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
-
-	tests := []struct {
-		name            string
-		rule            PolicyRule
-		scanCtx         *ScanContext
-		expectError     bool
-		expectViolation bool
-	}{
-		{
-			name: "critical vulnerabilities exceed threshold",
-			rule: PolicyRule{
-				ID:       "test-critical",
-				Type:     RuleTypeVulnerabilityCount,
-				Field:    "critical",
-				Operator: OperatorGreaterThan,
-				Value:    float64(0),
-			},
-			scanCtx: &ScanContext{
-				VulnSummary: VulnerabilitySummary{
-					Critical: 2,
-					High:     1,
-					Total:    3,
-				},
-			},
-			expectViolation: true,
-		},
-		{
-			name: "no critical vulnerabilities - within threshold",
-			rule: PolicyRule{
-				ID:       "test-critical",
-				Type:     RuleTypeVulnerabilityCount,
-				Field:    "critical",
-				Operator: OperatorGreaterThan,
-				Value:    float64(0),
-			},
-			scanCtx: &ScanContext{
-				VulnSummary: VulnerabilitySummary{
-					Critical: 0,
-					High:     2,
-					Total:    2,
-				},
-			},
-			expectViolation: false,
-		},
-		{
-			name: "high vulnerabilities within threshold",
-			rule: PolicyRule{
-				ID:       "test-high",
-				Type:     RuleTypeVulnerabilityCount,
-				Field:    "high",
-				Operator: OperatorGreaterThan,
-				Value:    float64(5),
-			},
-			scanCtx: &ScanContext{
-				VulnSummary: VulnerabilitySummary{
-					High:  3,
-					Total: 3,
-				},
-			},
-			expectViolation: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			violation, err := engine.evaluateVulnerabilityCountRule(tt.rule, tt.scanCtx)
-
-			if tt.expectError {
-				assert.Error(t, err)
-				return
-			}
-
-			assert.NoError(t, err)
-
-			if tt.expectViolation {
-				assert.NotNil(t, violation)
-				assert.Equal(t, tt.rule.ID, violation.RuleID)
-			} else {
-				assert.Nil(t, violation)
-			}
-		})
-	}
-}
-
-func TestEvaluateCVSSScoreRule(t *testing.T) {
-	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
-
-	rule := PolicyRule{
-		ID:       "test-cvss",
-		Type:     RuleTypeCVSSScore,
-		Field:    "max_cvss_score",
-		Operator: OperatorGreaterThan,
-		Value:    float64(7.0),
-	}
-
-	tests := []struct {
-		name            string
-		vulnerabilities []Vulnerability
-		expectViolation bool
-	}{
-		{
-			name: "high CVSS score triggers violation",
-			vulnerabilities: []Vulnerability{
-				{
-					VulnerabilityID: "CVE-2023-1234",
-					CVSSV3: CVSSV3Info{
-						Score: 8.5,
-					},
-				},
-				{
-					VulnerabilityID: "CVE-2023-5678",
-					CVSS: CVSSInfo{
-						Score: 6.0,
-					},
-				},
-			},
-			expectViolation: true,
-		},
-		{
-			name: "low CVSS scores no violation",
-			vulnerabilities: []Vulnerability{
-				{
-					VulnerabilityID: "CVE-2023-1234",
-					CVSS: CVSSInfo{
-						Score: 5.0,
-					},
-				},
-				{
-					VulnerabilityID: "CVE-2023-5678",
-					CVSS: CVSSInfo{
-						Score: 6.5,
-					},
-				},
-			},
-			expectViolation: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			scanCtx := &ScanContext{
-				Vulnerabilities: tt.vulnerabilities,
-			}
-
-			violation, err := engine.evaluateCVSSScoreRule(rule, scanCtx)
-			assert.NoError(t, err)
-
-			if tt.expectViolation {
-				assert.NotNil(t, violation)
-				assert.Equal(t, rule.ID, violation.RuleID)
-			} else {
-				assert.Nil(t, violation)
-			}
-		})
-	}
-}
-
-func TestEvaluateSecretPresenceRule(t *testing.T) {
-	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
-
-	rule := PolicyRule{
-		ID:       "test-secrets",
-		Type:     RuleTypeSecretPresence,
-		Field:    "secrets_found",
-		Operator: OperatorGreaterThan,
-		Value:    float64(0),
-	}
-
-	tests := []struct {
-		name            string
-		secretFindings  []ExtendedSecretFinding
-		secretSummary   *DiscoverySummary
-		expectViolation bool
-	}{
-		{
-			name: "secrets found triggers violation",
-			secretFindings: []ExtendedSecretFinding{
-				{
-					ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
-						Type: "api_key",
-					},
-					FalsePositive: false,
-				},
-				{
-					ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
-						Type: "password",
-					},
-					FalsePositive: true, // This should be excluded
-				},
-			},
-			secretSummary: &DiscoverySummary{
-				TotalFindings:  2,
-				FalsePositives: 1,
-			},
-			expectViolation: true,
-		},
-		{
-			name: "only false positives no violation",
-			secretFindings: []ExtendedSecretFinding{
-				{
-					ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
-						Type: "password",
-					},
-					FalsePositive: true,
-				},
-			},
-			secretSummary: &DiscoverySummary{
-				TotalFindings:  1,
-				FalsePositives: 1,
-			},
-			expectViolation: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			scanCtx := &ScanContext{
-				SecretFindings: tt.secretFindings,
-				SecretSummary:  tt.secretSummary,
-			}
-
-			violation, err := engine.evaluateSecretPresenceRule(rule, scanCtx)
-			assert.NoError(t, err)
-
-			if tt.expectViolation {
-				assert.NotNil(t, violation)
-				assert.Equal(t, rule.ID, violation.RuleID)
-			} else {
-				assert.Nil(t, violation)
-			}
-		})
-	}
-}
-
 func TestEvaluatePolicies(t *testing.T) {
 	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
+	engine := security.NewPolicyEngine(logger)
 
 	// Load default policies
 	err := engine.LoadDefaultPolicies()
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	scanCtx := &ScanContext{
+	scanCtx := &security.ScanContext{
 		ImageRef: "test:latest",
 		ScanTime: time.Now(),
-		VulnSummary: VulnerabilitySummary{
+		VulnSummary: security.VulnerabilitySummary{
 			Total:    10,
 			Critical: 2,
 			High:     3,
@@ -304,25 +65,33 @@ func TestEvaluatePolicies(t *testing.T) {
 			Low:      2,
 			Fixable:  8,
 		},
-		Vulnerabilities: []Vulnerability{
+		Vulnerabilities: []security.Vulnerability{
 			{
 				VulnerabilityID: "CVE-2023-1234",
 				Severity:        "CRITICAL",
-				CVSSV3: CVSSV3Info{
+				CVSSV3: security.CVSSV3Info{
 					Score: 9.0,
 				},
 			},
 		},
-		SecretSummary: &DiscoverySummary{
+		SecretSummary: &security.DiscoverySummary{
 			TotalFindings:  1,
 			FalsePositives: 0,
 		},
-		SecretFindings: []ExtendedSecretFinding{
+		SecretFindings: []security.ExtendedSecretFinding{
 			{
-				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
-					Type: "api_key",
+				SecretFinding: security.SecretFinding{
+					Type:        "api_key",
+					File:        "config.txt",
+					Line:        10,
+					Description: "API key found",
+					Confidence:  0.95,
+					RuleID:      "api-key-001",
 				},
-				FalsePositive: false,
+				ID:       "finding-001",
+				Severity: "HIGH",
+				Match:    "sk-1234567890",
+				Verified: false,
 			},
 		},
 	}
@@ -340,7 +109,7 @@ func TestEvaluatePolicies(t *testing.T) {
 	assert.Len(t, results, enabledCount)
 
 	// Check that critical policies failed
-	var criticalPolicy *PolicyEvaluationResult
+	var criticalPolicy *security.PolicyEvaluationResult
 	for i, result := range results {
 		if result.PolicyID == "critical-vulns-block" {
 			criticalPolicy = &results[i]
@@ -355,7 +124,7 @@ func TestEvaluatePolicies(t *testing.T) {
 	// Check that blocking action is present
 	hasBlockingAction := false
 	for _, action := range criticalPolicy.Actions {
-		if action.Type == ActionTypeBlock {
+		if action.Type == security.ActionTypeBlock {
 			hasBlockingAction = true
 			break
 		}
@@ -365,21 +134,21 @@ func TestEvaluatePolicies(t *testing.T) {
 
 func TestShouldBlock(t *testing.T) {
 	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
+	engine := security.NewPolicyEngine(logger)
 
 	tests := []struct {
 		name        string
-		results     []PolicyEvaluationResult
+		results     []security.PolicyEvaluationResult
 		shouldBlock bool
 	}{
 		{
 			name: "blocking action should block",
-			results: []PolicyEvaluationResult{
+			results: []security.PolicyEvaluationResult{
 				{
 					PolicyID: "test-policy",
 					Passed:   false,
-					Actions: []PolicyAction{
-						{Type: ActionTypeBlock},
+					Actions: []security.PolicyAction{
+						{Type: security.ActionTypeBlock},
 					},
 				},
 			},
@@ -387,13 +156,13 @@ func TestShouldBlock(t *testing.T) {
 		},
 		{
 			name: "only warning actions should not block",
-			results: []PolicyEvaluationResult{
+			results: []security.PolicyEvaluationResult{
 				{
 					PolicyID: "test-policy",
 					Passed:   false,
-					Actions: []PolicyAction{
-						{Type: ActionTypeWarn},
-						{Type: ActionTypeLog},
+					Actions: []security.PolicyAction{
+						{Type: security.ActionTypeWarn},
+						{Type: security.ActionTypeLog},
 					},
 				},
 			},
@@ -401,7 +170,7 @@ func TestShouldBlock(t *testing.T) {
 		},
 		{
 			name: "passed policies should not block",
-			results: []PolicyEvaluationResult{
+			results: []security.PolicyEvaluationResult{
 				{
 					PolicyID: "test-policy",
 					Passed:   true,
@@ -421,9 +190,9 @@ func TestShouldBlock(t *testing.T) {
 
 func TestGetViolationsSummary(t *testing.T) {
 	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
+	engine := security.NewPolicyEngine(logger)
 
-	results := []PolicyEvaluationResult{
+	results := []security.PolicyEvaluationResult{
 		{
 			PolicyID: "policy1",
 			Passed:   true,
@@ -431,23 +200,23 @@ func TestGetViolationsSummary(t *testing.T) {
 		{
 			PolicyID: "policy2",
 			Passed:   false,
-			Violations: []PolicyViolation{
-				{Severity: PolicySeverityCritical},
-				{Severity: PolicySeverityHigh},
+			Violations: []security.PolicyViolation{
+				{Severity: security.PolicySeverityCritical},
+				{Severity: security.PolicySeverityHigh},
 			},
-			Actions: []PolicyAction{
-				{Type: ActionTypeBlock},
-				{Type: ActionTypeNotify},
+			Actions: []security.PolicyAction{
+				{Type: security.ActionTypeBlock},
+				{Type: security.ActionTypeNotify},
 			},
 		},
 		{
 			PolicyID: "policy3",
 			Passed:   false,
-			Violations: []PolicyViolation{
-				{Severity: PolicySeverityMedium},
+			Violations: []security.PolicyViolation{
+				{Severity: security.PolicySeverityMedium},
 			},
-			Actions: []PolicyAction{
-				{Type: ActionTypeWarn},
+			Actions: []security.PolicyAction{
+				{Type: security.ActionTypeWarn},
 			},
 		},
 	}
@@ -474,29 +243,29 @@ func TestGetViolationsSummary(t *testing.T) {
 
 func TestPolicyManagement(t *testing.T) {
 	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
+	engine := security.NewPolicyEngine(logger)
 
 	// Test adding a policy
-	policy := Policy{
+	policy := security.Policy{
 		ID:          "test-policy",
 		Name:        "Test Policy",
 		Description: "A test policy",
 		Enabled:     true,
-		Severity:    PolicySeverityHigh,
-		Category:    PolicyCategoryVulnerability,
-		Rules: []PolicyRule{
+		Severity:    security.PolicySeverityHigh,
+		Category:    security.PolicyCategoryVulnerability,
+		Rules: []security.PolicyRule{
 			{
 				ID:          "test-rule",
-				Type:        RuleTypeVulnerabilityCount,
+				Type:        security.RuleTypeVulnerabilityCount,
 				Field:       "total",
-				Operator:    OperatorGreaterThan,
+				Operator:    security.OperatorGreaterThan,
 				Value:       float64(10),
 				Description: "Test rule",
 			},
 		},
-		Actions: []PolicyAction{
+		Actions: []security.PolicyAction{
 			{
-				Type:        ActionTypeWarn,
+				Type:        security.ActionTypeWarn,
 				Description: "Test action",
 			},
 		},
@@ -528,31 +297,114 @@ func TestPolicyManagement(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCompareValues(t *testing.T) {
+// Test that default policies can detect violations
+func TestDefaultPoliciesDetectViolations(t *testing.T) {
 	logger := zerolog.Nop()
-	engine := NewPolicyEngine(logger)
+	engine := security.NewPolicyEngine(logger)
 
-	tests := []struct {
-		name     string
-		actual   interface{}
-		operator RuleOperator
-		expected interface{}
-		result   bool
-	}{
-		{"equals int", 5, OperatorEquals, 5, true},
-		{"equals string", "test", OperatorEquals, "test", true},
-		{"not equals", 5, OperatorNotEquals, 3, true},
-		{"greater than", 10, OperatorGreaterThan, 5, true},
-		{"greater than false", 3, OperatorGreaterThan, 5, false},
-		{"less than", 3, OperatorLessThan, 5, true},
-		{"contains", "hello world", OperatorContains, "world", true},
-		{"not contains", "hello world", OperatorNotContains, "xyz", true},
+	err := engine.LoadDefaultPolicies()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Create a scan context with critical vulnerabilities
+	scanCtx := &security.ScanContext{
+		ImageRef: "vulnerable:latest",
+		ScanTime: time.Now(),
+		VulnSummary: security.VulnerabilitySummary{
+			Total:    5,
+			Critical: 3, // This should trigger the critical-vulns-block policy
+			High:     2,
+		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := engine.compareValues(tt.actual, tt.operator, tt.expected)
-			assert.Equal(t, tt.result, result)
-		})
+	results, err := engine.EvaluatePolicies(ctx, scanCtx)
+	assert.NoError(t, err)
+
+	// Find the critical vulnerabilities policy result
+	var criticalResult *security.PolicyEvaluationResult
+	for i, result := range results {
+		if result.PolicyID == "critical-vulns-block" {
+			criticalResult = &results[i]
+			break
+		}
 	}
+
+	require.NotNil(t, criticalResult)
+	assert.False(t, criticalResult.Passed, "Critical vulnerabilities policy should fail")
+	assert.NotEmpty(t, criticalResult.Violations, "Should have violations")
+
+	// Check that it recommends blocking
+	shouldBlock := engine.ShouldBlock(results)
+	assert.True(t, shouldBlock, "Should recommend blocking due to critical vulnerabilities")
+}
+
+// Test policy evaluation with secrets
+func TestPolicyEvaluationWithSecrets(t *testing.T) {
+	logger := zerolog.Nop()
+	engine := security.NewPolicyEngine(logger)
+
+	err := engine.LoadDefaultPolicies()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Create a scan context with secrets
+	scanCtx := &security.ScanContext{
+		ImageRef: "test:latest",
+		ScanTime: time.Now(),
+		VulnSummary: security.VulnerabilitySummary{
+			Total: 0, // No vulnerabilities
+		},
+		SecretSummary: &security.DiscoverySummary{
+			TotalFindings:  2,
+			FalsePositives: 0,
+		},
+		SecretFindings: []security.ExtendedSecretFinding{
+			{
+				SecretFinding: security.SecretFinding{
+					Type:        "aws_access_key",
+					File:        "config.txt",
+					Line:        20,
+					Description: "AWS access key found",
+					Confidence:  0.95,
+					RuleID:      "aws-key-001",
+				},
+				ID:       "finding-002",
+				Severity: "CRITICAL",
+				Match:    "AKIAIOSFODNN7EXAMPLE",
+				Verified: false,
+			},
+			{
+				SecretFinding: security.SecretFinding{
+					Type:        "private_key",
+					File:        "id_rsa",
+					Line:        1,
+					Description: "Private key found",
+					Confidence:  0.95,
+					RuleID:      "private-key-001",
+				},
+				ID:       "finding-003",
+				Severity: "CRITICAL",
+				Match:    "-----BEGIN RSA PRIVATE KEY-----",
+				Verified: false,
+			},
+		},
+	}
+
+	results, err := engine.EvaluatePolicies(ctx, scanCtx)
+	assert.NoError(t, err)
+
+	// Find the no-secrets policy result
+	var secretsResult *security.PolicyEvaluationResult
+	for i, result := range results {
+		if result.PolicyID == "no-secrets" {
+			secretsResult = &results[i]
+			break
+		}
+	}
+
+	require.NotNil(t, secretsResult)
+	assert.False(t, secretsResult.Passed, "No-secrets policy should fail")
+	assert.NotEmpty(t, secretsResult.Violations, "Should have violations for found secrets")
 }

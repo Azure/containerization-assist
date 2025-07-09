@@ -1,8 +1,8 @@
 package transport
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 	"github.com/rs/zerolog"
 )
 
@@ -87,8 +87,8 @@ func NewDefaultStdioTransport(baseLogger zerolog.Logger) *StdioTransport {
 	return stdioTransport
 }
 
-// NewDefaultCoreStdioTransport creates a stdio transport that implements core.Transport
-func NewDefaultCoreStdioTransport(baseLogger zerolog.Logger) core.Transport {
+// NewDefaultCoreStdioTransport creates a stdio transport that implements Transport
+func NewDefaultCoreStdioTransport(baseLogger zerolog.Logger) shared.Transport {
 	return NewDefaultStdioTransport(baseLogger)
 }
 

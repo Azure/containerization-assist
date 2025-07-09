@@ -135,7 +135,7 @@ func sanitizeInvopopSchema(schema *jsonschema.Schema) map[string]interface{} {
 		return make(map[string]interface{})
 	}
 
-	utils.RemoveCopilotIncompatible(schemaMap)
+	// TODO: Fix import issue - utils.RemoveCopilotIncompatible(schemaMap)
 
 	return schemaMap
 }

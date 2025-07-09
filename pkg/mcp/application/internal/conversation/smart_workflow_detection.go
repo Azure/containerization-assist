@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 type WorkflowIntent int
@@ -25,12 +27,12 @@ type ContainerizationRequest struct {
 	AutoPilot   bool
 }
 type SmartWorkflowDetector struct {
-	pm *PromptManager
+	ps *PromptServiceImpl
 }
 
-func NewSmartWorkflowDetector(pm *PromptManager) *SmartWorkflowDetector {
+func NewSmartWorkflowDetector(ps *PromptServiceImpl) *SmartWorkflowDetector {
 	return &SmartWorkflowDetector{
-		pm: pm,
+		ps: ps,
 	}
 }
 func (swd *SmartWorkflowDetector) DetectContainerizationIntent(ctx context.Context, userInput string) *ContainerizationRequest {
@@ -163,12 +165,12 @@ func (swd *SmartWorkflowDetector) HandleSmartWorkflow(ctx context.Context, state
 
 	default:
 
-		return swd.pm.handleWelcomeStage(ctx, state, userInput)
+		return swd.ps.handleWelcomeStage(ctx, state, userInput)
 	}
 }
 func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Context, state *ConversationState, userInput string, request *ContainerizationRequest) *ConversationResponse {
 
-	swd.pm.enableAutopilot(state)
+	swd.ps.enableAutopilot(state)
 	state.Context["skip_confirmations"] = true
 	state.Context["smart_workflow_detected"] = true
 	state.Context["detected_intent"] = "containerize_app"
@@ -187,17 +189,17 @@ func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Contex
 	message += "**Control**: You can type 'stop' or 'pause' at any time to take manual control\n\n"
 	if request.RepoURL != "" {
 		state.Context["repo_url"] = request.RepoURL
-		state.SetStage(convertFromTypesStage(types.StageAnalysis))
+		state.SetStage(convertFromTypesStage(shared.StageAnalysis))
 		message += fmt.Sprintf("**Repository**: %s\n\n", request.RepoURL)
 		message += "Starting repository analysis..."
 
 		response := &ConversationResponse{
 			Message: message,
-			Stage:   convertFromTypesStage(types.StageAnalysis),
+			Stage:   convertFromTypesStage(shared.StageAnalysis),
 			Status:  ResponseStatusProcessing,
 		}
 
-		return response.WithAutoAdvance(convertFromTypesStage(types.StageAnalysis), AutoAdvanceConfig{
+		return response.WithAutoAdvance(convertFromTypesStage(shared.StageAnalysis), AutoAdvanceConfig{
 			DelaySeconds:  1,
 			Confidence:    0.9,
 			Reason:        "Repository URL detected, starting analysis",
@@ -207,17 +209,17 @@ func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Contex
 
 	} else if request.LocalPath != "" {
 		state.Context["local_path"] = request.LocalPath
-		state.SetStage(convertFromTypesStage(types.StageAnalysis))
+		state.SetStage(convertFromTypesStage(shared.StageAnalysis))
 		message += fmt.Sprintf("**Local Path**: %s\n\n", request.LocalPath)
 		message += "Starting repository analysis..."
 
 		response := &ConversationResponse{
 			Message: message,
-			Stage:   convertFromTypesStage(types.StageAnalysis),
+			Stage:   convertFromTypesStage(shared.StageAnalysis),
 			Status:  ResponseStatusProcessing,
 		}
 
-		return response.WithAutoAdvance(convertFromTypesStage(types.StageAnalysis), AutoAdvanceConfig{
+		return response.WithAutoAdvance(convertFromTypesStage(shared.StageAnalysis), AutoAdvanceConfig{
 			DelaySeconds:  1,
 			Confidence:    0.9,
 			Reason:        "Local path detected, starting analysis",
@@ -227,12 +229,12 @@ func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Contex
 
 	} else {
 
-		state.SetStage(convertFromTypesStage(types.StageInit))
+		state.SetStage(convertFromTypesStage(shared.StageInit))
 		message += "Please provide your repository URL or local path to get started:"
 
 		return &ConversationResponse{
 			Message: message,
-			Stage:   convertFromTypesStage(types.StageInit),
+			Stage:   convertFromTypesStage(shared.StageInit),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -251,7 +253,7 @@ func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Contex
 }
 func (swd *SmartWorkflowDetector) handleInteractiveGuideIntent(ctx context.Context, state *ConversationState, userInput string, request *ContainerizationRequest) *ConversationResponse {
 
-	swd.pm.disableAutopilot(state)
+	swd.ps.disableAutopilot(state)
 	state.Context["smart_workflow_detected"] = true
 	state.Context["detected_intent"] = "interactive_guide"
 
@@ -265,12 +267,12 @@ func (swd *SmartWorkflowDetector) handleInteractiveGuideIntent(ctx context.Conte
 		state.Context["detected_app_type"] = request.AppType
 	}
 
-	state.SetStage(convertFromTypesStage(types.StageInit))
+	state.SetStage(convertFromTypesStage(shared.StageInit))
 	message += "Let's start by analyzing your repository. Please provide the repository URL or local path:"
 
 	return &ConversationResponse{
 		Message: message,
-		Stage:   convertFromTypesStage(types.StageInit),
+		Stage:   convertFromTypesStage(shared.StageInit),
 		Status:  ResponseStatusWaitingInput,
 		Options: []Option{
 			{

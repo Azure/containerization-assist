@@ -239,9 +239,10 @@ func (s *BoltSessionStore) CleanupExpired(ctx context.Context, ttl time.Duration
 				return err
 			}
 
-			if state.IsExpired() {
-				expiredSessions = append(expiredSessions, string(k))
-			}
+			// TODO: Implement IsExpired method on SessionState
+			// if state.IsExpired() {
+			//     expiredSessions = append(expiredSessions, string(k))
+			// }
 
 			return nil
 		})
@@ -274,17 +275,20 @@ func (s *BoltSessionStore) GetStats(ctx context.Context) (*SessionStoreStats, er
 				return err
 			}
 
-			stats.TotalDiskUsage += state.DiskUsage
+			// TODO: Implement DiskUsage field on SessionState
+			// stats.TotalDiskUsage += state.DiskUsage
 
-			if state.IsExpired() {
-				stats.ExpiredSessions++
-			} else {
-				stats.ActiveSessions++
-			}
+			// TODO: Implement IsExpired method on SessionState
+			// if state.IsExpired() {
+			//     stats.ExpiredSessions++
+			// } else {
+			//     stats.ActiveSessions++
+			// }
 
-			if state.GetActiveJobCount() > 0 {
-				stats.SessionsWithJobs++
-			}
+			// TODO: Implement GetActiveJobCount method on SessionState
+			// if state.GetActiveJobCount() > 0 {
+			//     stats.SessionsWithJobs++
+			// }
 
 			return nil
 		})

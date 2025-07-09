@@ -22,6 +22,7 @@ const (
 
 const (
 	CategoryAnalyze       = "analyze"
+	CategoryAnalysis      = "analysis" // Alias for CategoryAnalyze
 	CategoryBuild         = "build"
 	CategoryDeploy        = "deploy"
 	CategoryScan          = "scan"

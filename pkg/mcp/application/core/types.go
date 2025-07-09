@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/config"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 // Workflow Stage Constants
@@ -43,6 +45,24 @@ const (
 
 // Type aliases for external access
 type ServerConfig = config.ServerConfig
+type ConversationStage = shared.ConversationStage
+type ToolOrchestrator = api.Orchestrator
+
+// ConversationStage constants
+const (
+	ConversationStageWelcome    ConversationStage = shared.StageWelcome
+	ConversationStagePreFlight  ConversationStage = shared.StagePreFlight
+	ConversationStageInit       ConversationStage = shared.StageInit
+	ConversationStageAnalysis   ConversationStage = shared.StageAnalysis
+	ConversationStageDockerfile ConversationStage = shared.StageDockerfile
+	ConversationStageBuild      ConversationStage = shared.StageBuild
+	ConversationStagePush       ConversationStage = shared.StagePush
+	ConversationStageManifests  ConversationStage = shared.StageManifests
+	ConversationStageDeploy     ConversationStage = shared.StageDeployment
+	ConversationStageScan       ConversationStage = shared.StageScan
+	ConversationStageCompleted  ConversationStage = shared.StageCompleted
+	ConversationStageError      ConversationStage = shared.StageError
+)
 
 // ConsolidatedConversationConfig represents conversation mode configuration
 type ConsolidatedConversationConfig struct {

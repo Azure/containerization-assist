@@ -12,11 +12,11 @@ import (
 
 // SessionStateProvider provides access to session state
 type SessionStateProvider struct {
-	sessionManager *session.SessionManager
+	sessionManager session.SessionManager
 }
 
 // NewSessionStateProvider creates a new session state provider
-func NewSessionStateProvider(sessionManager *session.SessionManager) StateProvider {
+func NewSessionStateProvider(sessionManager session.SessionManager) StateProvider {
 	return &SessionStateProvider{
 		sessionManager: sessionManager,
 	}
@@ -24,7 +24,7 @@ func NewSessionStateProvider(sessionManager *session.SessionManager) StateProvid
 
 // GetState retrieves session state
 func (p *SessionStateProvider) GetState(ctx context.Context, id string) (interface{}, error) {
-	return p.sessionManager.GetSessionConcrete(id)
+	return p.sessionManager.GetSession(id)
 }
 
 // SetState updates session state
@@ -48,12 +48,12 @@ func (p *SessionStateProvider) SetState(ctx context.Context, id string, state in
 
 // DeleteState removes session state
 func (p *SessionStateProvider) DeleteState(ctx context.Context, id string) error {
-	return p.sessionManager.DeleteSession(ctx, id)
+	return p.sessionManager.DeleteSession(id)
 }
 
 // ListStates lists all session IDs
 func (p *SessionStateProvider) ListStates(ctx context.Context) ([]string, error) {
-	sessions, err := p.sessionManager.ListSessionsTyped(ctx, core.SessionFilter{})
+	sessions, err := p.sessionManager.ListSessionsTyped()
 	if err != nil {
 		return nil, err
 	}
@@ -359,4 +359,69 @@ func (p *GlobalStateProvider) ListStates(ctx context.Context) ([]string, error) 
 // GetType returns the state type
 func (p *GlobalStateProvider) GetType() StateType {
 	return StateTypeGlobal
+}
+
+// ServiceContainerSessionStateProvider provides session state access through service container
+type ServiceContainerSessionStateProvider struct {
+	serviceContainer ServiceContainer
+}
+
+// NewSessionStateProviderFromContainer creates a session state provider from service container
+func NewSessionStateProviderFromContainer(serviceContainer ServiceContainer) StateProvider {
+	return &ServiceContainerSessionStateProvider{
+		serviceContainer: serviceContainer,
+	}
+}
+
+// GetState retrieves session state using service container
+func (p *ServiceContainerSessionStateProvider) GetState(ctx context.Context, id string) (interface{}, error) {
+	sessionStore := p.serviceContainer.SessionStore()
+	return sessionStore.Get(ctx, id)
+}
+
+// SetState updates session state using service container
+func (p *ServiceContainerSessionStateProvider) SetState(_ context.Context, id string, state interface{}) error {
+	// Convert state to session format if needed
+	if sessionData, ok := state.(*session.SessionState); ok {
+		// Create a new session from the state
+		sessionState := &session.SessionState{
+			SessionID:    id,
+			WorkspaceDir: sessionData.WorkspaceDir,
+			// Add other fields as needed
+		}
+		_ = sessionState // TODO: Use sessionStore.Update with proper session conversion
+	}
+
+	return errors.NewError().
+		Code(codes.VALIDATION_FAILED).
+		Message("SetState not fully implemented for ServiceContainerSessionStateProvider").
+		Context("session_id", id).
+		Context("component", "service_container_session_state_provider").
+		Build()
+}
+
+// DeleteState removes session state using service container
+func (p *ServiceContainerSessionStateProvider) DeleteState(ctx context.Context, id string) error {
+	sessionStore := p.serviceContainer.SessionStore()
+	return sessionStore.Delete(ctx, id)
+}
+
+// ListStates lists all session IDs using service container
+func (p *ServiceContainerSessionStateProvider) ListStates(ctx context.Context) ([]string, error) {
+	sessionStore := p.serviceContainer.SessionStore()
+	sessions, err := sessionStore.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, len(sessions))
+	for i, session := range sessions {
+		ids[i] = session.ID
+	}
+	return ids, nil
+}
+
+// GetType returns the state type
+func (p *ServiceContainerSessionStateProvider) GetType() StateType {
+	return StateTypeSession
 }

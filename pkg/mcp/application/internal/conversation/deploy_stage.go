@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func getK8sManifestsFromMetadata(sessionState *session.SessionState) map[string]interface{} {
@@ -38,7 +39,7 @@ func getImageRef(sessionState *session.SessionState) string {
 	}
 	return imageID
 }
-func setK8sManifest(sessionState *session.SessionState, name string, manifest types.K8sManifest) {
+func setK8sManifest(sessionState *session.SessionState, name string, manifest shared.K8sManifest) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -58,8 +59,8 @@ func setK8sManifest(sessionState *session.SessionState, name string, manifest ty
 		"status":  manifest.Status,
 	}
 }
-func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]types.K8sManifest {
-	result := make(map[string]types.K8sManifest)
+func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]shared.K8sManifest {
+	result := make(map[string]shared.K8sManifest)
 	manifestsData := getK8sManifestsFromMetadata(sessionState)
 	if manifestsData == nil {
 		return result
@@ -67,7 +68,7 @@ func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]types
 
 	for name, manifestData := range manifestsData {
 		if manifestMap, ok := manifestData.(map[string]interface{}); ok {
-			manifest := types.K8sManifest{}
+			manifest := shared.K8sManifest{}
 			if content, ok := manifestMap["content"].(string); ok {
 				manifest.Content = content
 			}
@@ -87,30 +88,30 @@ func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]types
 	}
 	return result
 }
-func (pm *PromptManager) handleManifestsStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+func (ps *PromptServiceImpl) handleManifestsStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageManifests)), getStageIntro(convertFromTypesStage(types.StageManifests)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageManifests)), getStageIntro(convertFromTypesStage(shared.StageManifests)))
 	appName, ok := state.Context["app_name"].(string)
 	if !ok || appName == "" {
-		response := pm.gatherManifestPreferences(ctx, state, input)
+		response := ps.gatherManifestPreferences(ctx, state, input)
 		response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 		return response
 	}
 	k8sManifests := getK8sManifestsFromMetadata(state.SessionState)
 	if len(k8sManifests) > 0 {
-		response := pm.reviewManifests(ctx, state, input)
+		response := ps.reviewManifests(ctx, state, input)
 		response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 		return response
 	}
-	response := pm.generateManifests(ctx, state)
+	response := ps.generateManifests(ctx, state)
 	response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 	return response
 }
-func (pm *PromptManager) gatherManifestPreferences(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+func (ps *PromptServiceImpl) gatherManifestPreferences(_ context.Context, state *ConversationState, input string) *ConversationResponse {
 
 	decision := &DecisionPoint{
 		ID:       "k8s-config",
-		Stage:    convertFromTypesStage(types.StageManifests),
+		Stage:    convertFromTypesStage(shared.StageManifests),
 		Question: "Let's configure your Kubernetes deployment. What should we name the application?",
 		Required: true,
 	}
@@ -124,7 +125,7 @@ func (pm *PromptManager) gatherManifestPreferences(ctx context.Context, state *C
 		})
 		return &ConversationResponse{
 			Message: fmt.Sprintf("App name set to '%s'. How many replicas would you like?", state.Context["app_name"]),
-			Stage:   convertFromTypesStage(types.StageManifests),
+			Stage:   convertFromTypesStage(shared.StageManifests),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{ID: "1", Label: "1 replica (development)"},
@@ -133,17 +134,17 @@ func (pm *PromptManager) gatherManifestPreferences(ctx context.Context, state *C
 			},
 		}
 	}
-	suggestedName := pm.suggestAppName(state)
+	suggestedName := ps.suggestAppName(state)
 
 	return &ConversationResponse{
 		Message: decision.Question + fmt.Sprintf("\n\nSuggested: %s", suggestedName),
-		Stage:   convertFromTypesStage(types.StageManifests),
+		Stage:   convertFromTypesStage(shared.StageManifests),
 		Status:  ResponseStatusWaitingInput,
 	}
 }
-func (pm *PromptManager) generateManifests(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) generateManifests(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(types.StageManifests),
+		Stage:   convertFromTypesStage(shared.StageManifests),
 		Status:  ResponseStatusProcessing,
 		Message: "Generating Kubernetes manifests...",
 	}
@@ -175,7 +176,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	}
 
 	startTime := time.Now()
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "generate_manifests", params)
+	resultStruct, err := ps.toolOrchestrator.ExecuteTool(ctx, "generate_manifests", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -185,7 +186,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 	}
 
 	if err != nil {
-		toolCall.Error = &types.ToolError{
+		toolCall.Error = &shared.ToolError{
 			Type:      "generation_error",
 			Message:   fmt.Sprintf("generate_manifests error: %v", err),
 			Retryable: true,
@@ -193,8 +194,8 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 		}
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
-		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(types.StageManifests), err, state) {
+		autoFixHelper := NewAutoFixHelper(ps.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(shared.StageManifests), err, state) {
 			return response
 		}
 		response.Message = fmt.Sprintf("Failed to generate Kubernetes manifests: %v\n\nWould you like to:", err)
@@ -215,7 +216,7 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 				if !ok {
 					continue
 				}
-				manifest := types.K8sManifest{
+				manifest := shared.K8sManifest{
 					Name:    name,
 					Content: contentStr,
 					Kind:    extractKind(contentStr),
@@ -225,14 +226,14 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 					Type:    "k8s-manifest",
 					Name:    fmt.Sprintf("%s (%s)", name, manifest.Kind),
 					Content: manifest.Content,
-					Stage:   convertFromTypesStage(types.StageManifests),
+					Stage:   convertFromTypesStage(shared.StageManifests),
 				}
 				state.AddArtifact(artifact)
 			}
 		}
 	}
 	response.Status = ResponseStatusSuccess
-	response.Message = pm.formatManifestSummary(getK8sManifestsAsTypes(state.SessionState))
+	response.Message = ps.formatManifestSummary(getK8sManifestsAsTypes(state.SessionState))
 	response.Options = []Option{
 		{ID: "deploy", Label: "Deploy to Kubernetes", Recommended: true},
 		{ID: "review", Label: "Show full manifests"},
@@ -242,31 +243,31 @@ func (pm *PromptManager) generateManifests(ctx context.Context, state *Conversat
 
 	return response
 }
-func (pm *PromptManager) handleDeploymentStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
+func (ps *PromptServiceImpl) handleDeploymentStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(types.StageDeployment)), getStageIntro(convertFromTypesStage(types.StageDeployment)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageDeployment)), getStageIntro(convertFromTypesStage(shared.StageDeployment)))
 	if strings.Contains(strings.ToLower(input), "retry") {
-		response := pm.handleDeploymentRetry(ctx, state)
+		response := ps.handleDeploymentRetry(ctx, state)
 		response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 		return response
 	}
 	if strings.Contains(strings.ToLower(input), "dry") || strings.Contains(strings.ToLower(input), "preview") {
-		response := pm.deploymentDryRun(ctx, state)
+		response := ps.deploymentDryRun(ctx, state)
 		response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 		return response
 	}
 	if strings.Contains(strings.ToLower(input), "logs") {
-		response := pm.showDeploymentLogs(ctx, state)
+		response := ps.showDeploymentLogs(ctx, state)
 		response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 		return response
 	}
-	response := pm.executeDeployment(ctx, state)
+	response := ps.executeDeployment(ctx, state)
 	response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
 	return response
 }
-func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) deploymentDryRun(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(types.StageDeployment),
+		Stage:   convertFromTypesStage(shared.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Running deployment preview (dry-run)...",
 	}
@@ -280,7 +281,7 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 		"dry_run":    true,
 	}
 
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params)
+	resultStruct, err := ps.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params)
 	if err != nil {
 		response.Status = ResponseStatusError
 		response.Message = fmt.Sprintf("Dry-run failed: %v", err)
@@ -308,9 +309,9 @@ func (pm *PromptManager) deploymentDryRun(ctx context.Context, state *Conversati
 
 	return response
 }
-func (pm *PromptManager) executeDeployment(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) executeDeployment(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(types.StageDeployment),
+		Stage:   convertFromTypesStage(shared.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Deploying to Kubernetes cluster...",
 	}
@@ -326,7 +327,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	}
 
 	startTime := time.Now()
-	resultStruct, err := pm.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params)
+	resultStruct, err := ps.toolOrchestrator.ExecuteTool(ctx, "deploy_kubernetes", params)
 	duration := time.Since(startTime)
 
 	toolCall := ToolCall{
@@ -336,7 +337,7 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	}
 
 	if err != nil {
-		toolCall.Error = &types.ToolError{
+		toolCall.Error = &shared.ToolError{
 			Type:      "deployment_error",
 			Message:   fmt.Sprintf("deploy_kubernetes error: %v", err),
 			Retryable: true,
@@ -344,8 +345,8 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 		}
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
-		autoFixHelper := NewAutoFixHelper(pm.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(types.StageDeployment), err, state) {
+		autoFixHelper := NewAutoFixHelper(ps.conversationHandler)
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(shared.StageDeployment), err, state) {
 			return response
 		}
 
@@ -387,17 +388,17 @@ func (pm *PromptManager) executeDeployment(ctx context.Context, state *Conversat
 	}
 	waitForReady, ok := state.Context["wait_for_ready"].(bool)
 	if !ok || waitForReady || state.Context["wait_for_ready"] == nil {
-		return pm.checkDeploymentHealth(ctx, state, resultStruct)
+		return ps.checkDeploymentHealth(ctx, state, resultStruct)
 	}
-	state.SetStage(convertFromTypesStage(types.StageCompleted))
+	state.SetStage(convertFromTypesStage(shared.StageCompleted))
 	response.Status = ResponseStatusSuccess
-	response.Message = pm.formatDeploymentSuccess(state, duration)
+	response.Message = ps.formatDeploymentSuccess(state, duration)
 
 	return response
 }
-func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *ConversationState, deployResult interface{}) *ConversationResponse {
+func (ps *PromptServiceImpl) checkDeploymentHealth(ctx context.Context, state *ConversationState, _ interface{}) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(types.StageDeployment),
+		Stage:   convertFromTypesStage(shared.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Checking deployment health...",
 	}
@@ -409,7 +410,7 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 		"timeout":    60,
 	}
 
-	_, err := pm.toolOrchestrator.ExecuteTool(ctx, "check_health", params)
+	_, err := ps.toolOrchestrator.ExecuteTool(ctx, "check_health", params)
 	if err != nil {
 		response.Status = ResponseStatusWarning
 		response.Message = fmt.Sprintf(
@@ -423,7 +424,7 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 		}
 		return response
 	}
-	state.SetStage(convertFromTypesStage(types.StageCompleted))
+	state.SetStage(convertFromTypesStage(shared.StageCompleted))
 	response.Status = ResponseStatusSuccess
 	response.Message = fmt.Sprintf(
 		"✅ Deployment successful and healthy!\n\n"+
@@ -441,7 +442,7 @@ func (pm *PromptManager) checkDeploymentHealth(ctx context.Context, state *Conve
 
 	return response
 }
-func (pm *PromptManager) handleDeploymentRetry(ctx context.Context, state *ConversationState) *ConversationResponse {
+func (ps *PromptServiceImpl) handleDeploymentRetry(ctx context.Context, state *ConversationState) *ConversationResponse {
 
 	retryCount := 0
 	if count, ok := state.Context["deployment_retry_count"].(int); ok {
@@ -454,7 +455,7 @@ func (pm *PromptManager) handleDeploymentRetry(ctx context.Context, state *Conve
 				"- Checking your Kubernetes cluster connectivity\n" +
 				"- Reviewing the manifest configuration\n" +
 				"- Checking if the image exists and is accessible",
-			Stage:  convertFromTypesStage(types.StageDeployment),
+			Stage:  convertFromTypesStage(shared.StageDeployment),
 			Status: ResponseStatusError,
 			Options: []Option{
 				{ID: "modify", Label: "Modify manifests"},
@@ -466,5 +467,5 @@ func (pm *PromptManager) handleDeploymentRetry(ctx context.Context, state *Conve
 	delay := time.Duration(retryCount+1) * 2 * time.Second
 	time.Sleep(delay)
 
-	return pm.executeDeployment(ctx, state)
+	return ps.executeDeployment(ctx, state)
 }

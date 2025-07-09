@@ -242,6 +242,11 @@ func (b *ErrorBuilder) Context(key string, value interface{}) *ErrorBuilder {
 	return b
 }
 
+// WithField adds context information to the error (alias for Context)
+func (b *ErrorBuilder) WithField(key string, value interface{}) *ErrorBuilder {
+	return b.Context(key, value)
+}
+
 // Cause sets the error cause
 func (b *ErrorBuilder) Cause(err error) *ErrorBuilder {
 	b.err.Cause = err

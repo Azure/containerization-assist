@@ -75,7 +75,9 @@ func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload
 				Str("tool_name", name).
 				Msg("Failed to invoke tool via JSON-RPC")
 
-			response := types.ToolInvocationResponse{
+			response := struct {
+				Error string `json:"error"`
+			}{
 				Error: fmt.Sprintf("Failed to invoke tool '%s': %v", name, err),
 			}
 			if responseBytes, err := json.Marshal(response); err == nil {
@@ -139,5 +141,5 @@ func (s *StdioLLMTransport) IsConnected() bool {
 	return s.connected
 }
 
-// Ensure interface compliance
-var _ types.LLMTransport = (*StdioLLMTransport)(nil)
+// TODO: Interface compliance check disabled due to internal package restriction
+// var _ types.LLMTransport = (*StdioLLMTransport)(nil)

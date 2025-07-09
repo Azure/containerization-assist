@@ -24,7 +24,7 @@ type ValidationConfig struct {
 
 // NewProductionValidator creates a simplified production validator
 func NewProductionValidator(
-	sessionManager *session.SessionManager,
+	sessionManager session.SessionManager,
 	config ValidationConfig,
 	logger zerolog.Logger,
 ) *ProductionValidator {

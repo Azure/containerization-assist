@@ -6,9 +6,31 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/knowledge"
-	"github.com/Azure/container-kit/pkg/mcp/application/services"
 )
+
+// SessionStore interface for session storage operations
+type SessionStore interface {
+	// Create creates a new session
+	Create(ctx context.Context, session *api.Session) error
+	// Get retrieves a session by ID
+	Get(ctx context.Context, sessionID string) (*api.Session, error)
+	// Update updates an existing session
+	Update(ctx context.Context, session *api.Session) error
+	// Delete removes a session
+	Delete(ctx context.Context, sessionID string) error
+	// List returns all sessions
+	List(ctx context.Context) ([]*api.Session, error)
+}
+
+// SessionState interface for session state management
+type SessionState interface {
+	// SaveState saves the current state for a session
+	SaveState(ctx context.Context, sessionID string, state map[string]interface{}) error
+	// GetState retrieves the state for a session
+	GetState(ctx context.Context, sessionID string) (map[string]interface{}, error)
+}
 
 // RelationshipEnricher enriches context with additional relationship information
 type RelationshipEnricher struct {
@@ -446,13 +468,13 @@ func (e *InsightEnricher) generateCrossToolInsights(data *ComprehensiveContext) 
 
 // SecurityEnricher enriches context with security information
 type SecurityEnricher struct {
-	sessionStore services.SessionStore
-	sessionState services.SessionState
+	sessionStore SessionStore
+	sessionState SessionState
 	logger       *slog.Logger
 }
 
 // NewSecurityEnricher creates a new security enricher
-func NewSecurityEnricher(sessionStore services.SessionStore, sessionState services.SessionState, logger *slog.Logger) ContextEnricher {
+func NewSecurityEnricher(sessionStore SessionStore, sessionState SessionState, logger *slog.Logger) ContextEnricher {
 	return &SecurityEnricher{
 		sessionStore: sessionStore,
 		sessionState: sessionState,

@@ -1,7 +1,9 @@
 package shared
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -9,6 +11,7 @@ import (
 const (
 	CurrentSchemaVersion = "v1.0.0"
 	ToolAPIVersion       = "2024.12.17"
+	DefaultRegistry      = "docker.io"
 )
 
 // BaseToolResponse provides common response structure for all tools
@@ -286,4 +289,50 @@ type ValidationWarning struct {
 	Rule       string                 `json:"rule,omitempty"`
 	Suggestion string                 `json:"suggestion,omitempty"`
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// PreferenceStore provides user preference management functionality
+type PreferenceStore struct {
+	logger *slog.Logger
+}
+
+// Server interface defines server operations
+type Server interface {
+	Start(ctx context.Context) error
+	Stop() error
+	GetName() string
+	EnableConversationMode(config interface{}) error
+}
+
+// RequestHandler interface defines request handling operations
+type RequestHandler interface {
+	HandleRequest(ctx context.Context, request interface{}) (interface{}, error)
+}
+
+// Transport interface defines transport operations
+type Transport interface {
+	Start() error
+	Stop() error
+	Send(ctx context.Context, message interface{}) error
+	Receive(ctx context.Context) (interface{}, error)
+}
+
+// NewPreferenceStore creates a new preference store
+func NewPreferenceStore(_ string, logger *slog.Logger, _ string) (*PreferenceStore, error) {
+	return &PreferenceStore{
+		logger: logger,
+	}, nil
+}
+
+// ApplyPreferencesToSession applies user preferences to a session
+func (ps *PreferenceStore) ApplyPreferencesToSession(userID string, _ *UserPreferences) error {
+	// Minimal implementation - no-op for now
+	// In a full implementation, this would load preferences from storage
+	ps.logger.Debug("Applying user preferences", "user_id", userID)
+	return nil
+}
+
+// Close closes the preference store
+func (ps *PreferenceStore) Close() error {
+	return nil
 }

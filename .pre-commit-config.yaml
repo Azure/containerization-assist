@@ -44,7 +44,7 @@ repos:
 
   - id: check-generated-schemas
     name: Check generated schemas
-    entry: bash -c 'git add -N pkg/mcp/internal/**/generated_*.go 2>/dev/null; if [ -n "$(git diff --name-only -- "pkg/mcp/internal/**/generated_*.go")" ]; then echo "Generated schemas have uncommitted changes. Please stage them."; exit 1; fi'
+    entry: bash -c 'git add -N pkg/mcp/application/internal/**/generated_*.go 2>/dev/null; if [ -n "$(git diff --name-only -- "pkg/mcp/application/internal/**/generated_*.go")" ]; then echo "Generated schemas have uncommitted changes. Please stage them."; exit 1; fi'
     language: system
     always_run: true
     pass_filenames: false

@@ -43,16 +43,46 @@ type SimpleTemplateStage struct {
 	Optional   bool                   `yaml:"optional,omitempty" json:"optional,omitempty"`
 }
 
-// SimpleTemplateManager manages workflow templates from external files
-type SimpleTemplateManager struct {
+// SimpleTemplateService defines the interface for simple template management
+type SimpleTemplateService interface {
+	// LoadTemplate loads a template by name
+	LoadTemplate(name string) (*SimpleWorkflowTemplate, error)
+
+	// ListTemplates lists available templates
+	ListTemplates() ([]string, error)
+
+	// InstantiateWorkflow creates a workflow instance from a template
+	InstantiateWorkflow(ctx context.Context, templateName string, parameters map[string]interface{}) (*WorkflowSpec, error)
+
+	// GetTemplate retrieves a template
+	GetTemplate(name string) (*SimpleWorkflowTemplate, error)
+
+	// ClearCache clears the template cache
+	ClearCache()
+}
+
+// SimpleTemplateServiceImpl implements SimpleTemplateService
+type SimpleTemplateServiceImpl struct {
 	logger         *slog.Logger
 	templates      map[string]*SimpleWorkflowTemplate
 	templateLoader services.TemplateLoader
 }
 
-// NewSimpleTemplateManager creates a new template manager
+// Type alias for backward compatibility
+type SimpleTemplateManager = SimpleTemplateServiceImpl
+
+// NewSimpleTemplateService creates a new template service
+func NewSimpleTemplateService(logger *slog.Logger, templateLoader services.TemplateLoader) SimpleTemplateService {
+	return &SimpleTemplateServiceImpl{
+		logger:         logger.With("component", "template_service"),
+		templates:      make(map[string]*SimpleWorkflowTemplate),
+		templateLoader: templateLoader,
+	}
+}
+
+// NewSimpleTemplateManager creates a new template manager (backward compatibility)
 func NewSimpleTemplateManager(logger *slog.Logger, templateLoader services.TemplateLoader) *SimpleTemplateManager {
-	return &SimpleTemplateManager{
+	return &SimpleTemplateServiceImpl{
 		logger:         logger.With("component", "template_manager"),
 		templates:      make(map[string]*SimpleWorkflowTemplate),
 		templateLoader: templateLoader,
@@ -60,15 +90,15 @@ func NewSimpleTemplateManager(logger *slog.Logger, templateLoader services.Templ
 }
 
 // LoadTemplate loads a template from the embedded filesystem
-func (tm *SimpleTemplateManager) LoadTemplate(name string) (*SimpleWorkflowTemplate, error) {
+func (ts *SimpleTemplateServiceImpl) LoadTemplate(name string) (*SimpleWorkflowTemplate, error) {
 	// Check cache first
-	if template, exists := tm.templates[name]; exists {
+	if template, exists := ts.templates[name]; exists {
 		return template, nil
 	}
 
 	// Load from filesystem
 	path := fmt.Sprintf("workflows/%s.yaml", name)
-	content, err := tm.templateLoader.LoadTemplate(path)
+	content, err := ts.templateLoader.LoadTemplate(path)
 	if err != nil {
 		return nil, errors.NewError().
 			Message("failed to load template "+name).
@@ -99,9 +129,9 @@ func (tm *SimpleTemplateManager) LoadTemplate(name string) (*SimpleWorkflowTempl
 	}
 
 	// Cache for future use
-	tm.templates[name] = &template
+	ts.templates[name] = &template
 
-	tm.logger.Debug("Template loaded successfully",
+	ts.logger.Debug("Template loaded successfully",
 		"template", name,
 		"version", template.Version)
 
@@ -109,8 +139,8 @@ func (tm *SimpleTemplateManager) LoadTemplate(name string) (*SimpleWorkflowTempl
 }
 
 // ListTemplates lists available templates
-func (tm *SimpleTemplateManager) ListTemplates() ([]string, error) {
-	allTemplates, err := tm.templateLoader.ListTemplates()
+func (ts *SimpleTemplateServiceImpl) ListTemplates() ([]string, error) {
+	allTemplates, err := ts.templateLoader.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +159,12 @@ func (tm *SimpleTemplateManager) ListTemplates() ([]string, error) {
 }
 
 // InstantiateWorkflow creates a workflow instance from a template
-func (tm *SimpleTemplateManager) InstantiateWorkflow(
+func (ts *SimpleTemplateServiceImpl) InstantiateWorkflow(
 	ctx context.Context,
 	templateName string,
 	parameters map[string]interface{},
 ) (*WorkflowSpec, error) {
-	template, err := tm.LoadTemplate(templateName)
+	template, err := ts.LoadTemplate(templateName)
 	if err != nil {
 		return nil, err
 	}
@@ -195,18 +225,18 @@ func (tm *SimpleTemplateManager) InstantiateWorkflow(
 }
 
 // GetTemplate retrieves a cached template
-func (tm *SimpleTemplateManager) GetTemplate(name string) (*SimpleWorkflowTemplate, error) {
-	return tm.LoadTemplate(name)
+func (ts *SimpleTemplateServiceImpl) GetTemplate(name string) (*SimpleWorkflowTemplate, error) {
+	return ts.LoadTemplate(name)
 }
 
 // ClearCache clears the template cache
-func (tm *SimpleTemplateManager) ClearCache() {
-	tm.templates = make(map[string]*SimpleWorkflowTemplate)
-	tm.logger.Debug("Template cache cleared")
+func (ts *SimpleTemplateServiceImpl) ClearCache() {
+	ts.templates = make(map[string]*SimpleWorkflowTemplate)
+	ts.logger.Debug("Template cache cleared")
 }
 
 // convertToWorkflowTemplate converts a SimpleWorkflowTemplate to WorkflowTemplate
-func (tm *SimpleTemplateManager) convertToWorkflowTemplate(simple *SimpleWorkflowTemplate) *WorkflowTemplate {
+func (ts *SimpleTemplateServiceImpl) convertToWorkflowTemplate(simple *SimpleWorkflowTemplate) *WorkflowTemplate {
 	// Convert parameters
 	params := make([]TemplateParameter, len(simple.Parameters))
 	for i, p := range simple.Parameters {

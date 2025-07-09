@@ -62,16 +62,14 @@ make mcp
 - **[Examples](examples/)** - Working code examples and patterns
 
 ### For Developers
-- **[Architecture Guide](docs/mcp-architecture.md)** - Technical design and unified interface system
-- **[Tool Development Guide](docs/adding-new-tools.md)** - Building new tools and integrations
-- **[Interface Patterns](docs/interface-patterns.md)** - Design patterns and best practices
-- **[Technical Debt Inventory](docs/TECHNICAL_DEBT_INVENTORY.md)** - Current technical debt and cleanup tasks
+- **[Three-Layer Architecture](docs/THREE_LAYER_ARCHITECTURE.md)** - Clean architecture with domain/application/infra layers
+- **[Tool Development Guide](docs/ADDING_NEW_TOOLS.md)** - Building new tools and integrations
+- **[Architectural Decisions](docs/architecture/adr/)** - ADRs documenting key design decisions
 
 ### For Contributors
 - **[Contributing Guide](CONTRIBUTING.md)** - Development workflow and standards
 - **[Development Guidelines](DEVELOPMENT_GUIDELINES.md)** - Coding standards and practices
-- **[Migration Guide](docs/migration-guide.md)** - v1 to v2 migration instructions
-- **[Breaking Changes](docs/breaking-changes.md)** - Breaking changes in v2.0
+- **[Quality Standards](docs/QUALITY_STANDARDS.md)** - Code quality and testing requirements
 
 ## 🏗️ Architecture
 
@@ -81,7 +79,7 @@ Container Kit provides atomic tools and conversational workflows through a unifi
 - **Conversation Mode**: Guided AI workflows for complete containerization
 - **Unified Interface**: Consistent tool patterns with auto-registration
 
-> **📖 Technical Details**: See [Architecture Guide](docs/ARCHITECTURE.md) for complete system design.
+> **📖 Technical Details**: See [Three-Layer Architecture](docs/THREE_LAYER_ARCHITECTURE.md) for complete system design.
 
 ## 🛠️ Key Features
 
@@ -122,4 +120,4 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Tool Guide](docs/TOOL_GUIDE.md) and [Architecture Guide](docs/architecture/THREE_LAYER_ARCHITECTURE.md)
+- **Documentation**: Check the [Tool Guide](docs/TOOL_GUIDE.md) and [Three-Layer Architecture](docs/THREE_LAYER_ARCHITECTURE.md)

@@ -2,6 +2,9 @@ package services
 
 import (
 	"log/slog"
+
+	"github.com/Azure/container-kit/pkg/core/docker"
+	"github.com/Azure/container-kit/pkg/core/kubernetes"
 )
 
 // DefaultServiceContainer provides a default implementation of ServiceContainer
@@ -18,7 +21,18 @@ type DefaultServiceContainer struct {
 	knowledgeBase    KnowledgeBase
 	k8sClient        K8sClient
 	analyzer         Analyzer
+	persistence      Persistence
 	logger           *slog.Logger
+
+	// Infrastructure services
+	dockerService     docker.Service
+	manifestService   kubernetes.ManifestService
+	deploymentService kubernetes.Service
+	pipelineService   PipelineService
+
+	// Conversation services
+	conversationService ConversationService
+	promptService       PromptService
 }
 
 // NewDefaultServiceContainer creates a new service container
@@ -88,9 +102,44 @@ func (c *DefaultServiceContainer) Analyzer() Analyzer {
 	return c.analyzer
 }
 
+// Persistence returns the persistence service
+func (c *DefaultServiceContainer) Persistence() Persistence {
+	return c.persistence
+}
+
 // Logger returns the logger
 func (c *DefaultServiceContainer) Logger() *slog.Logger {
 	return c.logger
+}
+
+// DockerService returns the docker service
+func (c *DefaultServiceContainer) DockerService() docker.Service {
+	return c.dockerService
+}
+
+// ManifestService returns the manifest service
+func (c *DefaultServiceContainer) ManifestService() kubernetes.ManifestService {
+	return c.manifestService
+}
+
+// DeploymentService returns the deployment service
+func (c *DefaultServiceContainer) DeploymentService() kubernetes.Service {
+	return c.deploymentService
+}
+
+// PipelineService returns the pipeline service
+func (c *DefaultServiceContainer) PipelineService() PipelineService {
+	return c.pipelineService
+}
+
+// ConversationService returns the conversation service
+func (c *DefaultServiceContainer) ConversationService() ConversationService {
+	return c.conversationService
+}
+
+// PromptService returns the prompt service
+func (c *DefaultServiceContainer) PromptService() PromptService {
+	return c.promptService
 }
 
 // WithSessionStore sets the session store
@@ -162,5 +211,47 @@ func (c *DefaultServiceContainer) WithK8sClient(client K8sClient) *DefaultServic
 // WithAnalyzer sets the analyzer
 func (c *DefaultServiceContainer) WithAnalyzer(analyzer Analyzer) *DefaultServiceContainer {
 	c.analyzer = analyzer
+	return c
+}
+
+// WithPersistence sets the persistence service
+func (c *DefaultServiceContainer) WithPersistence(persistence Persistence) *DefaultServiceContainer {
+	c.persistence = persistence
+	return c
+}
+
+// WithDockerService sets the docker service
+func (c *DefaultServiceContainer) WithDockerService(service docker.Service) *DefaultServiceContainer {
+	c.dockerService = service
+	return c
+}
+
+// WithManifestService sets the manifest service
+func (c *DefaultServiceContainer) WithManifestService(service kubernetes.ManifestService) *DefaultServiceContainer {
+	c.manifestService = service
+	return c
+}
+
+// WithDeploymentService sets the deployment service
+func (c *DefaultServiceContainer) WithDeploymentService(service kubernetes.Service) *DefaultServiceContainer {
+	c.deploymentService = service
+	return c
+}
+
+// WithPipelineService sets the pipeline service
+func (c *DefaultServiceContainer) WithPipelineService(service PipelineService) *DefaultServiceContainer {
+	c.pipelineService = service
+	return c
+}
+
+// WithConversationService sets the conversation service
+func (c *DefaultServiceContainer) WithConversationService(service ConversationService) *DefaultServiceContainer {
+	c.conversationService = service
+	return c
+}
+
+// WithPromptService sets the prompt service
+func (c *DefaultServiceContainer) WithPromptService(service PromptService) *DefaultServiceContainer {
+	c.promptService = service
 	return c
 }

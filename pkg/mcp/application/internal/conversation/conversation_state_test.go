@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,7 @@ func TestNewConversationState(t *testing.T) {
 
 	assert.NotNil(t, state)
 	assert.Equal(t, sessionID, state.SessionState.SessionID)
-	assert.Equal(t, convertFromTypesStage(types.StageWelcome), state.CurrentStage)
+	assert.Equal(t, shared.StageWelcome, state.CurrentStage)
 	assert.NotNil(t, state.Context)
 	assert.NotNil(t, state.History)
 	assert.Empty(t, state.History)
@@ -31,11 +32,11 @@ func TestConversationStateAddToHistory(t *testing.T) {
 	turns := []struct {
 		input    string
 		response string
-		stage    core.ConversationStage
+		stage    shared.ConversationStage
 	}{
-		{"hello", "Welcome!", convertFromTypesStage(types.StageWelcome)},
-		{"analyze", "Starting analysis...", convertFromTypesStage(types.StageAnalysis)},
-		{"github.com/test/repo", "Analyzing repository...", convertFromTypesStage(types.StageAnalysis)},
+		{"hello", "Welcome!", shared.StageWelcome},
+		{"analyze", "Starting analysis...", shared.StageAnalysis},
+		{"github.com/test/repo", "Analyzing repository...", shared.StageAnalysis},
 	}
 
 	for _, turnData := range turns {
@@ -137,7 +138,7 @@ func TestConversationStateDecisionHandling(t *testing.T) {
 	assert.Nil(t, state.PendingDecision)
 	decision := &DecisionPoint{
 		ID:       "test_decision",
-		Stage:    convertFromTypesStage(types.StageAnalysis),
+		Stage:    convertFromTypesStage(shared.StageAnalysis),
 		Question: "What would you like to do?",
 		Options: []Option{
 			{
@@ -169,8 +170,8 @@ func TestConversationStateErrorTracking(t *testing.T) {
 		ID:        "turn-1",
 		Timestamp: time.Now(),
 		UserInput: "test input",
-		Stage:     convertFromTypesStage(types.StageBuild),
-		Error: &types.ToolError{
+		Stage:     convertFromTypesStage(shared.StageBuild),
+		Error: &shared.ToolError{
 			Type:      "test_error",
 			Message:   "Something went wrong",
 			Retryable: true,
@@ -187,23 +188,23 @@ func TestConversationStateErrorTracking(t *testing.T) {
 func TestConversationStateStageTransitions(t *testing.T) {
 	t.Parallel()
 	state := NewConversationState("test-session", "/tmp/workspace")
-	stages := []core.ConversationStage{
-		convertFromTypesStage(types.StageWelcome),
-		convertFromTypesStage(types.StagePreFlight),
-		convertFromTypesStage(types.StageInit),
-		convertFromTypesStage(types.StageAnalysis),
-		convertFromTypesStage(types.StageDockerfile),
-		convertFromTypesStage(types.StageBuild),
-		convertFromTypesStage(types.StageManifests),
-		convertFromTypesStage(types.StageDeployment),
-		convertFromTypesStage(types.StageCompleted),
+	stages := []shared.ConversationStage{
+		convertFromTypesStage(shared.StageWelcome),
+		convertFromTypesStage(shared.StagePreFlight),
+		convertFromTypesStage(shared.StageInit),
+		convertFromTypesStage(shared.StageAnalysis),
+		convertFromTypesStage(shared.StageDockerfile),
+		convertFromTypesStage(shared.StageBuild),
+		convertFromTypesStage(shared.StageManifests),
+		convertFromTypesStage(shared.StageDeployment),
+		convertFromTypesStage(shared.StageCompleted),
 	}
 
 	for _, stage := range stages {
 		state.SetStage(stage)
 		assert.Equal(t, stage, state.CurrentStage)
 	}
-	assert.Equal(t, convertFromTypesStage(types.StageCompleted), state.CurrentStage)
+	assert.Equal(t, convertFromTypesStage(shared.StageCompleted), state.CurrentStage)
 }
 
 func TestConversationStateArtifacts(t *testing.T) {
@@ -213,7 +214,7 @@ func TestConversationStateArtifacts(t *testing.T) {
 		Type:    "dockerfile",
 		Name:    "Dockerfile",
 		Content: "FROM alpine:latest",
-		Stage:   convertFromTypesStage(types.StageDockerfile),
+		Stage:   convertFromTypesStage(shared.StageDockerfile),
 	}
 	state.AddArtifact(artifact1)
 
@@ -221,7 +222,7 @@ func TestConversationStateArtifacts(t *testing.T) {
 		Type:    "manifest",
 		Name:    "deployment.yaml",
 		Content: "apiVersion: apps/v1",
-		Stage:   convertFromTypesStage(types.StageManifests),
+		Stage:   convertFromTypesStage(shared.StageManifests),
 	}
 	state.AddArtifact(artifact2)
 	dockerfiles := state.GetArtifactsByType("dockerfile")
@@ -238,12 +239,12 @@ func TestConversationStateStageProgression(t *testing.T) {
 	t.Parallel()
 	state := NewConversationState("test-session", "/tmp/workspace")
 	progress := state.GetStageProgress()
-	assert.Equal(t, convertFromTypesStage(types.StageWelcome), progress.CurrentStage)
+	assert.Equal(t, convertFromTypesStage(shared.StageWelcome), progress.CurrentStage)
 	assert.Equal(t, 1, progress.CurrentStep)
 	assert.Greater(t, progress.TotalSteps, 1)
-	state.SetStage(convertFromTypesStage(types.StageAnalysis))
+	state.SetStage(convertFromTypesStage(shared.StageAnalysis))
 	progress = state.GetStageProgress()
-	assert.Equal(t, convertFromTypesStage(types.StageAnalysis), progress.CurrentStage)
+	assert.Equal(t, convertFromTypesStage(shared.StageAnalysis), progress.CurrentStage)
 	assert.Greater(t, progress.CurrentStep, 1)
 }
 
@@ -253,13 +254,13 @@ func TestConversationTurn(t *testing.T) {
 		UserInput: "test input",
 		Assistant: "test response",
 		Timestamp: time.Now(),
-		Stage:     convertFromTypesStage(types.StageWelcome),
+		Stage:     convertFromTypesStage(shared.StageWelcome),
 	}
 
 	assert.Equal(t, "test input", turn.UserInput)
 	assert.Equal(t, "test response", turn.Assistant)
 	assert.False(t, turn.Timestamp.IsZero())
-	assert.Equal(t, convertFromTypesStage(types.StageWelcome), turn.Stage)
+	assert.Equal(t, convertFromTypesStage(shared.StageWelcome), turn.Stage)
 }
 
 func TestConversationHistoryManagement(t *testing.T) {
@@ -269,7 +270,7 @@ func TestConversationHistoryManagement(t *testing.T) {
 		turn := ConversationTurn{
 			UserInput: fmt.Sprintf("input-%d", i),
 			Assistant: fmt.Sprintf("response-%d", i),
-			Stage:     convertFromTypesStage(types.StageWelcome),
+			Stage:     convertFromTypesStage(shared.StageWelcome),
 		}
 		state.AddConversationTurn(turn)
 	}
