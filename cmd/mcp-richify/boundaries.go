@@ -272,8 +272,8 @@ func generateErrorInventory(csvFile string) error {
 			if isErrorCall(call) {
 				pos := fset.Position(call.Pos())
 				location := fmt.Sprintf("./%s:%d", path, pos.Line)
-				if _, err := file.WriteString(location + "\n"); err != nil {
-					return err
+				if _, writeErr := file.WriteString(location + "\n"); writeErr != nil {
+					fmt.Printf("Warning: failed to write location %s: %v\n", location, writeErr)
 				}
 			}
 			return true
