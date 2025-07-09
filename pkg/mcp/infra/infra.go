@@ -1,7 +1,7 @@
 // Package infra provides infrastructure layer components for external integrations
 //
 // This package implements the infrastructure layer of the three-context architecture,
-// handling all external integrations including Docker, Kubernetes, persistence, 
+// handling all external integrations including Docker, Kubernetes, persistence,
 // templates, and transport protocols.
 //
 // Architecture:
@@ -16,8 +16,8 @@
 //   - k8s: Enables Kubernetes operations
 //
 // Usage:
-//   go build -tags docker,k8s ./cmd/mcp-server
 //
+//	go build -tags docker,k8s ./cmd/mcp-server
 package infra
 
 import (
@@ -26,7 +26,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 )
 
@@ -44,18 +43,18 @@ type KubernetesOperationsInterface interface {
 type InfrastructureContainer struct {
 	// Persistence
 	persistence *BoltDBPersistence
-	
+
 	// Templates
 	templateManager     *TemplateManager
 	dockerfileGenerator *DockerfileGenerator
 	manifestGenerator   *ManifestGenerator
-	
+
 	// Docker operations (available with docker build tag)
 	dockerOps DockerOperationsInterface
-	
+
 	// Kubernetes operations (available with k8s build tag)
 	kubernetesOps KubernetesOperationsInterface
-	
+
 	// Configuration
 	config *InfrastructureConfig
 	logger *slog.Logger
@@ -66,28 +65,28 @@ type InfrastructureConfig struct {
 	// Persistence configuration
 	DatabasePath string
 	BackupPath   string
-	
+
 	// Docker configuration
-	DockerHost   string
-	DockerTLS    bool
-	DockerCerts  string
-	
+	DockerHost  string
+	DockerTLS   bool
+	DockerCerts string
+
 	// Kubernetes configuration
-	KubeConfig  string
-	Namespace   string
-	
+	KubeConfig string
+	Namespace  string
+
 	// Template configuration
 	TemplateDir string
 	CacheSize   int
-	
+
 	// Transport configuration
-	HTTPPort     int
-	HTTPHost     string
-	EnableHTTPS  bool
-	CertFile     string
-	KeyFile      string
-	EnableStdio  bool
-	
+	HTTPPort    int
+	HTTPHost    string
+	EnableHTTPS bool
+	CertFile    string
+	KeyFile     string
+	EnableStdio bool
+
 	// General configuration
 	LogLevel    string
 	MetricsPort int
@@ -120,32 +119,32 @@ func NewInfrastructureContainer(config *InfrastructureConfig, logger *slog.Logge
 	if config == nil {
 		config = DefaultInfrastructureConfig()
 	}
-	
+
 	container := &InfrastructureContainer{
 		config: config,
 		logger: logger,
 	}
-	
+
 	// Initialize persistence
 	if err := container.initializePersistence(); err != nil {
 		return nil, fmt.Errorf("failed to initialize persistence: %w", err)
 	}
-	
+
 	// Initialize templates
 	if err := container.initializeTemplates(); err != nil {
 		return nil, fmt.Errorf("failed to initialize templates: %w", err)
 	}
-	
+
 	// Initialize Docker operations (if build tag is enabled)
 	if err := container.initializeDockerOperations(); err != nil {
 		logger.Warn("Docker operations not available", "error", err)
 	}
-	
+
 	// Initialize Kubernetes operations (if build tag is enabled)
 	if err := container.initializeKubernetesOperations(); err != nil {
 		logger.Warn("Kubernetes operations not available", "error", err)
 	}
-	
+
 	logger.Info("Infrastructure container initialized successfully")
 	return container, nil
 }
@@ -156,7 +155,7 @@ func (c *InfrastructureContainer) initializePersistence() error {
 	if err != nil {
 		return fmt.Errorf("failed to create BoltDB persistence: %w", err)
 	}
-	
+
 	c.persistence = persistence
 	return nil
 }
@@ -224,7 +223,7 @@ func (c *InfrastructureContainer) HealthCheck(ctx context.Context) (*HealthStatu
 		Components: make(map[string]ComponentHealth),
 		Timestamp:  time.Now(),
 	}
-	
+
 	// Check persistence health
 	if err := c.checkPersistenceHealth(ctx); err != nil {
 		status.Components["persistence"] = ComponentHealth{
@@ -237,7 +236,7 @@ func (c *InfrastructureContainer) HealthCheck(ctx context.Context) (*HealthStatu
 			Status: "healthy",
 		}
 	}
-	
+
 	// Check templates health
 	if err := c.checkTemplatesHealth(ctx); err != nil {
 		status.Components["templates"] = ComponentHealth{
@@ -250,7 +249,7 @@ func (c *InfrastructureContainer) HealthCheck(ctx context.Context) (*HealthStatu
 			Status: "healthy",
 		}
 	}
-	
+
 	// Check Docker health (if available)
 	if c.dockerOps != nil {
 		if err := c.checkDockerHealth(ctx); err != nil {
@@ -265,7 +264,7 @@ func (c *InfrastructureContainer) HealthCheck(ctx context.Context) (*HealthStatu
 			}
 		}
 	}
-	
+
 	// Check Kubernetes health (if available)
 	if c.kubernetesOps != nil {
 		if err := c.checkKubernetesHealth(ctx); err != nil {
@@ -280,7 +279,7 @@ func (c *InfrastructureContainer) HealthCheck(ctx context.Context) (*HealthStatu
 			}
 		}
 	}
-	
+
 	return status, nil
 }
 
@@ -304,20 +303,20 @@ func (c *InfrastructureContainer) checkPersistenceHealth(ctx context.Context) er
 	// Test basic database operations
 	testKey := "health_check"
 	testValue := map[string]string{"timestamp": time.Now().Format(time.RFC3339)}
-	
+
 	if err := c.persistence.Put(ctx, BucketConfiguration, testKey, testValue); err != nil {
 		return fmt.Errorf("failed to write to database: %w", err)
 	}
-	
+
 	var result map[string]string
 	if err := c.persistence.Get(ctx, BucketConfiguration, testKey, &result); err != nil {
 		return fmt.Errorf("failed to read from database: %w", err)
 	}
-	
+
 	if err := c.persistence.Delete(ctx, BucketConfiguration, testKey); err != nil {
 		return fmt.Errorf("failed to delete from database: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -328,11 +327,11 @@ func (c *InfrastructureContainer) checkTemplatesHealth(ctx context.Context) erro
 	if err != nil {
 		return fmt.Errorf("failed to list workflow templates: %w", err)
 	}
-	
+
 	if len(workflowTemplates) == 0 {
 		return fmt.Errorf("no workflow templates found")
 	}
-	
+
 	// Test template rendering
 	if len(workflowTemplates) > 0 {
 		_, err := c.templateManager.RenderTemplate(TemplateRenderParams{
@@ -346,7 +345,7 @@ func (c *InfrastructureContainer) checkTemplatesHealth(ctx context.Context) erro
 			return fmt.Errorf("failed to render template: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -367,20 +366,20 @@ func (c *InfrastructureContainer) checkKubernetesHealth(ctx context.Context) err
 // Close shuts down all infrastructure components
 func (c *InfrastructureContainer) Close() error {
 	var errors []error
-	
+
 	// Close persistence
 	if c.persistence != nil {
 		if err := c.persistence.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("failed to close persistence: %w", err))
 		}
 	}
-	
+
 	// Additional cleanup for other components would go here
-	
+
 	if len(errors) > 0 {
 		return fmt.Errorf("errors during shutdown: %v", errors)
 	}
-	
+
 	c.logger.Info("Infrastructure container closed successfully")
 	return nil
 }
@@ -388,16 +387,16 @@ func (c *InfrastructureContainer) Close() error {
 // Backup creates a backup of all infrastructure data
 func (c *InfrastructureContainer) Backup(ctx context.Context, backupPath string) error {
 	c.logger.Info("Creating infrastructure backup", "backup_path", backupPath)
-	
+
 	// Create database backup
 	if c.persistence != nil {
 		if err := c.persistence.Backup(ctx, backupPath+"/database.db"); err != nil {
 			return fmt.Errorf("failed to backup database: %w", err)
 		}
 	}
-	
+
 	// Additional backup operations would go here
-	
+
 	c.logger.Info("Infrastructure backup completed successfully")
 	return nil
 }
@@ -407,7 +406,7 @@ func (c *InfrastructureContainer) GetStats(ctx context.Context) (*Infrastructure
 	stats := &InfrastructureStats{
 		Timestamp: time.Now(),
 	}
-	
+
 	// Get persistence stats
 	if c.persistence != nil {
 		persistenceStats, err := c.persistence.Stats(ctx)
@@ -416,15 +415,15 @@ func (c *InfrastructureContainer) GetStats(ctx context.Context) (*Infrastructure
 		}
 		stats.Persistence = persistenceStats
 	}
-	
+
 	// Get template stats
 	stats.Templates = &TemplateStats{
-		WorkflowCount:  c.getTemplateCount(TemplateTypeWorkflow),
-		ManifestCount:  c.getTemplateCount(TemplateTypeManifest),
+		WorkflowCount:   c.getTemplateCount(TemplateTypeWorkflow),
+		ManifestCount:   c.getTemplateCount(TemplateTypeManifest),
 		DockerfileCount: c.getTemplateCount(TemplateTypeDockerfile),
-		ComponentCount: c.getTemplateCount(TemplateTypeComponent),
+		ComponentCount:  c.getTemplateCount(TemplateTypeComponent),
 	}
-	
+
 	return stats, nil
 }
 

@@ -7,7 +7,7 @@ import (
 
 	"log/slog"
 
-	validation "github.com/Azure/container-kit/pkg/mcp/security"
+	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

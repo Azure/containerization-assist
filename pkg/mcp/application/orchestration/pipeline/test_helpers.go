@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // TestOperations creates a properly initialized Operations instance for testing

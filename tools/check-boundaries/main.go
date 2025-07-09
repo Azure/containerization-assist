@@ -331,7 +331,7 @@ func checkCircularDependencies() ([]BoundaryViolation, error) {
 				importPath := strings.Trim(importSpec.Path.Value, `"`)
 
 				// Only consider internal MCP imports
-				if strings.Contains(importPath, "github.com/Azure/container-kit/pkg/mcp/internal") {
+				if strings.Contains(importPath, "github.com/Azure/container-kit/pkg/mcp/application/internal") {
 					// Convert import path to local package path
 					localPath := strings.Replace(importPath, "github.com/Azure/container-kit/", "", 1)
 					depGraph[packagePath] = append(depGraph[packagePath], localPath)

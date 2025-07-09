@@ -6,9 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // GenerateKubernetesManifests generates Kubernetes manifests for the given application

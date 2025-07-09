@@ -5,45 +5,44 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConsolidatedBuildCommand consolidates all build tool functionality into a single command
 // This replaces the 67 files in pkg/mcp/tools/build/ with a unified implementation
 type ConsolidatedBuildCommand struct {
-	sessionStore   services.SessionStore
-	sessionState   services.SessionState
-	dockerClient   docker.Client
-	logger         *slog.Logger
+	sessionStore services.SessionStore
+	sessionState services.SessionState
+	dockerClient services.DockerClient
+	logger       *slog.Logger
 }
 
 // NewConsolidatedBuildCommand creates a new consolidated build command
 func NewConsolidatedBuildCommand(
 	sessionStore services.SessionStore,
 	sessionState services.SessionState,
-	dockerClient docker.Client,
+	dockerClient services.DockerClient,
 	logger *slog.Logger,
 ) *ConsolidatedBuildCommand {
 	return &ConsolidatedBuildCommand{
-		sessionStore:  sessionStore,
-		sessionState:  sessionState,
-		dockerClient:  dockerClient,
-		logger:        logger,
+		sessionStore: sessionStore,
+		sessionState: sessionState,
+		dockerClient: dockerClient,
+		logger:       logger,
 	}
 }
 
 // Execute performs build operations with full functionality from original tools
 func (cmd *ConsolidatedBuildCommand) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
 	startTime := time.Now()
-	
+
 	// Extract and validate input parameters
 	buildRequest, err := cmd.parseBuildInput(input)
 	if err != nil {
@@ -119,13 +118,13 @@ func (cmd *ConsolidatedBuildCommand) Execute(ctx context.Context, input api.Tool
 func (cmd *ConsolidatedBuildCommand) parseBuildInput(input api.ToolInput) (*BuildRequest, error) {
 	// Extract operation type
 	operation := getStringParam(input.Data, "operation", "build")
-	
+
 	// Extract common parameters
 	request := &BuildRequest{
-		SessionID:   input.SessionID,
-		Operation:   operation,
-		ImageName:   getStringParam(input.Data, "image_name", ""),
-		ImageTag:    getStringParam(input.Data, "image_tag", "latest"),
+		SessionID: input.SessionID,
+		Operation: operation,
+		ImageName: getStringParam(input.Data, "image_name", ""),
+		ImageTag:  getStringParam(input.Data, "image_tag", "latest"),
 		BuildOptions: BuildOptions{
 			DockerfilePath: getStringParam(input.Data, "dockerfile_path", "Dockerfile"),
 			BuildContext:   getStringParam(input.Data, "build_context", "."),
@@ -161,10 +160,10 @@ func (cmd *ConsolidatedBuildCommand) parseBuildInput(input api.ToolInput) (*Buil
 			Force:    getBoolParam(input.Data, "force", false),
 		},
 		PullOptions: PullOptions{
-			Registry:    getStringParam(input.Data, "registry", ""),
-			Tag:         getStringParam(input.Data, "tag", "latest"),
-			Platform:    getStringParam(input.Data, "platform", ""),
-			AllTags:     getBoolParam(input.Data, "all_tags", false),
+			Registry:            getStringParam(input.Data, "registry", ""),
+			Tag:                 getStringParam(input.Data, "tag", "latest"),
+			Platform:            getStringParam(input.Data, "platform", ""),
+			AllTags:             getBoolParam(input.Data, "all_tags", false),
 			DisableContentTrust: getBoolParam(input.Data, "disable_content_trust", false),
 		},
 		TagOptions: TagOptions{
@@ -227,7 +226,7 @@ func (cmd *ConsolidatedBuildCommand) validateBuildRequest(request *BuildRequest)
 
 	// Operation validation
 	validOperations := []string{"build", "push", "pull", "tag"}
-	if !contains(validOperations, request.Operation) {
+	if !slices.Contains(validOperations, request.Operation) {
 		errors = append(errors, ValidationError{
 			Field:   "operation",
 			Message: fmt.Sprintf("operation must be one of: %s", strings.Join(validOperations, ", ")),
@@ -279,19 +278,19 @@ func (cmd *ConsolidatedBuildCommand) getSessionWorkspace(sessionID string) (stri
 func (cmd *ConsolidatedBuildCommand) executeBuildImage(ctx context.Context, request *BuildRequest, workspaceDir string) (*build.BuildResult, error) {
 	// Create build request from domain
 	buildRequest := &build.BuildRequest{
-		ID:          fmt.Sprintf("build-%d", time.Now().Unix()),
-		SessionID:   request.SessionID,
-		Context:     filepath.Join(workspaceDir, request.BuildOptions.BuildContext),
-		Dockerfile:  filepath.Join(workspaceDir, request.BuildOptions.DockerfilePath),
-		ImageName:   request.ImageName,
-		Tags:        []string{request.ImageTag},
-		BuildArgs:   request.BuildOptions.BuildArgs,
-		Target:      request.BuildOptions.Target,
-		Platform:    request.BuildOptions.Platform,
-		NoCache:     request.BuildOptions.NoCache,
-		PullParent:  request.BuildOptions.PullParent,
-		Labels:      request.BuildOptions.Labels,
-		CreatedAt:   time.Now(),
+		ID:         fmt.Sprintf("build-%d", time.Now().Unix()),
+		SessionID:  request.SessionID,
+		Context:    filepath.Join(workspaceDir, request.BuildOptions.BuildContext),
+		Dockerfile: filepath.Join(workspaceDir, request.BuildOptions.DockerfilePath),
+		ImageName:  request.ImageName,
+		Tags:       []string{request.ImageTag},
+		BuildArgs:  request.BuildOptions.BuildArgs,
+		Target:     request.BuildOptions.Target,
+		Platform:   request.BuildOptions.Platform,
+		NoCache:    request.BuildOptions.NoCache,
+		PullParent: request.BuildOptions.PullParent,
+		Labels:     request.BuildOptions.Labels,
+		CreatedAt:  time.Now(),
 	}
 
 	// Execute build using Docker client
@@ -440,12 +439,12 @@ func (cmd *ConsolidatedBuildCommand) executeTagImage(ctx context.Context, reques
 func (cmd *ConsolidatedBuildCommand) updateSessionState(sessionID string, result *build.BuildResult) error {
 	// Update session state with build results
 	stateUpdate := map[string]interface{}{
-		"last_build":      result,
-		"build_time":      time.Now(),
-		"build_success":   result.Status == build.BuildStatusCompleted,
-		"image_name":      result.ImageName,
-		"image_id":        result.ImageID,
-		"build_duration":  result.Duration,
+		"last_build":     result,
+		"build_time":     time.Now(),
+		"build_success":  result.Status == build.BuildStatusCompleted,
+		"image_name":     result.ImageName,
+		"image_id":       result.ImageID,
+		"build_duration": result.Duration,
 	}
 
 	return cmd.sessionState.UpdateSessionData(sessionID, stateUpdate)
@@ -454,23 +453,23 @@ func (cmd *ConsolidatedBuildCommand) updateSessionState(sessionID string, result
 // createBuildResponse creates the final build response
 func (cmd *ConsolidatedBuildCommand) createBuildResponse(result *build.BuildResult, duration time.Duration) *ConsolidatedBuildResponse {
 	return &ConsolidatedBuildResponse{
-		Success:           result.Status == build.BuildStatusCompleted,
-		ImageName:         result.ImageName,
-		ImageTag:          getFirstTag(result.Tags),
-		FullImageRef:      fmt.Sprintf("%s:%s", result.ImageName, getFirstTag(result.Tags)),
-		ImageID:           result.ImageID,
-		Duration:          result.Duration,
-		BuildLogs:         convertBuildLogs(result.Logs),
-		Warnings:          []string{}, // Could be extracted from logs
-		Errors:            []string{result.Error},
-		LayerCount:        result.Metadata.Layers,
-		ImageSizeBytes:    result.Size,
-		CacheHits:         result.Metadata.CacheHits,
-		CacheMisses:       result.Metadata.CacheMisses,
-		Platform:          result.Metadata.Platform,
-		Tags:              result.Tags,
-		BuildMetadata:     convertBuildMetadata(result.Metadata),
-		TotalDuration:     duration,
+		Success:        result.Status == build.BuildStatusCompleted,
+		ImageName:      result.ImageName,
+		ImageTag:       getFirstTag(result.Tags),
+		FullImageRef:   fmt.Sprintf("%s:%s", result.ImageName, getFirstTag(result.Tags)),
+		ImageID:        result.ImageID,
+		Duration:       result.Duration,
+		BuildLogs:      convertBuildLogs(result.Logs),
+		Warnings:       []string{}, // Could be extracted from logs
+		Errors:         []string{result.Error},
+		LayerCount:     result.Metadata.Layers,
+		ImageSizeBytes: result.Size,
+		CacheHits:      result.Metadata.CacheHits,
+		CacheMisses:    result.Metadata.CacheMisses,
+		Platform:       result.Metadata.Platform,
+		Tags:           result.Tags,
+		BuildMetadata:  convertBuildMetadata(result.Metadata),
+		TotalDuration:  duration,
 	}
 }
 
@@ -656,52 +655,30 @@ type TagOptions struct {
 
 // ConsolidatedBuildResponse represents the consolidated build response
 type ConsolidatedBuildResponse struct {
-	Success           bool                   `json:"success"`
-	ImageName         string                 `json:"image_name"`
-	ImageTag          string                 `json:"image_tag"`
-	FullImageRef      string                 `json:"full_image_ref"`
-	ImageID           string                 `json:"image_id"`
-	Duration          time.Duration          `json:"duration"`
-	BuildLogs         []string               `json:"build_logs"`
-	Warnings          []string               `json:"warnings"`
-	Errors            []string               `json:"errors"`
-	LayerCount        int                    `json:"layer_count"`
-	ImageSizeBytes    int64                  `json:"image_size_bytes"`
-	CacheHits         int                    `json:"cache_hits"`
-	CacheMisses       int                    `json:"cache_misses"`
-	Platform          string                 `json:"platform"`
-	Tags              []string               `json:"tags"`
-	BuildMetadata     map[string]interface{} `json:"build_metadata"`
-	TotalDuration     time.Duration          `json:"total_duration"`
+	Success        bool                   `json:"success"`
+	ImageName      string                 `json:"image_name"`
+	ImageTag       string                 `json:"image_tag"`
+	FullImageRef   string                 `json:"full_image_ref"`
+	ImageID        string                 `json:"image_id"`
+	Duration       time.Duration          `json:"duration"`
+	BuildLogs      []string               `json:"build_logs"`
+	Warnings       []string               `json:"warnings"`
+	Errors         []string               `json:"errors"`
+	LayerCount     int                    `json:"layer_count"`
+	ImageSizeBytes int64                  `json:"image_size_bytes"`
+	CacheHits      int                    `json:"cache_hits"`
+	CacheMisses    int                    `json:"cache_misses"`
+	Platform       string                 `json:"platform"`
+	Tags           []string               `json:"tags"`
+	BuildMetadata  map[string]interface{} `json:"build_metadata"`
+	TotalDuration  time.Duration          `json:"total_duration"`
 }
 
-// ValidationError represents build validation errors
-type ValidationError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-	Code    string `json:"code"`
-}
+// Note: ValidationError is defined in common.go
 
 // Helper functions for build operations
 
-// isValidImageName validates Docker image name format
-func isValidImageName(name string) bool {
-	// Basic validation - can be enhanced with full Docker naming rules
-	if name == "" || len(name) > 255 {
-		return false
-	}
-	
-	// Check for invalid characters
-	for _, char := range name {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
-			 (char >= '0' && char <= '9') || char == '.' || char == '-' || 
-			 char == '_' || char == '/' || char == ':') {
-			return false
-		}
-	}
-	
-	return true
-}
+// Note: isValidImageName is defined in common.go
 
 // isValidImageTag validates Docker image tag format
 func isValidImageTag(tag string) bool {
@@ -709,83 +686,24 @@ func isValidImageTag(tag string) bool {
 	if tag == "" || len(tag) > 128 {
 		return false
 	}
-	
+
 	// Check for invalid characters
 	for _, char := range tag {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
-			 (char >= '0' && char <= '9') || char == '.' || char == '-' || 
-			 char == '_') {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') || char == '.' || char == '-' ||
+			char == '_') {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
-// contains checks if a string slice contains a specific value
-func contains(slice []string, value string) bool {
-	for _, item := range slice {
-		if item == value {
-			return true
-		}
-	}
-	return false
-}
+// Note: Use slices.Contains from standard library
 
-// getStringParam extracts a string parameter from input data
-func getStringParam(data map[string]interface{}, key, defaultValue string) string {
-	if value, ok := data[key].(string); ok {
-		return value
-	}
-	return defaultValue
-}
+// Note: Parameter extraction functions are defined in common.go
 
-// getBoolParam extracts a boolean parameter from input data
-func getBoolParam(data map[string]interface{}, key string, defaultValue bool) bool {
-	if value, ok := data[key].(bool); ok {
-		return value
-	}
-	return defaultValue
-}
-
-// getIntParam extracts an integer parameter from input data
-func getIntParam(data map[string]interface{}, key string, defaultValue int) int {
-	if value, ok := data[key].(int); ok {
-		return value
-	}
-	if value, ok := data[key].(float64); ok {
-		return int(value)
-	}
-	return defaultValue
-}
-
-// getStringMapParam extracts a string map parameter from input data
-func getStringMapParam(data map[string]interface{}, key string) map[string]string {
-	if value, ok := data[key].(map[string]interface{}); ok {
-		result := make(map[string]string)
-		for k, v := range value {
-			if str, ok := v.(string); ok {
-				result[k] = str
-			}
-		}
-		return result
-	}
-	return make(map[string]string)
-}
-
-// getStringSliceParam extracts a string slice parameter from input data
-func getStringSliceParam(data map[string]interface{}, key string) []string {
-	if value, ok := data[key].([]interface{}); ok {
-		result := make([]string, 0, len(value))
-		for _, v := range value {
-			if str, ok := v.(string); ok {
-				result = append(result, str)
-			}
-		}
-		return result
-	}
-	return []string{}
-}
+// Note: getStringSliceParam is defined in common.go
 
 // Helper functions for working with domain types
 
@@ -826,7 +744,7 @@ func convertBuildMetadata(metadata build.BuildMetadata) map[string]interface{} {
 // performDockerBuild performs the actual Docker build operation
 func (cmd *ConsolidatedBuildCommand) performDockerBuild(ctx context.Context, request *build.BuildRequest) (*build.BuildResult, error) {
 	startTime := time.Now()
-	
+
 	// Create build result
 	result := &build.BuildResult{
 		BuildID:   request.ID,
@@ -843,7 +761,7 @@ func (cmd *ConsolidatedBuildCommand) performDockerBuild(ctx context.Context, req
 	}
 
 	// Use Docker client to build image
-	buildOptions := docker.BuildOptions{
+	buildOptions := services.DockerBuildOptions{
 		Context:    request.Context,
 		Dockerfile: request.Dockerfile,
 		Tags:       request.Tags,
@@ -872,7 +790,7 @@ func (cmd *ConsolidatedBuildCommand) performDockerBuild(ctx context.Context, req
 	result.Duration = time.Since(startTime)
 	completedAt := time.Now()
 	result.CompletedAt = &completedAt
-	
+
 	// Convert build logs
 	result.Logs = make([]build.BuildLog, len(buildResult.Logs))
 	for i, log := range buildResult.Logs {
@@ -894,7 +812,7 @@ func (cmd *ConsolidatedBuildCommand) performDockerBuild(ctx context.Context, req
 // performDockerPush performs the actual Docker push operation
 func (cmd *ConsolidatedBuildCommand) performDockerPush(ctx context.Context, request *build.ImagePushRequest) (*build.ImagePushResult, error) {
 	startTime := time.Now()
-	
+
 	// Create push result
 	result := &build.ImagePushResult{
 		PushID:    request.ID,
@@ -939,7 +857,7 @@ func (cmd *ConsolidatedBuildCommand) performDockerPush(ctx context.Context, requ
 // performDockerPull performs the actual Docker pull operation
 func (cmd *ConsolidatedBuildCommand) performDockerPull(ctx context.Context, imageName, tag, registry string) (*build.BuildResult, error) {
 	startTime := time.Now()
-	
+
 	// Create result
 	result := &build.BuildResult{
 		BuildID:   fmt.Sprintf("pull-%d", time.Now().Unix()),
@@ -988,7 +906,7 @@ func (cmd *ConsolidatedBuildCommand) performDockerPull(ctx context.Context, imag
 // performDockerTag performs the actual Docker tag operation
 func (cmd *ConsolidatedBuildCommand) performDockerTag(ctx context.Context, request *build.ImageTagRequest) (*build.ImageTagResult, error) {
 	startTime := time.Now()
-	
+
 	// Create tag result
 	result := &build.ImageTagResult{
 		TagID:     request.ID,

@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

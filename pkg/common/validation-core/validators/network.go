@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // NetworkValidator validates network-related data like IP addresses, ports, and hostnames

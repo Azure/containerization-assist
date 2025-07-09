@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	sessiontypes "github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	sessiontypes "github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // JobType represents different types of jobs

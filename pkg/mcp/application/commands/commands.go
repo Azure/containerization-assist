@@ -11,11 +11,10 @@
 //   - ConsolidatedScanCommand: Security scanning operations
 //
 // Each command follows the consolidated pattern:
-//   1. Single command struct with all tool functionality
-//   2. Comprehensive implementations without stubs
-//   3. Proper domain integration
-//   4. Unified error handling
-//
+//  1. Single command struct with all tool functionality
+//  2. Comprehensive implementations without stubs
+//  3. Proper domain integration
+//  4. Unified error handling
 package commands
 
 import (
@@ -25,7 +24,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // CommandExecutor represents the interface for all command implementations
@@ -84,8 +83,10 @@ func (b *BaseCommand) createSuccessOutput(data map[string]interface{}) api.ToolO
 	}
 }
 
-// ValidationError represents a validation error
-type ValidationError struct {
+// Note: ValidationError is defined in common.go
+
+// ValidationWarning represents a validation warning
+type ValidationWarning struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
 	Code    string `json:"code"`
@@ -112,11 +113,11 @@ func GetAllCommands() map[string]CommandExecutor {
 
 // CommandInfo represents information about a command
 type CommandInfo struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
 	Schema      api.ToolSchema `json:"schema"`
-	Category    string     `json:"category"`
-	Version     string     `json:"version"`
+	Category    string         `json:"category"`
+	Version     string         `json:"version"`
 }
 
 // GetCommandInfo returns information about all commands
@@ -135,34 +136,7 @@ func GetCommandInfo() []CommandInfo {
 	return info
 }
 
-// Helper functions for parameter extraction
-
-// getStringParam extracts a string parameter from input data
-func getStringParam(data map[string]interface{}, key string, defaultValue string) string {
-	if val, ok := data[key].(string); ok {
-		return val
-	}
-	return defaultValue
-}
-
-// getIntParam extracts an integer parameter from input data
-func getIntParam(data map[string]interface{}, key string, defaultValue int) int {
-	if val, ok := data[key].(float64); ok {
-		return int(val)
-	}
-	if val, ok := data[key].(int); ok {
-		return val
-	}
-	return defaultValue
-}
-
-// getBoolParam extracts a boolean parameter from input data
-func getBoolParam(data map[string]interface{}, key string, defaultValue bool) bool {
-	if val, ok := data[key].(bool); ok {
-		return val
-	}
-	return defaultValue
-}
+// Note: Helper functions (getStringParam, getIntParam, getBoolParam) are defined in common.go
 
 // getDurationParam extracts a duration parameter from input data
 func getDurationParam(data map[string]interface{}, key string, defaultValue time.Duration) time.Duration {
@@ -188,15 +162,7 @@ func getStringArrayParam(data map[string]interface{}, key string) []string {
 	return []string{}
 }
 
-// contains checks if a slice contains a string
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
+// Note: contains function is defined in common.go
 
 // initializeCommands initializes all commands
 func InitializeCommands(

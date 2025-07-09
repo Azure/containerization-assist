@@ -9,12 +9,11 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation"
-	"github.com/Azure/container-kit/pkg/mcp/internal/utils"
+	"github.com/Azure/container-kit/pkg/mcp/application/commands"
+	"github.com/Azure/container-kit/pkg/mcp/application/internal/conversation"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"go.etcd.io/bbolt"
 )
 
@@ -100,8 +99,8 @@ func createUnifiedMCPServer(
 	mode ServerMode,
 	unifiedSessionManager session.UnifiedSessionManager,
 ) (*UnifiedMCPServer, error) {
-	unifiedRegistry := core.NewUnifiedRegistry(logger)
-	toolRegistry := core.NewRegistryAdapter(unifiedRegistry)
+	unifiedRegistry := commands.NewUnifiedRegistry(logger)
+	toolRegistry := commands.NewRegistryAdapter(unifiedRegistry)
 
 	var actualSessionManager session.UnifiedSessionManager
 	var concreteSessionManager *session.SessionManager // Keep reference for legacy components
@@ -318,7 +317,7 @@ func (s *UnifiedMCPServer) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// simpleToolOrchestrator is a basic implementation of core.ToolOrchestrator
+// simpleToolOrchestrator is a basic implementation of api.Orchestrator
 type simpleToolOrchestrator struct {
 	logger   *slog.Logger
 	registry api.Registry

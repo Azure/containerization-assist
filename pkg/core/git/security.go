@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // SecurityOptions contains security settings for Git operations

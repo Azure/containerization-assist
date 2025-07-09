@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // AnalyzeCommand implements the analyze tool at the application layer
@@ -105,8 +105,8 @@ func (cmd *BuildCommand) Execute(ctx context.Context, input api.ToolInput) (api.
 		NoCache:    getBoolParam(input.Data, "no_cache", false),
 		PullParent: getBoolParam(input.Data, "pull_parent", true),
 		Options: build.BuildOptions{
-			Strategy:         build.BuildStrategyDocker,
-			EnableBuildKit:   getBoolParam(input.Data, "enable_buildkit", true),
+			Strategy:           build.BuildStrategyDocker,
+			EnableBuildKit:     getBoolParam(input.Data, "enable_buildkit", true),
 			RemoveIntermediate: getBoolParam(input.Data, "remove_intermediate", true),
 		},
 		CreatedAt: time.Now(),
@@ -289,30 +289,4 @@ func (cmd *ScanCommand) Execute(ctx context.Context, input api.ToolInput) (api.T
 	}, nil
 }
 
-// Helper functions for parameter extraction
-func getStringParam(params map[string]interface{}, key, defaultValue string) string {
-	if val, exists := params[key]; exists {
-		if str, ok := val.(string); ok {
-			return str
-		}
-	}
-	return defaultValue
-}
-
-func getBoolParam(params map[string]interface{}, key string, defaultValue bool) bool {
-	if val, exists := params[key]; exists {
-		if b, ok := val.(bool); ok {
-			return b
-		}
-	}
-	return defaultValue
-}
-
-func getIntParam(params map[string]interface{}, key string, defaultValue int) int {
-	if val, exists := params[key]; exists {
-		if i, ok := val.(int); ok {
-			return i
-		}
-	}
-	return defaultValue
-}
+// Note: Parameter extraction functions (getStringParam, getBoolParam, getIntParam) are defined in common.go

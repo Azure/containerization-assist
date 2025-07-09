@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Parser defines an interface for extracting content from string responses

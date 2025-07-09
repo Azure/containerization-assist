@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core/config"
-	"github.com/Azure/container-kit/pkg/mcp/server"
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
+	"github.com/Azure/container-kit/pkg/mcp/domain/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,7 +72,7 @@ func testServerLifecycle(t *testing.T, workspaceDir, storeDir string) {
 	config.TransportType = "stdio" // Use stdio for testing
 
 	// Create server
-	mcpServer, err := server.NewServer(ctx, config)
+	mcpServer, err := core.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create MCP server")
 	require.NotNil(t, mcpServer, "Server should not be nil")
 
@@ -132,7 +132,7 @@ func testServerConfiguration(t *testing.T, workspaceDir, storeDir string) {
 			config := config.DefaultServerConfig()
 			tt.configModifier(config)
 
-			mcpServer, err := server.NewServer(ctx, config)
+			mcpServer, err := core.NewServer(ctx, config)
 
 			if tt.expectError {
 				assert.Error(t, err, "Expected error for invalid configuration")
@@ -160,7 +160,7 @@ func testWorkspaceManagement(t *testing.T, workspaceDir, storeDir string) {
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
-	mcpServer, err := server.NewServer(ctx, config)
+	mcpServer, err := core.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {
@@ -197,7 +197,7 @@ func testSessionHandling(t *testing.T, workspaceDir, storeDir string) {
 	config.MaxSessions = 5
 	config.SessionTTL = 10 * time.Minute
 
-	mcpServer, err := server.NewServer(ctx, config)
+	mcpServer, err := core.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {
@@ -252,7 +252,7 @@ func testToolRegistration(t *testing.T, workspaceDir, storeDir string) {
 	config.WorkspaceDir = workspaceDir
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 
-	mcpServer, err := server.NewServer(ctx, config)
+	mcpServer, err := core.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {
@@ -301,7 +301,7 @@ func TestMCPServerStressTest(t *testing.T) {
 	config.StorePath = filepath.Join(storeDir, "sessions.db")
 	config.MaxSessions = 100
 
-	mcpServer, err := server.NewServer(ctx, config)
+	mcpServer, err := core.NewServer(ctx, config)
 	require.NoError(t, err, "Failed to create server")
 	require.NotNil(t, mcpServer, "Server should not be nil")
 	defer func() {

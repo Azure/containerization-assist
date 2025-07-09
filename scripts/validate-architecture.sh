@@ -148,7 +148,7 @@ for dep in "${EXTERNAL_DEPS[@]}"; do
             violation "Domain layer has external dependency: $dep"
         fi
     fi
-    
+
     # Check application layer
     if [[ -d "$PKG_MCP_DIR/application" ]]; then
         APP_EXT=$(grep -r "$dep" "$PKG_MCP_DIR/application/" 2>/dev/null | wc -l || echo "0")
@@ -213,7 +213,7 @@ echo "------------------------"
 if [[ -d "$PKG_MCP_DIR/infra" ]]; then
     BUILD_TAG_FILES=$(find "$PKG_MCP_DIR/infra" -name "*.go" -exec grep -l "//go:build.*\(docker\|k8s\|cloud\)" {} \; 2>/dev/null | wc -l || echo "0")
     INFRA_GO_FILES=$(find "$PKG_MCP_DIR/infra" -name "*.go" ! -name "*_test.go" 2>/dev/null | wc -l || echo "0")
-    
+
     if [[ $BUILD_TAG_FILES -gt 0 ]]; then
         success "Infrastructure uses build tags for optional dependencies"
     elif [[ $INFRA_GO_FILES -gt 0 ]]; then

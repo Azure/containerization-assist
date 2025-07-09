@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 func (c *Clients) TestOpenAIConn(ctx context.Context) error {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	validation "github.com/Azure/container-kit/pkg/mcp/security"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/rs/zerolog"
 )
 

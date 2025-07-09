@@ -158,7 +158,7 @@ func TestAnalysisResult_ShouldRecommendDockerization(t *testing.T) {
 func TestAnalysisResult_CalculateOverallConfidence(t *testing.T) {
 	// High confidence result
 	highResult := &AnalysisResult{
-		Language: Language{Confidence: 0.9},
+		Language:  Language{Confidence: 0.9},
 		Framework: Framework{Confidence: ConfidenceHigh},
 	}
 	if highResult.CalculateOverallConfidence() != ConfidenceHigh {
@@ -167,7 +167,7 @@ func TestAnalysisResult_CalculateOverallConfidence(t *testing.T) {
 
 	// Medium confidence result
 	mediumResult := &AnalysisResult{
-		Language: Language{Confidence: 0.6},
+		Language:  Language{Confidence: 0.6},
 		Framework: Framework{Confidence: ConfidenceMedium},
 	}
 	if mediumResult.CalculateOverallConfidence() != ConfidenceMedium {
@@ -176,7 +176,7 @@ func TestAnalysisResult_CalculateOverallConfidence(t *testing.T) {
 
 	// Low confidence result
 	lowResult := &AnalysisResult{
-		Language: Language{Confidence: 0.3},
+		Language:  Language{Confidence: 0.3},
 		Framework: Framework{Confidence: ConfidenceLow},
 	}
 	if lowResult.CalculateOverallConfidence() != ConfidenceLow {

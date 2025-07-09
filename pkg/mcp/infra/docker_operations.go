@@ -4,13 +4,13 @@ package infra
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan"
-	"log/slog"
 )
 
 // DockerOperations handles Docker-specific operations
@@ -57,8 +57,8 @@ type BuildImageResult struct {
 // BuildImage builds a Docker image
 func (d *DockerOperations) BuildImage(ctx context.Context, params BuildImageParams) (*BuildImageResult, error) {
 	startTime := time.Now()
-	
-	d.logger.Info("Starting Docker image build", 
+
+	d.logger.Info("Starting Docker image build",
 		"context_path", params.ContextPath,
 		"dockerfile_path", params.DockerfilePath,
 		"tags", params.Tags)
@@ -115,30 +115,30 @@ func (d *DockerOperations) BuildImage(ctx context.Context, params BuildImagePara
 
 // PushImageParams represents parameters for pushing Docker images
 type PushImageParams struct {
-	ImageRef     string
-	Registry     string
-	Username     string
-	Password     string
+	ImageRef      string
+	Registry      string
+	Username      string
+	Password      string
 	SkipTLSVerify bool
-	Timeout      time.Duration
+	Timeout       time.Duration
 }
 
 // PushImageResult represents the result of pushing a Docker image
 type PushImageResult struct {
-	ImageRef  string
-	Digest    string
-	Size      int64
-	PushTime  time.Duration
-	Success   bool
-	Error     string
-	PushLogs  []string
+	ImageRef string
+	Digest   string
+	Size     int64
+	PushTime time.Duration
+	Success  bool
+	Error    string
+	PushLogs []string
 }
 
 // PushImage pushes a Docker image to a registry
 func (d *DockerOperations) PushImage(ctx context.Context, params PushImageParams) (*PushImageResult, error) {
 	startTime := time.Now()
-	
-	d.logger.Info("Starting Docker image push", 
+
+	d.logger.Info("Starting Docker image push",
 		"image_ref", params.ImageRef,
 		"registry", params.Registry)
 
@@ -190,12 +190,12 @@ func (d *DockerOperations) PushImage(ctx context.Context, params PushImageParams
 
 // PullImageParams represents parameters for pulling Docker images
 type PullImageParams struct {
-	ImageRef     string
-	Registry     string
-	Username     string
-	Password     string
+	ImageRef      string
+	Registry      string
+	Username      string
+	Password      string
 	SkipTLSVerify bool
-	Timeout      time.Duration
+	Timeout       time.Duration
 }
 
 // PullImageResult represents the result of pulling a Docker image
@@ -213,8 +213,8 @@ type PullImageResult struct {
 // PullImage pulls a Docker image from a registry
 func (d *DockerOperations) PullImage(ctx context.Context, params PullImageParams) (*PullImageResult, error) {
 	startTime := time.Now()
-	
-	d.logger.Info("Starting Docker image pull", 
+
+	d.logger.Info("Starting Docker image pull",
 		"image_ref", params.ImageRef,
 		"registry", params.Registry)
 
@@ -290,8 +290,8 @@ type ScanImageResult struct {
 // ScanImage scans a Docker image for vulnerabilities and secrets
 func (d *DockerOperations) ScanImage(ctx context.Context, params ScanImageParams) (*ScanImageResult, error) {
 	startTime := time.Now()
-	
-	d.logger.Info("Starting Docker image scan", 
+
+	d.logger.Info("Starting Docker image scan",
 		"image_ref", params.ImageRef,
 		"scanner_type", params.ScannerType,
 		"severity_threshold", params.SeverityThreshold)
@@ -391,7 +391,7 @@ type TagImageResult struct {
 
 // TagImage tags a Docker image
 func (d *DockerOperations) TagImage(ctx context.Context, params TagImageParams) (*TagImageResult, error) {
-	d.logger.Info("Starting Docker image tag", 
+	d.logger.Info("Starting Docker image tag",
 		"source_image_ref", params.SourceImageRef,
 		"target_image_ref", params.TargetImageRef)
 

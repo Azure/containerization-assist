@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	validation "github.com/Azure/container-kit/pkg/mcp/security"
+	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 )
 
 type ValidationError = validation.Error

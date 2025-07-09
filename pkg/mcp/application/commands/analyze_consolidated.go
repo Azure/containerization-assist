@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConsolidatedAnalyzeCommand consolidates all analyze tool functionality into a single command
@@ -43,7 +43,7 @@ func NewConsolidatedAnalyzeCommand(
 // Execute performs repository analysis with full functionality from original tools
 func (cmd *ConsolidatedAnalyzeCommand) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
 	startTime := time.Now()
-	
+
 	// Extract and validate input parameters
 	analysisRequest, err := cmd.parseAnalysisInput(input)
 	if err != nil {
@@ -104,12 +104,12 @@ func (cmd *ConsolidatedAnalyzeCommand) parseAnalysisInput(input api.ToolInput) (
 	// Extract required parameters
 	repositoryPath := getStringParam(input.Data, "repository_path", "")
 	repoURL := getStringParam(input.Data, "repo_url", "")
-	
+
 	// Support both repository_path and repo_url for backward compatibility
 	if repositoryPath == "" && repoURL == "" {
 		return nil, fmt.Errorf("either repository_path or repo_url must be provided")
 	}
-	
+
 	targetPath := repositoryPath
 	if targetPath == "" {
 		targetPath = repoURL
@@ -117,23 +117,23 @@ func (cmd *ConsolidatedAnalyzeCommand) parseAnalysisInput(input api.ToolInput) (
 
 	// Extract optional parameters with defaults
 	request := &AnalysisRequest{
-		SessionID:       input.SessionID,
-		RepositoryPath:  targetPath,
-		RepoURL:         repoURL,
+		SessionID:      input.SessionID,
+		RepositoryPath: targetPath,
+		RepoURL:        repoURL,
 		AnalysisOptions: AnalysisOptions{
-			IncludeSecrets:      getBoolParam(input.Data, "include_secrets", true),
-			IncludeDependencies: getBoolParam(input.Data, "include_dependencies", true),
-			IncludeDockerfile:   getBoolParam(input.Data, "include_dockerfile", true),
+			IncludeSecrets:         getBoolParam(input.Data, "include_secrets", true),
+			IncludeDependencies:    getBoolParam(input.Data, "include_dependencies", true),
+			IncludeDockerfile:      getBoolParam(input.Data, "include_dockerfile", true),
 			IncludeVulnerabilities: getBoolParam(input.Data, "include_vulnerabilities", false),
-			IncludeCompliance:   getBoolParam(input.Data, "include_compliance", false),
-			IncludeTests:        getBoolParam(input.Data, "include_tests", true),
-			IncludeMetrics:      getBoolParam(input.Data, "include_metrics", false),
-			MaxDepth:           getIntParam(input.Data, "max_depth", 10),
-			OutputFormat:       getStringParam(input.Data, "output_format", "json"),
-			Language:           getStringParam(input.Data, "language", ""),
-			Framework:          getStringParam(input.Data, "framework", ""),
-			CustomPatterns:     getStringSliceParam(input.Data, "custom_patterns"),
-			ExcludePatterns:    getStringSliceParam(input.Data, "exclude_patterns"),
+			IncludeCompliance:      getBoolParam(input.Data, "include_compliance", false),
+			IncludeTests:           getBoolParam(input.Data, "include_tests", true),
+			IncludeMetrics:         getBoolParam(input.Data, "include_metrics", false),
+			MaxDepth:               getIntParam(input.Data, "max_depth", 10),
+			OutputFormat:           getStringParam(input.Data, "output_format", "json"),
+			Language:               getStringParam(input.Data, "language", ""),
+			Framework:              getStringParam(input.Data, "framework", ""),
+			CustomPatterns:         getStringSliceParam(input.Data, "custom_patterns"),
+			ExcludePatterns:        getStringSliceParam(input.Data, "exclude_patterns"),
 		},
 		CreatedAt: time.Now(),
 	}
@@ -174,7 +174,7 @@ func (cmd *ConsolidatedAnalyzeCommand) validateAnalysisRequest(request *Analysis
 
 	// Validate output format
 	validFormats := []string{"json", "yaml", "xml", "csv"}
-	if !contains(validFormats, request.AnalysisOptions.OutputFormat) {
+	if !slices.Contains(validFormats, request.AnalysisOptions.OutputFormat) {
 		errors = append(errors, ValidationError{
 			Field:   "output_format",
 			Message: fmt.Sprintf("output_format must be one of: %s", strings.Join(validFormats, ", ")),
@@ -294,7 +294,7 @@ func (cmd *ConsolidatedAnalyzeCommand) performAnalysis(ctx context.Context, requ
 func (cmd *ConsolidatedAnalyzeCommand) detectLanguage(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
 	// Language detection logic from original tools
 	languageMap := make(map[string]int)
-	
+
 	// File extension-based detection
 	if err := cmd.detectLanguageByExtension(workspaceDir, languageMap); err != nil {
 		return fmt.Errorf("extension-based language detection failed: %w", err)
@@ -307,7 +307,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguage(ctx context.Context, resul
 
 	// Determine primary language
 	primaryLang, confidence := cmd.determinePrimaryLanguage(languageMap)
-	
+
 	result.Language = analyze.Language{
 		Name:       primaryLang,
 		Confidence: confidence,
@@ -333,8 +333,8 @@ func (cmd *ConsolidatedAnalyzeCommand) detectFramework(ctx context.Context, resu
 		return cmd.detectDotNetFramework(result, workspaceDir)
 	default:
 		result.Framework = analyze.Framework{
-			Name: "unknown",
-			Type: analyze.FrameworkTypeUnknown,
+			Name:       "unknown",
+			Type:       analyze.FrameworkTypeUnknown,
 			Confidence: analyze.ConfidenceLow,
 		}
 	}
@@ -383,7 +383,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeDependencies(ctx context.Context, 
 func (cmd *ConsolidatedAnalyzeCommand) analyzeDockerfile(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
 	// Dockerfile analysis logic from original tools
 	dockerfilePath := filepath.Join(workspaceDir, "Dockerfile")
-	
+
 	// Check if Dockerfile exists
 	if !fileExists(dockerfilePath) {
 		return nil // No Dockerfile found, not an error
@@ -476,26 +476,21 @@ type AnalysisOptions struct {
 
 // ConsolidatedAnalysisResponse represents the consolidated analysis response
 type ConsolidatedAnalysisResponse struct {
-	Repository       analyze.Repository            `json:"repository"`
-	Language         analyze.Language              `json:"language"`
-	Framework        analyze.Framework             `json:"framework"`
-	Dependencies     []analyze.Dependency          `json:"dependencies"`
-	Databases        []analyze.Database            `json:"databases"`
-	BuildTools       []analyze.BuildTool           `json:"build_tools"`
-	TestFrameworks   []analyze.TestFramework       `json:"test_frameworks"`
-	SecurityIssues   []analyze.SecurityIssue       `json:"security_issues"`
-	Recommendations  []analyze.Recommendation      `json:"recommendations"`
-	Confidence       analyze.ConfidenceLevel       `json:"confidence"`
-	AnalysisMetadata analyze.AnalysisMetadata      `json:"metadata"`
-	TotalDuration    time.Duration                 `json:"total_duration"`
+	Repository       analyze.Repository       `json:"repository"`
+	Language         analyze.Language         `json:"language"`
+	Framework        analyze.Framework        `json:"framework"`
+	Dependencies     []analyze.Dependency     `json:"dependencies"`
+	Databases        []analyze.Database       `json:"databases"`
+	BuildTools       []analyze.BuildTool      `json:"build_tools"`
+	TestFrameworks   []analyze.TestFramework  `json:"test_frameworks"`
+	SecurityIssues   []analyze.SecurityIssue  `json:"security_issues"`
+	Recommendations  []analyze.Recommendation `json:"recommendations"`
+	Confidence       analyze.ConfidenceLevel  `json:"confidence"`
+	AnalysisMetadata analyze.AnalysisMetadata `json:"metadata"`
+	TotalDuration    time.Duration            `json:"total_duration"`
 }
 
-// ValidationError represents analysis validation errors
-type ValidationError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-	Code    string `json:"code"`
-}
+// Note: ValidationError is defined in common.go
 
 // Tool registration for consolidated analyze command
 func (cmd *ConsolidatedAnalyzeCommand) Name() string {

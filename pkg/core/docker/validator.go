@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
-	validation "github.com/Azure/container-kit/pkg/mcp/security"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 )
 
 // Type aliases are defined in hadolint.go to avoid redeclaration

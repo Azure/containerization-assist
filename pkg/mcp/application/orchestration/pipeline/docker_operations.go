@@ -9,9 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // BuildDockerImage builds a Docker image from a Dockerfile in the session workspace

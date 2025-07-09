@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ReportDirectory is the directory where the iteration snapshots will be stored along with a report of the run

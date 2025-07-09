@@ -6,7 +6,7 @@
 
 **🔥 Immediate Priorities**:
 1. Complete tool migration: 188 files `pkg/mcp/tools/` → `application/commands/`
-2. Finish core migration: `pkg/mcp/core/` → `application/commands/`  
+2. Finish core migration: `pkg/mcp/core/` → `application/commands/`
 3. Eliminate manager pattern anti-patterns (10+ files)
 
 **✅ Major Wins**: Domain layer established, interface consolidation complete, architecture validation active
@@ -47,7 +47,7 @@
 ### **Remaining Critical Issues**
 
 1. **🛠️ Tool Migration Incomplete**: 188 files in `pkg/mcp/tools/` need to move to `application/commands`
-2. **🔧 Internal Package Cleanup**: 125 files in `internal/` need proper layer distribution  
+2. **🔧 Internal Package Cleanup**: 125 files in `internal/` need proper layer distribution
 3. **📦 Package Depth**: Still 5 levels deep vs target of 2 levels
 4. **🎭 Manager Pattern Persistence**: 10+ manager files remain (anti-pattern)
 5. **🔄 Mixed Architecture State**: Legacy and new systems running in parallel
@@ -55,7 +55,7 @@
 ### **Major Accomplishments**
 
 1. ✅ **Domain Layer Established**: Session domain extracted with clean boundaries
-2. ✅ **Interface Consolidation**: Single source of truth in `application/api/interfaces.go` (831 lines)  
+2. ✅ **Interface Consolidation**: Single source of truth in `application/api/interfaces.go` (831 lines)
 3. ✅ **Three-Layer Foundation**: All target directories created and functional
 4. ✅ **Architecture Validation**: Pre-commit hooks prevent regression
 5. ✅ **Domain Purity**: No external dependencies in domain layer
@@ -78,7 +78,7 @@ This plan **abandons the original 10-phase approach** and focuses on **immediate
    ```bash
    mkdir -p pkg/mcp/domain/{session,containerization,workflow,security,types}
    mkdir -p pkg/mcp/domain/containerization/{analyze,build,deploy,scan}
-   
+
    # Create placeholder files to keep CI green
    for dir in pkg/mcp/domain pkg/mcp/domain/session pkg/mcp/domain/containerization \
               pkg/mcp/domain/containerization/{analyze,build,deploy,scan} \
@@ -94,11 +94,11 @@ EOF
    done
    ```
 
-2. **Create Application Layer with Ports Pattern**  
+2. **Create Application Layer with Ports Pattern**
    ```bash
    mkdir -p pkg/mcp/application/{api,ports,commands}
    mkdir -p pkg/mcp/application/tools/{registry,coordination}
-   
+
    # Create placeholder files
    for dir in pkg/mcp/application pkg/mcp/application/{api,ports,commands} \
               pkg/mcp/application/tools pkg/mcp/application/tools/{registry,coordination}; do
@@ -116,7 +116,7 @@ EOF
 3. **Create Infrastructure Layer with Build Tags**
    ```bash
    mkdir -p pkg/mcp/infra/{transport,persistence,telemetry}
-   
+
    # Create placeholder files
    for dir in pkg/mcp/infra pkg/mcp/infra/{transport,persistence,telemetry}; do
      cat > "$dir/placeholder.go" << 'EOF'
@@ -128,7 +128,7 @@ package $(basename $dir)
 // This will be removed once real files are moved into this package.
 EOF
    done
-   
+
    # Note: Docker/K8s will use build tags instead of directories
    ```
 
@@ -141,7 +141,7 @@ EOF
 ```bash
 # Verify directory structure created correctly
 test -d pkg/mcp/domain && echo "✅ Domain layer created" || echo "❌ Domain layer missing"
-test -d pkg/mcp/application && echo "✅ Application layer created" || echo "❌ Application layer missing"  
+test -d pkg/mcp/application && echo "✅ Application layer created" || echo "❌ Application layer missing"
 test -d pkg/mcp/infra && echo "✅ Infrastructure layer created" || echo "❌ Infrastructure layer missing"
 
 # Ensure subdirectories exist
@@ -174,7 +174,7 @@ git checkout .
    ```bash
    # Move interfaces to ports (not api) - interfaces are ports!
    mv pkg/mcp/api/interfaces.go pkg/mcp/application/ports/interfaces.go
-   
+
    # Keep DTOs and errors in api/ (shared kernel)
    mv pkg/mcp/api/types.go pkg/mcp/application/api/types.go
    mv pkg/mcp/api/retry.go pkg/mcp/application/api/retry.go
@@ -184,14 +184,14 @@ git checkout .
    ```bash
    # Use gomvpkg for automatic alias generation (eliminates manual boilerplate)
    # Note: Install gomvpkg if not available: go install golang.org/x/tools/cmd/gomvpkg@latest
-   
+
    # Generate aliases automatically
    gomvpkg -from github.com/Azure/container-kit/pkg/mcp/api \
            -to github.com/Azure/container-kit/pkg/mcp/application/ports
-   
+
    # Fix imports automatically
    goimports -w .
-   
+
    # Create temporary compatibility shim
    cat > pkg/mcp/api/interfaces.go << 'EOF'
 // Package api provides backward compatibility aliases for interfaces moved to application/ports.
@@ -211,7 +211,7 @@ EOF
    ```bash
    # Update core/ to use application/ports for interfaces
    find pkg/mcp/core -name "*.go" -exec sed -i 's|pkg/mcp/api|pkg/mcp/application/ports|g' {} \;
-   
+
    # Fix any remaining import issues
    goimports -w pkg/mcp/core/
    ```
@@ -231,7 +231,7 @@ test -f pkg/mcp/api/interfaces.go && echo "✅ Compatibility shim exists" || ech
 # Test that old imports still work (backward compatibility)
 grep -r "pkg/mcp/api" pkg/mcp/core/ && echo "✅ Core updated to use application/api" || echo "❌ Core imports not updated"
 
-# Verify builds work with new structure  
+# Verify builds work with new structure
 go build ./pkg/mcp/application/ports > /dev/null 2>&1 && echo "✅ Application ports builds" || echo "❌ Application ports build failed"
 go build ./pkg/mcp/application/api > /dev/null 2>&1 && echo "✅ Application API builds" || echo "❌ Application API build failed"
 go build ./pkg/mcp/core > /dev/null 2>&1 && echo "✅ Core builds with new imports" || echo "❌ Core build failed"
@@ -273,11 +273,11 @@ find pkg/mcp/core -name "*.go" -exec sed -i 's|pkg/mcp/application/api|pkg/mcp/a
    cp pkg/mcp/session/session_types.go pkg/mcp/domain/session/types.go
    cp pkg/mcp/session/types.go pkg/mcp/domain/session/session.go
    cp pkg/mcp/session/types_test.go pkg/mcp/domain/session/session_test.go
-   
+
    # Copy business logic (pure functions, no infrastructure deps)
    cp pkg/mcp/session/validation.go pkg/mcp/domain/session/validation.go
    cp pkg/mcp/session/metadata.go pkg/mcp/domain/session/metadata.go
-   
+
    # Remove placeholder
    rm pkg/mcp/domain/session/placeholder.go
    ```
@@ -287,7 +287,7 @@ find pkg/mcp/core -name "*.go" -exec sed -i 's|pkg/mcp/application/api|pkg/mcp/a
    # Use gomvpkg to generate aliases automatically (eliminates manual work)
    gomvpkg -from github.com/Azure/container-kit/pkg/mcp/session \
            -to github.com/Azure/container-kit/pkg/mcp/domain/session
-   
+
    # Fix imports automatically
    goimports -w .
    ```
@@ -297,7 +297,7 @@ find pkg/mcp/core -name "*.go" -exec sed -i 's|pkg/mcp/application/api|pkg/mcp/a
    # Remove any Docker/K8s/HTTP imports from domain files
    # These will be handled by adapters in the application layer
    sed -i '/docker\|kubernetes\|http\|database/d' pkg/mcp/domain/session/*.go
-   
+
    # Ensure domain builds independently
    go build ./pkg/mcp/domain/session/
    ```
@@ -364,7 +364,7 @@ rmdir pkg/mcp/domain/session pkg/mcp/infra/persistence/storage pkg/mcp/infra/per
 
 2. **Extract Build Domain**
    ```bash
-   # Move build business logic  
+   # Move build business logic
    mv pkg/mcp/tools/build/build_executor.go pkg/mcp/domain/containerization/build/executor.go
    mv pkg/mcp/tools/build/build_strategizer.go pkg/mcp/domain/containerization/build/strategy.go
    ```
@@ -422,7 +422,7 @@ go list -deps ./pkg/mcp/domain/... 2>&1 | grep -i cycle && echo "❌ Circular de
 ```bash
 # If validation fails, restore tools to original locations
 mv pkg/mcp/domain/containerization/analyze/* pkg/mcp/tools/analyze/ 2>/dev/null
-mv pkg/mcp/domain/containerization/build/* pkg/mcp/tools/build/ 2>/dev/null  
+mv pkg/mcp/domain/containerization/build/* pkg/mcp/tools/build/ 2>/dev/null
 mv pkg/mcp/domain/containerization/deploy/* pkg/mcp/tools/deploy/ 2>/dev/null
 mv pkg/mcp/domain/containerization/scan/* pkg/mcp/tools/scan/ 2>/dev/null
 rm -rf pkg/mcp/domain/containerization/
@@ -450,7 +450,7 @@ Based on `git status` analysis (41 uncommitted changes), the team is actively:
 
 **High Priority** (Do First):
 1. **Complete Core Migration**: Finish moving `pkg/mcp/core/` files to `application/commands/`
-2. **Commit Current Work**: Clean git state before major tool migration  
+2. **Commit Current Work**: Clean git state before major tool migration
 3. **Tool Migration Strategy**: Plan systematic migration of 188 files from `pkg/mcp/tools/`
 
 **Medium Priority** (This Sprint):
@@ -471,7 +471,7 @@ Based on `git status` analysis (41 uncommitted changes), the team is actively:
    # Move tool factories to application/commands (not nested packages)
    mv pkg/mcp/core/registry.go pkg/mcp/application/commands/tool_registry.go
    mv pkg/mcp/core/interfaces.go pkg/mcp/application/commands/interfaces.go
-   
+
    # Remove placeholder
    rm pkg/mcp/application/commands/placeholder.go
    ```
@@ -536,7 +536,7 @@ echo "Commands files created: $APP_COMMANDS_FILES (target: >100)"
 
 # Verify the major tool categories are migrated
 test ! -d pkg/mcp/tools/analyze && echo "✅ Analyze tools migrated" || echo "⏸️ Analyze tools need migration"
-test ! -d pkg/mcp/tools/build && echo "✅ Build tools migrated" || echo "⏸️ Build tools need migration"  
+test ! -d pkg/mcp/tools/build && echo "✅ Build tools migrated" || echo "⏸️ Build tools need migration"
 test ! -d pkg/mcp/tools/deploy && echo "✅ Deploy tools migrated" || echo "⏸️ Deploy tools need migration"
 test ! -d pkg/mcp/tools/scan && echo "✅ Scan tools migrated" || echo "⏸️ Scan tools need migration"
 
@@ -564,7 +564,7 @@ go list -deps ./pkg/mcp/application/... 2>&1 | grep -i cycle && echo "❌ Import
 
 #### **🚨 Rollback Strategy**:
 ```bash
-# If validation fails, restore original tool structure  
+# If validation fails, restore original tool structure
 mv pkg/mcp/application/tools/registry/* pkg/mcp/core/ 2>/dev/null
 mv pkg/mcp/application/tools/*.go pkg/mcp/tools/ 2>/dev/null
 rm -rf pkg/mcp/application/tools/ pkg/mcp/application/orchestration/
@@ -682,7 +682,7 @@ func (d *DockerOperations) BuildImage(ctx context.Context, params BuildParams) e
     // Docker implementation
 }
 EOF
-   
+
    # Move existing Docker logic
    grep -l "docker\.Client" pkg/mcp/tools/build/*.go | while read file; do
        # Add build tag to existing files
@@ -708,7 +708,7 @@ func (k *KubernetesOperations) Deploy(ctx context.Context, manifest []byte) erro
     // K8s implementation
 }
 EOF
-   
+
    # Move existing K8s logic
    grep -l "kubernetes\|k8s\.io" pkg/mcp/tools/deploy/*.go | while read file; do
        # Add build tag to existing files
@@ -936,7 +936,7 @@ make pre-commit > /dev/null 2>&1 && echo "✅ Pre-commit hooks pass" || echo "�
 
 # Check final package structure
 DOMAIN_PKGS=$(find pkg/mcp/domain -type d | wc -l)
-APP_PKGS=$(find pkg/mcp/application -type d | wc -l) 
+APP_PKGS=$(find pkg/mcp/application -type d | wc -l)
 INFRA_PKGS=$(find pkg/mcp/infra -type d | wc -l)
 echo "Package counts - Domain: $DOMAIN_PKGS, Application: $APP_PKGS, Infra: $INFRA_PKGS"
 ```
@@ -1033,18 +1033,18 @@ if make test-all && go build ./cmd/mcp-server; then
     echo "✅ Package count reduced from 14 to 3"
     echo "✅ Complexity significantly reduced"
     echo "✅ All functionality preserved"
-    
+
     # Optional: Create summary commit
     git add -A
     git commit -m "feat: complete architecture realignment to domain/application/infra
 
     - Implemented three-layer architecture
-    - Reduced package count from 14 to 3  
+    - Reduced package count from 14 to 3
     - Eliminated manager pattern anti-patterns
     - Enforced dependency boundaries
     - Consolidated error and validation systems
     - 50%+ complexity reduction achieved
-    
+
     🚀 Architecture realignment complete!"
 else
     echo "❌ MIGRATION INCOMPLETE - resolve issues before proceeding"
@@ -1064,7 +1064,7 @@ pkg/mcp/
 │   │   └── metadata.go              # Session metadata logic
 │   ├── containerization/            # Container domain
 │   │   ├── analyze/                 # Analysis domain logic
-│   │   ├── build/                   # Build domain logic  
+│   │   ├── build/                   # Build domain logic
 │   │   ├── deploy/                  # Deploy domain logic
 │   │   └── scan/                    # Scan domain logic
 │   ├── workflow/                    # Workflow domain
@@ -1089,7 +1089,7 @@ pkg/mcp/
     │   ├── session_store.go         # Session persistence
     │   └── storage/                 # Storage implementations
     ├── docker_operations.go        # //go:build docker
-    ├── k8s_operations.go           # //go:build k8s  
+    ├── k8s_operations.go           # //go:build k8s
     ├── cloud_operations.go         # //go:build cloud
     ├── templates/                   # Kubernetes templates
     └── telemetry/                   # Observability
@@ -1097,7 +1097,7 @@ pkg/mcp/
 # Build Usage Examples:
 # go build                          # Core functionality only
 # go build -tags docker             # Include Docker operations
-# go build -tags k8s               # Include K8s operations  
+# go build -tags k8s               # Include K8s operations
 # go build -tags cloud             # Include both Docker + K8s
 # go build -tags "docker k8s"      # Explicit both
 ```
@@ -1111,7 +1111,7 @@ pkg/mcp/
 - ✅ 0 manager pattern files
 - ✅ Single interface definitions in `application/api/`
 
-### **Code Quality**  
+### **Code Quality**
 - ✅ >50% reduction in cyclomatic complexity
 - ✅ All tests pass
 - ✅ Lint rules pass
@@ -1141,7 +1141,7 @@ pkg/mcp/
 ### **Current Sprint Focus (Week 3)**
 **Goal**: Complete tool migration from `pkg/mcp/tools/` → `application/commands/`
 - **188 files** need migration to application layer
-- **Commands pattern** implementation 
+- **Commands pattern** implementation
 - **Manager pattern elimination**
 - **Tool orchestration consolidation**
 
@@ -1174,14 +1174,14 @@ make pre-commit              # Full pre-commit with architecture check
 
 **Benefits**:
 - **Prevents Regression**: Blocks commits that violate architecture
-- **Developer Feedback**: Immediate feedback on architectural violations  
+- **Developer Feedback**: Immediate feedback on architectural violations
 - **CI Integration**: Automated validation in CI pipeline
 - **Documentation**: Clear architectural guidelines in error messages
 
 **Total Effort**: 5 weeks of focused architectural realignment (**25% COMPLETE**) to achieve the planned three-layer architecture, plus **ongoing architectural governance** to prevent future drift.
 
 ### **⏰ Remaining Effort Estimate**
-- **Week 3 (Current)**: 2-3 days to complete Phase 3 tool migration 
+- **Week 3 (Current)**: 2-3 days to complete Phase 3 tool migration
 - **Week 4**: Infrastructure consolidation and build tag implementation
 - **Week 5**: Quality assurance, final cleanup, and architecture validation
 

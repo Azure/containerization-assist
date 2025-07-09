@@ -16,8 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -55,13 +54,18 @@ type DiscoveryResult struct {
 }
 
 // SecretFinding represents a discovered secret
-// Updated to use consolidated type for consistency
-type SecretFinding = core.ConsolidatedSecretFinding
+type SecretFinding struct {
+	Type        string `json:"type"`
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Description string `json:"description"`
+	Confidence  string `json:"confidence"`
+	RuleID      string `json:"rule_id"`
+}
 
-// ExtendedSecretFinding provides additional fields not in the consolidated type
-// This is used internally for rich secret detection details
+// ExtendedSecretFinding provides additional fields for rich secret detection
 type ExtendedSecretFinding struct {
-	core.ConsolidatedSecretFinding
+	SecretFinding
 	ID            string                 `json:"id"`
 	Column        int                    `json:"column"`
 	Severity      string                 `json:"severity"`
@@ -75,9 +79,9 @@ type ExtendedSecretFinding struct {
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ToConsolidated converts ExtendedSecretFinding to ConsolidatedSecretFinding
-func (esf ExtendedSecretFinding) ToConsolidated() core.ConsolidatedSecretFinding {
-	return esf.ConsolidatedSecretFinding
+// ToSecretFinding converts ExtendedSecretFinding to SecretFinding
+func (esf ExtendedSecretFinding) ToSecretFinding() SecretFinding {
+	return esf.SecretFinding
 }
 
 // DiscoverySummary provides a summary of findings
@@ -611,7 +615,7 @@ func (pd *PatternDetector) Scan(line, filePath string, lineNumber int) []Extende
 				}
 
 				finding := ExtendedSecretFinding{
-					ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+					SecretFinding: SecretFinding{
 						Type:        pattern.SecretType,
 						File:        filePath,
 						Line:        lineNumber,
@@ -675,7 +679,7 @@ func (ed *EntropyDetector) Scan(line, filePath string, lineNumber int) []Extende
 		entropy := ed.calculateEntropy(token)
 		if entropy >= ed.minEntropy {
 			finding := ExtendedSecretFinding{
-				ConsolidatedSecretFinding: core.ConsolidatedSecretFinding{
+				SecretFinding: SecretFinding{
 					Type:        "generic_secret",
 					File:        filePath,
 					Line:        lineNumber,

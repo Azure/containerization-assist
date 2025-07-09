@@ -7,18 +7,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
 	"log/slog"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // KubernetesOperations handles Kubernetes-specific operations
@@ -68,18 +69,18 @@ func NewKubernetesOperations(kubeconfig string, namespace string, logger *slog.L
 
 // DeployApplicationParams represents parameters for deploying applications
 type DeployApplicationParams struct {
-	Name           string
-	Image          string
-	Port           int32
-	Replicas       int32
-	Namespace      string
-	Labels         map[string]string
-	Annotations    map[string]string
-	EnvVars        map[string]string
-	Resources      ResourceRequirements
-	HealthCheck    HealthCheckConfig
-	ServiceType    string
-	Timeout        time.Duration
+	Name        string
+	Image       string
+	Port        int32
+	Replicas    int32
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	EnvVars     map[string]string
+	Resources   ResourceRequirements
+	HealthCheck HealthCheckConfig
+	ServiceType string
+	Timeout     time.Duration
 }
 
 // ResourceRequirements represents resource requirements
@@ -92,28 +93,28 @@ type ResourceRequirements struct {
 
 // HealthCheckConfig represents health check configuration
 type HealthCheckConfig struct {
-	HTTPPath        string
-	HTTPPort        int32
-	InitialDelay    time.Duration
-	PeriodSeconds   int32
-	TimeoutSeconds  int32
+	HTTPPath         string
+	HTTPPort         int32
+	InitialDelay     time.Duration
+	PeriodSeconds    int32
+	TimeoutSeconds   int32
 	FailureThreshold int32
 }
 
 // DeployApplicationResult represents the result of deploying an application
 type DeployApplicationResult struct {
-	Name            string
-	Namespace       string
-	DeploymentName  string
-	ServiceName     string
-	Status          string
-	Replicas        int32
+	Name              string
+	Namespace         string
+	DeploymentName    string
+	ServiceName       string
+	Status            string
+	Replicas          int32
 	AvailableReplicas int32
-	ServiceEndpoint string
-	DeployTime      time.Duration
-	Success         bool
-	Error           string
-	Pods            []PodInfo
+	ServiceEndpoint   string
+	DeployTime        time.Duration
+	Success           bool
+	Error             string
+	Pods              []PodInfo
 }
 
 // PodInfo represents pod information
@@ -128,8 +129,8 @@ type PodInfo struct {
 // DeployApplication deploys an application to Kubernetes
 func (k *KubernetesOperations) DeployApplication(ctx context.Context, params DeployApplicationParams) (*DeployApplicationResult, error) {
 	startTime := time.Now()
-	
-	k.logger.Info("Starting Kubernetes application deployment", 
+
+	k.logger.Info("Starting Kubernetes application deployment",
 		"name", params.Name,
 		"image", params.Image,
 		"namespace", params.Namespace,
@@ -269,7 +270,7 @@ type GenerateManifestsResult struct {
 
 // GenerateManifests generates Kubernetes manifests
 func (k *KubernetesOperations) GenerateManifests(ctx context.Context, params GenerateManifestsParams) (*GenerateManifestsResult, error) {
-	k.logger.Info("Starting Kubernetes manifest generation", 
+	k.logger.Info("Starting Kubernetes manifest generation",
 		"name", params.Name,
 		"image", params.Image,
 		"output_dir", params.OutputDir)
@@ -281,13 +282,13 @@ func (k *KubernetesOperations) GenerateManifests(ctx context.Context, params Gen
 
 	// Generate deployment manifest
 	deployment := k.buildDeploymentManifest(params, namespace)
-	
+
 	// Generate service manifest
 	service := k.buildServiceManifest(params, namespace)
 
 	// TODO: Write manifests to files in OutputDir
 	// This would involve serializing the manifests to YAML and writing to disk
-	
+
 	result := &GenerateManifestsResult{
 		Name:          params.Name,
 		Namespace:     namespace,
@@ -316,21 +317,21 @@ type RollbackParams struct {
 
 // RollbackResult represents the result of rolling back a deployment
 type RollbackResult struct {
-	Name           string
-	Namespace      string
-	FromRevision   int64
-	ToRevision     int64
-	Status         string
-	RollbackTime   time.Duration
-	Success        bool
-	Error          string
+	Name         string
+	Namespace    string
+	FromRevision int64
+	ToRevision   int64
+	Status       string
+	RollbackTime time.Duration
+	Success      bool
+	Error        string
 }
 
 // RollbackDeployment rolls back a deployment to a previous revision
 func (k *KubernetesOperations) RollbackDeployment(ctx context.Context, params RollbackParams) (*RollbackResult, error) {
 	startTime := time.Now()
-	
-	k.logger.Info("Starting Kubernetes deployment rollback", 
+
+	k.logger.Info("Starting Kubernetes deployment rollback",
 		"name", params.Name,
 		"namespace", params.Namespace,
 		"revision", params.Revision)
@@ -364,7 +365,7 @@ func (k *KubernetesOperations) RollbackDeployment(ctx context.Context, params Ro
 
 	// TODO: Implement actual rollback logic
 	// This would involve updating the deployment to a previous revision
-	
+
 	result := &RollbackResult{
 		Name:         params.Name,
 		Namespace:    namespace,
@@ -408,8 +409,8 @@ type HealthCheckResult struct {
 // CheckHealth checks the health of a deployment
 func (k *KubernetesOperations) CheckHealth(ctx context.Context, params HealthCheckParams) (*HealthCheckResult, error) {
 	startTime := time.Now()
-	
-	k.logger.Info("Starting Kubernetes health check", 
+
+	k.logger.Info("Starting Kubernetes health check",
 		"name", params.Name,
 		"namespace", params.Namespace)
 
@@ -446,7 +447,7 @@ func (k *KubernetesOperations) CheckHealth(ctx context.Context, params HealthChe
 	}
 
 	// Determine health status
-	healthy := deployment.Status.ReadyReplicas == deployment.Status.Replicas && 
+	healthy := deployment.Status.ReadyReplicas == deployment.Status.Replicas &&
 		deployment.Status.Replicas > 0
 
 	status := "healthy"
@@ -599,13 +600,13 @@ func (k *KubernetesOperations) buildDeploymentManifest(params GenerateManifestsP
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:            params.Name,
-							Image:           params.Image,
-							Ports:           []corev1.ContainerPort{{ContainerPort: params.Port}},
-							Env:             envVars,
-							Resources:       resources,
-							ReadinessProbe:  readinessProbe,
-							LivenessProbe:   livenessProbe,
+							Name:           params.Name,
+							Image:          params.Image,
+							Ports:          []corev1.ContainerPort{{ContainerPort: params.Port}},
+							Env:            envVars,
+							Resources:      resources,
+							ReadinessProbe: readinessProbe,
+							LivenessProbe:  livenessProbe,
 						},
 					},
 				},

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/docker"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	sessionsvc "github.com/Azure/container-kit/pkg/mcp/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
+	sessionsvc "github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // TypedBuildImageArgs is an alias for mcptypes.TypedBuildImageArgs

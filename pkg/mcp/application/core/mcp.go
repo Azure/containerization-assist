@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core/config"
+	"github.com/Azure/container-kit/pkg/mcp/domain/config"
 )
 
 // DefaultServerConfig returns the default server configuration

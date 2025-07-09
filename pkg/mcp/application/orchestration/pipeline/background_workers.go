@@ -6,9 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core/config"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/common"
+	"github.com/Azure/container-kit/pkg/mcp/domain/config"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // BackgroundWorker represents a managed background worker

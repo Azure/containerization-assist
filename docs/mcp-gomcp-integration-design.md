@@ -87,11 +87,11 @@ func (s *simplifiedGomcpManager) Start(_ context.Context) error {
         server.WithLogger(s.logger),
         server.WithProtocolVersion("1.0.0"),
     ).AsStdio()
-    
+
     if mcpServer, ok := s.server.(interface{ Run() error }); ok {
         return mcpServer.Run()
     }
-    
+
     return errors.NewError().Messagef("server does not implement Run() method").Build()
 }
 ```
@@ -108,7 +108,7 @@ func (s *simplifiedGomcpManager) RegisterTools(srv *Server) error {
             result, err := analyzeRepoTool.ExecuteRepositoryAnalysis(adaptMCPContext(ctx), *args)
             return result, err
         })
-    
+
     // Register additional tools...
 }
 ```
@@ -166,7 +166,7 @@ type StdioTransport struct {
 func (s *StdioTransport) Serve(ctx context.Context) error {
     // Delegate to gomcp manager
     mgr := s.gomcpManager.(interface{ StartServer() error })
-    
+
     // Run server in goroutine
     serverDone := make(chan error, 1)
     go func() {
@@ -174,7 +174,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
             serverDone <- err
         }
     }()
-    
+
     // Wait for context cancellation or server error
     select {
     case <-ctx.Done():
@@ -268,15 +268,15 @@ The server follows a structured lifecycle:
 ```go
 func (s *Server) Start(ctx context.Context) error {
     s.logger.Info("Starting Container Kit MCP Server")
-    
+
     // Start cleanup routines
     s.sessionManager.StartCleanupRoutine()
-    
+
     // Register tools with gomcp
     if err := s.gomcpManager.RegisterTools(s); err != nil {
         return err
     }
-    
+
     // Start transport
     return s.gomcpManager.Start(ctx)
 }
@@ -302,7 +302,7 @@ func (s *simplifiedGomcpManager) RegisterTools(srv *Server) error {
     analyzeRepoTool := analyze.NewAtomicAnalyzeRepositoryTool(pipelineOps, unifiedSessionMgr, srv.logger)
     buildImageTool := build.NewAtomicBuildImageTool(pipelineOps, unifiedSessionMgr, srv.logger)
     // ... additional tools
-    
+
     // Register with gomcp using lambda functions
     s.server.Tool("analyze_repository", "Description...",
         func(ctx *server.Context, args *analyze.AtomicAnalyzeRepositoryArgs) (*analyze.AtomicAnalysisResult, error) {
@@ -431,7 +431,7 @@ func (t *AtomicBuildImageTool) ExecuteWithContext(ctx context.Context, args *Ato
     if err != nil {
         return nil, errors.NewError().Messagef("session not found: %s", args.SessionID).Build()
     }
-    
+
     // Tool execution with session context
     buildParams := core.BuildImageParams{
         SessionID: sessionState.SessionID,

@@ -17,18 +17,18 @@ import (
 // performImageSecurityScan performs comprehensive image security scanning
 func (cmd *ConsolidatedScanCommand) performImageSecurityScan(ctx context.Context, imageRef string, options ScanOptions) (*SecurityScanResult, error) {
 	startTime := time.Now()
-	
+
 	cmd.logger.Info("Starting image security scan", "image_ref", imageRef)
-	
+
 	// Perform image vulnerability scan using Docker client
 	dockerScanResult, err := cmd.dockerClient.ScanImage(ctx, imageRef)
 	if err != nil {
 		return nil, fmt.Errorf("docker image scan failed: %w", err)
 	}
-	
+
 	// Convert Docker scan result to our format
 	vulnerabilities := convertDockerVulnerabilities(dockerScanResult.Vulnerabilities)
-	
+
 	// Perform secret scanning on image layers if enabled
 	var secrets []SecretInfo
 	if options.IncludeSecrets {
@@ -39,7 +39,7 @@ func (cmd *ConsolidatedScanCommand) performImageSecurityScan(ctx context.Context
 			secrets = secretsResult
 		}
 	}
-	
+
 	// Perform compliance checks if enabled
 	var compliance ComplianceInfo
 	if options.IncludeCompliance {
@@ -50,23 +50,23 @@ func (cmd *ConsolidatedScanCommand) performImageSecurityScan(ctx context.Context
 			compliance = complianceResult
 		}
 	}
-	
+
 	// Calculate security score
 	securityScore := cmd.calculateSecurityScore(vulnerabilities, secrets, compliance)
 	riskLevel := cmd.determineRiskLevel(securityScore, vulnerabilities, secrets)
-	
+
 	// Generate recommendations if enabled
 	var recommendations []SecurityRecommendation
 	if options.IncludeRemediations {
 		recommendations = cmd.generateSecurityRecommendations(vulnerabilities, secrets, compliance)
 	}
-	
+
 	// Generate remediation plan if enabled
 	var remediationPlan *RemediationPlan
 	if options.IncludeRemediations {
 		remediationPlan = cmd.generateRemediationPlan(vulnerabilities, secrets)
 	}
-	
+
 	result := &SecurityScanResult{
 		ImageRef:        imageRef,
 		Vulnerabilities: vulnerabilities,
@@ -77,53 +77,53 @@ func (cmd *ConsolidatedScanCommand) performImageSecurityScan(ctx context.Context
 		Recommendations: recommendations,
 		RemediationPlan: remediationPlan,
 	}
-	
-	cmd.logger.Info("Image security scan completed", 
+
+	cmd.logger.Info("Image security scan completed",
 		"image_ref", imageRef,
 		"vulnerabilities", len(vulnerabilities),
 		"secrets", len(secrets),
 		"security_score", securityScore,
 		"risk_level", riskLevel,
 		"duration", time.Since(startTime))
-	
+
 	return result, nil
 }
 
 // performSecretsscan performs comprehensive secrets scanning
 func (cmd *ConsolidatedScanCommand) performSecretsscan(ctx context.Context, scanPath string, options ScanOptions) (*SecretsScanResult, error) {
 	startTime := time.Now()
-	
+
 	cmd.logger.Info("Starting secrets scan", "path", scanPath)
-	
+
 	// Prepare scan options for security discovery
 	scanOptions := security.DefaultScanOptions()
 	scanOptions.FileTypes = cmd.convertFilePatterns(options.FilePatterns)
 	scanOptions.MaxDepth = options.ScanDepth
 	scanOptions.IncludeBase64 = true
 	scanOptions.IncludeEntropy = true
-	
+
 	// Perform secrets scan using security discovery
 	discoveryResult, err := cmd.secretDiscovery.ScanDirectory(ctx, scanPath, scanOptions)
 	if err != nil {
 		return nil, fmt.Errorf("secrets scan failed: %w", err)
 	}
-	
+
 	// Convert discovery results to our format
 	secrets := cmd.convertSecretFindings(discoveryResult.Findings)
-	
+
 	// Apply severity filtering
 	if options.SeverityThreshold != "" {
 		secrets = cmd.filterSecretsBySeverity(secrets, options.SeverityThreshold)
 	}
-	
+
 	// Apply result limits
 	if options.MaxResults > 0 && len(secrets) > options.MaxResults {
 		secrets = secrets[:options.MaxResults]
 	}
-	
+
 	// Generate summary
 	summary := cmd.generateSecretsSummary(secrets, discoveryResult.FilesScanned)
-	
+
 	result := &SecretsScanResult{
 		Path:          scanPath,
 		Secrets:       secrets,
@@ -132,27 +132,27 @@ func (cmd *ConsolidatedScanCommand) performSecretsscan(ctx context.Context, scan
 		HighRiskCount: cmd.countHighRiskSecrets(secrets),
 		Summary:       summary,
 	}
-	
-	cmd.logger.Info("Secrets scan completed", 
+
+	cmd.logger.Info("Secrets scan completed",
 		"path", scanPath,
 		"files_scanned", discoveryResult.FilesScanned,
 		"secrets_found", len(secrets),
 		"high_risk_count", result.HighRiskCount,
 		"duration", time.Since(startTime))
-	
+
 	return result, nil
 }
 
 // performVulnerabilityyScan performs comprehensive vulnerability scanning
 func (cmd *ConsolidatedScanCommand) performVulnerabilityyScan(ctx context.Context, target string, options ScanOptions) (*VulnerabilityScanResult, error) {
 	startTime := time.Now()
-	
+
 	cmd.logger.Info("Starting vulnerability scan", "target", target)
-	
+
 	// Determine scan type based on target
 	var vulnerabilities []VulnerabilityInfo
 	var err error
-	
+
 	if cmd.isDockerImage(target) {
 		// Image vulnerability scan
 		dockerScanResult, scanErr := cmd.dockerClient.ScanImage(ctx, target)
@@ -169,20 +169,20 @@ func (cmd *ConsolidatedScanCommand) performVulnerabilityyScan(ctx context.Contex
 	} else {
 		return nil, fmt.Errorf("unsupported target type: %s", target)
 	}
-	
+
 	// Apply severity filtering
 	if options.SeverityThreshold != "" {
 		vulnerabilities = cmd.filterVulnerabilitiesBySeverity(vulnerabilities, options.SeverityThreshold)
 	}
-	
+
 	// Apply result limits
 	if options.MaxResults > 0 && len(vulnerabilities) > options.MaxResults {
 		vulnerabilities = vulnerabilities[:options.MaxResults]
 	}
-	
+
 	// Generate summary
 	summary := cmd.generateVulnerabilitySummary(vulnerabilities)
-	
+
 	result := &VulnerabilityScanResult{
 		Target:          target,
 		Vulnerabilities: vulnerabilities,
@@ -192,8 +192,8 @@ func (cmd *ConsolidatedScanCommand) performVulnerabilityyScan(ctx context.Contex
 		MediumCount:     cmd.countVulnerabilitiesBySeverity(vulnerabilities, "medium"),
 		LowCount:        cmd.countVulnerabilitiesBySeverity(vulnerabilities, "low"),
 	}
-	
-	cmd.logger.Info("Vulnerability scan completed", 
+
+	cmd.logger.Info("Vulnerability scan completed",
 		"target", target,
 		"vulnerabilities", len(vulnerabilities),
 		"critical", result.CriticalCount,
@@ -201,7 +201,7 @@ func (cmd *ConsolidatedScanCommand) performVulnerabilityyScan(ctx context.Contex
 		"medium", result.MediumCount,
 		"low", result.LowCount,
 		"duration", time.Since(startTime))
-	
+
 	return result, nil
 }
 
@@ -236,7 +236,7 @@ func (cmd *ConsolidatedScanCommand) performComplianceChecks(ctx context.Context,
 			Description: "Total vulnerabilities should be below threshold",
 		},
 	}
-	
+
 	// Calculate overall score
 	passedCount := 0
 	for _, check := range checks {
@@ -244,9 +244,9 @@ func (cmd *ConsolidatedScanCommand) performComplianceChecks(ctx context.Context,
 			passedCount++
 		}
 	}
-	
+
 	score := float64(passedCount) / float64(len(checks))
-	
+
 	return ComplianceInfo{
 		Framework: "container-security",
 		Passed:    score >= 0.8,
@@ -258,32 +258,32 @@ func (cmd *ConsolidatedScanCommand) performComplianceChecks(ctx context.Context,
 // calculateSecurityScore calculates overall security score
 func (cmd *ConsolidatedScanCommand) calculateSecurityScore(vulnerabilities []VulnerabilityInfo, secrets []SecretInfo, compliance ComplianceInfo) int {
 	baseScore := 100
-	
+
 	// Deduct points for vulnerabilities
 	criticalCount := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "critical")
 	highCount := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "high")
 	mediumCount := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "medium")
 	lowCount := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "low")
-	
+
 	baseScore -= (criticalCount * 20)
 	baseScore -= (highCount * 10)
 	baseScore -= (mediumCount * 5)
 	baseScore -= (lowCount * 1)
-	
+
 	// Deduct points for secrets
 	highRiskSecrets := cmd.countHighRiskSecrets(secrets)
 	baseScore -= (highRiskSecrets * 15)
 	baseScore -= ((len(secrets) - highRiskSecrets) * 5)
-	
+
 	// Deduct points for compliance failures
 	if !compliance.Passed {
 		baseScore -= int((1.0 - compliance.Score) * 20)
 	}
-	
+
 	if baseScore < 0 {
 		baseScore = 0
 	}
-	
+
 	return baseScore
 }
 
@@ -291,26 +291,26 @@ func (cmd *ConsolidatedScanCommand) calculateSecurityScore(vulnerabilities []Vul
 func (cmd *ConsolidatedScanCommand) determineRiskLevel(score int, vulnerabilities []VulnerabilityInfo, secrets []SecretInfo) string {
 	criticalVulns := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "critical")
 	highRiskSecrets := cmd.countHighRiskSecrets(secrets)
-	
+
 	if criticalVulns > 0 || highRiskSecrets > 0 || score < 30 {
 		return "critical"
 	}
-	
+
 	if score < 60 {
 		return "high"
 	}
-	
+
 	if score < 80 {
 		return "medium"
 	}
-	
+
 	return "low"
 }
 
 // generateSecurityRecommendations generates security recommendations
 func (cmd *ConsolidatedScanCommand) generateSecurityRecommendations(vulnerabilities []VulnerabilityInfo, secrets []SecretInfo, compliance ComplianceInfo) []SecurityRecommendation {
 	var recommendations []SecurityRecommendation
-	
+
 	// Vulnerability recommendations
 	criticalCount := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "critical")
 	if criticalCount > 0 {
@@ -324,7 +324,7 @@ func (cmd *ConsolidatedScanCommand) generateSecurityRecommendations(vulnerabilit
 			Impact:      "Prevents potential security breaches",
 		})
 	}
-	
+
 	// Secrets recommendations
 	highRiskSecrets := cmd.countHighRiskSecrets(secrets)
 	if highRiskSecrets > 0 {
@@ -338,7 +338,7 @@ func (cmd *ConsolidatedScanCommand) generateSecurityRecommendations(vulnerabilit
 			Impact:      "Prevents credential exposure",
 		})
 	}
-	
+
 	// Compliance recommendations
 	if !compliance.Passed {
 		recommendations = append(recommendations, SecurityRecommendation{
@@ -351,7 +351,7 @@ func (cmd *ConsolidatedScanCommand) generateSecurityRecommendations(vulnerabilit
 			Impact:      "Meets security standards",
 		})
 	}
-	
+
 	return recommendations
 }
 
@@ -359,7 +359,7 @@ func (cmd *ConsolidatedScanCommand) generateSecurityRecommendations(vulnerabilit
 func (cmd *ConsolidatedScanCommand) generateRemediationPlan(vulnerabilities []VulnerabilityInfo, secrets []SecretInfo) *RemediationPlan {
 	var steps []RemediationStep
 	stepID := 1
-	
+
 	// Add vulnerability remediation steps
 	packageVulns := cmd.groupVulnerabilitiesByPackage(vulnerabilities)
 	for pkg, vulns := range packageVulns {
@@ -376,7 +376,7 @@ func (cmd *ConsolidatedScanCommand) generateRemediationPlan(vulnerabilities []Vu
 			stepID++
 		}
 	}
-	
+
 	// Add secret remediation steps
 	secretsByType := cmd.groupSecretsByType(secrets)
 	for secretType, typeSecrets := range secretsByType {
@@ -393,11 +393,11 @@ func (cmd *ConsolidatedScanCommand) generateRemediationPlan(vulnerabilities []Vu
 			stepID++
 		}
 	}
-	
+
 	// Calculate effort and priority
 	priority := cmd.calculateRemediationPriority(vulnerabilities, secrets)
 	effort := cmd.estimateRemediationEffort(steps)
-	
+
 	return &RemediationPlan{
 		ID:        fmt.Sprintf("remediation-%d", time.Now().Unix()),
 		Priority:  priority,
@@ -410,11 +410,11 @@ func (cmd *ConsolidatedScanCommand) generateRemediationPlan(vulnerabilities []Vu
 // scanFilesystemForVulnerabilities scans filesystem for vulnerabilities
 func (cmd *ConsolidatedScanCommand) scanFilesystemForVulnerabilities(ctx context.Context, path string, options ScanOptions) ([]VulnerabilityInfo, error) {
 	var vulnerabilities []VulnerabilityInfo
-	
+
 	// This would scan package manifests, dependencies, etc.
 	// For now, we'll return empty results as this requires complex package analysis
 	cmd.logger.Debug("Scanning filesystem for vulnerabilities", "path", path)
-	
+
 	return vulnerabilities, nil
 }
 
@@ -471,19 +471,19 @@ func (cmd *ConsolidatedScanCommand) filterSecretsBySeverity(secrets []SecretInfo
 		"high":     3,
 		"critical": 4,
 	}
-	
+
 	minSeverity, exists := severityOrder[threshold]
 	if !exists {
 		return secrets
 	}
-	
+
 	var filtered []SecretInfo
 	for _, secret := range secrets {
 		if secretSeverity, exists := severityOrder[secret.Severity]; exists && secretSeverity >= minSeverity {
 			filtered = append(filtered, secret)
 		}
 	}
-	
+
 	return filtered
 }
 
@@ -495,19 +495,19 @@ func (cmd *ConsolidatedScanCommand) filterVulnerabilitiesBySeverity(vulnerabilit
 		"high":     3,
 		"critical": 4,
 	}
-	
+
 	minSeverity, exists := severityOrder[threshold]
 	if !exists {
 		return vulnerabilities
 	}
-	
+
 	var filtered []VulnerabilityInfo
 	for _, vuln := range vulnerabilities {
 		if vulnSeverity, exists := severityOrder[vuln.Severity]; exists && vulnSeverity >= minSeverity {
 			filtered = append(filtered, vuln)
 		}
 	}
-	
+
 	return filtered
 }
 
@@ -517,19 +517,19 @@ func (cmd *ConsolidatedScanCommand) generateSecretsSummary(secrets []SecretInfo,
 	bySeverity := make(map[string]int)
 	byFile := make(map[string]int)
 	totalConfidence := 0.0
-	
+
 	for _, secret := range secrets {
 		byType[secret.Type]++
 		bySeverity[secret.Severity]++
 		byFile[secret.File]++
 		totalConfidence += secret.Confidence
 	}
-	
+
 	confidenceAvg := 0.0
 	if len(secrets) > 0 {
 		confidenceAvg = totalConfidence / float64(len(secrets))
 	}
-	
+
 	return SecretsSummary{
 		TotalSecrets:      len(secrets),
 		ByType:            byType,
@@ -547,7 +547,7 @@ func (cmd *ConsolidatedScanCommand) generateVulnerabilitySummary(vulnerabilities
 	bySeverity := make(map[string]int)
 	byPackage := make(map[string]int)
 	fixableCount := 0
-	
+
 	for _, vuln := range vulnerabilities {
 		bySeverity[vuln.Severity]++
 		byPackage[vuln.Package]++
@@ -555,7 +555,7 @@ func (cmd *ConsolidatedScanCommand) generateVulnerabilitySummary(vulnerabilities
 			fixableCount++
 		}
 	}
-	
+
 	return VulnerabilitySummary{
 		TotalVulns:   len(vulnerabilities),
 		BySeverity:   bySeverity,
@@ -624,12 +624,12 @@ func (cmd *ConsolidatedScanCommand) generatePackageUpdateCommand(pkg string, vul
 	if len(vulns) == 0 {
 		return ""
 	}
-	
+
 	// Use first vulnerability's fixed version if available
 	if vulns[0].FixedIn != "" {
 		return fmt.Sprintf("apt-get update && apt-get install %s=%s", pkg, vulns[0].FixedIn)
 	}
-	
+
 	return fmt.Sprintf("apt-get update && apt-get upgrade %s", pkg)
 }
 
@@ -638,7 +638,7 @@ func (cmd *ConsolidatedScanCommand) generateSecretRemovalCommand(secretType stri
 	if len(secrets) == 0 {
 		return ""
 	}
-	
+
 	// Create a command to help locate and remove secrets
 	files := make([]string, 0)
 	for _, secret := range secrets {
@@ -646,11 +646,11 @@ func (cmd *ConsolidatedScanCommand) generateSecretRemovalCommand(secretType stri
 			files = append(files, secret.File)
 		}
 	}
-	
+
 	if len(files) > 0 {
 		return fmt.Sprintf("# Review and remove %s secrets from: %s", secretType, strings.Join(files, ", "))
 	}
-	
+
 	return fmt.Sprintf("# Review and remove %s secrets", secretType)
 }
 
@@ -658,16 +658,16 @@ func (cmd *ConsolidatedScanCommand) generateSecretRemovalCommand(secretType stri
 func (cmd *ConsolidatedScanCommand) calculateRemediationPriority(vulnerabilities []VulnerabilityInfo, secrets []SecretInfo) string {
 	criticalVulns := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "critical")
 	highRiskSecrets := cmd.countHighRiskSecrets(secrets)
-	
+
 	if criticalVulns > 0 || highRiskSecrets > 0 {
 		return "high"
 	}
-	
+
 	highVulns := cmd.countVulnerabilitiesBySeverity(vulnerabilities, "high")
 	if highVulns > 0 || len(secrets) > 0 {
 		return "medium"
 	}
-	
+
 	return "low"
 }
 
@@ -676,15 +676,15 @@ func (cmd *ConsolidatedScanCommand) estimateRemediationEffort(steps []Remediatio
 	if len(steps) == 0 {
 		return "none"
 	}
-	
+
 	if len(steps) <= 3 {
 		return "low"
 	}
-	
+
 	if len(steps) <= 10 {
 		return "medium"
 	}
-	
+
 	return "high"
 }
 

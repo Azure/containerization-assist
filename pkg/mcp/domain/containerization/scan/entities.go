@@ -64,27 +64,27 @@ type ScanScope struct {
 
 // ScanOptions contains scanning configuration options
 type ScanOptions struct {
-	Scanner           Scanner           `json:"scanner,omitempty"`
-	SeverityThreshold SeverityLevel     `json:"severity_threshold,omitempty"`
-	Timeout           time.Duration     `json:"timeout,omitempty"`
-	FailOnSeverity    SeverityLevel     `json:"fail_on_severity,omitempty"`
-	OutputFormat      OutputFormat      `json:"output_format,omitempty"`
-	IncludeFixed      bool              `json:"include_fixed,omitempty"`
-	IncludeUnfixed    bool              `json:"include_unfixed,omitempty"`
-	CustomRules       []CustomRule      `json:"custom_rules,omitempty"`
-	SkipDBUpdate      bool              `json:"skip_db_update,omitempty"`
+	Scanner           Scanner       `json:"scanner,omitempty"`
+	SeverityThreshold SeverityLevel `json:"severity_threshold,omitempty"`
+	Timeout           time.Duration `json:"timeout,omitempty"`
+	FailOnSeverity    SeverityLevel `json:"fail_on_severity,omitempty"`
+	OutputFormat      OutputFormat  `json:"output_format,omitempty"`
+	IncludeFixed      bool          `json:"include_fixed,omitempty"`
+	IncludeUnfixed    bool          `json:"include_unfixed,omitempty"`
+	CustomRules       []CustomRule  `json:"custom_rules,omitempty"`
+	SkipDBUpdate      bool          `json:"skip_db_update,omitempty"`
 }
 
 // Scanner represents different security scanners
 type Scanner string
 
 const (
-	ScannerTrivy    Scanner = "trivy"
-	ScannerGrype    Scanner = "grype"
-	ScannerClair    Scanner = "clair"
-	ScannerAnchore  Scanner = "anchore"
-	ScannerSnyk     Scanner = "snyk"
-	ScannerAquaSec  Scanner = "aquasec"
+	ScannerTrivy     Scanner = "trivy"
+	ScannerGrype     Scanner = "grype"
+	ScannerClair     Scanner = "clair"
+	ScannerAnchore   Scanner = "anchore"
+	ScannerSnyk      Scanner = "snyk"
+	ScannerAquaSec   Scanner = "aquasec"
 	ScannerTwistlock Scanner = "twistlock"
 )
 
@@ -104,11 +104,11 @@ const (
 type OutputFormat string
 
 const (
-	OutputFormatJSON   OutputFormat = "json"
-	OutputFormatXML    OutputFormat = "xml"
-	OutputFormatSARIF  OutputFormat = "sarif"
-	OutputFormatTable  OutputFormat = "table"
-	OutputFormatCSV    OutputFormat = "csv"
+	OutputFormatJSON  OutputFormat = "json"
+	OutputFormatXML   OutputFormat = "xml"
+	OutputFormatSARIF OutputFormat = "sarif"
+	OutputFormatTable OutputFormat = "table"
+	OutputFormatCSV   OutputFormat = "csv"
 )
 
 // CustomRule represents a custom scanning rule
@@ -124,24 +124,24 @@ type CustomRule struct {
 
 // ScanResult represents the result of a security scan
 type ScanResult struct {
-	ScanID          string              `json:"scan_id"`
-	RequestID       string              `json:"request_id"`
-	SessionID       string              `json:"session_id"`
-	Target          ScanTarget          `json:"target"`
-	ScanType        ScanType            `json:"scan_type"`
-	Status          ScanStatus          `json:"status"`
-	Summary         ScanSummary         `json:"summary"`
-	Vulnerabilities []Vulnerability     `json:"vulnerabilities,omitempty"`
-	Secrets         []Secret            `json:"secrets,omitempty"`
-	Malware         []MalwareDetection  `json:"malware,omitempty"`
-	Compliance      []ComplianceResult  `json:"compliance,omitempty"`
-	Licenses        []LicenseIssue      `json:"licenses,omitempty"`
+	ScanID          string               `json:"scan_id"`
+	RequestID       string               `json:"request_id"`
+	SessionID       string               `json:"session_id"`
+	Target          ScanTarget           `json:"target"`
+	ScanType        ScanType             `json:"scan_type"`
+	Status          ScanStatus           `json:"status"`
+	Summary         ScanSummary          `json:"summary"`
+	Vulnerabilities []Vulnerability      `json:"vulnerabilities,omitempty"`
+	Secrets         []Secret             `json:"secrets,omitempty"`
+	Malware         []MalwareDetection   `json:"malware,omitempty"`
+	Compliance      []ComplianceResult   `json:"compliance,omitempty"`
+	Licenses        []LicenseIssue       `json:"licenses,omitempty"`
 	Configurations  []ConfigurationIssue `json:"configurations,omitempty"`
-	Error           string              `json:"error,omitempty"`
-	Duration        time.Duration       `json:"duration"`
-	CreatedAt       time.Time           `json:"created_at"`
-	CompletedAt     *time.Time          `json:"completed_at,omitempty"`
-	Metadata        ScanMetadata        `json:"metadata"`
+	Error           string               `json:"error,omitempty"`
+	Duration        time.Duration        `json:"duration"`
+	CreatedAt       time.Time            `json:"created_at"`
+	CompletedAt     *time.Time           `json:"completed_at,omitempty"`
+	Metadata        ScanMetadata         `json:"metadata"`
 }
 
 // ScanStatus represents the status of a scan operation
@@ -158,18 +158,18 @@ const (
 
 // ScanSummary provides a high-level summary of scan results
 type ScanSummary struct {
-	TotalIssues       int                        `json:"total_issues"`
-	BySeverity        map[SeverityLevel]int      `json:"by_severity"`
-	ByCategory        map[string]int             `json:"by_category"`
-	CriticalCount     int                        `json:"critical_count"`
-	HighCount         int                        `json:"high_count"`
-	MediumCount       int                        `json:"medium_count"`
-	LowCount          int                        `json:"low_count"`
-	FixableCount      int                        `json:"fixable_count"`
-	UnfixableCount    int                        `json:"unfixable_count"`
-	Score             float64                    `json:"score"`
-	Grade             SecurityGrade              `json:"grade"`
-	Passed            bool                       `json:"passed"`
+	TotalIssues    int                   `json:"total_issues"`
+	BySeverity     map[SeverityLevel]int `json:"by_severity"`
+	ByCategory     map[string]int        `json:"by_category"`
+	CriticalCount  int                   `json:"critical_count"`
+	HighCount      int                   `json:"high_count"`
+	MediumCount    int                   `json:"medium_count"`
+	LowCount       int                   `json:"low_count"`
+	FixableCount   int                   `json:"fixable_count"`
+	UnfixableCount int                   `json:"unfixable_count"`
+	Score          float64               `json:"score"`
+	Grade          SecurityGrade         `json:"grade"`
+	Passed         bool                  `json:"passed"`
 }
 
 // SecurityGrade represents an overall security grade
@@ -208,11 +208,11 @@ type Vulnerability struct {
 type ExploitLevel string
 
 const (
-	ExploitLevelNone         ExploitLevel = "none"
+	ExploitLevelNone           ExploitLevel = "none"
 	ExploitLevelProofOfConcept ExploitLevel = "proof_of_concept"
-	ExploitLevelFunctional   ExploitLevel = "functional"
-	ExploitLevelHigh         ExploitLevel = "high"
-	ExploitLevelNotDefined   ExploitLevel = "not_defined"
+	ExploitLevelFunctional     ExploitLevel = "functional"
+	ExploitLevelHigh           ExploitLevel = "high"
+	ExploitLevelNotDefined     ExploitLevel = "not_defined"
 )
 
 // Secret represents a detected secret or credential
@@ -236,14 +236,14 @@ type Secret struct {
 type SecretType string
 
 const (
-	SecretTypeAPIKey         SecretType = "api_key"
-	SecretTypePassword       SecretType = "password"
-	SecretTypeToken          SecretType = "token"
-	SecretTypePrivateKey     SecretType = "private_key"
-	SecretTypeCertificate    SecretType = "certificate"
+	SecretTypeAPIKey           SecretType = "api_key"
+	SecretTypePassword         SecretType = "password"
+	SecretTypeToken            SecretType = "token"
+	SecretTypePrivateKey       SecretType = "private_key"
+	SecretTypeCertificate      SecretType = "certificate"
 	SecretTypeConnectionString SecretType = "connection_string"
-	SecretTypeCredential     SecretType = "credential"
-	SecretTypeGeneric        SecretType = "generic"
+	SecretTypeCredential       SecretType = "credential"
+	SecretTypeGeneric          SecretType = "generic"
 )
 
 // MalwareDetection represents detected malware
@@ -276,14 +276,14 @@ const (
 
 // ComplianceResult represents compliance check results
 type ComplianceResult struct {
-	Standard     string             `json:"standard"`
-	Version      string             `json:"version,omitempty"`
-	Passed       bool               `json:"passed"`
-	Score        float64            `json:"score"`
-	TotalChecks  int                `json:"total_checks"`
-	PassedChecks int                `json:"passed_checks"`
-	FailedChecks int                `json:"failed_checks"`
-	Checks       []ComplianceCheck  `json:"checks"`
+	Standard     string            `json:"standard"`
+	Version      string            `json:"version,omitempty"`
+	Passed       bool              `json:"passed"`
+	Score        float64           `json:"score"`
+	TotalChecks  int               `json:"total_checks"`
+	PassedChecks int               `json:"passed_checks"`
+	FailedChecks int               `json:"failed_checks"`
+	Checks       []ComplianceCheck `json:"checks"`
 }
 
 // ComplianceCheck represents a single compliance check
@@ -316,11 +316,11 @@ type LicenseIssue struct {
 type LicenseType string
 
 const (
-	LicenseTypeProhibited    LicenseType = "prohibited"
-	LicenseTypeRestricted    LicenseType = "restricted"
-	LicenseTypeUnknown       LicenseType = "unknown"
-	LicenseTypeIncompatible  LicenseType = "incompatible"
-	LicenseTypeConflicting   LicenseType = "conflicting"
+	LicenseTypeProhibited   LicenseType = "prohibited"
+	LicenseTypeRestricted   LicenseType = "restricted"
+	LicenseTypeUnknown      LicenseType = "unknown"
+	LicenseTypeIncompatible LicenseType = "incompatible"
+	LicenseTypeConflicting  LicenseType = "conflicting"
 )
 
 // LicenseRisk represents the risk level of a license
@@ -352,12 +352,12 @@ type ConfigurationIssue struct {
 type ConfigType string
 
 const (
-	ConfigTypeDockerfile    ConfigType = "dockerfile"
-	ConfigTypeKubernetes    ConfigType = "kubernetes"
-	ConfigTypeTerraform     ConfigType = "terraform"
-	ConfigTypeAnsible       ConfigType = "ansible"
+	ConfigTypeDockerfile     ConfigType = "dockerfile"
+	ConfigTypeKubernetes     ConfigType = "kubernetes"
+	ConfigTypeTerraform      ConfigType = "terraform"
+	ConfigTypeAnsible        ConfigType = "ansible"
 	ConfigTypeCloudFormation ConfigType = "cloudformation"
-	ConfigTypeGeneric       ConfigType = "generic"
+	ConfigTypeGeneric        ConfigType = "generic"
 )
 
 // ScanMetadata contains additional scan information
@@ -386,39 +386,39 @@ type LayerInfo struct {
 
 // ScanStatistics represents statistics about the scan operation
 type ScanStatistics struct {
-	FilesScanned      int           `json:"files_scanned"`
-	PackagesAnalyzed  int           `json:"packages_analyzed"`
-	LayersAnalyzed    int           `json:"layers_analyzed"`
-	RulesEvaluated    int           `json:"rules_evaluated"`
-	DatabaseSize      int64         `json:"database_size,omitempty"`
-	ScanDuration      time.Duration `json:"scan_duration"`
-	PreparationTime   time.Duration `json:"preparation_time,omitempty"`
-	AnalysisTime      time.Duration `json:"analysis_time,omitempty"`
-	ReportGeneration  time.Duration `json:"report_generation,omitempty"`
+	FilesScanned     int           `json:"files_scanned"`
+	PackagesAnalyzed int           `json:"packages_analyzed"`
+	LayersAnalyzed   int           `json:"layers_analyzed"`
+	RulesEvaluated   int           `json:"rules_evaluated"`
+	DatabaseSize     int64         `json:"database_size,omitempty"`
+	ScanDuration     time.Duration `json:"scan_duration"`
+	PreparationTime  time.Duration `json:"preparation_time,omitempty"`
+	AnalysisTime     time.Duration `json:"analysis_time,omitempty"`
+	ReportGeneration time.Duration `json:"report_generation,omitempty"`
 }
 
 // ScanProgress represents the progress of an ongoing scan
 type ScanProgress struct {
-	ScanID         string        `json:"scan_id"`
-	Status         ScanStatus    `json:"status"`
-	CurrentStage   string        `json:"current_stage"`
-	StageNumber    int           `json:"stage_number"`
-	TotalStages    int           `json:"total_stages"`
-	Percentage     float64       `json:"percentage"`
-	ElapsedTime    time.Duration `json:"elapsed_time"`
-	EstimatedTime  *time.Duration `json:"estimated_time,omitempty"`
-	LastUpdate     time.Time     `json:"last_update"`
-	Message        string        `json:"message,omitempty"`
+	ScanID        string         `json:"scan_id"`
+	Status        ScanStatus     `json:"status"`
+	CurrentStage  string         `json:"current_stage"`
+	StageNumber   int            `json:"stage_number"`
+	TotalStages   int            `json:"total_stages"`
+	Percentage    float64        `json:"percentage"`
+	ElapsedTime   time.Duration  `json:"elapsed_time"`
+	EstimatedTime *time.Duration `json:"estimated_time,omitempty"`
+	LastUpdate    time.Time      `json:"last_update"`
+	Message       string         `json:"message,omitempty"`
 }
 
 // ScanPolicy represents a security scanning policy
 type ScanPolicy struct {
-	ID              string                 `json:"id"`
-	Name            string                 `json:"name"`
-	Description     string                 `json:"description"`
-	Version         string                 `json:"version"`
-	Enabled         bool                   `json:"enabled"`
-	SeverityLimits  map[SeverityLevel]int  `json:"severity_limits"`
+	ID               string                `json:"id"`
+	Name             string                `json:"name"`
+	Description      string                `json:"description"`
+	Version          string                `json:"version"`
+	Enabled          bool                  `json:"enabled"`
+	SeverityLimits   map[SeverityLevel]int `json:"severity_limits"`
 	FailureThreshold float64               `json:"failure_threshold"`
 	RequiredScans    []ScanType            `json:"required_scans"`
 	Exemptions       []Exemption           `json:"exemptions,omitempty"`
@@ -429,24 +429,24 @@ type ScanPolicy struct {
 
 // Exemption represents an exemption from security policies
 type Exemption struct {
-	ID          string        `json:"id"`
-	Type        ExemptionType `json:"type"`
-	Pattern     string        `json:"pattern"`
-	Reason      string        `json:"reason"`
-	Expiry      *time.Time    `json:"expiry,omitempty"`
-	Approved    bool          `json:"approved"`
-	ApprovedBy  string        `json:"approved_by,omitempty"`
-	ApprovedAt  *time.Time    `json:"approved_at,omitempty"`
+	ID         string        `json:"id"`
+	Type       ExemptionType `json:"type"`
+	Pattern    string        `json:"pattern"`
+	Reason     string        `json:"reason"`
+	Expiry     *time.Time    `json:"expiry,omitempty"`
+	Approved   bool          `json:"approved"`
+	ApprovedBy string        `json:"approved_by,omitempty"`
+	ApprovedAt *time.Time    `json:"approved_at,omitempty"`
 }
 
 // ExemptionType represents the type of exemption
 type ExemptionType string
 
 const (
-	ExemptionTypeCVE         ExemptionType = "cve"
-	ExemptionTypePackage     ExemptionType = "package"
-	ExemptionTypeFile        ExemptionType = "file"
-	ExemptionTypePath        ExemptionType = "path"
-	ExemptionTypeRule        ExemptionType = "rule"
-	ExemptionTypeLicense     ExemptionType = "license"
+	ExemptionTypeCVE     ExemptionType = "cve"
+	ExemptionTypePackage ExemptionType = "package"
+	ExemptionTypeFile    ExemptionType = "file"
+	ExemptionTypePath    ExemptionType = "path"
+	ExemptionTypeRule    ExemptionType = "rule"
+	ExemptionTypeLicense ExemptionType = "license"
 )

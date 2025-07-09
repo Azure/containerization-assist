@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ToolCoordinator orchestrates tool execution at the application layer

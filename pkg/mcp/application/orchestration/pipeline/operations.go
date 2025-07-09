@@ -4,8 +4,8 @@ package pipeline
 import (
 	"log/slog"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	sessionsvc "github.com/Azure/container-kit/pkg/mcp/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
+	sessionsvc "github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // NewOperations creates a new pipeline operations implementation

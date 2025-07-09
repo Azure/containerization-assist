@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"testing"
 
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	sessionsvc "github.com/Azure/container-kit/pkg/mcp/session"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
+	sessionsvc "github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

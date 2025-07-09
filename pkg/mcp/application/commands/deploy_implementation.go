@@ -16,7 +16,7 @@ import (
 // performKubernetesDeployment performs the actual Kubernetes deployment
 func (cmd *ConsolidatedDeployCommand) performKubernetesDeployment(ctx context.Context, request *deploy.DeploymentRequest, workspaceDir string) (*deploy.DeploymentResult, error) {
 	startTime := time.Now()
-	
+
 	// Create deployment result
 	result := &deploy.DeploymentResult{
 		DeploymentID: request.ID,
@@ -115,7 +115,7 @@ func (cmd *ConsolidatedDeployCommand) performKubernetesDeployment(ctx context.Co
 // performManifestGeneration generates Kubernetes manifests
 func (cmd *ConsolidatedDeployCommand) performManifestGeneration(ctx context.Context, request *deploy.ManifestGenerationRequest, workspaceDir string) (*deploy.DeploymentResult, error) {
 	startTime := time.Now()
-	
+
 	// Create result
 	result := &deploy.DeploymentResult{
 		DeploymentID: request.ID,
@@ -156,7 +156,7 @@ func (cmd *ConsolidatedDeployCommand) performManifestGeneration(ctx context.Cont
 // performKubernetesRollback performs deployment rollback
 func (cmd *ConsolidatedDeployCommand) performKubernetesRollback(ctx context.Context, request *deploy.RollbackRequest, workspaceDir string) (*deploy.DeploymentResult, error) {
 	startTime := time.Now()
-	
+
 	// Create result
 	result := &deploy.DeploymentResult{
 		DeploymentID: request.DeploymentID,
@@ -195,7 +195,7 @@ func (cmd *ConsolidatedDeployCommand) performKubernetesRollback(ctx context.Cont
 // performHealthCheck performs deployment health check
 func (cmd *ConsolidatedDeployCommand) performHealthCheck(ctx context.Context, name, namespace string) (*deploy.DeploymentResult, error) {
 	startTime := time.Now()
-	
+
 	// Create result
 	result := &deploy.DeploymentResult{
 		DeploymentID: fmt.Sprintf("health-%s", name),
@@ -243,7 +243,7 @@ func (cmd *ConsolidatedDeployCommand) performHealthCheck(ctx context.Context, na
 		result.Status = deploy.StatusFailed
 		result.Error = "deployment is not healthy"
 	}
-	
+
 	result.Duration = time.Since(startTime)
 	completedAt := time.Now()
 	result.CompletedAt = &completedAt
@@ -334,7 +334,7 @@ spec:
 	// Generate ports section
 	portsSection := ""
 	for _, port := range request.Configuration.Ports {
-		portsSection += fmt.Sprintf("        - containerPort: %d\n          name: %s\n          protocol: %s\n", 
+		portsSection += fmt.Sprintf("        - containerPort: %d\n          name: %s\n          protocol: %s\n",
 			port.TargetPort, port.Name, port.Protocol)
 	}
 
@@ -425,9 +425,9 @@ spec:
 	portsSection := ""
 	serviceType := "ClusterIP"
 	for _, port := range request.Configuration.Ports {
-		portsSection += fmt.Sprintf("  - name: %s\n    port: %d\n    targetPort: %d\n    protocol: %s\n", 
+		portsSection += fmt.Sprintf("  - name: %s\n    port: %d\n    targetPort: %d\n    protocol: %s\n",
 			port.Name, port.Port, port.TargetPort, port.Protocol)
-		
+
 		// Use LoadBalancer for external access
 		if port.ServiceType == deploy.ServiceTypeLoadBalancer {
 			serviceType = "LoadBalancer"
@@ -530,7 +530,7 @@ data:
 // generateManifestFiles generates manifest files for the ManifestGenerationRequest
 func (cmd *ConsolidatedDeployCommand) generateManifestFiles(ctx context.Context, request *deploy.ManifestGenerationRequest, workspaceDir string) (*deploy.ManifestGenerationResult, error) {
 	startTime := time.Now()
-	
+
 	// Create result
 	result := &deploy.ManifestGenerationResult{
 		GenerationID: request.ID,
@@ -607,15 +607,15 @@ func (cmd *ConsolidatedDeployCommand) generateManifestFiles(ctx context.Context,
 func (cmd *ConsolidatedDeployCommand) generateDeploymentManifestFromRequest(request *deploy.ManifestGenerationRequest) (string, error) {
 	// Create a deployment request for manifest generation
 	deployRequest := &deploy.DeploymentRequest{
-		Name:      request.Options.Namespace + "-app",
-		Namespace: request.Options.Namespace,
-		Image:     "nginx", // Default image
-		Tag:       "latest",
-		Replicas:  1,
-		Resources: request.ResourceReqs,
+		Name:          request.Options.Namespace + "-app",
+		Namespace:     request.Options.Namespace,
+		Image:         "nginx", // Default image
+		Tag:           "latest",
+		Replicas:      1,
+		Resources:     request.ResourceReqs,
 		Configuration: request.Configuration,
-		Environment: deploy.EnvironmentDevelopment,
-		Strategy:   deploy.StrategyRolling,
+		Environment:   deploy.EnvironmentDevelopment,
+		Strategy:      deploy.StrategyRolling,
 	}
 
 	return cmd.generateDeploymentManifest(deployRequest)
@@ -625,10 +625,10 @@ func (cmd *ConsolidatedDeployCommand) generateDeploymentManifestFromRequest(requ
 func (cmd *ConsolidatedDeployCommand) generateServiceManifestFromRequest(request *deploy.ManifestGenerationRequest) (string, error) {
 	// Create a deployment request for manifest generation
 	deployRequest := &deploy.DeploymentRequest{
-		Name:      request.Options.Namespace + "-app",
-		Namespace: request.Options.Namespace,
+		Name:          request.Options.Namespace + "-app",
+		Namespace:     request.Options.Namespace,
 		Configuration: request.Configuration,
-		Environment: deploy.EnvironmentDevelopment,
+		Environment:   deploy.EnvironmentDevelopment,
 	}
 
 	return cmd.generateServiceManifest(deployRequest)
@@ -639,20 +639,20 @@ func (cmd *ConsolidatedDeployCommand) generateServiceManifestFromRequest(request
 // applyManifests applies manifests to the Kubernetes cluster
 func (cmd *ConsolidatedDeployCommand) applyManifests(ctx context.Context, manifests map[string]string, namespace string) (deploy.DeployedResources, error) {
 	var resources deploy.DeployedResources
-	
+
 	// Apply each manifest
 	for name, manifest := range manifests {
 		cmd.logger.Info("applying manifest", "name", name, "namespace", namespace)
-		
+
 		// Parse manifest type
 		manifestType := cmd.parseManifestType(manifest)
-		
+
 		// Apply manifest using Kubernetes client
 		resourceName, err := cmd.applyManifest(ctx, manifest, namespace)
 		if err != nil {
 			return resources, fmt.Errorf("failed to apply %s: %w", name, err)
 		}
-		
+
 		// Track applied resources
 		switch manifestType {
 		case "Deployment":
@@ -667,7 +667,7 @@ func (cmd *ConsolidatedDeployCommand) applyManifests(ctx context.Context, manife
 			resources.Secrets = append(resources.Secrets, resourceName)
 		}
 	}
-	
+
 	return resources, nil
 }
 
@@ -675,12 +675,12 @@ func (cmd *ConsolidatedDeployCommand) applyManifests(ctx context.Context, manife
 func (cmd *ConsolidatedDeployCommand) applyManifest(ctx context.Context, manifest, namespace string) (string, error) {
 	// This would use the actual Kubernetes client to apply the manifest
 	// For now, we'll simulate the operation
-	
+
 	// Parse resource name from manifest
 	resourceName := cmd.parseResourceName(manifest)
-	
+
 	cmd.logger.Info("applied manifest", "resource", resourceName, "namespace", namespace)
-	
+
 	return resourceName, nil
 }
 
@@ -719,15 +719,15 @@ func (cmd *ConsolidatedDeployCommand) parseResourceName(manifest string) string 
 // waitForDeploymentReady waits for deployment to be ready
 func (cmd *ConsolidatedDeployCommand) waitForDeploymentReady(ctx context.Context, name, namespace string, timeout time.Duration) (bool, error) {
 	cmd.logger.Info("waiting for deployment to be ready", "name", name, "namespace", namespace, "timeout", timeout)
-	
+
 	// Create timeout context
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	
+
 	// Poll deployment status
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-timeoutCtx.Done():
@@ -748,9 +748,9 @@ func (cmd *ConsolidatedDeployCommand) waitForDeploymentReady(ctx context.Context
 func (cmd *ConsolidatedDeployCommand) checkDeploymentReady(ctx context.Context, name, namespace string) (bool, error) {
 	// This would use the actual Kubernetes client to check deployment status
 	// For now, we'll simulate the operation
-	
+
 	cmd.logger.Debug("checking deployment readiness", "name", name, "namespace", namespace)
-	
+
 	// Simulate deployment becoming ready after some time
 	return true, nil
 }
@@ -759,9 +759,9 @@ func (cmd *ConsolidatedDeployCommand) checkDeploymentReady(ctx context.Context, 
 func (cmd *ConsolidatedDeployCommand) checkDeploymentHealth(ctx context.Context, name, namespace string) (bool, error) {
 	// This would use the actual Kubernetes client to check deployment health
 	// For now, we'll simulate the operation
-	
+
 	cmd.logger.Info("checking deployment health", "name", name, "namespace", namespace)
-	
+
 	// Simulate health check
 	return true, nil
 }
@@ -770,7 +770,7 @@ func (cmd *ConsolidatedDeployCommand) checkDeploymentHealth(ctx context.Context,
 func (cmd *ConsolidatedDeployCommand) getDeploymentEndpoints(ctx context.Context, name, namespace string) ([]deploy.Endpoint, error) {
 	// This would use the actual Kubernetes client to get service endpoints
 	// For now, we'll simulate the operation
-	
+
 	endpoints := []deploy.Endpoint{
 		{
 			Name:     "http",
@@ -781,7 +781,7 @@ func (cmd *ConsolidatedDeployCommand) getDeploymentEndpoints(ctx context.Context
 			Ready:    true,
 		},
 	}
-	
+
 	return endpoints, nil
 }
 
@@ -789,7 +789,7 @@ func (cmd *ConsolidatedDeployCommand) getDeploymentEndpoints(ctx context.Context
 func (cmd *ConsolidatedDeployCommand) getDeploymentEvents(ctx context.Context, name, namespace string) ([]deploy.DeploymentEvent, error) {
 	// This would use the actual Kubernetes client to get events
 	// For now, we'll simulate the operation
-	
+
 	events := []deploy.DeploymentEvent{
 		{
 			Timestamp: time.Now(),
@@ -820,7 +820,7 @@ func (cmd *ConsolidatedDeployCommand) getDeploymentEvents(ctx context.Context, n
 			Component: "kubelet",
 		},
 	}
-	
+
 	return events, nil
 }
 
@@ -828,14 +828,14 @@ func (cmd *ConsolidatedDeployCommand) getDeploymentEvents(ctx context.Context, n
 func (cmd *ConsolidatedDeployCommand) getScalingInfo(ctx context.Context, name, namespace string) (deploy.ScalingInfo, error) {
 	// This would use the actual Kubernetes client to get deployment status
 	// For now, we'll simulate the operation
-	
+
 	scalingInfo := deploy.ScalingInfo{
 		DesiredReplicas:   1,
 		AvailableReplicas: 1,
 		ReadyReplicas:     1,
 		UpdatedReplicas:   1,
 	}
-	
+
 	return scalingInfo, nil
 }
 
@@ -843,9 +843,9 @@ func (cmd *ConsolidatedDeployCommand) getScalingInfo(ctx context.Context, name, 
 func (cmd *ConsolidatedDeployCommand) rollbackDeployment(ctx context.Context, deploymentName string, toRevision *int) (*deploy.RollbackResult, error) {
 	// This would use the actual Kubernetes client to rollback the deployment
 	// For now, we'll simulate the operation
-	
+
 	cmd.logger.Info("rolling back deployment", "name", deploymentName, "revision", toRevision)
-	
+
 	result := &deploy.RollbackResult{
 		RollbackID:   fmt.Sprintf("rollback-%d", time.Now().Unix()),
 		DeploymentID: deploymentName,
@@ -854,14 +854,14 @@ func (cmd *ConsolidatedDeployCommand) rollbackDeployment(ctx context.Context, de
 		Status:       deploy.RollbackStatusCompleted,
 		CreatedAt:    time.Now(),
 	}
-	
+
 	if toRevision != nil {
 		result.ToRevision = *toRevision
 	}
-	
+
 	completedAt := time.Now()
 	result.CompletedAt = &completedAt
-	
+
 	return result, nil
 }
 
@@ -870,11 +870,11 @@ func (cmd *ConsolidatedDeployCommand) validateManifests(manifests map[string]str
 	validation := deploy.ManifestValidation{
 		Valid: true,
 	}
-	
+
 	// Validate each manifest
 	for name, manifest := range manifests {
 		errors, warnings := cmd.validateSingleManifest(manifest)
-		
+
 		// Add validation errors
 		for _, err := range errors {
 			validation.Errors = append(validation.Errors, deploy.ValidationError{
@@ -884,7 +884,7 @@ func (cmd *ConsolidatedDeployCommand) validateManifests(manifests map[string]str
 			})
 			validation.Valid = false
 		}
-		
+
 		// Add validation warnings
 		for _, warning := range warnings {
 			validation.Warnings = append(validation.Warnings, deploy.ValidationWarning{
@@ -894,7 +894,7 @@ func (cmd *ConsolidatedDeployCommand) validateManifests(manifests map[string]str
 			})
 		}
 	}
-	
+
 	return validation, nil
 }
 
@@ -902,40 +902,36 @@ func (cmd *ConsolidatedDeployCommand) validateManifests(manifests map[string]str
 func (cmd *ConsolidatedDeployCommand) validateSingleManifest(manifest string) ([]string, []string) {
 	var errors []string
 	var warnings []string
-	
+
 	// Basic validation checks
 	if !strings.Contains(manifest, "apiVersion:") {
 		errors = append(errors, "missing apiVersion field")
 	}
-	
+
 	if !strings.Contains(manifest, "kind:") {
 		errors = append(errors, "missing kind field")
 	}
-	
+
 	if !strings.Contains(manifest, "metadata:") {
 		errors = append(errors, "missing metadata field")
 	}
-	
+
 	if !strings.Contains(manifest, "name:") {
 		errors = append(errors, "missing name field in metadata")
 	}
-	
+
 	// Check for common issues
 	if strings.Contains(manifest, "image: nginx") {
 		warnings = append(warnings, "using default nginx image - consider specifying a specific image")
 	}
-	
+
 	if strings.Contains(manifest, "latest") {
 		warnings = append(warnings, "using 'latest' tag - consider using specific version tags")
 	}
-	
+
 	return errors, warnings
 }
 
 // Utility methods
 
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
+// Note: fileExists is defined in common.go

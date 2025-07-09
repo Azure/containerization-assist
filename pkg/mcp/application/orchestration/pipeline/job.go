@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core/config"
+	"github.com/Azure/container-kit/pkg/mcp/domain/config"
 )
 
 // Job represents a unit of work in the pipeline

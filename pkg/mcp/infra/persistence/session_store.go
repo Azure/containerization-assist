@@ -1,4 +1,4 @@
-package session
+package persistence
 
 // Package session provides session management functionality for the MCP server.
 // This file acts as a unified interface that delegates to focused components:

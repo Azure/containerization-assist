@@ -87,12 +87,12 @@ func (s *Session) AddHistoryEntry(action string, details map[string]interface{})
 	if s.State == nil {
 		s.State = make(map[string]interface{})
 	}
-	
+
 	history, exists := s.State["history"]
 	if !exists {
 		history = []HistoryEntry{}
 	}
-	
+
 	entries := history.([]HistoryEntry)
 	entries = append(entries, HistoryEntry{
 		ID:        generateID(),
@@ -100,7 +100,7 @@ func (s *Session) AddHistoryEntry(action string, details map[string]interface{})
 		Action:    action,
 		Details:   details,
 	})
-	
+
 	s.State["history"] = entries
 	s.UpdatedAt = time.Now()
 }

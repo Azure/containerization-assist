@@ -3,8 +3,8 @@ package core
 import (
 	"sync"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/errors/codes"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 )
 
 // DefaultValidatorRegistry implements ValidatorRegistry

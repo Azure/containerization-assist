@@ -37,7 +37,7 @@ test-mcp:
 .PHONY: test-integration
 test-integration:
 	@echo "Running MCP integration tests..."
-	go test -tags=integration ./test/integration/... -v
+	go test -tags=integration ./pkg/mcp/internal/test/integration/... -v
 
 .PHONY: test-e2e
 test-e2e:
@@ -49,30 +49,12 @@ test-performance:
 	@echo "Running performance benchmarks..."
 	go test -tags=performance ./pkg/mcp/internal/test/e2e/... -v -bench=. -timeout=60m
 
-.PHONY: schema-gen
-schema-gen:
-	@echo "Generating tool schemas..."
-	@echo "Building schema generator..."
-	@go build -o bin/mcp-schema-gen ./cmd/mcp-schema-gen
-	@echo "Generating schemas for canonical tools..."
-	@go generate ./pkg/mcp/domain/containerization/...
-	@echo "Schema generation complete"
-
-.PHONY: schema-validate
-schema-validate: schema-gen
-	@echo "Validating generated schemas..."
-	@for schema in $$(find pkg/mcp/domain/containerization -name "*_schema.json"); do \
-		echo "Validating $$schema"; \
-		jq . $$schema > /dev/null || (echo "Invalid JSON in $$schema" && exit 1); \
-	done
-	@echo "All schemas valid"
-
 .PHONY: test-all-integration
 test-all-integration: test-integration test-e2e
 
 .PHONY: test-all
 test-all: test test-integration
-	go test -race ./pkg/mcp/...
+	go test -race ./...
 
 .PHONY: coverage
 coverage:
@@ -98,12 +80,12 @@ coverage-baseline:
 bench:
 	@echo "Running MCP performance benchmarks..."
 	@echo "Target: <300μs P95 per request"
-	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/
+	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/tools
 
 .PHONY: bench-baseline
 bench-baseline:
 	@echo "Setting performance baseline..."
-	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/ > bench-baseline.txt
+	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/tools > bench-baseline.txt
 	@echo "Baseline saved to bench-baseline.txt"
 
 .PHONY: lint
@@ -111,23 +93,6 @@ lint:
 	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	@echo "Running linter with error budget (threshold: 100)..."
 	@LINT_ERROR_THRESHOLD=100 LINT_WARN_THRESHOLD=50 ./scripts/lint-with-threshold.sh ./pkg/mcp/...
-
-.PHONY: check-boundaries
-check-boundaries:
-	@echo "Checking package boundary error handling compliance..."
-	@./scripts/check-boundary-errors.sh
-
-.PHONY: check-architecture
-check-architecture: validate-architecture
-	@echo "Architecture validation complete"
-
-.PHONY: fix-boundaries
-fix-boundaries:
-	@echo "Automatically fixing package boundary errors..."
-	@go build -o bin/mcp-richify ./cmd/mcp-richify
-	@bin/mcp-richify boundaries /tmp/boundaries.json
-	@bin/mcp-richify convert /tmp/boundaries.json
-	@echo "✅ Boundary errors fixed!"
 
 .PHONY: lint-strict
 lint-strict:
@@ -171,8 +136,9 @@ validate-architecture:
 	@./scripts/validate-architecture.sh
 
 .PHONY: pre-commit
-pre-commit: validate-architecture
+pre-commit:
 	@pre-commit run --all-files
+	@$(MAKE) validate-architecture
 
 .PHONY: generate
 generate: build-schemaGen
@@ -182,7 +148,7 @@ generate: build-schemaGen
 .PHONY: build-schemaGen
 build-schemaGen:
 	@echo "Building schema generator..."
-	@go build -o bin/mcp-schema-gen ./cmd/mcp-schema-gen
+	@go build -o bin/schemaGen ./pkg/mcp/cmd/schemaGen
 
 .PHONY: check-schemas
 check-schemas:
@@ -210,7 +176,7 @@ deps-update:
 	go mod verify
 	@echo ""
 	@echo "Testing with updated dependencies..."
-	go test ./pkg/mcp/...
+	go test ./...
 	@echo ""
 	@echo "Dependencies updated successfully!"
 	@echo ""
@@ -345,20 +311,14 @@ help:
 	@echo "Code quality targets:"
 	@echo "  fmt               Format all Go code"
 	@echo "  fmt-check         Check if code is formatted"
-	@echo "  install-hooks        Install pre-commit hooks"
-	@echo "  validate-architecture Validate three-layer architecture"
-	@echo "  pre-commit           Run pre-commit checks manually"
+	@echo "  install-hooks     Install pre-commit hooks"
+	@echo "  pre-commit        Run pre-commit checks manually"
 	@echo ""
 	@echo "Linting targets:"
 	@echo "  lint              Run linting with error budget (threshold: 100 issues)"
 	@echo "  lint-strict       Run linting in strict mode (shows all issues)"
 	@echo "  lint-report       Generate detailed lint report"
 	@echo "  lint-ratchet      Ensure lint issues don't increase"
-	@echo ""
-	@echo "Error boundary targets:"
-	@echo "  check-boundaries     Check package boundary error handling compliance (ADR-006)"
-	@echo "  check-architecture   Validate three-layer architecture (domain/application/infra)"
-	@echo "  fix-boundaries       Automatically fix boundary error violations"
 	@echo ""
 	@echo "Complexity targets:"
 	@echo "  complexity-baseline  Set current complexity as baseline"

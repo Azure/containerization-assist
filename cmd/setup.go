@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )

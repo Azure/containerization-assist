@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 // CheckRegistryHealthArgs defines arguments for registry health checking
 type CheckRegistryHealthArgs struct {
-	types.BaseToolArgs
+	shared.BaseToolArgs
 
 	Registries     []string `json:"registries,omitempty" jsonschema:"description=List of registries to check (defaults to common registries)"`
 	Detailed       bool     `json:"detailed,omitempty" jsonschema:"description=Include detailed endpoint checks"`

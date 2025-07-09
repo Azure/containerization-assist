@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core/config"
+	"github.com/Azure/container-kit/pkg/mcp/domain/config"
 )
 
 // Workflow Stage Constants

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core/config"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/config"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConfigLoader loads and validates pipeline configuration

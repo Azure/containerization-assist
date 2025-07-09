@@ -7,8 +7,8 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // SimpleWorkflowExecutor replaces the over-engineered WorkflowOrchestrator

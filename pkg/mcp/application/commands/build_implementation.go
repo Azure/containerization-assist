@@ -14,15 +14,15 @@ import (
 
 // BuildStrategy represents a build strategy for implementation
 type BuildStrategy struct {
-	Name                     string
-	Type                     string
-	Confidence               string
-	Description              string
-	Language                 string
-	Framework                string
-	Features                 []string
-	Optimizations            []string
-	SecurityRecommendations  []string
+	Name                    string
+	Type                    string
+	Confidence              string
+	Description             string
+	Language                string
+	Framework               string
+	Features                []string
+	Optimizations           []string
+	SecurityRecommendations []string
 }
 
 // ContextOptimization represents build context optimization
@@ -63,7 +63,7 @@ func (cmd *ConsolidatedBuildCommand) analyzeDockerfile(dockerfilePath string) (*
 	}
 
 	dockerfile := string(content)
-	
+
 	// Determine strategy based on Dockerfile content
 	strategy := &BuildStrategy{
 		Name:        "dockerfile",
@@ -147,15 +147,15 @@ func (cmd *ConsolidatedBuildCommand) detectLanguageStrategy(workspaceDir string)
 // detectPrimaryLanguage detects the primary programming language in the workspace
 func (cmd *ConsolidatedBuildCommand) detectPrimaryLanguage(workspaceDir string) string {
 	languageFiles := map[string][]string{
-		"go":         {"go.mod", "go.sum", "main.go"},
-		"node":       {"package.json", "package-lock.json", "yarn.lock"},
-		"python":     {"requirements.txt", "setup.py", "pyproject.toml", "Pipfile"},
-		"java":       {"pom.xml", "build.gradle", "gradlew"},
-		"dotnet":     {"*.csproj", "*.sln", "project.json"},
-		"ruby":       {"Gemfile", "Gemfile.lock"},
-		"php":        {"composer.json", "composer.lock"},
-		"rust":       {"Cargo.toml", "Cargo.lock"},
-		"cpp":        {"CMakeLists.txt", "Makefile", "*.cpp", "*.hpp"},
+		"go":     {"go.mod", "go.sum", "main.go"},
+		"node":   {"package.json", "package-lock.json", "yarn.lock"},
+		"python": {"requirements.txt", "setup.py", "pyproject.toml", "Pipfile"},
+		"java":   {"pom.xml", "build.gradle", "gradlew"},
+		"dotnet": {"*.csproj", "*.sln", "project.json"},
+		"ruby":   {"Gemfile", "Gemfile.lock"},
+		"php":    {"composer.json", "composer.lock"},
+		"rust":   {"Cargo.toml", "Cargo.lock"},
+		"cpp":    {"CMakeLists.txt", "Makefile", "*.cpp", "*.hpp"},
 	}
 
 	for language, files := range languageFiles {
@@ -199,16 +199,16 @@ func (cmd *ConsolidatedBuildCommand) detectGoFramework(workspaceDir string) stri
 	}
 
 	goMod := string(content)
-	
+
 	frameworks := map[string]string{
-		"github.com/gin-gonic/gin":     "gin",
-		"github.com/gorilla/mux":       "gorilla",
-		"github.com/labstack/echo":     "echo",
-		"github.com/gofiber/fiber":     "fiber",
-		"github.com/beego/beego":       "beego",
-		"github.com/revel/revel":       "revel",
-		"go.uber.org/fx":               "fx",
-		"github.com/go-chi/chi":        "chi",
+		"github.com/gin-gonic/gin": "gin",
+		"github.com/gorilla/mux":   "gorilla",
+		"github.com/labstack/echo": "echo",
+		"github.com/gofiber/fiber": "fiber",
+		"github.com/beego/beego":   "beego",
+		"github.com/revel/revel":   "revel",
+		"go.uber.org/fx":           "fx",
+		"github.com/go-chi/chi":    "chi",
 	}
 
 	for dep, framework := range frameworks {
@@ -233,18 +233,18 @@ func (cmd *ConsolidatedBuildCommand) detectNodeFramework(workspaceDir string) st
 	}
 
 	packageJson := string(content)
-	
+
 	frameworks := map[string]string{
-		"\"express\"":     "express",
-		"\"next\"":        "nextjs",
-		"\"react\"":       "react",
-		"\"vue\"":         "vue",
-		"\"angular\"":     "angular",
-		"\"nestjs\"":      "nestjs",
-		"\"koa\"":         "koa",
-		"\"fastify\"":     "fastify",
-		"\"nuxt\"":        "nuxt",
-		"\"gatsby\"":      "gatsby",
+		"\"express\"": "express",
+		"\"next\"":    "nextjs",
+		"\"react\"":   "react",
+		"\"vue\"":     "vue",
+		"\"angular\"": "angular",
+		"\"nestjs\"":  "nestjs",
+		"\"koa\"":     "koa",
+		"\"fastify\"": "fastify",
+		"\"nuxt\"":    "nuxt",
+		"\"gatsby\"":  "gatsby",
 	}
 
 	for dep, framework := range frameworks {
@@ -264,18 +264,18 @@ func (cmd *ConsolidatedBuildCommand) detectPythonFramework(workspaceDir string) 
 		content, err := os.ReadFile(requirementsPath)
 		if err == nil {
 			requirements := string(content)
-			
+
 			frameworks := map[string]string{
-				"Django":     "django",
-				"Flask":      "flask",
-				"FastAPI":    "fastapi",
-				"Tornado":    "tornado",
-				"Pyramid":    "pyramid",
-				"CherryPy":   "cherrypy",
-				"Bottle":     "bottle",
-				"Sanic":      "sanic",
-				"Quart":      "quart",
-				"Starlette":  "starlette",
+				"Django":    "django",
+				"Flask":     "flask",
+				"FastAPI":   "fastapi",
+				"Tornado":   "tornado",
+				"Pyramid":   "pyramid",
+				"CherryPy":  "cherrypy",
+				"Bottle":    "bottle",
+				"Sanic":     "sanic",
+				"Quart":     "quart",
+				"Starlette": "starlette",
 			}
 
 			for dep, framework := range frameworks {
@@ -305,16 +305,16 @@ func (cmd *ConsolidatedBuildCommand) detectJavaFramework(workspaceDir string) st
 		content, err := os.ReadFile(pomPath)
 		if err == nil {
 			pom := string(content)
-			
+
 			frameworks := map[string]string{
-				"spring-boot":         "spring-boot",
-				"spring-framework":    "spring",
-				"quarkus":            "quarkus",
-				"micronaut":          "micronaut",
-				"vertx":              "vertx",
-				"dropwizard":         "dropwizard",
-				"spark-core":         "spark",
-				"jersey":             "jersey",
+				"spring-boot":      "spring-boot",
+				"spring-framework": "spring",
+				"quarkus":          "quarkus",
+				"micronaut":        "micronaut",
+				"vertx":            "vertx",
+				"dropwizard":       "dropwizard",
+				"spark-core":       "spark",
+				"jersey":           "jersey",
 			}
 
 			for dep, framework := range frameworks {
@@ -331,13 +331,13 @@ func (cmd *ConsolidatedBuildCommand) detectJavaFramework(workspaceDir string) st
 		content, err := os.ReadFile(gradlePath)
 		if err == nil {
 			gradle := string(content)
-			
+
 			frameworks := map[string]string{
-				"spring-boot":         "spring-boot",
-				"spring-framework":    "spring",
-				"quarkus":            "quarkus",
-				"micronaut":          "micronaut",
-				"vertx":              "vertx",
+				"spring-boot":      "spring-boot",
+				"spring-framework": "spring",
+				"quarkus":          "quarkus",
+				"micronaut":        "micronaut",
+				"vertx":            "vertx",
 			}
 
 			for dep, framework := range frameworks {
@@ -423,9 +423,9 @@ func (cmd *ConsolidatedBuildCommand) analyzeDockerfileSecurity(dockerfile string
 // optimizeBuildContext analyzes and optimizes the build context
 func (cmd *ConsolidatedBuildCommand) optimizeBuildContext(ctx context.Context, workspaceDir string) (*ContextOptimization, error) {
 	optimization := &ContextOptimization{
-		OriginalSize: 0,
-		OptimizedSize: 0,
-		ExcludedFiles: []string{},
+		OriginalSize:    0,
+		OptimizedSize:   0,
+		ExcludedFiles:   []string{},
 		Recommendations: []string{},
 	}
 
@@ -763,11 +763,7 @@ func (cmd *ConsolidatedBuildCommand) calculateDirectorySize(dir string) (int64, 
 	return size, err
 }
 
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
+// Note: fileExists is defined in common.go
 
 // Performance and monitoring methods
 
@@ -841,6 +837,6 @@ func (cmd *ConsolidatedBuildCommand) validateBuildEnvironment(ctx context.Contex
 
 	// Check disk space
 	// This is a simplified check - you might want to implement more sophisticated disk space checking
-	
+
 	return nil
 }

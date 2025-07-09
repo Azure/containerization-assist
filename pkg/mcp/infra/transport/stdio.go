@@ -6,9 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/errors/codes"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
 )

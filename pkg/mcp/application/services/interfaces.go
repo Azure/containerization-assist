@@ -73,6 +73,12 @@ type SessionState interface {
 
 	// SetWorkspaceDir sets the workspace directory for a session
 	SetWorkspaceDir(ctx context.Context, sessionID string, dir string) error
+
+	// GetSessionMetadata gets session metadata
+	GetSessionMetadata(sessionID string) (map[string]interface{}, error)
+
+	// UpdateSessionData updates session data
+	UpdateSessionData(sessionID string, data map[string]interface{}) error
 }
 
 // BuildExecutor handles container build operations
@@ -202,6 +208,18 @@ type Analyzer interface {
 
 	// GenerateDockerfile generates a Dockerfile
 	GenerateDockerfile(ctx context.Context, analysis *AnalysisResult) (string, error)
+}
+
+// AnalysisService provides analysis operations for backward compatibility
+type AnalysisService interface {
+	// AnalyzeRepository analyzes a repository with progress callback
+	AnalyzeRepository(ctx context.Context, path string, callback ProgressCallback) (*RepositoryAnalysis, error)
+
+	// AnalyzeWithAI performs AI-powered analysis
+	AnalyzeWithAI(ctx context.Context, content string) (*AIAnalysis, error)
+
+	// GetAnalysisProgress gets the progress of an ongoing analysis
+	GetAnalysisProgress(ctx context.Context, analysisID string) (*AnalysisProgress, error)
 }
 
 // Supporting types
@@ -335,16 +353,67 @@ type AnalysisResult struct {
 type Persistence interface {
 	// Put stores a key-value pair
 	Put(ctx context.Context, bucket string, key string, value interface{}) error
-	
+
 	// Get retrieves a value by key
 	Get(ctx context.Context, bucket string, key string, result interface{}) error
-	
+
 	// Delete removes a key-value pair
 	Delete(ctx context.Context, bucket string, key string) error
-	
+
 	// List returns all key-value pairs in a bucket
 	List(ctx context.Context, bucket string) (map[string]interface{}, error)
-	
+
 	// Close closes the persistence layer
 	Close() error
+}
+
+// Analysis-related types for backward compatibility
+
+// ProgressCallback is called during long-running operations to report progress
+type ProgressCallback func(progress AnalysisProgress)
+
+// RepositoryAnalysis represents the result of analyzing a repository
+type RepositoryAnalysis struct {
+	Language        string                 `json:"language"`
+	Framework       string                 `json:"framework"`
+	Dependencies    []string               `json:"dependencies"`
+	EntryPoint      string                 `json:"entry_point"`
+	Port            int                    `json:"port"`
+	BuildCommand    string                 `json:"build_command"`
+	RunCommand      string                 `json:"run_command"`
+	Issues          []AnalysisIssue        `json:"issues"`
+	Recommendations []string               `json:"recommendations"`
+	Metadata        map[string]interface{} `json:"metadata"`
+}
+
+// AnalysisIssue represents an issue found during analysis
+type AnalysisIssue struct {
+	Type       string `json:"type"`
+	Severity   string `json:"severity"`
+	Message    string `json:"message"`
+	File       string `json:"file"`
+	Line       int    `json:"line"`
+	Suggestion string `json:"suggestion"`
+}
+
+// AIAnalysis represents the result of AI-powered analysis
+type AIAnalysis struct {
+	Summary         string                 `json:"summary"`
+	Insights        []string               `json:"insights"`
+	Recommendations []string               `json:"recommendations"`
+	Confidence      float64                `json:"confidence"`
+	Metadata        map[string]interface{} `json:"metadata"`
+}
+
+// AnalysisProgress represents the progress of an ongoing analysis
+type AnalysisProgress struct {
+	AnalysisID    string         `json:"analysis_id"`
+	Status        string         `json:"status"`
+	CurrentStep   string         `json:"current_step"`
+	StepNumber    int            `json:"step_number"`
+	TotalSteps    int            `json:"total_steps"`
+	Percentage    float64        `json:"percentage"`
+	ElapsedTime   time.Duration  `json:"elapsed_time"`
+	EstimatedTime *time.Duration `json:"estimated_time,omitempty"`
+	LastUpdate    time.Time      `json:"last_update"`
 }

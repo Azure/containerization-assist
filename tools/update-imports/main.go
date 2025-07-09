@@ -26,14 +26,14 @@ var (
 // Import path mappings based on the new package structure
 var importMappings = map[string]string{
 	// Package restructuring - flattened structure
-	"github.com/Azure/container-kit/pkg/mcp/internal/engine":               "github.com/Azure/container-kit/pkg/mcp/internal/runtime",
-	"github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation": "github.com/Azure/container-kit/pkg/mcp/internal/runtime/conversation",
-	"github.com/Azure/container-kit/pkg/mcp/internal/tools/security":       "github.com/Azure/container-kit/pkg/mcp/internal/scan",
-	"github.com/Azure/container-kit/pkg/mcp/internal/tools/analysis":       "github.com/Azure/container-kit/pkg/mcp/internal/analyze",
+	"github.com/Azure/container-kit/pkg/mcp/internal/engine":                   "github.com/Azure/container-kit/pkg/mcp/application/internal/runtime",
+	"github.com/Azure/container-kit/pkg/mcp/application/internal/conversation": "github.com/Azure/container-kit/pkg/mcp/application/internal/conversation",
+	"github.com/Azure/container-kit/pkg/mcp/internal/tools/security":           "github.com/Azure/container-kit/pkg/mcp/internal/scan",
+	"github.com/Azure/container-kit/pkg/mcp/internal/tools/analysis":           "github.com/Azure/container-kit/pkg/mcp/internal/analyze",
 
 	// Session consolidation
 	"github.com/Azure/container-kit/pkg/mcp/internal/store/session": "github.com/Azure/container-kit/pkg/mcp/internal/session",
-	"github.com/Azure/container-kit/pkg/mcp/internal/types/session": "github.com/Azure/container-kit/pkg/mcp/internal/session",
+	"github.com/Azure/container-kit/pkg/mcp/domain/shared/session":  "github.com/Azure/container-kit/pkg/mcp/internal/session",
 
 	// Workflow simplification
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration/workflow": "github.com/Azure/container-kit/pkg/mcp/internal/workflow",

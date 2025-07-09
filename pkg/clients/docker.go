@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // buildDockerfileContent builds a Docker image from a string containing Dockerfile contents

@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
 )
 
 // ServerConfig holds configuration for the MCP server
@@ -50,6 +52,10 @@ type ServerConfig struct {
 	ServiceVersion  string
 	Environment     string
 	TraceSampleRate float64
+
+	// Dependency injection
+	TransportFactory services.TransportFactory
+	TemplateLoader   services.TemplateLoader
 }
 
 // DefaultServerConfig returns a default server configuration

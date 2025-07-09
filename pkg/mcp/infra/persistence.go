@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"go.etcd.io/bbolt"
 )
 
@@ -50,13 +50,13 @@ func NewBoltDBPersistence(dbPath string, logger *slog.Logger) (*BoltDBPersistenc
 
 // Bucket names
 const (
-	BucketSessions     = "sessions"
-	BucketSessionState = "session_state"
-	BucketSessionData  = "session_data"
-	BucketWorkflows    = "workflows"
-	BucketJobs         = "jobs"
-	BucketMetrics      = "metrics"
-	BucketEvents       = "events"
+	BucketSessions      = "sessions"
+	BucketSessionState  = "session_state"
+	BucketSessionData   = "session_data"
+	BucketWorkflows     = "workflows"
+	BucketJobs          = "jobs"
+	BucketMetrics       = "metrics"
+	BucketEvents        = "events"
 	BucketConfiguration = "configuration"
 )
 
@@ -107,7 +107,7 @@ func (p *BoltDBPersistence) CreateSession(ctx context.Context, sessionInfo *sess
 		if bucket == nil {
 			return fmt.Errorf("sessions bucket not found")
 		}
-		
+
 		return bucket.Put([]byte(sessionInfo.ID), data)
 	})
 }
@@ -495,24 +495,24 @@ func (p *BoltDBPersistence) Stats(ctx context.Context) (*PersistenceStats, error
 
 // PersistenceStats represents database statistics
 type PersistenceStats struct {
-	PageCount         int                    `json:"page_count"`
-	FreePageCount     int                    `json:"free_page_count"`
-	PendingPageCount  int                    `json:"pending_page_count"`
-	FreeAlloc         int                    `json:"free_alloc"`
-	FreelistInuse     int                    `json:"freelist_inuse"`
-	TxCount           int                    `json:"tx_count"`
-	TxAlloc           int                    `json:"tx_alloc"`
-	TxCursorCount     int                    `json:"tx_cursor_count"`
-	TxNodeCount       int                    `json:"tx_node_count"`
-	TxNodeDeref       int                    `json:"tx_node_deref"`
-	TxRebalance       int                    `json:"tx_rebalance"`
-	TxRebalanceTime   time.Duration          `json:"tx_rebalance_time"`
-	TxSplit           int                    `json:"tx_split"`
-	TxSpill           int                    `json:"tx_spill"`
-	TxSpillTime       time.Duration          `json:"tx_spill_time"`
-	TxWrite           int                    `json:"tx_write"`
-	TxWriteTime       time.Duration          `json:"tx_write_time"`
-	BucketStats       map[string]BucketStats `json:"bucket_stats"`
+	PageCount        int                    `json:"page_count"`
+	FreePageCount    int                    `json:"free_page_count"`
+	PendingPageCount int                    `json:"pending_page_count"`
+	FreeAlloc        int                    `json:"free_alloc"`
+	FreelistInuse    int                    `json:"freelist_inuse"`
+	TxCount          int                    `json:"tx_count"`
+	TxAlloc          int                    `json:"tx_alloc"`
+	TxCursorCount    int                    `json:"tx_cursor_count"`
+	TxNodeCount      int                    `json:"tx_node_count"`
+	TxNodeDeref      int                    `json:"tx_node_deref"`
+	TxRebalance      int                    `json:"tx_rebalance"`
+	TxRebalanceTime  time.Duration          `json:"tx_rebalance_time"`
+	TxSplit          int                    `json:"tx_split"`
+	TxSpill          int                    `json:"tx_spill"`
+	TxSpillTime      time.Duration          `json:"tx_spill_time"`
+	TxWrite          int                    `json:"tx_write"`
+	TxWriteTime      time.Duration          `json:"tx_write_time"`
+	BucketStats      map[string]BucketStats `json:"bucket_stats"`
 }
 
 // BucketStats represents bucket statistics
@@ -573,7 +573,7 @@ func createDirectoryIfNotExists(dir string) error {
 	if dir == "" {
 		return nil
 	}
-	
+
 	// This would use os.MkdirAll in a real implementation
 	// For now, we'll assume the directory exists
 	return nil

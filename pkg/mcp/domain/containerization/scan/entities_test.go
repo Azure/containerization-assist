@@ -101,7 +101,7 @@ func TestScanResult_CalculateSecurityGrade(t *testing.T) {
 				},
 			}
 			if result.CalculateSecurityGrade() != tt.expected {
-				t.Errorf("expected grade %s for score %f, got %s", 
+				t.Errorf("expected grade %s for score %f, got %s",
 					tt.expected, tt.score, result.CalculateSecurityGrade())
 			}
 		})

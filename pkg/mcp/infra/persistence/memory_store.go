@@ -1,25 +1,28 @@
-package session
+package persistence
 
 import (
 	"context"
 	"sync"
+
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
+	"github.com/Azure/container-kit/pkg/mcp/domain"
 )
 
 // MemoryStore is a simple in-memory implementation of SessionStore
 type MemoryStore struct {
-	sessions map[string]*SessionState
+	sessions map[string]*domain.SessionState
 	mu       sync.RWMutex
 }
 
 // NewMemoryStore creates a new in-memory session store
-func NewMemoryStore() SessionStore {
+func NewMemoryStore() services.SessionStore {
 	return &MemoryStore{
-		sessions: make(map[string]*SessionState),
+		sessions: make(map[string]*domain.SessionState),
 	}
 }
 
 // Save stores a session in memory
-func (m *MemoryStore) Save(ctx context.Context, sessionID string, session *SessionState) error {
+func (m *MemoryStore) Save(ctx context.Context, sessionID string, session *domain.SessionState) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -30,7 +33,7 @@ func (m *MemoryStore) Save(ctx context.Context, sessionID string, session *Sessi
 }
 
 // Load retrieves a session from memory
-func (m *MemoryStore) Load(ctx context.Context, sessionID string) (*SessionState, error) {
+func (m *MemoryStore) Load(ctx context.Context, sessionID string) (*domain.SessionState, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 

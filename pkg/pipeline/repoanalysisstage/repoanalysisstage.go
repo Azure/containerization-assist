@@ -6,7 +6,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/ai"
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/pipeline"
 )
 

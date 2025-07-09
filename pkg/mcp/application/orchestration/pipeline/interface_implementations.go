@@ -4,9 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // AnalyzeRepository implements the legacy analysis interface

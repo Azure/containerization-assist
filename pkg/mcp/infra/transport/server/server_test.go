@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/core"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/rs/zerolog"
 )
 

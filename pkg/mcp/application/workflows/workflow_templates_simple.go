@@ -7,8 +7,8 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	"github.com/Azure/container-kit/pkg/mcp/templates"
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,15 +45,17 @@ type SimpleTemplateStage struct {
 
 // SimpleTemplateManager manages workflow templates from external files
 type SimpleTemplateManager struct {
-	logger    *slog.Logger
-	templates map[string]*SimpleWorkflowTemplate
+	logger         *slog.Logger
+	templates      map[string]*SimpleWorkflowTemplate
+	templateLoader services.TemplateLoader
 }
 
 // NewSimpleTemplateManager creates a new template manager
-func NewSimpleTemplateManager(logger *slog.Logger) *SimpleTemplateManager {
+func NewSimpleTemplateManager(logger *slog.Logger, templateLoader services.TemplateLoader) *SimpleTemplateManager {
 	return &SimpleTemplateManager{
-		logger:    logger.With("component", "template_manager"),
-		templates: make(map[string]*SimpleWorkflowTemplate),
+		logger:         logger.With("component", "template_manager"),
+		templates:      make(map[string]*SimpleWorkflowTemplate),
+		templateLoader: templateLoader,
 	}
 }
 
@@ -66,7 +68,7 @@ func (tm *SimpleTemplateManager) LoadTemplate(name string) (*SimpleWorkflowTempl
 
 	// Load from filesystem
 	path := fmt.Sprintf("workflows/%s.yaml", name)
-	content, err := templates.LoadTemplate(path)
+	content, err := tm.templateLoader.LoadTemplate(path)
 	if err != nil {
 		return nil, errors.NewError().
 			Message("failed to load template "+name).
@@ -108,7 +110,7 @@ func (tm *SimpleTemplateManager) LoadTemplate(name string) (*SimpleWorkflowTempl
 
 // ListTemplates lists available templates
 func (tm *SimpleTemplateManager) ListTemplates() ([]string, error) {
-	allTemplates, err := templates.ListTemplates()
+	allTemplates, err := tm.templateLoader.ListTemplates()
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Coordinator implements api.RetryCoordinator

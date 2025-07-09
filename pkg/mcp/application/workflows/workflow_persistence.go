@@ -8,7 +8,7 @@ import (
 
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	bolt "go.etcd.io/bbolt"
 )
 

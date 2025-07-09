@@ -10,8 +10,8 @@ import (
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/core/tools"
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
+	"github.com/Azure/container-kit/pkg/mcp/domain/tools"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -126,7 +126,7 @@ type HTTPValidationError struct {
 // HTTPValidationResponse represents validation error response
 type HTTPValidationResponse struct {
 	Success bool                  `json:"success"`
-	Errors  []HTTPValidationError `json:"github.com/Azure/container-kit/pkg/mcp/internal"`
+	Errors  []HTTPValidationError `json:"github.com/Azure/container-kit/pkg/mcp/application/internal"`
 	Message string                `json:"message"`
 }
 

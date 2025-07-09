@@ -12,7 +12,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	validation "github.com/Azure/container-kit/pkg/mcp/security"
+	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 	"github.com/rs/zerolog"
 	"sigs.k8s.io/yaml"
 )

@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
-	sessionsvc "github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	sessionsvc "github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // GetSessionWorkspace retrieves the workspace directory for a given session ID

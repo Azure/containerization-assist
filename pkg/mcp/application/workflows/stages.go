@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // StageValidator handles validation of workflow stages

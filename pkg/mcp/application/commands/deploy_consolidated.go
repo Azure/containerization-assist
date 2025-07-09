@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConsolidatedDeployCommand consolidates all deploy tool functionality into a single command
@@ -43,7 +42,7 @@ func NewConsolidatedDeployCommand(
 // Execute performs deploy operations with full functionality from original tools
 func (cmd *ConsolidatedDeployCommand) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
 	startTime := time.Now()
-	
+
 	// Extract and validate input parameters
 	deployRequest, err := cmd.parseDeployInput(input)
 	if err != nil {
@@ -119,7 +118,7 @@ func (cmd *ConsolidatedDeployCommand) Execute(ctx context.Context, input api.Too
 func (cmd *ConsolidatedDeployCommand) parseDeployInput(input api.ToolInput) (*DeployRequest, error) {
 	// Extract operation type
 	operation := getStringParam(input.Data, "operation", "deploy")
-	
+
 	// Extract common parameters
 	request := &DeployRequest{
 		SessionID:   input.SessionID,
@@ -132,25 +131,25 @@ func (cmd *ConsolidatedDeployCommand) parseDeployInput(input api.ToolInput) (*De
 		Environment: deploy.Environment(getStringParam(input.Data, "environment", "development")),
 		Strategy:    deploy.DeploymentStrategy(getStringParam(input.Data, "strategy", "rolling")),
 		DeployOptions: DeployOptions{
-			ManifestPath:     getStringParam(input.Data, "manifest_path", ""),
-			DryRun:           getBoolParam(input.Data, "dry_run", false),
-			WaitForReady:     getBoolParam(input.Data, "wait_for_ready", true),
-			Timeout:          getDurationParam(input.Data, "timeout", 5*time.Minute),
-			Force:            getBoolParam(input.Data, "force", false),
-			IncludeIngress:   getBoolParam(input.Data, "include_ingress", false),
-			IngressHost:      getStringParam(input.Data, "ingress_host", ""),
-			CustomLabels:     getStringMapParam(input.Data, "labels"),
+			ManifestPath:      getStringParam(input.Data, "manifest_path", ""),
+			DryRun:            getBoolParam(input.Data, "dry_run", false),
+			WaitForReady:      getBoolParam(input.Data, "wait_for_ready", true),
+			Timeout:           getDurationParam(input.Data, "timeout", 5*time.Minute),
+			Force:             getBoolParam(input.Data, "force", false),
+			IncludeIngress:    getBoolParam(input.Data, "include_ingress", false),
+			IngressHost:       getStringParam(input.Data, "ingress_host", ""),
+			CustomLabels:      getStringMapParam(input.Data, "labels"),
 			CustomAnnotations: getStringMapParam(input.Data, "annotations"),
 		},
 		ResourceRequirements: ResourceRequirements{
-			CPU:    getStringParam(input.Data, "cpu_request", "100m"),
-			Memory: getStringParam(input.Data, "memory_request", "128Mi"),
-			CPULimit: getStringParam(input.Data, "cpu_limit", "500m"),
+			CPU:         getStringParam(input.Data, "cpu_request", "100m"),
+			Memory:      getStringParam(input.Data, "memory_request", "128Mi"),
+			CPULimit:    getStringParam(input.Data, "cpu_limit", "500m"),
 			MemoryLimit: getStringParam(input.Data, "memory_limit", "512Mi"),
 		},
-		Ports: cmd.parsePortsFromInput(input.Data),
+		Ports:       cmd.parsePortsFromInput(input.Data),
 		Environment: deploy.Environment(getStringParam(input.Data, "environment", "development")),
-		CreatedAt: time.Now(),
+		CreatedAt:   time.Now(),
 	}
 
 	// Validate required fields based on operation
@@ -205,7 +204,7 @@ func (cmd *ConsolidatedDeployCommand) validateDeployRequest(request *DeployReque
 
 	// Operation validation
 	validOperations := []string{"deploy", "generate_manifests", "rollback", "health_check"}
-	if !contains(validOperations, request.Operation) {
+	if !slices.Contains(validOperations, request.Operation) {
 		errors = append(errors, ValidationError{
 			Field:   "operation",
 			Message: fmt.Sprintf("operation must be one of: %s", strings.Join(validOperations, ", ")),
@@ -277,10 +276,10 @@ func (cmd *ConsolidatedDeployCommand) getSessionWorkspace(sessionID string) (str
 func (cmd *ConsolidatedDeployCommand) executeDeployment(ctx context.Context, request *DeployRequest, workspaceDir string) (*deploy.DeploymentResult, error) {
 	// Create deployment request from domain
 	deploymentRequest := &deploy.DeploymentRequest{
-		ID:        fmt.Sprintf("deploy-%d", time.Now().Unix()),
-		SessionID: request.SessionID,
-		Name:      request.Name,
-		Namespace: request.Namespace,
+		ID:          fmt.Sprintf("deploy-%d", time.Now().Unix()),
+		SessionID:   request.SessionID,
+		Name:        request.Name,
+		Namespace:   request.Namespace,
 		Environment: request.Environment,
 		Strategy:    request.Strategy,
 		Image:       request.Image,
@@ -323,8 +322,8 @@ func (cmd *ConsolidatedDeployCommand) executeDeployment(ctx context.Context, req
 func (cmd *ConsolidatedDeployCommand) executeGenerateManifests(ctx context.Context, request *DeployRequest, workspaceDir string) (*deploy.DeploymentResult, error) {
 	// Create manifest generation request from domain
 	manifestRequest := &deploy.ManifestGenerationRequest{
-		ID:        fmt.Sprintf("manifest-%d", time.Now().Unix()),
-		SessionID: request.SessionID,
+		ID:           fmt.Sprintf("manifest-%d", time.Now().Unix()),
+		SessionID:    request.SessionID,
 		TemplateType: deploy.TemplateTypeDeployment,
 		Configuration: deploy.DeploymentConfiguration{
 			Environment: request.DeployOptions.CustomLabels,
@@ -393,12 +392,12 @@ func (cmd *ConsolidatedDeployCommand) executeHealthCheck(ctx context.Context, re
 func (cmd *ConsolidatedDeployCommand) updateSessionState(sessionID string, result *deploy.DeploymentResult) error {
 	// Update session state with deploy results
 	stateUpdate := map[string]interface{}{
-		"last_deployment":    result,
-		"deployment_time":    time.Now(),
-		"deployment_success": result.Status == deploy.StatusCompleted,
-		"deployment_name":    result.Name,
+		"last_deployment":      result,
+		"deployment_time":      time.Now(),
+		"deployment_success":   result.Status == deploy.StatusCompleted,
+		"deployment_name":      result.Name,
 		"deployment_namespace": result.Namespace,
-		"deployment_duration": result.Duration,
+		"deployment_duration":  result.Duration,
 	}
 
 	return cmd.sessionState.UpdateSessionData(sessionID, stateUpdate)
@@ -407,18 +406,18 @@ func (cmd *ConsolidatedDeployCommand) updateSessionState(sessionID string, resul
 // createDeployResponse creates the final deploy response
 func (cmd *ConsolidatedDeployCommand) createDeployResponse(result *deploy.DeploymentResult, duration time.Duration) *ConsolidatedDeployResponse {
 	return &ConsolidatedDeployResponse{
-		Success:        result.Status == deploy.StatusCompleted,
-		DeploymentID:   result.DeploymentID,
-		Name:           result.Name,
-		Namespace:      result.Namespace,
-		Status:         string(result.Status),
-		Resources:      convertDeployedResources(result.Resources),
-		Endpoints:      convertEndpoints(result.Endpoints),
-		Events:         convertEvents(result.Events),
-		Duration:       result.Duration,
-		Error:          result.Error,
-		TotalDuration:  duration,
-		Metadata:       convertDeploymentMetadata(result.Metadata),
+		Success:       result.Status == deploy.StatusCompleted,
+		DeploymentID:  result.DeploymentID,
+		Name:          result.Name,
+		Namespace:     result.Namespace,
+		Status:        string(result.Status),
+		Resources:     convertDeployedResources(result.Resources),
+		Endpoints:     convertEndpoints(result.Endpoints),
+		Events:        convertEvents(result.Events),
+		Duration:      result.Duration,
+		Error:         result.Error,
+		TotalDuration: duration,
+		Metadata:      convertDeploymentMetadata(result.Metadata),
 	}
 }
 
@@ -550,8 +549,8 @@ func (cmd *ConsolidatedDeployCommand) Schema() api.ToolSchema {
 								"type": "integer",
 							},
 							"protocol": map[string]interface{}{
-								"type": "string",
-								"enum": []string{"TCP", "UDP"},
+								"type":    "string",
+								"enum":    []string{"TCP", "UDP"},
 								"default": "TCP",
 							},
 						},
@@ -583,19 +582,19 @@ func (cmd *ConsolidatedDeployCommand) Schema() api.ToolSchema {
 
 // DeployRequest represents a consolidated deploy request
 type DeployRequest struct {
-	SessionID            string                  `json:"session_id"`
-	Operation            string                  `json:"operation"`
-	Name                 string                  `json:"name"`
-	Namespace            string                  `json:"namespace"`
-	Image                string                  `json:"image"`
-	Tag                  string                  `json:"tag"`
-	Replicas             int                     `json:"replicas"`
-	Environment          deploy.Environment      `json:"environment"`
+	SessionID            string                    `json:"session_id"`
+	Operation            string                    `json:"operation"`
+	Name                 string                    `json:"name"`
+	Namespace            string                    `json:"namespace"`
+	Image                string                    `json:"image"`
+	Tag                  string                    `json:"tag"`
+	Replicas             int                       `json:"replicas"`
+	Environment          deploy.Environment        `json:"environment"`
 	Strategy             deploy.DeploymentStrategy `json:"strategy"`
-	DeployOptions        DeployOptions           `json:"deploy_options"`
-	ResourceRequirements ResourceRequirements    `json:"resource_requirements"`
-	Ports                []PortConfig            `json:"ports"`
-	CreatedAt            time.Time               `json:"created_at"`
+	DeployOptions        DeployOptions             `json:"deploy_options"`
+	ResourceRequirements ResourceRequirements      `json:"resource_requirements"`
+	Ports                []PortConfig              `json:"ports"`
+	CreatedAt            time.Time                 `json:"created_at"`
 }
 
 // DeployOptions contains deployment configuration options
@@ -671,12 +670,7 @@ type EventInfo struct {
 	Component string    `json:"component"`
 }
 
-// ValidationError represents deploy validation errors
-type ValidationError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-	Code    string `json:"code"`
-}
+// Note: ValidationError is defined in common.go
 
 // Helper functions for deploy operations
 
@@ -686,14 +680,14 @@ func isValidKubernetesName(name string) bool {
 	if name == "" || len(name) > 63 {
 		return false
 	}
-	
+
 	// Check for invalid characters
 	for _, char := range name {
 		if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
 			return false
 		}
 	}
-	
+
 	// Must start and end with alphanumeric
 	if len(name) > 0 {
 		first := name[0]
@@ -705,33 +699,16 @@ func isValidKubernetesName(name string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
-// isValidImageName validates Docker image name format
-func isValidImageName(name string) bool {
-	// Basic validation - can be enhanced with full Docker naming rules
-	if name == "" || len(name) > 255 {
-		return false
-	}
-	
-	// Check for invalid characters
-	for _, char := range name {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
-			 (char >= '0' && char <= '9') || char == '.' || char == '-' || 
-			 char == '_' || char == '/' || char == ':') {
-			return false
-		}
-	}
-	
-	return true
-}
+// Note: isValidImageName is defined in common.go
 
 // parsePortsFromInput parses port configurations from input data
 func (cmd *ConsolidatedDeployCommand) parsePortsFromInput(data map[string]interface{}) []PortConfig {
 	var ports []PortConfig
-	
+
 	if portsData, ok := data["ports"].([]interface{}); ok {
 		for _, portData := range portsData {
 			if portMap, ok := portData.(map[string]interface{}); ok {
@@ -745,7 +722,7 @@ func (cmd *ConsolidatedDeployCommand) parsePortsFromInput(data map[string]interf
 			}
 		}
 	}
-	
+
 	// Default port if none specified
 	if len(ports) == 0 {
 		ports = append(ports, PortConfig{
@@ -755,7 +732,7 @@ func (cmd *ConsolidatedDeployCommand) parsePortsFromInput(data map[string]interf
 			Protocol:   "TCP",
 		})
 	}
-	
+
 	return ports
 }
 
@@ -764,10 +741,10 @@ func (cmd *ConsolidatedDeployCommand) convertToDomainPorts(ports []PortConfig) [
 	domainPorts := make([]deploy.ServicePort, len(ports))
 	for i, port := range ports {
 		domainPorts[i] = deploy.ServicePort{
-			Name:       port.Name,
-			Port:       port.Port,
-			TargetPort: port.TargetPort,
-			Protocol:   deploy.Protocol(port.Protocol),
+			Name:        port.Name,
+			Port:        port.Port,
+			TargetPort:  port.TargetPort,
+			Protocol:    deploy.Protocol(port.Protocol),
 			ServiceType: deploy.ServiceTypeClusterIP,
 		}
 	}
@@ -840,56 +817,11 @@ func contains(slice []string, value string) bool {
 	return false
 }
 
-// getStringParam extracts a string parameter from input data
-func getStringParam(data map[string]interface{}, key, defaultValue string) string {
-	if value, ok := data[key].(string); ok {
-		return value
-	}
-	return defaultValue
-}
+// Note: Parameter extraction functions (getStringParam, getBoolParam, getIntParam) are defined in common.go
 
-// getBoolParam extracts a boolean parameter from input data
-func getBoolParam(data map[string]interface{}, key string, defaultValue bool) bool {
-	if value, ok := data[key].(bool); ok {
-		return value
-	}
-	return defaultValue
-}
+// Note: getDurationParam is defined in commands.go
 
-// getIntParam extracts an integer parameter from input data
-func getIntParam(data map[string]interface{}, key string, defaultValue int) int {
-	if value, ok := data[key].(int); ok {
-		return value
-	}
-	if value, ok := data[key].(float64); ok {
-		return int(value)
-	}
-	return defaultValue
-}
-
-// getDurationParam extracts a duration parameter from input data
-func getDurationParam(data map[string]interface{}, key string, defaultValue time.Duration) time.Duration {
-	if value, ok := data[key].(string); ok {
-		if duration, err := time.ParseDuration(value); err == nil {
-			return duration
-		}
-	}
-	return defaultValue
-}
-
-// getStringMapParam extracts a string map parameter from input data
-func getStringMapParam(data map[string]interface{}, key string) map[string]string {
-	if value, ok := data[key].(map[string]interface{}); ok {
-		result := make(map[string]string)
-		for k, v := range value {
-			if str, ok := v.(string); ok {
-				result[k] = str
-			}
-		}
-		return result
-	}
-	return make(map[string]string)
-}
+// Note: getStringMapParam can be added to common.go if needed
 
 // getStringFromMap extracts a string value from a map
 func getStringFromMap(data map[string]interface{}, key, defaultValue string) string {

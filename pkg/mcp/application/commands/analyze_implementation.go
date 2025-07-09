@@ -2,12 +2,12 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze"
 )
@@ -17,33 +17,33 @@ import (
 // detectLanguageByExtension detects language based on file extensions
 func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(workspaceDir string, languageMap map[string]int) error {
 	extensionMap := map[string]string{
-		".go":     "go",
-		".js":     "javascript",
-		".ts":     "typescript",
-		".py":     "python",
-		".java":   "java",
-		".cs":     "csharp",
-		".cpp":    "cpp",
-		".c":      "c",
-		".rb":     "ruby",
-		".php":    "php",
-		".rs":     "rust",
-		".kt":     "kotlin",
-		".swift":  "swift",
-		".scala":  "scala",
-		".sh":     "shell",
-		".ps1":    "powershell",
-		".yaml":   "yaml",
-		".yml":    "yaml",
-		".json":   "json",
-		".xml":    "xml",
-		".html":   "html",
-		".css":    "css",
-		".scss":   "scss",
-		".sass":   "sass",
-		".less":   "less",
-		".sql":    "sql",
-		".md":     "markdown",
+		".go":         "go",
+		".js":         "javascript",
+		".ts":         "typescript",
+		".py":         "python",
+		".java":       "java",
+		".cs":         "csharp",
+		".cpp":        "cpp",
+		".c":          "c",
+		".rb":         "ruby",
+		".php":        "php",
+		".rs":         "rust",
+		".kt":         "kotlin",
+		".swift":      "swift",
+		".scala":      "scala",
+		".sh":         "shell",
+		".ps1":        "powershell",
+		".yaml":       "yaml",
+		".yml":        "yaml",
+		".json":       "json",
+		".xml":        "xml",
+		".html":       "html",
+		".css":        "css",
+		".scss":       "scss",
+		".sass":       "sass",
+		".less":       "less",
+		".sql":        "sql",
+		".md":         "markdown",
 		".dockerfile": "dockerfile",
 		".Dockerfile": "dockerfile",
 	}
@@ -292,7 +292,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
 func (cmd *ConsolidatedAnalyzeCommand) detectPythonFramework(result *analyze.AnalysisResult, workspaceDir string) error {
 	// Check requirements.txt, setup.py, pyproject.toml
 	files := []string{"requirements.txt", "setup.py", "pyproject.toml", "Pipfile"}
-	
+
 	var content string
 	for _, file := range files {
 		filePath := filepath.Join(workspaceDir, file)
@@ -359,7 +359,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectPythonFramework(result *analyze.Ana
 func (cmd *ConsolidatedAnalyzeCommand) detectJavaFramework(result *analyze.AnalysisResult, workspaceDir string) error {
 	// Check pom.xml, build.gradle, build.gradle.kts
 	files := []string{"pom.xml", "build.gradle", "build.gradle.kts"}
-	
+
 	var content string
 	for _, file := range files {
 		filePath := filepath.Join(workspaceDir, file)
@@ -495,7 +495,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectDotNetFramework(result *analyze.Ana
 // analyzeGoDependencies analyzes Go dependencies
 func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
-	
+
 	goModPath := filepath.Join(workspaceDir, "go.mod")
 	if !fileExists(goModPath) {
 		return dependencies, nil
@@ -508,20 +508,20 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
 
 	scanner := bufio.NewScanner(strings.NewReader(string(content)))
 	inRequire := false
-	
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		if line == "require (" {
 			inRequire = true
 			continue
 		}
-		
+
 		if line == ")" {
 			inRequire = false
 			continue
 		}
-		
+
 		if inRequire || strings.HasPrefix(line, "require ") {
 			// Parse dependency line
 			parts := strings.Fields(line)
@@ -534,12 +534,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
 						continue
 					}
 				}
-				
+
 				version := parts[1]
 				if len(parts) >= 3 {
 					version = parts[2]
 				}
-				
+
 				dependencies = append(dependencies, analyze.Dependency{
 					Name:    name,
 					Version: version,
@@ -556,7 +556,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
 // analyzeNodeDependencies analyzes Node.js dependencies
 func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
-	
+
 	packageJSONPath := filepath.Join(workspaceDir, "package.json")
 	if !fileExists(packageJSONPath) {
 		return dependencies, nil
@@ -569,21 +569,21 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir stri
 	}
 
 	contentStr := string(content)
-	
+
 	// Simple regex-based parsing for dependencies
 	depPattern := regexp.MustCompile(`"([^"]+)":\s*"([^"]+)"`)
 	matches := depPattern.FindAllStringSubmatch(contentStr, -1)
-	
+
 	for _, match := range matches {
 		if len(match) == 3 {
 			name := match[1]
 			version := match[2]
-			
+
 			// Skip non-dependency entries
 			if name == "name" || name == "version" || name == "description" || name == "main" || name == "scripts" {
 				continue
 			}
-			
+
 			dependencies = append(dependencies, analyze.Dependency{
 				Name:    name,
 				Version: version,
@@ -599,7 +599,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir stri
 // analyzePythonDependencies analyzes Python dependencies
 func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
-	
+
 	reqPath := filepath.Join(workspaceDir, "requirements.txt")
 	if !fileExists(reqPath) {
 		return dependencies, nil
@@ -616,7 +616,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir st
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		// Parse requirement line (package==version or package>=version)
 		parts := regexp.MustCompile(`[>=<!=]+`).Split(line, 2)
 		if len(parts) >= 1 {
@@ -625,7 +625,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir st
 			if len(parts) >= 2 {
 				version = strings.TrimSpace(parts[1])
 			}
-			
+
 			dependencies = append(dependencies, analyze.Dependency{
 				Name:    name,
 				Version: version,
@@ -641,7 +641,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir st
 // analyzeJavaDependencies analyzes Java dependencies
 func (cmd *ConsolidatedAnalyzeCommand) analyzeJavaDependencies(workspaceDir string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
-	
+
 	// Check for Maven dependencies (pom.xml)
 	pomPath := filepath.Join(workspaceDir, "pom.xml")
 	if fileExists(pomPath) {
@@ -651,7 +651,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeJavaDependencies(workspaceDir stri
 		}
 		dependencies = append(dependencies, deps...)
 	}
-	
+
 	// Check for Gradle dependencies (build.gradle)
 	gradlePath := filepath.Join(workspaceDir, "build.gradle")
 	if fileExists(gradlePath) {
@@ -668,7 +668,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeJavaDependencies(workspaceDir stri
 // parseMavenDependencies parses Maven dependencies from pom.xml
 func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
-	
+
 	content, err := os.ReadFile(pomPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read pom.xml: %w", err)
@@ -677,13 +677,13 @@ func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([
 	// Simple regex-based parsing - in a real system you'd use XML parser
 	depPattern := regexp.MustCompile(`<groupId>([^<]+)</groupId>\s*<artifactId>([^<]+)</artifactId>\s*<version>([^<]+)</version>`)
 	matches := depPattern.FindAllStringSubmatch(string(content), -1)
-	
+
 	for _, match := range matches {
 		if len(match) == 4 {
 			groupId := match[1]
 			artifactId := match[2]
 			version := match[3]
-			
+
 			dependencies = append(dependencies, analyze.Dependency{
 				Name:    fmt.Sprintf("%s:%s", groupId, artifactId),
 				Version: version,
@@ -699,7 +699,7 @@ func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([
 // parseGradleDependencies parses Gradle dependencies from build.gradle
 func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
-	
+
 	content, err := os.ReadFile(gradlePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read build.gradle: %w", err)
@@ -708,19 +708,19 @@ func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string
 	// Simple regex-based parsing for Gradle dependencies
 	depPattern := regexp.MustCompile(`(?:implementation|compile|testImplementation|testCompile)\s+['"]([^'"]+)['"]`)
 	matches := depPattern.FindAllStringSubmatch(string(content), -1)
-	
+
 	for _, match := range matches {
 		if len(match) == 2 {
 			depString := match[1]
 			parts := strings.Split(depString, ":")
-			
+
 			if len(parts) >= 2 {
 				name := strings.Join(parts[:2], ":")
 				version := ""
 				if len(parts) >= 3 {
 					version = parts[2]
 				}
-				
+
 				dependencies = append(dependencies, analyze.Dependency{
 					Name:    name,
 					Version: version,
@@ -740,14 +740,14 @@ func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string
 func (cmd *ConsolidatedAnalyzeCommand) analyzeSecrets(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
 	// Implement secrets analysis using patterns
 	secretPatterns := map[string]*regexp.Regexp{
-		"AWS_ACCESS_KEY":    regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
-		"AWS_SECRET_KEY":    regexp.MustCompile(`[0-9a-zA-Z/+]{40}`),
-		"GITHUB_TOKEN":      regexp.MustCompile(`gh[pousr]_[A-Za-z0-9_]{36}`),
-		"PRIVATE_KEY":       regexp.MustCompile(`-----BEGIN [A-Z ]+PRIVATE KEY-----`),
-		"API_KEY":           regexp.MustCompile(`[aA][pP][iI]_?[kK][eE][yY].*['\"'][0-9a-zA-Z]{32,45}['\"']`),
-		"PASSWORD":          regexp.MustCompile(`[pP][aA][sS][sS][wW][oO][rR][dD].*['\"'][^'\"]{8,}['\"']`),
-		"DATABASE_URL":      regexp.MustCompile(`[a-zA-Z][a-zA-Z0-9+.-]*://[^\s]*`),
-		"JWT_SECRET":        regexp.MustCompile(`[jJ][wW][tT].*['\"'][A-Za-z0-9_-]{20,}['\"']`),
+		"AWS_ACCESS_KEY": regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
+		"AWS_SECRET_KEY": regexp.MustCompile(`[0-9a-zA-Z/+]{40}`),
+		"GITHUB_TOKEN":   regexp.MustCompile(`gh[pousr]_[A-Za-z0-9_]{36}`),
+		"PRIVATE_KEY":    regexp.MustCompile(`-----BEGIN [A-Z ]+PRIVATE KEY-----`),
+		"API_KEY":        regexp.MustCompile(`[aA][pP][iI]_?[kK][eE][yY].*['\"'][0-9a-zA-Z]{32,45}['\"']`),
+		"PASSWORD":       regexp.MustCompile(`[pP][aA][sS][sS][wW][oO][rR][dD].*['\"'][^'\"]{8,}['\"']`),
+		"DATABASE_URL":   regexp.MustCompile(`[a-zA-Z][a-zA-Z0-9+.-]*://[^\s]*`),
+		"JWT_SECRET":     regexp.MustCompile(`[jJ][wW][tT].*['\"'][A-Za-z0-9_-]{20,}['\"']`),
 	}
 
 	var secretsFound []analyze.SecurityIssue
@@ -775,7 +775,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeSecrets(ctx context.Context, resul
 			for _, match := range matches {
 				// Find line number
 				lineNum := cmd.findLineNumber(contentStr, match[0])
-				
+
 				secretsFound = append(secretsFound, analyze.SecurityIssue{
 					Type:        analyze.SecurityIssueTypeSecret,
 					Severity:    analyze.SeverityHigh,
@@ -803,9 +803,9 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeSecrets(ctx context.Context, resul
 func (cmd *ConsolidatedAnalyzeCommand) analyzeVulnerabilities(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
 	// Implement basic vulnerability analysis
 	// This would typically integrate with vulnerability databases
-	
+
 	var vulns []analyze.SecurityIssue
-	
+
 	// Check for known vulnerable patterns
 	vulnPatterns := map[string]struct {
 		pattern *regexp.Regexp
@@ -836,7 +836,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeVulnerabilities(ctx context.Contex
 		}
 
 		contentStr := string(content)
-		
+
 		for vulnType, vuln := range vulnPatterns {
 			if vuln.pattern.MatchString(contentStr) {
 				vulns = append(vulns, analyze.SecurityIssue{
@@ -865,9 +865,9 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeVulnerabilities(ctx context.Contex
 func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
 	// Implement compliance checks (OWASP, NIST, etc.)
 	// This is a simplified implementation
-	
+
 	complianceItems := []analyze.SecurityIssue{}
-	
+
 	// Check for license files
 	licenseFiles := []string{"LICENSE", "LICENSE.txt", "LICENSE.md", "COPYING"}
 	hasLicense := false
@@ -877,7 +877,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, re
 			break
 		}
 	}
-	
+
 	if !hasLicense {
 		complianceItems = append(complianceItems, analyze.SecurityIssue{
 			Type:        analyze.SecurityIssueTypeCompliance,
@@ -887,7 +887,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, re
 			Rule:        "LICENSE_REQUIRED",
 		})
 	}
-	
+
 	// Check for security policy
 	securityFiles := []string{"SECURITY.md", "SECURITY.txt", ".github/SECURITY.md"}
 	hasSecurity := false
@@ -897,7 +897,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, re
 			break
 		}
 	}
-	
+
 	if !hasSecurity {
 		complianceItems = append(complianceItems, analyze.SecurityIssue{
 			Type:        analyze.SecurityIssueTypeCompliance,
@@ -907,7 +907,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, re
 			Rule:        "SECURITY_POLICY_REQUIRED",
 		})
 	}
-	
+
 	result.SecurityIssues = append(result.SecurityIssues, complianceItems...)
 	return nil
 }
@@ -916,7 +916,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeCompliance(ctx context.Context, re
 func (cmd *ConsolidatedAnalyzeCommand) analyzeTests(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
 	// Implement test analysis
 	var testFrameworks []analyze.TestFramework
-	
+
 	// Language-specific test framework detection
 	switch result.Language.Name {
 	case "go":
@@ -935,7 +935,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeTests(ctx context.Context, result 
 	case "java":
 		testFrameworks = append(testFrameworks, cmd.detectJavaTestFrameworks(workspaceDir)...)
 	}
-	
+
 	result.TestFrameworks = testFrameworks
 	return nil
 }
@@ -944,32 +944,32 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeTests(ctx context.Context, result 
 func (cmd *ConsolidatedAnalyzeCommand) analyzeMetrics(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
 	// Implement code metrics analysis
 	// This would calculate complexity, maintainability index, etc.
-	
+
 	// For now, just add basic file metrics
 	var totalFiles, totalLines int
-	
+
 	err := filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || !cmd.isSourceFile(path) {
 			return nil
 		}
-		
+
 		totalFiles++
-		
+
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return nil
 		}
-		
+
 		lines := strings.Split(string(content), "\n")
 		totalLines += len(lines)
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("metrics analysis failed: %w", err)
 	}
-	
+
 	// Store metrics in analysis metadata
 	result.AnalysisMetadata.Metrics = map[string]interface{}{
 		"total_files": totalFiles,
@@ -981,7 +981,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeMetrics(ctx context.Context, resul
 			return float64(totalLines) / float64(totalFiles)
 		}(),
 	}
-	
+
 	return nil
 }
 
@@ -1001,26 +1001,26 @@ func (cmd *ConsolidatedAnalyzeCommand) parseDockerfile(path string) (*Dockerfile
 
 	scanner := bufio.NewScanner(strings.NewReader(string(content)))
 	lineNum := 0
-	
+
 	for scanner.Scan() {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
 			continue
 		}
-		
+
 		instruction := DockerfileInstruction{
 			Command: strings.ToUpper(parts[0]),
 			Args:    parts[1],
 			Line:    lineNum,
 		}
-		
+
 		dockerfile.Instructions = append(dockerfile.Instructions, instruction)
 	}
 
@@ -1030,7 +1030,7 @@ func (cmd *ConsolidatedAnalyzeCommand) parseDockerfile(path string) (*Dockerfile
 // analyzeDockerfileSecurity analyzes Dockerfile for security issues
 func (cmd *ConsolidatedAnalyzeCommand) analyzeDockerfileSecurity(dockerfile *DockerfileInfo) ([]analyze.SecurityIssue, error) {
 	var issues []analyze.SecurityIssue
-	
+
 	for _, instruction := range dockerfile.Instructions {
 		switch instruction.Command {
 		case "USER":
@@ -1071,17 +1071,17 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeDockerfileSecurity(dockerfile *Doc
 			}
 		}
 	}
-	
+
 	return issues, nil
 }
 
 // generateDockerfileRecommendations generates recommendations for Dockerfile
 func (cmd *ConsolidatedAnalyzeCommand) generateDockerfileRecommendations(dockerfile *DockerfileInfo) ([]analyze.Recommendation, error) {
 	var recommendations []analyze.Recommendation
-	
+
 	hasUser := false
 	hasHealthcheck := false
-	
+
 	for _, instruction := range dockerfile.Instructions {
 		switch instruction.Command {
 		case "USER":
@@ -1090,7 +1090,7 @@ func (cmd *ConsolidatedAnalyzeCommand) generateDockerfileRecommendations(dockerf
 			hasHealthcheck = true
 		}
 	}
-	
+
 	if !hasUser {
 		recommendations = append(recommendations, analyze.Recommendation{
 			Type:        analyze.RecommendationTypeSecurity,
@@ -1100,7 +1100,7 @@ func (cmd *ConsolidatedAnalyzeCommand) generateDockerfileRecommendations(dockerf
 			Category:    "dockerfile",
 		})
 	}
-	
+
 	if !hasHealthcheck {
 		recommendations = append(recommendations, analyze.Recommendation{
 			Type:        analyze.RecommendationTypeOperational,
@@ -1110,7 +1110,7 @@ func (cmd *ConsolidatedAnalyzeCommand) generateDockerfileRecommendations(dockerf
 			Category:    "dockerfile",
 		})
 	}
-	
+
 	return recommendations, nil
 }
 
@@ -1123,7 +1123,7 @@ func (cmd *ConsolidatedAnalyzeCommand) calculateConfidence(result *analyze.Analy
 		result.Language.Confidence,
 		float64(result.Framework.Confidence) / 3.0, // Convert to 0-1 scale
 	}
-	
+
 	// Add factors for completeness
 	if len(result.Dependencies) > 0 {
 		factors = append(factors, 0.8)
@@ -1134,14 +1134,14 @@ func (cmd *ConsolidatedAnalyzeCommand) calculateConfidence(result *analyze.Analy
 	if len(result.SecurityIssues) == 0 {
 		factors = append(factors, 0.9)
 	}
-	
+
 	// Calculate average
 	sum := 0.0
 	for _, factor := range factors {
 		sum += factor
 	}
 	avg := sum / float64(len(factors))
-	
+
 	// Convert to confidence level
 	if avg >= 0.8 {
 		result.Confidence = analyze.ConfidenceHigh
@@ -1155,7 +1155,7 @@ func (cmd *ConsolidatedAnalyzeCommand) calculateConfidence(result *analyze.Analy
 // generateRecommendations generates recommendations based on analysis
 func (cmd *ConsolidatedAnalyzeCommand) generateRecommendations(result *analyze.AnalysisResult) {
 	// Generate recommendations based on analysis results
-	
+
 	// Language-specific recommendations
 	if result.Language.Name == "go" && result.Framework.Name == "none" {
 		result.Recommendations = append(result.Recommendations, analyze.Recommendation{
@@ -1166,7 +1166,7 @@ func (cmd *ConsolidatedAnalyzeCommand) generateRecommendations(result *analyze.A
 			Category:    "framework",
 		})
 	}
-	
+
 	// Security recommendations
 	if len(result.SecurityIssues) > 0 {
 		result.Recommendations = append(result.Recommendations, analyze.Recommendation{
@@ -1177,7 +1177,7 @@ func (cmd *ConsolidatedAnalyzeCommand) generateRecommendations(result *analyze.A
 			Category:    "security",
 		})
 	}
-	
+
 	// Testing recommendations
 	if len(result.TestFrameworks) == 0 {
 		result.Recommendations = append(result.Recommendations, analyze.Recommendation{
@@ -1197,23 +1197,23 @@ func (cmd *ConsolidatedAnalyzeCommand) isTextFile(path string) bool {
 	// Simple heuristic for text files
 	ext := strings.ToLower(filepath.Ext(path))
 	textExts := []string{".go", ".js", ".ts", ".py", ".java", ".cs", ".cpp", ".c", ".rb", ".php", ".rs", ".kt", ".swift", ".scala", ".sh", ".ps1", ".yaml", ".yml", ".json", ".xml", ".html", ".css", ".scss", ".sass", ".less", ".sql", ".md", ".txt", ".dockerfile", ".gitignore", ".gitattributes"}
-	
+
 	for _, textExt := range textExts {
 		if ext == textExt {
 			return true
 		}
 	}
-	
+
 	// Check for files without extension
 	fileName := strings.ToLower(filepath.Base(path))
 	specialFiles := []string{"dockerfile", "makefile", "gemfile", "rakefile", "requirements.txt", "setup.py", "package.json", "pom.xml", "build.gradle", "cargo.toml", "go.mod", "go.sum"}
-	
+
 	for _, specialFile := range specialFiles {
 		if fileName == specialFile {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -1221,13 +1221,13 @@ func (cmd *ConsolidatedAnalyzeCommand) isTextFile(path string) bool {
 func (cmd *ConsolidatedAnalyzeCommand) isSourceFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	sourceExts := []string{".go", ".js", ".ts", ".py", ".java", ".cs", ".cpp", ".c", ".rb", ".php", ".rs", ".kt", ".swift", ".scala"}
-	
+
 	for _, sourceExt := range sourceExts {
 		if ext == sourceExt {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -1246,13 +1246,13 @@ func (cmd *ConsolidatedAnalyzeCommand) shouldSkipFile(path string) bool {
 		"/tmp/",
 		"/temp/",
 	}
-	
+
 	for _, pattern := range skipPatterns {
 		if strings.Contains(path, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -1262,21 +1262,9 @@ func (cmd *ConsolidatedAnalyzeCommand) findLineNumber(content string, pos int) i
 	return len(lines)
 }
 
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
+// Note: fileExists is defined in common.go
 
-// contains checks if a slice contains a string
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
+// Note: Use slices.Contains from standard library
 
 // Helper methods for test framework detection
 
@@ -1306,19 +1294,19 @@ func (cmd *ConsolidatedAnalyzeCommand) calculateGoCoverage(workspaceDir string) 
 // detectJSTestFrameworks detects JavaScript test frameworks
 func (cmd *ConsolidatedAnalyzeCommand) detectJSTestFrameworks(workspaceDir string) []analyze.TestFramework {
 	var frameworks []analyze.TestFramework
-	
+
 	packageJSONPath := filepath.Join(workspaceDir, "package.json")
 	if !fileExists(packageJSONPath) {
 		return frameworks
 	}
-	
+
 	content, err := os.ReadFile(packageJSONPath)
 	if err != nil {
 		return frameworks
 	}
-	
+
 	contentStr := string(content)
-	
+
 	testFrameworks := []struct {
 		name    string
 		pattern string
@@ -1331,7 +1319,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSTestFrameworks(workspaceDir strin
 		{"playwright", "\"playwright\":", analyze.TestFrameworkTypeE2E},
 		{"puppeteer", "\"puppeteer\":", analyze.TestFrameworkTypeE2E},
 	}
-	
+
 	for _, fw := range testFrameworks {
 		if strings.Contains(contentStr, fw.pattern) {
 			frameworks = append(frameworks, analyze.TestFramework{
@@ -1342,21 +1330,21 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSTestFrameworks(workspaceDir strin
 			})
 		}
 	}
-	
+
 	return frameworks
 }
 
 // detectPythonTestFrameworks detects Python test frameworks
 func (cmd *ConsolidatedAnalyzeCommand) detectPythonTestFrameworks(workspaceDir string) []analyze.TestFramework {
 	var frameworks []analyze.TestFramework
-	
+
 	// Check requirements.txt
 	reqPath := filepath.Join(workspaceDir, "requirements.txt")
 	if fileExists(reqPath) {
 		content, err := os.ReadFile(reqPath)
 		if err == nil {
 			contentStr := strings.ToLower(string(content))
-			
+
 			testFrameworks := []struct {
 				name    string
 				pattern string
@@ -1367,7 +1355,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectPythonTestFrameworks(workspaceDir s
 				{"nose", "nose", analyze.TestFrameworkTypeUnit},
 				{"selenium", "selenium", analyze.TestFrameworkTypeE2E},
 			}
-			
+
 			for _, fw := range testFrameworks {
 				if strings.Contains(contentStr, fw.pattern) {
 					frameworks = append(frameworks, analyze.TestFramework{
@@ -1380,17 +1368,17 @@ func (cmd *ConsolidatedAnalyzeCommand) detectPythonTestFrameworks(workspaceDir s
 			}
 		}
 	}
-	
+
 	return frameworks
 }
 
 // detectJavaTestFrameworks detects Java test frameworks
 func (cmd *ConsolidatedAnalyzeCommand) detectJavaTestFrameworks(workspaceDir string) []analyze.TestFramework {
 	var frameworks []analyze.TestFramework
-	
+
 	// Check pom.xml and build.gradle
 	files := []string{"pom.xml", "build.gradle"}
-	
+
 	for _, file := range files {
 		filePath := filepath.Join(workspaceDir, file)
 		if fileExists(filePath) {
@@ -1398,9 +1386,9 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJavaTestFrameworks(workspaceDir str
 			if err != nil {
 				continue
 			}
-			
+
 			contentStr := strings.ToLower(string(content))
-			
+
 			testFrameworks := []struct {
 				name    string
 				pattern string
@@ -1411,7 +1399,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJavaTestFrameworks(workspaceDir str
 				{"mockito", "mockito", analyze.TestFrameworkTypeUnit},
 				{"selenium", "selenium", analyze.TestFrameworkTypeE2E},
 			}
-			
+
 			for _, fw := range testFrameworks {
 				if strings.Contains(contentStr, fw.pattern) {
 					frameworks = append(frameworks, analyze.TestFramework{
@@ -1424,7 +1412,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJavaTestFrameworks(workspaceDir str
 			}
 		}
 	}
-	
+
 	return frameworks
 }
 
@@ -1443,18 +1431,4 @@ type DockerfileInstruction struct {
 	Line    int
 }
 
-// getStringSliceParam extracts string slice parameter from input data
-func getStringSliceParam(params map[string]interface{}, key string) []string {
-	if val, exists := params[key]; exists {
-		if slice, ok := val.([]interface{}); ok {
-			result := make([]string, len(slice))
-			for i, item := range slice {
-				if str, ok := item.(string); ok {
-					result[i] = str
-				}
-			}
-			return result
-		}
-	}
-	return []string{}
-}
+// Note: getStringSliceParam is defined in common.go

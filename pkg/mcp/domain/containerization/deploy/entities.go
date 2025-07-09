@@ -8,19 +8,19 @@ import (
 
 // DeploymentRequest represents a request to deploy containerized applications
 type DeploymentRequest struct {
-	ID           string                 `json:"id"`
-	SessionID    string                 `json:"session_id"`
-	Name         string                 `json:"name"`
-	Namespace    string                 `json:"namespace"`
-	Environment  Environment            `json:"environment"`
-	Strategy     DeploymentStrategy     `json:"strategy"`
-	Image        string                 `json:"image"`
-	Tag          string                 `json:"tag"`
-	Replicas     int                    `json:"replicas"`
-	Resources    ResourceRequirements   `json:"resources"`
+	ID            string                  `json:"id"`
+	SessionID     string                  `json:"session_id"`
+	Name          string                  `json:"name"`
+	Namespace     string                  `json:"namespace"`
+	Environment   Environment             `json:"environment"`
+	Strategy      DeploymentStrategy      `json:"strategy"`
+	Image         string                  `json:"image"`
+	Tag           string                  `json:"tag"`
+	Replicas      int                     `json:"replicas"`
+	Resources     ResourceRequirements    `json:"resources"`
 	Configuration DeploymentConfiguration `json:"configuration"`
-	Options      DeploymentOptions      `json:"options"`
-	CreatedAt    time.Time              `json:"created_at"`
+	Options       DeploymentOptions       `json:"options"`
+	CreatedAt     time.Time               `json:"created_at"`
 }
 
 // Environment represents a deployment environment
@@ -37,11 +37,11 @@ const (
 type DeploymentStrategy string
 
 const (
-	StrategyRolling    DeploymentStrategy = "rolling"
-	StrategyRecreate   DeploymentStrategy = "recreate"
-	StrategyBlueGreen  DeploymentStrategy = "blue_green"
-	StrategyCanary     DeploymentStrategy = "canary"
-	StrategyABTesting  DeploymentStrategy = "ab_testing"
+	StrategyRolling   DeploymentStrategy = "rolling"
+	StrategyRecreate  DeploymentStrategy = "recreate"
+	StrategyBlueGreen DeploymentStrategy = "blue_green"
+	StrategyCanary    DeploymentStrategy = "canary"
+	StrategyABTesting DeploymentStrategy = "ab_testing"
 )
 
 // ResourceRequirements defines resource limits and requests
@@ -59,13 +59,13 @@ type ResourceSpec struct {
 
 // DeploymentConfiguration contains deployment-specific configuration
 type DeploymentConfiguration struct {
-	Environment    map[string]string    `json:"environment,omitempty"`
-	Secrets        []SecretReference    `json:"secrets,omitempty"`
-	ConfigMaps     []ConfigMapReference `json:"config_maps,omitempty"`
-	Volumes        []VolumeMount        `json:"volumes,omitempty"`
-	Ports          []ServicePort        `json:"ports,omitempty"`
-	HealthChecks   HealthCheckConfig    `json:"health_checks,omitempty"`
-	SecurityContext SecurityContext     `json:"security_context,omitempty"`
+	Environment     map[string]string    `json:"environment,omitempty"`
+	Secrets         []SecretReference    `json:"secrets,omitempty"`
+	ConfigMaps      []ConfigMapReference `json:"config_maps,omitempty"`
+	Volumes         []VolumeMount        `json:"volumes,omitempty"`
+	Ports           []ServicePort        `json:"ports,omitempty"`
+	HealthChecks    HealthCheckConfig    `json:"health_checks,omitempty"`
+	SecurityContext SecurityContext      `json:"security_context,omitempty"`
 }
 
 // SecretReference represents a reference to a secret
@@ -86,12 +86,12 @@ type ConfigMapReference struct {
 
 // VolumeMount represents a volume mount
 type VolumeMount struct {
-	Name        string     `json:"name"`
-	MountPath   string     `json:"mount_path"`
-	VolumeType  VolumeType `json:"volume_type"`
-	Size        string     `json:"size,omitempty"`
-	AccessMode  string     `json:"access_mode,omitempty"`
-	StorageClass string    `json:"storage_class,omitempty"`
+	Name         string     `json:"name"`
+	MountPath    string     `json:"mount_path"`
+	VolumeType   VolumeType `json:"volume_type"`
+	Size         string     `json:"size,omitempty"`
+	AccessMode   string     `json:"access_mode,omitempty"`
+	StorageClass string     `json:"storage_class,omitempty"`
 }
 
 // VolumeType represents the type of volume
@@ -107,10 +107,10 @@ const (
 
 // ServicePort represents a service port
 type ServicePort struct {
-	Name       string      `json:"name"`
-	Port       int         `json:"port"`
-	TargetPort int         `json:"target_port"`
-	Protocol   Protocol    `json:"protocol"`
+	Name        string      `json:"name"`
+	Port        int         `json:"port"`
+	TargetPort  int         `json:"target_port"`
+	Protocol    Protocol    `json:"protocol"`
 	ServiceType ServiceType `json:"service_type,omitempty"`
 }
 
@@ -126,8 +126,8 @@ const (
 type ServiceType string
 
 const (
-	ServiceTypeClusterIP   ServiceType = "ClusterIP"
-	ServiceTypeNodePort    ServiceType = "NodePort"
+	ServiceTypeClusterIP    ServiceType = "ClusterIP"
+	ServiceTypeNodePort     ServiceType = "NodePort"
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
@@ -163,13 +163,13 @@ const (
 
 // SecurityContext defines security settings
 type SecurityContext struct {
-	RunAsUser         *int64           `json:"run_as_user,omitempty"`
-	RunAsGroup        *int64           `json:"run_as_group,omitempty"`
-	RunAsNonRoot      *bool            `json:"run_as_non_root,omitempty"`
-	ReadOnlyRootFS    *bool            `json:"read_only_root_fs,omitempty"`
-	AllowPrivilegeEsc *bool            `json:"allow_privilege_escalation,omitempty"`
-	Capabilities      *Capabilities    `json:"capabilities,omitempty"`
-	SELinuxOptions    *SELinuxOptions  `json:"selinux_options,omitempty"`
+	RunAsUser         *int64          `json:"run_as_user,omitempty"`
+	RunAsGroup        *int64          `json:"run_as_group,omitempty"`
+	RunAsNonRoot      *bool           `json:"run_as_non_root,omitempty"`
+	ReadOnlyRootFS    *bool           `json:"read_only_root_fs,omitempty"`
+	AllowPrivilegeEsc *bool           `json:"allow_privilege_escalation,omitempty"`
+	Capabilities      *Capabilities   `json:"capabilities,omitempty"`
+	SELinuxOptions    *SELinuxOptions `json:"selinux_options,omitempty"`
 }
 
 // Capabilities defines Linux capabilities
@@ -188,31 +188,31 @@ type SELinuxOptions struct {
 
 // DeploymentOptions contains additional deployment options
 type DeploymentOptions struct {
-	DryRun              bool          `json:"dry_run,omitempty"`
-	Timeout             time.Duration `json:"timeout,omitempty"`
-	RollbackOnFailure   bool          `json:"rollback_on_failure,omitempty"`
-	WaitForReady        bool          `json:"wait_for_ready,omitempty"`
-	ProgressDeadline    time.Duration `json:"progress_deadline,omitempty"`
-	RevisionHistoryLimit *int         `json:"revision_history_limit,omitempty"`
-	Annotations         map[string]string `json:"annotations,omitempty"`
-	Labels              map[string]string `json:"labels,omitempty"`
+	DryRun               bool              `json:"dry_run,omitempty"`
+	Timeout              time.Duration     `json:"timeout,omitempty"`
+	RollbackOnFailure    bool              `json:"rollback_on_failure,omitempty"`
+	WaitForReady         bool              `json:"wait_for_ready,omitempty"`
+	ProgressDeadline     time.Duration     `json:"progress_deadline,omitempty"`
+	RevisionHistoryLimit *int              `json:"revision_history_limit,omitempty"`
+	Annotations          map[string]string `json:"annotations,omitempty"`
+	Labels               map[string]string `json:"labels,omitempty"`
 }
 
 // DeploymentResult represents the result of a deployment operation
 type DeploymentResult struct {
-	DeploymentID string           `json:"deployment_id"`
-	RequestID    string           `json:"request_id"`
-	SessionID    string           `json:"session_id"`
-	Name         string           `json:"name"`
-	Namespace    string           `json:"namespace"`
-	Status       DeploymentStatus `json:"status"`
-	Resources    DeployedResources `json:"resources"`
-	Endpoints    []Endpoint       `json:"endpoints"`
-	Events       []DeploymentEvent `json:"events"`
-	Error        string           `json:"error,omitempty"`
-	Duration     time.Duration    `json:"duration"`
-	CreatedAt    time.Time        `json:"created_at"`
-	CompletedAt  *time.Time       `json:"completed_at,omitempty"`
+	DeploymentID string             `json:"deployment_id"`
+	RequestID    string             `json:"request_id"`
+	SessionID    string             `json:"session_id"`
+	Name         string             `json:"name"`
+	Namespace    string             `json:"namespace"`
+	Status       DeploymentStatus   `json:"status"`
+	Resources    DeployedResources  `json:"resources"`
+	Endpoints    []Endpoint         `json:"endpoints"`
+	Events       []DeploymentEvent  `json:"events"`
+	Error        string             `json:"error,omitempty"`
+	Duration     time.Duration      `json:"duration"`
+	CreatedAt    time.Time          `json:"created_at"`
+	CompletedAt  *time.Time         `json:"completed_at,omitempty"`
 	Metadata     DeploymentMetadata `json:"metadata"`
 }
 
@@ -220,13 +220,13 @@ type DeploymentResult struct {
 type DeploymentStatus string
 
 const (
-	StatusPending    DeploymentStatus = "pending"
-	StatusDeploying  DeploymentStatus = "deploying"
-	StatusRunning    DeploymentStatus = "running"
-	StatusCompleted  DeploymentStatus = "completed"
-	StatusFailed     DeploymentStatus = "failed"
-	StatusRolledBack DeploymentStatus = "rolled_back"
-	StatusUpdating   DeploymentStatus = "updating"
+	StatusPending     DeploymentStatus = "pending"
+	StatusDeploying   DeploymentStatus = "deploying"
+	StatusRunning     DeploymentStatus = "running"
+	StatusCompleted   DeploymentStatus = "completed"
+	StatusFailed      DeploymentStatus = "failed"
+	StatusRolledBack  DeploymentStatus = "rolled_back"
+	StatusUpdating    DeploymentStatus = "updating"
 	StatusTerminating DeploymentStatus = "terminating"
 )
 
@@ -261,12 +261,12 @@ const (
 
 // DeploymentEvent represents an event during deployment
 type DeploymentEvent struct {
-	Timestamp time.Time  `json:"timestamp"`
-	Type      EventType  `json:"type"`
-	Reason    string     `json:"reason"`
-	Message   string     `json:"message"`
-	Component string     `json:"component,omitempty"`
-	Count     int        `json:"count,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+	Type      EventType `json:"type"`
+	Reason    string    `json:"reason"`
+	Message   string    `json:"message"`
+	Component string    `json:"component,omitempty"`
+	Count     int       `json:"count,omitempty"`
 }
 
 // EventType represents the type of deployment event
@@ -280,20 +280,20 @@ const (
 
 // DeploymentMetadata contains additional deployment information
 type DeploymentMetadata struct {
-	Strategy        DeploymentStrategy    `json:"strategy"`
-	Environment     Environment           `json:"environment"`
-	ImageDigest     string                `json:"image_digest,omitempty"`
-	PreviousVersion string                `json:"previous_version,omitempty"`
-	ResourceUsage   ResourceUsage         `json:"resource_usage"`
-	ScalingInfo     ScalingInfo           `json:"scaling_info"`
-	NetworkInfo     NetworkInfo           `json:"network_info"`
-	SecurityScan    *SecurityScanResult   `json:"security_scan,omitempty"`
+	Strategy        DeploymentStrategy  `json:"strategy"`
+	Environment     Environment         `json:"environment"`
+	ImageDigest     string              `json:"image_digest,omitempty"`
+	PreviousVersion string              `json:"previous_version,omitempty"`
+	ResourceUsage   ResourceUsage       `json:"resource_usage"`
+	ScalingInfo     ScalingInfo         `json:"scaling_info"`
+	NetworkInfo     NetworkInfo         `json:"network_info"`
+	SecurityScan    *SecurityScanResult `json:"security_scan,omitempty"`
 }
 
 // ResourceUsage represents actual resource consumption
 type ResourceUsage struct {
-	CPU    string `json:"cpu"`
-	Memory string `json:"memory"`
+	CPU     string `json:"cpu"`
+	Memory  string `json:"memory"`
 	Storage string `json:"storage,omitempty"`
 }
 
@@ -307,34 +307,34 @@ type ScalingInfo struct {
 
 // NetworkInfo contains network-related deployment information
 type NetworkInfo struct {
-	ClusterIP   string   `json:"cluster_ip,omitempty"`
-	ExternalIPs []string `json:"external_ips,omitempty"`
+	ClusterIP    string            `json:"cluster_ip,omitempty"`
+	ExternalIPs  []string          `json:"external_ips,omitempty"`
 	LoadBalancer *LoadBalancerInfo `json:"load_balancer,omitempty"`
-	Ingress     []IngressInfo     `json:"ingress,omitempty"`
+	Ingress      []IngressInfo     `json:"ingress,omitempty"`
 }
 
 // LoadBalancerInfo contains load balancer information
 type LoadBalancerInfo struct {
-	IP       string   `json:"ip,omitempty"`
-	Hostname string   `json:"hostname,omitempty"`
-	Ports    []int    `json:"ports,omitempty"`
+	IP       string `json:"ip,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
+	Ports    []int  `json:"ports,omitempty"`
 }
 
 // IngressInfo contains ingress information
 type IngressInfo struct {
-	Name  string `json:"name"`
-	Host  string `json:"host"`
-	Path  string `json:"path,omitempty"`
-	TLS   bool   `json:"tls"`
+	Name string `json:"name"`
+	Host string `json:"host"`
+	Path string `json:"path,omitempty"`
+	TLS  bool   `json:"tls"`
 }
 
 // SecurityScanResult represents deployment security scan results
 type SecurityScanResult struct {
-	Scanner     string              `json:"scanner"`
-	ScanTime    time.Time           `json:"scan_time"`
-	Passed      bool                `json:"passed"`
-	Issues      []SecurityIssue     `json:"issues"`
-	Compliance  ComplianceResult    `json:"compliance"`
+	Scanner    string           `json:"scanner"`
+	ScanTime   time.Time        `json:"scan_time"`
+	Passed     bool             `json:"passed"`
+	Issues     []SecurityIssue  `json:"issues"`
+	Compliance ComplianceResult `json:"compliance"`
 }
 
 // SecurityIssue represents a security issue in deployment
@@ -372,10 +372,10 @@ const (
 
 // ComplianceResult represents compliance check results
 type ComplianceResult struct {
-	Framework string             `json:"framework"`
-	Passed    bool               `json:"passed"`
-	Score     float64            `json:"score"`
-	Checks    []ComplianceCheck  `json:"checks"`
+	Framework string            `json:"framework"`
+	Passed    bool              `json:"passed"`
+	Score     float64           `json:"score"`
+	Checks    []ComplianceCheck `json:"checks"`
 }
 
 // ComplianceCheck represents a single compliance check
@@ -399,16 +399,16 @@ type RollbackRequest struct {
 
 // RollbackResult represents the result of a rollback operation
 type RollbackResult struct {
-	RollbackID   string           `json:"rollback_id"`
-	RequestID    string           `json:"request_id"`
-	DeploymentID string           `json:"deployment_id"`
-	FromRevision int              `json:"from_revision"`
-	ToRevision   int              `json:"to_revision"`
-	Status       RollbackStatus   `json:"status"`
-	Error        string           `json:"error,omitempty"`
-	Duration     time.Duration    `json:"duration"`
-	CreatedAt    time.Time        `json:"created_at"`
-	CompletedAt  *time.Time       `json:"completed_at,omitempty"`
+	RollbackID   string         `json:"rollback_id"`
+	RequestID    string         `json:"request_id"`
+	DeploymentID string         `json:"deployment_id"`
+	FromRevision int            `json:"from_revision"`
+	ToRevision   int            `json:"to_revision"`
+	Status       RollbackStatus `json:"status"`
+	Error        string         `json:"error,omitempty"`
+	Duration     time.Duration  `json:"duration"`
+	CreatedAt    time.Time      `json:"created_at"`
+	CompletedAt  *time.Time     `json:"completed_at,omitempty"`
 }
 
 // RollbackStatus represents the status of a rollback operation
@@ -423,14 +423,14 @@ const (
 
 // ManifestGenerationRequest represents a request to generate Kubernetes manifests
 type ManifestGenerationRequest struct {
-	ID              string                 `json:"id"`
-	SessionID       string                 `json:"session_id"`
-	TemplateType    TemplateType           `json:"template_type"`
+	ID              string                  `json:"id"`
+	SessionID       string                  `json:"session_id"`
+	TemplateType    TemplateType            `json:"template_type"`
 	Configuration   DeploymentConfiguration `json:"configuration"`
-	ResourceReqs    ResourceRequirements   `json:"resource_requirements"`
-	CustomTemplates map[string]string      `json:"custom_templates,omitempty"`
-	Options         ManifestOptions        `json:"options"`
-	CreatedAt       time.Time              `json:"created_at"`
+	ResourceReqs    ResourceRequirements    `json:"resource_requirements"`
+	CustomTemplates map[string]string       `json:"custom_templates,omitempty"`
+	Options         ManifestOptions         `json:"options"`
+	CreatedAt       time.Time               `json:"created_at"`
 }
 
 // TemplateType represents the type of manifest template
@@ -458,14 +458,14 @@ type ManifestOptions struct {
 
 // ManifestGenerationResult represents the result of manifest generation
 type ManifestGenerationResult struct {
-	GenerationID string                 `json:"generation_id"`
-	RequestID    string                 `json:"request_id"`
-	Manifests    map[string]string      `json:"manifests"`
-	Status       ManifestStatus         `json:"status"`
-	Validation   ManifestValidation     `json:"validation,omitempty"`
-	Error        string                 `json:"error,omitempty"`
-	Duration     time.Duration          `json:"duration"`
-	CreatedAt    time.Time              `json:"created_at"`
+	GenerationID string             `json:"generation_id"`
+	RequestID    string             `json:"request_id"`
+	Manifests    map[string]string  `json:"manifests"`
+	Status       ManifestStatus     `json:"status"`
+	Validation   ManifestValidation `json:"validation,omitempty"`
+	Error        string             `json:"error,omitempty"`
+	Duration     time.Duration      `json:"duration"`
+	CreatedAt    time.Time          `json:"created_at"`
 }
 
 // ManifestStatus represents the status of manifest generation
@@ -478,9 +478,9 @@ const (
 
 // ManifestValidation represents manifest validation results
 type ManifestValidation struct {
-	Valid   bool                    `json:"valid"`
-	Errors  []ValidationError       `json:"errors,omitempty"`
-	Warnings []ValidationWarning    `json:"warnings,omitempty"`
+	Valid    bool                `json:"valid"`
+	Errors   []ValidationError   `json:"errors,omitempty"`
+	Warnings []ValidationWarning `json:"warnings,omitempty"`
 }
 
 // ValidationError represents a manifest validation error

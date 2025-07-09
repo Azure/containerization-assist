@@ -5,50 +5,49 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConsolidatedScanCommand consolidates all scan tool functionality into a single command
 // This replaces the 33 files in pkg/mcp/tools/scan/ with a unified implementation
 type ConsolidatedScanCommand struct {
-	sessionStore     services.SessionStore
-	sessionState     services.SessionState
-	dockerClient     docker.Client
-	secretDiscovery  *security.SecretDiscovery
-	logger           *slog.Logger
+	sessionStore    services.SessionStore
+	sessionState    services.SessionState
+	dockerClient    services.DockerClient
+	secretDiscovery *security.SecretDiscovery
+	logger          *slog.Logger
 }
 
 // NewConsolidatedScanCommand creates a new consolidated scan command
 func NewConsolidatedScanCommand(
 	sessionStore services.SessionStore,
 	sessionState services.SessionState,
-	dockerClient docker.Client,
+	dockerClient services.DockerClient,
 	logger *slog.Logger,
 ) *ConsolidatedScanCommand {
 	// Initialize security services
 	secretDiscovery := security.NewSecretDiscovery(logger)
-	
+
 	return &ConsolidatedScanCommand{
-		sessionStore:     sessionStore,
-		sessionState:     sessionState,
-		dockerClient:     dockerClient,
-		secretDiscovery:  secretDiscovery,
-		logger:           logger,
+		sessionStore:    sessionStore,
+		sessionState:    sessionState,
+		dockerClient:    dockerClient,
+		secretDiscovery: secretDiscovery,
+		logger:          logger,
 	}
 }
 
 // Execute performs scan operations with full functionality from original tools
 func (cmd *ConsolidatedScanCommand) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
 	startTime := time.Now()
-	
+
 	// Extract and validate input parameters
 	scanRequest, err := cmd.parseScanInput(input)
 	if err != nil {
@@ -124,7 +123,7 @@ func (cmd *ConsolidatedScanCommand) Execute(ctx context.Context, input api.ToolI
 func (cmd *ConsolidatedScanCommand) parseScanInput(input api.ToolInput) (*ScanRequest, error) {
 	// Extract scan type
 	scanType := getStringParam(input.Data, "scan_type", "image_security")
-	
+
 	// Extract common parameters
 	request := &ScanRequest{
 		SessionID:         input.SessionID,
@@ -197,7 +196,7 @@ func (cmd *ConsolidatedScanCommand) validateScanRequest(request *ScanRequest) []
 
 	// Scan type validation
 	validScanTypes := []string{"image_security", "secrets", "vulnerabilities", "combined"}
-	if !contains(validScanTypes, request.ScanType) {
+	if !slices.Contains(validScanTypes, request.ScanType) {
 		errors = append(errors, ValidationError{
 			Field:   "scan_type",
 			Message: fmt.Sprintf("scan type must be one of: %s", strings.Join(validScanTypes, ", ")),
@@ -207,7 +206,7 @@ func (cmd *ConsolidatedScanCommand) validateScanRequest(request *ScanRequest) []
 
 	// Severity threshold validation
 	validSeverities := []string{"low", "medium", "high", "critical"}
-	if !contains(validSeverities, request.SeverityThreshold) {
+	if !slices.Contains(validSeverities, request.SeverityThreshold) {
 		errors = append(errors, ValidationError{
 			Field:   "severity_threshold",
 			Message: fmt.Sprintf("severity threshold must be one of: %s", strings.Join(validSeverities, ", ")),
@@ -265,13 +264,13 @@ func (cmd *ConsolidatedScanCommand) executeScanImageSecurity(ctx context.Context
 
 	// Create consolidated result
 	result := &ConsolidatedScanResult{
-		ScanID:            fmt.Sprintf("image-scan-%d", time.Now().Unix()),
-		SessionID:         request.SessionID,
-		ScanType:          request.ScanType,
-		Target:            request.ImageRef,
-		Status:            "completed",
+		ScanID:             fmt.Sprintf("image-scan-%d", time.Now().Unix()),
+		SessionID:          request.SessionID,
+		ScanType:           request.ScanType,
+		Target:             request.ImageRef,
+		Status:             "completed",
 		SecurityScanResult: scanResult,
-		CreatedAt:         time.Now(),
+		CreatedAt:          time.Now(),
 	}
 
 	return result, nil
@@ -287,13 +286,13 @@ func (cmd *ConsolidatedScanCommand) executeScanSecrets(ctx context.Context, requ
 
 	// Create consolidated result
 	result := &ConsolidatedScanResult{
-		ScanID:         fmt.Sprintf("secrets-scan-%d", time.Now().Unix()),
-		SessionID:      request.SessionID,
-		ScanType:       request.ScanType,
-		Target:         request.Path,
-		Status:         "completed",
+		ScanID:            fmt.Sprintf("secrets-scan-%d", time.Now().Unix()),
+		SessionID:         request.SessionID,
+		ScanType:          request.ScanType,
+		Target:            request.Path,
+		Status:            "completed",
 		SecretsScanResult: scanResult,
-		CreatedAt:      time.Now(),
+		CreatedAt:         time.Now(),
 	}
 
 	return result, nil
@@ -371,12 +370,12 @@ func (cmd *ConsolidatedScanCommand) executeCombinedScan(ctx context.Context, req
 func (cmd *ConsolidatedScanCommand) updateSessionState(sessionID string, result *ConsolidatedScanResult) error {
 	// Update session state with scan results
 	stateUpdate := map[string]interface{}{
-		"last_scan":         result,
-		"scan_time":         time.Now(),
-		"scan_success":      result.Status == "completed",
-		"scan_type":         result.ScanType,
-		"scan_target":       result.Target,
-		"scan_duration":     result.Duration,
+		"last_scan":     result,
+		"scan_time":     time.Now(),
+		"scan_success":  result.Status == "completed",
+		"scan_type":     result.ScanType,
+		"scan_target":   result.Target,
+		"scan_duration": result.Duration,
 	}
 
 	return cmd.sessionState.UpdateSessionData(sessionID, stateUpdate)
@@ -385,15 +384,15 @@ func (cmd *ConsolidatedScanCommand) updateSessionState(sessionID string, result 
 // createScanResponse creates the final scan response
 func (cmd *ConsolidatedScanCommand) createScanResponse(result *ConsolidatedScanResult, duration time.Duration) *ConsolidatedScanResponse {
 	response := &ConsolidatedScanResponse{
-		Success:        result.Status == "completed",
-		ScanID:         result.ScanID,
-		ScanType:       result.ScanType,
-		Target:         result.Target,
-		Status:         result.Status,
-		Duration:       result.Duration,
-		Error:          result.Error,
-		TotalDuration:  duration,
-		Metadata:       convertScanMetadata(result.Metadata),
+		Success:       result.Status == "completed",
+		ScanID:        result.ScanID,
+		ScanType:      result.ScanType,
+		Target:        result.Target,
+		Status:        result.Status,
+		Duration:      result.Duration,
+		Error:         result.Error,
+		TotalDuration: duration,
+		Metadata:      convertScanMetadata(result.Metadata),
 	}
 
 	// Add scan-specific results
@@ -533,14 +532,14 @@ func (cmd *ConsolidatedScanCommand) Schema() api.ToolSchema {
 
 // ScanRequest represents a consolidated scan request
 type ScanRequest struct {
-	SessionID         string        `json:"session_id"`
-	ScanType          string        `json:"scan_type"`
-	Target            string        `json:"target"`
-	ImageRef          string        `json:"image_ref"`
-	Path              string        `json:"path"`
-	SeverityThreshold string        `json:"severity_threshold"`
-	ScanOptions       ScanOptions   `json:"scan_options"`
-	CreatedAt         time.Time     `json:"created_at"`
+	SessionID         string      `json:"session_id"`
+	ScanType          string      `json:"scan_type"`
+	Target            string      `json:"target"`
+	ImageRef          string      `json:"image_ref"`
+	Path              string      `json:"path"`
+	SeverityThreshold string      `json:"severity_threshold"`
+	ScanOptions       ScanOptions `json:"scan_options"`
+	CreatedAt         time.Time   `json:"created_at"`
 }
 
 // ScanOptions contains scan configuration options
@@ -567,8 +566,8 @@ type ConsolidatedScanResult struct {
 	ScanType           string                   `json:"scan_type"`
 	Target             string                   `json:"target"`
 	Status             string                   `json:"status"`
-	SecurityScanResult *SecurityScanResult     `json:"security_scan_result,omitempty"`
-	SecretsScanResult  *SecretsScanResult      `json:"secrets_scan_result,omitempty"`
+	SecurityScanResult *SecurityScanResult      `json:"security_scan_result,omitempty"`
+	SecretsScanResult  *SecretsScanResult       `json:"secrets_scan_result,omitempty"`
 	VulnScanResult     *VulnerabilityScanResult `json:"vulnerability_scan_result,omitempty"`
 	Duration           time.Duration            `json:"duration"`
 	Error              string                   `json:"error,omitempty"`
@@ -578,30 +577,30 @@ type ConsolidatedScanResult struct {
 
 // SecurityScanResult represents security scan results
 type SecurityScanResult struct {
-	ImageRef         string               `json:"image_ref"`
-	Vulnerabilities  []VulnerabilityInfo  `json:"vulnerabilities"`
-	Secrets          []SecretInfo         `json:"secrets"`
-	Compliance       ComplianceInfo       `json:"compliance"`
-	SecurityScore    int                  `json:"security_score"`
-	RiskLevel        string               `json:"risk_level"`
-	Recommendations  []SecurityRecommendation `json:"recommendations"`
-	RemediationPlan  *RemediationPlan     `json:"remediation_plan,omitempty"`
+	ImageRef        string                   `json:"image_ref"`
+	Vulnerabilities []VulnerabilityInfo      `json:"vulnerabilities"`
+	Secrets         []SecretInfo             `json:"secrets"`
+	Compliance      ComplianceInfo           `json:"compliance"`
+	SecurityScore   int                      `json:"security_score"`
+	RiskLevel       string                   `json:"risk_level"`
+	Recommendations []SecurityRecommendation `json:"recommendations"`
+	RemediationPlan *RemediationPlan         `json:"remediation_plan,omitempty"`
 }
 
 // SecretsScanResult represents secrets scan results
 type SecretsScanResult struct {
-	Path          string       `json:"path"`
-	Secrets       []SecretInfo `json:"secrets"`
-	FilesScanned  int          `json:"files_scanned"`
-	SecretsFound  int          `json:"secrets_found"`
-	HighRiskCount int          `json:"high_risk_count"`
+	Path          string         `json:"path"`
+	Secrets       []SecretInfo   `json:"secrets"`
+	FilesScanned  int            `json:"files_scanned"`
+	SecretsFound  int            `json:"secrets_found"`
+	HighRiskCount int            `json:"high_risk_count"`
 	Summary       SecretsSummary `json:"summary"`
 }
 
 // VulnerabilityScanResult represents vulnerability scan results
 type VulnerabilityScanResult struct {
-	Target          string              `json:"target"`
-	Vulnerabilities []VulnerabilityInfo `json:"vulnerabilities"`
+	Target          string               `json:"target"`
+	Vulnerabilities []VulnerabilityInfo  `json:"vulnerabilities"`
 	Summary         VulnerabilitySummary `json:"summary"`
 	CriticalCount   int                  `json:"critical_count"`
 	HighCount       int                  `json:"high_count"`
@@ -611,27 +610,27 @@ type VulnerabilityScanResult struct {
 
 // ConsolidatedScanResponse represents the consolidated scan response
 type ConsolidatedScanResponse struct {
-	Success       bool                        `json:"success"`
-	ScanID        string                      `json:"scan_id"`
-	ScanType      string                      `json:"scan_type"`
-	Target        string                      `json:"target"`
-	Status        string                      `json:"status"`
-	SecurityScan  *SecurityScanInfo           `json:"security_scan,omitempty"`
-	SecretsScan   *SecretsScanInfo            `json:"secrets_scan,omitempty"`
-	VulnScan      *VulnerabilityScanInfo      `json:"vulnerability_scan,omitempty"`
-	Duration      time.Duration               `json:"duration"`
-	Error         string                      `json:"error,omitempty"`
-	TotalDuration time.Duration               `json:"total_duration"`
-	Metadata      map[string]interface{}      `json:"metadata"`
+	Success       bool                   `json:"success"`
+	ScanID        string                 `json:"scan_id"`
+	ScanType      string                 `json:"scan_type"`
+	Target        string                 `json:"target"`
+	Status        string                 `json:"status"`
+	SecurityScan  *SecurityScanInfo      `json:"security_scan,omitempty"`
+	SecretsScan   *SecretsScanInfo       `json:"secrets_scan,omitempty"`
+	VulnScan      *VulnerabilityScanInfo `json:"vulnerability_scan,omitempty"`
+	Duration      time.Duration          `json:"duration"`
+	Error         string                 `json:"error,omitempty"`
+	TotalDuration time.Duration          `json:"total_duration"`
+	Metadata      map[string]interface{} `json:"metadata"`
 }
 
 // SecurityScanInfo represents security scan information
 type SecurityScanInfo struct {
-	ImageRef        string               `json:"image_ref"`
-	VulnCount       int                  `json:"vulnerability_count"`
-	SecretsCount    int                  `json:"secrets_count"`
-	SecurityScore   int                  `json:"security_score"`
-	RiskLevel       string               `json:"risk_level"`
+	ImageRef        string                   `json:"image_ref"`
+	VulnCount       int                      `json:"vulnerability_count"`
+	SecretsCount    int                      `json:"secrets_count"`
+	SecurityScore   int                      `json:"security_score"`
+	RiskLevel       string                   `json:"risk_level"`
 	Recommendations []SecurityRecommendation `json:"recommendations"`
 }
 
@@ -671,22 +670,22 @@ type VulnerabilityInfo struct {
 
 // SecretInfo represents secret information
 type SecretInfo struct {
-	Type        string                 `json:"type"`
-	File        string                 `json:"file"`
-	Line        int                    `json:"line"`
-	Pattern     string                 `json:"pattern"`
-	Value       string                 `json:"value"`
-	Severity    string                 `json:"severity"`
-	Confidence  float64                `json:"confidence"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Type       string                 `json:"type"`
+	File       string                 `json:"file"`
+	Line       int                    `json:"line"`
+	Pattern    string                 `json:"pattern"`
+	Value      string                 `json:"value"`
+	Severity   string                 `json:"severity"`
+	Confidence float64                `json:"confidence"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 // ComplianceInfo represents compliance information
 type ComplianceInfo struct {
-	Framework string             `json:"framework"`
-	Passed    bool               `json:"passed"`
-	Score     float64            `json:"score"`
-	Checks    []ComplianceCheck  `json:"checks"`
+	Framework string            `json:"framework"`
+	Passed    bool              `json:"passed"`
+	Score     float64           `json:"score"`
+	Checks    []ComplianceCheck `json:"checks"`
 }
 
 // ComplianceCheck represents a compliance check
@@ -711,11 +710,11 @@ type SecurityRecommendation struct {
 
 // RemediationPlan represents a remediation plan
 type RemediationPlan struct {
-	ID          string             `json:"id"`
-	Priority    string             `json:"priority"`
-	Effort      string             `json:"effort"`
-	Steps       []RemediationStep  `json:"steps"`
-	Estimated   time.Duration      `json:"estimated_time"`
+	ID        string            `json:"id"`
+	Priority  string            `json:"priority"`
+	Effort    string            `json:"effort"`
+	Steps     []RemediationStep `json:"steps"`
+	Estimated time.Duration     `json:"estimated_time"`
 }
 
 // RemediationStep represents a remediation step
@@ -741,19 +740,19 @@ type SecretsSummary struct {
 
 // VulnerabilitySummary represents vulnerability scan summary
 type VulnerabilitySummary struct {
-	TotalVulns        int                    `json:"total_vulnerabilities"`
-	BySeverity        map[string]int         `json:"by_severity"`
-	ByPackage         map[string]int         `json:"by_package"`
-	FixableCount      int                    `json:"fixable_count"`
-	AgeAnalysis       AgeAnalysis            `json:"age_analysis"`
-	Metadata          map[string]interface{} `json:"metadata"`
+	TotalVulns   int                    `json:"total_vulnerabilities"`
+	BySeverity   map[string]int         `json:"by_severity"`
+	ByPackage    map[string]int         `json:"by_package"`
+	FixableCount int                    `json:"fixable_count"`
+	AgeAnalysis  AgeAnalysis            `json:"age_analysis"`
+	Metadata     map[string]interface{} `json:"metadata"`
 }
 
 // AgeAnalysis represents vulnerability age analysis
 type AgeAnalysis struct {
-	AverageAge   time.Duration `json:"average_age"`
-	OldestVuln   time.Duration `json:"oldest_vulnerability"`
-	NewestVuln   time.Duration `json:"newest_vulnerability"`
+	AverageAge   time.Duration  `json:"average_age"`
+	OldestVuln   time.Duration  `json:"oldest_vulnerability"`
+	NewestVuln   time.Duration  `json:"newest_vulnerability"`
 	Distribution map[string]int `json:"distribution"`
 }
 
@@ -765,16 +764,16 @@ func isValidImageRef(imageRef string) bool {
 	if imageRef == "" || len(imageRef) > 255 {
 		return false
 	}
-	
+
 	// Check for invalid characters
 	for _, char := range imageRef {
-		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
-			 (char >= '0' && char <= '9') || char == '.' || char == '-' || 
-			 char == '_' || char == '/' || char == ':') {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') || char == '.' || char == '-' ||
+			char == '_' || char == '/' || char == ':') {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -784,7 +783,7 @@ func isValidPath(path string) bool {
 	if path == "" {
 		return false
 	}
-	
+
 	// Check for valid absolute or relative path
 	if !filepath.IsAbs(path) && !strings.HasPrefix(path, "./") && !strings.HasPrefix(path, "../") {
 		// Relative path without explicit relative prefix
@@ -792,23 +791,11 @@ func isValidPath(path string) bool {
 			return true
 		}
 	}
-	
+
 	return filepath.IsAbs(path)
 }
 
-// getStringArrayParam extracts a string array parameter from input data
-func getStringArrayParam(data map[string]interface{}, key string) []string {
-	if value, ok := data[key].([]interface{}); ok {
-		result := make([]string, len(value))
-		for i, v := range value {
-			if str, ok := v.(string); ok {
-				result[i] = str
-			}
-		}
-		return result
-	}
-	return []string{}
-}
+// Note: getStringArrayParam is defined in commands.go
 
 // convertScanMetadata converts scan metadata to response format
 func convertScanMetadata(metadata map[string]interface{}) map[string]interface{} {
@@ -823,7 +810,7 @@ func convertSecurityScanResult(result *SecurityScanResult) *SecurityScanInfo {
 	if result == nil {
 		return nil
 	}
-	
+
 	return &SecurityScanInfo{
 		ImageRef:        result.ImageRef,
 		VulnCount:       len(result.Vulnerabilities),
@@ -839,7 +826,7 @@ func convertSecretsScanResult(result *SecretsScanResult) *SecretsScanInfo {
 	if result == nil {
 		return nil
 	}
-	
+
 	return &SecretsScanInfo{
 		Path:          result.Path,
 		FilesScanned:  result.FilesScanned,
@@ -854,7 +841,7 @@ func convertVulnScanResult(result *VulnerabilityScanResult) *VulnerabilityScanIn
 	if result == nil {
 		return nil
 	}
-	
+
 	return &VulnerabilityScanInfo{
 		Target:        result.Target,
 		VulnCount:     len(result.Vulnerabilities),

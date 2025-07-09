@@ -110,16 +110,16 @@ func (dr *DeploymentRequest) Validate() []DomainValidationError {
 
 // IsCompleted returns true if the deployment has completed
 func (dr *DeploymentResult) IsCompleted() bool {
-	return dr.Status == StatusCompleted || 
-		   dr.Status == StatusFailed || 
-		   dr.Status == StatusRolledBack
+	return dr.Status == StatusCompleted ||
+		dr.Status == StatusFailed ||
+		dr.Status == StatusRolledBack
 }
 
 // IsHealthy returns true if the deployment is running and healthy
 func (dr *DeploymentResult) IsHealthy() bool {
-	return dr.Status == StatusRunning && 
-		   dr.Metadata.ScalingInfo.ReadyReplicas > 0 &&
-		   dr.Metadata.ScalingInfo.ReadyReplicas == dr.Metadata.ScalingInfo.DesiredReplicas
+	return dr.Status == StatusRunning &&
+		dr.Metadata.ScalingInfo.ReadyReplicas > 0 &&
+		dr.Metadata.ScalingInfo.ReadyReplicas == dr.Metadata.ScalingInfo.DesiredReplicas
 }
 
 // NeedsScaling returns true if the deployment needs scaling
@@ -324,7 +324,7 @@ func isValidKubernetesName(name string) bool {
 	if len(name) == 0 || len(name) > 63 {
 		return false
 	}
-	
+
 	// Kubernetes name pattern: lowercase alphanumeric, dashes, starts/ends with alphanumeric
 	pattern := `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`
 	matched, err := regexp.MatchString(pattern, name)
@@ -339,7 +339,7 @@ func isValidEnvironment(env Environment) bool {
 		EnvironmentProduction,
 		EnvironmentTest,
 	}
-	
+
 	for _, validEnv := range validEnvs {
 		if env == validEnv {
 			return true
@@ -357,7 +357,7 @@ func isValidDeploymentStrategy(strategy DeploymentStrategy) bool {
 		StrategyCanary,
 		StrategyABTesting,
 	}
-	
+
 	for _, validStrategy := range validStrategies {
 		if strategy == validStrategy {
 			return true
@@ -524,10 +524,10 @@ func isValidResourceQuantity(quantity string) bool {
 	// Simplified validation for resource quantities (CPU: m, cores; Memory: Ki, Mi, Gi, etc.)
 	cpuPattern := `^[0-9]+[m]?$|^[0-9]*\.?[0-9]+$`
 	memoryPattern := `^[0-9]+[KMGTPE]i?$`
-	
+
 	cpuMatch, _ := regexp.MatchString(cpuPattern, quantity)
 	memoryMatch, _ := regexp.MatchString(memoryPattern, quantity)
-	
+
 	return cpuMatch || memoryMatch
 }
 

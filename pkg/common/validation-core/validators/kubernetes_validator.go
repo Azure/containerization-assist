@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
-	errors "github.com/Azure/container-kit/pkg/mcp/errors"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // This file contains the main KubernetesValidator interface and coordination logic.

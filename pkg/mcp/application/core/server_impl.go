@@ -12,16 +12,13 @@ import (
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/core"
-	mcptypes "github.com/Azure/container-kit/pkg/mcp/core"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/application/internal/runtime"
 	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline"
-	"github.com/Azure/container-kit/pkg/mcp/internal/runtime"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/session"
-	"github.com/Azure/container-kit/pkg/mcp/application/commands"
-	"github.com/Azure/container-kit/pkg/mcp/infra/transport"
-	"github.com/Azure/container-kit/pkg/mcp/application/workflows"
+	workflow "github.com/Azure/container-kit/pkg/mcp/application/workflows"
+	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/Azure/container-kit/pkg/runner"
 	"github.com/localrivet/gomcp/server"
 	"github.com/rs/zerolog"
@@ -372,20 +369,28 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 	// )
 	var toolOrchestrator api.Orchestrator // Temporary nil value
 
+	// Check if transport factory is provided
+	if config.TransportFactory == nil {
+		return nil, errors.NewError().
+			Message("transport factory not configured").
+			Code(errors.CodeInternalError).
+			Build()
+	}
+
 	var mcpTransport interface{}
 	switch config.TransportType {
 	case "stdio":
-		mcpTransport = transport.NewStdioTransport()
+		mcpTransport = config.TransportFactory.CreateStdioTransport()
 	case "http":
-		mcpTransport = transport.NewHTTPTransport(transport.HTTPTransportConfig{
-			Port:           config.HTTPPort,
-			CORSOrigins:    config.CORSOrigins,
-			APIKey:         config.APIKey,
-			RateLimit:      config.RateLimit,
-			Logger:         logger.With("component", "http_transport"),
-			LogBodies:      config.LogHTTPBodies,
-			MaxBodyLogSize: config.MaxBodyLogSize,
-			LogLevel:       config.LogLevel,
+		mcpTransport = config.TransportFactory.CreateHTTPTransport(map[string]interface{}{
+			"Port":           config.HTTPPort,
+			"CORSOrigins":    config.CORSOrigins,
+			"APIKey":         config.APIKey,
+			"RateLimit":      config.RateLimit,
+			"Logger":         logger.With("component", "http_transport"),
+			"LogBodies":      config.LogHTTPBodies,
+			"MaxBodyLogSize": config.MaxBodyLogSize,
+			"LogLevel":       config.LogLevel,
 		})
 	default:
 		return nil, errors.NewError().Messagef("unsupported transport type: %s", config.TransportType).WithLocation().Build()

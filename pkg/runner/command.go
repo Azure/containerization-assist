@@ -6,7 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/Azure/container-kit/pkg/logger"
-	mcperrors "github.com/Azure/container-kit/pkg/mcp/errors"
+	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // CommandRunner is an interface for executing commands and getting the output/error

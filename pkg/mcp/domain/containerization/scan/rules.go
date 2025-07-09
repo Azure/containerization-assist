@@ -73,10 +73,10 @@ func (sr *ScanRequest) Validate() []ValidationError {
 
 // IsCompleted returns true if the scan has completed
 func (sr *ScanResult) IsCompleted() bool {
-	return sr.Status == ScanStatusCompleted || 
-		   sr.Status == ScanStatusFailed || 
-		   sr.Status == ScanStatusCancelled ||
-		   sr.Status == ScanStatusTimeout
+	return sr.Status == ScanStatusCompleted ||
+		sr.Status == ScanStatusFailed ||
+		sr.Status == ScanStatusCancelled ||
+		sr.Status == ScanStatusTimeout
 }
 
 // IsSuccessful returns true if the scan completed successfully
@@ -261,7 +261,7 @@ func isValidTargetType(targetType TargetType) bool {
 		TargetTypeFilesystem,
 		TargetTypeContainer,
 	}
-	
+
 	for _, validType := range validTypes {
 		if targetType == validType {
 			return true
@@ -281,7 +281,7 @@ func isValidScanType(scanType ScanType) bool {
 		ScanTypeLicense,
 		ScanTypeComprehensive,
 	}
-	
+
 	for _, validType := range validTypes {
 		if scanType == validType {
 			return true

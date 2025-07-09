@@ -260,7 +260,7 @@ func ensureErrorsImport(fileAst *ast.File) error {
 	mcpErrorsImported := false
 
 	for _, imp := range fileAst.Imports {
-		if imp.Path.Value == `"github.com/Azure/container-kit/pkg/mcp/errors"` {
+		if imp.Path.Value == `"github.com/Azure/container-kit/pkg/mcp/domain/errors"` {
 			mcpErrorsImported = true
 		}
 	}
@@ -272,7 +272,7 @@ func ensureErrorsImport(fileAst *ast.File) error {
 			Name: &ast.Ident{Name: "mcperrors"},
 			Path: &ast.BasicLit{
 				Kind:  token.STRING,
-				Value: `"github.com/Azure/container-kit/pkg/mcp/errors"`,
+				Value: `"github.com/Azure/container-kit/pkg/mcp/domain/errors"`,
 			},
 		}
 

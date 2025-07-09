@@ -122,4 +122,4 @@ See [SECURITY.md](SECURITY.md) for security policy and reporting vulnerabilities
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
 - **Discussions**: Use GitHub Discussions for questions and help
-- **Documentation**: Check the [Tool Guide](docs/TOOL_GUIDE.md) and [Architecture Guide](docs/ARCHITECTURE.md)
+- **Documentation**: Check the [Tool Guide](docs/TOOL_GUIDE.md) and [Architecture Guide](docs/architecture/THREE_LAYER_ARCHITECTURE.md)

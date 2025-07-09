@@ -97,10 +97,10 @@ func (br *BuildRequest) Validate() []ValidationError {
 
 // IsCompleted returns true if the build has completed (successfully or with failure)
 func (br *BuildResult) IsCompleted() bool {
-	return br.Status == BuildStatusCompleted || 
-		   br.Status == BuildStatusFailed || 
-		   br.Status == BuildStatusCancelled ||
-		   br.Status == BuildStatusTimeout
+	return br.Status == BuildStatusCompleted ||
+		br.Status == BuildStatusFailed ||
+		br.Status == BuildStatusCancelled ||
+		br.Status == BuildStatusTimeout
 }
 
 // IsSuccessful returns true if the build completed successfully
@@ -110,9 +110,9 @@ func (br *BuildResult) IsSuccessful() bool {
 
 // CanBeCancelled returns true if the build can be cancelled
 func (br *BuildResult) CanBeCancelled() bool {
-	return br.Status == BuildStatusPending || 
-		   br.Status == BuildStatusQueued || 
-		   br.Status == BuildStatusRunning
+	return br.Status == BuildStatusPending ||
+		br.Status == BuildStatusQueued ||
+		br.Status == BuildStatusRunning
 }
 
 // GetCriticalVulnerabilities returns vulnerabilities with critical severity
@@ -184,9 +184,9 @@ func (br *BuildResult) GetOptimizationRecommendations() []OptimizationRecommenda
 	// Size-based recommendations
 	if br.Size > 1024*1024*1024 { // > 1GB
 		recommendations = append(recommendations, OptimizationRecommendation{
-			Type:        OptimizationTypeMultiStage,
-			Priority:    PriorityHigh,
-			Description: "Use multi-stage builds to reduce final image size",
+			Type:             OptimizationTypeMultiStage,
+			Priority:         PriorityHigh,
+			Description:      "Use multi-stage builds to reduce final image size",
 			PotentialSavings: "Up to 80% size reduction",
 		})
 	}
@@ -194,9 +194,9 @@ func (br *BuildResult) GetOptimizationRecommendations() []OptimizationRecommenda
 	// Layer-based recommendations
 	if br.Metadata.Layers > 20 {
 		recommendations = append(recommendations, OptimizationRecommendation{
-			Type:        OptimizationTypeLayerMerging,
-			Priority:    PriorityMedium,
-			Description: "Combine RUN commands to reduce layer count",
+			Type:             OptimizationTypeLayerMerging,
+			Priority:         PriorityMedium,
+			Description:      "Combine RUN commands to reduce layer count",
 			PotentialSavings: fmt.Sprintf("Reduce from %d to ~10 layers", br.Metadata.Layers),
 		})
 	}
@@ -206,9 +206,9 @@ func (br *BuildResult) GetOptimizationRecommendations() []OptimizationRecommenda
 		cacheHitRate := float64(br.Metadata.CacheHits) / float64(br.Metadata.CacheHits+br.Metadata.CacheMisses)
 		if cacheHitRate < 0.5 {
 			recommendations = append(recommendations, OptimizationRecommendation{
-				Type:        OptimizationTypeCache,
-				Priority:    PriorityMedium,
-				Description: "Reorder Dockerfile commands to improve cache utilization",
+				Type:             OptimizationTypeCache,
+				Priority:         PriorityMedium,
+				Description:      "Reorder Dockerfile commands to improve cache utilization",
 				PotentialSavings: "Faster builds through better caching",
 			})
 		}
@@ -217,9 +217,9 @@ func (br *BuildResult) GetOptimizationRecommendations() []OptimizationRecommenda
 	// Security-based recommendations
 	if br.HasSecurityIssues(SeverityHigh) {
 		recommendations = append(recommendations, OptimizationRecommendation{
-			Type:        OptimizationTypeBaseImage,
-			Priority:    PriorityHigh,
-			Description: "Update to a more secure base image",
+			Type:             OptimizationTypeBaseImage,
+			Priority:         PriorityHigh,
+			Description:      "Update to a more secure base image",
 			PotentialSavings: "Eliminate high/critical security vulnerabilities",
 		})
 	}
@@ -325,14 +325,14 @@ func isValidPlatform(platform string) bool {
 	if len(parts) != 2 {
 		return false
 	}
-	
+
 	validOS := map[string]bool{
 		"linux": true, "windows": true, "darwin": true,
 	}
 	validArch := map[string]bool{
 		"amd64": true, "arm64": true, "arm": true, "386": true,
 	}
-	
+
 	return validOS[parts[0]] && validArch[parts[1]]
 }
 
@@ -341,9 +341,9 @@ func isValidPlatform(platform string) bool {
 // CalculateResourceRequirements estimates resource needs for a build
 func CalculateResourceRequirements(req *BuildRequest) ResourceRequirements {
 	requirements := ResourceRequirements{
-		CPU:    "1",      // 1 CPU core default
-		Memory: "2Gi",    // 2GB RAM default
-		Disk:   "10Gi",   // 10GB disk default
+		CPU:    "1",    // 1 CPU core default
+		Memory: "2Gi",  // 2GB RAM default
+		Disk:   "10Gi", // 10GB disk default
 	}
 
 	// Increase requirements for complex builds

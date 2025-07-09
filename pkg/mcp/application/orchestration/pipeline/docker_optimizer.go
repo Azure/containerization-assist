@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/docker"
-	"github.com/Azure/container-kit/pkg/mcp/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
 )
 

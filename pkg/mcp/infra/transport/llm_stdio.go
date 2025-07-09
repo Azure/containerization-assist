@@ -7,7 +7,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/Azure/container-kit/pkg/mcp/internal/types"
 	"github.com/rs/zerolog"
 )
 

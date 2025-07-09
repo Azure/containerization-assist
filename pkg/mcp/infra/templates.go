@@ -1,16 +1,17 @@
 package infra
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
-	"path/filepath"
-	"text/template"
-	"bytes"
 	"log/slog"
+	"path/filepath"
 	"strings"
+	"text/template"
 )
 
 // Template filesystem embeddings
+//
 //go:embed templates/workflows/*.yaml
 var workflowTemplates embed.FS
 
@@ -26,7 +27,7 @@ var pipelineTemplates embed.FS
 //go:embed templates/components/*.yaml
 var componentTemplates embed.FS
 
-//go:embed templates/dockerfiles/*
+//go:embed templates/*.tmpl templates/Dockerfile
 var dockerfileTemplates embed.FS
 
 // TemplateManager manages template operations for infrastructure
@@ -47,12 +48,12 @@ func NewTemplateManager(logger *slog.Logger) *TemplateManager {
 type TemplateType string
 
 const (
-	TemplateTypeWorkflow    TemplateType = "workflow"
-	TemplateTypeManifest    TemplateType = "manifest"
-	TemplateTypeStage       TemplateType = "stage"
-	TemplateTypePipeline    TemplateType = "pipeline"
-	TemplateTypeComponent   TemplateType = "component"
-	TemplateTypeDockerfile  TemplateType = "dockerfile"
+	TemplateTypeWorkflow   TemplateType = "workflow"
+	TemplateTypeManifest   TemplateType = "manifest"
+	TemplateTypeStage      TemplateType = "stage"
+	TemplateTypePipeline   TemplateType = "pipeline"
+	TemplateTypeComponent  TemplateType = "component"
+	TemplateTypeDockerfile TemplateType = "dockerfile"
 )
 
 // TemplateRenderParams represents template rendering parameters
@@ -75,8 +76,8 @@ type TemplateRenderResult struct {
 
 // RenderTemplate renders a template with variables
 func (tm *TemplateManager) RenderTemplate(params TemplateRenderParams) (*TemplateRenderResult, error) {
-	tm.logger.Info("Rendering template", 
-		"name", params.Name, 
+	tm.logger.Info("Rendering template",
+		"name", params.Name,
 		"type", params.Type)
 
 	// Get template content
@@ -120,9 +121,9 @@ func (tm *TemplateManager) RenderTemplate(params TemplateRenderParams) (*Templat
 		Success:  true,
 	}
 
-	tm.logger.Info("Template rendered successfully", 
-		"name", result.Name, 
-		"type", result.Type, 
+	tm.logger.Info("Template rendered successfully",
+		"name", result.Name,
+		"type", result.Type,
 		"size", len(result.Content))
 
 	return result, nil
@@ -254,7 +255,7 @@ type TemplateMetadata struct {
 // extractTemplateVariables extracts template variables from content
 func (tm *TemplateManager) extractTemplateVariables(content string) []string {
 	var variables []string
-	
+
 	// Simple regex-based extraction for Go template variables
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
@@ -274,7 +275,7 @@ func (tm *TemplateManager) extractTemplateVariables(content string) []string {
 			}
 		}
 	}
-	
+
 	return variables
 }
 
@@ -309,46 +310,46 @@ func NewDockerfileGenerator(logger *slog.Logger) *DockerfileGenerator {
 
 // GenerateDockerfileParams represents Dockerfile generation parameters
 type GenerateDockerfileParams struct {
-	Language    string
-	Framework   string
-	BaseImage   string
-	WorkingDir  string
-	Ports       []int
-	Commands    []string
-	Variables   map[string]interface{}
-	OutputPath  string
+	Language   string
+	Framework  string
+	BaseImage  string
+	WorkingDir string
+	Ports      []int
+	Commands   []string
+	Variables  map[string]interface{}
+	OutputPath string
 }
 
 // GenerateDockerfileResult represents Dockerfile generation result
 type GenerateDockerfileResult struct {
-	Language    string
-	Framework   string
-	Content     string
-	FilePath    string
-	Success     bool
-	Error       string
-	Template    string
+	Language  string
+	Framework string
+	Content   string
+	FilePath  string
+	Success   bool
+	Error     string
+	Template  string
 }
 
 // GenerateDockerfile generates a Dockerfile based on language and framework
 func (dg *DockerfileGenerator) GenerateDockerfile(params GenerateDockerfileParams) (*GenerateDockerfileResult, error) {
-	dg.logger.Info("Generating Dockerfile", 
-		"language", params.Language, 
+	dg.logger.Info("Generating Dockerfile",
+		"language", params.Language,
 		"framework", params.Framework)
 
 	// Determine template name based on language and framework
 	templateName := dg.getDockerfileTemplateName(params.Language, params.Framework)
-	
+
 	// Prepare template variables
 	templateVars := map[string]interface{}{
-		"BaseImage":   params.BaseImage,
-		"WorkingDir":  params.WorkingDir,
-		"Ports":       params.Ports,
-		"Commands":    params.Commands,
-		"Language":    params.Language,
-		"Framework":   params.Framework,
+		"BaseImage":  params.BaseImage,
+		"WorkingDir": params.WorkingDir,
+		"Ports":      params.Ports,
+		"Commands":   params.Commands,
+		"Language":   params.Language,
+		"Framework":  params.Framework,
 	}
-	
+
 	// Merge with custom variables
 	for k, v := range params.Variables {
 		templateVars[k] = v
@@ -356,9 +357,9 @@ func (dg *DockerfileGenerator) GenerateDockerfile(params GenerateDockerfileParam
 
 	// Render template
 	renderResult, err := dg.templateManager.RenderTemplate(TemplateRenderParams{
-		Name:      templateName,
-		Type:      TemplateTypeDockerfile,
-		Variables: templateVars,
+		Name:       templateName,
+		Type:       TemplateTypeDockerfile,
+		Variables:  templateVars,
 		OutputPath: params.OutputPath,
 	})
 	if err != nil {
@@ -388,9 +389,9 @@ func (dg *DockerfileGenerator) GenerateDockerfile(params GenerateDockerfileParam
 		Template:  templateName,
 	}
 
-	dg.logger.Info("Dockerfile generated successfully", 
-		"language", result.Language, 
-		"framework", result.Framework, 
+	dg.logger.Info("Dockerfile generated successfully",
+		"language", result.Language,
+		"framework", result.Framework,
 		"template", result.Template)
 
 	return result, nil
@@ -400,7 +401,7 @@ func (dg *DockerfileGenerator) GenerateDockerfile(params GenerateDockerfileParam
 func (dg *DockerfileGenerator) getDockerfileTemplateName(language, framework string) string {
 	language = strings.ToLower(language)
 	framework = strings.ToLower(framework)
-	
+
 	// Language-specific templates
 	switch language {
 	case "go", "golang":
@@ -477,9 +478,9 @@ type GenerateManifestResult struct {
 
 // GenerateManifest generates a Kubernetes manifest
 func (mg *ManifestGenerator) GenerateManifest(params GenerateManifestParams) (*GenerateManifestResult, error) {
-	mg.logger.Info("Generating Kubernetes manifest", 
-		"type", params.Type, 
-		"name", params.Name, 
+	mg.logger.Info("Generating Kubernetes manifest",
+		"type", params.Type,
+		"name", params.Name,
 		"namespace", params.Namespace)
 
 	// Prepare template variables
@@ -488,7 +489,7 @@ func (mg *ManifestGenerator) GenerateManifest(params GenerateManifestParams) (*G
 		"Namespace": params.Namespace,
 		"Type":      params.Type,
 	}
-	
+
 	// Merge with custom variables
 	for k, v := range params.Variables {
 		templateVars[k] = v
@@ -496,9 +497,9 @@ func (mg *ManifestGenerator) GenerateManifest(params GenerateManifestParams) (*G
 
 	// Render template
 	renderResult, err := mg.templateManager.RenderTemplate(TemplateRenderParams{
-		Name:      params.Type,
-		Type:      TemplateTypeManifest,
-		Variables: templateVars,
+		Name:       params.Type,
+		Type:       TemplateTypeManifest,
+		Variables:  templateVars,
 		OutputPath: params.OutputPath,
 	})
 	if err != nil {
@@ -527,8 +528,8 @@ func (mg *ManifestGenerator) GenerateManifest(params GenerateManifestParams) (*G
 		Success:  true,
 	}
 
-	mg.logger.Info("Kubernetes manifest generated successfully", 
-		"type", result.Type, 
+	mg.logger.Info("Kubernetes manifest generated successfully",
+		"type", result.Type,
 		"name", result.Name)
 
 	return result, nil

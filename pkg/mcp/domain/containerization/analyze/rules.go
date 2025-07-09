@@ -239,13 +239,13 @@ func ClassifyFileType(filePath string) FileType {
 	// Configuration files (including Dockerfile which is a configuration for container builds)
 	configExtensions := []string{".json", ".yaml", ".yml", ".toml", ".ini", ".conf", ".config"}
 	configNames := []string{"dockerfile", "package.json", "pom.xml", "build.gradle", "cargo.toml", "go.mod"}
-	
+
 	for _, configExt := range configExtensions {
 		if ext == configExt {
 			return FileTypeConfiguration
 		}
 	}
-	
+
 	for _, configName := range configNames {
 		if strings.ToLower(fileName) == configName {
 			return FileTypeConfiguration

@@ -42,29 +42,29 @@ const (
 
 // RepositoryMetadata contains metadata about a repository
 type RepositoryMetadata struct {
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
-	Size        int64             `json:"size"`
-	FileCount   int               `json:"file_count"`
-	Branch      string            `json:"branch,omitempty"`
-	Commit      string            `json:"commit,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+	Size       int64             `json:"size"`
+	FileCount  int               `json:"file_count"`
+	Branch     string            `json:"branch,omitempty"`
+	Commit     string            `json:"commit,omitempty"`
+	Tags       []string          `json:"tags,omitempty"`
+	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
 // AnalysisResult represents the result of analyzing a repository
 type AnalysisResult struct {
-	Repository       Repository            `json:"repository"`
-	Language         Language              `json:"language"`
-	Framework        Framework             `json:"framework,omitempty"`
-	Dependencies     []Dependency          `json:"dependencies"`
-	Databases        []Database            `json:"databases"`
-	BuildTools       []BuildTool           `json:"build_tools"`
-	TestFrameworks   []TestFramework       `json:"test_frameworks"`
-	SecurityIssues   []SecurityIssue       `json:"security_issues,omitempty"`
-	Recommendations  []Recommendation      `json:"recommendations"`
-	Confidence       ConfidenceLevel       `json:"confidence"`
-	AnalysisMetadata AnalysisMetadata      `json:"metadata"`
+	Repository       Repository       `json:"repository"`
+	Language         Language         `json:"language"`
+	Framework        Framework        `json:"framework,omitempty"`
+	Dependencies     []Dependency     `json:"dependencies"`
+	Databases        []Database       `json:"databases"`
+	BuildTools       []BuildTool      `json:"build_tools"`
+	TestFrameworks   []TestFramework  `json:"test_frameworks"`
+	SecurityIssues   []SecurityIssue  `json:"security_issues,omitempty"`
+	Recommendations  []Recommendation `json:"recommendations"`
+	Confidence       ConfidenceLevel  `json:"confidence"`
+	AnalysisMetadata AnalysisMetadata `json:"metadata"`
 }
 
 // Language represents a detected programming language
@@ -99,12 +99,12 @@ const (
 
 // Dependency represents a project dependency
 type Dependency struct {
-	Name     string          `json:"name"`
-	Version  string          `json:"version,omitempty"`
-	Type     DependencyType  `json:"type"`
-	Source   string          `json:"source"`
-	Required bool            `json:"required"`
-	Evidence []Evidence      `json:"evidence"`
+	Name     string         `json:"name"`
+	Version  string         `json:"version,omitempty"`
+	Type     DependencyType `json:"type"`
+	Source   string         `json:"source"`
+	Required bool           `json:"required"`
+	Evidence []Evidence     `json:"evidence"`
 }
 
 // DependencyType represents the type of dependency
@@ -227,11 +227,11 @@ type Recommendation struct {
 type RecommendationType string
 
 const (
-	RecommendationTypeSecurity     RecommendationType = "security"
-	RecommendationTypePerformance  RecommendationType = "performance"
-	RecommendationTypeMaintenance  RecommendationType = "maintenance"
-	RecommendationTypeArchitecture RecommendationType = "architecture"
-	RecommendationTypeTesting      RecommendationType = "testing"
+	RecommendationTypeSecurity      RecommendationType = "security"
+	RecommendationTypePerformance   RecommendationType = "performance"
+	RecommendationTypeMaintenance   RecommendationType = "maintenance"
+	RecommendationTypeArchitecture  RecommendationType = "architecture"
+	RecommendationTypeTesting       RecommendationType = "testing"
 	RecommendationTypeDocumentation RecommendationType = "documentation"
 )
 
@@ -250,12 +250,12 @@ type Evidence struct {
 type EvidenceType string
 
 const (
-	EvidenceTypeFile         EvidenceType = "file"
-	EvidenceTypeContent      EvidenceType = "content"
-	EvidenceTypePattern      EvidenceType = "pattern"
-	EvidenceTypeDependency   EvidenceType = "dependency"
+	EvidenceTypeFile          EvidenceType = "file"
+	EvidenceTypeContent       EvidenceType = "content"
+	EvidenceTypePattern       EvidenceType = "pattern"
+	EvidenceTypeDependency    EvidenceType = "dependency"
 	EvidenceTypeConfiguration EvidenceType = "configuration"
-	EvidenceTypeStructure    EvidenceType = "structure"
+	EvidenceTypeStructure     EvidenceType = "structure"
 )
 
 // AnalysisMetadata contains metadata about the analysis process
