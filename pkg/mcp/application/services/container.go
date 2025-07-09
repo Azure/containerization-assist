@@ -35,11 +35,77 @@ type DefaultServiceContainer struct {
 	promptService       PromptService
 }
 
+// ContainerConfig contains configuration for service container
+type ContainerConfig struct {
+	SessionConfig  SessionConfig  `json:"session_config"`
+	DockerConfig   DockerConfig   `json:"docker_config"`
+	AnalysisConfig AnalysisConfig `json:"analysis_config"`
+	TemplateConfig TemplateConfig `json:"template_config"`
+	StateConfig    StateConfig    `json:"state_config"`
+	RetryConfig    RetryConfig    `json:"retry_config"`
+}
+
+// SessionConfig configures session management
+type SessionConfig struct {
+	StoragePath    string `json:"storage_path"`
+	SessionTimeout int    `json:"session_timeout"`
+	MaxSessions    int    `json:"max_sessions"`
+}
+
+// DockerConfig configures Docker client
+type DockerConfig struct {
+	Host         string            `json:"host"`
+	Version      string            `json:"version"`
+	TLSVerify    bool              `json:"tls_verify"`
+	CertPath     string            `json:"cert_path"`
+	RegistryAuth map[string]string `json:"registry_auth"`
+}
+
+// AnalysisConfig configures analysis engine
+type AnalysisConfig struct {
+	MaxDepth     int    `json:"max_depth"`
+	ScanTimeout  int    `json:"scan_timeout"`
+	CacheEnabled bool   `json:"cache_enabled"`
+	CachePath    string `json:"cache_path"`
+}
+
+// TemplateConfig configures template management
+type TemplateConfig struct {
+	TemplatePath string `json:"template_path"`
+	CacheEnabled bool   `json:"cache_enabled"`
+}
+
+// StateConfig configures state management
+type StateConfig struct {
+	StoragePath   string `json:"storage_path"`
+	SyncInterval  int    `json:"sync_interval"`
+	RetentionDays int    `json:"retention_days"`
+}
+
+// RetryConfig configures retry logic
+type RetryConfig struct {
+	MaxRetries    int     `json:"max_retries"`
+	BaseDelay     int     `json:"base_delay"`
+	MaxDelay      int     `json:"max_delay"`
+	BackoffFactor float64 `json:"backoff_factor"`
+}
+
 // NewDefaultServiceContainer creates a new service container
 func NewDefaultServiceContainer(logger *slog.Logger) *DefaultServiceContainer {
 	return &DefaultServiceContainer{
 		logger: logger,
 	}
+}
+
+// NewServiceContainer creates a new service container with configuration
+func NewServiceContainer(config ContainerConfig, logger *slog.Logger) (ServiceContainer, error) {
+	container := &DefaultServiceContainer{
+		logger: logger,
+	}
+
+	// For now, return a basic container
+	// In a full implementation, we would initialize services based on config
+	return container, nil
 }
 
 // SessionStore returns the session store service
@@ -146,6 +212,19 @@ func (c *DefaultServiceContainer) PromptService() PromptService {
 func (c *DefaultServiceContainer) WithSessionStore(store SessionStore) *DefaultServiceContainer {
 	c.sessionStore = store
 	return c
+}
+
+// GetServiceStatus returns the status of all services
+func (c *DefaultServiceContainer) GetServiceStatus() map[string]interface{} {
+	status := make(map[string]interface{})
+
+	// Check service availability
+	status["session_store"] = c.sessionStore != nil
+	status["session_state"] = c.sessionState != nil
+	status["docker_service"] = c.dockerService != nil
+	status["logger"] = c.logger != nil
+
+	return status
 }
 
 // WithSessionState sets the session state

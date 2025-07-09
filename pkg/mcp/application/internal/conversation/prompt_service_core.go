@@ -12,8 +12,11 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
-// PromptService defines the interface for prompt processing
-type PromptService interface {
+// ConversationPromptService defines the interface for prompt processing
+// ConversationPromptService - Use services.PromptService for the canonical interface
+// This version is simplified for conversation-specific operations
+// Deprecated: Use services.PromptService for new code
+type ConversationPromptService interface {
 	// ProcessPrompt processes a user prompt and returns a conversation response
 	ProcessPrompt(ctx context.Context, sessionID, userInput string) (*ConversationResponse, error)
 
@@ -25,7 +28,7 @@ type PromptServiceImpl struct {
 	sessionManager        session.SessionManager
 	toolOrchestrator      api.Orchestrator
 	preferenceStore       *shared.PreferenceStore
-	retryService          RetryService
+	retryService          ConversationRetryService
 	conversationHandler   *ConversationHandler
 	smartWorkflowDetector *SmartWorkflowDetector
 	logger                *slog.Logger
@@ -40,8 +43,8 @@ type PromptManagerConfig struct {
 	Logger           *slog.Logger
 }
 
-// NewPromptService creates a new prompt service
-func NewPromptService(config PromptManagerConfig) PromptService {
+// NewPromptService creates a new conversation prompt service
+func NewPromptService(config PromptManagerConfig) ConversationPromptService {
 	ps := &PromptServiceImpl{
 		sessionManager:   config.SessionManager,
 		toolOrchestrator: config.ToolOrchestrator,

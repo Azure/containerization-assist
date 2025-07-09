@@ -46,8 +46,8 @@ func NewHTTPTransport(config HTTPTransportConfig) *HTTPTransport {
 	return transport
 }
 
-// NewCoreHTTPTransport creates a new HTTP transport that implements core.Transport
-func NewCoreHTTPTransport(config HTTPTransportConfig) core.Transport {
+// NewCoreHTTPTransport creates a new HTTP transport that implements core.CoreTransport
+func NewCoreHTTPTransport(config HTTPTransportConfig) core.CoreTransport {
 	return NewHTTPTransport(config)
 }
 
@@ -171,7 +171,7 @@ func (t *HTTPTransport) Close() error {
 }
 
 // SetHandler sets the request handler for this transport
-// SetHandler sets the request handler (implements core.Transport)
+// SetHandler sets the request handler (implements core.CoreTransport)
 func (t *HTTPTransport) SetHandler(handler core.RequestHandler) {
 	t.handler = handler
 }
@@ -238,7 +238,7 @@ func (t *HTTPTransport) SendMessage(message interface{}) error {
 	return systemErr
 }
 
-// Send implements core.Transport interface
+// Send implements core.CoreTransport interface
 func (t *HTTPTransport) Send(ctx context.Context, message interface{}) error {
 	return t.SendMessage(message)
 }
@@ -267,7 +267,7 @@ func (t *HTTPTransport) ReceiveMessage() (interface{}, error) {
 	return nil, systemErr
 }
 
-// Receive implements core.Transport interface
+// Receive implements core.CoreTransport interface
 func (t *HTTPTransport) Receive(ctx context.Context) (interface{}, error) {
 	return t.ReceiveMessage()
 }

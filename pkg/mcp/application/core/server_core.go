@@ -563,8 +563,8 @@ type StateServiceContainerAdapter struct {
 	serviceContainer services.ServiceContainer
 }
 
-// SessionStore implements state.ServiceContainer interface
-func (a *StateServiceContainerAdapter) SessionStore() state.SessionStore {
+// SessionStore implements state.StateServiceContainer interface
+func (a *StateServiceContainerAdapter) SessionStore() state.StateSessionStore {
 	return &SessionStoreAdapter{sessionStore: a.serviceContainer.SessionStore()}
 }
 

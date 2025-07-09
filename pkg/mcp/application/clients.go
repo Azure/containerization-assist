@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain"
 	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/rs/zerolog"
@@ -24,12 +26,7 @@ import (
 // ProgressCallback is called during long-running operations to report progress
 type ProgressCallback func(status string, current int, total int)
 
-// AnalysisService provides analysis operations
-type AnalysisService interface {
-	AnalyzeRepository(ctx context.Context, path string, callback ProgressCallback) (*RepositoryAnalysis, error)
-	AnalyzeWithAI(ctx context.Context, content string) (*AIAnalysis, error)
-	GetAnalysisProgress(ctx context.Context, analysisID string) (*AnalysisProgress, error)
-}
+// AnalysisService - Use services.AnalysisService instead for new code
 
 // RepositoryAnalysis represents the result of analyzing a repository
 type RepositoryAnalysis struct {
@@ -84,7 +81,7 @@ type MCPClients struct {
 	Docker   docker.DockerClient
 	Kind     kind.KindRunner
 	Kube     k8s.KubeRunner
-	Analyzer AnalysisService // Always use stub or caller analyzer - never external AI
+	Analyzer services.AnalysisService // Always use stub or caller analyzer - never external AI
 }
 
 // NewMCPClients creates MCP-specific clients with stub analyzer
@@ -98,7 +95,7 @@ func NewMCPClients(docker docker.DockerClient, kind kind.KindRunner, kube k8s.Ku
 }
 
 // NewMCPClientsWithAnalyzer creates MCP-specific clients with a specific analyzer
-func NewMCPClientsWithAnalyzer(docker docker.DockerClient, kind kind.KindRunner, kube k8s.KubeRunner, analyzer AnalysisService) *MCPClients {
+func NewMCPClientsWithAnalyzer(docker docker.DockerClient, kind kind.KindRunner, kube k8s.KubeRunner, analyzer services.AnalysisService) *MCPClients {
 	return &MCPClients{
 		Docker:   docker,
 		Kind:     kind,
@@ -164,10 +161,20 @@ func (s *stubAnalyzer) ResetTokenUsage() {
 }
 
 // AnalyzeRepository implements AnalysisService interface
-func (s *stubAnalyzer) AnalyzeRepository(ctx context.Context, path string, callback ProgressCallback) (*RepositoryAnalysis, error) {
+func (s *stubAnalyzer) AnalyzeRepository(ctx context.Context, path string, callback services.ProgressCallback) (*services.RepositoryAnalysis, error) {
 	// Progress callback
 	if callback != nil {
-		callback("starting", 0, 100)
+		callback(services.AnalysisProgress{
+			AnalysisID:    "analysis",
+			Status:        "running",
+			CurrentStep:   "starting",
+			StepNumber:    0,
+			TotalSteps:    100,
+			Percentage:    0,
+			ElapsedTime:   0,
+			EstimatedTime: nil,
+			LastUpdate:    time.Now(),
+		})
 	}
 
 	// Check if path exists
@@ -179,14 +186,17 @@ func (s *stubAnalyzer) AnalyzeRepository(ctx context.Context, path string, callb
 		return nil, fmt.Errorf("path is not a directory: %s", path)
 	}
 
-	result := &RepositoryAnalysis{
-		Language:     detectPrimaryLanguage(path),
-		Framework:    detectFramework(path),
-		Dependencies: []string{},
-		Structure:    make(map[string]interface{}),
-		Metrics:      make(map[string]float64),
-		Issues:       []AnalysisIssue{},
-		Suggestions:  []string{},
+	result := &services.RepositoryAnalysis{
+		Language:        detectPrimaryLanguage(path),
+		Framework:       detectFramework(path),
+		Dependencies:    []string{},
+		EntryPoint:      "",
+		Port:            0,
+		BuildCommand:    "",
+		RunCommand:      "",
+		Issues:          []services.AnalysisIssue{},
+		Recommendations: []string{},
+		Metadata:        make(map[string]interface{}),
 	}
 
 	// Analyze repository structure
@@ -196,22 +206,32 @@ func (s *stubAnalyzer) AnalyzeRepository(ctx context.Context, path string, callb
 	}
 
 	if callback != nil {
-		callback("completed", 100, 100)
+		callback(services.AnalysisProgress{
+			AnalysisID:    "analysis",
+			Status:        "completed",
+			CurrentStep:   "completed",
+			StepNumber:    100,
+			TotalSteps:    100,
+			Percentage:    100,
+			ElapsedTime:   time.Minute,
+			EstimatedTime: nil,
+			LastUpdate:    time.Now(),
+		})
 	}
 
 	return result, nil
 }
 
 // AnalyzeWithAI implements AnalysisService interface
-func (s *stubAnalyzer) AnalyzeWithAI(ctx context.Context, content string) (*AIAnalysis, error) {
+func (s *stubAnalyzer) AnalyzeWithAI(ctx context.Context, content string) (*services.AIAnalysis, error) {
 	// For now, provide basic analysis without actual AI
 	// This can be enhanced later with real AI integration
 
-	analysis := &AIAnalysis{
+	analysis := &services.AIAnalysis{
 		Summary:         "Code analysis completed",
+		Insights:        []string{},
 		Recommendations: []string{},
 		Confidence:      0.8,
-		Analysis:        make(map[string]interface{}),
 		Metadata:        make(map[string]interface{}),
 	}
 
@@ -231,15 +251,18 @@ func (s *stubAnalyzer) AnalyzeWithAI(ctx context.Context, content string) (*AIAn
 }
 
 // GetAnalysisProgress implements AnalysisService interface
-func (s *stubAnalyzer) GetAnalysisProgress(ctx context.Context, analysisID string) (*AnalysisProgress, error) {
+func (s *stubAnalyzer) GetAnalysisProgress(ctx context.Context, analysisID string) (*services.AnalysisProgress, error) {
 	// Simple implementation - in real system would track actual progress
-	return &AnalysisProgress{
-		ID:       analysisID,
-		Stage:    "complete",
-		Progress: 100,
-		Total:    100,
-		Complete: true,
-		Messages: []string{"Analysis completed"},
+	return &services.AnalysisProgress{
+		AnalysisID:    analysisID,
+		Status:        "complete",
+		CurrentStep:   "complete",
+		StepNumber:    100,
+		TotalSteps:    100,
+		Percentage:    100,
+		ElapsedTime:   time.Minute,
+		EstimatedTime: nil,
+		LastUpdate:    time.Now(),
 	}, nil
 }
 
@@ -301,14 +324,24 @@ func exists(path string) bool {
 }
 
 // analyzeDirectory performs directory analysis
-func analyzeDirectory(ctx context.Context, path string, result *RepositoryAnalysis, callback ProgressCallback) error {
+func analyzeDirectory(ctx context.Context, path string, result *services.RepositoryAnalysis, callback services.ProgressCallback) error {
 	// Check context for cancellation
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	if callback != nil {
-		callback("scanning files", 25, 100)
+		callback(services.AnalysisProgress{
+			AnalysisID:    "analysis",
+			Status:        "running",
+			CurrentStep:   "scanning files",
+			StepNumber:    25,
+			TotalSteps:    100,
+			Percentage:    25,
+			ElapsedTime:   time.Second * 5,
+			EstimatedTime: nil,
+			LastUpdate:    time.Now(),
+		})
 	}
 
 	// Count files and directories
@@ -331,33 +364,49 @@ func analyzeDirectory(ctx context.Context, path string, result *RepositoryAnalys
 	}
 
 	if callback != nil {
-		callback("analyzing structure", 50, 100)
+		callback(services.AnalysisProgress{
+			AnalysisID:    "analysis",
+			Status:        "running",
+			CurrentStep:   "analyzing structure",
+			StepNumber:    50,
+			TotalSteps:    100,
+			Percentage:    50,
+			ElapsedTime:   time.Second * 10,
+			EstimatedTime: nil,
+			LastUpdate:    time.Now(),
+		})
 	}
 
-	// Set basic metrics
-	result.Metrics["file_count"] = float64(fileCount)
-	result.Metrics["directory_count"] = float64(dirCount)
-
-	// Set basic structure info
-	result.Structure["files"] = fileCount
-	result.Structure["directories"] = dirCount
-	result.Structure["analyzed_path"] = path
+	// Set basic metadata
+	result.Metadata["file_count"] = float64(fileCount)
+	result.Metadata["directory_count"] = float64(dirCount)
+	result.Metadata["analyzed_path"] = path
 
 	if callback != nil {
-		callback("generating suggestions", 75, 100)
+		callback(services.AnalysisProgress{
+			AnalysisID:    "analysis",
+			Status:        "running",
+			CurrentStep:   "generating suggestions",
+			StepNumber:    75,
+			TotalSteps:    100,
+			Percentage:    75,
+			ElapsedTime:   time.Second * 15,
+			EstimatedTime: nil,
+			LastUpdate:    time.Now(),
+		})
 	}
 
-	// Add basic suggestions based on language
+	// Add basic recommendations based on language
 	switch result.Language {
 	case "go":
-		result.Suggestions = append(result.Suggestions, "Consider adding go.sum for dependency verification")
+		result.Recommendations = append(result.Recommendations, "Consider adding go.sum for dependency verification")
 		if !exists(filepath.Join(path, "README.md")) {
-			result.Suggestions = append(result.Suggestions, "Add a README.md file for documentation")
+			result.Recommendations = append(result.Recommendations, "Add a README.md file for documentation")
 		}
 	case "javascript":
-		result.Suggestions = append(result.Suggestions, "Consider adding package-lock.json for dependency locking")
+		result.Recommendations = append(result.Recommendations, "Consider adding package-lock.json for dependency locking")
 		if !exists(filepath.Join(path, ".gitignore")) {
-			result.Suggestions = append(result.Suggestions, "Add a .gitignore file")
+			result.Recommendations = append(result.Recommendations, "Add a .gitignore file")
 		}
 	}
 

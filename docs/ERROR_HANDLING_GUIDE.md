@@ -10,13 +10,13 @@ Container Kit MCP uses a unified Rich Error System that provides comprehensive e
 
 ### Core Components
 
-1. **Rich Error Structure** (`pkg/mcp/errors/rich.go`)
+1. **Rich Error Structure** (`pkg/mcp/domain/errors/rich.go`)
    - Comprehensive error information with code, message, type, and severity
    - Context and metadata for debugging
    - Error chaining for proper error propagation
    - Suggestions for resolution
 
-2. **Domain-Specific Factories** (`pkg/mcp/errors/factories.go`)
+2. **Domain-Specific Factories** (`pkg/mcp/domain/errors/factories.go`)
    - `BuildError()` - Build and container operations
    - `DeployError()` - Kubernetes deployment operations
    - `SecurityError()` - Security scanning and vulnerabilities
@@ -24,11 +24,11 @@ Container Kit MCP uses a unified Rich Error System that provides comprehensive e
    - `NetworkError()` - Network and connectivity issues
    - `SystemError()` - System-level errors
 
-3. **Error Codes** (`pkg/mcp/errors/codes/`)
+3. **Error Codes** (`pkg/mcp/domain/errors/codes/`)
    - Centralized error code definitions by domain
    - Consistent error identification across the system
 
-4. **Error Classification** (`pkg/mcp/errors/classification.go`)
+4. **Error Classification** (`pkg/mcp/domain/errors/classification.go`)
    - Automatic error classification for retryability
    - Severity-based retry strategies
    - User-facing error determination
@@ -41,8 +41,8 @@ Container Kit MCP uses a unified Rich Error System that provides comprehensive e
 
 ```go
 import (
-    "github.com/Azure/container-kit/pkg/mcp/errors"
-    "github.com/Azure/container-kit/pkg/mcp/errors/codes"
+    "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+    "github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 )
 
 // Build domain error
@@ -417,14 +417,14 @@ errorCounter.WithLabelValues(
 ## Appendix: Error Code Reference
 
 See the following files for complete error code listings:
-- `pkg/mcp/errors/codes/build_codes.go` - Build domain error codes
-- `pkg/mcp/errors/codes/deploy_codes.go` - Deploy domain error codes
-- `pkg/mcp/errors/codes/security_codes.go` - Security domain error codes
-- `pkg/mcp/errors/codes/common_codes.go` - Common error codes
+- `pkg/mcp/domain/errors/codes/build_codes.go` - Build domain error codes
+- `pkg/mcp/domain/errors/codes/deploy_codes.go` - Deploy domain error codes
+- `pkg/mcp/domain/errors/codes/security_codes.go` - Security domain error codes
+- `pkg/mcp/domain/errors/codes/common_codes.go` - Common error codes
 
 ## Support
 
 For questions or issues with the error handling system, please refer to:
-- The error system source code in `pkg/mcp/errors/`
+- The error system source code in `pkg/mcp/domain/errors/`
 - The Container Kit MCP documentation
 - The project issue tracker

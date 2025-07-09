@@ -1,16 +1,16 @@
 package transport
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
 )
 
 // Config holds common configuration for stdio transports
 type Config struct {
 	// Logger is the base logger - transport-specific context will be added
-	Logger zerolog.Logger
+	Logger *slog.Logger
 
 	// EnableErrorHandler enables enhanced error handling for the main transport
 	EnableErrorHandler bool
@@ -26,7 +26,7 @@ type Config struct {
 }
 
 // NewDefaultConfig creates a default configuration with reasonable defaults
-func NewDefaultConfig(baseLogger zerolog.Logger) Config {
+func NewDefaultConfig(baseLogger *slog.Logger) Config {
 	return Config{
 		Logger:             baseLogger,
 		EnableErrorHandler: true,
@@ -37,7 +37,7 @@ func NewDefaultConfig(baseLogger zerolog.Logger) Config {
 }
 
 // NewConfigWithComponent creates a default config with a specific component name
-func NewConfigWithComponent(baseLogger zerolog.Logger, component string) Config {
+func NewConfigWithComponent(baseLogger *slog.Logger, component string) Config {
 	config := NewDefaultConfig(baseLogger)
 	config.Component = component
 	return config
@@ -60,27 +60,17 @@ func (c Config) Validate() error {
 }
 
 // CreateLogger creates a properly configured logger for stdio transport
-func (c Config) CreateLogger() zerolog.Logger {
-	logger := c.Logger.With().
-		Str("transport", "stdio").
-		Str("component", c.Component).
-		Logger()
-
-	// Apply log level if specified
-	if c.LogLevel != "" {
-		if level, err := zerolog.ParseLevel(c.LogLevel); err == nil {
-			logger = logger.Level(level)
-		}
-	}
-
-	return logger
+func (c Config) CreateLogger() *slog.Logger {
+	return c.Logger.With(
+		"transport", "stdio",
+		"component", c.Component,
+	)
 }
 
 // CreateDefaultLogger creates a fallback logger when none is provided
-func CreateDefaultLogger(component string) zerolog.Logger {
-	return zerolog.New(os.Stderr).With().
-		Timestamp().
-		Str("transport", "stdio").
-		Str("component", component).
-		Logger()
+func CreateDefaultLogger(component string) *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stderr, nil)).With(
+		"transport", "stdio",
+		"component", component,
+	)
 }

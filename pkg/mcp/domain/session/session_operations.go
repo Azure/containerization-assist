@@ -56,8 +56,8 @@ type ErrorTracker interface {
 	TrackError(sessionID string, err error, context interface{}) error
 }
 
-// Lifecycle handles session lifecycle management
-type Lifecycle interface {
+// SessionLifecycle handles session lifecycle management
+type SessionLifecycle interface {
 	// StartCleanupRoutine starts cleanup routine
 	StartCleanupRoutine()
 

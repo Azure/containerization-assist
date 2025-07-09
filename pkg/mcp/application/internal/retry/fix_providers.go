@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
@@ -25,13 +26,13 @@ func (dfp *DockerFixProvider) Name() string {
 	return dfp.name
 }
 
-func (dfp *DockerFixProvider) GetFixStrategies(_ context.Context, err error, context map[string]interface{}) ([]FixStrategy, error) {
-	strategies := make([]FixStrategy, 0)
+func (dfp *DockerFixProvider) GetFixStrategies(_ context.Context, err error, context map[string]interface{}) ([]api.FixStrategy, error) {
+	strategies := make([]api.FixStrategy, 0)
 	errMsg := strings.ToLower(err.Error())
 
 	// Dockerfile syntax fixes
 	if strings.Contains(errMsg, "dockerfile") && strings.Contains(errMsg, "syntax") {
-		strategies = append(strategies, FixStrategy{
+		strategies = append(strategies, api.FixStrategy{
 			Type:        "dockerfile",
 			Name:        "Fix Dockerfile Syntax",
 			Description: "Automatically fix common Dockerfile syntax errors",
@@ -46,7 +47,7 @@ func (dfp *DockerFixProvider) GetFixStrategies(_ context.Context, err error, con
 
 	// Base image not found
 	if strings.Contains(errMsg, "image not found") || strings.Contains(errMsg, "pull access denied") {
-		strategies = append(strategies, FixStrategy{
+		strategies = append(strategies, api.FixStrategy{
 			Type:        "docker",
 			Name:        "Fix Base Image",
 			Description: "Update base image to a valid alternative",
@@ -60,7 +61,7 @@ func (dfp *DockerFixProvider) GetFixStrategies(_ context.Context, err error, con
 
 	// Port already in use
 	if strings.Contains(errMsg, "port") && strings.Contains(errMsg, "already in use") {
-		strategies = append(strategies, FixStrategy{
+		strategies = append(strategies, api.FixStrategy{
 			Type:        "docker",
 			Name:        "Change Port",
 			Description: "Use an alternative port for the container",
@@ -76,7 +77,7 @@ func (dfp *DockerFixProvider) GetFixStrategies(_ context.Context, err error, con
 	return strategies, nil
 }
 
-func (dfp *DockerFixProvider) ApplyFix(ctx context.Context, strategy FixStrategy, context map[string]interface{}) error {
+func (dfp *DockerFixProvider) ApplyFix(ctx context.Context, strategy api.FixStrategy, context map[string]interface{}) error {
 	switch strategy.Type {
 	case "dockerfile":
 		return dfp.fixDockerfileSyntax(ctx, strategy, context)
@@ -100,7 +101,7 @@ func (dfp *DockerFixProvider) ApplyFix(ctx context.Context, strategy FixStrategy
 		Build()
 }
 
-func (dfp *DockerFixProvider) fixDockerfileSyntax(_ context.Context, strategy FixStrategy, _ map[string]interface{}) error {
+func (dfp *DockerFixProvider) fixDockerfileSyntax(_ context.Context, strategy api.FixStrategy, _ map[string]interface{}) error {
 	dockerfilePath, ok := strategy.Parameters["dockerfile_path"].(string)
 	if !ok || dockerfilePath == "" {
 		return errors.NewError().
@@ -137,7 +138,7 @@ func (dfp *DockerFixProvider) fixDockerfileSyntax(_ context.Context, strategy Fi
 	return nil
 }
 
-func (dfp *DockerFixProvider) fixBaseImage(_ context.Context, strategy FixStrategy, context map[string]interface{}) error {
+func (dfp *DockerFixProvider) fixBaseImage(_ context.Context, strategy api.FixStrategy, context map[string]interface{}) error {
 	dockerfilePath, ok := context["dockerfile_path"].(string)
 	if !ok || dockerfilePath == "" {
 		return errors.Validation("retry/fix-provider", "dockerfile path not provided")
@@ -163,7 +164,7 @@ func (dfp *DockerFixProvider) fixBaseImage(_ context.Context, strategy FixStrate
 	return nil
 }
 
-func (dfp *DockerFixProvider) fixPortConflict(_ context.Context, strategy FixStrategy, context map[string]interface{}) error {
+func (dfp *DockerFixProvider) fixPortConflict(_ context.Context, strategy api.FixStrategy, context map[string]interface{}) error {
 	// This would update docker-compose.yml or runtime configuration
 	// For now, just record the suggested port change
 	alternativePorts := strategy.Parameters["alternative_ports"].([]int)
@@ -186,13 +187,13 @@ func (cfp *ConfigFixProvider) Name() string {
 	return cfp.name
 }
 
-func (cfp *ConfigFixProvider) GetFixStrategies(_ context.Context, err error, context map[string]interface{}) ([]FixStrategy, error) {
-	strategies := make([]FixStrategy, 0)
+func (cfp *ConfigFixProvider) GetFixStrategies(_ context.Context, err error, context map[string]interface{}) ([]api.FixStrategy, error) {
+	strategies := make([]api.FixStrategy, 0)
 	errMsg := strings.ToLower(err.Error())
 
 	// Missing configuration file
 	if strings.Contains(errMsg, "not found") && (strings.Contains(errMsg, "config") || strings.Contains(errMsg, ".json") || strings.Contains(errMsg, ".yaml")) {
-		strategies = append(strategies, FixStrategy{
+		strategies = append(strategies, api.FixStrategy{
 			Type:        "config",
 			Name:        "Create Default Config",
 			Description: "Create a default configuration file",
@@ -207,7 +208,7 @@ func (cfp *ConfigFixProvider) GetFixStrategies(_ context.Context, err error, con
 
 	// Invalid configuration format
 	if strings.Contains(errMsg, "parse") || strings.Contains(errMsg, "invalid format") {
-		strategies = append(strategies, FixStrategy{
+		strategies = append(strategies, api.FixStrategy{
 			Type:        "config",
 			Name:        "Fix Config Format",
 			Description: "Repair configuration file format",
@@ -222,7 +223,7 @@ func (cfp *ConfigFixProvider) GetFixStrategies(_ context.Context, err error, con
 	return strategies, nil
 }
 
-func (cfp *ConfigFixProvider) ApplyFix(ctx context.Context, strategy FixStrategy, context map[string]interface{}) error {
+func (cfp *ConfigFixProvider) ApplyFix(ctx context.Context, strategy api.FixStrategy, context map[string]interface{}) error {
 	switch strategy.Name {
 	case "Create Default Config":
 		return cfp.createDefaultConfig(ctx, strategy, context)
@@ -232,7 +233,7 @@ func (cfp *ConfigFixProvider) ApplyFix(ctx context.Context, strategy FixStrategy
 	return errors.Internal("retry/fix-provider", "unsupported config fix strategy")
 }
 
-func (cfp *ConfigFixProvider) createDefaultConfig(_ context.Context, strategy FixStrategy, _ map[string]interface{}) error {
+func (cfp *ConfigFixProvider) createDefaultConfig(_ context.Context, strategy api.FixStrategy, _ map[string]interface{}) error {
 	configPath, ok := strategy.Parameters["config_path"].(string)
 	if !ok || configPath == "" {
 		return errors.Validation("retry/fix-provider", "config path not provided")
@@ -273,7 +274,7 @@ settings:
 	return nil
 }
 
-func (cfp *ConfigFixProvider) fixConfigFormat(_ context.Context, strategy FixStrategy, _ map[string]interface{}) error {
+func (cfp *ConfigFixProvider) fixConfigFormat(_ context.Context, strategy api.FixStrategy, _ map[string]interface{}) error {
 	configPath, ok := strategy.Parameters["config_path"].(string)
 	if !ok || configPath == "" {
 		return errors.Validation("retry/fix-provider", "config path not provided")
@@ -327,14 +328,14 @@ func (dep *DependencyFixProvider) Name() string {
 	return dep.name
 }
 
-func (dep *DependencyFixProvider) GetFixStrategies(_ context.Context, err error, _ map[string]interface{}) ([]FixStrategy, error) {
-	strategies := make([]FixStrategy, 0)
+func (dep *DependencyFixProvider) GetFixStrategies(_ context.Context, err error, _ map[string]interface{}) ([]api.FixStrategy, error) {
+	strategies := make([]api.FixStrategy, 0)
 	errMsg := strings.ToLower(err.Error())
 
 	// Command not found
 	if strings.Contains(errMsg, "command not found") || strings.Contains(errMsg, "not found") {
 		command := extractCommand(errMsg)
-		strategies = append(strategies, FixStrategy{
+		strategies = append(strategies, api.FixStrategy{
 			Type:        "dependency",
 			Name:        "Install Missing Command",
 			Description: fmt.Sprintf("Install missing command: %s", command),
@@ -350,14 +351,14 @@ func (dep *DependencyFixProvider) GetFixStrategies(_ context.Context, err error,
 	return strategies, nil
 }
 
-func (dep *DependencyFixProvider) ApplyFix(ctx context.Context, strategy FixStrategy, context map[string]interface{}) error {
+func (dep *DependencyFixProvider) ApplyFix(ctx context.Context, strategy api.FixStrategy, context map[string]interface{}) error {
 	if strategy.Name == "Install Missing Command" {
 		return dep.installMissingCommand(ctx, strategy, context)
 	}
 	return errors.Internal("retry/fix-provider", "unsupported dependency fix strategy")
 }
 
-func (dep *DependencyFixProvider) installMissingCommand(_ context.Context, strategy FixStrategy, context map[string]interface{}) error {
+func (dep *DependencyFixProvider) installMissingCommand(_ context.Context, strategy api.FixStrategy, context map[string]interface{}) error {
 	command, ok := strategy.Parameters["command"].(string)
 	if !ok || command == "" {
 		return errors.Validation("retry/fix-provider", "command not specified")

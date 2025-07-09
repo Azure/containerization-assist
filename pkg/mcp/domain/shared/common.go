@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -297,25 +296,14 @@ type PreferenceStore struct {
 }
 
 // Server interface defines server operations
-type Server interface {
-	Start(ctx context.Context) error
-	Stop() error
-	GetName() string
-	EnableConversationMode(config interface{}) error
-}
+// Server - Use core.Server for the canonical Server interface
+// This interface is deprecated
 
-// RequestHandler interface defines request handling operations
-type RequestHandler interface {
-	HandleRequest(ctx context.Context, request interface{}) (interface{}, error)
-}
+// RequestHandler - Use core.RequestHandler for the canonical RequestHandler interface
+// This interface is deprecated
 
-// Transport interface defines transport operations
-type Transport interface {
-	Start() error
-	Stop() error
-	Send(ctx context.Context, message interface{}) error
-	Receive(ctx context.Context) (interface{}, error)
-}
+// Transport - Use api.Transport for the canonical Transport interface
+// This interface is deprecated
 
 // NewPreferenceStore creates a new preference store
 func NewPreferenceStore(_ string, logger *slog.Logger, _ string) (*PreferenceStore, error) {

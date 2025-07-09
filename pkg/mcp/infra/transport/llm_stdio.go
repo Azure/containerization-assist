@@ -4,27 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
-
-	"github.com/rs/zerolog"
 )
 
 // StdioLLMTransport implements types.LLMTransport for stdio transport
 // It can invoke tools back to the hosting LLM via stdio
 type StdioLLMTransport struct {
 	stdioTransport *StdioTransport
-	logger         zerolog.Logger
+	logger         *slog.Logger
 	jsonrpcClient  *Client
 	mu             sync.Mutex
 	connected      bool
 }
 
 // NewStdioLLMTransport creates a new stdio LLM transport
-func NewStdioLLMTransport(stdioTransport *StdioTransport, logger zerolog.Logger) *StdioLLMTransport {
+func NewStdioLLMTransport(stdioTransport *StdioTransport, logger *slog.Logger) *StdioLLMTransport {
 	return &StdioLLMTransport{
 		stdioTransport: stdioTransport,
-		logger:         logger.With().Str("component", "stdio_llm_transport").Logger(),
+		logger:         logger.With("component", "stdio_llm_transport"),
 		// JSON-RPC client will be initialized on first use
 	}
 }
@@ -32,10 +31,9 @@ func NewStdioLLMTransport(stdioTransport *StdioTransport, logger zerolog.Logger)
 // InvokeTool implements types.LLMTransport
 // For stdio, this means sending a JSON-RPC request back through the stdio channel
 func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload map[string]any, stream bool) (<-chan json.RawMessage, error) {
-	s.logger.Debug().
-		Str("tool_name", name).
-		Bool("stream", stream).
-		Msg("Invoking tool on hosting LLM via stdio")
+	s.logger.Debug("Invoking tool on hosting LLM via stdio",
+		"tool_name", name,
+		"stream", stream)
 
 	// Initialize JSON-RPC client if not already done
 	s.mu.Lock()
@@ -55,9 +53,7 @@ func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload
 		// For streaming responses, we'll use the same JSON-RPC approach
 		// The streaming will be handled by the response channel
 		if stream {
-			s.logger.Debug().
-				Str("tool_name", name).
-				Msg("Processing streaming tool invocation via stdio")
+			s.logger.Debug("Processing streaming tool invocation via stdio", "tool_name", name)
 		}
 
 		// Prepare the tool invocation request
@@ -70,10 +66,7 @@ func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload
 		// Send the JSON-RPC request
 		result, err := jsonrpcClient.Call(ctx, "tools/call", params)
 		if err != nil {
-			s.logger.Error().
-				Err(err).
-				Str("tool_name", name).
-				Msg("Failed to invoke tool via JSON-RPC")
+			s.logger.Error("Failed to invoke tool via JSON-RPC", "error", err, "tool_name", name)
 
 			response := struct {
 				Error string `json:"error"`
@@ -90,7 +83,7 @@ func (s *StdioLLMTransport) InvokeTool(ctx context.Context, name string, payload
 		select {
 		case responseCh <- result:
 		case <-ctx.Done():
-			s.logger.Debug().Msg("Context cancelled while sending response")
+			s.logger.Debug("Context cancelled while sending response")
 		}
 	}()
 
@@ -110,28 +103,28 @@ func (s *StdioLLMTransport) Close() error {
 
 // Start implements types.LLMTransport
 func (s *StdioLLMTransport) Start(ctx context.Context) error {
-	s.logger.Info().Msg("Starting Stdio LLM transport")
+	s.logger.Info("Starting Stdio LLM transport")
 	s.connected = true
 	return nil
 }
 
 // Stop implements types.LLMTransport
 func (s *StdioLLMTransport) Stop(ctx context.Context) error {
-	s.logger.Info().Msg("Stopping Stdio LLM transport")
+	s.logger.Info("Stopping Stdio LLM transport")
 	s.connected = false
 	return s.Close()
 }
 
 // Send implements types.LLMTransport
 func (s *StdioLLMTransport) Send(ctx context.Context, message interface{}) error {
-	s.logger.Debug().Interface("message", message).Msg("Sending message via Stdio LLM transport")
+	s.logger.Debug("Sending message via Stdio LLM transport", "message", message)
 	// For stdio transport, sending is handled via InvokeTool
 	return nil
 }
 
 // Receive implements types.LLMTransport
 func (s *StdioLLMTransport) Receive(ctx context.Context) (interface{}, error) {
-	s.logger.Debug().Msg("Receiving message via Stdio LLM transport")
+	s.logger.Debug("Receiving message via Stdio LLM transport")
 	// For stdio transport, receiving is handled via InvokeTool response channels
 	return nil, nil
 }

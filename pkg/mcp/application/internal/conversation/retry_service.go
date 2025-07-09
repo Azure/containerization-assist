@@ -8,8 +8,11 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 )
 
-// RetryService handles retry logic for operations
-type RetryService interface {
+// ConversationRetryService handles retry logic for operations
+// ConversationRetryService - Use api.RetryService for the canonical interface
+// This is a simplified interface for conversation-specific retry operations
+// Deprecated: Use api.RetryService for new code
+type ConversationRetryService interface {
 	// ExecuteWithRetry executes an operation with retry logic
 	ExecuteWithRetry(ctx context.Context, operationType string, fn func() error) error
 
@@ -17,14 +20,14 @@ type RetryService interface {
 	SetPolicy(operationType string, policy *services.RetryPolicy)
 }
 
-// retryService implements RetryService
+// retryService implements ConversationRetryService
 type retryService struct {
 	logger           *slog.Logger
-	retryCoordinator services.RetryCoordinator
+	retryCoordinator services.ServiceRetryCoordinator
 }
 
-// NewRetryService creates a new RetryService
-func NewRetryService(logger *slog.Logger, retryCoordinator services.RetryCoordinator) RetryService {
+// NewRetryService creates a new ConversationRetryService
+func NewRetryService(logger *slog.Logger, retryCoordinator services.ServiceRetryCoordinator) ConversationRetryService {
 	service := &retryService{
 		logger:           logger.With("component", "retry_service"),
 		retryCoordinator: retryCoordinator,

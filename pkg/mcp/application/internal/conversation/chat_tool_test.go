@@ -22,9 +22,11 @@ func TestChatTool_Execute(t *testing.T) {
 	}{
 		{
 			name: "valid chat args",
-			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
-				Message:      "Hello, world!",
+			args: api.ToolInput{
+				SessionID: "test-session",
+				Data: map[string]interface{}{
+					"message": "Hello, world!",
+				},
 			},
 			setup: func() *ChatTool {
 				return &ChatTool{
@@ -41,17 +43,22 @@ func TestChatTool_Execute(t *testing.T) {
 			},
 		},
 		{
-			name:        "invalid args type",
-			args:        "invalid",
+			name: "invalid args type",
+			args: api.ToolInput{
+				SessionID: "test-session",
+				Data:      map[string]interface{}{
+					// Missing message field
+				},
+			},
 			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
-			expectedErr: "invalid argument type for chat tool",
+			expectedErr: "message parameter is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tool := tt.setup()
-			result, err := tool.Execute(context.Background(), tt.args)
+			result, err := tool.Execute(context.Background(), tt.args.(api.ToolInput))
 
 			if tt.expectedErr != "" {
 				assert.Error(t, err)

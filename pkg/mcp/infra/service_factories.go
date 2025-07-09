@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
-	"github.com/Azure/container-kit/pkg/mcp/infra/retry"
 )
 
 // DockerServiceFactory creates Docker service implementations
@@ -189,93 +188,6 @@ func (d *dockerServiceImpl) GetImageInfo(_ context.Context, imageRef string) (*D
 // CheckPrerequisites implements DockerService
 func (d *dockerServiceImpl) CheckPrerequisites(ctx context.Context) error {
 	return d.coreService.CheckPrerequisites(ctx)
-}
-
-// RetryServiceFactory creates retry service implementations
-type RetryServiceFactory struct{}
-
-// NewRetryServiceFactory creates a factory for retry services
-func NewRetryServiceFactory() *RetryServiceFactory {
-	return &RetryServiceFactory{}
-}
-
-// CreateRetryService creates a retry service implementation
-func (f *RetryServiceFactory) CreateRetryService() RetryService {
-	return &retryServiceImpl{
-		coordinator: retry.New(),
-		policies:    make(map[string]*RetryPolicy),
-	}
-}
-
-// RetryService defines the interface that eliminates the need for adapters
-type RetryService interface {
-	SetPolicy(operationType string, policy *RetryPolicy)
-	GetPolicy(operationType string) *RetryPolicy
-	ExecuteWithRetry(ctx context.Context, operationType string, operation func() error) error
-	ShouldRetry(err error, operationType string) bool
-}
-
-// RetryPolicy defines retry behavior for operations
-type RetryPolicy struct {
-	MaxAttempts     int
-	InitialDelay    time.Duration
-	MaxDelay        time.Duration
-	BackoffStrategy string
-	Multiplier      float64
-	Jitter          bool
-	ErrorPatterns   []string
-}
-
-// retryServiceImpl implements RetryService
-type retryServiceImpl struct {
-	coordinator *retry.Coordinator
-	policies    map[string]*RetryPolicy
-}
-
-// SetPolicy implements RetryService
-func (r *retryServiceImpl) SetPolicy(operationType string, policy *RetryPolicy) {
-	r.policies[operationType] = policy
-
-	corePolicy := &retry.Policy{
-		MaxAttempts:     policy.MaxAttempts,
-		InitialDelay:    policy.InitialDelay,
-		MaxDelay:        policy.MaxDelay,
-		BackoffStrategy: retry.BackoffStrategy(policy.BackoffStrategy),
-		Multiplier:      policy.Multiplier,
-		Jitter:          policy.Jitter,
-		ErrorPatterns:   policy.ErrorPatterns,
-	}
-
-	r.coordinator.SetPolicy(operationType, corePolicy)
-}
-
-// GetPolicy implements RetryService
-func (r *retryServiceImpl) GetPolicy(operationType string) *RetryPolicy {
-	if policy, exists := r.policies[operationType]; exists {
-		return policy
-	}
-
-	return &RetryPolicy{
-		MaxAttempts:     3,
-		InitialDelay:    1 * time.Second,
-		MaxDelay:        10 * time.Second,
-		BackoffStrategy: "exponential",
-		Multiplier:      2.0,
-		Jitter:          true,
-		ErrorPatterns:   []string{"timeout", "connection refused", "service unavailable"},
-	}
-}
-
-// ExecuteWithRetry implements RetryService
-func (r *retryServiceImpl) ExecuteWithRetry(ctx context.Context, operationType string, operation func() error) error {
-	return r.coordinator.Execute(ctx, operationType, func(_ context.Context) error {
-		return operation()
-	})
-}
-
-// ShouldRetry implements RetryService
-func (r *retryServiceImpl) ShouldRetry(err error, _ string) bool {
-	return r.coordinator.IsRetryable(err)
 }
 
 // extractImageName extracts the image name from a list of tags

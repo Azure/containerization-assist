@@ -43,13 +43,53 @@ type ChatTool struct {
 }
 
 // Execute implements the unified Tool interface
-func (ct *ChatTool) Execute(ctx context.Context, args interface{}) (interface{}, error) {
-	chatArgs, ok := args.(ChatToolArgs)
-	if !ok {
-		return nil, errors.NewError().Messagef("invalid argument type for chat tool: %T", args).Build()
+func (ct *ChatTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
+	// Convert ToolInput to ChatToolArgs
+	chatArgs := ChatToolArgs{
+		BaseToolArgs: shared.BaseToolArgs{
+			SessionID: input.SessionID,
+		},
 	}
 
-	return ct.ExecuteTyped(ctx, chatArgs)
+	// Extract message from input data
+	if msg, ok := input.Data["message"].(string); ok {
+		chatArgs.Message = msg
+	} else {
+		return api.ToolOutput{
+			Success: false,
+			Error:   "message parameter is required",
+		}, nil
+	}
+
+	// Extract optional session_id from input data
+	if sessionID, ok := input.Data["session_id"].(string); ok {
+		chatArgs.SessionID = sessionID
+	}
+
+	result, err := ct.ExecuteTyped(ctx, chatArgs)
+	if err != nil {
+		return api.ToolOutput{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	// Convert result to map for ToolOutput.Data
+	resultData := map[string]interface{}{
+		"success":    result.Success,
+		"session_id": result.SessionID,
+		"message":    result.Message,
+		"stage":      result.Stage,
+		"status":     result.Status,
+		"options":    result.Options,
+		"next_steps": result.NextSteps,
+		"progress":   result.Progress,
+	}
+
+	return api.ToolOutput{
+		Success: result.Success,
+		Data:    resultData,
+	}, nil
 }
 
 // ExecuteTyped handles the chat tool execution with typed arguments
@@ -88,6 +128,48 @@ func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatT
 	}
 
 	return result, nil
+}
+
+// Name returns the unique identifier for this tool
+func (ct *ChatTool) Name() string {
+	return "chat"
+}
+
+// Description returns a human-readable description of the tool
+func (ct *ChatTool) Description() string {
+	return "Interactive chat tool for conversation mode with AI assistance"
+}
+
+// Schema returns the JSON schema for the tool's parameters and results
+func (ct *ChatTool) Schema() api.ToolSchema {
+	return api.ToolSchema{
+		Name:        "chat",
+		Description: "Interactive chat tool for conversation mode with AI assistance",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"message": map[string]interface{}{
+					"type":        "string",
+					"description": "Your message to the assistant",
+				},
+				"session_id": map[string]interface{}{
+					"type":        "string",
+					"description": "Session ID for continuing a conversation (optional for first message)",
+				},
+			},
+			"required": []string{"message"},
+		},
+		OutputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"success":    map[string]interface{}{"type": "boolean"},
+				"session_id": map[string]interface{}{"type": "string"},
+				"message":    map[string]interface{}{"type": "string"},
+				"stage":      map[string]interface{}{"type": "string"},
+				"status":     map[string]interface{}{"type": "string"},
+			},
+		},
+	}
 }
 
 // GetMetadata returns comprehensive metadata about the chat tool

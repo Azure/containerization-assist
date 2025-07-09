@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +71,7 @@ func (m *MockStdioClient) GetLastRequest() (map[string]interface{}, error) {
 
 func TestStdioLLMTransport_InvokeTool(t *testing.T) {
 	// Create stdio transport using factory for consistent configuration
-	logger := zerolog.New(nil).Level(zerolog.Disabled)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	stdioTransport := NewDefaultStdioTransport(logger)
 
 	// Create LLM transport using factory for consistent configuration

@@ -1,9 +1,10 @@
 package transport
 
 import (
+	"log/slog"
+
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
-	"github.com/rs/zerolog"
 )
 
 // TransportPair holds related stdio transports
@@ -77,7 +78,7 @@ func NewLLMTransportWithConfig(config Config, baseTransport *StdioTransport) (*S
 }
 
 // NewDefaultStdioTransport creates a stdio transport with default configuration
-func NewDefaultStdioTransport(baseLogger zerolog.Logger) *StdioTransport {
+func NewDefaultStdioTransport(baseLogger *slog.Logger) *StdioTransport {
 	config := NewDefaultConfig(baseLogger)
 	stdioTransport, err := NewStdioTransportWithConfig(config)
 	if err != nil {
@@ -88,12 +89,12 @@ func NewDefaultStdioTransport(baseLogger zerolog.Logger) *StdioTransport {
 }
 
 // NewDefaultCoreStdioTransport creates a stdio transport that implements Transport
-func NewDefaultCoreStdioTransport(baseLogger zerolog.Logger) shared.Transport {
+func NewDefaultCoreStdioTransport(baseLogger *slog.Logger) api.Transport {
 	return NewDefaultStdioTransport(baseLogger)
 }
 
 // NewDefaultLLMTransport creates an LLM transport with default configuration
-func NewDefaultLLMTransport(baseTransport *StdioTransport, baseLogger zerolog.Logger) *StdioLLMTransport {
+func NewDefaultLLMTransport(baseTransport *StdioTransport, baseLogger *slog.Logger) *StdioLLMTransport {
 	config := NewConfigWithComponent(baseLogger, "stdio_llm_transport")
 	llmTransport, err := NewLLMTransportWithConfig(config, baseTransport)
 	if err != nil {
@@ -104,7 +105,7 @@ func NewDefaultLLMTransport(baseTransport *StdioTransport, baseLogger zerolog.Lo
 }
 
 // CreateStandardLoggerPair creates consistently configured loggers for both transports
-func CreateStandardLoggerPair(baseLogger zerolog.Logger) (main, llm zerolog.Logger) {
+func CreateStandardLoggerPair(baseLogger *slog.Logger) (main, llm *slog.Logger) {
 	mainConfig := NewConfigWithComponent(baseLogger, "stdio_transport")
 	llmConfig := NewConfigWithComponent(baseLogger, "stdio_llm_transport")
 

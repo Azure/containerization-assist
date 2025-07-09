@@ -4,8 +4,11 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 )
 
-// ToolRegistry manages tool registration and discovery
-type ToolRegistry interface {
+// CoreToolRegistry manages tool registration and discovery (internal core version)
+// CoreToolRegistry - Use services.ToolRegistry for the canonical interface
+// This version is simplified for core tool management
+// Deprecated: Use services.ToolRegistry for new code
+type CoreToolRegistry interface {
 	// Register adds a new tool to the registry
 	Register(tool api.Tool) error
 
@@ -19,13 +22,13 @@ type ToolRegistry interface {
 	ListByMode(mode ServerMode) []ToolDefinition
 }
 
-// toolRegistry implements ToolRegistry
+// toolRegistry implements CoreToolRegistry
 type toolRegistry struct {
 	service *ToolService
 }
 
-// NewToolRegistry creates a new ToolRegistry service
-func NewToolRegistry(service *ToolService) ToolRegistry {
+// NewCoreToolRegistry creates a new CoreToolRegistry service
+func NewCoreToolRegistry(service *ToolService) CoreToolRegistry {
 	return &toolRegistry{
 		service: service,
 	}

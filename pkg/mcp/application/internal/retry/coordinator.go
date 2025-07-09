@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
@@ -48,7 +49,7 @@ type AttemptResult struct {
 	Success   bool                   `json:"success"`
 	Error     error                  `json:"error,omitempty"`
 	Duration  time.Duration          `json:"duration"`
-	Strategy  *FixStrategy           `json:"strategy,omitempty"`
+	Strategy  *api.FixStrategy       `json:"strategy,omitempty"`
 	Applied   bool                   `json:"applied"`
 	Timestamp time.Time              `json:"timestamp"`
 	Context   map[string]interface{} `json:"context,omitempty"`
@@ -60,7 +61,7 @@ type Context struct {
 	SessionID      string                 `json:"session_id,omitempty"`
 	Policy         *Policy                `json:"policy"`
 	AttemptHistory []AttemptResult        `json:"attempt_history"`
-	FixStrategies  []FixStrategy          `json:"fix_strategies"`
+	FixStrategies  []api.FixStrategy      `json:"fix_strategies"`
 	MaxFixAttempts int                    `json:"max_fix_attempts"`
 	Context        map[string]interface{} `json:"context"`
 	CircuitBreaker *CircuitBreakerState   `json:"circuit_breaker,omitempty"`
@@ -80,7 +81,7 @@ type CircuitBreakerState struct {
 type Coordinator struct {
 	defaultPolicy   *Policy
 	policies        map[string]*Policy
-	fixProviders    map[string]FixProvider
+	fixProviders    map[string]api.FixProvider
 	errorClassifier *ErrorClassifier
 	circuitBreakers map[string]*CircuitBreakerState
 	// Performance optimizations
@@ -92,12 +93,7 @@ type Coordinator struct {
 	rngMutex        sync.Mutex
 }
 
-// FixProvider interface for implementing fix strategies
-type FixProvider interface {
-	GetFixStrategies(ctx context.Context, err error, context map[string]interface{}) ([]FixStrategy, error)
-	ApplyFix(ctx context.Context, strategy FixStrategy, context map[string]interface{}) error
-	Name() string
-}
+// FixProvider interface removed - use api.FixProvider for the canonical interface
 
 // RetryableFunc represents a function that can be retried
 type RetryableFunc func(ctx context.Context) error
@@ -122,7 +118,7 @@ func New() *Coordinator {
 			},
 		},
 		policies:        make(map[string]*Policy),
-		fixProviders:    make(map[string]FixProvider),
+		fixProviders:    make(map[string]api.FixProvider),
 		errorClassifier: NewErrorClassifier(),
 		circuitBreakers: make(map[string]*CircuitBreakerState),
 		// Performance optimizations
@@ -143,7 +139,7 @@ func (rc *Coordinator) SetPolicy(operationType string, policy *Policy) {
 }
 
 // RegisterFixProvider registers a fix provider for a specific error type
-func (rc *Coordinator) RegisterFixProvider(errorType string, provider FixProvider) {
+func (rc *Coordinator) RegisterFixProvider(errorType string, provider api.FixProvider) {
 	rc.fixProviders[errorType] = provider
 }
 
@@ -171,7 +167,7 @@ func (rc *Coordinator) ExecuteWithFix(ctx context.Context, operationType string,
 		OperationID:    fmt.Sprintf("%s_%d", operationType, time.Now().Unix()),
 		Policy:         policy,
 		AttemptHistory: make([]AttemptResult, 0),
-		FixStrategies:  make([]FixStrategy, 0),
+		FixStrategies:  make([]api.FixStrategy, 0),
 		MaxFixAttempts: 5,
 		Context:        make(map[string]interface{}),
 		CircuitBreaker: rc.getCircuitBreaker(operationType),

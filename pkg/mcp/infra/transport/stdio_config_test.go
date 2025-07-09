@@ -1,16 +1,16 @@
 package transport
 
 import (
+	"log/slog"
 	"os"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewDefaultConfig(t *testing.T) {
 	t.Parallel()
-	logger := zerolog.New(os.Stderr)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	config := NewDefaultConfig(logger)
 
 	assert.Equal(t, "stdio_transport", config.Component)
@@ -21,7 +21,7 @@ func TestNewDefaultConfig(t *testing.T) {
 
 func TestNewConfigWithComponent(t *testing.T) {
 	t.Parallel()
-	logger := zerolog.New(os.Stderr)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	config := NewConfigWithComponent(logger, "test_component")
 
 	assert.Equal(t, "test_component", config.Component)
@@ -30,7 +30,7 @@ func TestNewConfigWithComponent(t *testing.T) {
 
 func TestConfigValidate(t *testing.T) {
 	t.Parallel()
-	logger := zerolog.New(os.Stderr)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	t.Run("valid config", func(t *testing.T) {
 		t.Parallel()
@@ -60,14 +60,14 @@ func TestConfigValidate(t *testing.T) {
 
 func TestCreateLogger(t *testing.T) {
 	t.Parallel()
-	baseLogger := zerolog.New(os.Stderr).With().Str("test", "value").Logger()
+	baseLogger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	config := NewConfigWithComponent(baseLogger, "test_component")
 
 	logger := config.CreateLogger()
 
 	// Logger should have the transport and component context
 	// We can't easily inspect the logger internals, but we can verify it doesn't panic
-	logger.Info().Msg("Test message")
+	logger.Info("Test message")
 }
 
 func TestCreateDefaultLogger(t *testing.T) {
@@ -75,5 +75,5 @@ func TestCreateDefaultLogger(t *testing.T) {
 	logger := CreateDefaultLogger("test_component")
 
 	// Should not panic and should be usable
-	logger.Info().Msg("Test message")
+	logger.Info("Test message")
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -331,9 +332,9 @@ func (m *MockFixProvider) Name() string {
 	return "mock"
 }
 
-func (m *MockFixProvider) GetFixStrategies(_ context.Context, _ error, _ map[string]interface{}) ([]FixStrategy, error) {
+func (m *MockFixProvider) GetFixStrategies(_ context.Context, _ error, _ map[string]interface{}) ([]api.FixStrategy, error) {
 	m.GetStrategiesCalled = true
-	return []FixStrategy{
+	return []api.FixStrategy{
 		{
 			Type:        "config",
 			Name:        "Mock Fix",
@@ -344,7 +345,7 @@ func (m *MockFixProvider) GetFixStrategies(_ context.Context, _ error, _ map[str
 	}, nil
 }
 
-func (m *MockFixProvider) ApplyFix(_ context.Context, _ FixStrategy, _ map[string]interface{}) error {
+func (m *MockFixProvider) ApplyFix(_ context.Context, _ api.FixStrategy, _ map[string]interface{}) error {
 	m.ApplyFixCalled = true
 	return nil
 }

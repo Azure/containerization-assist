@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -10,25 +11,23 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 	"github.com/localrivet/gomcp/server"
-	"github.com/rs/zerolog"
 )
 
-// StdioTransport implements core.Transport for stdio communication
+// StdioTransport implements core.CoreTransport for stdio communication
 type StdioTransport struct {
 	server       server.Server
 	gomcpManager interface{} // GomcpManager interface for shutdown
 	errorHandler *StdioErrorHandler
-	logger       zerolog.Logger
+	logger       *slog.Logger
 	handler      core.RequestHandler // Use core.RequestHandler instead of LocalRequestHandler
 }
 
 // NewStdioTransport creates a new stdio transport
 func NewStdioTransport() *StdioTransport {
 	// Create a default logger for now, will be updated when server is set
-	logger := zerolog.New(os.Stderr).With().
-		Timestamp().
-		Str("transport", "stdio").
-		Logger()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil)).With(
+		"transport", "stdio",
+	)
 
 	return &StdioTransport{
 		logger:       logger,
@@ -37,8 +36,8 @@ func NewStdioTransport() *StdioTransport {
 }
 
 // NewStdioTransportWithLogger creates a new stdio transport with a specific logger
-func NewStdioTransportWithLogger(logger zerolog.Logger) *StdioTransport {
-	transportLogger := logger.With().Str("transport", "stdio").Logger()
+func NewStdioTransportWithLogger(logger *slog.Logger) *StdioTransport {
+	transportLogger := logger.With("transport", "stdio")
 
 	return &StdioTransport{
 		logger:       transportLogger,
@@ -46,8 +45,8 @@ func NewStdioTransportWithLogger(logger zerolog.Logger) *StdioTransport {
 	}
 }
 
-// NewCoreStdioTransport creates a new stdio transport that implements core.Transport
-func NewCoreStdioTransport(logger zerolog.Logger) core.Transport {
+// NewCoreStdioTransport creates a new stdio transport that implements core.CoreTransport
+func NewCoreStdioTransport(logger *slog.Logger) core.CoreTransport {
 	return NewStdioTransportWithLogger(logger)
 }
 
@@ -62,7 +61,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 		systemErr.Context["component"] = "stdio_transport"
 		return systemErr
 	}
-	s.logger.Info().Msg("Starting stdio transport")
+	s.logger.Info("Starting stdio transport")
 
 	// Use GomcpManager to start the server
 	if s.gomcpManager == nil {
@@ -107,19 +106,19 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 	// Wait for context cancellation or server error
 	select {
 	case <-ctx.Done():
-		s.logger.Info().Msg("Context cancelled, stopping stdio transport")
+		s.logger.Info("Context cancelled, stopping stdio transport")
 		return s.Close()
 	case err := <-serverDone:
 		if err != nil {
-			s.logger.Error().Err(err).Msg("Stdio server error")
+			s.logger.Error("Stdio server error", "error", err)
 			return err
 		}
-		s.logger.Info().Msg("Stdio server finished")
+		s.logger.Info("Stdio server finished")
 		return nil
 	}
 }
 
-// SetHandler sets the request handler for this transport (implements core.Transport)
+// SetHandler sets the request handler for this transport (implements core.CoreTransport)
 func (s *StdioTransport) SetHandler(handler core.RequestHandler) {
 	s.handler = handler
 }
@@ -176,7 +175,7 @@ func (s *StdioTransport) SendMessage(message interface{}) error {
 	return systemErr
 }
 
-// Send implements core.Transport interface
+// Send implements core.CoreTransport interface
 func (s *StdioTransport) Send(ctx context.Context, message interface{}) error {
 	return s.SendMessage(message)
 }
@@ -195,14 +194,14 @@ func (s *StdioTransport) ReceiveMessage() (interface{}, error) {
 	return nil, systemErr
 }
 
-// Receive implements core.Transport interface
+// Receive implements core.CoreTransport interface
 func (s *StdioTransport) Receive(ctx context.Context) (interface{}, error) {
 	return s.ReceiveMessage()
 }
 
 // Close shuts down the transport
 func (s *StdioTransport) Close() error {
-	s.logger.Info().Msg("Closing stdio transport")
+	s.logger.Info("Closing stdio transport")
 
 	// Shutdown using the GomcpManager
 	if s.gomcpManager == nil {
@@ -230,11 +229,11 @@ func (s *StdioTransport) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := mgr.Shutdown(ctx); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to shutdown gomcp manager")
+		s.logger.Error("Failed to shutdown gomcp manager", "error", err)
 		return err
 	}
 
-	s.logger.Info().Msg("Stdio transport closed successfully")
+	s.logger.Info("Stdio transport closed successfully")
 	return nil
 }
 
@@ -319,8 +318,8 @@ func (s *StdioTransport) CreateErrorResponse(id interface{}, code int, message s
 }
 
 // UpdateLogger updates the transport logger (useful when server context is available)
-func (s *StdioTransport) UpdateLogger(logger zerolog.Logger) {
-	s.logger = logger.With().Str("transport", "stdio").Logger()
+func (s *StdioTransport) UpdateLogger(logger *slog.Logger) {
+	s.logger = logger.With("transport", "stdio")
 	s.errorHandler = NewStdioErrorHandler(s.logger)
 }
 
@@ -342,6 +341,6 @@ func (s *StdioTransport) CreateRecoveryResponse(originalError error, recoverySte
 }
 
 // LogTransportInfo logs transport startup information
-func LogTransportInfo(transport core.Transport) {
+func LogTransportInfo(transport core.CoreTransport) {
 	fmt.Fprintf(os.Stderr, "Starting Container Kit MCP Server on stdio transport\n")
 }

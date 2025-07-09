@@ -6,8 +6,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 )
 
-// Services provides access to all pipeline-related services
-type Services interface {
+// PipelineServices provides access to all pipeline-related services
+type PipelineServices interface {
 	// Lifecycle returns the pipeline lifecycle service
 	Lifecycle() Lifecycle
 
@@ -24,7 +24,7 @@ type Services interface {
 	Monitor() Monitor
 }
 
-// pipelineServices implements Services
+// pipelineServices implements PipelineServices
 type pipelineServices struct {
 	lifecycle      Lifecycle
 	workerRegistry WorkerRegistry
@@ -33,8 +33,8 @@ type pipelineServices struct {
 	monitor        Monitor
 }
 
-// NewPipelineServices creates a new Services container with all services
-func NewPipelineServices(logger *slog.Logger) Services {
+// NewPipelineServices creates a new PipelineServices container with all services
+func NewPipelineServices(logger *slog.Logger) PipelineServices {
 	// Create the pipeline service
 	pipelineService := NewPipelineService(logger)
 
@@ -50,7 +50,7 @@ func NewPipelineServices(logger *slog.Logger) Services {
 
 // NewPipelineServicesFromService creates services from an existing service
 // This is useful for gradual migration
-func NewPipelineServicesFromService(service Service) Services {
+func NewPipelineServicesFromService(service Service) PipelineServices {
 	return &pipelineServices{
 		lifecycle:      NewPipelineLifecycle(service),
 		workerRegistry: NewWorkerRegistry(service),
@@ -178,7 +178,7 @@ func (a *ServiceManagerAdapter) GetOrchestratorStats() OrchestratorStats {
 
 // NewPipelineServicesFromContainer creates pipeline services from a service container
 // This demonstrates the service container approach in practice
-func NewPipelineServicesFromContainer(_ services.ServiceContainer) Services {
+func NewPipelineServicesFromContainer(_ services.ServiceContainer) PipelineServices {
 	// For now, create pipeline services with a legacy approach
 	// In the future, this would wire services from the container
 	logger := slog.Default()

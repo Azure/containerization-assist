@@ -3,7 +3,7 @@ package core
 // ToolServices provides access to all tool-related services
 type ToolServices interface {
 	// Registry returns the tool registry service
-	Registry() ToolRegistry
+	Registry() CoreToolRegistry
 
 	// Executor returns the tool executor service
 	Executor() ToolExecutor
@@ -14,7 +14,7 @@ type ToolServices interface {
 
 // toolServices implements ToolServices
 type toolServices struct {
-	registry       ToolRegistry
+	registry       CoreToolRegistry
 	executor       ToolExecutor
 	schemaProvider ToolSchemaProvider
 }
@@ -26,7 +26,7 @@ func NewToolServices(server *UnifiedMCPServer) ToolServices {
 
 	// Create focused services wrapping the service
 	return &toolServices{
-		registry:       NewToolRegistry(service),
+		registry:       NewCoreToolRegistry(service),
 		executor:       NewToolExecutor(service),
 		schemaProvider: NewToolSchemaProvider(service),
 	}
@@ -36,13 +36,13 @@ func NewToolServices(server *UnifiedMCPServer) ToolServices {
 // This is useful for gradual migration
 func NewToolServicesFromService(service *ToolService) ToolServices {
 	return &toolServices{
-		registry:       NewToolRegistry(service),
+		registry:       NewCoreToolRegistry(service),
 		executor:       NewToolExecutor(service),
 		schemaProvider: NewToolSchemaProvider(service),
 	}
 }
 
-func (t *toolServices) Registry() ToolRegistry {
+func (t *toolServices) Registry() CoreToolRegistry {
 	return t.registry
 }
 

@@ -34,9 +34,9 @@ type RequestHandler interface {
 	HandleRequest(ctx context.Context, request interface{}) (interface{}, error)
 }
 
-// Transport interface for backward compatibility
+// CoreTransport interface for backward compatibility
 // Deprecated: Use TransportService from unified_interfaces.go instead
-type Transport interface {
+type CoreTransport interface {
 	Start() error
 	Stop() error
 	Send(ctx context.Context, message interface{}) error

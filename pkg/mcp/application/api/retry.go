@@ -17,8 +17,9 @@ type RetryCoordinator interface {
 
 // FixProvider provides fix strategies for errors
 type FixProvider interface {
-	GetFixStrategies(ctx context.Context, err error, metadata map[string]interface{}) ([]FixStrategy, error)
-	ApplyFix(ctx context.Context, strategy FixStrategy, metadata map[string]interface{}) error
+	GetFixStrategies(ctx context.Context, err error, context map[string]interface{}) ([]FixStrategy, error)
+	ApplyFix(ctx context.Context, strategy FixStrategy, context map[string]interface{}) error
+	Name() string
 }
 
 // RetryService consolidates all retry-related functionality

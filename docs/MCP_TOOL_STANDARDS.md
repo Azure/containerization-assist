@@ -4,89 +4,171 @@ This document defines the canonical patterns that ALL MCP tools must follow to e
 
 ## 1. Tool Registration Pattern (CANONICAL)
 
-All tools MUST be registered using the unified api.Tool interface in the MCP server core:
+Tools are currently registered using the gomcp library pattern in the MCP server:
 
 ```go
-// Tools are automatically registered through the unified interface system
-// Each tool implements api.Tool interface
-type api.Tool interface {
-    Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error)
-    Name() string
-    Description() string
-    Schema() api.ToolSchema
-}
+// Current implementation uses gomcp library for tool registration
+s.server.Tool("analyze_repository", "Analyze repository structure and generate Dockerfile recommendations",
+    func(_ *server.Context, args *struct {
+        RepoURL      string `json:"repo_url"`
+        Context      string `json:"context,omitempty"`
+        // ... other parameters
+    }) (*struct {
+        Success    bool                   `json:"success"`
+        Message    string                 `json:"message,omitempty"`
+        // ... other response fields
+    }, error) {
+        // Tool implementation
+    })
 ```
 
-### ❌ FORBIDDEN Patterns:
+### Consolidated Command Pattern (Future)
+Consolidated commands implement the api.Tool interface for unified tool execution:
+
 ```go
-// DON'T use legacy interfaces or methods - all removed
-// DON'T use type casting in registration
-if typed, ok := result.(*SomeType); ok { return typed, nil }
+type Tool interface {
+    Execute(ctx context.Context, input ToolInput) (ToolOutput, error)
+    Name() string
+    Description() string
+    Schema() ToolSchema
+}
 ```
 
 ## 2. Tool Interface Standard (CANONICAL)
 
-All tools MUST implement the api.Tool interface:
+### Current Implementation: gomcp Library Pattern
+Tools are currently implemented using gomcp library functions:
 
 ```go
-type Tool interface {
-    Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error)
-    Name() string
-    Description() string
-    Schema() api.ToolSchema
+// Current pattern: gomcp library function with typed parameters
+func toolImplementation(_ *server.Context, args *ToolArgs) (*ToolResponse, error) {
+    // Validation
+    if args.RequiredParam == "" {
+        return &ToolResponse{
+            Success: false,
+            Message: "required parameter missing",
+        }, nil
+    }
+
+    // Business logic
+    result, err := performOperation(args)
+    if err != nil {
+        return &ToolResponse{
+            Success: false,
+            Message: err.Error(),
+        }, nil
+    }
+
+    return &ToolResponse{
+        Success: true,
+        Message: "Operation completed successfully",
+        Data:    result,
+    }, nil
 }
 ```
 
-### ✅ Required Method Signatures:
-- **Execute**: `Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error)`
-- **Name**: `Name() string`
-- **Description**: `Description() string`
-- **Schema**: `Schema() api.ToolSchema`
+### Consolidated Command Pattern (Available)
+Consolidated commands implement the api.Tool interface:
+
+```go
+type Tool interface {
+    Execute(ctx context.Context, input ToolInput) (ToolOutput, error)
+    Name() string
+    Description() string
+    Schema() ToolSchema
+}
+```
 
 ## 3. Parameter Structure Standard (CANONICAL)
 
-All tools receive parameters through the unified api.ToolInput structure:
+### Current Implementation: gomcp Typed Parameters
+Tools currently receive typed parameters through gomcp library:
+
+```go
+// Tool function signature with typed parameters
+func(_ *server.Context, args *struct {
+    RepoURL      string `json:"repo_url"`
+    Context      string `json:"context,omitempty"`
+    Branch       string `json:"branch,omitempty"`
+    LanguageHint string `json:"language_hint,omitempty"`
+    Shallow      bool   `json:"shallow,omitempty"`
+}) (*ResponseType, error) {
+    // Direct access to typed parameters
+    if args.RepoURL == "" {
+        return &ResponseType{
+            Success: false,
+            Message: "repo_url is required",
+        }, nil
+    }
+
+    // Business logic using typed parameters
+    result := processRepository(args.RepoURL, args.Context)
+    return &ResponseType{
+        Success: true,
+        Data:    result,
+    }, nil
+}
+```
+
+### Consolidated Command Pattern: api.ToolInput
+Consolidated commands use the api.ToolInput structure:
 
 ```go
 type ToolInput struct {
     SessionID string                 `json:"session_id,omitempty"`
     Data      map[string]interface{} `json:"data"`
 }
-```
 
-### Parameter Extraction Pattern:
-```go
-func (t *Tool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
-    // Extract tool-specific parameters from input.Data
-    var params ToolSpecificParams
-    if rawParams, ok := input.Data["params"]; ok {
-        if typedParams, ok := rawParams.(ToolSpecificParams); ok {
-            params = typedParams
-        } else {
-            return api.ToolOutput{
-                Success: false,
-                Error:   "Invalid input type",
-            }, fmt.Errorf("invalid input type")
-        }
+// Parameter extraction in consolidated commands
+func (cmd *ConsolidatedAnalyzeCommand) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
+    // Extract parameters from input.Data
+    request, err := cmd.parseAnalysisInput(input)
+    if err != nil {
+        return api.ToolOutput{
+            Success: false,
+            Error:   err.Error(),
+        }, err
     }
 
-    // Use session ID from input if available
-    if input.SessionID != "" {
-        params.SessionID = input.SessionID
-    }
-
-    // Continue with execution...
+    // Business logic
+    result, err := cmd.performAnalysis(ctx, request, workspaceDir)
+    // ...
 }
 ```
 
-### Parameter Validation Rules:
-- **session_id**: Available from api.ToolInput.SessionID
-- **dry_run**: Tool-specific parameter in params struct
-- Parameters are validated within each tool's Execute method
-
 ## 4. Response Structure Standard (CANONICAL)
 
-All tools return results through the unified api.ToolOutput structure:
+### Current Implementation: gomcp Typed Response
+Tools currently return typed response structures:
+
+```go
+// Typed response structure for gomcp tools
+type AnalyzeResponse struct {
+    Success    bool                   `json:"success"`
+    Message    string                 `json:"message,omitempty"`
+    Analysis   map[string]interface{} `json:"analysis,omitempty"`
+    RepoURL    string                 `json:"repo_url"`
+    Language   string                 `json:"language,omitempty"`
+    Framework  string                 `json:"framework,omitempty"`
+    Dockerfile string                 `json:"dockerfile,omitempty"`
+    SessionID  string                 `json:"session_id,omitempty"`
+}
+
+// Return pattern for current implementation
+return &AnalyzeResponse{
+    Success:    true,
+    Message:    "Analysis completed successfully",
+    Analysis:   analysisResult,
+    RepoURL:    args.RepoURL,
+    Language:   detectedLanguage,
+    Framework:  detectedFramework,
+    Dockerfile: generatedDockerfile,
+    SessionID:  generatedSessionID,
+}, nil
+```
+
+### Consolidated Command Pattern: api.ToolOutput
+Consolidated commands return api.ToolOutput:
 
 ```go
 type ToolOutput struct {
@@ -94,39 +176,53 @@ type ToolOutput struct {
     Data    map[string]interface{} `json:"data,omitempty"`
     Error   string                 `json:"error,omitempty"`
 }
+
+// Return pattern for consolidated commands
+return api.ToolOutput{
+    Success: true,
+    Data: map[string]interface{}{
+        "analysis_result": response,
+    },
+}, nil
 ```
-
-### Response Pattern:
-```go
-func (t *Tool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
-    // Execute tool logic...
-
-    // On success:
-    return api.ToolOutput{
-        Success: true,
-        Data:    map[string]interface{}{"result": toolResult},
-    }, nil
-
-    // On failure:
-    return api.ToolOutput{
-        Success: false,
-        Data:    map[string]interface{}{"result": partialResult},
-        Error:   err.Error(),
-    }, err
-}
-```
-
-### ✅ Required Response Fields:
-- **Success**: Always present, indicates operation success
-- **Data**: Contains tool-specific results in "result" key
-- **Error**: Present when Success is false
 
 ## 5. Error Handling Standard (CANONICAL)
 
-Tools MUST return both api.ToolOutput and error consistently:
+### Current Implementation: gomcp Error Handling
+Tools currently handle errors within the response structure:
 
 ```go
-func (t *Tool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
+// Error handling in gomcp tools
+func toolImplementation(_ *server.Context, args *ToolArgs) (*ToolResponse, error) {
+    // Validation errors
+    if args.RequiredParam == "" {
+        return &ToolResponse{
+            Success: false,
+            Message: "required parameter missing",
+        }, nil // Return nil error, encode error in response
+    }
+
+    // Operation errors
+    result, err := performOperation(args)
+    if err != nil {
+        return &ToolResponse{
+            Success: false,
+            Message: err.Error(),
+        }, nil // Return nil error, encode error in response
+    }
+
+    return &ToolResponse{
+        Success: true,
+        Data:    result,
+    }, nil
+}
+```
+
+### Consolidated Command Pattern: Dual Error Handling
+Consolidated commands return both ToolOutput and error:
+
+```go
+func (cmd *ConsolidatedCommand) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
     // Validation errors
     if err := validateInput(input); err != nil {
         return api.ToolOutput{
@@ -135,36 +231,22 @@ func (t *Tool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput
         }, err
     }
 
-    // Execute tool logic
-    result, err := t.executeOperation(ctx, input)
+    // Operation errors
+    result, err := cmd.executeOperation(ctx, input)
     if err != nil {
         return api.ToolOutput{
             Success: false,
-            Data:    map[string]interface{}{"result": result},
             Error:   err.Error(),
         }, err
     }
 
-    // Success case
     return api.ToolOutput{
         Success: true,
-        Data:    map[string]interface{}{"result": result},
+        Data: map[string]interface{}{
+            "result": result,
+        },
     }, nil
 }
-```
-
-### ✅ Required Error Patterns:
-- **Validation errors**: Return ToolOutput with Success=false AND return error
-- **Operation errors**: Return ToolOutput with partial data AND return error
-- **Success**: Return ToolOutput with Success=true AND nil error
-
-### ❌ FORBIDDEN Error Patterns:
-```go
-// DON'T return success without error when operation fails
-return api.ToolOutput{Success: false}, nil
-
-// DON'T return error without setting Success=false
-return api.ToolOutput{Success: true}, err
 ```
 
 ## 6. Session Management Standard (CANONICAL)
@@ -360,21 +442,32 @@ func (t *Tool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput
 
 ## Compliance Checklist
 
+### Current Implementation (gomcp library)
 When implementing or updating a tool, verify:
 
-- [ ] Tool implements api.Tool interface (Execute, Name, Description, Schema)
+- [ ] Tool registered using `s.server.Tool(name, description, handlerFunc)`
+- [ ] Handler function signature: `func(_ *server.Context, args *StructType) (*ResponseType, error)`
+- [ ] Parameters defined as typed structs with JSON tags
+- [ ] Response structure includes Success field
+- [ ] Error handling encoded in response structure (Success=false)
+- [ ] Return nil error for gomcp library (errors in response)
+- [ ] Has consistent logging with tool name in logger context
+- [ ] Has test coverage for success and error cases
+- [ ] Has proper documentation for all public methods
+
+### Consolidated Command Pattern (Available)
+When implementing consolidated commands, verify:
+
+- [ ] Command implements api.Tool interface (Execute, Name, Description, Schema)
 - [ ] Execute method signature: `Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error)`
 - [ ] Constructor returns api.Tool interface
-- [ ] Parameters extracted from api.ToolInput.Data["params"]
+- [ ] Parameters extracted from api.ToolInput.Data
 - [ ] Session ID used from api.ToolInput.SessionID
 - [ ] Returns api.ToolOutput with Success, Data, and Error fields
 - [ ] Returns both ToolOutput and error consistently
 - [ ] Uses standard session acquisition pattern
-- [ ] Has consistent logging with tool name in logger context
-- [ ] Has test coverage for success and error cases
-- [ ] Has proper documentation for all public methods
 - [ ] Schema() method returns complete api.ToolSchema
 
 ---
 
-**Note**: These standards are mandatory for all MCP tools. All tools now consistently implement the api.Tool interface - no legacy patterns remain in active use.
+**Note**: Container Kit currently uses both patterns. The gomcp library pattern is actively used in the server implementation, while consolidated commands provide the api.Tool interface for potential future migration.

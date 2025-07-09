@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/internal/runtime"
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	workflow "github.com/Azure/container-kit/pkg/mcp/application/workflows"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
@@ -67,6 +68,10 @@ type serverImpl struct {
 	conversationComponents *ConversationComponents
 
 	gomcpManager api.GomcpManager
+
+	// Migration infrastructure
+	serviceContainer services.ServiceContainer
+	server           server.Server // gomcp server instance
 
 	shutdownMutex  sync.Mutex
 	isShuttingDown bool
@@ -810,6 +815,13 @@ func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 		conversationComponents: &ConversationComponents{
 			isEnabled: false,
 		},
+	}
+
+	// Initialize migration infrastructure
+	migrationConfig := DefaultServerMigrationConfig()
+	if err := server.startMigration(migrationConfig); err != nil {
+		logger.Error("Failed to initialize migration", "error", err)
+		// Continue without migration for now
 	}
 
 	logger.Info("MCP Server initialized successfully",

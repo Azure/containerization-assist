@@ -1,18 +1,18 @@
 package conversation
 
 // Services provides access to all conversation-related services
-type Services interface {
+type ConversationServices interface {
 	// PromptService returns the prompt processing service
-	PromptService() PromptService
+	PromptService() ConversationPromptService
 }
 
-// conversationServices implements Services
+// conversationServices implements ConversationServices
 type conversationServices struct {
-	promptService PromptService
+	promptService ConversationPromptService
 }
 
-// NewConversationServices creates a new Services container
-func NewConversationServices(config PromptManagerConfig) Services {
+// NewConversationServices creates a new ConversationServices container
+func NewConversationServices(config PromptManagerConfig) ConversationServices {
 	// Create the prompt service
 	promptService := NewPromptService(config)
 
@@ -23,12 +23,12 @@ func NewConversationServices(config PromptManagerConfig) Services {
 
 // NewConversationServicesFromManager creates services from an existing PromptManager
 // This is useful for gradual migration
-func NewConversationServicesFromManager(manager *PromptManager) Services {
+func NewConversationServicesFromManager(manager *PromptManager) ConversationServices {
 	return &conversationServices{
 		promptService: manager,
 	}
 }
 
-func (cs *conversationServices) PromptService() PromptService {
+func (cs *conversationServices) PromptService() ConversationPromptService {
 	return cs.promptService
 }

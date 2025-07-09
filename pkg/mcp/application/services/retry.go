@@ -16,8 +16,10 @@ type RetryPolicy struct {
 	ErrorPatterns   []string
 }
 
-// RetryCoordinator provides retry coordination for operations
-type RetryCoordinator interface {
+// ServiceRetryCoordinator - Use api.RetryCoordinator for the canonical interface
+// This is a simplified interface for basic retry operations
+// Deprecated: Use api.RetryCoordinator for new code
+type ServiceRetryCoordinator interface {
 	// SetPolicy sets the retry policy for a given operation type
 	SetPolicy(operationType string, policy *RetryPolicy)
 

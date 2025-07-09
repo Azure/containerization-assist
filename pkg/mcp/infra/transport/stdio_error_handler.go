@@ -3,32 +3,31 @@ package transport
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/localrivet/gomcp/server"
-	"github.com/rs/zerolog"
 )
 
 // StdioErrorHandler provides enhanced error handling for stdio transport
 type StdioErrorHandler struct {
-	logger zerolog.Logger
+	logger *slog.Logger
 }
 
 // NewStdioErrorHandler creates a new stdio error handler
-func NewStdioErrorHandler(logger zerolog.Logger) *StdioErrorHandler {
+func NewStdioErrorHandler(logger *slog.Logger) *StdioErrorHandler {
 	return &StdioErrorHandler{
-		logger: logger.With().Str("component", "stdio_error_handler").Logger(),
+		logger: logger.With("component", "stdio_error_handler"),
 	}
 }
 
 // HandleToolError converts tool errors into appropriate JSON-RPC error responses
 func (h *StdioErrorHandler) HandleToolError(ctx context.Context, toolName string, err error) (interface{}, error) {
-	h.logger.Error().
-		Err(err).
-		Str("tool", toolName).
-		Msg("Handling tool error for stdio transport")
+	h.logger.Error("Handling tool error for stdio transport",
+		"error", err,
+		"tool", toolName)
 
 	// Check for context cancellation first
 	if ctx.Err() != nil {
@@ -346,13 +345,12 @@ func (h *StdioErrorHandler) EnhanceErrorWithContext(errorResponse map[string]int
 
 // LogErrorDetails logs error details for debugging
 func (h *StdioErrorHandler) LogErrorDetails(toolName, errorType string, duration time.Duration, retryable bool) {
-	h.logger.Info().
-		Str("tool", toolName).
-		Str("error_type", errorType).
-		Dur("duration", duration).
-		Bool("retryable", retryable).
-		Str("transport", "stdio").
-		Msg("Tool error handled")
+	h.logger.Info("Tool error handled",
+		"tool", toolName,
+		"error_type", errorType,
+		"duration", duration,
+		"retryable", retryable,
+		"transport", "stdio")
 }
 
 // enrichGenericError converts a generic error to RichError with transport context

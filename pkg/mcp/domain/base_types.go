@@ -403,8 +403,8 @@ type HealthCheckConfig struct {
 	FailureThreshold    int    `json:"failure_threshold,omitempty"`
 }
 
-// Missing Analyzer type for partial_analyzers.go
-type Analyzer interface {
+// Missing DomainAnalyzer type for partial_analyzers.go
+type DomainAnalyzer interface {
 	Analyze(path string) (*AnalyzeResult, error)
 	Validate(params ValidateParams) error
 }

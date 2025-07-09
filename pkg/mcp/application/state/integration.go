@@ -11,16 +11,19 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
-// ServiceContainer defines the interface for service container to avoid circular dependency
-type ServiceContainer interface {
-	SessionStore() SessionStore
+// StateServiceContainer defines the interface for service container to avoid circular dependency
+// StateServiceContainer - Use services.ServiceContainer for the canonical interface
+// This version is simplified for state management use
+// Deprecated: Use services.ServiceContainer for new code
+type StateServiceContainer interface {
+	SessionStore() StateSessionStore
 	Logger() *slog.Logger
 }
 
 // StateManagementIntegration provides high-level state management integration
 type StateManagementIntegration struct {
 	manager          *UnifiedStateManager
-	serviceContainer ServiceContainer
+	serviceContainer StateServiceContainer
 	metricsObserver  *MetricsObserver
 	auditObserver    *AuditObserver
 	logger           *slog.Logger
@@ -62,7 +65,7 @@ func NewStateManagementIntegration(
 
 // NewStateManagementIntegrationWithContainer creates a new state management integration with service container
 func NewStateManagementIntegrationWithContainer(
-	serviceContainer ServiceContainer,
+	serviceContainer StateServiceContainer,
 	logger *slog.Logger,
 ) *StateManagementIntegration {
 	// Create a simple unified state manager that uses the service container
@@ -221,7 +224,7 @@ func (i *StateManagementIntegration) EnableStateReplication(ctx context.Context,
 }
 
 // GetServiceContainer returns the service container if available
-func (i *StateManagementIntegration) GetServiceContainer() ServiceContainer {
+func (i *StateManagementIntegration) GetServiceContainer() StateServiceContainer {
 	return i.serviceContainer
 }
 

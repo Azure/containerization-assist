@@ -2,8 +2,8 @@ package session
 
 import "context"
 
-// Services provides access to all session-related services
-type Services interface {
+// SessionServices provides access to all session-related services
+type SessionServices interface {
 	// Operations returns the session operations service
 	Operations() Operations
 
@@ -20,22 +20,22 @@ type Services interface {
 	ErrorTracker() ErrorTracker
 
 	// Lifecycle returns the lifecycle management service
-	Lifecycle() Lifecycle
+	Lifecycle() SessionLifecycle
 }
 
-// sessionServices implements Services
+// sessionServices implements SessionServices
 type sessionServices struct {
 	operations   Operations
 	query        Query
 	jobTracker   JobTracker
 	toolTracker  ToolTracker
 	errorTracker ErrorTracker
-	lifecycle    Lifecycle
+	lifecycle    SessionLifecycle
 }
 
-// NewSessionServices creates a new Services container from a Manager
+// NewSessionServices creates a new SessionServices container from a Manager
 // This allows gradual migration from the old Manager interface
-func NewSessionServices(manager Manager) Services {
+func NewSessionServices(manager Manager) SessionServices {
 	// Create adapters that wrap the manager
 	return &sessionServices{
 		operations:   &sessionOperationsAdapter{manager: manager},
@@ -67,7 +67,7 @@ func (s *sessionServices) ErrorTracker() ErrorTracker {
 	return s.errorTracker
 }
 
-func (s *sessionServices) Lifecycle() Lifecycle {
+func (s *sessionServices) Lifecycle() SessionLifecycle {
 	return s.lifecycle
 }
 

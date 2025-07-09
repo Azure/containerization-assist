@@ -16,7 +16,7 @@ type SessionStateProvider struct {
 }
 
 // NewSessionStateProvider creates a new session state provider
-func NewSessionStateProvider(sessionManager session.SessionManager) StateProvider {
+func NewSessionStateProvider(sessionManager session.SessionManager) InternalStateProvider {
 	return &SessionStateProvider{
 		sessionManager: sessionManager,
 	}
@@ -77,7 +77,7 @@ type ConversationStateProvider struct {
 }
 
 // NewConversationStateProvider creates a new conversation state provider
-func NewConversationStateProvider() StateProvider {
+func NewConversationStateProvider() InternalStateProvider {
 	return &ConversationStateProvider{
 		states: make(map[string]*BasicConversationState),
 	}
@@ -155,7 +155,7 @@ type WorkflowStateProvider struct {
 }
 
 // NewWorkflowStateProvider creates a new workflow state provider
-func NewWorkflowStateProvider(checkpointManager CheckpointManagerInterface) StateProvider {
+func NewWorkflowStateProvider(checkpointManager CheckpointManagerInterface) InternalStateProvider {
 	return &WorkflowStateProvider{
 		checkpointManager: checkpointManager,
 		sessions:          make(map[string]WorkflowSessionInterface),
@@ -238,7 +238,7 @@ type ToolStateProvider struct {
 }
 
 // NewToolStateProvider creates a new tool state provider
-func NewToolStateProvider() StateProvider {
+func NewToolStateProvider() InternalStateProvider {
 	return &ToolStateProvider{
 		states: make(map[string]interface{}),
 	}
@@ -303,7 +303,7 @@ type GlobalStateProvider struct {
 }
 
 // NewGlobalStateProvider creates a new global state provider
-func NewGlobalStateProvider() StateProvider {
+func NewGlobalStateProvider() InternalStateProvider {
 	return &GlobalStateProvider{
 		states: make(map[string]interface{}),
 	}
@@ -363,11 +363,11 @@ func (p *GlobalStateProvider) GetType() StateType {
 
 // ServiceContainerSessionStateProvider provides session state access through service container
 type ServiceContainerSessionStateProvider struct {
-	serviceContainer ServiceContainer
+	serviceContainer StateServiceContainer
 }
 
 // NewSessionStateProviderFromContainer creates a session state provider from service container
-func NewSessionStateProviderFromContainer(serviceContainer ServiceContainer) StateProvider {
+func NewSessionStateProviderFromContainer(serviceContainer StateServiceContainer) InternalStateProvider {
 	return &ServiceContainerSessionStateProvider{
 		serviceContainer: serviceContainer,
 	}

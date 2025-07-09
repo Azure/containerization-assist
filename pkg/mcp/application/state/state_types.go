@@ -94,7 +94,7 @@ type UnifiedStateService interface {
 	RegisterValidator(stateType StateType, validator StateValidator)
 
 	// Provider management
-	RegisterStateProvider(stateType StateType, provider StateProvider)
+	RegisterStateProvider(stateType StateType, provider InternalStateProvider)
 }
 
 // UnifiedStateServiceImpl implements UnifiedStateService
@@ -104,7 +104,7 @@ type UnifiedStateServiceImpl struct {
 	stateObservers     []StateObserver
 	stateValidators    map[StateType]StateValidator
 	eventStore         *StateEventStore
-	stateProviders     map[StateType]StateProvider
+	stateProviders     map[StateType]InternalStateProvider
 	stateHistory       map[string][]StateHistoryEntry
 	syncCoordinator    *SyncCoordinator
 	sessionManager     interface{} // Using interface{} to avoid circular deps
@@ -439,8 +439,16 @@ type ContextProviderCapabilities struct {
 	RealTimeUpdates bool                   `json:"real_time_updates"`
 }
 
-// StateProvider interface for state providers
-type StateProvider interface {
+// InternalStateProvider interface for internal state providers
+type InternalStateProvider interface {
+	GetState(ctx context.Context, key string) (interface{}, error)
+	SetState(ctx context.Context, key string, value interface{}) error
+	DeleteState(ctx context.Context, key string) error
+	GetType() StateType
+}
+
+// StateOperations interface for state operations
+type StateOperations interface {
 	GetState(ctx context.Context, key string) (interface{}, error)
 	SetState(ctx context.Context, key string, value interface{}) error
 	DeleteState(ctx context.Context, key string) error
@@ -553,7 +561,7 @@ func NewUnifiedStateService(sessionManager interface{}, logger interface{}) Unif
 		stateObservers:     make([]StateObserver, 0),
 		stateValidators:    make(map[StateType]StateValidator),
 		eventStore:         &StateEventStore{events: make(map[string][]*StateEvent), eventsByID: make(map[string]*StateEvent), maxEvents: 1000},
-		stateProviders:     make(map[StateType]StateProvider),
+		stateProviders:     make(map[StateType]InternalStateProvider),
 		stateHistory:       make(map[string][]StateHistoryEntry),
 		syncCoordinator:    &SyncCoordinator{},
 		sessionManager:     sessionManager,
@@ -569,7 +577,7 @@ func NewUnifiedStateManager(sessionManager interface{}, logger interface{}) *Uni
 		stateObservers:     make([]StateObserver, 0),
 		stateValidators:    make(map[StateType]StateValidator),
 		eventStore:         &StateEventStore{events: make(map[string][]*StateEvent), eventsByID: make(map[string]*StateEvent), maxEvents: 1000},
-		stateProviders:     make(map[StateType]StateProvider),
+		stateProviders:     make(map[StateType]InternalStateProvider),
 		stateHistory:       make(map[string][]StateHistoryEntry),
 		syncCoordinator:    &SyncCoordinator{},
 		sessionManager:     sessionManager,
@@ -886,7 +894,7 @@ func (a *AIContextAggregator) mergeContextData(comp *ComprehensiveContext, data 
 
 // ===== STATE PROVIDER IMPLEMENTATIONS =====
 
-// BasicStateProvider is a basic implementation of StateProvider
+// BasicStateProvider is a basic implementation of InternalStateProvider
 type BasicStateProvider struct {
 	stateType StateType
 	states    map[string]interface{}
@@ -894,7 +902,7 @@ type BasicStateProvider struct {
 }
 
 // NewBasicStateProvider creates a new basic state provider
-func NewBasicStateProvider(stateType StateType) StateProvider {
+func NewBasicStateProvider(stateType StateType) InternalStateProvider {
 	return &BasicStateProvider{
 		stateType: stateType,
 		states:    make(map[string]interface{}),
@@ -947,11 +955,11 @@ func (m *UnifiedStateServiceImpl) RegisterValidator(stateType StateType, validat
 }
 
 // RegisterStateProvider registers a state provider for a state type
-func (m *UnifiedStateServiceImpl) RegisterStateProvider(stateType StateType, provider StateProvider) {
+func (m *UnifiedStateServiceImpl) RegisterStateProvider(stateType StateType, provider InternalStateProvider) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.stateProviders == nil {
-		m.stateProviders = make(map[StateType]StateProvider)
+		m.stateProviders = make(map[StateType]InternalStateProvider)
 	}
 	m.stateProviders[stateType] = provider
 }

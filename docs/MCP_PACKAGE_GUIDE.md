@@ -1,223 +1,180 @@
 # Container Kit MCP Package Organization Guide
 
-> **📖 For Complete Architecture**: See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full architectural overview and current package structure.
+> **📖 For Complete Architecture**: See [THREE_LAYER_ARCHITECTURE.md](./THREE_LAYER_ARCHITECTURE.md) for the full architectural overview and current package structure.
 
 ## Package Organization Principles
 
-The Container Kit MCP package follows a layered architecture with clear separation of concerns:
+The Container Kit MCP package follows a **three-layer architecture** with clear separation of concerns as defined in [ADR-001](./architecture/adr/2025-07-07-three-context-architecture.md):
 
-### API Layer
-- **api/**: Interface definitions and contracts (single source of truth)
-  - All public interfaces for tools, registry, session, and workflow
-  - No implementation code, only contracts
-  - Zero dependencies on other packages
+### Domain Layer (Pure Business Logic)
+- **domain/**: Business rules and entities with no dependencies
+  - `/containerization/`: Core containerization domain models
+    - `/analyze/`: Repository analysis entities and rules
+    - `/build/`: Build operation entities and rules
+    - `/deploy/`: Deployment entities and rules
+    - `/scan/`: Security scanning entities and rules
+  - `/errors/`: Unified rich error system (ADR-004)
+    - `/codes/`: Centralized error code definitions
+    - Rich error context and suggestions
+  - `/security/`: Security policies and validation (ADR-005)
+    - Tag-based validation DSL
+    - Security scanning policies
+  - `/session/`: Session entities and rules
+  - `/config/`: Configuration entities and validation
+  - `/types/`: Core domain types
+  - `/internal/`: Shared domain utilities
 
-### Core Layer
-- **core/**: Server lifecycle, registry management, and coordination
-  - `/registry`: Tool registry implementation
-  - `/state`: State management
-  - `/types`: Core type definitions
-  - Depends only on API and session packages
+### Application Layer (Orchestration)
+- **application/**: Coordinates domain logic and external integrations
+  - `/api/`: Canonical interface definitions (single source of truth)
+    - All public interfaces for tools, registry, session, and workflow
+    - No implementation code, only contracts
+  - `/core/`: Server lifecycle & registry management
+    - MCP server implementation
+    - Tool registry and orchestration
+    - Service container integration
+  - `/commands/`: Consolidated command implementations
+    - `analyze_consolidated.go`: Repository analysis tool
+    - `build_consolidated.go`: Docker build operations
+    - `deploy_consolidated.go`: Kubernetes deployment
+    - `scan_consolidated.go`: Security scanning
+  - `/orchestration/`: Tool coordination & workflow execution
+    - Pipeline management
+    - Background workers
+    - Atomic operations
+  - `/services/`: Service interfaces for dependency injection (ADR-006)
+    - Service container pattern
+    - Dependency injection interfaces
+  - `/state/`: Application state management
+    - Session state coordination
+    - Context enrichment
+  - `/workflows/`: Workflow management
+    - Multi-step operations
+    - Job execution service
+  - `/internal/`: Internal application implementations
+    - Conversation handling
+    - Runtime management
+    - Retry coordination
 
-- **tools/**: Container operations (analyze, build, deploy, scan)
-  - `/analyze`: Repository analysis and Dockerfile generation
-  - `/build`: Docker build operations with AI-powered fixing
-  - `/deploy`: Kubernetes manifest generation and deployment
-  - `/scan`: Security vulnerability scanning
-  - `/detectors`: Database and framework detection
-  - Independent of core, uses API contracts
-
-- **session/**: Session management and persistence
-  - Session lifecycle (create, get, delete)
-  - Workspace management
-  - State persistence
-  - Used by tools and workflow
-
-- **workflow/**: Multi-step operation orchestration
-  - Workflow engine for complex operations
-  - Tool coordination
-  - Atomic operations with rollback
-  - Depends on tools through API
-
-### Infrastructure Layer
-- **transport/**: MCP protocol transports (stdio, HTTP)
-  - Protocol implementation
-  - Request/response handling
-  - Error handling
-  - Depends on core for server integration
-
-- **storage/**: Persistence implementations (BoltDB)
-  - `/boltdb`: BoltDB implementation
-  - Key-value storage
-  - Session persistence
-  - Minimal dependencies
-
-- **security/**: Validation and security scanning
-  - `/validation`: Input validation and sanitization
-  - `/scanner`: Security vulnerability scanning integration
-  - Used by tools for validation
-  - Independent of other packages
-
-- **templates/**: Kubernetes manifest templates
-  - YAML templates for K8s resources
-  - Template rendering
-  - Pure data/configuration
-  - No code dependencies
-
-- **internal/**: Implementation details and utilities
-  - `/errors`: Unified error system
-  - `/types`: Shared type definitions
-  - `/utils`: Utility functions
-  - `/common`: Common functionality
-  - `/retry`: Retry mechanisms
-  - `/logging`: Logging utilities
-  - No dependencies on higher layers
+### Infrastructure Layer (External Integrations)
+- **infra/**: External system integrations and adapters
+  - `/transport/`: MCP protocol transports (stdio, HTTP)
+    - Protocol implementation
+    - Request/response handling
+    - Error handling
+  - `/persistence/`: BoltDB storage layer
+    - Session persistence
+    - State management
+  - `/templates/`: YAML templates (ADR-002)
+    - Kubernetes manifest templates
+    - Dockerfile templates
+    - Template rendering with `go:embed`
+  - `/docker/`: Docker client integration
+    - Build operations
+    - Image management
+  - `/k8s/`: Kubernetes integration
+    - Manifest generation
+    - Deployment operations
+  - `/telemetry/`: Monitoring and observability
+    - Metrics collection
+    - Tracing integration
 
 ## Import Guidelines
 
-### Maximum Depth: 3 Levels
-All imports must follow the pattern: `pkg/mcp/package/[subpackage]`
+### Three-Layer Architecture Rules
+All imports must follow the three-layer dependency rules:
 
 ✅ **Good Examples**:
 ```go
-import "github.com/Azure/container-kit/pkg/mcp/api"
-import "github.com/Azure/container-kit/pkg/mcp/tools/build"
-import "github.com/Azure/container-kit/pkg/mcp/core/registry"
+import "github.com/Azure/container-kit/pkg/mcp/application/api"
+import "github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
+import "github.com/Azure/container-kit/pkg/mcp/infra/transport"
 ```
 
 ❌ **Bad Examples**:
 ```go
-import "github.com/Azure/container-kit/pkg/mcp/application/internal/pipeline/distributed"
-import "github.com/Azure/container-kit/pkg/mcp/domain/containerization/build/strategies"
+import "github.com/Azure/container-kit/pkg/mcp/domain/containerization/build/strategies/deep/nested"
+import "github.com/Azure/container-kit/pkg/mcp/infra/transport/http/handlers/middleware/auth"
 ```
 
 ### Dependency Rules
 
-#### API Package
-- **Purpose**: Interface definitions only
-- **Dependencies**: None (interfaces only)
-- **Used by**: All other packages
+#### Domain Layer
+- **Purpose**: Pure business logic and entities
+- **Dependencies**: None (no external dependencies)
+- **Used by**: Application and Infrastructure layers
+- **Forbidden**: Any imports from application/ or infra/
 
-#### Core Package
-- **Purpose**: Server lifecycle and coordination
-- **Dependencies**: api/, session/
-- **Used by**: transport/, workflow/
-- **Forbidden**: tools/ (use API interfaces)
+#### Application Layer
+- **Purpose**: Orchestration and coordination
+- **Dependencies**: Domain layer only
+- **Used by**: Infrastructure layer and external consumers
+- **Forbidden**: Imports from infra/ (use dependency injection)
 
-#### Tools Package
-- **Purpose**: Container operations implementation
-- **Dependencies**: api/, session/, security/
-- **Used by**: workflow/
-- **Forbidden**: core/ (use API interfaces)
-
-#### Session Package
-- **Purpose**: Session and workspace management
-- **Dependencies**: api/, storage/
-- **Used by**: core/, tools/, workflow/
-- **Forbidden**: No circular dependencies
-
-#### Workflow Package
-- **Purpose**: Multi-step operation orchestration
-- **Dependencies**: api/, tools/, session/
+#### Infrastructure Layer
+- **Purpose**: External integrations and adapters
+- **Dependencies**: Domain and Application layers
 - **Used by**: External consumers
-- **Forbidden**: core/ (use API interfaces)
+- **Forbidden**: No restrictions (top level of dependency hierarchy)
 
 ## Architecture Boundaries
 
-Boundaries are enforced by `tools/check-boundaries`:
+Boundaries are enforced by architectural decision records (ADRs):
 
-```bash
-# Validate architecture compliance
-tools/check-boundaries/check-boundaries -strict ./pkg/mcp
-```
-
-### Layer Rules
-1. **API**: No dependencies (pure interfaces)
-2. **Core**: Only depends on API and session
-3. **Tools**: Only depends on API, session, and security
-4. **Infrastructure**: Minimal dependencies, no circular refs
-5. **Internal**: No dependencies on higher layers
+### Layer Rules (ADR-001)
+1. **Domain**: No dependencies (pure business logic)
+2. **Application**: Only depends on Domain layer
+3. **Infrastructure**: Depends on Domain and Application layers
+4. **No circular dependencies**: Strict enforcement
+5. **Service container**: Manual dependency injection (ADR-006)
 
 ### Enforcement
-- Automated boundary checking in CI/CD
-- Pre-commit hooks for local validation
-- Zero tolerance for violations
-- Clear error messages with resolution guidance
+- Architectural review in code reviews
+- ADR compliance checking
+- Clear layer separation
+- Service container pattern for dependency injection
 
-## Migration from Old Structure
+## Current Architecture Structure
 
-### Before (86 packages, 5-level depth)
+### Three-Layer Architecture (Final)
 ```
 pkg/mcp/
-├── application/
-│   ├── api/
-│   ├── core/
-│   ├── internal/
-│   │   ├── pipeline/
-│   │   ├── runtime/
-│   │   └── ...
-│   ├── orchestration/
-│   └── services/
-├── domain/
+├── domain/              # Business logic (no dependencies)
 │   ├── containerization/
 │   │   ├── analyze/
 │   │   ├── build/
-│   │   └── ...
-│   ├── errors/
-│   └── ...
-├── infra/
-│   ├── transport/
-│   ├── persistence/
-│   └── ...
-└── services/
-    └── ...
+│   │   ├── deploy/
+│   │   └── scan/
+│   ├── errors/          # Rich error system (ADR-004)
+│   │   └── codes/
+│   ├── security/        # Tag-based validation (ADR-005)
+│   ├── session/
+│   ├── config/
+│   └── internal/
+├── application/         # Orchestration (depends on domain)
+│   ├── api/            # Canonical interfaces
+│   ├── core/           # Server & registry
+│   ├── commands/       # Consolidated tools
+│   ├── orchestration/  # Pipeline management
+│   ├── services/       # Service container (ADR-006)
+│   ├── state/          # State management
+│   ├── workflows/      # Multi-step operations
+│   └── internal/       # Internal implementations
+└── infra/              # External integrations (depends on both)
+    ├── transport/      # MCP protocol
+    ├── persistence/    # BoltDB storage
+    ├── templates/      # YAML templates (ADR-002)
+    ├── docker/         # Docker integration
+    ├── k8s/            # Kubernetes integration
+    └── telemetry/      # Monitoring
 ```
 
-### After (27 packages, ≤3-level depth)
-```
-pkg/mcp/
-├── api/
-├── core/
-│   ├── registry/
-│   ├── state/
-│   └── types/
-├── tools/
-│   ├── analyze/
-│   ├── build/
-│   ├── deploy/
-│   ├── scan/
-│   └── detectors/
-├── session/
-├── workflow/
-├── transport/
-├── storage/
-│   └── boltdb/
-├── security/
-│   ├── validation/
-│   └── scanner/
-├── templates/
-└── internal/
-    ├── errors/
-    ├── types/
-    ├── utils/
-    ├── common/
-    ├── retry/
-    ├── logging/
-    └── processing/
-```
-
-### Import Updates
-```go
-// Old structure
-import "github.com/Azure/container-kit/pkg/mcp/application/api"
-import "github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
-import "github.com/Azure/container-kit/pkg/mcp/infra/transport"
-
-// New structure
-import "github.com/Azure/container-kit/pkg/mcp/api"
-import "github.com/Azure/container-kit/pkg/mcp/tools/build"
-import "github.com/Azure/container-kit/pkg/mcp/transport"
-```
+### Key Patterns
+- **Service Container**: Manual dependency injection (ADR-006)
+- **Rich Errors**: Unified error system with context (ADR-004)
+- **Tag Validation**: Struct tag-based validation DSL (ADR-005)
+- **Embedded Templates**: YAML templates with go:embed (ADR-002)
+- **Consolidated Commands**: Single files replace multiple tool packages
 
 ## Quality Standards
 
@@ -288,7 +245,9 @@ import "github.com/Azure/container-kit/pkg/mcp/transport"
 
 ## References
 
-- [Architecture Decision Records](../architecture/adr/)
-- [Migration Guide](./MCP_MIGRATION_GUIDE.md)
-- [Boundary Checker Tool](../../tools/check-boundaries/)
-- [Quality Gates](../../scripts/quality_gates.sh)
+- [Three-Layer Architecture](./THREE_LAYER_ARCHITECTURE.md)
+- [Architecture Decision Records](./architecture/adr/)
+- [Tool Development Guide](./ADDING_NEW_TOOLS.md)
+- [Error Handling Guide](./ERROR_HANDLING_GUIDE.md)
+- [Service Container Pattern](./architecture/adr/2025-01-07-manual-dependency-injection.md)
+- [Quality Standards](./QUALITY_STANDARDS.md)
