@@ -1,0 +1,10 @@
+=== PERFORMANCE CHECK ===
+Date: Wed Jul  9 19:44:05 EDT 2025
+
+Benchmarks found:
+BenchmarkHandleConversation-20    	time=2025-07-09T19:43:58.288-04:00 level=INFO msg="Using provided canonical orchestrator for conversation handler"
+BenchmarkStructValidation-20    	  137202	      8823 ns/op	   16237 B/op	     154 allocs/op
+✅ All benchmarks within 300μs target
+
+Build issues found:
+4 packages failed to build
