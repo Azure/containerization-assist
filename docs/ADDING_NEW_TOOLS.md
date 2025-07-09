@@ -22,8 +22,8 @@ For experienced developers, here's the minimal checklist:
 3. ✅ Implement `ExecuteWithContext()` method with proper signatures
 4. ✅ Use `types.BaseToolArgs` and `types.BaseToolResponse`
 5. ✅ Return actual errors (never use `success=false` patterns)
-6. ✅ Integrate `StandardizedSessionValidationMixin` for session management
-7. ✅ Register tool in `pkg/mcp/internal/server/core.go` using `ExecuteWithContext` pattern
+6. ✅ Integrate session management using domain/session patterns
+7. ✅ Register tool in `pkg/mcp/application/core/server_impl.go` using unified interface system
 8. ✅ Add unit tests and run integration tests
 
 > **📖 Important**: All patterns in this guide follow the canonical standards defined in [MCP_TOOL_STANDARDS.md](./MCP_TOOL_STANDARDS.md). When in doubt, reference that document.
@@ -55,7 +55,7 @@ Our current tools follow the domain-based structure:
 ### Required Method Signature
 
 ```go
-func (t *YourTool) ExecuteWithContext(ctx *server.Context, args *YourArgs) (*YourResult, error)
+func (t *YourTool) Execute(ctx context.Context, input ToolInput) (ToolOutput, error)
 ```
 
 ### Required Argument Structure
@@ -403,7 +403,7 @@ func TestYourToolIntegration(t *testing.T) {
 
 ## Registration Process
 
-Register your tool in `pkg/mcp/internal/server/core.go`:
+Register your tool in `pkg/mcp/application/core/server_impl.go`:
 
 ```go
 // In registerEssentialContainerizationTools function

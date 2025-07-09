@@ -82,15 +82,15 @@ return errors.NewError().
 
 #### No Print Statements
 - **NEVER** use `fmt.Print*`, `log.Print*`, or `print()` statements
-- Use structured logging with `slog` (per ADR-003)
+- Use structured logging with `zerolog` (actual implementation)
 ```go
 // Bad
 fmt.Println("Starting build process")
 log.Printf("Build failed: %v", err)
 
 // Good
-logger.Info("Starting build process", "session_id", sessionID)
-logger.Error("Build failed", "error", err, "session_id", sessionID)
+logger.Info().Str("session_id", sessionID).Msg("Starting build process")
+logger.Error().Err(err).Str("session_id", sessionID).Msg("Build failed")
 ```
 
 #### Dependency Management
@@ -287,12 +287,18 @@ pkg/mcp/
 │   ├── commands/       # Command implementations
 │   ├── core/           # Server lifecycle & registry
 │   ├── orchestration/  # Tool coordination & workflows
-│   └── services/       # Service interfaces
+│   ├── services/       # Service interfaces
+│   ├── state/          # Application state management
+│   ├── tools/          # Tool implementations
+│   └── workflows/      # Workflow management
 └── infra/              # Infrastructure layer - external integrations
-    ├── adapters/       # Interface adapters
     ├── persistence/    # BoltDB storage
     ├── transport/      # MCP protocol transports
-    └── templates/      # YAML templates
+    ├── templates/      # YAML templates
+    ├── retry/          # Retry coordination
+    ├── docker_*.go     # Docker integration files
+    ├── k8s_*.go        # Kubernetes integration files
+    └── internal/       # Infrastructure utilities
 ```
 
 ### Import Organization

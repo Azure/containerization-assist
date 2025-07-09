@@ -110,7 +110,7 @@ jobs:
         # Find all generated schema files
         echo "Validating generated schema files..."
 
-        for schema_file in $(find pkg/mcp/internal -name "generated_*.go" -type f); do
+        for schema_file in $(find pkg/mcp -name "generated_*.go" -type f); do
           echo "Checking $schema_file..."
 
           # Check that the file is properly formatted Go code
@@ -133,9 +133,21 @@ jobs:
         # Build the schema generator
         make build-schemaGen
 
-        # Test on the example file
-        cd pkg/mcp/internal/example
-        ../../../../bin/schemaGen -input=tool_args.go -output=test_generated.go -package=example
+        # Create a simple test file for schema generation
+        mkdir -p /tmp/schema-test
+        cat > /tmp/schema-test/test_args.go << 'EOF'
+        package test
+
+        // TestArgs represents test arguments
+        type TestArgs struct {
+            Name string `json:"name"`
+            Count int  `json:"count"`
+        }
+        EOF
+
+        # Test schema generation
+        cd /tmp/schema-test
+        /home/runner/work/container-kit/container-kit/bin/schemaGen -input=test_args.go -output=test_generated.go -package=test
 
         # Check that generation succeeded
         if [ ! -f test_generated.go ]; then
@@ -143,8 +155,12 @@ jobs:
           exit 1
         fi
 
-        # Clean up test file
-        rm -f test_generated.go
+        # Verify the generated file compiles
+        go mod init test-schema 2>/dev/null || true
+        go build -o /dev/null test_generated.go 2>&1 || {
+          echo "::error::Generated schema file has compilation errors"
+          exit 1
+        }
 
         echo "✅ Schema generation test passed!"
 
@@ -168,7 +184,7 @@ jobs:
         missing_directives=0
 
         # Find all files with Args structs
-        for file in $(find pkg/mcp/internal -name "*.go" -type f | xargs grep -l "type.*Args struct" | grep -v "_test.go" | grep -v "generated_"); do
+        for file in $(find pkg/mcp -name "*.go" -type f | xargs grep -l "type.*Args struct" 2>/dev/null | grep -v "_test.go" | grep -v "generated_" || true); do
           # Skip example and test files
           if [[ "$file" == *"/example/"* ]] || [[ "$file" == *"_test.go" ]]; then
             continue
@@ -192,7 +208,7 @@ jobs:
         echo "Checking that tools implement Schema() method..."
 
         # This is a simple check - in practice you might want to use go/ast
-        for tool_file in $(find pkg/mcp/internal -name "*_atomic.go" -o -name "*_tool.go" | grep -v "_test.go"); do
+        for tool_file in $(find pkg/mcp -name "*_atomic.go" -o -name "*_tool.go" 2>/dev/null | grep -v "_test.go" || true); do
           # Check if file has a tool struct (rough heuristic)
           if grep -q "type.*Tool struct" "$tool_file"; then
             # Check if it has a Schema() method

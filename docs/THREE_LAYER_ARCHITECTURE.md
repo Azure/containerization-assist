@@ -19,7 +19,7 @@ The domain layer contains the core business logic and entities. It has no depend
 - **workflow/**: Workflow domain logic
 - **internal/**: Shared utilities (common, utils, types, constants)
 
-**Files:** 101 Go files
+**Files:** 116 Go files
 
 ### 2. Application Layer (`pkg/mcp/application/`)
 The application layer orchestrates use cases and coordinates between domain and infrastructure.
@@ -28,32 +28,32 @@ The application layer orchestrates use cases and coordinates between domain and 
 - **api/**: Canonical interface definitions (single source of truth)
 - **commands/**: Consolidated command implementations
 - **core/**: Server lifecycle and registry management
-- **interfaces/**: Compatibility layer with type aliases
+- **conversation/**: Conversation handling and auto-fix helpers
 - **knowledge/**: Knowledge management and AI integration
 - **orchestration/**: Tool coordination and workflow execution
-- **server/**: MCP server implementation
 - **services/**: Service interfaces for dependency injection
 - **state/**: Application state management
 - **tools/**: Tool implementations
 - **workflows/**: Workflow management
-- **internal/**: Internal implementations (config, conversation, runtime, retry)
+- **internal/**: Internal implementations (conversation, retry, runtime)
 
-**Files:** 153 Go files
+**Files:** 168 Go files
 
 ### 3. Infrastructure Layer (`pkg/mcp/infra/`)
 The infrastructure layer handles external integrations and technical concerns.
 
 **Key Components:**
-- **adapters/**: Adapter implementations for application interfaces
-- **docker/**: Docker client integration
-- **k8s/**: Kubernetes client integration
-- **persistence/**: BoltDB storage implementation
-- **telemetry/**: Monitoring and observability
-- **templates/**: YAML template resources
-- **transport/**: MCP protocol transports (stdio, HTTP)
+- **persistence/**: BoltDB storage implementation (session_store.go, persistence.go, memory_store.go)
+- **templates/**: YAML template resources with go:embed integration
+- **transport/**: MCP protocol transports (stdio, HTTP, client implementations)
+- **retry/**: Retry coordination services
+- **docker_integration.go** & **docker_operations.go**: Docker client integration
+- **k8s_integration.go** & **k8s_operations.go**: Kubernetes client integration
 - **internal/**: Infrastructure utilities (logging, migration)
 
-**Files:** 38 Go files
+**Files:** 42 Go files
+
+**Note:** Infrastructure components are implemented as individual files rather than separate package directories, providing a clean and efficient organization.
 
 ## Dependency Rules
 
@@ -120,7 +120,7 @@ The architecture was migrated from a flat structure with 30+ packages to this cl
 - No circular dependencies
 - Well-defined interfaces
 - 3 main layers + internal packages
-- Total: 292 Go files organized by layer
+- Total: 326 Go files organized by layer
 
 ## Benefits
 

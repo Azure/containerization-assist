@@ -37,6 +37,8 @@ graph TD
             API[application/api/<br/>Canonical Interfaces<br/>Single Source of Truth]
             Commands[application/commands/<br/>Command Implementations]
             Core[application/core/<br/>Server & Registry]
+            Conversation[application/conversation/<br/>Chat & Auto-fix]
+            Knowledge[application/knowledge/<br/>Knowledge Base]
             Orchestration[application/orchestration/<br/>Pipeline & Workflow]
             Services[application/services/<br/>Service Interfaces]
             State[application/state/<br/>State Management]
@@ -48,6 +50,8 @@ graph TD
         Application --> API
         Application --> Commands
         Application --> Core
+        Application --> Conversation
+        Application --> Knowledge
         Application --> Orchestration
         Application --> Services
         Application --> State
@@ -59,24 +63,22 @@ graph TD
     subgraph "Infrastructure Layer (External Integrations)"
         Infrastructure[infra/]
 
-        subgraph "Infrastructure Packages"
-            Adapters[infra/adapters/<br/>Interface Adapters]
-            Docker[infra/docker/<br/>Docker Integration]
-            K8s[infra/k8s/<br/>Kubernetes Integration]
+        subgraph "Infrastructure Components"
             Persistence[infra/persistence/<br/>BoltDB Storage]
-            Telemetry[infra/telemetry/<br/>Monitoring]
-            Templates[infra/templates/<br/>YAML Templates]
+            Templates[infra/templates/<br/>YAML Templates with go:embed]
             Transport[infra/transport/<br/>MCP Protocol]
+            Retry[infra/retry/<br/>Retry Coordination]
+            DockerInfra[infra/docker_*.go<br/>Docker Integration]
+            K8sInfra[infra/k8s_*.go<br/>Kubernetes Integration]
             InfraInternal[infra/internal/<br/>logging/, migration/]
         end
 
-        Infrastructure --> Adapters
-        Infrastructure --> Docker
-        Infrastructure --> K8s
         Infrastructure --> Persistence
-        Infrastructure --> Telemetry
         Infrastructure --> Templates
         Infrastructure --> Transport
+        Infrastructure --> Retry
+        Infrastructure --> DockerInfra
+        Infrastructure --> K8sInfra
         Infrastructure --> InfraInternal
     end
 
@@ -85,6 +87,8 @@ graph TD
     API --> Domain
     Commands --> Domain
     Core --> Domain
+    Conversation --> Domain
+    Knowledge --> Domain
     Orchestration --> Domain
     Services --> Domain
     State --> Domain
@@ -93,14 +97,12 @@ graph TD
     AppInternal --> Domain
 
     %% Infrastructure can depend on Application and Domain
-    Adapters --> Application
-    Adapters --> Domain
-    Docker --> Application
-    K8s --> Application
     Persistence --> Application
-    Telemetry --> Application
     Templates --> Application
     Transport --> Application
+    Retry --> Application
+    DockerInfra --> Application
+    K8sInfra --> Application
     InfraInternal --> Domain
 
     %% Service Container Pattern (ADR-006)
@@ -127,8 +129,8 @@ graph TD
     ServiceContainer --> ErrorReporter
 
     %% External Systems Integration
-    Docker --> DockerEngine[Docker Engine]
-    K8s --> KubernetesAPI[Kubernetes API]
+    DockerInfra --> DockerEngine[Docker Engine]
+    K8sInfra --> KubernetesAPI[Kubernetes API]
     Persistence --> BoltDB[BoltDB Files]
     Scanner --> Trivy[Trivy Scanner]
     Scanner --> Grype[Grype Scanner]
@@ -145,7 +147,7 @@ graph TD
     classDef externalSys fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
 
     class Domain,Config,Containerization,Errors,Security,Session,Types,Workflow,Internal domainLayer
-    class Application,API,Commands,Core,Orchestration,Services,State,Tools,Workflows,AppInternal applicationLayer
-    class Infrastructure,Adapters,Docker,K8s,Persistence,Telemetry,Templates,Transport,InfraInternal infraLayer
+    class Application,API,Commands,Core,Conversation,Knowledge,Orchestration,Services,State,Tools,Workflows,AppInternal applicationLayer
+    class Infrastructure,Persistence,Templates,Transport,Retry,DockerInfra,K8sInfra,InfraInternal infraLayer
     class ServiceContainer,SessionStore,SessionState,BuildExecutor,ToolRegistry,WorkflowExecutor,Scanner,ConfigValidator,ErrorReporter serviceLayer
     class DockerEngine,KubernetesAPI,BoltDB,Trivy,Grype externalSys

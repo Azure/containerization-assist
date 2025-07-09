@@ -148,7 +148,7 @@ generate: build-schemaGen
 .PHONY: build-schemaGen
 build-schemaGen:
 	@echo "Building schema generator..."
-	@go build -o bin/schemaGen ./pkg/mcp/cmd/schemaGen
+	@go build -o bin/schemaGen ./cmd/mcp-schema-gen
 
 .PHONY: check-schemas
 check-schemas:

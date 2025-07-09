@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -22,6 +23,11 @@ type BoundaryInfo struct {
 }
 
 func runBoundaries(outputFile string) error {
+	// Generate error inventory first
+	fmt.Printf("🔍 Generating error inventory...\n")
+	if err := generateErrorInventory("/tmp/error_inventory.csv"); err != nil {
+		return fmt.Errorf("generating error inventory: %w", err)
+	}
 
 	// Read error inventory CSV
 	locations, err := readErrorLocations("/tmp/error_inventory.csv")
@@ -229,4 +235,70 @@ func printSummary(boundaries map[string]*BoundaryInfo) {
 			fmt.Printf("  %s: %d\n", reason, count)
 		}
 	}
+}
+
+func generateErrorInventory(csvFile string) error {
+	file, err := os.Create(csvFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Walk through pkg/mcp directory to find error calls
+	err = filepath.Walk("pkg/mcp", func(path string, _ os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		// Parse the Go file
+		fset := token.NewFileSet()
+		node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			return nil // Skip files with parse errors
+		}
+
+		// Find error calls
+		ast.Inspect(node, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+
+			// Check if this is an error-related call
+			if isErrorCall(call) {
+				pos := fset.Position(call.Pos())
+				location := fmt.Sprintf("./%s:%d", path, pos.Line)
+				if _, err := file.WriteString(location + "\n"); err != nil {
+					return err
+				}
+			}
+			return true
+		})
+
+		return nil
+	})
+
+	return err
+}
+
+func isErrorCall(call *ast.CallExpr) bool {
+	// Check for fmt.Errorf
+	if selector, ok := call.Fun.(*ast.SelectorExpr); ok {
+		if ident, ok := selector.X.(*ast.Ident); ok {
+			if ident.Name == "fmt" && selector.Sel.Name == "Errorf" {
+				return true
+			}
+			if ident.Name == "errors" && selector.Sel.Name == "New" {
+				return true
+			}
+			if ident.Name == "mcperrors" && selector.Sel.Name == "NewError" {
+				return true
+			}
+		}
+	}
+	return false
 }
