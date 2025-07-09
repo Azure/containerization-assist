@@ -132,7 +132,7 @@ type adapter struct {
 - [ ] Fix domain/common interface duplicates
 - [ ] Target: 8 duplicates → 0 duplicates
 
-### Step 3: Phase 2 - Retry System (15 minutes)  
+### Step 3: Phase 2 - Retry System (15 minutes)
 - [ ] Consolidate retry interfaces
 - [ ] Target: 3 duplicates → 0 duplicates
 

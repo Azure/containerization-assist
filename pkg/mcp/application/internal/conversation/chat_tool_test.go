@@ -51,7 +51,7 @@ func TestChatTool_Execute(t *testing.T) {
 				},
 			},
 			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
-			expectedErr: "message parameter is required",
+			expectedErr: "", // Should return ToolOutput with Success: false, not an error
 		},
 	}
 
@@ -63,10 +63,16 @@ func TestChatTool_Execute(t *testing.T) {
 			if tt.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
-				assert.Nil(t, result)
+				assert.False(t, result.Success)
 			} else {
 				assert.NoError(t, err)
-				assert.NotNil(t, result)
+				if tt.name == "invalid args type" {
+					// For validation errors, we should get a failed ToolOutput
+					assert.False(t, result.Success)
+					assert.Contains(t, result.Error, "message parameter is required")
+				} else {
+					assert.True(t, result.Success)
+				}
 			}
 		})
 	}

@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
+	"github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
@@ -239,18 +241,16 @@ type SessionState interface {
 }
 
 // BuildExecutor handles container build operations
+// This interface wraps the core docker.Service to provide focused build operations
 type BuildExecutor interface {
-	// BuildImage builds a container image
-	BuildImage(ctx context.Context, options BuildOptions) (*BuildResult, error)
+	// QuickBuild performs a quick build without template generation
+	QuickBuild(ctx context.Context, dockerfileContent string, targetDir string, options docker.BuildOptions) (*docker.BuildResult, error)
 
-	// PushImage pushes an image to a registry
-	PushImage(ctx context.Context, options PushOptions) error
+	// QuickPush performs a quick push of an already built image
+	QuickPush(ctx context.Context, imageRef string, options docker.PushOptions) (*docker.RegistryPushResult, error)
 
-	// PullImage pulls an image from a registry
-	PullImage(ctx context.Context, options PullOptions) error
-
-	// TagImage tags an image
-	TagImage(ctx context.Context, source, target string) error
+	// QuickPull performs a quick pull of an image
+	QuickPull(ctx context.Context, imageRef string) (*docker.PullResult, error)
 }
 
 // ToolRegistry manages tool registration and discovery
@@ -281,15 +281,16 @@ type WorkflowExecutor interface {
 }
 
 // Scanner provides security scanning capabilities
+// This interface wraps the core security.Service
 type Scanner interface {
 	// ScanImage scans a container image for vulnerabilities
-	ScanImage(ctx context.Context, image string, options ScanOptions) (*ScanResult, error)
+	ScanImage(ctx context.Context, image string, options security.ScanOptionsService) (*security.ScanResult, error)
 
 	// ScanDirectory scans a directory for secrets
-	ScanDirectory(ctx context.Context, path string, options ScanOptions) (*ScanResult, error)
+	ScanDirectory(ctx context.Context, path string, options security.ScanOptionsService) (*security.ScanResult, error)
 
-	// GetScanners returns available scanner types
-	GetScanners() []string
+	// GetAvailableScanners returns available scanner types
+	GetAvailableScanners() []string
 }
 
 // ConfigValidator validates configuration using BETA's validation framework
@@ -356,15 +357,10 @@ type K8sClient interface {
 }
 
 // Analyzer provides code and repository analysis
+// This interface wraps the core analysis.RepositoryAnalyzer
 type Analyzer interface {
-	// AnalyzeRepository analyzes a repository
-	AnalyzeRepository(ctx context.Context, path string) (*AnalysisResult, error)
-
-	// DetectFramework detects the framework used
-	DetectFramework(ctx context.Context, path string) (string, error)
-
-	// GenerateDockerfile generates a Dockerfile
-	GenerateDockerfile(ctx context.Context, analysis *AnalysisResult) (string, error)
+	// AnalyzeRepository analyzes a repository (matches core analysis.RepositoryAnalyzer)
+	AnalyzeRepository(repoPath string) (*analysis.AnalysisResult, error)
 }
 
 // AnalysisService provides analysis operations for backward compatibility
@@ -381,79 +377,15 @@ type AnalysisService interface {
 
 // Supporting types
 
-// BuildOptions configures image builds
-type BuildOptions struct {
-	ContextPath    string
-	DockerfilePath string
-	Tags           []string
-	BuildArgs      map[string]string
-	NoCache        bool
-	Platform       string
-}
+// Use core docker types directly
+// type BuildOptions = docker.BuildOptions
+// type BuildResult = docker.BuildResult
+// type PushOptions = docker.PushOptions
+// type PullOptions = docker.PullOptions
 
-// BuildResult contains build results
-type BuildResult struct {
-	ImageID   string
-	ImageSize int64
-	Duration  time.Duration
-	Logs      []string
-}
-
-// PushOptions configures image push operations
-type PushOptions struct {
-	Image    string
-	Registry string
-	Auth     AuthConfig
-}
-
-// PullOptions configures image pull operations
-type PullOptions struct {
-	Image    string
-	Registry string
-	Auth     AuthConfig
-}
-
-// AuthConfig contains registry authentication
-type AuthConfig struct {
-	Username string
-	Password string
-	Token    string
-}
-
-// ScanOptions configures scanning
-type ScanOptions struct {
-	Severity  string
-	Scanners  []string
-	Timeout   time.Duration
-	MaxIssues int
-}
-
-// ScanResult contains scan results
-type ScanResult struct {
-	Vulnerabilities []Vulnerability
-	Secrets         []Secret
-	Score           int
-	Summary         string
-}
-
-// Vulnerability represents a security vulnerability
-type Vulnerability struct {
-	ID          string
-	Severity    string
-	Package     string
-	Version     string
-	FixVersion  string
-	Description string
-}
-
-// Secret represents a detected secret
-type Secret struct {
-	Type     string
-	File     string
-	Line     int
-	Value    string
-	Severity string
-}
+// Use core security types directly
+// type ScanOptions = security.ScanOptionsService
+// type ScanResult = security.ScanResult
 
 // ValidationResult contains validation results
 type ValidationResult struct {
@@ -495,16 +427,8 @@ type ErrorEntry struct {
 	Fixed     bool
 }
 
-// AnalysisResult contains repository analysis results
-type AnalysisResult struct {
-	Language     string
-	Framework    string
-	Dependencies []string
-	EntryPoint   string
-	Port         int
-	BuildCommand string
-	RunCommand   string
-}
+// Use the core analysis.AnalysisResult directly
+// type AnalysisResult = analysis.AnalysisResult
 
 // Persistence handles persistent storage operations
 type Persistence interface {

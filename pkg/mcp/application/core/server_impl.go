@@ -729,6 +729,72 @@ func (s *simplifiedGomcpManager) RegisterTools(srv *serverImpl) error {
 	return nil
 }
 
+// registerConsolidatedTool registers a consolidated tool with the gomcp server
+func (s *serverImpl) registerConsolidatedTool(tool api.Tool) {
+	if s.server == nil {
+		s.logger.Error("gomcp server not available, cannot register tool", "tool", tool.Name())
+		return
+	}
+
+	// Create a wrapper function that converts gomcp input to api.ToolInput
+	handler := func(_ *server.Context, input map[string]interface{}) (map[string]interface{}, error) {
+		// Convert gomcp input to api.ToolInput
+		sessionID := extractSessionID(input)
+		toolInput := api.ToolInput{
+			SessionID: sessionID,
+			Data:      input,
+			Context:   make(map[string]interface{}),
+		}
+
+		// Execute the tool
+		output, err := tool.Execute(context.Background(), toolInput)
+		if err != nil {
+			return map[string]interface{}{
+				"success": false,
+				"error":   err.Error(),
+			}, nil
+		}
+
+		// Convert api.ToolOutput to gomcp format
+		result := map[string]interface{}{
+			"success": output.Success,
+		}
+
+		// Include data if present
+		if output.Data != nil {
+			for key, value := range output.Data {
+				result[key] = value
+			}
+		}
+
+		// Include error if present
+		if output.Error != "" {
+			result["error"] = output.Error
+			result["message"] = output.Error
+		}
+
+		// Include metadata if present
+		if output.Metadata != nil {
+			result["metadata"] = output.Metadata
+		}
+
+		return result, nil
+	}
+
+	// Register with gomcp server
+	s.server.Tool(tool.Name(), tool.Description(), handler)
+	s.logger.Info("Registered consolidated tool", "name", tool.Name())
+}
+
+// extractSessionID extracts or generates a session ID from gomcp input
+func extractSessionID(input map[string]interface{}) string {
+	if sessionID, ok := input["session_id"].(string); ok && sessionID != "" {
+		return sessionID
+	}
+	// Generate a new session ID if not provided
+	return fmt.Sprintf("session_%d", time.Now().UnixNano())
+}
+
 func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 	logLevel := parseSlogLevel(config.LogLevel)
 
@@ -800,6 +866,9 @@ func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 
 	gomcpManager := createRealGomcpManager(mcpTransport, logLevel, config.ServiceName, logger)
 
+	// Initialize service container with real implementations
+	serviceContainer := services.NewDefaultServiceContainer(logger)
+
 	server := &serverImpl{
 		config:         config,
 		sessionManager: sessionManager,
@@ -812,17 +881,14 @@ func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 		toolOrchestrator: toolOrchestrator,
 		toolRegistry:     toolRegistry,
 		gomcpManager:     gomcpManager,
+		serviceContainer: serviceContainer,
 		conversationComponents: &ConversationComponents{
 			isEnabled: false,
 		},
 	}
 
-	// Initialize migration infrastructure
-	migrationConfig := DefaultServerMigrationConfig()
-	if err := server.startMigration(migrationConfig); err != nil {
-		logger.Error("Failed to initialize migration", "error", err)
-		// Continue without migration for now
-	}
+	// Register consolidated tools directly (replacing migration infrastructure)
+	server.registerAllConsolidatedTools()
 
 	logger.Info("MCP Server initialized successfully",
 		"transport", config.TransportType,

@@ -353,7 +353,7 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
-	
+
 	log.Println("Server starting on :8080")
 	r.Run(":8080")
 }

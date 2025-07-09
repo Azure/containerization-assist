@@ -9,7 +9,7 @@ This plan migrates from the current gomcp library pattern to consolidated comman
 The migration uses **direct integration** - gomcp handlers call consolidated commands directly, converting input/output formats as needed. This approach:
 
 - ✅ Reuses existing consolidated command logic
-- ✅ Maintains gomcp server compatibility  
+- ✅ Maintains gomcp server compatibility
 - ✅ No complex adapter layer
 - ✅ Can migrate tools incrementally
 - ✅ Easy rollback per tool
@@ -60,7 +60,7 @@ Each tool follows this pattern:
 
 ```go
 // Before: gomcp function with typed parameters
-s.server.Tool("analyze_repository", "description", 
+s.server.Tool("analyze_repository", "description",
     func(_ *server.Context, args *AnalyzeArgs) (*AnalyzeResponse, error) {
         // Direct implementation
     })
@@ -70,10 +70,10 @@ s.server.Tool("analyze_repository", "description",
     func(_ *server.Context, input map[string]interface{}) (map[string]interface{}, error) {
         // Convert input
         toolInput := convertGomcpToToolInput(input)
-        
+
         // Call consolidated command
         output, err := s.analyzeCmd.Execute(context.Background(), toolInput)
-        
+
         // Convert output
         return convertToolOutputToGomcp(output), err
     })
@@ -88,7 +88,7 @@ s.server.Tool("analyze_repository", "description",
 
 **Priority 2 (Secondary Tools)**:
 4. `push_image` - Depends on build_image
-5. `scan_image` - Independent functionality  
+5. `scan_image` - Independent functionality
 6. `generate_dockerfile` - May be merged with analyze
 
 **Priority 3 (Simple Tools)**:
@@ -138,7 +138,7 @@ analyzer := analysis.NewRepositoryAnalyzer(logger)
 // Service container provides dependencies
 analyzeCmd := commands.NewConsolidatedAnalyzeCommand(
     container.SessionStore(),
-    container.SessionState(), 
+    container.SessionState(),
     container.Logger(),
     container.AnalysisEngine(),
 )
@@ -176,16 +176,16 @@ func NewServiceContainer(config Config) *ServiceContainer {
 func NewServer(config ServerConfig) *serverImpl {
     // Create service container
     container := services.NewServiceContainer(config)
-    
+
     // Create server with container
     server := &serverImpl{
         container: container,
         // ... other fields
     }
-    
+
     // Register tools using container
     server.registerAllConsolidatedTools()
-    
+
     return server
 }
 ```

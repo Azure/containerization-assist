@@ -71,7 +71,7 @@ func (ct *ChatTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolO
 		return api.ToolOutput{
 			Success: false,
 			Error:   err.Error(),
-		}, nil
+		}, err
 	}
 
 	// Convert result to map for ToolOutput.Data

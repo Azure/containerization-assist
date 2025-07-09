@@ -63,10 +63,13 @@ jobs:
 
         # Build time
         BUILD_START=$(date +%s)
-        go build -tags mcp ./pkg/mcp/... >/dev/null 2>&1
-        BUILD_END=$(date +%s)
-        BUILD_TIME=$((BUILD_END - BUILD_START))
-        echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+        if go build -tags mcp ./pkg/mcp/... >/dev/null 2>&1; then
+          BUILD_END=$(date +%s)
+          BUILD_TIME=$((BUILD_END - BUILD_START))
+          echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+        else
+          echo "build_time=FAILED" >> $GITHUB_OUTPUT
+        fi
 
     - name: Display Metrics Summary
       run: |

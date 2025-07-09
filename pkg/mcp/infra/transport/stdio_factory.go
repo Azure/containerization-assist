@@ -3,7 +3,7 @@ package transport
 import (
 	"log/slog"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
@@ -88,8 +88,8 @@ func NewDefaultStdioTransport(baseLogger *slog.Logger) *StdioTransport {
 	return stdioTransport
 }
 
-// NewDefaultCoreStdioTransport creates a stdio transport that implements Transport
-func NewDefaultCoreStdioTransport(baseLogger *slog.Logger) api.Transport {
+// NewDefaultCoreStdioTransport creates a stdio transport that implements core.CoreTransport
+func NewDefaultCoreStdioTransport(baseLogger *slog.Logger) core.CoreTransport {
 	return NewDefaultStdioTransport(baseLogger)
 }
 

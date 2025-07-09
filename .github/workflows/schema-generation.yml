@@ -3,18 +3,22 @@ name: Schema Generation Check
 on:
   pull_request:
     paths:
-      - 'pkg/mcp/internal/**/*Args*.go'
-      - 'pkg/mcp/internal/**/*_types.go'
-      - 'pkg/mcp/cmd/schemaGen/**'
+      - 'pkg/mcp/**/*Args*.go'
+      - 'pkg/mcp/**/*_types.go'
+      - 'pkg/mcp/application/api/**'
+      - 'pkg/mcp/domain/tools/**'
+      - 'cmd/schemaGen/**'
       - 'Makefile'
   push:
     branches:
       - main
       - 'gambtho/**'
     paths:
-      - 'pkg/mcp/internal/**/*Args*.go'
-      - 'pkg/mcp/internal/**/*_types.go'
-      - 'pkg/mcp/cmd/schemaGen/**'
+      - 'pkg/mcp/**/*Args*.go'
+      - 'pkg/mcp/**/*_types.go'
+      - 'pkg/mcp/application/api/**'
+      - 'pkg/mcp/domain/tools/**'
+      - 'cmd/schemaGen/**'
       - 'Makefile'
 
 jobs:
