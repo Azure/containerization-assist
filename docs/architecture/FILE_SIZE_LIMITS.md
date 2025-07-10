@@ -20,7 +20,7 @@ The CI system automatically classifies files based on their names and purposes:
 - General business logic files
 - Simple utility files
 
-### Interface Files (1200 lines)  
+### Interface Files (1200 lines)
 - `*interfaces.go` - Interface definitions
 - `*api.go` - API definitions
 - `*domain_validators.go` - Domain validation logic
@@ -34,7 +34,7 @@ The CI system automatically classifies files based on their names and purposes:
 
 ### Implementation Files (1600 lines)
 - `*consolidated*.go` - Consolidated implementations
-- `*implementation*.go` - Feature implementations  
+- `*implementation*.go` - Feature implementations
 - `*_impl.go` - Service implementations
 - `*server_impl.go` - Server implementations
 - `*tool_registration.go` - Tool registration logic
