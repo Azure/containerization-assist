@@ -8,22 +8,23 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // CanonicalChatTool implements the canonical api.Tool interface for chat functionality
 type CanonicalChatTool struct {
 	sessionManager interface{} // Use interface{} to avoid import cycle
-	logger         logging.Standards
+	logger         *slog.Logger
 	legacyTool     *ChatTool
 	aiHandler      func(context.Context, ChatToolArgs) (*ChatToolResult, error)
 }
 
 // NewCanonicalChatTool creates a new canonical chat tool
-func NewCanonicalChatTool(logger logging.Standards, aiHandler func(context.Context, ChatToolArgs) (*ChatToolResult, error)) api.Tool {
-	toolLogger := logger.WithField("tool", "canonical_chat")
+func NewCanonicalChatTool(logger *slog.Logger, aiHandler func(context.Context, ChatToolArgs) (*ChatToolResult, error)) api.Tool {
+	toolLogger := logger.With("component", "canonical_chat")
 
 	// Create legacy tool for compatibility
 	legacyTool := &ChatTool{
@@ -258,12 +259,11 @@ func (t *CanonicalChatTool) Execute(ctx context.Context, input api.ToolInput) (a
 	}
 
 	// Log the execution
-	t.logger.Info().
-		Str("session_id", params.SessionID).
-		Str("stage", params.Stage).
-		Int("message_length", len(params.Message)).
-		Bool("dry_run", params.DryRun).
-		Msg("Starting canonical chat interaction")
+	t.logger.Info("Starting canonical chat interaction",
+		"session_id", params.SessionID,
+		"stage", params.Stage,
+		"message_length", len(params.Message),
+		"dry_run", params.DryRun)
 
 	startTime := time.Now()
 
@@ -310,12 +310,11 @@ func (t *CanonicalChatTool) Execute(ctx context.Context, input api.ToolInput) (a
 		result.Error = "Chat interaction failed"
 	}
 
-	t.logger.Info().
-		Str("session_id", chatResult.SessionID).
-		Str("stage", chatResult.Stage).
-		Bool("success", chatResult.Success).
-		Str("duration", time.Since(startTime).String()).
-		Msg("Canonical chat interaction completed")
+	t.logger.Info("Canonical chat interaction completed",
+		"session_id", chatResult.SessionID,
+		"stage", chatResult.Stage,
+		"success", chatResult.Success,
+		"duration", time.Since(startTime).String())
 
 	return result, nil
 }

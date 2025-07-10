@@ -22,11 +22,11 @@ package infra
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // DockerOperationsInterface defines the interface for Docker operations
@@ -45,7 +45,7 @@ type InfrastructureContainer struct {
 	persistence *BoltDBPersistence
 
 	// Templates
-	templateManager     *TemplateManager
+	templateService     TemplateService
 	dockerfileGenerator *DockerfileGenerator
 	manifestGenerator   *ManifestGenerator
 
@@ -127,12 +127,12 @@ func NewInfrastructureContainer(config *InfrastructureConfig, logger *slog.Logge
 
 	// Initialize persistence
 	if err := container.initializePersistence(); err != nil {
-		return nil, fmt.Errorf("failed to initialize persistence: %w", err)
+		return nil, errors.NewError().Code(errors.CodeInternalError).Message("failed to initialize persistence").Cause(err).Build()
 	}
 
 	// Initialize templates
 	if err := container.initializeTemplates(); err != nil {
-		return nil, fmt.Errorf("failed to initialize templates: %w", err)
+		return nil, errors.NewError().Code(errors.CodeInternalError).Message("failed to initialize templates").Cause(err).Build()
 	}
 
 	// Initialize Docker operations (if build tag is enabled)
@@ -153,7 +153,7 @@ func NewInfrastructureContainer(config *InfrastructureConfig, logger *slog.Logge
 func (c *InfrastructureContainer) initializePersistence() error {
 	persistence, err := NewBoltDBPersistence(c.config.DatabasePath, c.logger)
 	if err != nil {
-		return fmt.Errorf("failed to create BoltDB persistence: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to create BoltDB persistence").Cause(err).Build()
 	}
 
 	c.persistence = persistence
@@ -162,7 +162,7 @@ func (c *InfrastructureContainer) initializePersistence() error {
 
 // initializeTemplates initializes the template management
 func (c *InfrastructureContainer) initializeTemplates() error {
-	c.templateManager = NewTemplateManager(c.logger)
+	c.templateService = NewTemplateService(c.logger)
 	c.dockerfileGenerator = NewDockerfileGenerator(c.logger)
 	c.manifestGenerator = NewManifestGenerator(c.logger)
 	return nil
@@ -172,14 +172,14 @@ func (c *InfrastructureContainer) initializeTemplates() error {
 func (c *InfrastructureContainer) initializeDockerOperations() error {
 	// This will be implemented with build tags
 	// For now, return an error indicating Docker is not available
-	return fmt.Errorf("Docker operations not available (build without docker tag)")
+	return errors.NewError().Code(errors.CodeResourceNotFound).Message("Docker operations not available (build without docker tag)").Build()
 }
 
 // initializeKubernetesOperations initializes Kubernetes operations (build tag dependent)
 func (c *InfrastructureContainer) initializeKubernetesOperations() error {
 	// This will be implemented with build tags
 	// For now, return an error indicating Kubernetes is not available
-	return fmt.Errorf("Kubernetes operations not available (build without k8s tag)")
+	return errors.NewError().Code(errors.CodeResourceNotFound).Message("Kubernetes operations not available (build without k8s tag)").Build()
 }
 
 // Service interface implementations for dependency injection
@@ -189,9 +189,9 @@ func (c *InfrastructureContainer) Persistence() services.Persistence {
 	return c.persistence
 }
 
-// TemplateManager returns the template manager
-func (c *InfrastructureContainer) TemplateManager() *TemplateManager {
-	return c.templateManager
+// TemplateService returns the template service
+func (c *InfrastructureContainer) TemplateService() TemplateService {
+	return c.templateService
 }
 
 // DockerfileGenerator returns the Dockerfile generator
@@ -305,16 +305,16 @@ func (c *InfrastructureContainer) checkPersistenceHealth(ctx context.Context) er
 	testValue := map[string]string{"timestamp": time.Now().Format(time.RFC3339)}
 
 	if err := c.persistence.Put(ctx, BucketConfiguration, testKey, testValue); err != nil {
-		return fmt.Errorf("failed to write to database: %w", err)
+		return errors.NewError().Code(errors.CodeIOError).Message("failed to write to database").Cause(err).Build()
 	}
 
 	var result map[string]string
 	if err := c.persistence.Get(ctx, BucketConfiguration, testKey, &result); err != nil {
-		return fmt.Errorf("failed to read from database: %w", err)
+		return errors.NewError().Code(errors.CodeIOError).Message("failed to read from database").Cause(err).Build()
 	}
 
 	if err := c.persistence.Delete(ctx, BucketConfiguration, testKey); err != nil {
-		return fmt.Errorf("failed to delete from database: %w", err)
+		return errors.NewError().Code(errors.CodeIOError).Message("failed to delete from database").Cause(err).Build()
 	}
 
 	return nil
@@ -323,18 +323,18 @@ func (c *InfrastructureContainer) checkPersistenceHealth(ctx context.Context) er
 // checkTemplatesHealth checks the health of the template system
 func (c *InfrastructureContainer) checkTemplatesHealth(ctx context.Context) error {
 	// Test template listing
-	workflowTemplates, err := c.templateManager.ListTemplates(TemplateTypeWorkflow)
+	workflowTemplates, err := c.templateService.ListTemplates(TemplateTypeWorkflow)
 	if err != nil {
-		return fmt.Errorf("failed to list workflow templates: %w", err)
+		return errors.NewError().Code(errors.CodeIOError).Message("failed to list workflow templates").Cause(err).Build()
 	}
 
 	if len(workflowTemplates) == 0 {
-		return fmt.Errorf("no workflow templates found")
+		return errors.NewError().Code(errors.CodeResourceNotFound).Message("no workflow templates found").Build()
 	}
 
 	// Test template rendering
 	if len(workflowTemplates) > 0 {
-		_, err := c.templateManager.RenderTemplate(TemplateRenderParams{
+		_, err := c.templateService.RenderTemplate(TemplateRenderParams{
 			Name: workflowTemplates[0],
 			Type: TemplateTypeWorkflow,
 			Variables: map[string]interface{}{
@@ -342,7 +342,7 @@ func (c *InfrastructureContainer) checkTemplatesHealth(ctx context.Context) erro
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("failed to render template: %w", err)
+			return errors.NewError().Code(errors.CodeInternalError).Message("failed to render template").Cause(err).Build()
 		}
 	}
 
@@ -352,32 +352,32 @@ func (c *InfrastructureContainer) checkTemplatesHealth(ctx context.Context) erro
 // checkDockerHealth checks the health of Docker operations
 func (c *InfrastructureContainer) checkDockerHealth(ctx context.Context) error {
 	// This would be implemented with build tags
-	return fmt.Errorf("Docker health check not implemented")
+	return errors.NewError().Code(errors.CodeResourceNotFound).Message("Docker health check not implemented").Build()
 }
 
 // checkKubernetesHealth checks the health of Kubernetes operations
 func (c *InfrastructureContainer) checkKubernetesHealth(ctx context.Context) error {
 	// This would be implemented with build tags
-	return fmt.Errorf("Kubernetes health check not implemented")
+	return errors.NewError().Code(errors.CodeResourceNotFound).Message("Kubernetes health check not implemented").Build()
 }
 
 // Cleanup and shutdown
 
 // Close shuts down all infrastructure components
 func (c *InfrastructureContainer) Close() error {
-	var errors []error
+	var errs []error
 
 	// Close persistence
 	if c.persistence != nil {
 		if err := c.persistence.Close(); err != nil {
-			errors = append(errors, fmt.Errorf("failed to close persistence: %w", err))
+			errs = append(errs, errors.NewError().Code(errors.CodeIOError).Message("failed to close persistence").Cause(err).Build())
 		}
 	}
 
 	// Additional cleanup for other components would go here
 
-	if len(errors) > 0 {
-		return fmt.Errorf("errors during shutdown: %v", errors)
+	if len(errs) > 0 {
+		return errors.NewError().Code(errors.CodeInternalError).Message("errors during shutdown").Context("errors", errs).Build()
 	}
 
 	c.logger.Info("Infrastructure container closed successfully")
@@ -391,7 +391,7 @@ func (c *InfrastructureContainer) Backup(ctx context.Context, backupPath string)
 	// Create database backup
 	if c.persistence != nil {
 		if err := c.persistence.Backup(ctx, backupPath+"/database.db"); err != nil {
-			return fmt.Errorf("failed to backup database: %w", err)
+			return errors.NewError().Code(errors.CodeIOError).Message("failed to backup database").Cause(err).Build()
 		}
 	}
 
@@ -411,7 +411,7 @@ func (c *InfrastructureContainer) GetStats(ctx context.Context) (*Infrastructure
 	if c.persistence != nil {
 		persistenceStats, err := c.persistence.Stats(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get persistence stats: %w", err)
+			return nil, errors.NewError().Code(errors.CodeIOError).Message("failed to get persistence stats").Cause(err).Build()
 		}
 		stats.Persistence = persistenceStats
 	}
@@ -459,7 +459,7 @@ type KubernetesStats struct {
 
 // getTemplateCount gets the count of templates by type
 func (c *InfrastructureContainer) getTemplateCount(templateType TemplateType) int {
-	templates, err := c.templateManager.ListTemplates(templateType)
+	templates, err := c.templateService.ListTemplates(templateType)
 	if err != nil {
 		return 0
 	}

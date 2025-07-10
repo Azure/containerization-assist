@@ -171,7 +171,7 @@ pre-commit:
 	@$(MAKE) validate-architecture
 
 .PHONY: generate
-generate: build-schemaGen
+generate: build-schemaGen generate-pipelines
 	@echo "Generating tool schemas..."
 	@go generate ./...
 
@@ -179,6 +179,26 @@ generate: build-schemaGen
 build-schemaGen:
 	@echo "Building schema generator..."
 	@go build -o bin/schemaGen ./cmd/mcp-schema-gen
+
+# Pipeline code generation
+.PHONY: generate-pipelines clean-generated validate-generation
+
+generate-pipelines:
+	@echo "Generating pipelines from templates..."
+	@go build -o tools/pipeline-generator/pipeline-generator ./tools/pipeline-generator
+	@tools/pipeline-generator/pipeline-generator -template tools/pipeline-generator/templates/pipeline.go.tmpl -output pkg/mcp/application/pipeline/generated_pipeline.go -name ExamplePipeline -stages "ValidateInput,ProcessData,GenerateOutput"
+	@echo "✅ Pipeline generation complete"
+
+clean-generated:
+	@echo "Cleaning generated pipeline files..."
+	@find pkg/mcp/application/pipeline -name "generated_*.go" -type f -delete
+	@echo "✅ Generated files cleaned"
+
+validate-generation:
+	@echo "Validating code generation..."
+	@$(MAKE) generate-pipelines
+	@go build ./pkg/mcp/application/pipeline && echo "✅ Generated code builds successfully"
+	@go test ./pkg/mcp/application/pipeline && echo "✅ Generated code tests pass"
 
 .PHONY: check-schemas
 check-schemas:
@@ -189,6 +209,7 @@ check-schemas:
 clean:
 	rm -f container-kit-mcp
 	rm -f bin/schemaGen
+	rm -f tools/pipeline-generator/pipeline-generator
 	find . -name "generated_*.go" -type f -delete
 
 .PHONY: deps-update
@@ -373,9 +394,14 @@ help:
 	@echo "  bench-performance    Compare performance to baseline"
 	@echo "  baseline-performance Establish new performance baseline"
 	@echo ""
-	@echo "Other targets:"
-	@echo "  generate          Generate tool schemas from Args structs"
+	@echo "Code generation targets:"
+	@echo "  generate          Generate tool schemas and pipelines"
+	@echo "  generate-pipelines Generate pipeline code from templates"
+	@echo "  clean-generated   Remove generated pipeline files"
+	@echo "  validate-generation Build and test generated code"
 	@echo "  check-schemas     Check if generated schemas are up to date"
+	@echo ""
+	@echo "Other targets:"
 	@echo "  clean             Remove built binaries and generated files"
 	@echo "  version           Show version of built binary"
 	@echo "  help              Show this help message"

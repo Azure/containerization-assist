@@ -5,12 +5,11 @@ package conversation
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/common/validation"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
@@ -38,7 +37,7 @@ type ChatToolResult struct {
 // ChatTool implements the chat tool for conversation mode
 type ChatTool struct {
 	Handler   func(context.Context, ChatToolArgs) (*ChatToolResult, error)
-	Logger    logging.Standards
+	Logger    *slog.Logger
 	createdAt time.Time
 }
 
@@ -94,33 +93,33 @@ func (ct *ChatTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolO
 
 // ExecuteTyped handles the chat tool execution with typed arguments
 func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
-	ct.Logger.Debug().
-		Str("message", args.Message).
-		Str("session_id", args.SessionID).
-		Msg("Executing chat tool")
+	ct.Logger.Debug("Executing chat tool",
+		"message", args.Message,
+		"session_id", args.SessionID)
 
-	validator := NewConversationValidator()
-	if err := validator.Validate(ctx, &args); err != nil {
-		ct.Logger.Warn().Err(err).Msg("Chat tool input validation failed")
-
-		var errorMessage string
-		if validationErr, ok := err.(*validation.ValidationError); ok {
-			errorMessage = fmt.Sprintf("Validation failed for %s: %s", validationErr.Field, validationErr.Message)
-		} else {
-			errorMessage = fmt.Sprintf("Input validation failed: %v", err)
-		}
-
+	// Basic validation - using direct validation logic instead of validator for now
+	// TODO: Update to use proper validation when validators.go is migrated
+	if args.Message == "" {
 		return &ChatToolResult{
 			BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
 			Success:          false,
-			Message:          errorMessage,
+			Message:          "message is required and cannot be empty",
+			Status:           "validation_error",
+		}, nil
+	}
+
+	if len(args.Message) > 10000 {
+		return &ChatToolResult{
+			BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
+			Success:          false,
+			Message:          "message is too long (max 10,000 characters)",
 			Status:           "validation_error",
 		}, nil
 	}
 
 	result, err := ct.Handler(ctx, args)
 	if err != nil {
-		ct.Logger.Error().Err(err).Msg("Chat handler error")
+		ct.Logger.Error("Chat handler error", "error", err)
 		return &ChatToolResult{
 			BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
 			Success:          false,

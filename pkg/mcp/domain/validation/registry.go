@@ -35,14 +35,14 @@ func (r *ValidatorRegistryImpl) Register(validator DomainValidator[interface{}])
 
 	// Check if validator is already registered
 	if _, exists := r.validators[name]; exists {
-		return errors.NewValidationFailed("validator.registration", 
+		return errors.NewValidationFailed("validator.registration",
 			fmt.Sprintf("validator '%s' is already registered", name))
 	}
 
 	// Validate dependencies exist
 	for _, dep := range validator.Dependencies() {
 		if _, exists := r.validators[dep]; !exists {
-			return errors.NewValidationFailed("validator.dependencies", 
+			return errors.NewValidationFailed("validator.dependencies",
 				fmt.Sprintf("dependency '%s' not found for validator '%s'", dep, name))
 		}
 	}
@@ -57,7 +57,7 @@ func (r *ValidatorRegistryImpl) Unregister(name string) error {
 	defer r.mu.Unlock()
 
 	if _, exists := r.validators[name]; !exists {
-		return errors.NewValidationFailed("validator.unregister", 
+		return errors.NewValidationFailed("validator.unregister",
 			fmt.Sprintf("validator '%s' not found", name))
 	}
 
@@ -65,8 +65,8 @@ func (r *ValidatorRegistryImpl) Unregister(name string) error {
 	for _, validator := range r.validators {
 		for _, dep := range validator.Dependencies() {
 			if dep == name {
-				return errors.NewValidationFailed("validator.dependencies", 
-					fmt.Sprintf("cannot unregister '%s': validator '%s' depends on it", 
+				return errors.NewValidationFailed("validator.dependencies",
+					fmt.Sprintf("cannot unregister '%s': validator '%s' depends on it",
 						name, validator.Name()))
 			}
 		}
@@ -119,7 +119,7 @@ func (r *ValidatorRegistryImpl) GetDomainValidators(domain string) []DomainValid
 // ValidateAll executes all applicable validators for domain and category
 func (r *ValidatorRegistryImpl) ValidateAll(ctx context.Context, data interface{}, domain, category string) ValidationResult {
 	validators := r.GetValidators(domain, category)
-	
+
 	if len(validators) == 0 {
 		return ValidationResult{
 			Valid:    true,
@@ -146,11 +146,11 @@ func (r *ValidatorRegistryImpl) ValidateAll(ctx context.Context, data interface{
 
 	for _, validator := range orderedValidators {
 		validationResult := validator.Validate(ctx, data)
-		
+
 		// Collect errors and warnings
 		result.Errors = append(result.Errors, validationResult.Errors...)
 		result.Warnings = append(result.Warnings, validationResult.Warnings...)
-		
+
 		// Update overall validity
 		if !validationResult.Valid {
 			result.Valid = false
@@ -233,7 +233,7 @@ func (r *ValidatorRegistryImpl) resolveDependencies(validators []DomainValidator
 		// Dequeue
 		current := queue[0]
 		queue = queue[1:]
-		
+
 		result = append(result, validatorMap[current])
 
 		// Process dependents
@@ -247,7 +247,7 @@ func (r *ValidatorRegistryImpl) resolveDependencies(validators []DomainValidator
 
 	// Check for circular dependencies
 	if len(result) != len(validators) {
-		return nil, errors.NewValidationFailed("validator.dependencies", 
+		return nil, errors.NewValidationFailed("validator.dependencies",
 			"circular dependency detected in validator dependencies")
 	}
 
@@ -261,7 +261,7 @@ func (r *ValidatorRegistryImpl) GetValidatorByName(name string) (DomainValidator
 
 	validator, exists := r.validators[name]
 	if !exists {
-		return nil, errors.NewValidationFailed("validator.lookup", 
+		return nil, errors.NewValidationFailed("validator.lookup",
 			fmt.Sprintf("validator '%s' not found", name))
 	}
 

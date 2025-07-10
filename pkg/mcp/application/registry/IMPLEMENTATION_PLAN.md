@@ -37,7 +37,7 @@
 
 ## Performance Results
 - Discovery: ~184ns per operation
-- Registration: ~469ns per operation  
+- Registration: ~469ns per operation
 - List: ~750ns per operation
 - All operations well under 300μs target
 

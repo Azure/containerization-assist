@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 	"github.com/Azure/container-kit/pkg/mcp/infra/retry"
 	bolt "go.etcd.io/bbolt"
 )
@@ -18,7 +19,7 @@ import (
 // BoltSessionStore implements SessionStore using BoltDB
 type BoltSessionStore struct {
 	db     *bolt.DB
-	logger logging.Standards
+	logger *slog.Logger
 }
 
 const (
@@ -26,7 +27,7 @@ const (
 )
 
 // NewBoltSessionStore creates a new BoltDB-based session store
-func NewBoltSessionStore(ctx context.Context, dbPath string, logger logging.Standards) (*BoltSessionStore, error) {
+func NewBoltSessionStore(ctx context.Context, dbPath string, logger *slog.Logger) (*BoltSessionStore, error) {
 	retryCoordinator := retry.New()
 
 	var db *bolt.DB
@@ -42,7 +43,7 @@ func NewBoltSessionStore(ctx context.Context, dbPath string, logger logging.Stan
 		if openErr == bolt.ErrTimeout {
 			backupPath := fmt.Sprintf("%s.locked.%d", dbPath, time.Now().Unix())
 			if renameErr := os.Rename(dbPath, backupPath); renameErr == nil {
-				logger.Warn().Str("backup_path", backupPath).Msg("Moved locked database file")
+				logger.Warn("Moved locked database file", "backup_path", backupPath)
 				db, openErr = bolt.Open(dbPath, 0o600, &bolt.Options{
 					Timeout:        5 * time.Second,
 					NoGrowSync:     false,
@@ -65,7 +66,7 @@ func NewBoltSessionStore(ctx context.Context, dbPath string, logger logging.Stan
 	})
 	if err != nil {
 		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
+			logger.Warn("Failed to close database after bucket creation error", "error", closeErr)
 		}
 		return nil, errors.Wrapf(err, "persistence", "Failed to create sessions bucket in database")
 	}

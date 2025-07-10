@@ -5,10 +5,9 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -18,7 +17,7 @@ import (
 
 var (
 	// ErrorInvalidInput indicates invalid input
-	ErrorInvalidInput = fmt.Errorf("invalid input")
+	ErrorInvalidInput = errors.NewError().Code(errors.CodeValidationFailed).Message("invalid input").Build()
 )
 
 // Tool is the canonical interface for all MCP tools.
@@ -690,10 +689,7 @@ type ErrorType string
 // Logging Interface
 // ============================================================================
 
-// Logger defines the logging interface
-type Logger interface {
-	logging.Standards
-}
+// Logger interface removed - use domain/*slog.Logger directly
 
 // ============================================================================
 // Build Types
@@ -821,3 +817,80 @@ type ToolFactory interface {
 
 // ToolCreator is a function that creates a tool
 type ToolCreator func() (Tool, error)
+
+// ============================================================================
+// Pipeline Interfaces - Unified Pipeline System
+// ============================================================================
+
+// Pipeline defines unified orchestration interface
+type Pipeline interface {
+	// Execute runs pipeline with context and metrics
+	Execute(ctx context.Context, request *PipelineRequest) (*PipelineResponse, error)
+
+	// AddStage adds a stage to the pipeline
+	AddStage(stage PipelineStage) Pipeline
+
+	// WithTimeout sets pipeline timeout
+	WithTimeout(timeout time.Duration) Pipeline
+
+	// WithRetry sets retry policy
+	WithRetry(policy PipelineRetryPolicy) Pipeline
+
+	// WithMetrics enables metrics collection
+	WithMetrics(collector MetricsCollector) Pipeline
+}
+
+// PipelineStage represents a single pipeline stage
+type PipelineStage interface {
+	Name() string
+	Execute(ctx context.Context, input interface{}) (interface{}, error)
+	Validate(input interface{}) error
+}
+
+// PipelineBuilder provides fluent API for pipeline construction
+type PipelineBuilder interface {
+	New() Pipeline
+	FromTemplate(template string) Pipeline
+	WithStages(stages ...PipelineStage) PipelineBuilder
+	Build() Pipeline
+}
+
+// CommandRouter provides map-based command routing
+type CommandRouter interface {
+	Register(command string, handler CommandHandler) error
+	Route(ctx context.Context, command string, args interface{}) (interface{}, error)
+	ListCommands() []string
+	Unregister(command string) error
+	GetHandler(command string) (CommandHandler, error)
+	RegisterFunc(command string, handler func(ctx context.Context, args interface{}) (interface{}, error)) error
+}
+
+// CommandHandler handles command execution
+type CommandHandler interface {
+	Execute(ctx context.Context, args interface{}) (interface{}, error)
+}
+
+// PipelineRequest represents input to pipeline execution
+type PipelineRequest struct {
+	Input    interface{}            `json:"input"`
+	Context  map[string]interface{} `json:"context,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// PipelineResponse represents output from pipeline execution
+type PipelineResponse struct {
+	Output   interface{}            `json:"output"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// PipelineRetryPolicy defines retry behavior for pipelines
+type PipelineRetryPolicy struct {
+	MaxAttempts     int           `json:"max_attempts"`
+	BackoffDuration time.Duration `json:"backoff_duration"`
+	Multiplier      float64       `json:"multiplier,omitempty"`
+}
+
+// MetricsCollector interface for pipeline metrics
+type MetricsCollector interface {
+	RecordStageExecution(stageName string, duration time.Duration, err error)
+}

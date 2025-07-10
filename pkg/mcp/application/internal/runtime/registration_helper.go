@@ -1,19 +1,20 @@
 package runtime
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"log/slog"
+
 	"github.com/localrivet/gomcp/server"
 )
 
 type StandardToolRegistrar struct {
 	server server.Server
-	logger logging.Standards
+	logger *slog.Logger
 }
 
-func NewStandardToolRegistrar(s server.Server, logger logging.Standards) *StandardToolRegistrar {
+func NewStandardToolRegistrar(s server.Server, logger *slog.Logger) *StandardToolRegistrar {
 	return &StandardToolRegistrar{
 		server: s,
-		logger: logger.WithComponent("tool_registrar"),
+		logger: logger.With("component", "tool_registrar"),
 	}
 }
 

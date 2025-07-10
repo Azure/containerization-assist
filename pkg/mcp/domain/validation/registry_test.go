@@ -206,7 +206,7 @@ func TestValidatorRegistry_GetValidators(t *testing.T) {
 	t.Run("filter by domain and category", func(t *testing.T) {
 		result := registry.GetValidators("kubernetes", "manifest")
 		assert.Len(t, result, 2)
-		
+
 		// Should be sorted by priority (higher first)
 		assert.Equal(t, "v2", result[0].Name())
 		assert.Equal(t, "v1", result[1].Name())
@@ -235,7 +235,7 @@ func TestValidatorRegistry_GetDomainValidators(t *testing.T) {
 
 	result := registry.GetDomainValidators("kubernetes")
 	assert.Len(t, result, 2)
-	
+
 	// Should be sorted by priority (higher first)
 	assert.Equal(t, "k2", result[0].Name())
 	assert.Equal(t, "k1", result[1].Name())
@@ -363,7 +363,7 @@ func TestValidatorRegistry_DependencyResolution(t *testing.T) {
 			category: "circular",
 		}
 		b := &mockValidator{
-			name:     "CircularB", 
+			name:     "CircularB",
 			domain:   "test",
 			category: "circular",
 		}
@@ -384,7 +384,7 @@ func TestValidatorRegistry_DependencyResolution(t *testing.T) {
 			&mockValidator{
 				name:         "TestB",
 				domain:       "test",
-				category:     "circular", 
+				category:     "circular",
 				dependencies: []string{"TestA"},
 			},
 		}

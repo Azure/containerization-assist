@@ -1,2 +1,28 @@
-go: updates to go.mod needed; to update it:
-	go mod tidy
+# github.com/Azure/container-kit/pkg/mcp/application/internal/conversation
+pkg/mcp/application/internal/conversation/build_stage.go:101:96: undefined: publicutils.StageBuild
+pkg/mcp/application/internal/conversation/build_stage.go:104:52: undefined: publicutils.StagePush
+pkg/mcp/application/internal/conversation/build_stage.go:107:47: undefined: publicutils.StagePush
+pkg/mcp/application/internal/conversation/build_stage.go:112:80: undefined: publicutils.StageBuild
+pkg/mcp/application/internal/conversation/build_stage.go:113:72: undefined: publicutils.StageBuild
+pkg/mcp/application/internal/conversation/build_stage.go:128:46: undefined: publicutils.StageBuild
+pkg/mcp/application/internal/conversation/build_stage.go:135:62: undefined: publicutils.StagePush
+pkg/mcp/application/internal/conversation/build_stage.go:144:52: undefined: publicutils.StagePush
+pkg/mcp/application/internal/conversation/build_stage.go:145:54: undefined: publicutils.StagePush
+pkg/mcp/application/internal/conversation/build_stage.go:159:45: undefined: publicutils.StageBuild
+pkg/mcp/application/internal/conversation/build_stage.go:159:45: too many errors
+# github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline
+pkg/mcp/application/orchestration/pipeline/background_workers.go:155:14: s.lifecycle undefined (type *BackgroundWorkerServiceImpl has no field or method lifecycle)
+pkg/mcp/application/orchestration/pipeline/background_workers.go:163:15: s.lifecycle undefined (type *BackgroundWorkerServiceImpl has no field or method lifecycle)
+pkg/mcp/application/orchestration/pipeline/background_workers.go:190:11: s.lifecycle undefined (type *BackgroundWorkerServiceImpl has no field or method lifecycle)
+pkg/mcp/application/orchestration/pipeline/background_workers.go:279:11: s.lifecycle undefined (type *BackgroundWorkerServiceImpl has no field or method lifecycle)
+pkg/mcp/application/orchestration/pipeline/background_workers.go:560:11: w.lifecycle undefined (type *SimpleBackgroundWorker has no field or method lifecycle)
+pkg/mcp/application/orchestration/pipeline/background_workers.go:583:11: w.lifecycle undefined (type *SimpleBackgroundWorker has no field or method lifecycle)
+pkg/mcp/application/orchestration/pipeline/basic_validator.go:83:2: not enough arguments in call to v.logger.Debug
+	have ()
+	want (string, ...any)
+pkg/mcp/application/orchestration/pipeline/basic_validator.go:83:2: v.logger.Debug() (no value) used as value or type
+pkg/mcp/application/orchestration/pipeline/basic_validator.go:156:2: not enough arguments in call to v.logger.Debug
+	have ()
+	want (string, ...any)
+pkg/mcp/application/orchestration/pipeline/basic_validator.go:156:2: v.logger.Debug() (no value) used as value or type
+pkg/mcp/application/orchestration/pipeline/basic_validator.go:156:2: too many errors

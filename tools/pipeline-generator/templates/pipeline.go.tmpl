@@ -1,0 +1,68 @@
+package pipeline
+
+import (
+	"context"
+	"time"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+)
+
+// {{.Name}}Pipeline implements {{.Name}} pipeline
+type {{.Name}}Pipeline struct {
+	stages []api.PipelineStage
+}
+
+// New{{.Name}}Pipeline creates a new {{.Name}} pipeline
+func New{{.Name}}Pipeline(stages ...api.PipelineStage) *{{.Name}}Pipeline {
+	return &{{.Name}}Pipeline{
+		stages: stages,
+	}
+}
+
+// Execute runs the {{.Name}} pipeline
+func (p *{{.Name}}Pipeline) Execute(ctx context.Context, request *api.PipelineRequest) (*api.PipelineResponse, error) {
+	var result interface{} = request.Input
+
+	for _, stage := range p.stages {
+		var err error
+		result, err = stage.Execute(ctx, result)
+		if err != nil {
+			return nil, errors.NewError().
+				Code(errors.CodeToolExecutionFailed).
+				Type(errors.ErrTypeOperation).
+				Message("{{.Name}} pipeline stage failed").
+				Context("stage", stage.Name()).
+				Cause(err).
+				Build()
+		}
+	}
+
+	return &api.PipelineResponse{
+		Output: result,
+		Metadata: map[string]interface{}{
+			"type":   "{{.Name}}",
+			"stages": len(p.stages),
+		},
+	}, nil
+}
+
+// AddStage adds a stage to the pipeline
+func (p *{{.Name}}Pipeline) AddStage(stage api.PipelineStage) api.Pipeline {
+	p.stages = append(p.stages, stage)
+	return p
+}
+
+// WithTimeout sets timeout
+func (p *{{.Name}}Pipeline) WithTimeout(timeout time.Duration) api.Pipeline {
+	return p
+}
+
+// WithRetry sets retry policy
+func (p *{{.Name}}Pipeline) WithRetry(policy api.PipelineRetryPolicy) api.Pipeline {
+	return p
+}
+
+// WithMetrics enables metrics collection
+func (p *{{.Name}}Pipeline) WithMetrics(collector api.MetricsCollector) api.Pipeline {
+	return p
+}

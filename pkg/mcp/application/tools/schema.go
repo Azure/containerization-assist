@@ -1,21 +1,35 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
-	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
-// SchemaValue represents a type that can be used in JSON schemas
-type SchemaValue interface {
-	~string | ~int | ~int64 | ~float64 | ~bool
+// Schema represents a typed schema structure for tools
+type Schema[TParams any, TResult any] struct {
+	Name         string                      `json:"name"`
+	Description  string                      `json:"description"`
+	Version      string                      `json:"version"`
+	ParamsSchema *JSONSchema                 `json:"params_schema"`
+	ResultSchema *JSONSchema                 `json:"result_schema"`
+	Examples     []Example[TParams, TResult] `json:"examples"`
 }
 
-// JSONSchema represents a typed JSON Schema structure with generic support
+// Example represents a typed example for a tool
+type Example[TParams any, TResult any] struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Input       TParams `json:"input"`
+	Output      TResult `json:"output"`
+}
+
+// JSONSchema represents a JSON Schema structure without reflection
 type JSONSchema struct {
 	Type                 string                 `json:"type,omitempty"`
 	Format               string                 `json:"format,omitempty"`
@@ -30,8 +44,8 @@ type JSONSchema struct {
 	MinLength            *int                   `json:"minLength,omitempty"`
 	MaxLength            *int                   `json:"maxLength,omitempty"`
 	Pattern              string                 `json:"pattern,omitempty"`
-	Enum                 []any                  `json:"enum,omitempty"`    // Schema-compatible enum values
-	Example              any                    `json:"example,omitempty"` // Schema-compatible example value
+	Enum                 []any                  `json:"enum,omitempty"`
+	Example              any                    `json:"example,omitempty"`
 	Ref                  string                 `json:"$ref,omitempty"`
 	Definitions          map[string]*JSONSchema `json:"definitions,omitempty"`
 	AllOf                []*JSONSchema          `json:"allOf,omitempty"`
@@ -39,37 +53,7 @@ type JSONSchema struct {
 	OneOf                []*JSONSchema          `json:"oneOf,omitempty"`
 }
 
-// TypedJSONSchema provides type-safe schema with generic constraints
-type TypedJSONSchema[T SchemaValue] struct {
-	*JSONSchema
-	TypedEnum    []T `json:"-"` // Type-safe enum values
-	TypedExample T   `json:"-"` // Type-safe example value
-}
-
-// NewTypedSchema creates a type-safe schema
-func NewTypedSchema[T SchemaValue]() *TypedJSONSchema[T] {
-	return &TypedJSONSchema[T]{
-		JSONSchema: &JSONSchema{},
-	}
-}
-
-// SetEnum sets type-safe enum values
-func (ts *TypedJSONSchema[T]) SetEnum(values []T) {
-	ts.TypedEnum = values
-	// Convert to any for JSON serialization
-	ts.Enum = make([]any, len(values))
-	for i, v := range values {
-		ts.Enum[i] = v
-	}
-}
-
-// SetExample sets a type-safe example value
-func (ts *TypedJSONSchema[T]) SetExample(example T) {
-	ts.TypedExample = example
-	ts.Example = example
-}
-
-// ToMap converts JSONSchema to map[string]any for backward compatibility
+// ToMap converts JSONSchema to map[string]any for compatibility
 func (s *JSONSchema) ToMap() map[string]any {
 	data, _ := json.Marshal(s)
 	var result map[string]any
@@ -85,578 +69,173 @@ func FromMap(m map[string]any) *JSONSchema {
 	return &schema
 }
 
-// ToMapLegacy provides legacy interface{} support for backward compatibility
-// Deprecated: Use ToMap instead
-func (s *JSONSchema) ToMapLegacy() map[string]any {
-	return s.ToMap()
+// StaticSchemaBuilder provides a fluent API for building schemas without reflection
+type StaticSchemaBuilder struct {
+	schema *JSONSchema
 }
 
-// FromMapLegacy creates JSONSchema from map[string]interface{} for backward compatibility
-// Deprecated: Use FromMap instead
-func FromMapLegacy(m map[string]any) *JSONSchema {
-	return FromMap(m)
-}
-
-// SchemaGenerator generates JSON schemas from Go types
-type SchemaGenerator struct {
-	// RefResolver handles schema references and definitions (bounded)
-	RefResolver map[string]*JSONSchema
-	// TypeRegistry maps Go types to custom schemas (bounded)
-	TypeRegistry map[reflect.Type]*JSONSchema
-	// TagOptions controls schema generation behavior
-	TagOptions SchemaOptions
-	// Cache limits to prevent memory leaks
-	maxRefResolverSize  int
-	maxTypeRegistrySize int
-}
-
-// SchemaOptions configures schema generation
-type SchemaOptions struct {
-	// UseJSONTags uses json struct tags for property names
-	UseJSONTags bool
-	// UseValidateTags incorporates validate tags as constraints
-	UseValidateTags bool
-	// RequiredByDefault makes all fields required unless marked optional
-	RequiredByDefault bool
-	// OmitEmptyFields excludes fields marked with omitempty
-	OmitEmptyFields bool
-	// GenerateExamples includes example values in schemas
-	GenerateExamples bool
-	// AllowAdditional allows additional properties in objects
-	AllowAdditional bool
-}
-
-// NewSchemaGenerator creates a new schema generator with default options
-func NewSchemaGenerator() *SchemaGenerator {
-	return &SchemaGenerator{
-		RefResolver:         make(map[string]*JSONSchema),
-		TypeRegistry:        make(map[reflect.Type]*JSONSchema),
-		maxRefResolverSize:  1000, // Prevent unbounded growth
-		maxTypeRegistrySize: 500,  // Prevent unbounded growth
-		TagOptions: SchemaOptions{
-			UseJSONTags:       true,
-			UseValidateTags:   true,
-			RequiredByDefault: false,
-			OmitEmptyFields:   true,
-			GenerateExamples:  true,
-			AllowAdditional:   false,
-		},
+// NewStaticSchemaBuilder creates a new schema builder
+func NewStaticSchemaBuilder() *StaticSchemaBuilder {
+	return &StaticSchemaBuilder{
+		schema: &JSONSchema{},
 	}
 }
 
-// GenerateSchema generates a JSON schema for a given type
-func (g *SchemaGenerator) GenerateSchema(t reflect.Type) (*JSONSchema, error) {
-	return g.generateSchemaForType(t, make(map[reflect.Type]bool))
+// Type sets the schema type
+func (b *StaticSchemaBuilder) Type(t string) *StaticSchemaBuilder {
+	b.schema.Type = t
+	return b
 }
 
-// GenerateSchemaAsMap generates a JSON schema as map[string]any for backward compatibility
-func (g *SchemaGenerator) GenerateSchemaAsMap(t reflect.Type) (map[string]any, error) {
-	schema, err := g.GenerateSchema(t)
-	if err != nil {
-		return nil, err
-	}
-	return schema.ToMap(), nil
+// Description sets the schema description
+func (b *StaticSchemaBuilder) Description(desc string) *StaticSchemaBuilder {
+	b.schema.Description = desc
+	return b
 }
 
-// GenerateSchemaAsMapLegacy generates a JSON schema as map[string]interface{} for legacy compatibility
-// Deprecated: Use GenerateSchemaAsMap instead
-func (g *SchemaGenerator) GenerateSchemaAsMapLegacy(t reflect.Type) (map[string]any, error) {
-	schema, err := g.GenerateSchema(t)
-	if err != nil {
-		return nil, err
-	}
-	return schema.ToMap(), nil
+// Properties sets the schema properties
+func (b *StaticSchemaBuilder) Properties(props map[string]*JSONSchema) *StaticSchemaBuilder {
+	b.schema.Properties = props
+	return b
 }
 
-// generateSchemaForType recursively generates schema for a type
-func (g *SchemaGenerator) generateSchemaForType(t reflect.Type, visited map[reflect.Type]bool) (*JSONSchema, error) {
-	// Check for custom type mapping
-	if schema, exists := g.TypeRegistry[t]; exists {
-		return schema, nil
-	}
-
-	// Prevent infinite recursion
-	if visited[t] {
-		refKey := fmt.Sprintf("#/definitions/%s", t.Name())
-		// Check if we already have this in RefResolver, otherwise add it
-		if _, exists := g.RefResolver[refKey]; !exists {
-			// Create a placeholder schema
-			g.addToRefResolver(refKey, &JSONSchema{
-				Type:        "object",
-				Description: fmt.Sprintf("Reference to %s", t.Name()),
-			})
-		}
-		return &JSONSchema{
-			Ref: refKey,
-		}, nil
-	}
-	visited[t] = true
-
-	switch t.Kind() {
-	case reflect.String:
-		return g.generateStringSchema(t)
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return g.generateIntegerSchema(t)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return g.generateIntegerSchema(t)
-	case reflect.Float32, reflect.Float64:
-		return g.generateNumberSchema(t)
-	case reflect.Bool:
-		return g.generateBooleanSchema(t)
-	case reflect.Array, reflect.Slice:
-		return g.generateArraySchema(t, visited)
-	case reflect.Map:
-		return g.generateMapSchema(t, visited)
-	case reflect.Struct:
-		return g.generateStructSchema(t, visited)
-	case reflect.Ptr:
-		return g.generateSchemaForType(t.Elem(), visited)
-	case reflect.Interface:
-		return g.generateInterfaceSchema(t)
-	default:
-		return &JSONSchema{
-			Type:        "object",
-			Description: fmt.Sprintf("Unsupported type: %s", t.Kind()),
-		}, nil
-	}
+// Required sets the required fields
+func (b *StaticSchemaBuilder) Required(fields ...string) *StaticSchemaBuilder {
+	b.schema.Required = fields
+	return b
 }
 
-// generateStringSchema generates schema for string types
-func (g *SchemaGenerator) generateStringSchema(t reflect.Type) (*JSONSchema, error) {
-	schema := &JSONSchema{
-		Type: "string",
-	}
-
-	// Handle special string types
-	if t == reflect.TypeOf(time.Time{}) {
-		schema.Format = "date-time"
-		if g.TagOptions.GenerateExamples {
-			schema.Example = "2023-01-01T00:00:00Z"
-		}
-	}
-
-	return schema, nil
+// MinLength sets the minimum length
+func (b *StaticSchemaBuilder) MinLength(length int) *StaticSchemaBuilder {
+	b.schema.MinLength = &length
+	return b
 }
 
-// generateIntegerSchema generates schema for integer types
-func (g *SchemaGenerator) generateIntegerSchema(t reflect.Type) (*JSONSchema, error) {
-	schema := &JSONSchema{
-		Type: "integer",
-	}
-
-	// Add format based on type size
-	switch t.Kind() {
-	case reflect.Int32, reflect.Uint32:
-		schema.Format = "int32"
-	case reflect.Int64, reflect.Uint64:
-		schema.Format = "int64"
-	}
-
-	// Add minimum for unsigned types
-	if strings.HasPrefix(t.Kind().String(), "uint") {
-		min := float64(0)
-		schema.Minimum = &min
-	}
-
-	if g.TagOptions.GenerateExamples {
-		schema.Example = 0
-	}
-
-	return schema, nil
+// MaxLength sets the maximum length
+func (b *StaticSchemaBuilder) MaxLength(length int) *StaticSchemaBuilder {
+	b.schema.MaxLength = &length
+	return b
 }
 
-// generateNumberSchema generates schema for floating-point types
-func (g *SchemaGenerator) generateNumberSchema(t reflect.Type) (*JSONSchema, error) {
-	schema := &JSONSchema{
-		Type: "number",
-	}
-
-	if t.Kind() == reflect.Float32 {
-		schema.Format = "float"
-	} else {
-		schema.Format = "double"
-	}
-
-	if g.TagOptions.GenerateExamples {
-		schema.Example = 0.0
-	}
-
-	return schema, nil
+// Pattern sets the pattern
+func (b *StaticSchemaBuilder) Pattern(pattern string) *StaticSchemaBuilder {
+	b.schema.Pattern = pattern
+	return b
 }
 
-// generateBooleanSchema generates schema for boolean types
-func (g *SchemaGenerator) generateBooleanSchema(t reflect.Type) (*JSONSchema, error) {
-	schema := &JSONSchema{
-		Type: "boolean",
-	}
-
-	if g.TagOptions.GenerateExamples {
-		schema.Example = false
-	}
-
-	return schema, nil
+// Enum sets the enum values
+func (b *StaticSchemaBuilder) Enum(values ...any) *StaticSchemaBuilder {
+	b.schema.Enum = values
+	return b
 }
 
-// generateArraySchema generates schema for array and slice types
-func (g *SchemaGenerator) generateArraySchema(t reflect.Type, visited map[reflect.Type]bool) (*JSONSchema, error) {
-	elemSchema, err := g.generateSchemaForType(t.Elem(), visited)
-	if err != nil {
-		return nil, err
-	}
-
-	schema := &JSONSchema{
-		Type:  "array",
-		Items: elemSchema,
-	}
-
-	if g.TagOptions.GenerateExamples {
-		schema.Example = []string{} // Type-safe empty array example
-	}
-
-	return schema, nil
+// Build returns the built schema
+func (b *StaticSchemaBuilder) Build() *JSONSchema {
+	return b.schema
 }
 
-// generateMapSchema generates schema for map types
-func (g *SchemaGenerator) generateMapSchema(t reflect.Type, visited map[reflect.Type]bool) (*JSONSchema, error) {
-	_, err := g.generateSchemaForType(t.Elem(), visited)
-	if err != nil {
-		return nil, err
-	}
+// Predefined schema builders for common types
 
-	// For maps, we use a special representation where additionalProperties holds the value schema
-	// Since JSONSchema struct doesn't have a field for this, we'll store as a schema that allows any additional properties
-	schema := &JSONSchema{
-		Type: "object",
-	}
-
-	// Create a copy of the value schema to use as additional properties
-	addlProps := true
-	schema.AdditionalProperties = &addlProps
-
-	if g.TagOptions.GenerateExamples {
-		schema.Example = map[string]any{} // Schema-compatible empty map example
-	}
-
-	return schema, nil
+// StringSchemaBuilder creates a string schema builder
+func StringSchemaBuilder() *StaticSchemaBuilder {
+	return NewStaticSchemaBuilder().Type("string")
 }
 
-// generateStructSchema generates schema for struct types
-func (g *SchemaGenerator) generateStructSchema(t reflect.Type, visited map[reflect.Type]bool) (*JSONSchema, error) {
-	schema := &JSONSchema{
-		Type:       "object",
-		Properties: make(map[string]*JSONSchema),
+// IntegerSchemaBuilder creates an integer schema builder
+func IntegerSchemaBuilder() *StaticSchemaBuilder {
+	return NewStaticSchemaBuilder().Type("integer")
+}
+
+// NumberSchemaBuilder creates a number schema builder
+func NumberSchemaBuilder() *StaticSchemaBuilder {
+	return NewStaticSchemaBuilder().Type("number")
+}
+
+// BooleanSchemaBuilder creates a boolean schema builder
+func BooleanSchemaBuilder() *StaticSchemaBuilder {
+	return NewStaticSchemaBuilder().Type("boolean")
+}
+
+// ArraySchemaBuilder creates an array schema builder
+func ArraySchemaBuilder(itemSchema *JSONSchema) *StaticSchemaBuilder {
+	builder := NewStaticSchemaBuilder().Type("array")
+	builder.schema.Items = itemSchema
+	return builder
+}
+
+// ObjectSchemaBuilder creates an object schema builder
+func ObjectSchemaBuilder() *StaticSchemaBuilder {
+	return NewStaticSchemaBuilder().Type("object")
+}
+
+// Common schema templates
+
+// CreateStringSchema creates a string schema with constraints
+func CreateStringSchema(minLen, maxLen int, pattern string) *JSONSchema {
+	builder := StringSchemaBuilder()
+
+	if minLen > 0 {
+		builder.MinLength(minLen)
+	}
+	if maxLen > 0 {
+		builder.MaxLength(maxLen)
+	}
+	if pattern != "" {
+		builder.Pattern(pattern)
 	}
 
-	var required []string
+	return builder.Build()
+}
 
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-
-		// Skip unexported fields
-		if !field.IsExported() {
-			continue
-		}
-
-		// Get field name from JSON tag or field name
-		fieldName := field.Name
-		if g.TagOptions.UseJSONTags {
-			if jsonTag := field.Tag.Get("json"); jsonTag != "" {
-				parts := strings.Split(jsonTag, ",")
-				if parts[0] != "" && parts[0] != "-" {
-					fieldName = parts[0]
-				}
-
-				// Skip fields marked with json:"-"
-				if parts[0] == "-" {
-					continue
-				}
-
-				// Handle omitempty
-				if g.TagOptions.OmitEmptyFields {
-					for _, part := range parts[1:] {
-						if part == "omitempty" {
-							// Field is optional
-							goto generateFieldSchema
-						}
-					}
-				}
-			}
-		}
-
-		// Check if field is required
-		if g.TagOptions.RequiredByDefault {
-			required = append(required, fieldName)
-		}
-
-		// Parse validation tags
-		if g.TagOptions.UseValidateTags {
-			if validateTag := field.Tag.Get("validate"); validateTag != "" {
-				if strings.Contains(validateTag, "required") {
-					required = append(required, fieldName)
-				}
-			}
-		}
-
-	generateFieldSchema:
-		// Generate schema for field type
-		fieldSchema, err := g.generateSchemaForType(field.Type, visited)
-		if err != nil {
-			return nil, errors.NewError().Message(fmt.Sprintf("failed to generate schema for field %s", fieldName)).Cause(err).WithLocation(
-
-			// Add validation constraints from tags
-			).Build()
-		}
-
-		if g.TagOptions.UseValidateTags {
-			if validateTag := field.Tag.Get("validate"); validateTag != "" {
-				g.applyValidationConstraintsTyped(fieldSchema, validateTag)
-			}
-		}
-
-		// Add description from comment or tag
-		if desc := field.Tag.Get("description"); desc != "" {
-			fieldSchema.Description = desc
-		}
-
-		schema.Properties[fieldName] = fieldSchema
+// CreateEnumSchema creates an enum schema
+func CreateEnumSchema(values []string) *JSONSchema {
+	enumVals := make([]any, len(values))
+	for i, v := range values {
+		enumVals[i] = v
 	}
+
+	return StringSchemaBuilder().Enum(enumVals...).Build()
+}
+
+// CreateObjectSchema creates an object schema with properties
+func CreateObjectSchema(properties map[string]*JSONSchema, required []string) *JSONSchema {
+	builder := ObjectSchemaBuilder().Properties(properties)
 
 	if len(required) > 0 {
-		schema.Required = required
+		builder.Required(required...)
 	}
 
-	schema.AdditionalProperties = &g.TagOptions.AllowAdditional
-
-	return schema, nil
+	return builder.Build()
 }
 
-// generateInterfaceSchema generates schema for interface types
-func (g *SchemaGenerator) generateInterfaceSchema(t reflect.Type) (*JSONSchema, error) {
+// CreateArraySchema creates an array schema
+func CreateArraySchema(itemSchema *JSONSchema) *JSONSchema {
 	return &JSONSchema{
-		Type:        "object",
-		Description: fmt.Sprintf("Interface type: %s", t.Name()),
-	}, nil
-}
-
-// applyValidationConstraints applies validation tag constraints to schema (legacy)
-// Deprecated: Use applyValidationConstraintsTyped instead
-func (g *SchemaGenerator) applyValidationConstraints(schema map[string]any, validateTag string) {
-	g.applyValidationConstraintsToMap(schema, validateTag)
-}
-
-// applyValidationConstraintsTyped applies validation tag constraints to typed schema
-func (g *SchemaGenerator) applyValidationConstraintsTyped(schema *JSONSchema, validateTag string) {
-	constraints := strings.Split(validateTag, ",")
-	for _, constraint := range constraints {
-		constraint = strings.TrimSpace(constraint)
-
-		switch {
-		case constraint == "required":
-			// Handled at struct level
-		case strings.HasPrefix(constraint, "min="):
-			if value := strings.TrimPrefix(constraint, "min="); value != "" {
-				if num, err := parseNumberFloat(value); err == nil {
-					schema.Minimum = &num
-				}
-			}
-		case strings.HasPrefix(constraint, "max="):
-			if value := strings.TrimPrefix(constraint, "max="); value != "" {
-				if num, err := parseNumberFloat(value); err == nil {
-					schema.Maximum = &num
-				}
-			}
-		case strings.HasPrefix(constraint, "len="):
-			if value := strings.TrimPrefix(constraint, "len="); value != "" {
-				if num64, err := parseNumberInt(value); err == nil {
-					num := int(num64)
-					if schema.Type == "string" {
-						schema.MinLength = &num
-						schema.MaxLength = &num
-					}
-				}
-			}
-		case strings.HasPrefix(constraint, "email"):
-			schema.Format = "email"
-		case strings.HasPrefix(constraint, "url"):
-			schema.Format = "uri"
-		case strings.HasPrefix(constraint, "uuid"):
-			schema.Pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-		}
+		Type:  "array",
+		Items: itemSchema,
 	}
 }
 
-// applyValidationConstraintsToMap applies validation constraints to a map (for backward compatibility)
-func (g *SchemaGenerator) applyValidationConstraintsToMap(schemaMap map[string]any, validateTag string) {
+// Validation functions
 
-	constraints := strings.Split(validateTag, ",")
-	for _, constraint := range constraints {
-		constraint = strings.TrimSpace(constraint)
-
-		switch {
-		case constraint == "required":
-			// Handled at struct level
-		case strings.HasPrefix(constraint, "min="):
-			if value := strings.TrimPrefix(constraint, "min="); value != "" {
-				if num, err := parseNumber(value); err == nil {
-					schemaMap["minimum"] = num
-				}
-			}
-		case strings.HasPrefix(constraint, "max="):
-			if value := strings.TrimPrefix(constraint, "max="); value != "" {
-				if num, err := parseNumber(value); err == nil {
-					schemaMap["maximum"] = num
-				}
-			}
-		case strings.HasPrefix(constraint, "len="):
-			if value := strings.TrimPrefix(constraint, "len="); value != "" {
-				if num, err := parseNumber(value); err == nil {
-					intVal := int(num)
-					if schemaMap["type"] == "string" {
-						schemaMap["minLength"] = intVal
-						schemaMap["maxLength"] = intVal
-					} else if schemaMap["type"] == "array" {
-						schemaMap["minItems"] = intVal
-						schemaMap["maxItems"] = intVal
-					}
-				}
-			}
-		case strings.HasPrefix(constraint, "email"):
-			schemaMap["format"] = "email"
-		case strings.HasPrefix(constraint, "url"):
-			schemaMap["format"] = "uri"
-		case strings.HasPrefix(constraint, "uuid"):
-			schemaMap["pattern"] = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-		}
-	}
-}
-
-// parseNumber attempts to parse a string as a number
-func parseNumber(s string) (float64, error) {
-	if f, err := json.Number(s).Float64(); err == nil {
-		return f, nil
-	}
-	return 0, errors.NewError().Messagef("not a number: %s", s).WithLocation().Build()
-}
-
-// parseNumberFloat parses a string as float64
-func parseNumberFloat(s string) (float64, error) {
-	return json.Number(s).Float64()
-}
-
-// parseNumberInt parses a string as int64
-func parseNumberInt(s string) (int64, error) {
-	return json.Number(s).Int64()
-}
-
-func GenerateToolSchema[TParams any, TResult any](
-	name, description string,
-	paramsType reflect.Type,
-	resultType reflect.Type,
-) (Schema[TParams, TResult], error) {
-	generator := NewSchemaGenerator()
-
-	paramsSchema, err := generator.GenerateSchema(paramsType)
-	if err != nil {
-		return Schema[TParams, TResult]{}, errors.NewError().Message("failed to generate params schema").Cause(err).Build()
-	}
-
-	resultSchema, err := generator.GenerateSchema(resultType)
-	if err != nil {
-		return Schema[TParams, TResult]{}, errors.NewError().Message("failed to generate result schema").Cause(err).Build()
-	}
-
-	return Schema[TParams, TResult]{
-		Name:         name,
-		Description:  description,
-		Version:      "1.0.0",
-		ParamsSchema: paramsSchema,
-		ResultSchema: resultSchema,
-		Examples:     []Example[TParams, TResult]{},
-	}, nil
-}
-
-// RegisterCustomType registers a custom schema for a specific type
-func (g *SchemaGenerator) RegisterCustomType(t reflect.Type, schema *JSONSchema) {
-	// Evict oldest entries if cache is full
-	if len(g.TypeRegistry) >= g.maxTypeRegistrySize {
-		g.evictOldestTypeRegistryEntries()
-	}
-	g.TypeRegistry[t] = schema
-}
-
-// evictOldestTypeRegistryEntries removes some entries when the cache is full
-func (g *SchemaGenerator) evictOldestTypeRegistryEntries() {
-	// Remove 20% of entries to make room for new ones
-	evictCount := g.maxTypeRegistrySize / 5
-	count := 0
-	for key := range g.TypeRegistry {
-		delete(g.TypeRegistry, key)
-		count++
-		if count >= evictCount {
-			break
-		}
-	}
-}
-
-// evictOldestRefResolverEntries removes some entries when the cache is full
-func (g *SchemaGenerator) evictOldestRefResolverEntries() {
-	// Remove 20% of entries to make room for new ones
-	evictCount := g.maxRefResolverSize / 5
-	count := 0
-	for key := range g.RefResolver {
-		delete(g.RefResolver, key)
-		count++
-		if count >= evictCount {
-			break
-		}
-	}
-}
-
-// addToRefResolver safely adds an entry to RefResolver with cache eviction
-func (g *SchemaGenerator) addToRefResolver(key string, schema *JSONSchema) {
-	// Evict oldest entries if cache is full
-	if len(g.RefResolver) >= g.maxRefResolverSize {
-		g.evictOldestRefResolverEntries()
-	}
-	g.RefResolver[key] = schema
-}
-
-// ClearCaches clears all internal caches to free memory
-func (g *SchemaGenerator) ClearCaches() {
-	g.RefResolver = make(map[string]*JSONSchema)
-	g.TypeRegistry = make(map[reflect.Type]*JSONSchema)
-}
-
-// GetCacheStats returns cache statistics
-func (g *SchemaGenerator) GetCacheStats() map[string]int {
-	return map[string]int{
-		"ref_resolver_size":  len(g.RefResolver),
-		"ref_resolver_max":   g.maxRefResolverSize,
-		"type_registry_size": len(g.TypeRegistry),
-		"type_registry_max":  g.maxTypeRegistrySize,
-	}
-}
-
-// GetSchemaAsJSON returns the schema as JSON bytes
-func GetSchemaAsJSON(schema *JSONSchema) ([]byte, error) {
-	return json.MarshalIndent(schema, "", "  ")
-}
-
-// ValidateAgainstSchema validates data against a JSON schema (simplified)
+// ValidateAgainstSchema validates data against a JSON schema
 func ValidateAgainstSchema(data any, schema *JSONSchema) error {
-	// This is a simplified validation - in production, use a proper JSON Schema validator
 	if schema.Type == "" {
 		return nil // No type constraint
 	}
 
 	dataType := getJSONType(data)
 	if dataType != schema.Type {
-		return errors.NewError().Messagef("expected type %s, got %s", schema.Type, dataType).Build()
+		return errors.NewError().
+			Message(fmt.Sprintf("expected type %s, got %s", schema.Type, dataType)).
+			WithLocation().
+			Build()
 	}
 
 	return nil
 }
 
+// getJSONType determines the JSON type of a value
 func getJSONType(v any) string {
 	if v == nil {
 		return "null"
@@ -680,251 +259,353 @@ func getJSONType(v any) string {
 	}
 }
 
-// getJSONTypeLegacy provides backward compatibility for interface{} parameters
-// Deprecated: Use getJSONType instead
-func getJSONTypeLegacy(v any) string {
-	return getJSONType(v)
-}
+// Tool schema creation functions
 
-// Common schema templates for frequently used types
-
-// StringSchema creates a string schema with common constraints
-func StringSchema(minLen, maxLen int, pattern string) map[string]any {
-	schema := map[string]any{
-		"type": "string",
-	}
-
-	if minLen > 0 {
-		schema["minLength"] = minLen
-	}
-	if maxLen > 0 {
-		schema["maxLength"] = maxLen
-	}
-	if pattern != "" {
-		schema["pattern"] = pattern
-	}
-
-	return schema
-}
-
-// StringSchemaLegacy provides backward compatibility for interface{} returns
-// Deprecated: Use StringSchema instead
-func StringSchemaLegacy(minLen, maxLen int, pattern string) map[string]any {
-	return StringSchema(minLen, maxLen, pattern)
-}
-
-// StringSchemaTyped creates a type-safe string schema with length and pattern constraints
-func StringSchemaTyped(minLen, maxLen int, pattern string) *TypedJSONSchema[string] {
-	schema := NewTypedSchema[string]()
-	schema.Type = "string"
-	if minLen > 0 {
-		schema.MinLength = &minLen
-	}
-	if maxLen > 0 {
-		schema.MaxLength = &maxLen
-	}
-	if pattern != "" {
-		schema.Pattern = pattern
-	}
-	return schema
-}
-
-// NumberSchema creates a number schema with constraints
-func NumberSchema(min, max *float64, multipleOf *float64) map[string]any {
-	schema := map[string]any{
-		"type": "number",
-	}
-
-	if min != nil {
-		schema["minimum"] = *min
-	}
-	if max != nil {
-		schema["maximum"] = *max
-	}
-	if multipleOf != nil {
-		schema["multipleOf"] = *multipleOf
-	}
-
-	return schema
-}
-
-// NumberSchemaLegacy provides backward compatibility for interface{} returns
-// Deprecated: Use NumberSchema instead
-func NumberSchemaLegacy(min, max *float64, multipleOf *float64) map[string]any {
-	return NumberSchema(min, max, multipleOf)
-}
-
-// NumberSchemaTyped creates a type-safe number schema with constraints
-func NumberSchemaTyped(min, max *float64, multipleOf *float64) *TypedJSONSchema[float64] {
-	schema := NewTypedSchema[float64]()
-	schema.Type = "number"
-	if min != nil {
-		schema.Minimum = min
-	}
-	if max != nil {
-		schema.Maximum = max
-	}
-	// Note: multipleOf not yet supported in TypedJSONSchema, would need to add field
-	return schema
-}
-
-// ArraySchema creates an array schema
-func ArraySchema(itemSchema any, minItems, maxItems int) map[string]any {
-	schema := map[string]any{
-		"type":  "array",
-		"items": itemSchema,
-	}
-
-	if minItems > 0 {
-		schema["minItems"] = minItems
-	}
-	if maxItems > 0 {
-		schema["maxItems"] = maxItems
-	}
-
-	return schema
-}
-
-// ArraySchemaLegacy provides backward compatibility for interface{} parameters and returns
-// Deprecated: Use ArraySchema instead
-func ArraySchemaLegacy(itemSchema any, minItems, maxItems int) map[string]any {
-	return ArraySchema(itemSchema, minItems, maxItems)
-}
-
-// ArraySchemaTyped creates a type-safe array schema
-// Note: This returns untyped JSONSchema since arrays don't satisfy SchemaValue constraint
-func ArraySchemaTyped(itemSchema *JSONSchema, minItems, maxItems int) *JSONSchema {
-	schema := &JSONSchema{
-		Type:  "array",
-		Items: itemSchema,
-	}
-	// Note: minItems and maxItems not yet supported in JSONSchema, would need to add fields
-	return schema
-}
-
-// EnumSchema creates an enum schema
-func EnumSchema(values []any) map[string]any {
-	return map[string]any{
-		"enum": values,
+// CreateToolSchema creates a tool schema without reflection
+func CreateToolSchema(name, description string, inputSchema, outputSchema *JSONSchema) api.ToolSchema {
+	return api.ToolSchema{
+		Name:         name,
+		Description:  description,
+		InputSchema:  inputSchema.ToMap(),
+		OutputSchema: outputSchema.ToMap(),
+		Version:      "1.0.0",
 	}
 }
 
-// EnumSchemaLegacy provides backward compatibility for interface{} parameters and returns
-// Deprecated: Use EnumSchema instead
-func EnumSchemaLegacy(values []any) map[string]any {
-	return EnumSchema(values)
+// GenerateToolSchema generates a tool schema using static registration
+func GenerateToolSchema[TParams any, TResult any](
+	name, description string,
+	inputBuilder func() *JSONSchema,
+	outputBuilder func() *JSONSchema,
+) (Schema[TParams, TResult], error) {
+	inputSchema := inputBuilder()
+	outputSchema := outputBuilder()
+
+	return Schema[TParams, TResult]{
+		Name:         name,
+		Description:  description,
+		Version:      "1.0.0",
+		ParamsSchema: inputSchema,
+		ResultSchema: outputSchema,
+		Examples:     []Example[TParams, TResult]{},
+	}, nil
 }
 
-// EnumSchemaTyped creates a type-safe enum schema for string values
-func EnumSchemaTyped(values []string) *TypedJSONSchema[string] {
-	schema := NewTypedSchema[string]()
-	schema.Type = "string"
-	schema.SetEnum(values)
-	return schema
+// Containerization tool schema builders
+
+// CreateAnalyzeToolSchema creates schema for analyze tool
+func CreateAnalyzeToolSchema() *JSONSchema {
+	return CreateObjectSchema(map[string]*JSONSchema{
+		"repository_path": CreateStringSchema(1, 500, ""),
+		"output_format":   CreateEnumSchema([]string{"json", "yaml", "text"}),
+		"deep_scan":       BooleanSchemaBuilder().Build(),
+	}, []string{"repository_path"})
 }
 
-// ObjectSchema creates an object schema
-func ObjectSchema(properties map[string]any, required []string) map[string]any {
-	schema := map[string]any{
-		"type":       "object",
-		"properties": properties,
+// CreateBuildToolSchema creates schema for build tool
+func CreateBuildToolSchema() *JSONSchema {
+	return CreateObjectSchema(map[string]*JSONSchema{
+		"dockerfile_path": CreateStringSchema(1, 500, ""),
+		"image_name":      CreateStringSchema(1, 200, ""),
+		"build_context":   CreateStringSchema(1, 500, ""),
+		"build_args":      ObjectSchemaBuilder().Build(),
+		"no_cache":        BooleanSchemaBuilder().Build(),
+	}, []string{"dockerfile_path", "image_name"})
+}
+
+// CreateDeployToolSchema creates schema for deploy tool
+func CreateDeployToolSchema() *JSONSchema {
+	return CreateObjectSchema(map[string]*JSONSchema{
+		"image_name":  CreateStringSchema(1, 200, ""),
+		"namespace":   CreateStringSchema(1, 100, ""),
+		"replicas":    IntegerSchemaBuilder().Build(),
+		"port":        IntegerSchemaBuilder().Build(),
+		"environment": ObjectSchemaBuilder().Build(),
+	}, []string{"image_name"})
+}
+
+// CreateScanToolSchema creates schema for scan tool
+func CreateScanToolSchema() *JSONSchema {
+	return CreateObjectSchema(map[string]*JSONSchema{
+		"image_name": CreateStringSchema(1, 200, ""),
+		"scanner":    CreateEnumSchema([]string{"trivy", "grype"}),
+		"format":     CreateEnumSchema([]string{"json", "table", "sarif"}),
+		"severity":   CreateEnumSchema([]string{"LOW", "MEDIUM", "HIGH", "CRITICAL"}),
+	}, []string{"image_name"})
+}
+
+// Session tool schema builders
+
+// CreateSessionCreateToolSchema creates schema for session create tool
+func CreateSessionCreateToolSchema() *JSONSchema {
+	return CreateObjectSchema(map[string]*JSONSchema{
+		"session_name":   CreateStringSchema(1, 100, ""),
+		"workspace_path": CreateStringSchema(1, 500, ""),
+		"labels":         ObjectSchemaBuilder().Build(),
+	}, []string{"session_name"})
+}
+
+// CreateSessionManageToolSchema creates schema for session manage tool
+func CreateSessionManageToolSchema() *JSONSchema {
+	return CreateObjectSchema(map[string]*JSONSchema{
+		"session_id": CreateStringSchema(1, 100, ""),
+		"action":     CreateEnumSchema([]string{"get", "update", "delete", "list"}),
+		"metadata":   ObjectSchemaBuilder().Build(),
+	}, []string{"action"})
+}
+
+// Schema registry for static schema management
+
+// SchemaRegistry manages static schemas
+type SchemaRegistry struct {
+	schemas map[string]*JSONSchema
+}
+
+// NewSchemaRegistry creates a new schema registry
+func NewSchemaRegistry() *SchemaRegistry {
+	registry := &SchemaRegistry{
+		schemas: make(map[string]*JSONSchema),
 	}
 
-	if len(required) > 0 {
-		schema["required"] = required
+	// Register built-in schemas
+	registry.registerBuiltinSchemas()
+
+	return registry
+}
+
+// registerBuiltinSchemas registers common tool schemas
+func (r *SchemaRegistry) registerBuiltinSchemas() {
+	r.schemas["containerization_analyze"] = CreateAnalyzeToolSchema()
+	r.schemas["containerization_build"] = CreateBuildToolSchema()
+	r.schemas["containerization_deploy"] = CreateDeployToolSchema()
+	r.schemas["containerization_scan"] = CreateScanToolSchema()
+	r.schemas["session_create"] = CreateSessionCreateToolSchema()
+	r.schemas["session_manage"] = CreateSessionManageToolSchema()
+}
+
+// GetSchema retrieves a schema by name
+func (r *SchemaRegistry) GetSchema(name string) (*JSONSchema, error) {
+	if schema, exists := r.schemas[name]; exists {
+		return schema, nil
 	}
 
-	return schema
+	return nil, errors.NewError().
+		Message(fmt.Sprintf("schema not found: %s", name)).
+		WithLocation().
+		Build()
 }
 
-// ObjectSchemaLegacy provides backward compatibility for interface{} parameters and returns
-// Deprecated: Use ObjectSchema instead
-func ObjectSchemaLegacy(properties map[string]any, required []string) map[string]any {
-	return ObjectSchema(properties, required)
+// RegisterSchema registers a custom schema
+func (r *SchemaRegistry) RegisterSchema(name string, schema *JSONSchema) {
+	r.schemas[name] = schema
 }
 
-// TypedSchemaProperty represents a typed schema property
-type TypedSchemaProperty = JSONSchema
-
-// ObjectSchemaTyped creates a type-safe object schema
-// Note: This returns untyped JSONSchema since objects don't satisfy SchemaValue constraint
-func ObjectSchemaTyped(properties map[string]*TypedSchemaProperty, required []string) *JSONSchema {
-	schema := &JSONSchema{
-		Type:       "object",
-		Properties: properties,
-		Required:   required,
+// ListSchemas returns all registered schema names
+func (r *SchemaRegistry) ListSchemas() []string {
+	names := make([]string, 0, len(r.schemas))
+	for name := range r.schemas {
+		names = append(names, name)
 	}
-	return schema
+	return names
 }
 
-// Helper functions for parsing numeric constraints removed - using existing implementations above
+// Global schema registry instance
+var globalSchemaRegistry = NewSchemaRegistry()
 
-// Predefined typed schemas for common tool inputs
+// GetGlobalSchemaRegistry returns the global schema registry
+func GetGlobalSchemaRegistry() *SchemaRegistry {
+	return globalSchemaRegistry
+}
 
-// ChatInputSchema provides typed schema for chat input
-var ChatInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
-	"message": {
-		Type:        "string",
-		Description: "Your message or question",
-	},
-	"session_id": {
-		Type:        "string",
-		Description: "Optional session ID for conversation continuity",
-	},
-	"context": {
-		Type:        "object",
-		Description: "Additional context for the conversation",
-	},
-}, []string{"message"})
+// Utility functions
 
-// ConversationHistoryInputSchema provides typed schema for conversation history input
-var ConversationHistoryInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
-	"session_id": {
-		Type:        "string",
-		Description: "Session ID to get history for",
-	},
-	"limit": {
-		Type:        "integer",
-		Description: "Maximum number of entries to return",
-	},
-}, []string{})
+// GetSchemaAsJSON returns the schema as JSON bytes
+func GetSchemaAsJSON(schema *JSONSchema) ([]byte, error) {
+	return json.MarshalIndent(schema, "", "  ")
+}
 
-// WorkflowExecuteInputSchema provides typed schema for workflow execution input
-var WorkflowExecuteInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
-	"workflow_name": {
-		Type:        "string",
-		Description: "Name of predefined workflow to execute",
-	},
-	"workflow_spec": {
-		Type:        "object",
-		Description: "Custom workflow specification",
-	},
-	"variables": {
-		Type:        "object",
-		Description: "Variables to pass to the workflow",
-	},
-	"options": {
-		Type:        "object",
-		Description: "Execution options (dry_run, checkpoints, etc.)",
-	},
-}, []string{})
+// ParseValidationRules parses validation rules from struct tags
+func ParseValidationRules(tag string) []string {
+	if tag == "" {
+		return nil
+	}
+	return strings.Split(tag, ",")
+}
 
-// WorkflowListInputSchema provides typed schema for workflow list input
-var WorkflowListInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
-	"category": {
-		Type:        "string",
-		Description: "Filter by workflow category",
-	},
-}, []string{})
+// ApplyValidationRule applies a validation rule to a value
+func ApplyValidationRule(value any, fieldName string, rule string) error {
+	parts := strings.SplitN(rule, "=", 2)
+	ruleName := parts[0]
 
-// WorkflowStatusInputSchema provides typed schema for workflow status input
-var WorkflowStatusInputSchema = ObjectSchemaTyped(map[string]*TypedSchemaProperty{
-	"workflow_id": {
-		Type:        "string",
-		Description: "ID of the workflow to check",
-	},
-	"session_id": {
-		Type:        "string",
-		Description: "Optional session ID",
-	},
-}, []string{"workflow_id"})
+	switch ruleName {
+	case "required":
+		if isZeroValue(value) {
+			return errors.NewError().
+				Message(fmt.Sprintf("field %s is required", fieldName)).
+				WithLocation().
+				Build()
+		}
+	case "min":
+		if len(parts) > 1 {
+			return validateMinConstraint(value, fieldName, parts[1])
+		}
+	case "max":
+		if len(parts) > 1 {
+			return validateMaxConstraint(value, fieldName, parts[1])
+		}
+	}
+
+	return nil
+}
+
+// isZeroValue checks if a value is zero
+func isZeroValue(value any) bool {
+	if value == nil {
+		return true
+	}
+
+	switch v := value.(type) {
+	case string:
+		return v == ""
+	case bool:
+		return !v
+	case int, int8, int16, int32, int64:
+		return v == 0
+	case uint, uint8, uint16, uint32, uint64:
+		return v == 0
+	case float32, float64:
+		return v == 0
+	default:
+		return false
+	}
+}
+
+// validateMinConstraint validates minimum constraint
+func validateMinConstraint(value any, fieldName string, param string) error {
+	switch v := value.(type) {
+	case string:
+		if len(v) < parseIntParam(param) {
+			return errors.NewError().
+				Message(fmt.Sprintf("field %s must be at least %s characters", fieldName, param)).
+				WithLocation().
+				Build()
+		}
+	case int:
+		if v < parseIntParam(param) {
+			return errors.NewError().
+				Message(fmt.Sprintf("field %s must be at least %s", fieldName, param)).
+				WithLocation().
+				Build()
+		}
+	}
+	return nil
+}
+
+// validateMaxConstraint validates maximum constraint
+func validateMaxConstraint(value any, fieldName string, param string) error {
+	switch v := value.(type) {
+	case string:
+		if len(v) > parseIntParam(param) {
+			return errors.NewError().
+				Message(fmt.Sprintf("field %s must be at most %s characters", fieldName, param)).
+				WithLocation().
+				Build()
+		}
+	case int:
+		if v > parseIntParam(param) {
+			return errors.NewError().
+				Message(fmt.Sprintf("field %s must be at most %s", fieldName, param)).
+				WithLocation().
+				Build()
+		}
+	}
+	return nil
+}
+
+// parseIntParam parses integer parameter
+func parseIntParam(param string) int {
+	var val int
+	for _, r := range param {
+		if r >= '0' && r <= '9' {
+			val = val*10 + int(r-'0')
+		} else {
+			break
+		}
+	}
+	return val
+}
+
+// Schema validation context
+
+// ValidationContext provides context for schema validation
+type ValidationContext struct {
+	FieldPath   string
+	SchemaPath  string
+	Errors      []error
+	Warnings    []string
+	ValidatedAt time.Time
+}
+
+// NewValidationContext creates a new validation context
+func NewValidationContext() *ValidationContext {
+	return &ValidationContext{
+		Errors:      []error{},
+		Warnings:    []string{},
+		ValidatedAt: time.Now(),
+	}
+}
+
+// AddError adds an error to the context
+func (c *ValidationContext) AddError(err error) {
+	c.Errors = append(c.Errors, err)
+}
+
+// AddWarning adds a warning to the context
+func (c *ValidationContext) AddWarning(msg string) {
+	c.Warnings = append(c.Warnings, msg)
+}
+
+// HasErrors returns true if there are errors
+func (c *ValidationContext) HasErrors() bool {
+	return len(c.Errors) > 0
+}
+
+// CombineErrors combines all errors into a single error
+func (c *ValidationContext) CombineErrors() error {
+	if len(c.Errors) == 0 {
+		return nil
+	}
+
+	if len(c.Errors) == 1 {
+		return c.Errors[0]
+	}
+
+	var messages []string
+	for _, err := range c.Errors {
+		messages = append(messages, err.Error())
+	}
+
+	return errors.NewError().
+		Message(fmt.Sprintf("validation errors: %s", strings.Join(messages, "; "))).
+		WithLocation().
+		Build()
+}
+
+// ValidateWithContext validates data against schema with context
+func ValidateWithContext(_ context.Context, data any, schema *JSONSchema, validationCtx *ValidationContext) error {
+	if schema.Type == "" {
+		return nil
+	}
+
+	dataType := getJSONType(data)
+	if dataType != schema.Type {
+		err := errors.NewError().
+			Message(fmt.Sprintf("expected type %s, got %s", schema.Type, dataType)).
+			WithLocation().
+			Build()
+		validationCtx.AddError(err)
+		return err
+	}
+
+	return validationCtx.CombineErrors()
+}

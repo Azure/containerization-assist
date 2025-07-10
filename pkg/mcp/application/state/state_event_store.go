@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // StateEventStore stores and retrieves state change events
@@ -17,17 +18,17 @@ type StateEventStore struct {
 	mu         sync.RWMutex
 	maxEvents  int
 	retention  time.Duration
-	logger     logging.Standards
+	logger     *slog.Logger
 }
 
 // NewStateEventStore creates a new state event store
-func NewStateEventStore(logger logging.Standards) *StateEventStore {
+func NewStateEventStore(logger *slog.Logger) *StateEventStore {
 	store := &StateEventStore{
 		events:     make(map[string][]*StateEvent),
 		eventsByID: make(map[string]*StateEvent),
 		maxEvents:  1000,
 		retention:  24 * time.Hour,
-		logger:     logger.WithComponent("state_event_store"),
+		logger:     logger.With("component", "state_event_store"),
 	}
 
 	go store.cleanupRoutine()

@@ -6,10 +6,8 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai v0.7.2
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0
 	github.com/go-chi/chi/v5 v5.2.2
-	github.com/go-chi/cors v1.2.2
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
-	github.com/invopop/jsonschema v0.13.0
 	github.com/joho/godotenv v1.5.1
 	github.com/localrivet/gomcp v1.7.2
 	github.com/prometheus/client_golang v1.22.0
@@ -28,14 +26,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.37.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.33.2
-	k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
 	sigs.k8s.io/yaml v1.5.0
 )
 
 require (
-	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/eclipse/paho.mqtt.golang v1.5.0 // indirect
@@ -69,7 +64,6 @@ require (
 	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
@@ -83,6 +77,7 @@ require (
 	google.golang.org/grpc v1.73.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
+	k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )
 

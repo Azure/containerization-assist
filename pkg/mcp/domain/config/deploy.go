@@ -2,6 +2,8 @@ package config
 
 import (
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Deploy represents typed configuration for Kubernetes deployment operations
@@ -257,33 +259,33 @@ type DeployTracingConfig struct {
 // Validate validates the deployment configuration
 func (dc *Deploy) Validate() error {
 	if dc.Name == "" {
-		return NewValidationError("name", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'name': required field cannot be empty").Context("field", "name").Build()
 	}
 
 	if dc.Namespace == "" {
-		return NewValidationError("namespace", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'namespace': required field cannot be empty").Context("field", "namespace").Build()
 	}
 
 	if dc.Image == "" {
-		return NewValidationError("image", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'image': required field cannot be empty").Context("field", "image").Build()
 	}
 
 	if dc.Replicas < 1 {
-		return NewValidationError("replicas", "must be at least 1")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'replicas': must be at least 1").Context("field", "replicas").Build()
 	}
 
 	if dc.Timeout < time.Second {
-		return NewValidationError("timeout", "must be at least 1 second")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'timeout': must be at least 1 second").Context("field", "timeout").Build()
 	}
 
 	if dc.Retries < 0 || dc.Retries > 10 {
-		return NewValidationError("retries", "must be between 0 and 10")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'retries': must be between 0 and 10").Context("field", "retries").Build()
 	}
 
 	// Validate ports
 	for i, port := range dc.Ports {
 		if port.ContainerPort < 1 || port.ContainerPort > 65535 {
-			return NewValidationError("ports["+string(rune(i))+"].container_port", "must be between 1 and 65535")
+			return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'ports["+string(rune(i))+"].container_port': must be between 1 and 65535").Context("field", "ports["+string(rune(i))+"].container_port").Build()
 		}
 	}
 

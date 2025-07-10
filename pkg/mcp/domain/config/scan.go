@@ -2,6 +2,8 @@ package config
 
 import (
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ScanConfig represents typed configuration for security scanning operations
@@ -268,31 +270,31 @@ type SlackConfig struct {
 // Validate validates the scan configuration
 func (sc *ScanConfig) Validate() error {
 	if sc.ScanType == "" {
-		return NewValidationError("scan_type", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'scan_type': required field cannot be empty").Context("field", "scan_type").Build()
 	}
 
 	if sc.TargetType == "" {
-		return NewValidationError("target_type", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'target_type': required field cannot be empty").Context("field", "target_type").Build()
 	}
 
 	if sc.Target == "" {
-		return NewValidationError("target", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'target': required field cannot be empty").Context("field", "target").Build()
 	}
 
 	if sc.Scanner.Name == "" {
-		return NewValidationError("scanner.name", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'scanner.name': required field cannot be empty").Context("field", "scanner.name").Build()
 	}
 
 	if sc.Timeout < time.Second {
-		return NewValidationError("timeout", "must be at least 1 second")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'timeout': must be at least 1 second").Context("field", "timeout").Build()
 	}
 
 	if sc.Retries < 0 || sc.Retries > 10 {
-		return NewValidationError("retries", "must be between 0 and 10")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'retries': must be between 0 and 10").Context("field", "retries").Build()
 	}
 
 	if sc.Workers < 0 || sc.Workers > 50 {
-		return NewValidationError("workers", "must be between 0 and 50")
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("validation error for field 'workers': must be between 0 and 50").Context("field", "workers").Build()
 	}
 
 	return nil

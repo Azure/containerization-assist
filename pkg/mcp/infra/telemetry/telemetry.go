@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
 )
@@ -40,23 +41,23 @@ func (m *Manager) Initialize(ctx context.Context) error {
 
 	// Validate configuration
 	if err := m.config.Validate(); err != nil {
-		return fmt.Errorf("invalid telemetry configuration: %w", err)
+		return errors.NewError().Code(errors.CodeValidationFailed).Message("invalid telemetry configuration").Cause(err).Build()
 	}
 
 	// Initialize tracing
 	if err := m.tracing.Initialize(ctx); err != nil {
-		return fmt.Errorf("failed to initialize tracing: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to initialize tracing").Cause(err).Build()
 	}
 
 	// Create resource for metrics (reuse tracing resource creation logic)
 	resource, err := m.createResource()
 	if err != nil {
-		return fmt.Errorf("failed to create resource: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to create resource").Cause(err).Build()
 	}
 
 	// Initialize metrics
 	if err := m.metrics.Initialize(ctx, resource); err != nil {
-		return fmt.Errorf("failed to initialize metrics: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to initialize metrics").Cause(err).Build()
 	}
 
 	// Start system monitoring
@@ -77,12 +78,12 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 
 	// Shutdown metrics
 	if err := m.metrics.Shutdown(ctx); err != nil {
-		return fmt.Errorf("failed to shutdown metrics: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to shutdown metrics").Cause(err).Build()
 	}
 
 	// Shutdown tracing
 	if err := m.tracing.Shutdown(ctx); err != nil {
-		return fmt.Errorf("failed to shutdown tracing: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to shutdown tracing").Cause(err).Build()
 	}
 
 	return nil

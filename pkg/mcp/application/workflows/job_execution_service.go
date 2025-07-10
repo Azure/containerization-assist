@@ -419,30 +419,3 @@ func (j *jobExecutionService) cleanup() {
 			"cleaned_jobs", len(toDelete))
 	}
 }
-
-// Backward compatibility
-
-// JobManager is a type alias for backward compatibility
-// DEPRECATED: Use JobExecutionService instead
-type JobManager = jobExecutionService
-
-// JobManagerConfig is a type alias for backward compatibility
-// DEPRECATED: Use JobExecutionConfig instead
-type JobManagerConfig = JobExecutionConfig
-
-// NewJobManager creates a new job manager (for backward compatibility)
-// DEPRECATED: Use NewJobExecutionService instead
-func NewJobManager(config JobManagerConfig) JobExecutionService {
-	return NewJobExecutionService(config)
-}
-
-// NewJobManagerWithServices creates a new job manager (for backward compatibility)
-// DEPRECATED: Use NewJobExecutionService instead
-func NewJobManagerWithServices(logger *slog.Logger) (JobExecutionService, error) {
-	config := JobExecutionConfig{
-		MaxWorkers: 5,
-		JobTTL:     1 * time.Hour,
-		Logger:     logger.With("component", "job_execution_service"),
-	}
-	return NewJobExecutionService(config), nil
-}

@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
+	"log/slog"
 )
 
 // NewPatternAnalyzer creates a new pattern analyzer
-func NewPatternAnalyzer(config PatternAnalysisConfig, logger logging.Standards) *PatternAnalyzer {
+func NewPatternAnalyzer(config PatternAnalysisConfig, logger *slog.Logger) *PatternAnalyzer {
 	return &PatternAnalyzer{
-		logger:  logger.WithComponent("pattern_analyzer"),
+		logger:  logger.With("component", "pattern_analyzer"),
 		config:  config,
 		fileSet: token.NewFileSet(),
 		statistics: PatternStatistics{
@@ -28,7 +28,7 @@ func NewPatternAnalyzer(config PatternAnalysisConfig, logger logging.Standards) 
 
 // AnalyzePatterns performs comprehensive pattern analysis
 func (pa *PatternAnalyzer) AnalyzePatterns(rootPath string) (*PatternAnalysisResult, error) {
-	pa.logger.Info().Str("path", rootPath).Msg("Starting pattern analysis")
+	pa.logger.Info("Starting pattern analysis", "path", rootPath)
 
 	startTime := time.Now()
 	result := &PatternAnalysisResult{
@@ -51,7 +51,7 @@ func (pa *PatternAnalyzer) AnalyzePatterns(rootPath string) (*PatternAnalysisRes
 
 		file, err := parser.ParseFile(pa.fileSet, path, nil, parser.ParseComments)
 		if err != nil {
-			pa.logger.Warn().Err(err).Str("file", path).Msg("Failed to parse file")
+			pa.logger.Warn("Failed to parse file", "error", err, "file", path)
 			return nil
 		}
 
@@ -88,12 +88,11 @@ func (pa *PatternAnalyzer) AnalyzePatterns(rootPath string) (*PatternAnalysisRes
 	pa.statistics.TotalDetections = len(result.ComplexityHotspots) +
 		len(result.DuplicationGroups) + len(result.AntiPatterns)
 
-	pa.logger.Info().
-		Int("hotspots", len(result.ComplexityHotspots)).
-		Int("duplications", len(result.DuplicationGroups)).
-		Int("anti_patterns", len(result.AntiPatterns)).
-		Str("duration", pa.statistics.DetectionTime.String()).
-		Msg("Pattern analysis completed")
+	pa.logger.Info("Pattern analysis completed",
+		"hotspots", len(result.ComplexityHotspots),
+		"duplications", len(result.DuplicationGroups),
+		"anti_patterns", len(result.AntiPatterns),
+		"duration", pa.statistics.DetectionTime.String())
 
 	return result, nil
 }

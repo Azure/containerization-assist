@@ -141,20 +141,20 @@ func (bv *BuildValidator) GeneratePushTroubleshootingTips(err error, registryURL
 	return tips
 }
 
-// SecurityValidator provides security-related validation for builds
-type SecurityValidator struct {
+// BuildSecurityValidator provides security-related validation for builds
+type BuildSecurityValidator struct {
 	unified *UnifiedValidator
 }
 
 // NewSecurityValidator creates a new security validator
-func NewSecurityValidator() *SecurityValidator {
-	return &SecurityValidator{
+func NewSecurityValidator() *BuildSecurityValidator {
+	return &BuildSecurityValidator{
 		unified: NewUnifiedValidator(),
 	}
 }
 
 // ValidateDockerfileSecurity performs basic security checks on Dockerfile
-func (sv *SecurityValidator) ValidateDockerfileSecurity(dockerfilePath string) ([]string, error) {
+func (sv *BuildSecurityValidator) ValidateDockerfileSecurity(dockerfilePath string) ([]string, error) {
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "security", "failed to read Dockerfile for security validation")
@@ -200,7 +200,7 @@ func (sv *SecurityValidator) ValidateDockerfileSecurity(dockerfilePath string) (
 }
 
 // ValidateBuildContext checks build context for security issues
-func (sv *SecurityValidator) ValidateBuildContext(contextPath string) ([]string, error) {
+func (sv *BuildSecurityValidator) ValidateBuildContext(contextPath string) ([]string, error) {
 	warnings := []string{}
 
 	// Check for .dockerignore file

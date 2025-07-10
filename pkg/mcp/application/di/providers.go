@@ -8,7 +8,18 @@ import (
 
 // NewToolRegistry creates a new unified tool registry instance
 func NewToolRegistry() api.ToolRegistry {
-	return registry.NewUnified()
+	unifiedRegistry := registry.NewUnified()
+
+	// Load auto-registered tools
+	// Note: We need to use the registry adapter to convert ToolRegistry to Registry
+	registryAdapter := registry.NewRegistryAdapter(unifiedRegistry)
+	if err := registry.LoadAutoRegisteredTools(registryAdapter); err != nil {
+		// Log error but don't fail - tools can be registered later
+		// TODO: Add proper logging
+		_ = err // Suppress linter warning
+	}
+
+	return unifiedRegistry
 }
 
 // NewSessionStore creates a new session store backed by BoltDB

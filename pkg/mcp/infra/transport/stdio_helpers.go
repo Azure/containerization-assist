@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // JSONRPCResponse represents a standard JSON-RPC response
@@ -90,66 +91,34 @@ func ParseJSONMessage(data []byte) (map[string]interface{}, error) {
 }
 
 // LogTransportEvent logs a transport-related event with structured data
-func LogTransportEvent(logger logging.Standards, event string, details map[string]interface{}) {
-	logEvent := logger.Info().
-		Str("event", event).
-		Str("timestamp", time.Now().Format(time.RFC3339))
+func LogTransportEvent(logger *slog.Logger, event string, details map[string]interface{}) {
+	args := []any{
+		"event", event,
+		"timestamp", time.Now().Format(time.RFC3339),
+	}
 
 	// Add details to log
 	for key, value := range details {
-		switch v := value.(type) {
-		case string:
-			logEvent = logEvent.Str(key, v)
-		case int:
-			logEvent = logEvent.Int(key, v)
-		case int64:
-			logEvent = logEvent.Int(key, int(v))
-		case bool:
-			logEvent = logEvent.Bool(key, v)
-		case time.Duration:
-			logEvent = logEvent.Str(key, v.String())
-		case error:
-			logEvent = logEvent.Err(v)
-		default:
-			// Convert to JSON for complex types
-			if jsonBytes, err := json.Marshal(v); err == nil {
-				logEvent = logEvent.Str(key, string(jsonBytes))
-			} else {
-				logEvent = logEvent.Str(key, fmt.Sprintf("%v", v))
-			}
-		}
+		args = append(args, key, value)
 	}
 
-	logEvent.Msg("Transport event")
+	logger.Info("Transport event", args...)
 }
 
 // LogTransportError logs a transport-related error with context
-func LogTransportError(logger logging.Standards, operation string, err error, context map[string]interface{}) {
-	logEvent := logger.Error().
-		Err(err).
-		Str("operation", operation).
-		Str("timestamp", time.Now().Format(time.RFC3339))
+func LogTransportError(logger *slog.Logger, operation string, err error, context map[string]interface{}) {
+	args := []any{
+		"error", err,
+		"operation", operation,
+		"timestamp", time.Now().Format(time.RFC3339),
+	}
 
 	// Add context to log
 	for key, value := range context {
-		switch v := value.(type) {
-		case string:
-			logEvent = logEvent.Str(key, v)
-		case int:
-			logEvent = logEvent.Int(key, v)
-		case bool:
-			logEvent = logEvent.Bool(key, v)
-		default:
-			// Convert to JSON for complex types
-			if jsonBytes, err := json.Marshal(v); err == nil {
-				logEvent = logEvent.Str(key, string(jsonBytes))
-			} else {
-				logEvent = logEvent.Str(key, fmt.Sprintf("%v", v))
-			}
-		}
+		args = append(args, key, value)
 	}
 
-	logEvent.Msg("Transport operation failed")
+	logger.Error("Transport operation failed", args...)
 }
 
 // ValidateJSONRPCRequest validates basic JSON-RPC request structure

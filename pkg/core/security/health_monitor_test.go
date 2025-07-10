@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/core/security"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -512,7 +515,8 @@ func TestSecretDiscoveryHealthChecker(t *testing.T) {
 	})
 
 	t.Run("working secret discovery", func(t *testing.T) {
-		secretDiscovery := security.NewSecretDiscovery(logger)
+		slogger := slog.Default()
+		secretDiscovery := security.NewSecretDiscovery(slogger)
 		checker := security.NewSecretDiscoveryHealthChecker(logger, secretDiscovery)
 		health := checker.CheckHealth(context.Background())
 

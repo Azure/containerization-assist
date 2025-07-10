@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -12,6 +11,8 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // MetricsManager manages OpenTelemetry metrics
@@ -62,7 +63,7 @@ func (mm *MetricsManager) Initialize(ctx context.Context, resource *resource.Res
 	// Create exporter
 	exporter, err := mm.createExporter()
 	if err != nil {
-		return fmt.Errorf("failed to create metrics exporter: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to create metrics exporter").Cause(err).Build()
 	}
 
 	// Create meter provider
@@ -79,7 +80,7 @@ func (mm *MetricsManager) Initialize(ctx context.Context, resource *resource.Res
 
 	// Initialize metrics
 	if err := mm.initializeMetrics(); err != nil {
-		return fmt.Errorf("failed to initialize metrics: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to initialize metrics").Cause(err).Build()
 	}
 
 	return nil

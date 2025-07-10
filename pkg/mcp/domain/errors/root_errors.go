@@ -2,97 +2,96 @@ package errors
 
 import (
 	"errors"
-	"fmt"
 )
 
 // Sentinel errors for common cases.
 var (
 	// ErrToolNotFound is returned when a requested tool is not found.
-	ErrToolNotFound = fmt.Errorf("tool not found")
+	ErrToolNotFound = NewError().Code(CodeToolNotFound).Message("tool not found").Build()
 
 	// ErrInvalidParams is returned when tool parameters are invalid.
-	ErrInvalidParams = fmt.Errorf("invalid parameters")
+	ErrInvalidParams = NewError().Code(CodeInvalidParameter).Message("invalid parameters").Build()
 
 	// ErrExecutionFailed is returned when tool execution fails.
-	ErrExecutionFailed = fmt.Errorf("execution failed")
+	ErrExecutionFailed = NewError().Code(CodeToolExecutionFailed).Message("execution failed").Build()
 
 	// ErrTimeout is returned when an operation times out.
-	ErrTimeout = fmt.Errorf("operation timeout")
+	ErrTimeout = NewError().Code(CodeNetworkTimeout).Message("operation timeout").Build()
 
 	// ErrToolAlreadyExists is returned when trying to register a tool that already exists.
-	ErrToolAlreadyExists = fmt.Errorf("tool already exists")
+	ErrToolAlreadyExists = NewError().Code(CodeToolAlreadyRegistered).Message("tool already exists").Build()
 
 	// ErrRegistrationFailed is returned when tool registration fails.
-	ErrRegistrationFailed = fmt.Errorf("registration failed")
+	ErrRegistrationFailed = NewError().Code(CodeToolExecutionFailed).Message("registration failed").Build()
 
 	// ErrInvalidTool is returned when a tool doesn't implement the required interface.
-	ErrInvalidTool = fmt.Errorf("invalid tool interface")
+	ErrInvalidTool = NewError().Code(CodeValidationFailed).Message("invalid tool interface").Build()
 )
 
 // Docker-specific errors.
 var (
 	// ErrInvalidImage is returned when an image reference is invalid.
-	ErrInvalidImage = fmt.Errorf("invalid image reference")
+	ErrInvalidImage = NewError().Code(CodeValidationFailed).Message("invalid image reference").Build()
 
 	// ErrImageNotFound is returned when an image is not found.
-	ErrImageNotFound = fmt.Errorf("image not found")
+	ErrImageNotFound = NewError().Code(CodeResourceNotFound).Message("image not found").Build()
 
 	// ErrBuildFailed is returned when image build fails.
-	ErrBuildFailed = fmt.Errorf("image build failed")
+	ErrBuildFailed = NewError().Code(CodeImageBuildFailed).Message("image build failed").Build()
 
 	// ErrPushFailed is returned when image push fails.
-	ErrPushFailed = fmt.Errorf("image push failed")
+	ErrPushFailed = NewError().Code(CodeImagePushFailed).Message("image push failed").Build()
 
 	// ErrPullFailed is returned when image pull fails.
-	ErrPullFailed = fmt.Errorf("image pull failed")
+	ErrPullFailed = NewError().Code(CodeImagePullFailed).Message("image pull failed").Build()
 )
 
 // Kubernetes-specific errors.
 var (
 	// ErrClusterNotFound is returned when a cluster is not found.
-	ErrClusterNotFound = fmt.Errorf("cluster not found")
+	ErrClusterNotFound = NewError().Code(CodeResourceNotFound).Message("cluster not found").Build()
 
 	// ErrDeploymentFailed is returned when deployment fails.
-	ErrDeploymentFailed = fmt.Errorf("deployment failed")
+	ErrDeploymentFailed = NewError().Code(CodeDeploymentFailed).Message("deployment failed").Build()
 
 	// ErrResourceNotFound is returned when a Kubernetes resource is not found.
-	ErrResourceNotFound = fmt.Errorf("resource not found")
+	ErrResourceNotFound = NewError().Code(CodeResourceNotFound).Message("resource not found").Build()
 
 	// ErrManifestInvalid is returned when a Kubernetes manifest is invalid.
-	ErrManifestInvalid = fmt.Errorf("manifest invalid")
+	ErrManifestInvalid = NewError().Code(CodeManifestInvalid).Message("manifest invalid").Build()
 
 	// ErrNamespaceNotFound is returned when a namespace is not found.
-	ErrNamespaceNotFound = fmt.Errorf("namespace not found")
+	ErrNamespaceNotFound = NewError().Code(CodeNamespaceNotFound).Message("namespace not found").Build()
 )
 
 // Security-specific errors.
 var (
 	// ErrVulnerabilityFound is returned when security vulnerabilities are found.
-	ErrVulnerabilityFound = fmt.Errorf("vulnerability found")
+	ErrVulnerabilityFound = NewError().Code(CodeValidationFailed).Message("vulnerability found").Build()
 
 	// ErrSecretDetected is returned when secrets are detected in code.
-	ErrSecretDetected = fmt.Errorf("secret detected")
+	ErrSecretDetected = NewError().Code(CodeValidationFailed).Message("secret detected").Build()
 
 	// ErrScanFailed is returned when security scanning fails.
-	ErrScanFailed = fmt.Errorf("security scan failed")
+	ErrScanFailed = NewError().Code(CodeToolExecutionFailed).Message("security scan failed").Build()
 
 	// ErrPolicyViolation is returned when security policies are violated.
-	ErrPolicyViolation = fmt.Errorf("policy violation")
+	ErrPolicyViolation = NewError().Code(CodeValidationFailed).Message("policy violation").Build()
 )
 
 // Analysis-specific errors.
 var (
 	// ErrRepositoryNotFound is returned when a repository is not found.
-	ErrRepositoryNotFound = fmt.Errorf("repository not found")
+	ErrRepositoryNotFound = NewError().Code(CodeResourceNotFound).Message("repository not found").Build()
 
 	// ErrAnalysisFailed is returned when repository analysis fails.
-	ErrAnalysisFailed = fmt.Errorf("analysis failed")
+	ErrAnalysisFailed = NewError().Code(CodeToolExecutionFailed).Message("analysis failed").Build()
 
 	// ErrUnsupportedLanguage is returned when a language is not supported.
-	ErrUnsupportedLanguage = fmt.Errorf("unsupported language")
+	ErrUnsupportedLanguage = NewError().Code(CodeValidationFailed).Message("unsupported language").Build()
 
 	// ErrInvalidRepository is returned when a repository is invalid.
-	ErrInvalidRepository = fmt.Errorf("invalid repository")
+	ErrInvalidRepository = NewError().Code(CodeValidationFailed).Message("invalid repository").Build()
 )
 
 // Is reports whether any error in err's chain matches target.
@@ -133,7 +132,7 @@ type ClassifiedError struct {
 // Error implements the error interface.
 func (e *ClassifiedError) Error() string {
 	if e.Cause != nil {
-		return fmt.Sprintf("%s: %v", e.Message, e.Cause)
+		return e.Message + ": " + e.Cause.Error()
 	}
 	return e.Message
 }

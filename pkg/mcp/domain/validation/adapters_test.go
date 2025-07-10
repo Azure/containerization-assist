@@ -20,6 +20,14 @@ func TestLegacyValidatorAdapter(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name": "test-pod",
 			},
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"name":  "test",
+						"image": "test:latest",
+					},
+				},
+			},
 		}
 
 		err := adapter.ValidateOldInterface(manifest)
@@ -42,6 +50,14 @@ func TestLegacyValidatorAdapter(t *testing.T) {
 			"kind":       "Pod",
 			"metadata": map[string]interface{}{
 				"name": "test-pod",
+			},
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"name":  "test",
+						"image": "test:latest",
+					},
+				},
 			},
 		}
 
@@ -110,6 +126,14 @@ func TestRegistryAdapter(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name": "test-pod",
 			},
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"name":  "test",
+						"image": "test:latest",
+					},
+				},
+			},
 		}
 
 		err := adapter.ValidateKubernetesManifest(manifest)
@@ -161,6 +185,14 @@ func TestRegistryAdapter(t *testing.T) {
 			"kind":       "Pod",
 			"metadata": map[string]interface{}{
 				"name": "test-pod",
+			},
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"name":  "test",
+						"image": "test:latest",
+					},
+				},
 			},
 		}
 
@@ -250,7 +282,7 @@ func TestValidationResultAdapter(t *testing.T) {
 
 		assert.NoError(t, adapter.AsError())
 		assert.NoError(t, adapter.AsMultiError())
-		
+
 		valid, err := adapter.AsBoolError()
 		assert.True(t, valid)
 		assert.NoError(t, err)
@@ -265,7 +297,7 @@ func TestValidationResultAdapter(t *testing.T) {
 
 		assert.Error(t, adapter.AsError())
 		assert.Equal(t, "test error", adapter.AsError().Error())
-		
+
 		multiErr := adapter.AsMultiError()
 		assert.Error(t, multiErr)
 		assert.Equal(t, "test error", multiErr.Error())

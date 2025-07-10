@@ -59,6 +59,7 @@ type AnalysisResult struct {
 	Framework        Framework        `json:"framework,omitempty"`
 	Dependencies     []Dependency     `json:"dependencies"`
 	Databases        []Database       `json:"databases"`
+	Ports            []Port           `json:"ports,omitempty"`
 	BuildTools       []BuildTool      `json:"build_tools"`
 	TestFrameworks   []TestFramework  `json:"test_frameworks"`
 	SecurityIssues   []SecurityIssue  `json:"security_issues,omitempty"`
@@ -312,3 +313,13 @@ const (
 	PriorityMedium PriorityLevel = "medium"
 	PriorityLow    PriorityLevel = "low"
 )
+
+// Port represents a detected port
+type Port struct {
+	Number   int        `json:"number"`
+	Type     string     `json:"type"`
+	Protocol string     `json:"protocol,omitempty"`
+	Sources  []string   `json:"sources"`
+	Evidence []Evidence `json:"evidence,omitempty"`
+	Usage    string     `json:"usage,omitempty"`
+}

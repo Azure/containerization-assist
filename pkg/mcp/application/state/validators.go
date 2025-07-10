@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/validation"
 )
 
 // SessionStateValidator validates session state
@@ -213,32 +213,43 @@ type StateValidationData struct {
 
 // UnifiedSessionStateValidator implements unified validation for session state
 type UnifiedSessionStateValidator struct {
-	core.Validator
 	sessionValidator *SessionStateValidator
 }
 
 // NewUnifiedSessionStateValidator creates a new unified session state validator
-func NewUnifiedSessionStateValidator() core.Validator {
+func NewUnifiedSessionStateValidator() validation.DomainValidator[interface{}] {
 	return &UnifiedSessionStateValidator{
 		sessionValidator: &SessionStateValidator{},
 	}
 }
 
-// Validate implements the core.Validator interface for session state
-func (v *UnifiedSessionStateValidator) Validate(ctx context.Context, data interface{}, options *core.ValidationOptions) *core.NonGenericResult {
-	result := core.NewNonGenericResult("unified_session_state_validator", "1.0.0")
+// Category implements the DomainValidator interface
+func (v *UnifiedSessionStateValidator) Category() string {
+	return "session_state"
+}
+
+// Validate implements the validation.Validator interface for session state
+func (v *UnifiedSessionStateValidator) Validate(ctx context.Context, value interface{}) validation.ValidationResult {
+	result := validation.ValidationResult{
+		Valid:    true,
+		Errors:   make([]error, 0),
+		Warnings: make([]string, 0),
+		Context: validation.ValidationContext{
+			Field: "session_state",
+			Path:  "session_state",
+			Metadata: map[string]interface{}{
+				"validator": "unified_session_state_validator",
+				"version":   "1.0.0",
+			},
+		},
+	}
 
 	var stateData *StateValidationData
-	if mapped, ok := data.(map[string]interface{}); ok {
+	if mapped, ok := value.(map[string]interface{}); ok {
 		stateValue, exists := mapped["state_value"]
 		if !exists {
-			result.AddError(&core.Error{
-				Code:     "SESSION_STATE_VALIDATOR_001",
-				Message:  "state_value field is required",
-				Type:     core.ErrTypeValidation,
-				Severity: core.SeverityHigh,
-				Field:    "state_value",
-			})
+			result.Valid = false
+			result.Errors = append(result.Errors, fmt.Errorf("state_value field is required"))
 			return result
 		}
 		stateData = &StateValidationData{
@@ -248,14 +259,14 @@ func (v *UnifiedSessionStateValidator) Validate(ctx context.Context, data interf
 		if stType, ok := mapped["state_type"].(string); ok {
 			stateData.StateType = stType
 		}
-		if ctx, ok := mapped["context"].(map[string]interface{}); ok {
-			stateData.Context = ctx
+		if ctxData, ok := mapped["context"].(map[string]interface{}); ok {
+			stateData.Context = ctxData
 		}
-	} else if typed, ok := data.(*StateValidationData); ok {
+	} else if typed, ok := value.(*StateValidationData); ok {
 		stateData = typed
 	} else {
 		stateData = &StateValidationData{
-			StateValue: data,
+			StateValue: value,
 			StateType:  "session",
 		}
 	}
@@ -263,24 +274,34 @@ func (v *UnifiedSessionStateValidator) Validate(ctx context.Context, data interf
 	err := v.sessionValidator.ValidateState(ctx, StateTypeSession, stateData.StateValue)
 
 	if err != nil {
-		result.AddError(&core.Error{
-			Code:     "SESSION_STATE_VALIDATOR_002",
-			Message:  err.Error(),
-			Type:     core.ErrTypeValidation,
-			Severity: core.SeverityHigh,
-			Context: map[string]interface{}{
-				"original_error": err.Error(),
-				"state_type":     stateData.StateType,
-			},
-		})
-	} else {
-		result.AddSuggestion("Session state validation passed successfully")
+		result.Valid = false
+		result.Errors = append(result.Errors, err)
 	}
 
 	return result
 }
 
-// GetName returns the validator name
+// Name implements the validation.Validator interface
+func (v *UnifiedSessionStateValidator) Name() string {
+	return "unified_session_state_validator"
+}
+
+// Domain implements the validation.DomainValidator interface
+func (v *UnifiedSessionStateValidator) Domain() string {
+	return "application_state"
+}
+
+// Priority implements the validation.DomainValidator interface
+func (v *UnifiedSessionStateValidator) Priority() int {
+	return 100
+}
+
+// Dependencies implements the validation.DomainValidator interface
+func (v *UnifiedSessionStateValidator) Dependencies() []string {
+	return []string{}
+}
+
+// GetName returns the validator name (legacy compatibility)
 func (v *UnifiedSessionStateValidator) GetName() string {
 	return "unified_session_state_validator"
 }
@@ -296,7 +317,7 @@ func (v *UnifiedSessionStateValidator) GetSupportedTypes() []string {
 }
 
 // ValidateSessionStateUnified provides a convenience method for unified session state validation
-func ValidateSessionStateUnified(ctx context.Context, sessionState interface{}, options *core.ValidationOptions) *core.NonGenericResult {
+func ValidateSessionStateUnified(ctx context.Context, sessionState interface{}) validation.ValidationResult {
 	validator := NewUnifiedSessionStateValidator()
-	return validator.Validate(ctx, sessionState, options)
+	return validator.Validate(ctx, sessionState)
 }

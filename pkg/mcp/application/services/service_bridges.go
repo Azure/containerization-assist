@@ -174,28 +174,38 @@ func NewToolRegistryStub(logger *slog.Logger) ToolRegistry {
 	return &ToolRegistryStub{logger: logger}
 }
 
-func (t *ToolRegistryStub) Register(ctx context.Context, name string, _ api.Tool) error {
+func (t *ToolRegistryStub) Register(name string, _ interface{}) error {
 	t.logger.Info("Registering tool", "name", name)
 	return nil
 }
 
-func (t *ToolRegistryStub) GetTool(ctx context.Context, name string) (api.Tool, error) {
+func (t *ToolRegistryStub) Discover(name string) (interface{}, error) {
 	return nil, fmt.Errorf("tool not found: %s", name)
 }
 
-func (t *ToolRegistryStub) ListTools(ctx context.Context) []string {
+func (t *ToolRegistryStub) List() []string {
 	return []string{}
 }
 
-func (t *ToolRegistryStub) GetMetrics(ctx context.Context) api.RegistryMetrics {
-	return api.RegistryMetrics{
-		TotalTools:           0,
-		ActiveTools:          0,
-		TotalExecutions:      0,
-		FailedExecutions:     0,
-		AverageExecutionTime: 0,
-		UpTime:               0,
-	}
+func (t *ToolRegistryStub) Metadata(name string) (api.ToolMetadata, error) {
+	return api.ToolMetadata{}, fmt.Errorf("tool not found: %s", name)
+}
+
+func (t *ToolRegistryStub) SetMetadata(name string, _ api.ToolMetadata) error {
+	return fmt.Errorf("tool not found: %s", name)
+}
+
+func (t *ToolRegistryStub) Unregister(name string) error {
+	return fmt.Errorf("tool not found: %s", name)
+}
+
+func (t *ToolRegistryStub) Execute(_ context.Context, name string, _ api.ToolInput) (api.ToolOutput, error) {
+	return api.ToolOutput{}, fmt.Errorf("tool not found: %s", name)
+}
+
+func (t *ToolRegistryStub) Close() error {
+	t.logger.Info("Closing ToolRegistry")
+	return nil
 }
 
 // PipelineServiceStub provides a stub implementation
@@ -518,4 +528,77 @@ func (k *K8sClientStub) Delete(_ context.Context, _ string, namespace string) er
 func (k *K8sClientStub) GetStatus(_ context.Context, resource, name, namespace string) (interface{}, error) {
 	k.logger.Info("Getting resource status", "resource", resource, "name", name, "namespace", namespace)
 	return map[string]interface{}{"status": "running"}, nil
+}
+
+// FileAccessServiceStub provides a stub implementation for testing
+type FileAccessServiceStub struct {
+	logger *slog.Logger
+}
+
+func NewFileAccessServiceStub(logger *slog.Logger) FileAccessService {
+	return &FileAccessServiceStub{logger: logger}
+}
+
+func (f *FileAccessServiceStub) ReadFile(ctx context.Context, sessionID, path string) (string, error) {
+	f.logger.Info("Reading file", "session_id", sessionID, "path", path)
+	return "# Sample file content\npackage main\n\nfunc main() {\n    println(\"Hello, World!\")\n}", nil
+}
+
+func (f *FileAccessServiceStub) ListDirectory(ctx context.Context, sessionID, path string) ([]FileInfo, error) {
+	f.logger.Info("Listing directory", "session_id", sessionID, "path", path)
+	return []FileInfo{
+		{
+			Name:    "main.go",
+			Path:    "main.go",
+			Size:    1024,
+			ModTime: time.Now(),
+			IsDir:   false,
+			Mode:    "-rw-r--r--",
+		},
+		{
+			Name:    "go.mod",
+			Path:    "go.mod",
+			Size:    256,
+			ModTime: time.Now(),
+			IsDir:   false,
+			Mode:    "-rw-r--r--",
+		},
+	}, nil
+}
+
+func (f *FileAccessServiceStub) FileExists(ctx context.Context, sessionID, path string) (bool, error) {
+	f.logger.Info("Checking file existence", "session_id", sessionID, "path", path)
+	return true, nil
+}
+
+func (f *FileAccessServiceStub) GetFileTree(ctx context.Context, sessionID, rootPath string) (string, error) {
+	f.logger.Info("Getting file tree", "session_id", sessionID, "root_path", rootPath)
+	return ".\n├── main.go (1024 bytes)\n├── go.mod (256 bytes)\n└── README.md (512 bytes)", nil
+}
+
+func (f *FileAccessServiceStub) ReadFileWithMetadata(ctx context.Context, sessionID, path string) (*FileContent, error) {
+	f.logger.Info("Reading file with metadata", "session_id", sessionID, "path", path)
+	content := "# Sample file content\npackage main\n\nfunc main() {\n    println(\"Hello, World!\")\n}"
+	return &FileContent{
+		Path:     path,
+		Content:  content,
+		Size:     int64(len(content)),
+		ModTime:  time.Now(),
+		Encoding: "UTF-8",
+		Lines:    5,
+	}, nil
+}
+
+func (f *FileAccessServiceStub) SearchFiles(ctx context.Context, sessionID, pattern string) ([]FileInfo, error) {
+	f.logger.Info("Searching files", "session_id", sessionID, "pattern", pattern)
+	return []FileInfo{
+		{
+			Name:    "main.go",
+			Path:    "main.go",
+			Size:    1024,
+			ModTime: time.Now(),
+			IsDir:   false,
+			Mode:    "-rw-r--r--",
+		},
+	}, nil
 }

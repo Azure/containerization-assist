@@ -233,7 +233,7 @@ func TestRichError_ErrorFormatting(t *testing.T) {
 	// Test error message formatting
 	err := domainerrors.NewError().
 		Code(domainerrors.CodeValidationFailed).
-		Message("validation failed for user %s", "john_doe").
+		Message("validation failed for user john_doe").
 		Context("user_id", "12345").
 		Build()
 

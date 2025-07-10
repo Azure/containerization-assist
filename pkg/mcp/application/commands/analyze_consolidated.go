@@ -21,6 +21,7 @@ import (
 type ConsolidatedAnalyzeCommand struct {
 	sessionStore   services.SessionStore
 	sessionState   services.SessionState
+	fileAccess     services.FileAccessService
 	logger         *slog.Logger
 	analysisEngine *analysis.Engine
 }
@@ -29,12 +30,14 @@ type ConsolidatedAnalyzeCommand struct {
 func NewConsolidatedAnalyzeCommand(
 	sessionStore services.SessionStore,
 	sessionState services.SessionState,
+	fileAccess services.FileAccessService,
 	logger *slog.Logger,
 	analysisEngine *analysis.Engine,
 ) *ConsolidatedAnalyzeCommand {
 	return &ConsolidatedAnalyzeCommand{
 		sessionStore:   sessionStore,
 		sessionState:   sessionState,
+		fileAccess:     fileAccess,
 		logger:         logger,
 		analysisEngine: analysisEngine,
 	}
@@ -236,7 +239,7 @@ func (cmd *ConsolidatedAnalyzeCommand) performAnalysis(ctx context.Context, requ
 	}
 
 	// Perform language detection
-	if err := cmd.detectLanguage(ctx, result, workspaceDir); err != nil {
+	if err := cmd.detectLanguage(ctx, result, request.SessionID); err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeInternalError).
 			Type(errors.ErrTypeInternal).
@@ -246,7 +249,7 @@ func (cmd *ConsolidatedAnalyzeCommand) performAnalysis(ctx context.Context, requ
 	}
 
 	// Perform framework detection
-	if err := cmd.detectFramework(ctx, result, workspaceDir); err != nil {
+	if err := cmd.detectFramework(ctx, result, request.SessionID); err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeInternalError).
 			Type(errors.ErrTypeInternal).
@@ -257,7 +260,7 @@ func (cmd *ConsolidatedAnalyzeCommand) performAnalysis(ctx context.Context, requ
 
 	// Perform dependency analysis if requested
 	if request.AnalysisOptions.IncludeDependencies {
-		if err := cmd.analyzeDependencies(ctx, result, workspaceDir); err != nil {
+		if err := cmd.analyzeDependencies(ctx, result, request.SessionID); err != nil {
 			cmd.logger.Warn("dependency analysis failed", "error", err)
 		}
 	}
@@ -304,6 +307,16 @@ func (cmd *ConsolidatedAnalyzeCommand) performAnalysis(ctx context.Context, requ
 		}
 	}
 
+	// Perform database detection - always enabled for better container insights
+	if err := cmd.analyzeDatabases(ctx, request.SessionID, result); err != nil {
+		cmd.logger.Warn("database analysis failed", "error", err)
+	}
+
+	// TODO: Port detection requires domain structure changes - implement in Phase 4
+	// if err := cmd.analyzePorts(ctx, request.SessionID, result); err != nil {
+	//	cmd.logger.Warn("port analysis failed", "error", err)
+	// }
+
 	// Calculate final confidence and generate recommendations
 	cmd.calculateConfidence(result)
 	cmd.generateRecommendations(result)
@@ -316,12 +329,12 @@ func (cmd *ConsolidatedAnalyzeCommand) performAnalysis(ctx context.Context, requ
 }
 
 // detectLanguage performs language detection using multiple strategies
-func (cmd *ConsolidatedAnalyzeCommand) detectLanguage(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
+func (cmd *ConsolidatedAnalyzeCommand) detectLanguage(ctx context.Context, result *analyze.AnalysisResult, sessionID string) error {
 	// Language detection logic from original tools
 	languageMap := make(map[string]int)
 
 	// File extension-based detection
-	if err := cmd.detectLanguageByExtension(workspaceDir, languageMap); err != nil {
+	if err := cmd.detectLanguageByExtension(ctx, sessionID, languageMap); err != nil {
 		return errors.NewError().
 			Code(errors.CodeInternalError).
 			Type(errors.ErrTypeInternal).
@@ -331,7 +344,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguage(ctx context.Context, resul
 	}
 
 	// Content-based detection
-	if err := cmd.detectLanguageByContent(workspaceDir, languageMap); err != nil {
+	if err := cmd.detectLanguageByContent(ctx, sessionID, languageMap); err != nil {
 		cmd.logger.Warn("content-based language detection failed", "error", err)
 	}
 
@@ -348,19 +361,19 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguage(ctx context.Context, resul
 }
 
 // detectFramework performs framework detection based on detected language
-func (cmd *ConsolidatedAnalyzeCommand) detectFramework(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
+func (cmd *ConsolidatedAnalyzeCommand) detectFramework(ctx context.Context, result *analyze.AnalysisResult, sessionID string) error {
 	// Framework detection logic based on language
 	switch result.Language.Name {
 	case "go":
-		return cmd.detectGoFramework(result, workspaceDir)
+		return cmd.detectGoFramework(ctx, sessionID, result)
 	case "javascript", "typescript":
-		return cmd.detectJSFramework(result, workspaceDir)
+		return cmd.detectJSFramework(ctx, sessionID, result)
 	case "python":
-		return cmd.detectPythonFramework(result, workspaceDir)
+		return cmd.detectPythonFramework(ctx, sessionID, result)
 	case "java":
-		return cmd.detectJavaFramework(result, workspaceDir)
+		return cmd.detectJavaFramework(ctx, sessionID, result)
 	case "csharp":
-		return cmd.detectDotNetFramework(result, workspaceDir)
+		return cmd.detectDotNetFramework(ctx, sessionID, result)
 	default:
 		result.Framework = analyze.Framework{
 			Name:       "unknown",
@@ -373,32 +386,32 @@ func (cmd *ConsolidatedAnalyzeCommand) detectFramework(ctx context.Context, resu
 }
 
 // analyzeDependencies performs dependency analysis
-func (cmd *ConsolidatedAnalyzeCommand) analyzeDependencies(ctx context.Context, result *analyze.AnalysisResult, workspaceDir string) error {
+func (cmd *ConsolidatedAnalyzeCommand) analyzeDependencies(ctx context.Context, result *analyze.AnalysisResult, sessionID string) error {
 	// Dependency analysis logic from original tools
 	dependencies := []analyze.Dependency{}
 
 	// Language-specific dependency analysis
 	switch result.Language.Name {
 	case "go":
-		deps, err := cmd.analyzeGoDependencies(workspaceDir)
+		deps, err := cmd.analyzeGoDependencies(ctx, sessionID)
 		if err != nil {
 			return err
 		}
 		dependencies = append(dependencies, deps...)
 	case "javascript", "typescript":
-		deps, err := cmd.analyzeNodeDependencies(workspaceDir)
+		deps, err := cmd.analyzeNodeDependencies(ctx, sessionID)
 		if err != nil {
 			return err
 		}
 		dependencies = append(dependencies, deps...)
 	case "python":
-		deps, err := cmd.analyzePythonDependencies(workspaceDir)
+		deps, err := cmd.analyzePythonDependencies(ctx, sessionID)
 		if err != nil {
 			return err
 		}
 		dependencies = append(dependencies, deps...)
 	case "java":
-		deps, err := cmd.analyzeJavaDependencies(workspaceDir)
+		deps, err := cmd.analyzeJavaDependencies(ctx, sessionID)
 		if err != nil {
 			return err
 		}

@@ -35,7 +35,9 @@ func TestUnifiedRegistry_Register(t *testing.T) {
 	registry := NewUnified()
 
 	t.Run("successful registration", func(t *testing.T) {
-		err := RegisterTool(registry, "test-tool", func() string { return "test" })
+		err := RegisterSimpleTool(registry, "test-tool", func() api.Tool {
+			return &mockTool{name: "test-tool", description: "test"}
+		})
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -48,36 +50,42 @@ func TestUnifiedRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("duplicate registration", func(t *testing.T) {
-		err := RegisterTool(registry, "test-tool", func() string { return "duplicate" })
+		err := registry.Register("test-tool", ToolFactory(func() (api.Tool, error) {
+			return &mockTool{name: "duplicate", description: "test"}, nil
+		}))
 		if err == nil {
 			t.Fatal("Expected error for duplicate registration")
 		}
 	})
 
 	t.Run("empty name registration", func(t *testing.T) {
-		err := RegisterTool(registry, "", func() string { return "test" })
+		err := registry.Register("", ToolFactory(func() (api.Tool, error) {
+			return &mockTool{name: "empty", description: "test"}, nil
+		}))
 		if err == nil {
 			t.Fatal("Expected error for empty name")
 		}
 	})
 
-	t.Run("register different types", func(t *testing.T) {
-		// Register int factory
-		err := RegisterTool(registry, "int-tool", func() int { return 42 })
-		if err != nil {
-			t.Fatalf("Failed to register int tool: %v", err)
-		}
-
-		// Register struct factory
-		err = RegisterTool(registry, "struct-tool", func() mockTool {
-			return mockTool{name: "mock", description: "test"}
+	t.Run("register different api.Tool types", func(t *testing.T) {
+		// Register first mockTool factory
+		err := RegisterSimpleTool(registry, "mock-tool-1", func() api.Tool {
+			return &mockTool{name: "mock1", description: "test1"}
 		})
 		if err != nil {
-			t.Fatalf("Failed to register struct tool: %v", err)
+			t.Fatalf("Failed to register mock tool 1: %v", err)
 		}
 
-		// Register interface factory
-		err = RegisterTool(registry, "api-tool", func() api.Tool {
+		// Register second mockTool factory
+		err = RegisterSimpleTool(registry, "mock-tool-2", func() api.Tool {
+			return &mockTool{name: "mock2", description: "test2"}
+		})
+		if err != nil {
+			t.Fatalf("Failed to register mock tool 2: %v", err)
+		}
+
+		// Register api.Tool interface factory
+		err = RegisterSimpleTool(registry, "api-tool", func() api.Tool {
 			return &mockTool{name: "api", description: "test"}
 		})
 		if err != nil {
@@ -90,34 +98,38 @@ func TestUnifiedRegistry_Discover(t *testing.T) {
 	registry := NewUnified()
 
 	// Register test tools
-	RegisterTool(registry, "string-tool", func() string { return "test-result" })
-	RegisterTool(registry, "int-tool", func() int { return 42 })
-	RegisterTool(registry, "api-tool", func() api.Tool {
+	_ = RegisterSimpleTool(registry, "tool1", func() api.Tool {
+		return &mockTool{name: "tool1", description: "test tool 1"}
+	})
+	_ = RegisterSimpleTool(registry, "tool2", func() api.Tool {
+		return &mockTool{name: "tool2", description: "test tool 2"}
+	})
+	_ = RegisterSimpleTool(registry, "api-tool", func() api.Tool {
 		return &mockTool{name: "test", description: "test tool"}
 	})
 
-	t.Run("discover string tool", func(t *testing.T) {
-		result, err := DiscoverTool[string](registry, "string-tool")
+	t.Run("discover tool1", func(t *testing.T) {
+		result, err := DiscoverTypedTool[api.Tool](registry, "tool1")
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if result != "test-result" {
-			t.Fatalf("Expected 'test-result', got %s", result)
+		if result.Name() != "tool1" {
+			t.Fatalf("Expected 'tool1', got %s", result.Name())
 		}
 	})
 
-	t.Run("discover int tool", func(t *testing.T) {
-		result, err := DiscoverTool[int](registry, "int-tool")
+	t.Run("discover tool2", func(t *testing.T) {
+		result, err := DiscoverTypedTool[api.Tool](registry, "tool2")
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if result != 42 {
-			t.Fatalf("Expected 42, got %d", result)
+		if result.Name() != "tool2" {
+			t.Fatalf("Expected 'tool2', got %s", result.Name())
 		}
 	})
 
 	t.Run("discover api.Tool", func(t *testing.T) {
-		result, err := DiscoverTool[api.Tool](registry, "api-tool")
+		result, err := DiscoverTypedTool[api.Tool](registry, "api-tool")
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
@@ -127,16 +139,9 @@ func TestUnifiedRegistry_Discover(t *testing.T) {
 	})
 
 	t.Run("discover missing tool", func(t *testing.T) {
-		_, err := DiscoverTool[string](registry, "missing-tool")
+		_, err := DiscoverTypedTool[api.Tool](registry, "missing-tool")
 		if err == nil {
 			t.Fatal("Expected error for missing tool")
-		}
-	})
-
-	t.Run("discover with wrong type", func(t *testing.T) {
-		_, err := DiscoverTool[int](registry, "string-tool")
-		if err == nil {
-			t.Fatal("Expected error for type mismatch")
 		}
 	})
 }
@@ -152,7 +157,9 @@ func TestUnifiedRegistry_ThreadSafety(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			err := RegisterTool(registry, fmt.Sprintf("tool-%d", id), func() int { return id })
+			err := RegisterSimpleTool(registry, fmt.Sprintf("tool-%d", id), func() api.Tool {
+				return &mockTool{name: fmt.Sprintf("tool-%d", id), description: "test"}
+			})
 			if err != nil {
 				errors <- err
 			}
@@ -179,13 +186,14 @@ func TestUnifiedRegistry_ThreadSafety(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			result, err := DiscoverTool[int](registry, fmt.Sprintf("tool-%d", id))
+			result, err := DiscoverTypedTool[api.Tool](registry, fmt.Sprintf("tool-%d", id))
 			if err != nil {
 				t.Errorf("Discovery error for tool-%d: %v", id, err)
 				return
 			}
-			if result != id {
-				t.Errorf("Expected %d, got %d", id, result)
+			expectedName := fmt.Sprintf("tool-%d", id)
+			if result.Name() != expectedName {
+				t.Errorf("Expected %s, got %s", expectedName, result.Name())
 			}
 		}(i)
 	}
@@ -197,7 +205,9 @@ func TestUnifiedRegistry_Metadata(t *testing.T) {
 	registry := NewUnified()
 
 	// Register a tool
-	err := RegisterTool(registry, "test-tool", func() string { return "test" })
+	err := RegisterSimpleTool(registry, "test-tool", func() api.Tool {
+		return &mockTool{name: "test-tool", description: "test"}
+	})
 	if err != nil {
 		t.Fatalf("Failed to register tool: %v", err)
 	}
@@ -257,7 +267,7 @@ func TestUnifiedRegistry_Execute(t *testing.T) {
 	registry := NewUnified()
 
 	// Register an api.Tool
-	err := RegisterTool(registry, "exec-tool", func() api.Tool {
+	err := RegisterSimpleTool(registry, "exec-tool", func() api.Tool {
 		return &mockTool{name: "exec", description: "executable tool"}
 	})
 	if err != nil {
@@ -304,7 +314,9 @@ func TestUnifiedRegistry_Unregister(t *testing.T) {
 	registry := NewUnified()
 
 	// Register a tool
-	err := RegisterTool(registry, "test-tool", func() string { return "test" })
+	err := RegisterSimpleTool(registry, "test-tool", func() api.Tool {
+		return &mockTool{name: "test-tool", description: "test"}
+	})
 	if err != nil {
 		t.Fatalf("Failed to register tool: %v", err)
 	}
@@ -316,7 +328,7 @@ func TestUnifiedRegistry_Unregister(t *testing.T) {
 		}
 
 		// Verify tool is gone
-		_, err = DiscoverTool[string](registry, "test-tool")
+		_, err = DiscoverTypedTool[api.Tool](registry, "test-tool")
 		if err == nil {
 			t.Fatal("Expected error for unregistered tool")
 		}
@@ -334,8 +346,12 @@ func TestUnifiedRegistry_Close(t *testing.T) {
 	registry := NewUnified()
 
 	// Register some tools
-	RegisterTool(registry, "tool1", func() string { return "1" })
-	RegisterTool(registry, "tool2", func() string { return "2" })
+	_ = RegisterSimpleTool(registry, "tool1", func() api.Tool {
+		return &mockTool{name: "tool1", description: "test1"}
+	})
+	_ = RegisterSimpleTool(registry, "tool2", func() api.Tool {
+		return &mockTool{name: "tool2", description: "test2"}
+	})
 
 	t.Run("close registry", func(t *testing.T) {
 		err := registry.Close()
@@ -352,13 +368,15 @@ func TestUnifiedRegistry_Close(t *testing.T) {
 
 	t.Run("operations on closed registry", func(t *testing.T) {
 		// Try to register after close
-		err := RegisterTool(registry, "new-tool", func() string { return "test" })
+		err := RegisterSimpleTool(registry, "new-tool", func() api.Tool {
+			return &mockTool{name: "new-tool", description: "test"}
+		})
 		if err == nil {
 			t.Fatal("Expected error for closed registry")
 		}
 
 		// Try to discover after close
-		_, err = DiscoverTool[string](registry, "tool1")
+		_, err = DiscoverTypedTool[api.Tool](registry, "tool1")
 		if err == nil {
 			t.Fatal("Expected error for closed registry")
 		}
@@ -369,12 +387,14 @@ func TestUnifiedRegistry_Metrics(t *testing.T) {
 	registry := NewUnified()
 
 	// Perform some operations
-	RegisterTool(registry, "metric-tool", func() string { return "test" })
-	DiscoverTool[string](registry, "metric-tool")
-	DiscoverTool[string](registry, "metric-tool")
+	_ = RegisterSimpleTool(registry, "metric-tool", func() api.Tool {
+		return &mockTool{name: "metric-tool", description: "test"}
+	})
+	_, _ = DiscoverTypedTool[api.Tool](registry, "metric-tool")
+	_, _ = DiscoverTypedTool[api.Tool](registry, "metric-tool")
 
 	// Register api.Tool for execution
-	RegisterTool(registry, "exec-tool", func() api.Tool {
+	_ = RegisterSimpleTool(registry, "exec-tool", func() api.Tool {
 		return &mockTool{name: "exec", description: "test"}
 	})
 
@@ -407,13 +427,15 @@ func BenchmarkRegistryOperations(b *testing.B) {
 
 	// Setup: Register 100 tools
 	for i := 0; i < 100; i++ {
-		RegisterTool(registry, fmt.Sprintf("tool-%d", i), func() string { return "result" })
+		_ = RegisterSimpleTool(registry, fmt.Sprintf("tool-%d", i), func() api.Tool {
+			return &mockTool{name: fmt.Sprintf("tool-%d", i), description: "result"}
+		})
 	}
 
 	b.Run("Discovery", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := DiscoverTool[string](registry, "tool-50")
+			_, err := DiscoverTypedTool[api.Tool](registry, "tool-50")
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -424,7 +446,9 @@ func BenchmarkRegistryOperations(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			name := fmt.Sprintf("bench-tool-%d", i)
-			err := RegisterTool(registry, name, func() string { return "test" })
+			err := RegisterSimpleTool(registry, name, func() api.Tool {
+				return &mockTool{name: name, description: "test"}
+			})
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -459,7 +483,9 @@ func TestRaceConditions(t *testing.T) {
 		go func(id int) {
 			for j := 0; j < 100; j++ {
 				name := fmt.Sprintf("race-tool-%d-%d", id, j)
-				RegisterTool(registry, name, func() int { return id*100 + j })
+				_ = RegisterSimpleTool(registry, name, func() api.Tool {
+					return &mockTool{name: name, description: "race test"}
+				})
 				time.Sleep(time.Microsecond)
 				registry.Unregister(name)
 			}

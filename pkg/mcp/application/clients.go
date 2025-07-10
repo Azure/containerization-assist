@@ -8,13 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/k8s"
 	"github.com/Azure/container-kit/pkg/kind"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain"
 	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // Local interface definitions to avoid import cycles
@@ -108,7 +109,7 @@ func NewMCPClientsWithAnalyzer(docker docker.DockerClient, kind kind.KindRunner,
 // Use mc.Analyzer = analyzer instead of SetAnalyzer(analyzer)
 
 // ValidateAnalyzerForProduction ensures the analyzer is appropriate for production
-func (mc *MCPClients) ValidateAnalyzerForProduction(logger logging.Standards) error {
+func (mc *MCPClients) ValidateAnalyzerForProduction(logger *slog.Logger) error {
 	if mc.Analyzer == nil {
 		return errors.NewError().Messagef("analyzer cannot be nil").WithLocation(
 

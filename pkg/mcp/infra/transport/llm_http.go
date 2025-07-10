@@ -10,8 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // circuitBreaker implements a simple circuit breaker pattern
@@ -30,7 +31,7 @@ type HTTPLLMTransport struct {
 	client  *http.Client
 	baseURL string
 	apiKey  string
-	logger  logging.Standards
+	logger  *slog.Logger
 	cb      *circuitBreaker
 	// metrics functionality removed
 	connected bool
@@ -44,12 +45,12 @@ type HTTPLLMTransportConfig struct {
 }
 
 // NewHTTPLLMTransport creates a new HTTP LLM transport
-func NewHTTPLLMTransport(config HTTPLLMTransportConfig, logger logging.Standards) *HTTPLLMTransport {
+func NewHTTPLLMTransport(config HTTPLLMTransportConfig, logger *slog.Logger) *HTTPLLMTransport {
 	return NewHTTPLLMTransportWithMetrics(config, logger, nil)
 }
 
 // NewHTTPLLMTransportWithMetrics creates a new HTTP LLM transport with metrics
-func NewHTTPLLMTransportWithMetrics(config HTTPLLMTransportConfig, logger logging.Standards, metrics interface{}) *HTTPLLMTransport {
+func NewHTTPLLMTransportWithMetrics(config HTTPLLMTransportConfig, logger *slog.Logger, metrics interface{}) *HTTPLLMTransport {
 	// Store the metrics for potential future use
 	_ = metrics
 	if config.Timeout == 0 {
@@ -62,7 +63,7 @@ func NewHTTPLLMTransportWithMetrics(config HTTPLLMTransportConfig, logger loggin
 		},
 		baseURL: config.BaseURL,
 		apiKey:  config.APIKey,
-		logger:  logger.WithComponent("http_llm_transport"),
+		logger:  logger.With("component", "http_llm_transport"),
 		cb: &circuitBreaker{
 			failureLimit: 5,
 			resetTimeout: 60 * time.Second,
@@ -113,11 +114,10 @@ func (cb *circuitBreaker) recordSuccess() {
 // InvokeTool implements types.LLMTransport
 // For HTTP, this means making an HTTP request to the hosting LLM
 func (h *HTTPLLMTransport) InvokeTool(ctx context.Context, name string, payload map[string]any, stream bool) (<-chan json.RawMessage, error) {
-	h.logger.Debug().
-		Str("tool_name", name).
-		Bool("stream", stream).
-		Str("base_url", h.baseURL).
-		Msg("Invoking tool on hosting LLM via HTTP")
+	h.logger.Debug("Invoking tool on hosting LLM via HTTP",
+		"tool_name", name,
+		"stream", stream,
+		"base_url", h.baseURL)
 
 	// Check circuit breaker
 	if err := h.checkCircuitBreaker(); err != nil {
@@ -132,7 +132,7 @@ func (h *HTTPLLMTransport) InvokeTool(ctx context.Context, name string, payload 
 // checkCircuitBreaker validates circuit breaker state
 func (h *HTTPLLMTransport) checkCircuitBreaker() error {
 	if h.cb.isCircuitOpen() {
-		h.logger.Warn().Msg("Circuit breaker is open, rejecting request")
+		h.logger.Warn("Circuit breaker is open, rejecting request")
 		// Metrics functionality removed
 		return errors.NewError().Messagef("circuit breaker is open").WithLocation().Build()
 	}
@@ -166,7 +166,7 @@ func (h *HTTPLLMTransport) processHTTPRequest(ctx context.Context, name string, 
 
 	// Process response
 	if err := h.processHTTPResponse(ctx, resp, responseCh); err != nil {
-		h.logger.Error().Err(err).Msg("Failed to process HTTP response")
+		h.logger.Error("Failed to process HTTP response", "error", err)
 	}
 }
 
@@ -232,18 +232,16 @@ func (h *HTTPLLMTransport) processHTTPResponse(ctx context.Context, resp *http.R
 
 	// Check if we hit the limit
 	if len(responseBytes) == maxResponseSize {
-		h.logger.Warn().
-			Int("max_size", maxResponseSize).
-			Msg("HTTP response truncated due to size limit")
+		h.logger.Warn("HTTP response truncated due to size limit",
+			"max_size", maxResponseSize)
 	}
 
 	// Check HTTP status
 	if resp.StatusCode != http.StatusOK {
 		h.cb.recordFailure()
-		h.logger.Error().
-			Int("status_code", resp.StatusCode).
-			Str("response", string(responseBytes)).
-			Msg("HTTP request returned error status")
+		h.logger.Error("HTTP request returned error status",
+			"status_code", resp.StatusCode,
+			"response", string(responseBytes))
 
 		errorMsg := fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(responseBytes))
 		h.sendErrorResponse(ctx, responseCh, errorMsg)
@@ -254,15 +252,14 @@ func (h *HTTPLLMTransport) processHTTPResponse(ctx context.Context, resp *http.R
 	h.cb.recordSuccess()
 	// Metrics recording removed
 
-	h.logger.Debug().
-		Int("response_size", len(responseBytes)).
-		Msg("Received HTTP response from hosting LLM")
+	h.logger.Debug("Received HTTP response from hosting LLM",
+		"response_size", len(responseBytes))
 
 	// Send response
 	select {
 	case responseCh <- json.RawMessage(responseBytes):
 	case <-ctx.Done():
-		h.logger.Debug().Msg("Context cancelled while sending HTTP response")
+		h.logger.Debug("Debug message")
 	}
 
 	return nil
@@ -287,34 +284,34 @@ func (h *HTTPLLMTransport) sendErrorResponse(ctx context.Context, responseCh cha
 // closeResponse safely closes the HTTP response body
 func (h *HTTPLLMTransport) closeResponse(resp *http.Response) {
 	if err := resp.Body.Close(); err != nil {
-		h.logger.Warn().Err(err).Msg("Failed to close response body")
+		h.logger.Warn("Failed to close response body", "error", err)
 	}
 }
 
 // Start implements types.LLMTransport
 func (h *HTTPLLMTransport) Start(ctx context.Context) error {
-	h.logger.Info().Msg("Starting HTTP LLM transport")
+	h.logger.Info("Starting HTTP LLM transport")
 	h.connected = true
 	return nil
 }
 
 // Stop implements types.LLMTransport
 func (h *HTTPLLMTransport) Stop(ctx context.Context) error {
-	h.logger.Info().Msg("Stopping HTTP LLM transport")
+	h.logger.Info("Stopping HTTP LLM transport")
 	h.connected = false
 	return nil
 }
 
 // Send implements types.LLMTransport
 func (h *HTTPLLMTransport) Send(ctx context.Context, message interface{}) error {
-	h.logger.Debug().Str("message", fmt.Sprintf("%+v", message)).Msg("Sending message via HTTP LLM transport")
+	h.logger.Debug("Debug message")
 	// For HTTP transport, sending is handled via InvokeTool
 	return nil
 }
 
 // Receive implements types.LLMTransport
 func (h *HTTPLLMTransport) Receive(ctx context.Context) (interface{}, error) {
-	h.logger.Debug().Msg("Receiving message via HTTP LLM transport")
+	h.logger.Debug("Debug message")
 	// For HTTP transport, receiving is handled via InvokeTool response channels
 	return nil, nil
 }

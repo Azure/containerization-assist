@@ -6,12 +6,12 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
+	"log/slog"
 )
 
 // Detector automatically detects migration opportunities in the codebase
 type Detector struct {
-	logger    logging.Standards
+	logger    *slog.Logger
 	config    Config
 	fileSet   *token.FileSet
 	patterns  map[string]*regexp.Regexp
@@ -32,7 +32,7 @@ type Config struct {
 
 // PatternAnalyzer analyzes code patterns to identify refactoring opportunities
 type PatternAnalyzer struct {
-	logger     logging.Standards
+	logger     *slog.Logger
 	config     PatternAnalysisConfig
 	fileSet    *token.FileSet
 	statistics PatternStatistics

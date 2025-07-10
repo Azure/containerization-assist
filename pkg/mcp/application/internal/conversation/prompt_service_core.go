@@ -185,6 +185,7 @@ func (ps *PromptServiceImpl) applyUserPreferences(ctx context.Context, convState
 		if err := ps.preferenceStore.ApplyPreferencesToSession(userID, &convState.Preferences); err != nil {
 			ps.logger.Warn("Failed to apply user preferences", "error", err)
 		}
+		ps.logger.Debug("User preferences applied", "user_id", userID)
 	}
 }
 func (ps *PromptServiceImpl) handleEarlyCases(ctx context.Context, convState *ConversationState, userInput string) *ConversationResponse {

@@ -8,14 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // NewDetector creates a new migration opportunity detector
-func NewDetector(config Config, logger logging.Standards) *Detector {
+func NewDetector(config Config, logger *slog.Logger) *Detector {
 	md := &Detector{
-		logger:  logger.WithComponent("migration_detector"),
+		logger:  logger.With("component", "migration_detector"),
 		config:  config,
 		fileSet: token.NewFileSet(),
 	}
@@ -29,7 +30,7 @@ func NewDetector(config Config, logger logging.Standards) *Detector {
 
 // DetectMigrations analyzes the codebase and returns migration opportunities
 func (md *Detector) DetectMigrations(rootPath string) (*Report, error) {
-	md.logger.Info().Str("path", rootPath).Msg("Starting migration detection")
+	md.logger.Info("Starting migration detection", "path", rootPath)
 
 	startTime := time.Now()
 	report := &Report{
@@ -65,7 +66,7 @@ func (md *Detector) DetectMigrations(rootPath string) (*Report, error) {
 		// Analyze the file
 		opportunities, err := md.analyzeFile(path)
 		if err != nil {
-			md.logger.Error().Err(err).Str("file", path).Msg("Failed to analyze file")
+			md.logger.Error("Failed to analyze file", "error", err, "file", path)
 			return nil // Continue with other files
 		}
 
@@ -108,10 +109,9 @@ func (md *Detector) DetectMigrations(rootPath string) (*Report, error) {
 	// Generate summary
 	report.Summary = md.generateSummary(report)
 
-	md.logger.Info().
-		Int("opportunities", len(report.Opportunities)).
-		Str("duration", time.Since(startTime).String()).
-		Msg("Migration detection completed")
+	md.logger.Info("Migration detection completed",
+		"opportunities", len(report.Opportunities),
+		"duration", time.Since(startTime).String())
 
 	return report, nil
 }
@@ -135,7 +135,7 @@ func (md *Detector) analyzeFile(filePath string) ([]Opportunity, error) {
 	if md.config.EnableStructuralAnalysis {
 		structuralOpportunities, err := md.analyzeStructure(filePath)
 		if err != nil {
-			md.logger.Warn().Err(err).Str("file", filePath).Msg("Structural analysis failed")
+			md.logger.Warn("Structural analysis failed", "error", err, "file", filePath)
 		} else {
 			allOpportunities = append(allOpportunities, structuralOpportunities...)
 		}

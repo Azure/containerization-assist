@@ -373,65 +373,6 @@ func (t *ConsolidatedBuildTool) Schema() api.ToolSchema {
 	}
 }
 
-// initializeConsolidatedTools creates and returns all consolidated command tools
-func (s *serverImpl) initializeConsolidatedTools() []api.Tool {
-	if s.serviceContainer == nil {
-		s.logger.Warn("Service container not available for consolidated tools")
-		return make([]api.Tool, 0)
-	}
-
-	tools := make([]api.Tool, 0)
-
-	// Create analyze tool with real analyzer service
-	analyzeCmd := NewConsolidatedAnalyzeTool(s.serviceContainer)
-	tools = append(tools, analyzeCmd)
-
-	// Create build tool with real build executor service
-	buildCmd := NewConsolidatedBuildTool(s.serviceContainer)
-	tools = append(tools, buildCmd)
-
-	// Create deploy tool with real manifest service
-	deployCmd := NewConsolidatedDeployTool(s.serviceContainer)
-	tools = append(tools, deployCmd)
-
-	// Create push tool with real docker service
-	pushCmd := NewConsolidatedPushTool(s.serviceContainer)
-	tools = append(tools, pushCmd)
-
-	// Create scan tool with real scanner service
-	scanCmd := NewConsolidatedScanTool(s.serviceContainer)
-	tools = append(tools, scanCmd)
-
-	// Create simple tools
-	pingCmd := NewConsolidatedPingTool(s.serviceContainer)
-	tools = append(tools, pingCmd)
-
-	statusCmd := NewConsolidatedServerStatusTool(s.serviceContainer)
-	tools = append(tools, statusCmd)
-
-	sessionsCmd := NewConsolidatedListSessionsTool(s.serviceContainer)
-	tools = append(tools, sessionsCmd)
-
-	s.logger.Info("Initialized consolidated tools", "count", len(tools))
-	return tools
-}
-
-// registerAllConsolidatedTools registers all consolidated tools with gomcp
-func (s *serverImpl) registerAllConsolidatedTools() {
-	if s.serviceContainer == nil {
-		s.logger.Error("Service container not available, cannot register consolidated tools")
-		return
-	}
-
-	tools := s.initializeConsolidatedTools()
-	s.logger.Info("Registering consolidated tools", "count", len(tools))
-
-	for _, tool := range tools {
-		s.registerConsolidatedTool(tool)
-		s.logger.Info("Registered consolidated tool", "name", tool.Name())
-	}
-}
-
 // ConsolidatedDeployTool implements api.Tool interface for generating Kubernetes manifests
 type ConsolidatedDeployTool struct {
 	name            string

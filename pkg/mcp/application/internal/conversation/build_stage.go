@@ -8,8 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-
-	publicutils "github.com/Azure/container-kit/pkg/mcp/application/state"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func getIntFromMap(m map[string]interface{}, key string) int {
@@ -98,19 +97,19 @@ func setImageRefTag(sessionState *session.SessionState, tag string) {
 }
 
 func (ps *PromptServiceImpl) handleBuildStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(publicutils.StageBuild)), getStageIntro(convertFromTypesStage(publicutils.StageBuild)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StageBuild)), getStageIntro(convertFromTypesStage(domaintypes.StageBuild)))
 
 	if strings.Contains(strings.ToLower(input), "skip") {
-		state.SetStage(convertFromTypesStage(publicutils.StagePush))
+		state.SetStage(convertFromTypesStage(domaintypes.StagePush))
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sSkipping build stage. Moving to push stage...", progressPrefix),
-			Stage:   convertFromTypesStage(publicutils.StagePush),
+			Stage:   convertFromTypesStage(domaintypes.StagePush),
 			Status:  ResponseStatusSuccess,
 		}
 	}
 
-	if !ps.hasPassedStagePreFlightChecks(state, convertFromTypesStage(publicutils.StageBuild)) {
-		ps.markStagePreFlightPassed(state, convertFromTypesStage(publicutils.StageBuild))
+	if !ps.hasPassedStagePreFlightChecks(state, convertFromTypesStage(domaintypes.StageBuild)) {
+		ps.markStagePreFlightPassed(state, convertFromTypesStage(domaintypes.StageBuild))
 	}
 
 	if !getDockerfileBuilt(state.SessionState) {
@@ -125,14 +124,14 @@ func (ps *PromptServiceImpl) handleBuildStage(ctx context.Context, state *Conver
 
 	response := &ConversationResponse{
 		Message: fmt.Sprintf("%sImage built successfully: %s", progressPrefix, getDockerfileImageID(state.SessionState)),
-		Stage:   convertFromTypesStage(publicutils.StageBuild),
+		Stage:   convertFromTypesStage(domaintypes.StageBuild),
 		Status:  ResponseStatusSuccess,
 	}
 
 	hasAutopilot := ps.hasAutopilotEnabled(state)
 
 	if hasAutopilot {
-		response.WithAutoAdvance(convertFromTypesStage(publicutils.StagePush), AutoAdvanceConfig{
+		response.WithAutoAdvance(convertFromTypesStage(domaintypes.StagePush), AutoAdvanceConfig{
 			DelaySeconds:  2,
 			Confidence:    0.9,
 			Reason:        "Build successful, proceeding to push stage",
@@ -141,8 +140,8 @@ func (ps *PromptServiceImpl) handleBuildStage(ctx context.Context, state *Conver
 		})
 		response.Message = response.GetAutoAdvanceMessage()
 	} else {
-		state.SetStage(convertFromTypesStage(publicutils.StagePush))
-		response.Stage = convertFromTypesStage(publicutils.StagePush)
+		state.SetStage(convertFromTypesStage(domaintypes.StagePush))
+		response.Stage = convertFromTypesStage(domaintypes.StagePush)
 		response.WithUserInput()
 		response.Message += "\n\nWould you like to push it to a registry?"
 		response.Options = []Option{
@@ -156,7 +155,7 @@ func (ps *PromptServiceImpl) handleBuildStage(ctx context.Context, state *Conver
 
 func (ps *PromptServiceImpl) offerBuildDryRun(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  convertFromTypesStage(publicutils.StageBuild),
+		Stage:  convertFromTypesStage(domaintypes.StageBuild),
 		Status: ResponseStatusProcessing,
 	}
 
@@ -198,7 +197,7 @@ func (ps *PromptServiceImpl) offerBuildDryRun(ctx context.Context, state *Conver
 			"- Estimated layers: %d\n"+
 			"- Estimated size: %s\n\n"+
 			"This may take a few minutes. Proceed with the build?",
-		baseImage, layers, publicutils.FormatBytes(size))
+		baseImage, layers, domaintypes.FormatBytes(size))
 
 	response.Status = ResponseStatusSuccess
 	response.Options = []Option{
@@ -212,7 +211,7 @@ func (ps *PromptServiceImpl) offerBuildDryRun(ctx context.Context, state *Conver
 
 func (ps *PromptServiceImpl) executeBuild(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(publicutils.StageBuild),
+		Stage:   convertFromTypesStage(domaintypes.StageBuild),
 		Status:  ResponseStatusProcessing,
 		Message: "Building Docker image... This may take a few minutes.",
 	}
@@ -239,7 +238,7 @@ func (ps *PromptServiceImpl) executeBuild(ctx context.Context, state *Conversati
 	}
 
 	if err != nil {
-		toolCall.Error = &publicutils.ToolError{
+		toolCall.Error = &domaintypes.ToolError{
 			Type:      "build_error",
 			Message:   fmt.Sprintf("build_image error: %v", err),
 			Retryable: true,
@@ -249,7 +248,7 @@ func (ps *PromptServiceImpl) executeBuild(ctx context.Context, state *Conversati
 		response.Status = ResponseStatusError
 
 		autoFixHelper := NewAutoFixHelper(ps.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(publicutils.StageBuild), err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(domaintypes.StageBuild), err, state) {
 			return response
 		}
 
@@ -289,7 +288,7 @@ func (ps *PromptServiceImpl) executeBuild(ctx context.Context, state *Conversati
 		Type:    "docker-image",
 		Name:    "Docker Image",
 		Content: imageTag,
-		Stage:   convertFromTypesStage(publicutils.StageBuild),
+		Stage:   convertFromTypesStage(domaintypes.StageBuild),
 		Metadata: map[string]interface{}{
 			"size":     details["size"],
 			"layers":   details["layers"],
@@ -298,7 +297,7 @@ func (ps *PromptServiceImpl) executeBuild(ctx context.Context, state *Conversati
 	}
 	state.AddArtifact(artifact)
 
-	state.SetStage(convertFromTypesStage(publicutils.StagePush))
+	state.SetStage(convertFromTypesStage(domaintypes.StagePush))
 	response.Status = ResponseStatusSuccess
 	response.Message = fmt.Sprintf(
 		"✅ Image built successfully!\n\n"+
@@ -307,7 +306,7 @@ func (ps *PromptServiceImpl) executeBuild(ctx context.Context, state *Conversati
 			"- Build time: %s\n\n"+
 			"Would you like to push this image to a registry?",
 		imageTag,
-		publicutils.FormatBytes(int64(getIntFromMap(details, "size"))),
+		domaintypes.FormatBytes(int64(getIntFromMap(details, "size"))),
 		duration.Round(time.Second))
 
 	response.Options = []Option{
@@ -320,7 +319,7 @@ func (ps *PromptServiceImpl) executeBuild(ctx context.Context, state *Conversati
 }
 
 func (ps *PromptServiceImpl) handlePushStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(publicutils.StagePush)), getStageIntro(convertFromTypesStage(publicutils.StagePush)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StagePush)), getStageIntro(convertFromTypesStage(domaintypes.StagePush)))
 
 	if strings.Contains(strings.ToLower(input), "scan") {
 		response := ps.performSecurityScan(ctx, state)
@@ -329,16 +328,16 @@ func (ps *PromptServiceImpl) handlePushStage(ctx context.Context, state *Convers
 	}
 
 	if strings.Contains(strings.ToLower(input), "skip") || strings.Contains(strings.ToLower(input), "local") {
-		state.SetStage(convertFromTypesStage(publicutils.StageManifests))
+		state.SetStage(convertFromTypesStage(domaintypes.StageManifests))
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sKeeping image local. Moving to Kubernetes manifest generation...", progressPrefix),
-			Stage:   convertFromTypesStage(publicutils.StageManifests),
+			Stage:   convertFromTypesStage(domaintypes.StageManifests),
 			Status:  ResponseStatusSuccess,
 		}
 	}
 
-	if !ps.hasPassedStagePreFlightChecks(state, convertFromTypesStage(publicutils.StagePush)) {
-		ps.markStagePreFlightPassed(state, convertFromTypesStage(publicutils.StagePush))
+	if !ps.hasPassedStagePreFlightChecks(state, convertFromTypesStage(domaintypes.StagePush)) {
+		ps.markStagePreFlightPassed(state, convertFromTypesStage(domaintypes.StagePush))
 	}
 
 	registry, ok := state.Context["preferred_registry"].(string)
@@ -361,7 +360,7 @@ func (ps *PromptServiceImpl) gatherRegistryInfo(ctx context.Context, state *Conv
 
 	return &ConversationResponse{
 		Message: "Which container registry would you like to use?",
-		Stage:   convertFromTypesStage(publicutils.StagePush),
+		Stage:   convertFromTypesStage(domaintypes.StagePush),
 		Status:  ResponseStatusWaitingInput,
 		Options: []Option{
 			{ID: "dockerhub", Label: "Docker Hub (docker.io)"},
@@ -375,7 +374,7 @@ func (ps *PromptServiceImpl) gatherRegistryInfo(ctx context.Context, state *Conv
 
 func (ps *PromptServiceImpl) executePush(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(publicutils.StagePush),
+		Stage:   convertFromTypesStage(domaintypes.StagePush),
 		Status:  ResponseStatusProcessing,
 		Message: "Pushing image to registry...",
 	}
@@ -431,7 +430,7 @@ func (ps *PromptServiceImpl) executePush(ctx context.Context, state *Conversatio
 	}
 
 	if err != nil {
-		toolCall.Error = &publicutils.ToolError{
+		toolCall.Error = &domaintypes.ToolError{
 			Type:      "push_error",
 			Message:   fmt.Sprintf("push_image error: %v", err),
 			Retryable: true,
@@ -441,7 +440,7 @@ func (ps *PromptServiceImpl) executePush(ctx context.Context, state *Conversatio
 		response.Status = ResponseStatusError
 
 		autoFixHelper := NewAutoFixHelper(ps.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(publicutils.StagePush), err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(domaintypes.StagePush), err, state) {
 			return response
 		}
 
@@ -469,7 +468,7 @@ func (ps *PromptServiceImpl) executePush(ctx context.Context, state *Conversatio
 	setImageRefRegistry(state.SessionState, registry)
 	setImageRefTag(state.SessionState, extractTag(imageRef))
 
-	state.SetStage(convertFromTypesStage(publicutils.StageManifests))
+	state.SetStage(convertFromTypesStage(domaintypes.StageManifests))
 	response.Status = ResponseStatusSuccess
 	response.Message = fmt.Sprintf(
 		"✅ Image pushed successfully!\n\n"+

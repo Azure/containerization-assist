@@ -37,8 +37,8 @@ type ValidationWarning struct {
 	Context map[string]interface{} `json:"context,omitempty"`
 }
 
-// Validator is the unified interface for all validators
-// This consolidates all scattered validator interfaces across pkg/mcp
+// Validator is the interface for security-specific validators
+// Renamed to avoid conflict with domain/validation.Validator
 type Validator interface {
 	// Name returns the validator's unique identifier
 	Name() string

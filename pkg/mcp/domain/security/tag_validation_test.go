@@ -89,7 +89,7 @@ func TestStructValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validator.ValidateStruct(context.Background(), &tt.config)
+			err := validator.Validate(&tt.config)
 			if (err != nil) != tt.wantError {
 				t.Errorf("ValidateStruct() error = %v, wantError %v", err, tt.wantError)
 			}
@@ -149,7 +149,7 @@ func TestFieldValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validator.ValidateField(tt.value, tt.tag)
+			err := validator.ValidateField(context.Background(), "testField", tt.value, tt.tag)
 			if (err != nil) != tt.wantError {
 				t.Errorf("ValidateField() error = %v, wantError %v", err, tt.wantError)
 			}
@@ -177,6 +177,6 @@ func BenchmarkStructValidation(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = validator.ValidateStruct(context.Background(), &config)
+		_ = validator.Validate(&config)
 	}
 }

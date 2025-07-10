@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/config"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // BuildToolParams represents parameters for Docker build operations
@@ -23,7 +24,7 @@ type BuildToolParams struct {
 // Validate implements ToolParams interface
 func (p BuildToolParams) Validate() error {
 	if p.SessionID == "" {
-		return NewValidationError("session_id", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("session_id" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return p.Config.Validate()
 }
@@ -48,7 +49,7 @@ type DeployToolParams struct {
 // Validate implements ToolParams interface
 func (p DeployToolParams) Validate() error {
 	if p.SessionID == "" {
-		return NewValidationError("session_id", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("session_id" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return p.Config.Validate()
 }
@@ -73,7 +74,7 @@ type ScanToolParams struct {
 // Validate implements ToolParams interface
 func (p ScanToolParams) Validate() error {
 	if p.SessionID == "" {
-		return NewValidationError("session_id", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("session_id" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return p.Config.Validate()
 }
@@ -97,10 +98,10 @@ type AnalyzeToolParams struct {
 // Validate implements ToolParams interface
 func (p AnalyzeToolParams) Validate() error {
 	if p.SessionID == "" {
-		return NewValidationError("session_id", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("session_id" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	if p.RepositoryPath == "" {
-		return NewValidationError("repository_path", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("repository_path" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return nil
 }
@@ -124,10 +125,10 @@ type GenerateManifestsParams struct {
 // Validate implements ToolParams interface
 func (p GenerateManifestsParams) Validate() error {
 	if p.SessionID == "" {
-		return NewValidationError("session_id", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("session_id" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	if p.ImageRef == "" {
-		return NewValidationError("image_ref", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("image_ref" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return p.Config.Validate()
 }
@@ -146,7 +147,7 @@ type SessionParams struct {
 // Validate implements ToolParams interface
 func (p SessionParams) Validate() error {
 	if p.SessionID == "" {
-		return NewValidationError("session_id", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("session_id" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return nil
 }
@@ -178,7 +179,7 @@ func (p AtomicAnalyzeRepositoryParams) Validate() error {
 		return err
 	}
 	if p.RepoURL == "" {
-		return NewValidationError("repo_url", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("repo_url" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return nil
 }
@@ -203,7 +204,7 @@ func (p AtomicBuildImageParams) Validate() error {
 		return err
 	}
 	if p.ImageName == "" {
-		return NewValidationError("image_name", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("image_name" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return nil
 }
@@ -238,7 +239,7 @@ func (p AtomicDeployKubernetesParams) Validate() error {
 		return err
 	}
 	if p.ImageRef == "" {
-		return NewValidationError("image_ref", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("image_ref" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return nil
 }
@@ -264,7 +265,7 @@ func (p AtomicScanImageSecurityParams) Validate() error {
 		return err
 	}
 	if p.ImageRef == "" {
-		return NewValidationError("image_ref", "required field cannot be empty")
+		return errors.NewError().Code(errors.CodeValidationFailed).Type(errors.ErrTypeValidation).Message("image_ref" + ": " + "required field cannot be empty").WithLocation().Build()
 	}
 	return nil
 }

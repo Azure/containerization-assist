@@ -1,39 +1,38 @@
 # Container Kit Quality Dashboard
 
-**Generated**: Wed Jul  9 22:43:45 EDT 2025
-**Commit**: e2082793c2d77c882b19f333373ad99744aaaafa
+**Generated**: Thu Jul 10 00:59:28 EDT 2025
+**Commit**: ad5d4de3e72b9a8d360b461a951d07b24189320d
 **Overall Status**: ❌ FAILED
 
 ## Quality Gates Results
 
-✅ Code Formatting: PASSED - All Go files properly formatted
-✅ Linting: PASSED - 29 issues (within budget of 100)
+❌ Code Formatting: FAILED - 1 files need formatting
+✅ Linting: PASSED - 33 issues (within budget of 100)
 ❌ Build Verification: FAILED - 0
 1 build errors
 ❌ Test Coverage: FAILED - Unable to run coverage analysis
 ❌ Performance Benchmarks: FAILED - Benchmark execution failed or timed out
-❌ Architecture Validation: FAILED - 30 architecture violations found
-❌ Security Checks: FAILED - 585 potential security issues found
+❌ Architecture Validation: FAILED - 59 architecture violations found
+❌ Security Checks: FAILED - 579 potential security issues found
 
 ## Metrics Summary
 
 ### Code Quality
-- **Formatting**: ✅ Compliant
-- **Lint Issues**: 29 (Budget: 100)
+- **Formatting**: ❌ 1 files need formatting
+- **Lint Issues**: 33 (Budget: 100)
 - **Build Status**: ✅ Success
 
 ### Testing
 - **Coverage**: N/A% (Target: 15.0%)
-- **Benchmark Count**: 0
-0
+- **Benchmark Count**: 8
 - **Performance**: ✅ Within targets
 
 ### Architecture
-- **Violations**: 30
+- **Violations**: 59
 - **Dependencies**: ⚠️ Issues found
 
 ### Security
-- **Issues**: 585
+- **Issues**: 579
 - **Status**: ⚠️ Review needed
 
 ## Recommendations

@@ -131,6 +131,7 @@ func TestInstrumentToolExecution(t *testing.T) {
 		TracingEnabled:  true,
 		MetricsEnabled:  false, // Disable metrics for simpler test
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tm := NewManager(config)
@@ -175,6 +176,7 @@ func TestInstrumentPipelineStage(t *testing.T) {
 		TracingEnabled:  true,
 		MetricsEnabled:  false,
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tm := NewManager(config)
@@ -213,6 +215,7 @@ func TestHTTPInstrumentation(t *testing.T) {
 		TracingEnabled:  true,
 		MetricsEnabled:  false,
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tm := NewManager(config)
@@ -251,6 +254,7 @@ func TestTracingEnabledDisabled(t *testing.T) {
 		TracingEnabled:  true,
 		MetricsEnabled:  false,
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tmEnabled := NewManager(enabledConfig)
@@ -273,6 +277,7 @@ func TestTracingEnabledDisabled(t *testing.T) {
 		TracingEnabled:  false,
 		MetricsEnabled:  false,
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tmDisabled := NewManager(disabledConfig)
@@ -295,6 +300,7 @@ func TestTraceAndSpanIDs(t *testing.T) {
 		TracingEnabled:  true,
 		MetricsEnabled:  false,
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tm := NewManager(config)
@@ -335,6 +341,7 @@ func BenchmarkInstrumentToolExecution(b *testing.B) {
 		TracingEnabled:  true,
 		MetricsEnabled:  false,
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tm := NewManager(config)
@@ -364,6 +371,7 @@ func BenchmarkInstrumentToolExecutionNoTracing(b *testing.B) {
 		TracingEnabled:  false,
 		MetricsEnabled:  false,
 		TraceSampleRate: 1.0,
+		MetricsInterval: 10 * time.Second,
 	}
 
 	tm := NewManager(config)

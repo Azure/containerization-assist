@@ -2,6 +2,7 @@ package domaintypes
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -286,4 +287,43 @@ type ValidationWarning struct {
 	Rule       string                 `json:"rule,omitempty"`
 	Suggestion string                 `json:"suggestion,omitempty"`
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// FormatBytes formats bytes into human-readable format
+func FormatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// PreferenceStore provides user preference management functionality
+type PreferenceStore struct {
+	logger *slog.Logger
+}
+
+// NewPreferenceStore creates a new preference store
+func NewPreferenceStore(_ string, logger *slog.Logger, _ string) (*PreferenceStore, error) {
+	return &PreferenceStore{
+		logger: logger,
+	}, nil
+}
+
+// ApplyPreferencesToSession applies user preferences to a session
+func (ps *PreferenceStore) ApplyPreferencesToSession(userID string, _ *UserPreferences) error {
+	// Minimal implementation - no-op for now
+	// In a full implementation, this would load preferences from storage
+	ps.logger.Debug("Applying user preferences", "user_id", userID)
+	return nil
+}
+
+// Close closes the preference store
+func (ps *PreferenceStore) Close() error {
+	return nil
 }

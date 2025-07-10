@@ -13,6 +13,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
@@ -42,13 +44,13 @@ func (tm *TracingManager) Initialize(ctx context.Context) error {
 	// Create resource
 	res, err := tm.createResource()
 	if err != nil {
-		return fmt.Errorf("failed to create resource: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to create resource").Cause(err).Build()
 	}
 
 	// Create exporter
 	exporter, err := tm.createExporter()
 	if err != nil {
-		return fmt.Errorf("failed to create exporter: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to create exporter").Cause(err).Build()
 	}
 
 	// Create tracer provider

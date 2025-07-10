@@ -1,17 +1,4 @@
 package config
 
-import (
-	"fmt"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-)
-
-// ValidationError represents a configuration validation error
-// DEPRECATED: Use errors.ValidationError directly instead
-func NewValidationError(field, message string) error {
-	return errors.ValidationError(
-		errors.CodeValidationFailed,
-		fmt.Sprintf("validation error for field '%s': %s", field, message),
-		nil,
-	).WithContext("field", field)
-}
+// Package-level constants and helper functions for validation errors
+// This file is reserved for config-specific error handling functions

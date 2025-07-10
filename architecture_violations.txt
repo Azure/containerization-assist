@@ -1,8 +1,0 @@
-=== ARCHITECTURE VIOLATIONS ===
-Found legacy packages:
-
-Domain layer importing application/infra:
-No violations found
-
-Application layer importing infra:
-No violations found

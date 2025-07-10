@@ -94,17 +94,31 @@ type toolRegistryServiceAdapter struct {
 	registry api.ToolRegistry
 }
 
-func (t *toolRegistryServiceAdapter) Register(name string, tool interface{}) error {
+func (t *toolRegistryServiceAdapter) RegisterTool(_ context.Context, name string, tool api.Tool) error {
 	// Wrap the tool as a factory function
-	factory := func() interface{} { return tool }
+	factory := func() api.Tool { return tool }
 	return t.registry.Register(name, factory)
 }
 
-func (t *toolRegistryServiceAdapter) Get(name string) (interface{}, error) {
-	return t.registry.Discover(name)
+func (t *toolRegistryServiceAdapter) GetTool(_ context.Context, name string) (api.Tool, error) {
+	result, err := t.registry.Discover(name)
+	if err != nil {
+		return nil, err
+	}
+
+	tool, ok := result.(api.Tool)
+	if !ok {
+		return nil, errors.NewError().
+			Code(errors.CodeTypeMismatch).
+			Message("registered item is not a tool").
+			Context("name", name).
+			Build()
+	}
+
+	return tool, nil
 }
 
-func (t *toolRegistryServiceAdapter) List() []string {
+func (t *toolRegistryServiceAdapter) ListTools(_ context.Context) []string {
 	return t.registry.List()
 }
 
@@ -116,7 +130,7 @@ func (t *toolRegistryServiceAdapter) GetMetadata(name string) (*api.ToolMetadata
 	return &metadata, nil
 }
 
-func (t *toolRegistryServiceAdapter) Execute(ctx context.Context, name string, input interface{}) (interface{}, error) {
+func (t *toolRegistryServiceAdapter) ExecuteGeneric(ctx context.Context, name string, input interface{}) (interface{}, error) {
 	// Convert input to ToolInput
 	toolInput := api.ToolInput{
 		Data: map[string]interface{}{"input": input},
@@ -140,6 +154,38 @@ func (t *toolRegistryServiceAdapter) GetMetrics(ctx context.Context) api.Registr
 		AverageExecutionTime: 0,
 		UpTime:               0,
 	}
+}
+
+func (t *toolRegistryServiceAdapter) Close() error {
+	return t.registry.Close()
+}
+
+func (t *toolRegistryServiceAdapter) Register(name string, factory interface{}) error {
+	return t.registry.Register(name, factory)
+}
+
+func (t *toolRegistryServiceAdapter) Discover(name string) (interface{}, error) {
+	return t.registry.Discover(name)
+}
+
+func (t *toolRegistryServiceAdapter) List() []string {
+	return t.registry.List()
+}
+
+func (t *toolRegistryServiceAdapter) Metadata(name string) (api.ToolMetadata, error) {
+	return t.registry.Metadata(name)
+}
+
+func (t *toolRegistryServiceAdapter) SetMetadata(name string, metadata api.ToolMetadata) error {
+	return t.registry.SetMetadata(name, metadata)
+}
+
+func (t *toolRegistryServiceAdapter) Unregister(name string) error {
+	return t.registry.Unregister(name)
+}
+
+func (t *toolRegistryServiceAdapter) Execute(ctx context.Context, name string, input api.ToolInput) (api.ToolOutput, error) {
+	return t.registry.Execute(ctx, name, input)
 }
 
 // workflowExecutorStub is a stub implementation

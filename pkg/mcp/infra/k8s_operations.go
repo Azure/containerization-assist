@@ -9,6 +9,7 @@ import (
 
 	"log/slog"
 
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,19 +40,19 @@ func NewKubernetesOperations(kubeconfig string, namespace string, logger *slog.L
 		// Use kubeconfig file
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build config from kubeconfig: %w", err)
+			return nil, errors.NewError().Code(errors.CodeInternalError).Message("failed to build config from kubeconfig").Wrap(err).Build()
 		}
 	} else {
 		// Use in-cluster config
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+			return nil, errors.NewError().Code(errors.CodeInternalError).Message("failed to get in-cluster config").Wrap(err).Build()
 		}
 	}
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+		return nil, errors.NewError().Code(errors.CodeInternalError).Message("failed to create kubernetes client").Wrap(err).Build()
 	}
 
 	if namespace == "" {
@@ -657,7 +658,7 @@ func (k *KubernetesOperations) waitForDeploymentReady(ctx context.Context, name,
 		FieldSelector: fmt.Sprintf("metadata.name=%s", name),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to watch deployment: %w", err)
+		return errors.NewError().Code(errors.CodeInternalError).Message("failed to watch deployment").Wrap(err).Build()
 	}
 	defer watchInterface.Stop()
 
@@ -692,7 +693,7 @@ func (k *KubernetesOperations) getPodInfo(ctx context.Context, appName, namespac
 		}).String(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pods: %w", err)
+		return nil, errors.NewError().Code(errors.CodeInternalError).Message("failed to list pods").Wrap(err).Build()
 	}
 
 	var podInfos []PodInfo

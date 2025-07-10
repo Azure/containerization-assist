@@ -115,6 +115,18 @@ func TestValidatorIntegrationWithExistingSystem(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name": "my-service",
 			},
+			"spec": map[string]interface{}{
+				"type": "ClusterIP",
+				"ports": []interface{}{
+					map[string]interface{}{
+						"port":     80,
+						"protocol": "TCP",
+					},
+				},
+				"selector": map[string]interface{}{
+					"app": "my-app",
+				},
+			},
 		}
 
 		result := registry.ValidateAll(context.Background(), manifest, "kubernetes", "manifest")

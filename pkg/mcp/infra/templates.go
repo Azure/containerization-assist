@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Template filesystem embeddings
@@ -60,22 +62,6 @@ type templateService struct {
 // NewTemplateService creates a new template service
 func NewTemplateService(logger *slog.Logger) TemplateService {
 	return &templateService{
-		logger: logger,
-		cache:  make(map[string]*template.Template),
-	}
-}
-
-// TemplateManager manages template operations for infrastructure
-// DEPRECATED: Use TemplateService instead
-type TemplateManager struct {
-	logger *slog.Logger
-	cache  map[string]*template.Template
-}
-
-// NewTemplateManager creates a new template manager
-// DEPRECATED: Use NewTemplateService instead
-func NewTemplateManager(logger *slog.Logger) *TemplateManager {
-	return &TemplateManager{
 		logger: logger,
 		cache:  make(map[string]*template.Template),
 	}
@@ -203,7 +189,7 @@ func (ts *templateService) getTemplateContent(templateType TemplateType, name st
 	// Read template content
 	content, err := fs.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read template %s: %w", filePath, err)
+		return "", errors.NewError().Code(errors.CodeInternalError).Messagef("failed to read template %s", filePath).Cause(err).Build()
 	}
 
 	return string(content), nil
@@ -240,7 +226,7 @@ func (ts *templateService) ListTemplates(templateType TemplateType) ([]string, e
 	// Read directory entries
 	entries, err := fs.ReadDir(basePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template directory %s: %w", basePath, err)
+		return nil, errors.NewError().Code(errors.CodeInternalError).Messagef("failed to read template directory %s", basePath).Cause(err).Build()
 	}
 
 	var templates []string
@@ -580,24 +566,4 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
-}
-
-// Backward compatibility methods for TemplateManager
-
-// RenderTemplate renders a template with variables
-func (tm *TemplateManager) RenderTemplate(params TemplateRenderParams) (*TemplateRenderResult, error) {
-	service := NewTemplateService(tm.logger)
-	return service.RenderTemplate(params)
-}
-
-// ListTemplates lists available templates by type
-func (tm *TemplateManager) ListTemplates(templateType TemplateType) ([]string, error) {
-	service := NewTemplateService(tm.logger)
-	return service.ListTemplates(templateType)
-}
-
-// GetTemplateMetadata gets metadata about a template
-func (tm *TemplateManager) GetTemplateMetadata(templateType TemplateType, name string) (*TemplateMetadata, error) {
-	service := NewTemplateService(tm.logger)
-	return service.GetTemplateMetadata(templateType, name)
 }

@@ -219,8 +219,8 @@ func (ps *PromptServiceImpl) showDeploymentLogs(ctx context.Context, state *Conv
 }
 
 func extractRegistry(input string) string {
-	if strings.Contains(input, internal.DefaultRegistry) || strings.Contains(input, "dockerhub") {
-		return internal.DefaultRegistry
+	if strings.Contains(input, domaintypes.DefaultRegistry) || strings.Contains(input, "dockerhub") {
+		return domaintypes.DefaultRegistry
 	}
 	if strings.Contains(input, "gcr.io") {
 		return "gcr.io"
@@ -236,7 +236,7 @@ func extractRegistry(input string) string {
 		return strings.Split(input, "/")[0]
 	}
 
-	return internal.DefaultRegistry
+	return domaintypes.DefaultRegistry
 }
 
 func extractTag(imageRef string) string {

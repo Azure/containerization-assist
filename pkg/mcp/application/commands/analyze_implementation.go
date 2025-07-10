@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze"
 	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
@@ -16,7 +18,7 @@ import (
 // Language detection implementations
 
 // detectLanguageByExtension detects language based on file extensions
-func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(workspaceDir string, languageMap map[string]int) error {
+func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(ctx context.Context, sessionID string, languageMap map[string]int) error {
 	extensionMap := map[string]string{
 		".go":         "go",
 		".js":         "javascript",
@@ -49,27 +51,30 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(workspaceDir st
 		".Dockerfile": "dockerfile",
 	}
 
-	return filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip files with errors
+	// Use FileAccessService to search for all files
+	files, err := cmd.fileAccess.SearchFiles(ctx, sessionID, "*")
+	if err != nil {
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to search files: %w", err).
+			WithLocation().
+			Build()
+	}
+
+	for _, file := range files {
+		// Skip directories
+		if file.IsDir {
+			continue
 		}
 
-		if info.IsDir() {
-			// Skip common directories
-			dirName := info.Name()
-			if dirName == ".git" || dirName == "node_modules" || dirName == "vendor" || dirName == ".vscode" || dirName == ".idea" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		ext := filepath.Ext(info.Name())
+		ext := filepath.Ext(file.Name)
 		if lang, exists := extensionMap[ext]; exists {
 			languageMap[lang]++
 		}
 
 		// Special cases for files without extensions
-		fileName := info.Name()
+		fileName := file.Name
 		if fileName == "Dockerfile" || fileName == "dockerfile" {
 			languageMap["dockerfile"]++
 		} else if fileName == "Makefile" || fileName == "makefile" {
@@ -87,13 +92,13 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByExtension(workspaceDir st
 		} else if fileName == "Cargo.toml" {
 			languageMap["rust"]++
 		}
+	}
 
-		return nil
-	})
+	return nil
 }
 
 // detectLanguageByContent detects language based on file content patterns
-func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByContent(workspaceDir string, languageMap map[string]int) error {
+func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByContent(ctx context.Context, sessionID string, languageMap map[string]int) error {
 	patterns := map[string]*regexp.Regexp{
 		"go":         regexp.MustCompile(`(?m)^package\s+\w+`),
 		"javascript": regexp.MustCompile(`(?m)(require\(|import\s+.*from|export\s+.*=)`),
@@ -103,30 +108,42 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguageByContent(workspaceDir stri
 		"csharp":     regexp.MustCompile(`(?m)(using\s+System|namespace\s+\w+|public\s+class)`),
 	}
 
-	return filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
+	// Get all files for content analysis
+	files, err := cmd.fileAccess.SearchFiles(ctx, sessionID, "*")
+	if err != nil {
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to search files: %w", err).
+			WithLocation().
+			Build()
+	}
+
+	for _, file := range files {
+		// Skip directories
+		if file.IsDir {
+			continue
 		}
 
 		// Only check text files
-		if !cmd.isTextFile(path) {
-			return nil
+		if !cmd.isTextFile(file.Path) {
+			continue
 		}
 
-		content, err := os.ReadFile(path)
+		// Read file content using FileAccessService
+		content, err := cmd.fileAccess.ReadFile(ctx, sessionID, file.Path)
 		if err != nil {
-			return nil
+			continue // Skip files we can't read
 		}
 
-		contentStr := string(content)
 		for lang, pattern := range patterns {
-			if pattern.MatchString(contentStr) {
+			if pattern.MatchString(content) {
 				languageMap[lang] += 2 // Weight content-based detection higher
 			}
 		}
+	}
 
-		return nil
-	})
+	return nil
 }
 
 // determinePrimaryLanguage determines the primary language from detection results
@@ -172,10 +189,19 @@ func (cmd *ConsolidatedAnalyzeCommand) calculateLanguagePercentage(language stri
 // Framework detection implementations
 
 // detectGoFramework detects Go frameworks
-func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.AnalysisResult, workspaceDir string) error {
-	// Check go.mod for framework dependencies
-	goModPath := filepath.Join(workspaceDir, "go.mod")
-	if !fileExists(goModPath) {
+func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
+	// Check if go.mod exists using FileAccessService
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "go.mod")
+	if err != nil {
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to check go.mod existence: %w", err).
+			WithLocation().
+			Build()
+	}
+
+	if !exists {
 		result.Framework = analyze.Framework{
 			Name:       "none",
 			Type:       analyze.FrameworkTypeNone,
@@ -184,7 +210,8 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
 		return nil
 	}
 
-	content, err := os.ReadFile(goModPath)
+	// Read go.mod content using FileAccessService
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "go.mod")
 	if err != nil {
 		return errors.NewError().
 			Code(errors.CodeFileNotFound).
@@ -194,7 +221,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
 			Build()
 	}
 
-	contentStr := string(content)
+	contentStr := content
 	frameworks := []struct {
 		name    string
 		pattern string
@@ -235,9 +262,19 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
 }
 
 // detectJSFramework detects JavaScript/TypeScript frameworks
-func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.AnalysisResult, workspaceDir string) error {
-	packageJSONPath := filepath.Join(workspaceDir, "package.json")
-	if !fileExists(packageJSONPath) {
+func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
+	// Check if package.json exists using FileAccessService
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "package.json")
+	if err != nil {
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to check package.json existence: %w", err).
+			WithLocation().
+			Build()
+	}
+
+	if !exists {
 		result.Framework = analyze.Framework{
 			Name:       "none",
 			Type:       analyze.FrameworkTypeNone,
@@ -246,7 +283,8 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
 		return nil
 	}
 
-	content, err := os.ReadFile(packageJSONPath)
+	// Read package.json content using FileAccessService
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "package.json")
 	if err != nil {
 		return errors.NewError().
 			Code(errors.CodeFileNotFound).
@@ -256,7 +294,7 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
 			Build()
 	}
 
-	contentStr := string(content)
+	contentStr := content
 	frameworks := []struct {
 		name    string
 		pattern string
@@ -300,19 +338,24 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
 }
 
 // detectPythonFramework detects Python frameworks
-func (cmd *ConsolidatedAnalyzeCommand) detectPythonFramework(result *analyze.AnalysisResult, workspaceDir string) error {
+func (cmd *ConsolidatedAnalyzeCommand) detectPythonFramework(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
 	// Check requirements.txt, setup.py, pyproject.toml
 	files := []string{"requirements.txt", "setup.py", "pyproject.toml", "Pipfile"}
 
 	var content string
 	for _, file := range files {
-		filePath := filepath.Join(workspaceDir, file)
-		if fileExists(filePath) {
-			fileContent, err := os.ReadFile(filePath)
+		// Check if file exists using FileAccessService
+		exists, err := cmd.fileAccess.FileExists(ctx, sessionID, file)
+		if err != nil {
+			continue
+		}
+		if exists {
+			// Read file content using FileAccessService
+			fileContent, err := cmd.fileAccess.ReadFile(ctx, sessionID, file)
 			if err != nil {
 				continue
 			}
-			content += string(fileContent) + "\n"
+			content += fileContent + "\n"
 		}
 	}
 
@@ -367,19 +410,24 @@ func (cmd *ConsolidatedAnalyzeCommand) detectPythonFramework(result *analyze.Ana
 }
 
 // detectJavaFramework detects Java frameworks
-func (cmd *ConsolidatedAnalyzeCommand) detectJavaFramework(result *analyze.AnalysisResult, workspaceDir string) error {
+func (cmd *ConsolidatedAnalyzeCommand) detectJavaFramework(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
 	// Check pom.xml, build.gradle, build.gradle.kts
 	files := []string{"pom.xml", "build.gradle", "build.gradle.kts"}
 
 	var content string
 	for _, file := range files {
-		filePath := filepath.Join(workspaceDir, file)
-		if fileExists(filePath) {
-			fileContent, err := os.ReadFile(filePath)
+		// Check if file exists using FileAccessService
+		exists, err := cmd.fileAccess.FileExists(ctx, sessionID, file)
+		if err != nil {
+			continue
+		}
+		if exists {
+			// Read file content using FileAccessService
+			fileContent, err := cmd.fileAccess.ReadFile(ctx, sessionID, file)
 			if err != nil {
 				continue
 			}
-			content += string(fileContent) + "\n"
+			content += fileContent + "\n"
 		}
 	}
 
@@ -431,20 +479,20 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJavaFramework(result *analyze.Analy
 }
 
 // detectDotNetFramework detects .NET frameworks
-func (cmd *ConsolidatedAnalyzeCommand) detectDotNetFramework(result *analyze.AnalysisResult, workspaceDir string) error {
-	// Check for .csproj, .vbproj, .fsproj files
-	var csprojFiles []string
-	filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(info.Name(), ".csproj") || strings.HasSuffix(info.Name(), ".vbproj") || strings.HasSuffix(info.Name(), ".fsproj") {
-			csprojFiles = append(csprojFiles, path)
-		}
-		return nil
-	})
+func (cmd *ConsolidatedAnalyzeCommand) detectDotNetFramework(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
+	// Search for .csproj, .vbproj, .fsproj files using FileAccessService
+	patterns := []string{"*.csproj", "*.vbproj", "*.fsproj"}
+	var projectFiles []services.FileInfo
 
-	if len(csprojFiles) == 0 {
+	for _, pattern := range patterns {
+		files, err := cmd.fileAccess.SearchFiles(ctx, sessionID, pattern)
+		if err != nil {
+			continue
+		}
+		projectFiles = append(projectFiles, files...)
+	}
+
+	if len(projectFiles) == 0 {
 		result.Framework = analyze.Framework{
 			Name:       "none",
 			Type:       analyze.FrameworkTypeNone,
@@ -454,12 +502,13 @@ func (cmd *ConsolidatedAnalyzeCommand) detectDotNetFramework(result *analyze.Ana
 	}
 
 	var content string
-	for _, file := range csprojFiles {
-		fileContent, err := os.ReadFile(file)
+	for _, file := range projectFiles {
+		// Read project file content using FileAccessService
+		fileContent, err := cmd.fileAccess.ReadFile(ctx, sessionID, file.Path)
 		if err != nil {
 			continue
 		}
-		content += string(fileContent) + "\n"
+		content += fileContent + "\n"
 	}
 
 	frameworks := []struct {
@@ -504,15 +553,26 @@ func (cmd *ConsolidatedAnalyzeCommand) detectDotNetFramework(result *analyze.Ana
 // Dependency analysis implementations
 
 // analyzeGoDependencies analyzes Go dependencies
-func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string) ([]analyze.Dependency, error) {
+func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(ctx context.Context, sessionID string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
 
-	goModPath := filepath.Join(workspaceDir, "go.mod")
-	if !fileExists(goModPath) {
+	// Check if go.mod exists using FileAccessService
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "go.mod")
+	if err != nil {
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to check go.mod existence: %w", err).
+			WithLocation().
+			Build()
+	}
+
+	if !exists {
 		return dependencies, nil
 	}
 
-	content, err := os.ReadFile(goModPath)
+	// Read go.mod content using FileAccessService
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "go.mod")
 	if err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeFileNotFound).
@@ -522,7 +582,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
 			Build()
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(string(content)))
+	scanner := bufio.NewScanner(strings.NewReader(content))
 	inRequire := false
 
 	for scanner.Scan() {
@@ -570,16 +630,20 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
 }
 
 // analyzeNodeDependencies analyzes Node.js dependencies
-func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir string) ([]analyze.Dependency, error) {
+func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(ctx context.Context, sessionID string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
 
-	packageJSONPath := filepath.Join(workspaceDir, "package.json")
-	if !fileExists(packageJSONPath) {
+	// Check if package.json exists
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "package.json")
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
 		return dependencies, nil
 	}
 
-	// This is a simplified implementation - in a real system you'd parse JSON properly
-	content, err := os.ReadFile(packageJSONPath)
+	// Read package.json content using FileAccessService
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "package.json")
 	if err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeFileNotFound).
@@ -589,7 +653,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir stri
 			Build()
 	}
 
-	contentStr := string(content)
+	contentStr := content
 
 	// Simple regex-based parsing for dependencies
 	depPattern := regexp.MustCompile(`"([^"]+)":\s*"([^"]+)"`)
@@ -618,15 +682,20 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir stri
 }
 
 // analyzePythonDependencies analyzes Python dependencies
-func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir string) ([]analyze.Dependency, error) {
+func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(ctx context.Context, sessionID string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
 
-	reqPath := filepath.Join(workspaceDir, "requirements.txt")
-	if !fileExists(reqPath) {
+	// Check if requirements.txt exists
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "requirements.txt")
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
 		return dependencies, nil
 	}
 
-	content, err := os.ReadFile(reqPath)
+	// Read requirements.txt content using FileAccessService
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "requirements.txt")
 	if err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeFileNotFound).
@@ -636,7 +705,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir st
 			Build()
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(string(content)))
+	scanner := bufio.NewScanner(strings.NewReader(content))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -665,13 +734,16 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir st
 }
 
 // analyzeJavaDependencies analyzes Java dependencies
-func (cmd *ConsolidatedAnalyzeCommand) analyzeJavaDependencies(workspaceDir string) ([]analyze.Dependency, error) {
+func (cmd *ConsolidatedAnalyzeCommand) analyzeJavaDependencies(ctx context.Context, sessionID string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
 
 	// Check for Maven dependencies (pom.xml)
-	pomPath := filepath.Join(workspaceDir, "pom.xml")
-	if fileExists(pomPath) {
-		deps, err := cmd.parseMavenDependencies(pomPath)
+	pomExists, err := cmd.fileAccess.FileExists(ctx, sessionID, "pom.xml")
+	if err != nil {
+		return nil, err
+	}
+	if pomExists {
+		deps, err := cmd.parseMavenDependencies(ctx, sessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -679,9 +751,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeJavaDependencies(workspaceDir stri
 	}
 
 	// Check for Gradle dependencies (build.gradle)
-	gradlePath := filepath.Join(workspaceDir, "build.gradle")
-	if fileExists(gradlePath) {
-		deps, err := cmd.parseGradleDependencies(gradlePath)
+	gradleExists, err := cmd.fileAccess.FileExists(ctx, sessionID, "build.gradle")
+	if err != nil {
+		return nil, err
+	}
+	if gradleExists {
+		deps, err := cmd.parseGradleDependencies(ctx, sessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -692,10 +767,11 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeJavaDependencies(workspaceDir stri
 }
 
 // parseMavenDependencies parses Maven dependencies from pom.xml
-func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([]analyze.Dependency, error) {
+func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(ctx context.Context, sessionID string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
 
-	content, err := os.ReadFile(pomPath)
+	// Read pom.xml content using FileAccessService
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "pom.xml")
 	if err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeFileNotFound).
@@ -707,7 +783,7 @@ func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([
 
 	// Simple regex-based parsing - in a real system you'd use XML parser
 	depPattern := regexp.MustCompile(`<groupId>([^<]+)</groupId>\s*<artifactId>([^<]+)</artifactId>\s*<version>([^<]+)</version>`)
-	matches := depPattern.FindAllStringSubmatch(string(content), -1)
+	matches := depPattern.FindAllStringSubmatch(content, -1)
 
 	for _, match := range matches {
 		if len(match) == 4 {
@@ -728,10 +804,11 @@ func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([
 }
 
 // parseGradleDependencies parses Gradle dependencies from build.gradle
-func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string) ([]analyze.Dependency, error) {
+func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(ctx context.Context, sessionID string) ([]analyze.Dependency, error) {
 	var dependencies []analyze.Dependency
 
-	content, err := os.ReadFile(gradlePath)
+	// Read build.gradle content using FileAccessService
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "build.gradle")
 	if err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeFileNotFound).
@@ -743,7 +820,7 @@ func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string
 
 	// Simple regex-based parsing for Gradle dependencies
 	depPattern := regexp.MustCompile(`(?:implementation|compile|testImplementation|testCompile)\s+['"]([^'"]+)['"]`)
-	matches := depPattern.FindAllStringSubmatch(string(content), -1)
+	matches := depPattern.FindAllStringSubmatch(content, -1)
 
 	for _, match := range matches {
 		if len(match) == 2 {
@@ -768,6 +845,581 @@ func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string
 	}
 
 	return dependencies, nil
+}
+
+// Database detection implementations
+
+// analyzeDatabases detects database usage and configuration
+func (cmd *ConsolidatedAnalyzeCommand) analyzeDatabases(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
+	var databases []analyze.Database
+
+	// Database patterns to search for
+	dbPatterns := map[string]*regexp.Regexp{
+		"PostgreSQL":    regexp.MustCompile(`postgres://|postgresql://|host.*dbname.*user|DATABASE_URL.*postgres`),
+		"MySQL":         regexp.MustCompile(`mysql://|jdbc:mysql|host.*database.*username|DATABASE_URL.*mysql`),
+		"MongoDB":       regexp.MustCompile(`mongodb://|mongodb\+srv://|mongoose\.connect|MongoClient`),
+		"Redis":         regexp.MustCompile(`redis://|redis-server|RedisClient|redis\.createClient`),
+		"SQLite":        regexp.MustCompile(`sqlite://|\.db$|\.sqlite$|sqlite3|database\.sqlite`),
+		"Oracle":        regexp.MustCompile(`oracle://|jdbc:oracle|OracleClient`),
+		"Cassandra":     regexp.MustCompile(`cassandra://|CassandraClient|contact_points`),
+		"DynamoDB":      regexp.MustCompile(`dynamodb|aws-sdk.*dynamodb|DynamoDBClient`),
+		"Elasticsearch": regexp.MustCompile(`elasticsearch://|ElasticsearchClient|@elastic/elasticsearch`),
+	}
+
+	// Check dependency files for database connections
+	databases = append(databases, cmd.detectDatabasesFromDependencies(ctx, sessionID, result.Language.Name)...)
+
+	// Check configuration files for database strings
+	databases = append(databases, cmd.detectDatabasesFromConfig(ctx, sessionID, dbPatterns)...)
+
+	// Check source code for database usage
+	databases = append(databases, cmd.detectDatabasesFromSource(ctx, sessionID, dbPatterns)...)
+
+	result.Databases = databases
+	return nil
+}
+
+// detectDatabasesFromDependencies detects databases from dependency files
+func (cmd *ConsolidatedAnalyzeCommand) detectDatabasesFromDependencies(ctx context.Context, sessionID, language string) []analyze.Database {
+	var databases []analyze.Database
+
+	switch language {
+	case "javascript", "typescript":
+		databases = append(databases, cmd.detectNodeDatabases(ctx, sessionID)...)
+	case "python":
+		databases = append(databases, cmd.detectPythonDatabases(ctx, sessionID)...)
+	case "go":
+		databases = append(databases, cmd.detectGoDatabases(ctx, sessionID)...)
+	case "java":
+		databases = append(databases, cmd.detectJavaDatabases(ctx, sessionID)...)
+	}
+
+	return databases
+}
+
+// detectNodeDatabases detects Node.js database dependencies
+func (cmd *ConsolidatedAnalyzeCommand) detectNodeDatabases(ctx context.Context, sessionID string) []analyze.Database {
+	var databases []analyze.Database
+
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "package.json")
+	if err != nil || !exists {
+		return databases
+	}
+
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "package.json")
+	if err != nil {
+		return databases
+	}
+
+	// Database dependency mapping
+	dbMapping := map[string]analyze.Database{
+		"pg":             {Type: analyze.DatabaseTypePostgreSQL, Name: "pg", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"postgres":       {Type: analyze.DatabaseTypePostgreSQL, Name: "postgres", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"mysql":          {Type: analyze.DatabaseTypeMySQL, Name: "mysql", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"mysql2":         {Type: analyze.DatabaseTypeMySQL, Name: "mysql2", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"mongoose":       {Type: analyze.DatabaseTypeMongoDB, Name: "mongoose", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"mongodb":        {Type: analyze.DatabaseTypeMongoDB, Name: "mongodb", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"redis":          {Type: analyze.DatabaseTypeRedis, Name: "redis", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"ioredis":        {Type: analyze.DatabaseTypeRedis, Name: "ioredis", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"sqlite3":        {Type: analyze.DatabaseTypeSQLite, Name: "sqlite3", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"better-sqlite3": {Type: analyze.DatabaseTypeSQLite, Name: "better-sqlite3", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"prisma":         {Type: analyze.DatabaseTypePostgreSQL, Name: "prisma", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"typeorm":        {Type: analyze.DatabaseTypePostgreSQL, Name: "typeorm", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+		"sequelize":      {Type: analyze.DatabaseTypePostgreSQL, Name: "sequelize", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: "package.json", Type: "dependency"}}},
+	}
+
+	for depName, db := range dbMapping {
+		if strings.Contains(content, fmt.Sprintf("\"%s\"", depName)) {
+			databases = append(databases, db)
+		}
+	}
+
+	return databases
+}
+
+// detectPythonDatabases detects Python database dependencies
+func (cmd *ConsolidatedAnalyzeCommand) detectPythonDatabases(ctx context.Context, sessionID string) []analyze.Database {
+	var databases []analyze.Database
+
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "requirements.txt")
+	if err != nil || !exists {
+		return databases
+	}
+
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "requirements.txt")
+	if err != nil {
+		return databases
+	}
+
+	// Python database package mapping
+	dbMapping := map[string]analyze.Database{
+		"psycopg2":        {Type: analyze.DatabaseTypePostgreSQL, Name: "psycopg2", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+		"asyncpg":         {Type: analyze.DatabaseTypePostgreSQL, Name: "asyncpg", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+		"PyMySQL":         {Type: analyze.DatabaseTypeMySQL, Name: "PyMySQL", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+		"mysql-connector": {Type: analyze.DatabaseTypeMySQL, Name: "mysql-connector", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+		"pymongo":         {Type: analyze.DatabaseTypeMongoDB, Name: "pymongo", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+		"redis":           {Type: analyze.DatabaseTypeRedis, Name: "redis", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+		"sqlalchemy":      {Type: analyze.DatabaseTypePostgreSQL, Name: "sqlalchemy", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+		"django":          {Type: analyze.DatabaseTypePostgreSQL, Name: "django", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: "requirements.txt", Type: "dependency"}}},
+	}
+
+	for depName, db := range dbMapping {
+		if strings.Contains(content, depName) {
+			databases = append(databases, db)
+		}
+	}
+
+	return databases
+}
+
+// detectGoDatabases detects Go database dependencies
+func (cmd *ConsolidatedAnalyzeCommand) detectGoDatabases(ctx context.Context, sessionID string) []analyze.Database {
+	var databases []analyze.Database
+
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "go.mod")
+	if err != nil || !exists {
+		return databases
+	}
+
+	content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "go.mod")
+	if err != nil {
+		return databases
+	}
+
+	// Go database package mapping
+	dbMapping := map[string]analyze.Database{
+		"github.com/lib/pq":              {Type: analyze.DatabaseTypePostgreSQL, Name: "pq", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "go.mod", Type: "dependency"}}},
+		"github.com/jackc/pgx":           {Type: analyze.DatabaseTypePostgreSQL, Name: "pgx", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "go.mod", Type: "dependency"}}},
+		"github.com/go-sql-driver/mysql": {Type: analyze.DatabaseTypeMySQL, Name: "mysql", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "go.mod", Type: "dependency"}}},
+		"go.mongodb.org/mongo-driver":    {Type: analyze.DatabaseTypeMongoDB, Name: "mongo-driver", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "go.mod", Type: "dependency"}}},
+		"github.com/go-redis/redis":      {Type: analyze.DatabaseTypeRedis, Name: "redis", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: "go.mod", Type: "dependency"}}},
+		"gorm.io/gorm":                   {Type: analyze.DatabaseTypePostgreSQL, Name: "gorm", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: "go.mod", Type: "dependency"}}},
+		"github.com/jmoiron/sqlx":        {Type: analyze.DatabaseTypePostgreSQL, Name: "sqlx", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: "go.mod", Type: "dependency"}}},
+	}
+
+	for depName, db := range dbMapping {
+		if strings.Contains(content, depName) {
+			databases = append(databases, db)
+		}
+	}
+
+	return databases
+}
+
+// detectJavaDatabases detects Java database dependencies
+func (cmd *ConsolidatedAnalyzeCommand) detectJavaDatabases(ctx context.Context, sessionID string) []analyze.Database {
+	var databases []analyze.Database
+
+	// Check pom.xml
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "pom.xml")
+	if err == nil && exists {
+		content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "pom.xml")
+		if err == nil {
+			databases = append(databases, cmd.parseJavaDbDependencies(content, "pom.xml")...)
+		}
+	}
+
+	// Check build.gradle
+	exists, err = cmd.fileAccess.FileExists(ctx, sessionID, "build.gradle")
+	if err == nil && exists {
+		content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "build.gradle")
+		if err == nil {
+			databases = append(databases, cmd.parseJavaDbDependencies(content, "build.gradle")...)
+		}
+	}
+
+	return databases
+}
+
+// parseJavaDbDependencies parses Java database dependencies from build files
+func (cmd *ConsolidatedAnalyzeCommand) parseJavaDbDependencies(content, source string) []analyze.Database {
+	var databases []analyze.Database
+
+	// Java database artifact mapping
+	dbMapping := map[string]analyze.Database{
+		"postgresql":                   {Type: analyze.DatabaseTypePostgreSQL, Name: "postgresql", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: source, Type: "dependency"}}},
+		"mysql-connector-java":         {Type: analyze.DatabaseTypeMySQL, Name: "mysql-connector", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: source, Type: "dependency"}}},
+		"mongo-java-driver":            {Type: analyze.DatabaseTypeMongoDB, Name: "mongo-java-driver", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: source, Type: "dependency"}}},
+		"jedis":                        {Type: analyze.DatabaseTypeRedis, Name: "jedis", Confidence: analyze.ConfidenceHigh, Evidence: []analyze.Evidence{{Source: source, Type: "dependency"}}},
+		"spring-boot-starter-data-jpa": {Type: analyze.DatabaseTypePostgreSQL, Name: "spring-data-jpa", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: source, Type: "dependency"}}},
+		"hibernate-core":               {Type: analyze.DatabaseTypePostgreSQL, Name: "hibernate", Confidence: analyze.ConfidenceMedium, Evidence: []analyze.Evidence{{Source: source, Type: "dependency"}}},
+	}
+
+	for artifact, db := range dbMapping {
+		if strings.Contains(content, artifact) {
+			databases = append(databases, db)
+		}
+	}
+
+	return databases
+}
+
+// detectDatabasesFromConfig detects databases from configuration files
+func (cmd *ConsolidatedAnalyzeCommand) detectDatabasesFromConfig(ctx context.Context, sessionID string, patterns map[string]*regexp.Regexp) []analyze.Database {
+	var databases []analyze.Database
+
+	// Configuration files to check
+	configFiles := []string{
+		".env",
+		".env.local",
+		".env.example",
+		"config.json",
+		"database.yml",
+		"application.yml",
+		"application.properties",
+		"docker-compose.yml",
+		"docker-compose.yaml",
+	}
+
+	for _, configFile := range configFiles {
+		exists, err := cmd.fileAccess.FileExists(ctx, sessionID, configFile)
+		if err != nil || !exists {
+			continue
+		}
+
+		content, err := cmd.fileAccess.ReadFile(ctx, sessionID, configFile)
+		if err != nil {
+			continue
+		}
+
+		for dbType, pattern := range patterns {
+			if pattern.MatchString(content) {
+				// Map string to DatabaseType
+				var dbTypeEnum analyze.DatabaseType
+				switch strings.ToLower(dbType) {
+				case "postgresql":
+					dbTypeEnum = analyze.DatabaseTypePostgreSQL
+				case "mysql":
+					dbTypeEnum = analyze.DatabaseTypeMySQL
+				case "mongodb":
+					dbTypeEnum = analyze.DatabaseTypeMongoDB
+				case "redis":
+					dbTypeEnum = analyze.DatabaseTypeRedis
+				case "sqlite":
+					dbTypeEnum = analyze.DatabaseTypeSQLite
+				case "oracle":
+					dbTypeEnum = analyze.DatabaseTypeOracle
+				case "cassandra":
+					dbTypeEnum = analyze.DatabaseTypeCassandra
+				case "elasticsearch":
+					dbTypeEnum = analyze.DatabaseTypeElastic
+				default:
+					dbTypeEnum = analyze.DatabaseTypePostgreSQL // fallback
+				}
+
+				connStr := cmd.extractConnectionString(content, pattern)
+				databases = append(databases, analyze.Database{
+					Type:       dbTypeEnum,
+					Name:       dbType,
+					Confidence: analyze.ConfidenceMedium,
+					Evidence: []analyze.Evidence{{
+						Source:  configFile,
+						Type:    analyze.EvidenceTypeConfiguration,
+						Content: connStr,
+					}},
+				})
+			}
+		}
+	}
+
+	return databases
+}
+
+// detectDatabasesFromSource detects databases from source code files
+func (cmd *ConsolidatedAnalyzeCommand) detectDatabasesFromSource(ctx context.Context, sessionID string, patterns map[string]*regexp.Regexp) []analyze.Database {
+	var databases []analyze.Database
+
+	// Search for database patterns in source files
+	sourcePatterns := []string{"*.js", "*.ts", "*.py", "*.go", "*.java"}
+
+	for _, pattern := range sourcePatterns {
+		files, err := cmd.fileAccess.SearchFiles(ctx, sessionID, pattern)
+		if err != nil {
+			continue
+		}
+
+		for _, file := range files {
+			if file.IsDir {
+				continue
+			}
+
+			content, err := cmd.fileAccess.ReadFile(ctx, sessionID, file.Path)
+			if err != nil {
+				continue
+			}
+
+			for dbType, dbPattern := range patterns {
+				if dbPattern.MatchString(content) {
+					// Map string to DatabaseType
+					var dbTypeEnum analyze.DatabaseType
+					switch strings.ToLower(dbType) {
+					case "postgresql":
+						dbTypeEnum = analyze.DatabaseTypePostgreSQL
+					case "mysql":
+						dbTypeEnum = analyze.DatabaseTypeMySQL
+					case "mongodb":
+						dbTypeEnum = analyze.DatabaseTypeMongoDB
+					case "redis":
+						dbTypeEnum = analyze.DatabaseTypeRedis
+					case "sqlite":
+						dbTypeEnum = analyze.DatabaseTypeSQLite
+					case "oracle":
+						dbTypeEnum = analyze.DatabaseTypeOracle
+					case "cassandra":
+						dbTypeEnum = analyze.DatabaseTypeCassandra
+					case "elasticsearch":
+						dbTypeEnum = analyze.DatabaseTypeElastic
+					default:
+						dbTypeEnum = analyze.DatabaseTypePostgreSQL // fallback
+					}
+
+					databases = append(databases, analyze.Database{
+						Type:       dbTypeEnum,
+						Name:       dbType,
+						Confidence: analyze.ConfidenceLow,
+						Evidence: []analyze.Evidence{{
+							Source: file.Path,
+							Type:   analyze.EvidenceTypeContent,
+						}},
+					})
+				}
+			}
+		}
+	}
+
+	return databases
+}
+
+// extractConnectionString attempts to extract database connection string
+func (cmd *ConsolidatedAnalyzeCommand) extractConnectionString(content string, pattern *regexp.Regexp) string {
+	matches := pattern.FindAllString(content, 1)
+	if len(matches) > 0 {
+		// Mask sensitive parts of connection string
+		connStr := matches[0]
+		// Simple masking - replace password with ***
+		masked := regexp.MustCompile(`://([^:]+):([^@]+)@`).ReplaceAllString(connStr, "://$1:***@")
+		return masked
+	}
+	return ""
+}
+
+// Port detection implementations
+
+// analyzePorts detects port configuration from various sources
+func (cmd *ConsolidatedAnalyzeCommand) analyzePorts(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
+	var ports []analyze.Port
+
+	// Detect ports from different sources
+	ports = append(ports, cmd.detectPortsFromConfig(ctx, sessionID)...)
+	ports = append(ports, cmd.detectPortsFromSource(ctx, sessionID, result.Language.Name)...)
+	ports = append(ports, cmd.detectPortsFromDocker(ctx, sessionID)...)
+
+	// Deduplicate ports
+	uniquePorts := make(map[int]analyze.Port)
+	for _, port := range ports {
+		if existing, exists := uniquePorts[port.Number]; exists {
+			// Merge sources
+			existing.Sources = append(existing.Sources, port.Sources...)
+			uniquePorts[port.Number] = existing
+		} else {
+			uniquePorts[port.Number] = port
+		}
+	}
+
+	// Convert back to slice
+	result.Ports = make([]analyze.Port, 0, len(uniquePorts))
+	for _, port := range uniquePorts {
+		result.Ports = append(result.Ports, port)
+	}
+
+	return nil
+}
+
+// detectPortsFromConfig detects ports from configuration files
+func (cmd *ConsolidatedAnalyzeCommand) detectPortsFromConfig(ctx context.Context, sessionID string) []analyze.Port {
+	var ports []analyze.Port
+
+	// Configuration files to check
+	configFiles := []string{
+		".env",
+		".env.local",
+		"config.json",
+		"package.json",
+		"application.yml",
+		"application.properties",
+		"docker-compose.yml",
+		"docker-compose.yaml",
+	}
+
+	// Port patterns
+	portPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`PORT\s*=\s*(\d+)`),
+		regexp.MustCompile(`port\s*:\s*(\d+)`),
+		regexp.MustCompile(`"port"\s*:\s*(\d+)`),
+		regexp.MustCompile(`listen\s*:\s*(\d+)`),
+		regexp.MustCompile(`server\.port\s*=\s*(\d+)`),
+		regexp.MustCompile(`-\s*"(\d+):\d+"`), // Docker port mapping
+	}
+
+	for _, configFile := range configFiles {
+		exists, err := cmd.fileAccess.FileExists(ctx, sessionID, configFile)
+		if err != nil || !exists {
+			continue
+		}
+
+		content, err := cmd.fileAccess.ReadFile(ctx, sessionID, configFile)
+		if err != nil {
+			continue
+		}
+
+		for _, pattern := range portPatterns {
+			matches := pattern.FindAllStringSubmatch(content, -1)
+			for _, match := range matches {
+				if len(match) > 1 {
+					if portNum := cmd.parsePort(match[1]); portNum > 0 {
+						ports = append(ports, analyze.Port{
+							Number:  portNum,
+							Type:    cmd.detectPortType(portNum),
+							Sources: []string{configFile},
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return ports
+}
+
+// detectPortsFromSource detects ports from source code
+func (cmd *ConsolidatedAnalyzeCommand) detectPortsFromSource(ctx context.Context, sessionID, language string) []analyze.Port {
+	var ports []analyze.Port
+
+	// Language-specific port detection patterns
+	var patterns []*regexp.Regexp
+	var filePattern string
+
+	switch language {
+	case "javascript", "typescript":
+		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`listen\(\s*(\d+)`),
+			regexp.MustCompile(`\.listen\(\s*process\.env\.PORT\s*\|\|\s*(\d+)`),
+			regexp.MustCompile(`port:\s*(\d+)`),
+		}
+		filePattern = "*.js"
+	case "python":
+		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`app\.run\([^)]*port\s*=\s*(\d+)`),
+			regexp.MustCompile(`listen\(\s*(\d+)`),
+			regexp.MustCompile(`bind\s*=\s*.*:(\d+)`),
+		}
+		filePattern = "*.py"
+	case "go":
+		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`ListenAndServe\(\s*":(\d+)"`),
+			regexp.MustCompile(`Addr:\s*":(\d+)"`),
+		}
+		filePattern = "*.go"
+	case "java":
+		patterns = []*regexp.Regexp{
+			regexp.MustCompile(`server\.port\s*=\s*(\d+)`),
+			regexp.MustCompile(`@Value\("\$\{server\.port:(\d+)\}"\)`),
+		}
+		filePattern = "*.java"
+	default:
+		return ports
+	}
+
+	files, err := cmd.fileAccess.SearchFiles(ctx, sessionID, filePattern)
+	if err != nil {
+		return ports
+	}
+
+	for _, file := range files {
+		if file.IsDir {
+			continue
+		}
+
+		content, err := cmd.fileAccess.ReadFile(ctx, sessionID, file.Path)
+		if err != nil {
+			continue
+		}
+
+		for _, pattern := range patterns {
+			matches := pattern.FindAllStringSubmatch(content, -1)
+			for _, match := range matches {
+				if len(match) > 1 {
+					if portNum := cmd.parsePort(match[1]); portNum > 0 {
+						ports = append(ports, analyze.Port{
+							Number:  portNum,
+							Type:    cmd.detectPortType(portNum),
+							Sources: []string{file.Path},
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return ports
+}
+
+// detectPortsFromDocker detects ports from Docker files
+func (cmd *ConsolidatedAnalyzeCommand) detectPortsFromDocker(ctx context.Context, sessionID string) []analyze.Port {
+	var ports []analyze.Port
+
+	// Check Dockerfile
+	exists, err := cmd.fileAccess.FileExists(ctx, sessionID, "Dockerfile")
+	if err == nil && exists {
+		content, err := cmd.fileAccess.ReadFile(ctx, sessionID, "Dockerfile")
+		if err == nil {
+			exposePattern := regexp.MustCompile(`EXPOSE\s+(\d+)`)
+			matches := exposePattern.FindAllStringSubmatch(content, -1)
+			for _, match := range matches {
+				if len(match) > 1 {
+					if portNum := cmd.parsePort(match[1]); portNum > 0 {
+						ports = append(ports, analyze.Port{
+							Number:  portNum,
+							Type:    cmd.detectPortType(portNum),
+							Sources: []string{"Dockerfile"},
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return ports
+}
+
+// Helper methods for port and database detection
+
+func (cmd *ConsolidatedAnalyzeCommand) parsePort(portStr string) int {
+	if portNum, err := strconv.Atoi(portStr); err == nil && portNum > 0 && portNum <= 65535 {
+		return portNum
+	}
+	return 0
+}
+
+func (cmd *ConsolidatedAnalyzeCommand) detectPortType(port int) string {
+	switch {
+	case port == 80 || port == 8080:
+		return "HTTP"
+	case port == 443 || port == 8443:
+		return "HTTPS"
+	case port == 3000:
+		return "Development"
+	case port == 5000:
+		return "Flask/Development"
+	case port == 8000:
+		return "Django/Development"
+	case port == 9000:
+		return "Application"
+	case port >= 3000 && port <= 9999:
+		return "Application"
+	default:
+		return "Custom"
+	}
 }
 
 // Additional analysis implementations

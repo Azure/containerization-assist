@@ -12,9 +12,9 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/application/commands"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/localrivet/gomcp/server"
 )
@@ -35,19 +35,10 @@ func parseSlogLevel(level string) slog.Level {
 	}
 }
 
-// adaptSlogToLogging creates a logging.Standards from an slog.Logger
-func adaptSlogToLogging(slogLogger *slog.Logger) logging.Standards {
-	// Store the slogLogger for potential future use
-	_ = slogLogger
-	// Create a logging standards implementation with default config
-	config := logging.Config{
-		Level:                   logging.LevelInfo,
-		Output:                  os.Stdout,
-		EnableStructuredLogging: true,
-		EnableRingBuffer:        true,
-		BufferSize:              1000,
-	}
-	return logging.NewLogger(config)
+// adaptSlogToLogging creates a *slog.Logger from an slog.Logger
+func adaptSlogToLogging(slogLogger *slog.Logger) *slog.Logger {
+	// Just return the logger as-is since we're using direct slog now
+	return slogLogger
 }
 
 // adaptMCPContext creates a context.Context from a gomcp server.Context
@@ -736,63 +727,6 @@ func (s *simplifiedGomcpManager) RegisterTools(srv *serverImpl) error {
 	return nil
 }
 
-// registerConsolidatedTool registers a consolidated tool with the gomcp server
-func (s *serverImpl) registerConsolidatedTool(tool api.Tool) {
-	if s.server == nil {
-		s.logger.Error("gomcp server not available, cannot register tool", "tool", tool.Name())
-		return
-	}
-
-	// Create a wrapper function that converts gomcp input to api.ToolInput
-	handler := func(_ *server.Context, input map[string]interface{}) (map[string]interface{}, error) {
-		// Convert gomcp input to api.ToolInput
-		sessionID := extractSessionID(input)
-		toolInput := api.ToolInput{
-			SessionID: sessionID,
-			Data:      input,
-			Context:   make(map[string]interface{}),
-		}
-
-		// Execute the tool
-		output, err := tool.Execute(context.Background(), toolInput)
-		if err != nil {
-			return map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-			}, nil
-		}
-
-		// Convert api.ToolOutput to gomcp format
-		result := map[string]interface{}{
-			"success": output.Success,
-		}
-
-		// Include data if present
-		if output.Data != nil {
-			for key, value := range output.Data {
-				result[key] = value
-			}
-		}
-
-		// Include error if present
-		if output.Error != "" {
-			result["error"] = output.Error
-			result["message"] = output.Error
-		}
-
-		// Include metadata if present
-		if output.Metadata != nil {
-			result["metadata"] = output.Metadata
-		}
-
-		return result, nil
-	}
-
-	// Register with gomcp server
-	s.server.Tool(tool.Name(), tool.Description(), handler)
-	s.logger.Info("Registered consolidated tool", "name", tool.Name())
-}
-
 // extractSessionID extracts or generates a session ID from gomcp input
 func extractSessionID(input map[string]interface{}) string {
 	if sessionID, ok := input["session_id"].(string); ok && sessionID != "" {
@@ -875,6 +809,9 @@ func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 	// Initialize service container with real implementations
 	serviceContainer := services.NewDefaultServiceContainer(logger)
 
+	// Set global services for lazy-loaded commands
+	commands.SetGlobalServices(serviceContainer)
+
 	server := &serverImpl{
 		config:         config,
 		sessionManager: sessionManager,
@@ -892,9 +829,6 @@ func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 			isEnabled: false,
 		},
 	}
-
-	// Register consolidated tools directly (replacing migration infrastructure)
-	server.registerAllConsolidatedTools()
 
 	logger.Info("MCP Server initialized successfully",
 		"transport", config.TransportType,

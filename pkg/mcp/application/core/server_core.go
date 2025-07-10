@@ -11,10 +11,12 @@ import (
 	"github.com/Azure/container-kit/pkg/core/deployment"
 	"github.com/Azure/container-kit/pkg/core/git"
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
-	"github.com/Azure/container-kit/pkg/core/registry"
+	coreregistry "github.com/Azure/container-kit/pkg/core/registry"
 	"github.com/Azure/container-kit/pkg/core/worker"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/commands"
+	"github.com/Azure/container-kit/pkg/mcp/application/di"
+	"github.com/Azure/container-kit/pkg/mcp/application/registry"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	appstate "github.com/Azure/container-kit/pkg/mcp/application/state"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
@@ -117,12 +119,41 @@ func createUnifiedMCPServer(
 	// Create service container with all core services
 	serviceContainer := createServiceContainer(logger)
 
+	// Set global services for lazy-loaded commands
+	commands.SetGlobalServices(serviceContainer)
+
 	// Create state management integration with service container
 	stateServiceContainer := &StateServiceContainerAdapter{serviceContainer: serviceContainer}
 	stateIntegration := appstate.NewStateManagementIntegrationWithContainer(stateServiceContainer, logger)
 
-	unifiedRegistry := commands.NewUnifiedRegistry(logger)
-	toolRegistry := commands.NewRegistryAdapter(unifiedRegistry)
+	// Initialize Wire dependency injection container
+	wireContainer, err := di.InitializeContainer()
+	if err != nil {
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Message("failed to initialize dependency injection container").
+			Cause(err).
+			Build()
+	}
+
+	// Use Wire-generated dependencies
+	unifiedToolRegistry := wireContainer.ToolRegistry
+	toolRegistry := registry.NewRegistryAdapter(unifiedToolRegistry)
+
+	// Initialize commands with the unified registry
+	err = commands.InitializeCommands(
+		unifiedToolRegistry,
+		wireContainer.SessionStore,
+		wireContainer.SessionState,
+		logger,
+	)
+	if err != nil {
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Message("failed to initialize commands").
+			Cause(err).
+			Build()
+	}
 
 	var actualSessionManager session.UnifiedSessionManager
 	var concreteSessionManager session.SessionManager // Interface for legacy components
@@ -164,6 +195,7 @@ func createUnifiedMCPServer(
 		toolRegistry:          toolRegistry,
 		toolOrchestrator:      toolOrchestrator,
 		unifiedSessionManager: actualSessionManager,
+		workflowExecutor:      wireContainer.WorkflowExecutor,
 		currentMode:           mode,
 		logger:                logger.With("component", "unified_mcp_server"),
 	}
@@ -531,7 +563,7 @@ func createServiceContainer(logger *slog.Logger) services.ServiceContainer {
 	// TODO: Need to inject clients properly
 	// dockerService := docker.NewService(clients, logger)
 	_ = git.NewGitService(logger)
-	_ = registry.NewRegistryService(logger)
+	_ = coreregistry.NewRegistryService(logger)
 	_ = deployment.NewDeploymentService(logger)
 	_ = worker.NewWorkerService(logger, nil)
 	// TODO: securityService := security.NewSecurityService(logger, nil) - disabled due to type conflicts

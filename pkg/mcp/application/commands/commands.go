@@ -35,6 +35,31 @@ type CommandExecutor interface {
 	Schema() api.ToolSchema
 }
 
+// commandToolAdapter adapts CommandExecutor to api.Tool interface
+type commandToolAdapter struct {
+	command CommandExecutor
+	name    string
+}
+
+func (c *commandToolAdapter) Name() string {
+	return c.command.Name()
+}
+
+func (c *commandToolAdapter) Description() string {
+	return c.command.Description()
+}
+
+func (c *commandToolAdapter) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
+	return c.command.Execute(ctx, input)
+}
+
+func (c *commandToolAdapter) Schema() api.ToolSchema {
+	return c.command.Schema()
+}
+
+// Ensure commandToolAdapter implements api.Tool
+var _ api.Tool = (*commandToolAdapter)(nil)
+
 // BaseCommand provides common functionality for all commands
 type BaseCommand struct {
 	sessionStore services.SessionStore
@@ -92,23 +117,60 @@ type ValidationWarning struct {
 	Code    string `json:"code"`
 }
 
-// Command registry for all available commands
-var registeredCommands = make(map[string]CommandExecutor)
+// ToolFactory represents a typed factory function (local definition)
+type ToolFactory func() (api.Tool, error)
 
-// RegisterCommand registers a command with the registry
-func RegisterCommand(name string, command CommandExecutor) {
-	registeredCommands[name] = command
+// Command registry using unified registry system
+var commandRegistry api.ToolRegistry
+
+// RegisterCommand registers a command with the unified registry
+func RegisterCommand(name string, command CommandExecutor) error {
+	if commandRegistry == nil {
+		return errors.NewError().
+			Code(errors.CodeInvalidState).
+			Message("command registry not initialized").
+			Suggestion("Call InitializeCommands() first").
+			Build()
+	}
+
+	// Wrap CommandExecutor as ToolFactory
+	factory := ToolFactory(func() (api.Tool, error) {
+		return &commandToolAdapter{command: command, name: name}, nil
+	})
+
+	return commandRegistry.Register(name, factory)
 }
 
 // GetCommand retrieves a command by name
 func GetCommand(name string) (CommandExecutor, bool) {
-	cmd, exists := registeredCommands[name]
-	return cmd, exists
+	if commandRegistry == nil {
+		return nil, false
+	}
+
+	tool, err := commandRegistry.Discover(name)
+	if err != nil {
+		return nil, false
+	}
+
+	if adapter, ok := tool.(*commandToolAdapter); ok {
+		return adapter.command, true
+	}
+	return nil, false
 }
 
 // GetAllCommands returns all registered commands
 func GetAllCommands() map[string]CommandExecutor {
-	return registeredCommands
+	if commandRegistry == nil {
+		return make(map[string]CommandExecutor)
+	}
+
+	result := make(map[string]CommandExecutor)
+	for _, name := range commandRegistry.List() {
+		if cmd, exists := GetCommand(name); exists {
+			result[name] = cmd
+		}
+	}
+	return result
 }
 
 // CommandInfo represents information about a command
@@ -123,7 +185,7 @@ type CommandInfo struct {
 // GetCommandInfo returns information about all commands
 func GetCommandInfo() []CommandInfo {
 	var info []CommandInfo
-	for name, cmd := range registeredCommands {
+	for name, cmd := range GetAllCommands() {
 		schema := cmd.Schema()
 		info = append(info, CommandInfo{
 			Name:        name,
@@ -166,21 +228,15 @@ func getStringArrayParam(data map[string]interface{}, key string) []string {
 
 // initializeCommands initializes all commands
 func InitializeCommands(
+	registry api.ToolRegistry,
 	sessionStore services.SessionStore,
 	sessionState services.SessionState,
 	logger *slog.Logger,
-) {
-	// Initialize consolidated commands
-	analyzeCmd := NewConsolidatedAnalyzeCommand(sessionStore, sessionState, logger, nil)
-	buildCmd := NewConsolidatedBuildCommand(sessionStore, sessionState, nil, logger)
-	deployCmd := NewConsolidatedDeployCommand(sessionStore, sessionState, nil, logger)
-	scanCmd := NewConsolidatedScanCommand(sessionStore, sessionState, nil, logger)
+) error {
+	// Set the unified registry for command registration
+	commandRegistry = registry
 
-	// Register commands
-	RegisterCommand(analyzeCmd.Name(), analyzeCmd)
-	RegisterCommand(buildCmd.Name(), buildCmd)
-	RegisterCommand(deployCmd.Name(), deployCmd)
-	RegisterCommand(scanCmd.Name(), scanCmd)
-
-	logger.Info("Commands initialized successfully", "count", len(registeredCommands))
+	registeredCount := len(registry.List())
+	logger.Info("Commands initialized successfully", "count", registeredCount)
+	return nil
 }

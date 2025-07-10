@@ -32,6 +32,7 @@ type DefaultServiceContainer struct {
 	manifestService   kubernetes.ManifestService
 	deploymentService kubernetes.Service
 	pipelineService   PipelineService
+	fileAccessService FileAccessService
 
 	// Conversation services
 	conversationService ConversationService
@@ -216,6 +217,11 @@ func (c *DefaultServiceContainer) PromptService() PromptService {
 	return c.promptService
 }
 
+// FileAccessService returns the file access service
+func (c *DefaultServiceContainer) FileAccessService() FileAccessService {
+	return c.fileAccessService
+}
+
 // WithSessionStore sets the session store
 func (c *DefaultServiceContainer) WithSessionStore(store SessionStore) *DefaultServiceContainer {
 	c.sessionStore = store
@@ -343,6 +349,12 @@ func (c *DefaultServiceContainer) WithPromptService(service PromptService) *Defa
 	return c
 }
 
+// WithFileAccessService sets the file access service
+func (c *DefaultServiceContainer) WithFileAccessService(service FileAccessService) *DefaultServiceContainer {
+	c.fileAccessService = service
+	return c
+}
+
 // initializeServices initializes all services with their real implementations
 func (c *DefaultServiceContainer) initializeServices() {
 	logger := c.logger.With("component", "service_container")
@@ -394,6 +406,9 @@ func (c *DefaultServiceContainer) initializeServices() {
 	c.errorReporter = NewErrorReporterFromLogger(logger)
 	c.knowledgeBase = NewKnowledgeBaseStub(logger)
 	c.k8sClient = NewK8sClientStub(logger)
+
+	// Initialize file access service (stub for now, will be replaced with real implementation)
+	c.fileAccessService = NewFileAccessServiceStub(logger)
 
 	logger.Info("All services initialized with real implementations")
 }

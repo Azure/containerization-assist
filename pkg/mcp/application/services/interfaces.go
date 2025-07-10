@@ -57,6 +57,7 @@ type ServiceContainer interface {
 	ManifestService() kubernetes.ManifestService
 	DeploymentService() kubernetes.Service
 	PipelineService() PipelineService
+	FileAccessService() FileAccessService
 }
 
 // ConversationService handles chat-based interactions per ADR-006
@@ -253,20 +254,9 @@ type BuildExecutor interface {
 	QuickPull(ctx context.Context, imageRef string) (*docker.PullResult, error)
 }
 
-// ToolRegistry manages tool registration and discovery
-type ToolRegistry interface {
-	// Register registers a new tool
-	Register(ctx context.Context, name string, tool api.Tool) error
-
-	// GetTool retrieves a tool by name
-	GetTool(ctx context.Context, name string) (api.Tool, error)
-
-	// ListTools lists all registered tools
-	ListTools(ctx context.Context) []string
-
-	// GetMetrics returns registry metrics
-	GetMetrics(ctx context.Context) api.RegistryMetrics
-}
+// ToolRegistry is an alias to the canonical api ToolRegistry interface
+// This resolves interface validation conflicts while maintaining compatibility
+type ToolRegistry = api.ToolRegistry
 
 // WorkflowExecutor handles multi-step workflow execution
 type WorkflowExecutor interface {
@@ -497,4 +487,45 @@ type AnalysisProgress struct {
 	ElapsedTime   time.Duration  `json:"elapsed_time"`
 	EstimatedTime *time.Duration `json:"estimated_time,omitempty"`
 	LastUpdate    time.Time      `json:"last_update"`
+}
+
+// FileAccessService provides secure file access operations for MCP tools
+type FileAccessService interface {
+	// ReadFile reads a file within the session workspace
+	ReadFile(ctx context.Context, sessionID, path string) (string, error)
+
+	// ListDirectory lists files and directories within the session workspace
+	ListDirectory(ctx context.Context, sessionID, path string) ([]FileInfo, error)
+
+	// FileExists checks if a file exists within the session workspace
+	FileExists(ctx context.Context, sessionID, path string) (bool, error)
+
+	// GetFileTree returns a tree representation of the directory structure
+	GetFileTree(ctx context.Context, sessionID, rootPath string) (string, error)
+
+	// ReadFileWithMetadata reads a file with additional metadata
+	ReadFileWithMetadata(ctx context.Context, sessionID, path string) (*FileContent, error)
+
+	// SearchFiles searches for files matching a pattern within the session workspace
+	SearchFiles(ctx context.Context, sessionID, pattern string) ([]FileInfo, error)
+}
+
+// FileInfo represents file information
+type FileInfo struct {
+	Name    string    `json:"name"`
+	Path    string    `json:"path"`
+	Size    int64     `json:"size"`
+	ModTime time.Time `json:"mod_time"`
+	IsDir   bool      `json:"is_dir"`
+	Mode    string    `json:"mode"`
+}
+
+// FileContent represents file content with metadata
+type FileContent struct {
+	Path     string    `json:"path"`
+	Content  string    `json:"content"`
+	Size     int64     `json:"size"`
+	ModTime  time.Time `json:"mod_time"`
+	Encoding string    `json:"encoding"`
+	Lines    int       `json:"lines"`
 }

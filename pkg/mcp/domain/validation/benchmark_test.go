@@ -93,12 +93,12 @@ func BenchmarkValidatorChain(b *testing.B) {
 		name:   "fast",
 		result: ValidationResult{Valid: true},
 	}
-	
+
 	mediumValidator := &mockValidator{
 		name:   "medium",
 		result: ValidationResult{Valid: true, Warnings: []string{"warning"}},
 	}
-	
+
 	slowValidator := &mockValidator{
 		name:   "slow",
 		result: ValidationResult{Valid: true, Warnings: []string{"warning1", "warning2"}},
@@ -110,7 +110,7 @@ func BenchmarkValidatorChain(b *testing.B) {
 	b.Run("Single Validator", func(b *testing.B) {
 		chain := NewValidatorChain[interface{}](ContinueOnError)
 		chain.Add(fastValidator)
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = chain.Validate(ctx, testData)
@@ -120,7 +120,7 @@ func BenchmarkValidatorChain(b *testing.B) {
 	b.Run("Three Validators Continue On Error", func(b *testing.B) {
 		chain := NewValidatorChain[interface{}](ContinueOnError)
 		chain.Add(fastValidator).Add(mediumValidator).Add(slowValidator)
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = chain.Validate(ctx, testData)
@@ -130,7 +130,7 @@ func BenchmarkValidatorChain(b *testing.B) {
 	b.Run("Three Validators Stop On Error", func(b *testing.B) {
 		chain := NewValidatorChain[interface{}](StopOnFirstError)
 		chain.Add(fastValidator).Add(mediumValidator).Add(slowValidator)
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = chain.Validate(ctx, testData)
@@ -153,7 +153,6 @@ func BenchmarkValidatorRegistry_Operations(b *testing.B) {
 		}
 		_ = registry.Register(validator)
 	}
-
 
 	b.Run("Register", func(b *testing.B) {
 		b.ResetTimer()

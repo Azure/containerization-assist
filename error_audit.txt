@@ -1,7 +1,0 @@
-=== ERROR PATTERN AUDIT ===
-fmt.Errorf usage:
-135
-RichError usage:
-717
-Mixed error files:
-7

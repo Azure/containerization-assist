@@ -88,7 +88,7 @@ func WrapError(err error, message string) error {
 		return nil
 	}
 	systemErr := errors.SystemError(
-		errorcodes.SYSTEM_ERROR,
+		errors.SYSTEM_ERROR,
 		message,
 		err,
 	)
@@ -109,7 +109,7 @@ func NewError(message string, context ...interface{}) error {
 	// Maintain backward compatibility with existing map[string]interface{} usage
 	// while gradually migrating to typed contexts
 	systemErr := errors.SystemError(
-		errorcodes.SYSTEM_ERROR,
+		errors.SYSTEM_ERROR,
 		message,
 		nil,
 	)
@@ -121,7 +121,7 @@ func NewError(message string, context ...interface{}) error {
 func NewTypedError(message string, context ...ConsolidatedErrorContext) error {
 	// New function for typed error contexts
 	systemErr := errors.SystemError(
-		errorcodes.SYSTEM_ERROR,
+		errors.SYSTEM_ERROR,
 		message,
 		nil,
 	)

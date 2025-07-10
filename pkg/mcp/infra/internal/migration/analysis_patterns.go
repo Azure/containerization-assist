@@ -235,7 +235,7 @@ if !ok {
 				Before: `result, _ := someFunction()`,
 				After: `result, err := someFunction()
 if err != nil {
-    return fmt.Errorf("failed to call someFunction: %w", err)
+    return errors.NewError().Code(errors.CodeInternalError).Message("failed to call someFunction").Wrap(err).Build()
 }`,
 			},
 		},

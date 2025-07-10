@@ -3,22 +3,25 @@ package registry
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
-// UnifiedRegistry implements api.ToolRegistry with thread safety and minimal reflection
+// ToolFactory represents a typed factory function
+type ToolFactory func() (api.Tool, error)
+
+// UnifiedRegistry implements api.ToolRegistry with thread safety and zero reflection
 type UnifiedRegistry struct {
 	mu       sync.RWMutex
-	tools    map[string]interface{} // stores factory functions
+	tools    map[string]ToolFactory // stores typed factory functions
 	metadata map[string]api.ToolMetadata
 	metrics  api.RegistryMetrics
-	logger   logging.Logger
+	logger   *slog.Logger
 	closed   bool
 
 	// Performance tracking
@@ -31,24 +34,12 @@ type UnifiedRegistry struct {
 
 // NewUnified creates a new unified registry instance
 func NewUnified() api.ToolRegistry {
-	// Create a logger using the domain logging interface
-	logger := &loggerAdapter{}
 	return &UnifiedRegistry{
-		tools:    make(map[string]interface{}),
+		tools:    make(map[string]ToolFactory),
 		metadata: make(map[string]api.ToolMetadata),
-		logger:   logger,
+		logger:   slog.Default(),
 	}
 }
-
-// loggerAdapter implements logging.Logger interface
-type loggerAdapter struct{}
-
-func (l *loggerAdapter) Debug(msg string, args ...any)                 {}
-func (l *loggerAdapter) Info(msg string, args ...any)                  {}
-func (l *loggerAdapter) Warn(msg string, args ...any)                  {}
-func (l *loggerAdapter) Error(msg string, args ...any)                 {}
-func (l *loggerAdapter) With(args ...any) logging.Logger               { return l }
-func (l *loggerAdapter) WithComponent(component string) logging.Logger { return l }
 
 // Register registers a tool factory function
 func (r *UnifiedRegistry) Register(name string, factory interface{}) error {
@@ -69,20 +60,14 @@ func (r *UnifiedRegistry) Register(name string, factory interface{}) error {
 			Build()
 	}
 
-	if factory == nil {
+	// Validate factory is a ToolFactory
+	toolFactory, ok := factory.(ToolFactory)
+	if !ok {
 		return errors.NewError().
 			Code(errors.CodeInvalidParameter).
-			Message("factory cannot be nil").
-			Build()
-	}
-
-	// Validate factory is a function
-	factoryType := reflect.TypeOf(factory)
-	if factoryType.Kind() != reflect.Func {
-		return errors.NewError().
-			Code(errors.CodeInvalidParameter).
-			Message("factory must be a function").
-			Context("actual_type", factoryType.String()).
+			Message("factory must be a ToolFactory function").
+			Context("actual_type", fmt.Sprintf("%T", factory)).
+			Suggestion("Use RegisterTypedTool for type-safe registration").
 			Build()
 	}
 
@@ -97,7 +82,7 @@ func (r *UnifiedRegistry) Register(name string, factory interface{}) error {
 	}
 
 	// Store the factory function
-	r.tools[name] = factory
+	r.tools[name] = toolFactory
 
 	// Initialize metadata
 	r.metadata[name] = api.ToolMetadata{
@@ -120,7 +105,7 @@ func (r *UnifiedRegistry) Register(name string, factory interface{}) error {
 
 	r.logger.Info("tool registered",
 		"tool", name,
-		"factory_type", factoryType.String())
+		"factory_type", "ToolFactory")
 
 	return nil
 }
@@ -155,20 +140,18 @@ func (r *UnifiedRegistry) Discover(name string) (interface{}, error) {
 			Build()
 	}
 
-	// Call the factory function using reflection
-	factoryValue := reflect.ValueOf(factory)
-	results := factoryValue.Call(nil)
-
-	if len(results) != 1 {
+	// Call the factory function directly - no reflection needed
+	tool, err := factory()
+	if err != nil {
 		return nil, errors.NewError().
 			Code(errors.CodeInternalError).
-			Message("factory must return exactly one value").
+			Message("factory function failed").
 			Context("tool_name", name).
-			Context("return_count", len(results)).
+			Cause(err).
 			Build()
 	}
 
-	return results[0].Interface(), nil
+	return tool, nil
 }
 
 // List returns all registered tool names
@@ -279,7 +262,7 @@ func (r *UnifiedRegistry) Execute(ctx context.Context, name string, input api.To
 		}, err
 	}
 
-	// Type assert to api.Tool
+	// Type assert to api.Tool - should always succeed since ToolFactory guarantees this
 	tool, ok := toolInterface.(api.Tool)
 	if !ok {
 		return api.ToolOutput{
@@ -339,7 +322,7 @@ func (r *UnifiedRegistry) Close() error {
 	r.closed = true
 
 	// Clear all tools and metadata
-	r.tools = make(map[string]interface{})
+	r.tools = make(map[string]ToolFactory)
 	r.metadata = make(map[string]api.ToolMetadata)
 
 	r.logger.Info("registry closed")
@@ -372,15 +355,23 @@ func (r *UnifiedRegistry) GetMetrics() api.RegistryMetrics {
 	}
 }
 
-// Generic helper functions for type-safe registration and discovery
+// Type-safe helper functions for registration and discovery
 
-// RegisterTool provides type-safe tool registration
-func RegisterTool[T any](registry api.ToolRegistry, name string, factory func() T) error {
-	return registry.Register(name, factory)
+// RegisterTypedTool provides type-safe tool registration
+func RegisterTypedTool[T api.Tool](registry api.ToolRegistry, name string, factory func() (T, error)) error {
+	// Wrap the typed factory in a ToolFactory
+	toolFactory := ToolFactory(func() (api.Tool, error) {
+		tool, err := factory()
+		if err != nil {
+			return nil, err
+		}
+		return tool, nil
+	})
+	return registry.Register(name, toolFactory)
 }
 
-// DiscoverTool provides type-safe tool discovery
-func DiscoverTool[T any](registry api.ToolRegistry, name string) (T, error) {
+// DiscoverTypedTool provides type-safe tool discovery
+func DiscoverTypedTool[T api.Tool](registry api.ToolRegistry, name string) (T, error) {
 	var zero T
 
 	result, err := registry.Discover(name)
@@ -400,4 +391,11 @@ func DiscoverTool[T any](registry api.ToolRegistry, name string) (T, error) {
 	}
 
 	return typed, nil
+}
+
+// RegisterSimpleTool provides a simpler registration for tools without error return
+func RegisterSimpleTool[T api.Tool](registry api.ToolRegistry, name string, factory func() T) error {
+	return RegisterTypedTool(registry, name, func() (T, error) {
+		return factory(), nil
+	})
 }

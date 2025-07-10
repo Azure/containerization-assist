@@ -1,35 +1,44 @@
 package runtime
 
 import (
-	"fmt"
+	"log/slog"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/commands"
+	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
-func RegisterAllTools(registry interface{}) error {
-	if reg, ok := registry.(interface {
-		Register(name string, factory func() interface{}) error
-	}); ok {
-		tools := commands.GetRegisteredTools()
-		for name, factory := range tools {
-			if err := reg.Register(name, func() interface{} { return factory() }); err != nil {
-				return errors.NewError().Message(fmt.Sprintf("failed to register tool %s", name)).Cause(err).Build()
-			}
-		}
-		return nil
+// RegisterAllTools registers all commands with the unified registry
+func RegisterAllTools(
+	registry api.ToolRegistry,
+	sessionStore services.SessionStore,
+	sessionState services.SessionState,
+	logger *slog.Logger,
+) error {
+	// Initialize commands with the unified registry
+	err := commands.InitializeCommands(registry, sessionStore, sessionState, logger)
+	if err != nil {
+		return errors.NewError().
+			Message("failed to initialize commands").
+			Cause(err).
+			Build()
 	}
-	return errors.NewError().Messagef("registry does not implement required Register method").WithLocation().Build()
+	return nil
 }
-func GetAllToolNames() []string {
-	tools := commands.GetRegisteredTools()
-	names := make([]string, 0, len(tools))
-	for name := range tools {
-		names = append(names, name)
+
+// GetAllToolNames returns all registered tool names from the unified registry
+func GetAllToolNames(registry api.ToolRegistry) []string {
+	if registry == nil {
+		return []string{}
 	}
-	return names
+	return registry.List()
 }
-func GetToolCount() int {
-	tools := commands.GetRegisteredTools()
-	return len(tools)
+
+// GetToolCount returns the count of registered tools
+func GetToolCount(registry api.ToolRegistry) int {
+	if registry == nil {
+		return 0
+	}
+	return len(registry.List())
 }

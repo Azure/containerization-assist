@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strings"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 //go:embed *.tmpl Dockerfile
@@ -69,7 +71,7 @@ func ListTemplates() ([]string, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to list templates: %w", err)
+		return nil, errors.NewError().Code(errors.CodeInternalError).Message("failed to list templates").Cause(err).Build()
 	}
 
 	return templates, nil
