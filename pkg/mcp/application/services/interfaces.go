@@ -529,3 +529,328 @@ type FileContent struct {
 	Encoding string    `json:"encoding"`
 	Lines    int       `json:"lines"`
 }
+
+// AI Analysis Service interfaces and types
+
+// AIAnalysisService provides AI-powered analysis capabilities
+type AIAnalysisService interface {
+	// AnalyzeCodePatterns performs AI analysis of code patterns and architecture
+	AnalyzeCodePatterns(ctx context.Context, files map[string]string) (*CodeAnalysisResult, error)
+
+	// SuggestDockerfileOptimizations provides AI-powered Dockerfile optimization suggestions
+	SuggestDockerfileOptimizations(ctx context.Context, dockerfile string, optContext *OptimizationContext) (*DockerfileOptimizations, error)
+
+	// DetectSecurityIssues uses AI to detect potential security vulnerabilities
+	DetectSecurityIssues(ctx context.Context, code string, language string) (*SecurityAnalysisResult, error)
+
+	// AnalyzePerformance provides performance analysis recommendations
+	AnalyzePerformance(ctx context.Context, code string, metrics map[string]interface{}) (*PerformanceAnalysisResult, error)
+
+	// SuggestContainerizationApproach recommends containerization strategies
+	SuggestContainerizationApproach(ctx context.Context, repoAnalysis *RepositoryAnalysis) (*ContainerizationRecommendations, error)
+
+	// ValidateConfiguration validates configuration files with AI assistance
+	ValidateConfiguration(ctx context.Context, configType string, content string) (*ConfigurationResult, error)
+
+	// GetCachedAnalysis retrieves cached analysis results
+	GetCachedAnalysis(ctx context.Context, cacheKey string, timeRange *TimeRange) (*CachedAnalysis, error)
+}
+
+// CachedAnalysis represents cached analysis data
+type CachedAnalysis struct {
+	Key       string                 `json:"key"`
+	Type      string                 `json:"type"`
+	Data      map[string]interface{} `json:"data"`
+	CreatedAt time.Time              `json:"created_at"`
+	ExpiresAt time.Time              `json:"expires_at"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// OptimizationContext provides context for optimization suggestions
+type OptimizationContext struct {
+	Language       string                 `json:"language"`
+	Framework      string                 `json:"framework"`
+	TargetSize     string                 `json:"target_size"`               // "minimal", "balanced", "feature-rich"
+	Environment    string                 `json:"environment"`               // "development", "production", "testing"
+	TargetPlatform string                 `json:"target_platform,omitempty"` // "linux/amd64", "linux/arm64", etc.
+	Dependencies   []string               `json:"dependencies,omitempty"`
+	Constraints    map[string]interface{} `json:"constraints,omitempty"`
+	Preferences    map[string]interface{} `json:"preferences,omitempty"`
+}
+
+// DockerfileOptimizations contains Dockerfile optimization recommendations
+type DockerfileOptimizations struct {
+	OriginalSize     int64                    `json:"original_size"`
+	EstimatedSize    int64                    `json:"estimated_size"`
+	SizeReduction    float64                  `json:"size_reduction"`
+	BuildTime        time.Duration            `json:"build_time"`
+	SecurityScore    float64                  `json:"security_score"`
+	OptimizedContent string                   `json:"optimized_content"`
+	Optimizations    []DockerfileOptimization `json:"optimizations"`
+	RecommendedBase  string                   `json:"recommended_base"`
+	SecurityIssues   []SecurityIssue          `json:"security_issues"`
+	BestPractices    []BestPractice           `json:"best_practices"`
+	Confidence       float64                  `json:"confidence"`
+}
+
+// DockerfileOptimization represents a single dockerfile optimization
+type DockerfileOptimization struct {
+	Type        string  `json:"type"`
+	Description string  `json:"description"`
+	Impact      string  `json:"impact"`
+	Priority    string  `json:"priority"`
+	Before      string  `json:"before"`
+	After       string  `json:"after"`
+	Confidence  float64 `json:"confidence"`
+}
+
+// OptimizationSuggestion represents a single optimization recommendation
+type OptimizationSuggestion struct {
+	Type        string  `json:"type"`
+	Description string  `json:"description"`
+	Impact      string  `json:"impact"`
+	Priority    string  `json:"priority"`
+	Before      string  `json:"before"`
+	After       string  `json:"after"`
+	Confidence  float64 `json:"confidence"`
+}
+
+// SecurityAnalysisResult contains security analysis results
+type SecurityAnalysisResult struct {
+	OverallRisk     string                   `json:"overall_risk"`
+	SecurityScore   float64                  `json:"security_score"`
+	Issues          []SecurityIssue          `json:"issues"`
+	Recommendations []SecurityRecommendation `json:"recommendations"`
+	Compliance      ComplianceReport         `json:"compliance"`
+	Confidence      float64                  `json:"confidence"`
+}
+
+// SecurityRecommendation represents a security improvement recommendation
+type SecurityRecommendation struct {
+	Category    string `json:"category"`
+	Priority    string `json:"priority"`
+	Description string `json:"description"`
+	Action      string `json:"action"`
+	Impact      string `json:"impact"`
+}
+
+// ComplianceReport contains compliance assessment results
+type ComplianceReport struct {
+	Standards map[string]ComplianceResult `json:"standards"`
+}
+
+// ComplianceResult represents compliance with a specific standard
+type ComplianceResult struct {
+	Score       float64  `json:"score"`
+	Violations  []string `json:"violations"`
+	Suggestions []string `json:"suggestions"`
+}
+
+// SecurityIssue represents a security vulnerability or issue
+type SecurityIssue struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	Severity    string `json:"severity"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	File        string `json:"file,omitempty"`
+	Line        int    `json:"line,omitempty"`
+	Fix         string `json:"fix,omitempty"`
+	Reference   string `json:"reference,omitempty"`
+}
+
+// PerformanceAnalysisResult contains performance analysis recommendations
+type PerformanceAnalysisResult struct {
+	OverallScore     float64                   `json:"overall_score"`
+	Bottlenecks      []PerformanceBottleneck   `json:"bottlenecks"`
+	Optimizations    []PerformanceOptimization `json:"optimizations"`
+	ScalabilityScore float64                   `json:"scalability_score"`
+	Recommendations  []string                  `json:"recommendations"`
+	OptimizedMetrics map[string]interface{}    `json:"optimized_metrics"`
+	Confidence       float64                   `json:"confidence"`
+}
+
+// PerformanceIssue represents a performance bottleneck or issue
+type PerformanceIssue struct {
+	Type        string  `json:"type"`
+	Description string  `json:"description"`
+	Impact      string  `json:"impact"`
+	File        string  `json:"file,omitempty"`
+	Line        int     `json:"line,omitempty"`
+	Fix         string  `json:"fix,omitempty"`
+	Priority    string  `json:"priority"`
+	Confidence  float64 `json:"confidence"`
+}
+
+// ContainerizationRecommendations contains containerization strategy recommendations
+type ContainerizationRecommendations struct {
+	Strategy        string                 `json:"strategy"`
+	BaseImage       string                 `json:"base_image"`
+	MultiStage      bool                   `json:"multi_stage"`
+	BuildSteps      []BuildStep            `json:"build_steps"`
+	RuntimeConfig   map[string]interface{} `json:"runtime_config"`
+	SecurityConfig  map[string]interface{} `json:"security_config"`
+	Recommendations []string               `json:"recommendations"`
+	Confidence      float64                `json:"confidence"`
+}
+
+// BuildStep represents a single build step in the containerization process
+type BuildStep struct {
+	Stage       string   `json:"stage"`
+	Commands    []string `json:"commands"`
+	Description string   `json:"description"`
+	Purpose     string   `json:"purpose"`
+}
+
+// ConfigurationResult contains configuration validation results
+type ConfigurationResult struct {
+	Valid           bool                   `json:"valid"`
+	Issues          []ConfigurationIssue   `json:"issues"`
+	Suggestions     []string               `json:"suggestions"`
+	Score           float64                `json:"score"`
+	OptimizedConfig map[string]interface{} `json:"optimized_config,omitempty"`
+	Confidence      float64                `json:"confidence"`
+}
+
+// ConfigurationIssue represents a configuration problem
+type ConfigurationIssue struct {
+	Type        string `json:"type"`
+	Severity    string `json:"severity"`
+	Description string `json:"description"`
+	Path        string `json:"path,omitempty"`
+	Fix         string `json:"fix,omitempty"`
+}
+
+// TimeRange represents a time range for cache queries
+type TimeRange struct {
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+}
+
+// CodeAnalysisResult contains the results of code pattern analysis
+type CodeAnalysisResult struct {
+	Summary         string                 `json:"summary"`
+	Architecture    ArchitectureAnalysis   `json:"architecture"`
+	CodeQuality     CodeQualityMetrics     `json:"code_quality"`
+	Patterns        []DetectedPattern      `json:"patterns"`
+	Dependencies    []DependencyAnalysis   `json:"dependencies"`
+	Recommendations []string               `json:"recommendations"`
+	Confidence      float64                `json:"confidence"`
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ArchitectureAnalysis contains architecture-related analysis
+type ArchitectureAnalysis struct {
+	Style           string   `json:"style"`
+	Layers          []string `json:"layers"`
+	Patterns        []string `json:"patterns"`
+	Violations      []string `json:"violations"`
+	Complexity      float64  `json:"complexity"`
+	Maintainability float64  `json:"maintainability"`
+}
+
+// CodeQualityMetrics contains code quality measurements
+type CodeQualityMetrics struct {
+	Readability   float64 `json:"readability"`
+	Testability   float64 `json:"testability"`
+	Modularity    float64 `json:"modularity"`
+	Documentation float64 `json:"documentation"`
+	ErrorHandling float64 `json:"error_handling"`
+	Performance   float64 `json:"performance"`
+	Security      float64 `json:"security"`
+	OverallScore  float64 `json:"overall_score"`
+}
+
+// DetectedPattern represents a detected code pattern
+type DetectedPattern struct {
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Confidence  float64  `json:"confidence"`
+	Files       []string `json:"files"`
+	Description string   `json:"description"`
+	Impact      string   `json:"impact"`
+}
+
+// DependencyAnalysis contains dependency analysis results
+type DependencyAnalysis struct {
+	Name            string   `json:"name"`
+	Version         string   `json:"version"`
+	Type            string   `json:"type"`
+	Risk            string   `json:"risk"`
+	Vulnerabilities []string `json:"vulnerabilities"`
+	Alternatives    []string `json:"alternatives"`
+	Usage           string   `json:"usage"`
+}
+
+// BestPractice represents a best practice recommendation
+type BestPractice struct {
+	Category    string `json:"category"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Priority    string `json:"priority"`
+	Reference   string `json:"reference,omitempty"`
+}
+
+// AIUsageMetrics contains AI service usage metrics
+type AIUsageMetrics struct {
+	TotalRequests      int64                     `json:"total_requests"`
+	SuccessfulRequests int64                     `json:"successful_requests"`
+	FailedRequests     int64                     `json:"failed_requests"`
+	TotalTokens        int64                     `json:"total_tokens"`
+	InputTokens        int64                     `json:"input_tokens"`
+	OutputTokens       int64                     `json:"output_tokens"`
+	TotalCost          float64                   `json:"total_cost"`
+	AverageCost        float64                   `json:"average_cost"`
+	CostBreakdown      map[string]float64        `json:"cost_breakdown"`
+	ResponseTimes      ResponseTimeMetrics       `json:"response_times"`
+	Usage              map[string]OperationUsage `json:"usage"`
+	SuccessRate        float64                   `json:"success_rate"`
+}
+
+// ResponseTimeMetrics contains response time statistics
+type ResponseTimeMetrics struct {
+	Average    time.Duration `json:"average"`
+	Min        time.Duration `json:"min"`
+	Max        time.Duration `json:"max"`
+	Median     time.Duration `json:"median"`
+	P50        time.Duration `json:"p50"`
+	P95        time.Duration `json:"p95"`
+	P99        time.Duration `json:"p99"`
+	SampleSize int           `json:"sample_size"`
+}
+
+// Additional types for AI analysis service
+
+// PerformanceBottleneck represents a performance issue
+type PerformanceBottleneck struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	Severity    string `json:"severity"`
+	Location    string `json:"location"`
+	Description string `json:"description"`
+	Impact      string `json:"impact"`
+	Solution    string `json:"solution"`
+	Improvement string `json:"estimated_improvement"`
+}
+
+// PerformanceOptimization represents a performance improvement opportunity
+type PerformanceOptimization struct {
+	Category    string `json:"category"`
+	Priority    string `json:"priority"`
+	Description string `json:"description"`
+	Impact      string `json:"implementation"`
+	Benefit     string `json:"expected_benefit"`
+	Effort      string `json:"effort"`
+	Code        string `json:"code,omitempty"`
+}
+
+// OperationUsage tracks usage statistics for specific operations
+type OperationUsage struct {
+	Count         int64               `json:"count"`
+	TotalTokens   int64               `json:"total_tokens"`
+	TotalCost     float64             `json:"total_cost"`
+	AverageTokens float64             `json:"average_tokens"`
+	ResponseTime  ResponseTimeMetrics `json:"response_time"`
+	Errors        int64               `json:"errors"`
+	ErrorRate     float64             `json:"error_rate"`
+}

@@ -26,7 +26,7 @@ func NewStringLengthValidator(name, fieldName string, minLength, maxLength int) 
 	}
 }
 
-func (v *StringLengthValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *StringLengthValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	str, ok := value.(string)
 	if !ok {
 		return ValidationResult{
@@ -95,7 +95,7 @@ func NewPatternValidator(name, fieldName, pattern string) (*PatternValidator, er
 	}, nil
 }
 
-func (v *PatternValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *PatternValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	str, ok := value.(string)
 	if !ok {
 		return ValidationResult{
@@ -146,7 +146,7 @@ func NewRequiredValidator(name, fieldName string) *RequiredValidator {
 	return &RequiredValidator{FieldName: fieldName, name: name}
 }
 
-func (v *RequiredValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *RequiredValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	str, ok := value.(string)
 	if !ok {
 		return ValidationResult{
@@ -194,7 +194,7 @@ func NewEmailValidator(name, fieldName string) *EmailValidator {
 	return &EmailValidator{FieldName: fieldName, name: name}
 }
 
-func (v *EmailValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *EmailValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	str, ok := value.(string)
 	if !ok {
 		return ValidationResult{
@@ -246,7 +246,7 @@ func NewURLValidator(name, fieldName string) *URLValidator {
 	return &URLValidator{FieldName: fieldName, name: name}
 }
 
-func (v *URLValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *URLValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	str, ok := value.(string)
 	if !ok {
 		return ValidationResult{
@@ -303,7 +303,7 @@ func NewNetworkPortValidator(name, fieldName string, allowZero bool) *NetworkPor
 	}
 }
 
-func (v *NetworkPortValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *NetworkPortValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	var port int
 	var ok bool
 
@@ -384,7 +384,7 @@ func NewIPAddressValidator(name, fieldName string, allowIPv4, allowIPv6, allowLo
 	}
 }
 
-func (v *IPAddressValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *IPAddressValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	str, ok := value.(string)
 	if !ok {
 		return ValidationResult{

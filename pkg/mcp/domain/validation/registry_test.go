@@ -20,7 +20,7 @@ type mockValidator struct {
 	result       ValidationResult
 }
 
-func (m *mockValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (m *mockValidator) Validate(_ context.Context, _ interface{}) ValidationResult {
 	return m.result
 }
 

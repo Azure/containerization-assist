@@ -101,7 +101,7 @@ func (s *AnalysisServiceImpl) buildSecurityAnalysisPrompt(code string, language 
       "files": ["affected files"],
       "lines": [line numbers],
       "cwe": "CWE-XXX if applicable",
-      "cve": "CVE-XXXX-XXXX if applicable", 
+      "cve": "CVE-XXXX-XXXX if applicable",
       "remediation": "how to fix this issue"
     }
   ],
@@ -165,7 +165,7 @@ func (s *AnalysisServiceImpl) parseDockerfileOptimizationResponse(response strin
 					Description: "AI analysis completed - see optimized content",
 					Before:      "original dockerfile",
 					After:       response,
-					Savings:     "analysis provided",
+					Confidence:  0.3,
 				},
 			},
 		}, nil
@@ -186,7 +186,7 @@ func (s *AnalysisServiceImpl) parseDockerfileOptimizationResponse(response strin
 				Description: "Analysis completed successfully",
 				Before:      "n/a",
 				After:       "see analysis response",
-				Savings:     "varies",
+				Confidence:  0.7,
 			},
 		}
 	}
@@ -247,25 +247,21 @@ func (s *AnalysisServiceImpl) parseSecurityAnalysisResponse(response string) (*s
 // Implement remaining AIAnalysisService methods
 
 // AnalyzePerformance suggests performance optimizations based on code analysis
-func (s *AnalysisServiceImpl) AnalyzePerformance(ctx context.Context, codebase map[string]string, framework string) (*services.PerformanceAnalysisResult, error) {
-	s.logger.Info("Starting performance analysis", slog.String("framework", framework))
+func (s *AnalysisServiceImpl) AnalyzePerformance(ctx context.Context, code string, metrics map[string]interface{}) (*services.PerformanceAnalysisResult, error) {
+	s.logger.Info("Starting performance analysis")
 
 	// Validate input size
-	totalSize := 0
-	for _, content := range codebase {
-		totalSize += len(content)
-	}
-	if totalSize > s.config.MaxAnalysisSize {
+	if len(code) > s.config.MaxAnalysisSize {
 		return nil, errors.NewError().
 			Code(errors.CodeValidationFailed).
-			Message("Codebase size exceeds analysis limit").
+			Message("Code size exceeds analysis limit").
 			Build()
 	}
 
 	// Generate cache key
 	cacheKey := s.generateCacheKey("performance_analysis", map[string]interface{}{
-		"codebase":  codebase,
-		"framework": framework,
+		"code":    code,
+		"metrics": metrics,
 	})
 
 	// Check cache
@@ -281,7 +277,7 @@ func (s *AnalysisServiceImpl) AnalyzePerformance(ctx context.Context, codebase m
 	start := time.Now()
 
 	// Build performance analysis prompt
-	performancePrompt := s.buildPerformanceAnalysisPrompt(codebase, framework)
+	performancePrompt := s.buildPerformanceAnalysisPrompt(code, metrics)
 
 	// Create analysis session
 	analysisSessionID := fmt.Sprintf("perf_analysis_%d", time.Now().Unix())
@@ -330,8 +326,8 @@ func (s *AnalysisServiceImpl) AnalyzePerformance(ctx context.Context, codebase m
 	return result, nil
 }
 
-// SuggestContainerization provides intelligent containerization recommendations
-func (s *AnalysisServiceImpl) SuggestContainerization(ctx context.Context, analysis *services.RepositoryAnalysis) (*services.ContainerizationRecommendations, error) {
+// SuggestContainerizationApproach provides intelligent containerization recommendations
+func (s *AnalysisServiceImpl) SuggestContainerizationApproach(ctx context.Context, analysis *services.RepositoryAnalysis) (*services.ContainerizationRecommendations, error) {
 	s.logger.Info("Starting containerization recommendations")
 
 	// Generate cache key
@@ -478,8 +474,8 @@ func (s *AnalysisServiceImpl) ValidateConfiguration(ctx context.Context, configT
 	return result, nil
 }
 
-// GetAnalysisCache retrieves cached analysis results
-func (s *AnalysisServiceImpl) GetAnalysisCache(_ context.Context, cacheKey string) (*services.CachedAnalysis, error) {
+// GetCachedAnalysis retrieves cached analysis results
+func (s *AnalysisServiceImpl) GetCachedAnalysis(_ context.Context, cacheKey string, _ *services.TimeRange) (*services.CachedAnalysis, error) {
 	return s.cache.Get(cacheKey)
 }
 
@@ -571,10 +567,10 @@ func (s *AnalysisServiceImpl) calculateResponseTimeMetrics(times []time.Duration
 }
 
 // buildPerformanceAnalysisPrompt creates a prompt for performance analysis
-func (s *AnalysisServiceImpl) buildPerformanceAnalysisPrompt(codebase map[string]string, framework string) string {
+func (s *AnalysisServiceImpl) buildPerformanceAnalysisPrompt(code string, metrics map[string]interface{}) string {
 	var prompt strings.Builder
 
-	prompt.WriteString("Please analyze the following codebase for performance bottlenecks and optimization opportunities.\n\n")
+	prompt.WriteString("Please analyze the following code for performance bottlenecks and optimization opportunities.\n\n")
 	prompt.WriteString("I need analysis covering:\n")
 	prompt.WriteString("1. CPU-intensive operations and hot paths\n")
 	prompt.WriteString("2. Memory usage patterns and potential leaks\n")
@@ -582,10 +578,14 @@ func (s *AnalysisServiceImpl) buildPerformanceAnalysisPrompt(codebase map[string
 	prompt.WriteString("4. Database query optimization opportunities\n")
 	prompt.WriteString("5. Caching strategies and recommendations\n")
 	prompt.WriteString("6. Concurrency and parallelization opportunities\n")
-	prompt.WriteString("7. Framework-specific optimizations\n\n")
+	prompt.WriteString("7. Algorithm optimizations\n\n")
 
-	if framework != "" {
-		prompt.WriteString(fmt.Sprintf("Framework: %s\n\n", framework))
+	if len(metrics) > 0 {
+		prompt.WriteString("Performance Metrics:\n")
+		for key, value := range metrics {
+			prompt.WriteString(fmt.Sprintf("- %s: %v\n", key, value))
+		}
+		prompt.WriteString("\n")
 	}
 
 	prompt.WriteString("Please respond with a JSON object following this structure:\n")
@@ -625,19 +625,16 @@ func (s *AnalysisServiceImpl) buildPerformanceAnalysisPrompt(codebase map[string
   "confidence": 0.0-1.0
 }`)
 
-	prompt.WriteString("\n\nCodebase to analyze:\n\n")
+	prompt.WriteString("\n\nCode to analyze:\n```\n")
 
-	for filename, content := range codebase {
-		prompt.WriteString(fmt.Sprintf("=== %s ===\n", filename))
-		// Truncate very large files to avoid token limits
-		if len(content) > 4000 {
-			prompt.WriteString(content[:4000])
-			prompt.WriteString("\n... (truncated for analysis)\n")
-		} else {
-			prompt.WriteString(content)
-		}
-		prompt.WriteString("\n\n")
+	// Truncate very large code to avoid token limits
+	if len(code) > 8000 {
+		prompt.WriteString(code[:8000])
+		prompt.WriteString("\n... (truncated for analysis)")
+	} else {
+		prompt.WriteString(code)
 	}
+	prompt.WriteString("\n```\n")
 
 	return prompt.String()
 }
@@ -792,6 +789,115 @@ func (s *AnalysisServiceImpl) buildConfigValidationPrompt(configType string, con
 	return prompt.String()
 }
 
+// buildCodePatternAnalysisPrompt creates a prompt for code pattern analysis
+func (s *AnalysisServiceImpl) buildCodePatternAnalysisPrompt(files map[string]string) string {
+	var prompt strings.Builder
+
+	prompt.WriteString("Please analyze the following codebase for architectural patterns, code quality, and design issues.\n\n")
+	prompt.WriteString("I need analysis covering:\n")
+	prompt.WriteString("1. Architectural patterns and design principles\n")
+	prompt.WriteString("2. Code quality metrics and maintainability\n")
+	prompt.WriteString("3. Common anti-patterns and code smells\n")
+	prompt.WriteString("4. Dependency management and coupling\n")
+	prompt.WriteString("5. Testing patterns and coverage\n")
+	prompt.WriteString("6. Documentation and readability\n")
+	prompt.WriteString("7. Framework and library usage patterns\n\n")
+
+	prompt.WriteString("Please respond with a JSON object following this structure:\n")
+	prompt.WriteString(`{
+  "summary": "overall assessment of the codebase",
+  "architecture": {
+    "style": "monolithic|microservices|layered|mvc|etc",
+    "patterns": ["detected patterns"],
+    "violations": ["architectural violations"],
+    "complexity": 0.0-1.0,
+    "maintainability": 0.0-1.0
+  },
+  "code_quality": {
+    "readability": 0.0-1.0,
+    "testability": 0.0-1.0,
+    "modularity": 0.0-1.0,
+    "documentation": 0.0-1.0,
+    "error_handling": 0.0-1.0,
+    "performance": 0.0-1.0,
+    "security": 0.0-1.0,
+    "overall_score": 0.0-1.0
+  },
+  "patterns": [
+    {
+      "name": "pattern name",
+      "type": "design|architectural|behavioral",
+      "confidence": 0.0-1.0,
+      "files": ["affected files"],
+      "description": "pattern description",
+      "impact": "positive|negative|neutral"
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "dependency name",
+      "version": "version",
+      "type": "runtime|dev|peer",
+      "risk": "low|medium|high",
+      "vulnerabilities": ["known issues"],
+      "alternatives": ["suggested alternatives"],
+      "usage": "how it's used"
+    }
+  ],
+  "recommendations": [
+    "specific improvement recommendations"
+  ],
+  "confidence": 0.0-1.0
+}`)
+
+	prompt.WriteString("\n\nCodebase to analyze:\n\n")
+
+	for filename, content := range files {
+		prompt.WriteString(fmt.Sprintf("=== %s ===\n", filename))
+		// Truncate very large files to avoid token limits
+		if len(content) > 4000 {
+			prompt.WriteString(content[:4000])
+			prompt.WriteString("\n... (truncated for analysis)\n")
+		} else {
+			prompt.WriteString(content)
+		}
+		prompt.WriteString("\n\n")
+	}
+
+	return prompt.String()
+}
+
+// parseCodePatternAnalysisResponse parses the AI response into CodeAnalysisResult
+func (s *AnalysisServiceImpl) parseCodePatternAnalysisResponse(response string) (*services.CodeAnalysisResult, error) {
+	// Extract JSON from response
+	jsonStr := s.extractJSON(response)
+
+	var result services.CodeAnalysisResult
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		// If JSON parsing fails, create a basic result
+		return &services.CodeAnalysisResult{
+			Summary:         "Code pattern analysis completed - review response for details",
+			Confidence:      0.5,
+			Patterns:        []services.DetectedPattern{},
+			Dependencies:    []services.DependencyAnalysis{},
+			Recommendations: []string{"Review the analysis response for detailed insights"},
+		}, nil
+	}
+
+	// Ensure we have default values for missing fields
+	if len(result.Patterns) == 0 {
+		result.Patterns = []services.DetectedPattern{}
+	}
+	if len(result.Dependencies) == 0 {
+		result.Dependencies = []services.DependencyAnalysis{}
+	}
+	if len(result.Recommendations) == 0 {
+		result.Recommendations = []string{"Analysis completed successfully"}
+	}
+
+	return &result, nil
+}
+
 // parsePerformanceAnalysisResponse parses the AI response into PerformanceAnalysisResult
 func (s *AnalysisServiceImpl) parsePerformanceAnalysisResponse(response string) (*services.PerformanceAnalysisResult, error) {
 	// Extract JSON from response
@@ -814,6 +920,7 @@ func (s *AnalysisServiceImpl) parsePerformanceAnalysisResponse(response string) 
 				},
 			},
 			ScalabilityScore: 0.5,
+			Recommendations:  []string{"Performance analysis completed - review response for details"},
 			Confidence:       0.5,
 		}, nil
 	}
@@ -825,7 +932,9 @@ func (s *AnalysisServiceImpl) parsePerformanceAnalysisResponse(response string) 
 	if len(result.Optimizations) == 0 {
 		result.Optimizations = []services.PerformanceOptimization{}
 	}
-	// No need to set recommendations field as it doesn't exist in PerformanceAnalysisResult
+	if len(result.Recommendations) == 0 {
+		result.Recommendations = []string{"Analysis completed successfully"}
+	}
 
 	return &result, nil
 }

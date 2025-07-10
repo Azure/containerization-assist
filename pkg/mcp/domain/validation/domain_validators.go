@@ -56,7 +56,7 @@ func NewKubernetesManifestValidatorWithOptions(options KubernetesValidatorOption
 	return validator
 }
 
-func (v *KubernetesManifestValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *KubernetesManifestValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	manifest, ok := value.(map[string]interface{})
 	if !ok {
 		return ValidationResult{
@@ -145,7 +145,7 @@ func NewDockerConfigValidator() *DockerConfigValidator {
 	}
 }
 
-func (v *DockerConfigValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *DockerConfigValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	config, ok := value.(map[string]interface{})
 	if !ok {
 		return ValidationResult{
@@ -264,7 +264,7 @@ func NewSecurityPolicyValidator() *SecurityPolicyValidator {
 	}
 }
 
-func (v *SecurityPolicyValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+func (v *SecurityPolicyValidator) Validate(_ context.Context, value interface{}) ValidationResult {
 	policy, ok := value.(map[string]interface{})
 	if !ok {
 		return ValidationResult{

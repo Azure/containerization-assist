@@ -778,3 +778,111 @@ func (h *AutoFixHelper) retryWithSimplifiedManifest(ctx context.Context, tool ap
 	toolInput := api.ToolInput{Data: data}
 	return tool.Execute(ctx, toolInput)
 }
+
+// shouldUseFixChain determines if a fix chain should be used based on session context
+func (h *AutoFixHelper) shouldUseFixChain(sessionCtx *SessionContext, tool api.Tool, err error) bool {
+	if sessionCtx == nil {
+		return false
+	}
+
+	// Use fix chain for complex errors with multiple failures
+	if history, exists := h.fixHistory[sessionCtx.SessionID]; exists {
+		failureCount := 0
+		for _, attempt := range history {
+			if attempt.ToolName == tool.Name() && !attempt.Successful {
+				failureCount++
+			}
+		}
+
+		// Use chain if we have multiple failures (3 or more)
+		if failureCount >= 3 {
+			return true
+		}
+	}
+
+	// Use chain for dockerfile syntax errors or complex build errors
+	errorMsg := strings.ToLower(err.Error())
+	if strings.Contains(errorMsg, "dockerfile") && strings.Contains(errorMsg, "syntax") {
+		return true
+	}
+
+	if strings.Contains(errorMsg, "build failed") && strings.Contains(errorMsg, "multiple") {
+		return true
+	}
+
+	return false
+}
+
+// shouldSkipRepeatedFix determines if we should skip a repeated fix attempt
+func (h *AutoFixHelper) shouldSkipRepeatedFix(sessionCtx *SessionContext, toolName string, errorType string) bool {
+	if sessionCtx == nil {
+		return false
+	}
+
+	if history, exists := h.fixHistory[sessionCtx.SessionID]; exists {
+		failureCount := 0
+		for _, attempt := range history {
+			if attempt.ToolName == toolName && strings.Contains(attempt.Error, errorType) && !attempt.Successful {
+				failureCount++
+			}
+		}
+
+		// Skip if we've already failed 3 times for this specific error type
+		return failureCount >= 3
+	}
+
+	return false
+}
+
+// GetFixChainStatus returns the current status of fix chains
+func (h *AutoFixHelper) GetFixChainStatus() map[string]interface{} {
+	status := make(map[string]interface{})
+
+	// Available chains
+	availableChains := map[string]string{
+		"dockerfile_build":      "Handles Dockerfile build errors with multi-step fixes",
+		"dependency_resolution": "Resolves dependency and package issues",
+		"manifest_generation":   "Fixes Kubernetes manifest generation problems",
+		"image_registry":        "Handles image registry and push/pull issues",
+	}
+	status["available_chains"] = availableChains
+
+	// Calculate usage statistics
+	totalAttempts := 0
+	successfulAttempts := 0
+
+	for _, history := range h.fixHistory {
+		for _, attempt := range history {
+			if attempt.Strategy == "chain" {
+				totalAttempts++
+				if attempt.Successful {
+					successfulAttempts++
+				}
+			}
+		}
+	}
+
+	usageStats := map[string]interface{}{
+		"total_chain_attempts": totalAttempts,
+		"successful_chains":    successfulAttempts,
+		"success_rate":         h.calculateSuccessRate(successfulAttempts, totalAttempts),
+	}
+	status["usage_stats"] = usageStats
+
+	// Chain availability status
+	chainStatus := map[string]interface{}{
+		"enabled": h.chainExecutor != nil,
+		"healthy": h.chainExecutor != nil, // Simple health check
+	}
+	status["chain_status"] = chainStatus
+
+	return status
+}
+
+// calculateSuccessRate calculates the success rate as a percentage
+func (h *AutoFixHelper) calculateSuccessRate(successful int, total int) float64 {
+	if total == 0 {
+		return 0.0
+	}
+	return (float64(successful) / float64(total)) * 100.0
+}

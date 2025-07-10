@@ -340,7 +340,7 @@ func (e *FixChainExecutor) executeChainSteps(ctx context.Context, chain *FixChai
 			// Clear the error since this step succeeded
 			lastError = nil
 		} else {
-			lastError = fmt.Errorf(stepResult.Error)
+			lastError = fmt.Errorf("%s", stepResult.Error)
 
 			if !strategy.ContinueOnError {
 				result.Success = false

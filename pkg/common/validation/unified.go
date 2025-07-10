@@ -59,8 +59,8 @@ func (u *UnifiedValidator) ValidateSchema(ctx context.Context, _ interface{}, da
 }
 
 // ValidateHealth validates health
-func (u *UnifiedValidator) ValidateHealth(_ context.Context) []interfaces.Result {
-	return []interfaces.Result{
+func (u *UnifiedValidator) ValidateHealth(_ context.Context) []interfaces.ValidationResult {
+	return []interfaces.ValidationResult{
 		{
 			Valid:    true,
 			Message:  "Validator is healthy",
