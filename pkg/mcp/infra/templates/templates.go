@@ -2,7 +2,6 @@ package templates
 
 import (
 	"embed"
-	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -48,7 +47,13 @@ func LoadTemplate(name string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("template not found: %s", name)
+	return "", errors.NewError().
+		Code(errors.CodeNotFound).
+		Type(errors.ErrTypeNotFound).
+		Severity(errors.SeverityMedium).
+		Messagef("template not found: %s", name).
+		WithLocation().
+		Build()
 }
 
 // ListTemplates lists all available templates
