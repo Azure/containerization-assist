@@ -90,19 +90,19 @@ bench-baseline:
 
 .PHONY: lint
 lint:
-	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
+	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.0.0"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	@echo "Running linter with error budget (threshold: 100)..."
 	@LINT_ERROR_THRESHOLD=100 LINT_WARN_THRESHOLD=50 ./scripts/lint-with-threshold.sh ./pkg/mcp/...
 
 .PHONY: lint-strict
 lint-strict:
-	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
+	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.0.0"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	@echo "Running linter in strict mode (all issues)..."
 	golangci-lint run ./pkg/mcp/...
 
 .PHONY: lint-all
 lint-all:
-	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.55.2"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
+	@which golangci-lint > /dev/null || (echo "❌ golangci-lint not found. Install with:"; echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.0.0"; echo "  Or use the development container: see .devcontainer/README.md"; exit 1)
 	golangci-lint run ./...
 
 .PHONY: fmt
