@@ -1,0 +1,197 @@
+groups:
+  - name: container-kit-performance
+    rules:
+      - alert: HighToolLatency
+        expr: histogram_quantile(0.95, rate(tool_execution_duration_seconds_bucket[5m])) > 0.0003
+        for: 5m
+        labels:
+          severity: warning
+          component: tools
+        annotations:
+          summary: "High tool execution latency detected"
+          description: "Tool execution P95 latency ({{ $value }}s) is above 300μs threshold for 5 minutes"
+          runbook_url: "https://docs.container-kit.dev/runbooks/high-latency"
+
+      - alert: CriticalToolLatency
+        expr: histogram_quantile(0.95, rate(tool_execution_duration_seconds_bucket[5m])) > 0.001
+        for: 2m
+        labels:
+          severity: critical
+          component: tools
+        annotations:
+          summary: "Critical tool execution latency detected"
+          description: "Tool execution P95 latency ({{ $value }}s) is above 1ms critical threshold"
+          runbook_url: "https://docs.container-kit.dev/runbooks/critical-latency"
+
+      - alert: HighErrorRate
+        expr: rate(tool_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: tools
+        annotations:
+          summary: "High tool error rate detected"
+          description: "Tool error rate ({{ $value }}/sec) is above 10% threshold for 2 minutes"
+          runbook_url: "https://docs.container-kit.dev/runbooks/high-error-rate"
+
+      - alert: PipelineLatencyHigh
+        expr: histogram_quantile(0.95, rate(pipeline_execution_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: pipeline
+        annotations:
+          summary: "High pipeline execution latency"
+          description: "Pipeline execution P95 latency ({{ $value }}s) is above 30s threshold"
+          runbook_url: "https://docs.container-kit.dev/runbooks/pipeline-latency"
+
+      - alert: SessionCreationFailure
+        expr: rate(session_errors_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          component: sessions
+        annotations:
+          summary: "High session creation failure rate"
+          description: "Session creation error rate ({{ $value }}/sec) is above 5% threshold"
+
+  - name: container-kit-availability
+    rules:
+      - alert: ServiceDown
+        expr: up{job="container-kit"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: service
+        annotations:
+          summary: "Container Kit service is down"
+          description: "Container Kit service has been down for more than 1 minute"
+          runbook_url: "https://docs.container-kit.dev/runbooks/service-down"
+
+      - alert: HighHTTPErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "HTTP 5xx error rate ({{ $value | humanizePercentage }}) is above 5% threshold"
+
+      - alert: HTTPLatencyHigh
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "High HTTP request latency"
+          description: "HTTP request P95 latency ({{ $value }}s) is above 1s threshold"
+
+  - name: container-kit-resources
+    rules:
+      - alert: HighMemoryUsage
+        expr: system_memory_usage_bytes / 1024 / 1024 / 1024 > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage ({{ $value }}GB) is above 2GB threshold for 5 minutes"
+
+      - alert: HighCPUUsage
+        expr: system_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage ({{ $value }}%) is above 80% threshold for 5 minutes"
+
+      - alert: HighGoroutineCount
+        expr: system_goroutines_count > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High goroutine count detected"
+          description: "Goroutine count ({{ $value }}) is above 1000 threshold"
+          runbook_url: "https://docs.container-kit.dev/runbooks/goroutine-leak"
+
+      - alert: FrequentGC
+        expr: rate(system_gc_duration_seconds_count[5m]) > 10
+        for: 3m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Frequent garbage collection detected"
+          description: "GC rate ({{ $value }}/sec) is above 10/sec threshold, indicating memory pressure"
+
+  - name: container-kit-business
+    rules:
+      - alert: LowToolUsage
+        expr: rate(tool_execution_total[1h]) < 0.1
+        for: 30m
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "Low tool usage detected"
+          description: "Tool execution rate ({{ $value }}/hour) is below expected usage levels"
+
+      - alert: UnusualToolPattern
+        expr: increase(tool_execution_total[1h]) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Unusual tool usage pattern detected"
+          description: "Tool execution rate ({{ $value }}/hour) is unusually high, possible abuse or runaway process"
+
+      - alert: LongRunningSessions
+        expr: histogram_quantile(0.95, rate(session_duration_seconds_bucket[1h])) > 3600
+        for: 15m
+        labels:
+          severity: info
+          component: sessions
+        annotations:
+          summary: "Long-running sessions detected"
+          description: "P95 session duration ({{ $value }}s) is above 1 hour, may indicate stuck sessions"
+
+  - name: container-kit-security
+    rules:
+      - alert: SuspiciousActivity
+        expr: rate(tool_errors_total{error_type="security"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Security-related errors detected"
+          description: "Security errors detected in tool execution, investigate immediately"
+          runbook_url: "https://docs.container-kit.dev/runbooks/security-incident"
+
+      - alert: UnauthorizedAccess
+        expr: rate(http_requests_total{status_code="401"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High unauthorized access rate"
+          description: "HTTP 401 error rate ({{ $value }}/sec) indicates possible brute force attempts"
+
+      - alert: RateLimitExceeded
+        expr: rate(http_requests_total{status_code="429"}[5m]) > 1
+        for: 3m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Rate limit frequently exceeded"
+          description: "HTTP 429 error rate ({{ $value }}/sec) indicates clients hitting rate limits"
