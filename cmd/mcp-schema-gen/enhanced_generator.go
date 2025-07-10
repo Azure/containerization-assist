@@ -24,13 +24,13 @@ func NewEnhancedSchemaGenerator(outputDir string, verbose bool) (*EnhancedSchema
 	if err != nil {
 		return nil, mcperrors.NewError().Messagef("failed to get executable path: %w", err).WithLocation().Build()
 	}
-	
+
 	// Get the directory containing the executable
 	exeDir := filepath.Dir(exe)
-	
+
 	// Look for templates in the project root relative to bin/
 	templatePath := filepath.Join(exeDir, "..", "cmd", "mcp-schema-gen", "templates", "canonical_tool.go.tmpl")
-	
+
 	// Load templates
 	tmpl, err := template.New("generator").Funcs(templateFuncs()).ParseFiles(templatePath)
 	if err != nil {

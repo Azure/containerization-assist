@@ -163,7 +163,7 @@ type ServiceContainer interface {
 
 ### Minor Outstanding Items
 
-1. **Empty Directories**: 
+1. **Empty Directories**:
    - `pkg/mcp/domain/workflow/` (domain logic missing)
    - `pkg/mcp/application/interfaces/` (compatibility layer missing)
 

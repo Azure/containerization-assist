@@ -67,7 +67,6 @@ func (t *toolargsTool) Schema() api.ToolSchema {
 							"type":        "string",
 							"description": "Execution status",
 						},
-						
 					},
 				},
 				"error": map[string]interface{}{
@@ -102,20 +101,17 @@ func (t *toolargsTool) Execute(ctx context.Context, input api.ToolInput) (api.To
 	// Extract and validate input parameters
 	var params struct {
 		Session_id string `json:"session_id",omitempty`
-		
 	}
 
 	// Parse parameters from input.Data
-	
+
 	if val, ok := input.Data["session_id"]; ok {
 		if strVal, ok := val.(string); ok {
 			params.Session_id = strVal
 		}
 	}
-	
 
 	// Validate required parameters
-	
 
 	// Log the execution
 	t.logger.Info().
