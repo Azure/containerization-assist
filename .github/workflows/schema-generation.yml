@@ -61,14 +61,16 @@ jobs:
     - name: Check for uncommitted changes
       id: check-changes
       run: |
-        if [ -n "$(git status --porcelain)" ]; then
+        # Check for changes excluding go.sum (dependency lockfile changes during wire generation)
+        changes=$(git status --porcelain | grep -v "go.sum" || true)
+        if [ -n "$changes" ]; then
           echo "has_changes=true" >> $GITHUB_OUTPUT
           echo "::error::Generated schemas are out of date. Please run 'make generate' and commit the changes."
           echo "The following files have uncommitted changes:"
-          git status --porcelain
+          echo "$changes"
           echo ""
-          echo "Diff of changes:"
-          git diff
+          echo "Diff of changes (excluding go.sum):"
+          git diff -- . ':!go.sum'
           exit 1
         else
           echo "has_changes=false" >> $GITHUB_OUTPUT
