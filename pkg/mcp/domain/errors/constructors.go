@@ -281,11 +281,11 @@ func NewOperationFailedError(operation, reason string, cause error) error {
 		Context("operation", operation).
 		Context("reason", reason).
 		WithLocation()
-	
+
 	if cause != nil {
 		builder = builder.Cause(cause)
 	}
-	
+
 	return builder.Build()
 }
 
@@ -299,11 +299,11 @@ func NewSecurityError(violation string, details map[string]interface{}) error {
 		Context("violation", violation).
 		Suggestion("Review security policies and access controls").
 		WithLocation()
-	
+
 	for k, v := range details {
 		builder = builder.Context(k, v)
 	}
-	
+
 	return builder.Build()
 }
 
@@ -312,16 +312,16 @@ func NewMultiError(operation string, errors []error) error {
 	if len(errors) == 0 {
 		return nil
 	}
-	
+
 	if len(errors) == 1 {
 		return errors[0]
 	}
-	
+
 	errorMessages := make([]string, len(errors))
 	for i, err := range errors {
 		errorMessages[i] = err.Error()
 	}
-	
+
 	return NewError().
 		Code(CodeOperationFailed).
 		Type(ErrTypeOperation).

@@ -63,7 +63,9 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t api.Tool) error {
 			Build()
 	}
 
-	reg.logger.Info().Str("tool", toolName).Msg("🔧 Using invopop/jsonschema for schema generation with array fixes")
+	reg.logger.Info("🔧 Using invopop/jsonschema for schema generation with array fixes",
+
+		"tool", toolName)
 
 	reflector := &jsonschema.Reflector{
 		RequiredFromJSONSchemaTags: true,
@@ -83,7 +85,9 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t api.Tool) error {
 	cleanOutput := sanitizeInvopopSchema(outputSchema)
 
 	if hasArrays := containsArrays(cleanInput); hasArrays {
-		reg.logger.Info().Str("tool", toolName).Msg("✅ Generated schema with proper array items using invopop/jsonschema")
+		reg.logger.Info("✅ Generated schema with proper array items using invopop/jsonschema",
+
+			"tool", toolName)
 	}
 
 	reg.tools[toolName] = &ToolRegistration{
@@ -117,10 +121,11 @@ func RegisterTool[TArgs, TResult any](reg *ToolRegistry, t api.Tool) error {
 		},
 	}
 
-	reg.logger.Info().
-		Str("tool", toolName).
-		Str("version", "1.0.0").
-		Msg("registered")
+	reg.logger.Info("registered",
+
+		"tool", toolName,
+
+		"version", "1.0.0")
 	return nil
 }
 
@@ -184,12 +189,20 @@ func (r *ToolRegistry) ExecuteTool(ctx context.Context, name string, raw json.Ra
 		return nil, errors.NewError().Messagef("registry operation failed").Build()
 	}
 
-	r.logger.Debug().Str("tool", name).Msg("executing tool")
+	r.logger.Debug("executing tool",
+
+		"tool", name)
 	res, err := reg.Handler(ctx, raw)
 	if err != nil {
-		r.logger.Error().Err(err).Str("tool", name).Msg("tool execution failed")
+		r.logger.Error("tool execution failed",
+
+			"error", err,
+
+			"tool", name)
 		return nil, err
 	}
-	r.logger.Debug().Str("tool", name).Msg("tool execution completed")
+	r.logger.Debug("tool execution completed",
+
+		"tool", name)
 	return res, nil
 }

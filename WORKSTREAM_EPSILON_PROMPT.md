@@ -398,7 +398,7 @@ package PACKAGE_NAME
 import (
     "context"
     "testing"
-    
+
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/mock"
 )
@@ -406,10 +406,10 @@ import (
 func TestFUNCTION_NAME(t *testing.T) {
     // Arrange
     ctx := context.Background()
-    
+
     // Act
     result, err := FUNCTION_NAME(ctx, input)
-    
+
     // Assert
     assert.NoError(t, err)
     assert.NotNil(t, result)
@@ -418,10 +418,10 @@ func TestFUNCTION_NAME(t *testing.T) {
 func TestFUNCTION_NAME_Error(t *testing.T) {
     // Arrange
     ctx := context.Background()
-    
+
     // Act
     result, err := FUNCTION_NAME(ctx, invalidInput)
-    
+
     // Assert
     assert.Error(t, err)
     assert.Nil(t, result)
@@ -435,7 +435,7 @@ package PACKAGE_NAME
 import (
     "context"
     "testing"
-    
+
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/suite"
 )
@@ -456,7 +456,7 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 func (s *IntegrationTestSuite) TestIntegration() {
     // Integration test implementation
     ctx := context.Background()
-    
+
     // Test logic here
     assert.NotNil(s.T(), ctx)
 }
@@ -563,15 +563,15 @@ on:
 jobs:
   quality-gates:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.24.1'
-    
+
     - name: Cache Go modules
       uses: actions/cache@v3
       with:
@@ -579,13 +579,13 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-    
+
     - name: Install dependencies
       run: go mod download
-    
+
     - name: Run quality gates
       run: scripts/quality/quality_gates.sh
-    
+
     - name: Upload coverage reports
       uses: actions/upload-artifact@v3
       if: always()
@@ -665,7 +665,7 @@ package telemetry
 import (
     "context"
     "fmt"
-    
+
     "go.opentelemetry.io/otel"
     "go.opentelemetry.io/otel/attribute"
     "go.opentelemetry.io/otel/exporters/jaeger"
@@ -683,23 +683,23 @@ func InitTracing(serviceName string) (*trace.TracerProvider, error) {
     if err != nil {
         return nil, fmt.Errorf("failed to create Jaeger exporter: %w", err)
     }
-    
+
     // Create resource
     res := resource.NewWithAttributes(
         semconv.SchemaURL,
         semconv.ServiceNameKey.String(serviceName),
         semconv.ServiceVersionKey.String("1.0.0"),
     )
-    
+
     // Create tracer provider
     tp := trace.NewTracerProvider(
         trace.WithBatcher(exporter),
         trace.WithResource(res),
     )
-    
+
     // Set global tracer provider
     otel.SetTracerProvider(tp)
-    
+
     return tp, nil
 }
 
@@ -722,7 +722,7 @@ package telemetry
 import (
     "context"
     "time"
-    
+
     "go.opentelemetry.io/otel"
     "go.opentelemetry.io/otel/metric"
 )
@@ -746,7 +746,7 @@ func NewMetrics() (*Metrics, error) {
     if err != nil {
         return nil, err
     }
-    
+
     toolExecutionCounter, err := meter.Int64Counter(
         "tool_execution_total",
         metric.WithDescription("Total number of tool executions"),
@@ -754,7 +754,7 @@ func NewMetrics() (*Metrics, error) {
     if err != nil {
         return nil, err
     }
-    
+
     errorCounter, err := meter.Int64Counter(
         "errors_total",
         metric.WithDescription("Total number of errors"),
@@ -762,7 +762,7 @@ func NewMetrics() (*Metrics, error) {
     if err != nil {
         return nil, err
     }
-    
+
     return &Metrics{
         ToolExecutionDuration: toolExecutionDuration,
         ToolExecutionCounter:  toolExecutionCounter,
@@ -774,10 +774,10 @@ func NewMetrics() (*Metrics, error) {
 func (m *Metrics) RecordToolExecution(ctx context.Context, toolName string, duration time.Duration, err error) {
     m.ToolExecutionDuration.Record(ctx, duration.Seconds(),
         metric.WithAttributes(attribute.String("tool", toolName)))
-    
+
     m.ToolExecutionCounter.Add(ctx, 1,
         metric.WithAttributes(attribute.String("tool", toolName)))
-    
+
     if err != nil {
         m.ErrorCounter.Add(ctx, 1,
             metric.WithAttributes(
@@ -842,7 +842,7 @@ groups:
         annotations:
           summary: "High tool execution latency detected"
           description: "Tool execution P95 latency is above 300μs for 5 minutes"
-      
+
       - alert: HighErrorRate
         expr: rate(errors_total[1m]) > 0.1
         for: 2m
@@ -1006,7 +1006,7 @@ package tools
 import (
     "context"
     "time"
-    
+
     "pkg/mcp/infra/telemetry"
     "go.opentelemetry.io/otel/attribute"
 )
@@ -1016,20 +1016,20 @@ func ExecuteWithTracing(ctx context.Context, toolName string, executor func(cont
     ctx, span := telemetry.StartSpan(ctx, "tool.execute",
         attribute.String("tool.name", toolName))
     defer span.End()
-    
+
     start := time.Now()
     err := executor(ctx)
     duration := time.Since(start)
-    
+
     // Record metrics
     if metrics, err := telemetry.GetMetrics(); err == nil {
         metrics.RecordToolExecution(ctx, toolName, duration, err)
     }
-    
+
     if err != nil {
         telemetry.RecordError(span, err)
     }
-    
+
     return err
 }
 EOF
@@ -1242,7 +1242,7 @@ echo "🚨 EPSILON COMPLETE - All performance and documentation goals achieved"
 
 ### Quality Gate Fixes Today:
 - [Architecture violations fixed]
-- [Security issues resolved]  
+- [Security issues resolved]
 - [Lint configuration updated]
 - [Baseline established]
 
@@ -1262,7 +1262,7 @@ echo "🚨 EPSILON COMPLETE - All performance and documentation goals achieved"
 ```
 
 ### Daily Status Template (Normal Operations - After Gates Fixed)
-```markdown  
+```markdown
 ## WORKSTREAM EPSILON - Day X Status
 
 ### Monitoring Results:
@@ -1299,7 +1299,7 @@ echo "=== EPSILON QUALITY GATE PRIORITY PHASE ==="
 # 1. Check current quality gate status
 scripts/quality/quality_gates.sh
 
-# 2. Fix architecture violations  
+# 2. Fix architecture violations
 scripts/validate-architecture.sh --verbose
 # Fix issues, then validate:
 scripts/validate-architecture.sh && echo "✅ Architecture clean"

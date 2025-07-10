@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // CacheManager provides simple in-memory caching functionality

@@ -2,6 +2,8 @@ package conversation
 
 import (
 	"testing"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func TestConversationResponseAutoAdvance(t *testing.T) {
@@ -10,7 +12,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		t.Parallel()
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   convertFromTypesStage(shared.StageBuild),
+			Stage:   convertFromTypesStage(domaintypes.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -22,14 +24,14 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			DefaultAction: "proceed",
 		}
 
-		response.WithAutoAdvance(convertFromTypesStage(shared.StagePush), config)
+		response.WithAutoAdvance(convertFromTypesStage(domaintypes.StagePush), config)
 
 		if response.RequiresInput {
 			t.Error("Expected RequiresInput to be false")
 		}
 
-		if response.NextStage == nil || *response.NextStage != convertFromTypesStage(shared.StagePush) {
-			t.Errorf("Expected NextStage to be %s, got %v", convertFromTypesStage(shared.StagePush), response.NextStage)
+		if response.NextStage == nil || *response.NextStage != convertFromTypesStage(domaintypes.StagePush) {
+			t.Errorf("Expected NextStage to be %s, got %v", convertFromTypesStage(domaintypes.StagePush), response.NextStage)
 		}
 
 		if !response.CanAutoAdvance() {
@@ -41,7 +43,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		t.Parallel()
 		response := &ConversationResponse{
 			Message: "Choose an option",
-			Stage:   convertFromTypesStage(shared.StageBuild),
+			Stage:   convertFromTypesStage(domaintypes.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -64,7 +66,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		t.Parallel()
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   convertFromTypesStage(shared.StageBuild),
+			Stage:   convertFromTypesStage(domaintypes.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -72,15 +74,15 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			Confidence: 0.9,
 		}
 
-		response.WithAutoAdvance(convertFromTypesStage(shared.StagePush), config)
-		prefsAutopilot := shared.UserPreferences{
+		response.WithAutoAdvance(convertFromTypesStage(domaintypes.StagePush), config)
+		prefsAutopilot := domaintypes.UserPreferences{
 			SkipConfirmations: true,
 		}
 
 		if !response.ShouldAutoAdvance(prefsAutopilot) {
 			t.Error("Expected ShouldAutoAdvance to return true with autopilot enabled")
 		}
-		prefsManual := shared.UserPreferences{
+		prefsManual := domaintypes.UserPreferences{
 			SkipConfirmations: false,
 		}
 
@@ -93,16 +95,16 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		t.Parallel()
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   convertFromTypesStage(shared.StageBuild),
+			Stage:   convertFromTypesStage(domaintypes.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 		lowConfidenceConfig := AutoAdvanceConfig{
 			Confidence: 0.5,
 		}
 
-		response.WithAutoAdvance(convertFromTypesStage(shared.StagePush), lowConfidenceConfig)
+		response.WithAutoAdvance(convertFromTypesStage(domaintypes.StagePush), lowConfidenceConfig)
 
-		prefs := shared.UserPreferences{
+		prefs := domaintypes.UserPreferences{
 			SkipConfirmations: true,
 		}
 
@@ -113,7 +115,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			Confidence: 0.9,
 		}
 
-		response.WithAutoAdvance(convertFromTypesStage(shared.StagePush), highConfidenceConfig)
+		response.WithAutoAdvance(convertFromTypesStage(domaintypes.StagePush), highConfidenceConfig)
 
 		if !response.ShouldAutoAdvance(prefs) {
 			t.Error("Expected ShouldAutoAdvance to return true with high confidence")
@@ -124,7 +126,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 		t.Parallel()
 		response := &ConversationResponse{
 			Message: "Build complete",
-			Stage:   convertFromTypesStage(shared.StageBuild),
+			Stage:   convertFromTypesStage(domaintypes.StageBuild),
 			Status:  ResponseStatusSuccess,
 		}
 
@@ -134,7 +136,7 @@ func TestConversationResponseAutoAdvance(t *testing.T) {
 			CanCancel:    true,
 		}
 
-		response.WithAutoAdvance(convertFromTypesStage(shared.StagePush), config)
+		response.WithAutoAdvance(convertFromTypesStage(domaintypes.StagePush), config)
 
 		message := response.GetAutoAdvanceMessage()
 

@@ -6,7 +6,7 @@ This document provides concrete file paths and line numbers corresponding to the
 
 **Current Examples:**
 - `/pkg/mcp/application/internal/conversation/` - 5 levels deep
-- `/pkg/mcp/domain/containerization/analyze/` - 5 levels deep  
+- `/pkg/mcp/domain/containerization/analyze/` - 5 levels deep
 - `/pkg/mcp/infra/templates/components/` - 5 levels deep
 - `/pkg/mcp/domain/security/validation/` - 5 levels deep
 
@@ -25,7 +25,7 @@ This document provides concrete file paths and line numbers corresponding to the
   - Defines `BackoffStrategy`, `Policy` struct
   - Implements retry logic with exponential backoff
 
-### Implementation 2: Infrastructure Layer  
+### Implementation 2: Infrastructure Layer
 - `pkg/mcp/infra/retry/coordinator.go` (lines 1-30)
   - Identical `BackoffStrategy`, `Policy` struct definitions
   - Duplicate implementation of the same retry patterns

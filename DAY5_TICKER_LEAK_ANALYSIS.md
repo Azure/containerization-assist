@@ -43,7 +43,7 @@ func (e *OptimizedExecutor) Close() error {
 ### Location: `pkg/mcp/application/orchestration/pipeline/background_workers.go`
 - **Claim**: "healthTicker is created but never stopped"
 - **Reality**: `healthTicker` is properly stopped in `StopAll()` method at line 220
-- **Evidence**: 
+- **Evidence**:
 ```go
 // StopAll stops all workers gracefully
 func (s *BackgroundWorkerServiceImpl) StopAll() error {

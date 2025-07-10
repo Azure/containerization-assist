@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func (ps *PromptServiceImpl) handleWelcomeStage(_ context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageWelcome)), getStageIntro(convertFromTypesStage(shared.StageWelcome)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StageWelcome)), getStageIntro(convertFromTypesStage(domaintypes.StageWelcome)))
 	if input == "" {
 
 		return &ConversationResponse{
@@ -22,7 +24,7 @@ I'll guide you through:
 • 🚀 Deploying to your cluster
 
 How would you like to proceed?`, progressPrefix),
-			Stage:  convertFromTypesStage(shared.StageWelcome),
+			Stage:  convertFromTypesStage(domaintypes.StageWelcome),
 			Status: ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -43,10 +45,10 @@ How would you like to proceed?`, progressPrefix),
 
 	if strings.Contains(lowerInput, "interactive") || strings.Contains(lowerInput, "guide") || input == "1" {
 
-		state.SetStage(convertFromTypesStage(shared.StageInit))
+		state.SetStage(convertFromTypesStage(domaintypes.StageInit))
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sGreat! I'll guide you through each step. Let's start by analyzing your repository.\n\nCould you provide the repository URL or local path?", progressPrefix),
-			Stage:   convertFromTypesStage(shared.StageInit),
+			Stage:   convertFromTypesStage(domaintypes.StageInit),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -67,7 +69,7 @@ How would you like to proceed?`, progressPrefix),
 
 		ps.enableAutopilot(state)
 		state.Context["skip_confirmations"] = true
-		state.SetStage(convertFromTypesStage(shared.StageInit))
+		state.SetStage(convertFromTypesStage(domaintypes.StageInit))
 
 		return &ConversationResponse{
 			Message: fmt.Sprintf(`%s🤖 Autopilot mode enabled! I'll proceed automatically with smart defaults.
@@ -77,13 +79,13 @@ You can still:
 • Type 'autopilot off' to switch back to interactive mode
 
 Now, please provide your repository URL or local path:`, progressPrefix),
-			Stage:  convertFromTypesStage(shared.StageInit),
+			Stage:  convertFromTypesStage(domaintypes.StageInit),
 			Status: ResponseStatusWaitingInput,
 		}
 	}
 	return &ConversationResponse{
 		Message: fmt.Sprintf("%sPlease choose how you'd like to proceed:", progressPrefix),
-		Stage:   convertFromTypesStage(shared.StageWelcome),
+		Stage:   convertFromTypesStage(domaintypes.StageWelcome),
 		Status:  ResponseStatusWaitingInput,
 		Options: []Option{
 			{
@@ -100,14 +102,14 @@ Now, please provide your repository URL or local path:`, progressPrefix),
 }
 func (ps *PromptServiceImpl) handleInitStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageInit)), getStageIntro(convertFromTypesStage(shared.StageInit)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StageInit)), getStageIntro(convertFromTypesStage(domaintypes.StageInit)))
 	repoRef := ps.extractRepositoryReference(input)
 
 	if repoRef == "" {
 
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sI'll help you containerize your application. Could you provide the repository URL or local path?", progressPrefix),
-			Stage:   convertFromTypesStage(shared.StageInit),
+			Stage:   convertFromTypesStage(domaintypes.StageInit),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -124,14 +126,14 @@ func (ps *PromptServiceImpl) handleInitStage(ctx context.Context, state *Convers
 		}
 	}
 	state.SessionState.RepoURL = repoRef
-	state.SetStage(convertFromTypesStage(shared.StageAnalysis))
+	state.SetStage(convertFromTypesStage(domaintypes.StageAnalysis))
 
 	state.Context["autopilot_enabled"] = true
 	return ps.startAnalysis(ctx, state, repoRef)
 }
 func (ps *PromptServiceImpl) handleAnalysisStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageAnalysis)), getStageIntro(convertFromTypesStage(shared.StageAnalysis)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StageAnalysis)), getStageIntro(convertFromTypesStage(domaintypes.StageAnalysis)))
 	repoAnalysisEmpty := true
 	repoURL := ""
 	if state.SessionState.Metadata != nil {
@@ -183,7 +185,7 @@ func (ps *PromptServiceImpl) handleAnalysisStage(ctx context.Context, state *Con
 
 			response := &ConversationResponse{
 				Message: fmt.Sprintf("%sLet's configure how to analyze your repository. You can provide specific settings or type 'skip' to use defaults:", progressPrefix),
-				Stage:   convertFromTypesStage(shared.StageAnalysis),
+				Stage:   convertFromTypesStage(domaintypes.StageAnalysis),
 				Status:  ResponseStatusWaitingInput,
 				Form:    form,
 			}
@@ -198,17 +200,17 @@ func (ps *PromptServiceImpl) handleAnalysisStage(ctx context.Context, state *Con
 		}
 	}
 	if repoAnalysisExists {
-		state.SetStage(convertFromTypesStage(shared.StageDockerfile))
+		state.SetStage(convertFromTypesStage(domaintypes.StageDockerfile))
 
 		if ps.hasAutopilotEnabled(state) {
 
 			response := &ConversationResponse{
 				Message: fmt.Sprintf("%sRepository analysis complete. Proceeding to Dockerfile generation...", progressPrefix),
-				Stage:   convertFromTypesStage(shared.StageAnalysis),
+				Stage:   convertFromTypesStage(domaintypes.StageAnalysis),
 				Status:  ResponseStatusSuccess,
 			}
 
-			return response.WithAutoAdvance(convertFromTypesStage(shared.StageDockerfile), AutoAdvanceConfig{
+			return response.WithAutoAdvance(convertFromTypesStage(domaintypes.StageDockerfile), AutoAdvanceConfig{
 				DelaySeconds:  2,
 				Confidence:    0.9,
 				Reason:        "Analysis complete, proceeding to Dockerfile generation",
@@ -219,7 +221,7 @@ func (ps *PromptServiceImpl) handleAnalysisStage(ctx context.Context, state *Con
 
 		return &ConversationResponse{
 			Message: fmt.Sprintf("%sAnalysis is complete. Shall we proceed to create a Dockerfile?", progressPrefix),
-			Stage:   convertFromTypesStage(shared.StageAnalysis),
+			Stage:   convertFromTypesStage(domaintypes.StageAnalysis),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -238,7 +240,7 @@ func (ps *PromptServiceImpl) handleAnalysisStage(ctx context.Context, state *Con
 }
 func (ps *PromptServiceImpl) handleDockerfileStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageDockerfile)), getStageIntro(convertFromTypesStage(shared.StageDockerfile)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StageDockerfile)), getStageIntro(convertFromTypesStage(domaintypes.StageDockerfile)))
 	dockerfileContent := ""
 	if state.SessionState.Metadata != nil {
 		if content, ok := state.SessionState.Metadata["dockerfile_content"].(string); ok {
@@ -282,11 +284,11 @@ func (ps *PromptServiceImpl) handleDockerfileStage(ctx context.Context, state *C
 
 			response := &ConversationResponse{
 				Message: fmt.Sprintf("%sUsing smart defaults for Dockerfile configuration...", progressPrefix),
-				Stage:   convertFromTypesStage(shared.StageDockerfile),
+				Stage:   convertFromTypesStage(domaintypes.StageDockerfile),
 				Status:  ResponseStatusProcessing,
 			}
 
-			return response.WithAutoAdvance(convertFromTypesStage(shared.StageBuild), AutoAdvanceConfig{
+			return response.WithAutoAdvance(convertFromTypesStage(domaintypes.StageBuild), AutoAdvanceConfig{
 				DelaySeconds:  1,
 				Confidence:    0.85,
 				Reason:        "Applied smart Dockerfile defaults",
@@ -298,7 +300,7 @@ func (ps *PromptServiceImpl) handleDockerfileStage(ctx context.Context, state *C
 
 		response := &ConversationResponse{
 			Message: fmt.Sprintf("%sLet's configure your Dockerfile. You can provide specific settings or type 'skip' to use smart defaults:", progressPrefix),
-			Stage:   convertFromTypesStage(shared.StageDockerfile),
+			Stage:   convertFromTypesStage(domaintypes.StageDockerfile),
 			Status:  ResponseStatusWaitingInput,
 			Form:    form,
 		}
@@ -339,7 +341,7 @@ func (ps *PromptServiceImpl) handleCompletedStage(ctx context.Context, state *Co
    ` + "`kubectl logs -n " + state.Preferences.Namespace + " -l app=" + appName + "`" + `
 
 What else would you like to know?`,
-			Stage:  convertFromTypesStage(shared.StageCompleted),
+			Stage:  convertFromTypesStage(domaintypes.StageCompleted),
 			Status: ResponseStatusSuccess,
 			Options: []Option{
 				{ID: "summary", Label: "Show deployment summary"},
@@ -350,7 +352,7 @@ What else would you like to know?`,
 	}
 	return &ConversationResponse{
 		Message: "Your containerization journey is complete! 🎉\n\nType 'help' for next steps or 'summary' for a deployment overview.",
-		Stage:   convertFromTypesStage(shared.StageCompleted),
+		Stage:   convertFromTypesStage(domaintypes.StageCompleted),
 		Status:  ResponseStatusSuccess,
 	}
 }

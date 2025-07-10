@@ -15,10 +15,10 @@ mkdir -p pkg/mcp/knowledge
 if [ -d "pkg/mcp/application/knowledge" ]; then
     echo "Moving knowledge package files..."
     find pkg/mcp/application/knowledge -name "*.go" -exec cp {} pkg/mcp/knowledge/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/knowledge -name "*.go" -exec sed -i 's/^package knowledge$/package knowledge/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/knowledge -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/application/knowledge not found"
@@ -33,13 +33,13 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/application/kn
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
         sed -i 's|github.com/Azure/container-kit/pkg/mcp/application/knowledge|github.com/Azure/container-kit/pkg/mcp/knowledge|g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old knowledge package"

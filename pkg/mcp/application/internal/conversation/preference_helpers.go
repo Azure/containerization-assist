@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func (ps *PromptServiceImpl) extractRepositoryReference(input string) string {
@@ -97,10 +99,10 @@ func (ps *PromptServiceImpl) handlePendingDecision(ctx context.Context, state *C
 		state.ResolvePendingDecision(userDecision)
 	}
 
-	if state.CurrentStage == shared.StageBuild {
+	if state.CurrentStage == domaintypes.StageBuild {
 
 		if detailedStage, ok := state.Context["detailed_stage"].(string); ok &&
-			shared.ConversationStage(detailedStage) == shared.StageDockerfile {
+			domaintypes.ConversationStage(detailedStage) == domaintypes.StageDockerfile {
 			return ps.generateDockerfile(ctx, state)
 		}
 	}
@@ -142,7 +144,7 @@ func (ps *PromptServiceImpl) generateSummary(_ context.Context, state *Conversat
 
 	return &ConversationResponse{
 		Message: summary.String(),
-		Stage:   shared.StageCompleted,
+		Stage:   domaintypes.StageCompleted,
 		Status:  ResponseStatusSuccess,
 	}
 }
@@ -168,7 +170,7 @@ func (ps *PromptServiceImpl) exportArtifacts(_ context.Context, state *Conversat
 
 	return &ConversationResponse{
 		Message: exports.String(),
-		Stage:   shared.StageCompleted,
+		Stage:   domaintypes.StageCompleted,
 		Status:  ResponseStatusSuccess,
 	}
 }

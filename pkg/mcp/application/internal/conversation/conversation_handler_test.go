@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -128,8 +129,8 @@ func (m *mockUnifiedSessionManager) GetOrCreateSession(sessionID string) (*sessi
 	return sess, nil
 }
 
-func (m *mockUnifiedSessionManager) GetStats(_ context.Context) (*shared.SessionManagerStats, error) {
-	return &shared.SessionManagerStats{
+func (m *mockUnifiedSessionManager) GetStats(_ context.Context) (*domaintypes.SessionManagerStats, error) {
+	return &domaintypes.SessionManagerStats{
 		ActiveSessions: len(m.sessions),
 		TotalSessions:  len(m.sessions),
 	}, nil
@@ -227,7 +228,7 @@ func TestNewConversationHandler(t *testing.T) {
 		sessionMgr := createTestSessionManager(t)
 		// TODO: Fix after package reorganization
 		// For now, use nil preference store
-		var prefStore *shared.PreferenceStore
+		var prefStore *domaintypes.PreferenceStore
 
 		config := ConversationHandlerConfig{
 			SessionManager:   sessionMgr,
@@ -330,7 +331,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		require.NoError(t, err)
 		response := &ConversationResponse{
 			SessionID: "auto-advance-test",
-			Stage:     shared.StageAnalysis,
+			Stage:     domaintypes.StageAnalysis,
 			Status:    ResponseStatusSuccess,
 			Message:   "Ready to proceed",
 			AutoAdvance: &AutoAdvanceConfig{
@@ -350,7 +351,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		handler := createTestHandler(t, logger)
 		response := &ConversationResponse{
 			SessionID:     "no-auto-advance",
-			Stage:         shared.StagePreFlight,
+			Stage:         domaintypes.StagePreFlight,
 			Status:        ResponseStatusWaitingInput,
 			Message:       "Welcome",
 			RequiresInput: true,
@@ -366,7 +367,7 @@ func TestHandleAutoAdvance(t *testing.T) {
 		handler := createTestHandler(t, logger)
 		response := &ConversationResponse{
 			SessionID: "infinite-loop-test",
-			Stage:     shared.StageAnalysis,
+			Stage:     domaintypes.StageAnalysis,
 			Status:    ResponseStatusSuccess,
 			AutoAdvance: &AutoAdvanceConfig{
 				DefaultAction: "continue",
@@ -441,7 +442,7 @@ func TestPreferenceIntegration(t *testing.T) {
 func createTestHandler(t *testing.T, logger *slog.Logger) *ConversationHandler {
 	sessionMgr := createTestSessionManager(t)
 	// TODO: Fix after package reorganization
-	var prefStore *shared.PreferenceStore // createTestPreferenceStore(t)
+	var prefStore *domaintypes.PreferenceStore // createTestPreferenceStore(t)
 	orchestrator := &mockToolOrchestrator{}
 
 	config := ConversationHandlerConfig{

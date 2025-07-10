@@ -14,8 +14,8 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/localrivet/gomcp/server"
 )
 

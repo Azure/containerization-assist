@@ -80,7 +80,7 @@ if go build ./pkg/mcp/... 2>&1 | tee /tmp/build_output.txt; then
 else
     echo ""
     echo "⚠️  Some compilation errors remain. Checking for common issues..."
-    
+
     # Check for specific error patterns
     if grep -q "package .* is not in GOROOT" /tmp/build_output.txt; then
         echo ""
@@ -90,7 +90,7 @@ else
             go get "$pkg" || true
         done
     fi
-    
+
     if grep -q "undefined:" /tmp/build_output.txt; then
         echo ""
         echo "📝 Found undefined symbols. This might indicate:"

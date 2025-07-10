@@ -44,18 +44,18 @@ run_workstream_bench() {
     local workstream=$1
     local package=$2
     local target_ns=$3
-    
+
     echo -e "${BLUE}Testing $workstream workstream...${NC}"
     echo -e "\n=== $workstream WORKSTREAM ===" >> "$REPORT_FILE"
     echo "Package: $package" >> "$REPORT_FILE"
     echo "Target: <$target_ns ns/op" >> "$REPORT_FILE"
     echo "" >> "$REPORT_FILE"
-    
+
     # Run benchmarks
     if go test -bench=. -benchmem -benchtime=10s "$package" > temp_bench.txt 2>&1; then
         # Extract results
         grep -E "Benchmark.*ns/op" temp_bench.txt >> "$REPORT_FILE" || echo "No benchmarks found" >> "$REPORT_FILE"
-        
+
         # Check for performance regression
         while read -r line; do
             if [[ $line =~ ([0-9]+)[[:space:]]+ns/op ]]; then
@@ -72,7 +72,7 @@ run_workstream_bench() {
         echo -e "${YELLOW}⚠️  No benchmarks or build error for $workstream${NC}"
         echo "⚠️  No benchmarks available or build error" >> "$REPORT_FILE"
     fi
-    
+
     rm -f temp_bench.txt
     echo "" >> "$REPORT_FILE"
 }

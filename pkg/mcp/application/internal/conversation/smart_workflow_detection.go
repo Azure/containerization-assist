@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 type WorkflowIntent int
@@ -187,17 +189,17 @@ func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Contex
 	message += "**Control**: You can type 'stop' or 'pause' at any time to take manual control\n\n"
 	if request.RepoURL != "" {
 		state.Context["repo_url"] = request.RepoURL
-		state.SetStage(convertFromTypesStage(shared.StageAnalysis))
+		state.SetStage(convertFromTypesStage(domaintypes.StageAnalysis))
 		message += fmt.Sprintf("**Repository**: %s\n\n", request.RepoURL)
 		message += "Starting repository analysis..."
 
 		response := &ConversationResponse{
 			Message: message,
-			Stage:   convertFromTypesStage(shared.StageAnalysis),
+			Stage:   convertFromTypesStage(domaintypes.StageAnalysis),
 			Status:  ResponseStatusProcessing,
 		}
 
-		return response.WithAutoAdvance(convertFromTypesStage(shared.StageAnalysis), AutoAdvanceConfig{
+		return response.WithAutoAdvance(convertFromTypesStage(domaintypes.StageAnalysis), AutoAdvanceConfig{
 			DelaySeconds:  1,
 			Confidence:    0.9,
 			Reason:        "Repository URL detected, starting analysis",
@@ -207,17 +209,17 @@ func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Contex
 
 	} else if request.LocalPath != "" {
 		state.Context["local_path"] = request.LocalPath
-		state.SetStage(convertFromTypesStage(shared.StageAnalysis))
+		state.SetStage(convertFromTypesStage(domaintypes.StageAnalysis))
 		message += fmt.Sprintf("**Local Path**: %s\n\n", request.LocalPath)
 		message += "Starting repository analysis..."
 
 		response := &ConversationResponse{
 			Message: message,
-			Stage:   convertFromTypesStage(shared.StageAnalysis),
+			Stage:   convertFromTypesStage(domaintypes.StageAnalysis),
 			Status:  ResponseStatusProcessing,
 		}
 
-		return response.WithAutoAdvance(convertFromTypesStage(shared.StageAnalysis), AutoAdvanceConfig{
+		return response.WithAutoAdvance(convertFromTypesStage(domaintypes.StageAnalysis), AutoAdvanceConfig{
 			DelaySeconds:  1,
 			Confidence:    0.9,
 			Reason:        "Local path detected, starting analysis",
@@ -227,12 +229,12 @@ func (swd *SmartWorkflowDetector) handleContainerizeAppIntent(ctx context.Contex
 
 	} else {
 
-		state.SetStage(convertFromTypesStage(shared.StageInit))
+		state.SetStage(convertFromTypesStage(domaintypes.StageInit))
 		message += "Please provide your repository URL or local path to get started:"
 
 		return &ConversationResponse{
 			Message: message,
-			Stage:   convertFromTypesStage(shared.StageInit),
+			Stage:   convertFromTypesStage(domaintypes.StageInit),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{
@@ -265,12 +267,12 @@ func (swd *SmartWorkflowDetector) handleInteractiveGuideIntent(ctx context.Conte
 		state.Context["detected_app_type"] = request.AppType
 	}
 
-	state.SetStage(convertFromTypesStage(shared.StageInit))
+	state.SetStage(convertFromTypesStage(domaintypes.StageInit))
 	message += "Let's start by analyzing your repository. Please provide the repository URL or local path:"
 
 	return &ConversationResponse{
 		Message: message,
-		Stage:   convertFromTypesStage(shared.StageInit),
+		Stage:   convertFromTypesStage(domaintypes.StageInit),
 		Status:  ResponseStatusWaitingInput,
 		Options: []Option{
 			{

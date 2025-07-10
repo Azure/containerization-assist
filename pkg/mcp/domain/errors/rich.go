@@ -46,6 +46,13 @@ const (
 	CodeToolAlreadyRegistered ErrorCode = "TOOL_ALREADY_REGISTERED"
 	CodeVersionMismatch       ErrorCode = "VERSION_MISMATCH"
 
+	// Additional codes for tests
+	CodeConfigurationInvalid ErrorCode = "CONFIGURATION_INVALID"
+	CodeNetworkError         ErrorCode = "NETWORK_ERROR"
+	CodeOperationFailed      ErrorCode = "OPERATION_FAILED"
+	CodeTimeoutError         ErrorCode = "TIMEOUT_ERROR"
+	CodeTypeMismatch         ErrorCode = "TYPE_MISMATCH"
+
 	// Security error codes
 	CodeSecurity           ErrorCode = "SECURITY_ERROR"
 	CodeValidation         ErrorCode = "VALIDATION_ERROR"
@@ -83,6 +90,8 @@ const (
 	ErrTypeSystem        ErrorType = "system"
 	ErrTypePermission    ErrorType = "permission"
 	ErrTypeConfiguration ErrorType = "configuration"
+	ErrTypeOperation     ErrorType = "operation"
+	ErrTypeExternal      ErrorType = "external"
 )
 
 // ErrorSeverity indicates the error severity

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	validationCore "github.com/Azure/container-kit/pkg/mcp/domain/security"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func (ps *PromptServiceImpl) startAnalysisWithFormData(ctx context.Context, state *ConversationState) *ConversationResponse {
@@ -16,7 +17,7 @@ func (ps *PromptServiceImpl) startAnalysisWithFormData(ctx context.Context, stat
 }
 func (ps *PromptServiceImpl) startAnalysis(ctx context.Context, state *ConversationState, repoURL string) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  convertFromTypesStage(shared.StageAnalysis),
+		Stage:  convertFromTypesStage(domaintypes.StageAnalysis),
 		Status: ResponseStatusProcessing,
 	}
 	ps.applyAnalysisFormDataToPreferences(state)
@@ -42,7 +43,7 @@ func (ps *PromptServiceImpl) startAnalysis(ctx context.Context, state *Conversat
 	}
 
 	if err != nil {
-		toolCall.Error = &shared.ToolError{
+		toolCall.Error = &domaintypes.ToolError{
 			Type:      "analysis_error",
 			Message:   fmt.Sprintf("analyze_repository error: %v", err),
 			Retryable: true,
@@ -98,7 +99,7 @@ func (ps *PromptServiceImpl) startAnalysis(ctx context.Context, state *Conversat
 }
 func (ps *PromptServiceImpl) generateDockerfile(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:  convertFromTypesStage(shared.StageDockerfile),
+		Stage:  convertFromTypesStage(domaintypes.StageDockerfile),
 		Status: ResponseStatusProcessing,
 	}
 
@@ -123,7 +124,7 @@ func (ps *PromptServiceImpl) generateDockerfile(ctx context.Context, state *Conv
 	}
 
 	if err != nil {
-		toolCall.Error = &shared.ToolError{
+		toolCall.Error = &domaintypes.ToolError{
 			Type:      "generation_error",
 			Message:   fmt.Sprintf("generate_dockerfile error: %v", err),
 			Retryable: true,
@@ -196,7 +197,7 @@ func (ps *PromptServiceImpl) generateDockerfile(ctx context.Context, state *Conv
 					Type:    "dockerfile",
 					Name:    path,
 					Content: content,
-					Stage:   convertFromTypesStage(shared.StageDockerfile),
+					Stage:   convertFromTypesStage(domaintypes.StageDockerfile),
 				}
 				state.AddArtifact(artifact)
 
@@ -209,7 +210,7 @@ func (ps *PromptServiceImpl) generateDockerfile(ctx context.Context, state *Conv
 
 				response.Status = ResponseStatusSuccess
 				response.NextSteps = []string{"Build Docker image", "Review Dockerfile"}
-				state.SetStage(convertFromTypesStage(shared.StageBuild))
+				state.SetStage(convertFromTypesStage(domaintypes.StageBuild))
 			}
 		}
 	}

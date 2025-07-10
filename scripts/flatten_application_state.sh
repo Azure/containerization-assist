@@ -20,10 +20,10 @@ mkdir -p pkg/mcp/appstate
 if [ -d "pkg/mcp/application/state" ]; then
     echo "Moving state package files..."
     find pkg/mcp/application/state -name "*.go" -exec cp {} pkg/mcp/appstate/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/appstate -name "*.go" -exec sed -i 's/^package state$/package appstate/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/appstate -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/application/state not found"
@@ -38,7 +38,7 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/application/st
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
@@ -46,7 +46,7 @@ if [ -n "$files_to_update" ]; then
         # Update any package references in the code
         sed -i 's/state\./appstate\./g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old state package"

@@ -12,10 +12,10 @@ fix_imports() {
     local old_path=$1
     local new_path=$2
     local description=$3
-    
+
     echo "Fixing: $description"
     echo "  $old_path → $new_path"
-    
+
     # Find and update all Go files with this import
     find . -name "*.go" -type f | while read -r file; do
         if grep -q "$old_path" "$file" 2>/dev/null; then
@@ -157,7 +157,7 @@ echo "Fixing package declarations in moved files..."
 find pkg/mcp/domain/types -name "*.go" -exec sed -i 's/^package domaintypes$/package types/g' {} \;
 find pkg/mcp/domain/internal -name "*.go" -exec sed -i 's/^package shared$/package internal/g' {} \;
 
-# Application packages  
+# Application packages
 find pkg/mcp/application/state -name "*.go" -exec sed -i 's/^package appstate$/package state/g' {} \;
 
 echo ""

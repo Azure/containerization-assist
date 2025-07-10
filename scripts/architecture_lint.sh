@@ -15,7 +15,7 @@ SCRIPTS_DIR="scripts"
 
 # Colors for output
 RED='\033[0;31m'
-GREEN='\033[0;32m' 
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
@@ -62,7 +62,7 @@ echo ""
 echo "3️⃣  Checking for circular dependencies..."
 if go run "$SCRIPTS_DIR/detect_circular_dependencies.go" "$PKG_ROOT" > /tmp/circular_deps_results.txt 2>&1; then
     echo "   ✅ No circular dependencies found"
-    
+
     # Show some useful stats
     avg_deps=$(grep "Average dependencies" /tmp/circular_deps_results.txt | grep -o '[0-9.]\+' || echo "0")
     leaf_count=$(grep "Leaf packages" /tmp/circular_deps_results.txt | grep -o '[0-9]\+' || echo "0")
@@ -120,7 +120,7 @@ naming_violations=0
 while IFS= read -r -d '' dir; do
     rel_path=$(realpath --relative-to="$PKG_ROOT" "$dir")
     depth=$(echo "$rel_path" | tr '/' '\n' | wc -l)
-    
+
     if [ "$depth" -gt 3 ]; then
         if [ $naming_violations -eq 0 ]; then
             echo "   ❌ Found packages exceeding depth limit:"
@@ -137,7 +137,7 @@ fi
 
 echo ""
 
-# 6. Internal Package Access Check  
+# 6. Internal Package Access Check
 echo "6️⃣  Checking internal package access..."
 
 internal_violations=0
@@ -145,12 +145,12 @@ while IFS= read -r line; do
     if [[ $line == *"/internal/"* ]]; then
         file=$(echo "$line" | cut -d: -f1)
         import=$(echo "$line" | cut -d'"' -f2)
-        
+
         # Check if this is cross-package access to internal
         file_pkg_path=$(dirname "$file")
         import_relative=$(echo "$import" | sed 's|github.com/Azure/container-kit/||')
         import_pkg_path=$(echo "$import_relative" | sed 's|/internal/.*||')
-        
+
         if [[ "$file_pkg_path" != *"$import_pkg_path"* ]]; then
             if [ $internal_violations -eq 0 ]; then
                 echo "   ❌ Found cross-package internal imports:"
@@ -179,7 +179,7 @@ if [ $OVERALL_STATUS -eq 0 ]; then
     echo ""
     echo "Architecture Quality Metrics:"
     echo "- ✅ Import depth ≤ $MAX_IMPORT_DEPTH levels"
-    echo "- ✅ Clean architecture boundaries maintained"  
+    echo "- ✅ Clean architecture boundaries maintained"
     echo "- ✅ No circular dependencies"
     echo "- ✅ Proper package organization"
     echo "- ✅ No forbidden patterns"

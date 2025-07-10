@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 type WorkflowError struct {
@@ -33,19 +34,19 @@ type ErrorAction struct {
 	Metadata   map[string]interface{} `json:"metadata"`
 	Parameters map[string]interface{} `json:"parameters"`
 }
-type UserPreferences = shared.UserPreferences
+type UserPreferences = domaintypes.UserPreferences
 
 type ConversationHandler struct {
 	promptManager    *PromptManager
 	sessionManager   session.SessionManager
 	toolOrchestrator api.Orchestrator
-	preferenceStore  *shared.PreferenceStore
+	preferenceStore  *domaintypes.PreferenceStore
 	logger           *slog.Logger
 }
 type ConversationHandlerConfig struct {
 	SessionManager     session.SessionManager
 	SessionAdapter     session.SessionManager
-	PreferenceStore    *shared.PreferenceStore
+	PreferenceStore    *domaintypes.PreferenceStore
 	PipelineOperations interface{} // TypedPipelineOperations - not used, keeping for compatibility
 	ToolOrchestrator   api.Orchestrator
 	Transport          interface{}
@@ -139,7 +140,7 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 	if response == nil {
 		return response, nil
 	}
-	var userPrefs shared.UserPreferences = shared.UserPreferences{
+	var userPrefs domaintypes.UserPreferences = domaintypes.UserPreferences{
 		SkipConfirmations: false,
 	}
 	if sessionID := response.SessionID; sessionID != "" {
@@ -189,7 +190,7 @@ func (ch *ConversationHandler) handleAutoAdvance(ctx context.Context, response *
 
 	return currentResponse, nil
 }
-func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID string, stage shared.ConversationStage, err error, state *ConversationState) (*AutoFixResult, error) {
+func (ch *ConversationHandler) attemptAutoFix(ctx context.Context, sessionID string, stage domaintypes.ConversationStage, err error, state *ConversationState) (*AutoFixResult, error) {
 	ch.logger.Info("Attempting automatic fix before manual intervention",
 		"session_id", sessionID,
 		"stage", string(stage),
@@ -281,15 +282,15 @@ type AutoFixResult struct {
 	Message         string   `json:"message"`
 }
 
-func (ch *ConversationHandler) getToolNameForStage(stage shared.ConversationStage) string {
+func (ch *ConversationHandler) getToolNameForStage(stage domaintypes.ConversationStage) string {
 	switch stage {
-	case shared.StageDockerfile, shared.StageBuild:
+	case domaintypes.StageDockerfile, domaintypes.StageBuild:
 		return "build_image"
-	case shared.StagePush:
+	case domaintypes.StagePush:
 		return "push_image"
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		return "deploy_kubernetes"
-	case shared.StageManifests:
+	case domaintypes.StageManifests:
 		return "generate_manifests"
 	default:
 		return "unknown"
@@ -334,7 +335,7 @@ func (ch *ConversationHandler) getErrorSeverity(err error) string {
 	}
 }
 
-func (ch *ConversationHandler) attemptRetryFix(ctx context.Context, sessionID string, stage shared.ConversationStage, action *ErrorAction) bool {
+func (ch *ConversationHandler) attemptRetryFix(ctx context.Context, sessionID string, stage domaintypes.ConversationStage, action *ErrorAction) bool {
 
 	convState, err := ch.prepareRetrySession(sessionID)
 	if err != nil {
@@ -413,14 +414,14 @@ func (ch *ConversationHandler) loadConversationHistory(convState *ConversationSt
 	}
 	return convState
 }
-func (ch *ConversationHandler) findOrBuildLastToolCall(convState *ConversationState, stage shared.ConversationStage) *ToolCall {
+func (ch *ConversationHandler) findOrBuildLastToolCall(convState *ConversationState, stage domaintypes.ConversationStage) *ToolCall {
 
 	if lastToolCall := ch.findLastToolCallInHistory(convState, stage); lastToolCall != nil {
 		return lastToolCall
 	}
 	return ch.buildToolCallFromMetadata(convState.SessionState, stage)
 }
-func (ch *ConversationHandler) findLastToolCallInHistory(convState *ConversationState, stage shared.ConversationStage) *ToolCall {
+func (ch *ConversationHandler) findLastToolCallInHistory(convState *ConversationState, stage domaintypes.ConversationStage) *ToolCall {
 	if len(convState.History) == 0 {
 		return nil
 	}
@@ -439,7 +440,7 @@ func (ch *ConversationHandler) findLastToolCallInHistory(convState *Conversation
 	}
 	return nil
 }
-func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *session.SessionState, stage shared.ConversationStage) *ToolCall {
+func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *session.SessionState, stage domaintypes.ConversationStage) *ToolCall {
 	toolName := ch.getToolNameForStage(stage)
 	params := make(map[string]interface{})
 	params["session_id"] = internalSession.SessionID
@@ -448,9 +449,9 @@ func (ch *ConversationHandler) buildToolCallFromMetadata(internalSession *sessio
 		return &ToolCall{Tool: toolName, Parameters: params}
 	}
 	switch stage {
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 		ch.addBuildParameters(params, internalSession.Metadata)
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		ch.addDeploymentParameters(params, internalSession.Metadata)
 	}
 
@@ -604,14 +605,14 @@ func (ch *ConversationHandler) attemptRedirectFix(ctx context.Context, sessionID
 	return true
 }
 
-func (ch *ConversationHandler) generateFallbackOptions(stage shared.ConversationStage, _ error, action *ErrorAction) []Option {
+func (ch *ConversationHandler) generateFallbackOptions(stage domaintypes.ConversationStage, _ error, action *ErrorAction) []Option {
 	var options []Option
 	options = append(options, Option{
 		ID:    "retry",
 		Label: "Retry operation",
 	})
 	switch stage {
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 		options = append(options, Option{
 			ID:    "logs",
 			Label: "Show build logs",
@@ -621,7 +622,7 @@ func (ch *ConversationHandler) generateFallbackOptions(stage shared.Conversation
 			Label: "Modify Dockerfile",
 		})
 
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		options = append(options, Option{
 			ID:    "manifests",
 			Label: "Review manifests",
@@ -631,7 +632,7 @@ func (ch *ConversationHandler) generateFallbackOptions(stage shared.Conversation
 			Label: "Rebuild image",
 		})
 
-	case shared.StageManifests:
+	case domaintypes.StageManifests:
 		options = append(options, Option{
 			ID:    "regenerate",
 			Label: "Regenerate manifests",

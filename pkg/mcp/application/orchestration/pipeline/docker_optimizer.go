@@ -62,24 +62,26 @@ func NewDockerOperationOptimizer(dockerClient docker.DockerClient, config Optimi
 
 // OptimizedPull performs a Docker pull operation
 func (opt *DockerOperationOptimizer) OptimizedPull(ctx context.Context, imageRef string, options map[string]string) (string, error) {
-	opt.logger.Debug().
-		Str("image", imageRef).
-		Msg("Pulling image")
+	opt.logger.Debug("Pulling image",
+
+		"image", imageRef)
 
 	output, err := opt.dockerClient.Pull(ctx, imageRef)
 	if err != nil {
 		return "", errors.NewError().Message("failed to pull image " + imageRef).Cause(err).WithLocation().Build()
 	}
-	opt.logger.Debug().Str("output", output).Msg("Pull completed")
+	opt.logger.Debug("Pull completed",
+
+		"output", output)
 
 	return imageRef, nil
 }
 
 // OptimizedBuild performs a Docker build operation
 func (opt *DockerOperationOptimizer) OptimizedBuild(ctx context.Context, buildContext string, options map[string]string) (string, error) {
-	opt.logger.Debug().
-		Str("context", buildContext).
-		Msg("Building image")
+	opt.logger.Debug("Building image",
+
+		"context", buildContext)
 
 	dockerfilePath := options["dockerfile"]
 	imageTag := options["tag"]
@@ -100,31 +102,36 @@ func (opt *DockerOperationOptimizer) OptimizedBuild(ctx context.Context, buildCo
 
 // OptimizedPush performs a Docker push operation
 func (opt *DockerOperationOptimizer) OptimizedPush(ctx context.Context, imageRef string, options map[string]string) error {
-	opt.logger.Debug().
-		Str("image", imageRef).
-		Msg("Pushing image")
+	opt.logger.Debug("Pushing image",
+
+		"image", imageRef)
 
 	output, err := opt.dockerClient.Push(ctx, imageRef)
 	if err != nil {
 		return errors.NewError().Message("failed to push image " + imageRef).Cause(err).WithLocation().Build()
 	}
-	opt.logger.Debug().Str("output", output).Msg("Push completed")
+	opt.logger.Debug("Push completed",
+
+		"output", output)
 
 	return nil
 }
 
 // OptimizedTag performs a Docker tag operation
 func (opt *DockerOperationOptimizer) OptimizedTag(ctx context.Context, sourceImage, targetImage string) error {
-	opt.logger.Debug().
-		Str("source", sourceImage).
-		Str("target", targetImage).
-		Msg("Tagging image")
+	opt.logger.Debug("Tagging image",
+
+		"source", sourceImage,
+
+		"target", targetImage)
 
 	output, err := opt.dockerClient.Tag(ctx, sourceImage, targetImage)
 	if err != nil {
 		return errors.NewError().Message("failed to tag image " + sourceImage + " as " + targetImage).Cause(err).WithLocation().Build()
 	}
-	opt.logger.Debug().Str("output", output).Msg("Tag completed")
+	opt.logger.Debug("Tag completed",
+
+		"output", output)
 
 	return nil
 }
@@ -139,13 +146,13 @@ func (opt *DockerOperationOptimizer) GetOperationMetrics() map[string]interface{
 
 // Shutdown performs cleanup
 func (opt *DockerOperationOptimizer) Shutdown(ctx context.Context) error {
-	opt.logger.Info().Msg("Shutting down Docker optimizer")
+	opt.logger.Info("Shutting down Docker optimizer")
 	return nil
 }
 
 // ClearCache clears the operation cache
 func (opt *DockerOperationOptimizer) ClearCache() {
-	opt.logger.Debug().Msg("Cache clearing not needed in simplified version")
+	opt.logger.Debug("Cache clearing not needed in simplified version")
 }
 
 // GetResourceUsage returns basic resource info
@@ -168,11 +175,13 @@ func (opt *DockerOperationOptimizer) GetImageInfo(ctx context.Context, imageRef 
 
 // RemoveImage removes a Docker image
 func (opt *DockerOperationOptimizer) RemoveImage(ctx context.Context, imageRef string) error {
-	opt.logger.Debug().
-		Str("image", imageRef).
-		Msg("Removing image")
+	opt.logger.Debug("Removing image",
 
-	opt.logger.Info().Str("image", imageRef).Msg("Image removal not implemented")
+		"image", imageRef)
+
+	opt.logger.Info("Image removal not implemented",
+
+		"image", imageRef)
 
 	return nil
 }

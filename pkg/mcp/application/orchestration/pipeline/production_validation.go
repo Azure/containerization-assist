@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // ProductionValidator provides production validation capabilities
@@ -42,9 +42,9 @@ func (pv *ProductionValidator) ValidateProduction(ctx context.Context, target in
 		defer cancel()
 	}
 
-	pv.logger.Info().
-		Bool("detailed_logging", pv.config.EnableDetailedLogging).
-		Msg("Starting production validation")
+	pv.logger.Info("Starting production validation",
+
+		"detailed_logging", pv.config.EnableDetailedLogging)
 
 	result, err := pv.ValidateBasic(ctx, target)
 	if err != nil {
@@ -97,9 +97,9 @@ func (pv *ProductionValidator) ValidateSystemHealth(ctx context.Context) (*Syste
 		},
 	}
 
-	pv.logger.Debug().
-		Bool("healthy", status.Healthy).
-		Msg("System health check completed")
+	pv.logger.Debug("System health check completed",
+
+		"healthy", status.Healthy)
 
 	return status, nil
 }
@@ -135,6 +135,6 @@ func (pv *ProductionValidator) GetValidationResult(testID string) (*validation.R
 
 // Shutdown gracefully shuts down the validator
 func (pv *ProductionValidator) Shutdown(ctx context.Context) error {
-	pv.logger.Info().Msg("Shutting down production validator")
+	pv.logger.Info("Shutting down production validator")
 	return nil
 }

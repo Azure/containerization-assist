@@ -53,28 +53,28 @@ echo "Starting zerolog to internal logging migration..."
 for file in "${FILES[@]}"; do
     if [ -f "$file" ]; then
         echo "Processing $file..."
-        
+
         # Replace import
         sed -i 's|"github.com/rs/zerolog"|"github.com/Azure/container-kit/pkg/mcp/infra/internal/logging"|g' "$file"
-        
+
         # Replace type declarations
         sed -i 's/zerolog\.Logger/logging.LoggingStandards/g' "$file"
-        
+
         # Replace logger.With().Str("component", "xxx").Logger() pattern
         sed -i 's/logger\.With()\.Str("component", \("[^"]*"\)\)\.Logger()/logger.WithComponent(\1)/g' "$file"
-        
+
         # Replace logger.With().Timestamp().Logger() pattern
         sed -i 's/logger\.With()\.Timestamp()\.Logger()/logger/g' "$file"
-        
+
         # Replace zerolog.New(...) patterns
         sed -i 's/zerolog\.New([^)]*)/logging.NewLogger()/g' "$file"
-        
+
         # Handle zerolog levels
         sed -i 's/zerolog\.InfoLevel/logging.LevelInfo/g' "$file"
         sed -i 's/zerolog\.DebugLevel/logging.LevelDebug/g' "$file"
         sed -i 's/zerolog\.WarnLevel/logging.LevelWarn/g' "$file"
         sed -i 's/zerolog\.ErrorLevel/logging.LevelError/g' "$file"
-        
+
         echo "  ✓ Updated $file"
     else
         echo "  ⚠ File not found: $file"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Week 3, Day 1: Flatten application/core package  
+# Week 3, Day 1: Flatten application/core package
 # Move pkg/mcp/application/core → pkg/mcp/core (depth 4 → 3)
 
 set -e
@@ -15,10 +15,10 @@ mkdir -p pkg/mcp/core
 if [ -d "pkg/mcp/application/core" ]; then
     echo "Moving core package files..."
     find pkg/mcp/application/core -name "*.go" -exec cp {} pkg/mcp/core/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/core -name "*.go" -exec sed -i 's/^package core$/package core/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/core -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/application/core not found"
@@ -33,13 +33,13 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/application/co
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
         sed -i 's|github.com/Azure/container-kit/pkg/mcp/application/core|github.com/Azure/container-kit/pkg/mcp/core|g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old core package"

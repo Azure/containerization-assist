@@ -10,14 +10,14 @@ import (
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/sdk/metric"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 )
 
 // MetricsManager manages OpenTelemetry metrics
 type MetricsManager struct {
 	config   *Config
-	provider *metric.MeterProvider
+	provider metric.MeterProvider
 	meter    metric.Meter
 
 	// Core metrics
@@ -66,9 +66,9 @@ func (mm *MetricsManager) Initialize(ctx context.Context, resource *resource.Res
 	}
 
 	// Create meter provider
-	provider := metric.NewMeterProvider(
-		metric.WithResource(resource),
-		metric.WithReader(exporter),
+	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(resource),
+		sdkmetric.WithReader(exporter),
 	)
 
 	// Set global meter provider
@@ -88,7 +88,10 @@ func (mm *MetricsManager) Initialize(ctx context.Context, resource *resource.Res
 // Shutdown gracefully shuts down the metrics system
 func (mm *MetricsManager) Shutdown(ctx context.Context) error {
 	if mm.provider != nil {
-		return mm.provider.Shutdown(ctx)
+		if provider, ok := mm.provider.(*sdkmetric.MeterProvider); ok {
+			return provider.Shutdown(ctx)
+		}
+		return nil
 	}
 	return nil
 }
@@ -238,10 +241,14 @@ func (mm *MetricsManager) initializeSystemMetrics() error {
 }
 
 // createExporter creates a metrics exporter
-func (mm *MetricsManager) createExporter() (metric.Reader, error) {
+func (mm *MetricsManager) createExporter() (sdkmetric.Reader, error) {
 	// For development, use stdout exporter
 	if mm.config.Environment == "development" {
-		return stdoutmetric.New()
+		exporter, err := stdoutmetric.New()
+		if err != nil {
+			return nil, err
+		}
+		return sdkmetric.NewPeriodicReader(exporter), nil
 	}
 
 	// For production, use Prometheus exporter

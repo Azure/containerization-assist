@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 type RetryState struct {
@@ -14,41 +15,41 @@ type RetryState struct {
 }
 type ConversationState struct {
 	*session.SessionState
-	CurrentStage          shared.ConversationStage `json:"current_stage"`
-	History               []ConversationTurn       `json:"conversation_history"`
-	Preferences           shared.UserPreferences   `json:"user_preferences"`
-	PendingDecision       *DecisionPoint           `json:"pending_decision,omitempty"`
-	Context               map[string]interface{}   `json:"conversation_context"`
-	Artifacts             map[string]Artifact      `json:"artifacts"`
-	SecurityScanCompleted bool                     `json:"security_scan_completed"`
-	SecurityScore         int                      `json:"security_score"`
-	RetryStates           map[string]*RetryState   `json:"retry_states,omitempty"`
+	CurrentStage          domaintypes.ConversationStage `json:"current_stage"`
+	History               []ConversationTurn            `json:"conversation_history"`
+	Preferences           domaintypes.UserPreferences   `json:"user_preferences"`
+	PendingDecision       *DecisionPoint                `json:"pending_decision,omitempty"`
+	Context               map[string]interface{}        `json:"conversation_context"`
+	Artifacts             map[string]Artifact           `json:"artifacts"`
+	SecurityScanCompleted bool                          `json:"security_scan_completed"`
+	SecurityScore         int                           `json:"security_score"`
+	RetryStates           map[string]*RetryState        `json:"retry_states,omitempty"`
 }
 type ConversationTurn struct {
-	ID        string                   `json:"id"`
-	Timestamp time.Time                `json:"timestamp"`
-	UserInput string                   `json:"user_input"`
-	Assistant string                   `json:"assistant_response"`
-	Stage     shared.ConversationStage `json:"stage"`
-	ToolCalls []ToolCall               `json:"tool_calls,omitempty"`
-	Decision  *Decision                `json:"decision,omitempty"`
-	Error     *shared.ToolError        `json:"error,omitempty"`
+	ID        string                        `json:"id"`
+	Timestamp time.Time                     `json:"timestamp"`
+	UserInput string                        `json:"user_input"`
+	Assistant string                        `json:"assistant_response"`
+	Stage     domaintypes.ConversationStage `json:"stage"`
+	ToolCalls []ToolCall                    `json:"tool_calls,omitempty"`
+	Decision  *Decision                     `json:"decision,omitempty"`
+	Error     *domaintypes.ToolError        `json:"error,omitempty"`
 }
 type ToolCall struct {
 	Tool       string                 `json:"tool"`
 	Parameters map[string]interface{} `json:"parameters"`
 	Result     interface{}            `json:"result,omitempty"`
-	Error      *shared.ToolError      `json:"error,omitempty"`
+	Error      *domaintypes.ToolError `json:"error,omitempty"`
 	Duration   time.Duration          `json:"duration"`
 }
 type DecisionPoint struct {
-	ID       string                   `json:"id"`
-	Stage    shared.ConversationStage `json:"stage"`
-	Question string                   `json:"question"`
-	Options  []Option                 `json:"options"`
-	Default  string                   `json:"default,omitempty"`
-	Required bool                     `json:"required"`
-	Context  map[string]interface{}   `json:"context,omitempty"`
+	ID       string                        `json:"id"`
+	Stage    domaintypes.ConversationStage `json:"stage"`
+	Question string                        `json:"question"`
+	Options  []Option                      `json:"options"`
+	Default  string                        `json:"default,omitempty"`
+	Required bool                          `json:"required"`
+	Context  map[string]interface{}        `json:"context,omitempty"`
 }
 type Option struct {
 	ID          string      `json:"id"`
@@ -64,15 +65,15 @@ type Decision struct {
 	Timestamp   time.Time   `json:"timestamp"`
 }
 type Artifact struct {
-	ID        string                   `json:"id"`
-	Type      string                   `json:"type"`
-	Name      string                   `json:"name"`
-	Content   string                   `json:"content"`
-	Path      string                   `json:"path,omitempty"`
-	CreatedAt time.Time                `json:"created_at"`
-	UpdatedAt time.Time                `json:"updated_at"`
-	Stage     shared.ConversationStage `json:"stage"`
-	Metadata  map[string]interface{}   `json:"metadata,omitempty"`
+	ID        string                        `json:"id"`
+	Type      string                        `json:"type"`
+	Name      string                        `json:"name"`
+	Content   string                        `json:"content"`
+	Path      string                        `json:"path,omitempty"`
+	CreatedAt time.Time                     `json:"created_at"`
+	UpdatedAt time.Time                     `json:"updated_at"`
+	Stage     domaintypes.ConversationStage `json:"stage"`
+	Metadata  map[string]interface{}        `json:"metadata,omitempty"`
 }
 
 func NewConversationState(sessionID, workspaceDir string) *ConversationState {
@@ -84,9 +85,9 @@ func NewConversationState(sessionID, workspaceDir string) *ConversationState {
 			UpdatedAt:    time.Now(),
 			Metadata:     make(map[string]interface{}),
 		},
-		CurrentStage: shared.StageWelcome,
+		CurrentStage: domaintypes.StageWelcome,
 		History:      make([]ConversationTurn, 0),
-		Preferences: shared.UserPreferences{
+		Preferences: domaintypes.UserPreferences{
 			Namespace:          "default",
 			Replicas:           1,
 			ServiceType:        "ClusterIP",
@@ -142,7 +143,7 @@ func (cs *ConversationState) AddConversationTurn(turn ConversationTurn) {
 
 	cs.SessionState.Metadata["conversation_history"] = historyData
 }
-func (cs *ConversationState) SetStage(stage shared.ConversationStage) {
+func (cs *ConversationState) SetStage(stage domaintypes.ConversationStage) {
 	cs.CurrentStage = stage
 	cs.SessionState.UpdatedAt = time.Now()
 }
@@ -190,10 +191,10 @@ func (cs *ConversationState) GetLatestTurn() *ConversationTurn {
 	}
 	return &cs.History[len(cs.History)-1]
 }
-func (cs *ConversationState) CanProceedToStage(stage shared.ConversationStage) bool {
+func (cs *ConversationState) CanProceedToStage(stage domaintypes.ConversationStage) bool {
 
 	switch stage {
-	case shared.StageAnalysis:
+	case domaintypes.StageAnalysis:
 
 		repoURL := ""
 		if cs.SessionState.Metadata != nil {
@@ -203,7 +204,7 @@ func (cs *ConversationState) CanProceedToStage(stage shared.ConversationStage) b
 		}
 		return repoURL != ""
 
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 
 		repoAnalysisExists := false
 		if cs.SessionState.Metadata != nil {
@@ -213,7 +214,7 @@ func (cs *ConversationState) CanProceedToStage(stage shared.ConversationStage) b
 		}
 		return repoAnalysisExists
 
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 
 		imageBuilt := false
 		if cs.SessionState.Metadata != nil {
@@ -223,7 +224,7 @@ func (cs *ConversationState) CanProceedToStage(stage shared.ConversationStage) b
 		}
 		return imageBuilt
 
-	case shared.StageScan:
+	case domaintypes.StageScan:
 
 		imageRef := ""
 		if cs.SessionState.Metadata != nil {
@@ -239,12 +240,12 @@ func (cs *ConversationState) CanProceedToStage(stage shared.ConversationStage) b
 }
 func (cs *ConversationState) GetStageProgress() StageProgress {
 
-	stages := []shared.ConversationStage{
-		shared.StagePreFlight,
-		shared.StageAnalysis,
-		shared.StageBuild,
-		shared.StageDeployment,
-		shared.StageScan,
+	stages := []domaintypes.ConversationStage{
+		domaintypes.StagePreFlight,
+		domaintypes.StageAnalysis,
+		domaintypes.StageBuild,
+		domaintypes.StageDeployment,
+		domaintypes.StageScan,
 	}
 
 	currentIndex := 0
@@ -266,12 +267,12 @@ func (cs *ConversationState) GetStageProgress() StageProgress {
 }
 
 type StageProgress struct {
-	CurrentStage    shared.ConversationStage   `json:"current_stage"`
-	CurrentStep     int                        `json:"current_step"`
-	TotalSteps      int                        `json:"total_steps"`
-	Percentage      int                        `json:"percentage"`
-	CompletedStages []shared.ConversationStage `json:"completed_stages"`
-	RemainingStages []shared.ConversationStage `json:"remaining_stages"`
+	CurrentStage    domaintypes.ConversationStage   `json:"current_stage"`
+	CurrentStep     int                             `json:"current_step"`
+	TotalSteps      int                             `json:"total_steps"`
+	Percentage      int                             `json:"percentage"`
+	CompletedStages []domaintypes.ConversationStage `json:"completed_stages"`
+	RemainingStages []domaintypes.ConversationStage `json:"remaining_stages"`
 }
 
 func generateTurnID() string {

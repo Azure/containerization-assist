@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/config"
 	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/internal"
 )
 
 // BackgroundWorker represents a managed background worker
@@ -67,7 +68,7 @@ type BackgroundWorkerService interface {
 type BackgroundWorkerServiceImpl struct {
 	workers         map[string]BackgroundWorker
 	workerStates    map[string]WorkerStatus
-	lifecycle       *shared.Lifecycle
+	lifecycle       *internal.Lifecycle
 	config          *config.WorkerConfig
 	healthTicker    *time.Ticker
 	mu              sync.RWMutex
@@ -84,7 +85,7 @@ func NewBackgroundWorkerService(cfg *config.WorkerConfig) BackgroundWorkerServic
 	return &BackgroundWorkerServiceImpl{
 		workers:         make(map[string]BackgroundWorker),
 		workerStates:    make(map[string]WorkerStatus),
-		lifecycle:       shared.NewLifecycle(),
+		lifecycle:       internal.NewLifecycle(),
 		config:          cfg,
 		startTime:       time.Now(),
 		healthMetrics:   make(map[string]WorkerHealth),
@@ -97,7 +98,7 @@ func NewBackgroundWorkerManager(cfg *config.WorkerConfig) *BackgroundWorkerManag
 	return &BackgroundWorkerManager{
 		workers:         make(map[string]BackgroundWorker),
 		workerStates:    make(map[string]WorkerStatus),
-		lifecycle:       shared.NewLifecycle(),
+		lifecycle:       internal.NewLifecycle(),
 		config:          cfg,
 		startTime:       time.Now(),
 		healthMetrics:   make(map[string]WorkerHealth),
@@ -533,7 +534,7 @@ type SimpleBackgroundWorker struct {
 	name        string
 	taskFunc    func(ctx context.Context) error
 	interval    time.Duration
-	lifecycle   *shared.Lifecycle
+	lifecycle   *internal.Lifecycle
 	lastError   error
 	tasksTotal  int64
 	tasksFailed int64
@@ -546,7 +547,7 @@ func NewSimpleBackgroundWorker(name string, taskFunc func(ctx context.Context) e
 		name:      name,
 		taskFunc:  taskFunc,
 		interval:  interval,
-		lifecycle: shared.NewLifecycle(),
+		lifecycle: internal.NewLifecycle(),
 		startTime: time.Now(),
 	}
 }

@@ -9,7 +9,7 @@
 ```bash
 # WRONG: Current structure (26 directories)
 pkg/mcp/analyze      pkg/mcp/errorcodes   pkg/mcp/scan
-pkg/mcp/api          pkg/mcp/errors       pkg/mcp/security  
+pkg/mcp/api          pkg/mcp/errors       pkg/mcp/security
 pkg/mcp/application  pkg/mcp/infra        pkg/mcp/services
 pkg/mcp/appstate     pkg/mcp/knowledge    pkg/mcp/session
 pkg/mcp/build        pkg/mcp/logging      pkg/mcp/shared
@@ -24,7 +24,7 @@ pkg/mcp/core         pkg/mcp/security     pkg/mcp/domain
 ```bash
 # CORRECT: Required structure (3 directories only)
 pkg/mcp/domain/      # Business logic (no dependencies)
-pkg/mcp/application/ # Orchestration (depends on domain only)  
+pkg/mcp/application/ # Orchestration (depends on domain only)
 pkg/mcp/infra/       # External integrations (depends on domain + application)
 ```
 
@@ -35,7 +35,7 @@ pkg/mcp/infra/       # External integrations (depends on domain + application)
 ## 📋 Context
 - **Project**: Container Kit Architecture Refactoring
 - **Your Role**: Foundation architect - you MUST implement the existing ADR-001 three-layer architecture
-- **Timeline**: Week 1-3 (21 days) 
+- **Timeline**: Week 1-3 (21 days)
 - **Dependencies**: None (you are the foundation)
 - **Deliverables**: ADR-001 compliant three-layer architecture needed by ALL other workstreams
 
@@ -52,7 +52,7 @@ You have exclusive ownership of ALL package restructuring:
 ```
 pkg/mcp/ (complete restructuring to three-layer architecture)
 scripts/check_import_depth.sh
-scripts/check-context-params.sh  
+scripts/check-context-params.sh
 scripts/check-cycles.sh
 scripts/validate-architecture.sh
 tools/check-boundaries/
@@ -115,7 +115,7 @@ echo "- transport/ (already exists)" >> migration_plan.txt
 # Verify documentation read
 test -f architecture_violation.txt && test -f migration_plan.txt && echo "✅ Architecture violation documented"
 
-# Pre-commit validation  
+# Pre-commit validation
 alias make='/usr/bin/make'
 /usr/bin/make pre-commit
 ```
@@ -141,12 +141,12 @@ mkdir -p pkg/mcp/domain/{config,containerization,errors,security,session,types,w
 echo "Migrating config domain logic..."
 mv pkg/mcp/config/* pkg/mcp/domain/config/ 2>/dev/null || echo "Config already in correct location"
 
-# Migrate containerization domain logic  
+# Migrate containerization domain logic
 echo "Migrating containerization domain logic..."
 mkdir -p pkg/mcp/domain/containerization/{analyze,build,deploy,scan}
 mv pkg/mcp/analyze/* pkg/mcp/domain/containerization/analyze/ 2>/dev/null || echo "Analyze logic moved"
 mv pkg/mcp/build/* pkg/mcp/domain/containerization/build/ 2>/dev/null || echo "Build logic moved"
-mv pkg/mcp/deploy/* pkg/mcp/domain/containerization/deploy/ 2>/dev/null || echo "Deploy logic moved"  
+mv pkg/mcp/deploy/* pkg/mcp/domain/containerization/deploy/ 2>/dev/null || echo "Deploy logic moved"
 mv pkg/mcp/scan/* pkg/mcp/domain/containerization/scan/ 2>/dev/null || echo "Scan logic moved"
 
 # Migrate error domain logic
@@ -189,7 +189,7 @@ go build ./pkg/mcp/domain/... && echo "✅ Domain layer compiles"
 - [ ] Domain layer compiles successfully
 - [ ] Empty directories removed
 
-#### Day 3: Application Layer Migration  
+#### Day 3: Application Layer Migration
 **Morning Goals**:
 - [ ] **CRITICAL**: Migrate orchestration logic to `pkg/mcp/application/` per ADR-001
 - [ ] Ensure application layer depends ONLY on domain layer
@@ -261,7 +261,7 @@ grep -r "pkg/mcp/infra" pkg/mcp/application/ && echo "❌ Application imports in
 # Infra layer already exists - migrate remaining external concerns
 echo "Completing infrastructure layer per ADR-001..."
 
-# Migrate logging infrastructure  
+# Migrate logging infrastructure
 mkdir -p pkg/mcp/infra/logging
 mv pkg/mcp/logging/* pkg/mcp/infra/logging/ 2>/dev/null || echo "Logging infrastructure moved"
 
@@ -295,7 +295,7 @@ fi
 # Verify three-layer architecture
 test -d pkg/mcp/domain && test -d pkg/mcp/application && test -d pkg/mcp/infra && echo "✅ Three layers exist"
 
-# Verify ONLY three directories  
+# Verify ONLY three directories
 DIRS=$(find pkg/mcp -maxdepth 1 -type d | grep -v "^pkg/mcp$" | wc -l)
 test $DIRS -eq 3 && echo "✅ EXACTLY 3 directories (ADR-001 compliant)" || echo "❌ $DIRS directories found (ADR-001 violation)"
 
@@ -363,7 +363,7 @@ test $DIRS -eq 3 && echo "✅ Exactly 3 directories" || echo "❌ $DIRS director
 
 # 2. Verify required directories exist
 test -d pkg/mcp/domain && echo "✅ Domain layer exists" || echo "❌ Domain layer missing"
-test -d pkg/mcp/application && echo "✅ Application layer exists" || echo "❌ Application layer missing"  
+test -d pkg/mcp/application && echo "✅ Application layer exists" || echo "❌ Application layer missing"
 test -d pkg/mcp/infra && echo "✅ Infrastructure layer exists" || echo "❌ Infrastructure layer missing"
 
 # 3. Verify no extra directories
@@ -467,7 +467,7 @@ echo "✅ ADR-001 compliant: 3 directories (domain, application, infra)"
 
 ### **Architecture Boundaries**
 - **Domain**: NO external dependencies
-- **Application**: Depends ONLY on domain  
+- **Application**: Depends ONLY on domain
 - **Infrastructure**: Depends on domain + application
 
 ### **Success Criteria**

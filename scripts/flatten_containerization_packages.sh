@@ -13,13 +13,13 @@ packages=("analyze" "build" "deploy" "scan")
 for pkg in "${packages[@]}"; do
     echo ""
     echo "--- Processing package: $pkg ---"
-    
+
     # Define paths
     OLD_PKG="pkg/mcp/domain/containerization/$pkg"
     NEW_PKG="pkg/mcp/domain/$pkg"
     OLD_IMPORT="github.com/Azure/container-kit/pkg/mcp/domain/containerization/$pkg"
     NEW_IMPORT="github.com/Azure/container-kit/pkg/mcp/domain/$pkg"
-    
+
     # Step 1: Create new directory and copy files
     echo "Step 1: Creating new directory and copying files..."
     mkdir -p "$NEW_PKG"
@@ -29,15 +29,15 @@ for pkg in "${packages[@]}"; do
         echo "Warning: $OLD_PKG does not exist"
         continue
     fi
-    
+
     # Step 2: Update package declarations (no change needed - package name stays the same)
     echo "Step 2: Package declarations already correct for $pkg"
-    
+
     # Step 3: Count files to update
     echo "Step 3: Counting files that need import updates for $pkg..."
     import_count=$(grep -r "$OLD_IMPORT" --include="*.go" . 2>/dev/null | grep -v "^Binary file" | grep -v "$NEW_PKG" | wc -l)
     echo "Files with old import: $import_count"
-    
+
     if [ "$import_count" -gt 0 ]; then
         # Step 4: Update imports in the entire codebase
         echo "Step 4: Updating imports across codebase for $pkg..."
@@ -47,7 +47,7 @@ for pkg in "${packages[@]}"; do
                 sed -i "s|$OLD_IMPORT|$NEW_IMPORT|g" "$file"
             fi
         done
-        
+
         # Step 5: Verify no old imports remain
         echo "Step 5: Verifying migration for $pkg..."
         remaining=$(grep -r "$OLD_IMPORT" --include="*.go" . 2>/dev/null | grep -v "^Binary file" | grep -v "$NEW_PKG" | wc -l)
@@ -60,7 +60,7 @@ for pkg in "${packages[@]}"; do
     else
         echo "No imports to update for $pkg"
     fi
-    
+
     echo "✓ Package $pkg migration completed"
 done
 

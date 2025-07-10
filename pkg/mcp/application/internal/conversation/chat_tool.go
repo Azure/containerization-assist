@@ -11,18 +11,19 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // ChatToolArgs defines arguments for the chat tool
 type ChatToolArgs struct {
-	shared.BaseToolArgs
+	domaintypes.BaseToolArgs
 	Message   string `json:"message" description:"Your message to the assistant"`
 	SessionID string `json:"session_id,omitempty" description:"Session ID for continuing a conversation (optional for first message)"`
 }
 
 // ChatToolResult defines the response from the chat tool
 type ChatToolResult struct {
-	shared.BaseToolResponse
+	domaintypes.BaseToolResponse
 	Success   bool   `json:"success"`
 	SessionID string `json:"session_id"`
 	Message   string `json:"message"`
@@ -45,7 +46,7 @@ type ChatTool struct {
 func (ct *ChatTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
 	// Convert ToolInput to ChatToolArgs
 	chatArgs := ChatToolArgs{
-		BaseToolArgs: shared.BaseToolArgs{
+		BaseToolArgs: domaintypes.BaseToolArgs{
 			SessionID: input.SessionID,
 		},
 	}
@@ -110,7 +111,7 @@ func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatT
 		}
 
 		return &ChatToolResult{
-			BaseToolResponse: shared.NewBaseResponse("chat", args.SessionID, args.DryRun),
+			BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
 			Success:          false,
 			Message:          errorMessage,
 			Status:           "validation_error",
@@ -121,7 +122,7 @@ func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatT
 	if err != nil {
 		ct.Logger.Error().Err(err).Msg("Chat handler error")
 		return &ChatToolResult{
-			BaseToolResponse: shared.NewBaseResponse("chat", args.SessionID, args.DryRun),
+			BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
 			Success:          false,
 			Message:          fmt.Sprintf("Error: %v", err),
 		}, nil

@@ -8,6 +8,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/errors"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +32,7 @@ func TestChatTool_Execute(t *testing.T) {
 				return &ChatTool{
 					Handler: func(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 						return &ChatToolResult{
-							BaseToolResponse: shared.NewBaseResponse("chat", args.SessionID, args.DryRun),
+							BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
 							Success:          true,
 							SessionID:        args.SessionID,
 							Message:          "Hello back!",
@@ -87,7 +88,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 		{
 			name: "successful execution",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "Test message",
 				SessionID:    "test-session",
 			},
@@ -95,7 +96,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 				return &ChatTool{
 					Handler: func(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 						return &ChatToolResult{
-							BaseToolResponse: shared.NewBaseResponse("chat", args.SessionID, args.DryRun),
+							BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
 							Success:          true,
 							SessionID:        args.SessionID,
 							Message:          "Response message",
@@ -119,7 +120,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 		{
 			name: "handler error",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "Test message",
 				SessionID:    "test-session",
 			},
@@ -141,7 +142,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 		{
 			name: "with optional fields",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "Test message",
 				SessionID:    "chat-session-123",
 			},
@@ -149,7 +150,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 				return &ChatTool{
 					Handler: func(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 						return &ChatToolResult{
-							BaseToolResponse: shared.NewBaseResponse("chat", args.SessionID, args.DryRun),
+							BaseToolResponse: domaintypes.NewBaseResponse("chat", args.SessionID, args.DryRun),
 							Success:          true,
 							SessionID:        args.SessionID,
 							Message:          "Response with options",
@@ -217,7 +218,7 @@ func TestChatTool_Validate(t *testing.T) {
 		{
 			name: "valid args",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "Valid message",
 				SessionID:    "valid-session-id",
 			},
@@ -239,7 +240,7 @@ func TestChatTool_Validate(t *testing.T) {
 		{
 			name: "empty message",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "",
 			},
 			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
@@ -248,7 +249,7 @@ func TestChatTool_Validate(t *testing.T) {
 		{
 			name: "message too long",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      string(make([]byte, 10001)), // 10,001 characters
 			},
 			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
@@ -257,7 +258,7 @@ func TestChatTool_Validate(t *testing.T) {
 		{
 			name: "session ID too short",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "Valid message",
 				SessionID:    "ab", // Too short
 			},
@@ -267,7 +268,7 @@ func TestChatTool_Validate(t *testing.T) {
 		{
 			name: "session ID too long",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "Valid message",
 				SessionID:    string(make([]byte, 101)), // Too long
 			},
@@ -277,7 +278,7 @@ func TestChatTool_Validate(t *testing.T) {
 		{
 			name: "no handler configured",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test-session"},
 				Message:      "Valid message",
 			},
 			setup: func() *ChatTool {
@@ -313,14 +314,14 @@ func TestChatToolArgs_Validation(t *testing.T) {
 		{
 			name: "minimal valid args",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{SessionID: "test"},
+				BaseToolArgs: domaintypes.BaseToolArgs{SessionID: "test"},
 				Message:      "Hello",
 			},
 		},
 		{
 			name: "full valid args",
 			args: ChatToolArgs{
-				BaseToolArgs: shared.BaseToolArgs{
+				BaseToolArgs: domaintypes.BaseToolArgs{
 					SessionID: "test-session",
 					DryRun:    true,
 				},
@@ -340,7 +341,7 @@ func TestChatToolArgs_Validation(t *testing.T) {
 
 func TestChatToolResult_Structure(t *testing.T) {
 	result := &ChatToolResult{
-		BaseToolResponse: shared.NewBaseResponse("chat", "session-123", false),
+		BaseToolResponse: domaintypes.NewBaseResponse("chat", "session-123", false),
 		Success:          true,
 		SessionID:        "session-123",
 		Message:          "Test response",

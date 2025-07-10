@@ -1,0 +1,9 @@
+=== REGISTRY AUDIT ===
+Runtime Registry:
+212 pkg/mcp/application/internal/runtime/registry.go
+Commands Registry:
+76 pkg/mcp/application/commands/command_registry.go
+Unified Registry:
+616 pkg/mcp/application/commands/tool_registry.go
+Core Registry (deprecated):
+69 pkg/mcp/application/core/tool_registry.go

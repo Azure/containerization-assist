@@ -118,15 +118,21 @@ func (mc *MCPClients) ValidateAnalyzerForProduction(logger logging.Standards) er
 	}
 
 	analyzerType := fmt.Sprintf("%T", mc.Analyzer)
-	logger.Debug().Str("analyzer_type", analyzerType).Msg("Validating analyzer for production")
+	logger.Debug("Validating analyzer for production",
+
+		"analyzer_type", analyzerType)
 
 	// Check for known safe analyzer types
 	switch analyzerType {
 	case "*core.stubAnalyzer", "*analyze.StubAnalyzer", "*analyze.CallerAnalyzer":
-		logger.Info().Str("analyzer_type", analyzerType).Msg("Using safe analyzer for production")
+		logger.Info("Using safe analyzer for production",
+
+			"analyzer_type", analyzerType)
 		return nil
 	default:
-		logger.Warn().Str("analyzer_type", analyzerType).Msg("Unknown analyzer type - may not be safe for production")
+		logger.Warn("Unknown analyzer type - may not be safe for production",
+
+			"analyzer_type", analyzerType)
 		return errors.NewError().Messagef("analyzer type %s may not be safe for production", analyzerType).WithLocation(
 
 		// stubAnalyzer is a local stub implementation to avoid import cycles

@@ -3,23 +3,25 @@ package conversation
 import (
 	"fmt"
 	"time"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 type ConversationResponse struct {
-	SessionID     string                    `json:"session_id"`
-	Message       string                    `json:"message"`
-	Stage         shared.ConversationStage  `json:"stage"`
-	Status        ResponseStatus            `json:"status"`
-	Options       []Option                  `json:"options,omitempty"`
-	Artifacts     []ArtifactSummary         `json:"artifacts,omitempty"`
-	NextSteps     []string                  `json:"next_steps,omitempty"`
-	Progress      *StageProgress            `json:"progress,omitempty"`
-	ToolCalls     []ToolCall                `json:"tool_calls,omitempty"`
-	RequiresInput bool                      `json:"requires_input"`
-	NextStage     *shared.ConversationStage `json:"next_stage,omitempty"`
-	AutoAdvance   *AutoAdvanceConfig        `json:"auto_advance,omitempty"`
-	Form          *StructuredForm           `json:"form,omitempty"`
-	ErrorRecovery *ErrorRecoveryGuidance    `json:"error_recovery,omitempty"`
+	SessionID     string                         `json:"session_id"`
+	Message       string                         `json:"message"`
+	Stage         domaintypes.ConversationStage  `json:"stage"`
+	Status        ResponseStatus                 `json:"status"`
+	Options       []Option                       `json:"options,omitempty"`
+	Artifacts     []ArtifactSummary              `json:"artifacts,omitempty"`
+	NextSteps     []string                       `json:"next_steps,omitempty"`
+	Progress      *StageProgress                 `json:"progress,omitempty"`
+	ToolCalls     []ToolCall                     `json:"tool_calls,omitempty"`
+	RequiresInput bool                           `json:"requires_input"`
+	NextStage     *domaintypes.ConversationStage `json:"next_stage,omitempty"`
+	AutoAdvance   *AutoAdvanceConfig             `json:"auto_advance,omitempty"`
+	Form          *StructuredForm                `json:"form,omitempty"`
+	ErrorRecovery *ErrorRecoveryGuidance         `json:"error_recovery,omitempty"`
 }
 type ResponseStatus string
 
@@ -57,7 +59,7 @@ type ErrorRecoveryGuidance struct {
 	IsProgressive      bool     `json:"is_progressive"`
 }
 
-func (r *ConversationResponse) WithAutoAdvance(nextStage shared.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
+func (r *ConversationResponse) WithAutoAdvance(nextStage domaintypes.ConversationStage, config AutoAdvanceConfig) *ConversationResponse {
 	r.RequiresInput = false
 	r.NextStage = &nextStage
 	r.AutoAdvance = &config
@@ -80,7 +82,7 @@ func (r *ConversationResponse) WithErrorRecovery(guidance *ErrorRecoveryGuidance
 func (r *ConversationResponse) HasErrorRecovery() bool {
 	return r.ErrorRecovery != nil
 }
-func (r *ConversationResponse) ShouldAutoAdvance(userPrefs shared.UserPreferences) bool {
+func (r *ConversationResponse) ShouldAutoAdvance(userPrefs domaintypes.UserPreferences) bool {
 	if !r.CanAutoAdvance() {
 		return false
 	}
@@ -116,13 +118,13 @@ func (r *ConversationResponse) GetAutoAdvanceMessage() string {
 
 	return baseMsg
 }
-func convertFromTypesStage(stage shared.ConversationStage) shared.ConversationStage {
-	// This function now seems redundant since both input and output are shared.ConversationStage
+func convertFromTypesStage(stage domaintypes.ConversationStage) domaintypes.ConversationStage {
+	// This function now seems redundant since both input and output are domaintypes.ConversationStage
 	// Keeping it for compatibility but it just returns the input
 	return stage
 }
-func mapMCPStageToDetailedStage(stage shared.ConversationStage, _ map[string]interface{}) shared.ConversationStage {
-	// This function now seems redundant since both input and output are shared.ConversationStage
+func mapMCPStageToDetailedStage(stage domaintypes.ConversationStage, _ map[string]interface{}) domaintypes.ConversationStage {
+	// This function now seems redundant since both input and output are domaintypes.ConversationStage
 	// Keeping it for compatibility but it just returns the input
 	return stage
 }

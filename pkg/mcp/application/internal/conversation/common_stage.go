@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func (ps *PromptServiceImpl) hasRunBuildDryRun(state *ConversationState) bool {
@@ -24,7 +26,7 @@ func (ps *PromptServiceImpl) generateImageTag(state *ConversationState) string {
 
 func (ps *PromptServiceImpl) performSecurityScan(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(shared.StagePush),
+		Stage:   convertFromTypesStage(domaintypes.StagePush),
 		Status:  ResponseStatusProcessing,
 		Message: "Running security scan on image...",
 	}
@@ -84,7 +86,7 @@ func (ps *PromptServiceImpl) reviewManifests(_ context.Context, state *Conversat
 
 		return &ConversationResponse{
 			Message: fmt.Sprintf("Full Kubernetes manifests:\n\n```yaml\n%s```\n\nReady to deploy?", manifestsText.String()),
-			Stage:   convertFromTypesStage(shared.StageManifests),
+			Stage:   convertFromTypesStage(domaintypes.StageManifests),
 			Status:  ResponseStatusSuccess,
 			Options: []Option{
 				{ID: "deploy", Label: "Deploy to Kubernetes", Recommended: true},
@@ -93,10 +95,10 @@ func (ps *PromptServiceImpl) reviewManifests(_ context.Context, state *Conversat
 		}
 	}
 
-	state.SetStage(convertFromTypesStage(shared.StageDeployment))
+	state.SetStage(convertFromTypesStage(domaintypes.StageDeployment))
 	return &ConversationResponse{
 		Message: "Manifests are ready. Shall we deploy to Kubernetes?",
-		Stage:   convertFromTypesStage(shared.StageDeployment),
+		Stage:   convertFromTypesStage(domaintypes.StageDeployment),
 		Status:  ResponseStatusSuccess,
 		Options: []Option{
 			{ID: "deploy", Label: "Yes, deploy", Recommended: true},
@@ -129,7 +131,7 @@ func (ps *PromptServiceImpl) suggestAppName(state *ConversationState) string {
 	return "my-app"
 }
 
-func (ps *PromptServiceImpl) formatManifestSummary(manifests map[string]shared.K8sManifest) string {
+func (ps *PromptServiceImpl) formatManifestSummary(manifests map[string]domaintypes.K8sManifest) string {
 	var sb strings.Builder
 	sb.WriteString("✅ Kubernetes manifests generated:\n\n")
 
@@ -178,7 +180,7 @@ func (ps *PromptServiceImpl) formatDeploymentSuccess(state *ConversationState, d
 
 func (ps *PromptServiceImpl) showDeploymentLogs(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(shared.StageDeployment),
+		Stage:   convertFromTypesStage(domaintypes.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Fetching deployment logs...",
 	}
@@ -217,8 +219,8 @@ func (ps *PromptServiceImpl) showDeploymentLogs(ctx context.Context, state *Conv
 }
 
 func extractRegistry(input string) string {
-	if strings.Contains(input, shared.DefaultRegistry) || strings.Contains(input, "dockerhub") {
-		return shared.DefaultRegistry
+	if strings.Contains(input, internal.DefaultRegistry) || strings.Contains(input, "dockerhub") {
+		return internal.DefaultRegistry
 	}
 	if strings.Contains(input, "gcr.io") {
 		return "gcr.io"
@@ -234,7 +236,7 @@ func extractRegistry(input string) string {
 		return strings.Split(input, "/")[0]
 	}
 
-	return shared.DefaultRegistry
+	return internal.DefaultRegistry
 }
 
 func extractTag(imageRef string) string {

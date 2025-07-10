@@ -15,10 +15,10 @@ mkdir -p pkg/mcp/commands
 if [ -d "pkg/mcp/application/commands" ]; then
     echo "Moving commands package files..."
     find pkg/mcp/application/commands -name "*.go" -exec cp {} pkg/mcp/commands/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/commands -name "*.go" -exec sed -i 's/^package commands$/package commands/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/commands -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/application/commands not found"
@@ -33,13 +33,13 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/application/co
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
         sed -i 's|github.com/Azure/container-kit/pkg/mcp/application/commands|github.com/Azure/container-kit/pkg/mcp/commands|g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old commands package"

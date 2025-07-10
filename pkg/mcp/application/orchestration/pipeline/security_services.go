@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // Context key types for security operations
@@ -145,13 +145,12 @@ func (s *securityService) RecordSecurityEvent(sessionID, operation, eventType, s
 
 	// Log high-severity events immediately
 	if severity == "HIGH" {
-		s.logger.Warn().
-			Str("event_id", event.ID).
-			Str("session_id", sessionID).
-			Str("operation", operation).
-			Str("event_type", eventType).
-			Str("description", description).
-			Msg("Security event recorded")
+		s.logger.Warn("Security event recorded",
+			"event_id", event.ID,
+			"session_id", sessionID,
+			"operation", operation,
+			"event_type", eventType,
+			"description", description)
 	}
 }
 

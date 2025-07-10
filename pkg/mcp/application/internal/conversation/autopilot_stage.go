@@ -3,14 +3,16 @@ package conversation
 import (
 	"fmt"
 	"strings"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
-func getStageProgress(currentStage shared.ConversationStage) string {
-	progressMap := map[shared.ConversationStage]int{
-		shared.StageAnalysis:   4,
-		shared.StageBuild:      6,
-		shared.StageDeployment: 8,
-		shared.StageScan:       9,
+func getStageProgress(currentStage domaintypes.ConversationStage) string {
+	progressMap := map[domaintypes.ConversationStage]int{
+		domaintypes.StageAnalysis:   4,
+		domaintypes.StageBuild:      6,
+		domaintypes.StageDeployment: 8,
+		domaintypes.StageScan:       9,
 	}
 
 	currentStep := 1
@@ -23,12 +25,12 @@ func getStageProgress(currentStage shared.ConversationStage) string {
 	return fmt.Sprintf("[Step %d/%d]", currentStep, totalSteps)
 }
 
-func getStageIntro(stage shared.ConversationStage) string {
-	intros := map[shared.ConversationStage]string{
-		shared.StageAnalysis:   "Analyzing your repository to understand the project structure.",
-		shared.StageBuild:      "Building your Docker image with the generated Dockerfile.",
-		shared.StageDeployment: "Deploying your application to the Kubernetes cluster.",
-		shared.StageScan:       "Running security scans on your container image.",
+func getStageIntro(stage domaintypes.ConversationStage) string {
+	intros := map[domaintypes.ConversationStage]string{
+		domaintypes.StageAnalysis:   "Analyzing your repository to understand the project structure.",
+		domaintypes.StageBuild:      "Building your Docker image with the generated Dockerfile.",
+		domaintypes.StageDeployment: "Deploying your application to the Kubernetes cluster.",
+		domaintypes.StageScan:       "Running security scans on your container image.",
 	}
 
 	if intro, exists := intros[stage]; exists {

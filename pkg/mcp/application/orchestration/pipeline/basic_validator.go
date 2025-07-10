@@ -8,8 +8,8 @@ import (
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // ValidationRule defines a simple validation check
@@ -111,7 +111,9 @@ func (v *UnifiedBasicValidator) Validate(ctx context.Context, data interface{}, 
 			}
 			return nil
 		}); err != nil {
-			v.logger.Warn().Err(err).Msg("Failed to store validation result in session")
+			v.logger.Warn("Failed to store validation result in session",
+
+				"error", err)
 		}
 	}
 
@@ -169,10 +171,11 @@ func (v *UnifiedBasicValidator) ValidateBasic(ctx context.Context, target interf
 				Message: err.Error(),
 				Code:    "validation_failed",
 			})
-			v.logger.Debug().
-				Str("rule", rule.Name).
-				Err(err).
-				Msg("Validation rule failed")
+			v.logger.Debug("Validation rule failed",
+
+				"rule", rule.Name,
+
+				"error", err)
 		}
 	}
 
@@ -190,7 +193,9 @@ func (v *UnifiedBasicValidator) ValidateBasic(ctx context.Context, target interf
 			}
 			return nil
 		}); err != nil {
-			v.logger.Warn().Err(err).Msg("Failed to store validation result in session")
+			v.logger.Warn("Failed to store validation result in session",
+
+				"error", err)
 		}
 	}
 

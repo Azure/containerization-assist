@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +26,7 @@ func TestAutoFixHelper(t *testing.T) {
 		}
 		state := &ConversationState{}
 
-		result := helper.AttemptAutoFix(context.Background(), response, shared.StageBuild, nil, state)
+		result := helper.AttemptAutoFix(context.Background(), response, domaintypes.StageBuild, nil, state)
 		assert.False(t, result, "Should return false when handler is nil")
 		assert.Equal(t, ResponseStatusError, response.Status, "Status should remain unchanged")
 	})
@@ -35,14 +36,14 @@ func TestAutoFixHelper(t *testing.T) {
 		helper := &AutoFixHelper{}
 
 		testCases := []struct {
-			stage    shared.ConversationStage
+			stage    domaintypes.ConversationStage
 			expected string
 		}{
-			{shared.StageBuild, "Continue to next stage"},
-			{shared.StagePush, "Continue to manifest generation"},
-			{shared.StageManifests, "Continue to deployment"},
-			{shared.StageDeployment, "Continue to completion"},
-			{shared.StageWelcome, "Continue"},
+			{domaintypes.StageBuild, "Continue to next stage"},
+			{domaintypes.StagePush, "Continue to manifest generation"},
+			{domaintypes.StageManifests, "Continue to deployment"},
+			{domaintypes.StageDeployment, "Continue to completion"},
+			{domaintypes.StageWelcome, "Continue"},
 		}
 
 		for _, tc := range testCases {
@@ -56,14 +57,14 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageDisplayName", func(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
-			stage    shared.ConversationStage
+			stage    domaintypes.ConversationStage
 			expected string
 		}{
-			{convertFromTypesStage(shared.StageBuild), "Build"},
-			{convertFromTypesStage(shared.StagePush), "Push"},
-			{convertFromTypesStage(shared.StageManifests), "Manifest generation"},
-			{convertFromTypesStage(shared.StageDeployment), "Deployment"},
-			{convertFromTypesStage(shared.StageWelcome), "Operation"},
+			{convertFromTypesStage(domaintypes.StageBuild), "Build"},
+			{convertFromTypesStage(domaintypes.StagePush), "Push"},
+			{convertFromTypesStage(domaintypes.StageManifests), "Manifest generation"},
+			{convertFromTypesStage(domaintypes.StageDeployment), "Deployment"},
+			{convertFromTypesStage(domaintypes.StageWelcome), "Operation"},
 		}
 
 		for _, tc := range testCases {
@@ -75,14 +76,14 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageErrorPrefix", func(t *testing.T) {
 		t.Parallel()
 		testCases := []struct {
-			stage    shared.ConversationStage
+			stage    domaintypes.ConversationStage
 			expected string
 		}{
-			{convertFromTypesStage(shared.StageBuild), "Build"},
-			{convertFromTypesStage(shared.StagePush), "Failed to push Docker image"},
-			{convertFromTypesStage(shared.StageManifests), "Failed to generate Kubernetes manifests"},
-			{convertFromTypesStage(shared.StageDeployment), "Deployment"},
-			{convertFromTypesStage(shared.StageWelcome), "Operation"},
+			{convertFromTypesStage(domaintypes.StageBuild), "Build"},
+			{convertFromTypesStage(domaintypes.StagePush), "Failed to push Docker image"},
+			{convertFromTypesStage(domaintypes.StageManifests), "Failed to generate Kubernetes manifests"},
+			{convertFromTypesStage(domaintypes.StageDeployment), "Deployment"},
+			{convertFromTypesStage(domaintypes.StageWelcome), "Operation"},
 		}
 
 		for _, tc := range testCases {
@@ -94,13 +95,13 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getSuccessOptions coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 		helper := &AutoFixHelper{}
-		allStages := []shared.ConversationStage{
-			convertFromTypesStage(shared.StageBuild),
-			convertFromTypesStage(shared.StagePush),
-			convertFromTypesStage(shared.StageManifests),
-			convertFromTypesStage(shared.StageDeployment),
-			convertFromTypesStage(shared.StageWelcome),
-			convertFromTypesStage(shared.StagePreFlight),
+		allStages := []domaintypes.ConversationStage{
+			convertFromTypesStage(domaintypes.StageBuild),
+			convertFromTypesStage(domaintypes.StagePush),
+			convertFromTypesStage(domaintypes.StageManifests),
+			convertFromTypesStage(domaintypes.StageDeployment),
+			convertFromTypesStage(domaintypes.StageWelcome),
+			convertFromTypesStage(domaintypes.StagePreFlight),
 		}
 
 		for _, stage := range allStages {
@@ -115,13 +116,13 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageDisplayName coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 
-		allStages := []shared.ConversationStage{
-			convertFromTypesStage(shared.StageBuild),
-			convertFromTypesStage(shared.StagePush),
-			convertFromTypesStage(shared.StageManifests),
-			convertFromTypesStage(shared.StageDeployment),
-			convertFromTypesStage(shared.StageWelcome),
-			convertFromTypesStage(shared.StagePreFlight),
+		allStages := []domaintypes.ConversationStage{
+			convertFromTypesStage(domaintypes.StageBuild),
+			convertFromTypesStage(domaintypes.StagePush),
+			convertFromTypesStage(domaintypes.StageManifests),
+			convertFromTypesStage(domaintypes.StageDeployment),
+			convertFromTypesStage(domaintypes.StageWelcome),
+			convertFromTypesStage(domaintypes.StagePreFlight),
 		}
 
 		for _, stage := range allStages {
@@ -133,13 +134,13 @@ func TestAutoFixHelper(t *testing.T) {
 	t.Run("getStageErrorPrefix coverage for all branches", func(t *testing.T) {
 		t.Parallel()
 
-		allStages := []shared.ConversationStage{
-			convertFromTypesStage(shared.StageBuild),
-			convertFromTypesStage(shared.StagePush),
-			convertFromTypesStage(shared.StageManifests),
-			convertFromTypesStage(shared.StageDeployment),
-			convertFromTypesStage(shared.StageWelcome),
-			convertFromTypesStage(shared.StagePreFlight),
+		allStages := []domaintypes.ConversationStage{
+			convertFromTypesStage(domaintypes.StageBuild),
+			convertFromTypesStage(domaintypes.StagePush),
+			convertFromTypesStage(domaintypes.StageManifests),
+			convertFromTypesStage(domaintypes.StageDeployment),
+			convertFromTypesStage(domaintypes.StageWelcome),
+			convertFromTypesStage(domaintypes.StagePreFlight),
 		}
 
 		for _, stage := range allStages {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func getK8sManifestsFromMetadata(sessionState *session.SessionState) map[string]interface{} {
@@ -38,7 +39,7 @@ func getImageRef(sessionState *session.SessionState) string {
 	}
 	return imageID
 }
-func setK8sManifest(sessionState *session.SessionState, name string, manifest shared.K8sManifest) {
+func setK8sManifest(sessionState *session.SessionState, name string, manifest domaintypes.K8sManifest) {
 	if sessionState.Metadata == nil {
 		sessionState.Metadata = make(map[string]interface{})
 	}
@@ -58,8 +59,8 @@ func setK8sManifest(sessionState *session.SessionState, name string, manifest sh
 		"status":  manifest.Status,
 	}
 }
-func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]shared.K8sManifest {
-	result := make(map[string]shared.K8sManifest)
+func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]domaintypes.K8sManifest {
+	result := make(map[string]domaintypes.K8sManifest)
 	manifestsData := getK8sManifestsFromMetadata(sessionState)
 	if manifestsData == nil {
 		return result
@@ -67,7 +68,7 @@ func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]share
 
 	for name, manifestData := range manifestsData {
 		if manifestMap, ok := manifestData.(map[string]interface{}); ok {
-			manifest := shared.K8sManifest{}
+			manifest := domaintypes.K8sManifest{}
 			if content, ok := manifestMap["content"].(string); ok {
 				manifest.Content = content
 			}
@@ -89,7 +90,7 @@ func getK8sManifestsAsTypes(sessionState *session.SessionState) map[string]share
 }
 func (ps *PromptServiceImpl) handleManifestsStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageManifests)), getStageIntro(convertFromTypesStage(shared.StageManifests)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StageManifests)), getStageIntro(convertFromTypesStage(domaintypes.StageManifests)))
 	appName, ok := state.Context["app_name"].(string)
 	if !ok || appName == "" {
 		response := ps.gatherManifestPreferences(ctx, state, input)
@@ -110,7 +111,7 @@ func (ps *PromptServiceImpl) gatherManifestPreferences(_ context.Context, state 
 
 	decision := &DecisionPoint{
 		ID:       "k8s-config",
-		Stage:    convertFromTypesStage(shared.StageManifests),
+		Stage:    convertFromTypesStage(domaintypes.StageManifests),
 		Question: "Let's configure your Kubernetes deployment. What should we name the application?",
 		Required: true,
 	}
@@ -124,7 +125,7 @@ func (ps *PromptServiceImpl) gatherManifestPreferences(_ context.Context, state 
 		})
 		return &ConversationResponse{
 			Message: fmt.Sprintf("App name set to '%s'. How many replicas would you like?", state.Context["app_name"]),
-			Stage:   convertFromTypesStage(shared.StageManifests),
+			Stage:   convertFromTypesStage(domaintypes.StageManifests),
 			Status:  ResponseStatusWaitingInput,
 			Options: []Option{
 				{ID: "1", Label: "1 replica (development)"},
@@ -137,13 +138,13 @@ func (ps *PromptServiceImpl) gatherManifestPreferences(_ context.Context, state 
 
 	return &ConversationResponse{
 		Message: decision.Question + fmt.Sprintf("\n\nSuggested: %s", suggestedName),
-		Stage:   convertFromTypesStage(shared.StageManifests),
+		Stage:   convertFromTypesStage(domaintypes.StageManifests),
 		Status:  ResponseStatusWaitingInput,
 	}
 }
 func (ps *PromptServiceImpl) generateManifests(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(shared.StageManifests),
+		Stage:   convertFromTypesStage(domaintypes.StageManifests),
 		Status:  ResponseStatusProcessing,
 		Message: "Generating Kubernetes manifests...",
 	}
@@ -185,7 +186,7 @@ func (ps *PromptServiceImpl) generateManifests(ctx context.Context, state *Conve
 	}
 
 	if err != nil {
-		toolCall.Error = &shared.ToolError{
+		toolCall.Error = &domaintypes.ToolError{
 			Type:      "generation_error",
 			Message:   fmt.Sprintf("generate_manifests error: %v", err),
 			Retryable: true,
@@ -194,7 +195,7 @@ func (ps *PromptServiceImpl) generateManifests(ctx context.Context, state *Conve
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
 		autoFixHelper := NewAutoFixHelper(ps.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(shared.StageManifests), err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(domaintypes.StageManifests), err, state) {
 			return response
 		}
 		response.Message = fmt.Sprintf("Failed to generate Kubernetes manifests: %v\n\nWould you like to:", err)
@@ -215,7 +216,7 @@ func (ps *PromptServiceImpl) generateManifests(ctx context.Context, state *Conve
 				if !ok {
 					continue
 				}
-				manifest := shared.K8sManifest{
+				manifest := domaintypes.K8sManifest{
 					Name:    name,
 					Content: contentStr,
 					Kind:    extractKind(contentStr),
@@ -225,7 +226,7 @@ func (ps *PromptServiceImpl) generateManifests(ctx context.Context, state *Conve
 					Type:    "k8s-manifest",
 					Name:    fmt.Sprintf("%s (%s)", name, manifest.Kind),
 					Content: manifest.Content,
-					Stage:   convertFromTypesStage(shared.StageManifests),
+					Stage:   convertFromTypesStage(domaintypes.StageManifests),
 				}
 				state.AddArtifact(artifact)
 			}
@@ -244,7 +245,7 @@ func (ps *PromptServiceImpl) generateManifests(ctx context.Context, state *Conve
 }
 func (ps *PromptServiceImpl) handleDeploymentStage(ctx context.Context, state *ConversationState, input string) *ConversationResponse {
 
-	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(shared.StageDeployment)), getStageIntro(convertFromTypesStage(shared.StageDeployment)))
+	progressPrefix := fmt.Sprintf("%s %s\n\n", getStageProgress(convertFromTypesStage(domaintypes.StageDeployment)), getStageIntro(convertFromTypesStage(domaintypes.StageDeployment)))
 	if strings.Contains(strings.ToLower(input), "retry") {
 		response := ps.handleDeploymentRetry(ctx, state)
 		response.Message = fmt.Sprintf("%s%s", progressPrefix, response.Message)
@@ -266,7 +267,7 @@ func (ps *PromptServiceImpl) handleDeploymentStage(ctx context.Context, state *C
 }
 func (ps *PromptServiceImpl) deploymentDryRun(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(shared.StageDeployment),
+		Stage:   convertFromTypesStage(domaintypes.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Running deployment preview (dry-run)...",
 	}
@@ -310,7 +311,7 @@ func (ps *PromptServiceImpl) deploymentDryRun(ctx context.Context, state *Conver
 }
 func (ps *PromptServiceImpl) executeDeployment(ctx context.Context, state *ConversationState) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(shared.StageDeployment),
+		Stage:   convertFromTypesStage(domaintypes.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Deploying to Kubernetes cluster...",
 	}
@@ -336,7 +337,7 @@ func (ps *PromptServiceImpl) executeDeployment(ctx context.Context, state *Conve
 	}
 
 	if err != nil {
-		toolCall.Error = &shared.ToolError{
+		toolCall.Error = &domaintypes.ToolError{
 			Type:      "deployment_error",
 			Message:   fmt.Sprintf("deploy_kubernetes error: %v", err),
 			Retryable: true,
@@ -345,7 +346,7 @@ func (ps *PromptServiceImpl) executeDeployment(ctx context.Context, state *Conve
 		response.ToolCalls = []ToolCall{toolCall}
 		response.Status = ResponseStatusError
 		autoFixHelper := NewAutoFixHelper(ps.conversationHandler)
-		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(shared.StageDeployment), err, state) {
+		if autoFixHelper.AttemptAutoFix(ctx, response, convertFromTypesStage(domaintypes.StageDeployment), err, state) {
 			return response
 		}
 
@@ -389,7 +390,7 @@ func (ps *PromptServiceImpl) executeDeployment(ctx context.Context, state *Conve
 	if !ok || waitForReady || state.Context["wait_for_ready"] == nil {
 		return ps.checkDeploymentHealth(ctx, state, resultStruct)
 	}
-	state.SetStage(convertFromTypesStage(shared.StageCompleted))
+	state.SetStage(convertFromTypesStage(domaintypes.StageCompleted))
 	response.Status = ResponseStatusSuccess
 	response.Message = ps.formatDeploymentSuccess(state, duration)
 
@@ -397,7 +398,7 @@ func (ps *PromptServiceImpl) executeDeployment(ctx context.Context, state *Conve
 }
 func (ps *PromptServiceImpl) checkDeploymentHealth(ctx context.Context, state *ConversationState, _ interface{}) *ConversationResponse {
 	response := &ConversationResponse{
-		Stage:   convertFromTypesStage(shared.StageDeployment),
+		Stage:   convertFromTypesStage(domaintypes.StageDeployment),
 		Status:  ResponseStatusProcessing,
 		Message: "Checking deployment health...",
 	}
@@ -423,7 +424,7 @@ func (ps *PromptServiceImpl) checkDeploymentHealth(ctx context.Context, state *C
 		}
 		return response
 	}
-	state.SetStage(convertFromTypesStage(shared.StageCompleted))
+	state.SetStage(convertFromTypesStage(domaintypes.StageCompleted))
 	response.Status = ResponseStatusSuccess
 	response.Message = fmt.Sprintf(
 		"✅ Deployment successful and healthy!\n\n"+
@@ -454,7 +455,7 @@ func (ps *PromptServiceImpl) handleDeploymentRetry(ctx context.Context, state *C
 				"- Checking your Kubernetes cluster connectivity\n" +
 				"- Reviewing the manifest configuration\n" +
 				"- Checking if the image exists and is accessible",
-			Stage:  convertFromTypesStage(shared.StageDeployment),
+			Stage:  convertFromTypesStage(domaintypes.StageDeployment),
 			Status: ResponseStatusError,
 			Options: []Option{
 				{ID: "modify", Label: "Modify manifests"},

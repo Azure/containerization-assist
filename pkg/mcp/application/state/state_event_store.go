@@ -57,12 +57,11 @@ func (s *StateEventStore) StoreEvent(event *StateEvent) {
 
 	s.eventsByID[event.ID] = event
 
-	s.logger.Debug().
-		Str("event_id", event.ID).
-		Str("event_type", string(event.Type)).
-		Str("state_type", string(event.StateType)).
-		Str("state_id", event.StateID).
-		Msg("Stored state event")
+	s.logger.Debug("Stored state event",
+		"event_id", event.ID,
+		"event_type", string(event.Type),
+		"state_type", string(event.StateType),
+		"state_id", event.StateID)
 }
 
 // GetEvents retrieves events for a specific state
@@ -190,6 +189,6 @@ func (s *StateEventStore) cleanup() {
 	}
 
 	if removedCount > 0 {
-		s.logger.Info().Int("removed_count", removedCount).Msg("Cleaned up old state events")
+		s.logger.Info("Cleaned up old state events", "removed_count", removedCount)
 	}
 }

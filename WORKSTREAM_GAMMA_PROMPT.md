@@ -219,30 +219,30 @@ func main() {
         fmt.Fprintf(os.Stderr, "Usage: %s <directory> <max-fmt-errorf>\n", os.Args[0])
         os.Exit(1)
     }
-    
+
     dir := os.Args[1]
     maxFmtErrorf, err := strconv.Atoi(os.Args[2])
     if err != nil {
         fmt.Fprintf(os.Stderr, "Invalid max-fmt-errorf value: %v\n", err)
         os.Exit(1)
     }
-    
+
     count := 0
     err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
         if err != nil {
             return err
         }
-        
+
         if !strings.HasSuffix(path, ".go") || strings.Contains(path, "vendor/") {
             return nil
         }
-        
+
         fset := token.NewFileSet()
         node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
         if err != nil {
             return nil // Skip files with parse errors
         }
-        
+
         ast.Inspect(node, func(n ast.Node) bool {
             if call, ok := n.(*ast.CallExpr); ok {
                 if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
@@ -257,22 +257,22 @@ func main() {
             }
             return true
         })
-        
+
         return nil
     })
-    
+
     if err != nil {
         fmt.Fprintf(os.Stderr, "Error walking directory: %v\n", err)
         os.Exit(1)
     }
-    
+
     fmt.Printf("Total fmt.Errorf usage: %d (max allowed: %d)\n", count, maxFmtErrorf)
-    
+
     if count > maxFmtErrorf {
         fmt.Printf("❌ fmt.Errorf usage exceeds limit\n")
         os.Exit(1)
     }
-    
+
     fmt.Printf("✅ fmt.Errorf usage within limit\n")
 }
 EOF
@@ -457,7 +457,7 @@ import (
 type Validator[T any] interface {
     // Validate validates a value and returns validation result
     Validate(ctx context.Context, value T) ValidationResult
-    
+
     // Name returns the validator name for error reporting
     Name() string
 }
@@ -516,14 +516,14 @@ func (c *ValidatorChain[T]) Validate(ctx context.Context, value T) ValidationRes
         Errors:   make([]error, 0),
         Warnings: make([]string, 0),
     }
-    
+
     for _, validator := range c.validators {
         validationResult := validator.Validate(ctx, value)
-        
+
         // Collect errors and warnings
         result.Errors = append(result.Errors, validationResult.Errors...)
         result.Warnings = append(result.Warnings, validationResult.Warnings...)
-        
+
         // Apply strategy
         if !validationResult.Valid {
             result.Valid = false
@@ -531,12 +531,12 @@ func (c *ValidatorChain[T]) Validate(ctx context.Context, value T) ValidationRes
                 break
             }
         }
-        
+
         if len(validationResult.Warnings) > 0 && c.strategy == StopOnFirstWarning {
             break
         }
     }
-    
+
     return result
 }
 
@@ -603,15 +603,15 @@ func NewStringLengthValidator(fieldName string, minLength, maxLength int) *Strin
 
 func (v *StringLengthValidator) Validate(ctx context.Context, value string) ValidationResult {
     result := ValidationResult{Valid: true, Errors: make([]error, 0)}
-    
+
     if len(value) < v.MinLength {
         result.Valid = false
         result.Errors = append(result.Errors, errors.NewValidationFailed(
-            v.FieldName, 
+            v.FieldName,
             fmt.Sprintf("length %d is less than minimum %d", len(value), v.MinLength),
         ))
     }
-    
+
     if len(value) > v.MaxLength {
         result.Valid = false
         result.Errors = append(result.Errors, errors.NewValidationFailed(
@@ -619,7 +619,7 @@ func (v *StringLengthValidator) Validate(ctx context.Context, value string) Vali
             fmt.Sprintf("length %d exceeds maximum %d", len(value), v.MaxLength),
         ))
     }
-    
+
     return result
 }
 
@@ -638,7 +638,7 @@ func NewPatternValidator(fieldName, pattern string) (*PatternValidator, error) {
     if err != nil {
         return nil, errors.NewValidationFailed("pattern", fmt.Sprintf("invalid regex: %v", err))
     }
-    
+
     return &PatternValidator{
         Pattern:   regex,
         FieldName: fieldName,
@@ -647,7 +647,7 @@ func NewPatternValidator(fieldName, pattern string) (*PatternValidator, error) {
 
 func (v *PatternValidator) Validate(ctx context.Context, value string) ValidationResult {
     result := ValidationResult{Valid: true, Errors: make([]error, 0)}
-    
+
     if !v.Pattern.MatchString(value) {
         result.Valid = false
         result.Errors = append(result.Errors, errors.NewValidationFailed(
@@ -655,7 +655,7 @@ func (v *PatternValidator) Validate(ctx context.Context, value string) Validatio
             fmt.Sprintf("value does not match pattern %s", v.Pattern.String()),
         ))
     }
-    
+
     return result
 }
 
@@ -674,12 +674,12 @@ func NewRequiredValidator(fieldName string) *RequiredValidator {
 
 func (v *RequiredValidator) Validate(ctx context.Context, value string) ValidationResult {
     result := ValidationResult{Valid: true, Errors: make([]error, 0)}
-    
+
     if strings.TrimSpace(value) == "" {
         result.Valid = false
         result.Errors = append(result.Errors, errors.NewMissingParam(v.FieldName))
     }
-    
+
     return result
 }
 
@@ -698,7 +698,7 @@ func NewEmailValidator(fieldName string) *EmailValidator {
 
 func (v *EmailValidator) Validate(ctx context.Context, value string) ValidationResult {
     result := ValidationResult{Valid: true, Errors: make([]error, 0)}
-    
+
     emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
     if !emailRegex.MatchString(value) {
         result.Valid = false
@@ -707,7 +707,7 @@ func (v *EmailValidator) Validate(ctx context.Context, value string) ValidationR
             "invalid email format",
         ))
     }
-    
+
     return result
 }
 
@@ -726,7 +726,7 @@ func NewURLValidator(fieldName string) *URLValidator {
 
 func (v *URLValidator) Validate(ctx context.Context, value string) ValidationResult {
     result := ValidationResult{Valid: true, Errors: make([]error, 0)}
-    
+
     urlRegex := regexp.MustCompile(`^https?://[^\s/$.?#].[^\s]*$`)
     if !urlRegex.MatchString(value) {
         result.Valid = false
@@ -735,7 +735,7 @@ func (v *URLValidator) Validate(ctx context.Context, value string) ValidationRes
             "invalid URL format",
         ))
     }
-    
+
     return result
 }
 
@@ -756,19 +756,19 @@ import (
 func TestStringLengthValidator(t *testing.T) {
     validator := NewStringLengthValidator("test_field", 5, 10)
     ctx := context.Background()
-    
+
     // Test valid string
     result := validator.Validate(ctx, "hello")
     if !result.Valid {
         t.Errorf("Expected valid result for 'hello', got invalid")
     }
-    
+
     // Test too short
     result = validator.Validate(ctx, "hi")
     if result.Valid {
         t.Errorf("Expected invalid result for 'hi', got valid")
     }
-    
+
     // Test too long
     result = validator.Validate(ctx, "this is too long")
     if result.Valid {
@@ -780,21 +780,21 @@ func TestValidatorChain(t *testing.T) {
     chain := NewValidatorChain[string](StopOnFirstError)
     chain.Add(NewRequiredValidator("test_field"))
     chain.Add(NewStringLengthValidator("test_field", 5, 10))
-    
+
     ctx := context.Background()
-    
+
     // Test valid chain
     result := chain.Validate(ctx, "hello")
     if !result.Valid {
         t.Errorf("Expected valid result for 'hello', got invalid")
     }
-    
+
     // Test empty string (should fail required)
     result = chain.Validate(ctx, "")
     if result.Valid {
         t.Errorf("Expected invalid result for empty string, got valid")
     }
-    
+
     // Test too short (should fail length after passing required)
     result = chain.Validate(ctx, "hi")
     if result.Valid {
@@ -947,27 +947,27 @@ func TestValidationIntegration(t *testing.T) {
     userChain := NewValidatorChain[string](ContinueOnError)
     userChain.Add(NewRequiredValidator("username"))
     userChain.Add(NewStringLengthValidator("username", 3, 20))
-    
+
     patternValidator, err := NewPatternValidator("username", "^[a-zA-Z0-9_]+$")
     if err != nil {
         t.Fatal(err)
     }
     userChain.Add(patternValidator)
-    
+
     ctx := context.Background()
-    
+
     // Test valid input
     result := userChain.Validate(ctx, "valid_user123")
     if !result.Valid {
         t.Errorf("Expected valid result for valid username, got errors: %v", result.Errors)
     }
-    
+
     // Test invalid input (multiple errors)
     result = userChain.Validate(ctx, "a!")
     if result.Valid {
         t.Error("Expected invalid result for invalid username")
     }
-    
+
     // Should have multiple errors (too short + invalid pattern)
     if len(result.Errors) < 2 {
         t.Errorf("Expected multiple errors, got %d", len(result.Errors))
@@ -979,20 +979,20 @@ func TestValidationPerformance(t *testing.T) {
     chain := NewValidatorChain[string](ContinueOnError)
     chain.Add(NewRequiredValidator("field"))
     chain.Add(NewStringLengthValidator("field", 1, 1000))
-    
+
     patternValidator, _ := NewPatternValidator("field", "^[a-zA-Z0-9_.-]+$")
     chain.Add(patternValidator)
     chain.Add(NewEmailValidator("field"))
-    
+
     ctx := context.Background()
-    
+
     // Benchmark validation performance
     start := time.Now()
     for i := 0; i < 1000; i++ {
         chain.Validate(ctx, "test@example.com")
     }
     duration := time.Since(start)
-    
+
     // Validation should be fast (< 1ms per validation)
     if duration > time.Millisecond*1000 {
         t.Errorf("Validation too slow: %v for 1000 validations", duration)
@@ -1002,22 +1002,22 @@ func TestValidationPerformance(t *testing.T) {
 func TestValidationErrorPropagation(t *testing.T) {
     validator := NewRequiredValidator("required_field")
     ctx := context.Background()
-    
+
     result := validator.Validate(ctx, "")
     if result.Valid {
         t.Error("Expected validation to fail for empty required field")
     }
-    
+
     if len(result.Errors) != 1 {
         t.Errorf("Expected 1 error, got %d", len(result.Errors))
     }
-    
+
     // Test error is RichError
     err := result.Errors[0]
     if err == nil {
         t.Error("Expected error to be non-nil")
     }
-    
+
     // Error should contain field context
     errorMsg := err.Error()
     if !strings.Contains(errorMsg, "required_field") {
@@ -1395,16 +1395,16 @@ wc -l domain_errors.txt
 while read line; do
     file=$(echo "$line" | cut -d: -f1)
     line_num=$(echo "$line" | cut -d: -f2)
-    
+
     if [ -f "$file" ]; then
         # Create backup
         cp "$file" "$file.backup"
-        
+
         # Convert specific error patterns
         sed -i 's/fmt\.Errorf("missing %s"/errors.NewMissingParam(/g' "$file"
         sed -i 's/fmt\.Errorf("invalid %s"/errors.NewValidationFailed(/g' "$file"
         sed -i 's/fmt\.Errorf("failed to %s"/errors.NewInternalError(/g' "$file"
-        
+
         echo "Converted errors in $file"
     fi
 done < domain_errors.txt
@@ -1454,10 +1454,10 @@ find pkg/mcp/application -name "*.go" -exec grep -l "fmt\.Errorf" {} \; | while 
     sed -i 's/fmt\.Errorf("tool not found: %s"/errors.NewNotFoundError("tool"/g' "$file"
     sed -i 's/fmt\.Errorf("configuration error: %s"/errors.NewConfigurationError("config"/g' "$file"
     sed -i 's/fmt\.Errorf("internal error: %s"/errors.NewInternalError("operation"/g' "$file"
-    
+
     # Convert wrapped errors
     sed -i 's/fmt\.Errorf("failed to %s: %w"/errors.NewInternalError("operation", err)/g' "$file"
-    
+
     echo "Converted application errors in $file"
 done
 
@@ -1507,12 +1507,12 @@ echo "Final fmt.Errorf count: $FINAL_COUNT"
 if [ $FINAL_COUNT -gt 10 ]; then
     echo "Identifying remaining errors for grandfathering..."
     grep -r "fmt\.Errorf" pkg/mcp/ | head -20 > remaining_errors.txt
-    
+
     # Convert more errors or mark as grandfathered
     while read line; do
         file=$(echo "$line" | cut -d: -f1)
         context=$(echo "$line" | cut -d: -f3-)
-        
+
         # Add grandfathering comment
         sed -i "s|fmt\.Errorf($context)|fmt.Errorf($context) // GRANDFATHERED: Hot path performance|g" "$file"
         echo "Grandfathered error in $file"
@@ -1615,7 +1615,7 @@ return errors.NewError().
 if err != nil {
     // RichError provides structured information
     if richErr, ok := err.(errors.RichError); ok {
-        log.Error("Error occurred", 
+        log.Error("Error occurred",
             "code", richErr.Code(),
             "type", richErr.Type(),
             "severity", richErr.Severity(),
@@ -1809,7 +1809,7 @@ echo "🎉 GAMMA ERROR SYSTEM & VALIDATION WORKSTREAM COMPLETE"
 | ALPHA | Package structure stable | Day 1 | @alpha-lead |
 | BETA | Service interfaces | Day 11 | @beta-lead |
 
-### Dependencies TO Other Workstreams  
+### Dependencies TO Other Workstreams
 | Workstream | What They Need | When | Format |
 |------------|----------------|------|--------|
 | DELTA | Error patterns established | Day 16 | Error usage examples |

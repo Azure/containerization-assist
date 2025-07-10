@@ -15,10 +15,10 @@ mkdir -p pkg/mcp/retry
 if [ -d "pkg/mcp/infra/retry" ]; then
     echo "Moving retry package files..."
     find pkg/mcp/infra/retry -name "*.go" -exec cp {} pkg/mcp/retry/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/retry -name "*.go" -exec sed -i 's/^package retry$/package retry/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/retry -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/infra/retry not found"
@@ -33,13 +33,13 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/infra/retry" p
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
         sed -i 's|github.com/Azure/container-kit/pkg/mcp/infra/retry|github.com/Azure/container-kit/pkg/mcp/retry|g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old retry package"

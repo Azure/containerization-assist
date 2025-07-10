@@ -8,11 +8,11 @@ echo "Fixing imports to three-layer architecture..."
 fix_imports() {
     local dir=$1
     echo "Processing $dir..."
-    
+
     find "$dir" -name "*.go" -type f | while read -r file; do
         # Create a temporary file
         tmp_file="${file}.tmp"
-        
+
         # Apply all import fixes
         sed -E \
             -e 's|"github.com/Azure/container-kit/pkg/mcp/errors"|"github.com/Azure/container-kit/pkg/mcp/domain/errors"|g' \
@@ -35,7 +35,7 @@ fix_imports() {
             -e 's|"github.com/Azure/container-kit/pkg/mcp/logging"|"github.com/Azure/container-kit/pkg/mcp/infra/internal/logging"|g' \
             -e 's|"github.com/Azure/container-kit/pkg/mcp/retry"|"github.com/Azure/container-kit/pkg/mcp/infra/retry"|g' \
             "$file" > "$tmp_file"
-        
+
         # Check if sed made any changes
         if ! diff -q "$file" "$tmp_file" >/dev/null 2>&1; then
             mv "$tmp_file" "$file"
@@ -48,7 +48,7 @@ fix_imports() {
 
 # Fix imports in all directories
 fix_imports "pkg/mcp/domain"
-fix_imports "pkg/mcp/application" 
+fix_imports "pkg/mcp/application"
 fix_imports "pkg/mcp/infra"
 fix_imports "pkg/common"
 fix_imports "cmd"

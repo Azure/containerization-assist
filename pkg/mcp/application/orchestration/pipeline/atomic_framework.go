@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // AtomicOperationFramework provides foundation for atomic tool operations
@@ -73,11 +73,13 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 		return result, result.Error
 	}
 
-	af.logger.Info().
-		Str("session_id", config.SessionID).
-		Str("image_ref", imageRef).
-		Bool("dry_run", config.DryRun).
-		Msg("Starting atomic Docker pull operation")
+	af.logger.Info("Starting atomic Docker pull operation",
+
+		"session_id", config.SessionID,
+
+		"image_ref", imageRef,
+
+		"dry_run", config.DryRun)
 
 	if config.DryRun {
 		result.Success = true
@@ -96,7 +98,11 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 		result.Success = false
 		result.Error = err
 
-		af.logger.Error().Err(err).Str("image_ref", imageRef).Msg("Atomic Docker pull failed")
+		af.logger.Error("Atomic Docker pull failed",
+
+			"error", err,
+
+			"image_ref", imageRef)
 		return result, err
 	}
 
@@ -106,10 +112,9 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 		"pulled":    true,
 	}
 
-	af.logger.Info().
-		Str("image_ref", imageRef).
-		Str("duration", result.Duration.String()).
-		Msg("Atomic Docker pull completed successfully")
+	af.logger.Info("Atomic Docker pull completed successfully",
+		"image_ref", imageRef,
+		"duration", result.Duration.String())
 
 	return result, nil
 }
@@ -133,11 +138,13 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 		return result, result.Error
 	}
 
-	af.logger.Info().
-		Str("session_id", config.SessionID).
-		Str("image_ref", imageRef).
-		Bool("dry_run", config.DryRun).
-		Msg("Starting atomic Docker push operation")
+	af.logger.Info("Starting atomic Docker push operation",
+
+		"session_id", config.SessionID,
+
+		"image_ref", imageRef,
+
+		"dry_run", config.DryRun)
 
 	if config.DryRun {
 		result.Success = true
@@ -156,7 +163,11 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 		result.Success = false
 		result.Error = err
 
-		af.logger.Error().Err(err).Str("image_ref", imageRef).Msg("Atomic Docker push failed")
+		af.logger.Error("Atomic Docker push failed",
+
+			"error", err,
+
+			"image_ref", imageRef)
 		return result, err
 	}
 
@@ -166,10 +177,9 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 		"pushed":    true,
 	}
 
-	af.logger.Info().
-		Str("image_ref", imageRef).
-		Str("duration", result.Duration.String()).
-		Msg("Atomic Docker push completed successfully")
+	af.logger.Info("Atomic Docker push completed successfully",
+		"image_ref", imageRef,
+		"duration", result.Duration.String())
 
 	return result, nil
 }
@@ -193,12 +203,15 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 		return result, result.Error
 	}
 
-	af.logger.Info().
-		Str("session_id", config.SessionID).
-		Str("source_ref", sourceRef).
-		Str("target_ref", targetRef).
-		Bool("dry_run", config.DryRun).
-		Msg("Starting atomic Docker tag operation")
+	af.logger.Info("Starting atomic Docker tag operation",
+
+		"session_id", config.SessionID,
+
+		"source_ref", sourceRef,
+
+		"target_ref", targetRef,
+
+		"dry_run", config.DryRun)
 
 	if config.DryRun {
 		result.Success = true
@@ -217,10 +230,13 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 		result.Success = false
 		result.Error = err
 
-		af.logger.Error().Err(err).
-			Str("source_ref", sourceRef).
-			Str("target_ref", targetRef).
-			Msg("Atomic Docker tag failed")
+		af.logger.Error("Atomic Docker tag failed",
+
+			"error", err,
+
+			"source_ref", sourceRef,
+
+			"target_ref", targetRef)
 		return result, err
 	}
 
@@ -231,11 +247,10 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 		"tagged":     true,
 	}
 
-	af.logger.Info().
-		Str("source_ref", sourceRef).
-		Str("target_ref", targetRef).
-		Str("duration", result.Duration.String()).
-		Msg("Atomic Docker tag completed successfully")
+	af.logger.Info("Atomic Docker tag completed successfully",
+		"source_ref", sourceRef,
+		"target_ref", targetRef,
+		"duration", result.Duration.String())
 
 	return result, nil
 }

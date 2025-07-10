@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // ConversationPromptService defines the interface for prompt processing
@@ -26,7 +27,7 @@ type ConversationPromptService interface {
 type PromptServiceImpl struct {
 	sessionManager        session.SessionManager
 	toolOrchestrator      api.Orchestrator
-	preferenceStore       *shared.PreferenceStore
+	preferenceStore       *domaintypes.PreferenceStore
 	retryService          ConversationRetryService
 	conversationHandler   *ConversationHandler
 	smartWorkflowDetector *SmartWorkflowDetector
@@ -38,7 +39,7 @@ type PromptManager = PromptServiceImpl
 type PromptManagerConfig struct {
 	SessionManager   session.SessionManager
 	ToolOrchestrator api.Orchestrator
-	PreferenceStore  *shared.PreferenceStore
+	PreferenceStore  *domaintypes.PreferenceStore
 	Logger           *slog.Logger
 }
 
@@ -111,9 +112,9 @@ func (ps *PromptServiceImpl) initializeConversationState(ctx context.Context, se
 
 	convState := &ConversationState{
 		SessionState: internalSession,
-		CurrentStage: shared.StagePreFlight,
+		CurrentStage: domaintypes.StagePreFlight,
 		History:      make([]ConversationTurn, 0),
-		Preferences: shared.UserPreferences{
+		Preferences: domaintypes.UserPreferences{
 			Namespace:          "default",
 			Replicas:           1,
 			ServiceType:        "ClusterIP",
@@ -145,7 +146,7 @@ func (ps *PromptServiceImpl) restoreStateFromSession(convState *ConversationStat
 					Assistant: fmt.Sprintf("%v", turnMap["assistant"]),
 				}
 				if stage, ok := turnMap["stage"].(string); ok {
-					turn.Stage = shared.ConversationStage(stage)
+					turn.Stage = domaintypes.ConversationStage(stage)
 				}
 				if ts, ok := turnMap["timestamp"].(string); ok {
 					turn.Timestamp, _ = time.Parse(time.RFC3339, ts)
@@ -175,7 +176,7 @@ func (ps *PromptServiceImpl) restoreStateFromSession(convState *ConversationStat
 		}
 	}
 	if stage, ok := internalSession.Metadata["current_stage"].(string); ok {
-		convState.CurrentStage = shared.ConversationStage(stage)
+		convState.CurrentStage = domaintypes.ConversationStage(stage)
 	}
 }
 func (ps *PromptServiceImpl) applyUserPreferences(ctx context.Context, convState *ConversationState) {
@@ -187,7 +188,7 @@ func (ps *PromptServiceImpl) applyUserPreferences(ctx context.Context, convState
 	}
 }
 func (ps *PromptServiceImpl) handleEarlyCases(ctx context.Context, convState *ConversationState, userInput string) *ConversationResponse {
-	if convState.CurrentStage == shared.StagePreFlight && !ps.hasPassedPreFlightChecks(convState) {
+	if convState.CurrentStage == domaintypes.StagePreFlight && !ps.hasPassedPreFlightChecks(convState) {
 		return ps.handlePreFlightChecks(ctx, convState, userInput)
 	}
 	if convState.PendingDecision != nil {
@@ -216,35 +217,35 @@ func (ps *PromptServiceImpl) processMainConversation(ctx context.Context, convSt
 	internalStage := mapMCPStageToDetailedStage(convState.CurrentStage, convState.Context)
 
 	switch internalStage {
-	case shared.StageWelcome:
+	case domaintypes.StageWelcome:
 		if len(convState.History) == 0 && userInput != "" {
 			return ps.smartWorkflowDetector.HandleSmartWorkflow(ctx, convState, userInput)
 		} else {
 			return ps.handleWelcomeStage(ctx, convState, userInput)
 		}
-	case shared.StageInit:
+	case domaintypes.StageInit:
 		return ps.handleInitStage(ctx, convState, userInput)
-	case shared.StageAnalysis:
+	case domaintypes.StageAnalysis:
 		return ps.handleAnalysisStage(ctx, convState, userInput)
-	case shared.StageDockerfile:
+	case domaintypes.StageDockerfile:
 		return ps.handleDockerfileStage(ctx, convState, userInput)
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 		return ps.handleBuildStage(ctx, convState, userInput)
-	case shared.StagePush:
+	case domaintypes.StagePush:
 		return ps.handlePushStage(ctx, convState, userInput)
-	case shared.StageManifests:
+	case domaintypes.StageManifests:
 		return ps.handleManifestsStage(ctx, convState, userInput)
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		return ps.handleDeploymentStage(ctx, convState, userInput)
-	case shared.StageCompleted:
+	case domaintypes.StageCompleted:
 		return ps.handleCompletedStage(ctx, convState, userInput)
 	default:
 		response := &ConversationResponse{
 			Message: "I'm not sure what stage we're in. Let's start over. What would you like to containerize?",
-			Stage:   convertFromTypesStage(shared.StageInit),
+			Stage:   convertFromTypesStage(domaintypes.StageInit),
 			Status:  ResponseStatusError,
 		}
-		convState.SetStage(convertFromTypesStage(shared.StageInit))
+		convState.SetStage(convertFromTypesStage(domaintypes.StageInit))
 		return response
 	}
 }

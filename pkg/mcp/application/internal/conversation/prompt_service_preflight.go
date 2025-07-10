@@ -6,19 +6,20 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 func (ps *PromptServiceImpl) hasPassedPreFlightChecks(_ *ConversationState) bool {
 	return false
 }
 
-func (ps *PromptServiceImpl) hasPassedStagePreFlightChecks(state *ConversationState, stage shared.ConversationStage) bool {
+func (ps *PromptServiceImpl) hasPassedStagePreFlightChecks(state *ConversationState, stage domaintypes.ConversationStage) bool {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	_, passed := state.Context[key]
 	return passed
 }
 
-func (ps *PromptServiceImpl) markStagePreFlightPassed(state *ConversationState, stage shared.ConversationStage) {
+func (ps *PromptServiceImpl) markStagePreFlightPassed(state *ConversationState, stage domaintypes.ConversationStage) {
 	key := fmt.Sprintf("preflight_%s_passed", stage)
 	state.Context[key] = true
 }
@@ -51,7 +52,7 @@ func (ps *PromptServiceImpl) handlePreFlightChecks(_ context.Context, state *Con
 		state.Context["preflight_skipped"] = true
 		response := ps.newResponse(state)
 		response.Message = "⚠️ Skipping pre-flight checks. Note that you may encounter issues if your environment isn't properly configured.\n\nWhat would you like to containerize?"
-		response.Stage = convertFromTypesStage(shared.StageInit)
+		response.Stage = convertFromTypesStage(domaintypes.StageInit)
 		response.Status = ResponseStatusWarning
 		return response
 	}
@@ -71,7 +72,7 @@ func (ps *PromptServiceImpl) handlePreFlightChecks(_ context.Context, state *Con
 		response.Message = "Let me run some pre-flight checks before we begin..."
 	}
 
-	response.Stage = convertFromTypesStage(shared.StagePreFlight)
+	response.Stage = convertFromTypesStage(domaintypes.StagePreFlight)
 	response.Status = ResponseStatusProcessing
 	var result interface{}
 	var err error
@@ -79,7 +80,7 @@ func (ps *PromptServiceImpl) handlePreFlightChecks(_ context.Context, state *Con
 	if err != nil {
 		response := ps.newResponse(state)
 		response.Message = fmt.Sprintf("Failed to run pre-flight checks: %v\n\nWould you like to skip the checks and proceed anyway?", err)
-		response.Stage = convertFromTypesStage(shared.StagePreFlight)
+		response.Stage = convertFromTypesStage(domaintypes.StagePreFlight)
 		response.Status = ResponseStatusError
 		response.Options = []Option{
 			{ID: "skip", Label: "Skip checks and continue"},

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 type AutoFixHelper struct {
@@ -22,7 +24,7 @@ func NewAutoFixHelper(handler *ConversationHandler) *AutoFixHelper {
 
 	return helper
 }
-func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *ConversationResponse, stage shared.ConversationStage, err error, state *ConversationState) bool {
+func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *ConversationResponse, stage domaintypes.ConversationStage, err error, state *ConversationState) bool {
 	if h.conversationHandler == nil {
 		return false
 	}
@@ -51,28 +53,28 @@ func (h *AutoFixHelper) AttemptAutoFix(ctx context.Context, response *Conversati
 	return true
 }
 
-func convertToMCPStage(stage shared.ConversationStage) shared.ConversationStage {
+func convertToMCPStage(stage domaintypes.ConversationStage) domaintypes.ConversationStage {
 	return convertFromTypesStage(stage)
 }
 
-func (h *AutoFixHelper) getSuccessOptions(stage shared.ConversationStage) []Option {
+func (h *AutoFixHelper) getSuccessOptions(stage domaintypes.ConversationStage) []Option {
 	switch stage {
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 		return []Option{
 			{ID: "continue", Label: "Continue to next stage", Recommended: true},
 			{ID: "review", Label: "Review changes"},
 		}
-	case shared.StagePush:
+	case domaintypes.StagePush:
 		return []Option{
 			{ID: "continue", Label: "Continue to manifest generation", Recommended: true},
 			{ID: "review", Label: "Review changes"},
 		}
-	case shared.StageManifests:
+	case domaintypes.StageManifests:
 		return []Option{
 			{ID: "continue", Label: "Continue to deployment", Recommended: true},
 			{ID: "review", Label: "Review changes"},
 		}
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		return []Option{
 			{ID: "continue", Label: "Continue to completion", Recommended: true},
 			{ID: "review", Label: "Review deployment status"},
@@ -85,30 +87,30 @@ func (h *AutoFixHelper) getSuccessOptions(stage shared.ConversationStage) []Opti
 	}
 }
 
-func getStageDisplayName(stage shared.ConversationStage) string {
+func getStageDisplayName(stage domaintypes.ConversationStage) string {
 	switch stage {
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 		return "Build"
-	case shared.StagePush:
+	case domaintypes.StagePush:
 		return "Push"
-	case shared.StageManifests:
+	case domaintypes.StageManifests:
 		return "Manifest generation"
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		return "Deployment"
 	default:
 		return "Operation"
 	}
 }
 
-func getStageErrorPrefix(stage shared.ConversationStage) string {
+func getStageErrorPrefix(stage domaintypes.ConversationStage) string {
 	switch stage {
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 		return "Build"
-	case shared.StagePush:
+	case domaintypes.StagePush:
 		return "Failed to push Docker image"
-	case shared.StageManifests:
+	case domaintypes.StageManifests:
 		return "Failed to generate Kubernetes manifests"
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		return "Deployment"
 	default:
 		return "Operation"
@@ -117,7 +119,7 @@ func getStageErrorPrefix(stage shared.ConversationStage) string {
 
 type RetryGuidanceInput struct {
 	Response      *ConversationResponse
-	Stage         shared.ConversationStage
+	Stage         domaintypes.ConversationStage
 	Error         error
 	AutoFixResult *AutoFixResult
 	State         *ConversationState
@@ -191,11 +193,11 @@ func (h *AutoFixHelper) buildRetryContext(sessionID string, err error, autoFixRe
 	}
 }
 
-func (h *AutoFixHelper) classifyError(err error, stage shared.ConversationStage) string {
+func (h *AutoFixHelper) classifyError(err error, stage domaintypes.ConversationStage) string {
 	errorMsg := strings.ToLower(err.Error())
 
 	switch stage {
-	case shared.StageBuild:
+	case domaintypes.StageBuild:
 		if strings.Contains(errorMsg, "copy failed") || strings.Contains(errorMsg, "no such file") {
 			return "Docker Build - File Not Found"
 		} else if strings.Contains(errorMsg, "command failed") || strings.Contains(errorMsg, "non-zero code") {
@@ -206,9 +208,9 @@ func (h *AutoFixHelper) classifyError(err error, stage shared.ConversationStage)
 			return "Docker Build - Dependency Error"
 		}
 		return "Docker Build - General Error"
-	case shared.StagePush:
+	case domaintypes.StagePush:
 		return "Docker Push Error"
-	case shared.StageDeployment:
+	case domaintypes.StageDeployment:
 		return "Kubernetes Deployment Error"
 	default:
 		return "General Error"

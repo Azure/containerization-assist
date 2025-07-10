@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -17,12 +18,11 @@ import (
 	"time"
 
 	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
 )
 
 // SecretDiscovery provides comprehensive secret detection capabilities
 type SecretDiscovery struct {
-	logger          zerolog.Logger
+	logger          *slog.Logger
 	patternDetector *PatternDetector
 	entropyDetector *EntropyDetector
 	fileTypeHandler *FileTypeHandler
@@ -31,9 +31,13 @@ type SecretDiscovery struct {
 }
 
 // NewSecretDiscovery creates a new secret discovery engine
-func NewSecretDiscovery(logger zerolog.Logger) *SecretDiscovery {
+func NewSecretDiscovery(logger *slog.Logger) *SecretDiscovery {
+	// If logger is nil, create a default one
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &SecretDiscovery{
-		logger:          logger.With().Str("component", "secret_discovery").Logger(),
+		logger:          logger.With("component", "secret_discovery"),
 		patternDetector: NewPatternDetector(),
 		entropyDetector: NewEntropyDetector(),
 		fileTypeHandler: NewFileTypeHandler(),
@@ -113,11 +117,10 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 		return nil, mcperrors.NewError().Messagef("directory does not exist: %s", path).WithLocation().Build()
 	}
 
-	sd.logger.Info().
-		Str("path", path).
-		Bool("recursive", options.Recursive).
-		Strs("file_types", options.FileTypes).
-		Msg("Starting secret discovery scan")
+	sd.logger.Info("Starting secret discovery scan",
+		"path", path,
+		"recursive", options.Recursive,
+		"file_types", options.FileTypes)
 
 	// Walk through directory
 	var wg sync.WaitGroup
@@ -176,12 +179,11 @@ func (sd *SecretDiscovery) ScanDirectory(ctx context.Context, path string, optio
 	result.Duration = result.EndTime.Sub(startTime)
 	result.RiskScore = sd.calculateRiskScore(result)
 
-	sd.logger.Info().
-		Int("files_scanned", result.FilesScanned).
-		Int("findings", len(result.Findings)).
-		Int("risk_score", result.RiskScore).
-		Dur("duration", result.Duration).
-		Msg("Secret discovery scan completed")
+	sd.logger.Info("Secret discovery scan completed",
+		"files_scanned", result.FilesScanned,
+		"findings", len(result.Findings),
+		"risk_score", result.RiskScore,
+		"duration", result.Duration)
 
 	return result, nil
 }
@@ -191,7 +193,7 @@ func (sd *SecretDiscovery) scanFile(_ context.Context, filePath string, options 
 	// nolint:gosec // filePath is controlled within the scanning logic
 	file, err := os.Open(filePath)
 	if err != nil {
-		sd.logger.Debug().Err(err).Str("file", filePath).Msg("Failed to open file")
+		sd.logger.Debug("Failed to open file", "error", err, "file", filePath)
 		return nil
 	}
 	defer func() { _ = file.Close() }()
@@ -246,10 +248,9 @@ func (sd *SecretDiscovery) shouldProcessFile(filePath string, info os.FileInfo, 
 
 	// Check file size limit
 	if options.MaxFileSize > 0 && info.Size() > options.MaxFileSize {
-		sd.logger.Debug().
-			Str("file", filePath).
-			Int64("size", info.Size()).
-			Msg("Skipping file due to size limit")
+		sd.logger.Debug("Skipping file due to size limit",
+			"file", filePath,
+			"size", info.Size())
 		return false
 	}
 

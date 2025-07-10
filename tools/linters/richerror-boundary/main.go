@@ -81,6 +81,13 @@ func (w *lintRichErrorBoundary) isSimpleErrorCall(call *ast.CallExpr) bool {
 }
 
 func main() {
+	// Check if we should run fmt.Errorf counter mode
+	if len(os.Args) == 3 && !strings.HasPrefix(os.Args[1], "-") {
+		// Run fmt.Errorf counter from WORKSTREAM_GAMMA_PROMPT.md
+		countFmtErrorf()
+		return
+	}
+
 	var (
 		packagePath     = flag.String("package", "pkg/mcp", "Package path to audit (defaults to pkg/mcp)")
 		jsonOutput      = flag.Bool("json", false, "Output results as JSON")

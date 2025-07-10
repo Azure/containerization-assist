@@ -59,7 +59,7 @@ scripts/check_import_depth.sh --max-depth=3 || (echo "❌ ALPHA Week 2 not compl
 echo "=== REGISTRY AUDIT ===" > registry_audit.txt
 echo "Core Registry:" >> registry_audit.txt
 wc -l pkg/mcp/application/core/registry.go >> registry_audit.txt
-echo "Commands Registry:" >> registry_audit.txt  
+echo "Commands Registry:" >> registry_audit.txt
 wc -l pkg/mcp/application/commands/command_registry.go >> registry_audit.txt
 echo "Runtime Registry:" >> registry_audit.txt
 wc -l pkg/mcp/application/internal/runtime/registry.go >> registry_audit.txt
@@ -99,13 +99,13 @@ cat > pkg/mcp/application/api/registry_interfaces.go << 'EOF'
 type ToolRegistry interface {
     // Register registers a tool with type safety
     Register[T any](name string, factory func() T) error
-    
+
     // Discover finds tools by name with type safety
     Discover[T any](name string) (T, error)
-    
+
     // List returns all registered tool names
     List() []string
-    
+
     // Metadata returns tool metadata
     Metadata(name string) (ToolMetadata, error)
 }
@@ -338,7 +338,7 @@ func NewUnified() api.ToolRegistry {
 func (r *UnifiedRegistry) Register[T any](name string, factory func() T) error {
     r.mu.Lock()
     defer r.mu.Unlock()
-    
+
     if _, exists := r.tools[name]; exists {
         return errors.NewError().
             Code(errors.CodeAlreadyExists).
@@ -346,7 +346,7 @@ func (r *UnifiedRegistry) Register[T any](name string, factory func() T) error {
             Context("tool_name", name).
             Build()
     }
-    
+
     r.tools[name] = factory
     return nil
 }
@@ -355,7 +355,7 @@ func (r *UnifiedRegistry) Register[T any](name string, factory func() T) error {
 func (r *UnifiedRegistry) Discover[T any](name string) (T, error) {
     r.mu.RLock()
     defer r.mu.RUnlock()
-    
+
     var zero T
     factory, exists := r.tools[name]
     if !exists {
@@ -365,7 +365,7 @@ func (r *UnifiedRegistry) Discover[T any](name string) (T, error) {
             Context("tool_name", name).
             Build()
     }
-    
+
     typedFactory, ok := factory.(func() T)
     if !ok {
         return zero, errors.NewError().
@@ -374,7 +374,7 @@ func (r *UnifiedRegistry) Discover[T any](name string) (T, error) {
             Context("tool_name", name).
             Build()
     }
-    
+
     return typedFactory(), nil
 }
 
@@ -382,7 +382,7 @@ func (r *UnifiedRegistry) Discover[T any](name string) (T, error) {
 func (r *UnifiedRegistry) List() []string {
     r.mu.RLock()
     defer r.mu.RUnlock()
-    
+
     names := make([]string, 0, len(r.tools))
     for name := range r.tools {
         names = append(names, name)
@@ -394,7 +394,7 @@ func (r *UnifiedRegistry) List() []string {
 func (r *UnifiedRegistry) Metadata(name string) (api.ToolMetadata, error) {
     r.mu.RLock()
     defer r.mu.RUnlock()
-    
+
     metadata, exists := r.metadata[name]
     if !exists {
         return api.ToolMetadata{}, errors.NewError().
@@ -403,7 +403,7 @@ func (r *UnifiedRegistry) Metadata(name string) (api.ToolMetadata, error) {
             Context("tool_name", name).
             Build()
     }
-    
+
     return metadata, nil
 }
 EOF
@@ -448,13 +448,13 @@ import (
 
 func TestUnifiedRegistry_Register(t *testing.T) {
     registry := NewUnified()
-    
+
     // Test successful registration
     err := registry.Register("test-tool", func() string { return "test" })
     if err != nil {
         t.Fatalf("Expected no error, got %v", err)
     }
-    
+
     // Test duplicate registration
     err = registry.Register("test-tool", func() string { return "duplicate" })
     if err == nil {
@@ -464,10 +464,10 @@ func TestUnifiedRegistry_Register(t *testing.T) {
 
 func TestUnifiedRegistry_Discover(t *testing.T) {
     registry := NewUnified()
-    
+
     // Register test tool
     registry.Register("test-tool", func() string { return "test-result" })
-    
+
     // Test successful discovery
     result, err := registry.Discover[string]("test-tool")
     if err != nil {
@@ -476,7 +476,7 @@ func TestUnifiedRegistry_Discover(t *testing.T) {
     if result != "test-result" {
         t.Fatalf("Expected 'test-result', got %s", result)
     }
-    
+
     // Test not found
     _, err = registry.Discover[string]("missing-tool")
     if err == nil {
@@ -486,7 +486,7 @@ func TestUnifiedRegistry_Discover(t *testing.T) {
 
 func TestUnifiedRegistry_ThreadSafety(t *testing.T) {
     registry := NewUnified()
-    
+
     // Test concurrent registration
     var wg sync.WaitGroup
     for i := 0; i < 100; i++ {
@@ -497,7 +497,7 @@ func TestUnifiedRegistry_ThreadSafety(t *testing.T) {
         }(i)
     }
     wg.Wait()
-    
+
     // Verify all tools registered
     tools := registry.List()
     if len(tools) != 100 {
@@ -635,23 +635,23 @@ import (
 
 func TestRegistryIntegration(t *testing.T) {
     registry := NewUnified()
-    
+
     // Test tool registration
     err := registry.Register("analyze", func() string { return "analyze-tool" })
     if err != nil {
         t.Fatalf("Failed to register analyze tool: %v", err)
     }
-    
+
     // Test tool discovery
     tool, err := registry.Discover[string]("analyze")
     if err != nil {
         t.Fatalf("Failed to discover analyze tool: %v", err)
     }
-    
+
     if tool != "analyze-tool" {
         t.Fatalf("Expected 'analyze-tool', got %s", tool)
     }
-    
+
     // Test tool listing
     tools := registry.List()
     if len(tools) != 1 || tools[0] != "analyze" {
@@ -661,14 +661,14 @@ func TestRegistryIntegration(t *testing.T) {
 
 func BenchmarkRegistryOperations(b *testing.B) {
     registry := NewUnified()
-    
+
     // Setup tools
     for i := 0; i < 100; i++ {
         registry.Register(fmt.Sprintf("tool-%d", i), func() string { return "result" })
     }
-    
+
     b.ResetTimer()
-    
+
     // Benchmark discovery
     for i := 0; i < b.N; i++ {
         _, err := registry.Discover[string]("tool-50")
@@ -889,22 +889,22 @@ func TestServiceContainerIntegration(t *testing.T) {
     if err != nil {
         t.Fatalf("Failed to initialize service container: %v", err)
     }
-    
+
     // Test tool registry
     err = container.ToolRegistry.Register("test", func() string { return "test" })
     if err != nil {
         t.Fatalf("Failed to register tool: %v", err)
     }
-    
+
     // Test service interactions
     ctx := context.Background()
-    
+
     // Test workflow executor with registry
     workflow := container.WorkflowExecutor
     if workflow == nil {
         t.Fatal("WorkflowExecutor not initialized")
     }
-    
+
     // Test scanner
     scanner := container.Scanner
     if scanner == nil {
@@ -1093,7 +1093,7 @@ if err != nil {
 // Before
 registry.Register("tool-name", func() interface{} { return NewTool() })
 
-// After  
+// After
 registry.Register("tool-name", func() ToolType { return NewTool() })
 ```
 
@@ -1140,11 +1140,11 @@ while read line; do
         sed -i 's/oldRegistry\.RegisterTool/registry.Register/g' "$file"
         sed -i 's/runtimeRegistry\.RegisterTool/registry.Register/g' "$file"
         sed -i 's/core\.RegisterTool/registry.Register/g' "$file"
-        
+
         # Update factory patterns
         sed -i 's/func() interface{}/func() ToolType/g' "$file"
         sed -i 's/\.Register(\([^,]*\), func() interface{}/\.Register(\1, func() ToolType/g' "$file"
-        
+
         echo "Migrated tools in $file"
     fi
 done < remaining_tools.txt
@@ -1202,12 +1202,12 @@ cat > docs/REGISTRY_USAGE_FOR_DELTA.md << 'EOF'
 ## Tool Registration
 ```go
 // Register pipeline tools
-registry.Register("pipeline-builder", func() pipeline.Builder { 
-    return pipeline.NewBuilder() 
+registry.Register("pipeline-builder", func() pipeline.Builder {
+    return pipeline.NewBuilder()
 })
 
-registry.Register("stage-executor", func() pipeline.StageExecutor { 
-    return pipeline.NewStageExecutor() 
+registry.Register("stage-executor", func() pipeline.StageExecutor {
+    return pipeline.NewStageExecutor()
 })
 ```
 
@@ -1317,7 +1317,7 @@ echo "🎉 BETA REGISTRY & DI WORKSTREAM COMPLETE"
 | ALPHA | Architecture boundaries | Day 6 | @alpha-lead |
 | GAMMA | Error interfaces | Day 6 | @gamma-lead |
 
-### Dependencies TO Other Workstreams  
+### Dependencies TO Other Workstreams
 | Workstream | What They Need | When | Format |
 |------------|----------------|------|--------|
 | DELTA | Registry system complete | Day 19 | Handoff docs + examples |

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
+	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
 // MonitoringIntegrator provides basic monitoring integration with logging
@@ -103,11 +103,13 @@ func NewMonitoringIntegrator(
 		go mi.startPeriodicLogging()
 	}
 
-	mi.logger.Info().
-		Str("service_name", config.ServiceName).
-		Str("service_version", config.ServiceVersion).
-		Bool("detailed_metrics", config.EnableDetailedMetrics).
-		Msg("Monitoring integration initialized")
+	mi.logger.Info("Monitoring integration initialized",
+
+		"service_name", config.ServiceName,
+
+		"service_version", config.ServiceVersion,
+
+		"detailed_metrics", config.EnableDetailedMetrics)
 
 	return mi, nil
 }
@@ -132,17 +134,7 @@ func (mi *MonitoringIntegrator) TrackOperation(
 	}
 	mi.mu.Unlock()
 
-	logEvent := mi.logger.Info().
-		Str("operation_type", operationType).
-		Str("session_id", sessionID).
-		Str("duration", duration.String()).
-		Bool("success", err == nil)
-
-	if err != nil {
-		logEvent = logEvent.Err(err)
-	}
-
-	logEvent.Msg("Operation tracked")
+	logEvent := mi.logger.Info("Operation tracked", "error", err)
 
 	return err
 }
@@ -153,10 +145,11 @@ func (mi *MonitoringIntegrator) TrackSession(sessionID, event string) {
 	mi.sessionCounts[event]++
 	mi.mu.Unlock()
 
-	mi.logger.Info().
-		Str("session_id", sessionID).
-		Str("event", event).
-		Msg("Session event tracked")
+	mi.logger.Info("Session event tracked",
+
+		"session_id", sessionID,
+
+		"event", event)
 }
 
 // GetMonitoringMetrics returns basic monitoring metrics
@@ -204,7 +197,7 @@ func (mi *MonitoringIntegrator) GetMonitoringMetrics(ctx context.Context) (*Moni
 
 // Shutdown gracefully shuts down the monitoring integrator
 func (mi *MonitoringIntegrator) Shutdown(ctx context.Context) error {
-	mi.logger.Info().Msg("Shutting down monitoring integrator")
+	mi.logger.Info("Shutting down monitoring integrator")
 	return nil
 }
 

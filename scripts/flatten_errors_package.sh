@@ -24,7 +24,7 @@ find "$NEW_PKG" -name "*.go" -type f | while read -r file; do
     if [[ "$file" == *"_test.go" ]]; then
         continue
     fi
-    
+
     # Update package declaration if it's in a subdirectory
     if [[ "$file" == *"/codes/"* ]]; then
         # Files in codes/ subdirectory should keep their package

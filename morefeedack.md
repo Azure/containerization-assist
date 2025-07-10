@@ -46,7 +46,7 @@ Phase	Min global coverage	Key packages
 1	keep baseline (≈15 %)	—
 2	25 %	runtime, session, retry
 3	40 %	all internal/*
-4	55 % global, 80 % new code	
+4	55 % global, 80 % new code
 
 Do the same for benchmark P95 targets to catch perf regressions early.
 

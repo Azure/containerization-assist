@@ -1,0 +1,11 @@
+pkg/mcp/application/clients.go
+pkg/mcp/application/internal/conversation/canonical_tools.go
+pkg/mcp/application/internal/runtime/registration_helper.go
+pkg/mcp/application/internal/runtime/registry.go
+pkg/mcp/application/orchestration/pipeline/atomic_framework.go
+pkg/mcp/application/orchestration/pipeline/basic_validator.go
+pkg/mcp/application/orchestration/pipeline/cache_service.go
+pkg/mcp/application/orchestration/pipeline/docker_optimizer.go
+pkg/mcp/application/orchestration/pipeline/monitoring_integration.go
+pkg/mcp/application/orchestration/pipeline/production_validation.go
+pkg/mcp/application/orchestration/pipeline/security_services.go

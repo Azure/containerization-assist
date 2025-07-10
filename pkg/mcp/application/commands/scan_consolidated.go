@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,7 +13,6 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
 )
 
 // ConsolidatedScanCommand consolidates all scan tool functionality into a single command
@@ -35,9 +33,7 @@ func NewConsolidatedScanCommand(
 	logger *slog.Logger,
 ) *ConsolidatedScanCommand {
 	// Initialize security services
-	// Create a zerolog logger for security package compatibility
-	zerologger := zerolog.New(os.Stderr).With().Timestamp().Logger()
-	secretDiscovery := security.NewSecretDiscovery(zerologger)
+	secretDiscovery := security.NewSecretDiscovery(logger)
 
 	return &ConsolidatedScanCommand{
 		sessionStore:    sessionStore,

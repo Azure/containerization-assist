@@ -5,7 +5,7 @@ Created an import depth checker tool that analyzes package structure. Found sign
 
 ## Statistics
 - **Depth 2**: 11 imports (✓ OK)
-- **Depth 3**: 42 imports (✓ OK) 
+- **Depth 3**: 42 imports (✓ OK)
 - **Depth 4**: 267 imports (❌ VIOLATION)
 - **Depth 5**: 33 imports (❌ VIOLATION)
 
@@ -70,7 +70,7 @@ Domain layer also has significant depth issues:
 ```
 pkg/mcp/
 ├── api/           # Was: application/api
-├── commands/      # Was: application/commands  
+├── commands/      # Was: application/commands
 ├── core/          # Application core (unchanged)
 ├── domain/        # Domain logic
 │   ├── analyze/   # Was: domain/containerization/analyze

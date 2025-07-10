@@ -64,11 +64,11 @@ This document outlines ten high-impact, architecture-level refactors that would 
 1. **Core Registry** (`pkg/mcp/application/core/registry.go:45`)
    - Deprecated but still used in 15+ files
    - Basic string-based tool lookup
-   
+
 2. **Commands Registry** (`pkg/mcp/application/commands/command_registry.go:89`)
    - Adds metadata system and validation
    - Used by CLI implementations
-   
+
 3. **Runtime Registry** (`pkg/mcp/application/internal/runtime/registry.go:123`)
    - Uses reflection and `interface{}` parameters
    - Auto-registration via `RegisterAllTools()`
@@ -341,7 +341,7 @@ Finally, add semantic context usage, performance optimizations, and comprehensiv
 strategy:
   matrix:
     phase_target: [0, 1, 2, 3, 4]
-    
+
 jobs:
   quality-gates:
     runs-on: ubuntu-latest
@@ -353,15 +353,15 @@ jobs:
           ! grep -r "zerolog\|logrus" pkg/mcp/
           # Context plumbing
           scripts/check-context-params.sh
-          
-      - name: Check Phase 1 Rules  
+
+      - name: Check Phase 1 Rules
         if: matrix.phase_target >= 1
         run: |
           # Package depth ≤ 3
           scripts/check_import_depth.sh --max-depth=3
           # No circular imports
           go mod graph | scripts/check-cycles.sh
-          
+
       - name: Check Phase 2 Rules
         if: matrix.phase_target >= 2
         run: |
@@ -421,7 +421,7 @@ jobs:
 
 ### Timeline Adjustments
 - **Unknown-unknown buffer**: 20% slack per phase
-- **Holiday/freeze windows**: Account for release schedules  
+- **Holiday/freeze windows**: Account for release schedules
 - **Part-time team**: Stretch to 12 weeks if team is not dedicated
 - **Parallel workstreams**: CI improvements and docs don't block code moves
 

@@ -41,7 +41,7 @@ The remaining 11 violations fall into these categories:
 
 #### Internal Restructuring Needed (3 violations)
 - `pkg/mcp/application/internal/conversation` (depth 5) - 1 file
-- `pkg/mcp/application/internal/runtime` (depth 5) - 1 file  
+- `pkg/mcp/application/internal/runtime` (depth 5) - 1 file
 - `pkg/mcp/application/orchestration/pipeline` (depth 5) - 1 file
 
 #### Infrastructure (1 violation)
@@ -81,7 +81,7 @@ pkg/mcp/
 
 ## Scripts Created
 - `scripts/flatten_domain_security.sh`
-- `scripts/flatten_application_commands.sh`  
+- `scripts/flatten_application_commands.sh`
 - `scripts/flatten_application_core.sh`
 - `scripts/flatten_application_state.sh`
 - `scripts/flatten_application_knowledge.sh`
@@ -122,7 +122,7 @@ From Week 2-3 combined:
 ### Remaining Work
 Only **4 import depth violations** need attention:
 1. **application/internal/conversation** → can flatten to **conversation**
-2. **application/internal/runtime** → can flatten to **runtime**  
+2. **application/internal/runtime** → can flatten to **runtime**
 3. **application/orchestration/pipeline** → can flatten to **pipeline**
 4. **Common validation packages** → external scope, no action needed
 

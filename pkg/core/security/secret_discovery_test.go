@@ -3,19 +3,19 @@ package security_test
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/core/security"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSecretDiscovery_ScanDirectory(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	// Create a temporary directory for testing
@@ -125,7 +125,7 @@ MIIEpAIBAAKCAQEA1234567890abcdefghijklmnopqrstuvwxyz
 }
 
 func TestSecretDiscovery_ScanOptions(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	tmpDir := t.TempDir()
@@ -179,7 +179,7 @@ func TestSecretDiscovery_ScanOptions(t *testing.T) {
 }
 
 func TestSecretDiscovery_FalsePositives(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	tmpDir := t.TempDir()
@@ -259,7 +259,7 @@ func TestSecretDiscovery_ExtendedSecretFinding(t *testing.T) {
 }
 
 func TestSecretDiscovery_LargeFile(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	tmpDir := t.TempDir()
@@ -299,7 +299,7 @@ func TestSecretDiscovery_LargeFile(t *testing.T) {
 }
 
 func TestSecretDiscovery_ContextCancellation(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	tmpDir := t.TempDir()
@@ -332,7 +332,7 @@ func TestSecretDiscovery_ContextCancellation(t *testing.T) {
 }
 
 func TestSecretDiscovery_EmptyDirectory(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	tmpDir := t.TempDir()
@@ -349,7 +349,7 @@ func TestSecretDiscovery_EmptyDirectory(t *testing.T) {
 }
 
 func TestSecretDiscovery_InvalidPath(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	ctx := context.Background()
@@ -368,7 +368,7 @@ func TestSecretDiscovery_DefaultScanOptions(t *testing.T) {
 
 // Test scanning specific file patterns
 func TestSecretDiscovery_FilePatterns(t *testing.T) {
-	logger := zerolog.Nop()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	sd := security.NewSecretDiscovery(logger)
 
 	tmpDir := t.TempDir()

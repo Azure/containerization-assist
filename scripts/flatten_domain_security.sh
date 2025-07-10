@@ -15,10 +15,10 @@ mkdir -p pkg/mcp/security
 if [ -d "pkg/mcp/domain/security" ]; then
     echo "Moving security package files..."
     find pkg/mcp/domain/security -name "*.go" -exec cp {} pkg/mcp/security/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/security -name "*.go" -exec sed -i 's/^package security$/package security/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/security -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/domain/security not found"
@@ -33,13 +33,13 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/domain/securit
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
         sed -i 's|github.com/Azure/container-kit/pkg/mcp/domain/security|github.com/Azure/container-kit/pkg/mcp/security|g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old security package"

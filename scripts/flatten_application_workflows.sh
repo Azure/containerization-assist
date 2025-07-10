@@ -15,10 +15,10 @@ mkdir -p pkg/mcp/workflows
 if [ -d "pkg/mcp/application/workflows" ]; then
     echo "Moving workflows package files..."
     find pkg/mcp/application/workflows -name "*.go" -exec cp {} pkg/mcp/workflows/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/workflows -name "*.go" -exec sed -i 's/^package workflows$/package workflows/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/workflows -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/application/workflows not found"
@@ -33,13 +33,13 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/application/wo
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
         sed -i 's|github.com/Azure/container-kit/pkg/mcp/application/workflows|github.com/Azure/container-kit/pkg/mcp/workflows|g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old workflows package"

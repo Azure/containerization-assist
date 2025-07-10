@@ -11,14 +11,14 @@ echo "Moving pkg/mcp/domain/types → pkg/mcp/domaintypes"
 # Create target directory
 mkdir -p pkg/mcp/domaintypes
 
-# Move all files from domain/types to domaintypes  
+# Move all files from domain/types to domaintypes
 if [ -d "pkg/mcp/domain/types" ]; then
     echo "Moving domain types package files..."
     find pkg/mcp/domain/types -name "*.go" -exec cp {} pkg/mcp/domaintypes/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/domaintypes -name "*.go" -exec sed -i 's/^package types$/package domaintypes/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/domaintypes -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/domain/types not found"
@@ -33,15 +33,15 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/domain/types" 
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
         sed -i 's|github.com/Azure/container-kit/pkg/mcp/domain/types|github.com/Azure/container-kit/pkg/mcp/domaintypes|g' "$file"
-        # Update any package references in the code  
+        # Update any package references in the code
         sed -i 's/types\./domaintypes\./g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old types package"

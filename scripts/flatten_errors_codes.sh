@@ -15,10 +15,10 @@ mkdir -p pkg/mcp/errorcodes
 if [ -d "pkg/mcp/errors/codes" ]; then
     echo "Moving error codes package files..."
     find pkg/mcp/errors/codes -name "*.go" -exec cp {} pkg/mcp/errorcodes/ \;
-    
+
     # Update package declarations in moved files
     find pkg/mcp/errorcodes -name "*.go" -exec sed -i 's/^package codes$/package errorcodes/' {} \;
-    
+
     echo "Moved $(find pkg/mcp/errorcodes -name "*.go" | wc -l) Go files"
 else
     echo "❌ Source directory pkg/mcp/errors/codes not found"
@@ -33,7 +33,7 @@ files_to_update=$(grep -r "github.com/Azure/container-kit/pkg/mcp/errors/codes" 
 
 if [ -n "$files_to_update" ]; then
     echo "Updating imports in $(echo "$files_to_update" | wc -l) files:"
-    
+
     for file in $files_to_update; do
         echo "  - $file"
         # Replace the import path
@@ -41,7 +41,7 @@ if [ -n "$files_to_update" ]; then
         # Update any package references in the code
         sed -i 's/codes\./errorcodes\./g' "$file"
     done
-    
+
     echo "✅ Updated all import references"
 else
     echo "ℹ️  No files found importing old codes package"

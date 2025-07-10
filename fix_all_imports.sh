@@ -8,11 +8,11 @@ echo "Fixing imports across entire codebase..."
 fix_imports() {
     local dir=$1
     echo "Processing $dir..."
-    
+
     find "$dir" -name "*.go" -type f | while read -r file; do
         # Create a temporary file
         tmp_file="${file}.tmp"
-        
+
         # Apply all import fixes
         sed -E \
             -e 's|"github.com/Azure/container-kit/pkg/mcp/errors"|"github.com/Azure/container-kit/pkg/mcp/domain/errors"|g' \
@@ -35,7 +35,7 @@ fix_imports() {
             -e 's|"github.com/Azure/container-kit/pkg/mcp/logging"|"github.com/Azure/container-kit/pkg/mcp/infra/internal/logging"|g' \
             -e 's|"github.com/Azure/container-kit/pkg/mcp/retry"|"github.com/Azure/container-kit/pkg/mcp/infra/retry"|g' \
             "$file" > "$tmp_file"
-        
+
         # Check if sed made any changes
         if ! diff -q "$file" "$tmp_file" >/dev/null 2>&1; then
             mv "$tmp_file" "$file"
@@ -46,7 +46,7 @@ fix_imports() {
     done
 }
 
-# Fix imports in ALL directories  
+# Fix imports in ALL directories
 echo "=== Fixing MCP packages ==="
 fix_imports "pkg/mcp"
 
@@ -55,7 +55,7 @@ echo "=== Fixing other packages ==="
 fix_imports "pkg/ai"
 fix_imports "pkg/core"
 fix_imports "pkg/common"
-fix_imports "pkg/integrations"  
+fix_imports "pkg/integrations"
 fix_imports "pkg/release"
 fix_imports "pkg/utils"
 
