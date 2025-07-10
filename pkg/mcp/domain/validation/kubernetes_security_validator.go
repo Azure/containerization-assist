@@ -350,7 +350,13 @@ func (v *KubernetesManifestValidator) validateCapability(capability, _ string) e
 	}
 
 	if !validCapabilities[capability] {
-		return fmt.Errorf("unknown capability '%s'", capability)
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Messagef("unknown capability '%s'", capability).
+			WithLocation().
+			Build()
 	}
 
 	return nil

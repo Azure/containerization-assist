@@ -2,10 +2,10 @@ package workflow
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ToolRegistry provides simple tool registration
@@ -35,7 +35,13 @@ func (r *ToolRegistry) Get(name string) (api.Tool, bool) {
 func (r *ToolRegistry) GetTool(name string) (api.Tool, error) {
 	tool, exists := r.tools[name]
 	if !exists {
-		return nil, fmt.Errorf("tool not found: %s", name)
+		return nil, errors.NewError().
+			Code(errors.CodeToolNotFound).
+			Type(errors.ErrTypeTool).
+			Severity(errors.SeverityMedium).
+			Messagef("tool not found: %s", name).
+			WithLocation().
+			Build()
 	}
 	return tool, nil
 }

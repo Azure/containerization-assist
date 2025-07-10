@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -176,7 +177,13 @@ func ExampleErrorHandling(tm *Manager) {
 				attribute.String("failure.line", "15"),
 			)
 
-			return fmt.Errorf("dockerfile validation failed: invalid syntax on line 15")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Message("dockerfile validation failed: invalid syntax on line 15").
+				WithLocation().
+				Build()
 		}
 
 		return nil
@@ -194,7 +201,13 @@ func ExampleCustomMetrics(tm *Manager) {
 
 	// Record various metrics during operation
 	tm.Metrics().RecordToolExecution(ctx, "custom-tool", 150*time.Millisecond, nil)
-	tm.Metrics().RecordToolExecution(ctx, "custom-tool", 200*time.Millisecond, fmt.Errorf("failed"))
+	tm.Metrics().RecordToolExecution(ctx, "custom-tool", 200*time.Millisecond, errors.NewError().
+		Code(errors.CodeOperationFailed).
+		Type(errors.ErrTypeOperation).
+		Severity(errors.SeverityMedium).
+		Message("failed").
+		WithLocation().
+		Build())
 
 	tm.Metrics().RecordHTTPRequest(ctx, "GET", "/health", 200, 5*time.Millisecond)
 	tm.Metrics().RecordHTTPRequest(ctx, "POST", "/api/tools", 201, 120*time.Millisecond)

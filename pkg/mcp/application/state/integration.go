@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	mcptypes "github.com/Azure/container-kit/pkg/mcp/domain"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
@@ -231,7 +232,13 @@ func (i *StateManagementIntegration) GetServiceContainer() StateServiceContainer
 // CreateSessionFromServices creates a session using the service container
 func (i *StateManagementIntegration) CreateSessionFromServices(ctx context.Context, sessionID string) error {
 	if i.serviceContainer == nil {
-		return fmt.Errorf("service container not available")
+		return errors.NewError().
+			Code(errors.CodeInvalidState).
+			Type(errors.ErrTypeInternal).
+			Severity(errors.SeverityHigh).
+			Message("service container not available").
+			WithLocation().
+			Build()
 	}
 
 	sessionStore := i.serviceContainer.SessionStore()
@@ -255,7 +262,13 @@ func (i *StateManagementIntegration) CreateSessionFromServices(ctx context.Conte
 // GetSessionFromServices retrieves a session using the service container
 func (i *StateManagementIntegration) GetSessionFromServices(ctx context.Context, sessionID string) (interface{}, error) {
 	if i.serviceContainer == nil {
-		return nil, fmt.Errorf("service container not available")
+		return nil, errors.NewError().
+			Code(errors.CodeInvalidState).
+			Type(errors.ErrTypeInternal).
+			Severity(errors.SeverityHigh).
+			Message("service container not available").
+			WithLocation().
+			Build()
 	}
 
 	sessionStore := i.serviceContainer.SessionStore()

@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
@@ -180,7 +181,13 @@ func (t *ToolRegistryStub) Register(name string, _ interface{}) error {
 }
 
 func (t *ToolRegistryStub) Discover(name string) (interface{}, error) {
-	return nil, fmt.Errorf("tool not found: %s", name)
+	return nil, errors.NewError().
+		Code(errors.CodeToolNotFound).
+		Type(errors.ErrTypeTool).
+		Severity(errors.SeverityMedium).
+		Messagef("tool not found: %s", name).
+		WithLocation().
+		Build()
 }
 
 func (t *ToolRegistryStub) List() []string {
@@ -188,19 +195,43 @@ func (t *ToolRegistryStub) List() []string {
 }
 
 func (t *ToolRegistryStub) Metadata(name string) (api.ToolMetadata, error) {
-	return api.ToolMetadata{}, fmt.Errorf("tool not found: %s", name)
+	return api.ToolMetadata{}, errors.NewError().
+		Code(errors.CodeToolNotFound).
+		Type(errors.ErrTypeTool).
+		Severity(errors.SeverityMedium).
+		Messagef("tool not found: %s", name).
+		WithLocation().
+		Build()
 }
 
 func (t *ToolRegistryStub) SetMetadata(name string, _ api.ToolMetadata) error {
-	return fmt.Errorf("tool not found: %s", name)
+	return errors.NewError().
+		Code(errors.CodeToolNotFound).
+		Type(errors.ErrTypeTool).
+		Severity(errors.SeverityMedium).
+		Messagef("tool not found: %s", name).
+		WithLocation().
+		Build()
 }
 
 func (t *ToolRegistryStub) Unregister(name string) error {
-	return fmt.Errorf("tool not found: %s", name)
+	return errors.NewError().
+		Code(errors.CodeToolNotFound).
+		Type(errors.ErrTypeTool).
+		Severity(errors.SeverityMedium).
+		Messagef("tool not found: %s", name).
+		WithLocation().
+		Build()
 }
 
 func (t *ToolRegistryStub) Execute(_ context.Context, name string, _ api.ToolInput) (api.ToolOutput, error) {
-	return api.ToolOutput{}, fmt.Errorf("tool not found: %s", name)
+	return api.ToolOutput{}, errors.NewError().
+		Code(errors.CodeToolNotFound).
+		Type(errors.ErrTypeTool).
+		Severity(errors.SeverityMedium).
+		Messagef("tool not found: %s", name).
+		WithLocation().
+		Build()
 }
 
 func (t *ToolRegistryStub) Close() error {

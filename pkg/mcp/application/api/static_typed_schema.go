@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
@@ -486,7 +485,13 @@ func (r *StaticTypedSchemaRegistry) GetSchema(name string) (StaticTypedSchema, e
 		return schema, nil
 	}
 
-	return StaticTypedSchema{}, fmt.Errorf("schema not found: %s", name)
+	return StaticTypedSchema{}, errors.NewError().
+		Code(errors.CodeNotFound).
+		Type(errors.ErrTypeNotFound).
+		Severity(errors.SeverityMedium).
+		Messagef("schema not found: %s", name).
+		WithLocation().
+		Build()
 }
 
 // RegisterSchema registers a custom schema

@@ -177,7 +177,13 @@ func (ts *templateService) getTemplateContent(templateType TemplateType, name st
 		fs = dockerfileTemplates
 		basePath = "templates/dockerfiles"
 	default:
-		return "", fmt.Errorf("unsupported template type: %s", templateType)
+		return "", errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Messagef("unsupported template type: %s", templateType).
+			WithLocation().
+			Build()
 	}
 
 	// Construct file path
@@ -220,7 +226,13 @@ func (ts *templateService) ListTemplates(templateType TemplateType) ([]string, e
 		fs = dockerfileTemplates
 		basePath = "templates/dockerfiles"
 	default:
-		return nil, fmt.Errorf("unsupported template type: %s", templateType)
+		return nil, errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Messagef("unsupported template type: %s", templateType).
+			WithLocation().
+			Build()
 	}
 
 	// Read directory entries

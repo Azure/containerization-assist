@@ -1,10 +1,11 @@
 package telemetry
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Config holds telemetry configuration
@@ -76,16 +77,40 @@ func (c *Config) LoadFromEnv() {
 // Validate validates the configuration
 func (c *Config) Validate() error {
 	if c.ServiceName == "" {
-		return fmt.Errorf("service name is required")
+		return errors.NewError().
+			Code(errors.CodeMissingParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("service name is required").
+			WithLocation().
+			Build()
 	}
 	if c.ServiceVersion == "" {
-		return fmt.Errorf("service version is required")
+		return errors.NewError().
+			Code(errors.CodeMissingParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("service version is required").
+			WithLocation().
+			Build()
 	}
 	if c.TraceSampleRate < 0 || c.TraceSampleRate > 1 {
-		return fmt.Errorf("trace sample rate must be between 0 and 1")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("trace sample rate must be between 0 and 1").
+			WithLocation().
+			Build()
 	}
 	if c.MetricsInterval <= 0 {
-		return fmt.Errorf("metrics interval must be positive")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("metrics interval must be positive").
+			WithLocation().
+			Build()
 	}
 	return nil
 }

@@ -4,7 +4,6 @@ package infra
 
 import (
 	"context"
-	"fmt"
 
 	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
@@ -28,7 +27,13 @@ func (c *InfrastructureContainer) initializeKubernetesOperations() error {
 // checkKubernetesHealth checks Kubernetes health when k8s build tag is enabled
 func (c *InfrastructureContainer) checkKubernetesHealth(ctx context.Context) error {
 	if c.kubernetesOps == nil {
-		return fmt.Errorf("Kubernetes operations not initialized")
+		return errors.NewError().
+			Code(errors.CodeInvalidState).
+			Type(errors.ErrTypeInternal).
+			Severity(errors.SeverityHigh).
+			Message("Kubernetes operations not initialized").
+			WithLocation().
+			Build()
 	}
 
 	// Test Kubernetes connection by getting server version

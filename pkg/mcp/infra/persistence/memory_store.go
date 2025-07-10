@@ -2,12 +2,12 @@ package persistence
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // MemoryStore is a simple in-memory implementation of SessionStore
@@ -29,7 +29,13 @@ func (m *MemoryStore) Create(_ context.Context, session *api.Session) error {
 	defer m.mu.Unlock()
 
 	if _, exists := m.sessions[session.ID]; exists {
-		return fmt.Errorf("session already exists: %s", session.ID)
+		return errors.NewError().
+			Code(errors.CodeAlreadyExists).
+			Type(errors.ErrTypeConflict).
+			Severity(errors.SeverityMedium).
+			Messagef("session already exists: %s", session.ID).
+			WithLocation().
+			Build()
 	}
 
 	// Deep copy the session to avoid external modifications
@@ -45,7 +51,13 @@ func (m *MemoryStore) Get(_ context.Context, sessionID string) (*api.Session, er
 
 	session, exists := m.sessions[sessionID]
 	if !exists {
-		return nil, fmt.Errorf("session not found: %s", sessionID)
+		return nil, errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Severity(errors.SeverityMedium).
+			Messagef("session not found: %s", sessionID).
+			WithLocation().
+			Build()
 	}
 
 	// Return a copy to avoid external modifications
@@ -68,7 +80,13 @@ func (m *MemoryStore) Update(_ context.Context, session *api.Session) error {
 	defer m.mu.Unlock()
 
 	if _, exists := m.sessions[session.ID]; !exists {
-		return fmt.Errorf("session not found: %s", session.ID)
+		return errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Severity(errors.SeverityMedium).
+			Messagef("session not found: %s", session.ID).
+			WithLocation().
+			Build()
 	}
 
 	// Deep copy the session to avoid external modifications

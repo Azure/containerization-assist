@@ -249,7 +249,13 @@ func (v *UnifiedSessionStateValidator) Validate(ctx context.Context, value inter
 		stateValue, exists := mapped["state_value"]
 		if !exists {
 			result.Valid = false
-			result.Errors = append(result.Errors, fmt.Errorf("state_value field is required"))
+			result.Errors = append(result.Errors, errors.NewError().
+				Code(errors.CodeMissingParameter).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Message("state_value field is required").
+				WithLocation().
+				Build())
 			return result
 		}
 		stateData = &StateValidationData{

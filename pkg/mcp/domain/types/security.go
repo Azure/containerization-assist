@@ -1,8 +1,9 @@
 package domaintypes
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // SecurityScanParams defines strongly-typed parameters for security scanning
@@ -33,10 +34,22 @@ type SecurityScanParams struct {
 // Validate implements tools.ToolParams
 func (p SecurityScanParams) Validate() error {
 	if p.Target == "" {
-		return fmt.Errorf("security-scan: target is required")
+		return errors.NewError().
+			Code(errors.CodeMissingParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("security-scan: target is required").
+			WithLocation().
+			Build()
 	}
 	if p.ScanType == "" {
-		return fmt.Errorf("security-scan: scan_type is required")
+		return errors.NewError().
+			Code(errors.CodeMissingParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("security-scan: scan_type is required").
+			WithLocation().
+			Build()
 	}
 	validScanTypes := map[string]bool{
 		"image":      true,
@@ -44,7 +57,13 @@ func (p SecurityScanParams) Validate() error {
 		"filesystem": true,
 	}
 	if !validScanTypes[p.ScanType] {
-		return fmt.Errorf("security-scan: scan_type must be one of: image, container, filesystem")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("security-scan: scan_type must be one of: image, container, filesystem").
+			WithLocation().
+			Build()
 	}
 	return nil
 }

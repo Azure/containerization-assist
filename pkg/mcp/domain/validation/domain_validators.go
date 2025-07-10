@@ -511,33 +511,69 @@ func (v *KubernetesManifestValidator) validateResourceName(name string) error {
 	// - end with an alphanumeric character
 
 	if len(name) > 253 {
-		return fmt.Errorf("resource name is too long (max 253 characters)")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("resource name is too long (max 253 characters)").
+			WithLocation().
+			Build()
 	}
 
 	if name == "" {
-		return fmt.Errorf("resource name cannot be empty")
+		return errors.NewError().
+			Code(errors.CodeMissingParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("resource name cannot be empty").
+			WithLocation().
+			Build()
 	}
 
 	// Check if it starts with a number
 	if name[0] >= '0' && name[0] <= '9' {
-		return fmt.Errorf("resource name cannot start with a number")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("resource name cannot start with a number").
+			WithLocation().
+			Build()
 	}
 
 	// Check for uppercase letters
 	for _, ch := range name {
 		if ch >= 'A' && ch <= 'Z' {
-			return fmt.Errorf("resource name must be lowercase")
+			return errors.NewError().
+				Code(errors.CodeInvalidParameter).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Message("resource name must be lowercase").
+				WithLocation().
+				Build()
 		}
 		// Check for valid characters
 		if !((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '.') {
-			return fmt.Errorf("resource name contains invalid characters")
+			return errors.NewError().
+				Code(errors.CodeInvalidParameter).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Message("resource name contains invalid characters").
+				WithLocation().
+				Build()
 		}
 	}
 
 	// Check if it ends with alphanumeric
 	lastChar := name[len(name)-1]
 	if !((lastChar >= 'a' && lastChar <= 'z') || (lastChar >= '0' && lastChar <= '9')) {
-		return fmt.Errorf("resource name must end with an alphanumeric character")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("resource name must end with an alphanumeric character").
+			WithLocation().
+			Build()
 	}
 
 	return nil
@@ -560,35 +596,77 @@ func (v *KubernetesManifestValidator) validateLabelKey(key string) error {
 
 		// Validate prefix (DNS subdomain)
 		if len(prefix) > 253 {
-			return fmt.Errorf("label key prefix is too long (max 253 characters)")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Message("label key prefix is too long (max 253 characters)").
+				WithLocation().
+				Build()
 		}
 	} else {
-		return fmt.Errorf("label key can have at most one '/'")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label key can have at most one '/'").
+			WithLocation().
+			Build()
 	}
 
 	// Validate name segment
 	if len(name) > 63 {
-		return fmt.Errorf("label key name is too long (max 63 characters)")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label key name is too long (max 63 characters)").
+			WithLocation().
+			Build()
 	}
 
 	if name == "" {
-		return fmt.Errorf("label key name cannot be empty")
+		return errors.NewError().
+			Code(errors.CodeMissingParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label key name cannot be empty").
+			WithLocation().
+			Build()
 	}
 
 	// Must start and end with alphanumeric
 	if !((name[0] >= 'a' && name[0] <= 'z') || (name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= '0' && name[0] <= '9')) {
-		return fmt.Errorf("label key name must start with alphanumeric character")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label key name must start with alphanumeric character").
+			WithLocation().
+			Build()
 	}
 
 	lastChar := name[len(name)-1]
 	if !((lastChar >= 'a' && lastChar <= 'z') || (lastChar >= 'A' && lastChar <= 'Z') || (lastChar >= '0' && lastChar <= '9')) {
-		return fmt.Errorf("label key name must end with alphanumeric character")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label key name must end with alphanumeric character").
+			WithLocation().
+			Build()
 	}
 
 	// Check valid characters
 	for _, ch := range name {
 		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.') {
-			return fmt.Errorf("label key name contains invalid characters")
+			return errors.NewError().
+				Code(errors.CodeInvalidParameter).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Message("label key name contains invalid characters").
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -602,7 +680,13 @@ func (v *KubernetesManifestValidator) validateLabelValue(value string) error {
 	// Can contain dashes, underscores, dots, and alphanumerics
 
 	if len(value) > 63 {
-		return fmt.Errorf("label value is too long (max 63 characters)")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label value is too long (max 63 characters)").
+			WithLocation().
+			Build()
 	}
 
 	if value == "" {
@@ -611,18 +695,36 @@ func (v *KubernetesManifestValidator) validateLabelValue(value string) error {
 
 	// Must start and end with alphanumeric
 	if !((value[0] >= 'a' && value[0] <= 'z') || (value[0] >= 'A' && value[0] <= 'Z') || (value[0] >= '0' && value[0] <= '9')) {
-		return fmt.Errorf("label value must start with alphanumeric character")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label value must start with alphanumeric character").
+			WithLocation().
+			Build()
 	}
 
 	lastChar := value[len(value)-1]
 	if !((lastChar >= 'a' && lastChar <= 'z') || (lastChar >= 'A' && lastChar <= 'Z') || (lastChar >= '0' && lastChar <= '9')) {
-		return fmt.Errorf("label value must end with alphanumeric character")
+		return errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Severity(errors.SeverityMedium).
+			Message("label value must end with alphanumeric character").
+			WithLocation().
+			Build()
 	}
 
 	// Check valid characters
 	for _, ch := range value {
 		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.') {
-			return fmt.Errorf("label value contains invalid characters")
+			return errors.NewError().
+				Code(errors.CodeInvalidParameter).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Message("label value contains invalid characters").
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -633,7 +735,13 @@ func (v *KubernetesManifestValidator) validateNamespace(namespace string) error 
 	// Check forbidden namespaces
 	for _, forbidden := range v.forbiddenNamespaces {
 		if namespace == forbidden {
-			return fmt.Errorf("namespace '%s' is reserved and cannot be used", namespace)
+			return errors.NewError().
+				Code(errors.CodeInvalidParameter).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Messagef("namespace '%s' is reserved and cannot be used", namespace).
+				WithLocation().
+				Build()
 		}
 	}
 
@@ -647,7 +755,13 @@ func (v *KubernetesManifestValidator) validateNamespace(namespace string) error 
 			}
 		}
 		if !found {
-			return fmt.Errorf("namespace '%s' is not in the allowed list", namespace)
+			return errors.NewError().
+				Code(errors.CodeInvalidParameter).
+				Type(errors.ErrTypeValidation).
+				Severity(errors.SeverityMedium).
+				Messagef("namespace '%s' is not in the allowed list", namespace).
+				WithLocation().
+				Build()
 		}
 	}
 

@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // StateType represents different types of state that can be managed
@@ -599,7 +601,13 @@ func (m *UnifiedStateServiceImpl) GetState(ctx context.Context, stateType StateT
 	m.mu.RUnlock()
 
 	if !exists {
-		return nil, fmt.Errorf("no provider for state type: %s", stateType)
+		return nil, errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Severity(errors.SeverityMedium).
+			Messagef("no provider for state type: %s", stateType).
+			WithLocation().
+			Build()
 	}
 
 	return provider.GetState(ctx, key)
@@ -612,7 +620,13 @@ func (m *UnifiedStateServiceImpl) SetState(ctx context.Context, stateType StateT
 	m.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("no provider for state type: %s", stateType)
+		return errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Severity(errors.SeverityMedium).
+			Messagef("no provider for state type: %s", stateType).
+			WithLocation().
+			Build()
 	}
 
 	// Add to history
@@ -639,7 +653,13 @@ func (m *UnifiedStateServiceImpl) DeleteState(ctx context.Context, stateType Sta
 	m.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("no provider for state type: %s", stateType)
+		return errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Severity(errors.SeverityMedium).
+			Messagef("no provider for state type: %s", stateType).
+			WithLocation().
+			Build()
 	}
 
 	// Notify observers
@@ -916,7 +936,13 @@ func (p *BasicStateProvider) GetState(ctx context.Context, key string) (interfac
 
 	state, exists := p.states[key]
 	if !exists {
-		return nil, fmt.Errorf("state not found: %s", key)
+		return nil, errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Severity(errors.SeverityMedium).
+			Messagef("state not found: %s", key).
+			WithLocation().
+			Build()
 	}
 	return state, nil
 }

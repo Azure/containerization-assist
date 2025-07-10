@@ -666,7 +666,13 @@ func (k *KubernetesOperations) waitForDeploymentReady(ctx context.Context, name,
 		select {
 		case event, ok := <-watchInterface.ResultChan():
 			if !ok {
-				return fmt.Errorf("watch channel closed")
+				return errors.NewError().
+					Code(errors.CodeIOError).
+					Type(errors.ErrTypeIO).
+					Severity(errors.SeverityMedium).
+					Message("watch channel closed").
+					WithLocation().
+					Build()
 			}
 
 			if event.Type == watch.Modified {
