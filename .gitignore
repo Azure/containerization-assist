@@ -66,6 +66,9 @@ coverage/
 /tools/linters/*/richerror-boundary
 /tools/linters/richerror-boundary/richerror-boundary
 
+# Generator binaries
+/tools/pipeline-generator/pipeline-generator
+
 ################################################################################
 # IDE and Editor files
 ################################################################################
