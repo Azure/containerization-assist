@@ -22,7 +22,11 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-WebRequest -Uri https:/
 
 ### Verify Installation
 ```bash
-container-kit --version
+# Check executable
+./container-kit-mcp --version
+
+# Verify build
+make mcp
 ```
 
 For detailed usage and troubleshooting, see the [Tool Guide](docs/TOOL_GUIDE.md).
@@ -36,11 +40,11 @@ For detailed usage and troubleshooting, see the [Tool Guide](docs/TOOL_GUIDE.md)
 
 ### Basic Usage
 ```bash
-# Containerize your application
-container-kit generate /path/to/your/app
+# Run MCP server (main executable)
+./container-kit-mcp
 
-# Use the guided setup
-container-kit setup --target-repo /path/to/your/app
+# Container Kit operates via MCP protocol
+# Connect with MCP client for guided containerization
 ```
 
 ### Building from Source
@@ -48,11 +52,16 @@ container-kit setup --target-repo /path/to/your/app
 git clone https://github.com/Azure/container-kit.git
 cd container-kit
 
-# Build the CLI
-go build -o container-kit .
+# Set up make alias (required for WSL/Linux)
+alias make='/usr/bin/make'
 
 # Build the MCP server
 make mcp
+
+# Run tests
+make test              # MCP package tests
+make test-all          # All packages
+make bench             # Performance benchmarks
 ```
 
 ## 📖 Documentation
@@ -97,6 +106,14 @@ Container Kit provides atomic tools and conversational workflows through a unifi
 ```bash
 # Start MCP server
 ./container-kit-mcp
+
+# Container Kit provides tools via MCP protocol:
+# - analyze_repository: Repository analysis
+# - generate_dockerfile: Dockerfile generation
+# - build_image: Container building
+# - scan_image: Security scanning
+# - generate_manifests: Kubernetes manifest generation
+# - push_image: Container registry operations
 
 # Use through Claude Desktop or direct API calls
 # Ask: "Analyze my Python Flask app and create a Dockerfile"

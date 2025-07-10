@@ -16,17 +16,18 @@ The domain layer contains the core business logic and entities. It has no depend
 - **security/**: Security policies and validation rules
 - **session/**: Session entities and business rules
 - **types/**: Core domain types and interfaces
-- **workflow/**: Workflow domain logic
+- **workflow/**: Workflow domain logic ⚠️ (directory exists but empty)
 - **internal/**: Shared utilities (common, utils, types, constants)
 
-**Files:** 116 Go files
+**Files:** 96 Go files
 
 ### 2. Application Layer (`pkg/mcp/application/`)
 The application layer orchestrates use cases and coordinates between domain and infrastructure.
 
 **Key Components:**
-- **api/**: Canonical interface definitions (single source of truth)
+- **api/**: Canonical interface definitions (single source of truth) - 831 lines
 - **commands/**: Consolidated command implementations
+- **interfaces/**: ⚠️ Compatibility layer (directory exists but empty)
 - **core/**: Server lifecycle and registry management
 - **conversation/**: Conversation handling and auto-fix helpers
 - **knowledge/**: Knowledge management and AI integration
@@ -37,7 +38,7 @@ The application layer orchestrates use cases and coordinates between domain and 
 - **workflows/**: Workflow management
 - **internal/**: Internal implementations (conversation, retry, runtime)
 
-**Files:** 168 Go files
+**Files:** 150 Go files
 
 ### 3. Infrastructure Layer (`pkg/mcp/infra/`)
 The infrastructure layer handles external integrations and technical concerns.

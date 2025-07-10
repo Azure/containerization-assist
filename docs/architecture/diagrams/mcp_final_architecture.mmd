@@ -1,6 +1,7 @@
 graph TD
     %% Container Kit MCP - Three-Layer Architecture
-    %% Updated to reflect actual codebase structure per ADR-001
+    %% Updated to reflect actual codebase structure as of July 2025
+    %% 447 Go files, 132,625 lines of code, 179MB codebase
 
     Client[MCP Client] --> Transport[infra/transport/]
     Transport --> Server[application/core/]
@@ -9,14 +10,14 @@ graph TD
     subgraph "Domain Layer (Business Logic)"
         Domain[domain/]
 
-        subgraph "Domain Packages"
-            Config[domain/config/<br/>Configuration Rules]
+        subgraph "Domain Packages (96 Go files)"
+            Config[domain/config/<br/>Tag-based Validation DSL]
             Containerization[domain/containerization/<br/>analyze/, build/, deploy/, scan/]
-            Errors[domain/errors/<br/>Rich Error System]
-            Security[domain/security/<br/>Validation & Policies]
-            Session[domain/session/<br/>Session Rules]
-            Types[domain/types/<br/>Core Types]
-            Workflow[domain/workflow/<br/>Workflow Logic]
+            Errors[domain/errors/<br/>Unified RichError System]
+            Security[domain/security/<br/>Security Policies]
+            Session[domain/session/<br/>Session Entities]
+            Types[domain/types/<br/>Core Domain Types]
+            Workflow[domain/workflow/<br/>⚠️ Empty Directory]
             Internal[domain/internal/<br/>common/, utils/, types/]
         end
 
@@ -33,13 +34,14 @@ graph TD
     subgraph "Application Layer (Use Cases & Orchestration)"
         Application[application/]
 
-        subgraph "Application Packages"
-            API[application/api/<br/>Canonical Interfaces<br/>Single Source of Truth]
-            Commands[application/commands/<br/>Command Implementations]
-            Core[application/core/<br/>Server & Registry]
+        subgraph "Application Packages (150 Go files)"
+            API[application/api/<br/>831 Lines - Canonical Interfaces<br/>Single Source of Truth]
+            Commands[application/commands/<br/>Consolidated Implementations]
+            Core[application/core/<br/>Server & Registry Management]
             Conversation[application/conversation/<br/>Chat & Auto-fix]
-            Knowledge[application/knowledge/<br/>Knowledge Base]
-            Orchestration[application/orchestration/<br/>Pipeline & Workflow]
+            Interfaces[application/interfaces/<br/>⚠️ Empty Directory<br/>Missing Compatibility Layer]
+            Knowledge[application/knowledge/<br/>Knowledge Management]
+            Orchestration[application/orchestration/<br/>Tool Coordination]
             Services[application/services/<br/>Service Interfaces]
             State[application/state/<br/>State Management]
             Tools[application/tools/<br/>Tool Implementations]
@@ -51,6 +53,7 @@ graph TD
         Application --> Commands
         Application --> Core
         Application --> Conversation
+        Application --> Interfaces
         Application --> Knowledge
         Application --> Orchestration
         Application --> Services
@@ -63,13 +66,14 @@ graph TD
     subgraph "Infrastructure Layer (External Integrations)"
         Infrastructure[infra/]
 
-        subgraph "Infrastructure Components"
+        subgraph "Infrastructure Components (46 Go files)"
             Persistence[infra/persistence/<br/>BoltDB Storage]
             Templates[infra/templates/<br/>YAML Templates with go:embed]
-            Transport[infra/transport/<br/>MCP Protocol]
+            Transport[infra/transport/<br/>MCP Protocol - stdio, HTTP]
             Retry[infra/retry/<br/>Retry Coordination]
-            DockerInfra[infra/docker_*.go<br/>Docker Integration]
-            K8sInfra[infra/k8s_*.go<br/>Kubernetes Integration]
+            DockerInfra[infra/docker/<br/>Docker Client Integration]
+            K8sInfra[infra/k8s/<br/>Kubernetes Integration]
+            Telemetry[infra/telemetry/<br/>Prometheus & OpenTelemetry]
             InfraInternal[infra/internal/<br/>logging/, migration/]
         end
 
@@ -79,6 +83,7 @@ graph TD
         Infrastructure --> Retry
         Infrastructure --> DockerInfra
         Infrastructure --> K8sInfra
+        Infrastructure --> Telemetry
         Infrastructure --> InfraInternal
     end
 
@@ -88,6 +93,7 @@ graph TD
     Commands --> Domain
     Core --> Domain
     Conversation --> Domain
+    Interfaces --> Domain
     Knowledge --> Domain
     Orchestration --> Domain
     Services --> Domain
@@ -103,19 +109,20 @@ graph TD
     Retry --> Application
     DockerInfra --> Application
     K8sInfra --> Application
+    Telemetry --> Application
     InfraInternal --> Domain
 
     %% Service Container Pattern (ADR-006)
-    subgraph "Service Container (Dependency Injection)"
-        ServiceContainer[ServiceContainer]
-        SessionStore[SessionStore]
-        SessionState[SessionState]
-        BuildExecutor[BuildExecutor]
-        ToolRegistry[ToolRegistry]
-        WorkflowExecutor[WorkflowExecutor]
-        Scanner[Scanner]
-        ConfigValidator[ConfigValidator]
-        ErrorReporter[ErrorReporter]
+    subgraph "Service Container (Manual Dependency Injection)"
+        ServiceContainer[ServiceContainer<br/>8 Focused Services]
+        SessionStore[SessionStore<br/>Session CRUD]
+        SessionState[SessionState<br/>State & Checkpoints]
+        BuildExecutor[BuildExecutor<br/>Container Operations]
+        ToolRegistry[ToolRegistry<br/>Tool Management]
+        WorkflowExecutor[WorkflowExecutor<br/>Multi-step Workflows]
+        Scanner[Scanner<br/>Trivy & Grype]
+        ConfigValidator[ConfigValidator<br/>Tag-based Validation]
+        ErrorReporter[ErrorReporter<br/>Unified Error Handling]
     end
 
     Core --> ServiceContainer
@@ -131,14 +138,17 @@ graph TD
     %% External Systems Integration
     DockerInfra --> DockerEngine[Docker Engine]
     K8sInfra --> KubernetesAPI[Kubernetes API]
-    Persistence --> BoltDB[BoltDB Files]
+    Persistence --> BoltDB[BoltDB Files<br/>Session Storage]
     Scanner --> Trivy[Trivy Scanner]
     Scanner --> Grype[Grype Scanner]
+    Telemetry --> Prometheus[Prometheus Metrics]
+    Telemetry --> OpenTelemetry[OpenTelemetry Tracing]
 
-    %% Architecture Validation
-    %% - Domain depends on nothing
-    %% - Application depends only on Domain
-    %% - Infrastructure depends on Application and Domain
+    %% Architecture Validation (ADR-001)
+    %% - Domain: 96 files, no dependencies (pure business logic)
+    %% - Application: 150 files, depends only on Domain
+    %% - Infrastructure: 46 files, depends on Application and Domain
+    %% Total: 447 Go files, 132,625 lines of code
 
     classDef domainLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
     classDef applicationLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
@@ -147,7 +157,7 @@ graph TD
     classDef externalSys fill:#eceff1,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
 
     class Domain,Config,Containerization,Errors,Security,Session,Types,Workflow,Internal domainLayer
-    class Application,API,Commands,Core,Conversation,Knowledge,Orchestration,Services,State,Tools,Workflows,AppInternal applicationLayer
-    class Infrastructure,Persistence,Templates,Transport,Retry,DockerInfra,K8sInfra,InfraInternal infraLayer
+    class Application,API,Commands,Core,Conversation,Interfaces,Knowledge,Orchestration,Services,State,Tools,Workflows,AppInternal applicationLayer
+    class Infrastructure,Persistence,Templates,Transport,Retry,DockerInfra,K8sInfra,Telemetry,InfraInternal infraLayer
     class ServiceContainer,SessionStore,SessionState,BuildExecutor,ToolRegistry,WorkflowExecutor,Scanner,ConfigValidator,ErrorReporter serviceLayer
-    class DockerEngine,KubernetesAPI,BoltDB,Trivy,Grype externalSys
+    class DockerEngine,KubernetesAPI,BoltDB,Trivy,Grype,Prometheus,OpenTelemetry externalSys
