@@ -57,7 +57,7 @@ func (k *KindCmdRunner) SetupRegistry(ctx context.Context) (string, error) {
 	if runtime.GOOS == "windows" {
 		return k.runner.RunCommand("powershell", "-Command", `
         if (-Not (docker network inspect kind -ErrorAction SilentlyContinue)) { docker network create kind }
-        if (-Not (docker ps -q -f name=kind-registry)) { docker run -d --restart=always -p 5001:5001 --name kind-registry registry:2 }
+        if (-Not (docker ps -q -f name=kind-registry)) { docker run -d --restart=always -p 5001:5000 --name kind-registry registry:2 }
         if (-Not (docker network inspect kind | Select-String kind-registry)) { docker network connect kind kind-registry }
         kind create cluster --name container-kit
 		$configMap = @"
