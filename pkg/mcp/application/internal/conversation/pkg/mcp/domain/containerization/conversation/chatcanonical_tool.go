@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/rs/zerolog"
 )
@@ -93,7 +94,7 @@ func (t *chatcanonicalTool) Execute(ctx context.Context, input api.ToolInput) (a
 			Data: map[string]interface{}{
 				"error": "session_id is required",
 			},
-		}, fmt.Errorf("session_id is required")
+		}, errors.NewError().Message("session_id is required").WithLocation().Build()
 	}
 
 	// Extract and validate input parameters
