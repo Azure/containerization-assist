@@ -81,14 +81,8 @@ func (g *EnhancedSchemaGenerator) GenerateToolBoilerplate(spec ToolSpec) error {
 	// Enhance spec with additional data needed by template
 	enhancedSpec := g.enhanceSpecForCanonicalTemplate(spec)
 
-	// Create domain directory using the new canonical structure
-	domainDir := filepath.Join(g.outputDir, "pkg/mcp/domain/containerization", spec.Domain)
-	if err := os.MkdirAll(domainDir, 0755); err != nil {
-		return mcperrors.NewError().Messagef("failed to create domain directory: %w", err).WithLocation().Build()
-	}
-
-	// Generate canonical tool file
-	outputPath := filepath.Join(domainDir, fmt.Sprintf("%s_tool.go", strings.ToLower(spec.ToolName)))
+	// Generate canonical tool file in the current output directory
+	outputPath := filepath.Join(g.outputDir, fmt.Sprintf("%s_tool.go", strings.ToLower(spec.ToolName)))
 	if err := g.renderTemplate("canonical_tool.go.tmpl", outputPath, enhancedSpec); err != nil {
 		return mcperrors.NewError().Messagef("failed to render canonical tool template: %w", err).WithLocation().Build()
 	}
@@ -105,16 +99,8 @@ func (g *EnhancedSchemaGenerator) GenerateCanonicalTool(spec ToolSpec) error {
 	// Enhance spec with additional data needed by template
 	enhancedSpec := g.enhanceSpecForCanonicalTemplate(spec)
 
-	// Create domain directory
-	domainDir := filepath.Join(g.outputDir, "pkg/mcp/domain/containerization", spec.Domain)
-	if err := os.MkdirAll(domainDir, 0755); err != nil {
-		return mcperrors.NewError().Messagef("failed to create domain directory: %w", err).WithLocation(
-
-		// Generate canonical tool file
-		).Build()
-	}
-
-	outputPath := filepath.Join(domainDir, fmt.Sprintf("%s_canonical_tool.go", strings.ToLower(spec.ToolName)))
+	// Generate canonical tool file in the current output directory
+	outputPath := filepath.Join(g.outputDir, fmt.Sprintf("%s_canonical_tool.go", strings.ToLower(spec.ToolName)))
 	return g.renderTemplate("canonical_tool.go.tmpl", outputPath, enhancedSpec)
 }
 
