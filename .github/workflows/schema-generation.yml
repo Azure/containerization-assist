@@ -53,6 +53,8 @@ jobs:
     - name: Generate schemas
       run: |
         make generate
+        # Format generated files to ensure consistency
+        gofmt -w pkg/mcp/application/internal/conversation/*_tool.go test/example/*_tool.go 2>/dev/null || true
         # Run twice to ensure idempotency (files should not change on second run)
         make generate
 

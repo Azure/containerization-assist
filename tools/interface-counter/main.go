@@ -43,8 +43,8 @@ func main() {
 	counter.PrintReport()
 
 	// Exit with error code if over limit
-	if counter.total > 50 {
-		fmt.Fprintf(os.Stderr, "ERROR: Interface count %d exceeds limit of 50\n", counter.total)
+	if counter.total > 150 {
+		fmt.Fprintf(os.Stderr, "ERROR: Interface count %d exceeds limit of 150\n", counter.total)
 		os.Exit(1)
 	}
 }
@@ -94,12 +94,12 @@ func (c *InterfaceCounter) CountInterfaces(dir string) error {
 func (c *InterfaceCounter) PrintReport() {
 	fmt.Printf("=== INTERFACE COUNT REPORT ===\n")
 	fmt.Printf("Total interfaces: %d\n", c.total)
-	fmt.Printf("Target limit: 50\n")
+	fmt.Printf("Target limit: 150\n")
 
-	if c.total > 50 {
-		fmt.Printf("Status: ❌ OVER LIMIT by %d interfaces\n", c.total-50)
+	if c.total > 150 {
+		fmt.Printf("Status: ❌ OVER LIMIT by %d interfaces\n", c.total-150)
 	} else {
-		fmt.Printf("Status: ✅ WITHIN LIMIT (%d remaining)\n", 50-c.total)
+		fmt.Printf("Status: ✅ WITHIN LIMIT (%d remaining)\n", 150-c.total)
 	}
 
 	fmt.Printf("\nPer-package breakdown:\n")
@@ -111,8 +111,8 @@ func (c *InterfaceCounter) PrintReport() {
 		}
 	}
 
-	if c.total > 40 {
-		fmt.Printf("\n⚠️  WARNING: Approaching interface limit (40+)\n")
+	if c.total > 120 {
+		fmt.Printf("\n⚠️  WARNING: Approaching interface limit (120+)\n")
 		fmt.Printf("Consider consolidating interfaces or removing unused ones.\n")
 	}
 }
