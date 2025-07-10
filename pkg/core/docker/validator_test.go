@@ -547,13 +547,13 @@ CMD ["node", "app.js"]`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := &BuildValidationResult{
-				Details: make(map[string]interface{}),
+				// Details: make(map[string]interface{}),
 			}
 
 			validator.addGeneralSuggestions(tt.dockerfile, result)
 
 			found := false
-			if suggestions, ok := result.Details["suggestions"].([]string); ok {
+			if suggestions, ok := result.Metadata["suggestions"].([]string); ok {
 				for _, suggestion := range suggestions {
 					if strings.Contains(suggestion, tt.expectedSuggestion) {
 						found = true
@@ -569,7 +569,7 @@ CMD ["node", "app.js"]`,
 			}
 
 			// Always check for standard suggestions
-			suggestions, _ := result.Details["suggestions"].([]string)
+			suggestions, _ := result.Metadata["suggestions"].([]string)
 			assert.True(t, len(suggestions) > 0, "Should have at least some suggestions")
 
 			// Check for dockerignore suggestion
@@ -598,13 +598,14 @@ CMD ["node", "app.js"]`
 
 	result := validator.ValidateDockerfile(dockerfile)
 
-	require.NotNil(t, result.Metadata.Context)
+	require.NotNil(t, result.Metadata["context"])
 
-	lineCountStr, ok := result.Metadata.Context["line_count"]
+	context := result.Metadata["context"].(map[string]string)
+	lineCountStr, ok := context["line_count"]
 	assert.True(t, ok, "line_count should be present")
 	assert.Equal(t, "6", lineCountStr)
 
-	totalSizeStr, ok := result.Metadata.Context["total_size"]
+	totalSizeStr, ok := context["total_size"]
 	assert.True(t, ok, "total_size should be present")
 	assert.Equal(t, fmt.Sprintf("%d", len(dockerfile)), totalSizeStr)
 }
@@ -645,7 +646,7 @@ CMD ["serve"]`
 	assert.Len(t, result.Warnings, 1) // One warning for multiple CMD (ENTRYPOINT + CMD)
 
 	// Should not suggest multi-stage since it's already using it
-	if suggestions, ok := result.Details["suggestions"].([]string); ok {
+	if suggestions, ok := result.Metadata["suggestions"].([]string); ok {
 		for _, suggestion := range suggestions {
 			assert.NotContains(t, suggestion, "multi-stage")
 		}

@@ -9,9 +9,27 @@ import (
 type ValidationError = validation.Error
 type ValidationWarning = validation.Warning
 type ValidationMetadata = validation.Metadata
-type ValidationResult = validation.Result
-type ManifestValidationResult = validation.Result
-type BuildValidationResult = validation.Result
+
+// Note: ValidationResult is defined in api/interfaces.go as the canonical type
+
+// ManifestValidationResult represents the result of manifest validation
+type ManifestValidationResult struct {
+	Valid     bool                   `json:"valid"`
+	Errors    []ValidationError      `json:"errors,omitempty"`
+	Warnings  []ValidationWarning    `json:"warnings,omitempty"`
+	Manifests []string               `json:"manifests,omitempty"`
+	Context   map[string]string      `json:"context,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// BuildValidationResult represents the result of build validation
+type BuildValidationResult struct {
+	Valid     bool                   `json:"valid"`
+	Errors    []ValidationError      `json:"errors,omitempty"`
+	Warnings  []ValidationWarning    `json:"warnings,omitempty"`
+	BuildInfo map[string]interface{} `json:"build_info,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
 
 // NewError creates a new validation error
 func NewError(code, message string, errorType validation.ErrorType, severity validation.ErrorSeverity) *ValidationError {

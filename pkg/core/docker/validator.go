@@ -31,11 +31,12 @@ func NewValidator(logger *slog.Logger) *Validator {
 func (v *Validator) ValidateDockerfile(dockerfileContent string) *BuildValidationResult {
 	// Use factory function from unified validation framework
 	result := NewBuildResult()
-	if result.Metadata.Context == nil {
-		result.Metadata.Context = make(map[string]string)
+	if result.Metadata == nil {
+		result.Metadata = make(map[string]interface{})
 	}
-	result.Metadata.ValidatorName = "dockerfile-validator"
-	result.Metadata.ValidatorVersion = "1.0.0"
+	result.Metadata["context"] = make(map[string]string)
+	result.Metadata["validator_name"] = "dockerfile-validator"
+	result.Metadata["validator_version"] = "1.0.0"
 
 	v.logger.Debug("Starting Dockerfile validation")
 
@@ -53,8 +54,9 @@ func (v *Validator) ValidateDockerfile(dockerfileContent string) *BuildValidatio
 	}
 
 	lines := strings.Split(dockerfileContent, "\n")
-	result.Metadata.Context["line_count"] = fmt.Sprintf("%d", len(lines))
-	result.Metadata.Context["total_size"] = fmt.Sprintf("%d", len(dockerfileContent))
+	context := result.Metadata["context"].(map[string]string)
+	context["line_count"] = fmt.Sprintf("%d", len(lines))
+	context["total_size"] = fmt.Sprintf("%d", len(dockerfileContent))
 
 	// Parse and validate each line, handling line continuations
 	var instructions []string
@@ -457,8 +459,8 @@ func (v *Validator) validateStructure(instructions []string, result *BuildValida
 // addGeneralSuggestions adds general best practice suggestions
 func (v *Validator) addGeneralSuggestions(dockerfileContent string, result *BuildValidationResult) {
 	// Initialize Details map if needed
-	if result.Details == nil {
-		result.Details = make(map[string]interface{})
+	if result.Metadata == nil {
+		result.Metadata = make(map[string]interface{})
 	}
 
 	suggestions := []string{}
@@ -481,5 +483,5 @@ func (v *Validator) addGeneralSuggestions(dockerfileContent string, result *Buil
 	suggestions = append(suggestions, "Use specific version tags for base images to ensure reproducible builds")
 
 	// Store suggestions in Details map
-	result.Details["suggestions"] = suggestions
+	result.Metadata["suggestions"] = suggestions
 }

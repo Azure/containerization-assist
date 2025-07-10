@@ -10,40 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Mock validator for testing
-type mockValidator struct {
-	name         string
-	domain       string
-	category     string
-	priority     int
-	dependencies []string
-	result       ValidationResult
-}
-
-func (m *mockValidator) Validate(_ context.Context, _ interface{}) ValidationResult {
-	return m.result
-}
-
-func (m *mockValidator) Name() string {
-	return m.name
-}
-
-func (m *mockValidator) Domain() string {
-	return m.domain
-}
-
-func (m *mockValidator) Category() string {
-	return m.category
-}
-
-func (m *mockValidator) Priority() int {
-	return m.priority
-}
-
-func (m *mockValidator) Dependencies() []string {
-	return m.dependencies
-}
-
 func TestValidatorRegistry_Register(t *testing.T) {
 	registry := NewValidatorRegistry()
 

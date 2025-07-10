@@ -65,7 +65,7 @@ type ContainerizationResult struct {
 	Template *GenerateResult `json:"template,omitempty"`
 
 	// Validation results
-	Validation *api.ManifestValidationResult `json:"validation,omitempty"`
+	Validation *api.BuildValidationResult `json:"validation,omitempty"`
 
 	// Build results
 	Build *BuildResult `json:"build,omitempty"`

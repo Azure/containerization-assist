@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/validation"
 )
 
 // SessionStateValidator validates session state
@@ -217,7 +217,7 @@ type UnifiedSessionStateValidator struct {
 }
 
 // NewUnifiedSessionStateValidator creates a new unified session state validator
-func NewUnifiedSessionStateValidator() validation.DomainValidator[interface{}] {
+func NewUnifiedSessionStateValidator() api.DomainValidator[interface{}] {
 	return &UnifiedSessionStateValidator{
 		sessionValidator: &SessionStateValidator{},
 	}
@@ -229,12 +229,12 @@ func (v *UnifiedSessionStateValidator) Category() string {
 }
 
 // Validate implements the validation.Validator interface for session state
-func (v *UnifiedSessionStateValidator) Validate(ctx context.Context, value interface{}) validation.ValidationResult {
-	result := validation.ValidationResult{
+func (v *UnifiedSessionStateValidator) Validate(ctx context.Context, value interface{}) api.ValidationResult {
+	result := api.ValidationResult{
 		Valid:    true,
 		Errors:   make([]error, 0),
 		Warnings: make([]string, 0),
-		Context: validation.ValidationContext{
+		Context: api.ValidationContext{
 			Field: "session_state",
 			Path:  "session_state",
 			Metadata: map[string]interface{}{
@@ -317,7 +317,7 @@ func (v *UnifiedSessionStateValidator) GetSupportedTypes() []string {
 }
 
 // ValidateSessionStateUnified provides a convenience method for unified session state validation
-func ValidateSessionStateUnified(ctx context.Context, sessionState interface{}) validation.ValidationResult {
+func ValidateSessionStateUnified(ctx context.Context, sessionState interface{}) api.ValidationResult {
 	validator := NewUnifiedSessionStateValidator()
 	return validator.Validate(ctx, sessionState)
 }

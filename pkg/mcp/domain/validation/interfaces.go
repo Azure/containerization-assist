@@ -4,7 +4,10 @@ import (
 	"context"
 )
 
-// Validator defines the core validation interface
+// Type aliases to avoid importing from application layer
+// These are aliases to the canonical types in application/api
+
+// Validator defines the core validation interface (alias)
 type Validator[T any] interface {
 	// Validate validates a value and returns validation result
 	Validate(ctx context.Context, value T) ValidationResult
@@ -13,7 +16,7 @@ type Validator[T any] interface {
 	Name() string
 }
 
-// ValidationResult holds validation outcome
+// ValidationResult holds validation outcome (alias)
 type ValidationResult struct {
 	Valid    bool
 	Errors   []error
@@ -21,20 +24,20 @@ type ValidationResult struct {
 	Context  ValidationContext
 }
 
-// ValidationContext provides validation execution context
+// ValidationContext provides validation execution context (alias)
 type ValidationContext struct {
 	Field    string
 	Path     string
 	Metadata map[string]interface{}
 }
 
-// ValidatorChain allows composing multiple validators
+// ValidatorChain allows composing multiple validators (alias)
 type ValidatorChain[T any] struct {
 	validators []Validator[T]
 	strategy   ChainStrategy
 }
 
-// ChainStrategy defines how validators are executed
+// ChainStrategy defines how validators are executed (alias)
 type ChainStrategy int
 
 const (
@@ -46,7 +49,7 @@ const (
 	StopOnFirstWarning
 )
 
-// DomainValidator extends basic validation with domain-specific metadata
+// DomainValidator extends basic validation with domain-specific metadata (alias)
 type DomainValidator[T any] interface {
 	Validator[T]
 
@@ -63,7 +66,7 @@ type DomainValidator[T any] interface {
 	Dependencies() []string
 }
 
-// ValidatorRegistry manages domain validators with dependency resolution
+// ValidatorRegistry manages domain validators with dependency resolution (alias)
 type ValidatorRegistry interface {
 	// Register a domain validator
 	Register(validator DomainValidator[interface{}]) error
@@ -84,7 +87,7 @@ type ValidatorRegistry interface {
 	ListValidators() []ValidatorInfo
 }
 
-// ValidatorInfo provides metadata about registered validators
+// ValidatorInfo provides metadata about registered validators (alias)
 type ValidatorInfo struct {
 	Name         string   `json:"name"`
 	Domain       string   `json:"domain"`

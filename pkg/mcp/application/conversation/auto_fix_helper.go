@@ -834,6 +834,167 @@ func (h *AutoFixHelper) shouldSkipRepeatedFix(sessionCtx *SessionContext, toolNa
 	return false
 }
 
+// Helper methods for session context and fix attempts
+
+// buildSessionContext builds session context for smart decision making
+func (h *AutoFixHelper) buildSessionContext(ctx context.Context, sessionID string) (*SessionContext, error) {
+	sessionCtx := &SessionContext{
+		SessionID: sessionID,
+		Metadata:  make(map[string]interface{}),
+	}
+
+	// Get session metadata if available
+	if metadata, err := h.sessionState.GetSessionMetadata(ctx, sessionID); err == nil {
+		sessionCtx.Metadata = metadata
+
+		// Extract language and framework from metadata
+		if lang, ok := metadata["language"].(string); ok {
+			sessionCtx.Language = lang
+		}
+		if framework, ok := metadata["framework"].(string); ok {
+			sessionCtx.Framework = framework
+		}
+		if tools, ok := metadata["tools"].([]string); ok {
+			sessionCtx.Tools = tools
+		}
+	}
+
+	// Populate recent errors from fix history
+	if history, exists := h.fixHistory[sessionID]; exists {
+		recentErrors := make([]string, 0, len(history))
+		for _, attempt := range history {
+			if len(recentErrors) < 10 { // Limit to last 10 errors
+				recentErrors = append(recentErrors, attempt.Error)
+			}
+		}
+		sessionCtx.RecentErrors = recentErrors
+	}
+
+	return sessionCtx, nil
+}
+
+// recordFixAttempt records a fix attempt for tracking
+func (h *AutoFixHelper) recordFixAttempt(sessionID, toolName, errorMsg, strategy string, successful bool) {
+	if h.fixHistory == nil {
+		h.fixHistory = make(map[string][]FixAttempt)
+	}
+
+	attempt := FixAttempt{
+		ToolName:   toolName,
+		Error:      errorMsg,
+		Strategy:   strategy,
+		Successful: successful,
+		Timestamp:  time.Now(),
+		SessionID:  sessionID,
+	}
+
+	h.fixHistory[sessionID] = append(h.fixHistory[sessionID], attempt)
+
+	// Keep only last 50 attempts per session to avoid memory leaks
+	if len(h.fixHistory[sessionID]) > 50 {
+		h.fixHistory[sessionID] = h.fixHistory[sessionID][len(h.fixHistory[sessionID])-50:]
+	}
+}
+
+// extractSessionID extracts session ID from arguments
+func (h *AutoFixHelper) extractSessionID(args interface{}) string {
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		if sessionID, ok := argsMap["session_id"].(string); ok {
+			return sessionID
+		}
+	}
+
+	// Try to extract from other argument types
+	if buildArgs, ok := args.(*BuildArgs); ok && buildArgs != nil {
+		// Assuming BuildArgs has a SessionID field, if not we'll use a default
+		return "default-session"
+	}
+
+	return "default-session"
+}
+
+// attemptBasicFix attempts basic fixes using individual strategies
+func (h *AutoFixHelper) attemptBasicFix(ctx context.Context, tool api.Tool, args interface{}, err error) (interface{}, error) {
+	// Try each fix strategy
+	for name, strategy := range h.fixes {
+		h.logger.Debug("Trying fix strategy", slog.String("strategy", name))
+
+		if result, fixErr := strategy(ctx, tool, args, err); fixErr == nil && result != nil {
+			h.logger.Info("Auto-fix successful", slog.String("strategy", name))
+			return result, nil
+		}
+	}
+
+	return nil, err
+}
+
+// attemptContextAwareFix attempts context-aware fixes based on session history
+func (h *AutoFixHelper) attemptContextAwareFix(ctx context.Context, tool api.Tool, args interface{}, err error, sessionCtx *SessionContext) (interface{}, error) {
+	if sessionCtx == nil {
+		return h.attemptBasicFix(ctx, tool, args, err)
+	}
+
+	errorMsg := strings.ToLower(err.Error())
+	toolName := tool.Name()
+
+	// Check if we should skip repeated fixes
+	if h.shouldSkipRepeatedFix(sessionCtx, toolName, errorMsg) {
+		h.logger.Info("Skipping repeated fix attempt",
+			slog.String("tool", toolName),
+			slog.String("error_type", errorMsg))
+		return nil, err
+	}
+
+	// Try language-specific fixes first if we know the language
+	if sessionCtx.Language != "" {
+		if result, fixErr := h.tryLanguageSpecificFixes(ctx, tool, args, err, sessionCtx.Language); fixErr == nil && result != nil {
+			return result, nil
+		}
+	}
+
+	// Fall back to basic fixes
+	return h.attemptBasicFix(ctx, tool, args, err)
+}
+
+// tryLanguageSpecificFixes attempts fixes specific to the detected language
+func (h *AutoFixHelper) tryLanguageSpecificFixes(ctx context.Context, tool api.Tool, args interface{}, err error, language string) (interface{}, error) {
+	errorMsg := strings.ToLower(err.Error())
+
+	// Language-specific port mappings
+	languagePorts := map[string][]int{
+		"go":         {8080, 3000, 5000},
+		"javascript": {3000, 8080, 5000},
+		"python":     {5000, 8000, 8080},
+		"java":       {8080, 8090, 9000},
+	}
+
+	if strings.Contains(errorMsg, "port") {
+		if ports, exists := languagePorts[language]; exists {
+			for _, port := range ports {
+				toolInput := api.ToolInput{
+					Data: h.updateArgsWithPort(args, port),
+				}
+				if result, execErr := tool.Execute(ctx, toolInput); execErr == nil {
+					h.logger.Info("Language-specific port fix successful",
+						slog.String("language", language),
+						slog.Int("port", port))
+					return result, nil
+				}
+			}
+		}
+	}
+
+	return nil, err
+}
+
+// BuildArgs represents build arguments for dockerfile operations
+type BuildArgs struct {
+	DockerfilePath string
+	ContextPath    string
+	ImageName      string
+	SessionID      string
+}
+
 // GetFixChainStatus returns the current status of fix chains
 func (h *AutoFixHelper) GetFixChainStatus() map[string]interface{} {
 	status := make(map[string]interface{})

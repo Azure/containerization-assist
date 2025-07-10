@@ -33,14 +33,6 @@ type Session struct {
 	Metadata  map[string]interface{} `json:"metadata"`
 }
 
-// BuildArgs represents build tool arguments for auto-fix
-type BuildArgs struct {
-	DockerfilePath string            `json:"dockerfile_path"`
-	ContextPath    string            `json:"context_path"`
-	Tags           []string          `json:"tags"`
-	BuildArgs      map[string]string `json:"build_args"`
-}
-
 // WorkflowRequest represents a workflow execution request
 type WorkflowRequest struct {
 	WorkflowID string                 `json:"workflow_id"`

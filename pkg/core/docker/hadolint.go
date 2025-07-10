@@ -10,16 +10,22 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 )
 
 // BuildValidationResult is a local type to avoid import cycles
-type BuildValidationResult = validation.Result
+type BuildValidationResult = api.BuildValidationResult
 
 // NewBuildResult creates a new BuildValidationResult
 func NewBuildResult() *BuildValidationResult {
-	return validation.NewResult()
+	return &api.BuildValidationResult{
+		Valid:    true,
+		Errors:   make([]api.ValidationError, 0),
+		Warnings: make([]api.ValidationWarning, 0),
+		Metadata: make(map[string]interface{}),
+	}
 }
 
 // HadolintValidator provides Hadolint-based Dockerfile validation
@@ -96,11 +102,12 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 
 	// Convert Hadolint results to ValidationResult using factory function
 	result := NewBuildResult()
-	result.Metadata.ValidatorName = "hadolint"
-	result.Metadata.ValidatorVersion = hv.getHadolintVersion()
+	result.Metadata["validator_name"] = "hadolint"
+	result.Metadata["validator_version"] = hv.getHadolintVersion()
 
-	result.Metadata.Context["hadolint_version"] = hv.getHadolintVersion()
-	result.Metadata.Context["total_issues"] = fmt.Sprintf("%d", len(hadolintResults))
+	context := result.Metadata["context"].(map[string]string)
+	context["hadolint_version"] = hv.getHadolintVersion()
+	context["total_issues"] = fmt.Sprintf("%d", len(hadolintResults))
 
 	// Process each Hadolint finding
 	criticalCount := 0
@@ -164,7 +171,7 @@ func (hv *HadolintValidator) ValidateWithHadolint(ctx context.Context, dockerfil
 
 	// Set validity based on critical errors
 	result.Valid = criticalCount == 0
-	result.Metadata.Context["critical_issues"] = fmt.Sprintf("%d", criticalCount)
+	context["critical_issues"] = fmt.Sprintf("%d", criticalCount)
 
 	hv.logger.Info("Hadolint validation completed",
 		"valid", result.Valid,
@@ -257,8 +264,8 @@ func (hv *HadolintValidator) addHadolintSuggestions(results []HadolintResult, va
 	}
 
 	// Store suggestions in Details map
-	if validation.Details == nil {
-		validation.Details = make(map[string]interface{})
+	if validation.Metadata == nil {
+		validation.Metadata = make(map[string]interface{})
 	}
 
 	suggestions := []string{}
@@ -284,7 +291,7 @@ func (hv *HadolintValidator) addHadolintSuggestions(results []HadolintResult, va
 		"Add a .dockerignore file to exclude unnecessary files from the build context",
 	)
 
-	validation.Details["suggestions"] = suggestions
+	validation.Metadata["suggestions"] = suggestions
 }
 
 // CheckHadolintInstalled checks if Hadolint is available
