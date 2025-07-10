@@ -76,7 +76,7 @@ For functions approaching or exceeding complexity limits:
 
 ### When to Consider Exceptions
 - **Domain-specific algorithms**: Complex but well-understood business logic
-- **Legacy integration**: Code that interfaces with complex external systems  
+- **Legacy integration**: Code that interfaces with complex external systems
 - **Configuration/registration**: Functions that handle many similar cases
 - **Performance-critical paths**: Where refactoring would impact performance
 

@@ -472,7 +472,7 @@ github.com/Azure/container-kit/pkg/mcp/application/container_registry_service.go
 github.com/Azure/container-kit/pkg/mcp/application/container_registry_service.go:86:				SetKnownRegistries				0.0%
 github.com/Azure/container-kit/pkg/mcp/application/container_registry_service.go:96:				Reset						0.0%
 github.com/Azure/container-kit/pkg/mcp/application/conversation/auto_fix_helper.go:49:				NewAutoFixHelper				100.0%
-github.com/Azure/container-kit/pkg/mcp/application/conversation/auto_fix_helper.go:74:				registerCommonFixes				53.2%
+github.com/Azure/container-kit/pkg/mcp/application/conversation/auto_fix_helper.go:74:				registerCommonFixes				52.6%
 github.com/Azure/container-kit/pkg/mcp/application/conversation/auto_fix_helper.go:526:				AttemptFix					74.1%
 github.com/Azure/container-kit/pkg/mcp/application/conversation/auto_fix_helper.go:584:				RegisterFix					100.0%
 github.com/Azure/container-kit/pkg/mcp/application/conversation/auto_fix_helper.go:589:				HasFix						100.0%

@@ -1,4 +1,4 @@
-#\!/bin/bash
+#!/bin/bash
 set -e
 
 echo "=== COVERAGE CHECKER ==="
@@ -7,7 +7,7 @@ echo "=== COVERAGE CHECKER ==="
 echo "Generating coverage report..."
 go test -coverprofile=coverage.out -covermode=atomic ./pkg/mcp/...
 
-if [ \! -f coverage.out ]; then
+if [ ! -f coverage.out ]; then
     echo "❌ FAIL: Coverage report generation failed"
     exit 1
 fi
@@ -34,4 +34,3 @@ go tool cover -html=coverage.out -o coverage.html
 
 echo "✅ Coverage analysis complete"
 echo "View detailed report: coverage.html"
-EOF < /dev/null
