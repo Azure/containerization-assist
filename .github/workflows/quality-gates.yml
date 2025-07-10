@@ -112,7 +112,12 @@ jobs:
       run: |
         echo "🎯 Running comprehensive quality gates with enforcement..."
         alias make='/usr/bin/make'
-        scripts/quality_gates_enforced.sh || exit 1
+        # Run our new comprehensive quality gates script
+        if [ -f scripts/quality/quality_gates.sh ]; then
+          scripts/quality/quality_gates.sh || exit 1
+        else
+          scripts/quality_gates_enforced.sh || exit 1
+        fi
 
     - name: Upload Coverage Reports
       if: always()

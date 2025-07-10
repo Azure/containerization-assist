@@ -37,7 +37,7 @@ test-mcp:
 .PHONY: test-integration
 test-integration:
 	@echo "Running MCP integration tests..."
-	go test -tags=integration ./pkg/mcp/internal/test/integration/... -v
+	go test -tags=integration ./test/integration/... -v
 
 .PHONY: test-e2e
 test-e2e:
@@ -80,12 +80,12 @@ coverage-baseline:
 bench:
 	@echo "Running MCP performance benchmarks..."
 	@echo "Target: <300μs P95 per request"
-	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/tools
+	go test -bench=. -benchmem -benchtime=5s ./pkg/mcp/...
 
 .PHONY: bench-baseline
 bench-baseline:
 	@echo "Setting performance baseline..."
-	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/tools > bench-baseline.txt
+	go test -bench=. -benchmem -benchtime=10s ./pkg/mcp/... > bench-baseline.txt
 	@echo "Baseline saved to bench-baseline.txt"
 
 .PHONY: lint
@@ -134,6 +134,36 @@ install-hooks:
 validate-architecture:
 	@echo "Validating three-layer architecture..."
 	@./scripts/validate-architecture.sh
+
+# Quality Gates
+.PHONY: quality-gates
+quality-gates:
+	@echo "Running comprehensive quality gates..."
+	@scripts/quality/quality_gates.sh
+
+.PHONY: quality-gates-ci
+quality-gates-ci:
+	@echo "Running quality gates for CI..."
+	@COVERAGE_THRESHOLD=15.0 LINT_ERROR_BUDGET=100 scripts/quality/quality_gates.sh
+
+.PHONY: quality-dashboard
+quality-dashboard:
+	@echo "Generating quality metrics dashboard..."
+	@scripts/quality/generate_metrics_dashboard.sh
+
+.PHONY: coverage
+coverage:
+	@echo "Generating test coverage report..."
+	@scripts/quality/coverage_tracker.sh
+
+.PHONY: pre-commit-hook
+pre-commit-hook:
+	@echo "Running pre-commit quality checks..."
+	@scripts/quality/pre_commit_hook.sh
+
+.PHONY: quality-all
+quality-all: fmt-check lint coverage quality-gates quality-dashboard
+	@echo "✅ All quality checks completed!"
 
 .PHONY: pre-commit
 pre-commit:
