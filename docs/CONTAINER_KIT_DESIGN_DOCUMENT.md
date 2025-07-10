@@ -1,8 +1,8 @@
 # Container Kit Design Document
 
-**Version**: 1.0  
-**Date**: 2025-07-10  
-**Status**: Current  
+**Version**: 1.0
+**Date**: 2025-07-10
+**Status**: Current
 
 ## Table of Contents
 
@@ -271,30 +271,30 @@ type SessionStore interface {
 ### 1. Tool Execution Flow
 
 ```
-User Request → MCP Server → Tool Registry → Command Router → 
-Tool Implementation → Service Container → Domain Logic → 
+User Request → MCP Server → Tool Registry → Command Router →
+Tool Implementation → Service Container → Domain Logic →
 Infrastructure Services → External Systems → Response
 ```
 
 ### 2. Session Lifecycle
 
 ```
-Session Creation → Workspace Setup → Tool Registration → 
+Session Creation → Workspace Setup → Tool Registration →
 Execution Context → State Persistence → Cleanup
 ```
 
 ### 3. Error Handling Flow
 
 ```
-Error Detection → Classification → Context Enrichment → 
-Recovery Strategy → Auto-Fix Attempt → User Notification → 
+Error Detection → Classification → Context Enrichment →
+Recovery Strategy → Auto-Fix Attempt → User Notification →
 Audit Logging
 ```
 
 ### 4. AI Integration Flow
 
 ```
-User Input → Context Analysis → AI Service → Response Generation → 
+User Input → Context Analysis → AI Service → Response Generation →
 Context Update → Action Execution → Result Validation
 ```
 

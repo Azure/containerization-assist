@@ -89,8 +89,8 @@ jobs:
 
     - name: Lint Check
       run: |
-        echo "🔍 Installing golangci-lint v2.0..."
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.0.0
+        echo "🔍 Installing golangci-lint v1.64.8..."
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
         echo "🔍 Running linting with error budget..."
         LINT_ERROR_THRESHOLD=100 LINT_WARN_THRESHOLD=50 ./scripts/lint-with-threshold.sh ./pkg/mcp/...
         echo "✅ Linting completed"
