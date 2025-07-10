@@ -14,32 +14,41 @@ type StringLengthValidator struct {
 	MinLength int
 	MaxLength int
 	FieldName string
+	name      string
 }
 
-func NewStringLengthValidator(fieldName string, minLength, maxLength int) *StringLengthValidator {
+func NewStringLengthValidator(name, fieldName string, minLength, maxLength int) *StringLengthValidator {
 	return &StringLengthValidator{
 		MinLength: minLength,
 		MaxLength: maxLength,
 		FieldName: fieldName,
+		name:      name,
 	}
 }
 
-func (v *StringLengthValidator) Validate(ctx context.Context, value string) ValidationResult {
+func (v *StringLengthValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+	str, ok := value.(string)
+	if !ok {
+		return ValidationResult{
+			Valid:  false,
+			Errors: []error{errors.NewValidationFailed("input", "expected string input")},
+		}
+	}
 	result := ValidationResult{Valid: true, Errors: make([]error, 0)}
 
-	if len(value) < v.MinLength {
+	if len(str) < v.MinLength {
 		result.Valid = false
 		result.Errors = append(result.Errors, errors.NewValidationFailed(
 			v.FieldName,
-			fmt.Sprintf("length %d is less than minimum %d", len(value), v.MinLength),
+			fmt.Sprintf("length %d is less than minimum %d", len(str), v.MinLength),
 		))
 	}
 
-	if len(value) > v.MaxLength {
+	if v.MaxLength > 0 && len(str) > v.MaxLength {
 		result.Valid = false
 		result.Errors = append(result.Errors, errors.NewValidationFailed(
 			v.FieldName,
-			fmt.Sprintf("length %d exceeds maximum %d", len(value), v.MaxLength),
+			fmt.Sprintf("length %d exceeds maximum %d", len(str), v.MaxLength),
 		))
 	}
 
@@ -47,16 +56,33 @@ func (v *StringLengthValidator) Validate(ctx context.Context, value string) Vali
 }
 
 func (v *StringLengthValidator) Name() string {
-	return "StringLengthValidator"
+	return v.name
+}
+
+func (v *StringLengthValidator) Domain() string {
+	return "common"
+}
+
+func (v *StringLengthValidator) Category() string {
+	return "string"
+}
+
+func (v *StringLengthValidator) Priority() int {
+	return 50
+}
+
+func (v *StringLengthValidator) Dependencies() []string {
+	return []string{}
 }
 
 // PatternValidator validates string patterns
 type PatternValidator struct {
 	Pattern   *regexp.Regexp
 	FieldName string
+	name      string
 }
 
-func NewPatternValidator(fieldName, pattern string) (*PatternValidator, error) {
+func NewPatternValidator(name, fieldName, pattern string) (*PatternValidator, error) {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, errors.NewValidationFailed("pattern", fmt.Sprintf("invalid regex: %v", err))
@@ -65,13 +91,21 @@ func NewPatternValidator(fieldName, pattern string) (*PatternValidator, error) {
 	return &PatternValidator{
 		Pattern:   regex,
 		FieldName: fieldName,
+		name:      name,
 	}, nil
 }
 
-func (v *PatternValidator) Validate(ctx context.Context, value string) ValidationResult {
+func (v *PatternValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+	str, ok := value.(string)
+	if !ok {
+		return ValidationResult{
+			Valid:  false,
+			Errors: []error{errors.NewValidationFailed("input", "expected string input")},
+		}
+	}
 	result := ValidationResult{Valid: true, Errors: make([]error, 0)}
 
-	if !v.Pattern.MatchString(value) {
+	if !v.Pattern.MatchString(str) {
 		result.Valid = false
 		result.Errors = append(result.Errors, errors.NewValidationFailed(
 			v.FieldName,
@@ -83,22 +117,46 @@ func (v *PatternValidator) Validate(ctx context.Context, value string) Validatio
 }
 
 func (v *PatternValidator) Name() string {
-	return "PatternValidator"
+	return v.name
+}
+
+func (v *PatternValidator) Domain() string {
+	return "common"
+}
+
+func (v *PatternValidator) Category() string {
+	return "pattern"
+}
+
+func (v *PatternValidator) Priority() int {
+	return 55
+}
+
+func (v *PatternValidator) Dependencies() []string {
+	return []string{}
 }
 
 // RequiredValidator validates required fields
 type RequiredValidator struct {
 	FieldName string
+	name      string
 }
 
-func NewRequiredValidator(fieldName string) *RequiredValidator {
-	return &RequiredValidator{FieldName: fieldName}
+func NewRequiredValidator(name, fieldName string) *RequiredValidator {
+	return &RequiredValidator{FieldName: fieldName, name: name}
 }
 
-func (v *RequiredValidator) Validate(ctx context.Context, value string) ValidationResult {
+func (v *RequiredValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+	str, ok := value.(string)
+	if !ok {
+		return ValidationResult{
+			Valid:  false,
+			Errors: []error{errors.NewValidationFailed("input", "expected string input")},
+		}
+	}
 	result := ValidationResult{Valid: true, Errors: make([]error, 0)}
 
-	if strings.TrimSpace(value) == "" {
+	if strings.TrimSpace(str) == "" {
 		result.Valid = false
 		result.Errors = append(result.Errors, errors.NewMissingParam(v.FieldName))
 	}
@@ -107,23 +165,47 @@ func (v *RequiredValidator) Validate(ctx context.Context, value string) Validati
 }
 
 func (v *RequiredValidator) Name() string {
-	return "RequiredValidator"
+	return v.name
+}
+
+func (v *RequiredValidator) Domain() string {
+	return "common"
+}
+
+func (v *RequiredValidator) Category() string {
+	return "required"
+}
+
+func (v *RequiredValidator) Priority() int {
+	return 100
+}
+
+func (v *RequiredValidator) Dependencies() []string {
+	return []string{}
 }
 
 // EmailValidator validates email format
 type EmailValidator struct {
 	FieldName string
+	name      string
 }
 
-func NewEmailValidator(fieldName string) *EmailValidator {
-	return &EmailValidator{FieldName: fieldName}
+func NewEmailValidator(name, fieldName string) *EmailValidator {
+	return &EmailValidator{FieldName: fieldName, name: name}
 }
 
-func (v *EmailValidator) Validate(ctx context.Context, value string) ValidationResult {
+func (v *EmailValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+	str, ok := value.(string)
+	if !ok {
+		return ValidationResult{
+			Valid:  false,
+			Errors: []error{errors.NewValidationFailed("input", "expected string input")},
+		}
+	}
 	result := ValidationResult{Valid: true, Errors: make([]error, 0)}
 
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	if !emailRegex.MatchString(value) {
+	if !emailRegex.MatchString(str) {
 		result.Valid = false
 		result.Errors = append(result.Errors, errors.NewValidationFailed(
 			v.FieldName,
@@ -135,23 +217,47 @@ func (v *EmailValidator) Validate(ctx context.Context, value string) ValidationR
 }
 
 func (v *EmailValidator) Name() string {
-	return "EmailValidator"
+	return v.name
+}
+
+func (v *EmailValidator) Domain() string {
+	return "common"
+}
+
+func (v *EmailValidator) Category() string {
+	return "string"
+}
+
+func (v *EmailValidator) Priority() int {
+	return 60
+}
+
+func (v *EmailValidator) Dependencies() []string {
+	return []string{}
 }
 
 // URLValidator validates URL format
 type URLValidator struct {
 	FieldName string
+	name      string
 }
 
-func NewURLValidator(fieldName string) *URLValidator {
-	return &URLValidator{FieldName: fieldName}
+func NewURLValidator(name, fieldName string) *URLValidator {
+	return &URLValidator{FieldName: fieldName, name: name}
 }
 
-func (v *URLValidator) Validate(ctx context.Context, value string) ValidationResult {
+func (v *URLValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+	str, ok := value.(string)
+	if !ok {
+		return ValidationResult{
+			Valid:  false,
+			Errors: []error{errors.NewValidationFailed("input", "expected string input")},
+		}
+	}
 	result := ValidationResult{Valid: true, Errors: make([]error, 0)}
 
 	urlRegex := regexp.MustCompile(`^https?://[^\s/$.?#].[^\s]*$`)
-	if !urlRegex.MatchString(value) {
+	if !urlRegex.MatchString(str) {
 		result.Valid = false
 		result.Errors = append(result.Errors, errors.NewValidationFailed(
 			v.FieldName,
@@ -163,23 +269,64 @@ func (v *URLValidator) Validate(ctx context.Context, value string) ValidationRes
 }
 
 func (v *URLValidator) Name() string {
-	return "URLValidator"
+	return v.name
+}
+
+func (v *URLValidator) Domain() string {
+	return "common"
+}
+
+func (v *URLValidator) Category() string {
+	return "string"
+}
+
+func (v *URLValidator) Priority() int {
+	return 60
+}
+
+func (v *URLValidator) Dependencies() []string {
+	return []string{}
 }
 
 // NetworkPortValidator validates network ports
 type NetworkPortValidator struct {
 	FieldName string
 	AllowZero bool
+	name      string
 }
 
-func NewNetworkPortValidator(fieldName string, allowZero bool) *NetworkPortValidator {
+func NewNetworkPortValidator(name, fieldName string, allowZero bool) *NetworkPortValidator {
 	return &NetworkPortValidator{
 		FieldName: fieldName,
 		AllowZero: allowZero,
+		name:      name,
 	}
 }
 
-func (v *NetworkPortValidator) Validate(ctx context.Context, value int) ValidationResult {
+func (v *NetworkPortValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+	var port int
+	var ok bool
+
+	switch val := value.(type) {
+	case int:
+		port = val
+		ok = true
+	case int64:
+		port = int(val)
+		ok = true
+	case int32:
+		port = int(val)
+		ok = true
+	default:
+		ok = false
+	}
+
+	if !ok {
+		return ValidationResult{
+			Valid:  false,
+			Errors: []error{errors.NewValidationFailed("input", "expected integer input")},
+		}
+	}
 	result := ValidationResult{Valid: true, Errors: make([]error, 0)}
 
 	minPort := 1
@@ -187,11 +334,11 @@ func (v *NetworkPortValidator) Validate(ctx context.Context, value int) Validati
 		minPort = 0
 	}
 
-	if value < minPort || value > 65535 {
+	if port < minPort || port > 65535 {
 		result.Valid = false
 		result.Errors = append(result.Errors, errors.NewValidationFailed(
 			v.FieldName,
-			fmt.Sprintf("port %d must be between %d and 65535", value, minPort),
+			fmt.Sprintf("port %d must be between %d and 65535", port, minPort),
 		))
 	}
 
@@ -199,7 +346,23 @@ func (v *NetworkPortValidator) Validate(ctx context.Context, value int) Validati
 }
 
 func (v *NetworkPortValidator) Name() string {
-	return "NetworkPortValidator"
+	return v.name
+}
+
+func (v *NetworkPortValidator) Domain() string {
+	return "network"
+}
+
+func (v *NetworkPortValidator) Category() string {
+	return "port"
+}
+
+func (v *NetworkPortValidator) Priority() int {
+	return 70
+}
+
+func (v *NetworkPortValidator) Dependencies() []string {
+	return []string{}
 }
 
 // IPAddressValidator validates IP addresses (IPv4/IPv6)
@@ -208,18 +371,27 @@ type IPAddressValidator struct {
 	AllowIPv4     bool
 	AllowIPv6     bool
 	AllowLoopback bool
+	name          string
 }
 
-func NewIPAddressValidator(fieldName string, allowIPv4, allowIPv6, allowLoopback bool) *IPAddressValidator {
+func NewIPAddressValidator(name, fieldName string, allowIPv4, allowIPv6, allowLoopback bool) *IPAddressValidator {
 	return &IPAddressValidator{
 		FieldName:     fieldName,
 		AllowIPv4:     allowIPv4,
 		AllowIPv6:     allowIPv6,
 		AllowLoopback: allowLoopback,
+		name:          name,
 	}
 }
 
-func (v *IPAddressValidator) Validate(ctx context.Context, value string) ValidationResult {
+func (v *IPAddressValidator) Validate(ctx context.Context, value interface{}) ValidationResult {
+	str, ok := value.(string)
+	if !ok {
+		return ValidationResult{
+			Valid:  false,
+			Errors: []error{errors.NewValidationFailed("input", "expected string input")},
+		}
+	}
 	result := ValidationResult{Valid: true, Errors: make([]error, 0)}
 
 	// Basic IPv4 pattern
@@ -227,9 +399,9 @@ func (v *IPAddressValidator) Validate(ctx context.Context, value string) Validat
 	// Basic IPv6 pattern
 	ipv6Regex := regexp.MustCompile(`^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$`)
 
-	isIPv4 := ipv4Regex.MatchString(value)
-	isIPv6 := ipv6Regex.MatchString(value)
-	isLoopback := value == "127.0.0.1" || value == "::1" || value == "localhost"
+	isIPv4 := ipv4Regex.MatchString(str)
+	isIPv6 := ipv6Regex.MatchString(str)
+	isLoopback := str == "127.0.0.1" || str == "::1" || str == "localhost"
 
 	if !isIPv4 && !isIPv6 {
 		result.Valid = false
@@ -268,5 +440,21 @@ func (v *IPAddressValidator) Validate(ctx context.Context, value string) Validat
 }
 
 func (v *IPAddressValidator) Name() string {
-	return "IPAddressValidator"
+	return v.name
+}
+
+func (v *IPAddressValidator) Domain() string {
+	return "network"
+}
+
+func (v *IPAddressValidator) Category() string {
+	return "address"
+}
+
+func (v *IPAddressValidator) Priority() int {
+	return 80
+}
+
+func (v *IPAddressValidator) Dependencies() []string {
+	return []string{}
 }
