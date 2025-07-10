@@ -152,17 +152,17 @@ jobs:
 
         # Test schema generation
         cd /tmp/schema-test
-        /home/runner/work/container-kit/container-kit/bin/schemaGen -input=test_args.go -output=test_generated.go -package=test
+        /home/runner/work/container-kit/container-kit/bin/schemaGen -tool=test_tool_args -domain=test -output=.
 
         # Check that generation succeeded
-        if [ ! -f test_generated.go ]; then
+        if [ ! -f toolargs_tool.go ]; then
           echo "::error::Schema generation test failed"
           exit 1
         fi
 
         # Verify the generated file compiles
         go mod init test-schema 2>/dev/null || true
-        go build -o /dev/null test_generated.go 2>&1 || {
+        go build -o /dev/null toolargs_tool.go 2>&1 || {
           echo "::error::Generated schema file has compilation errors"
           exit 1
         }
