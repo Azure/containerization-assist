@@ -119,10 +119,19 @@ func (c *ComplexityChecker) calculateComplexity(body *ast.BlockStmt) int {
 func (c *ComplexityChecker) PrintReport() {
 	fmt.Printf("=== COMPLEXITY CHECKER REPORT ===\n")
 	fmt.Printf("Maximum allowed complexity: %d\n", c.maxComplexity)
+
+	// Show allowed exceptions
+	if len(c.allowedFunctions) > 0 {
+		fmt.Printf("Functions with custom complexity limits:\n")
+		for funcName, limit := range c.allowedFunctions {
+			fmt.Printf("  - %s(): %d\n", funcName, limit)
+		}
+	}
+
 	fmt.Printf("Violations found: %d\n", len(c.violations))
 
 	if len(c.violations) == 0 {
-		fmt.Printf("✅ PASS: All functions within complexity limit\n")
+		fmt.Printf("✅ PASS: All functions within complexity limits\n")
 		return
 	}
 
