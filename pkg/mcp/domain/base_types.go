@@ -4,44 +4,44 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/internal/types"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // BaseToolResponse is an alias to avoid import cycles
-type BaseToolResponse = types.BaseToolResponse
+type BaseToolResponse = domaintypes.BaseToolResponse
 
 // ConversationStage is an alias for the conversation stage from internal types
-type ConversationStage = types.ConversationStage
+type ConversationStage = domaintypes.ConversationStage
 
 // ConversationStage constants
 const (
-	ConversationStageWelcome    ConversationStage = types.StageWelcome
-	ConversationStagePreFlight  ConversationStage = types.StagePreFlight
-	ConversationStageInit       ConversationStage = types.StageInit
-	ConversationStageAnalyze    ConversationStage = types.StageAnalysis
-	ConversationStageAnalysis   ConversationStage = types.StageAnalysis // Alias for backward compatibility
-	ConversationStageDockerfile ConversationStage = types.StageDockerfile
-	ConversationStageBuild      ConversationStage = types.StageBuild
-	ConversationStagePush       ConversationStage = types.StagePush
-	ConversationStageManifests  ConversationStage = types.StageManifests
-	ConversationStageDeploy     ConversationStage = types.StageDeployment
-	ConversationStageScan       ConversationStage = types.StageScan
-	ConversationStageCompleted  ConversationStage = types.StageCompleted
-	ConversationStageError      ConversationStage = types.StageError
+	ConversationStageWelcome    ConversationStage = domaintypes.StageWelcome
+	ConversationStagePreFlight  ConversationStage = domaintypes.StagePreFlight
+	ConversationStageInit       ConversationStage = domaintypes.StageInit
+	ConversationStageAnalyze    ConversationStage = domaintypes.StageAnalysis
+	ConversationStageAnalysis   ConversationStage = domaintypes.StageAnalysis // Alias for backward compatibility
+	ConversationStageDockerfile ConversationStage = domaintypes.StageDockerfile
+	ConversationStageBuild      ConversationStage = domaintypes.StageBuild
+	ConversationStagePush       ConversationStage = domaintypes.StagePush
+	ConversationStageManifests  ConversationStage = domaintypes.StageManifests
+	ConversationStageDeploy     ConversationStage = domaintypes.StageDeployment
+	ConversationStageScan       ConversationStage = domaintypes.StageScan
+	ConversationStageCompleted  ConversationStage = domaintypes.StageCompleted
+	ConversationStageError      ConversationStage = domaintypes.StageError
 )
 
 // ImageReference is an alias for image reference from internal types
-type ImageReference = types.ImageReference
+type ImageReference = domaintypes.ImageReference
 
 // ToolError is an alias for tool error from internal types
-type ToolError = types.ToolError
+type ToolError = domaintypes.ToolError
 
 // ExecutionResult is an alias for execution result from internal types
-type ExecutionResult = types.ExecutionResult
+type ExecutionResult = domaintypes.ExecutionResult
 
 // NewBaseResponse creates a new BaseToolResponse with current timestamp
 func NewBaseResponse(success bool, message string) BaseToolResponse {
-	response := types.NewBaseResponse("", "", false)
+	response := domaintypes.NewBaseResponse("", "", false)
 	response.Success = success
 	response.Message = message
 	return response
@@ -49,7 +49,7 @@ func NewBaseResponse(success bool, message string) BaseToolResponse {
 
 // NewToolResponse creates a tool response with current metadata
 func NewToolResponse(tool, sessionID string, dryRun bool) BaseToolResponse {
-	return types.NewBaseResponse(tool, sessionID, dryRun)
+	return domaintypes.NewBaseResponse(tool, sessionID, dryRun)
 }
 
 // Recommendation represents an AI recommendation

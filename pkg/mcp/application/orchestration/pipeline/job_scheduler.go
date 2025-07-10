@@ -1,5 +1,7 @@
 package pipeline
 
+import "context"
+
 // JobScheduler manages job submission and lifecycle
 type JobScheduler interface {
 	// Submit adds a new job to the queue
@@ -28,11 +30,11 @@ func NewJobScheduler(service Service) JobScheduler {
 }
 
 func (j *jobScheduler) Submit(job *Job) error {
-	return j.service.SubmitJob(job)
+	return j.service.SubmitJob(context.Background(), job)
 }
 
 func (j *jobScheduler) Get(jobID string) (*Job, error) {
-	job, found := j.service.GetJob(jobID)
+	job, found := j.service.GetJob(context.Background(), jobID)
 	if !found {
 		return nil, ErrJobNotFound
 	}
@@ -40,9 +42,9 @@ func (j *jobScheduler) Get(jobID string) (*Job, error) {
 }
 
 func (j *jobScheduler) List(status JobStatus) []*Job {
-	return j.service.ListJobs(status)
+	return j.service.ListJobs(context.Background(), status)
 }
 
 func (j *jobScheduler) Cancel(jobID string) error {
-	return j.service.CancelJob(jobID)
+	return j.service.CancelJob(context.Background(), jobID)
 }

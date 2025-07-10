@@ -253,7 +253,7 @@ func ExampleTelemetryConfiguration() {
 		ServiceVersion:  "dev",
 		Environment:     "development",
 		TracingEnabled:  true,
-		TracingEndpoint: "", // Will use stdout exporter
+		TracingEndpoint: "",  // Will use stdout exporter
 		TraceSampleRate: 1.0, // Sample all traces in dev
 		MetricsEnabled:  true,
 		MetricsInterval: 5 * time.Second,
@@ -315,10 +315,10 @@ func initializeComponents(ctx context.Context, tm *Manager) {
 	components := []string{"registry", "sessions", "pipeline", "transport"}
 	for _, component := range components {
 		ctx, componentSpan := tm.Tracing().StartSpan(ctx, fmt.Sprintf("component.%s.init", component))
-		
+
 		// Simulate component initialization
 		time.Sleep(20 * time.Millisecond)
-		
+
 		tm.RecordEvent(ctx, "component.initialized",
 			attribute.String("component.name", component),
 		)
@@ -341,12 +341,12 @@ func processRequests(ctx context.Context, tm *Manager) {
 			for key, value := range req.params {
 				tm.AddContextualAttributes(ctx, attribute.String(key, value))
 			}
-			
+
 			// Simulate tool execution
 			time.Sleep(80 * time.Millisecond)
 			return nil
 		})
-		
+
 		if err != nil {
 			fmt.Printf("Request failed: %v\n", err)
 		}

@@ -7,8 +7,8 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	"github.com/invopop/jsonschema"
-	"github.com/rs/zerolog"
 )
 
 type ToolRegistration struct {
@@ -21,14 +21,14 @@ type ToolRegistration struct {
 type ToolRegistry struct {
 	mu     sync.RWMutex
 	tools  map[string]*ToolRegistration
-	logger zerolog.Logger
+	logger logging.Standards
 	frozen bool
 }
 
-func NewToolRegistry(l zerolog.Logger) *ToolRegistry {
+func NewToolRegistry(l logging.Standards) *ToolRegistry {
 	return &ToolRegistry{
 		tools:  make(map[string]*ToolRegistration),
-		logger: l.With().Str("component", "tool_registry").Logger(),
+		logger: l.WithComponent("tool_registry"),
 	}
 }
 

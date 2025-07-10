@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // DockerValidators consolidates all Docker/Container validation logic
@@ -24,7 +24,7 @@ func NewDockerValidators() *DockerValidators {
 func (dv *DockerValidators) ValidateImageName(imageName string) error {
 	if imageName == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("image name cannot be empty").
 			Build()
@@ -34,7 +34,7 @@ func (dv *DockerValidators) ValidateImageName(imageName string) error {
 	validImageName := regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127})?$`)
 	if !validImageName.MatchString(imageName) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid Docker image name format: %s", imageName).
 			Build()
@@ -47,7 +47,7 @@ func (dv *DockerValidators) ValidateImageName(imageName string) error {
 func (dv *DockerValidators) ValidateDockerfile(content string) error {
 	if content == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("Dockerfile content cannot be empty").
 			Build()
@@ -75,7 +75,7 @@ func (dv *DockerValidators) ValidateDockerfile(content string) error {
 
 	if !hasFrom {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("Dockerfile must contain at least one FROM instruction").
 			Build()
@@ -88,7 +88,7 @@ func (dv *DockerValidators) ValidateDockerfile(content string) error {
 func (dv *DockerValidators) ValidateBuildContext(contextPath string) error {
 	if contextPath == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("build context path cannot be empty").
 			Build()
@@ -108,7 +108,7 @@ func (dv *DockerValidators) ValidateBuildContext(contextPath string) error {
 		}
 		if !found {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("no Dockerfile found in build context: %s", contextPath).
 				Build()
@@ -122,7 +122,7 @@ func (dv *DockerValidators) ValidateBuildContext(contextPath string) error {
 func (dv *DockerValidators) ValidateTag(tag string) error {
 	if tag == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("image tag cannot be empty").
 			Build()
@@ -132,7 +132,7 @@ func (dv *DockerValidators) ValidateTag(tag string) error {
 	validTag := regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$`)
 	if !validTag.MatchString(tag) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid Docker tag format: %s", tag).
 			Build()
@@ -145,7 +145,7 @@ func (dv *DockerValidators) ValidateTag(tag string) error {
 func (dv *DockerValidators) ValidateRegistryURL(registryURL string) error {
 	if registryURL == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("registry URL cannot be empty").
 			Build()
@@ -154,7 +154,7 @@ func (dv *DockerValidators) ValidateRegistryURL(registryURL string) error {
 	// Basic URL validation for registry
 	if !strings.Contains(registryURL, ".") && !strings.Contains(registryURL, ":") {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid registry URL format: %s", registryURL).
 			Build()
@@ -181,7 +181,7 @@ func (dv *DockerValidators) validateDockerInstruction(line string, lineNum int) 
 
 	if !validInstructions[instruction] {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid Dockerfile instruction '%s' on line %d", instruction, lineNum).
 			Build()

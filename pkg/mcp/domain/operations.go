@@ -102,7 +102,7 @@ type BuildOperationConfig struct {
 	WorkspaceDir   string      `json:"workspace_dir"`
 	BuildContext   string      `json:"build_context"`
 	DockerfilePath string      `json:"dockerfile_path"`
-	Logger         interface{} `json:"logger"` // zerolog.Logger
+	Logger         interface{} `json:"logger"` // logging.Standards
 }
 
 // AIContextEnhanceConfig represents configuration for AI context enhancement

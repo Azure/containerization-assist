@@ -14,7 +14,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain"
 	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // Local interface definitions to avoid import cycles
@@ -108,7 +108,7 @@ func NewMCPClientsWithAnalyzer(docker docker.DockerClient, kind kind.KindRunner,
 // Use mc.Analyzer = analyzer instead of SetAnalyzer(analyzer)
 
 // ValidateAnalyzerForProduction ensures the analyzer is appropriate for production
-func (mc *MCPClients) ValidateAnalyzerForProduction(logger zerolog.Logger) error {
+func (mc *MCPClients) ValidateAnalyzerForProduction(logger logging.Standards) error {
 	if mc.Analyzer == nil {
 		return errors.NewError().Messagef("analyzer cannot be nil").WithLocation(
 
@@ -180,10 +180,20 @@ func (s *stubAnalyzer) AnalyzeRepository(ctx context.Context, path string, callb
 	// Check if path exists
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, fmt.Errorf("invalid repository path: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("invalid repository path: %w", err).
+			WithLocation().
+			Build()
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("path is not a directory: %s", path)
+		return nil, errors.NewError().
+			Code(errors.CodeInvalidParameter).
+			Type(errors.ErrTypeValidation).
+			Messagef("path is not a directory: %s", path).
+			WithLocation().
+			Build()
 	}
 
 	result := &services.RepositoryAnalysis{
@@ -360,7 +370,12 @@ func analyzeDirectory(ctx context.Context, path string, result *services.Reposit
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to analyze directory structure: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to analyze directory structure: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	if callback != nil {

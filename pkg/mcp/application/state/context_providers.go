@@ -1,4 +1,4 @@
-package state
+package appstate
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/knowledge"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
@@ -54,7 +54,7 @@ func (p *BuildContextProvider) GetContext(ctx context.Context, request *ContextR
 	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"Failed to get session state",
 			err,
 		)
@@ -162,7 +162,7 @@ func (p *DeploymentContextProvider) GetContext(ctx context.Context, request *Con
 	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"Failed to get session state",
 			err,
 		)
@@ -267,7 +267,7 @@ func (p *SecurityContextProvider) GetContext(ctx context.Context, request *Conte
 	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"Failed to get session state",
 			err,
 		)
@@ -377,7 +377,7 @@ func (p *PerformanceContextProvider) GetContext(ctx context.Context, request *Co
 	sessionState, err := p.sessionManager.GetSession(request.SessionID)
 	if err != nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"Failed to get session state",
 			err,
 		)

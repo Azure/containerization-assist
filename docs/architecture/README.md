@@ -114,12 +114,12 @@ type ServiceContainer interface {
     ToolRegistry() ToolRegistry
     SessionManager() SessionManager
     WorkflowEngine() WorkflowEngine
-    
+
     // Domain Services
     BuildExecutor() BuildExecutor
     Scanner() Scanner
     Deployer() Deployer
-    
+
     // Infrastructure Services
     Storage() Storage
     DockerClient() DockerClient

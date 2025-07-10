@@ -38,11 +38,11 @@ echo "" >> "$REPORT_FILE"
 if [ -f "pkg/mcp/application/api/interfaces.go" ]; then
     INTERFACE_COUNT=$(grep -c "^type .* interface {" pkg/mcp/application/api/interfaces.go || echo "0")
     echo "- Total interfaces defined: $INTERFACE_COUNT" >> "$REPORT_FILE"
-    
+
     # Check if each interface has documentation
     DOCUMENTED_COUNT=$(grep -B1 "^type .* interface {" pkg/mcp/application/api/interfaces.go | grep -c "^//" || echo "0")
     echo "- Interfaces with comments: $DOCUMENTED_COUNT" >> "$REPORT_FILE"
-    
+
     COVERAGE=$((DOCUMENTED_COUNT * 100 / INTERFACE_COUNT))
     echo "- Documentation coverage: $COVERAGE%" >> "$REPORT_FILE"
 fi

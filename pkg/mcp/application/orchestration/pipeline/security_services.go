@@ -12,7 +12,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // Context key types for security operations
@@ -65,7 +65,7 @@ type SecurityServiceCombined interface {
 // securityService implements SecurityService
 type securityService struct {
 	sessionManager session.SessionManager
-	logger         zerolog.Logger
+	logger         logging.Standards
 	config         SecurityConfig
 
 	auditLog   []SecurityEvent
@@ -76,10 +76,10 @@ type securityService struct {
 }
 
 // NewSecurityServiceCombined creates a new combined security service
-func NewSecurityServiceCombined(sessionManager session.SessionManager, config SecurityConfig, logger zerolog.Logger) SecurityServiceCombined {
+func NewSecurityServiceCombined(sessionManager session.SessionManager, config SecurityConfig, logger logging.Standards) SecurityServiceCombined {
 	service := &securityService{
 		sessionManager: sessionManager,
-		logger:         logger.With().Str("component", "security_service").Logger(),
+		logger:         logger.WithComponent("security_service"),
 		config:         config,
 		auditLog:       make([]SecurityEvent, 0),
 		auditMutex:     &sync.RWMutex{},
@@ -251,7 +251,12 @@ func (s *securityService) CheckRateLimit(sessionID string) error {
 	// Check rate limit (default: 60 operations per minute)
 	if entry.Count >= 60 {
 		entry.Blocked = true
-		return fmt.Errorf("rate limit exceeded for session: %s", sessionID)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("rate limit exceeded for session: %s", sessionID).
+			WithLocation().
+			Build()
 	}
 
 	entry.Count++
@@ -276,28 +281,48 @@ func (s *securityService) CleanupRateLimiter() {
 func (s *securityService) validatePullOperation(sessionID string, args map[string]interface{}) error {
 	imageRef, ok := args["image_ref"].(string)
 	if !ok || imageRef == "" {
-		return fmt.Errorf("invalid image reference")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("invalid image reference").
+			WithLocation().
+			Build()
 	}
 
 	// Validate image reference format
 	if !s.isValidImageReference(imageRef) {
 		s.RecordSecurityEvent(sessionID, "pull", "INVALID_IMAGE_FORMAT", "HIGH",
 			fmt.Sprintf("Invalid image reference format: %s", imageRef), args)
-		return fmt.Errorf("invalid image reference format: %s", imageRef)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("invalid image reference format: %s", imageRef).
+			WithLocation().
+			Build()
 	}
 
 	// Check against allowed registries
 	if !s.isRegistryAllowed(imageRef) {
 		s.RecordSecurityEvent(sessionID, "pull", "UNAUTHORIZED_REGISTRY", "HIGH",
 			fmt.Sprintf("Unauthorized registry access: %s", imageRef), args)
-		return fmt.Errorf("registry not allowed: %s", s.extractRegistry(imageRef))
+		return errors.NewError().
+			Code(errors.CodePermissionDenied).
+			Type(errors.ErrTypePermission).
+			Messagef("registry not allowed: %s", s.extractRegistry(imageRef)).
+			WithLocation().
+			Build()
 	}
 
 	// Check against blocked images
 	if s.isImageBlocked(imageRef) {
 		s.RecordSecurityEvent(sessionID, "pull", "BLOCKED_IMAGE", "HIGH",
 			fmt.Sprintf("Blocked image access attempt: %s", imageRef), args)
-		return fmt.Errorf("image is blocked: %s", imageRef)
+		return errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("image is blocked: %s", imageRef).
+			WithLocation().
+			Build()
 	}
 
 	// Log successful validation
@@ -310,28 +335,48 @@ func (s *securityService) validatePullOperation(sessionID string, args map[strin
 func (s *securityService) validatePushOperation(sessionID string, args map[string]interface{}) error {
 	imageRef, ok := args["image_ref"].(string)
 	if !ok || imageRef == "" {
-		return fmt.Errorf("invalid image reference")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("invalid image reference").
+			WithLocation().
+			Build()
 	}
 
 	// Validate image reference
 	if !s.isValidImageReference(imageRef) {
 		s.RecordSecurityEvent(sessionID, "push", "INVALID_IMAGE_FORMAT", "HIGH",
 			fmt.Sprintf("Invalid image reference format: %s", imageRef), args)
-		return fmt.Errorf("invalid image reference format: %s", imageRef)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("invalid image reference format: %s", imageRef).
+			WithLocation().
+			Build()
 	}
 
 	// Check registry permissions for push
 	if !s.canPushToRegistry(imageRef) {
 		s.RecordSecurityEvent(sessionID, "push", "UNAUTHORIZED_PUSH", "HIGH",
 			fmt.Sprintf("Unauthorized push attempt: %s", imageRef), args)
-		return fmt.Errorf("push not allowed to registry: %s", s.extractRegistry(imageRef))
+		return errors.NewError().
+			Code(errors.CodePermissionDenied).
+			Type(errors.ErrTypePermission).
+			Messagef("push not allowed to registry: %s", s.extractRegistry(imageRef)).
+			WithLocation().
+			Build()
 	}
 
 	// Check for sensitive data in image name
 	if s.containsSensitiveData(imageRef) {
 		s.RecordSecurityEvent(sessionID, "push", "SENSITIVE_DATA_DETECTED", "HIGH",
 			fmt.Sprintf("Sensitive data detected in image name: %s", imageRef), args)
-		return fmt.Errorf("sensitive data detected in image reference")
+		return errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Message("sensitive data detected in image reference").
+			WithLocation().
+			Build()
 	}
 
 	s.RecordSecurityEvent(sessionID, "push", "OPERATION_VALIDATED", "INFO",
@@ -345,21 +390,36 @@ func (s *securityService) validateTagOperation(sessionID string, args map[string
 	targetRef, targetOk := args["target_ref"].(string)
 
 	if !sourceOk || !targetOk || sourceRef == "" || targetRef == "" {
-		return fmt.Errorf("invalid source or target reference")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("invalid source or target reference").
+			WithLocation().
+			Build()
 	}
 
 	// Validate both references
 	if !s.isValidImageReference(sourceRef) || !s.isValidImageReference(targetRef) {
 		s.RecordSecurityEvent(sessionID, "tag", "INVALID_IMAGE_FORMAT", "HIGH",
 			"Invalid image reference format in tag operation", args)
-		return fmt.Errorf("invalid image reference format")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("invalid image reference format").
+			WithLocation().
+			Build()
 	}
 
 	// Prevent tag bombing (excessive tags)
 	if s.isTagBombing(sessionID, sourceRef, targetRef) {
 		s.RecordSecurityEvent(sessionID, "tag", "TAG_BOMBING_DETECTED", "HIGH",
 			"Potential tag bombing detected", args)
-		return fmt.Errorf("excessive tagging detected")
+		return errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Message("excessive tagging detected").
+			WithLocation().
+			Build()
 	}
 
 	s.RecordSecurityEvent(sessionID, "tag", "OPERATION_VALIDATED", "INFO",
@@ -372,17 +432,32 @@ func (s *securityService) validateSession(sessionID string) error {
 	// Get session state for expiration check
 	sessionState, err := s.sessionManager.GetSession(sessionID)
 	if err != nil {
-		return fmt.Errorf("failed to get session state: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("failed to get session state: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Check session expiration
 	if time.Now().After(sessionState.ExpiresAt) {
-		return fmt.Errorf("session expired: %s", sessionID)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("session expired: %s", sessionID).
+			WithLocation().
+			Build()
 	}
 
 	// Check maximum session duration
 	if s.config.MaxSessionDuration > 0 && time.Since(sessionState.CreatedAt) > s.config.MaxSessionDuration {
-		return fmt.Errorf("session duration exceeded maximum allowed time")
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Message("session duration exceeded maximum allowed time").
+			WithLocation().
+			Build()
 	}
 
 	return nil

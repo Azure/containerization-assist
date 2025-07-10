@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // KubernetesValidators consolidates all Kubernetes/Deployment validation logic
@@ -25,7 +25,7 @@ func NewKubernetesValidators() *KubernetesValidators {
 func (kv *KubernetesValidators) ValidateResourceName(name string) error {
 	if name == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("Kubernetes resource name cannot be empty").
 			Build()
@@ -33,7 +33,7 @@ func (kv *KubernetesValidators) ValidateResourceName(name string) error {
 
 	if len(name) > 253 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("Kubernetes resource name too long (max 253 chars): %s", name).
 			Build()
@@ -43,7 +43,7 @@ func (kv *KubernetesValidators) ValidateResourceName(name string) error {
 	validName := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
 	if !validName.MatchString(name) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid Kubernetes resource name format: %s", name).
 			Build()
@@ -61,7 +61,7 @@ func (kv *KubernetesValidators) ValidateNamespace(namespace string) error {
 
 	if len(namespace) > 63 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("namespace name too long (max 63 chars): %s", namespace).
 			Build()
@@ -71,7 +71,7 @@ func (kv *KubernetesValidators) ValidateNamespace(namespace string) error {
 	validNamespace := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 	if !validNamespace.MatchString(namespace) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid namespace format: %s", namespace).
 			Build()
@@ -82,7 +82,7 @@ func (kv *KubernetesValidators) ValidateNamespace(namespace string) error {
 	for _, res := range reserved {
 		if namespace == res {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("namespace name is reserved: %s", namespace).
 				Build()
@@ -109,7 +109,7 @@ func (kv *KubernetesValidators) ValidateLabels(labels map[string]string) error {
 func (kv *KubernetesValidators) ValidateLabelKey(key string) error {
 	if key == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("label key cannot be empty").
 			Build()
@@ -117,7 +117,7 @@ func (kv *KubernetesValidators) ValidateLabelKey(key string) error {
 
 	if len(key) > 253 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("label key too long (max 253 chars): %s", key).
 			Build()
@@ -127,7 +127,7 @@ func (kv *KubernetesValidators) ValidateLabelKey(key string) error {
 	parts := strings.Split(key, "/")
 	if len(parts) > 2 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid label key format (too many slashes): %s", key).
 			Build()
@@ -140,7 +140,7 @@ func (kv *KubernetesValidators) ValidateLabelKey(key string) error {
 func (kv *KubernetesValidators) ValidateLabelValue(value string) error {
 	if len(value) > 63 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("label value too long (max 63 chars): %s", value).
 			Build()
@@ -150,7 +150,7 @@ func (kv *KubernetesValidators) ValidateLabelValue(value string) error {
 		validValue := regexp.MustCompile(`^[a-zA-Z0-9]([-a-zA-Z0-9_.]*[a-zA-Z0-9])?$`)
 		if !validValue.MatchString(value) {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid label value format: %s", value).
 				Build()
@@ -164,7 +164,7 @@ func (kv *KubernetesValidators) ValidateLabelValue(value string) error {
 func (kv *KubernetesValidators) ValidateYAMLManifest(yamlContent string) error {
 	if yamlContent == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("YAML manifest content cannot be empty").
 			Build()
@@ -175,7 +175,7 @@ func (kv *KubernetesValidators) ValidateYAMLManifest(yamlContent string) error {
 	for _, field := range requiredFields {
 		if !strings.Contains(yamlContent, field+":") {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("YAML manifest missing required field: %s", field).
 				Build()
@@ -191,7 +191,7 @@ func (kv *KubernetesValidators) ValidateDeployment(deployment map[string]interfa
 	spec, ok := deployment["spec"].(map[string]interface{})
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("deployment spec is required").
 			Build()
@@ -201,7 +201,7 @@ func (kv *KubernetesValidators) ValidateDeployment(deployment map[string]interfa
 	if replicas, exists := spec["replicas"]; exists {
 		if r, ok := replicas.(float64); ok && r < 0 {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("deployment replicas cannot be negative: %v", r).
 				Build()
@@ -216,7 +216,7 @@ func (kv *KubernetesValidators) ValidateService(service map[string]interface{}) 
 	spec, ok := service["spec"].(map[string]interface{})
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("service spec is required").
 			Build()
@@ -235,7 +235,7 @@ func (kv *KubernetesValidators) ValidateService(service map[string]interface{}) 
 		}
 		if !valid {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid service type: %s", typeStr).
 				Build()
@@ -253,7 +253,7 @@ func (kv *KubernetesValidators) ValidateHealthCheck(healthCheck map[string]inter
 			if port, exists := httpMap["port"]; exists {
 				if p, ok := port.(float64); ok && (p < 1 || p > 65535) {
 					return errors.NewError().
-						Code(codes.VALIDATION_FAILED).
+						Code(errorcodes.VALIDATION_FAILED).
 						Type(errors.ErrTypeValidation).
 						Messagef("invalid health check port: %v", p).
 						Build()

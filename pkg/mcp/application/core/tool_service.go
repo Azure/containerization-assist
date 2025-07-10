@@ -163,9 +163,10 @@ func (ts *ToolService) executeChatTool(_ context.Context, args map[string]interf
 		sessionID = sid
 	}
 
-	if ts.server.promptManager == nil {
-		return nil, errors.NewError().Messagef("prompt manager not available").WithLocation().Build()
-	}
+	// TODO: Fix after migration - promptManager removed
+	// if ts.server.promptManager == nil {
+	// 	return nil, errors.NewError().Messagef("prompt manager not available").WithLocation().Build()
+	// }
 
 	state, err := ts.server.sessionManager.GetOrCreateSession(sessionID)
 	if err != nil {

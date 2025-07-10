@@ -7,26 +7,26 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // AtomicOperationFramework provides foundation for atomic tool operations
 type AtomicOperationFramework struct {
 	sessionManager session.SessionManager
 	operations     *Operations
-	logger         zerolog.Logger
+	logger         logging.Standards
 }
 
 // NewAtomicOperationFramework creates a new atomic operation framework
 func NewAtomicOperationFramework(
 	sessionManager session.SessionManager,
 	operations *Operations,
-	logger zerolog.Logger,
+	logger logging.Standards,
 ) *AtomicOperationFramework {
 	return &AtomicOperationFramework{
 		sessionManager: sessionManager,
 		operations:     operations,
-		logger:         logger.With().Str("component", "atomic_framework").Logger(),
+		logger:         logger.WithComponent("atomic_framework"),
 	}
 }
 
@@ -108,7 +108,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPull(ctx context.Context,
 
 	af.logger.Info().
 		Str("image_ref", imageRef).
-		Dur("duration", result.Duration).
+		Str("duration", result.Duration.String()).
 		Msg("Atomic Docker pull completed successfully")
 
 	return result, nil
@@ -168,7 +168,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerPush(ctx context.Context,
 
 	af.logger.Info().
 		Str("image_ref", imageRef).
-		Dur("duration", result.Duration).
+		Str("duration", result.Duration.String()).
 		Msg("Atomic Docker push completed successfully")
 
 	return result, nil
@@ -234,7 +234,7 @@ func (af *AtomicOperationFramework) ExecuteAtomicDockerTag(ctx context.Context, 
 	af.logger.Info().
 		Str("source_ref", sourceRef).
 		Str("target_ref", targetRef).
-		Dur("duration", result.Duration).
+		Str("duration", result.Duration.String()).
 		Msg("Atomic Docker tag completed successfully")
 
 	return result, nil

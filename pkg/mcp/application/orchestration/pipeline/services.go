@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
@@ -89,11 +90,11 @@ type ServiceManagerAdapter struct {
 
 // All Manager methods delegate to the service
 func (a *ServiceManagerAdapter) Start() error {
-	return a.service.Start()
+	return a.service.Start(context.Background())
 }
 
 func (a *ServiceManagerAdapter) Stop() error {
-	return a.service.Stop()
+	return a.service.Stop(context.Background())
 }
 
 func (a *ServiceManagerAdapter) IsRunning() bool {
@@ -109,23 +110,23 @@ func (a *ServiceManagerAdapter) GetConfig() *PipelineConfig {
 }
 
 func (a *ServiceManagerAdapter) UpdateConfig(config *PipelineConfig) error {
-	return a.service.UpdateConfig(config)
+	return a.service.UpdateConfig(context.Background(), config)
 }
 
 func (a *ServiceManagerAdapter) RegisterWorker(worker BackgroundWorker) error {
-	return a.service.RegisterWorker(worker)
+	return a.service.RegisterWorker(context.Background(), worker)
 }
 
 func (a *ServiceManagerAdapter) UnregisterWorker(name string) error {
-	return a.service.UnregisterWorker(name)
+	return a.service.UnregisterWorker(context.Background(), name)
 }
 
 func (a *ServiceManagerAdapter) RestartWorker(name string) error {
-	return a.service.RestartWorker(name)
+	return a.service.RestartWorker(context.Background(), name)
 }
 
 func (a *ServiceManagerAdapter) RestartAllWorkers() error {
-	return a.service.RestartAllWorkers()
+	return a.service.RestartAllWorkers(context.Background())
 }
 
 func (a *ServiceManagerAdapter) GetWorkerNames() []string {
@@ -133,19 +134,19 @@ func (a *ServiceManagerAdapter) GetWorkerNames() []string {
 }
 
 func (a *ServiceManagerAdapter) GetWorkerHealth(name string) (WorkerHealth, error) {
-	return a.service.GetWorkerHealth(name)
+	return a.service.GetWorkerHealth(context.Background(), name)
 }
 
 func (a *ServiceManagerAdapter) GetAllWorkerHealth() map[string]WorkerHealth {
-	return a.service.GetAllWorkerHealth()
+	return a.service.GetAllWorkerHealth(context.Background())
 }
 
 func (a *ServiceManagerAdapter) GetWorkerStatus(name string) (WorkerStatus, error) {
-	return a.service.GetWorkerStatus(name)
+	return a.service.GetWorkerStatus(context.Background(), name)
 }
 
 func (a *ServiceManagerAdapter) GetAllWorkerStatuses() map[string]WorkerStatus {
-	return a.service.GetAllWorkerStatuses()
+	return a.service.GetAllWorkerStatuses(context.Background())
 }
 
 func (a *ServiceManagerAdapter) IsHealthy() bool {
@@ -153,27 +154,27 @@ func (a *ServiceManagerAdapter) IsHealthy() bool {
 }
 
 func (a *ServiceManagerAdapter) SubmitJob(job *Job) error {
-	return a.service.SubmitJob(job)
+	return a.service.SubmitJob(context.Background(), job)
 }
 
 func (a *ServiceManagerAdapter) GetJob(jobID string) (*Job, bool) {
-	return a.service.GetJob(jobID)
+	return a.service.GetJob(context.Background(), jobID)
 }
 
 func (a *ServiceManagerAdapter) ListJobs(status JobStatus) []*Job {
-	return a.service.ListJobs(status)
+	return a.service.ListJobs(context.Background(), status)
 }
 
 func (a *ServiceManagerAdapter) CancelJob(jobID string) error {
-	return a.service.CancelJob(jobID)
+	return a.service.CancelJob(context.Background(), jobID)
 }
 
 func (a *ServiceManagerAdapter) GetManagerStats() ManagerStats {
-	return a.service.GetManagerStats()
+	return a.service.GetManagerStats(context.Background())
 }
 
 func (a *ServiceManagerAdapter) GetOrchestratorStats() OrchestratorStats {
-	return a.service.GetOrchestratorStats()
+	return a.service.GetOrchestratorStats(context.Background())
 }
 
 // NewPipelineServicesFromContainer creates pipeline services from a service container

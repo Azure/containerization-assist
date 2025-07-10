@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // NewDetector creates a new migration opportunity detector
-func NewDetector(config Config, logger zerolog.Logger) *Detector {
+func NewDetector(config Config, logger logging.Standards) *Detector {
 	md := &Detector{
-		logger:  logger.With().Str("component", "migration_detector").Logger(),
+		logger:  logger.WithComponent("migration_detector"),
 		config:  config,
 		fileSet: token.NewFileSet(),
 	}
@@ -110,7 +110,7 @@ func (md *Detector) DetectMigrations(rootPath string) (*Report, error) {
 
 	md.logger.Info().
 		Int("opportunities", len(report.Opportunities)).
-		Dur("duration", time.Since(startTime)).
+		Str("duration", time.Since(startTime).String()).
 		Msg("Migration detection completed")
 
 	return report, nil

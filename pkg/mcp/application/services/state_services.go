@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp/application/state"
+	appstate "github.com/Azure/container-kit/pkg/mcp/application/state"
 )
 
 // StateServices provides access to all state-related services
@@ -20,7 +20,7 @@ type stateServices struct {
 }
 
 // NewStateServices creates a new StateServices container with all services
-func NewStateServices(stateManager *state.UnifiedStateManager) StateServices {
+func NewStateServices(stateManager *appstate.UnifiedStateManager) StateServices {
 	return &stateServices{
 		store:    NewStateStoreImpl(stateManager),
 		provider: NewStateProvider(stateManager),

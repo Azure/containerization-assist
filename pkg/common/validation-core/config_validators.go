@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"sigs.k8s.io/yaml"
 )
 
@@ -24,7 +24,7 @@ func NewConfigValidators() *ConfigValidators {
 func (cv *ConfigValidators) ValidateFilePath(path string) error {
 	if path == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("file path cannot be empty").
 			Build()
@@ -33,7 +33,7 @@ func (cv *ConfigValidators) ValidateFilePath(path string) error {
 	// Check for path traversal attempts
 	if strings.Contains(path, "..") {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeSecurity).
 			Messagef("path traversal detected in file path: %s", path).
 			Build()
@@ -48,7 +48,7 @@ func (cv *ConfigValidators) ValidateFilePath(path string) error {
 
 	if ext != "" && !validExtensions[ext] {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("unsupported config file extension: %s", ext).
 			Build()
@@ -61,7 +61,7 @@ func (cv *ConfigValidators) ValidateFilePath(path string) error {
 func (cv *ConfigValidators) ValidateJSON(jsonStr string) error {
 	if jsonStr == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("JSON content cannot be empty").
 			Build()
@@ -70,7 +70,7 @@ func (cv *ConfigValidators) ValidateJSON(jsonStr string) error {
 	var jsonData interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &jsonData); err != nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid JSON format: %s", err.Error()).
 			Build()
@@ -83,7 +83,7 @@ func (cv *ConfigValidators) ValidateJSON(jsonStr string) error {
 func (cv *ConfigValidators) ValidateYAML(yamlStr string) error {
 	if yamlStr == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("YAML content cannot be empty").
 			Build()
@@ -92,7 +92,7 @@ func (cv *ConfigValidators) ValidateYAML(yamlStr string) error {
 	var yamlData interface{}
 	if err := yaml.Unmarshal([]byte(yamlStr), &yamlData); err != nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid YAML format: %s", err.Error()).
 			Build()
@@ -105,7 +105,7 @@ func (cv *ConfigValidators) ValidateYAML(yamlStr string) error {
 func (cv *ConfigValidators) ValidateEnvironmentVariable(name, value string) error {
 	if name == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("environment variable name cannot be empty").
 			Build()
@@ -115,7 +115,7 @@ func (cv *ConfigValidators) ValidateEnvironmentVariable(name, value string) erro
 	validEnvName := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 	if !validEnvName.MatchString(name) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid environment variable name format: %s", name).
 			Build()
@@ -144,7 +144,7 @@ func (cv *ConfigValidators) ValidateConfigMap(configMap map[string]interface{}) 
 	metadata, ok := configMap["metadata"].(map[string]interface{})
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("configMap metadata is required").
 			Build()
@@ -159,7 +159,7 @@ func (cv *ConfigValidators) ValidateConfigMap(configMap map[string]interface{}) 
 		}
 	} else {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("configMap name is required").
 			Build()
@@ -185,7 +185,7 @@ func (cv *ConfigValidators) ValidateSecret(secret map[string]interface{}) error 
 	metadata, ok := secret["metadata"].(map[string]interface{})
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("secret metadata is required").
 			Build()
@@ -200,7 +200,7 @@ func (cv *ConfigValidators) ValidateSecret(secret map[string]interface{}) error 
 		}
 	} else {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("secret name is required").
 			Build()
@@ -228,7 +228,7 @@ func (cv *ConfigValidators) ValidateResourceLimits(limits map[string]interface{}
 	for resource, limit := range limits {
 		if !validResources[resource] {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid resource type: %s", resource).
 				Build()
@@ -246,7 +246,7 @@ func (cv *ConfigValidators) ValidateResourceLimits(limits map[string]interface{}
 func (cv *ConfigValidators) validateConfigMapName(name string) error {
 	if len(name) > 253 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("configMap name too long (max 253 chars): %s", name).
 			Build()
@@ -255,7 +255,7 @@ func (cv *ConfigValidators) validateConfigMapName(name string) error {
 	validName := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 	if !validName.MatchString(name) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid configMap name format: %s", name).
 			Build()
@@ -269,7 +269,7 @@ func (cv *ConfigValidators) validateConfigMapData(key string, value interface{})
 	// Key validation
 	if key == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("configMap data key cannot be empty").
 			Build()
@@ -278,7 +278,7 @@ func (cv *ConfigValidators) validateConfigMapData(key string, value interface{})
 	// Value should be string
 	if _, ok := value.(string); !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("configMap data value must be string for key: %s", key).
 			Build()
@@ -291,7 +291,7 @@ func (cv *ConfigValidators) validateConfigMapData(key string, value interface{})
 func (cv *ConfigValidators) validateSecretName(name string) error {
 	if len(name) > 253 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("secret name too long (max 253 chars): %s", name).
 			Build()
@@ -300,7 +300,7 @@ func (cv *ConfigValidators) validateSecretName(name string) error {
 	validName := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 	if !validName.MatchString(name) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid secret name format: %s", name).
 			Build()
@@ -329,7 +329,7 @@ func (cv *ConfigValidators) validateSecretType(secretType string) error {
 	}
 
 	return errors.NewError().
-		Code(codes.VALIDATION_FAILED).
+		Code(errorcodes.VALIDATION_FAILED).
 		Type(errors.ErrTypeValidation).
 		Messagef("invalid secret type: %s", secretType).
 		Build()
@@ -340,7 +340,7 @@ func (cv *ConfigValidators) validateResourceValue(resource string, value interfa
 	valueStr, ok := value.(string)
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("resource limit value must be string for %s", resource).
 			Build()
@@ -353,7 +353,7 @@ func (cv *ConfigValidators) validateResourceValue(resource string, value interfa
 		cpuPattern := regexp.MustCompile(`^(\d+(\.\d+)?|\d+m)$`)
 		if !cpuPattern.MatchString(valueStr) {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid CPU resource format: %s", valueStr).
 				Build()
@@ -363,7 +363,7 @@ func (cv *ConfigValidators) validateResourceValue(resource string, value interfa
 		memoryPattern := regexp.MustCompile(`^(\d+(\.\d+)?([KMGTPE]i?)?|\d+[kmgtpe])$`)
 		if !memoryPattern.MatchString(valueStr) {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid memory resource format: %s", valueStr).
 				Build()

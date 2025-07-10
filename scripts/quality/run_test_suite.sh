@@ -72,26 +72,26 @@ run_tests() {
     local test_type="$1"
     local test_pattern="$2"
     local output_file="$3"
-    
+
     echo "Running $test_type tests..."
-    
+
     local cmd="go test"
     if [ "$GENERATE_COVERAGE" = true ] && [ "$test_type" = "unit" ]; then
         cmd="$cmd -coverprofile=$COVERAGE_DIR/${test_type}_coverage.out"
     fi
-    
+
     if [ "$VERBOSE" = true ]; then
         cmd="$cmd -v"
     fi
-    
+
     cmd="$cmd -timeout=$TEST_TIMEOUT"
-    
+
     if [ -n "$test_pattern" ]; then
         cmd="$cmd -run=$test_pattern"
     fi
-    
+
     cmd="$cmd ./pkg/mcp/..."
-    
+
     echo "Executing: $cmd"
     if eval "$cmd" > "$output_file" 2>&1; then
         echo "✅ $test_type tests passed"
@@ -134,11 +134,11 @@ fi
 if [ "$RUN_BENCHMARKS" = true ]; then
     echo "=== BENCHMARK TESTS ==="
     echo "Running benchmark tests..."
-    
+
     if go test -bench=. -benchmem ./pkg/mcp/... > "$REPORTS_DIR/benchmark_tests.txt" 2>&1; then
         echo "✅ Benchmark tests completed"
         RESULTS+=("✅ Benchmarks: COMPLETED")
-        
+
         # Extract benchmark results
         echo "Top benchmark results:"
         grep "^Benchmark" "$REPORTS_DIR/benchmark_tests.txt" | head -10
@@ -152,17 +152,17 @@ fi
 # Generate coverage report
 if [ "$GENERATE_COVERAGE" = true ] && [ "$RUN_UNIT" = true ]; then
     echo "=== COVERAGE ANALYSIS ==="
-    
+
     if [ -f "$COVERAGE_DIR/unit_coverage.out" ]; then
         # Generate HTML report
         go tool cover -html="$COVERAGE_DIR/unit_coverage.out" -o "$REPORTS_DIR/coverage.html"
-        
+
         # Calculate overall coverage
         COVERAGE_PERCENT=$(go tool cover -func="$COVERAGE_DIR/unit_coverage.out" | grep total | awk '{print $3}' | sed 's/%//')
-        
+
         echo "Overall coverage: ${COVERAGE_PERCENT}%"
         echo "Coverage threshold: ${COVERAGE_THRESHOLD}%"
-        
+
         # Check coverage threshold
         if (( $(echo "$COVERAGE_PERCENT >= $COVERAGE_THRESHOLD" | bc -l 2>/dev/null || echo "0") )); then
             echo "✅ Coverage meets threshold"
@@ -172,11 +172,11 @@ if [ "$GENERATE_COVERAGE" = true ] && [ "$RUN_UNIT" = true ]; then
             RESULTS+=("❌ Coverage: ${COVERAGE_PERCENT}% (< ${COVERAGE_THRESHOLD}%)")
             OVERALL_SUCCESS=false
         fi
-        
+
         # Generate detailed coverage report
         echo "Generating detailed coverage analysis..."
         scripts/quality/coverage_tracker.sh > "$REPORTS_DIR/detailed_coverage.txt"
-        
+
     else
         echo "❌ No coverage data generated"
         RESULTS+=("❌ Coverage: NO DATA")
@@ -224,7 +224,7 @@ echo ""
 # Performance analysis
 if [ "$RUN_BENCHMARKS" = true ] && [ -f "$REPORTS_DIR/benchmark_tests.txt" ]; then
     echo "=== PERFORMANCE ANALYSIS ==="
-    
+
     # Check for slow benchmarks (>300μs target)
     SLOW_BENCHMARKS=$(grep "^Benchmark" "$REPORTS_DIR/benchmark_tests.txt" | awk '{
         if ($3 ~ /ns\/op/) {
@@ -233,7 +233,7 @@ if [ "$RUN_BENCHMARKS" = true ] && [ -f "$REPORTS_DIR/benchmark_tests.txt" ]; th
             if (ns > 300000) print $1 ": " ns "ns/op (>" 300000 "ns target)"
         }
     }')
-    
+
     if [ -n "$SLOW_BENCHMARKS" ]; then
         echo "⚠️  Benchmarks exceeding 300μs target:"
         echo "$SLOW_BENCHMARKS"
@@ -267,7 +267,7 @@ $(printf '%s\n' "${RESULTS[@]}")
 ## Test Quality
 
 - Table-driven tests: $TABLE_TESTS files
-- Tests with mocks: $MOCK_TESTS files  
+- Tests with mocks: $MOCK_TESTS files
 - Tests using testify: $TESTIFY_TESTS files
 
 ## Generated Reports
@@ -306,10 +306,10 @@ else
     echo "Reports generated:"
     echo "  - Summary: $SUMMARY_FILE"
     echo "  - Reports directory: $REPORTS_DIR/"
-    
+
     if [ "$GENERATE_COVERAGE" = true ]; then
         echo "  - Coverage report: $REPORTS_DIR/coverage.html"
     fi
-    
+
     exit 1
 fi

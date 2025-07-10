@@ -1,4 +1,4 @@
-package state
+package appstate
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
@@ -28,7 +28,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 	sessionState, ok := state.(*session.SessionState)
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message(fmt.Sprintf("Invalid state type: expected *session.SessionState, got %T", state)).
 			Context("expected_type", "*session.SessionState").
 			Context("actual_type", fmt.Sprintf("%T", state)).
@@ -38,7 +38,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 
 	if sessionState.SessionID == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Session ID is required").
 			Context("field", "session_id").
 			Context("component", "session_state_validator").
@@ -48,7 +48,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 
 	if sessionState.CreatedAt.IsZero() {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Session creation time is required").
 			Context("field", "created_at").
 			Context("component", "session_state_validator").
@@ -59,7 +59,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 	// TODO: Add disk usage validation when fields are available
 	// if sessionState.DiskUsage < 0 {
 	//     return errors.NewError().
-	//         Code(codes.VALIDATION_FAILED).
+	//         Code(errorcodes.VALIDATION_FAILED).
 	//         Message("Disk usage cannot be negative").
 	//         Context("field", "disk_usage").
 	//         Context("value", sessionState.DiskUsage).
@@ -70,7 +70,7 @@ func (v *SessionStateValidator) ValidateState(_ context.Context, stateType State
 
 	// if sessionState.MaxDiskUsage > 0 && sessionState.DiskUsage > sessionState.MaxDiskUsage {
 	//     return errors.NewError().
-	//         Code(codes.VALIDATION_FAILED).
+	//         Code(errorcodes.VALIDATION_FAILED).
 	//         Message(fmt.Sprintf("Disk usage %d exceeds maximum allowed %d", sessionState.DiskUsage, sessionState.MaxDiskUsage)).
 	//         Context("field", "disk_usage").
 	//         Context("current_usage", sessionState.DiskUsage).
@@ -117,7 +117,7 @@ func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateT
 	conversationState, ok := state.(*BasicConversationState)
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message(fmt.Sprintf("Invalid state type: expected *BasicConversationState, got %T", state)).
 			Context("expected_type", "*BasicConversationState").
 			Context("actual_type", fmt.Sprintf("%T", state)).
@@ -128,7 +128,7 @@ func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateT
 	sessionValidator := NewSessionStateValidator()
 	if err := sessionValidator.Validate(&conversationState.SessionState); err != nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Embedded session state validation failed").
 			Cause(err).
 			Context("field", "session_state").
@@ -139,7 +139,7 @@ func (v *ConversationStateValidator) ValidateState(ctx context.Context, _ StateT
 
 	if conversationState.ConversationID == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Conversation ID is required").
 			Context("field", "conversation_id").
 			Context("component", "conversation_state_validator").
@@ -183,7 +183,7 @@ func (v *WorkflowStateValidator) Validate(state interface{}) error {
 func (v *WorkflowStateValidator) ValidateState(ctx context.Context, stateType StateType, state interface{}) error {
 	if state == nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("State cannot be nil").
 			Context("state_type", string(stateType)).
 			Context("component", "workflow_state_validator").

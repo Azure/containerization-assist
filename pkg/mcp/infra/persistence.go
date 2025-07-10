@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"go.etcd.io/bbolt"
 )
@@ -23,14 +24,24 @@ type BoltDBPersistence struct {
 func NewBoltDBPersistence(dbPath string, logger *slog.Logger) (*BoltDBPersistence, error) {
 	// Ensure directory exists
 	if err := createDirectoryIfNotExists(filepath.Dir(dbPath)); err != nil {
-		return nil, fmt.Errorf("failed to create database directory: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to create database directory: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	db, err := bbolt.Open(dbPath, 0600, &bbolt.Options{
 		Timeout: 1 * time.Second,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to open BoltDB: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to open BoltDB: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	persistence := &BoltDBPersistence{
@@ -42,7 +53,12 @@ func NewBoltDBPersistence(dbPath string, logger *slog.Logger) (*BoltDBPersistenc
 	// Initialize buckets
 	if err := persistence.initializeBuckets(); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("failed to initialize buckets: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to initialize buckets: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return persistence, nil
@@ -76,7 +92,12 @@ func (p *BoltDBPersistence) initializeBuckets() error {
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		for _, bucket := range buckets {
 			if _, err := tx.CreateBucketIfNotExists([]byte(bucket)); err != nil {
-				return fmt.Errorf("failed to create bucket %s: %w", bucket, err)
+				return errors.NewError().
+					Code(errors.CodeInternalError).
+					Type(errors.ErrTypeInternal).
+					Messagef("failed to create bucket %s: %w", bucket, err).
+					WithLocation().
+					Build()
 			}
 		}
 		return nil
@@ -99,13 +120,23 @@ func (p *BoltDBPersistence) CreateSession(ctx context.Context, sessionInfo *sess
 
 	data, err := json.Marshal(sessionInfo)
 	if err != nil {
-		return fmt.Errorf("failed to marshal session info: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to marshal session info: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessions))
 		if bucket == nil {
-			return fmt.Errorf("sessions bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("sessions bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		return bucket.Put([]byte(sessionInfo.ID), data)
@@ -120,12 +151,22 @@ func (p *BoltDBPersistence) GetSession(ctx context.Context, sessionID string) (*
 	err := p.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessions))
 		if bucket == nil {
-			return fmt.Errorf("sessions bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("sessions bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		data := bucket.Get([]byte(sessionID))
 		if data == nil {
-			return fmt.Errorf("session not found: %s", sessionID)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("session not found: %s", sessionID).
+				WithLocation().
+				Build()
 		}
 
 		return json.Unmarshal(data, &sessionInfo)
@@ -144,18 +185,33 @@ func (p *BoltDBPersistence) UpdateSession(ctx context.Context, sessionInfo *sess
 
 	data, err := json.Marshal(sessionInfo)
 	if err != nil {
-		return fmt.Errorf("failed to marshal session info: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to marshal session info: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessions))
 		if bucket == nil {
-			return fmt.Errorf("sessions bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("sessions bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		// Check if session exists
 		if existing := bucket.Get([]byte(sessionInfo.ID)); existing == nil {
-			return fmt.Errorf("session not found: %s", sessionInfo.ID)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("session not found: %s", sessionInfo.ID).
+				WithLocation().
+				Build()
 		}
 
 		return bucket.Put([]byte(sessionInfo.ID), data)
@@ -169,7 +225,12 @@ func (p *BoltDBPersistence) DeleteSession(ctx context.Context, sessionID string)
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessions))
 		if bucket == nil {
-			return fmt.Errorf("sessions bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("sessions bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		return bucket.Delete([]byte(sessionID))
@@ -184,7 +245,12 @@ func (p *BoltDBPersistence) ListSessions(ctx context.Context, filter map[string]
 	err := p.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessions))
 		if bucket == nil {
-			return fmt.Errorf("sessions bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("sessions bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		return bucket.ForEach(func(key, value []byte) error {
@@ -218,13 +284,23 @@ func (p *BoltDBPersistence) SaveSessionState(ctx context.Context, sessionID stri
 
 	data, err := json.Marshal(state)
 	if err != nil {
-		return fmt.Errorf("failed to marshal session state: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to marshal session state: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessionState))
 		if bucket == nil {
-			return fmt.Errorf("session state bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("session state bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		return bucket.Put([]byte(sessionID), data)
@@ -239,7 +315,12 @@ func (p *BoltDBPersistence) LoadSessionState(ctx context.Context, sessionID stri
 	err := p.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessionState))
 		if bucket == nil {
-			return fmt.Errorf("session state bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("session state bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		data := bucket.Get([]byte(sessionID))
@@ -265,7 +346,12 @@ func (p *BoltDBPersistence) DeleteSessionState(ctx context.Context, sessionID st
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessionState))
 		if bucket == nil {
-			return fmt.Errorf("session state bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("session state bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		return bucket.Delete([]byte(sessionID))
@@ -280,13 +366,23 @@ func (p *BoltDBPersistence) SaveSessionData(ctx context.Context, sessionID strin
 
 	data, err := json.Marshal(value)
 	if err != nil {
-		return fmt.Errorf("failed to marshal session data: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to marshal session data: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessionData))
 		if bucket == nil {
-			return fmt.Errorf("session data bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("session data bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		dataKey := fmt.Sprintf("%s:%s", sessionID, key)
@@ -301,13 +397,23 @@ func (p *BoltDBPersistence) LoadSessionData(ctx context.Context, sessionID strin
 	return p.db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessionData))
 		if bucket == nil {
-			return fmt.Errorf("session data bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("session data bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		dataKey := fmt.Sprintf("%s:%s", sessionID, key)
 		data := bucket.Get([]byte(dataKey))
 		if data == nil {
-			return fmt.Errorf("session data not found: %s", key)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("session data not found: %s", key).
+				WithLocation().
+				Build()
 		}
 
 		return json.Unmarshal(data, result)
@@ -321,7 +427,12 @@ func (p *BoltDBPersistence) DeleteSessionData(ctx context.Context, sessionID str
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketSessionData))
 		if bucket == nil {
-			return fmt.Errorf("session data bucket not found")
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Message("session data bucket not found").
+				WithLocation().
+				Build()
 		}
 
 		dataKey := fmt.Sprintf("%s:%s", sessionID, key)
@@ -337,13 +448,23 @@ func (p *BoltDBPersistence) Put(ctx context.Context, bucket string, key string, 
 
 	data, err := json.Marshal(value)
 	if err != nil {
-		return fmt.Errorf("failed to marshal value: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to marshal value: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
-			return fmt.Errorf("bucket not found: %s", bucket)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("bucket not found: %s", bucket).
+				WithLocation().
+				Build()
 		}
 
 		return b.Put([]byte(key), data)
@@ -357,12 +478,22 @@ func (p *BoltDBPersistence) Get(ctx context.Context, bucket string, key string, 
 	return p.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
-			return fmt.Errorf("bucket not found: %s", bucket)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("bucket not found: %s", bucket).
+				WithLocation().
+				Build()
 		}
 
 		data := b.Get([]byte(key))
 		if data == nil {
-			return fmt.Errorf("key not found: %s", key)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("key not found: %s", key).
+				WithLocation().
+				Build()
 		}
 
 		return json.Unmarshal(data, result)
@@ -376,7 +507,12 @@ func (p *BoltDBPersistence) Delete(ctx context.Context, bucket string, key strin
 	return p.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
-			return fmt.Errorf("bucket not found: %s", bucket)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("bucket not found: %s", bucket).
+				WithLocation().
+				Build()
 		}
 
 		return b.Delete([]byte(key))
@@ -391,7 +527,12 @@ func (p *BoltDBPersistence) List(_ context.Context, bucket string) (map[string]i
 	err := p.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
-			return fmt.Errorf("bucket not found: %s", bucket)
+			return errors.NewError().
+				Code(errors.CodeNotFound).
+				Type(errors.ErrTypeNotFound).
+				Messagef("bucket not found: %s", bucket).
+				WithLocation().
+				Build()
 		}
 
 		return b.ForEach(func(key, value []byte) error {
@@ -421,7 +562,12 @@ func (p *BoltDBPersistence) Backup(ctx context.Context, backupPath string) error
 
 	// Ensure backup directory exists
 	if err := createDirectoryIfNotExists(filepath.Dir(backupPath)); err != nil {
-		return fmt.Errorf("failed to create backup directory: %w", err)
+		return errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to create backup directory: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return p.db.View(func(tx *bbolt.Tx) error {

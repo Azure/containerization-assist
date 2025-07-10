@@ -8,7 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -119,7 +119,7 @@ func (t *HTTPTransport) setupCORS() func(http.Handler) http.Handler {
 func (t *HTTPTransport) Serve(ctx context.Context) error {
 	if t.handler == nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"Request handler not set",
 			nil,
 		)
@@ -139,7 +139,7 @@ func (t *HTTPTransport) Serve(ctx context.Context) error {
 		t.logger.Info("Starting HTTP transport", "port", t.port)
 		if err := t.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			networkErr := errors.NetworkError(
-				codes.NETWORK_ERROR,
+				errorcodes.NETWORK_ERROR,
 				"Failed to start HTTP server",
 				err,
 			)
@@ -229,7 +229,7 @@ func (t *HTTPTransport) StopWithContext(ctx context.Context) error {
 // SendMessage not applicable for HTTP transport (legacy method for backward compatibility)
 func (t *HTTPTransport) SendMessage(message interface{}) error {
 	systemErr := errors.SystemError(
-		codes.SYSTEM_ERROR,
+		errorcodes.SYSTEM_ERROR,
 		"SendMessage not applicable for HTTP transport",
 		nil,
 	)
@@ -246,7 +246,7 @@ func (t *HTTPTransport) Send(ctx context.Context, message interface{}) error {
 // SendTypedMessage provides typed alternative to SendMessage
 func (t *HTTPTransport) SendTypedMessage(message *ToolExecutionRequest) (*ToolExecutionResponse, error) {
 	systemErr := errors.SystemError(
-		codes.SYSTEM_ERROR,
+		errorcodes.SYSTEM_ERROR,
 		"SendTypedMessage not applicable for HTTP transport",
 		nil,
 	)
@@ -258,7 +258,7 @@ func (t *HTTPTransport) SendTypedMessage(message *ToolExecutionRequest) (*ToolEx
 // ReceiveMessage not applicable for HTTP transport (legacy method for backward compatibility)
 func (t *HTTPTransport) ReceiveMessage() (interface{}, error) {
 	systemErr := errors.SystemError(
-		codes.SYSTEM_ERROR,
+		errorcodes.SYSTEM_ERROR,
 		"ReceiveMessage not applicable for HTTP transport",
 		nil,
 	)
@@ -275,7 +275,7 @@ func (t *HTTPTransport) Receive(ctx context.Context) (interface{}, error) {
 // ReceiveTypedMessage provides typed alternative to ReceiveMessage
 func (t *HTTPTransport) ReceiveTypedMessage() (*ToolExecutionRequest, error) {
 	systemErr := errors.SystemError(
-		codes.SYSTEM_ERROR,
+		errorcodes.SYSTEM_ERROR,
 		"ReceiveTypedMessage not applicable for HTTP transport",
 		nil,
 	)
@@ -302,7 +302,7 @@ func (t *HTTPTransport) RegisterToolTyped(name, description string, handler inte
 	toolHandler, ok := handler.(ToolHandler)
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Handler must be of type ToolHandler").
 			Context("expected_type", "ToolHandler").
 			Context("actual_type", fmt.Sprintf("%T", handler)).

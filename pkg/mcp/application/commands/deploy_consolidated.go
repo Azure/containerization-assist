@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConsolidatedDeployCommand consolidates all deploy tool functionality into a single command
@@ -63,7 +63,7 @@ func (cmd *ConsolidatedDeployCommand) Execute(ctx context.Context, input api.Too
 	}
 
 	// Get workspace directory for the session
-	workspaceDir, err := cmd.getSessionWorkspace(deployRequest.SessionID)
+	workspaceDir, err := cmd.getSessionWorkspace(ctx, deployRequest.SessionID)
 	if err != nil {
 		return api.ToolOutput{}, errors.NewError().
 			Code(errors.CodeInternalError).
@@ -99,7 +99,7 @@ func (cmd *ConsolidatedDeployCommand) Execute(ctx context.Context, input api.Too
 	}
 
 	// Update session state with deploy results
-	if err := cmd.updateSessionState(deployRequest.SessionID, deployResult); err != nil {
+	if err := cmd.updateSessionState(ctx, deployRequest.SessionID, deployResult); err != nil {
 		cmd.logger.Warn("failed to update session state", "error", err)
 	}
 
@@ -164,25 +164,55 @@ func (cmd *ConsolidatedDeployCommand) validateOperationParams(request *DeployReq
 	switch request.Operation {
 	case "deploy":
 		if request.Name == "" {
-			return fmt.Errorf("name is required for deploy operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("name is required for deploy operation").
+				WithLocation().
+				Build()
 		}
 		if request.Image == "" {
-			return fmt.Errorf("image is required for deploy operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("image is required for deploy operation").
+				WithLocation().
+				Build()
 		}
 	case "generate_manifests":
 		if request.Name == "" {
-			return fmt.Errorf("name is required for generate_manifests operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("name is required for generate_manifests operation").
+				WithLocation().
+				Build()
 		}
 		if request.Image == "" {
-			return fmt.Errorf("image is required for generate_manifests operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("image is required for generate_manifests operation").
+				WithLocation().
+				Build()
 		}
 	case "rollback":
 		if request.Name == "" {
-			return fmt.Errorf("name is required for rollback operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("name is required for rollback operation").
+				WithLocation().
+				Build()
 		}
 	case "health_check":
 		if request.Name == "" {
-			return fmt.Errorf("name is required for health_check operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("name is required for health_check operation").
+				WithLocation().
+				Build()
 		}
 	}
 	return nil
@@ -257,15 +287,25 @@ func (cmd *ConsolidatedDeployCommand) validateDeployRequest(request *DeployReque
 }
 
 // getSessionWorkspace retrieves the workspace directory for a session
-func (cmd *ConsolidatedDeployCommand) getSessionWorkspace(sessionID string) (string, error) {
-	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(sessionID)
+func (cmd *ConsolidatedDeployCommand) getSessionWorkspace(ctx context.Context, sessionID string) (string, error) {
+	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(ctx, sessionID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get session metadata: %w", err)
+		return "", errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("failed to get session metadata: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	workspaceDir, ok := sessionMetadata["workspace_dir"].(string)
 	if !ok || workspaceDir == "" {
-		return "", fmt.Errorf("workspace directory not found for session %s", sessionID)
+		return "", errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Messagef("workspace directory not found for session %s", sessionID).
+			WithLocation().
+			Build()
 	}
 
 	return workspaceDir, nil
@@ -311,7 +351,12 @@ func (cmd *ConsolidatedDeployCommand) executeDeployment(ctx context.Context, req
 	// Execute deployment using Kubernetes client
 	result, err := cmd.performKubernetesDeployment(ctx, deploymentRequest, workspaceDir)
 	if err != nil {
-		return nil, fmt.Errorf("deployment execution failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeKubernetesAPIError).
+			Type(errors.ErrTypeKubernetes).
+			Messagef("deployment execution failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return result, nil
@@ -350,7 +395,12 @@ func (cmd *ConsolidatedDeployCommand) executeGenerateManifests(ctx context.Conte
 	// Execute manifest generation
 	result, err := cmd.performManifestGeneration(ctx, manifestRequest, workspaceDir)
 	if err != nil {
-		return nil, fmt.Errorf("manifest generation failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeKubernetesAPIError).
+			Type(errors.ErrTypeKubernetes).
+			Messagef("manifest generation failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return result, nil
@@ -370,7 +420,12 @@ func (cmd *ConsolidatedDeployCommand) executeRollback(ctx context.Context, reque
 	// Execute rollback using Kubernetes client
 	result, err := cmd.performKubernetesRollback(ctx, rollbackRequest, workspaceDir)
 	if err != nil {
-		return nil, fmt.Errorf("rollback execution failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeKubernetesAPIError).
+			Type(errors.ErrTypeKubernetes).
+			Messagef("rollback execution failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return result, nil
@@ -381,14 +436,19 @@ func (cmd *ConsolidatedDeployCommand) executeHealthCheck(ctx context.Context, re
 	// Execute health check using Kubernetes client
 	result, err := cmd.performHealthCheck(ctx, request.Name, request.Namespace)
 	if err != nil {
-		return nil, fmt.Errorf("health check failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeKubernetesAPIError).
+			Type(errors.ErrTypeKubernetes).
+			Messagef("health check failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	return result, nil
 }
 
 // updateSessionState updates session state with deploy results
-func (cmd *ConsolidatedDeployCommand) updateSessionState(sessionID string, result *deploy.DeploymentResult) error {
+func (cmd *ConsolidatedDeployCommand) updateSessionState(ctx context.Context, sessionID string, result *deploy.DeploymentResult) error {
 	// Update session state with deploy results
 	stateUpdate := map[string]interface{}{
 		"last_deployment":      result,
@@ -399,7 +459,7 @@ func (cmd *ConsolidatedDeployCommand) updateSessionState(sessionID string, resul
 		"deployment_duration":  result.Duration,
 	}
 
-	return cmd.sessionState.UpdateSessionData(sessionID, stateUpdate)
+	return cmd.sessionState.UpdateSessionData(ctx, sessionID, stateUpdate)
 }
 
 // createDeployResponse creates the final deploy response

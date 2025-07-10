@@ -59,10 +59,10 @@ func (s *MyStage) Validate(input StageInput) error {
 func (s *MyStage) Execute(ctx context.Context, input StageInput) (StageOutput, error) {
     // Process input
     data := input.Get("data")
-    
+
     // Perform operations
     result := process(data)
-    
+
     // Return output
     output := NewStageOutput()
     output.Set("result", result)
@@ -204,10 +204,10 @@ func TestPipeline(t *testing.T) {
     pipeline := NewTestPipeline().
         WithMockStage("analyze", mockAnalyzeResult).
         WithMockStage("build", mockBuildResult)
-    
+
     // Execute test
     response, err := pipeline.Execute(ctx, testRequest)
-    
+
     // Verify results
     assert.NoError(t, err)
     assert.Equal(t, "success", response.Status)

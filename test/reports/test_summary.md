@@ -16,7 +16,7 @@
 ## Test Quality
 
 - Table-driven tests: 18 files
-- Tests with mocks: 1 files  
+- Tests with mocks: 1 files
 - Tests using testify: 22 files
 
 ## Generated Reports

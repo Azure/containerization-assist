@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/analyze"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Language detection implementations
@@ -185,7 +186,12 @@ func (cmd *ConsolidatedAnalyzeCommand) detectGoFramework(result *analyze.Analysi
 
 	content, err := os.ReadFile(goModPath)
 	if err != nil {
-		return fmt.Errorf("failed to read go.mod: %w", err)
+		return errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read go.mod: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	contentStr := string(content)
@@ -242,7 +248,12 @@ func (cmd *ConsolidatedAnalyzeCommand) detectJSFramework(result *analyze.Analysi
 
 	content, err := os.ReadFile(packageJSONPath)
 	if err != nil {
-		return fmt.Errorf("failed to read package.json: %w", err)
+		return errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read package.json: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	contentStr := string(content)
@@ -503,7 +514,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeGoDependencies(workspaceDir string
 
 	content, err := os.ReadFile(goModPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read go.mod: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read go.mod: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(string(content)))
@@ -565,7 +581,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeNodeDependencies(workspaceDir stri
 	// This is a simplified implementation - in a real system you'd parse JSON properly
 	content, err := os.ReadFile(packageJSONPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read package.json: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read package.json: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	contentStr := string(content)
@@ -607,7 +628,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzePythonDependencies(workspaceDir st
 
 	content, err := os.ReadFile(reqPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read requirements.txt: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read requirements.txt: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(string(content)))
@@ -671,7 +697,12 @@ func (cmd *ConsolidatedAnalyzeCommand) parseMavenDependencies(pomPath string) ([
 
 	content, err := os.ReadFile(pomPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read pom.xml: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read pom.xml: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Simple regex-based parsing - in a real system you'd use XML parser
@@ -702,7 +733,12 @@ func (cmd *ConsolidatedAnalyzeCommand) parseGradleDependencies(gradlePath string
 
 	content, err := os.ReadFile(gradlePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read build.gradle: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read build.gradle: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Simple regex-based parsing for Gradle dependencies
@@ -791,7 +827,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeSecrets(ctx context.Context, resul
 	})
 
 	if err != nil {
-		return fmt.Errorf("secrets analysis failed: %w", err)
+		return errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("secrets analysis failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	result.SecurityIssues = append(result.SecurityIssues, secretsFound...)
@@ -853,7 +894,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeVulnerabilities(ctx context.Contex
 	})
 
 	if err != nil {
-		return fmt.Errorf("vulnerability analysis failed: %w", err)
+		return errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("vulnerability analysis failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	result.SecurityIssues = append(result.SecurityIssues, vulns...)
@@ -965,7 +1011,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeMetrics(ctx context.Context, resul
 	})
 
 	if err != nil {
-		return fmt.Errorf("metrics analysis failed: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("metrics analysis failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Store metrics in analysis metadata
@@ -992,7 +1043,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeMetrics(ctx context.Context, resul
 func (cmd *ConsolidatedAnalyzeCommand) parseDockerfile(path string) (*DockerfileInfo, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Dockerfile: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read Dockerfile: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	dockerfile := &DockerfileInfo{

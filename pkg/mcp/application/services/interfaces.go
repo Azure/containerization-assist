@@ -13,18 +13,18 @@ import (
 	"github.com/Azure/container-kit/pkg/core/kubernetes"
 	"github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // PipelineService defines the interface for pipeline orchestration without importing the concrete type
 type PipelineService interface {
 	// Lifecycle management
-	Start() error
-	Stop() error
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
 	IsRunning() bool
 
 	// Job management
-	CancelJob(jobID string) error
+	CancelJob(ctx context.Context, jobID string) error
 }
 
 // ServiceContainer provides access to all services through dependency injection.
@@ -65,70 +65,70 @@ type ConversationService interface {
 	ProcessMessage(ctx context.Context, sessionID, message string) (*ConversationResponse, error)
 
 	// GetConversationState returns the current conversation state
-	GetConversationState(sessionID string) (*ConversationState, error)
+	GetConversationState(ctx context.Context, sessionID string) (*ConversationState, error)
 
 	// UpdateConversationStage updates the conversation stage
-	UpdateConversationStage(sessionID string, stage shared.ConversationStage) error
+	UpdateConversationStage(ctx context.Context, sessionID string, stage domaintypes.ConversationStage) error
 
 	// GetConversationHistory returns conversation history
-	GetConversationHistory(sessionID string, limit int) ([]ConversationTurn, error)
+	GetConversationHistory(ctx context.Context, sessionID string, limit int) ([]ConversationTurn, error)
 
 	// ClearConversationContext clears conversation context
-	ClearConversationContext(sessionID string) error
+	ClearConversationContext(ctx context.Context, sessionID string) error
 }
 
 // PromptService manages AI prompt interactions per ADR-006
 type PromptService interface {
 	// BuildPrompt creates a prompt for the given stage and context
-	BuildPrompt(stage shared.ConversationStage, context map[string]interface{}) (string, error)
+	BuildPrompt(ctx context.Context, stage domaintypes.ConversationStage, promptContext map[string]interface{}) (string, error)
 
 	// ProcessPromptResponse processes AI response and updates state
-	ProcessPromptResponse(response string, state *ConversationState) error
+	ProcessPromptResponse(ctx context.Context, response string, state *ConversationState) error
 
 	// DetectWorkflowIntent detects if message indicates workflow intent
-	DetectWorkflowIntent(message string) (*WorkflowIntent, error)
+	DetectWorkflowIntent(ctx context.Context, message string) (*WorkflowIntent, error)
 
 	// ShouldAutoAdvance determines if conversation should auto-advance
-	ShouldAutoAdvance(state *ConversationState) (bool, *AutoAdvanceConfig)
+	ShouldAutoAdvance(ctx context.Context, state *ConversationState) (bool, *AutoAdvanceConfig)
 }
 
 // ConversationResponse represents a response from the conversation service
 type ConversationResponse struct {
-	SessionID     string                    `json:"session_id"`
-	Message       string                    `json:"message"`
-	Stage         shared.ConversationStage  `json:"stage"`
-	Status        string                    `json:"status"`
-	Options       []Option                  `json:"options,omitempty"`
-	Artifacts     []ArtifactSummary         `json:"artifacts,omitempty"`
-	NextSteps     []string                  `json:"next_steps,omitempty"`
-	Progress      *StageProgress            `json:"progress,omitempty"`
-	ToolCalls     []ToolCall                `json:"tool_calls,omitempty"`
-	RequiresInput bool                      `json:"requires_input"`
-	NextStage     *shared.ConversationStage `json:"next_stage,omitempty"`
-	AutoAdvance   *AutoAdvanceConfig        `json:"auto_advance,omitempty"`
+	SessionID     string                         `json:"session_id"`
+	Message       string                         `json:"message"`
+	Stage         domaintypes.ConversationStage  `json:"stage"`
+	Status        string                         `json:"status"`
+	Options       []Option                       `json:"options,omitempty"`
+	Artifacts     []ArtifactSummary              `json:"artifacts,omitempty"`
+	NextSteps     []string                       `json:"next_steps,omitempty"`
+	Progress      *StageProgress                 `json:"progress,omitempty"`
+	ToolCalls     []ToolCall                     `json:"tool_calls,omitempty"`
+	RequiresInput bool                           `json:"requires_input"`
+	NextStage     *domaintypes.ConversationStage `json:"next_stage,omitempty"`
+	AutoAdvance   *AutoAdvanceConfig             `json:"auto_advance,omitempty"`
 }
 
 // ConversationState represents the state of a conversation
 type ConversationState struct {
-	SessionID        string                   `json:"session_id"`
-	CurrentStage     shared.ConversationStage `json:"current_stage"`
-	History          []ConversationTurn       `json:"conversation_history"`
-	Preferences      shared.UserPreferences   `json:"user_preferences"`
-	PendingDecision  *DecisionPoint           `json:"pending_decision,omitempty"`
-	WorkflowSession  *WorkflowSession         `json:"workflow_session,omitempty"`
-	LastActivity     time.Time                `json:"last_activity"`
-	RetryState       *RetryState              `json:"retry_state,omitempty"`
-	AutoAdvanceState *AutoAdvanceState        `json:"auto_advance_state,omitempty"`
+	SessionID        string                        `json:"session_id"`
+	CurrentStage     domaintypes.ConversationStage `json:"current_stage"`
+	History          []ConversationTurn            `json:"conversation_history"`
+	Preferences      domaintypes.UserPreferences   `json:"user_preferences"`
+	PendingDecision  *DecisionPoint                `json:"pending_decision,omitempty"`
+	WorkflowSession  *WorkflowSession              `json:"workflow_session,omitempty"`
+	LastActivity     time.Time                     `json:"last_activity"`
+	RetryState       *RetryState                   `json:"retry_state,omitempty"`
+	AutoAdvanceState *AutoAdvanceState             `json:"auto_advance_state,omitempty"`
 }
 
 // ConversationTurn represents a single turn in a conversation
 type ConversationTurn struct {
-	ID        string                   `json:"id"`
-	Timestamp time.Time                `json:"timestamp"`
-	Role      string                   `json:"role"`
-	Content   string                   `json:"content"`
-	Stage     shared.ConversationStage `json:"stage"`
-	Metadata  map[string]interface{}   `json:"metadata,omitempty"`
+	ID        string                        `json:"id"`
+	Timestamp time.Time                     `json:"timestamp"`
+	Role      string                        `json:"role"`
+	Content   string                        `json:"content"`
+	Stage     domaintypes.ConversationStage `json:"stage"`
+	Metadata  map[string]interface{}        `json:"metadata,omitempty"`
 }
 
 // Supporting types for the conversation service
@@ -234,10 +234,10 @@ type SessionState interface {
 	SetWorkspaceDir(ctx context.Context, sessionID string, dir string) error
 
 	// GetSessionMetadata gets session metadata
-	GetSessionMetadata(sessionID string) (map[string]interface{}, error)
+	GetSessionMetadata(ctx context.Context, sessionID string) (map[string]interface{}, error)
 
 	// UpdateSessionData updates session data
-	UpdateSessionData(sessionID string, data map[string]interface{}) error
+	UpdateSessionData(ctx context.Context, sessionID string, data map[string]interface{}) error
 }
 
 // BuildExecutor handles container build operations
@@ -256,16 +256,16 @@ type BuildExecutor interface {
 // ToolRegistry manages tool registration and discovery
 type ToolRegistry interface {
 	// Register registers a new tool
-	Register(name string, tool api.Tool) error
+	Register(ctx context.Context, name string, tool api.Tool) error
 
 	// GetTool retrieves a tool by name
-	GetTool(name string) (api.Tool, error)
+	GetTool(ctx context.Context, name string) (api.Tool, error)
 
 	// ListTools lists all registered tools
-	ListTools() []string
+	ListTools(ctx context.Context) []string
 
 	// GetMetrics returns registry metrics
-	GetMetrics() api.RegistryMetrics
+	GetMetrics(ctx context.Context) api.RegistryMetrics
 }
 
 // WorkflowExecutor handles multi-step workflow execution
@@ -277,7 +277,7 @@ type WorkflowExecutor interface {
 	ExecuteStep(ctx context.Context, step *api.WorkflowStep) (*api.StepResult, error)
 
 	// ValidateWorkflow validates a workflow definition
-	ValidateWorkflow(workflow *api.Workflow) error
+	ValidateWorkflow(ctx context.Context, workflow *api.Workflow) error
 }
 
 // Scanner provides security scanning capabilities
@@ -290,19 +290,19 @@ type Scanner interface {
 	ScanDirectory(ctx context.Context, path string, options security.ScanOptionsService) (*security.ScanResult, error)
 
 	// GetAvailableScanners returns available scanner types
-	GetAvailableScanners() []string
+	GetAvailableScanners(ctx context.Context) []string
 }
 
 // ConfigValidator validates configuration using BETA's validation framework
 type ConfigValidator interface {
 	// ValidateDockerfile validates a Dockerfile
-	ValidateDockerfile(content string) (*ValidationResult, error)
+	ValidateDockerfile(ctx context.Context, content string) (*ValidationResult, error)
 
 	// ValidateManifest validates a Kubernetes manifest
-	ValidateManifest(content string) (*ValidationResult, error)
+	ValidateManifest(ctx context.Context, content string) (*ValidationResult, error)
 
 	// ValidateConfig validates general configuration
-	ValidateConfig(config map[string]interface{}) (*ValidationResult, error)
+	ValidateConfig(ctx context.Context, config map[string]interface{}) (*ValidationResult, error)
 }
 
 // ErrorReporter provides unified error reporting and recovery
@@ -311,10 +311,10 @@ type ErrorReporter interface {
 	ReportError(ctx context.Context, err error, context map[string]interface{})
 
 	// GetErrorStats returns error statistics
-	GetErrorStats() ErrorStats
+	GetErrorStats(ctx context.Context) ErrorStats
 
 	// SuggestFix suggests fixes for common errors
-	SuggestFix(err error) []string
+	SuggestFix(ctx context.Context, err error) []string
 }
 
 // StateManager manages application state beyond sessions
@@ -360,7 +360,7 @@ type K8sClient interface {
 // This interface wraps the core analysis.RepositoryAnalyzer
 type Analyzer interface {
 	// AnalyzeRepository analyzes a repository (matches core analysis.RepositoryAnalyzer)
-	AnalyzeRepository(repoPath string) (*analysis.AnalysisResult, error)
+	AnalyzeRepository(ctx context.Context, repoPath string) (*analysis.AnalysisResult, error)
 }
 
 // AnalysisService provides analysis operations for backward compatibility

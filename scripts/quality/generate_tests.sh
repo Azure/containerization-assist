@@ -114,7 +114,7 @@ fi
 if [ ${#FUNCTIONS[@]} -gt 1 ]; then
     echo "" >> "$TEST_FILE"
     echo "// Additional test functions for other exported functions" >> "$TEST_FILE"
-    
+
     for func in "${FUNCTIONS[@]:1}"; do
         cat >> "$TEST_FILE" << EOF
 
@@ -141,7 +141,7 @@ fi
 echo "Validating generated test..."
 if go test -c "$PACKAGE_PATH" -o /dev/null >/dev/null 2>&1; then
     echo "✅ Test file generated successfully: $TEST_FILE"
-    
+
     # Show what to do next
     echo ""
     echo "Next steps:"
@@ -149,7 +149,7 @@ if go test -c "$PACKAGE_PATH" -o /dev/null >/dev/null 2>&1; then
     echo "2. Implement actual test logic for your functions"
     echo "3. Run tests: go test $PACKAGE_PATH"
     echo "4. Check coverage: go test -cover $PACKAGE_PATH"
-    
+
     if [ ${#FUNCTIONS[@]} -gt 1 ]; then
         echo "5. Implement tests for additional functions:"
         for func in "${FUNCTIONS[@]:1}"; do

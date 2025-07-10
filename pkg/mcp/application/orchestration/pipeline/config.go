@@ -62,24 +62,49 @@ func (cl *ConfigLoader) LoadWorkerConfig() (*config.WorkerConfig, error) {
 // validatePipelineConfig validates pipeline configuration
 func (cl *ConfigLoader) validatePipelineConfig(pipelineConfig *PipelineConfig) error {
 	if pipelineConfig.WorkerPoolSize < 1 {
-		return fmt.Errorf("worker pool size must be at least 1, got %d", pipelineConfig.WorkerPoolSize)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("worker pool size must be at least 1, got %d", pipelineConfig.WorkerPoolSize).
+			WithLocation().
+			Build()
 	}
 
 	if pipelineConfig.WorkerPoolSize > config.MaxGoroutines {
-		return fmt.Errorf("worker pool size (%d) cannot exceed max goroutines (%d)",
-			pipelineConfig.WorkerPoolSize, config.MaxGoroutines)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("worker pool size (%d) cannot exceed max goroutines (%d)",
+				pipelineConfig.WorkerPoolSize, config.MaxGoroutines).
+			WithLocation().
+			Build()
 	}
 
 	if pipelineConfig.MaxConcurrentJobs < 1 {
-		return fmt.Errorf("max concurrent jobs must be at least 1, got %d", pipelineConfig.MaxConcurrentJobs)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("max concurrent jobs must be at least 1, got %d", pipelineConfig.MaxConcurrentJobs).
+			WithLocation().
+			Build()
 	}
 
 	if pipelineConfig.JobTimeout <= 0 {
-		return fmt.Errorf("job timeout must be positive, got %v", pipelineConfig.JobTimeout)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("job timeout must be positive, got %v", pipelineConfig.JobTimeout).
+			WithLocation().
+			Build()
 	}
 
 	if pipelineConfig.HealthCheckInterval <= 0 {
-		return fmt.Errorf("health check interval must be positive, got %v", pipelineConfig.HealthCheckInterval)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("health check interval must be positive, got %v", pipelineConfig.HealthCheckInterval).
+			WithLocation().
+			Build()
 	}
 
 	return nil
@@ -88,15 +113,30 @@ func (cl *ConfigLoader) validatePipelineConfig(pipelineConfig *PipelineConfig) e
 // validateWorkerConfig validates worker configuration
 func (cl *ConfigLoader) validateWorkerConfig(workerConfig *config.WorkerConfig) error {
 	if workerConfig.ShutdownTimeout <= 0 {
-		return fmt.Errorf("shutdown timeout must be positive, got %v", workerConfig.ShutdownTimeout)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("shutdown timeout must be positive, got %v", workerConfig.ShutdownTimeout).
+			WithLocation().
+			Build()
 	}
 
 	if workerConfig.HealthCheckPeriod <= 0 {
-		return fmt.Errorf("health check period must be positive, got %v", workerConfig.HealthCheckPeriod)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("health check period must be positive, got %v", workerConfig.HealthCheckPeriod).
+			WithLocation().
+			Build()
 	}
 
 	if workerConfig.MaxRetries < 0 {
-		return fmt.Errorf("max retries cannot be negative, got %d", workerConfig.MaxRetries)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("max retries cannot be negative, got %d", workerConfig.MaxRetries).
+			WithLocation().
+			Build()
 	}
 
 	return nil
@@ -205,32 +245,67 @@ func (cv *ConfigValidator) ValidateConfiguration(config *ExtendPipelineConfig) e
 
 func (cv *ConfigValidator) validateExtendedConfig(extendedConfig *ExtendPipelineConfig) error {
 	if extendedConfig.MaxGoroutines < extendedConfig.WorkerPoolSize {
-		return fmt.Errorf("max goroutines (%d) must be >= worker pool size (%d)",
-			extendedConfig.MaxGoroutines, extendedConfig.WorkerPoolSize)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("max goroutines (%d) must be >= worker pool size (%d)",
+				extendedConfig.MaxGoroutines, extendedConfig.WorkerPoolSize).
+			WithLocation().
+			Build()
 	}
 
 	if extendedConfig.JobRetryAttempts < 0 {
-		return fmt.Errorf("job retry attempts cannot be negative, got %d", extendedConfig.JobRetryAttempts)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("job retry attempts cannot be negative, got %d", extendedConfig.JobRetryAttempts).
+			WithLocation().
+			Build()
 	}
 
 	if extendedConfig.JobRetryDelay < 0 {
-		return fmt.Errorf("job retry delay cannot be negative, got %v", extendedConfig.JobRetryDelay)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("job retry delay cannot be negative, got %v", extendedConfig.JobRetryDelay).
+			WithLocation().
+			Build()
 	}
 
 	if extendedConfig.MaxMemoryPerWorker <= 0 {
-		return fmt.Errorf("max memory per worker must be positive, got %d", extendedConfig.MaxMemoryPerWorker)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("max memory per worker must be positive, got %d", extendedConfig.MaxMemoryPerWorker).
+			WithLocation().
+			Build()
 	}
 
 	if extendedConfig.MaxCPUPerWorker <= 0 {
-		return fmt.Errorf("max CPU per worker must be positive, got %f", extendedConfig.MaxCPUPerWorker)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("max CPU per worker must be positive, got %f", extendedConfig.MaxCPUPerWorker).
+			WithLocation().
+			Build()
 	}
 
 	if extendedConfig.JobQueueSize <= 0 {
-		return fmt.Errorf("job queue size must be positive, got %d", extendedConfig.JobQueueSize)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("job queue size must be positive, got %d", extendedConfig.JobQueueSize).
+			WithLocation().
+			Build()
 	}
 
 	if extendedConfig.PriorityLevels < 1 {
-		return fmt.Errorf("priority levels must be at least 1, got %d", extendedConfig.PriorityLevels)
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("priority levels must be at least 1, got %d", extendedConfig.PriorityLevels).
+			WithLocation().
+			Build()
 	}
 
 	return nil

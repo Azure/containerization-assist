@@ -8,7 +8,6 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // Manager coordinates tracing and metrics
@@ -16,7 +15,7 @@ type Manager struct {
 	config  *Config
 	tracing *TracingManager
 	metrics *MetricsManager
-	
+
 	// System monitoring
 	systemMonitor *SystemMonitor
 }
@@ -144,7 +143,7 @@ func (m *Manager) InstrumentOperation(ctx context.Context, operationName string,
 
 	// Execute operation
 	err := fn(ctx)
-	
+
 	// Record duration
 	duration := time.Since(start)
 
@@ -179,7 +178,7 @@ func (m *Manager) InstrumentToolExecution(ctx context.Context, toolName string, 
 func (m *Manager) InstrumentPipelineStage(ctx context.Context, pipelineName, stageName string, fn func(context.Context) error) error {
 	return m.InstrumentOperation(ctx, fmt.Sprintf("pipeline.%s.%s", pipelineName, stageName), "pipeline_stage", func(ctx context.Context) error {
 		span := m.tracing.SpanFromContext(ctx)
-		m.tracing.AddSpanAttributes(span, 
+		m.tracing.AddSpanAttributes(span,
 			attribute.String("pipeline.name", pipelineName),
 			attribute.String("pipeline.stage", stageName),
 		)
@@ -204,7 +203,7 @@ func (m *Manager) InstrumentHTTPRequest(ctx context.Context, method, path string
 
 	// Execute request
 	statusCode, err := fn(ctx)
-	
+
 	// Record duration
 	duration := time.Since(start)
 
@@ -339,13 +338,13 @@ func (sm *SystemMonitor) collectSystemMetrics(ctx context.Context) {
 
 	// Note: These would be recorded via observable instruments in a real implementation
 	// For now, we'll track them manually
-	
+
 	// Memory usage
 	// sm.metrics.SystemMetrics.MemoryUsage would be updated via callback
-	
-	// Goroutine count  
+
+	// Goroutine count
 	goroutineCount := runtime.NumGoroutine()
 	_ = goroutineCount // Would be recorded via observable gauge
-	
+
 	// GC stats would be collected via runtime hooks
 }

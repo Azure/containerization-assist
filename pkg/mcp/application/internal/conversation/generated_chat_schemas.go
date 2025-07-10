@@ -2,9 +2,7 @@
 
 package conversation
 
-import (
-	"github.com/Azure/container-kit/pkg/mcp/domain/tools"
-)
+import "github.com/Azure/container-kit/pkg/mcp/application/tools"
 
 // Generated schemas for tool arguments
 var (

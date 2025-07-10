@@ -28,12 +28,12 @@ func NewPipelineLifecycle(service Service) Lifecycle {
 	}
 }
 
-func (p *pipelineLifecycle) Start(_ context.Context) error {
-	return p.service.Start()
+func (p *pipelineLifecycle) Start(ctx context.Context) error {
+	return p.service.Start(ctx)
 }
 
-func (p *pipelineLifecycle) Stop(_ context.Context) error {
-	return p.service.Stop()
+func (p *pipelineLifecycle) Stop(ctx context.Context) error {
+	return p.service.Stop(ctx)
 }
 
 func (p *pipelineLifecycle) IsRunning() bool {

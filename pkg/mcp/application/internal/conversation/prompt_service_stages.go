@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func (ps *PromptServiceImpl) handleWelcomeStage(_ context.Context, state *ConversationState, input string) *ConversationResponse {

@@ -1,4 +1,4 @@
-package state
+package appstate
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
@@ -32,7 +32,7 @@ func (p *SessionStateProvider) SetState(ctx context.Context, id string, state in
 	sessionState, ok := state.(*session.SessionState)
 	if !ok {
 		err := errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Invalid state type for session provider").
 			Context("expected_type", "*session.SessionState").
 			Context("actual_type", fmt.Sprintf("%T", state)).
@@ -91,7 +91,7 @@ func (p *ConversationStateProvider) GetState(ctx context.Context, id string) (in
 	state, exists := p.states[id]
 	if !exists {
 		err := errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message(fmt.Sprintf("Conversation state not found: %s", id)).
 			Context("conversation_id", id).
 			Context("component", "conversation_state_provider").
@@ -107,7 +107,7 @@ func (p *ConversationStateProvider) SetState(ctx context.Context, id string, sta
 	conversationState, ok := state.(*BasicConversationState)
 	if !ok {
 		err := errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Invalid state type for conversation provider").
 			Context("expected_type", "*BasicConversationState").
 			Context("actual_type", fmt.Sprintf("%T", state)).
@@ -170,7 +170,7 @@ func (p *WorkflowStateProvider) GetState(ctx context.Context, id string) (interf
 	session, exists := p.sessions[id]
 	if !exists {
 		err := errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message(fmt.Sprintf("Workflow state not found: %s", id)).
 			Context("workflow_id", id).
 			Context("component", "workflow_state_provider").
@@ -186,7 +186,7 @@ func (p *WorkflowStateProvider) SetState(ctx context.Context, id string, state i
 	workflowSession, ok := state.(WorkflowSessionInterface)
 	if !ok {
 		err := errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Invalid state type for workflow provider").
 			Context("expected_type", "WorkflowSessionInterface").
 			Context("actual_type", fmt.Sprintf("%T", state)).
@@ -252,7 +252,7 @@ func (p *ToolStateProvider) GetState(ctx context.Context, id string) (interface{
 	state, exists := p.states[id]
 	if !exists {
 		err := errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message(fmt.Sprintf("Tool state not found: %s", id)).
 			Context("tool_id", id).
 			Context("component", "tool_state_provider").
@@ -317,7 +317,7 @@ func (p *GlobalStateProvider) GetState(ctx context.Context, id string) (interfac
 	state, exists := p.states[id]
 	if !exists {
 		err := errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message(fmt.Sprintf("Global state not found: %s", id)).
 			Context("state_id", id).
 			Context("component", "global_state_provider").
@@ -393,7 +393,7 @@ func (p *ServiceContainerSessionStateProvider) SetState(_ context.Context, id st
 	}
 
 	return errors.NewError().
-		Code(codes.VALIDATION_FAILED).
+		Code(errorcodes.VALIDATION_FAILED).
 		Message("SetState not fully implemented for ServiceContainerSessionStateProvider").
 		Context("session_id", id).
 		Context("component", "service_container_session_state_provider").

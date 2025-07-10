@@ -10,20 +10,20 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // CanonicalChatTool implements the canonical api.Tool interface for chat functionality
 type CanonicalChatTool struct {
 	sessionManager interface{} // Use interface{} to avoid import cycle
-	logger         zerolog.Logger
+	logger         logging.Standards
 	legacyTool     *ChatTool
 	aiHandler      func(context.Context, ChatToolArgs) (*ChatToolResult, error)
 }
 
 // NewCanonicalChatTool creates a new canonical chat tool
-func NewCanonicalChatTool(logger zerolog.Logger, aiHandler func(context.Context, ChatToolArgs) (*ChatToolResult, error)) api.Tool {
-	toolLogger := logger.With().Str("tool", "canonical_chat").Logger()
+func NewCanonicalChatTool(logger logging.Standards, aiHandler func(context.Context, ChatToolArgs) (*ChatToolResult, error)) api.Tool {
+	toolLogger := logger.WithField("tool", "canonical_chat")
 
 	// Create legacy tool for compatibility
 	legacyTool := &ChatTool{
@@ -314,7 +314,7 @@ func (t *CanonicalChatTool) Execute(ctx context.Context, input api.ToolInput) (a
 		Str("session_id", chatResult.SessionID).
 		Str("stage", chatResult.Stage).
 		Bool("success", chatResult.Success).
-		Dur("duration", time.Since(startTime)).
+		Str("duration", time.Since(startTime).String()).
 		Msg("Canonical chat interaction completed")
 
 	return result, nil

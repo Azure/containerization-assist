@@ -3,7 +3,7 @@
 package example
 
 import (
-	"github.com/Azure/container-kit/pkg/mcp/domain/tools"
+	"github.com/Azure/container-kit/pkg/mcp/application/tools"
 )
 
 // Generated schemas for tool arguments

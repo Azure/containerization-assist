@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Kubernetes integration methods
@@ -260,14 +261,24 @@ func (cmd *ConsolidatedDeployCommand) generateKubernetesManifests(ctx context.Co
 	// Generate deployment manifest
 	deploymentManifest, err := cmd.generateDeploymentManifest(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate deployment manifest: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeKubernetesAPIError).
+			Type(errors.ErrTypeKubernetes).
+			Messagef("failed to generate deployment manifest: %w", err).
+			WithLocation().
+			Build()
 	}
 	manifests["deployment.yaml"] = deploymentManifest
 
 	// Generate service manifest
 	serviceManifest, err := cmd.generateServiceManifest(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate service manifest: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeKubernetesAPIError).
+			Type(errors.ErrTypeKubernetes).
+			Messagef("failed to generate service manifest: %w", err).
+			WithLocation().
+			Build()
 	}
 	manifests["service.yaml"] = serviceManifest
 
@@ -275,7 +286,12 @@ func (cmd *ConsolidatedDeployCommand) generateKubernetesManifests(ctx context.Co
 	if request.Options.Labels["include_ingress"] == "true" {
 		ingressManifest, err := cmd.generateIngressManifest(request)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate ingress manifest: %w", err)
+			return nil, errors.NewError().
+				Code(errors.CodeKubernetesAPIError).
+				Type(errors.ErrTypeKubernetes).
+				Messagef("failed to generate ingress manifest: %w", err).
+				WithLocation().
+				Build()
 		}
 		manifests["ingress.yaml"] = ingressManifest
 	}
@@ -284,7 +300,12 @@ func (cmd *ConsolidatedDeployCommand) generateKubernetesManifests(ctx context.Co
 	if len(request.Configuration.Environment) > 0 {
 		configMapManifest, err := cmd.generateConfigMapManifest(request)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate configmap manifest: %w", err)
+			return nil, errors.NewError().
+				Code(errors.CodeKubernetesAPIError).
+				Type(errors.ErrTypeKubernetes).
+				Messagef("failed to generate configmap manifest: %w", err).
+				WithLocation().
+				Build()
 		}
 		manifests["configmap.yaml"] = configMapManifest
 	}
@@ -650,7 +671,12 @@ func (cmd *ConsolidatedDeployCommand) applyManifests(ctx context.Context, manife
 		// Apply manifest using Kubernetes client
 		resourceName, err := cmd.applyManifest(ctx, manifest, namespace)
 		if err != nil {
-			return resources, fmt.Errorf("failed to apply %s: %w", name, err)
+			return resources, errors.NewError().
+				Code(errors.CodeKubernetesAPIError).
+				Type(errors.ErrTypeKubernetes).
+				Messagef("failed to apply %s: %w", name, err).
+				WithLocation().
+				Build()
 		}
 
 		// Track applied resources

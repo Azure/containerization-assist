@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // CacheManager provides simple in-memory caching functionality
 type CacheManager struct {
 	sessionManager *session.SessionManager
-	logger         zerolog.Logger
+	logger         logging.Standards
 
 	cache      map[string]*CacheEntry
 	cacheMutex sync.RWMutex

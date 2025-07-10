@@ -12,10 +12,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	workflow "github.com/Azure/container-kit/pkg/mcp/application/workflows"
 	"github.com/Azure/container-kit/pkg/mcp/domain"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 
-	// "github.com/Azure/container-kit/pkg/mcp/domain/processing" // TODO: Fix import after package reorganization
-	// "github.com/Azure/container-kit/pkg/mcp/domain/internal/utils" // Removed: violates package boundaries
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

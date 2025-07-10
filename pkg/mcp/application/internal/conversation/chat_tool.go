@@ -10,8 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/common/validation"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // ChatToolArgs defines arguments for the chat tool
@@ -38,7 +37,7 @@ type ChatToolResult struct {
 // ChatTool implements the chat tool for conversation mode
 type ChatTool struct {
 	Handler   func(context.Context, ChatToolArgs) (*ChatToolResult, error)
-	Logger    zerolog.Logger
+	Logger    logging.Standards
 	createdAt time.Time
 }
 
@@ -95,7 +94,8 @@ func (ct *ChatTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolO
 // ExecuteTyped handles the chat tool execution with typed arguments
 func (ct *ChatTool) ExecuteTyped(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 	ct.Logger.Debug().
-		Interface("args", args).
+		Str("message", args.Message).
+		Str("session_id", args.SessionID).
 		Msg("Executing chat tool")
 
 	validator := NewConversationValidator()

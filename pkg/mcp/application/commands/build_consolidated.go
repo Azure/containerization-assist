@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConsolidatedBuildCommand consolidates all build tool functionality into a single command
@@ -63,7 +63,7 @@ func (cmd *ConsolidatedBuildCommand) Execute(ctx context.Context, input api.Tool
 	}
 
 	// Get workspace directory for the session
-	workspaceDir, err := cmd.getSessionWorkspace(buildRequest.SessionID)
+	workspaceDir, err := cmd.getSessionWorkspace(ctx, buildRequest.SessionID)
 	if err != nil {
 		return api.ToolOutput{}, errors.NewError().
 			Code(errors.CodeInternalError).
@@ -99,7 +99,7 @@ func (cmd *ConsolidatedBuildCommand) Execute(ctx context.Context, input api.Tool
 	}
 
 	// Update session state with build results
-	if err := cmd.updateSessionState(buildRequest.SessionID, buildResult); err != nil {
+	if err := cmd.updateSessionState(ctx, buildRequest.SessionID, buildResult); err != nil {
 		cmd.logger.Warn("failed to update session state", "error", err)
 	}
 
@@ -187,25 +187,55 @@ func (cmd *ConsolidatedBuildCommand) validateOperationParams(request *BuildReque
 	switch request.Operation {
 	case "build":
 		if request.ImageName == "" {
-			return fmt.Errorf("image_name is required for build operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("image_name is required for build operation").
+				WithLocation().
+				Build()
 		}
 		if request.BuildOptions.DockerfilePath == "" {
-			return fmt.Errorf("dockerfile_path is required for build operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("dockerfile_path is required for build operation").
+				WithLocation().
+				Build()
 		}
 	case "push":
 		if request.ImageName == "" {
-			return fmt.Errorf("image_name is required for push operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("image_name is required for push operation").
+				WithLocation().
+				Build()
 		}
 	case "pull":
 		if request.ImageName == "" {
-			return fmt.Errorf("image_name is required for pull operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("image_name is required for pull operation").
+				WithLocation().
+				Build()
 		}
 	case "tag":
 		if request.TagOptions.SourceImage == "" {
-			return fmt.Errorf("source_image is required for tag operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("source_image is required for tag operation").
+				WithLocation().
+				Build()
 		}
 		if request.TagOptions.TargetImage == "" {
-			return fmt.Errorf("target_image is required for tag operation")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("target_image is required for tag operation").
+				WithLocation().
+				Build()
 		}
 	}
 	return nil
@@ -260,15 +290,25 @@ func (cmd *ConsolidatedBuildCommand) validateBuildRequest(request *BuildRequest)
 }
 
 // getSessionWorkspace retrieves the workspace directory for a session
-func (cmd *ConsolidatedBuildCommand) getSessionWorkspace(sessionID string) (string, error) {
-	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(sessionID)
+func (cmd *ConsolidatedBuildCommand) getSessionWorkspace(ctx context.Context, sessionID string) (string, error) {
+	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(ctx, sessionID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get session metadata: %w", err)
+		return "", errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("failed to get session metadata: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	workspaceDir, ok := sessionMetadata["workspace_dir"].(string)
 	if !ok || workspaceDir == "" {
-		return "", fmt.Errorf("workspace directory not found for session %s", sessionID)
+		return "", errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Messagef("workspace directory not found for session %s", sessionID).
+			WithLocation().
+			Build()
 	}
 
 	return workspaceDir, nil
@@ -296,7 +336,12 @@ func (cmd *ConsolidatedBuildCommand) executeBuildImage(ctx context.Context, requ
 	// Execute build using Docker client
 	result, err := cmd.performDockerBuild(ctx, buildRequest)
 	if err != nil {
-		return nil, fmt.Errorf("build execution failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("build execution failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Handle post-build operations
@@ -332,7 +377,12 @@ func (cmd *ConsolidatedBuildCommand) executePushImage(ctx context.Context, reque
 	// Execute push using Docker client
 	result, err := cmd.performDockerPush(ctx, pushRequest)
 	if err != nil {
-		return nil, fmt.Errorf("push execution failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("push execution failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Convert push result to build result
@@ -364,7 +414,12 @@ func (cmd *ConsolidatedBuildCommand) executePullImage(ctx context.Context, reque
 	// Execute pull using Docker client
 	result, err := cmd.performDockerPull(ctx, request.ImageName, request.PullOptions.Tag, request.PullOptions.Registry)
 	if err != nil {
-		return nil, fmt.Errorf("pull execution failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("pull execution failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Convert to build result
@@ -407,7 +462,12 @@ func (cmd *ConsolidatedBuildCommand) executeTagImage(ctx context.Context, reques
 	// Execute tag using Docker client
 	result, err := cmd.performDockerTag(ctx, tagRequest)
 	if err != nil {
-		return nil, fmt.Errorf("tag execution failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("tag execution failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Convert to build result
@@ -436,7 +496,7 @@ func (cmd *ConsolidatedBuildCommand) executeTagImage(ctx context.Context, reques
 }
 
 // updateSessionState updates session state with build results
-func (cmd *ConsolidatedBuildCommand) updateSessionState(sessionID string, result *build.BuildResult) error {
+func (cmd *ConsolidatedBuildCommand) updateSessionState(ctx context.Context, sessionID string, result *build.BuildResult) error {
 	// Update session state with build results
 	stateUpdate := map[string]interface{}{
 		"last_build":     result,
@@ -447,7 +507,7 @@ func (cmd *ConsolidatedBuildCommand) updateSessionState(sessionID string, result
 		"build_duration": result.Duration,
 	}
 
-	return cmd.sessionState.UpdateSessionData(sessionID, stateUpdate)
+	return cmd.sessionState.UpdateSessionData(ctx, sessionID, stateUpdate)
 }
 
 // createBuildResponse creates the final build response

@@ -5,10 +5,9 @@ import (
 	"testing"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
+	"k8s.io/kube-openapi/pkg/validation/errors"
 
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +37,7 @@ func TestChatTool_Execute(t *testing.T) {
 							Message:          "Hello back!",
 						}, nil
 					},
-					Logger: zerolog.New(nil),
+					Logger: logging.NewTestLogger(),
 				}
 			},
 		},
@@ -50,7 +49,7 @@ func TestChatTool_Execute(t *testing.T) {
 					// Missing message field
 				},
 			},
-			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
+			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
 			expectedErr: "", // Should return ToolOutput with Success: false, not an error
 		},
 	}
@@ -104,7 +103,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 							Status:           "active",
 						}, nil
 					},
-					Logger: zerolog.New(nil),
+					Logger: logging.NewTestLogger(),
 				}
 			},
 			validate: func(t *testing.T, result *ChatToolResult, err error) {
@@ -129,7 +128,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 					Handler: func(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 						return nil, errors.Validation("test", "handler error")
 					},
-					Logger: zerolog.New(nil),
+					Logger: logging.NewTestLogger(),
 				}
 			},
 			validate: func(t *testing.T, result *ChatToolResult, err error) {
@@ -162,7 +161,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 							Progress:  map[string]interface{}{"completed": 50},
 						}, nil
 					},
-					Logger: zerolog.New(nil),
+					Logger: logging.NewTestLogger(),
 				}
 			},
 			validate: func(t *testing.T, result *ChatToolResult, err error) {
@@ -186,7 +185,7 @@ func TestChatTool_ExecuteTyped(t *testing.T) {
 }
 
 func TestChatTool_GetMetadata(t *testing.T) {
-	tool := &ChatTool{Logger: zerolog.New(nil)}
+	tool := &ChatTool{Logger: logging.NewTestLogger()}
 	metadata := tool.GetMetadata()
 
 	assert.Equal(t, "chat", metadata.Name)
@@ -227,14 +226,14 @@ func TestChatTool_Validate(t *testing.T) {
 					Handler: func(ctx context.Context, args ChatToolArgs) (*ChatToolResult, error) {
 						return &ChatToolResult{}, nil
 					},
-					Logger: zerolog.New(nil),
+					Logger: logging.NewTestLogger(),
 				}
 			},
 		},
 		{
 			name:        "invalid args type",
 			args:        "invalid",
-			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
+			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
 			expectedErr: "invalid arguments type",
 		},
 		{
@@ -243,7 +242,7 @@ func TestChatTool_Validate(t *testing.T) {
 				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
 				Message:      "",
 			},
-			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
+			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
 			expectedErr: "message is required and cannot be empty",
 		},
 		{
@@ -252,7 +251,7 @@ func TestChatTool_Validate(t *testing.T) {
 				BaseToolArgs: shared.BaseToolArgs{SessionID: "test-session"},
 				Message:      string(make([]byte, 10001)), // 10,001 characters
 			},
-			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
+			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
 			expectedErr: "message is too long",
 		},
 		{
@@ -262,7 +261,7 @@ func TestChatTool_Validate(t *testing.T) {
 				Message:      "Valid message",
 				SessionID:    "ab", // Too short
 			},
-			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
+			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
 			expectedErr: "session_id must be between 3 and 100 characters",
 		},
 		{
@@ -272,7 +271,7 @@ func TestChatTool_Validate(t *testing.T) {
 				Message:      "Valid message",
 				SessionID:    string(make([]byte, 101)), // Too long
 			},
-			setup:       func() *ChatTool { return &ChatTool{Logger: zerolog.New(nil)} },
+			setup:       func() *ChatTool { return &ChatTool{Logger: logging.NewTestLogger()} },
 			expectedErr: "session_id must be between 3 and 100 characters",
 		},
 		{
@@ -284,7 +283,7 @@ func TestChatTool_Validate(t *testing.T) {
 			setup: func() *ChatTool {
 				return &ChatTool{
 					Handler: nil, // No handler
-					Logger:  zerolog.New(nil),
+					Logger:  logging.NewTestLogger(),
 				}
 			},
 			expectedErr: "chat handler is not configured",

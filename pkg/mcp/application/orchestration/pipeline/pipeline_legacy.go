@@ -70,7 +70,7 @@ func (m *Manager) Start() error {
 		return errors.NewError().Message("failed to start worker manager").Cause(err).WithLocation().Build()
 	}
 
-	if err := m.jobOrchestrator.Start(); err != nil {
+	if err := m.jobOrchestrator.Start(context.Background()); err != nil {
 		return errors.NewError().Message("failed to start job orchestrator").Cause(err).WithLocation().Build()
 	}
 
@@ -91,7 +91,7 @@ func (m *Manager) Stop() error {
 
 	m.logger.Info("Stopping pipeline manager")
 
-	if err := m.jobOrchestrator.Stop(); err != nil {
+	if err := m.jobOrchestrator.Stop(context.Background()); err != nil {
 		m.logger.Error("Error stopping job orchestrator", "error", err)
 	}
 
@@ -126,22 +126,22 @@ func (m *Manager) UnregisterWorker(name string) error {
 
 // SubmitJob submits a new job for execution
 func (m *Manager) SubmitJob(job *Job) error {
-	return m.jobOrchestrator.SubmitJob(job)
+	return m.jobOrchestrator.SubmitJob(context.Background(), job)
 }
 
 // GetJob retrieves a job by ID
 func (m *Manager) GetJob(jobID string) (*Job, bool) {
-	return m.jobOrchestrator.GetJob(jobID)
+	return m.jobOrchestrator.GetJob(context.Background(), jobID)
 }
 
 // ListJobs returns all jobs with optional status filter
 func (m *Manager) ListJobs(status JobStatus) []*Job {
-	return m.jobOrchestrator.ListJobs(status)
+	return m.jobOrchestrator.ListJobs(context.Background(), status)
 }
 
 // CancelJob cancels a pending or running job
 func (m *Manager) CancelJob(jobID string) error {
-	return m.jobOrchestrator.CancelJob(jobID)
+	return m.jobOrchestrator.CancelJob(context.Background(), jobID)
 }
 
 // GetWorkerHealth returns health status for a specific worker
@@ -176,7 +176,7 @@ func (m *Manager) GetManagerStats() ManagerStats {
 
 // GetOrchestratorStats returns statistics about the job orchestrator
 func (m *Manager) GetOrchestratorStats() OrchestratorStats {
-	return m.jobOrchestrator.GetStats()
+	return m.jobOrchestrator.GetStats(context.Background())
 }
 
 // RestartWorker stops and starts a worker
@@ -218,7 +218,7 @@ func (m *Manager) GetStatus() Status {
 	defer m.mu.RUnlock()
 
 	workerStats := m.workerManager.GetManagerStats()
-	orchestratorStats := m.jobOrchestrator.GetStats()
+	orchestratorStats := m.jobOrchestrator.GetStats(context.Background())
 
 	return Status{
 		IsRunning:     m.isRunning,

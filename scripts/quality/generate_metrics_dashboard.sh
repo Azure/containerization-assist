@@ -122,8 +122,8 @@ EOF
 cat > "$DASHBOARD_FILE" << EOF
 # Container Kit Quality Metrics Dashboard
 
-**Generated**: $(date)  
-**Commit**: $(git rev-parse HEAD 2>/dev/null || echo 'unknown')  
+**Generated**: $(date)
+**Commit**: $(git rev-parse HEAD 2>/dev/null || echo 'unknown')
 **Branch**: $(git branch --show-current 2>/dev/null || echo 'unknown')
 
 ## 📊 Current Metrics
@@ -254,7 +254,7 @@ scripts/performance/track_benchmarks.sh
 
 ---
 
-*Dashboard generated automatically by Container Kit Quality Infrastructure*  
+*Dashboard generated automatically by Container Kit Quality Infrastructure*
 *For questions or improvements, see [Quality Standards](../QUALITY_STANDARDS.md)*
 EOF
 
@@ -264,7 +264,7 @@ if [ -f "$TREND_FILE" ]; then
     # Append to existing trends
     CURRENT_DATE=$(date -Iseconds)
     TEMP_FILE=$(mktemp)
-    
+
     # Read existing trends and add current data
     jq --arg date "$CURRENT_DATE" \
        --arg coverage "$COVERAGE" \
@@ -272,7 +272,7 @@ if [ -f "$TREND_FILE" ]; then
        --argjson packages "$TOTAL_PACKAGES" \
        '. + [{"date": $date, "coverage": $coverage, "tests": $tests, "packages": $packages}]' \
        "$TREND_FILE" > "$TEMP_FILE" 2>/dev/null || echo "[]" > "$TEMP_FILE"
-    
+
     mv "$TEMP_FILE" "$TREND_FILE"
 else
     # Create initial trend data

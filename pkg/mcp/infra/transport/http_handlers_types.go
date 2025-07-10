@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/tools"
+	"github.com/Azure/container-kit/pkg/mcp/application/tools"
 )
 
 // ============================================================================

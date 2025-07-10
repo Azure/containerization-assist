@@ -5,24 +5,24 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestFUNCTION_NAME_Success tests the happy path scenario
 func TestFUNCTION_NAME_Success(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
-	
+
 	// Create test input
 	input := &TestInput{
 		Field1: "test-value",
 		Field2: 42,
 	}
-	
+
 	// Act
 	result, err := FUNCTION_NAME(ctx, input)
-	
+
 	// Assert
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -37,10 +37,10 @@ func TestFUNCTION_NAME_InvalidInput(t *testing.T) {
 		Field1: "", // Invalid empty value
 		Field2: -1, // Invalid negative value
 	}
-	
+
 	// Act
 	result, err := FUNCTION_NAME(ctx, invalidInput)
-	
+
 	// Assert
 	require.Error(t, err)
 	assert.Nil(t, result)
@@ -52,15 +52,15 @@ func TestFUNCTION_NAME_ContextCancellation(t *testing.T) {
 	// Arrange
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
-	
+
 	input := &TestInput{
 		Field1: "test-value",
 		Field2: 42,
 	}
-	
+
 	// Act
 	result, err := FUNCTION_NAME(ctx, input)
-	
+
 	// Assert
 	require.Error(t, err)
 	assert.Nil(t, result)
@@ -102,14 +102,14 @@ func TestFUNCTION_NAME_EdgeCases(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	ctx := context.Background()
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Act
 			result, err := FUNCTION_NAME(ctx, tt.input)
-			
+
 			// Assert
 			if tt.expectError {
 				require.Error(t, err)
@@ -138,18 +138,18 @@ func TestFUNCTION_NAME_WithMocks(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	mockDep := new(MockDependency)
-	
+
 	// Set up mock expectations
 	mockDep.On("SomeMethod", ctx, "test-param").Return("mock-result", nil)
-	
+
 	// Create service with mock dependency
 	service := &ServiceWithDependency{
 		dependency: mockDep,
 	}
-	
+
 	// Act
 	result, err := service.FUNCTION_NAME(ctx, "test-param")
-	
+
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, "mock-result", result)
@@ -163,7 +163,7 @@ func BenchmarkFUNCTION_NAME(b *testing.B) {
 		Field1: "benchmark-test",
 		Field2: 100,
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = FUNCTION_NAME(ctx, input)

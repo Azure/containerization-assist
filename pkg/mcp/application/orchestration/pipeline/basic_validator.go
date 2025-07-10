@@ -7,8 +7,9 @@ import (
 
 	"github.com/Azure/container-kit/pkg/common/validation-core/core"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // ValidationRule defines a simple validation check
@@ -21,7 +22,7 @@ type ValidationRule struct {
 // NewBasicValidator creates a new unified basic validator for backward compatibility
 func NewBasicValidator(
 	sessionManager session.SessionManager,
-	logger zerolog.Logger,
+	logger logging.Standards,
 ) *BasicValidator {
 	unified := NewUnifiedBasicValidator(sessionManager, logger)
 	return &BasicValidator{UnifiedBasicValidator: unified}
@@ -35,7 +36,12 @@ func makeDefaultRules() []ValidationRule {
 			Description: "Check required fields are present",
 			Validate: func(ctx context.Context, target interface{}) error {
 				if target == nil {
-					return fmt.Errorf("target cannot be nil")
+					return errors.NewError().
+						Code(errors.CodeValidationFailed).
+						Type(errors.ErrTypeValidation).
+						Message("target cannot be nil").
+						WithLocation().
+						Build()
 				}
 				return nil
 			},
@@ -53,17 +59,17 @@ func makeDefaultRules() []ValidationRule {
 // UnifiedBasicValidator implements the unified validation framework
 type UnifiedBasicValidator struct {
 	sessionManager session.SessionManager
-	logger         zerolog.Logger
+	logger         logging.Standards
 	rules          []ValidationRule
 	name           string
 	version        string
 }
 
 // NewUnifiedBasicValidator creates a new unified basic validator
-func NewUnifiedBasicValidator(sessionManager session.SessionManager, logger zerolog.Logger) *UnifiedBasicValidator {
+func NewUnifiedBasicValidator(sessionManager session.SessionManager, logger logging.Standards) *UnifiedBasicValidator {
 	return &UnifiedBasicValidator{
 		sessionManager: sessionManager,
-		logger:         logger.With().Str("component", "unified_basic_validator").Logger(),
+		logger:         logger.WithComponent("unified_basic_validator"),
 		rules:          makeDefaultRules(),
 		name:           "unified_basic_validator",
 		version:        "1.0.0",
@@ -114,13 +120,18 @@ func (v *UnifiedBasicValidator) Validate(ctx context.Context, data interface{}, 
 
 // validateWithRules runs validation rules and returns any errors
 func (v *UnifiedBasicValidator) validateWithRules(ctx context.Context, data interface{}) []error {
-	var errors []error
+	var validationErrors []error
 	for _, rule := range v.rules {
 		if err := rule.Validate(ctx, data); err != nil {
-			errors = append(errors, fmt.Errorf("%s: %w", rule.Name, err))
+			validationErrors = append(validationErrors, errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Messagef("%s: %w", rule.Name, err).
+				WithLocation().
+				Build())
 		}
 	}
-	return errors
+	return validationErrors
 }
 
 // GetVersion returns the validator version

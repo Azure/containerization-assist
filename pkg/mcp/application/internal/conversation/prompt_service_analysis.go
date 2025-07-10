@@ -8,7 +8,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	validationCore "github.com/Azure/container-kit/pkg/mcp/domain/security"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func (ps *PromptServiceImpl) startAnalysisWithFormData(ctx context.Context, state *ConversationState) *ConversationResponse {

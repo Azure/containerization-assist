@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/core"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/localrivet/gomcp/server"
 )
 
@@ -54,7 +54,7 @@ func NewCoreStdioTransport(logger *slog.Logger) core.CoreTransport {
 func (s *StdioTransport) Serve(ctx context.Context) error {
 	if s.handler == nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"Request handler not set",
 			nil,
 		)
@@ -66,7 +66,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 	// Use GomcpManager to start the server
 	if s.gomcpManager == nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"STDIO transport: gomcp manager not initialized",
 			nil,
 		)
@@ -77,7 +77,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 	mgr, ok := s.gomcpManager.(interface{ StartServer() error })
 	if !ok {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"STDIO transport: gomcp manager does not implement StartServer",
 			nil,
 		)
@@ -94,7 +94,7 @@ func (s *StdioTransport) Serve(ctx context.Context) error {
 		defer close(serverDone)
 		if err := runFunc(); err != nil {
 			networkErr := errors.NetworkError(
-				codes.NETWORK_ERROR,
+				errorcodes.NETWORK_ERROR,
 				"STDIO server error",
 				err,
 			)
@@ -166,7 +166,7 @@ func (s *StdioTransport) SendMessage(message interface{}) error {
 	// For stdio transport, message sending is handled by the gomcp server
 	// This is typically not called directly
 	systemErr := errors.SystemError(
-		codes.SYSTEM_ERROR,
+		errorcodes.SYSTEM_ERROR,
 		"SendMessage should be handled by gomcp server for stdio transport",
 		nil,
 	)
@@ -185,7 +185,7 @@ func (s *StdioTransport) ReceiveMessage() (interface{}, error) {
 	// For stdio transport, message receiving is handled by the gomcp server
 	// This is typically not called directly
 	systemErr := errors.SystemError(
-		codes.SYSTEM_ERROR,
+		errorcodes.SYSTEM_ERROR,
 		"ReceiveMessage should be handled by gomcp server for stdio transport",
 		nil,
 	)
@@ -206,7 +206,7 @@ func (s *StdioTransport) Close() error {
 	// Shutdown using the GomcpManager
 	if s.gomcpManager == nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"STDIO transport: gomcp manager not initialized",
 			nil,
 		)
@@ -217,7 +217,7 @@ func (s *StdioTransport) Close() error {
 	mgr, ok := s.gomcpManager.(interface{ Shutdown(context.Context) error })
 	if !ok {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			"STDIO transport: gomcp manager does not implement Shutdown",
 			nil,
 		)
@@ -261,7 +261,7 @@ func (s *StdioTransport) SetGomcpManager(manager interface{}) {
 func (s *StdioTransport) RegisterTool(name, description string, handler interface{}) error {
 	if s.server == nil {
 		systemErr := errors.SystemError(
-			codes.SYSTEM_UNAVAILABLE,
+			errorcodes.SYSTEM_UNAVAILABLE,
 			"Server not initialized",
 			nil,
 		)
@@ -277,7 +277,7 @@ func (s *StdioTransport) HandleToolError(ctx context.Context, toolName string, e
 	if s.errorHandler == nil {
 		// Fallback to basic error handling
 		systemErr := errors.SystemError(
-			codes.SYSTEM_ERROR,
+			errorcodes.SYSTEM_ERROR,
 			fmt.Sprintf("Tool '%s' failed", toolName),
 			err,
 		)

@@ -25,7 +25,7 @@ echo "" >> "$REPORT_DIR/regression_report_$TIMESTAMP.txt"
 if grep -q "^Benchmark" "$CURRENT_DIR/current_$TIMESTAMP.txt"; then
     echo "Benchmarks found:" >> "$REPORT_DIR/regression_report_$TIMESTAMP.txt"
     grep "^Benchmark" "$CURRENT_DIR/current_$TIMESTAMP.txt" >> "$REPORT_DIR/regression_report_$TIMESTAMP.txt"
-    
+
     # Check if any benchmark exceeds 300μs (300000 ns)
     PERF_ISSUES=0
     while IFS= read -r line; do
@@ -39,7 +39,7 @@ if grep -q "^Benchmark" "$CURRENT_DIR/current_$TIMESTAMP.txt"; then
             fi
         fi
     done < <(grep "^Benchmark" "$CURRENT_DIR/current_$TIMESTAMP.txt")
-    
+
     if [ $PERF_ISSUES -eq 0 ]; then
         echo "✅ All benchmarks within 300μs target" >> "$REPORT_DIR/regression_report_$TIMESTAMP.txt"
     fi

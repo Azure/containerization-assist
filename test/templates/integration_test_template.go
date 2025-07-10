@@ -2,51 +2,50 @@ package PACKAGE_NAME
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
 // IntegrationTestSuite groups related integration tests
 type IntegrationTestSuite struct {
 	suite.Suite
-	
+
 	// Test fixtures
-	tempDir     string
-	testServer  *TestServer
-	testClient  *TestClient
-	cleanup     []func()
+	tempDir    string
+	testServer *TestServer
+	testClient *TestClient
+	cleanup    []func()
 }
 
 // SetupSuite runs once before all tests in the suite
 func (s *IntegrationTestSuite) SetupSuite() {
 	var err error
-	
+
 	// Create temporary directory for test files
 	s.tempDir, err = os.MkdirTemp("", "container-kit-integration-*")
 	s.Require().NoError(err)
 	s.addCleanup(func() { os.RemoveAll(s.tempDir) })
-	
+
 	// Start test server
 	s.testServer, err = NewTestServer(&TestServerConfig{
 		Port:    0, // Use random available port
 		DataDir: filepath.Join(s.tempDir, "data"),
 	})
 	s.Require().NoError(err)
-	
+
 	err = s.testServer.Start()
 	s.Require().NoError(err)
 	s.addCleanup(func() { s.testServer.Stop() })
-	
+
 	// Create test client
 	s.testClient = NewTestClient(s.testServer.URL())
 	s.addCleanup(func() { s.testClient.Close() })
-	
+
 	// Wait for server to be ready
 	s.waitForServerReady()
 }
@@ -74,7 +73,7 @@ func (s *IntegrationTestSuite) TearDownTest() {
 // TestFullWorkflow tests the complete end-to-end workflow
 func (s *IntegrationTestSuite) TestFullWorkflow() {
 	ctx := context.Background()
-	
+
 	// Step 1: Initialize session
 	session, err := s.testClient.CreateSession(ctx, &CreateSessionRequest{
 		Name: "integration-test-session",
@@ -85,7 +84,7 @@ func (s *IntegrationTestSuite) TestFullWorkflow() {
 	s.Require().NoError(err)
 	s.Require().NotNil(session)
 	s.Assert().NotEmpty(session.ID)
-	
+
 	// Step 2: Execute tool
 	result, err := s.testClient.ExecuteTool(ctx, &ExecuteToolRequest{
 		SessionID: session.ID,
@@ -97,13 +96,13 @@ func (s *IntegrationTestSuite) TestFullWorkflow() {
 	s.Require().NoError(err)
 	s.Require().NotNil(result)
 	s.Assert().Equal("success", result.Status)
-	
+
 	// Step 3: Verify side effects
 	sessions, err := s.testClient.ListSessions(ctx, &ListSessionsRequest{})
 	s.Require().NoError(err)
 	s.Assert().Len(sessions, 1)
 	s.Assert().Equal(session.ID, sessions[0].ID)
-	
+
 	// Step 4: Cleanup
 	err = s.testClient.DeleteSession(ctx, session.ID)
 	s.Require().NoError(err)
@@ -112,12 +111,12 @@ func (s *IntegrationTestSuite) TestFullWorkflow() {
 // TestConcurrentOperations tests concurrent access scenarios
 func (s *IntegrationTestSuite) TestConcurrentOperations() {
 	ctx := context.Background()
-	
+
 	// Create multiple sessions concurrently
 	const numSessions = 10
 	sessionChan := make(chan *Session, numSessions)
 	errorChan := make(chan error, numSessions)
-	
+
 	for i := 0; i < numSessions; i++ {
 		go func(index int) {
 			session, err := s.testClient.CreateSession(ctx, &CreateSessionRequest{
@@ -130,7 +129,7 @@ func (s *IntegrationTestSuite) TestConcurrentOperations() {
 			sessionChan <- session
 		}(i)
 	}
-	
+
 	// Collect results
 	var sessions []*Session
 	for i := 0; i < numSessions; i++ {
@@ -143,9 +142,9 @@ func (s *IntegrationTestSuite) TestConcurrentOperations() {
 			s.Fail("timeout waiting for concurrent operations")
 		}
 	}
-	
+
 	s.Assert().Len(sessions, numSessions)
-	
+
 	// Verify all sessions are unique
 	sessionIDs := make(map[string]bool)
 	for _, session := range sessions {
@@ -157,7 +156,7 @@ func (s *IntegrationTestSuite) TestConcurrentOperations() {
 // TestErrorHandling tests error scenarios
 func (s *IntegrationTestSuite) TestErrorHandling() {
 	ctx := context.Background()
-	
+
 	// Test invalid tool execution
 	_, err := s.testClient.ExecuteTool(ctx, &ExecuteToolRequest{
 		SessionID: "non-existent-session",
@@ -166,13 +165,13 @@ func (s *IntegrationTestSuite) TestErrorHandling() {
 	})
 	s.Require().Error(err)
 	s.Assert().Contains(err.Error(), "session not found")
-	
+
 	// Test invalid tool name
 	session, err := s.testClient.CreateSession(ctx, &CreateSessionRequest{
 		Name: "error-test-session",
 	})
 	s.Require().NoError(err)
-	
+
 	_, err = s.testClient.ExecuteTool(ctx, &ExecuteToolRequest{
 		SessionID: session.ID,
 		ToolName:  "non-existent-tool",
@@ -186,12 +185,12 @@ func (s *IntegrationTestSuite) TestErrorHandling() {
 func (s *IntegrationTestSuite) TestLongRunningOperations() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	session, err := s.testClient.CreateSession(ctx, &CreateSessionRequest{
 		Name: "long-running-test",
 	})
 	s.Require().NoError(err)
-	
+
 	// Execute a tool that takes some time
 	start := time.Now()
 	result, err := s.testClient.ExecuteTool(ctx, &ExecuteToolRequest{
@@ -202,7 +201,7 @@ func (s *IntegrationTestSuite) TestLongRunningOperations() {
 		},
 	})
 	duration := time.Since(start)
-	
+
 	s.Require().NoError(err)
 	s.Require().NotNil(result)
 	s.Assert().GreaterOrEqual(duration, 2*time.Second)
@@ -212,7 +211,7 @@ func (s *IntegrationTestSuite) TestLongRunningOperations() {
 // TestDataPersistence tests data persistence across server restarts
 func (s *IntegrationTestSuite) TestDataPersistence() {
 	ctx := context.Background()
-	
+
 	// Create session and data
 	session, err := s.testClient.CreateSession(ctx, &CreateSessionRequest{
 		Name: "persistence-test",
@@ -222,17 +221,17 @@ func (s *IntegrationTestSuite) TestDataPersistence() {
 	})
 	s.Require().NoError(err)
 	originalSessionID := session.ID
-	
+
 	// Restart server to test persistence
 	s.testServer.Stop()
 	err = s.testServer.Start()
 	s.Require().NoError(err)
 	s.waitForServerReady()
-	
+
 	// Verify session still exists
 	sessions, err := s.testClient.ListSessions(ctx, &ListSessionsRequest{})
 	s.Require().NoError(err)
-	
+
 	found := false
 	for _, session := range sessions {
 		if session.ID == originalSessionID {
@@ -254,7 +253,7 @@ func (s *IntegrationTestSuite) addCleanup(fn func()) {
 func (s *IntegrationTestSuite) waitForServerReady() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -274,22 +273,22 @@ func TestIntegrationSuite(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration tests in short mode")
 	}
-	
+
 	// Check for required environment or dependencies
 	if os.Getenv("SKIP_INTEGRATION_TESTS") == "true" {
 		t.Skip("integration tests disabled by environment variable")
 	}
-	
+
 	suite.Run(t, new(IntegrationTestSuite))
 }
 
 // Table-driven integration test example
 func (s *IntegrationTestSuite) TestToolExecution() {
 	tests := []struct {
-		name        string
-		toolName    string
-		arguments   map[string]interface{}
-		expectError bool
+		name         string
+		toolName     string
+		arguments    map[string]interface{}
+		expectError  bool
 		expectStatus string
 	}{
 		{
@@ -318,13 +317,13 @@ func (s *IntegrationTestSuite) TestToolExecution() {
 			expectError: true,
 		},
 	}
-	
+
 	ctx := context.Background()
 	session, err := s.testClient.CreateSession(ctx, &CreateSessionRequest{
 		Name: "tool-execution-test",
 	})
 	s.Require().NoError(err)
-	
+
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			result, err := s.testClient.ExecuteTool(ctx, &ExecuteToolRequest{
@@ -332,7 +331,7 @@ func (s *IntegrationTestSuite) TestToolExecution() {
 				ToolName:  tt.toolName,
 				Arguments: tt.arguments,
 			})
-			
+
 			if tt.expectError {
 				s.Require().Error(err)
 			} else {

@@ -76,7 +76,11 @@ func NewJobOrchestrator(workers *BackgroundWorkerManager, config *PipelineConfig
 }
 
 // SubmitJob submits a new job for execution
-func (jo *JobOrchestrator) SubmitJob(job *Job) error {
+func (jo *JobOrchestrator) SubmitJob(ctx context.Context, job *Job) error {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	jo.mutex.Lock()
 	defer jo.mutex.Unlock()
 
@@ -95,7 +99,11 @@ func (jo *JobOrchestrator) SubmitJob(job *Job) error {
 }
 
 // GetJob retrieves a job by ID
-func (jo *JobOrchestrator) GetJob(jobID string) (*Job, bool) {
+func (jo *JobOrchestrator) GetJob(ctx context.Context, jobID string) (*Job, bool) {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return nil, false
+	}
 	jo.mutex.RLock()
 	defer jo.mutex.RUnlock()
 
@@ -104,7 +112,11 @@ func (jo *JobOrchestrator) GetJob(jobID string) (*Job, bool) {
 }
 
 // ListJobs returns all jobs with optional status filter
-func (jo *JobOrchestrator) ListJobs(status JobStatus) []*Job {
+func (jo *JobOrchestrator) ListJobs(ctx context.Context, status JobStatus) []*Job {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
 	jo.mutex.RLock()
 	defer jo.mutex.RUnlock()
 
@@ -118,7 +130,11 @@ func (jo *JobOrchestrator) ListJobs(status JobStatus) []*Job {
 }
 
 // CancelJob cancels a pending or running job
-func (jo *JobOrchestrator) CancelJob(jobID string) error {
+func (jo *JobOrchestrator) CancelJob(ctx context.Context, jobID string) error {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	jo.mutex.Lock()
 	defer jo.mutex.Unlock()
 
@@ -137,7 +153,10 @@ func (jo *JobOrchestrator) CancelJob(jobID string) error {
 }
 
 // Start starts the job orchestrator
-func (jo *JobOrchestrator) Start() error {
+func (jo *JobOrchestrator) Start(ctx context.Context) error {
+	// Update internal context with the provided one
+	jo.ctx, jo.cancel = context.WithCancel(ctx)
+
 	for i := 0; i < jo.config.WorkerPoolSize; i++ {
 		go jo.jobProcessor()
 	}
@@ -146,7 +165,10 @@ func (jo *JobOrchestrator) Start() error {
 }
 
 // Stop stops the job orchestrator
-func (jo *JobOrchestrator) Stop() error {
+func (jo *JobOrchestrator) Stop(ctx context.Context) error {
+	// Use context for graceful shutdown timeout if needed
+	_ = ctx
+
 	jo.cancel()
 	close(jo.jobChannel)
 	return nil
@@ -235,7 +257,11 @@ func (jo *JobOrchestrator) executeDeployJob(ctx context.Context, job *Job) (map[
 }
 
 // GetStats returns orchestrator statistics
-func (jo *JobOrchestrator) GetStats() OrchestratorStats {
+func (jo *JobOrchestrator) GetStats(ctx context.Context) OrchestratorStats {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return OrchestratorStats{}
+	}
 	jo.mutex.RLock()
 	defer jo.mutex.RUnlock()
 

@@ -2,8 +2,6 @@ package conversation
 
 import (
 	"testing"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func TestConversationResponseAutoAdvance(t *testing.T) {

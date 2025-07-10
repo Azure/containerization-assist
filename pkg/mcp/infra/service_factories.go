@@ -2,11 +2,11 @@ package infra
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // DockerServiceFactory creates Docker service implementations
@@ -103,7 +103,12 @@ type dockerServiceImpl struct {
 // Build implements DockerService
 func (d *dockerServiceImpl) Build(ctx context.Context, options DockerBuildOptions) (*DockerBuildResult, error) {
 	if options.Dockerfile == "" {
-		return nil, fmt.Errorf("dockerfile content is required")
+		return nil, errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("dockerfile content is required").
+			WithLocation().
+			Build()
 	}
 
 	coreOptions := docker.BuildOptions{
@@ -141,7 +146,12 @@ func (d *dockerServiceImpl) Push(ctx context.Context, imageRef string, options D
 	}
 
 	if !result.Success {
-		return fmt.Errorf("push failed: %s", result.Error.Message)
+		return errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("push failed: %s", result.Error.Message).
+			WithLocation().
+			Build()
 	}
 
 	return nil
@@ -155,7 +165,12 @@ func (d *dockerServiceImpl) Pull(ctx context.Context, imageRef string, _ DockerP
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("pull failed: %s", result.Error.Message)
+		return nil, errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("pull failed: %s", result.Error.Message).
+			WithLocation().
+			Build()
 	}
 
 	return &DockerPullResult{
@@ -166,12 +181,22 @@ func (d *dockerServiceImpl) Pull(ctx context.Context, imageRef string, _ DockerP
 
 // Tag implements DockerService
 func (d *dockerServiceImpl) Tag(_ context.Context, _, _ string) error {
-	return fmt.Errorf("tag operation not yet implemented in core service")
+	return errors.NewError().
+		Code(errors.CodeInternalError).
+		Type(errors.ErrTypeInternal).
+		Message("tag operation not yet implemented in core service").
+		WithLocation().
+		Build()
 }
 
 // ImageExists implements DockerService
 func (d *dockerServiceImpl) ImageExists(_ context.Context, _ string) (bool, error) {
-	return false, fmt.Errorf("image exists check not yet implemented in core service")
+	return false, errors.NewError().
+		Code(errors.CodeInternalError).
+		Type(errors.ErrTypeInternal).
+		Message("image exists check not yet implemented in core service").
+		WithLocation().
+		Build()
 }
 
 // GetImageInfo implements DockerService

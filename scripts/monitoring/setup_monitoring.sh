@@ -339,7 +339,7 @@ SERVICES=("Prometheus:9090" "Grafana:3000" "Jaeger:16686" "Alertmanager:9093")
 for service in "${SERVICES[@]}"; do
     name=$(echo "$service" | cut -d: -f1)
     port=$(echo "$service" | cut -d: -f2)
-    
+
     if curl -s "http://localhost:$port" >/dev/null 2>&1; then
         echo "✅ $name: http://localhost:$port"
     else

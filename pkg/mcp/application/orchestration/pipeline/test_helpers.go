@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
@@ -57,7 +57,12 @@ func (m *MockSessionManager) GetSession(sessionID string) (*session.SessionState
 	if sess, exists := m.sessions[sessionID]; exists {
 		return sess, nil
 	}
-	return nil, fmt.Errorf("session not found: %s", sessionID)
+	return nil, errors.NewError().
+		Code(errors.CodeNotFound).
+		Type(errors.ErrTypeNotFound).
+		Messagef("session not found: %s", sessionID).
+		WithLocation().
+		Build()
 }
 
 // GetSessionTyped retrieves a session with type safety
@@ -106,7 +111,12 @@ func (m *MockSessionManager) UpdateSession(_ context.Context, sessionID string, 
 	if sess, exists := m.sessions[sessionID]; exists {
 		return updateFunc(sess)
 	}
-	return fmt.Errorf("session not found: %s", sessionID)
+	return errors.NewError().
+		Code(errors.CodeNotFound).
+		Type(errors.ErrTypeNotFound).
+		Messagef("session not found: %s", sessionID).
+		WithLocation().
+		Build()
 }
 
 // DeleteSession deletes a session

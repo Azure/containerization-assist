@@ -35,9 +35,9 @@ func NewConsolidatedScanCommand(
 	logger *slog.Logger,
 ) *ConsolidatedScanCommand {
 	// Initialize security services
-	// Convert slog to zerolog for compatibility
-	zlog := zerolog.New(os.Stderr).With().Timestamp().Logger()
-	secretDiscovery := security.NewSecretDiscovery(zlog)
+	// Create a zerolog logger for security package compatibility
+	zerologger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	secretDiscovery := security.NewSecretDiscovery(zerologger)
 
 	return &ConsolidatedScanCommand{
 		sessionStore:    sessionStore,
@@ -72,7 +72,7 @@ func (cmd *ConsolidatedScanCommand) Execute(ctx context.Context, input api.ToolI
 	}
 
 	// Get workspace directory for the session
-	workspaceDir, err := cmd.getSessionWorkspace(scanRequest.SessionID)
+	workspaceDir, err := cmd.getSessionWorkspace(ctx, scanRequest.SessionID)
 	if err != nil {
 		return api.ToolOutput{}, errors.NewError().
 			Code(errors.CodeInternalError).
@@ -108,7 +108,7 @@ func (cmd *ConsolidatedScanCommand) Execute(ctx context.Context, input api.ToolI
 	}
 
 	// Update session state with scan results
-	if err := cmd.updateSessionState(scanRequest.SessionID, scanResult); err != nil {
+	if err := cmd.updateSessionState(ctx, scanRequest.SessionID, scanResult); err != nil {
 		cmd.logger.Warn("failed to update session state", "error", err)
 	}
 
@@ -167,19 +167,39 @@ func (cmd *ConsolidatedScanCommand) validateScanTypeParams(request *ScanRequest)
 	switch request.ScanType {
 	case "image_security":
 		if request.ImageRef == "" {
-			return fmt.Errorf("image_ref is required for image_security scan")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("image_ref is required for image_security scan").
+				WithLocation().
+				Build()
 		}
 	case "secrets":
 		if request.Path == "" {
-			return fmt.Errorf("path is required for secrets scan")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("path is required for secrets scan").
+				WithLocation().
+				Build()
 		}
 	case "vulnerabilities":
 		if request.Target == "" {
-			return fmt.Errorf("target is required for vulnerabilities scan")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("target is required for vulnerabilities scan").
+				WithLocation().
+				Build()
 		}
 	case "combined":
 		if request.ImageRef == "" && request.Path == "" {
-			return fmt.Errorf("either image_ref or path is required for combined scan")
+			return errors.NewError().
+				Code(errors.CodeValidationFailed).
+				Type(errors.ErrTypeValidation).
+				Message("either image_ref or path is required for combined scan").
+				WithLocation().
+				Build()
 		}
 	}
 	return nil
@@ -244,15 +264,25 @@ func (cmd *ConsolidatedScanCommand) validateScanRequest(request *ScanRequest) []
 }
 
 // getSessionWorkspace retrieves the workspace directory for a session
-func (cmd *ConsolidatedScanCommand) getSessionWorkspace(sessionID string) (string, error) {
-	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(sessionID)
+func (cmd *ConsolidatedScanCommand) getSessionWorkspace(ctx context.Context, sessionID string) (string, error) {
+	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(ctx, sessionID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get session metadata: %w", err)
+		return "", errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("failed to get session metadata: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	workspaceDir, ok := sessionMetadata["workspace_dir"].(string)
 	if !ok || workspaceDir == "" {
-		return "", fmt.Errorf("workspace directory not found for session %s", sessionID)
+		return "", errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Messagef("workspace directory not found for session %s", sessionID).
+			WithLocation().
+			Build()
 	}
 
 	return workspaceDir, nil
@@ -263,7 +293,12 @@ func (cmd *ConsolidatedScanCommand) executeScanImageSecurity(ctx context.Context
 	// Perform image security scan using Docker client
 	scanResult, err := cmd.performImageSecurityScan(ctx, request.ImageRef, request.ScanOptions)
 	if err != nil {
-		return nil, fmt.Errorf("image security scan failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("image security scan failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Create consolidated result
@@ -285,7 +320,12 @@ func (cmd *ConsolidatedScanCommand) executeScanSecrets(ctx context.Context, requ
 	// Perform secrets scan using security discovery
 	scanResult, err := cmd.performSecretsscan(ctx, request.Path, request.ScanOptions)
 	if err != nil {
-		return nil, fmt.Errorf("secrets scan failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("secrets scan failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Create consolidated result
@@ -307,7 +347,12 @@ func (cmd *ConsolidatedScanCommand) executeScanVulnerabilities(ctx context.Conte
 	// Perform vulnerability scan
 	scanResult, err := cmd.performVulnerabilityyScan(ctx, request.Target, request.ScanOptions)
 	if err != nil {
-		return nil, fmt.Errorf("vulnerability scan failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("vulnerability scan failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Create consolidated result
@@ -371,7 +416,7 @@ func (cmd *ConsolidatedScanCommand) executeCombinedScan(ctx context.Context, req
 }
 
 // updateSessionState updates session state with scan results
-func (cmd *ConsolidatedScanCommand) updateSessionState(sessionID string, result *ConsolidatedScanResult) error {
+func (cmd *ConsolidatedScanCommand) updateSessionState(ctx context.Context, sessionID string, result *ConsolidatedScanResult) error {
 	// Update session state with scan results
 	stateUpdate := map[string]interface{}{
 		"last_scan":     result,
@@ -382,7 +427,7 @@ func (cmd *ConsolidatedScanCommand) updateSessionState(sessionID string, result 
 		"scan_duration": result.Duration,
 	}
 
-	return cmd.sessionState.UpdateSessionData(sessionID, stateUpdate)
+	return cmd.sessionState.UpdateSessionData(ctx, sessionID, stateUpdate)
 }
 
 // createScanResponse creates the final scan response

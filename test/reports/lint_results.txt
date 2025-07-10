@@ -1,0 +1,6 @@
+go: updates to go.mod needed; to update it:
+	go mod tidy
+Checking for common issues...
+TODO/FIXME comments: 63
+panic() usage: 10
+fmt.Print usage: 17

@@ -8,12 +8,12 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // CheckRegistryHealthArgs defines arguments for registry health checking
 type CheckRegistryHealthArgs struct {
-	shared.BaseToolArgs
+	domaintypes.BaseToolArgs
 
 	Registries     []string `json:"registries,omitempty" jsonschema:"description=List of registries to check (defaults to common registries)"`
 	Detailed       bool     `json:"detailed,omitempty" jsonschema:"description=Include detailed endpoint checks"`
@@ -24,7 +24,7 @@ type CheckRegistryHealthArgs struct {
 
 // CheckRegistryHealthResult represents registry health check results
 type CheckRegistryHealthResult struct {
-	shared.BaseToolResponse
+	domaintypes.BaseToolResponse
 
 	AllHealthy   bool          `json:"all_healthy"`
 	TotalChecked int           `json:"total_checked"`
@@ -89,7 +89,7 @@ func CheckRegistryHealth(ctx context.Context, args CheckRegistryHealthArgs) (*Ch
 	}
 
 	result := &CheckRegistryHealthResult{
-		BaseToolResponse: shared.BaseToolResponse{}, // Simplified
+		BaseToolResponse: domaintypes.BaseToolResponse{}, // Simplified
 		CheckTime:        startTime,
 		TotalChecked:     len(registries),
 		Registries:       make(map[string]*RegistryHealthInfo),
@@ -157,12 +157,12 @@ func checkSingleRegistry(ctx context.Context, registry string, detailed, forceRe
 }
 
 type GetJobStatusArgs struct {
-	shared.BaseToolArgs
+	domaintypes.BaseToolArgs
 	JobID string `json:"job_id" jsonschema:"description=ID of the job to check"`
 }
 
 type GetJobStatusResult struct {
-	shared.BaseToolResponse
+	domaintypes.BaseToolResponse
 	JobID     string     `json:"job_id"`
 	Status    string     `json:"status"`
 	Progress  int        `json:"progress"`
@@ -175,12 +175,12 @@ type GetJobStatusResult struct {
 func GetJobStatus(ctx context.Context, args GetJobStatusArgs) (*GetJobStatusResult, error) {
 	if args.JobID == "" {
 		return &GetJobStatusResult{
-			BaseToolResponse: shared.BaseToolResponse{}, // Simplified
+			BaseToolResponse: domaintypes.BaseToolResponse{}, // Simplified
 		}, errors.NewError().Messagef("job_id is required").WithLocation().Build()
 	}
 
 	return &GetJobStatusResult{
-		BaseToolResponse: shared.BaseToolResponse{}, // Simplified
+		BaseToolResponse: domaintypes.BaseToolResponse{}, // Simplified
 		JobID:            args.JobID,
 		Status:           "running",
 		Progress:         50,
@@ -190,7 +190,7 @@ func GetJobStatus(ctx context.Context, args GetJobStatusArgs) (*GetJobStatusResu
 }
 
 type GetLogsArgs struct {
-	shared.BaseToolArgs
+	domaintypes.BaseToolArgs
 	Source    string `json:"source" jsonschema:"description=Log source (server, session, tool)"`
 	SessionID string `json:"session_id,omitempty" jsonschema:"description=Session ID for session logs"`
 	Lines     int    `json:"lines,omitempty" jsonschema:"description=Number of lines to retrieve (default: 100)"`
@@ -203,7 +203,7 @@ type GetLogsArgs struct {
 }
 
 type GetLogsResult struct {
-	shared.BaseToolResponse
+	domaintypes.BaseToolResponse
 	Source    string    `json:"source"`
 	SessionID string    `json:"session_id,omitempty"`
 	Lines     []LogLine `json:"lines"`
@@ -221,7 +221,7 @@ type LogLine struct {
 func GetLogs(ctx context.Context, args GetLogsArgs) (*GetLogsResult, error) {
 	if args.Source == "" {
 		return &GetLogsResult{
-			BaseToolResponse: shared.BaseToolResponse{}, // Simplified
+			BaseToolResponse: domaintypes.BaseToolResponse{}, // Simplified
 		}, errors.NewError().Messagef("source is required").Build()
 	}
 
@@ -241,7 +241,7 @@ func GetLogs(ctx context.Context, args GetLogsArgs) (*GetLogsResult, error) {
 	}
 
 	return &GetLogsResult{
-		BaseToolResponse: shared.BaseToolResponse{}, // Simplified
+		BaseToolResponse: domaintypes.BaseToolResponse{}, // Simplified
 		Source:           args.Source,
 		SessionID:        args.BaseToolArgs.SessionID,
 		Lines:            logLines,

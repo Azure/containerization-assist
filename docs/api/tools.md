@@ -49,10 +49,10 @@ func (t *MyTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMes
             Wrap(err).
             Build()
     }
-    
+
     // Execute tool logic
     result := processInput(input)
-    
+
     // Return result
     return json.Marshal(result)
 }
@@ -112,14 +112,14 @@ runtime.MustRegisterToolWithMetadata(&MyTool{}, metadata)
 ```go
 func TestMyTool(t *testing.T) {
     tool := &MyTool{}
-    
+
     input := MyToolInput{
         Field: "value",
     }
-    
+
     args, _ := json.Marshal(input)
     result, err := tool.Execute(context.Background(), args)
-    
+
     assert.NoError(t, err)
     assert.NotNil(t, result)
 }

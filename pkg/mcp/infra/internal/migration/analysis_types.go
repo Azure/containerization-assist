@@ -6,12 +6,12 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // Detector automatically detects migration opportunities in the codebase
 type Detector struct {
-	logger    zerolog.Logger
+	logger    logging.Standards
 	config    Config
 	fileSet   *token.FileSet
 	patterns  map[string]*regexp.Regexp
@@ -32,7 +32,7 @@ type Config struct {
 
 // PatternAnalyzer analyzes code patterns to identify refactoring opportunities
 type PatternAnalyzer struct {
-	logger     zerolog.Logger
+	logger     logging.Standards
 	config     PatternAnalysisConfig
 	fileSet    *token.FileSet
 	statistics PatternStatistics

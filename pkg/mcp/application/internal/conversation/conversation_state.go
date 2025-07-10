@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 type RetryState struct {

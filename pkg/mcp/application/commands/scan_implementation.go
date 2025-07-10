@@ -10,6 +10,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/core/security"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Security scanning implementation methods
@@ -129,7 +130,12 @@ func (cmd *ConsolidatedScanCommand) performSecretsscan(ctx context.Context, scan
 	// Perform secrets scan using security discovery
 	discoveryResult, err := cmd.secretDiscovery.ScanDirectory(ctx, scanPath, scanOptions)
 	if err != nil {
-		return nil, fmt.Errorf("secrets scan failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("secrets scan failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Convert discovery results to our format
@@ -186,10 +192,20 @@ func (cmd *ConsolidatedScanCommand) performVulnerabilityyScan(ctx context.Contex
 		// Filesystem vulnerability scan
 		vulnerabilities, err = cmd.scanFilesystemForVulnerabilities(ctx, target, options)
 		if err != nil {
-			return nil, fmt.Errorf("filesystem vulnerability scan failed: %w", err)
+			return nil, errors.NewError().
+				Code(errors.CodeSecurityViolation).
+				Type(errors.ErrTypeSecurity).
+				Messagef("filesystem vulnerability scan failed: %w", err).
+				WithLocation().
+				Build()
 		}
 	} else {
-		return nil, fmt.Errorf("unsupported target type: %s", target)
+		return nil, errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("unsupported target type: %s", target).
+			WithLocation().
+			Build()
 	}
 
 	// Apply severity filtering

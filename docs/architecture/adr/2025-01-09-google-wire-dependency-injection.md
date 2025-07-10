@@ -12,7 +12,7 @@ Container Kit currently uses manual dependency injection with large service cont
 // Current approach - manual wiring in multiple places
 type ServiceContainer interface {
     SessionStore() SessionStore        // 8 methods
-    SessionState() SessionState        // 6 methods  
+    SessionState() SessionState        // 6 methods
     BuildExecutor() BuildExecutor      // 12 methods
     ToolRegistry() ToolRegistry        // 7 methods
     // ... 4 more services with 32 total methods
@@ -81,31 +81,31 @@ var ServiceSet = wire.NewSet(
     // Storage providers
     persistence.NewBoltStore,
     wire.Bind(new(services.SessionStore), new(*persistence.BoltStore)),
-    
-    // Docker providers  
+
+    // Docker providers
     docker.NewClient,
     wire.Bind(new(services.BuildExecutor), new(*docker.Client)),
-    
+
     // Registry providers
     registry.NewUnifiedRegistry,
     wire.Bind(new(services.ToolRegistry), new(*registry.UnifiedRegistry)),
-    
+
     // Session providers
     session.NewManager,
     wire.Bind(new(services.SessionState), new(*session.Manager)),
-    
+
     // Workflow providers
     workflow.NewExecutor,
     wire.Bind(new(services.WorkflowExecutor), new(*workflow.Executor)),
-    
+
     // Security providers
     security.NewScanner,
     wire.Bind(new(services.Scanner), new(*security.Scanner)),
-    
+
     // Config providers
     config.NewValidator,
     wire.Bind(new(services.ConfigValidator), new(*config.Validator)),
-    
+
     // Error providers
     errors.NewReporter,
     wire.Bind(new(services.ErrorReporter), new(*errors.Reporter)),

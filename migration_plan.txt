@@ -1,0 +1,22 @@
+=== MIGRATION MAPPING ===
+Domain Layer (pkg/mcp/domain/):
+- config/ (from pkg/mcp/config/)
+- containerization/ (from pkg/mcp/analyze/, pkg/mcp/build/, pkg/mcp/deploy/, pkg/mcp/scan/)
+- errors/ (from pkg/mcp/errors/, pkg/mcp/errorcodes/)
+- security/ (from pkg/mcp/security/)
+- session/ (from pkg/mcp/session/)
+- types/ (from pkg/mcp/domaintypes/, pkg/mcp/shared/)
+Application Layer (pkg/mcp/application/):
+- api/ (from pkg/mcp/api/)
+- commands/ (from pkg/mcp/commands/)
+- core/ (from pkg/mcp/core/)
+- services/ (from pkg/mcp/services/)
+- tools/ (from pkg/mcp/tools/)
+- workflows/ (from pkg/mcp/workflows/)
+- state/ (from pkg/mcp/appstate/)
+- knowledge/ (from pkg/mcp/knowledge/)
+Infrastructure Layer (pkg/mcp/infra/):
+- logging/ (from pkg/mcp/logging/)
+- retry/ (from pkg/mcp/retry/)
+- persistence/ (already exists)
+- transport/ (already exists)

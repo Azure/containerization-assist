@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -104,7 +103,7 @@ func getBoolEnvWithDefault(key string, defaultValue bool) bool {
 	if value == "" {
 		return defaultValue
 	}
-	
+
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return defaultValue
@@ -117,7 +116,7 @@ func getFloatEnvWithDefault(key string, defaultValue float64) float64 {
 	if value == "" {
 		return defaultValue
 	}
-	
+
 	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return defaultValue
@@ -130,7 +129,7 @@ func getDurationEnvWithDefault(key string, defaultValue time.Duration) time.Dura
 	if value == "" {
 		return defaultValue
 	}
-	
+
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
 		return defaultValue

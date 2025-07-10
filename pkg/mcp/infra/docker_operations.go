@@ -10,7 +10,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan"
 )
 
 // DockerOperations handles Docker-specific operations

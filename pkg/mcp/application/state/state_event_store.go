@@ -1,4 +1,4 @@
-package state
+package appstate
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
-	"github.com/rs/zerolog"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // StateEventStore stores and retrieves state change events
@@ -17,17 +17,17 @@ type StateEventStore struct {
 	mu         sync.RWMutex
 	maxEvents  int
 	retention  time.Duration
-	logger     zerolog.Logger
+	logger     logging.Standards
 }
 
 // NewStateEventStore creates a new state event store
-func NewStateEventStore(logger zerolog.Logger) *StateEventStore {
+func NewStateEventStore(logger logging.Standards) *StateEventStore {
 	store := &StateEventStore{
 		events:     make(map[string][]*StateEvent),
 		eventsByID: make(map[string]*StateEvent),
 		maxEvents:  1000,
 		retention:  24 * time.Hour,
-		logger:     logger.With().Str("component", "state_event_store").Logger(),
+		logger:     logger.WithComponent("state_event_store"),
 	}
 
 	go store.cleanupRoutine()
@@ -95,7 +95,7 @@ func (s *StateEventStore) GetEventByID(eventID string) (*StateEvent, error) {
 	event, exists := s.eventsByID[eventID]
 	if !exists {
 		return nil, errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message(fmt.Sprintf("Event not found: %s", eventID)).
 			Context("event_id", eventID).
 			Context("component", "state_event_store").

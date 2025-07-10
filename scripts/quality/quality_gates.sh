@@ -26,7 +26,7 @@ record_gate() {
     local gate_name="$1"
     local status="$2"
     local details="$3"
-    
+
     if [ "$status" = "PASS" ]; then
         echo "✅ Gate: $gate_name - PASSED"
         GATE_RESULTS+=("✅ $gate_name: PASSED - $details")
@@ -43,7 +43,7 @@ echo "Checking Go code formatting compliance..."
 
 if command -v gofmt >/dev/null 2>&1; then
     UNFORMATTED_FILES=$(find pkg -name "*.go" -exec gofmt -l {} \; 2>/dev/null)
-    
+
     if [ -z "$UNFORMATTED_FILES" ]; then
         record_gate "Code Formatting" "PASS" "All Go files properly formatted"
     else
@@ -117,7 +117,7 @@ if timeout "${MAX_BUILD_TIME}s" go build ./pkg/mcp/... > "$BUILD_OUTPUT" 2>&1; t
 else
     BUILD_END_TIME=$(date +%s)
     BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
-    
+
     # Check if it was a timeout
     if [ "$BUILD_DURATION" -ge "$MAX_BUILD_TIME" ]; then
         record_gate "Build Verification" "FAIL" "Build timeout (>${MAX_BUILD_TIME}s)"
@@ -138,23 +138,23 @@ COVERAGE_OUTPUT="$REPORTS_DIR/coverage_gate.txt"
 if go test -cover ./pkg/mcp/... > "$COVERAGE_OUTPUT" 2>&1; then
     # Extract coverage from successful packages
     COVERAGE_LINES=$(grep "coverage:" "$COVERAGE_OUTPUT" | grep -v "0.0%")
-    
+
     if [ -n "$COVERAGE_LINES" ]; then
         # Calculate weighted average coverage
         TOTAL_STATEMENTS=0
         COVERED_STATEMENTS=0
-        
+
         while IFS= read -r line; do
             if [[ $line =~ coverage:\ ([0-9.]+)%\ of\ ([0-9]+)\ statements ]]; then
                 COVERAGE_PERCENT=${BASH_REMATCH[1]}
                 STATEMENTS=${BASH_REMATCH[2]}
-                
+
                 COVERED=$( echo "$STATEMENTS * $COVERAGE_PERCENT / 100" | bc -l 2>/dev/null || echo "0")
                 TOTAL_STATEMENTS=$( echo "$TOTAL_STATEMENTS + $STATEMENTS" | bc -l 2>/dev/null || echo "$TOTAL_STATEMENTS")
                 COVERED_STATEMENTS=$( echo "$COVERED_STATEMENTS + $COVERED" | bc -l 2>/dev/null || echo "$COVERED_STATEMENTS")
             fi
         done <<< "$COVERAGE_LINES"
-        
+
         if [ "$TOTAL_STATEMENTS" != "0" ]; then
             OVERALL_COVERAGE=$(echo "scale=1; $COVERED_STATEMENTS * 100 / $TOTAL_STATEMENTS" | bc -l 2>/dev/null || echo "0")
         else
@@ -163,9 +163,9 @@ if go test -cover ./pkg/mcp/... > "$COVERAGE_OUTPUT" 2>&1; then
     else
         OVERALL_COVERAGE="0"
     fi
-    
+
     echo "Overall coverage: ${OVERALL_COVERAGE}%"
-    
+
     if (( $(echo "$OVERALL_COVERAGE >= $COVERAGE_THRESHOLD" | bc -l 2>/dev/null || echo "0") )); then
         record_gate "Test Coverage" "PASS" "${OVERALL_COVERAGE}% (≥ ${COVERAGE_THRESHOLD}%)"
     else
@@ -192,7 +192,7 @@ if timeout 120s go test -bench=. -benchmem ./pkg/mcp/... > "$BENCHMARK_OUTPUT" 2
             }
         }
     }')
-    
+
     if [ -z "$SLOW_BENCHMARKS" ]; then
         BENCHMARK_COUNT=$(grep -c "^Benchmark" "$BENCHMARK_OUTPUT" || echo "0")
         record_gate "Performance Benchmarks" "PASS" "$BENCHMARK_COUNT benchmarks within ${PERFORMANCE_THRESHOLD_NS}ns target"

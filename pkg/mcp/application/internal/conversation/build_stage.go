@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 
-	publicutils "github.com/Azure/container-kit/pkg/mcp/domain/shared"
+	publicutils "github.com/Azure/container-kit/pkg/mcp/application/state"
 )
 
 func getIntFromMap(m map[string]interface{}, key string) int {

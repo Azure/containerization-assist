@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // Request represents a JSON-RPC 2.0 request
@@ -94,7 +94,7 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}) (j
 	reqBytes, err := json.Marshal(req)
 	if err != nil {
 		networkErr := errors.NetworkError(
-			codes.NETWORK_ERROR,
+			errors.NETWORK_ERROR,
 			"Failed to marshal request",
 			err,
 		)
@@ -105,7 +105,7 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}) (j
 	// Write request with newline
 	if _, err := fmt.Fprintf(c.writer, "%s\n", reqBytes); err != nil {
 		networkErr := errors.NetworkError(
-			codes.NETWORK_ERROR,
+			errors.NETWORK_ERROR,
 			"Failed to write request",
 			err,
 		)
@@ -119,7 +119,7 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}) (j
 		return nil, ctx.Err()
 	case <-c.ctx.Done():
 		systemErr := errors.SystemError(
-			codes.SYSTEM_UNAVAILABLE,
+			errors.SYSTEM_UNAVAILABLE,
 			"Client closed",
 			nil,
 		)
@@ -128,7 +128,7 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}) (j
 	case resp := <-respChan:
 		if resp.Error != nil {
 			networkErr := errors.NetworkError(
-				codes.NETWORK_ERROR,
+				errorcodes.NETWORK_ERROR,
 				fmt.Sprintf("RPC error %d: %s", resp.Error.Code, resp.Error.Message),
 				nil,
 			)

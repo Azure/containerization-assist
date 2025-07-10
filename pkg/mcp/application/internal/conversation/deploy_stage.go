@@ -8,7 +8,6 @@ import (
 
 	"github.com/Azure/container-kit/pkg/genericutils"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func getK8sManifestsFromMetadata(sessionState *session.SessionState) map[string]interface{} {

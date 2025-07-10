@@ -24,26 +24,26 @@ type MetricsManager struct {
 	ToolExecutionDuration metric.Float64Histogram
 	ToolExecutionCounter  metric.Int64Counter
 	ToolErrorCounter      metric.Int64Counter
-	
+
 	PipelineExecutionDuration metric.Float64Histogram
 	PipelineStageCounter      metric.Int64Counter
 	PipelineErrorCounter      metric.Int64Counter
-	
-	SessionCounter           metric.Int64Counter
-	SessionDuration         metric.Float64Histogram
-	
-	HTTPRequestDuration     metric.Float64Histogram
-	HTTPRequestCounter      metric.Int64Counter
-	
-	SystemMetrics           *SystemMetrics
+
+	SessionCounter  metric.Int64Counter
+	SessionDuration metric.Float64Histogram
+
+	HTTPRequestDuration metric.Float64Histogram
+	HTTPRequestCounter  metric.Int64Counter
+
+	SystemMetrics *SystemMetrics
 }
 
 // SystemMetrics holds system-level metrics
 type SystemMetrics struct {
-	MemoryUsage     metric.Int64ObservableGauge
-	CPUUsage        metric.Float64ObservableGauge
-	GoroutineCount  metric.Int64ObservableGauge
-	GCDuration      metric.Float64Histogram
+	MemoryUsage    metric.Int64ObservableGauge
+	CPUUsage       metric.Float64ObservableGauge
+	GoroutineCount metric.Int64ObservableGauge
+	GCDuration     metric.Float64Histogram
 }
 
 // NewMetricsManager creates a new metrics manager
@@ -192,7 +192,7 @@ func (mm *MetricsManager) initializeMetrics() error {
 // initializeSystemMetrics creates system-level metrics
 func (mm *MetricsManager) initializeSystemMetrics() error {
 	var err error
-	
+
 	mm.SystemMetrics = &SystemMetrics{}
 
 	// Memory usage gauge
@@ -270,7 +270,7 @@ func (mm *MetricsManager) RecordToolExecution(ctx context.Context, toolName stri
 	} else {
 		attrs = append(attrs, attribute.String("status", "success"))
 	}
-	
+
 	mm.ToolExecutionCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
@@ -355,7 +355,7 @@ func (mm *MetricsManager) InstrumentToolExecution(ctx context.Context, toolName 
 	start := time.Now()
 	err := fn(ctx)
 	duration := time.Since(start)
-	
+
 	mm.RecordToolExecution(ctx, toolName, duration, err)
 	return err
 }
@@ -365,7 +365,7 @@ func (mm *MetricsManager) InstrumentPipelineExecution(ctx context.Context, pipel
 	start := time.Now()
 	err := fn(ctx)
 	duration := time.Since(start)
-	
+
 	mm.RecordPipelineExecution(ctx, pipelineType, duration, stageCount, err)
 	return err
 }
@@ -376,7 +376,7 @@ func (mm *MetricsManager) InstrumentHTTPHandler(method, path string, fn func(con
 		start := time.Now()
 		statusCode, err := fn(ctx)
 		duration := time.Since(start)
-		
+
 		mm.RecordHTTPRequest(ctx, method, path, statusCode, duration)
 		return statusCode, err
 	}

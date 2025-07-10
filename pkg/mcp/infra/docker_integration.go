@@ -4,9 +4,9 @@ package infra
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/Azure/container-kit/pkg/core/docker"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // initializeDockerOperations initializes Docker operations when docker build tag is enabled
@@ -20,7 +20,12 @@ func (c *InfrastructureContainer) initializeDockerOperations() error {
 		CertPath: c.config.DockerCerts,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create Docker client: %w", err)
+		return errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("failed to create Docker client: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Create Docker operations
@@ -33,13 +38,23 @@ func (c *InfrastructureContainer) initializeDockerOperations() error {
 // checkDockerHealth checks Docker health when docker build tag is enabled
 func (c *InfrastructureContainer) checkDockerHealth(ctx context.Context) error {
 	if c.dockerOps == nil {
-		return fmt.Errorf("Docker operations not initialized")
+		return errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Message("Docker operations not initialized").
+			WithLocation().
+			Build()
 	}
 
 	// Test Docker connection by getting version info
 	versionInfo, err := c.dockerOps.client.Version(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get Docker version: %w", err)
+		return errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Messagef("failed to get Docker version: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	c.logger.Debug("Docker health check passed", "version", versionInfo.Version)

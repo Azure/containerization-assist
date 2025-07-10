@@ -1,16 +1,16 @@
 package runtime
 
 import (
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 type ToolRegistryUpdates struct {
-	logger zerolog.Logger
+	logger logging.Standards
 }
 
-func NewToolRegistryUpdates(logger zerolog.Logger) *ToolRegistryUpdates {
+func NewToolRegistryUpdates(logger logging.Standards) *ToolRegistryUpdates {
 	return &ToolRegistryUpdates{
-		logger: logger.With().Str("component", "tool_registry_updates").Logger(),
+		logger: logger.WithComponent("tool_registry_updates"),
 	}
 }
 func (t *ToolRegistryUpdates) GetUpdatedToolMap() map[string]string {

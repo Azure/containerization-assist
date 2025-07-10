@@ -6,12 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 )
-
-// ErrorCode represents a unique error identifier
-type ErrorCode = codes.ErrorCode
 
 // Common error codes
 const (

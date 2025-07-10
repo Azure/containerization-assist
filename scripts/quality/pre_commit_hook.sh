@@ -28,7 +28,7 @@ CHECKS_FAILED=0
 check_result() {
     local check_name="$1"
     local result="$2"
-    
+
     if [ "$result" -eq 0 ]; then
         echo "✅ $check_name: PASSED"
         CHECKS_PASSED=$((CHECKS_PASSED + 1))
@@ -77,7 +77,7 @@ done
 # Try to build affected packages
 if [ "$BUILD_ISSUES" -eq 0 ]; then
     AFFECTED_PACKAGES=$(for file in $STAGED_FILES; do dirname "$file"; done | sort -u | grep "^pkg/" | head -5)
-    
+
     for package in $AFFECTED_PACKAGES; do
         if [ -d "$package" ]; then
             if ! go build "$package" >/dev/null 2>&1; then
@@ -103,13 +103,13 @@ for file in $STAGED_FILES; do
             echo "   TODO/FIXME without context in: $file"
             LINT_ISSUES=$((LINT_ISSUES + 1))
         fi
-        
+
         # Check for fmt.Print usage (should use structured logging)
         if grep -H "fmt\.Print" "$file" >/dev/null 2>&1; then
             echo "   fmt.Print usage found in: $file (use structured logging)"
             LINT_ISSUES=$((LINT_ISSUES + 1))
         fi
-        
+
         # Check for panic usage
         if grep -H "panic(" "$file" >/dev/null 2>&1; then
             echo "   panic() usage found in: $file"
@@ -127,7 +127,7 @@ VET_ISSUES=0
 
 if [ "$QUICK_MODE" != "true" ]; then
     AFFECTED_PACKAGES=$(for file in $STAGED_FILES; do dirname "$file"; done | sort -u | grep "^pkg/" | head -3)
-    
+
     for package in $AFFECTED_PACKAGES; do
         if [ -d "$package" ]; then
             if ! go vet "$package" >/dev/null 2>&1; then
@@ -156,7 +156,7 @@ if [ "$SKIP_TESTS" != "true" ] && [ "$QUICK_MODE" != "true" ]; then
             TEST_FILES="$TEST_FILES $test_file"
         fi
     done
-    
+
     if [ -n "$TEST_FILES" ]; then
         echo "   Found related test files, validating..."
         for test_file in $TEST_FILES; do

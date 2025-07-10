@@ -1,10 +1,8 @@
 package core
 
 import (
+	"fmt"
 	"sync"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 )
 
 // DefaultValidatorRegistry implements ValidatorRegistry
@@ -23,30 +21,17 @@ func NewValidatorRegistry() ValidatorRegistry {
 // Register registers a validator
 func (r *DefaultValidatorRegistry) Register(name string, validator Validator) error {
 	if name == "" {
-		return errors.NewError().
-			Code(codes.VALIDATION_REQUIRED_MISSING).
-			Message("Validator name cannot be empty").
-			Context("field", "name").
-			Build()
+		return fmt.Errorf("validator name cannot be empty")
 	}
 	if validator == nil {
-		return errors.NewError().
-			Code(codes.VALIDATION_REQUIRED_MISSING).
-			Message("Validator cannot be nil").
-			Context("parameter", "validator").
-			Build()
+		return fmt.Errorf("validator cannot be nil")
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, exists := r.validators[name]; exists {
-		return errors.NewError().
-			Code(codes.RESOURCE_ALREADY_EXISTS).
-			Messagef("Validator '%s' is already registered", name).
-			Context("validator_name", name).
-			Suggestion("Use a different name or unregister the existing validator first").
-			Build()
+		return fmt.Errorf("validator '%s' is already registered", name)
 	}
 
 	r.validators[name] = validator
@@ -59,12 +44,7 @@ func (r *DefaultValidatorRegistry) Unregister(name string) error {
 	defer r.mu.Unlock()
 
 	if _, exists := r.validators[name]; !exists {
-		return errors.NewError().
-			Code(codes.RESOURCE_NOT_FOUND).
-			Messagef("Validator '%s' is not registered", name).
-			Context("validator_name", name).
-			Suggestion("Check the validator name or list available validators").
-			Build()
+		return fmt.Errorf("validator '%s' is not registered", name)
 	}
 
 	delete(r.validators, name)

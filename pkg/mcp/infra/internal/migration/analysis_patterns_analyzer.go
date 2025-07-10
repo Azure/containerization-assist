@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // NewPatternAnalyzer creates a new pattern analyzer
-func NewPatternAnalyzer(config PatternAnalysisConfig, logger zerolog.Logger) *PatternAnalyzer {
+func NewPatternAnalyzer(config PatternAnalysisConfig, logger logging.Standards) *PatternAnalyzer {
 	return &PatternAnalyzer{
-		logger:  logger.With().Str("component", "pattern_analyzer").Logger(),
+		logger:  logger.WithComponent("pattern_analyzer"),
 		config:  config,
 		fileSet: token.NewFileSet(),
 		statistics: PatternStatistics{
@@ -92,7 +92,7 @@ func (pa *PatternAnalyzer) AnalyzePatterns(rootPath string) (*PatternAnalysisRes
 		Int("hotspots", len(result.ComplexityHotspots)).
 		Int("duplications", len(result.DuplicationGroups)).
 		Int("anti_patterns", len(result.AntiPatterns)).
-		Dur("duration", pa.statistics.DetectionTime).
+		Str("duration", pa.statistics.DetectionTime.String()).
 		Msg("Pattern analysis completed")
 
 	return result, nil

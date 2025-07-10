@@ -21,6 +21,11 @@ on:
       - 'cmd/schemaGen/**'
       - 'Makefile'
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   check-schema-generation:
     name: Check Schema Generation

@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/deploy"
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // AnalyzeCommand implements the analyze tool at the application layer

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // NetworkValidators consolidates all Network/Infrastructure validation logic
@@ -24,7 +24,7 @@ func NewNetworkValidators() *NetworkValidators {
 func (nv *NetworkValidators) ValidateIPAddress(ip string) error {
 	if ip == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("IP address cannot be empty").
 			Build()
@@ -32,7 +32,7 @@ func (nv *NetworkValidators) ValidateIPAddress(ip string) error {
 
 	if net.ParseIP(ip) == nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid IP address format: %s", ip).
 			Build()
@@ -53,7 +53,7 @@ func (nv *NetworkValidators) ValidatePort(port interface{}) error {
 		portNum, err = strconv.Atoi(p)
 		if err != nil {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid port format: %s", p).
 				Build()
@@ -62,7 +62,7 @@ func (nv *NetworkValidators) ValidatePort(port interface{}) error {
 		portNum = int(p)
 	default:
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("port must be a number, got: %T", port).
 			Build()
@@ -70,7 +70,7 @@ func (nv *NetworkValidators) ValidatePort(port interface{}) error {
 
 	if portNum < 1 || portNum > 65535 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("port number out of range (1-65535): %d", portNum).
 			Build()
@@ -83,7 +83,7 @@ func (nv *NetworkValidators) ValidatePort(port interface{}) error {
 func (nv *NetworkValidators) ValidateURL(urlStr string) error {
 	if urlStr == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("URL cannot be empty").
 			Build()
@@ -92,7 +92,7 @@ func (nv *NetworkValidators) ValidateURL(urlStr string) error {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid URL format: %s", urlStr).
 			Build()
@@ -105,7 +105,7 @@ func (nv *NetworkValidators) ValidateURL(urlStr string) error {
 
 	if parsedURL.Scheme == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("URL missing scheme: %s", urlStr).
 			Build()
@@ -113,7 +113,7 @@ func (nv *NetworkValidators) ValidateURL(urlStr string) error {
 
 	if !validSchemes[strings.ToLower(parsedURL.Scheme)] {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("unsupported URL scheme: %s", parsedURL.Scheme).
 			Build()
@@ -126,7 +126,7 @@ func (nv *NetworkValidators) ValidateURL(urlStr string) error {
 func (nv *NetworkValidators) ValidateHostname(hostname string) error {
 	if hostname == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("hostname cannot be empty").
 			Build()
@@ -134,7 +134,7 @@ func (nv *NetworkValidators) ValidateHostname(hostname string) error {
 
 	if len(hostname) > 253 {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("hostname too long (max 253 chars): %s", hostname).
 			Build()
@@ -144,7 +144,7 @@ func (nv *NetworkValidators) ValidateHostname(hostname string) error {
 	validHostname := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 	if !validHostname.MatchString(hostname) {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid hostname format: %s", hostname).
 			Build()
@@ -157,7 +157,7 @@ func (nv *NetworkValidators) ValidateHostname(hostname string) error {
 func (nv *NetworkValidators) ValidateCIDR(cidr string) error {
 	if cidr == "" {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("CIDR cannot be empty").
 			Build()
@@ -166,7 +166,7 @@ func (nv *NetworkValidators) ValidateCIDR(cidr string) error {
 	_, _, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("invalid CIDR format: %s", cidr).
 			Build()
@@ -182,7 +182,7 @@ func (nv *NetworkValidators) ValidateLoadBalancerConfig(config map[string]interf
 	for _, field := range requiredFields {
 		if _, exists := config[field]; !exists {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("load balancer config missing required field: %s", field).
 				Build()
@@ -202,7 +202,7 @@ func (nv *NetworkValidators) ValidateLoadBalancerConfig(config map[string]interf
 		}
 		if !valid {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid load balancer type: %s", typeStr).
 				Build()
@@ -215,7 +215,7 @@ func (nv *NetworkValidators) ValidateLoadBalancerConfig(config map[string]interf
 			for i, port := range portList {
 				if err := nv.ValidatePort(port); err != nil {
 					return errors.NewError().
-						Code(codes.VALIDATION_FAILED).
+						Code(errorcodes.VALIDATION_FAILED).
 						Type(errors.ErrTypeValidation).
 						Messagef("invalid port in load balancer config at index %d: %v", i, err).
 						Build()
@@ -273,7 +273,7 @@ func (nv *NetworkValidators) validateFirewallRule(rule interface{}, index int) e
 	ruleMap, ok := rule.(map[string]interface{})
 	if !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Type(errors.ErrTypeValidation).
 			Messagef("firewall rule %d must be an object", index).
 			Build()
@@ -284,7 +284,7 @@ func (nv *NetworkValidators) validateFirewallRule(rule interface{}, index int) e
 	for _, field := range requiredFields {
 		if _, exists := ruleMap[field]; !exists {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("firewall rule %d missing required field: %s", index, field).
 				Build()
@@ -304,7 +304,7 @@ func (nv *NetworkValidators) validateFirewallRule(rule interface{}, index int) e
 		}
 		if !valid {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid firewall action in rule %d: %s", index, actionStr).
 				Build()
@@ -324,7 +324,7 @@ func (nv *NetworkValidators) validateFirewallRule(rule interface{}, index int) e
 		}
 		if !valid {
 			return errors.NewError().
-				Code(codes.VALIDATION_FAILED).
+				Code(errorcodes.VALIDATION_FAILED).
 				Type(errors.ErrTypeValidation).
 				Messagef("invalid protocol in firewall rule %d: %s", index, protocolStr).
 				Build()

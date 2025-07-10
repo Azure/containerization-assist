@@ -727,7 +727,7 @@ func (s *ServiceImpl) executeWorker(instance *workerInstance) {
 		instance.health.LastError = err
 		instance.health.ErrorCount++
 		instance.status = WorkerStatusFailed
-		s.logger.Error("Worker execution failed", "name", name, "error", err, "duration", duration)
+		s.logger.Error("Worker execution failed", "name", name, "error", err, "duration", duration.String())
 	} else {
 		instance.health.Healthy = true
 		instance.health.LastError = nil
@@ -735,7 +735,7 @@ func (s *ServiceImpl) executeWorker(instance *workerInstance) {
 		if instance.status != WorkerStatusRunning {
 			instance.status = WorkerStatusRunning
 		}
-		s.logger.Debug("Worker executed successfully", "name", name, "duration", duration)
+		s.logger.Debug("Worker executed successfully", "name", name, "duration", duration.String())
 	}
 	instance.health.Status = instance.status
 	instance.mutex.Unlock()

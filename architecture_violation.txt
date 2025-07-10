@@ -1,0 +1,39 @@
+=== ARCHITECTURE VIOLATION ASSESSMENT ===
+Current directories (VIOLATES ADR-001):
+pkg/mcp
+pkg/mcp/analyze
+pkg/mcp/api
+pkg/mcp/application
+pkg/mcp/appstate
+pkg/mcp/build
+pkg/mcp/commands
+pkg/mcp/config
+pkg/mcp/core
+pkg/mcp/deploy
+pkg/mcp/domain
+pkg/mcp/domaintypes
+pkg/mcp/errorcodes
+pkg/mcp/errors
+pkg/mcp/infra
+pkg/mcp/knowledge
+pkg/mcp/logging
+pkg/mcp/retry
+pkg/mcp/scan
+pkg/mcp/security
+pkg/mcp/services
+pkg/mcp/session
+pkg/mcp/shared
+pkg/mcp/tools
+pkg/mcp/workflows
+Count: 25 directories
+Required: EXACTLY 3 directories per ADR-001
+=== READING ADR-001 REQUIREMENTS ===
+# ADR-001: Three-Context Architecture Model
+
+Date: 2025-07-07
+Status: Accepted
+Context: Current 30+ package structure has deep nesting, import cycles, and unclear boundaries
+Decision: Adopt 3-bounded-context architecture: domain/, application/, infra/
+Consequences:
+- Easier: Clear separation of concerns, reduced import cycles, better testability
+- Harder: Initial migration effort, need to understand bounded context principles

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan"
+	"github.com/Azure/container-kit/pkg/mcp/domain/scan"
 )
 
 // TestScenario represents a test scenario for security scanning

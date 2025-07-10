@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/scan"
+	"github.com/Azure/container-kit/pkg/mcp/domain/scan"
 )
 
 // MockSecurityScanner provides mock implementations for security scanning

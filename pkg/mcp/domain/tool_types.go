@@ -5,7 +5,7 @@ package domain
 import (
 	"time"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/internal/types"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // ============================================================================
@@ -35,7 +35,7 @@ func NewExtendedResponse(toolName, sessionID string, dryRun bool) ExtendedToolRe
 }
 
 // ============================================================================
-// Security Scanning Types - Consolidated from scan_security_types.go
+// Security Scanning Types - Consolidated from scan_security_domaintypes.go
 // ============================================================================
 
 // BaseToolArgs provides common arguments for all tools
@@ -64,7 +64,7 @@ type AtomicScanImageSecurityArgs struct {
 	FailOnCritical      bool `json:"fail_on_critical,omitempty" description:"Fail if critical vulnerabilities found"`
 }
 
-// NOTE: SecurityScanResult moved to session_types.go to avoid redeclaration
+// NOTE: SecurityScanResult moved to session_domaintypes.go to avoid redeclaration
 
 // SecurityVulnerability represents a security vulnerability
 type SecurityVulnerability struct {
@@ -131,7 +131,7 @@ type Remediation struct {
 }
 
 // ============================================================================
-// Secret Scanning Types - Consolidated from secrets_types.go
+// Secret Scanning Types - Consolidated from secrets_domaintypes.go
 // ============================================================================
 
 // SecretScanArgs defines arguments for secret scanning
@@ -214,15 +214,15 @@ type BuildResult struct {
 type DeployArgs struct {
 	BaseToolArgs
 
-	Image       string               `json:"image" description:"Container image to deploy"`
-	Name        string               `json:"name" description:"Deployment name"`
-	Namespace   string               `json:"namespace,omitempty" description:"Kubernetes namespace"`
-	Replicas    int                  `json:"replicas,omitempty" description:"Number of replicas"`
-	Ports       []ContainerPort      `json:"ports,omitempty" description:"Exposed ports"`
-	Environment map[string]string    `json:"environment,omitempty" description:"Environment variables"`
-	Resources   types.ResourceLimits `json:"resources,omitempty" description:"Resource limits"`
-	HealthCheck HealthCheck          `json:"health_check,omitempty" description:"Health check configuration"`
-	Strategy    string               `json:"strategy,omitempty" description:"Deployment strategy"`
+	Image       string                     `json:"image" description:"Container image to deploy"`
+	Name        string                     `json:"name" description:"Deployment name"`
+	Namespace   string                     `json:"namespace,omitempty" description:"Kubernetes namespace"`
+	Replicas    int                        `json:"replicas,omitempty" description:"Number of replicas"`
+	Ports       []ContainerPort            `json:"ports,omitempty" description:"Exposed ports"`
+	Environment map[string]string          `json:"environment,omitempty" description:"Environment variables"`
+	Resources   domaintypes.ResourceLimits `json:"resources,omitempty" description:"Resource limits"`
+	HealthCheck HealthCheck                `json:"health_check,omitempty" description:"Health check configuration"`
+	Strategy    string                     `json:"strategy,omitempty" description:"Deployment strategy"`
 }
 
 // ContainerPort represents a container port configuration

@@ -1,10 +1,10 @@
-package state
+package appstate
 
 import (
 	"fmt"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
@@ -26,7 +26,7 @@ func (m *SessionToConversationMapping) MapState(source interface{}) (interface{}
 	sessionState, ok := source.(*session.SessionState)
 	if !ok {
 		return nil, errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Messagef("Expected *session.SessionState, got %T", source).
 			Context("expected_type", "*session.SessionState").
 			Context("actual_type", fmt.Sprintf("%T", source)).
@@ -51,7 +51,7 @@ func (m *SessionToConversationMapping) ReverseMap(target interface{}) (interface
 	conversationState, ok := target.(*BasicConversationState)
 	if !ok {
 		return nil, errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Messagef("Expected *BasicConversationState, got %T", target).
 			Context("expected_type", "*BasicConversationState").
 			Context("actual_type", fmt.Sprintf("%T", target)).
@@ -78,7 +78,7 @@ func (m *WorkflowToSessionMapping) SupportsReverse() bool {
 // ReverseMap is not supported for workflow to session mapping
 func (m *WorkflowToSessionMapping) ReverseMap(target interface{}) (interface{}, error) {
 	return nil, errors.NewError().
-		Code(codes.VALIDATION_FAILED).
+		Code(errorcodes.VALIDATION_FAILED).
 		Message("Reverse mapping not supported for workflow to session mapping").
 		Context("component", "workflow_to_session_mapping").
 		Build()

@@ -2,7 +2,8 @@ package pipeline
 
 import (
 	"context"
-	"fmt"
+
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // SimpleOperations provides direct container operations
@@ -19,11 +20,21 @@ func NewSimpleOperations() *SimpleOperations {
 // ExecuteDockerCommand runs Docker commands directly
 func (s *SimpleOperations) ExecuteDockerCommand(ctx context.Context, command string, args []string) error {
 	// Direct Docker API calls - no distributed complexity
-	return fmt.Errorf("docker command execution: %s %v", command, args)
+	return errors.NewError().
+		Code(errors.CodeContainerStartFailed).
+		Type(errors.ErrTypeContainer).
+		Messagef("docker command execution: %s %v", command, args).
+		WithLocation().
+		Build()
 }
 
 // ExecuteKubectlCommand runs kubectl commands directly
 func (s *SimpleOperations) ExecuteKubectlCommand(ctx context.Context, command string, args []string) error {
 	// Direct kubectl execution - no orchestration overhead
-	return fmt.Errorf("kubectl command execution: %s %v", command, args)
+	return errors.NewError().
+		Code(errors.CodeKubernetesAPIError).
+		Type(errors.ErrTypeKubernetes).
+		Messagef("kubectl command execution: %s %v", command, args).
+		WithLocation().
+		Build()
 }

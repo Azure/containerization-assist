@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 	"github.com/stretchr/testify/assert"
 )
 

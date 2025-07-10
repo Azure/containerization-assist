@@ -1,4 +1,4 @@
-package state
+package appstate
 
 // NOTE: StateMapping interface has been consolidated into StateService
 // in ../unified_interfaces.go for better maintainability.

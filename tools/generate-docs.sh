@@ -243,10 +243,10 @@ func (t *MyTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMes
             Wrap(err).
             Build()
     }
-    
+
     // Execute tool logic
     result := processInput(input)
-    
+
     // Return result
     return json.Marshal(result)
 }
@@ -306,14 +306,14 @@ runtime.MustRegisterToolWithMetadata(&MyTool{}, metadata)
 ```go
 func TestMyTool(t *testing.T) {
     tool := &MyTool{}
-    
+
     input := MyToolInput{
         Field: "value",
     }
-    
+
     args, _ := json.Marshal(input)
     result, err := tool.Execute(context.Background(), args)
-    
+
     assert.NoError(t, err)
     assert.NotNil(t, result)
 }
@@ -399,10 +399,10 @@ func (s *MyStage) Validate(input StageInput) error {
 func (s *MyStage) Execute(ctx context.Context, input StageInput) (StageOutput, error) {
     // Process input
     data := input.Get("data")
-    
+
     // Perform operations
     result := process(data)
-    
+
     // Return output
     output := NewStageOutput()
     output.Set("result", result)
@@ -544,10 +544,10 @@ func TestPipeline(t *testing.T) {
     pipeline := NewTestPipeline().
         WithMockStage("analyze", mockAnalyzeResult).
         WithMockStage("build", mockBuildResult)
-    
+
     // Execute test
     response, err := pipeline.Execute(ctx, testRequest)
-    
+
     // Verify results
     assert.NoError(t, err)
     assert.Equal(t, "success", response.Status)
@@ -675,12 +675,12 @@ type ServiceContainer interface {
     ToolRegistry() ToolRegistry
     SessionManager() SessionManager
     WorkflowEngine() WorkflowEngine
-    
+
     // Domain Services
     BuildExecutor() BuildExecutor
     Scanner() Scanner
     Deployer() Deployer
-    
+
     // Infrastructure Services
     Storage() Storage
     DockerClient() DockerClient
@@ -976,7 +976,7 @@ import (
     "encoding/json"
     "fmt"
     "log"
-    
+
     "github.com/Azure/container-kit/pkg/mcp/application/core"
 )
 
@@ -988,22 +988,22 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Get tool registry
     registry := server.ToolRegistry()
-    
+
     // Execute analyze tool
     args := map[string]interface{}{
         "repository": "/path/to/repo",
         "framework": "auto-detect",
     }
-    
+
     argsJSON, _ := json.Marshal(args)
     result, err := registry.Execute(context.Background(), "analyze", argsJSON)
     if err != nil {
         log.Fatal(err)
     }
-    
+
     fmt.Printf("Analysis result: %s\n", result)
 }
 ```
@@ -1228,13 +1228,13 @@ stages:
     args:
       repository: ./my-python-app
       framework: python
-      
+
   - name: optimize
     tool: optimize
     args:
       dockerfile: ./my-python-app/Dockerfile
       target_size: minimal
-      
+
   - name: build
     tool: build
     args:
@@ -1243,7 +1243,7 @@ stages:
       platforms:
         - linux/amd64
         - linux/arm64
-        
+
   - name: scan
     tool: scan
     args:

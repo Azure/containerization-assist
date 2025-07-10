@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/docker"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	"github.com/Azure/container-kit/pkg/runner"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDockerOperationOptimizer_NewDockerOperationOptimizer(t *testing.T) {
-	logger := zerolog.New(zerolog.NewTestWriter(t))
+	logger := logging.NewTestLogger()
 	dockerClient := docker.NewDockerCmdRunner(&runner.FakeCommandRunner{})
 
 	config := OptimizationConfig{
@@ -37,7 +37,7 @@ func TestDockerOperationOptimizer_NewDockerOperationOptimizer(t *testing.T) {
 }
 
 func TestDockerOperationOptimizer_PullOperation(t *testing.T) {
-	logger := zerolog.New(zerolog.NewTestWriter(t))
+	logger := logging.NewTestLogger()
 
 	// Create fake docker client that returns predictable results
 	fakeRunner := &runner.FakeCommandRunner{
@@ -72,7 +72,7 @@ func TestDockerOperationOptimizer_PullOperation(t *testing.T) {
 }
 
 func TestDockerOperationOptimizer_BuildOperation(t *testing.T) {
-	logger := zerolog.New(zerolog.NewTestWriter(t))
+	logger := logging.NewTestLogger()
 
 	// Mock successful build command
 	fakeRunner := &runner.FakeCommandRunner{
@@ -101,7 +101,7 @@ func TestDockerOperationOptimizer_BuildOperation(t *testing.T) {
 }
 
 func TestDockerOperationOptimizer_ResourceLimits(t *testing.T) {
-	logger := zerolog.New(zerolog.NewTestWriter(t))
+	logger := logging.NewTestLogger()
 	dockerClient := docker.NewDockerCmdRunner(&runner.FakeCommandRunner{})
 
 	config := OptimizationConfig{
@@ -124,7 +124,7 @@ func TestDockerOperationOptimizer_ResourceLimits(t *testing.T) {
 }
 
 func TestDockerOperationOptimizer_ErrorHandling(t *testing.T) {
-	logger := zerolog.New(zerolog.NewTestWriter(t))
+	logger := logging.NewTestLogger()
 
 	// Mock failed command
 	fakeRunner := &runner.FakeCommandRunner{

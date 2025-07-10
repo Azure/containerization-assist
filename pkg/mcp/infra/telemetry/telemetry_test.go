@@ -10,19 +10,19 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	if config.ServiceName != "container-kit" {
 		t.Errorf("Expected service name 'container-kit', got '%s'", config.ServiceName)
 	}
-	
+
 	if config.TracingEnabled != true {
 		t.Error("Expected tracing to be enabled by default")
 	}
-	
+
 	if config.MetricsEnabled != true {
 		t.Error("Expected metrics to be enabled by default")
 	}
-	
+
 	if err := config.Validate(); err != nil {
 		t.Errorf("Default config should be valid: %v", err)
 	}
@@ -188,11 +188,11 @@ func TestInstrumentPipelineStage(t *testing.T) {
 	executed := false
 	err = tm.InstrumentPipelineStage(ctx, "test-pipeline", "test-stage", func(ctx context.Context) error {
 		executed = true
-		
+
 		// Verify we can add attributes and events
 		tm.AddContextualAttributes(ctx, attribute.String("test.key", "test.value"))
 		tm.RecordEvent(ctx, "test.event")
-		
+
 		return nil
 	})
 

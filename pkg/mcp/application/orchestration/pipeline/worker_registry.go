@@ -1,5 +1,7 @@
 package pipeline
 
+import "context"
+
 // WorkerRegistry manages registration and discovery of workers
 type WorkerRegistry interface {
 	// Register adds a new worker to the registry
@@ -28,11 +30,11 @@ func NewWorkerRegistry(service Service) WorkerRegistry {
 }
 
 func (w *workerRegistry) Register(worker BackgroundWorker) error {
-	return w.service.RegisterWorker(worker)
+	return w.service.RegisterWorker(context.Background(), worker)
 }
 
 func (w *workerRegistry) Unregister(name string) error {
-	return w.service.UnregisterWorker(name)
+	return w.service.UnregisterWorker(context.Background(), name)
 }
 
 func (w *workerRegistry) Get(_ string) (BackgroundWorker, error) {

@@ -356,9 +356,12 @@ func (c *DefaultServiceContainer) initializeServices() {
 	c.manifestService = kubernetes.NewManifestService(logger)
 	c.deploymentService = kubernetes.NewService(coreClients, logger)
 
-	// Initialize real core services directly
-	c.analyzer = analysis.NewRepositoryAnalyzer(logger)
-	c.scanner = security.NewSecurityService(logger, nil)
+	// Initialize real core services with adapters for context support
+	coreAnalyzer := analysis.NewRepositoryAnalyzer(logger)
+	c.analyzer = NewAnalyzerAdapter(coreAnalyzer)
+
+	coreScanner := security.NewSecurityService(logger, nil)
+	c.scanner = NewScannerAdapter(coreScanner)
 
 	// Initialize session storage (stub for now to avoid import cycles)
 	c.sessionStore = NewSessionStoreStub(logger)

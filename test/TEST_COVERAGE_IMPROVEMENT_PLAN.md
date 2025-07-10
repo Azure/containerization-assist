@@ -113,7 +113,7 @@ func TestRichError_WithContext(t *testing.T) {
         Message("test error").
         Context("field", "value").
         Build()
-    
+
     assert.Equal(t, errors.CodeValidationFailed, err.Code())
     assert.Equal(t, "value", err.Context()["field"])
 }
@@ -129,9 +129,9 @@ Example:
 func TestToolRegistry_Execute(t *testing.T) {
     registry := NewToolRegistry()
     mockTool := &MockTool{}
-    
+
     registry.Register(mockTool)
-    
+
     result, err := registry.Execute(ctx, "mock-tool", args)
     assert.NoError(t, err)
     assert.NotNil(t, result)
@@ -149,7 +149,7 @@ func TestToolRegistry_Execute(t *testing.T) {
 ```go
 func TestFunction_Scenario(t *testing.T) {
     // Arrange
-    // Act  
+    // Act
     // Assert
 }
 ```
@@ -178,7 +178,7 @@ func TestFunction_Scenario(t *testing.T) {
 ### Week 2: Critical Domain Tests
 - [ ] Fix build issues blocking tests
 - [ ] Implement domain/errors comprehensive tests
-- [ ] Implement domain/security validation tests  
+- [ ] Implement domain/security validation tests
 - [ ] Implement domain/session tests
 
 ### Week 3: Domain Layer Completion

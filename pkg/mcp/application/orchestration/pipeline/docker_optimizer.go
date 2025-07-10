@@ -6,12 +6,12 @@ import (
 
 	"github.com/Azure/container-kit/pkg/docker"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // DockerOperationOptimizer provides Docker operation optimization
 type DockerOperationOptimizer struct {
-	logger       zerolog.Logger
+	logger       logging.Standards
 	dockerClient docker.DockerClient
 }
 
@@ -51,9 +51,11 @@ type CachedOperation struct {
 }
 
 // NewDockerOperationOptimizer creates a simple Docker operation wrapper
-func NewDockerOperationOptimizer(dockerClient docker.DockerClient, config OptimizationConfig, logger zerolog.Logger) *DockerOperationOptimizer {
+func NewDockerOperationOptimizer(dockerClient docker.DockerClient, config OptimizationConfig, logger logging.Standards) *DockerOperationOptimizer {
+	// Store the config for potential future use
+	_ = config
 	return &DockerOperationOptimizer{
-		logger:       logger.With().Str("component", "docker_optimizer").Logger(),
+		logger:       logger.WithComponent("docker_optimizer"),
 		dockerClient: dockerClient,
 	}
 }

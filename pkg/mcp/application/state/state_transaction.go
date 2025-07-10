@@ -1,11 +1,11 @@
-package state
+package appstate
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
+	errorcodes "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // StateOperation represents a single state operation in a transaction
@@ -70,7 +70,7 @@ func (t *StateTransaction) Delete(stateType StateType, id string) *StateTransact
 func (t *StateTransaction) Commit() error {
 	if t.committed {
 		return errors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(errorcodes.VALIDATION_FAILED).
 			Message("Transaction already committed").
 			Context("component", "state_transaction").
 			Suggestion("Create a new transaction for additional operations").
@@ -81,7 +81,7 @@ func (t *StateTransaction) Commit() error {
 		if op.Validator != nil {
 			if err := op.Validator(op.State); err != nil {
 				return errors.NewError().
-					Code(codes.VALIDATION_FAILED).
+					Code(errorcodes.VALIDATION_FAILED).
 					Message(fmt.Sprintf("Validation failed for %s/%s", op.StateType, op.StateID)).
 					Cause(err).
 					Context("state_type", string(op.StateType)).
@@ -104,7 +104,7 @@ func (t *StateTransaction) Commit() error {
 			if err := t.manager.SetState(t.ctx, op.StateType, op.StateID, op.State); err != nil {
 				t.rollback(rollback[:completed])
 				systemErr := errors.SystemError(
-					codes.SYSTEM_ERROR,
+					errorcodes.SYSTEM_ERROR,
 					fmt.Sprintf("Transaction operation %d failed", i),
 					err,
 				)
@@ -130,7 +130,7 @@ func (t *StateTransaction) Commit() error {
 			if err := t.manager.DeleteState(t.ctx, op.StateType, op.StateID); err != nil {
 				t.rollback(rollback[:completed])
 				systemErr := errors.SystemError(
-					codes.SYSTEM_ERROR,
+					errorcodes.SYSTEM_ERROR,
 					fmt.Sprintf("Transaction operation %d failed", i),
 					err,
 				)

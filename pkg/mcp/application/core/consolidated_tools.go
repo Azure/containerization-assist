@@ -37,7 +37,7 @@ func (t *ConsolidatedAnalyzeTool) Description() string {
 	return t.description
 }
 
-func (t *ConsolidatedAnalyzeTool) Execute(_ context.Context, input api.ToolInput) (api.ToolOutput, error) {
+func (t *ConsolidatedAnalyzeTool) Execute(ctx context.Context, input api.ToolInput) (api.ToolOutput, error) {
 	t.logger.Info("Executing consolidated analyze tool", "session_id", input.SessionID)
 
 	// Extract repository path from input
@@ -58,7 +58,7 @@ func (t *ConsolidatedAnalyzeTool) Execute(_ context.Context, input api.ToolInput
 	}
 
 	// Perform analysis
-	result, err := t.analyzer.AnalyzeRepository(repoPath)
+	result, err := t.analyzer.AnalyzeRepository(ctx, repoPath)
 	if err != nil {
 		return api.ToolOutput{
 			Success: false,

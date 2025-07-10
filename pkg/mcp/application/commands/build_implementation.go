@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // BuildStrategy represents a build strategy for implementation
@@ -59,7 +60,12 @@ func (cmd *ConsolidatedBuildCommand) detectBuildStrategy(ctx context.Context, wo
 func (cmd *ConsolidatedBuildCommand) analyzeDockerfile(dockerfilePath string) (*BuildStrategy, error) {
 	content, err := os.ReadFile(dockerfilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Dockerfile: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("failed to read Dockerfile: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	dockerfile := string(content)
@@ -432,7 +438,12 @@ func (cmd *ConsolidatedBuildCommand) optimizeBuildContext(ctx context.Context, w
 	// Calculate original context size
 	originalSize, err := cmd.calculateDirectorySize(workspaceDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to calculate directory size: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("failed to calculate directory size: %w", err).
+			WithLocation().
+			Build()
 	}
 	optimization.OriginalSize = originalSize
 
@@ -827,12 +838,22 @@ func (cmd *ConsolidatedBuildCommand) optimizeBuildPerformance(ctx context.Contex
 func (cmd *ConsolidatedBuildCommand) validateBuildEnvironment(ctx context.Context, workspaceDir string) error {
 	// Check if Docker is available
 	if cmd.dockerClient == nil {
-		return fmt.Errorf("Docker client not available")
+		return errors.NewError().
+			Code(errors.CodeContainerStartFailed).
+			Type(errors.ErrTypeContainer).
+			Message("Docker client not available").
+			WithLocation().
+			Build()
 	}
 
 	// Check workspace directory
 	if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
-		return fmt.Errorf("workspace directory does not exist: %s", workspaceDir)
+		return errors.NewError().
+			Code(errors.CodeFileNotFound).
+			Type(errors.ErrTypeIO).
+			Messagef("workspace directory does not exist: %s", workspaceDir).
+			WithLocation().
+			Build()
 	}
 
 	// Check disk space

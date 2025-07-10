@@ -33,7 +33,7 @@ var importMappings = map[string]string{
 
 	// Session consolidation
 	"github.com/Azure/container-kit/pkg/mcp/internal/store/session": "github.com/Azure/container-kit/pkg/mcp/internal/session",
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared/session":  "github.com/Azure/container-kit/pkg/mcp/internal/session",
+	"github.com/Azure/container-kit/pkg/mcp/shared/session":         "github.com/Azure/container-kit/pkg/mcp/internal/session",
 
 	// Workflow simplification
 	"github.com/Azure/container-kit/pkg/mcp/internal/orchestration/workflow": "github.com/Azure/container-kit/pkg/mcp/internal/workflow",

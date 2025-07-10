@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // circuitBreaker implements a simple circuit breaker pattern
@@ -30,7 +30,7 @@ type HTTPLLMTransport struct {
 	client  *http.Client
 	baseURL string
 	apiKey  string
-	logger  zerolog.Logger
+	logger  logging.Standards
 	cb      *circuitBreaker
 	// metrics functionality removed
 	connected bool
@@ -44,12 +44,14 @@ type HTTPLLMTransportConfig struct {
 }
 
 // NewHTTPLLMTransport creates a new HTTP LLM transport
-func NewHTTPLLMTransport(config HTTPLLMTransportConfig, logger zerolog.Logger) *HTTPLLMTransport {
+func NewHTTPLLMTransport(config HTTPLLMTransportConfig, logger logging.Standards) *HTTPLLMTransport {
 	return NewHTTPLLMTransportWithMetrics(config, logger, nil)
 }
 
 // NewHTTPLLMTransportWithMetrics creates a new HTTP LLM transport with metrics
-func NewHTTPLLMTransportWithMetrics(config HTTPLLMTransportConfig, logger zerolog.Logger, metrics interface{}) *HTTPLLMTransport {
+func NewHTTPLLMTransportWithMetrics(config HTTPLLMTransportConfig, logger logging.Standards, metrics interface{}) *HTTPLLMTransport {
+	// Store the metrics for potential future use
+	_ = metrics
 	if config.Timeout == 0 {
 		config.Timeout = 30 * time.Second
 	}
@@ -60,7 +62,7 @@ func NewHTTPLLMTransportWithMetrics(config HTTPLLMTransportConfig, logger zerolo
 		},
 		baseURL: config.BaseURL,
 		apiKey:  config.APIKey,
-		logger:  logger.With().Str("component", "http_llm_transport").Logger(),
+		logger:  logger.WithComponent("http_llm_transport"),
 		cb: &circuitBreaker{
 			failureLimit: 5,
 			resetTimeout: 60 * time.Second,
@@ -305,7 +307,7 @@ func (h *HTTPLLMTransport) Stop(ctx context.Context) error {
 
 // Send implements types.LLMTransport
 func (h *HTTPLLMTransport) Send(ctx context.Context, message interface{}) error {
-	h.logger.Debug().Interface("message", message).Msg("Sending message via HTTP LLM transport")
+	h.logger.Debug().Str("message", fmt.Sprintf("%+v", message)).Msg("Sending message via HTTP LLM transport")
 	// For HTTP transport, sending is handled via InvokeTool
 	return nil
 }

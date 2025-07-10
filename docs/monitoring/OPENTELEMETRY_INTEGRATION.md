@@ -75,7 +75,7 @@ func (t *MyTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMes
 
         // Your tool logic here
         result, err := t.processInput(ctx, args)
-        
+
         if err != nil {
             tm.RecordEvent(ctx, "tool.validation.failed",
                 attribute.String("error.type", "validation"),
@@ -114,7 +114,7 @@ func (p *Pipeline) ExecuteStage(ctx context.Context, stage string) error {
 ```go
 func (s *Server) handleToolExecution(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
-    
+
     statusCode, err := tm.InstrumentHTTPRequest(ctx, r.Method, r.URL.Path, func(ctx context.Context) (int, error) {
         // Add request context
         tm.AddContextualAttributes(ctx,
@@ -148,14 +148,14 @@ func (sm *SessionManager) CreateSession(ctx context.Context, config SessionConfi
     defer span.End()
 
     start := time.Now()
-    
+
     tm.AddContextualAttributes(ctx,
         attribute.String("session.type", config.Type),
         attribute.String("user.id", config.UserID),
     )
 
     session, err := sm.createSessionInternal(ctx, config)
-    
+
     // Record metrics
     if err != nil {
         tm.Metrics().RecordSessionCreation(ctx, "failed")
@@ -197,7 +197,7 @@ func recordCustomMetric(ctx context.Context, operationType string, dur time.Dura
 func callExternalService(ctx context.Context, url string) error {
     // Create HTTP client with tracing
     client := &http.Client{}
-    
+
     req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
     if err != nil {
         return err
@@ -242,7 +242,7 @@ func handleOperation(ctx context.Context) error {
 
     for i, item := range items {
         ctx, itemSpan := tm.Tracing().StartSpan(ctx, "process.item")
-        
+
         tm.AddContextualAttributes(ctx,
             attribute.Int("item.index", i),
             attribute.String("item.id", item.ID),
@@ -255,9 +255,9 @@ func handleOperation(ctx context.Context) error {
                 attribute.String("error.type", getErrorType(err)),
                 attribute.String("item.id", item.ID),
             )
-            
+
             itemSpan.End()
-            
+
             // Decide whether to continue or fail entire operation
             if isCriticalError(err) {
                 return fmt.Errorf("critical error processing item %s: %w", item.ID, err)

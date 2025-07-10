@@ -64,7 +64,7 @@ func (cmd *ConsolidatedAnalyzeCommand) Execute(ctx context.Context, input api.To
 	}
 
 	// Get workspace directory for the session
-	workspaceDir, err := cmd.getSessionWorkspace(analysisRequest.SessionID)
+	workspaceDir, err := cmd.getSessionWorkspace(ctx, analysisRequest.SessionID)
 	if err != nil {
 		return api.ToolOutput{}, errors.NewError().
 			Code(errors.CodeInternalError).
@@ -84,7 +84,7 @@ func (cmd *ConsolidatedAnalyzeCommand) Execute(ctx context.Context, input api.To
 	}
 
 	// Update session state with analysis results
-	if err := cmd.updateSessionState(analysisRequest.SessionID, analysisResult); err != nil {
+	if err := cmd.updateSessionState(ctx, analysisRequest.SessionID, analysisResult); err != nil {
 		cmd.logger.Warn("failed to update session state", "error", err)
 	}
 
@@ -107,7 +107,12 @@ func (cmd *ConsolidatedAnalyzeCommand) parseAnalysisInput(input api.ToolInput) (
 
 	// Support both repository_path and repo_url for backward compatibility
 	if repositoryPath == "" && repoURL == "" {
-		return nil, fmt.Errorf("either repository_path or repo_url must be provided")
+		return nil, errors.NewError().
+			Code(errors.CodeMissingParameter).
+			Type(errors.ErrTypeValidation).
+			Message("either repository_path or repo_url must be provided").
+			WithLocation().
+			Build()
 	}
 
 	targetPath := repositoryPath
@@ -186,15 +191,25 @@ func (cmd *ConsolidatedAnalyzeCommand) validateAnalysisRequest(request *Analysis
 }
 
 // getSessionWorkspace retrieves the workspace directory for a session
-func (cmd *ConsolidatedAnalyzeCommand) getSessionWorkspace(sessionID string) (string, error) {
-	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(sessionID)
+func (cmd *ConsolidatedAnalyzeCommand) getSessionWorkspace(ctx context.Context, sessionID string) (string, error) {
+	sessionMetadata, err := cmd.sessionState.GetSessionMetadata(ctx, sessionID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get session metadata: %w", err)
+		return "", errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("failed to get session metadata: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	workspaceDir, ok := sessionMetadata["workspace_dir"].(string)
 	if !ok || workspaceDir == "" {
-		return "", fmt.Errorf("workspace directory not found for session %s", sessionID)
+		return "", errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeSession).
+			Messagef("workspace directory not found for session %s", sessionID).
+			WithLocation().
+			Build()
 	}
 
 	return workspaceDir, nil
@@ -222,12 +237,22 @@ func (cmd *ConsolidatedAnalyzeCommand) performAnalysis(ctx context.Context, requ
 
 	// Perform language detection
 	if err := cmd.detectLanguage(ctx, result, workspaceDir); err != nil {
-		return nil, fmt.Errorf("language detection failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("language detection failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Perform framework detection
 	if err := cmd.detectFramework(ctx, result, workspaceDir); err != nil {
-		return nil, fmt.Errorf("framework detection failed: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("framework detection failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Perform dependency analysis if requested
@@ -297,7 +322,12 @@ func (cmd *ConsolidatedAnalyzeCommand) detectLanguage(ctx context.Context, resul
 
 	// File extension-based detection
 	if err := cmd.detectLanguageByExtension(workspaceDir, languageMap); err != nil {
-		return fmt.Errorf("extension-based language detection failed: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("extension-based language detection failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Content-based detection
@@ -392,13 +422,23 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeDockerfile(ctx context.Context, re
 	// Parse and analyze Dockerfile
 	dockerfile, err := cmd.parseDockerfile(dockerfilePath)
 	if err != nil {
-		return fmt.Errorf("failed to parse Dockerfile: %w", err)
+		return errors.NewError().
+			Code(errors.CodeDockerfileSyntaxError).
+			Type(errors.ErrTypeContainer).
+			Messagef("failed to parse Dockerfile: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Analyze Dockerfile for security issues
 	securityIssues, err := cmd.analyzeDockerfileSecurity(dockerfile)
 	if err != nil {
-		return fmt.Errorf("dockerfile security analysis failed: %w", err)
+		return errors.NewError().
+			Code(errors.CodeSecurityViolation).
+			Type(errors.ErrTypeSecurity).
+			Messagef("dockerfile security analysis failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	result.SecurityIssues = append(result.SecurityIssues, securityIssues...)
@@ -406,7 +446,12 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeDockerfile(ctx context.Context, re
 	// Generate Dockerfile recommendations
 	recommendations, err := cmd.generateDockerfileRecommendations(dockerfile)
 	if err != nil {
-		return fmt.Errorf("dockerfile recommendations failed: %w", err)
+		return errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeInternal).
+			Messagef("dockerfile recommendations failed: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	result.Recommendations = append(result.Recommendations, recommendations...)
@@ -415,7 +460,7 @@ func (cmd *ConsolidatedAnalyzeCommand) analyzeDockerfile(ctx context.Context, re
 }
 
 // updateSessionState updates session state with analysis results
-func (cmd *ConsolidatedAnalyzeCommand) updateSessionState(sessionID string, result *analyze.AnalysisResult) error {
+func (cmd *ConsolidatedAnalyzeCommand) updateSessionState(ctx context.Context, sessionID string, result *analyze.AnalysisResult) error {
 	// Update session state with analysis results
 	stateUpdate := map[string]interface{}{
 		"last_analysis": result,
@@ -425,7 +470,7 @@ func (cmd *ConsolidatedAnalyzeCommand) updateSessionState(sessionID string, resu
 		"confidence":    result.Confidence,
 	}
 
-	return cmd.sessionState.UpdateSessionData(sessionID, stateUpdate)
+	return cmd.sessionState.UpdateSessionData(ctx, sessionID, stateUpdate)
 }
 
 // createAnalysisResponse creates the final analysis response

@@ -1,62 +1,19 @@
 === COVERAGE SUMMARY ===
-Generated: Wed Jul  9 20:37:15 EDT 2025
+Generated: Wed Jul  9 21:37:38 EDT 2025
 
-Overall Coverage: 
+Overall Coverage:
 
 Per-Package Coverage:
 Package | Coverage | Status
 --------|----------|--------
-api | 0.0% | ❌ No coverage
-application | 0.0% | ❌ No coverage
-application/commands | 0.0% | ❌ No coverage
-application/conversation | 0.0% | ❌ No coverage
-application/core | 0.0% | ❌ No coverage
-application/internal | 0.0% | ❌ No coverage
-ok | 14.6% | ❌ Poor
-ok | 44.8% | ⚠️  Needs work
-ok | 20.8% | ❌ Poor
-application/knowledge | 0.0% | ❌ No coverage
-application/logging | 0.0% | ❌ No coverage
-application/services | 0.0% | ❌ No coverage
-application/state | 0.0% | ❌ No coverage
-ok | 0.0% | ❌ No coverage
-domain | 0.0% | ❌ No coverage
-ok | 68.2% | ✅ Good
-ok | 69.5% | ✅ Good
-domain/config | 0.0% | ❌ No coverage
-ok | 68.2% | ✅ Good
-ok | 69.5% | ✅ Good
-ok | 55.7% | ✅ Good
-ok | 52.5% | ⚠️  Needs work
-ok | 55.7% | ✅ Good
-domain/internal/common | 0.0% | ❌ No coverage
-domain/internal/types | 0.0% | ❌ No coverage
-ok | 4.6% | ❌ Poor
-ok | 52.5% | ⚠️  Needs work
-ok | 34.2% | ⚠️  Needs work
-domain/security/validators | 0.0% | ❌ No coverage
-domain/shared | 0.0% | ❌ No coverage
-domain/tools | 0.0% | ❌ No coverage
-domain/types | 0.0% | ❌ No coverage
-ok | 14.3% | ❌ Poor
-infra | 0.0% | ❌ No coverage
-infra/internal/migration | 0.0% | ❌ No coverage
-infra/persistence | 0.0% | ❌ No coverage
-ok | 44.8% | ⚠️  Needs work
-infra/templates | 0.0% | ❌ No coverage
-ok | 8.6% | ❌ Poor
-ok | 46.2% | ⚠️  Needs work
 
 Packages without tests:
-- domain/constants
-- domain/internal/constants
-- errors/codes
 
-Build failures: 1 packages
+Build failures: 0 packages
 
 === TARGETS AND RECOMMENDATIONS ===
 Current vs Baseline:
-- Current: 
+- Current:
 - Baseline: 15.0%
 - Target: 55%
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/container-kit/pkg/mcp/application/state"
+	appstate "github.com/Azure/container-kit/pkg/mcp/application/state"
 )
 
 // StateProvider provides state observation and subscription capabilities
@@ -43,12 +43,12 @@ type StateHistoryEntry struct {
 
 // stateProvider implements StateProvider
 type stateProvider struct {
-	stateManager *state.UnifiedStateManager
+	stateManager *appstate.UnifiedStateManager
 	callbacks    []StateChangeCallback
 }
 
 // NewStateProvider creates a new StateProvider service
-func NewStateProvider(stateManager *state.UnifiedStateManager) StateProvider {
+func NewStateProvider(stateManager *appstate.UnifiedStateManager) StateProvider {
 	return &stateProvider{
 		stateManager: stateManager,
 		callbacks:    make([]StateChangeCallback, 0),
@@ -92,7 +92,7 @@ func (s *stateProvider) Checkpoint(_ context.Context) error {
 func (s *stateProvider) GetHistory(ctx context.Context, key string) ([]StateHistoryEntry, error) {
 	// Get history from UnifiedStateManager
 	// GetStateHistory needs context, state type, state ID and limit
-	events, err := s.stateManager.GetStateHistory(ctx, state.StateTypeGlobal, key, 100)
+	events, err := s.stateManager.GetStateHistory(ctx, appstate.StateTypeGlobal, key, 100)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +116,8 @@ type callbackObserver struct {
 	id       string
 }
 
-func (c *callbackObserver) OnStateChange(event *state.StateEvent) error {
-	if event.EventType == state.StateEventUpdated {
+func (c *callbackObserver) OnStateChange(event *appstate.StateEvent) error {
+	if event.EventType == appstate.StateEventUpdated {
 		c.callback(event.StateID, event.OldValue, event.NewValue)
 	}
 	return nil

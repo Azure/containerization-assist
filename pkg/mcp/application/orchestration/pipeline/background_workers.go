@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/config"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // BackgroundWorker represents a managed background worker

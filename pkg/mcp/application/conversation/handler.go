@@ -2,12 +2,12 @@ package conversation
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // ConversationHandler handles conversation messages and orchestrates tool execution
@@ -47,7 +47,12 @@ func (h *ConversationHandler) HandleMessage(ctx context.Context, msg *Conversati
 	// Get or create session
 	session, err := h.getOrCreateSession(ctx, msg.SessionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("failed to get session: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Process message based on type
@@ -59,7 +64,12 @@ func (h *ConversationHandler) HandleMessage(ctx context.Context, msg *Conversati
 	case "status_request":
 		return h.handleStatusRequest(ctx, session, msg)
 	default:
-		return nil, fmt.Errorf("unknown message type: %s", msg.Type)
+		return nil, errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("unknown message type: %s", msg.Type).
+			WithLocation().
+			Build()
 	}
 }
 
@@ -67,13 +77,23 @@ func (h *ConversationHandler) HandleMessage(ctx context.Context, msg *Conversati
 func (h *ConversationHandler) handleToolRequest(ctx context.Context, session *api.Session, msg *ConversationMessage) (*ConversationResponse, error) {
 	toolName := msg.ToolName
 	if toolName == "" {
-		return nil, fmt.Errorf("tool name is required")
+		return nil, errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("tool name is required").
+			WithLocation().
+			Build()
 	}
 
 	// Get tool from registry
-	tool, err := h.toolRegistry.GetTool(toolName)
+	tool, err := h.toolRegistry.GetTool(ctx, toolName)
 	if err != nil {
-		return nil, fmt.Errorf("tool not found: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeNotFound).
+			Type(errors.ErrTypeNotFound).
+			Messagef("tool not found: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	// Create tool input
@@ -121,7 +141,12 @@ func (h *ConversationHandler) handleWorkflowRequest(ctx context.Context, session
 	// Extract workflow request
 	workflowReq, ok := msg.Arguments.(*WorkflowRequest)
 	if !ok {
-		return nil, fmt.Errorf("invalid workflow request format")
+		return nil, errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("invalid workflow request format").
+			WithLocation().
+			Build()
 	}
 
 	h.logger.Info("Executing workflow",
@@ -147,7 +172,12 @@ func (h *ConversationHandler) handleStatusRequest(ctx context.Context, session *
 	// Extract status request
 	statusReq, ok := msg.Arguments.(*StatusRequest)
 	if !ok {
-		return nil, fmt.Errorf("invalid status request format")
+		return nil, errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("invalid status request format").
+			WithLocation().
+			Build()
 	}
 
 	h.logger.Debug("Processing status request",
@@ -161,7 +191,12 @@ func (h *ConversationHandler) handleStatusRequest(ctx context.Context, session *
 		// Get session status
 		sessionState, err := h.sessionState.GetState(ctx, msg.SessionID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get session state: %w", err)
+			return nil, errors.NewError().
+				Code(errors.CodeInternalError).
+				Type(errors.ErrTypeSession).
+				Messagef("failed to get session state: %w", err).
+				WithLocation().
+				Build()
 		}
 
 		statusResp = StatusResponse{
@@ -186,7 +221,7 @@ func (h *ConversationHandler) handleStatusRequest(ctx context.Context, session *
 
 	case "tool":
 		// Get tool metrics
-		metrics := h.toolRegistry.GetMetrics()
+		metrics := h.toolRegistry.GetMetrics(ctx)
 		statusResp = StatusResponse{
 			Type: "tool",
 			Summary: StatusSummary{
@@ -198,7 +233,12 @@ func (h *ConversationHandler) handleStatusRequest(ctx context.Context, session *
 		}
 
 	default:
-		return nil, fmt.Errorf("unknown status type: %s", statusReq.Type)
+		return nil, errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Messagef("unknown status type: %s", statusReq.Type).
+			WithLocation().
+			Build()
 	}
 
 	return &ConversationResponse{
@@ -226,7 +266,12 @@ func (h *ConversationHandler) getOrCreateSession(ctx context.Context, sessionID 
 	}
 
 	if err := h.sessionStore.Create(ctx, session); err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
+		return nil, errors.NewError().
+			Code(errors.CodeInternalError).
+			Type(errors.ErrTypeSession).
+			Messagef("failed to create session: %w", err).
+			WithLocation().
+			Build()
 	}
 
 	h.logger.Info("Created new session", slog.String("session_id", sessionID))

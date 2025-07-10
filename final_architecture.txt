@@ -1,0 +1,6 @@
+=== FINAL ARCHITECTURE VALIDATION ===
+Top-level directories (MUST BE EXACTLY 3):
+pkg/mcp/application
+pkg/mcp/domain
+pkg/mcp/infra
+Count: 3

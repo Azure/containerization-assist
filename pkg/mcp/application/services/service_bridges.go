@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/core/analysis"
+	"github.com/Azure/container-kit/pkg/core/security"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 )
 
 // WorkflowExecutorStub provides a stub implementation
@@ -42,7 +44,7 @@ func (w *WorkflowExecutorStub) ExecuteStep(_ context.Context, step *api.Workflow
 	}, nil
 }
 
-func (w *WorkflowExecutorStub) ValidateWorkflow(workflow *api.Workflow) error {
+func (w *WorkflowExecutorStub) ValidateWorkflow(ctx context.Context, workflow *api.Workflow) error {
 	w.logger.Info("Validating workflow", "workflow_id", workflow.ID)
 	return nil
 }
@@ -61,27 +63,27 @@ func (c *ConversationServiceStub) ProcessMessage(_ context.Context, sessionID, m
 	return &ConversationResponse{
 		SessionID:     sessionID,
 		Message:       "I understand your request. How can I help you further?",
-		Stage:         shared.StageAnalysis,
+		Stage:         domaintypes.StageAnalysis,
 		Status:        "active",
 		RequiresInput: false,
 	}, nil
 }
 
-func (c *ConversationServiceStub) GetConversationState(sessionID string) (*ConversationState, error) {
+func (c *ConversationServiceStub) GetConversationState(ctx context.Context, sessionID string) (*ConversationState, error) {
 	c.logger.Info("Getting conversation state", "session_id", sessionID)
 	return &ConversationState{
 		SessionID:    sessionID,
-		CurrentStage: shared.StageAnalysis,
+		CurrentStage: domaintypes.StageAnalysis,
 		LastActivity: time.Now(),
 	}, nil
 }
 
-func (c *ConversationServiceStub) UpdateConversationStage(sessionID string, stage shared.ConversationStage) error {
+func (c *ConversationServiceStub) UpdateConversationStage(ctx context.Context, sessionID string, stage domaintypes.ConversationStage) error {
 	c.logger.Info("Updating conversation stage", "session_id", sessionID, "stage", stage)
 	return nil
 }
 
-func (c *ConversationServiceStub) GetConversationHistory(sessionID string, limit int) ([]ConversationTurn, error) {
+func (c *ConversationServiceStub) GetConversationHistory(ctx context.Context, sessionID string, limit int) ([]ConversationTurn, error) {
 	c.logger.Info("Getting conversation history", "session_id", sessionID, "limit", limit)
 	return []ConversationTurn{
 		{
@@ -89,12 +91,12 @@ func (c *ConversationServiceStub) GetConversationHistory(sessionID string, limit
 			Timestamp: time.Now(),
 			Role:      "user",
 			Content:   "Hello",
-			Stage:     shared.StageAnalysis,
+			Stage:     domaintypes.StageAnalysis,
 		},
 	}, nil
 }
 
-func (c *ConversationServiceStub) ClearConversationContext(sessionID string) error {
+func (c *ConversationServiceStub) ClearConversationContext(ctx context.Context, sessionID string) error {
 	c.logger.Info("Clearing conversation context", "session_id", sessionID)
 	return nil
 }
@@ -108,17 +110,17 @@ func NewPromptServiceStub(logger *slog.Logger) PromptService {
 	return &PromptServiceStub{logger: logger}
 }
 
-func (p *PromptServiceStub) BuildPrompt(stage shared.ConversationStage, _ map[string]interface{}) (string, error) {
+func (p *PromptServiceStub) BuildPrompt(ctx context.Context, stage domaintypes.ConversationStage, _ map[string]interface{}) (string, error) {
 	p.logger.Info("Building prompt", "stage", stage)
 	return fmt.Sprintf("You are in stage %s. Please provide assistance.", stage), nil
 }
 
-func (p *PromptServiceStub) ProcessPromptResponse(response string, _ *ConversationState) error {
+func (p *PromptServiceStub) ProcessPromptResponse(ctx context.Context, response string, _ *ConversationState) error {
 	p.logger.Info("Processing prompt response", "response_length", len(response))
 	return nil
 }
 
-func (p *PromptServiceStub) DetectWorkflowIntent(message string) (*WorkflowIntent, error) {
+func (p *PromptServiceStub) DetectWorkflowIntent(ctx context.Context, message string) (*WorkflowIntent, error) {
 	p.logger.Info("Detecting workflow intent", "message", message)
 	return &WorkflowIntent{
 		Detected:   true,
@@ -127,7 +129,7 @@ func (p *PromptServiceStub) DetectWorkflowIntent(message string) (*WorkflowInten
 	}, nil
 }
 
-func (p *PromptServiceStub) ShouldAutoAdvance(state *ConversationState) (bool, *AutoAdvanceConfig) {
+func (p *PromptServiceStub) ShouldAutoAdvance(ctx context.Context, state *ConversationState) (bool, *AutoAdvanceConfig) {
 	p.logger.Info("Checking auto-advance", "session_id", state.SessionID)
 	return false, &AutoAdvanceConfig{
 		Enabled: false,
@@ -150,7 +152,7 @@ func (e *ErrorReporterFromLogger) ReportError(_ context.Context, err error, cont
 	e.logger.Error("Error reported", "error", err, "context", context)
 }
 
-func (e *ErrorReporterFromLogger) GetErrorStats() ErrorStats {
+func (e *ErrorReporterFromLogger) GetErrorStats(ctx context.Context) ErrorStats {
 	return ErrorStats{
 		TotalErrors:  0,
 		ErrorsByType: make(map[string]int64),
@@ -159,7 +161,7 @@ func (e *ErrorReporterFromLogger) GetErrorStats() ErrorStats {
 	}
 }
 
-func (e *ErrorReporterFromLogger) SuggestFix(_ error) []string {
+func (e *ErrorReporterFromLogger) SuggestFix(ctx context.Context, _ error) []string {
 	return []string{"Check logs for more details"}
 }
 
@@ -172,20 +174,20 @@ func NewToolRegistryStub(logger *slog.Logger) ToolRegistry {
 	return &ToolRegistryStub{logger: logger}
 }
 
-func (t *ToolRegistryStub) Register(name string, _ api.Tool) error {
+func (t *ToolRegistryStub) Register(ctx context.Context, name string, _ api.Tool) error {
 	t.logger.Info("Registering tool", "name", name)
 	return nil
 }
 
-func (t *ToolRegistryStub) GetTool(name string) (api.Tool, error) {
+func (t *ToolRegistryStub) GetTool(ctx context.Context, name string) (api.Tool, error) {
 	return nil, fmt.Errorf("tool not found: %s", name)
 }
 
-func (t *ToolRegistryStub) ListTools() []string {
+func (t *ToolRegistryStub) ListTools(ctx context.Context) []string {
 	return []string{}
 }
 
-func (t *ToolRegistryStub) GetMetrics() api.RegistryMetrics {
+func (t *ToolRegistryStub) GetMetrics(ctx context.Context) api.RegistryMetrics {
 	return api.RegistryMetrics{
 		TotalTools:           0,
 		ActiveTools:          0,
@@ -205,12 +207,12 @@ func NewPipelineServiceStub(logger *slog.Logger) PipelineService {
 	return &PipelineServiceStub{logger: logger}
 }
 
-func (p *PipelineServiceStub) Start() error {
+func (p *PipelineServiceStub) Start(ctx context.Context) error {
 	p.logger.Info("Starting pipeline service")
 	return nil
 }
 
-func (p *PipelineServiceStub) Stop() error {
+func (p *PipelineServiceStub) Stop(ctx context.Context) error {
 	p.logger.Info("Stopping pipeline service")
 	return nil
 }
@@ -219,7 +221,7 @@ func (p *PipelineServiceStub) IsRunning() bool {
 	return true
 }
 
-func (p *PipelineServiceStub) CancelJob(jobID string) error {
+func (p *PipelineServiceStub) CancelJob(ctx context.Context, jobID string) error {
 	p.logger.Info("Canceling job", "job_id", jobID)
 	return nil
 }
@@ -345,12 +347,12 @@ func (s *SessionStateStub) SetWorkspaceDir(_ context.Context, sessionID string, 
 	return nil
 }
 
-func (s *SessionStateStub) GetSessionMetadata(sessionID string) (map[string]interface{}, error) {
+func (s *SessionStateStub) GetSessionMetadata(ctx context.Context, sessionID string) (map[string]interface{}, error) {
 	s.logger.Info("Getting session metadata", "session_id", sessionID)
 	return map[string]interface{}{"created": time.Now()}, nil
 }
 
-func (s *SessionStateStub) UpdateSessionData(sessionID string, _ map[string]interface{}) error {
+func (s *SessionStateStub) UpdateSessionData(ctx context.Context, sessionID string, _ map[string]interface{}) error {
 	s.logger.Info("Updating session data", "session_id", sessionID)
 	return nil
 }
@@ -364,7 +366,7 @@ func NewConfigValidatorStub(logger *slog.Logger) ConfigValidator {
 	return &ConfigValidatorStub{logger: logger}
 }
 
-func (v *ConfigValidatorStub) ValidateDockerfile(_ string) (*ValidationResult, error) {
+func (v *ConfigValidatorStub) ValidateDockerfile(ctx context.Context, _ string) (*ValidationResult, error) {
 	v.logger.Info("Validating Dockerfile")
 	return &ValidationResult{
 		Valid:    true,
@@ -374,7 +376,7 @@ func (v *ConfigValidatorStub) ValidateDockerfile(_ string) (*ValidationResult, e
 	}, nil
 }
 
-func (v *ConfigValidatorStub) ValidateManifest(_ string) (*ValidationResult, error) {
+func (v *ConfigValidatorStub) ValidateManifest(ctx context.Context, _ string) (*ValidationResult, error) {
 	v.logger.Info("Validating manifest")
 	return &ValidationResult{
 		Valid:    true,
@@ -384,7 +386,7 @@ func (v *ConfigValidatorStub) ValidateManifest(_ string) (*ValidationResult, err
 	}, nil
 }
 
-func (v *ConfigValidatorStub) ValidateConfig(_ map[string]interface{}) (*ValidationResult, error) {
+func (v *ConfigValidatorStub) ValidateConfig(ctx context.Context, _ map[string]interface{}) (*ValidationResult, error) {
 	v.logger.Info("Validating configuration")
 	return &ValidationResult{
 		Valid:    true,
@@ -392,6 +394,48 @@ func (v *ConfigValidatorStub) ValidateConfig(_ map[string]interface{}) (*Validat
 		Warnings: []ValidationWarning{},
 		Score:    100,
 	}, nil
+}
+
+// AnalyzerAdapter adapts the core analyzer to accept context
+type AnalyzerAdapter struct {
+	analyzer *analysis.RepositoryAnalyzer
+}
+
+func NewAnalyzerAdapter(analyzer *analysis.RepositoryAnalyzer) Analyzer {
+	return &AnalyzerAdapter{analyzer: analyzer}
+}
+
+func (a *AnalyzerAdapter) AnalyzeRepository(ctx context.Context, repoPath string) (*analysis.AnalysisResult, error) {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.analyzer.AnalyzeRepository(repoPath)
+}
+
+// ScannerAdapter adapts the core scanner to accept context
+type ScannerAdapter struct {
+	scanner security.Service
+}
+
+func NewScannerAdapter(scanner security.Service) Scanner {
+	return &ScannerAdapter{scanner: scanner}
+}
+
+func (s *ScannerAdapter) ScanImage(ctx context.Context, image string, options security.ScanOptionsService) (*security.ScanResult, error) {
+	return s.scanner.ScanImage(ctx, image, options)
+}
+
+func (s *ScannerAdapter) ScanDirectory(ctx context.Context, path string, options security.ScanOptionsService) (*security.ScanResult, error) {
+	return s.scanner.ScanDirectory(ctx, path, options)
+}
+
+func (s *ScannerAdapter) GetAvailableScanners(ctx context.Context) []string {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
+	return s.scanner.GetAvailableScanners()
 }
 
 // PersistenceStub provides a stub implementation

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func (ps *PromptServiceImpl) hasPassedPreFlightChecks(_ *ConversationState) bool {

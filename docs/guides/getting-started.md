@@ -147,13 +147,13 @@ stages:
     args:
       repository: ./my-python-app
       framework: python
-      
+
   - name: optimize
     tool: optimize
     args:
       dockerfile: ./my-python-app/Dockerfile
       target_size: minimal
-      
+
   - name: build
     tool: build
     args:
@@ -162,7 +162,7 @@ stages:
       platforms:
         - linux/amd64
         - linux/arm64
-        
+
   - name: scan
     tool: scan
     args:

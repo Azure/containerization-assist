@@ -1,5 +1,7 @@
 package pipeline
 
+import "context"
+
 // Monitor provides monitoring and statistics for the pipeline
 type Monitor interface {
 	// GetStatus returns the overall pipeline status
@@ -33,11 +35,11 @@ func (p *pipelineMonitor) GetStatus() (*Status, error) {
 }
 
 func (p *pipelineMonitor) GetWorkerStats() ManagerStats {
-	return p.service.GetManagerStats()
+	return p.service.GetManagerStats(context.Background())
 }
 
 func (p *pipelineMonitor) GetJobStats() OrchestratorStats {
-	return p.service.GetOrchestratorStats()
+	return p.service.GetOrchestratorStats(context.Background())
 }
 
 func (p *pipelineMonitor) GetConfiguration() *PipelineConfig {

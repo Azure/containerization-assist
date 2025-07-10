@@ -2,12 +2,12 @@ package pipeline
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
 )
 
@@ -127,7 +127,12 @@ type SecurityMetrics struct {
 func (s *SecurityServiceImpl) ValidateDockerOperation(_ context.Context, sessionID, operation string, args map[string]interface{}) error {
 	// Basic validation logic
 	if s.requireAuthentication && sessionID == "" {
-		return fmt.Errorf("session ID required for authentication")
+		return errors.NewError().
+			Code(errors.CodeValidationFailed).
+			Type(errors.ErrTypeValidation).
+			Message("session ID required for authentication").
+			WithLocation().
+			Build()
 	}
 
 	// Check if operation is allowed
@@ -136,7 +141,12 @@ func (s *SecurityServiceImpl) ValidateDockerOperation(_ context.Context, session
 			// Check blocked images
 			for _, blocked := range s.blockedImages {
 				if strings.Contains(imageRef, blocked) {
-					return fmt.Errorf("image %s is blocked", imageRef)
+					return errors.NewError().
+						Code(errors.CodeSecurityViolation).
+						Type(errors.ErrTypeSecurity).
+						Messagef("image %s is blocked", imageRef).
+						WithLocation().
+						Build()
 				}
 			}
 		}

@@ -33,7 +33,7 @@ type SessionState struct {
 	CurrentStage string   `json:"current_stage"`
 	Status       string   `json:"status"`
 	Stage        string   `json:"stage"`
-	Errors       []string `json:"github.com/Azure/container-kit/pkg/mcp/domain/errors"`
+	Errors       []string `json:"errors"`
 
 	SecurityScan *SecurityScanResult `json:"security_scan,omitempty"`
 

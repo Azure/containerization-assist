@@ -78,7 +78,7 @@ func TestRichError_WithLocation(t *testing.T) {
 func TestRichError_ErrorWrapping(t *testing.T) {
 	// Test wrapping of standard errors
 	originalErr := errors.New("original error")
-	
+
 	wrappedErr := domainerrros.NewError().
 		Code(domainerrros.CodeExternalServiceError).
 		Message("external service failed").
@@ -94,13 +94,13 @@ func TestRichError_ErrorWrapping(t *testing.T) {
 func TestRichError_ChainedWrapping(t *testing.T) {
 	// Test multiple levels of error wrapping
 	level1 := errors.New("database connection failed")
-	
+
 	level2 := domainerrros.NewError().
 		Code(domainerrros.CodeExternalServiceError).
 		Message("storage layer error").
 		Wrap(level1).
 		Build()
-	
+
 	level3 := domainerrros.NewError().
 		Code(domainerrros.CodeOperationFailed).
 		Message("user operation failed").
@@ -112,7 +112,7 @@ func TestRichError_ChainedWrapping(t *testing.T) {
 	// Test the error chain
 	assert.True(t, errors.Is(level3, level1))
 	assert.True(t, errors.Is(level3, level2))
-	
+
 	// Test unwrapping
 	assert.Equal(t, level2, level3.Unwrap())
 	assert.Equal(t, level1, level2.Unwrap())
@@ -141,7 +141,7 @@ func TestRichError_JSONSerialization(t *testing.T) {
 	var unmarshaledErr domainerrros.RichError
 	unmarshalErr := unmarshaledErr.UnmarshalJSON(jsonData)
 	require.NoError(t, unmarshalErr)
-	
+
 	assert.Equal(t, err.Code(), unmarshaledErr.Code())
 	assert.Equal(t, err.Message(), unmarshaledErr.Error())
 	assert.Equal(t, err.Severity(), unmarshaledErr.Severity())
@@ -268,7 +268,7 @@ func BenchmarkRichError_WithLocation(b *testing.B) {
 // Property-based test example
 func TestRichError_Properties(t *testing.T) {
 	// Test that RichError maintains its properties correctly
-	
+
 	// Property: Error code should always be preserved
 	t.Run("code_preservation", func(t *testing.T) {
 		codes := []domainerrros.ErrorCode{
@@ -276,13 +276,13 @@ func TestRichError_Properties(t *testing.T) {
 			domainerrros.CodeConfigurationInvalid,
 			domainerrros.CodeInternalError,
 		}
-		
+
 		for _, code := range codes {
 			err := domainerrros.NewError().Code(code).Build()
 			assert.Equal(t, code, err.Code())
 		}
 	})
-	
+
 	// Property: Context should be additive
 	t.Run("context_additive", func(t *testing.T) {
 		err := domainerrros.NewError().
@@ -290,14 +290,14 @@ func TestRichError_Properties(t *testing.T) {
 			Context("key2", "value2").
 			Context("key3", "value3").
 			Build()
-		
+
 		context := err.Context()
 		assert.Len(t, context, 3)
 		assert.Equal(t, "value1", context["key1"])
 		assert.Equal(t, "value2", context["key2"])
 		assert.Equal(t, "value3", context["key3"])
 	})
-	
+
 	// Property: Suggestions should be accumulated
 	t.Run("suggestions_accumulative", func(t *testing.T) {
 		err := domainerrros.NewError().
@@ -305,7 +305,7 @@ func TestRichError_Properties(t *testing.T) {
 			Suggestion("suggestion 2").
 			Suggestion("suggestion 3").
 			Build()
-		
+
 		suggestions := err.Suggestions()
 		assert.Len(t, suggestions, 3)
 		assert.Contains(t, suggestions, "suggestion 1")
@@ -319,12 +319,12 @@ func TestRichError_WithContext_Integration(t *testing.T) {
 	// Test RichError behavior with Go context
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, "request_id", "req-12345")
-	
+
 	err := domainerrros.NewError().
 		Code(domainerrros.CodeValidationFailed).
 		Message("validation failed").
 		Context("request_id", ctx.Value("request_id")).
 		Build()
-	
+
 	assert.Equal(t, "req-12345", err.Context()["request_id"])
 }

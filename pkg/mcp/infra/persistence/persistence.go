@@ -10,14 +10,15 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 	"github.com/Azure/container-kit/pkg/mcp/infra/retry"
-	"github.com/rs/zerolog/log"
 	bolt "go.etcd.io/bbolt"
 )
 
 // BoltSessionStore implements SessionStore using BoltDB
 type BoltSessionStore struct {
-	db *bolt.DB
+	db     *bolt.DB
+	logger logging.Standards
 }
 
 const (
@@ -25,7 +26,7 @@ const (
 )
 
 // NewBoltSessionStore creates a new BoltDB-based session store
-func NewBoltSessionStore(ctx context.Context, dbPath string) (*BoltSessionStore, error) {
+func NewBoltSessionStore(ctx context.Context, dbPath string, logger logging.Standards) (*BoltSessionStore, error) {
 	retryCoordinator := retry.New()
 
 	var db *bolt.DB
@@ -41,7 +42,7 @@ func NewBoltSessionStore(ctx context.Context, dbPath string) (*BoltSessionStore,
 		if openErr == bolt.ErrTimeout {
 			backupPath := fmt.Sprintf("%s.locked.%d", dbPath, time.Now().Unix())
 			if renameErr := os.Rename(dbPath, backupPath); renameErr == nil {
-				log.Warn().Str("backup_path", backupPath).Msg("Moved locked database file")
+				logger.Warn().Str("backup_path", backupPath).Msg("Moved locked database file")
 				db, openErr = bolt.Open(dbPath, 0o600, &bolt.Options{
 					Timeout:        5 * time.Second,
 					NoGrowSync:     false,
@@ -64,12 +65,12 @@ func NewBoltSessionStore(ctx context.Context, dbPath string) (*BoltSessionStore,
 	})
 	if err != nil {
 		if closeErr := db.Close(); closeErr != nil {
-			log.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
+			logger.Warn().Err(closeErr).Msg("Failed to close database after bucket creation error")
 		}
 		return nil, errors.Wrapf(err, "persistence", "Failed to create sessions bucket in database")
 	}
 
-	return &BoltSessionStore{db: db}, nil
+	return &BoltSessionStore{db: db, logger: logger}, nil
 }
 
 // Save persists a session state to the database
@@ -223,7 +224,11 @@ func (s *BoltSessionStore) List(ctx context.Context) ([]string, error) {
 }
 
 // Close closes the database connection
-func (s *BoltSessionStore) Close() error {
+func (s *BoltSessionStore) Close(ctx context.Context) error {
+	// BoltDB doesn't support context-aware close, but we can check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return s.db.Close()
 }
 
@@ -381,6 +386,10 @@ func (s *MemorySessionStore) List(ctx context.Context) ([]string, error) {
 }
 
 // Close is a no-op for memory store
-func (s *MemorySessionStore) Close() error {
+func (s *MemorySessionStore) Close(ctx context.Context) error {
+	// Check context for consistency
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return nil
 }

@@ -2,11 +2,11 @@ package conversation
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
+	errors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
 )
 
 // AutoFixHelper provides automatic error recovery and fixing capabilities
@@ -128,7 +128,12 @@ func (h *AutoFixHelper) registerCommonFixes() {
 				slog.String("error", err.Error()))
 
 			// Return a helpful error message
-			return nil, fmt.Errorf("authentication required: please ensure Docker is logged in to the registry")
+			return nil, errors.NewError().
+				Code(errors.CodePermissionDenied).
+				Type(errors.ErrTypePermission).
+				Message("authentication required: please ensure Docker is logged in to the registry").
+				WithLocation().
+				Build()
 		}
 		return nil, err
 	}
@@ -139,7 +144,12 @@ func (h *AutoFixHelper) registerCommonFixes() {
 			h.logger.Info("Network error detected, suggesting retry")
 
 			// Could implement retry logic here
-			return nil, fmt.Errorf("network error: %w. Please check your internet connection and try again", err)
+			return nil, errors.NewError().
+				Code(errors.CodeNetworkTimeout).
+				Type(errors.ErrTypeNetwork).
+				Messagef("network error: %w. Please check your internet connection and try again", err).
+				WithLocation().
+				Build()
 		}
 		return nil, err
 	}
@@ -150,7 +160,12 @@ func (h *AutoFixHelper) registerCommonFixes() {
 			h.logger.Warn("Permission error detected",
 				slog.String("error", err.Error()))
 
-			return nil, fmt.Errorf("permission denied: ensure you have the necessary permissions to perform this operation")
+			return nil, errors.NewError().
+				Code(errors.CodePermissionDenied).
+				Type(errors.ErrTypePermission).
+				Message("permission denied: ensure you have the necessary permissions to perform this operation").
+				WithLocation().
+				Build()
 		}
 		return nil, err
 	}
@@ -161,7 +176,12 @@ func (h *AutoFixHelper) registerCommonFixes() {
 			h.logger.Error("Disk space error detected",
 				slog.String("error", err.Error()))
 
-			return nil, fmt.Errorf("insufficient disk space: please free up disk space and try again. Consider running 'docker system prune'")
+			return nil, errors.NewError().
+				Code(errors.CodeInternalError).
+				Type(errors.ErrTypeInternal).
+				Message("insufficient disk space: please free up disk space and try again. Consider running 'docker system prune'").
+				WithLocation().
+				Build()
 		}
 		return nil, err
 	}

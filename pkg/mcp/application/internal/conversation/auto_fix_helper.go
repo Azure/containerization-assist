@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 type AutoFixHelper struct {

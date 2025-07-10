@@ -3,8 +3,6 @@ package conversation
 import (
 	"fmt"
 	"strings"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func getStageProgress(currentStage shared.ConversationStage) string {

@@ -388,7 +388,7 @@ func (s *ServiceImpl) ScanImage(_ context.Context, image string, options ScanOpt
 	s.recordScan(scanID, image, "image", result.Scanner, startTime, endTime, "completed", result)
 	s.updateMetrics(result)
 
-	s.logger.Info("Image scan completed", "image", image, "vulnerabilities", len(vulnerabilities), "duration", duration)
+	s.logger.Info("Image scan completed", "image", image, "vulnerabilities", len(vulnerabilities), "duration", duration.String())
 	return result, nil
 }
 
@@ -427,7 +427,7 @@ func (s *ServiceImpl) ScanDirectory(_ context.Context, path string, options Scan
 	s.recordScan(scanID, path, "directory", result.Scanner, startTime, endTime, "completed", result)
 	s.updateMetrics(result)
 
-	s.logger.Info("Directory scan completed", "path", path, "vulnerabilities", len(vulnerabilities), "duration", duration)
+	s.logger.Info("Directory scan completed", "path", path, "vulnerabilities", len(vulnerabilities), "duration", duration.String())
 	return result, nil
 }
 
@@ -466,7 +466,7 @@ func (s *ServiceImpl) ScanDockerfile(_ context.Context, content string, options 
 	s.recordScan(scanID, "Dockerfile", "dockerfile", result.Scanner, startTime, endTime, "completed", result)
 	s.updateMetrics(result)
 
-	s.logger.Info("Dockerfile scan completed", "vulnerabilities", len(vulnerabilities), "duration", duration)
+	s.logger.Info("Dockerfile scan completed", "vulnerabilities", len(vulnerabilities), "duration", duration.String())
 	return result, nil
 }
 
@@ -500,7 +500,7 @@ func (s *ServiceImpl) ScanSecrets(_ context.Context, path string, options Secret
 		},
 	}
 
-	s.logger.Info("Secret scan completed", "path", path, "secrets", len(secrets), "duration", duration)
+	s.logger.Info("Secret scan completed", "path", path, "secrets", len(secrets), "duration", duration.String())
 	return result, nil
 }
 
@@ -534,7 +534,7 @@ func (s *ServiceImpl) ValidateSecrets(_ context.Context, content string, _ Secre
 		},
 	}
 
-	s.logger.Info("Secret validation completed", "secrets", len(secrets), "duration", duration)
+	s.logger.Info("Secret validation completed", "secrets", len(secrets), "duration", duration.String())
 	return result, nil
 }
 

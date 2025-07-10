@@ -15,13 +15,11 @@ import (
 	"github.com/Azure/container-kit/pkg/core/worker"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/application/commands"
-	"github.com/Azure/container-kit/pkg/mcp/application/internal/conversation"
-	"github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	"github.com/Azure/container-kit/pkg/mcp/application/state"
+	appstate "github.com/Azure/container-kit/pkg/mcp/application/state"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
+	domaintypes "github.com/Azure/container-kit/pkg/mcp/domain/types"
 	"go.etcd.io/bbolt"
 )
 
@@ -34,7 +32,8 @@ type UnifiedMCPServer struct {
 	conversationService services.ConversationService
 	promptService       services.PromptService
 	sessionManager      session.SessionManager
-	promptManager       *conversation.PromptManager
+	// TODO: Fix after migration - use services.PromptService instead
+	// promptManager       api.PromptManager
 
 	// Unified session management
 	unifiedSessionManager session.UnifiedSessionManager
@@ -43,7 +42,7 @@ type UnifiedMCPServer struct {
 	workflowExecutor services.WorkflowExecutor
 
 	// State management integration
-	stateIntegration *state.StateManagementIntegration
+	stateIntegration *appstate.StateManagementIntegration
 
 	// Shared components
 	toolRegistry     api.Registry
@@ -120,7 +119,7 @@ func createUnifiedMCPServer(
 
 	// Create state management integration with service container
 	stateServiceContainer := &StateServiceContainerAdapter{serviceContainer: serviceContainer}
-	stateIntegration := state.NewStateManagementIntegrationWithContainer(stateServiceContainer, logger)
+	stateIntegration := appstate.NewStateManagementIntegrationWithContainer(stateServiceContainer, logger)
 
 	unifiedRegistry := commands.NewUnifiedRegistry(logger)
 	toolRegistry := commands.NewRegistryAdapter(unifiedRegistry)
@@ -172,18 +171,20 @@ func createUnifiedMCPServer(
 	server.toolService = NewToolService(server)
 
 	if mode == ModeDual || mode == ModeChat {
-		preferenceStore, err := shared.NewPreferenceStore("/tmp/mcp-preferences.db", logger, "")
-		if err != nil {
-			return nil, errors.NewError().Message("failed to create preference store").Cause(err).Build()
-		}
+		// TODO: Fix preference store after three-layer migration
+		// preferenceStore, err := shared.NewPreferenceStore("/tmp/mcp-preferences.db", logger, "")
+		// if err != nil {
+		// 	return nil, errors.NewError().Message("failed to create preference store").Cause(err).Build()
+		// }
+		// var preferenceStore interface{} // temporary placeholder
 
 		if concreteSessionManager != nil {
 			// Create service implementations inline to avoid import cycle
 			server.conversationService = &simpleConversationService{
 				sessionManager:   concreteSessionManager,
 				toolOrchestrator: toolOrchestrator,
-				preferenceStore:  preferenceStore,
-				logger:           logger,
+				// preferenceStore:  preferenceStore, // TODO: Fix after migration
+				logger: logger,
 			}
 			server.promptService = &simplePromptService{logger: logger}
 		} else {
@@ -320,7 +321,7 @@ func (s *UnifiedMCPServer) GetWorkflowExecutor() services.WorkflowExecutor {
 }
 
 // GetStateIntegration returns the state management integration
-func (s *UnifiedMCPServer) GetStateIntegration() *state.StateManagementIntegration {
+func (s *UnifiedMCPServer) GetStateIntegration() *appstate.StateManagementIntegration {
 	return s.stateIntegration
 }
 
@@ -452,8 +453,9 @@ func (o *simpleToolOrchestrator) GetStats() interface{} {
 type simpleConversationService struct {
 	sessionManager   session.SessionManager
 	toolOrchestrator api.Orchestrator
-	preferenceStore  *shared.PreferenceStore
-	logger           *slog.Logger
+	// TODO: Fix preference store after migration
+	// preferenceStore  *shared.PreferenceStore
+	logger *slog.Logger
 }
 
 func (cs *simpleConversationService) ProcessMessage(_ context.Context, sessionID, message string) (*services.ConversationResponse, error) {
@@ -461,33 +463,33 @@ func (cs *simpleConversationService) ProcessMessage(_ context.Context, sessionID
 	return &services.ConversationResponse{
 		SessionID:     sessionID,
 		Message:       "Message processed successfully",
-		Stage:         shared.StageWelcome,
+		Stage:         domaintypes.StageWelcome,
 		Status:        "success",
 		RequiresInput: false,
 	}, nil
 }
 
-func (cs *simpleConversationService) GetConversationState(sessionID string) (*services.ConversationState, error) {
+func (cs *simpleConversationService) GetConversationState(ctx context.Context, sessionID string) (*services.ConversationState, error) {
 	cs.logger.Debug("Getting conversation state", "session_id", sessionID)
 	return &services.ConversationState{
 		SessionID:    sessionID,
-		CurrentStage: shared.StageWelcome,
+		CurrentStage: domaintypes.StageWelcome,
 		History:      []services.ConversationTurn{},
-		Preferences:  shared.UserPreferences{},
+		Preferences:  domaintypes.UserPreferences{},
 	}, nil
 }
 
-func (cs *simpleConversationService) UpdateConversationStage(sessionID string, stage shared.ConversationStage) error {
+func (cs *simpleConversationService) UpdateConversationStage(ctx context.Context, sessionID string, stage domaintypes.ConversationStage) error {
 	cs.logger.Debug("Updating conversation stage", "session_id", sessionID, "stage", stage)
 	return nil
 }
 
-func (cs *simpleConversationService) GetConversationHistory(sessionID string, limit int) ([]services.ConversationTurn, error) {
+func (cs *simpleConversationService) GetConversationHistory(ctx context.Context, sessionID string, limit int) ([]services.ConversationTurn, error) {
 	cs.logger.Debug("Getting conversation history", "session_id", sessionID, "limit", limit)
 	return []services.ConversationTurn{}, nil
 }
 
-func (cs *simpleConversationService) ClearConversationContext(sessionID string) error {
+func (cs *simpleConversationService) ClearConversationContext(ctx context.Context, sessionID string) error {
 	cs.logger.Debug("Clearing conversation context", "session_id", sessionID)
 	return nil
 }
@@ -497,17 +499,17 @@ type simplePromptService struct {
 	logger *slog.Logger
 }
 
-func (ps *simplePromptService) BuildPrompt(stage shared.ConversationStage, _ map[string]interface{}) (string, error) {
+func (ps *simplePromptService) BuildPrompt(ctx context.Context, stage domaintypes.ConversationStage, _ map[string]interface{}) (string, error) {
 	ps.logger.Debug("Building prompt", "stage", stage)
 	return "System prompt for stage: " + string(stage), nil
 }
 
-func (ps *simplePromptService) ProcessPromptResponse(response string, _ *services.ConversationState) error {
+func (ps *simplePromptService) ProcessPromptResponse(ctx context.Context, response string, _ *services.ConversationState) error {
 	ps.logger.Debug("Processing prompt response", "response_length", len(response))
 	return nil
 }
 
-func (ps *simplePromptService) DetectWorkflowIntent(message string) (*services.WorkflowIntent, error) {
+func (ps *simplePromptService) DetectWorkflowIntent(ctx context.Context, message string) (*services.WorkflowIntent, error) {
 	ps.logger.Debug("Detecting workflow intent", "message_length", len(message))
 	return &services.WorkflowIntent{
 		Detected:   false,
@@ -516,7 +518,7 @@ func (ps *simplePromptService) DetectWorkflowIntent(message string) (*services.W
 	}, nil
 }
 
-func (ps *simplePromptService) ShouldAutoAdvance(state *services.ConversationState) (bool, *services.AutoAdvanceConfig) {
+func (ps *simplePromptService) ShouldAutoAdvance(ctx context.Context, state *services.ConversationState) (bool, *services.AutoAdvanceConfig) {
 	ps.logger.Debug("Checking auto-advance", "session_id", state.SessionID)
 	return false, nil
 }
@@ -542,7 +544,8 @@ func createServiceContainer(logger *slog.Logger) services.ServiceContainer {
 	deploymentService := kubernetes.NewService(nil, logger)
 
 	// Create pipeline service
-	pipelineService := pipeline.NewPipelineService(logger)
+	// TODO: Create pipeline service from service container
+	var pipelineService services.PipelineService
 
 	// Build service container with all services
 	container := services.NewDefaultServiceContainer(logger).
@@ -558,47 +561,47 @@ func createServiceContainer(logger *slog.Logger) services.ServiceContainer {
 	return container
 }
 
-// StateServiceContainerAdapter adapts services.ServiceContainer to state.ServiceContainer
+// StateServiceContainerAdapter adapts services.ServiceContainer to appstate.ServiceContainer
 type StateServiceContainerAdapter struct {
 	serviceContainer services.ServiceContainer
 }
 
-// SessionStore implements state.StateServiceContainer interface
-func (a *StateServiceContainerAdapter) SessionStore() state.StateSessionStore {
+// SessionStore implements appstate.StateServiceContainer interface
+func (a *StateServiceContainerAdapter) SessionStore() appstate.StateSessionStore {
 	return &SessionStoreAdapter{sessionStore: a.serviceContainer.SessionStore()}
 }
 
-// Logger implements state.ServiceContainer interface
+// Logger implements appstate.ServiceContainer interface
 func (a *StateServiceContainerAdapter) Logger() *slog.Logger {
 	return a.serviceContainer.Logger()
 }
 
-// SessionStoreAdapter adapts services.SessionStore to state.SessionStore
+// SessionStoreAdapter adapts services.SessionStore to appstate.SessionStore
 type SessionStoreAdapter struct {
 	sessionStore services.SessionStore
 }
 
-// Create implements state.SessionStore interface
+// Create implements appstate.SessionStore interface
 func (a *SessionStoreAdapter) Create(ctx context.Context, session *api.Session) error {
 	return a.sessionStore.Create(ctx, session)
 }
 
-// Get implements state.SessionStore interface
+// Get implements appstate.SessionStore interface
 func (a *SessionStoreAdapter) Get(ctx context.Context, sessionID string) (*api.Session, error) {
 	return a.sessionStore.Get(ctx, sessionID)
 }
 
-// Delete implements state.SessionStore interface
+// Delete implements appstate.SessionStore interface
 func (a *SessionStoreAdapter) Delete(ctx context.Context, sessionID string) error {
 	return a.sessionStore.Delete(ctx, sessionID)
 }
 
-// List implements state.SessionStore interface
+// List implements appstate.SessionStore interface
 func (a *SessionStoreAdapter) List(ctx context.Context) ([]*api.Session, error) {
 	return a.sessionStore.List(ctx)
 }
 
-// Update implements state.SessionStore interface
+// Update implements appstate.SessionStore interface
 func (a *SessionStoreAdapter) Update(ctx context.Context, session *api.Session) error {
 	return a.sessionStore.Update(ctx, session)
 }

@@ -55,7 +55,7 @@ while IFS= read -r line; do
     if [[ $line =~ coverage:\ ([0-9.]+)%\ of\ statements ]]; then
         COVERAGE_PERCENT=${BASH_REMATCH[1]}
         PACKAGE=$(echo "$line" | awk '{print $1}')
-        
+
         # Determine status based on coverage
         if (( $(echo "$COVERAGE_PERCENT >= 80" | bc -l 2>/dev/null || echo "0") )); then
             STATUS="✅ Excellent"
@@ -68,10 +68,10 @@ while IFS= read -r line; do
         else
             STATUS="❌ No coverage"
         fi
-        
+
         # Short package name for display
         SHORT_PACKAGE=$(echo "$PACKAGE" | sed 's/.*\/pkg\/mcp\///')
-        
+
         echo "$SHORT_PACKAGE | $COVERAGE_PERCENT% | $STATUS"
         echo "$SHORT_PACKAGE | $COVERAGE_PERCENT% | $STATUS" >> "$REPORTS_DIR/coverage_summary.txt"
     fi

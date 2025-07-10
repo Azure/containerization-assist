@@ -1,5 +1,7 @@
 package pipeline
 
+import "context"
+
 // WorkerHealthMonitor monitors and manages worker health
 type WorkerHealthMonitor interface {
 	// GetHealth returns the health status of a specific worker
@@ -28,15 +30,15 @@ func NewWorkerHealthMonitor(service Service) WorkerHealthMonitor {
 }
 
 func (w *workerHealthMonitor) GetHealth(workerName string) (WorkerHealth, error) {
-	return w.service.GetWorkerHealth(workerName)
+	return w.service.GetWorkerHealth(context.Background(), workerName)
 }
 
 func (w *workerHealthMonitor) GetAllHealth() map[string]WorkerHealth {
-	return w.service.GetAllWorkerHealth()
+	return w.service.GetAllWorkerHealth(context.Background())
 }
 
 func (w *workerHealthMonitor) RestartWorker(workerName string) error {
-	return w.service.RestartWorker(workerName)
+	return w.service.RestartWorker(context.Background(), workerName)
 }
 
 func (w *workerHealthMonitor) IsHealthy() bool {

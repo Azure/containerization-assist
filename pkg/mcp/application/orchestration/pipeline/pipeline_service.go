@@ -13,38 +13,38 @@ import (
 // Service provides pipeline orchestration functionality
 type Service interface {
 	// Lifecycle management
-	Start() error
-	Stop() error
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
 	IsRunning() bool
 	GetStatus() Status
 
 	// Configuration management
 	GetConfig() *PipelineConfig
-	UpdateConfig(config *PipelineConfig) error
+	UpdateConfig(ctx context.Context, config *PipelineConfig) error
 
 	// Worker management
-	RegisterWorker(worker BackgroundWorker) error
-	UnregisterWorker(name string) error
-	RestartWorker(name string) error
-	RestartAllWorkers() error
+	RegisterWorker(ctx context.Context, worker BackgroundWorker) error
+	UnregisterWorker(ctx context.Context, name string) error
+	RestartWorker(ctx context.Context, name string) error
+	RestartAllWorkers(ctx context.Context) error
 	GetWorkerNames() []string
 
 	// Health monitoring
-	GetWorkerHealth(name string) (WorkerHealth, error)
-	GetAllWorkerHealth() map[string]WorkerHealth
-	GetWorkerStatus(name string) (WorkerStatus, error)
-	GetAllWorkerStatuses() map[string]WorkerStatus
+	GetWorkerHealth(ctx context.Context, name string) (WorkerHealth, error)
+	GetAllWorkerHealth(ctx context.Context) map[string]WorkerHealth
+	GetWorkerStatus(ctx context.Context, name string) (WorkerStatus, error)
+	GetAllWorkerStatuses(ctx context.Context) map[string]WorkerStatus
 	IsHealthy() bool
 
 	// Job management
-	SubmitJob(job *Job) error
-	GetJob(jobID string) (*Job, bool)
-	ListJobs(status JobStatus) []*Job
-	CancelJob(jobID string) error
+	SubmitJob(ctx context.Context, job *Job) error
+	GetJob(ctx context.Context, jobID string) (*Job, bool)
+	ListJobs(ctx context.Context, status JobStatus) []*Job
+	CancelJob(ctx context.Context, jobID string) error
 
 	// Statistics
-	GetManagerStats() ManagerStats
-	GetOrchestratorStats() OrchestratorStats
+	GetManagerStats(ctx context.Context) ManagerStats
+	GetOrchestratorStats(ctx context.Context) OrchestratorStats
 }
 
 // ServiceImpl implements the Service interface
@@ -86,7 +86,7 @@ func NewPipelineService(logger *slog.Logger) Service {
 }
 
 // Start starts the pipeline service
-func (s *ServiceImpl) Start() error {
+func (s *ServiceImpl) Start(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -100,7 +100,7 @@ func (s *ServiceImpl) Start() error {
 		return errors.NewError().Message("failed to start worker manager").Cause(err).WithLocation().Build()
 	}
 
-	if err := s.jobOrchestrator.Start(); err != nil {
+	if err := s.jobOrchestrator.Start(ctx); err != nil {
 		return errors.NewError().Message("failed to start job orchestrator").Cause(err).WithLocation().Build()
 	}
 
@@ -111,7 +111,7 @@ func (s *ServiceImpl) Start() error {
 }
 
 // Stop stops the pipeline service
-func (s *ServiceImpl) Stop() error {
+func (s *ServiceImpl) Stop(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -121,7 +121,7 @@ func (s *ServiceImpl) Stop() error {
 
 	s.logger.Info("Stopping pipeline service")
 
-	if err := s.jobOrchestrator.Stop(); err != nil {
+	if err := s.jobOrchestrator.Stop(ctx); err != nil {
 		s.logger.Error("Error stopping job orchestrator", "error", err)
 	}
 
@@ -150,7 +150,11 @@ func (s *ServiceImpl) GetConfig() *PipelineConfig {
 }
 
 // UpdateConfig updates the pipeline configuration
-func (s *ServiceImpl) UpdateConfig(config *PipelineConfig) error {
+func (s *ServiceImpl) UpdateConfig(ctx context.Context, config *PipelineConfig) error {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -163,22 +167,38 @@ func (s *ServiceImpl) UpdateConfig(config *PipelineConfig) error {
 }
 
 // RegisterWorker registers a new background worker
-func (s *ServiceImpl) RegisterWorker(worker BackgroundWorker) error {
+func (s *ServiceImpl) RegisterWorker(ctx context.Context, worker BackgroundWorker) error {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return s.workerManager.RegisterWorker(worker)
 }
 
 // UnregisterWorker removes a background worker
-func (s *ServiceImpl) UnregisterWorker(name string) error {
+func (s *ServiceImpl) UnregisterWorker(ctx context.Context, name string) error {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return s.workerManager.UnregisterWorker(name)
 }
 
 // RestartWorker stops and starts a worker
-func (s *ServiceImpl) RestartWorker(name string) error {
+func (s *ServiceImpl) RestartWorker(ctx context.Context, name string) error {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return s.workerManager.RestartWorker(name)
 }
 
 // RestartAllWorkers stops and starts all workers
-func (s *ServiceImpl) RestartAllWorkers() error {
+func (s *ServiceImpl) RestartAllWorkers(ctx context.Context) error {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return s.workerManager.RestartAllWorkers()
 }
 
@@ -188,22 +208,39 @@ func (s *ServiceImpl) GetWorkerNames() []string {
 }
 
 // GetWorkerHealth returns health status for a specific worker
-func (s *ServiceImpl) GetWorkerHealth(name string) (WorkerHealth, error) {
+func (s *ServiceImpl) GetWorkerHealth(ctx context.Context, name string) (WorkerHealth, error) {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return WorkerHealth{}, err
+	}
 	return s.workerManager.GetWorkerHealth(name)
 }
 
 // GetAllWorkerHealth returns health status for all workers
-func (s *ServiceImpl) GetAllWorkerHealth() map[string]WorkerHealth {
+func (s *ServiceImpl) GetAllWorkerHealth(ctx context.Context) map[string]WorkerHealth {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
 	return s.workerManager.GetAllWorkerHealth()
 }
 
 // GetWorkerStatus returns the current status of a worker
-func (s *ServiceImpl) GetWorkerStatus(name string) (WorkerStatus, error) {
+func (s *ServiceImpl) GetWorkerStatus(ctx context.Context, name string) (WorkerStatus, error) {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		var status WorkerStatus
+		return status, err
+	}
 	return s.workerManager.GetWorkerStatus(name)
 }
 
 // GetAllWorkerStatuses returns status for all workers
-func (s *ServiceImpl) GetAllWorkerStatuses() map[string]WorkerStatus {
+func (s *ServiceImpl) GetAllWorkerStatuses(ctx context.Context) map[string]WorkerStatus {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
 	return s.workerManager.GetAllWorkerStatuses()
 }
 
@@ -213,33 +250,37 @@ func (s *ServiceImpl) IsHealthy() bool {
 }
 
 // SubmitJob submits a new job for execution
-func (s *ServiceImpl) SubmitJob(job *Job) error {
-	return s.jobOrchestrator.SubmitJob(job)
+func (s *ServiceImpl) SubmitJob(ctx context.Context, job *Job) error {
+	return s.jobOrchestrator.SubmitJob(ctx, job)
 }
 
 // GetJob retrieves a job by ID
-func (s *ServiceImpl) GetJob(jobID string) (*Job, bool) {
-	return s.jobOrchestrator.GetJob(jobID)
+func (s *ServiceImpl) GetJob(ctx context.Context, jobID string) (*Job, bool) {
+	return s.jobOrchestrator.GetJob(ctx, jobID)
 }
 
 // ListJobs returns all jobs with optional status filter
-func (s *ServiceImpl) ListJobs(status JobStatus) []*Job {
-	return s.jobOrchestrator.ListJobs(status)
+func (s *ServiceImpl) ListJobs(ctx context.Context, status JobStatus) []*Job {
+	return s.jobOrchestrator.ListJobs(ctx, status)
 }
 
 // CancelJob cancels a pending or running job
-func (s *ServiceImpl) CancelJob(jobID string) error {
-	return s.jobOrchestrator.CancelJob(jobID)
+func (s *ServiceImpl) CancelJob(ctx context.Context, jobID string) error {
+	return s.jobOrchestrator.CancelJob(ctx, jobID)
 }
 
 // GetManagerStats returns statistics about the worker manager
-func (s *ServiceImpl) GetManagerStats() ManagerStats {
+func (s *ServiceImpl) GetManagerStats(ctx context.Context) ManagerStats {
+	// Check context first
+	if err := ctx.Err(); err != nil {
+		return ManagerStats{}
+	}
 	return s.workerManager.GetManagerStats()
 }
 
 // GetOrchestratorStats returns statistics about the job orchestrator
-func (s *ServiceImpl) GetOrchestratorStats() OrchestratorStats {
-	return s.jobOrchestrator.GetStats()
+func (s *ServiceImpl) GetOrchestratorStats(ctx context.Context) OrchestratorStats {
+	return s.jobOrchestrator.GetStats(ctx)
 }
 
 // GetStatus returns the overall status of the pipeline service
@@ -248,7 +289,7 @@ func (s *ServiceImpl) GetStatus() Status {
 	defer s.mu.RUnlock()
 
 	workerStats := s.workerManager.GetManagerStats()
-	orchestratorStats := s.jobOrchestrator.GetStats()
+	orchestratorStats := s.jobOrchestrator.GetStats(context.Background())
 
 	return Status{
 		IsRunning:     s.isRunning,

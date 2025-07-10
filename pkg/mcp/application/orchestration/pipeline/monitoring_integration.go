@@ -2,18 +2,19 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // MonitoringIntegrator provides basic monitoring integration with logging
 type MonitoringIntegrator struct {
 	sessionManager *session.SessionManager
-	logger         zerolog.Logger
+	logger         logging.Standards
 
 	operationCounts map[string]int64
 	sessionCounts   map[string]int64
@@ -76,7 +77,7 @@ type SystemHealthMetrics struct {
 func NewMonitoringIntegrator(
 	sessionManager *session.SessionManager,
 	config MonitoringConfig,
-	logger zerolog.Logger,
+	logger logging.Standards,
 ) (*MonitoringIntegrator, error) {
 
 	if config.ServiceName == "" {
@@ -91,7 +92,7 @@ func NewMonitoringIntegrator(
 
 	mi := &MonitoringIntegrator{
 		sessionManager:  sessionManager,
-		logger:          logger.With().Str("component", "monitoring_integrator").Logger(),
+		logger:          logger.WithComponent("monitoring_integrator"),
 		config:          config,
 		operationCounts: make(map[string]int64),
 		sessionCounts:   make(map[string]int64),
@@ -134,7 +135,7 @@ func (mi *MonitoringIntegrator) TrackOperation(
 	logEvent := mi.logger.Info().
 		Str("operation_type", operationType).
 		Str("session_id", sessionID).
-		Dur("duration", duration).
+		Str("duration", duration.String()).
 		Bool("success", err == nil)
 
 	if err != nil {
@@ -222,19 +223,19 @@ func (mi *MonitoringIntegrator) logMetricsSummary() {
 
 	if len(mi.operationCounts) > 0 {
 		mi.logger.Info().
-			Interface("operation_counts", mi.operationCounts).
+			Str("operation_counts", fmt.Sprintf("%v", mi.operationCounts)).
 			Msg("Operation metrics summary")
 	}
 
 	if len(mi.sessionCounts) > 0 {
 		mi.logger.Info().
-			Interface("session_counts", mi.sessionCounts).
+			Str("session_counts", fmt.Sprintf("%v", mi.sessionCounts)).
 			Msg("Session metrics summary")
 	}
 
 	if len(mi.errorCounts) > 0 {
 		mi.logger.Info().
-			Interface("error_counts", mi.errorCounts).
+			Str("error_counts", fmt.Sprintf("%v", mi.errorCounts)).
 			Msg("Error metrics summary")
 	}
 }

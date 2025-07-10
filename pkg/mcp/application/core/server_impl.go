@@ -12,13 +12,11 @@ import (
 
 	"github.com/Azure/container-kit/pkg/core/analysis"
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
-	"github.com/Azure/container-kit/pkg/mcp/application/internal/runtime"
 	"github.com/Azure/container-kit/pkg/mcp/application/services"
-	workflow "github.com/Azure/container-kit/pkg/mcp/application/workflows"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	"github.com/localrivet/gomcp/server"
-	"github.com/rs/zerolog"
 )
 
 // parseSlogLevel converts a string log level to slog.Level
@@ -37,11 +35,19 @@ func parseSlogLevel(level string) slog.Level {
 	}
 }
 
-// adaptSlogToZerolog creates a zerolog.Logger from an slog.Logger
-func adaptSlogToZerolog(slogLogger *slog.Logger) zerolog.Logger {
-	// Create a zerolog logger with appropriate level
-	level := zerolog.InfoLevel
-	return zerolog.New(os.Stderr).Level(level).With().Timestamp().Logger()
+// adaptSlogToLogging creates a logging.Standards from an slog.Logger
+func adaptSlogToLogging(slogLogger *slog.Logger) logging.Standards {
+	// Store the slogLogger for potential future use
+	_ = slogLogger
+	// Create a logging standards implementation with default config
+	config := logging.Config{
+		Level:                   logging.LevelInfo,
+		Output:                  os.Stdout,
+		EnableStructuredLogging: true,
+		EnableRingBuffer:        true,
+		BufferSize:              1000,
+	}
+	return logging.NewLogger(config)
 }
 
 // adaptMCPContext creates a context.Context from a gomcp server.Context
@@ -57,13 +63,14 @@ type serverImpl struct {
 	sessionManager session.SessionManager
 	// workspaceManager *runtime.WorkspaceManager // TODO: Type needs to be implemented
 	// circuitBreakers  *execution.CircuitBreakerRegistry // TODO: Type needs to be implemented
-	jobManager workflow.JobExecutionService
-	transport  interface{} // stdio or http transport
-	logger     *slog.Logger
-	startTime  time.Time
+	// TODO: Fix job manager type after migration
+	// jobManager api.JobExecutionService
+	transport interface{} // stdio or http transport
+	logger    *slog.Logger
+	startTime time.Time
 
 	toolOrchestrator api.Orchestrator
-	toolRegistry     *runtime.ToolRegistry
+	toolRegistry     api.Registry
 
 	conversationComponents *ConversationComponents
 
@@ -834,13 +841,12 @@ func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 	// TODO: Implement CircuitBreakerRegistry
 	// circuitBreakers := execution.NewCircuitBreakerRegistry(logger.With("component", "circuit_breakers"))
 
-	jobManager := workflow.NewJobManager(workflow.JobManagerConfig{
-		MaxWorkers: config.MaxWorkers,
-		JobTTL:     config.JobTTL,
-		Logger:     logger.With("component", "job_manager"),
-	})
+	// TODO: Create job manager from service container
+	// TODO: Fix after migration
+	// var jobManager api.JobExecutionService
 
-	toolRegistry := runtime.NewToolRegistry(adaptSlogToZerolog(logger.With("component", "tool_registry")))
+	// TODO: Create tool registry from service container
+	var toolRegistry api.Registry
 
 	// TODO: Implement Orchestrator
 	// toolOrchestrator := orchestration.NewOrchestrator(
@@ -874,7 +880,7 @@ func NewServer(_ context.Context, config ServerConfig) (Server, error) {
 		sessionManager: sessionManager,
 		// workspaceManager: workspaceManager,
 		// circuitBreakers:  circuitBreakers,
-		jobManager:       jobManager,
+		// jobManager:       jobManager, // TODO: Fix after migration
 		transport:        mcpTransport,
 		logger:           logger,
 		startTime:        time.Now(),

@@ -588,6 +588,29 @@ func (e *OptimizedExecutor) SetValidator(validator interfaces.UnifiedValidator) 
 	e.validator = validator
 }
 
+// Close gracefully shuts down the executor and releases all resources
+func (e *OptimizedExecutor) Close() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Cancel all active executions
+	for _, execution := range e.activeTools {
+		execution.Cancel()
+	}
+
+	// Stop worker pool
+	if e.workerPool != nil {
+		e.workerPool.Stop()
+	}
+
+	// Stop metrics buffer - THIS FIXES THE TICKER LEAK
+	if e.metricsBuffer != nil {
+		e.metricsBuffer.Stop()
+	}
+
+	return nil
+}
+
 // GetStats returns executor statistics
 func (e *OptimizedExecutor) GetStats() ExecutorStats {
 	e.mu.RLock()

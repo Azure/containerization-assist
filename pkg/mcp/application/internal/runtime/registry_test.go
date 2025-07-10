@@ -8,7 +8,7 @@ import (
 
 	"github.com/Azure/container-kit/pkg/mcp/application/api"
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -144,7 +144,7 @@ func (m *mockTool) Validate(ctx context.Context, args interface{}) error {
 }
 
 func createTestRegistry() *ToolRegistry {
-	logger := zerolog.New(nil).Level(zerolog.Disabled)
+	logger := logging.NewTestLogger()
 	return NewToolRegistry(logger)
 }
 func getStringFromMap(m map[string]interface{}, key string) string {
@@ -185,7 +185,7 @@ func getStringSliceFromMap(m map[string]interface{}, key string) []string {
 
 func TestNewToolRegistry(t *testing.T) {
 	t.Parallel()
-	logger := zerolog.New(nil).Level(zerolog.Disabled)
+	logger := logging.NewTestLogger()
 	registry := NewToolRegistry(logger)
 
 	assert.NotNil(t, registry)

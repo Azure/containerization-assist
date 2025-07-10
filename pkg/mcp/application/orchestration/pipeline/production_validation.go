@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
 	validation "github.com/Azure/container-kit/pkg/mcp/domain/security"
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // ProductionValidator provides production validation capabilities
@@ -26,7 +26,7 @@ type ValidationConfig struct {
 func NewProductionValidator(
 	sessionManager session.SessionManager,
 	config ValidationConfig,
-	logger zerolog.Logger,
+	logger logging.Standards,
 ) *ProductionValidator {
 	return &ProductionValidator{
 		UnifiedBasicValidator: NewUnifiedBasicValidator(sessionManager, logger),

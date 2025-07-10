@@ -100,7 +100,7 @@ $ grep -r "OrchestrationPipeline\|AtomicPipeline\|WorkflowPipeline" pkg/mcp/
 type Pipeline interface {
     // Execute runs the pipeline with unified semantics
     Execute(ctx context.Context, request *PipelineRequest) (*PipelineResponse, error)
-    
+
     // Builder methods for fluent API
     AddStage(stage PipelineStage) Pipeline
     WithTimeout(timeout time.Duration) Pipeline
@@ -143,9 +143,9 @@ func (p *AtomicPipeline) Execute(ctx context.Context, request *PipelineRequest) 
     // Begin transaction
     tx := p.transaction.Begin()
     defer tx.Rollback() // Auto-rollback on error
-    
+
     var result interface{} = request.Input
-    
+
     // Execute stages atomically
     for _, stage := range p.stages {
         var err error
@@ -154,12 +154,12 @@ func (p *AtomicPipeline) Execute(ctx context.Context, request *PipelineRequest) 
             return nil, err // Automatic rollback
         }
     }
-    
+
     // Commit transaction
     if err := tx.Commit(); err != nil {
         return nil, err
     }
-    
+
     return &PipelineResponse{
         Output: result,
         Metadata: map[string]interface{}{
@@ -190,7 +190,7 @@ func (p *WorkflowPipeline) executeParallel(ctx context.Context, request *Pipelin
     var wg sync.WaitGroup
     results := make([]interface{}, len(p.stages))
     errors := make([]error, len(p.stages))
-    
+
     for i, stage := range p.stages {
         wg.Add(1)
         go func(idx int, s PipelineStage) {
@@ -200,16 +200,16 @@ func (p *WorkflowPipeline) executeParallel(ctx context.Context, request *Pipelin
             errors[idx] = err
         }(i, stage)
     }
-    
+
     wg.Wait()
-    
+
     // Collect results and check for errors
     for _, err := range errors {
         if err != nil {
             return nil, err
         }
     }
-    
+
     return &PipelineResponse{
         Output: results,
         Metadata: map[string]interface{}{
@@ -237,36 +237,36 @@ func (p *OrchestrationPipeline) Execute(ctx context.Context, request *PipelineRe
         ctx, cancel = context.WithTimeout(ctx, p.timeout)
         defer cancel()
     }
-    
+
     var result interface{} = request.Input
-    
+
     // Execute stages with retry and metrics
     for _, stage := range p.stages {
         start := time.Now()
         var err error
-        
+
         // Execute with retry policy
         for attempt := 0; attempt <= p.retryPolicy.MaxAttempts; attempt++ {
             result, err = stage.Execute(ctx, result)
             if err == nil {
                 break
             }
-            
+
             if attempt < p.retryPolicy.MaxAttempts {
                 time.Sleep(p.retryPolicy.BackoffDuration)
             }
         }
-        
+
         // Record metrics
         if p.metrics != nil {
             p.metrics.RecordStageExecution(stage.Name(), time.Since(start), err)
         }
-        
+
         if err != nil {
             return nil, err
         }
     }
-    
+
     return &PipelineResponse{
         Output: result,
         Metadata: map[string]interface{}{
@@ -288,13 +288,13 @@ type PipelineBuilder interface {
     Atomic() PipelineBuilder
     Workflow(parallel bool) PipelineBuilder
     Orchestration() PipelineBuilder
-    
+
     // Common configuration
     WithStages(stages ...PipelineStage) PipelineBuilder
     WithTimeout(timeout time.Duration) PipelineBuilder
     WithRetry(policy RetryPolicy) PipelineBuilder
     WithMetrics(collector MetricsCollector) PipelineBuilder
-    
+
     // Build final pipeline
     Build() Pipeline
 }
@@ -318,7 +318,7 @@ pipeline := pipeline.New().
 
 #### Phase 2: Legacy Migration (Week 5, Days 6-10)
 - Migrate existing OrchestrationPipeline usage
-- Migrate existing AtomicPipeline usage  
+- Migrate existing AtomicPipeline usage
 - Migrate existing WorkflowPipeline usage
 
 #### Phase 3: Code Removal (Week 5, Days 11-15)
@@ -403,12 +403,12 @@ func TestPipelineMigration(t *testing.T) {
     t.Run("atomic_migration", func(t *testing.T) {
         // Compare legacy vs unified behavior
     })
-    
+
     // Test workflow pipeline migration
     t.Run("workflow_migration", func(t *testing.T) {
         // Compare legacy vs unified behavior
     })
-    
+
     // Test orchestration pipeline migration
     t.Run("orchestration_migration", func(t *testing.T) {
         // Compare legacy vs unified behavior

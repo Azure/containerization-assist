@@ -90,13 +90,13 @@ type CustomRouter struct {
 
 func NewCustomRouter() *CustomRouter {
     router := commands.NewRouter()
-    
+
     // Manual registration of each command
     router.Register("command1", &Command1Handler{})
     router.Register("command2", &Command2Handler{})
     router.Register("command3", &Command3Handler{})
     // ... dozens of manual registrations
-    
+
     return &CustomRouter{router: router}
 }
 ```
@@ -199,7 +199,7 @@ func (p *{{.Name}}Pipeline) Execute(ctx context.Context, request *api.PipelineRe
         defer cancel()
     }
     {{- end}}
-    
+
     {{- if eq .Type "atomic"}}
     // Atomic execution logic
     {{template "atomic_execution" .}}
@@ -232,7 +232,7 @@ features:
   timeout: true
   retry: true
   metrics: true
-  
+
 custom_fields:
   - name: "dockerClient"
     type: "docker.Client"
@@ -330,25 +330,25 @@ func (g *PipelineGenerator) Generate() error {
     if err != nil {
         return fmt.Errorf("failed to load config: %w", err)
     }
-    
+
     // Parse template
     tmpl, err := template.ParseFiles(g.TemplatePath)
     if err != nil {
         return fmt.Errorf("failed to parse template: %w", err)
     }
-    
+
     // Create output file
     output, err := os.Create(g.OutputPath)
     if err != nil {
         return fmt.Errorf("failed to create output: %w", err)
     }
     defer output.Close()
-    
+
     // Generate code
     if err := tmpl.Execute(output, config); err != nil {
         return fmt.Errorf("failed to generate code: %w", err)
     }
-    
+
     return nil
 }
 
@@ -357,12 +357,12 @@ func (g *PipelineGenerator) loadConfig() (*PipelineConfig, error) {
     if err != nil {
         return nil, err
     }
-    
+
     var config PipelineConfig
     if err := yaml.Unmarshal(data, &config); err != nil {
         return nil, err
     }
-    
+
     return &config, nil
 }
 ```
@@ -489,20 +489,20 @@ func (p *ContainerBuildPipeline) Validate(request *api.PipelineRequest) error {
     if request.Input == nil {
         return errors.NewValidationError("input cannot be nil")
     }
-    
+
     buildArgs, ok := request.Input.(*BuildArgs)
     if !ok {
         return errors.NewValidationError("input must be BuildArgs")
     }
-    
+
     if buildArgs.Dockerfile == "" {
         return errors.NewValidationError("dockerfile path is required")
     }
-    
+
     if buildArgs.Context == "" {
         return errors.NewValidationError("build context is required")
     }
-    
+
     return nil
 }
 ```

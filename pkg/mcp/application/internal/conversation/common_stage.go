@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 func (ps *PromptServiceImpl) hasRunBuildDryRun(state *ConversationState) bool {

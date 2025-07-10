@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/session"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 )
 
 // NewCacheManager creates a new simple cache manager
 func NewCacheManager(
 	sessionManager *session.SessionManager,
 	config CacheConfig,
-	logger zerolog.Logger,
+	logger logging.Standards,
 ) *CacheManager {
 	if config.EvictionPolicy == "" {
 		config.EvictionPolicy = "lru"
@@ -35,7 +35,7 @@ func NewCacheManager(
 
 	cm := &CacheManager{
 		sessionManager: sessionManager,
-		logger:         logger.With().Str("component", "cache_manager").Logger(),
+		logger:         logger.WithComponent("cache_manager"),
 		cache:          make(map[string]*CacheEntry),
 		config:         config,
 		shutdownCh:     make(chan struct{}),
@@ -48,7 +48,7 @@ func NewCacheManager(
 
 	cm.logger.Info().
 		Str("eviction_policy", config.EvictionPolicy).
-		Int64("max_cache_size", config.MaxCacheSize).
+		Int("max_cache_size", int(config.MaxCacheSize)).
 		Int("max_entries", config.MaxEntries).
 		Msg("Cache manager initialized")
 

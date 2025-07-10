@@ -28,7 +28,7 @@ import (
     "encoding/json"
     "fmt"
     "log"
-    
+
     "github.com/Azure/container-kit/pkg/mcp/application/core"
 )
 
@@ -40,22 +40,22 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    
+
     // Get tool registry
     registry := server.ToolRegistry()
-    
+
     // Execute analyze tool
     args := map[string]interface{}{
         "repository": "/path/to/repo",
         "framework": "auto-detect",
     }
-    
+
     argsJSON, _ := json.Marshal(args)
     result, err := registry.Execute(context.Background(), "analyze", argsJSON)
     if err != nil {
         log.Fatal(err)
     }
-    
+
     fmt.Printf("Analysis result: %s\n", result)
 }
 ```

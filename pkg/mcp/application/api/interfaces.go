@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/container-kit/pkg/mcp/domain/logging"
 	"github.com/localrivet/gomcp/server"
-	"github.com/rs/zerolog"
 )
 
 // ============================================================================
@@ -692,12 +692,7 @@ type ErrorType string
 
 // Logger defines the logging interface
 type Logger interface {
-	Debug() *zerolog.Event
-	Info() *zerolog.Event
-	Warn() *zerolog.Event
-	Error() *zerolog.Event
-	Fatal() *zerolog.Event
-	With() zerolog.Context
+	logging.Standards
 }
 
 // ============================================================================

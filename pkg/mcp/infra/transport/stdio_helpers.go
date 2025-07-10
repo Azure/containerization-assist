@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
-	"github.com/rs/zerolog"
+	"github.com/Azure/container-kit/pkg/mcp/infra/logging"
 )
 
 // JSONRPCResponse represents a standard JSON-RPC response
@@ -62,7 +61,7 @@ func FormatMCPMessage(message interface{}) ([]byte, error) {
 	data, err := json.Marshal(message)
 	if err != nil {
 		networkErr := errors.NetworkError(
-			codes.NETWORK_ERROR,
+			errors.NETWORK_ERROR,
 			"Failed to marshal MCP message",
 			err,
 		)
@@ -80,7 +79,7 @@ func ParseJSONMessage(data []byte) (map[string]interface{}, error) {
 	var message map[string]interface{}
 	if err := json.Unmarshal(data, &message); err != nil {
 		networkErr := errors.NetworkError(
-			codes.NETWORK_ERROR,
+			errors.NETWORK_ERROR,
 			"Failed to parse JSON message",
 			err,
 		)
@@ -91,10 +90,10 @@ func ParseJSONMessage(data []byte) (map[string]interface{}, error) {
 }
 
 // LogTransportEvent logs a transport-related event with structured data
-func LogTransportEvent(logger zerolog.Logger, event string, details map[string]interface{}) {
+func LogTransportEvent(logger logging.Standards, event string, details map[string]interface{}) {
 	logEvent := logger.Info().
 		Str("event", event).
-		Timestamp()
+		Str("timestamp", time.Now().Format(time.RFC3339))
 
 	// Add details to log
 	for key, value := range details {
@@ -104,15 +103,20 @@ func LogTransportEvent(logger zerolog.Logger, event string, details map[string]i
 		case int:
 			logEvent = logEvent.Int(key, v)
 		case int64:
-			logEvent = logEvent.Int64(key, v)
+			logEvent = logEvent.Int(key, int(v))
 		case bool:
 			logEvent = logEvent.Bool(key, v)
 		case time.Duration:
-			logEvent = logEvent.Dur(key, v)
+			logEvent = logEvent.Str(key, v.String())
 		case error:
 			logEvent = logEvent.Err(v)
 		default:
-			logEvent = logEvent.Interface(key, v)
+			// Convert to JSON for complex types
+			if jsonBytes, err := json.Marshal(v); err == nil {
+				logEvent = logEvent.Str(key, string(jsonBytes))
+			} else {
+				logEvent = logEvent.Str(key, fmt.Sprintf("%v", v))
+			}
 		}
 	}
 
@@ -120,11 +124,11 @@ func LogTransportEvent(logger zerolog.Logger, event string, details map[string]i
 }
 
 // LogTransportError logs a transport-related error with context
-func LogTransportError(logger zerolog.Logger, operation string, err error, context map[string]interface{}) {
+func LogTransportError(logger logging.Standards, operation string, err error, context map[string]interface{}) {
 	logEvent := logger.Error().
 		Err(err).
 		Str("operation", operation).
-		Timestamp()
+		Str("timestamp", time.Now().Format(time.RFC3339))
 
 	// Add context to log
 	for key, value := range context {
@@ -136,7 +140,12 @@ func LogTransportError(logger zerolog.Logger, operation string, err error, conte
 		case bool:
 			logEvent = logEvent.Bool(key, v)
 		default:
-			logEvent = logEvent.Interface(key, v)
+			// Convert to JSON for complex types
+			if jsonBytes, err := json.Marshal(v); err == nil {
+				logEvent = logEvent.Str(key, string(jsonBytes))
+			} else {
+				logEvent = logEvent.Str(key, fmt.Sprintf("%v", v))
+			}
 		}
 	}
 
@@ -147,7 +156,7 @@ func LogTransportError(logger zerolog.Logger, operation string, err error, conte
 func ValidateJSONRPCRequest(request map[string]interface{}) error {
 	if request == nil {
 		return errors.NewError().
-			Code(codes.VALIDATION_REQUIRED_MISSING).
+			Code(errors.VALIDATION_REQUIRED_MISSING).
 			Message("Request cannot be nil").
 			Build()
 	}
@@ -155,7 +164,7 @@ func ValidateJSONRPCRequest(request map[string]interface{}) error {
 	// Check for required fields
 	if _, ok := request["method"]; !ok {
 		return errors.NewError().
-			Code(codes.VALIDATION_REQUIRED_MISSING).
+			Code(errors.VALIDATION_REQUIRED_MISSING).
 			Message("Request missing 'method' field").
 			Context("field", "method").
 			Build()
@@ -164,7 +173,7 @@ func ValidateJSONRPCRequest(request map[string]interface{}) error {
 	if version, ok := request["jsonrpc"]; ok {
 		if v, ok := version.(string); !ok || v != "2.0" {
 			return errors.NewError().
-				Code(codes.VALIDATION_FORMAT_INVALID).
+				Code(errors.VALIDATION_FORMAT_INVALID).
 				Message("Invalid jsonrpc version, expected '2.0'").
 				Context("version", version).
 				Suggestion("Set jsonrpc field to '2.0'").

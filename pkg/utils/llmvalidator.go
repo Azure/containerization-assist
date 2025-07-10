@@ -8,7 +8,6 @@ import (
 	"github.com/Azure/container-kit/pkg/ai"
 	"github.com/Azure/container-kit/pkg/logger"
 	mcperrors "github.com/Azure/container-kit/pkg/mcp/domain/errors"
-	"github.com/Azure/container-kit/pkg/mcp/domain/errors/codes"
 )
 
 type LLMConfig struct {
@@ -23,7 +22,7 @@ func ValidateLLM(ctx context.Context, llmConfig LLMConfig) error {
 	_, err := url.ParseRequestURI(llmConfig.Endpoint)
 	if err != nil {
 		return mcperrors.NewError().
-			Code(codes.VALIDATION_FAILED).
+			Code(mcperrors.CodeValidationFailed).
 			Message("Invalid endpoint URL").
 			Cause(err).
 			Context("endpoint", llmConfig.Endpoint).
@@ -46,7 +45,7 @@ func ValidateLLM(ctx context.Context, llmConfig LLMConfig) error {
 	if err != nil {
 		logger.Errorf("LLM validation failed: failed to get chat completion: %v", err)
 		return mcperrors.NewError().
-			Code(codes.NETWORK_ERROR).
+			Code(mcperrors.NETWORK_ERROR).
 			Message("Failed to get chat completion using AzOpenAIClient").
 			Cause(err).
 			Context("endpoint", llmConfig.Endpoint).

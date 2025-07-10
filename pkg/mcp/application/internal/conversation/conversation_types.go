@@ -3,8 +3,6 @@ package conversation
 import (
 	"fmt"
 	"time"
-
-	"github.com/Azure/container-kit/pkg/mcp/domain/shared"
 )
 
 type ConversationResponse struct {
