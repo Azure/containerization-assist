@@ -1,0 +1,64 @@
+?   	github.com/Azure/container-kit/pkg/mcp/api	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/commands	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/conversation	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/core	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/internal	[no test files]
+# github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline [github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline.test]
+pkg/mcp/application/orchestration/pipeline/integration_test.go:125:9: not enough arguments in call to orchestrator.Start
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/integration_test.go:137:33: not enough arguments in call to orchestrator.SubmitJob
+	have (*Job)
+	want (context.Context, *Job)
+pkg/mcp/application/orchestration/pipeline/integration_test.go:145:11: not enough arguments in call to orchestrator.GetStats
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/integration_test.go:149:37: not enough arguments in call to orchestrator.GetJob
+	have (string)
+	want (context.Context, string)
+pkg/mcp/application/orchestration/pipeline/integration_test.go:155:8: not enough arguments in call to orchestrator.Stop
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/integration_test.go:290:9: not enough arguments in call to pipelineService.Start
+	have ()
+	want (context.Context)
+pkg/mcp/application/orchestration/pipeline/integration_test.go:308:8: not enough arguments in call to pipelineService.Stop
+	have ()
+	want (context.Context)
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/conversation	0.110s
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/retry	2.177s
+ok  	github.com/Azure/container-kit/pkg/mcp/application/internal/runtime	0.023s
+?   	github.com/Azure/container-kit/pkg/mcp/application/knowledge	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/logging	[no test files]
+FAIL	github.com/Azure/container-kit/pkg/mcp/application/orchestration/pipeline [build failed]
+?   	github.com/Azure/container-kit/pkg/mcp/application/services	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/application/state	[no test files]
+ok  	github.com/Azure/container-kit/pkg/mcp/application/workflows	0.010s
+?   	github.com/Azure/container-kit/pkg/mcp/domain	[no test files]
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/analyze	0.002s
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/build	0.002s
+?   	github.com/Azure/container-kit/pkg/mcp/domain/config	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/constants	[no test files]
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/deploy	0.002s
+?   	github.com/Azure/container-kit/pkg/mcp/domain/internal/common	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/internal/constants	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/internal/types	[no test files]
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/internal/utils	0.017s
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/scan	0.013s
+ok  	github.com/Azure/container-kit/pkg/mcp/domain/security	0.014s
+?   	github.com/Azure/container-kit/pkg/mcp/domain/security/validators	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/shared	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/tools	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/domain/types	[no test files]
+ok  	github.com/Azure/container-kit/pkg/mcp/errors	0.004s
+?   	github.com/Azure/container-kit/pkg/mcp/errors/codes	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/infra	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/infra/internal/migration	[no test files]
+?   	github.com/Azure/container-kit/pkg/mcp/infra/persistence	[no test files]
+ok  	github.com/Azure/container-kit/pkg/mcp/infra/retry	2.068s
+?   	github.com/Azure/container-kit/pkg/mcp/infra/templates	[no test files]
+ok  	github.com/Azure/container-kit/pkg/mcp/infra/transport	0.263s
+ok  	github.com/Azure/container-kit/pkg/mcp/session	0.002s
+?   	github.com/Azure/container-kit/pkg/mcp/shared	[no test files]
+FAIL
