@@ -40,42 +40,41 @@ make test-all          # All packages
 ./cmd/mcp-schema-gen/mcp-schema-gen
 ```
 
-### 2. Analyze a Repository
+### 2. Available Tools
+
+Container Kit provides **12 production-ready tools** through MCP protocol:
+
+#### Containerization Tools (6 tools)
+- **`analyze_repository`** - Repository analysis and framework detection
+- **`generate_dockerfile`** - AI-powered Dockerfile generation
+- **`build_image`** - Docker image building with optimization
+- **`push_image`** - Container registry push operations
+- **`generate_manifests`** - Kubernetes manifest generation
+- **`scan_image`** - Security vulnerability scanning
+
+#### File Access Tools (3 tools)
+- **`read_file`** - Secure file reading within session workspace
+- **`list_directory`** - Directory listing with path validation
+- **`file_exists`** - File existence checking
+
+#### Session & Diagnostic Tools (3 tools)
+- **`list_sessions`** - Session management and listing
+- **`ping`** - Connectivity testing
+- **`server_status`** - Server health and status
+
+### 3. Complete Containerization Workflow
 
 ```bash
-# Container Kit operates via MCP protocol
-# Connect via MCP client and use analyze tool
-# Available tools: analyze, build, deploy, scan
+# Example workflow through MCP client:
+# 1. Analyze repository
+# 2. Generate Dockerfile
+# 3. Build container image
+# 4. Scan for vulnerabilities
+# 5. Generate Kubernetes manifests
+# 6. Push to registry
 
-# Tools are accessed through MCP protocol, not direct CLI
-# See MCP client documentation for integration
-```
-
-### 3. Build a Container
-
-```bash
-# Build operations are available through MCP tools
-# Use build tool via MCP client with parameters:
-# - repository: path to source code
-# - dockerfile: path to Dockerfile (optional)
-# - tag: container image tag
-# - platforms: target platforms (linux/amd64, linux/arm64)
-```
-
-### 4. Security Scanning
-
-```bash
-# Security scanning via MCP scan tool
-# Supports Trivy and Grype scanners
-# Parameters: image, severity_filter, output_format
-```
-
-### 5. Deploy to Kubernetes
-
-```bash
-# Deploy via MCP deploy tool
-# Generates Kubernetes manifests and applies them
-# Parameters: image, kubeconfig, namespace, replicas
+# All operations use session-based state management
+# and support dry-run mode for testing
 ```
 
 ## Configuration
@@ -92,34 +91,49 @@ export CONTAINER_KIT_TRACING_ENABLED=true
 # Set timeout
 export CONTAINER_KIT_TIMEOUT=5m
 
-# Storage path for BoltDB
+# Storage path for BoltDB session persistence
 export CONTAINER_KIT_STORAGE_PATH=~/.container-kit/data
+
+# Session configuration
+export CONTAINER_KIT_SESSION_TIMEOUT=30m
+export CONTAINER_KIT_MAX_SESSIONS=100
 ```
 
 ### Configuration File
 
-Container Kit uses configuration defined in the domain layer:
+Container Kit uses configuration defined in the domain layer with tag-based validation DSL:
 
 ```yaml
 # Configuration is handled through domain/config package
-# with tag-based validation DSL
+# with tag-based validation DSL (ADR-005)
 
-# Example session configuration
+# Session configuration
 session:
   workspace_dir: "/tmp/container-kit-sessions"
   cleanup_interval: "1h"
   max_sessions: 100
+  timeout: "30m"
 
 # Tool configuration
 tools:
   timeout: "30s"
   retry_attempts: 3
   concurrent_limit: 10
+  file_access:
+    max_file_size: "10MB"
+    blocked_paths: [".git", "node_modules", ".env"]
 
-# Storage configuration
+# Storage configuration (BoltDB)
 storage:
   type: "boltdb"
   path: "~/.container-kit/data"
+  backup_interval: "1h"
+
+# FileAccessService configuration
+file_access:
+  max_file_size: "10MB"
+  blocked_extensions: [".exe", ".bin"]
+  security_validation: true
 
 # Monitoring
 monitoring:
@@ -151,20 +165,24 @@ monitoring:
 # Multi-stage workflows are supported through the workflow engine
 # Located in pkg/mcp/application/workflows/
 
-# Workflow execution involves:
-# 1. Session management with BoltDB persistence
-# 2. Tool orchestration through the registry
-# 3. State management and checkpointing
-# 4. Error handling and recovery
+# Complete workflow using session continuity:
+# 1. analyze_repository - Language detection and framework analysis
+# 2. generate_dockerfile - AI-powered Dockerfile generation
+# 3. build_image - Docker image building with optimization
+# 4. scan_image - Security vulnerability scanning
+# 5. generate_manifests - Kubernetes manifest generation
+# 6. push_image - Registry push operations
 
-# Example workflow structure:
-# - Stage 1: analyze tool (repository analysis)
-# - Stage 2: build tool (container creation)
-# - Stage 3: scan tool (security validation)
-# - Stage 4: deploy tool (Kubernetes deployment)
+# Session-based state management:
+# - Each workflow creates a session with unique workspace
+# - FileAccessService provides secure file operations
+# - State persisted in BoltDB for recovery
+# - Session metadata tracks progress and results
 
-# Workflows are defined through the MCP protocol
-# and executed by the workflow engine
+# Example session workflow:
+# Session ID: session-abc123
+# Workspace: /tmp/container-kit-sessions/session-abc123
+# All tools share session state and workspace
 ```
 
 ## Troubleshooting
@@ -185,7 +203,7 @@ export CONTAINER_KIT_LOG_LEVEL=debug
 # Run MCP server with debug output
 ./container-kit-mcp --log-level debug
 
-# Check logs (structured logging with zerolog)
+# Check logs (structured logging with slog)
 tail -f ~/.container-kit/logs/mcp-server.log
 
 # Performance monitoring

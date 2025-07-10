@@ -29,6 +29,7 @@ Container Kit is a production-ready, enterprise-grade AI-powered containerizatio
 - **Enterprise Security**: Comprehensive vulnerability scanning with Trivy/Grype
 - **Session Management**: Persistent state with BoltDB storage
 - **Production Ready**: 159,570 lines of code across 606 files with comprehensive testing
+- **FileAccessService**: Secure file operations with session-based workspace isolation
 
 ### Technology Stack
 - **Core**: Go 1.24.1 with clean three-layer architecture
@@ -75,13 +76,14 @@ pkg/mcp/
 │   └── internal/       # Shared utilities
 ├── application/         # Application Layer (153 files)
 │   ├── api/            # Canonical interface definitions
-│   ├── commands/       # Command implementations
+│   ├── commands/       # Command implementations & tool registration
 │   ├── core/           # Server lifecycle & registry
 │   ├── orchestration/  # Tool coordination
-│   ├── services/       # Service interfaces
+│   ├── services/       # Service interfaces (21 services)
 │   ├── state/          # Application state management
 │   └── workflows/      # Workflow management
 └── infra/              # Infrastructure Layer (38 files)
+    ├── file_access.go  # FileAccessService implementation
     ├── persistence/    # BoltDB storage layer
     ├── transport/      # MCP protocol transports
     ├── telemetry/      # Monitoring and observability
@@ -100,6 +102,7 @@ The system implements manual dependency injection as defined in ADR-006, replaci
 
 ```go
 type ServiceContainer interface {
+    // Core 8 services (32 methods total)
     SessionStore() SessionStore        // Session CRUD operations (4 methods)
     SessionState() SessionState        // State & checkpoint management (4 methods)
     BuildExecutor() BuildExecutor      // Container build operations (5 methods)
@@ -108,6 +111,13 @@ type ServiceContainer interface {
     Scanner() Scanner                  // Security scanning (3 methods)
     ConfigValidator() ConfigValidator  // Configuration validation (4 methods)
     ErrorReporter() ErrorReporter      // Unified error handling (3 methods)
+
+    // Additional 13 services including FileAccessService
+    FileAccessService() FileAccessService // Secure file operations (6 methods)
+    StateManager() StateManager        // Application state management
+    KnowledgeBase() KnowledgeBase      // Pattern storage and retrieval
+    ConversationService() ConversationService // Chat-based interactions
+    // ... 9 more specialized services
 }
 ```
 
@@ -137,10 +147,11 @@ The unified MCP server supports three operation modes:
 ### 1. Containerization Domain
 
 #### Analyze Tools
-- **Repository Analysis**: Language detection, dependency analysis, framework identification
+- **Repository Analysis**: Language detection via FileAccessService, dependency analysis, framework identification
 - **Dockerfile Generation**: AI-powered Dockerfile creation with best practices
 - **Template Management**: Language-specific templates with go:embed integration
 - **Validation**: Dockerfile syntax and security validation
+- **FileAccessService Integration**: Secure file operations with session-based workspace isolation
 
 #### Build Tools
 - **Docker Operations**: Build, push, pull, tag with comprehensive error handling
@@ -160,6 +171,13 @@ The unified MCP server supports three operation modes:
 - **Policy Engine**: Configurable security policies and compliance checking
 - **Report Generation**: Comprehensive security reports with remediation guidance
 
+#### File Access Tools
+- **Secure File Operations**: FileAccessService with session-based workspace isolation
+- **Path Validation**: Protection against path traversal attacks
+- **File Type Filtering**: Security validation for file types and sizes
+- **Directory Operations**: Recursive directory listing with filtering
+- **Content Reading**: Safe file content access within session boundaries
+
 ### 2. Session Management
 
 #### Persistence Layer
@@ -177,10 +195,11 @@ The unified MCP server supports three operation modes:
 ### 3. AI Integration
 
 #### Analysis Service
-- **Code Intelligence**: Repository structure and pattern analysis
+- **Code Intelligence**: Repository structure and pattern analysis via FileAccessService
 - **Recommendation Engine**: Best practice suggestions and optimizations
 - **Error Classification**: Intelligent error categorization and resolution
 - **Context Enrichment**: Enhanced AI context for better decision making
+- **Secure Repository Access**: All file operations go through FileAccessService
 
 #### Conversation System
 - **Auto-Fix Helpers**: Intelligent error resolution with strategy chaining
@@ -304,7 +323,8 @@ Context Update → Action Execution → Result Validation
 - **Struct Tag Validation**: Declarative validation rules
 - **Security Sanitization**: Automatic input cleaning
 - **Parameter Validation**: Type and format checking
-- **Path Traversal Protection**: Safe file system operations
+- **Path Traversal Protection**: FileAccessService prevents directory traversal attacks
+- **Session Isolation**: All file operations scoped to session workspace
 
 ### 2. Vulnerability Scanning
 - **Multi-Scanner Support**: Trivy and Grype integration
@@ -381,9 +401,10 @@ Context Update → Action Execution → Result Validation
 ### 1. Adding New Tools
 1. **Interface Definition**: Add to `pkg/mcp/application/api/interfaces.go`
 2. **Implementation**: Create in appropriate layer following three-layer architecture
-3. **Registration**: Auto-registration via unified interface system
-4. **Testing**: Unit and integration tests with mocks
-5. **Documentation**: Update tool inventory and guides
+3. **Registration**: Auto-registration via unified interface system in `pkg/mcp/application/commands/tool_registration.go`
+4. **FileAccessService Integration**: Use FileAccessService for secure file operations
+5. **Testing**: Unit and integration tests with mocks
+6. **Documentation**: Update tool inventory and guides
 
 ### 2. Error Handling
 - Use unified RichError system from `pkg/mcp/domain/errors/rich.go`
@@ -419,9 +440,11 @@ Context Update → Action Execution → Result Validation
 
 - **Codebase Size**: 606 Go files, 159,570 lines of code, 126MB total
 - **Architecture**: 3 layers (domain: 101 files, application: 153 files, infra: 38 files)
-- **Service Interfaces**: 8 focused services with 32 total methods
+- **Service Interfaces**: 21 services including FileAccessService
+- **Tools Implemented**: 12 production-ready tools (6 containerization + 3 file access + 3 utility)
 - **Error Reduction**: 51% method reduction from manager refactoring
 - **Quality Gates**: <100 lint issues, <300μs P95 performance
+- **Security Features**: Session isolation, path traversal protection, file validation
 
 ### C. Technology Dependencies
 

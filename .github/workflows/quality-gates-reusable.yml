@@ -21,6 +21,29 @@ on:
         description: "Markdown summary of results"
         value: ${{ jobs.quality-checks.outputs.summary }}
 
+  # Enable standalone execution
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/quality-gates-reusable.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/quality-gates-reusable.yml'
+  workflow_dispatch:
+    inputs:
+      package-filter:
+        description: 'Packages to analyze (e.g., ./pkg/mcp/...)'
+        required: false
+        default: './pkg/mcp/...'
+        type: string
+
 jobs:
   quality-checks:
     runs-on: ubuntu-latest
@@ -33,7 +56,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source-ref }}
+          ref: ${{ inputs.source-ref || github.sha }}
           fetch-depth: 0  # For proper git history
 
       - name: Setup Go
@@ -66,7 +89,7 @@ jobs:
               violations="$violations{\"file\": \"$file\", \"lines\": $lines}"
               count=$((count + 1))
             fi
-          done < <(find ${{ inputs.package-filter }} -name "*.go" -type f 2>/dev/null || find . -name "*.go" -type f)
+          done < <(find ${{ inputs.package-filter || github.event.inputs.package-filter || './pkg/mcp/...' }} -name "*.go" -type f 2>/dev/null || find . -name "*.go" -type f)
 
           violations="[$violations]"
           echo "file_length_violations=$violations" >> $GITHUB_OUTPUT
@@ -87,7 +110,7 @@ jobs:
           count=0
 
           # Run gocyclo and capture output
-          output=$(gocyclo -over 15 ${{ inputs.package-filter }} 2>&1 || true)
+          output=$(gocyclo -over 15 ${{ inputs.package-filter || github.event.inputs.package-filter || './pkg/mcp/...' }} 2>&1 || true)
 
           if [ -n "$output" ]; then
             while IFS= read -r line; do
@@ -119,7 +142,7 @@ jobs:
 
           # Try to detect cycles using go list
           cycles=""
-          if output=$(go list -f '{{.ImportPath}}' ${{ inputs.package-filter }} 2>&1); then
+          if output=$(go list -f '{{.ImportPath}}' ${{ inputs.package-filter || github.event.inputs.package-filter || './pkg/mcp/...' }} 2>&1); then
             # Check for import cycles in the output
             if echo "$output" | grep -q "import cycle"; then
               cycles="Import cycles detected"
@@ -195,7 +218,7 @@ jobs:
                 fi
               fi
             fi
-          done < <(grep -Hn "^func New" ${{ inputs.package-filter }} --include="*.go" 2>/dev/null || grep -Hn "^func New" . --include="*.go")
+          done < <(grep -Hn "^func New" ${{ inputs.package-filter || github.event.inputs.package-filter || './pkg/mcp/...' }} --include="*.go" 2>/dev/null || grep -Hn "^func New" . --include="*.go")
 
           violations="[$violations]"
           echo "constructor_violations=$violations" >> $GITHUB_OUTPUT
@@ -225,7 +248,7 @@ jobs:
               violations="$violations{\"location\": \"$file:$lineno\", \"line\": \"${code//\"/\\\"}\"}"
               count=$((count + 1))
             fi
-          done < <(grep -rn "context\.Background()" ${{ inputs.package-filter }} --include="*.go" --exclude="*_test.go" 2>/dev/null || true)
+          done < <(grep -rn "context\.Background()" ${{ inputs.package-filter || github.event.inputs.package-filter || './pkg/mcp/...' }} --include="*.go" --exclude="*_test.go" 2>/dev/null || true)
 
           violations="[$violations]"
           echo "context_violations=$violations" >> $GITHUB_OUTPUT
@@ -257,7 +280,7 @@ jobs:
               violations="$violations{\"location\": \"$file:$lineno\", \"statement\": \"${statement//\"/\\\"}\"}"
               count=$((count + 1))
             fi
-          done < <(grep -rn -E "$patterns" ${{ inputs.package-filter }} --include="*.go" --exclude="*_test.go" 2>/dev/null || true)
+          done < <(grep -rn -E "$patterns" ${{ inputs.package-filter || github.event.inputs.package-filter || './pkg/mcp/...' }} --include="*.go" --exclude="*_test.go" 2>/dev/null || true)
 
           violations="[$violations]"
           echo "print_violations=$violations" >> $GITHUB_OUTPUT
@@ -291,7 +314,7 @@ jobs:
             # Count those with comments (simplified check)
             file_documented=$(grep -B1 "^func [A-Z]\|^type [A-Z]\|^const [A-Z]\|^var [A-Z]" "$file" 2>/dev/null | grep -c "^//" || echo 0)
             documented=$((documented + file_documented))
-          done < <(find ${{ inputs.package-filter }} -name "*.go" -type f 2>/dev/null || find . -name "*.go" -type f)
+          done < <(find ${{ inputs.package-filter || github.event.inputs.package-filter || './pkg/mcp/...' }} -name "*.go" -type f 2>/dev/null || find . -name "*.go" -type f)
 
           if [ $total_exports -gt 0 ]; then
             coverage=$((documented * 100 / total_exports))

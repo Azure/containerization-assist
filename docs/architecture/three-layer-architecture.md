@@ -47,7 +47,7 @@ The infrastructure layer handles external integrations and technical concerns.
 - **persistence/**: BoltDB storage implementation (session_store.go, persistence.go, memory_store.go)
 - **templates/**: YAML template resources with go:embed integration
 - **transport/**: MCP protocol transports (stdio, HTTP, client implementations)
-- **retry/**: Retry coordination services
+- **file_access.go**: FileAccessService implementation with security validation and session isolation
 - **docker_integration.go** & **docker_operations.go**: Docker client integration
 - **k8s_integration.go** & **k8s_operations.go**: Kubernetes client integration
 - **internal/**: Infrastructure utilities (logging, migration)

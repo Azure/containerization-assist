@@ -1,21 +1,38 @@
 # Container Kit API Documentation
 
-This directory contains the API documentation for Container Kit.
+⚠️ **DEPRECATED**: This directory has been consolidated into the unified API reference.
 
-## Documentation Structure
+## New Location
 
-- `interfaces.md` - Core interface definitions
-- `tools.md` - Tool system documentation
-- `pipeline.md` - Pipeline system documentation
-- `session.md` - Session management documentation
-- `errors.md` - Error handling documentation
+The API documentation has been moved to:
+**[docs/reference/api/interfaces.md](../reference/api/interfaces.md)**
+
+## What Changed
+
+This consolidation addresses several issues with the previous documentation:
+
+- **Outdated Information**: Multiple files contained outdated interface definitions
+- **Redundant Content**: Duplicate information across files
+- **Inconsistent Structure**: Different formatting and organization
+- **Maintenance Overhead**: Multiple files to keep in sync
+
+## Migration
+
+The new consolidated documentation includes:
+
+- ✅ **Current Interface Definitions** - Sourced from actual code
+- ✅ **Complete Tool System** - All tool interfaces and examples
+- ✅ **Pipeline System** - Complete pipeline documentation
+- ✅ **Registry System** - Tool registration and management
+- ✅ **Workflow System** - Multi-step workflow orchestration
+- ✅ **Validation System** - Domain-specific validation
+- ✅ **Build System** - Container build operations
+- ✅ **Error Handling** - Unified error system
+- ✅ **Monitoring** - Metrics and observability
 
 ## Quick Links
 
-- [Architecture Overview](../architecture/README.md)
-- [Getting Started Guide](../guides/getting-started.md)
-- [Examples](../examples/README.md)
-
-## API Versioning
-
-Container Kit follows semantic versioning. The current API version is v1.0.0.
+- **[New API Reference](../reference/api/interfaces.md)** - Complete API documentation
+- [Architecture Overview](../architecture/three-layer-architecture.md)
+- [Developer Guides](../guides/developer/)
+- [Tool Standards](../reference/tools/standards.md)

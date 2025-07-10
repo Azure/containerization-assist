@@ -1,7 +1,7 @@
 graph TD
     %% Container Kit MCP - Three-Layer Architecture
     %% Updated to reflect actual codebase structure as of July 2025
-    %% 447 Go files, 132,625 lines of code, 179MB codebase
+    %% 606 Go files, 159,570 lines of code, 126MB codebase
 
     Client[MCP Client] --> Transport[infra/transport/]
     Transport --> Server[application/core/]
@@ -10,14 +10,14 @@ graph TD
     subgraph "Domain Layer (Business Logic)"
         Domain[domain/]
 
-        subgraph "Domain Packages (96 Go files)"
+        subgraph "Domain Packages (101 Go files)"
             Config[domain/config/<br/>Tag-based Validation DSL]
             Containerization[domain/containerization/<br/>analyze/, build/, deploy/, scan/]
             Errors[domain/errors/<br/>Unified RichError System]
             Security[domain/security/<br/>Security Policies]
             Session[domain/session/<br/>Session Entities]
             Types[domain/types/<br/>Core Domain Types]
-            Workflow[domain/workflow/<br/>⚠️ Empty Directory]
+            Workflow[domain/workflow/<br/>Workflow Domain Logic]
             Internal[domain/internal/<br/>common/, utils/, types/]
         end
 
@@ -34,15 +34,15 @@ graph TD
     subgraph "Application Layer (Use Cases & Orchestration)"
         Application[application/]
 
-        subgraph "Application Packages (150 Go files)"
+        subgraph "Application Packages (153 Go files)"
             API[application/api/<br/>831 Lines - Canonical Interfaces<br/>Single Source of Truth]
-            Commands[application/commands/<br/>Consolidated Implementations]
+            Commands[application/commands/<br/>Consolidated Implementations<br/>Tool Registration & FileAccessService]
             Core[application/core/<br/>Server & Registry Management]
             Conversation[application/conversation/<br/>Chat & Auto-fix]
-            Interfaces[application/interfaces/<br/>⚠️ Empty Directory<br/>Missing Compatibility Layer]
+            Interfaces[application/interfaces/<br/>Compatibility Layer<br/>Type aliases for backward compatibility]
             Knowledge[application/knowledge/<br/>Knowledge Management]
             Orchestration[application/orchestration/<br/>Tool Coordination]
-            Services[application/services/<br/>Service Interfaces]
+            Services[application/services/<br/>Service Interfaces & Container<br/>21 Services including FileAccessService]
             State[application/state/<br/>State Management]
             Tools[application/tools/<br/>Tool Implementations]
             Workflows[application/workflows/<br/>Workflow Engine]
@@ -66,11 +66,11 @@ graph TD
     subgraph "Infrastructure Layer (External Integrations)"
         Infrastructure[infra/]
 
-        subgraph "Infrastructure Components (46 Go files)"
+        subgraph "Infrastructure Components (38 Go files)"
             Persistence[infra/persistence/<br/>BoltDB Storage]
             Templates[infra/templates/<br/>YAML Templates with go:embed]
             Transport[infra/transport/<br/>MCP Protocol - stdio, HTTP]
-            Retry[infra/retry/<br/>Retry Coordination]
+            FileAccess[infra/file_access.go<br/>FileAccessService Implementation<br/>Secure File Operations]
             DockerInfra[infra/docker/<br/>Docker Client Integration]
             K8sInfra[infra/k8s/<br/>Kubernetes Integration]
             Telemetry[infra/telemetry/<br/>Prometheus & OpenTelemetry]
@@ -80,7 +80,7 @@ graph TD
         Infrastructure --> Persistence
         Infrastructure --> Templates
         Infrastructure --> Transport
-        Infrastructure --> Retry
+        Infrastructure --> FileAccess
         Infrastructure --> DockerInfra
         Infrastructure --> K8sInfra
         Infrastructure --> Telemetry
@@ -114,7 +114,7 @@ graph TD
 
     %% Service Container Pattern (ADR-006)
     subgraph "Service Container (Manual Dependency Injection)"
-        ServiceContainer[ServiceContainer<br/>8 Focused Services]
+        ServiceContainer[ServiceContainer<br/>21 Services Including FileAccessService]
         SessionStore[SessionStore<br/>Session CRUD]
         SessionState[SessionState<br/>State & Checkpoints]
         BuildExecutor[BuildExecutor<br/>Container Operations]
@@ -123,6 +123,7 @@ graph TD
         Scanner[Scanner<br/>Trivy & Grype]
         ConfigValidator[ConfigValidator<br/>Tag-based Validation]
         ErrorReporter[ErrorReporter<br/>Unified Error Handling]
+        FileAccessSvc[FileAccessService<br/>Secure File Operations<br/>Session-based Workspace Isolation]
     end
 
     Core --> ServiceContainer
@@ -134,6 +135,8 @@ graph TD
     ServiceContainer --> Scanner
     ServiceContainer --> ConfigValidator
     ServiceContainer --> ErrorReporter
+    ServiceContainer --> FileAccessSvc
+    FileAccessSvc --> FileAccess
 
     %% External Systems Integration
     DockerInfra --> DockerEngine[Docker Engine]
@@ -145,10 +148,17 @@ graph TD
     Telemetry --> OpenTelemetry[OpenTelemetry Tracing]
 
     %% Architecture Validation (ADR-001)
-    %% - Domain: 96 files, no dependencies (pure business logic)
-    %% - Application: 150 files, depends only on Domain
-    %% - Infrastructure: 46 files, depends on Application and Domain
-    %% Total: 447 Go files, 132,625 lines of code
+    %% - Domain: 101 files, no dependencies (pure business logic)
+    %% - Application: 153 files, depends only on Domain
+    %% - Infrastructure: 38 files, depends on Application and Domain
+    %% Total: 606 Go files, 159,570 lines of code
+    %%
+    %% FileAccessService Implementation:
+    %% - Real implementation in infra/file_access.go
+    %% - Service interface in application/services/interfaces.go
+    %% - 12 tools including 3 file access tools
+    %% - Session-based workspace isolation
+    %% - Security validation and path traversal protection
 
     classDef domainLayer fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
     classDef applicationLayer fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
@@ -159,5 +169,5 @@ graph TD
     class Domain,Config,Containerization,Errors,Security,Session,Types,Workflow,Internal domainLayer
     class Application,API,Commands,Core,Conversation,Interfaces,Knowledge,Orchestration,Services,State,Tools,Workflows,AppInternal applicationLayer
     class Infrastructure,Persistence,Templates,Transport,Retry,DockerInfra,K8sInfra,Telemetry,InfraInternal infraLayer
-    class ServiceContainer,SessionStore,SessionState,BuildExecutor,ToolRegistry,WorkflowExecutor,Scanner,ConfigValidator,ErrorReporter serviceLayer
+    class ServiceContainer,SessionStore,SessionState,BuildExecutor,ToolRegistry,WorkflowExecutor,Scanner,ConfigValidator,ErrorReporter,FileAccessSvc serviceLayer
     class DockerEngine,KubernetesAPI,BoltDB,Trivy,Grype,Prometheus,OpenTelemetry externalSys

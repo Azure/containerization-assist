@@ -33,17 +33,18 @@ The Container Kit MCP package follows a **three-layer architecture** with clear 
     - MCP server implementation
     - Tool registry and orchestration
     - Service container integration
-  - `/commands/`: Consolidated command implementations
-    - `analyze_consolidated.go`: Repository analysis tool
-    - `build_consolidated.go`: Docker build operations
-    - `deploy_consolidated.go`: Kubernetes deployment
-    - `scan_consolidated.go`: Security scanning
+  - `/commands/`: Consolidated command implementations with FileAccessService integration
+    - `tool_registration.go`: Lazy tool registration with 12 production tools
+    - `analyze_consolidated.go`: Repository analysis with FileAccessService
+    - File access tools: `read_file`, `list_directory`, `file_exists`
+    - Containerization tools with session management
   - `/orchestration/`: Tool coordination & workflow execution
     - Pipeline management
     - Background workers
     - Atomic operations
   - `/services/`: Service interfaces for dependency injection (ADR-006)
-    - Service container pattern
+    - Service container pattern with 21 services
+    - FileAccessService interface for secure file operations
     - Dependency injection interfaces
   - `/state/`: Application state management
     - Session state coordination
@@ -69,6 +70,10 @@ The Container Kit MCP package follows a **three-layer architecture** with clear 
     - Kubernetes manifest templates
     - Dockerfile templates
     - Template rendering with `go:embed`
+  - `/file_access.go`: FileAccessService implementation
+    - Secure file operations with session isolation
+    - Path traversal protection and file validation
+    - Workspace-scoped file access
   - `/docker/`: Docker client integration
     - Build operations
     - Image management
@@ -87,14 +92,19 @@ All imports must follow the three-layer dependency rules:
 ✅ **Good Examples**:
 ```go
 import "github.com/Azure/container-kit/pkg/mcp/application/api"
+import "github.com/Azure/container-kit/pkg/mcp/application/services"
 import "github.com/Azure/container-kit/pkg/mcp/domain/containerization/build"
 import "github.com/Azure/container-kit/pkg/mcp/infra/transport"
 ```
 
 ❌ **Bad Examples**:
 ```go
+// Direct file operations (use FileAccessService instead)
+import "os"
+import "path/filepath"
+
+// Deep nested imports
 import "github.com/Azure/container-kit/pkg/mcp/domain/containerization/build/strategies/deep/nested"
-import "github.com/Azure/container-kit/pkg/mcp/infra/transport/http/handlers/middleware/auth"
 ```
 
 ### Dependency Rules
@@ -109,12 +119,14 @@ import "github.com/Azure/container-kit/pkg/mcp/infra/transport/http/handlers/mid
 - **Purpose**: Orchestration and coordination
 - **Dependencies**: Domain layer only
 - **Used by**: Infrastructure layer and external consumers
+- **Services**: 21 services including FileAccessService
 - **Forbidden**: Imports from infra/ (use dependency injection)
 
 #### Infrastructure Layer
 - **Purpose**: External integrations and adapters
 - **Dependencies**: Domain and Application layers
-- **Used by**: External consumers
+- **Key Implementation**: FileAccessService in file_access.go
+- **Used by**: External consumers through service container
 - **Forbidden**: No restrictions (top level of dependency hierarchy)
 
 ## Architecture Boundaries
@@ -170,11 +182,13 @@ pkg/mcp/
 ```
 
 ### Key Patterns
-- **Service Container**: Manual dependency injection (ADR-006)
+- **Service Container**: Manual dependency injection (ADR-006) with 21 services
+- **FileAccessService**: Secure file operations with session isolation
 - **Rich Errors**: Unified error system with context (ADR-004)
 - **Tag Validation**: Struct tag-based validation DSL (ADR-005)
 - **Embedded Templates**: YAML templates with go:embed (ADR-002)
-- **Consolidated Commands**: Single files replace multiple tool packages
+- **Consolidated Commands**: Lazy tool registration pattern
+- **Session Management**: Workspace isolation and security validation
 
 ## Quality Standards
 
@@ -201,9 +215,10 @@ pkg/mcp/
 ### Adding New Features
 1. Identify the appropriate package based on functionality
 2. Follow existing patterns within that package
-3. Use interfaces from api/ package
-4. Validate boundaries with check-boundaries tool
-5. Keep imports shallow (≤3 levels)
+3. Use interfaces from api/ package and service container
+4. **Use FileAccessService for any file operations** (security by default)
+5. Validate boundaries with check-boundaries tool
+6. Keep imports shallow (≤3 levels)
 
 ### Refactoring Existing Code
 1. Move code to appropriate package
@@ -226,6 +241,7 @@ pkg/mcp/
 **Problem**: Circular dependency between packages
 **Solution**:
 - Use interfaces from api/ package
+- Access services through service container
 - Move shared code to internal/
 - Refactor to break the cycle
 
@@ -233,8 +249,17 @@ pkg/mcp/
 **Problem**: Package depends on forbidden package
 **Solution**:
 - Check allowed dependencies for package
-- Use API interfaces instead of direct imports
+- Use service container for dependency injection
+- Use FileAccessService instead of direct file operations
 - Move code if in wrong package
+
+#### File Security Violation
+**Problem**: Direct file operations bypassing security
+**Solution**:
+- Always use FileAccessService for file operations
+- Never use os.ReadFile, filepath.Walk, etc. directly
+- Use session-scoped file access patterns
+- Leverage workspace isolation
 
 #### Deep Import Path
 **Problem**: Import path exceeds 3 levels

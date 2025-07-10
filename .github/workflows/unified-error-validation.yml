@@ -1,0 +1,318 @@
+name: Unified Error Validation
+
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        required: true
+        type: string
+      package-filter:
+        required: false
+        type: string
+        default: './pkg/mcp/...'
+    outputs:
+      passed:
+        description: "Whether all error validation checks passed"
+        value: ${{ jobs.error-validation.outputs.passed }}
+      boundary-violations:
+        description: "Number of boundary error violations"
+        value: ${{ jobs.error-validation.outputs.boundary-violations }}
+      pattern-violations:
+        description: "Number of error pattern violations"
+        value: ${{ jobs.error-validation.outputs.pattern-violations }}
+      summary:
+        description: "Markdown summary of results"
+        value: ${{ jobs.error-validation.outputs.summary }}
+
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/unified-error-validation.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  error-validation:
+    name: Unified Error Validation
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.evaluate.outputs.passed }}
+      boundary-violations: ${{ steps.boundary-check.outputs.violations }}
+      pattern-violations: ${{ steps.pattern-check.outputs.violations }}
+      summary: ${{ steps.evaluate.outputs.summary }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.source-ref || github.sha }}
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache: true
+
+    - name: Build error validation tools
+      run: |
+        echo "🔧 Building error validation tools..."
+        
+        # Build mcp-richify tool for boundary detection
+        if [ -d "cmd/mcp-richify" ]; then
+          go build -o /tmp/mcp-richify ./cmd/mcp-richify
+          chmod +x /tmp/mcp-richify
+          echo "✅ Built mcp-richify tool"
+        else
+          echo "⚠️ mcp-richify tool not found, skipping boundary analysis"
+        fi
+        
+        # Build error pattern linter
+        if [ -d "tools/linters/richerror-boundary" ]; then
+          cd tools/linters/richerror-boundary
+          go build -o /tmp/richerror-boundary .
+          chmod +x /tmp/richerror-boundary
+          cd ../../../
+          echo "✅ Built richerror-boundary linter"
+        else
+          echo "⚠️ richerror-boundary linter not found, skipping pattern analysis"
+        fi
+
+    - name: Run boundary error analysis
+      id: boundary-check
+      continue-on-error: true
+      run: |
+        echo "🔍 Analyzing package boundaries for error handling compliance..."
+        
+        if [ -x "/tmp/mcp-richify" ]; then
+          # Run boundary analysis
+          /tmp/mcp-richify boundaries /tmp/boundaries.json
+          
+          # Count boundary errors that should use RichError
+          BOUNDARY_COUNT=$(jq -r 'to_entries[] | select(.value.type == "BOUNDARY") | .key' /tmp/boundaries.json | wc -l)
+          echo "📋 Found $BOUNDARY_COUNT functions at package boundaries"
+          
+          # Check if any boundary functions still use fmt.Errorf
+          VIOLATIONS=$(jq -r 'to_entries[] | select(.value.type == "BOUNDARY") | .key' /tmp/boundaries.json | while read location; do
+            file=$(echo $location | cut -d: -f1)
+            line=$(echo $location | cut -d: -f2)
+            if sed -n "${line}p" "$file" 2>/dev/null | grep -q "fmt\.Errorf\|errors\.New"; then
+              echo "$location"
+            fi
+          done)
+          
+          VIOLATION_COUNT=$(echo "$VIOLATIONS" | grep -c . || echo "0")
+          echo "violations=$VIOLATION_COUNT" >> $GITHUB_OUTPUT
+          
+          if [ $VIOLATION_COUNT -gt 0 ]; then
+            echo "❌ Found $VIOLATION_COUNT boundary error violations"
+            echo "violations_list<<EOF" >> $GITHUB_OUTPUT
+            echo "$VIOLATIONS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ All boundary functions properly use RichError!"
+            echo "violations_list=" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "⚠️ Boundary analysis skipped - tool not available"
+          echo "violations=0" >> $GITHUB_OUTPUT
+          echo "violations_list=" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run error pattern analysis
+      id: pattern-check
+      continue-on-error: true
+      run: |
+        echo "🔍 Analyzing error patterns and fmt.Errorf usage..."
+        
+        if [ -x "/tmp/richerror-boundary" ]; then
+          # Calculate progressive reduction targets
+          CURRENT_DATE=$(date +%s)
+          START_DATE=$(date -d "2025-01-10" +%s)
+          DAYS_ELAPSED=$(( ($CURRENT_DATE - $START_DATE) / 86400 ))
+          
+          if [ $DAYS_ELAPSED -lt 14 ]; then
+            MAX_ALLOWED=100
+          elif [ $DAYS_ELAPSED -lt 28 ]; then
+            MAX_ALLOWED=75
+          elif [ $DAYS_ELAPSED -lt 42 ]; then
+            MAX_ALLOWED=50
+          else
+            MAX_ALLOWED=25
+          fi
+          
+          echo "Days since error migration start: $DAYS_ELAPSED"
+          echo "Max fmt.Errorf allowed: $MAX_ALLOWED"
+          
+          # Run pattern analysis
+          cd tools/linters/richerror-boundary 2>/dev/null || true
+          PATTERN_RESULT=$(/tmp/richerror-boundary ${{ inputs.package-filter }} $MAX_ALLOWED 2>&1 || true)
+          PATTERN_EXIT_CODE=$?
+          
+          # Extract violation count from output
+          PATTERN_VIOLATIONS=$(echo "$PATTERN_RESULT" | grep -o "[0-9]\+ fmt\.Errorf" | head -1 | grep -o "[0-9]\+" || echo "0")
+          
+          echo "violations=$PATTERN_VIOLATIONS" >> $GITHUB_OUTPUT
+          echo "max_allowed=$MAX_ALLOWED" >> $GITHUB_OUTPUT
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$PATTERN_RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          if [ $PATTERN_EXIT_CODE -ne 0 ] && [ $PATTERN_VIOLATIONS -gt $MAX_ALLOWED ]; then
+            echo "❌ Found $PATTERN_VIOLATIONS fmt.Errorf usages (max allowed: $MAX_ALLOWED)"
+            exit 1
+          else
+            echo "✅ Error patterns within acceptable limits ($PATTERN_VIOLATIONS/$MAX_ALLOWED)"
+          fi
+        else
+          echo "⚠️ Pattern analysis skipped - tool not available"
+          echo "violations=0" >> $GITHUB_OUTPUT
+          echo "max_allowed=0" >> $GITHUB_OUTPUT
+          echo "result=Pattern analysis tool not available" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Check RichError boundary compliance
+      id: compliance-check
+      continue-on-error: true
+      run: |
+        echo "⚖️ Checking overall RichError boundary compliance..."
+        
+        if [ -x "/tmp/richerror-boundary" ]; then
+          cd tools/linters/richerror-boundary 2>/dev/null || true
+          COMPLIANCE_RESULT=$(/tmp/richerror-boundary -package ${{ inputs.package-filter }} -fail 2>&1 || echo "Compliance check completed with warnings")
+          
+          echo "compliance_result<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMPLIANCE_RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "📊 RichError boundary compliance check completed"
+        else
+          echo "⚠️ Compliance check skipped - tool not available"
+          echo "compliance_result=Tool not available" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Evaluate overall results
+      id: evaluate
+      run: |
+        BOUNDARY_VIOLATIONS="${{ steps.boundary-check.outputs.violations || '0' }}"
+        PATTERN_VIOLATIONS="${{ steps.pattern-check.outputs.violations || '0' }}"
+        
+        # Determine overall pass/fail
+        if [ "${{ steps.boundary-check.outcome }}" = "success" ] && [ "${{ steps.pattern-check.outcome }}" = "success" ]; then
+          PASSED="true"
+          OVERALL_STATUS="✅ All error validation checks passed"
+        else
+          PASSED="false"
+          OVERALL_STATUS="❌ Error validation checks failed"
+        fi
+        
+        echo "passed=$PASSED" >> $GITHUB_OUTPUT
+        
+        # Generate summary
+        cat > summary.md << EOF
+        # 🔍 Error Validation Summary
+        
+        $OVERALL_STATUS
+        
+        ## 📊 Results Overview
+        | Check | Status | Details |
+        |-------|--------|---------|
+        | 🏗️ **Boundary Compliance** | ${{ steps.boundary-check.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | $BOUNDARY_VIOLATIONS violations found |
+        | 📝 **Pattern Analysis** | ${{ steps.pattern-check.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | $PATTERN_VIOLATIONS fmt.Errorf usages (max: ${{ steps.pattern-check.outputs.max_allowed || 'N/A' }}) |
+        | ⚖️ **Compliance Check** | ${{ steps.compliance-check.outcome == 'success' && '✅ Passed' || '⚠️ Warnings' }} | RichError boundary policy compliance |
+        
+        ## 📋 Policy Information
+        - **ADR-006**: Package boundary functions must use RichError
+        - **Progressive Migration**: fmt.Errorf usage being reduced over time
+        - **Internal Flexibility**: Internal functions can use fmt.Errorf temporarily
+        
+        EOF
+        
+        if [ "$BOUNDARY_VIOLATIONS" -gt 0 ]; then
+          cat >> summary.md << EOF
+        ## ❌ Boundary Violations
+        The following boundary functions must use RichError instead of fmt.Errorf/errors.New:
+        \`\`\`
+        ${{ steps.boundary-check.outputs.violations_list }}
+        \`\`\`
+        
+        **Fix with:**
+        \`\`\`bash
+        /tmp/mcp-richify convert /tmp/boundaries.json
+        \`\`\`
+        
+        EOF
+        fi
+        
+        if [ "$PATTERN_VIOLATIONS" -gt 0 ]; then
+          cat >> summary.md << EOF
+        ## ⚠️ Pattern Analysis Details
+        ${{ steps.pattern-check.outputs.result }}
+        
+        EOF
+        fi
+        
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        cat summary.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Generate detailed report
+      if: always()
+      run: |
+        echo "📊 UNIFIED ERROR VALIDATION REPORT" > error-validation-report.md
+        echo "====================================" >> error-validation-report.md
+        echo "" >> error-validation-report.md
+        echo "**Analysis Date:** $(date)" >> error-validation-report.md
+        echo "**Commit:** ${{ github.sha }}" >> error-validation-report.md
+        echo "**Package Filter:** ${{ inputs.package-filter }}" >> error-validation-report.md
+        echo "" >> error-validation-report.md
+        
+        echo "## Summary" >> error-validation-report.md
+        echo "- **Boundary Violations:** ${{ steps.boundary-check.outputs.violations || '0' }}" >> error-validation-report.md
+        echo "- **Pattern Violations:** ${{ steps.pattern-check.outputs.violations || '0' }} / ${{ steps.pattern-check.outputs.max_allowed || 'N/A' }}" >> error-validation-report.md
+        echo "- **Overall Status:** ${{ steps.evaluate.outputs.passed == 'true' && '✅ Passed' || '❌ Failed' }}" >> error-validation-report.md
+        echo "" >> error-validation-report.md
+        
+        echo "## Policy Compliance (ADR-006)" >> error-validation-report.md
+        echo "Package boundary functions are identified as:" >> error-validation-report.md
+        echo "- Exported functions (start with capital letter)" >> error-validation-report.md
+        echo "- Interface method implementations" >> error-validation-report.md
+        echo "- Public API endpoints" >> error-validation-report.md
+        echo "- Functions that cross package boundaries" >> error-validation-report.md
+        echo "" >> error-validation-report.md
+        
+        if [ -n "${{ steps.compliance-check.outputs.compliance_result }}" ]; then
+          echo "## Compliance Check Results" >> error-validation-report.md
+          echo "\`\`\`" >> error-validation-report.md
+          echo "${{ steps.compliance-check.outputs.compliance_result }}" >> error-validation-report.md
+          echo "\`\`\`" >> error-validation-report.md
+        fi
+
+    - name: Upload validation report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: error-validation-report-${{ github.run_id }}
+        path: error-validation-report.md
+        retention-days: 30
+
+    - name: Upload boundary analysis
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: boundary-analysis-${{ github.run_id }}
+        path: /tmp/boundaries.json
+        retention-days: 7
+      continue-on-error: true
