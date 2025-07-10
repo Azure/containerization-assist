@@ -41,11 +41,10 @@ func (t *{{.ToolName}}Tool) Schema() api.ToolSchema {
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
-				{{range .InputFields}}"{{.Name}}": map[string]interface{}{
-					"type":        "{{.Type}}",
-					"description": "{{.Description}}",
+				"session_id": map[string]interface{}{
+					"type":        "string",
+					"description": "Session ID for correlation (auto-generated if not provided)",
 				},
-				{{end}}
 			},
 			"required": []string{},
 		},
@@ -60,11 +59,10 @@ func (t *{{.ToolName}}Tool) Schema() api.ToolSchema {
 					"type":        "object",
 					"description": "Operation result data",
 					"properties": map[string]interface{}{
-						{{range .OutputFields}}"{{.Name}}": map[string]interface{}{
-							"type":        "{{.Type}}",
-							"description": "{{.Description}}",
+						"status": map[string]interface{}{
+							"type":        "string",
+							"description": "Execution status",
 						},
-						{{end}}
 					},
 				},
 				"error": map[string]interface{}{
@@ -98,39 +96,17 @@ func (t *{{.ToolName}}Tool) Execute(ctx context.Context, input api.ToolInput) (a
 
 	// Extract and validate input parameters
 	var params struct {
-		{{range .InputFields}}{{.Name | title}} {{.GoType}} `json:"{{.Name}}"{{if not .Required}},omitempty{{end}}`
-		{{end}}
+		Session_id string `json:"session_id",omitempty`
 	}
 
 	// Parse parameters from input.Data
-	{{range .InputFields}}
-	if val, ok := input.Data["{{.Name}}"]; ok {
-		{{if eq .Type "string"}}if strVal, ok := val.(string); ok {
-			params.{{.Name | title}} = strVal
-		}{{else if eq .Type "boolean"}}if boolVal, ok := val.(bool); ok {
-			params.{{.Name | title}} = boolVal
-		}{{else if eq .Type "array"}}if arrVal, ok := val.([]interface{}); ok {
-			for _, item := range arrVal {
-				if strItem, ok := item.(string); ok {
-					params.{{.Name | title}} = append(params.{{.Name | title}}, strItem)
-				}
-			}
-		}{{end}}
+	if val, ok := input.Data["session_id"]; ok {
+		if strVal, ok := val.(string); ok {
+			params.Session_id = strVal
+		}
 	}
-	{{end}}
 
 	// Validate required parameters
-	{{range .InputFields}}{{if .Required}}
-	{{if eq .Type "string"}}if params.{{.Name | title}} == "" {
-		return api.ToolOutput{
-			Success: false,
-			Error:   "{{.Name}} is required",
-			Data: map[string]interface{}{
-				"error": "{{.Name}} is required",
-			},
-		}, errors.NewError().Message("{{.Name}} is required").WithLocation().Build()
-	}{{end}}
-	{{end}}{{end}}
 
 	// Log the execution
 	t.logger.Info().

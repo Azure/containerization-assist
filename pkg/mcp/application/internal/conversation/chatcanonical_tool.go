@@ -100,7 +100,6 @@ func (t *chatcanonicalTool) Execute(ctx context.Context, input api.ToolInput) (a
 	}
 
 	// Parse parameters from input.Data
-
 	if val, ok := input.Data["session_id"]; ok {
 		if strVal, ok := val.(string); ok {
 			params.Session_id = strVal
