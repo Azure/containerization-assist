@@ -136,8 +136,8 @@ echo "Checking test coverage meets threshold: ${COVERAGE_THRESHOLD}%"
 # Run coverage analysis
 COVERAGE_OUTPUT="$REPORTS_DIR/coverage_gate.txt"
 if go test -cover ./pkg/mcp/... > "$COVERAGE_OUTPUT" 2>&1; then
-    # Extract coverage from successful packages
-    COVERAGE_LINES=$(grep "coverage:" "$COVERAGE_OUTPUT" | grep -v "0.0%")
+    # Extract coverage from all packages
+    COVERAGE_LINES=$(grep "coverage:" "$COVERAGE_OUTPUT")
 
     if [ -n "$COVERAGE_LINES" ]; then
         # Calculate weighted average coverage
@@ -145,13 +145,15 @@ if go test -cover ./pkg/mcp/... > "$COVERAGE_OUTPUT" 2>&1; then
         COVERED_STATEMENTS=0
 
         while IFS= read -r line; do
-            if [[ $line =~ coverage:\ ([0-9.]+)%\ of\ ([0-9]+)\ statements ]]; then
+            if [[ $line =~ coverage:\ ([0-9.]+)%\ of\ statements ]]; then
                 COVERAGE_PERCENT=${BASH_REMATCH[1]}
-                STATEMENTS=${BASH_REMATCH[2]}
-
-                COVERED=$( echo "$STATEMENTS * $COVERAGE_PERCENT / 100" | bc -l 2>/dev/null || echo "0")
-                TOTAL_STATEMENTS=$( echo "$TOTAL_STATEMENTS + $STATEMENTS" | bc -l 2>/dev/null || echo "$TOTAL_STATEMENTS")
-                COVERED_STATEMENTS=$( echo "$COVERED_STATEMENTS + $COVERED" | bc -l 2>/dev/null || echo "$COVERED_STATEMENTS")
+                # For packages with statements, extract statement count from previous line or estimate
+                if [[ $COVERAGE_PERCENT != "0.0" ]]; then
+                    # Simple approach: count non-zero coverage packages
+                    TOTAL_STATEMENTS=$( echo "$TOTAL_STATEMENTS + 100" | bc -l 2>/dev/null || echo "100")
+                    COVERED=$( echo "100 * $COVERAGE_PERCENT / 100" | bc -l 2>/dev/null || echo "0")
+                    COVERED_STATEMENTS=$( echo "$COVERED_STATEMENTS + $COVERED" | bc -l 2>/dev/null || echo "$COVERED_STATEMENTS")
+                fi
             fi
         done <<< "$COVERAGE_LINES"
 
